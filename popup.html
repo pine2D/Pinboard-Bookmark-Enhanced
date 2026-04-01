@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pinboard Bookmark Plus</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="login-section" class="hidden">
+    <div class="header-bar">Pinboard Bookmark Plus</div>
+    <div class="login-body">
+      <p>Enter your API token from <a href="https://pinboard.in/settings/password" target="_blank">settings/password</a></p>
+      <input type="text" id="token-input" placeholder="username:XXXXXXXXXXXXXX" />
+      <button id="login-btn">Login</button>
+      <p id="login-error" class="error-text hidden"></p>
+    </div>
+  </div>
+
+  <div id="main-section" class="hidden">
+    <div class="header-bar">
+      <span id="user-info"></span>
+      <a href="#" id="options-link">settings</a>
+    </div>
+
+    <div class="form-body">
+      <div class="row">
+        <span class="label">URL</span>
+        <div class="field"><input type="text" id="url-input" /></div>
+      </div>
+      <div class="row">
+        <span class="label">Title</span>
+        <div class="field"><input type="text" id="title-input" /></div>
+      </div>
+      <div class="row">
+        <span class="label top">Notes</span>
+        <div class="field">
+          <textarea id="description-input" rows="9"></textarea>
+          <div class="notes-bar">
+            <span id="desc-char-count">0</span>
+            <a href="#" id="ai-summary-btn" class="action-link">🤖 AI summary</a>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Tags</span>
+        <div class="field">
+          <div class="tags-input-wrap">
+            <div id="tags-display" class="tags-display"></div>
+            <input type="text" id="tags-input" autocomplete="off" />
+          </div>
+          <div id="tags-autocomplete" class="autocomplete-dropdown hidden"></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label top">Suggest</span>
+        <div class="field">
+          <div id="pinboard-suggest-tags" class="suggest-area"><span class="muted">loading...</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label top">AI Tags</span>
+        <div class="field">
+          <div id="ai-suggest-tags" class="suggest-area"><a href="#" id="ai-tags-btn" class="action-link">🤖 generate</a></div>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <label><input type="checkbox" id="private-check" /> private</label>
+        <label><input type="checkbox" id="readlater-check" /> read later</label>
+      </div>
+      <div class="submit-bar">
+        <button id="submit-btn">Submit</button>
+        <button id="delete-btn" class="del-btn hidden">Delete</button>
+      </div>
+      <p id="status-msg" class="status-msg hidden"></p>
+    </div>
+  </div>
+
+  <!-- 底部快捷操作栏 - 放在 main-section 末尾、options-link 之前 -->
+  <div class="quick-actions">
+    <hr class="divider">
+    <div class="quick-row">
+      <button id="save-tabset-btn" class="qbtn" title="Save all open tabs as a tab set">📑 Save Tabs</button>
+      <a href="https://pinboard.in/tabs/" target="_blank" class="qbtn" title="View tab sets">📂 Tab Sets</a>
+      <a href="https://pinboard.in/network/" target="_blank" class="qbtn" title="Network">🌐 Network</a>
+      <a href="https://pinboard.in/u:oumu/unread/" target="_blank" class="qbtn" title="Unread bookmarks">📖 Unread</a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

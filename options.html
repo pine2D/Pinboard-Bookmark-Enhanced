@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pinboard Bookmark Plus - Settings</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Helvetica Neue", Verdana, sans-serif; background: #f5f5f0; color: #333; font-size: 13px; }
+    .container { max-width: 700px; margin: 0 auto; padding: 24px 16px; }
+    h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid #ccc; margin-bottom: 0; }
+    .tab-btn { padding: 6px 16px; border: 1px solid #ccc; border-bottom: none; background: #eee; cursor: pointer; font-size: 12px; margin-right: -1px; }
+    .tab-btn.active { background: #fff; font-weight: bold; position: relative; top: 1px; }
+    .panel { display: none; background: #fff; border: 1px solid #ccc; border-top: none; padding: 16px; }
+    .panel.active { display: block; }
+    .fg { margin-bottom: 12px; }
+    .fg label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; margin-bottom: 4px; }
+    .fg label.bl { display: block; font-weight: bold; margin-bottom: 4px; cursor: default; font-size: 12px; color: #555; }
+    .fg input[type="text"], .fg input[type="password"], .fg select, .fg textarea {
+      width: 100%; padding: 4px 8px; border: 1px solid #bbb; font-size: 13px; font-family: inherit;
+    }
+    .fg textarea { resize: vertical; min-height: 80px; font-family: monospace; font-size: 11px; line-height: 1.5; }
+    .fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: #4477bb; }
+    .hint { font-size: 11px; color: #999; margin-top: 2px; }
+    .hint a { color: #4477bb; }
+    .hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; }
+    .divider { border-top: 1px solid #ddd; margin: 14px 0; }
+    .btn { padding: 4px 16px; font-size: 12px; cursor: pointer; border: 1px solid #999; background: #f5f5f0; }
+    .btn:hover { background: #eee; }
+    .btn-sm { padding: 2px 10px; font-size: 11px; }
+    .save-status { font-size: 12px; color: #080; margin-left: 8px; }
+    .pf { margin-top: 8px; padding: 10px; background: #f9f9f6; border: 1px solid #e0e0d8; }
+    .pf.hidden { display: none; }
+    .pf h3 { font-size: 12px; color: #555; margin-bottom: 8px; font-weight: bold; }
+    .section-title { font-size: 13px; font-weight: bold; color: #444; margin-bottom: 8px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pinboard Bookmark Plus — Settings</h1>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-panel="general">General</button>
+      <button class="tab-btn" data-panel="api">API Keys</button>
+      <button class="tab-btn" data-panel="ai">AI Settings</button>
+      <button class="tab-btn" data-panel="prompts">Prompts</button>
+    </div>
+
+    <!-- General -->
+    <div id="panel-general" class="panel active">
+      <div class="fg"><label><input type="checkbox" id="opt-private-default" /> Private by default</label></div>
+      <div class="fg"><label><input type="checkbox" id="opt-private-incognito" /> Private in Incognito</label></div>
+      <div class="fg"><label><input type="checkbox" id="opt-readlater-default" /> Read Later by default</label></div>
+      <div class="fg"><label><input type="checkbox" id="opt-blockquote" checked /> Wrap selected text with &lt;blockquote&gt;</label></div>
+      <div class="fg"><label><input type="checkbox" id="opt-include-referrer" checked /> Include referrer in Notes</label></div>
+      <div class="divider"></div>
+      <button class="btn" id="save-general">Save</button><span class="save-status" id="general-status"></span>
+    </div>
+
+    <!-- API Keys -->
+    <div id="panel-api" class="panel">
+      <div class="fg">
+        <label class="bl">Pinboard API Token</label>
+        <input type="text" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" />
+        <p class="hint">From <a href="https://pinboard.in/settings/password" target="_blank">pinboard.in/settings/password</a></p>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-title">AI Provider</div>
+
+      <div class="fg">
+        <select id="opt-ai-provider">
+          <option value="gemini">Google Gemini</option>
+          <option value="openai">OpenAI (ChatGPT)</option>
+          <option value="claude">Anthropic Claude</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="qwen">Qwen (通义千问)</option>
+          <option value="minimax">MiniMax</option>
+          <option value="openrouter">OpenRouter</option>
+          <option value="ollama">Ollama (Local)</option>
+          <option value="custom">Custom OpenAI-compatible</option>
+        </select>
+      </div>
+
+      <!-- Gemini -->
+      <div class="pf" id="fields-gemini">
+        <h3>Google Gemini</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-gemini-key" placeholder="AIza..." /><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-gemini-model" value="gemini-2.0-flash" /></div>
+      </div>
+
+      <!-- OpenAI -->
+      <div class="pf hidden" id="fields-openai">
+        <h3>OpenAI</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-openai-key" placeholder="sk-..." /><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-openai-model" value="gpt-4o-mini" /></div>
+        <div class="fg"><label class="bl">Base URL</label><input type="text" id="opt-openai-baseurl" value="https://api.openai.com/v1" /><p class="hint">Change for proxy or compatible endpoint</p></div>
+      </div>
+
+      <!-- Claude -->
+      <div class="pf hidden" id="fields-claude">
+        <h3>Anthropic Claude</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-claude-key" placeholder="sk-ant-..." /><p class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-claude-model" value="claude-sonnet-4-20250514" /><p class="hint">e.g. claude-sonnet-4-20250514, claude-3-5-haiku-20241022</p></div>
+      </div>
+
+      <!-- DeepSeek -->
+      <div class="pf hidden" id="fields-deepseek">
+        <h3>DeepSeek</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-deepseek-key" placeholder="sk-..." /><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-chat" /></div>
+      </div>
+
+      <!-- Qwen -->
+      <div class="pf hidden" id="fields-qwen">
+        <h3>Qwen (通义千问)</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-qwen-key" placeholder="sk-..." /><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-qwen-model" value="qwen-turbo" /></div>
+      </div>
+
+      <!-- MiniMax -->
+      <div class="pf hidden" id="fields-minimax">
+        <h3>MiniMax</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-minimax-key" /><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-Text-01" /></div>
+      </div>
+
+      <!-- OpenRouter -->
+      <div class="pf hidden" id="fields-openrouter">
+        <h3>OpenRouter</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-openrouter-key" placeholder="sk-or-..." /><p class="hint"><a href="https://openrouter.ai/keys" target="_blank">Get key</a>. Access 100+ models from one API.</p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-openrouter-model" value="google/gemini-2.0-flash-exp:free" /><p class="hint">Browse models at <a href="https://openrouter.ai/models" target="_blank">openrouter.ai/models</a></p></div>
+      </div>
+
+      <!-- Ollama -->
+      <div class="pf hidden" id="fields-ollama">
+        <h3>Ollama (Local)</h3>
+        <div class="fg"><label class="bl">Base URL</label><input type="text" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-ollama-model" value="llama3" /><p class="hint">Run <code>ollama pull llama3</code> first</p></div>
+      </div>
+
+      <!-- Custom -->
+      <div class="pf hidden" id="fields-custom">
+        <h3>Custom OpenAI-compatible API</h3>
+        <div class="fg"><label class="bl">Display Name</label><input type="text" id="opt-custom-name" value="Custom" /></div>
+        <div class="fg"><label class="bl">Base URL</label><input type="text" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /><p class="hint">Must support <code>/chat/completions</code> endpoint</p></div>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-custom-key" /><p class="hint">Leave empty if not required</p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
+      </div>
+
+      <div class="divider"></div>
+      <button class="btn" id="save-api">Save</button><span class="save-status" id="api-status"></span>
+    </div>
+
+    <!-- AI Settings -->
+    <div id="panel-ai" class="panel">
+      <div class="fg"><label><input type="checkbox" id="opt-ai-auto-tags" /> Auto-generate AI tags on popup open</label></div>
+      <div class="fg">
+        <label class="bl">AI Summary Language</label>
+        <select id="opt-ai-summary-lang">
+          <option value="auto">Auto (same as content)</option>
+          <option value="zh">中文 (Chinese)</option>
+          <option value="en">English</option>
+          <option value="ja">日本語 (Japanese)</option>
+          <option value="ko">한국어 (Korean)</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="ru">Русский</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="bl">AI Cache Duration (minutes)</label>
+        <input type="text" id="opt-ai-cache-duration" value="60" />
+        <p class="hint">Cached per URL. Set 0 to disable.</p>
+      </div>
+      <div class="divider"></div>
+      <button class="btn" id="save-ai">Save</button><span class="save-status" id="ai-status"></span>
+    </div>
+
+    <!-- Prompts -->
+    <div id="panel-prompts" class="panel">
+      <p class="hint" style="margin-bottom:12px">Customize the prompts sent to the AI. Use placeholders: <code>{{title}}</code> <code>{{url}}</code> <code>{{content}}</code> <code>{{description}}</code> <code>{{lang_instruction}}</code>. Leave empty to use defaults.</p>
+
+      <div class="fg">
+        <label class="bl">AI Tags Prompt</label>
+        <textarea id="opt-custom-tag-prompt" rows="8" placeholder="Leave empty for default prompt"></textarea>
+        <p class="hint">Default: asks for 5-10 tags as JSON array. Must instruct AI to return <code>["tag1","tag2"]</code> format.</p>
+        <button class="btn btn-sm" id="reset-tag-prompt" style="margin-top:4px">Reset to default</button>
+      </div>
+
+      <div class="fg">
+        <label class="bl">AI Summary Prompt</label>
+        <textarea id="opt-custom-summary-prompt" rows="8" placeholder="Leave empty for default prompt"></textarea>
+        <p class="hint">Use <code>{{lang_instruction}}</code> to insert the language setting automatically.</p>
+        <button class="btn btn-sm" id="reset-summary-prompt" style="margin-top:4px">Reset to default</button>
+      </div>
+
+      <div class="divider"></div>
+      <button class="btn" id="save-prompts">Save</button><span class="save-status" id="prompts-status"></span>
+    </div>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

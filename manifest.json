@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Pinboard Bookmark Plus",
+  "version": "2.1",
+  "description": "Bookmark to Pinboard with AI-powered tags and summaries",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://api.pinboard.in/*",
+    "https://pinboard.in/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.deepseek.com/*",
+    "https://dashscope.aliyuncs.com/*",
+    "https://api.minimax.chat/*",
+    "https://openrouter.ai/*",
+    "http://localhost:*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/pin-default-16.png",
+      "32": "icons/pin-default-32.png",
+      "48": "icons/pin-default-48.png",
+      "128": "icons/pin-default-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/pin-default-16.png",
+    "32": "icons/pin-default-32.png",
+    "48": "icons/pin-default-48.png",
+    "128": "icons/pin-default-128.png"
+  },
+  "options_page": "options.html"
+}
