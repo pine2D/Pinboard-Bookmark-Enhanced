@@ -25,16 +25,16 @@
     <div class="form-body">
       <div class="row">
         <span class="label">URL</span>
-        <div class="field"><input type="text" id="url-input" /></div>
+        <div class="field"><input type="text" id="url-input" aria-label="Bookmark URL" /></div>
       </div>
       <div class="row">
         <span class="label">Title</span>
-        <div class="field"><input type="text" id="title-input" /></div>
+        <div class="field"><input type="text" id="title-input" aria-label="Bookmark title" /></div>
       </div>
       <div class="row">
         <span class="label top">Notes</span>
         <div class="field">
-          <textarea id="description-input" rows="9"></textarea>
+          <textarea id="description-input" rows="9" aria-label="Notes"></textarea>
           <div class="notes-bar">
             <span id="desc-char-count">0</span>
             <a href="#" id="ai-summary-btn" class="action-link">🤖 AI summary</a>
@@ -46,7 +46,7 @@
         <div class="field">
           <div class="tags-input-wrap">
             <div id="tags-display" class="tags-display"></div>
-            <input type="text" id="tags-input" autocomplete="off" />
+            <input type="text" id="tags-input" autocomplete="off" aria-label="Add tags" />
           </div>
           <div id="tags-autocomplete" class="autocomplete-dropdown hidden"></div>
           <a href="#" id="tags-clear-all" class="clear-all-link hidden">Clear all</a>
@@ -80,7 +80,7 @@
   <div class="quick-actions">
     <hr class="divider">
     <div class="search-row">
-      <input type="text" id="search-input" placeholder="Search your bookmarks..." class="search-field" />
+      <input type="text" id="search-input" placeholder="Search your bookmarks..." class="search-field" aria-label="Search bookmarks" />
     </div>
     <div class="quick-row">
       <button id="save-tabset-btn" class="qbtn" title="Save all open tabs as a tab set">📑 Tabs</button>

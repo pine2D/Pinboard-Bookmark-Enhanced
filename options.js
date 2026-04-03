@@ -9,38 +9,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // ---- All settings with defaults ----
-  const DEFAULTS = {
-    pinboardToken: "",
-    aiProvider: "gemini",
-    geminiApiKey: "", geminiModel: "gemini-2.0-flash",
-    openaiApiKey: "", openaiModel: "gpt-4o-mini", openaiBaseUrl: "https://api.openai.com/v1",
-    claudeApiKey: "", claudeModel: "claude-sonnet-4-20250514",
-    deepseekApiKey: "", deepseekModel: "deepseek-chat",
-    qwenApiKey: "", qwenModel: "qwen-turbo",
-    minimaxApiKey: "", minimaxModel: "MiniMax-Text-01",
-    openrouterApiKey: "", openrouterModel: "google/gemini-2.0-flash-exp:free",
-    ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3",
-    customApiKey: "", customModel: "", customBaseUrl: "", customName: "Custom",
-    aiSummaryLang: "auto", aiCacheDuration: 60,
-    customTagPrompt: "", customSummaryPrompt: "",
-    optPrivateDefault: false, optPrivateIncognito: false, optReadlaterDefault: false,
-    optAutoDescription: true, optBlockquote: true, optIncludeReferrer: true,
-    optAiAutoTags: false,
-    ctxAutoNotes: true, ctxBlockquote: true, ctxDefaultTags: "", ctxAiTags: false, ctxAiSummary: false,
-    qsAutoNotes: true, qsBlockquote: true, qsDefaultTags: "", qsAiTags: false, qsAiSummary: false,
-    optBatchTagEnabled: true, optBatchTag: "batch_saved",
-    batchAiTags: false, batchAiSummary: false,
-    optShowRecent: true, optShowSearch: true, optTheme: "auto",
-    notifyContextMenu: true, notifyQuickSave: true, notifyTabSet: true, notifyBatchSave: true, notifyErrors: true,
-    customFont: "", customCSS: ""
-  };
-
-  const s = await chrome.storage.sync.get(DEFAULTS);
-
-  // Deobfuscate API keys for display
-  const keyFields = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","customApiKey"];
-  keyFields.forEach(k => { if (s[k]) s[k] = deobfuscateKey(s[k]); });
+  // ---- All settings with defaults (from shared.js) ----
+  const s = await chrome.storage.sync.get(SETTINGS_DEFAULTS);
+  deobfuscateSettings(s);
 
   // ---- Fill text/password/select fields ----
   const fieldMap = {
@@ -59,7 +30,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-ai-summary-lang": s.aiSummaryLang, "opt-ai-cache-duration": s.aiCacheDuration,
     "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
     "opt-batch-tag": s.optBatchTag, "opt-theme": s.optTheme,
-    "ctx-default-tags": s.ctxDefaultTags, "qs-default-tags": s.qsDefaultTags,
+    "ctx-default-tags": s.ctxDefaultTags, "qs-default-tags": s.qsDefaultTags, "rl-default-tags": s.rlDefaultTags,
     "opt-custom-font": s.customFont, "opt-custom-css": s.customCSS
   };
   for (const [id, val] of Object.entries(fieldMap)) {
@@ -77,10 +48,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     "ctx-ai-tags": s.ctxAiTags, "ctx-ai-summary": s.ctxAiSummary,
     "qs-auto-notes": s.qsAutoNotes, "qs-blockquote": s.qsBlockquote,
     "qs-ai-tags": s.qsAiTags, "qs-ai-summary": s.qsAiSummary,
+    "rl-auto-notes": s.rlAutoNotes, "rl-blockquote": s.rlBlockquote,
+    "rl-ai-tags": s.rlAiTags, "rl-ai-summary": s.rlAiSummary,
     "opt-batch-tag-enabled": s.optBatchTagEnabled,
     "batch-ai-tags": s.batchAiTags, "batch-ai-summary": s.batchAiSummary,
+    "batch-skip-existing": s.batchSkipExisting,
     "opt-show-recent": s.optShowRecent, "opt-show-search": s.optShowSearch,
     "notify-context-menu": s.notifyContextMenu, "notify-quick-save": s.notifyQuickSave,
+    "notify-read-later": s.notifyReadLater,
     "notify-tab-set": s.notifyTabSet, "notify-batch-save": s.notifyBatchSave,
     "notify-errors": s.notifyErrors
   };
@@ -134,10 +109,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       qsDefaultTags: document.getElementById("qs-default-tags").value.trim(),
       qsAiTags: document.getElementById("qs-ai-tags").checked,
       qsAiSummary: document.getElementById("qs-ai-summary").checked,
+      // Read Later
+      rlAutoNotes: document.getElementById("rl-auto-notes").checked,
+      rlBlockquote: document.getElementById("rl-blockquote").checked,
+      rlDefaultTags: document.getElementById("rl-default-tags").value.trim(),
+      rlAiTags: document.getElementById("rl-ai-tags").checked,
+      rlAiSummary: document.getElementById("rl-ai-summary").checked,
       optBatchTagEnabled: document.getElementById("opt-batch-tag-enabled").checked,
       optBatchTag: document.getElementById("opt-batch-tag").value.trim() || "batch_saved",
       batchAiTags: document.getElementById("batch-ai-tags").checked,
       batchAiSummary: document.getElementById("batch-ai-summary").checked,
+      batchSkipExisting: document.getElementById("batch-skip-existing").checked,
       // AI Provider & Keys
       aiProvider: document.getElementById("opt-ai-provider").value,
       geminiApiKey: obfuscateKey(document.getElementById("opt-gemini-key").value.trim()),
@@ -164,7 +146,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // AI Behavior & Prompts
       optAiAutoTags: document.getElementById("opt-ai-auto-tags").checked,
       aiSummaryLang: document.getElementById("opt-ai-summary-lang").value,
-      aiCacheDuration: parseInt(document.getElementById("opt-ai-cache-duration").value) || 60,
+      aiCacheDuration: Math.max(0, parseInt(document.getElementById("opt-ai-cache-duration").value) || 60),
       customTagPrompt: document.getElementById("opt-custom-tag-prompt").value,
       customSummaryPrompt: document.getElementById("opt-custom-summary-prompt").value,
       // Appearance
@@ -174,6 +156,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Notifications
       notifyContextMenu: document.getElementById("notify-context-menu").checked,
       notifyQuickSave: document.getElementById("notify-quick-save").checked,
+      notifyReadLater: document.getElementById("notify-read-later").checked,
       notifyTabSet: document.getElementById("notify-tab-set").checked,
       notifyBatchSave: document.getElementById("notify-batch-save").checked,
       notifyErrors: document.getElementById("notify-errors").checked,
@@ -196,7 +179,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll('.panel input[type="checkbox"]').forEach(el => {
     el.addEventListener("change", scheduleAutoSave);
   });
-  document.querySelectorAll('.panel input[type="text"], .panel input[type="password"], .panel textarea').forEach(el => {
+  document.querySelectorAll('.panel input[type="text"], .panel input[type="password"], .panel input[type="number"], .panel textarea').forEach(el => {
     el.addEventListener("input", scheduleAutoSave);
   });
   document.querySelectorAll('.panel select').forEach(el => {
@@ -352,6 +335,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- Chrome shortcuts link ----
   document.getElementById("open-shortcuts-link")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+  });
+  document.getElementById("open-shortcuts-link-rl")?.addEventListener("click", (e) => {
     e.preventDefault();
     chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
   });

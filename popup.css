@@ -245,6 +245,14 @@ a:hover { text-decoration: underline; }
 }
 .recent-bm-item:hover { text-decoration: underline; }
 
+@keyframes save-flash {
+  0% { background: #d4edda; border-color: #28a745; }
+  100% { background: #f5f5f0; border-color: #999; }
+}
+.submit-bar button.save-success {
+  animation: save-flash 1.2s ease-out;
+}
+
 /* ===================== Dark Mode ===================== */
 /* JS adds .dark to <html> based on theme setting (auto/dark/light) */
 html.dark body { background: #1a1a1a; color: #e0e0e0; }

@@ -4,6 +4,7 @@
 
 let currentTags = [];
 let allUserTags = [];
+let allUserTagCounts = {};
 let pageInfo = {};
 let existingBookmark = null;
 let acIndex = -1;
@@ -11,30 +12,8 @@ let settings = {};
 
 
 document.addEventListener("DOMContentLoaded", async () => {
-  settings = await chrome.storage.sync.get({
-    pinboardToken: "",
-    aiProvider: "gemini",
-    geminiApiKey: "", geminiModel: "gemini-2.0-flash",
-    openaiApiKey: "", openaiModel: "gpt-4o-mini", openaiBaseUrl: "https://api.openai.com/v1",
-    claudeApiKey: "", claudeModel: "claude-sonnet-4-20250514",
-    deepseekApiKey: "", deepseekModel: "deepseek-chat",
-    qwenApiKey: "", qwenModel: "qwen-turbo",
-    minimaxApiKey: "", minimaxModel: "MiniMax-Text-01",
-    openrouterApiKey: "", openrouterModel: "google/gemini-2.0-flash-exp:free",
-    ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3",
-    customApiKey: "", customModel: "", customBaseUrl: "", customName: "Custom",
-    aiSummaryLang: "auto", aiCacheDuration: 60,
-    customTagPrompt: "", customSummaryPrompt: "",
-    optPrivateDefault: false, optPrivateIncognito: false, optReadlaterDefault: false,
-    optAutoDescription: true, optBlockquote: true, optIncludeReferrer: true, optAiAutoTags: false,
-    optShowRecent: true, optShowSearch: true,
-    optTheme: "auto", optBatchTagEnabled: true, optBatchTag: "batch_saved",
-    batchAiTags: false, batchAiSummary: false
-  });
-
-  // Deobfuscate API keys loaded from storage
-  ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","customApiKey"]
-    .forEach(k => { if (settings[k]) settings[k] = deobfuscateKey(settings[k]); });
+  settings = await chrome.storage.sync.get(SETTINGS_DEFAULTS);
+  deobfuscateSettings(settings);
 
   // Apply theme: JS controls .dark class on <html>
   function applyTheme() {
@@ -209,10 +188,22 @@ function setupTabSet() {
       const useAiTags = settings.batchAiTags && hasAIKey(settings);
       const useAiSummary = settings.batchAiSummary && hasAIKey(settings);
 
-      let saved = 0, failed = 0;
+      let saved = 0, failed = 0, skipped = 0;
+      // If skip existing is enabled, check which URLs already exist
+      let existingUrls = new Set();
+      if (settings.batchSkipExisting) {
+        try {
+          const recentData = await (await fetch(`https://api.pinboard.in/v1/posts/all?auth_token=${pinboardToken}&format=json&results=1000`)).json();
+          existingUrls = new Set(recentData.map(p => p.href));
+        } catch (_) {}
+      }
       for (let i = 0; i < validTabs.length; i++) {
         const t = validTabs[i];
-        batchBtn.textContent = `⏳ ${i + 1}/${validTabs.length}...`;
+        batchBtn.textContent = `⏳ ${i + 1}/${validTabs.length} (✓${saved} ✗${failed})`;
+        if (settings.batchSkipExisting && existingUrls.has(t.url)) {
+          skipped++;
+          continue;
+        }
         try {
           let tags = [...baseTags];
           let notes = "";
@@ -259,9 +250,10 @@ function setupTabSet() {
         await new Promise(r => setTimeout(r, 3100));
       }
       const tagStr = baseTags.join(", ");
-      showStatus("status-msg", `Batch done: ${saved} saved, ${failed} failed`, saved > 0 ? "success" : "error");
+      const skipMsg = skipped > 0 ? `, ${skipped} skipped` : "";
+      showStatus("status-msg", `Batch done: ${saved} saved, ${failed} failed${skipMsg}`, saved > 0 ? "success" : "error");
       if (saved > 0) {
-        chrome.runtime.sendMessage({ type: "show_notification", id: "batch-saved", title: "Pinboard: Batch Saved!", message: `${saved} bookmarks saved${tagStr ? ` (tagged: ${tagStr})` : ""}.`, category: "batchSave" });
+        chrome.runtime.sendMessage({ type: "show_notification", id: "batch-saved-" + Date.now(), title: "Pinboard: Batch Saved!", message: `${saved} bookmarks saved${tagStr ? ` (tagged: ${tagStr})` : ""}.`, category: "batchSave" });
       }
       batchBtn.textContent = `✅ ${saved} saved`;
       setTimeout(() => { batchBtn.textContent = "📌 Batch Save"; batchBtn.disabled = false; }, 3000);
@@ -282,10 +274,19 @@ async function checkExistingBookmark(token, url) {
       document.getElementById("description-input").value = existingBookmark.extended;
       document.getElementById("private-check").checked = existingBookmark.shared === "no";
       document.getElementById("readlater-check").checked = existingBookmark.toread === "yes";
-      if (existingBookmark.tags?.trim()) existingBookmark.tags.split(" ").forEach((t) => { if (t.trim()) addTag(t.trim()); });
+      currentTags = [];
+      renderTags();
+      if (existingBookmark.tags?.trim()) existingBookmark.tags.split(" ").filter(Boolean).forEach((t) => { if (t.trim()) addTag(t.trim()); });
       document.getElementById("submit-btn").textContent = "Update";
       document.getElementById("delete-btn").classList.remove("hidden");
       updateCharCount();
+      // Show bookmark timestamp
+      const timeStr = existingBookmark.time;
+      if (timeStr) {
+        const d = new Date(timeStr);
+        const formatted = d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+        showStatus("status-msg", `Last saved: ${formatted}`, "success");
+      }
     }
   } catch (e) { console.error(e); }
 }
@@ -325,6 +326,7 @@ async function fetchPinboardSuggestTags(token, url) {
 async function fetchAllUserTags(token) {
   try {
     const data = await (await fetch(`https://api.pinboard.in/v1/tags/get?auth_token=${token}&format=json`)).json();
+    allUserTagCounts = data;
     // Sort by usage count descending, then alphabetically
     allUserTags = Object.entries(data)
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
@@ -347,6 +349,13 @@ function setupTagsInput() {
     dropdown.innerHTML = "";
     matches.forEach((tag) => {
       const item = document.createElement("div"); item.className = "ac-item"; item.textContent = tag;
+      const count = allUserTagCounts[tag];
+      if (count) {
+        const countSpan = document.createElement("span");
+        countSpan.style.cssText = "color:#999;font-size:10px;margin-left:4px";
+        countSpan.textContent = `(${count})`;
+        item.appendChild(countSpan);
+      }
       item.addEventListener("click", () => { addTag(tag); input.value = ""; dropdown.classList.add("hidden"); input.focus(); });
       dropdown.appendChild(item);
     });
@@ -354,8 +363,8 @@ function setupTagsInput() {
   });
   input.addEventListener("keydown", (e) => {
     const items = dropdown.querySelectorAll(".ac-item");
-    if (e.key === "ArrowDown") { e.preventDefault(); acIndex = Math.min(acIndex + 1, items.length - 1); updateAc(items); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); acIndex = Math.max(acIndex - 1, 0); updateAc(items); }
+    if (e.key === "ArrowDown") { e.preventDefault(); acIndex = acIndex >= items.length - 1 ? 0 : acIndex + 1; updateAc(items); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); acIndex = acIndex <= 0 ? items.length - 1 : acIndex - 1; updateAc(items); }
     else if (e.key === "Enter" || e.key === "Tab") {
       e.preventDefault();
       if (acIndex >= 0 && items[acIndex]) {
@@ -366,7 +375,7 @@ function setupTagsInput() {
         addTag(items[0].textContent);
       } else if (input.value.trim()) {
         // 没有匹配项，按原逻辑添加输入内容
-        input.value.trim().split(/[\s,]+/).forEach((t) => { if (t) addTag(t); });
+        input.value.trim().split(/[\s,]+/).filter(Boolean).forEach((t) => addTag(t));
       }
       input.value = ""; dropdown.classList.add("hidden");
     } else if (e.key === " ") {
@@ -439,11 +448,13 @@ function setupSubmit(token) {
       const data = await (await fetch(apiUrl)).json();
       if (data.result_code === "done") {
         showStatus("status-msg", "Bookmark saved.", "success");
-        document.getElementById("submit-btn").style.background = "#d4edda";
-        setTimeout(() => { document.getElementById("submit-btn").style.background = ""; }, 800);
+        btn.textContent = "✅ Saved!";
+        btn.style.background = "#d4edda";
+        btn.style.borderColor = "#28a745";
+        setTimeout(() => { btn.style.background = ""; btn.style.borderColor = ""; }, 1200);
         // 通知 background 更新图标
         chrome.runtime.sendMessage({ type: "bookmark_saved", url: url });
-        setTimeout(() => window.close(), 1000);
+        setTimeout(() => window.close(), 1200);
       } else showStatus("status-msg", `Error: ${data.result_code}`, "error");
     } catch (e) { showStatus("status-msg", "Network error", "error"); }
     btn.disabled = false; btn.classList.remove("loading"); btn.textContent = orig;
@@ -460,6 +471,9 @@ function setupSubmit(token) {
 
   document.getElementById("delete-btn").addEventListener("click", async () => {
     if (!confirm("Delete this bookmark?")) return;
+    const delBtn = document.getElementById("delete-btn");
+    const delOrig = delBtn.textContent;
+    delBtn.disabled = true; delBtn.classList.add("loading"); delBtn.textContent = "Deleting...";
     const url = document.getElementById("url-input").value;
     try {
       const data = await (await fetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(url)}&auth_token=${token}&format=json`)).json();
@@ -470,6 +484,7 @@ function setupSubmit(token) {
         setTimeout(() => window.close(), 800);
       } else showStatus("status-msg", `Error: ${data.result_code}`, "error");
     } catch (e) { showStatus("status-msg", "Network error", "error"); }
+    delBtn.disabled = false; delBtn.classList.remove("loading"); delBtn.textContent = delOrig;
   });
 }
 
@@ -671,21 +686,33 @@ function renderAITags(tags, fromCache) {
   });
   container.appendChild(aa);
 
-  // Cache hint + regenerate button (only when loaded from cache)
+  // Cache hint + regenerate/replace buttons (only when loaded from cache)
   if (fromCache) {
+    const cachedTagSet = new Set(tags.map(t => t.toLowerCase()));
     const hintWrap = document.createElement("span");
     hintWrap.className = "cache-hint-wrap";
     hintWrap.style.display = "inline-block";
     hintWrap.style.marginLeft = "8px";
-    hintWrap.innerHTML = `<span class="cache-hint">cached</span><a href="#" class="regen-link">↻ regenerate</a>`;
+    hintWrap.innerHTML = [
+      '<span class="cache-hint">cached</span>',
+      '<a href="#" class="regen-link" data-mode="append">↻ regenerate</a>',
+      '<a href="#" class="regen-link" data-mode="replace">↻ replace</a>'
+    ].join("");
     container.appendChild(hintWrap);
 
-    hintWrap.querySelector(".regen-link").addEventListener("click", async (e) => {
-      e.preventDefault();
-      const link = e.currentTarget;
-      link.textContent = "regenerating...";
-      link.classList.add("loading");
-      await doAITags(true);
+    hintWrap.querySelectorAll(".regen-link").forEach((link) => {
+      link.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const mode = e.currentTarget.dataset.mode;
+        hintWrap.querySelectorAll(".regen-link").forEach((l) => l.classList.add("loading"));
+        e.currentTarget.textContent = mode === "replace" ? "replacing..." : "regenerating...";
+        if (mode === "replace") {
+          // Remove cached AI tags from currentTags before regenerating
+          currentTags = currentTags.filter(t => !cachedTagSet.has(t.toLowerCase()));
+          renderTags();
+        }
+        await doAITags(true);
+      });
     });
   }
 }
@@ -713,7 +740,7 @@ async function fetchRecentBookmarks(token) {
       a.textContent = (p.description || p.href).substring(0, 60);
       container.appendChild(a);
     });
-  } catch (e) { /* fail silently */ }
+  } catch (e) { container.classList.remove("hidden"); container.innerHTML = '<div class="recent-bm-label">Recent:</div><span class="muted">failed to load</span>'; }
 }
 
 // ===================== Helpers =====================

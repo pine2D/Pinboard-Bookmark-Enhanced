@@ -17,35 +17,19 @@ const ICONS_BOOKMARKED = {
 // URL 状态缓存
 const statusCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
+const MAX_CACHE_SIZE = 500;
+
+function cleanupStatusCache() {
+  if (statusCache.size <= MAX_CACHE_SIZE) return;
+  const entries = [...statusCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+  const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+  toRemove.forEach(([key]) => statusCache.delete(key));
+}
 
 // ---- Load settings with deobfuscation ----
 async function loadSettings() {
-  const s = await chrome.storage.sync.get({
-    pinboardToken: "",
-    aiProvider: "gemini",
-    geminiApiKey: "", geminiModel: "gemini-2.0-flash",
-    openaiApiKey: "", openaiModel: "gpt-4o-mini", openaiBaseUrl: "https://api.openai.com/v1",
-    claudeApiKey: "", claudeModel: "claude-sonnet-4-20250514",
-    deepseekApiKey: "", deepseekModel: "deepseek-chat",
-    qwenApiKey: "", qwenModel: "qwen-turbo",
-    minimaxApiKey: "", minimaxModel: "MiniMax-Text-01",
-    openrouterApiKey: "", openrouterModel: "google/gemini-2.0-flash-exp:free",
-    ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3",
-    customApiKey: "", customModel: "", customBaseUrl: "", customName: "Custom",
-    aiSummaryLang: "auto", aiCacheDuration: 60,
-    customTagPrompt: "", customSummaryPrompt: "",
-    // Context menu settings
-    ctxAutoNotes: true, ctxBlockquote: true, ctxDefaultTags: "",
-    ctxAiTags: false, ctxAiSummary: false,
-    // Quick save settings
-    qsAutoNotes: true, qsBlockquote: true, qsDefaultTags: "",
-    qsAiTags: false, qsAiSummary: false,
-    // Notifications
-    notifyContextMenu: true, notifyQuickSave: true,
-    notifyTabSet: true, notifyBatchSave: true, notifyErrors: true
-  });
-  ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","customApiKey"]
-    .forEach(k => { if (s[k]) s[k] = deobfuscateKey(s[k]); });
+  const s = await chrome.storage.sync.get(SETTINGS_DEFAULTS);
+  deobfuscateSettings(s);
   return s;
 }
 
@@ -53,16 +37,17 @@ async function loadSettings() {
 async function showNotification(id, title, message, category) {
   try {
     const cats = await chrome.storage.sync.get({
-      notifyContextMenu: true, notifyQuickSave: true,
+      notifyContextMenu: true, notifyQuickSave: true, notifyReadLater: true,
       notifyTabSet: true, notifyBatchSave: true, notifyErrors: true
     });
     if (category === "contextMenu" && !cats.notifyContextMenu) return;
     if (category === "quickSave" && !cats.notifyQuickSave) return;
+    if (category === "readLater" && !cats.notifyReadLater) return;
     if (category === "tabSet" && !cats.notifyTabSet) return;
     if (category === "batchSave" && !cats.notifyBatchSave) return;
     if (category === "error" && !cats.notifyErrors) return;
   } catch (_) {}
-  chrome.notifications.create(id, {
+  chrome.notifications.create(id + "-" + Date.now(), {
     type: "basic", iconUrl: "icons/pin-default-48.png", title, message
   });
 }
@@ -85,6 +70,7 @@ async function checkBookmarked(url) {
     const data = await resp.json();
     const bookmarked = data.posts && data.posts.length > 0;
     statusCache.set(url, { bookmarked, timestamp: Date.now() });
+    cleanupStatusCache();
     return bookmarked;
   } catch (e) {
     console.error("checkBookmarked error:", e);
@@ -108,8 +94,18 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   }
 });
 
+// Keep service worker alive with periodic alarm
+chrome.alarms.create("keepalive", { periodInMinutes: 4 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "keepalive") {
+    // Ping to keep alive — no-op
+  }
+});
+
 // ---- 监听来自 popup 的消息 ----
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || typeof message !== "object") { sendResponse({ error: "invalid" }); return true; }
+
   if (message.type === "bookmark_saved" && message.url) {
     statusCache.set(message.url, { bookmarked: true, timestamp: Date.now() });
     chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
@@ -268,6 +264,109 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
   } catch (e) {
     showNotification("pinboard-error", "Pinboard: Network error", e.message, "error");
+  }
+});
+
+// ===================== Read Later (keyboard shortcut) =====================
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== "read_later") return;
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.url || !tab.url.startsWith("http")) {
+      showNotification("rl-error", "Pinboard: Cannot save", "This page cannot be bookmarked.", "error");
+      return;
+    }
+
+    const s = await loadSettings();
+    if (!s.pinboardToken) {
+      showNotification("rl-error", "Pinboard: Not logged in", "Set your API token in extension settings.", "error");
+      return;
+    }
+
+    const url = tab.url;
+    const title = tab.title || url;
+
+    // Extract page info
+    let pageInfo = null;
+    try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) {}
+
+    // Build notes
+    let notes = "";
+    if (pageInfo) {
+      notes = buildAutoNotes(pageInfo, {
+        autoDescription: s.rlAutoNotes,
+        blockquote: s.rlBlockquote,
+        includeReferrer: false
+      });
+    }
+
+    // Default tags
+    let tags = [];
+    if (s.rlDefaultTags) {
+      tags = s.rlDefaultTags.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
+    }
+
+    // AI features (parallel)
+    const aiPromises = [];
+    if (pageInfo?.pageText && hasAIKey(s)) {
+      if (s.rlAiTags) {
+        aiPromises.push(
+          (async () => {
+            try {
+              const cached = await getAICache(url, "tags", s.aiCacheDuration);
+              if (cached) return { type: "tags", result: cached };
+              const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
+              const resp = await callAI(s, prompt);
+              const aiTags = parseAITags(resp);
+              await setAICache(url, "tags", aiTags, s.aiCacheDuration);
+              return { type: "tags", result: aiTags };
+            } catch (e) { console.warn("Read later AI tags failed:", e.message); return null; }
+          })()
+        );
+      }
+      if (s.rlAiSummary) {
+        aiPromises.push(
+          (async () => {
+            try {
+              const cached = await getAICache(url, "summary", s.aiCacheDuration);
+              if (cached) return { type: "summary", result: cached };
+              const prompt = buildSummaryPrompt(s, title, url, pageInfo.pageText, notes);
+              const summary = await callAI(s, prompt);
+              await setAICache(url, "summary", summary, s.aiCacheDuration);
+              return { type: "summary", result: summary };
+            } catch (e) { console.warn("Read later AI summary failed:", e.message); return null; }
+          })()
+        );
+      }
+    }
+
+    const aiResults = await Promise.all(aiPromises);
+    for (const r of aiResults) {
+      if (!r) continue;
+      if (r.type === "tags") tags = [...tags, ...r.result];
+      if (r.type === "summary") {
+        const wrapped = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
+        notes = notes ? notes + "\n\n" + wrapped : wrapped;
+      }
+    }
+
+    // Save bookmark with toread=yes
+    const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${s.pinboardToken}&format=json` +
+      `&url=${encodeURIComponent(url)}&description=${encodeURIComponent(title)}` +
+      `&extended=${encodeURIComponent(notes)}&tags=${encodeURIComponent(tags.join(" "))}&toread=yes&replace=yes`;
+    const resp = await fetch(apiUrl);
+    const data = await resp.json();
+
+    if (data.result_code === "done") {
+      statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
+      setIcon(tab.id, true);
+      showNotification("rl-saved", "Pinboard: Quick Read Later!", `"${title.substring(0, 60)}" saved.`, "readLater");
+    } else {
+      showNotification("rl-error", "Pinboard: Save failed", data.result_code || "Unknown error", "error");
+    }
+  } catch (e) {
+    showNotification("rl-error", "Pinboard: Read Later failed", e.message, "error");
   }
 });
 

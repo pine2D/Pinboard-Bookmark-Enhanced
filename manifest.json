@@ -9,7 +9,8 @@
     "scripting",
     "tabs",
     "contextMenus",
-    "notifications"
+    "notifications",
+    "alarms"
   ],
   "host_permissions": [
     "https://api.pinboard.in/*",
@@ -63,6 +64,13 @@
         "mac": "MacCtrl+Shift+B"
       },
       "description": "Quick save to Pinboard (no popup)"
+    },
+    "read_later": {
+      "suggested_key": {
+        "default": "Alt+Shift+R",
+        "mac": "MacCtrl+Shift+R"
+      },
+      "description": "Quick save as Read Later (no popup)"
     }
   }
 }
