@@ -49,6 +49,7 @@
             <input type="text" id="tags-input" autocomplete="off" />
           </div>
           <div id="tags-autocomplete" class="autocomplete-dropdown hidden"></div>
+          <a href="#" id="tags-clear-all" class="clear-all-link hidden">Clear all</a>
         </div>
       </div>
       <div class="row">
@@ -78,14 +79,20 @@
   <!-- 底部快捷操作栏 - 放在 main-section 末尾、options-link 之前 -->
   <div class="quick-actions">
     <hr class="divider">
+    <div class="search-row">
+      <input type="text" id="search-input" placeholder="Search your bookmarks..." class="search-field" />
+    </div>
     <div class="quick-row">
       <button id="save-tabset-btn" class="qbtn" title="Save all open tabs as a tab set">📑 Save Tabs</button>
-      <a href="https://pinboard.in/tabs/" target="_blank" class="qbtn" title="View tab sets">📂 Tab Sets</a>
+      <button id="batch-bookmark-btn" class="qbtn" title="Save each open tab as an individual bookmark">📌 Batch Save</button>
       <a href="https://pinboard.in/network/" target="_blank" class="qbtn" title="Network">🌐 Network</a>
-      <a href="https://pinboard.in/u:oumu/unread/" target="_blank" class="qbtn" title="Unread bookmarks">📖 Unread</a>
+      <a id="unread-link" href="#" target="_blank" class="qbtn" title="Unread bookmarks">📖 Unread</a>
     </div>
+    <div id="recent-bookmarks" class="recent-bm-area hidden"></div>
   </div>
 
+  <script src="shared.js"></script>
+  <script src="ai.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

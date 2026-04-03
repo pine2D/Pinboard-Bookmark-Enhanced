@@ -7,7 +7,9 @@
     "activeTab",
     "storage",
     "scripting",
-    "tabs"
+    "tabs",
+    "contextMenus",
+    "notifications"
   ],
   "host_permissions": [
     "https://api.pinboard.in/*",
@@ -39,5 +41,21 @@
     "48": "icons/pin-default-48.png",
     "128": "icons/pin-default-128.png"
   },
-  "options_page": "options.html"
+  "options_page": "options.html",
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+B",
+        "mac": "MacCtrl+B"
+      },
+      "description": "Open Pinboard Bookmark Plus"
+    },
+    "quick_save": {
+      "suggested_key": {
+        "default": "Alt+Shift+B",
+        "mac": "MacCtrl+Shift+B"
+      },
+      "description": "Quick save to Pinboard (no popup)"
+    }
+  }
 }

@@ -40,35 +40,78 @@
     <h1>Pinboard Bookmark Plus — Settings</h1>
 
     <div class="tabs">
-      <button class="tab-btn active" data-panel="general">General</button>
-      <button class="tab-btn" data-panel="api">API Keys</button>
-      <button class="tab-btn" data-panel="ai">AI Settings</button>
-      <button class="tab-btn" data-panel="prompts">Prompts</button>
+      <button class="tab-btn active" data-panel="bookmarks">Bookmarks</button>
+      <button class="tab-btn" data-panel="quick">Quick Actions</button>
+      <button class="tab-btn" data-panel="ai">AI</button>
+      <button class="tab-btn" data-panel="appearance">Appearance</button>
     </div>
 
-    <!-- General -->
-    <div id="panel-general" class="panel active">
+    <!-- Tab 1: Bookmarks -->
+    <div id="panel-bookmarks" class="panel active">
+      <div class="section-title">Save Defaults</div>
       <div class="fg"><label><input type="checkbox" id="opt-private-default" /> Private by default</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-private-incognito" /> Private in Incognito</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-readlater-default" /> Read Later by default</label></div>
+      <div class="divider"></div>
+      <div class="section-title">Notes Behavior</div>
+      <div class="fg"><label><input type="checkbox" id="opt-auto-description" checked /> Auto-fill meta description into notes</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-blockquote" checked /> Wrap selected text with &lt;blockquote&gt;</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-include-referrer" checked /> Include referrer in Notes</label></div>
       <div class="divider"></div>
-      <button class="btn" id="save-general">Save</button><span class="save-status" id="general-status"></span>
+      <button class="btn" id="save-bookmarks">Save</button><span class="save-status" id="bookmarks-status"></span>
     </div>
 
-    <!-- API Keys -->
-    <div id="panel-api" class="panel">
+    <!-- Tab 2: Quick Actions -->
+    <div id="panel-quick" class="panel">
+      <div class="section-title">Context Menu Save</div>
+      <p class="hint" style="margin-bottom:8px">Right-click a page or link to save to Pinboard. These settings control what's included.</p>
+      <div class="fg"><label><input type="checkbox" id="ctx-auto-notes" checked /> Auto-add page description to notes</label></div>
+      <div class="fg"><label><input type="checkbox" id="ctx-blockquote" checked /> Wrap selected text with blockquote in notes</label></div>
+      <div class="fg">
+        <label class="bl">Default Tags (comma-separated)</label>
+        <input type="text" id="ctx-default-tags" placeholder="tag1, tag2" />
+      </div>
+      <div class="fg"><label><input type="checkbox" id="ctx-ai-tags" /> Auto-generate AI tags</label></div>
+      <div class="fg"><label><input type="checkbox" id="ctx-ai-summary" /> Auto-generate AI summary in notes</label></div>
+
+      <div class="divider"></div>
+      <div class="section-title">Quick Save</div>
+      <p class="hint" style="margin-bottom:8px">Save the current page instantly via keyboard shortcut (without opening popup). Configure in Chrome's shortcut settings.</p>
+      <p style="margin-bottom:8px;"><a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" style="text-decoration:none;">Open Chrome Shortcut Settings</a></p>
+      <p class="hint" style="margin-bottom:8px">Or navigate manually: <code>chrome://extensions/shortcuts</code></p>
+      <div class="fg"><label><input type="checkbox" id="qs-auto-notes" checked /> Auto-add page description to notes</label></div>
+      <div class="fg"><label><input type="checkbox" id="qs-blockquote" checked /> Wrap selected text with blockquote</label></div>
+      <div class="fg">
+        <label class="bl">Default Tags (comma-separated)</label>
+        <input type="text" id="qs-default-tags" placeholder="tag1, tag2" />
+      </div>
+      <div class="fg"><label><input type="checkbox" id="qs-ai-tags" /> Auto-generate AI tags</label></div>
+      <div class="fg"><label><input type="checkbox" id="qs-ai-summary" /> Auto-generate AI summary in notes</label></div>
+
+      <div class="divider"></div>
+      <div class="section-title">Batch Save</div>
+      <p class="hint" style="margin-bottom:8px">Save each open tab as an individual bookmark. Useful for saving research sessions.</p>
+      <div class="fg"><label><input type="checkbox" id="opt-batch-tag-enabled" checked /> Auto-add tag</label></div>
+      <div class="fg">
+        <label class="bl">Tag Name</label>
+        <input type="text" id="opt-batch-tag" value="batch_saved" />
+        <p class="hint">This tag is automatically added to every bookmark saved via Batch Save.</p>
+      </div>
+      <div class="divider"></div>
+      <button class="btn" id="save-quick">Save</button><span class="save-status" id="quick-status"></span>
+    </div>
+
+    <!-- Tab 3: AI -->
+    <div id="panel-ai" class="panel">
+      <div class="section-title">Provider</div>
       <div class="fg">
         <label class="bl">Pinboard API Token</label>
         <input type="text" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" />
         <p class="hint">From <a href="https://pinboard.in/settings/password" target="_blank">pinboard.in/settings/password</a></p>
       </div>
-
       <div class="divider"></div>
-      <div class="section-title">AI Provider</div>
-
       <div class="fg">
+        <label class="bl">AI Provider</label>
         <select id="opt-ai-provider">
           <option value="gemini">Google Gemini</option>
           <option value="openai">OpenAI (ChatGPT)</option>
@@ -87,6 +130,8 @@
         <h3>Google Gemini</h3>
         <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-gemini-key" placeholder="AIza..." /><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-gemini-model" value="gemini-2.0-flash" /></div>
+        <button class="btn btn-sm" id="test-gemini">Test Connection</button>
+        <span class="save-status" id="test-gemini-status"></span>
       </div>
 
       <!-- OpenAI -->
@@ -95,6 +140,8 @@
         <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-openai-key" placeholder="sk-..." /><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-openai-model" value="gpt-4o-mini" /></div>
         <div class="fg"><label class="bl">Base URL</label><input type="text" id="opt-openai-baseurl" value="https://api.openai.com/v1" /><p class="hint">Change for proxy or compatible endpoint</p></div>
+        <button class="btn btn-sm" id="test-openai">Test Connection</button>
+        <span class="save-status" id="test-openai-status"></span>
       </div>
 
       <!-- Claude -->
@@ -102,6 +149,8 @@
         <h3>Anthropic Claude</h3>
         <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-claude-key" placeholder="sk-ant-..." /><p class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-claude-model" value="claude-sonnet-4-20250514" /><p class="hint">e.g. claude-sonnet-4-20250514, claude-3-5-haiku-20241022</p></div>
+        <button class="btn btn-sm" id="test-claude">Test Connection</button>
+        <span class="save-status" id="test-claude-status"></span>
       </div>
 
       <!-- DeepSeek -->
@@ -109,6 +158,8 @@
         <h3>DeepSeek</h3>
         <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-deepseek-key" placeholder="sk-..." /><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-chat" /></div>
+        <button class="btn btn-sm" id="test-deepseek">Test Connection</button>
+        <span class="save-status" id="test-deepseek-status"></span>
       </div>
 
       <!-- Qwen -->
@@ -116,6 +167,8 @@
         <h3>Qwen (通义千问)</h3>
         <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-qwen-key" placeholder="sk-..." /><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-qwen-model" value="qwen-turbo" /></div>
+        <button class="btn btn-sm" id="test-qwen">Test Connection</button>
+        <span class="save-status" id="test-qwen-status"></span>
       </div>
 
       <!-- MiniMax -->
@@ -123,6 +176,8 @@
         <h3>MiniMax</h3>
         <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-minimax-key" /><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-Text-01" /></div>
+        <button class="btn btn-sm" id="test-minimax">Test Connection</button>
+        <span class="save-status" id="test-minimax-status"></span>
       </div>
 
       <!-- OpenRouter -->
@@ -130,6 +185,8 @@
         <h3>OpenRouter</h3>
         <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-openrouter-key" placeholder="sk-or-..." /><p class="hint"><a href="https://openrouter.ai/keys" target="_blank">Get key</a>. Access 100+ models from one API.</p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-openrouter-model" value="google/gemini-2.0-flash-exp:free" /><p class="hint">Browse models at <a href="https://openrouter.ai/models" target="_blank">openrouter.ai/models</a></p></div>
+        <button class="btn btn-sm" id="test-openrouter">Test Connection</button>
+        <span class="save-status" id="test-openrouter-status"></span>
       </div>
 
       <!-- Ollama -->
@@ -137,6 +194,8 @@
         <h3>Ollama (Local)</h3>
         <div class="fg"><label class="bl">Base URL</label><input type="text" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-ollama-model" value="llama3" /><p class="hint">Run <code>ollama pull llama3</code> first</p></div>
+        <button class="btn btn-sm" id="test-ollama">Test Connection</button>
+        <span class="save-status" id="test-ollama-status"></span>
       </div>
 
       <!-- Custom -->
@@ -146,14 +205,15 @@
         <div class="fg"><label class="bl">Base URL</label><input type="text" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /><p class="hint">Must support <code>/chat/completions</code> endpoint</p></div>
         <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-custom-key" /><p class="hint">Leave empty if not required</p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
+        <button class="btn btn-sm" id="test-custom">Test Connection</button>
+        <span class="save-status" id="test-custom-status"></span>
       </div>
 
       <div class="divider"></div>
-      <button class="btn" id="save-api">Save</button><span class="save-status" id="api-status"></span>
-    </div>
+      <button class="btn" id="save-provider">Save Provider & Keys</button><span class="save-status" id="provider-status"></span>
 
-    <!-- AI Settings -->
-    <div id="panel-ai" class="panel">
+      <div class="divider"></div>
+      <div class="section-title">AI Behavior</div>
       <div class="fg"><label><input type="checkbox" id="opt-ai-auto-tags" /> Auto-generate AI tags on popup open</label></div>
       <div class="fg">
         <label class="bl">AI Summary Language</label>
@@ -174,12 +234,9 @@
         <input type="text" id="opt-ai-cache-duration" value="60" />
         <p class="hint">Cached per URL. Set 0 to disable.</p>
       </div>
-      <div class="divider"></div>
-      <button class="btn" id="save-ai">Save</button><span class="save-status" id="ai-status"></span>
-    </div>
 
-    <!-- Prompts -->
-    <div id="panel-prompts" class="panel">
+      <div class="divider"></div>
+      <div class="section-title">Prompts</div>
       <p class="hint" style="margin-bottom:12px">Customize the prompts sent to the AI. Use placeholders: <code>{{title}}</code> <code>{{url}}</code> <code>{{content}}</code> <code>{{description}}</code> <code>{{lang_instruction}}</code>. Leave empty to use defaults.</p>
 
       <div class="fg">
@@ -197,9 +254,50 @@
       </div>
 
       <div class="divider"></div>
-      <button class="btn" id="save-prompts">Save</button><span class="save-status" id="prompts-status"></span>
+      <button class="btn" id="save-ai">Save AI Settings & Prompts</button><span class="save-status" id="ai-status"></span>
+    </div>
+
+    <!-- Tab 4: Appearance & Notifications -->
+    <div id="panel-appearance" class="panel">
+      <div class="section-title">Theme</div>
+      <div class="fg">
+        <select id="opt-theme">
+          <option value="auto">Auto (follow system)</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-title">Popup Elements</div>
+      <div class="fg"><label><input type="checkbox" id="opt-show-search" checked /> Show search bar in popup</label></div>
+      <div class="fg"><label><input type="checkbox" id="opt-show-recent" checked /> Show recent bookmarks in popup</label></div>
+
+      <div class="divider"></div>
+      <div class="section-title">Notifications</div>
+      <div class="fg"><label><input type="checkbox" id="notify-context-menu" checked /> Context menu save</label></div>
+      <div class="fg"><label><input type="checkbox" id="notify-quick-save" checked /> Quick save</label></div>
+      <div class="fg"><label><input type="checkbox" id="notify-tab-set" checked /> Tab Set save</label></div>
+      <div class="fg"><label><input type="checkbox" id="notify-batch-save" checked /> Batch save</label></div>
+      <div class="fg"><label><input type="checkbox" id="notify-errors" checked /> Error notifications</label></div>
+
+      <div class="divider"></div>
+      <button class="btn" id="save-appearance">Save</button><span class="save-status" id="appearance-status"></span>
+
+      <div class="divider"></div>
+      <div class="section-title">Backup & Restore</div>
+      <p class="hint" style="margin-bottom:8px">Export/import your settings (API keys are excluded from export for security).</p>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn" id="export-settings">Export Settings</button>
+        <label class="btn" style="cursor:pointer;" title="Import settings from JSON file">
+          Import Settings
+          <input type="file" id="import-settings-file" accept=".json" style="display:none;" />
+        </label>
+        <span class="save-status" id="import-status"></span>
+      </div>
     </div>
   </div>
+  <script src="shared.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
