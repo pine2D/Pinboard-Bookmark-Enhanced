@@ -42,6 +42,13 @@
     "128": "icons/pin-default-128.png"
   },
   "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://pinboard.in/*", "https://*.pinboard.in/*"],
+      "js": ["pinboard-style.js"],
+      "run_at": "document_start"
+    }
+  ],
   "commands": {
     "_execute_action": {
       "suggested_key": {

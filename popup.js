@@ -27,8 +27,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     customTagPrompt: "", customSummaryPrompt: "",
     optPrivateDefault: false, optPrivateIncognito: false, optReadlaterDefault: false,
     optAutoDescription: true, optBlockquote: true, optIncludeReferrer: true, optAiAutoTags: false,
-    optShowNotifications: true, optShowRecent: true, optShowSearch: true,
-    optTheme: "auto", optBatchTagEnabled: true, optBatchTag: "batch_saved"
+    optShowRecent: true, optShowSearch: true,
+    optTheme: "auto", optBatchTagEnabled: true, optBatchTag: "batch_saved",
+    batchAiTags: false, batchAiSummary: false
   });
 
   // Deobfuscate API keys loaded from storage
@@ -201,11 +202,55 @@ function setupTabSet() {
         batchBtn.textContent = "📌 Batch Save"; batchBtn.disabled = false;
         return;
       }
-      const batchTag = settings.optBatchTagEnabled && settings.optBatchTag ? settings.optBatchTag : "";
+      // Parse comma-separated tags into space-separated format for Pinboard
+      const baseTags = settings.optBatchTagEnabled && settings.optBatchTag
+        ? settings.optBatchTag.split(/[,，]+/).map(t => t.trim().replace(/\s+/g, "-")).filter(Boolean)
+        : [];
+      const useAiTags = settings.batchAiTags && hasAIKey(settings);
+      const useAiSummary = settings.batchAiSummary && hasAIKey(settings);
+
       let saved = 0, failed = 0;
-      for (const t of validTabs) {
+      for (let i = 0; i < validTabs.length; i++) {
+        const t = validTabs[i];
+        batchBtn.textContent = `⏳ ${i + 1}/${validTabs.length}...`;
         try {
-          const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${pinboardToken}&format=json&url=${enc(t.url)}&description=${enc(t.title || t.url)}&tags=${enc(batchTag)}&replace=yes`;
+          let tags = [...baseTags];
+          let notes = "";
+
+          // AI features per tab (if enabled)
+          if (useAiTags || useAiSummary) {
+            let tabPageInfo = null;
+            try { tabPageInfo = await getPageInfoFromTab(t.id); } catch (_) {}
+            if (tabPageInfo?.pageText) {
+              if (useAiTags) {
+                try {
+                  const cached = await getAICache(t.url, "tags", settings.aiCacheDuration);
+                  if (cached) { tags = [...tags, ...cached]; }
+                  else {
+                    const prompt = buildTagPrompt(settings, t.title || t.url, t.url, tabPageInfo.pageText, "", []);
+                    const resp = await callAI(settings, prompt);
+                    const aiTags = parseAITags(resp);
+                    await setAICache(t.url, "tags", aiTags, settings.aiCacheDuration);
+                    tags = [...tags, ...aiTags];
+                  }
+                } catch (_) {}
+              }
+              if (useAiSummary) {
+                try {
+                  const cached = await getAICache(t.url, "summary", settings.aiCacheDuration);
+                  if (cached) { notes = `[AI Summary]\n<blockquote>${cached}</blockquote>`; }
+                  else {
+                    const prompt = buildSummaryPrompt(settings, t.title || t.url, t.url, tabPageInfo.pageText, "");
+                    const summary = await callAI(settings, prompt);
+                    await setAICache(t.url, "summary", summary, settings.aiCacheDuration);
+                    notes = `[AI Summary]\n<blockquote>${summary}</blockquote>`;
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+
+          const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${pinboardToken}&format=json&url=${enc(t.url)}&description=${enc(t.title || t.url)}&extended=${enc(notes)}&tags=${enc(tags.join(" "))}&replace=yes`;
           const data = await (await fetch(apiUrl)).json();
           if (data.result_code === "done") saved++;
           else failed++;
@@ -213,9 +258,10 @@ function setupTabSet() {
         // Respect Pinboard rate limit (3s between calls)
         await new Promise(r => setTimeout(r, 3100));
       }
+      const tagStr = baseTags.join(", ");
       showStatus("status-msg", `Batch done: ${saved} saved, ${failed} failed`, saved > 0 ? "success" : "error");
       if (saved > 0) {
-        chrome.runtime.sendMessage({ type: "show_notification", id: "batch-saved", title: "Pinboard: Batch Saved!", message: `${saved} bookmarks saved${batchTag ? ` (tagged: ${batchTag})` : ""}.`, category: "batchSave" });
+        chrome.runtime.sendMessage({ type: "show_notification", id: "batch-saved", title: "Pinboard: Batch Saved!", message: `${saved} bookmarks saved${tagStr ? ` (tagged: ${tagStr})` : ""}.`, category: "batchSave" });
       }
       batchBtn.textContent = `✅ ${saved} saved`;
       setTimeout(() => { batchBtn.textContent = "📌 Batch Save"; batchBtn.disabled = false; }, 3000);

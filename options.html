@@ -33,11 +33,16 @@
     .pf.hidden { display: none; }
     .pf h3 { font-size: 12px; color: #555; margin-bottom: 8px; font-weight: bold; }
     .section-title { font-size: 13px; font-weight: bold; color: #444; margin-bottom: 8px; margin-top: 4px; }
+    .auto-save-hint {
+      float: right; font-size: 11px; color: #999; font-weight: normal;
+      transition: color 0.3s;
+    }
+    .auto-save-hint.saved { color: #080; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Pinboard Bookmark Plus — Settings</h1>
+    <h1>Pinboard Bookmark Plus — Settings <span class="auto-save-hint" id="auto-save-status">auto-save enabled</span></h1>
 
     <div class="tabs">
       <button class="tab-btn active" data-panel="bookmarks">Bookmarks</button>
@@ -48,6 +53,13 @@
 
     <!-- Tab 1: Bookmarks -->
     <div id="panel-bookmarks" class="panel active">
+      <div class="section-title">Pinboard Account</div>
+      <div class="fg">
+        <label class="bl">API Token</label>
+        <input type="text" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" />
+        <p class="hint">From <a href="https://pinboard.in/settings/password" target="_blank">pinboard.in/settings/password</a></p>
+      </div>
+      <div class="divider"></div>
       <div class="section-title">Save Defaults</div>
       <div class="fg"><label><input type="checkbox" id="opt-private-default" /> Private by default</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-private-incognito" /> Private in Incognito</label></div>
@@ -57,14 +69,12 @@
       <div class="fg"><label><input type="checkbox" id="opt-auto-description" checked /> Auto-fill meta description into notes</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-blockquote" checked /> Wrap selected text with &lt;blockquote&gt;</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-include-referrer" checked /> Include referrer in Notes</label></div>
-      <div class="divider"></div>
-      <button class="btn" id="save-bookmarks">Save</button><span class="save-status" id="bookmarks-status"></span>
     </div>
 
     <!-- Tab 2: Quick Actions -->
     <div id="panel-quick" class="panel">
       <div class="section-title">Context Menu Save</div>
-      <p class="hint" style="margin-bottom:8px">Right-click a page or link to save to Pinboard. These settings control what's included.</p>
+      <p class="hint" style="margin-bottom:8px">Right-click a page or link to save to Pinboard.</p>
       <div class="fg"><label><input type="checkbox" id="ctx-auto-notes" checked /> Auto-add page description to notes</label></div>
       <div class="fg"><label><input type="checkbox" id="ctx-blockquote" checked /> Wrap selected text with blockquote in notes</label></div>
       <div class="fg">
@@ -76,7 +86,7 @@
 
       <div class="divider"></div>
       <div class="section-title">Quick Save</div>
-      <p class="hint" style="margin-bottom:8px">Save the current page instantly via keyboard shortcut (without opening popup). Configure in Chrome's shortcut settings.</p>
+      <p class="hint" style="margin-bottom:8px">Save the current page instantly via keyboard shortcut (without opening popup).</p>
       <p style="margin-bottom:8px;"><a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" style="text-decoration:none;">Open Chrome Shortcut Settings</a></p>
       <p class="hint" style="margin-bottom:8px">Or navigate manually: <code>chrome://extensions/shortcuts</code></p>
       <div class="fg"><label><input type="checkbox" id="qs-auto-notes" checked /> Auto-add page description to notes</label></div>
@@ -90,28 +100,22 @@
 
       <div class="divider"></div>
       <div class="section-title">Batch Save</div>
-      <p class="hint" style="margin-bottom:8px">Save each open tab as an individual bookmark. Useful for saving research sessions.</p>
-      <div class="fg"><label><input type="checkbox" id="opt-batch-tag-enabled" checked /> Auto-add tag</label></div>
+      <p class="hint" style="margin-bottom:8px">Save each open tab as an individual bookmark.</p>
+      <div class="fg"><label><input type="checkbox" id="opt-batch-tag-enabled" checked /> Auto-add tags</label></div>
       <div class="fg">
-        <label class="bl">Tag Name</label>
+        <label class="bl">Tags (comma-separated)</label>
         <input type="text" id="opt-batch-tag" value="batch_saved" />
-        <p class="hint">This tag is automatically added to every bookmark saved via Batch Save.</p>
+        <p class="hint">Multiple tags separated by commas. E.g. <code>batch_saved, research</code></p>
       </div>
-      <div class="divider"></div>
-      <button class="btn" id="save-quick">Save</button><span class="save-status" id="quick-status"></span>
+      <div class="fg"><label><input type="checkbox" id="batch-ai-tags" /> Auto-generate AI tags for each tab</label></div>
+      <div class="fg"><label><input type="checkbox" id="batch-ai-summary" /> Auto-generate AI summary for each tab</label></div>
+      <p class="hint">⚠ AI features in batch save will be slow — each tab needs a separate AI call with 3s rate limit between saves.</p>
     </div>
 
     <!-- Tab 3: AI -->
     <div id="panel-ai" class="panel">
-      <div class="section-title">Provider</div>
+      <div class="section-title">AI Provider</div>
       <div class="fg">
-        <label class="bl">Pinboard API Token</label>
-        <input type="text" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" />
-        <p class="hint">From <a href="https://pinboard.in/settings/password" target="_blank">pinboard.in/settings/password</a></p>
-      </div>
-      <div class="divider"></div>
-      <div class="fg">
-        <label class="bl">AI Provider</label>
         <select id="opt-ai-provider">
           <option value="gemini">Google Gemini</option>
           <option value="openai">OpenAI (ChatGPT)</option>
@@ -210,9 +214,6 @@
       </div>
 
       <div class="divider"></div>
-      <button class="btn" id="save-provider">Save Provider & Keys</button><span class="save-status" id="provider-status"></span>
-
-      <div class="divider"></div>
       <div class="section-title">AI Behavior</div>
       <div class="fg"><label><input type="checkbox" id="opt-ai-auto-tags" /> Auto-generate AI tags on popup open</label></div>
       <div class="fg">
@@ -252,9 +253,6 @@
         <p class="hint">Use <code>{{lang_instruction}}</code> to insert the language setting automatically.</p>
         <button class="btn btn-sm" id="reset-summary-prompt" style="margin-top:4px">Reset to default</button>
       </div>
-
-      <div class="divider"></div>
-      <button class="btn" id="save-ai">Save AI Settings & Prompts</button><span class="save-status" id="ai-status"></span>
     </div>
 
     <!-- Tab 4: Appearance & Notifications -->
@@ -282,7 +280,18 @@
       <div class="fg"><label><input type="checkbox" id="notify-errors" checked /> Error notifications</label></div>
 
       <div class="divider"></div>
-      <button class="btn" id="save-appearance">Save</button><span class="save-status" id="appearance-status"></span>
+      <div class="section-title">Pinboard.in Custom Style</div>
+      <p class="hint" style="margin-bottom:8px">Inject custom CSS into pinboard.in pages. Useful for changing fonts, colors, layout etc.</p>
+      <div class="fg">
+        <label class="bl">Custom Font</label>
+        <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans SC', 'Fira Code', sans-serif" />
+        <p class="hint">Applied to <code>body</code> on pinboard.in. Leave empty to keep default.</p>
+      </div>
+      <div class="fg">
+        <label class="bl">Custom CSS</label>
+        <textarea id="opt-custom-css" rows="6" placeholder="/* Custom CSS for pinboard.in */&#10;body { line-height: 1.6; }&#10;.bookmark_title { font-size: 14px; }"></textarea>
+        <p class="hint">Injected as a <code>&lt;style&gt;</code> block on every pinboard.in page.</p>
+      </div>
 
       <div class="divider"></div>
       <div class="section-title">Backup & Restore</div>

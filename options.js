@@ -9,70 +9,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // ---- Load all settings ----
-  const s = await chrome.storage.sync.get({
+  // ---- All settings with defaults ----
+  const DEFAULTS = {
     pinboardToken: "",
     aiProvider: "gemini",
-    geminiApiKey: "",
-    geminiModel: "gemini-2.0-flash",
-    openaiApiKey: "",
-    openaiModel: "gpt-4o-mini",
-    openaiBaseUrl: "https://api.openai.com/v1",
-    claudeApiKey: "",
-    claudeModel: "claude-sonnet-4-20250514",
-    deepseekApiKey: "",
-    deepseekModel: "deepseek-chat",
-    qwenApiKey: "",
-    qwenModel: "qwen-turbo",
-    minimaxApiKey: "",
-    minimaxModel: "MiniMax-Text-01",
-    openrouterApiKey: "",
-    openrouterModel: "google/gemini-2.0-flash-exp:free",
-    ollamaBaseUrl: "http://localhost:11434",
-    ollamaModel: "llama3",
-    customApiKey: "",
-    customModel: "",
-    customBaseUrl: "",
-    customName: "Custom",
-    aiSummaryLang: "auto",
-    aiCacheDuration: 60,
-    customTagPrompt: "",
-    customSummaryPrompt: "",
-    // Bookmarks tab
-    optPrivateDefault: false,
-    optPrivateIncognito: false,
-    optReadlaterDefault: false,
-    optAutoDescription: true,
-    optBlockquote: true,
-    optIncludeReferrer: true,
-    // AI tab
+    geminiApiKey: "", geminiModel: "gemini-2.0-flash",
+    openaiApiKey: "", openaiModel: "gpt-4o-mini", openaiBaseUrl: "https://api.openai.com/v1",
+    claudeApiKey: "", claudeModel: "claude-sonnet-4-20250514",
+    deepseekApiKey: "", deepseekModel: "deepseek-chat",
+    qwenApiKey: "", qwenModel: "qwen-turbo",
+    minimaxApiKey: "", minimaxModel: "MiniMax-Text-01",
+    openrouterApiKey: "", openrouterModel: "google/gemini-2.0-flash-exp:free",
+    ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3",
+    customApiKey: "", customModel: "", customBaseUrl: "", customName: "Custom",
+    aiSummaryLang: "auto", aiCacheDuration: 60,
+    customTagPrompt: "", customSummaryPrompt: "",
+    optPrivateDefault: false, optPrivateIncognito: false, optReadlaterDefault: false,
+    optAutoDescription: true, optBlockquote: true, optIncludeReferrer: true,
     optAiAutoTags: false,
-    // Quick Actions - Context Menu
-    ctxAutoNotes: true,
-    ctxBlockquote: true,
-    ctxDefaultTags: "",
-    ctxAiTags: false,
-    ctxAiSummary: false,
-    // Quick Actions - Quick Save
-    qsAutoNotes: true,
-    qsBlockquote: true,
-    qsDefaultTags: "",
-    qsAiTags: false,
-    qsAiSummary: false,
-    // Quick Actions - Batch Save
-    optBatchTagEnabled: true,
-    optBatchTag: "batch_saved",
-    // Appearance
-    optShowRecent: true,
-    optShowSearch: true,
-    optTheme: "auto",
-    // Notifications
-    notifyContextMenu: true,
-    notifyQuickSave: true,
-    notifyTabSet: true,
-    notifyBatchSave: true,
-    notifyErrors: true
-  });
+    ctxAutoNotes: true, ctxBlockquote: true, ctxDefaultTags: "", ctxAiTags: false, ctxAiSummary: false,
+    qsAutoNotes: true, qsBlockquote: true, qsDefaultTags: "", qsAiTags: false, qsAiSummary: false,
+    optBatchTagEnabled: true, optBatchTag: "batch_saved",
+    batchAiTags: false, batchAiSummary: false,
+    optShowRecent: true, optShowSearch: true, optTheme: "auto",
+    notifyContextMenu: true, notifyQuickSave: true, notifyTabSet: true, notifyBatchSave: true, notifyErrors: true,
+    customFont: "", customCSS: ""
+  };
+
+  const s = await chrome.storage.sync.get(DEFAULTS);
 
   // Deobfuscate API keys for display
   const keyFields = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","customApiKey"];
@@ -82,37 +46,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   const fieldMap = {
     "opt-pinboard-token": s.pinboardToken,
     "opt-ai-provider": s.aiProvider,
-    "opt-gemini-key": s.geminiApiKey,
-    "opt-gemini-model": s.geminiModel,
-    "opt-openai-key": s.openaiApiKey,
-    "opt-openai-model": s.openaiModel,
-    "opt-openai-baseurl": s.openaiBaseUrl,
-    "opt-claude-key": s.claudeApiKey,
-    "opt-claude-model": s.claudeModel,
-    "opt-deepseek-key": s.deepseekApiKey,
-    "opt-deepseek-model": s.deepseekModel,
-    "opt-qwen-key": s.qwenApiKey,
-    "opt-qwen-model": s.qwenModel,
-    "opt-minimax-key": s.minimaxApiKey,
-    "opt-minimax-model": s.minimaxModel,
-    "opt-openrouter-key": s.openrouterApiKey,
-    "opt-openrouter-model": s.openrouterModel,
-    "opt-ollama-baseurl": s.ollamaBaseUrl,
-    "opt-ollama-model": s.ollamaModel,
-    "opt-custom-name": s.customName,
-    "opt-custom-baseurl": s.customBaseUrl,
-    "opt-custom-key": s.customApiKey,
-    "opt-custom-model": s.customModel,
-    "opt-ai-summary-lang": s.aiSummaryLang,
-    "opt-ai-cache-duration": s.aiCacheDuration,
-    "opt-custom-tag-prompt": s.customTagPrompt,
-    "opt-custom-summary-prompt": s.customSummaryPrompt,
-    "opt-batch-tag": s.optBatchTag,
-    "opt-theme": s.optTheme,
-    "ctx-default-tags": s.ctxDefaultTags,
-    "qs-default-tags": s.qsDefaultTags
+    "opt-gemini-key": s.geminiApiKey, "opt-gemini-model": s.geminiModel,
+    "opt-openai-key": s.openaiApiKey, "opt-openai-model": s.openaiModel, "opt-openai-baseurl": s.openaiBaseUrl,
+    "opt-claude-key": s.claudeApiKey, "opt-claude-model": s.claudeModel,
+    "opt-deepseek-key": s.deepseekApiKey, "opt-deepseek-model": s.deepseekModel,
+    "opt-qwen-key": s.qwenApiKey, "opt-qwen-model": s.qwenModel,
+    "opt-minimax-key": s.minimaxApiKey, "opt-minimax-model": s.minimaxModel,
+    "opt-openrouter-key": s.openrouterApiKey, "opt-openrouter-model": s.openrouterModel,
+    "opt-ollama-baseurl": s.ollamaBaseUrl, "opt-ollama-model": s.ollamaModel,
+    "opt-custom-name": s.customName, "opt-custom-baseurl": s.customBaseUrl,
+    "opt-custom-key": s.customApiKey, "opt-custom-model": s.customModel,
+    "opt-ai-summary-lang": s.aiSummaryLang, "opt-ai-cache-duration": s.aiCacheDuration,
+    "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
+    "opt-batch-tag": s.optBatchTag, "opt-theme": s.optTheme,
+    "ctx-default-tags": s.ctxDefaultTags, "qs-default-tags": s.qsDefaultTags,
+    "opt-custom-font": s.customFont, "opt-custom-css": s.customCSS
   };
-
   for (const [id, val] of Object.entries(fieldMap)) {
     const el = document.getElementById(id);
     if (el) el.value = val;
@@ -120,88 +69,61 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- Fill checkbox fields ----
   const checkMap = {
-    // Bookmarks tab
-    "opt-private-default": s.optPrivateDefault,
-    "opt-private-incognito": s.optPrivateIncognito,
-    "opt-readlater-default": s.optReadlaterDefault,
-    "opt-auto-description": s.optAutoDescription,
-    "opt-blockquote": s.optBlockquote,
-    "opt-include-referrer": s.optIncludeReferrer,
-    // AI tab
+    "opt-private-default": s.optPrivateDefault, "opt-private-incognito": s.optPrivateIncognito,
+    "opt-readlater-default": s.optReadlaterDefault, "opt-auto-description": s.optAutoDescription,
+    "opt-blockquote": s.optBlockquote, "opt-include-referrer": s.optIncludeReferrer,
     "opt-ai-auto-tags": s.optAiAutoTags,
-    // Quick Actions - Context Menu
-    "ctx-auto-notes": s.ctxAutoNotes,
-    "ctx-blockquote": s.ctxBlockquote,
-    "ctx-ai-tags": s.ctxAiTags,
-    "ctx-ai-summary": s.ctxAiSummary,
-    // Quick Actions - Quick Save
-    "qs-auto-notes": s.qsAutoNotes,
-    "qs-blockquote": s.qsBlockquote,
-    "qs-ai-tags": s.qsAiTags,
-    "qs-ai-summary": s.qsAiSummary,
-    // Quick Actions - Batch Save
+    "ctx-auto-notes": s.ctxAutoNotes, "ctx-blockquote": s.ctxBlockquote,
+    "ctx-ai-tags": s.ctxAiTags, "ctx-ai-summary": s.ctxAiSummary,
+    "qs-auto-notes": s.qsAutoNotes, "qs-blockquote": s.qsBlockquote,
+    "qs-ai-tags": s.qsAiTags, "qs-ai-summary": s.qsAiSummary,
     "opt-batch-tag-enabled": s.optBatchTagEnabled,
-    // Appearance
-    "opt-show-recent": s.optShowRecent,
-    "opt-show-search": s.optShowSearch,
-    // Notifications
-    "notify-context-menu": s.notifyContextMenu,
-    "notify-quick-save": s.notifyQuickSave,
-    "notify-tab-set": s.notifyTabSet,
-    "notify-batch-save": s.notifyBatchSave,
+    "batch-ai-tags": s.batchAiTags, "batch-ai-summary": s.batchAiSummary,
+    "opt-show-recent": s.optShowRecent, "opt-show-search": s.optShowSearch,
+    "notify-context-menu": s.notifyContextMenu, "notify-quick-save": s.notifyQuickSave,
+    "notify-tab-set": s.notifyTabSet, "notify-batch-save": s.notifyBatchSave,
     "notify-errors": s.notifyErrors
   };
-
   for (const [id, val] of Object.entries(checkMap)) {
     const el = document.getElementById(id);
     if (el) el.checked = val;
   }
 
   // ---- Provider field toggle ----
-  const providers = ["gemini", "openai", "claude", "deepseek", "qwen", "minimax", "openrouter", "ollama", "custom"];
-
+  const providers = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","ollama","custom"];
   function updateProviderFields() {
     const selected = document.getElementById("opt-ai-provider").value;
-    providers.forEach((p) => {
+    providers.forEach(p => {
       const el = document.getElementById("fields-" + p);
-      if (el) {
-        if (p === selected) {
-          el.classList.remove("hidden");
-        } else {
-          el.classList.add("hidden");
-        }
-      }
+      if (el) el.classList.toggle("hidden", p !== selected);
     });
   }
-
   updateProviderFields();
   document.getElementById("opt-ai-provider").addEventListener("change", updateProviderFields);
 
   // ---- Reset prompt buttons ----
   document.getElementById("reset-tag-prompt").addEventListener("click", () => {
     document.getElementById("opt-custom-tag-prompt").value = DEFAULT_TAG_PROMPT;
+    saveAll();
   });
-
   document.getElementById("reset-summary-prompt").addEventListener("click", () => {
     document.getElementById("opt-custom-summary-prompt").value = DEFAULT_SUMMARY_PROMPT;
+    saveAll();
   });
 
-  // ---- Save: Bookmarks ----
-  document.getElementById("save-bookmarks").addEventListener("click", async () => {
-    await chrome.storage.sync.set({
+  // ===================== Auto-save =====================
+  // Collect all settings from the form and save to chrome.storage.sync
+  async function saveAll() {
+    const data = {
+      // Bookmarks
+      pinboardToken: obfuscateKey(document.getElementById("opt-pinboard-token").value.trim()),
       optPrivateDefault: document.getElementById("opt-private-default").checked,
       optPrivateIncognito: document.getElementById("opt-private-incognito").checked,
       optReadlaterDefault: document.getElementById("opt-readlater-default").checked,
       optAutoDescription: document.getElementById("opt-auto-description").checked,
       optBlockquote: document.getElementById("opt-blockquote").checked,
-      optIncludeReferrer: document.getElementById("opt-include-referrer").checked
-    });
-    flash("bookmarks-status");
-  });
-
-  // ---- Save: Quick Actions ----
-  document.getElementById("save-quick").addEventListener("click", async () => {
-    await chrome.storage.sync.set({
+      optIncludeReferrer: document.getElementById("opt-include-referrer").checked,
+      // Quick Actions
       ctxAutoNotes: document.getElementById("ctx-auto-notes").checked,
       ctxBlockquote: document.getElementById("ctx-blockquote").checked,
       ctxDefaultTags: document.getElementById("ctx-default-tags").value.trim(),
@@ -213,15 +135,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       qsAiTags: document.getElementById("qs-ai-tags").checked,
       qsAiSummary: document.getElementById("qs-ai-summary").checked,
       optBatchTagEnabled: document.getElementById("opt-batch-tag-enabled").checked,
-      optBatchTag: document.getElementById("opt-batch-tag").value.trim() || "batch_saved"
-    });
-    flash("quick-status");
-  });
-
-  // ---- Save: Provider & Keys ----
-  document.getElementById("save-provider").addEventListener("click", async () => {
-    await chrome.storage.sync.set({
-      pinboardToken: obfuscateKey(document.getElementById("opt-pinboard-token").value.trim()),
+      optBatchTag: document.getElementById("opt-batch-tag").value.trim() || "batch_saved",
+      batchAiTags: document.getElementById("batch-ai-tags").checked,
+      batchAiSummary: document.getElementById("batch-ai-summary").checked,
+      // AI Provider & Keys
       aiProvider: document.getElementById("opt-ai-provider").value,
       geminiApiKey: obfuscateKey(document.getElementById("opt-gemini-key").value.trim()),
       geminiModel: document.getElementById("opt-gemini-model").value.trim() || "gemini-2.0-flash",
@@ -243,42 +160,63 @@ document.addEventListener("DOMContentLoaded", async () => {
       customName: document.getElementById("opt-custom-name").value.trim() || "Custom",
       customBaseUrl: document.getElementById("opt-custom-baseurl").value.trim(),
       customApiKey: obfuscateKey(document.getElementById("opt-custom-key").value.trim()),
-      customModel: document.getElementById("opt-custom-model").value.trim()
-    });
-    flash("provider-status");
-  });
-
-  // ---- Save: AI Settings & Prompts ----
-  document.getElementById("save-ai").addEventListener("click", async () => {
-    await chrome.storage.sync.set({
+      customModel: document.getElementById("opt-custom-model").value.trim(),
+      // AI Behavior & Prompts
       optAiAutoTags: document.getElementById("opt-ai-auto-tags").checked,
       aiSummaryLang: document.getElementById("opt-ai-summary-lang").value,
       aiCacheDuration: parseInt(document.getElementById("opt-ai-cache-duration").value) || 60,
       customTagPrompt: document.getElementById("opt-custom-tag-prompt").value,
-      customSummaryPrompt: document.getElementById("opt-custom-summary-prompt").value
-    });
-    flash("ai-status");
-  });
-
-  // ---- Save: Appearance & Notifications ----
-  document.getElementById("save-appearance").addEventListener("click", async () => {
-    await chrome.storage.sync.set({
+      customSummaryPrompt: document.getElementById("opt-custom-summary-prompt").value,
+      // Appearance
       optTheme: document.getElementById("opt-theme").value,
       optShowSearch: document.getElementById("opt-show-search").checked,
       optShowRecent: document.getElementById("opt-show-recent").checked,
+      // Notifications
       notifyContextMenu: document.getElementById("notify-context-menu").checked,
       notifyQuickSave: document.getElementById("notify-quick-save").checked,
       notifyTabSet: document.getElementById("notify-tab-set").checked,
       notifyBatchSave: document.getElementById("notify-batch-save").checked,
-      notifyErrors: document.getElementById("notify-errors").checked
-    });
-    flash("appearance-status");
+      notifyErrors: document.getElementById("notify-errors").checked,
+      // Custom Style
+      customFont: document.getElementById("opt-custom-font").value.trim(),
+      customCSS: document.getElementById("opt-custom-css").value
+    };
+    await chrome.storage.sync.set(data);
+    flashAutoSave();
+  }
+
+  // Debounced auto-save: triggers 500ms after last change
+  let saveTimer = null;
+  function scheduleAutoSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveAll, 500);
+  }
+
+  // Listen on all form inputs for auto-save
+  document.querySelectorAll('.panel input[type="checkbox"]').forEach(el => {
+    el.addEventListener("change", scheduleAutoSave);
   });
+  document.querySelectorAll('.panel input[type="text"], .panel input[type="password"], .panel textarea').forEach(el => {
+    el.addEventListener("input", scheduleAutoSave);
+  });
+  document.querySelectorAll('.panel select').forEach(el => {
+    el.addEventListener("change", scheduleAutoSave);
+  });
+
+  function flashAutoSave() {
+    const el = document.getElementById("auto-save-status");
+    el.textContent = "✓ Saved";
+    el.classList.add("saved");
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => {
+      el.textContent = "auto-save enabled";
+      el.classList.remove("saved");
+    }, 1500);
+  }
 
   // ---- Export Settings ----
   document.getElementById("export-settings").addEventListener("click", async () => {
     const raw = await chrome.storage.sync.get(null);
-    // Strip sensitive keys (API keys and tokens)
     const sensitiveKeys = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","customApiKey"];
     const exportData = Object.fromEntries(
       Object.entries(raw).filter(([k]) => !sensitiveKeys.includes(k))
@@ -297,7 +235,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      // Only import non-sensitive keys
       const sensitiveKeys = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","customApiKey"];
       const safeData = Object.fromEntries(
         Object.entries(data).filter(([k]) => !sensitiveKeys.includes(k))
@@ -322,8 +259,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     statusEl.textContent = "Testing...";
     statusEl.style.color = "#888";
 
-    // Build a minimal settings object from current form values
-    const currentSettings = {
+    const cs = {
       aiProvider: provider,
       geminiApiKey: document.getElementById("opt-gemini-key")?.value?.trim() || "",
       geminiModel: document.getElementById("opt-gemini-model")?.value?.trim() || "gemini-2.0-flash",
@@ -349,75 +285,51 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
       const testPrompt = "Reply with just the word: OK";
-      let result = "";
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
-
       async function doFetch(url, options) {
         return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
       }
 
+      let result = "";
       if (provider === "gemini") {
-        if (!currentSettings.geminiApiKey) throw new Error("No API key");
-        const res = await doFetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentSettings.geminiModel}:generateContent?key=${currentSettings.geminiApiKey}`, {
+        if (!cs.geminiApiKey) throw new Error("No API key");
+        const res = await doFetch(`https://generativelanguage.googleapis.com/v1beta/models/${cs.geminiModel}:generateContent?key=${cs.geminiApiKey}`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: testPrompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 10 } })
         });
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `HTTP ${res.status}`); }
         result = (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "OK";
       } else if (provider === "claude") {
-        if (!currentSettings.claudeApiKey) throw new Error("No API key");
+        if (!cs.claudeApiKey) throw new Error("No API key");
         const res = await doFetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": currentSettings.claudeApiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-          body: JSON.stringify({ model: currentSettings.claudeModel, max_tokens: 10, messages: [{ role: "user", content: testPrompt }] })
+          headers: { "Content-Type": "application/json", "x-api-key": cs.claudeApiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+          body: JSON.stringify({ model: cs.claudeModel, max_tokens: 10, messages: [{ role: "user", content: testPrompt }] })
         });
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `HTTP ${res.status}`); }
         result = (await res.json()).content?.[0]?.text?.trim() || "OK";
       } else if (provider === "ollama") {
-        const base = (currentSettings.ollamaBaseUrl || "http://localhost:11434").replace(/\/+$/, "");
+        const base = (cs.ollamaBaseUrl || "http://localhost:11434").replace(/\/+$/, "");
         const res = await doFetch(`${base}/api/chat`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: currentSettings.ollamaModel, messages: [{ role: "user", content: testPrompt }], stream: false })
+          body: JSON.stringify({ model: cs.ollamaModel, messages: [{ role: "user", content: testPrompt }], stream: false })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         result = (await res.json()).message?.content?.trim() || "OK";
       } else {
-        // OpenAI-compatible: openai, deepseek, qwen, minimax, openrouter, custom
-        const baseUrlMap = {
-          openai: currentSettings.openaiBaseUrl || "https://api.openai.com/v1",
-          deepseek: "https://api.deepseek.com/v1",
-          qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-          minimax: "https://api.minimax.chat/v1",
-          openrouter: "https://openrouter.ai/api/v1",
-          custom: currentSettings.customBaseUrl
-        };
-        const apiKeyMap = {
-          openai: currentSettings.openaiApiKey,
-          deepseek: currentSettings.deepseekApiKey,
-          qwen: currentSettings.qwenApiKey,
-          minimax: currentSettings.minimaxApiKey,
-          openrouter: currentSettings.openrouterApiKey,
-          custom: currentSettings.customApiKey
-        };
-        const modelMap = {
-          openai: currentSettings.openaiModel,
-          deepseek: currentSettings.deepseekModel,
-          qwen: currentSettings.qwenModel,
-          minimax: currentSettings.minimaxModel,
-          openrouter: currentSettings.openrouterModel,
-          custom: currentSettings.customModel
-        };
+        const baseUrlMap = { openai: cs.openaiBaseUrl, deepseek: "https://api.deepseek.com/v1", qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1", minimax: "https://api.minimax.chat/v1", openrouter: "https://openrouter.ai/api/v1", custom: cs.customBaseUrl };
+        const apiKeyMap = { openai: cs.openaiApiKey, deepseek: cs.deepseekApiKey, qwen: cs.qwenApiKey, minimax: cs.minimaxApiKey, openrouter: cs.openrouterApiKey, custom: cs.customApiKey };
+        const modelMap = { openai: cs.openaiModel, deepseek: cs.deepseekModel, qwen: cs.qwenModel, minimax: cs.minimaxModel, openrouter: cs.openrouterModel, custom: cs.customModel };
         const baseUrl = baseUrlMap[provider];
         const apiKey = apiKeyMap[provider];
-        const model = modelMap[provider];
         if (!baseUrl) throw new Error("No base URL configured");
         if (!apiKey && provider !== "custom") throw new Error("No API key");
         const headers = { "Content-Type": "application/json" };
         if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
         const res = await doFetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
           method: "POST", headers,
-          body: JSON.stringify({ model, messages: [{ role: "user", content: testPrompt }], temperature: 0, max_tokens: 10 })
+          body: JSON.stringify({ model: modelMap[provider], messages: [{ role: "user", content: testPrompt }], temperature: 0, max_tokens: 10 })
         });
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `HTTP ${res.status}`); }
         result = (await res.json()).choices?.[0]?.message?.content?.trim() || "OK";
@@ -434,8 +346,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  const testBtns = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","ollama","custom"];
-  testBtns.forEach(p => {
+  ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","ollama","custom"].forEach(p => {
     document.getElementById(`test-${p}`)?.addEventListener("click", () => testAIProvider(p));
   });
 
@@ -445,11 +356,3 @@ document.addEventListener("DOMContentLoaded", async () => {
     chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
   });
 });
-
-function flash(id) {
-  const el = document.getElementById(id);
-  el.textContent = "✓ Saved";
-  setTimeout(() => {
-    el.textContent = "";
-  }, 2000);
-}
