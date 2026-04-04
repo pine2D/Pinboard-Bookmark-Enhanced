@@ -124,24 +124,6 @@
     <!-- Tab 2: Quick Actions -->
     <div id="panel-quick" class="panel">
       <div class="accordion-section">
-        <div class="accordion-header" data-target="acc-ctx">
-          <span class="accordion-arrow">▶</span> Context Menu Save
-        </div>
-        <div class="accordion-body" id="acc-ctx">
-          <div class="fg"><label><input type="checkbox" id="ctx-enabled" checked /> Enable context menu</label></div>
-          <p class="hint" style="margin-bottom:8px">Right-click a page, link, or selected text to save to Pinboard.</p>
-          <div class="fg"><label><input type="checkbox" id="ctx-auto-notes" checked /> Auto-add page description to notes</label></div>
-          <div class="fg"><label><input type="checkbox" id="ctx-blockquote" checked /> Wrap selected text with blockquote in notes</label></div>
-          <div class="fg">
-            <label class="bl">Default Tags (comma-separated)</label>
-            <input type="text" id="ctx-default-tags" placeholder="tag1, tag2" />
-          </div>
-          <div class="fg"><label><input type="checkbox" id="ctx-ai-tags" /> Auto-generate AI tags</label></div>
-          <div class="fg"><label><input type="checkbox" id="ctx-ai-summary" /> Auto-generate AI summary in notes</label></div>
-        </div>
-      </div>
-
-      <div class="accordion-section">
         <div class="accordion-header" data-target="acc-qs">
           <span class="accordion-arrow">▶</span> Quick Save
         </div>
@@ -369,7 +351,6 @@
 
       <div class="divider"></div>
       <div class="section-title">Notifications</div>
-      <div class="fg"><label><input type="checkbox" id="notify-context-menu" checked /> Context menu save</label></div>
       <div class="fg"><label><input type="checkbox" id="notify-quick-save" checked /> Quick save</label></div>
       <div class="fg"><label><input type="checkbox" id="notify-read-later" checked /> Read Later save</label></div>
       <div class="fg"><label><input type="checkbox" id="notify-tab-set" checked /> Tab Set save</label></div>

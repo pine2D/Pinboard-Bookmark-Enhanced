@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-ai-summary-lang": s.aiSummaryLang, "opt-ai-cache-duration": s.aiCacheDuration,
     "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
     "opt-batch-tag": s.optBatchTag, "opt-theme": s.optTheme,
-    "ctx-default-tags": s.ctxDefaultTags, "qs-default-tags": s.qsDefaultTags, "rl-default-tags": s.rlDefaultTags,
+    "qs-default-tags": s.qsDefaultTags, "rl-default-tags": s.rlDefaultTags,
     "opt-custom-font": s.customFont, "opt-custom-css": s.customCSS,
     "opt-ai-tag-separator": s.aiTagSeparator
   };
@@ -52,9 +52,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-readlater-default": s.optReadlaterDefault, "opt-auto-description": s.optAutoDescription,
     "opt-blockquote": s.optBlockquote, "opt-include-referrer": s.optIncludeReferrer,
     "opt-ai-auto-tags": s.optAiAutoTags,
-    "ctx-enabled": s.ctxEnabled,
-    "ctx-auto-notes": s.ctxAutoNotes, "ctx-blockquote": s.ctxBlockquote,
-    "ctx-ai-tags": s.ctxAiTags, "ctx-ai-summary": s.ctxAiSummary,
     "qs-auto-notes": s.qsAutoNotes, "qs-blockquote": s.qsBlockquote,
     "qs-ai-tags": s.qsAiTags, "qs-ai-summary": s.qsAiSummary,
     "rl-auto-notes": s.rlAutoNotes, "rl-blockquote": s.rlBlockquote,
@@ -63,7 +60,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "batch-ai-tags": s.batchAiTags, "batch-ai-summary": s.batchAiSummary,
     "batch-skip-existing": s.batchSkipExisting,
     "opt-show-recent": s.optShowRecent, "opt-show-search": s.optShowSearch,
-    "notify-context-menu": s.notifyContextMenu, "notify-quick-save": s.notifyQuickSave,
+    "notify-quick-save": s.notifyQuickSave,
     "notify-read-later": s.notifyReadLater,
     "notify-tab-set": s.notifyTabSet, "notify-batch-save": s.notifyBatchSave,
     "notify-errors": s.notifyErrors,
@@ -113,12 +110,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       optRespectTagCase: document.getElementById("opt-respect-tag-case").checked,
       offlineQueueEnabled: document.getElementById("offline-queue-enabled").checked,
       // Quick Actions
-      ctxEnabled: document.getElementById("ctx-enabled").checked,
-      ctxAutoNotes: document.getElementById("ctx-auto-notes").checked,
-      ctxBlockquote: document.getElementById("ctx-blockquote").checked,
-      ctxDefaultTags: document.getElementById("ctx-default-tags").value.trim(),
-      ctxAiTags: document.getElementById("ctx-ai-tags").checked,
-      ctxAiSummary: document.getElementById("ctx-ai-summary").checked,
       qsAutoNotes: document.getElementById("qs-auto-notes").checked,
       qsBlockquote: document.getElementById("qs-blockquote").checked,
       qsDefaultTags: document.getElementById("qs-default-tags").value.trim(),
@@ -171,7 +162,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       optShowRecent: document.getElementById("opt-show-recent").checked,
       optShowBadge: document.getElementById("opt-show-badge").checked,
       // Notifications
-      notifyContextMenu: document.getElementById("notify-context-menu").checked,
       notifyQuickSave: document.getElementById("notify-quick-save").checked,
       notifyReadLater: document.getElementById("notify-read-later").checked,
       notifyTabSet: document.getElementById("notify-tab-set").checked,

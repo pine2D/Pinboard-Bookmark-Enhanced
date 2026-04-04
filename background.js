@@ -72,10 +72,9 @@ async function loadSettings() {
 async function showNotification(id, title, message, category) {
   try {
     const cats = await chrome.storage.sync.get({
-      notifyContextMenu: true, notifyQuickSave: true, notifyReadLater: true,
+      notifyQuickSave: true, notifyReadLater: true,
       notifyTabSet: true, notifyBatchSave: true, notifyErrors: true
     });
-    if (category === "contextMenu" && !cats.notifyContextMenu) return;
     if (category === "quickSave" && !cats.notifyQuickSave) return;
     if (category === "readLater" && !cats.notifyReadLater) return;
     if (category === "tabSet" && !cats.notifyTabSet) return;
@@ -161,7 +160,7 @@ async function processOfflineQueue() {
 }
 
 // ---- P1: Shared save function ----
-async function saveFromBackground({ url, title, tab, selectionText, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
+async function saveFromBackground({ url, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
   const s = await loadSettings();
   // Apply settings overrides (prefix-resolved keys)
   if (settingsOverrides) Object.assign(s, settingsOverrides);
@@ -175,13 +174,6 @@ async function saveFromBackground({ url, title, tab, selectionText, settingsOver
   let pageInfo = null;
   if (tab?.id) {
     try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) {}
-  }
-
-  // Override selectedText if provided by context menu (more reliable than executeScript)
-  if (selectionText && pageInfo) {
-    pageInfo.selectedText = selectionText;
-  } else if (selectionText && !pageInfo) {
-    pageInfo = { url, title, selectedText: selectionText, metaDescription: "", referrer: "", pageText: "" };
   }
 
   // Build notes from page info
@@ -381,44 +373,13 @@ async function handleSaveTabSet(tabsData) {
   }
 }
 
-// ===================== Context Menu =====================
-async function setupContextMenu() {
-  await chrome.contextMenus.removeAll();
-  const s = await chrome.storage.sync.get({ ctxEnabled: true });
-  if (!s.ctxEnabled) return;
-  chrome.contextMenus.create({
-    id: "save-to-pinboard",
-    title: "Save to Pinboard",
-    contexts: ["page", "link", "selection"]
-  });
-}
-
-chrome.runtime.onInstalled.addListener(() => setupContextMenu());
-// Re-create menu when setting changes
+// ---- Storage change listener ----
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.pinboardToken) _cachedToken = null;
   if (changes.optShowBadge) {
     if (changes.optShowBadge.newValue) updateBadge().catch(() => {});
     else chrome.action.setBadgeText({ text: "" });
   }
-  if (changes.ctxEnabled) setupContextMenu();
-});
-
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  const url = info.linkUrl || info.pageUrl;
-  if (!url) return;
-  const title = info.linkUrl ? (info.selectionText || info.linkUrl) : (tab?.title || url);
-  const s = await loadSettings();
-  const overrides = resolvePrefixSettings(s, "ctx");
-  await saveFromBackground({
-    url, title, tab,
-    selectionText: info.selectionText || "",
-    settingsOverrides: overrides,
-    toread: false,
-    notifyId: "pinboard",
-    notifyTitle: "Pinboard: Saved!",
-    notifyCategory: "contextMenu"
-  });
 });
 
 // ===================== Read Later (keyboard shortcut) =====================
