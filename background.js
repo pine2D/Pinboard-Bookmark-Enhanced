@@ -161,7 +161,7 @@ async function processOfflineQueue() {
 }
 
 // ---- P1: Shared save function ----
-async function saveFromBackground({ url, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
+async function saveFromBackground({ url, title, tab, selectionText, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
   const s = await loadSettings();
   // Apply settings overrides (prefix-resolved keys)
   if (settingsOverrides) Object.assign(s, settingsOverrides);
@@ -175,6 +175,13 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   let pageInfo = null;
   if (tab?.id) {
     try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) {}
+  }
+
+  // Override selectedText if provided by context menu (more reliable than executeScript)
+  if (selectionText && pageInfo) {
+    pageInfo.selectedText = selectionText;
+  } else if (selectionText && !pageInfo) {
+    pageInfo = { url, title, selectedText: selectionText, metaDescription: "", referrer: "", pageText: "" };
   }
 
   // Build notes from page info
@@ -405,6 +412,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const overrides = resolvePrefixSettings(s, "ctx");
   await saveFromBackground({
     url, title, tab,
+    selectionText: info.selectionText || "",
     settingsOverrides: overrides,
     toread: false,
     notifyId: "pinboard",

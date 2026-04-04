@@ -440,7 +440,9 @@ function setupTagsInput() {
     if (!matches.length) { dropdown.classList.add("hidden"); return; }
     dropdown.innerHTML = "";
     matches.forEach((tag) => {
-      const item = document.createElement("div"); item.className = "ac-item"; item.textContent = tag;
+      const item = document.createElement("div"); item.className = "ac-item";
+      item.dataset.tag = tag;
+      item.textContent = tag;
       const count = allUserTagCounts[tag];
       if (count) {
         const countSpan = document.createElement("span");
@@ -470,10 +472,9 @@ function setupTagsInput() {
       e.preventDefault();
       if (acIndex >= 0 && items[acIndex]) {
         // 用户已用方向键选中了某项
-        addTag(items[acIndex].textContent);
+        addTag(items[acIndex].dataset.tag);
       } else if (items.length > 0 && !dropdown.classList.contains("hidden")) {
-        // ✅ 新增：下拉列表可见且有匹配项 → 自动选第一个
-        addTag(items[0].textContent);
+        addTag(items[0].dataset.tag);
       } else if (input.value.trim()) {
         // 没有匹配项，按原逻辑添加输入内容
         input.value.trim().split(/[\s,]+/).filter(Boolean).forEach((t) => addTag(t));
@@ -539,6 +540,20 @@ function renderTags() {
   // Show "clear all" link when there are 2+ tags
   const clearBtn = document.getElementById("tags-clear-all");
   if (clearBtn) clearBtn.classList.toggle("hidden", currentTags.length < 2);
+  // Sync .used state on suggest/AI tag elements
+  syncSuggestTagStates();
+}
+
+function syncSuggestTagStates() {
+  const lowerTags = new Set(currentTags.map(t => t.toLowerCase()));
+  document.querySelectorAll("#pinboard-suggest-tags .stag, #ai-suggest-tags .stag").forEach((el) => {
+    const tag = (el.dataset.tag || "").toLowerCase();
+    if (lowerTags.has(tag)) {
+      el.classList.add("used");
+    } else {
+      el.classList.remove("used");
+    }
+  });
 }
 
 // ===================== Submit / Delete =====================
