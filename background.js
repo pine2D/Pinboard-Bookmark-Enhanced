@@ -30,6 +30,11 @@ function cleanupStatusCache() {
 let _cachedToken = null;
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.pinboardToken) _cachedToken = null;
+  // Immediately clear or refresh badge when setting changes
+  if (changes.optShowBadge) {
+    if (changes.optShowBadge.newValue) updateBadge().catch(() => {});
+    else chrome.action.setBadgeText({ text: "" });
+  }
 });
 
 async function getCachedToken() {

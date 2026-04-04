@@ -23,6 +23,9 @@
     </div>
 
     <div class="form-body">
+      <div id="url-warning" class="url-warning hidden">
+        <span>⚠ This page cannot be saved to Pinboard (unsupported URL)</span>
+      </div>
       <div class="row">
         <span class="label">URL</span>
         <div class="field"><input type="text" id="url-input" aria-label="Bookmark URL" /></div>
@@ -85,9 +88,21 @@
     <div class="quick-row">
       <button id="save-tabset-btn" class="qbtn" title="Save all open tabs as a tab set">📑 Tabs</button>
       <button id="batch-bookmark-btn" class="qbtn" title="Save each open tab as an individual bookmark">📌 Batch</button>
-      <a id="tabs-link" href="https://pinboard.in/tabs/" target="_blank" class="qbtn" title="View saved tab sets">📂 Sets</a>
-      <a href="https://pinboard.in/network/" target="_blank" class="qbtn" title="Network">🌐 Net</a>
-      <a id="unread-link" href="#" target="_blank" class="qbtn" title="Unread bookmarks">📖 Unread</a>
+    </div>
+    <div class="quick-links">
+      <a id="tabs-link" href="https://pinboard.in/tabs/" target="_blank" title="Tab Sets">Sets</a>
+      <span class="ql-sep">·</span>
+      <a href="https://pinboard.in/network/" target="_blank" title="Network">Network</a>
+      <span class="ql-sep">·</span>
+      <a id="unread-link" href="#" target="_blank" title="Unread bookmarks">Unread</a>
+      <span class="ql-sep">·</span>
+      <a href="https://pinboard.in/notes/" target="_blank" title="Notes">Notes</a>
+      <span class="ql-sep">·</span>
+      <a href="https://pinboard.in/popular/" target="_blank" title="Popular">Popular</a>
+    </div>
+    <div id="offline-queue-bar" class="offline-bar hidden">
+      <span id="offline-queue-text"></span>
+      <a href="#" id="offline-queue-clear" class="offline-clear">clear</a>
     </div>
     <div id="recent-bookmarks" class="recent-bm-area hidden"></div>
   </div>

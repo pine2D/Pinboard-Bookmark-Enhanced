@@ -80,6 +80,23 @@ async function showMain(token) {
   document.getElementById("url-input").value = pageInfo.url;
   document.getElementById("title-input").value = pageInfo.title;
 
+  // Check if URL is supported by Pinboard
+  const isUnsupportedUrl = !pageInfo.url || (!pageInfo.url.startsWith("http://") && !pageInfo.url.startsWith("https://"));
+  if (isUnsupportedUrl) {
+    document.getElementById("url-warning").classList.remove("hidden");
+    document.getElementById("submit-btn").disabled = true;
+    document.getElementById("submit-btn").title = "Cannot save: unsupported URL";
+    document.getElementById("ai-summary-btn").classList.add("disabled-link");
+    document.getElementById("ai-tags-btn").classList.add("disabled-link");
+  }
+
+  document.getElementById("url-input").addEventListener("input", () => {
+    const val = document.getElementById("url-input").value.trim();
+    const bad = !val || (!val.startsWith("http://") && !val.startsWith("https://"));
+    document.getElementById("url-warning").classList.toggle("hidden", !bad);
+    document.getElementById("submit-btn").disabled = bad;
+  });
+
   let desc = "";
   if (pageInfo.selectedText) {
     desc = settings.optBlockquote ? `<blockquote>${pageInfo.selectedText}</blockquote>` : pageInfo.selectedText;
@@ -87,6 +104,7 @@ async function showMain(token) {
   if (settings.optIncludeReferrer && pageInfo.referrer) { desc += (desc ? "\n\n" : "") + `via: ${pageInfo.referrer}`; }
   document.getElementById("description-input").value = desc;
   updateCharCount();
+  setTimeout(() => autoResizeTextarea(document.getElementById("description-input")), 50);
 
   if (settings.optPrivateDefault) document.getElementById("private-check").checked = true;
   if (settings.optPrivateIncognito && tab.incognito) document.getElementById("private-check").checked = true;
@@ -103,6 +121,13 @@ async function showMain(token) {
   if (settings.optShowRecent) fetchRecentBookmarks(token);
   document.querySelector(".tags-input-wrap").addEventListener("click", () => document.getElementById("tags-input").focus());
   if (settings.optAiAutoTags && hasAIKey(settings)) document.getElementById("ai-tags-btn").click();
+  showOfflineQueueStatus();
+
+  // Focus optimization: tags input for new bookmarks, description for existing
+  setTimeout(() => {
+    if (existingBookmark) document.getElementById("description-input").focus();
+    else document.getElementById("tags-input").focus();
+  }, 100);
 }
 
 
@@ -312,6 +337,7 @@ async function checkExistingBookmark(token, url) {
       document.getElementById("submit-btn").textContent = "Update";
       document.getElementById("delete-btn").classList.remove("hidden");
       updateCharCount();
+      setTimeout(() => autoResizeTextarea(document.getElementById("description-input")), 50);
       // Show bookmark timestamp
       const timeStr = existingBookmark.time;
       if (timeStr) {
@@ -413,6 +439,15 @@ function setupTagsInput() {
       dropdown.appendChild(item);
     });
     dropdown.classList.remove("hidden");
+  });
+  input.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    if (text) {
+      text.split(/[,\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => addTag(t));
+      input.value = "";
+      dropdown.classList.add("hidden");
+    }
   });
   input.addEventListener("keydown", (e) => {
     const items = dropdown.querySelectorAll(".ac-item");
@@ -791,20 +826,69 @@ async function fetchRecentBookmarks(token) {
     label.textContent = "Recent:";
     container.appendChild(label);
     posts.forEach(p => {
-      if (!/^https?:\/\//i.test(p.href)) return; // Skip non-HTTP URLs
+      if (!/^https?:\/\//i.test(p.href)) return;
+      const row = document.createElement("div");
+      row.className = "recent-bm-row";
       const a = document.createElement("a");
       a.href = p.href;
       a.target = "_blank";
       a.className = "recent-bm-item";
       a.title = p.description;
-      a.textContent = (p.description || p.href).substring(0, 60);
-      container.appendChild(a);
+      a.textContent = (p.description || p.href).substring(0, 55);
+      row.appendChild(a);
+      const del = document.createElement("span");
+      del.className = "recent-bm-del";
+      del.textContent = "✕";
+      del.title = "Delete this bookmark";
+      del.addEventListener("click", async () => {
+        if (!confirm("Delete this bookmark?")) return;
+        try {
+          const data = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(p.href)}&auth_token=${token}&format=json`)).json();
+          if (data.result_code === "done" || data.result_code === "item not found") {
+            row.remove();
+            chrome.runtime.sendMessage({ type: "bookmark_deleted", url: p.href });
+          }
+        } catch (_) {}
+      });
+      row.appendChild(del);
+      container.appendChild(row);
     });
   } catch (e) { container.classList.remove("hidden"); container.innerHTML = '<div class="recent-bm-label">Recent:</div><span class="muted">failed to load</span>'; }
 }
 
+// ===================== Offline Queue Status =====================
+async function showOfflineQueueStatus() {
+  const bar = document.getElementById("offline-queue-bar");
+  if (!bar) return;
+  try {
+    const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
+    if (offlineQueue.length > 0) {
+      bar.classList.remove("hidden");
+      document.getElementById("offline-queue-text").textContent = `${offlineQueue.length} bookmark${offlineQueue.length > 1 ? "s" : ""} queued (offline)`;
+    } else {
+      bar.classList.add("hidden");
+    }
+  } catch (_) { bar.classList.add("hidden"); }
+
+  document.getElementById("offline-queue-clear")?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    if (!confirm("Clear all queued bookmarks?")) return;
+    await chrome.storage.local.set({ offlineQueue: [] });
+    bar.classList.add("hidden");
+  });
+}
+
 // ===================== Helpers =====================
-function setupDescriptionCounter() { document.getElementById("description-input").addEventListener("input", updateCharCount); }
+function setupDescriptionCounter() {
+  const textarea = document.getElementById("description-input");
+  textarea.addEventListener("input", () => { updateCharCount(); autoResizeTextarea(textarea); });
+  // Initial resize
+  setTimeout(() => autoResizeTextarea(textarea), 50);
+}
+function autoResizeTextarea(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(Math.max(el.scrollHeight, 54), 300) + "px";
+}
 function updateCharCount() {
   const len = document.getElementById("description-input").value.length;
   const el = document.getElementById("desc-char-count");
