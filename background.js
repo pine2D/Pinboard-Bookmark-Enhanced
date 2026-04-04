@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - Background Service Worker (v3.0)
+// Pinboard Bookmark Plus - Background Service Worker (v4.0)
 // ============================================================
 
 importScripts("shared.js", "ai.js");
@@ -24,6 +24,44 @@ function cleanupStatusCache() {
   const entries = [...statusCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
   const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
   toRemove.forEach(([key]) => statusCache.delete(key));
+}
+
+// ---- P2: Cached token + invalidation ----
+let _cachedToken = null;
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.pinboardToken) _cachedToken = null;
+});
+
+async function getCachedToken() {
+  if (_cachedToken) return _cachedToken;
+  const s = await loadSettings();
+  _cachedToken = s.pinboardToken || null;
+  return _cachedToken;
+}
+
+// ---- P3: Debounce + dedup for tab switch ----
+let _checkDebounceTimer = null;
+const _pendingChecks = new Map(); // url -> Promise
+
+async function debouncedCheck(tabId, url) {
+  if (!url || !url.startsWith("http")) {
+    setIcon(tabId, false);
+    return;
+  }
+  // Dedup: if same URL is already being checked, reuse promise
+  if (_pendingChecks.has(url)) {
+    const bookmarked = await _pendingChecks.get(url);
+    setIcon(tabId, bookmarked);
+    return;
+  }
+  const promise = checkBookmarked(url);
+  _pendingChecks.set(url, promise);
+  try {
+    const bookmarked = await promise;
+    setIcon(tabId, bookmarked);
+  } finally {
+    _pendingChecks.delete(url);
+  }
 }
 
 // ---- Load settings with deobfuscation ----
@@ -59,14 +97,14 @@ async function setIcon(tabId, bookmarked) {
   } catch (_) {}
 }
 
-// ---- 检查 URL 是否已收藏 ----
+// ---- 检查 URL 是否已收藏 (uses cached token, direct fetch for latency) ----
 async function checkBookmarked(url) {
   const cached = statusCache.get(url);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.bookmarked;
   try {
-    const s = await loadSettings();
-    if (!s.pinboardToken) return false;
-    const resp = await fetch(`https://api.pinboard.in/v1/posts/get?auth_token=${s.pinboardToken}&format=json&url=${encodeURIComponent(url)}`);
+    const token = await getCachedToken();
+    if (!token) return false;
+    const resp = await fetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
     const data = await resp.json();
     const bookmarked = data.posts && data.posts.length > 0;
     statusCache.set(url, { bookmarked, timestamp: Date.now() });
@@ -78,28 +116,208 @@ async function checkBookmarked(url) {
   }
 }
 
-// ---- 标签页激活/更新时刷新图标 ----
-chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+// ---- Badge: unread count ----
+async function updateBadge() {
+  const s = await loadSettings();
+  if (!s.optShowBadge || !s.pinboardToken) {
+    chrome.action.setBadgeText({ text: "" });
+    return;
+  }
   try {
-    const tab = await chrome.tabs.get(tabId);
-    if (tab.url && tab.url.startsWith("http")) {
-      setIcon(tabId, await checkBookmarked(tab.url));
-    } else { setIcon(tabId, false); }
+    const resp = await fetch(`https://api.pinboard.in/v1/posts/all?auth_token=${s.pinboardToken}&format=json&toread=yes&results=100`);
+    const data = await resp.json();
+    const count = Array.isArray(data) ? data.length : 0;
+    chrome.action.setBadgeText({ text: count > 0 ? String(count > 99 ? "99+" : count) : "" });
+    chrome.action.setBadgeBackgroundColor({ color: "#4477bb" });
   } catch (_) {}
+}
+
+// ---- F3: Offline queue ----
+async function enqueueOfflineSave(params) {
+  const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
+  offlineQueue.push({ ...params, queuedAt: Date.now() });
+  await chrome.storage.local.set({ offlineQueue });
+}
+
+async function processOfflineQueue() {
+  const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
+  if (!offlineQueue.length) return;
+  const remaining = [];
+  for (const item of offlineQueue) {
+    try {
+      const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${item.token}&format=json` +
+        `&url=${encodeURIComponent(item.url)}&description=${encodeURIComponent(item.title)}` +
+        `&extended=${encodeURIComponent(item.notes)}&tags=${encodeURIComponent(item.tags)}` +
+        (item.toread ? "&toread=yes" : "") + "&replace=yes";
+      const resp = await pinboardFetch(apiUrl);
+      const data = await resp.json();
+      if (data.result_code !== "done") {
+        remaining.push(item); // keep for retry
+      } else {
+        statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
+      }
+    } catch (_) {
+      remaining.push(item); // network still down, keep
+    }
+  }
+  await chrome.storage.local.set({ offlineQueue: remaining });
+}
+
+// ---- P1: Shared save function ----
+async function saveFromBackground({ url, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
+  const s = await loadSettings();
+  // Apply settings overrides (prefix-resolved keys)
+  if (settingsOverrides) Object.assign(s, settingsOverrides);
+
+  if (!s.pinboardToken) {
+    showNotification(notifyId + "-error", "Pinboard: Not logged in", "Set your API token in extension settings.", "error");
+    return;
+  }
+
+  // Extract page info if tab available
+  let pageInfo = null;
+  if (tab?.id) {
+    try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) {}
+  }
+
+  // Build notes from page info
+  let notes = "";
+  if (pageInfo) {
+    notes = buildAutoNotes(pageInfo, {
+      autoDescription: s._autoNotes,
+      blockquote: s._blockquote,
+      includeReferrer: false
+    });
+  }
+
+  // Default tags
+  let tags = [];
+  if (s._defaultTags) {
+    tags = s._defaultTags.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
+  }
+
+  // AI features (parallel)
+  const aiPromises = [];
+  if (pageInfo?.pageText && hasAIKey(s)) {
+    if (s._aiTags) {
+      aiPromises.push(
+        (async () => {
+          try {
+            const cached = await getAICache(url, "tags", s.aiCacheDuration);
+            if (cached) return { type: "tags", result: cached };
+            const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
+            const resp = await callAI(s, prompt);
+            const aiTags = parseAITags(resp, s.aiTagSeparator);
+            await setAICache(url, "tags", aiTags, s.aiCacheDuration);
+            return { type: "tags", result: aiTags };
+          } catch (e) { console.warn(`${notifyCategory} AI tags failed:`, e.message); return null; }
+        })()
+      );
+    }
+    if (s._aiSummary) {
+      aiPromises.push(
+        (async () => {
+          try {
+            const cached = await getAICache(url, "summary", s.aiCacheDuration);
+            if (cached) return { type: "summary", result: cached };
+            const prompt = buildSummaryPrompt(s, title, url, pageInfo.pageText, notes);
+            const summary = await callAI(s, prompt);
+            await setAICache(url, "summary", summary, s.aiCacheDuration);
+            return { type: "summary", result: summary };
+          } catch (e) { console.warn(`${notifyCategory} AI summary failed:`, e.message); return null; }
+        })()
+      );
+    }
+  }
+
+  // Wait for AI results
+  const aiResults = await Promise.all(aiPromises);
+  for (const r of aiResults) {
+    if (!r) continue;
+    if (r.type === "tags") tags = [...tags, ...r.result];
+    if (r.type === "summary") {
+      const wrapped = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
+      notes = notes ? notes + "\n\n" + wrapped : wrapped;
+    }
+  }
+
+  // Save bookmark via pinboardFetch (rate-limited)
+  const tagsStr = tags.join(" ");
+  const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${s.pinboardToken}&format=json` +
+    `&url=${encodeURIComponent(url)}&description=${encodeURIComponent(title)}` +
+    `&extended=${encodeURIComponent(notes)}&tags=${encodeURIComponent(tagsStr)}` +
+    (toread ? "&toread=yes" : "") + "&replace=yes";
+
+  try {
+    const resp = await pinboardFetch(apiUrl);
+    const data = await resp.json();
+
+    if (data.result_code === "done") {
+      statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
+      if (tab?.id) setIcon(tab.id, true);
+      showNotification(notifyId + "-saved", notifyTitle, `"${title.substring(0, 60)}" saved.`, notifyCategory);
+      // Opportunistic: process offline queue after successful save
+      processOfflineQueue().catch(() => {});
+      // Update badge if toread
+      if (toread) updateBadge().catch(() => {});
+    } else {
+      showNotification(notifyId + "-error", "Pinboard: Save failed", data.result_code || "Unknown error", "error");
+    }
+  } catch (e) {
+    // Network error — queue for offline retry if enabled
+    if (s.offlineQueueEnabled) {
+      await enqueueOfflineSave({ url, title, notes, tags: tagsStr, toread: !!toread, token: s.pinboardToken });
+      showNotification(notifyId + "-queued", "Pinboard: Queued offline", `"${title.substring(0, 60)}" will be saved when online.`, notifyCategory);
+    } else {
+      showNotification(notifyId + "-error", "Pinboard: Network error", e.message, "error");
+    }
+  }
+}
+
+// Helper: resolve prefix-specific settings to internal keys
+function resolvePrefixSettings(s, prefix) {
+  return {
+    _autoNotes: s[prefix + "AutoNotes"],
+    _blockquote: s[prefix + "Blockquote"],
+    _defaultTags: s[prefix + "DefaultTags"],
+    _aiTags: s[prefix + "AiTags"],
+    _aiSummary: s[prefix + "AiSummary"]
+  };
+}
+
+// ---- 标签页激活/更新时刷新图标 (P3: debounced + deduped) ----
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  clearTimeout(_checkDebounceTimer);
+  _checkDebounceTimer = setTimeout(async () => {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      await debouncedCheck(tabId, tab.url);
+    } catch (_) {}
+  }, 150);
 });
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url && tab.url.startsWith("http")) {
-    setIcon(tabId, await checkBookmarked(tab.url));
+    clearTimeout(_checkDebounceTimer);
+    _checkDebounceTimer = setTimeout(() => {
+      debouncedCheck(tabId, tab.url).catch(() => {});
+    }, 150);
   }
 });
 
-// Keep service worker alive with periodic alarm
+// Keep service worker alive + periodic tasks
 chrome.alarms.create("keepalive", { periodInMinutes: 4 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "keepalive") {
-    // Ping to keep alive — no-op
+    processOfflineQueue().catch(() => {});
+    updateBadge().catch(() => {});
   }
+});
+
+// Startup: process offline queue + update badge
+chrome.runtime.onStartup.addListener(() => {
+  processOfflineQueue().catch(() => {});
+  updateBadge().catch(() => {});
 });
 
 // ---- 监听来自 popup 的消息 ----
@@ -111,6 +329,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
       if (tab?.id) setIcon(tab.id, true);
     }).catch(() => {});
+    // Update badge if toread bookmark was saved
+    if (message.toread) updateBadge().catch(() => {});
     sendResponse({ ok: true });
     return true;
   }
@@ -169,202 +389,38 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const url = info.linkUrl || info.pageUrl;
   if (!url) return;
-
-  try {
-    const s = await loadSettings();
-    if (!s.pinboardToken) {
-      showNotification("pinboard-error", "Pinboard: Not logged in", "Set your API token in extension settings.", "error");
-      return;
-    }
-
-    // Get title: for links use selection or link URL; for pages use tab title
-    let title = info.linkUrl ? (info.selectionText || info.linkUrl) : (tab?.title || url);
-
-    // Extract page info for AI and auto-notes (only if tab is available)
-    let pageInfo = null;
-    let notes = "";
-    let tags = [];
-
-    if (tab?.id) {
-      try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) {}
-    }
-
-    // Build notes from page info
-    if (pageInfo) {
-      notes = buildAutoNotes(pageInfo, {
-        autoDescription: s.ctxAutoNotes,
-        blockquote: s.ctxBlockquote,
-        includeReferrer: false
-      });
-    }
-
-    // Default tags
-    if (s.ctxDefaultTags) {
-      tags = s.ctxDefaultTags.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
-    }
-
-    // AI features (run in parallel if both enabled)
-    const aiPromises = [];
-    if (pageInfo?.pageText && hasAIKey(s)) {
-      if (s.ctxAiTags) {
-        aiPromises.push(
-          (async () => {
-            try {
-              const cached = await getAICache(url, "tags", s.aiCacheDuration);
-              if (cached) return { type: "tags", result: cached };
-              const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
-              const resp = await callAI(s, prompt);
-              const aiTags = parseAITags(resp);
-              await setAICache(url, "tags", aiTags, s.aiCacheDuration);
-              return { type: "tags", result: aiTags };
-            } catch (e) { console.warn("Context menu AI tags failed:", e.message); return null; }
-          })()
-        );
-      }
-      if (s.ctxAiSummary) {
-        aiPromises.push(
-          (async () => {
-            try {
-              const cached = await getAICache(url, "summary", s.aiCacheDuration);
-              if (cached) return { type: "summary", result: cached };
-              const prompt = buildSummaryPrompt(s, title, url, pageInfo.pageText, notes);
-              const summary = await callAI(s, prompt);
-              await setAICache(url, "summary", summary, s.aiCacheDuration);
-              return { type: "summary", result: summary };
-            } catch (e) { console.warn("Context menu AI summary failed:", e.message); return null; }
-          })()
-        );
-      }
-    }
-
-    // Wait for AI results
-    const aiResults = await Promise.all(aiPromises);
-    for (const r of aiResults) {
-      if (!r) continue;
-      if (r.type === "tags") tags = [...tags, ...r.result];
-      if (r.type === "summary") {
-        const wrapped = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
-        notes = notes ? notes + "\n\n" + wrapped : wrapped;
-      }
-    }
-
-    // Save bookmark
-    const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${s.pinboardToken}&format=json` +
-      `&url=${encodeURIComponent(url)}&description=${encodeURIComponent(title)}` +
-      `&extended=${encodeURIComponent(notes)}&tags=${encodeURIComponent(tags.join(" "))}&replace=yes`;
-    const resp = await fetch(apiUrl);
-    const data = await resp.json();
-
-    if (data.result_code === "done") {
-      statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
-      if (tab?.id) setIcon(tab.id, true);
-      showNotification("pinboard-saved", "Pinboard: Saved!", `"${title.substring(0, 60)}" saved.`, "contextMenu");
-    } else {
-      showNotification("pinboard-error", "Pinboard: Save failed", data.result_code || "Unknown error", "error");
-    }
-  } catch (e) {
-    showNotification("pinboard-error", "Pinboard: Network error", e.message, "error");
-  }
+  const title = info.linkUrl ? (info.selectionText || info.linkUrl) : (tab?.title || url);
+  const s = await loadSettings();
+  const overrides = resolvePrefixSettings(s, "ctx");
+  await saveFromBackground({
+    url, title, tab,
+    settingsOverrides: overrides,
+    toread: false,
+    notifyId: "pinboard",
+    notifyTitle: "Pinboard: Saved!",
+    notifyCategory: "contextMenu"
+  });
 });
 
 // ===================== Read Later (keyboard shortcut) =====================
 chrome.commands.onCommand.addListener(async (command) => {
   if (command !== "read_later") return;
-
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url || !tab.url.startsWith("http")) {
       showNotification("rl-error", "Pinboard: Cannot save", "This page cannot be bookmarked.", "error");
       return;
     }
-
     const s = await loadSettings();
-    if (!s.pinboardToken) {
-      showNotification("rl-error", "Pinboard: Not logged in", "Set your API token in extension settings.", "error");
-      return;
-    }
-
-    const url = tab.url;
-    const title = tab.title || url;
-
-    // Extract page info
-    let pageInfo = null;
-    try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) {}
-
-    // Build notes
-    let notes = "";
-    if (pageInfo) {
-      notes = buildAutoNotes(pageInfo, {
-        autoDescription: s.rlAutoNotes,
-        blockquote: s.rlBlockquote,
-        includeReferrer: false
-      });
-    }
-
-    // Default tags
-    let tags = [];
-    if (s.rlDefaultTags) {
-      tags = s.rlDefaultTags.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
-    }
-
-    // AI features (parallel)
-    const aiPromises = [];
-    if (pageInfo?.pageText && hasAIKey(s)) {
-      if (s.rlAiTags) {
-        aiPromises.push(
-          (async () => {
-            try {
-              const cached = await getAICache(url, "tags", s.aiCacheDuration);
-              if (cached) return { type: "tags", result: cached };
-              const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
-              const resp = await callAI(s, prompt);
-              const aiTags = parseAITags(resp);
-              await setAICache(url, "tags", aiTags, s.aiCacheDuration);
-              return { type: "tags", result: aiTags };
-            } catch (e) { console.warn("Read later AI tags failed:", e.message); return null; }
-          })()
-        );
-      }
-      if (s.rlAiSummary) {
-        aiPromises.push(
-          (async () => {
-            try {
-              const cached = await getAICache(url, "summary", s.aiCacheDuration);
-              if (cached) return { type: "summary", result: cached };
-              const prompt = buildSummaryPrompt(s, title, url, pageInfo.pageText, notes);
-              const summary = await callAI(s, prompt);
-              await setAICache(url, "summary", summary, s.aiCacheDuration);
-              return { type: "summary", result: summary };
-            } catch (e) { console.warn("Read later AI summary failed:", e.message); return null; }
-          })()
-        );
-      }
-    }
-
-    const aiResults = await Promise.all(aiPromises);
-    for (const r of aiResults) {
-      if (!r) continue;
-      if (r.type === "tags") tags = [...tags, ...r.result];
-      if (r.type === "summary") {
-        const wrapped = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
-        notes = notes ? notes + "\n\n" + wrapped : wrapped;
-      }
-    }
-
-    // Save bookmark with toread=yes
-    const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${s.pinboardToken}&format=json` +
-      `&url=${encodeURIComponent(url)}&description=${encodeURIComponent(title)}` +
-      `&extended=${encodeURIComponent(notes)}&tags=${encodeURIComponent(tags.join(" "))}&toread=yes&replace=yes`;
-    const resp = await fetch(apiUrl);
-    const data = await resp.json();
-
-    if (data.result_code === "done") {
-      statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
-      setIcon(tab.id, true);
-      showNotification("rl-saved", "Pinboard: Quick Read Later!", `"${title.substring(0, 60)}" saved.`, "readLater");
-    } else {
-      showNotification("rl-error", "Pinboard: Save failed", data.result_code || "Unknown error", "error");
-    }
+    const overrides = resolvePrefixSettings(s, "rl");
+    await saveFromBackground({
+      url: tab.url, title: tab.title || tab.url, tab,
+      settingsOverrides: overrides,
+      toread: true,
+      notifyId: "rl",
+      notifyTitle: "Pinboard: Quick Read Later!",
+      notifyCategory: "readLater"
+    });
   } catch (e) {
     showNotification("rl-error", "Pinboard: Read Later failed", e.message, "error");
   }
@@ -373,101 +429,22 @@ chrome.commands.onCommand.addListener(async (command) => {
 // ===================== Quick Save (keyboard shortcut) =====================
 chrome.commands.onCommand.addListener(async (command) => {
   if (command !== "quick_save") return;
-
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url || !tab.url.startsWith("http")) {
       showNotification("qs-error", "Pinboard: Cannot save", "This page cannot be bookmarked.", "error");
       return;
     }
-
     const s = await loadSettings();
-    if (!s.pinboardToken) {
-      showNotification("qs-error", "Pinboard: Not logged in", "Set your API token in extension settings.", "error");
-      return;
-    }
-
-    const url = tab.url;
-    const title = tab.title || url;
-
-    // Extract page info
-    let pageInfo = null;
-    try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) {}
-
-    // Build notes
-    let notes = "";
-    if (pageInfo) {
-      notes = buildAutoNotes(pageInfo, {
-        autoDescription: s.qsAutoNotes,
-        blockquote: s.qsBlockquote,
-        includeReferrer: false
-      });
-    }
-
-    // Default tags
-    let tags = [];
-    if (s.qsDefaultTags) {
-      tags = s.qsDefaultTags.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
-    }
-
-    // AI features (parallel)
-    const aiPromises = [];
-    if (pageInfo?.pageText && hasAIKey(s)) {
-      if (s.qsAiTags) {
-        aiPromises.push(
-          (async () => {
-            try {
-              const cached = await getAICache(url, "tags", s.aiCacheDuration);
-              if (cached) return { type: "tags", result: cached };
-              const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
-              const resp = await callAI(s, prompt);
-              const aiTags = parseAITags(resp);
-              await setAICache(url, "tags", aiTags, s.aiCacheDuration);
-              return { type: "tags", result: aiTags };
-            } catch (e) { console.warn("Quick save AI tags failed:", e.message); return null; }
-          })()
-        );
-      }
-      if (s.qsAiSummary) {
-        aiPromises.push(
-          (async () => {
-            try {
-              const cached = await getAICache(url, "summary", s.aiCacheDuration);
-              if (cached) return { type: "summary", result: cached };
-              const prompt = buildSummaryPrompt(s, title, url, pageInfo.pageText, notes);
-              const summary = await callAI(s, prompt);
-              await setAICache(url, "summary", summary, s.aiCacheDuration);
-              return { type: "summary", result: summary };
-            } catch (e) { console.warn("Quick save AI summary failed:", e.message); return null; }
-          })()
-        );
-      }
-    }
-
-    const aiResults = await Promise.all(aiPromises);
-    for (const r of aiResults) {
-      if (!r) continue;
-      if (r.type === "tags") tags = [...tags, ...r.result];
-      if (r.type === "summary") {
-        const wrapped = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
-        notes = notes ? notes + "\n\n" + wrapped : wrapped;
-      }
-    }
-
-    // Save bookmark
-    const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${s.pinboardToken}&format=json` +
-      `&url=${encodeURIComponent(url)}&description=${encodeURIComponent(title)}` +
-      `&extended=${encodeURIComponent(notes)}&tags=${encodeURIComponent(tags.join(" "))}&replace=yes`;
-    const resp = await fetch(apiUrl);
-    const data = await resp.json();
-
-    if (data.result_code === "done") {
-      statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
-      setIcon(tab.id, true);
-      showNotification("qs-saved", "Pinboard: Quick Saved!", `"${title.substring(0, 60)}" saved.`, "quickSave");
-    } else {
-      showNotification("qs-error", "Pinboard: Save failed", data.result_code || "Unknown error", "error");
-    }
+    const overrides = resolvePrefixSettings(s, "qs");
+    await saveFromBackground({
+      url: tab.url, title: tab.title || tab.url, tab,
+      settingsOverrides: overrides,
+      toread: false,
+      notifyId: "qs",
+      notifyTitle: "Pinboard: Quick Saved!",
+      notifyCategory: "quickSave"
+    });
   } catch (e) {
     showNotification("qs-error", "Pinboard: Quick Save failed", e.message, "error");
   }

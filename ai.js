@@ -143,7 +143,9 @@ function buildSummaryPrompt(s, title, url, content, description) {
 }
 
 // ---- Parse AI tag response ----
-function parseAITags(resp) {
+// separator: "-" or "_" (configurable via settings.aiTagSeparator)
+function parseAITags(resp, separator) {
+  const sep = separator || "-";
   let tags = [];
   try {
     const m = resp.match(/\[[\s\S]*?\]/);
@@ -151,7 +153,7 @@ function parseAITags(resp) {
   } catch (_) {
     tags = resp.split(/[,\n]/).map(t => t.replace(/["[\]`]/g, "").trim()).filter(Boolean);
   }
-  return tags.map(t => t.toLowerCase().replace(/\s+/g, "-"));
+  return tags.map(t => t.toLowerCase().replace(/\s+/g, sep));
 }
 
 // ---- AI cache helpers ----

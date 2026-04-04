@@ -31,7 +31,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
     "opt-batch-tag": s.optBatchTag, "opt-theme": s.optTheme,
     "ctx-default-tags": s.ctxDefaultTags, "qs-default-tags": s.qsDefaultTags, "rl-default-tags": s.rlDefaultTags,
-    "opt-custom-font": s.customFont, "opt-custom-css": s.customCSS
+    "opt-custom-font": s.customFont, "opt-custom-css": s.customCSS,
+    "opt-ai-tag-separator": s.aiTagSeparator
   };
   for (const [id, val] of Object.entries(fieldMap)) {
     const el = document.getElementById(id);
@@ -57,7 +58,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     "notify-context-menu": s.notifyContextMenu, "notify-quick-save": s.notifyQuickSave,
     "notify-read-later": s.notifyReadLater,
     "notify-tab-set": s.notifyTabSet, "notify-batch-save": s.notifyBatchSave,
-    "notify-errors": s.notifyErrors
+    "notify-errors": s.notifyErrors,
+    "opt-respect-tag-case": s.optRespectTagCase,
+    "offline-queue-enabled": s.offlineQueueEnabled,
+    "opt-show-badge": s.optShowBadge
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = document.getElementById(id);
@@ -98,6 +102,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       optAutoDescription: document.getElementById("opt-auto-description").checked,
       optBlockquote: document.getElementById("opt-blockquote").checked,
       optIncludeReferrer: document.getElementById("opt-include-referrer").checked,
+      optRespectTagCase: document.getElementById("opt-respect-tag-case").checked,
+      offlineQueueEnabled: document.getElementById("offline-queue-enabled").checked,
       // Quick Actions
       ctxAutoNotes: document.getElementById("ctx-auto-notes").checked,
       ctxBlockquote: document.getElementById("ctx-blockquote").checked,
@@ -147,12 +153,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       optAiAutoTags: document.getElementById("opt-ai-auto-tags").checked,
       aiSummaryLang: document.getElementById("opt-ai-summary-lang").value,
       aiCacheDuration: Math.max(0, parseInt(document.getElementById("opt-ai-cache-duration").value) || 60),
+      aiTagSeparator: document.getElementById("opt-ai-tag-separator").value,
       customTagPrompt: document.getElementById("opt-custom-tag-prompt").value,
       customSummaryPrompt: document.getElementById("opt-custom-summary-prompt").value,
       // Appearance
       optTheme: document.getElementById("opt-theme").value,
       optShowSearch: document.getElementById("opt-show-search").checked,
       optShowRecent: document.getElementById("opt-show-recent").checked,
+      optShowBadge: document.getElementById("opt-show-badge").checked,
       // Notifications
       notifyContextMenu: document.getElementById("notify-context-menu").checked,
       notifyQuickSave: document.getElementById("notify-quick-save").checked,

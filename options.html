@@ -69,6 +69,8 @@
       <div class="fg"><label><input type="checkbox" id="opt-auto-description" checked /> Auto-fill meta description into notes</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-blockquote" checked /> Wrap selected text with &lt;blockquote&gt;</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-include-referrer" checked /> Include referrer in Notes</label></div>
+      <div class="fg"><label><input type="checkbox" id="opt-respect-tag-case" /> Respect existing tag case (match most-used casing)</label></div>
+      <div class="fg"><label><input type="checkbox" id="offline-queue-enabled" /> Enable offline save queue</label></div>
     </div>
 
     <!-- Tab 2: Quick Actions -->
@@ -249,6 +251,15 @@
         <input type="number" id="opt-ai-cache-duration" value="60" min="0" />
         <p class="hint">Cached per URL. Set 0 to disable.</p>
       </div>
+      <div class="fg">
+        <div class="row-inline">
+          <label class="bl">Multi-word tag separator</label>
+          <select id="opt-ai-tag-separator">
+            <option value="-">hyphen (machine-learning)</option>
+            <option value="_">underscore (machine_learning)</option>
+          </select>
+        </div>
+      </div>
 
       <div class="divider"></div>
       <div class="section-title">Prompts</div>
@@ -284,6 +295,7 @@
       <div class="section-title">Popup Elements</div>
       <div class="fg"><label><input type="checkbox" id="opt-show-search" checked /> Show search bar in popup</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-show-recent" checked /> Show recent bookmarks in popup</label></div>
+      <div class="fg"><label><input type="checkbox" id="opt-show-badge" /> Show unread count badge on icon</label></div>
 
       <div class="divider"></div>
       <div class="section-title">Notifications</div>

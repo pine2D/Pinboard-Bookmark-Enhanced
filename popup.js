@@ -1,10 +1,11 @@
 // ============================================================
-// Pinboard Bookmark Plus - Popup (v2.1)
+// Pinboard Bookmark Plus - Popup (v2.2)
 // ============================================================
 
 let currentTags = [];
 let allUserTags = [];
 let allUserTagCounts = {};
+let tagCaseMap = {};
 let pageInfo = {};
 let existingBookmark = null;
 let acIndex = -1;
@@ -104,7 +105,7 @@ async function showMain(token) {
   if (settings.optAiAutoTags && hasAIKey(settings)) document.getElementById("ai-tags-btn").click();
 }
 
-  
+
 
 /// ===================== Tab Set 保存功能 =====================
 function setupTabSet() {
@@ -189,13 +190,10 @@ function setupTabSet() {
       const useAiSummary = settings.batchAiSummary && hasAIKey(settings);
 
       let saved = 0, failed = 0, skipped = 0;
-      // If skip existing is enabled, check which URLs already exist
+      // If skip existing is enabled, check which URLs already exist (with local cache)
       let existingUrls = new Set();
       if (settings.batchSkipExisting) {
-        try {
-          const recentData = await (await fetch(`https://api.pinboard.in/v1/posts/all?auth_token=${pinboardToken}&format=json&results=1000`)).json();
-          existingUrls = new Set(recentData.map(p => p.href));
-        } catch (_) {}
+        existingUrls = await fetchExistingUrlSet(pinboardToken);
       }
       for (let i = 0; i < validTabs.length; i++) {
         const t = validTabs[i];
@@ -220,7 +218,10 @@ function setupTabSet() {
                   else {
                     const prompt = buildTagPrompt(settings, t.title || t.url, t.url, tabPageInfo.pageText, "", []);
                     const resp = await callAI(settings, prompt);
-                    const aiTags = parseAITags(resp);
+                    const rawTags = parseAITags(resp, settings.aiTagSeparator);
+                    const aiTags = settings.optRespectTagCase
+                      ? rawTags.map(t => resolveTagCase(t, tagCaseMap))
+                      : rawTags;
                     await setAICache(t.url, "tags", aiTags, settings.aiCacheDuration);
                     tags = [...tags, ...aiTags];
                   }
@@ -242,12 +243,20 @@ function setupTabSet() {
           }
 
           const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${pinboardToken}&format=json&url=${enc(t.url)}&description=${enc(t.title || t.url)}&extended=${enc(notes)}&tags=${enc(tags.join(" "))}&replace=yes`;
-          const data = await (await fetch(apiUrl)).json();
+          const data = await (await pinboardFetch(apiUrl)).json();
           if (data.result_code === "done") saved++;
           else failed++;
         } catch (_) { failed++; }
-        // Respect Pinboard rate limit (3s between calls)
-        await new Promise(r => setTimeout(r, 3100));
+      }
+      // Update local URL set cache after batch save
+      if (saved > 0) {
+        const newUrls = validTabs.filter(t => !existingUrls.has(t.url)).map(t => t.url);
+        newUrls.forEach(u => existingUrls.add(u));
+        try {
+          await chrome.storage.local.set({
+            cached_existing_urls: { urls: [...existingUrls], timestamp: Date.now() }
+          });
+        } catch (_) {}
       }
       const tagStr = baseTags.join(", ");
       const skipMsg = skipped > 0 ? `, ${skipped} skipped` : "";
@@ -262,6 +271,29 @@ function setupTabSet() {
       batchBtn.textContent = "📌 Batch Save"; batchBtn.disabled = false;
     }
   });
+}
+
+// ===================== Existing URL Set Cache (for batch dedup) =====================
+async function fetchExistingUrlSet(token) {
+  const cacheKey = "cached_existing_urls";
+  try {
+    const cached = await chrome.storage.local.get(cacheKey);
+    if (cached[cacheKey]) {
+      const { urls, timestamp } = cached[cacheKey];
+      if (Date.now() - timestamp < 30 * 60 * 1000) {
+        return new Set(urls);
+      }
+    }
+  } catch (_) {}
+  // Cache miss — fetch from API
+  try {
+    const recentData = await (await fetch(`https://api.pinboard.in/v1/posts/all?auth_token=${token}&format=json&results=1000`)).json();
+    const urls = recentData.map(p => p.href);
+    await chrome.storage.local.set({ [cacheKey]: { urls, timestamp: Date.now() } });
+    return new Set(urls);
+  } catch (_) {
+    return new Set();
+  }
 }
 
 // ===================== Existing Bookmark =====================
@@ -301,16 +333,19 @@ async function fetchPinboardSuggestTags(token, url) {
     const recommended = data[1]?.recommended || [];
     if (!popular.length && !recommended.length) { container.innerHTML = '<span class="muted">no suggestions</span>'; return; }
 
+    // Resolve suggested tag case against user's existing tags
+    const resolveTag = (t) => (settings.optRespectTagCase && tagCaseMap) ? resolveTagCase(t, tagCaseMap) : t;
+
     if (popular.length) {
       const g = document.createElement("div"); g.className = "suggest-group";
       let h = '<span class="group-label">popular:</span>';
-      popular.forEach((t) => { h += `<span class="stag" data-tag="${esc(t)}">${esc(t)}</span> `; });
+      popular.forEach((t) => { const resolved = resolveTag(t); h += `<span class="stag" data-tag="${esc(resolved)}">${esc(resolved)}</span> `; });
       g.innerHTML = h; container.appendChild(g);
     }
     if (recommended.length) {
       const g = document.createElement("div"); g.className = "suggest-group";
       let h = '<span class="group-label">recommended:</span>';
-      recommended.forEach((t) => { h += `<span class="stag" data-tag="${esc(t)}">${esc(t)}</span> `; });
+      recommended.forEach((t) => { const resolved = resolveTag(t); h += `<span class="stag" data-tag="${esc(resolved)}">${esc(resolved)}</span> `; });
       h += '<span class="add-all-link" id="add-all-suggest">Add all</span>';
       g.innerHTML = h; container.appendChild(g);
     }
@@ -324,6 +359,21 @@ async function fetchPinboardSuggestTags(token, url) {
 }
 
 async function fetchAllUserTags(token) {
+  // Check local cache first (TTL: 10 minutes)
+  const cacheKey = "cached_user_tags";
+  try {
+    const cached = await chrome.storage.local.get(cacheKey);
+    if (cached[cacheKey]) {
+      const { tags, counts, timestamp } = cached[cacheKey];
+      if (Date.now() - timestamp < 10 * 60 * 1000) {
+        allUserTagCounts = counts;
+        allUserTags = tags;
+        tagCaseMap = buildTagCaseMap(counts);
+        return;
+      }
+    }
+  } catch (_) {}
+  // Cache miss — fetch from API
   try {
     const data = await (await fetch(`https://api.pinboard.in/v1/tags/get?auth_token=${token}&format=json`)).json();
     allUserTagCounts = data;
@@ -331,6 +381,9 @@ async function fetchAllUserTags(token) {
     allUserTags = Object.entries(data)
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([tag]) => tag);
+    tagCaseMap = buildTagCaseMap(data);
+    // Cache result
+    await chrome.storage.local.set({ [cacheKey]: { tags: allUserTags, counts: allUserTagCounts, timestamp: Date.now() } });
   } catch (e) { console.error(e); }
 }
 
@@ -341,7 +394,7 @@ function setupTagsInput() {
   input.addEventListener("input", () => {
     const val = input.value.trim().toLowerCase(); acIndex = -1;
     if (!val) { dropdown.classList.add("hidden"); return; }
-    const matches = allUserTags.filter((t) => 
+    const matches = allUserTags.filter((t) =>
       t.toLowerCase().includes(val) &&
       !currentTags.some((ct) => ct.toLowerCase() === t.toLowerCase())
     ).slice(0, 10);
@@ -395,8 +448,12 @@ function setupTagsInput() {
 }
 function updateAc(items) { items.forEach((el, i) => el.classList.toggle("selected", i === acIndex)); }
 function addTag(tag) {
-  tag = tag.trim().replace(/\s+/g, "-");
+  tag = tag.trim().replace(/\s+/g, settings.aiTagSeparator || "-");
   if (!tag) return;
+  // Respect existing tag casing if enabled
+  if (settings.optRespectTagCase && tagCaseMap) {
+    tag = resolveTagCase(tag, tagCaseMap);
+  }
   // 大小写不敏感去重：如果已存在相同 tag（忽略大小写），则跳过
   if (currentTags.some((t) => t.toLowerCase() === tag.toLowerCase())) return;
   currentTags.push(tag);
@@ -445,7 +502,7 @@ function setupSubmit(token) {
     if (!url || !title) { showStatus("status-msg", "URL and Title required", "error"); btn.disabled = false; btn.textContent = orig; return; }
     try {
       const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${token}&format=json&url=${enc(url)}&description=${enc(title)}&extended=${enc(document.getElementById("description-input").value)}&tags=${enc(currentTags.join(" "))}&shared=${document.getElementById("private-check").checked ? "no" : "yes"}&toread=${document.getElementById("readlater-check").checked ? "yes" : "no"}&replace=yes`;
-      const data = await (await fetch(apiUrl)).json();
+      const data = await (await pinboardFetch(apiUrl)).json();
       if (data.result_code === "done") {
         showStatus("status-msg", "Bookmark saved.", "success");
         btn.textContent = "✅ Saved!";
@@ -476,7 +533,7 @@ function setupSubmit(token) {
     delBtn.disabled = true; delBtn.classList.add("loading"); delBtn.textContent = "Deleting...";
     const url = document.getElementById("url-input").value;
     try {
-      const data = await (await fetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(url)}&auth_token=${token}&format=json`)).json();
+      const data = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(url)}&auth_token=${token}&format=json`)).json();
       if (data.result_code === "done" || data.result_code === "item not found") {
         showStatus("status-msg", "Deleted.", "success");
         // 通知 background 更新图标
@@ -640,7 +697,10 @@ async function doAITags(forceRefresh) {
 
   try {
     const resp = await callAI(settings, buildTagPrompt(settings, document.getElementById("title-input").value, document.getElementById("url-input").value, pageInfo.pageText, document.getElementById("description-input").value, allUserTags));
-    const tags = parseAITags(resp);
+    const rawTags = parseAITags(resp, settings.aiTagSeparator);
+    const tags = settings.optRespectTagCase
+      ? rawTags.map(t => resolveTagCase(t, tagCaseMap))
+      : rawTags;
     await setAICache(pageInfo.url, "tags", tags, settings.aiCacheDuration);
     renderAITags(tags, false); // false = freshly generated
     if (forceRefresh) {
