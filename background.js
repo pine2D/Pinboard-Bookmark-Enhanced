@@ -45,6 +45,11 @@ async function debouncedCheck(tabId, url) {
     setIcon(tabId, false);
     return;
   }
+  // Check if bookmark status icon is enabled
+  try {
+    const { optCheckBookmarkStatus } = await chrome.storage.sync.get({ optCheckBookmarkStatus: true });
+    if (!optCheckBookmarkStatus) return;
+  } catch (_) {}
   // Dedup: if same URL is already being checked, reuse promise
   if (_pendingChecks.has(url)) {
     const bookmarked = await _pendingChecks.get(url);
@@ -68,8 +73,11 @@ async function loadSettings() {
   return s;
 }
 
+// F7: Track recent saves for undo via notification button
+const _recentSaves = new Map(); // notificationId -> { url, token }
+
 // ---- Show Chrome notification (with category filter) ----
-async function showNotification(id, title, message, category) {
+async function showNotification(id, title, message, category, undoInfo) {
   try {
     const cats = await chrome.storage.sync.get({
       notifyQuickSave: true, notifyReadLater: true,
@@ -81,10 +89,32 @@ async function showNotification(id, title, message, category) {
     if (category === "batchSave" && !cats.notifyBatchSave) return;
     if (category === "error" && !cats.notifyErrors) return;
   } catch (_) {}
-  chrome.notifications.create(id + "-" + Date.now(), {
-    type: "basic", iconUrl: "icons/pin-default-48.png", title, message
-  });
+  const notifId = id + "-" + Date.now();
+  const opts = { type: "basic", iconUrl: "icons/pin-default-48.png", title, message };
+  if (undoInfo) {
+    opts.buttons = [{ title: "Undo" }];
+    _recentSaves.set(notifId, undoInfo);
+    // Auto-expire undo after 30s
+    setTimeout(() => _recentSaves.delete(notifId), 30000);
+  }
+  chrome.notifications.create(notifId, opts);
 }
+
+// F7: Handle undo button click on notifications
+chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
+  if (btnIndex !== 0) return;
+  const info = _recentSaves.get(notifId);
+  if (!info) return;
+  _recentSaves.delete(notifId);
+  try {
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${info.token}&url=${encodeURIComponent(info.url)}&format=json`);
+    const data = await resp.json();
+    if (data.result_code === "done") {
+      statusCache.set(info.url, { bookmarked: false, timestamp: Date.now() });
+      showNotification("undo-done", "Pinboard: Undone", `Bookmark removed.`);
+    }
+  } catch (_) {}
+});
 
 // ---- 设置图标 ----
 async function setIcon(tabId, bookmarked) {
@@ -100,7 +130,7 @@ async function checkBookmarked(url) {
   try {
     const token = await getCachedToken();
     if (!token) return false;
-    const resp = await fetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
     const data = await resp.json();
     const bookmarked = data.posts && data.posts.length > 0;
     statusCache.set(url, { bookmarked, timestamp: Date.now() });
@@ -120,7 +150,7 @@ async function updateBadge() {
     return;
   }
   try {
-    const resp = await fetch(`https://api.pinboard.in/v1/posts/all?auth_token=${s.pinboardToken}&format=json&toread=yes&results=100`);
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${s.pinboardToken}&format=json&toread=yes&results=100`);
     const data = await resp.json();
     const count = Array.isArray(data) ? data.length : 0;
     chrome.action.setBadgeText({ text: count > 0 ? String(count > 99 ? "99+" : count) : "" });
@@ -141,7 +171,8 @@ async function processOfflineQueue() {
   const remaining = [];
   for (const item of offlineQueue) {
     try {
-      const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${item.token}&format=json` +
+      const token = deobfuscateKey(item.token);
+      const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${token}&format=json` +
         `&url=${encodeURIComponent(item.url)}&description=${encodeURIComponent(item.title)}` +
         `&extended=${encodeURIComponent(item.notes)}&tags=${encodeURIComponent(item.tags)}` +
         (item.toread ? "&toread=yes" : "") + "&replace=yes";
@@ -251,7 +282,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     if (data.result_code === "done") {
       statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
       if (tab?.id) setIcon(tab.id, true);
-      showNotification(notifyId + "-saved", notifyTitle, `"${title.substring(0, 60)}" saved.`, notifyCategory);
+      showNotification(notifyId + "-saved", notifyTitle, `"${title.substring(0, 60)}" saved.`, notifyCategory, { url, token: s.pinboardToken });
       // Opportunistic: process offline queue after successful save
       processOfflineQueue().catch(() => {});
       // Update badge if toread
@@ -262,7 +293,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   } catch (e) {
     // Network error — queue for offline retry if enabled
     if (s.offlineQueueEnabled) {
-      await enqueueOfflineSave({ url, title, notes, tags: tagsStr, toread: !!toread, token: s.pinboardToken });
+      await enqueueOfflineSave({ url, title, notes, tags: tagsStr, toread: !!toread, token: obfuscateKey(s.pinboardToken) });
       showNotification(notifyId + "-queued", "Pinboard: Queued offline", `"${title.substring(0, 60)}" will be saved when online.`, notifyCategory);
     } else {
       showNotification(notifyId + "-error", "Pinboard: Network error", e.message, "error");
@@ -303,12 +334,30 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // Keep service worker alive + periodic tasks
 chrome.alarms.create("keepalive", { periodInMinutes: 4 });
+chrome.alarms.create("ai-cache-cleanup", { periodInMinutes: 60 * 24 }); // daily
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "keepalive") {
     processOfflineQueue().catch(() => {});
     updateBadge().catch(() => {});
   }
+  if (alarm.name === "ai-cache-cleanup") {
+    cleanupExpiredAICache().catch(() => {});
+  }
 });
+
+// F1: Cleanup expired AI cache entries
+async function cleanupExpiredAICache() {
+  try {
+    const all = await chrome.storage.local.get(null);
+    const { aiCacheDuration = 60 } = await chrome.storage.sync.get({ aiCacheDuration: 60 });
+    const maxAge = (aiCacheDuration || 60) * 60 * 1000;
+    const now = Date.now();
+    const expired = Object.keys(all).filter(k =>
+      k.startsWith("ai_cache_") && all[k]?.timestamp && (now - all[k].timestamp > maxAge)
+    );
+    if (expired.length) await chrome.storage.local.remove(expired);
+  } catch (_) {}
+}
 
 // Startup: process offline queue + update badge
 chrome.runtime.onStartup.addListener(() => {
@@ -356,6 +405,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ===================== Tab Set 保存 =====================
 async function handleSaveTabSet(tabsData) {
   try {
+    // Tab Set uses pinboard.in web API (cookie auth, not API token)
     const result = { browser: "chrome", windows: [tabsData.map(t => ({ title: t.title, url: t.url }))] };
     const formData = new FormData();
     formData.append("data", JSON.stringify(result));

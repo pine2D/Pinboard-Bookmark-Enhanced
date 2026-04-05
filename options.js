@@ -39,7 +39,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-batch-tag": s.optBatchTag, "opt-theme": s.optTheme,
     "qs-default-tags": s.qsDefaultTags, "rl-default-tags": s.rlDefaultTags,
     "opt-custom-font": s.customFont, "opt-custom-css": s.customCSS,
-    "opt-ai-tag-separator": s.aiTagSeparator
+    "opt-ai-tag-separator": s.aiTagSeparator,
+    "opt-tag-presets": s.tagPresets
   };
   for (const [id, val] of Object.entries(fieldMap)) {
     const el = document.getElementById(id);
@@ -66,7 +67,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     "notify-errors": s.notifyErrors,
     "opt-respect-tag-case": s.optRespectTagCase,
     "offline-queue-enabled": s.offlineQueueEnabled,
-    "opt-show-badge": s.optShowBadge
+    "opt-show-badge": s.optShowBadge,
+    "opt-check-bookmark-status": s.optCheckBookmarkStatus,
+    "opt-show-suggest-tags": s.optShowSuggestTags,
+    "opt-auto-close": s.optAutoCloseAfterSave
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = document.getElementById(id);
@@ -181,7 +185,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       notifyErrors: document.getElementById("notify-errors").checked,
       // Custom Style
       customFont: document.getElementById("opt-custom-font").value.trim(),
-      customCSS: document.getElementById("opt-custom-css").value
+      customCSS: document.getElementById("opt-custom-css").value,
+      // New toggles
+      optCheckBookmarkStatus: document.getElementById("opt-check-bookmark-status").checked,
+      optShowSuggestTags: document.getElementById("opt-show-suggest-tags").checked,
+      optAutoCloseAfterSave: document.getElementById("opt-auto-close").checked,
+      tagPresets: document.getElementById("opt-tag-presets").value
     };
     await chrome.storage.sync.set(data);
     flashAutoSave();

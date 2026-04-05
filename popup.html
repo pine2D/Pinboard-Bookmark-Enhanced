@@ -23,6 +23,7 @@
     </div>
 
     <div class="form-body">
+      <div id="existing-banner" class="existing-banner hidden"></div>
       <div id="url-warning" class="url-warning hidden">
         <span>⚠ This page cannot be saved to Pinboard (unsupported URL)</span>
       </div>
@@ -55,7 +56,13 @@
           <a href="#" id="tags-clear-all" class="clear-all-link hidden">Clear all</a>
         </div>
       </div>
-      <div class="row">
+      <div id="presets-row" class="row hidden">
+        <span class="label top">Presets</span>
+        <div class="field">
+          <div id="tag-presets" class="suggest-area"></div>
+        </div>
+      </div>
+      <div id="suggest-row" class="row">
         <span class="label top">Suggest</span>
         <div class="field">
           <div id="pinboard-suggest-tags" class="suggest-area"><span class="muted">loading...</span></div>
@@ -97,7 +104,7 @@
       <a href="https://pinboard.in/popular/" target="_blank" title="Popular">Popular</a>
     </div>
     <div class="quick-row">
-      <button id="save-tabset-btn" class="qbtn" title="Save all open tabs as a tab set">📑 Save Tabs</button>
+      <button id="save-tabset-btn" class="qbtn" title="Save all open tabs as a tab set (requires pinboard.in login)">📑 Save Tabs</button>
       <button id="batch-bookmark-btn" class="qbtn" title="Save each open tab as an individual bookmark">📌 Batch Save</button>
     </div>
     <div id="offline-queue-bar" class="offline-bar hidden">

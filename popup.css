@@ -25,6 +25,16 @@ a:hover { text-decoration: underline; }
 .login-body button { padding: 3px 14px; font-size: 12px; cursor: pointer; }
 .error-text { color: #c00; font-size: 11px; margin-top: 4px; }
 
+/* Existing Bookmark Banner */
+.existing-banner {
+  padding: 5px 12px;
+  background: #e8f0fe;
+  border-bottom: 1px solid #b8d4fe;
+  color: #1a56db;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 /* URL Warning */
 .url-warning {
   padding: 6px 12px;
@@ -34,6 +44,22 @@ a:hover { text-decoration: underline; }
   font-size: 11px;
   line-height: 1.4;
 }
+
+/* Tag Presets */
+.preset-btn {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-right: 5px;
+  font-size: 11px;
+  color: #2255aa;
+  background: #eef2ff;
+  border: 1px solid #c0d0f0;
+  border-radius: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.preset-btn:hover { background: #d5e0ff; }
+.preset-btn.used { color: #bbb; background: #f5f5f0; border-color: #ddd; pointer-events: none; }
 
 .form-body { padding: 6px 0 8px; }
 .row { display: flex; padding: 3px 12px; gap: 8px; }
@@ -302,6 +328,7 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
 }
 .recent-bm-item:hover { text-decoration: underline; }
+.recent-bm-domain { color: #999; font-size: 10px; }
 .recent-bm-del {
   flex-shrink: 0;
   color: #ccc;
@@ -350,6 +377,7 @@ html.dark .action-link { color: #aa77dd; }
 html.dark #desc-char-count { color: #666; }
 html.dark .recent-bm-label { color: #777; }
 html.dark .recent-bm-item { color: #6699ff; }
+html.dark .recent-bm-domain { color: #555; }
 html.dark .recent-bm-del { color: #555; }
 html.dark .recent-bm-del:hover { color: #ff6666; }
 html.dark .search-field { background: #2a2a2a; border-color: #555; color: #e0e0e0; }
@@ -357,7 +385,11 @@ html.dark .search-field:focus { border-color: #4477bb; background: #1e2a3a; }
 html.dark .clear-all-link { color: #666; }
 html.dark .clear-all-link:hover { color: #ff6666; }
 html.dark .tag-item.drag-over { border-left-color: #6699ff; }
+html.dark .existing-banner { background: #1a2a3a; border-color: #2a4a6a; color: #6699ff; }
 html.dark .url-warning { background: #3a1a1a; border-color: #5a2a2a; color: #ff6666; }
+html.dark .preset-btn { color: #6699ff; background: #1e2a3a; border-color: #3a4a6a; }
+html.dark .preset-btn:hover { background: #2a3f5f; }
+html.dark .preset-btn.used { color: #444; background: #252525; border-color: #333; }
 html.dark .quick-links a { color: #6699ff; }
 html.dark .ql-sep { color: #444; }
 html.dark .offline-bar { background: #2a2510; border-color: #4a4020; color: #d4a800; }

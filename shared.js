@@ -53,7 +53,9 @@ const SETTINGS_DEFAULTS = {
   notifyTabSet: true, notifyBatchSave: true, notifyErrors: true,
   customFont: "", customCSS: "",
   optRespectTagCase: true, aiTagSeparator: "-",
-  offlineQueueEnabled: true, optShowBadge: false
+  offlineQueueEnabled: true, optShowBadge: false,
+  optCheckBookmarkStatus: true, optShowSuggestTags: true,
+  tagPresets: "", optAutoCloseAfterSave: true
 };
 
 // ---- Tag case normalization helpers ----
@@ -102,10 +104,18 @@ async function _processPinboardQueue() {
   _pinboardProcessing = true;
   while (_pinboardQueue.length) {
     const { url, options, resolve, reject } = _pinboardQueue.shift();
+    // Cross-context coordination: read shared timestamp from storage
+    let lastCall = _pinboardLastCall;
+    try {
+      const stored = await chrome.storage.local.get("_pbRateLimitTs");
+      if (stored._pbRateLimitTs > lastCall) lastCall = stored._pbRateLimitTs;
+    } catch (_) {}
     const now = Date.now();
-    const wait = Math.max(0, 3100 - (now - _pinboardLastCall));
+    const wait = Math.max(0, 3100 - (now - lastCall));
     if (wait > 0) await new Promise(r => setTimeout(r, wait));
-    _pinboardLastCall = Date.now();
+    const callTime = Date.now();
+    _pinboardLastCall = callTime;
+    try { await chrome.storage.local.set({ _pbRateLimitTs: callTime }); } catch (_) {}
     try { resolve(await fetch(url, options)); } catch (e) { reject(e); }
   }
   _pinboardProcessing = false;

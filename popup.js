@@ -119,12 +119,18 @@ async function showMain(token) {
   if (settings.optReadlaterDefault) document.getElementById("readlater-check").checked = true;
 
   await checkExistingBookmark(token, pageInfo.url);
-  setTimeout(() => fetchPinboardSuggestTags(token, pageInfo.url), 500);
+  // Suggest tags toggle
+  if (settings.optShowSuggestTags) {
+    setTimeout(() => fetchPinboardSuggestTags(token, pageInfo.url), 500);
+  } else {
+    document.getElementById("suggest-row").classList.add("hidden");
+  }
   setupTagsInput();
   setupSubmit(token);
   setupAIFeatures();
   setupDescriptionCounter();
   setupTabSet();
+  setupTagPresets();
   if (settings.optShowRecent) fetchRecentBookmarks(token);
   document.querySelector(".tags-input-wrap").addEventListener("click", () => document.getElementById("tags-input").focus());
   // Fetch all user tags first (uses local cache, populates tagCaseMap), then trigger auto AI tags
@@ -241,38 +247,41 @@ function setupTabSet() {
           let tags = [...baseTags];
           let notes = "";
 
-          // AI features per tab (if enabled)
+          // AI features per tab (parallel tags + summary)
           if (useAiTags || useAiSummary) {
             let tabPageInfo = null;
             try { tabPageInfo = await getPageInfoFromTab(t.id); } catch (_) {}
             if (tabPageInfo?.pageText) {
-              if (useAiTags) {
+              const aiJobs = [];
+              if (useAiTags) aiJobs.push((async () => {
                 try {
                   const cached = await getAICache(t.url, "tags", settings.aiCacheDuration);
-                  if (cached) { tags = [...tags, ...cached]; }
-                  else {
-                    const prompt = buildTagPrompt(settings, t.title || t.url, t.url, tabPageInfo.pageText, "", []);
-                    const resp = await callAI(settings, prompt);
-                    const rawTags = parseAITags(resp, settings.aiTagSeparator);
-                    const aiTags = settings.optRespectTagCase
-                      ? rawTags.map(tag => resolveTagCase(tag, tagCaseMap))
-                      : rawTags;
-                    await setAICache(t.url, "tags", aiTags, settings.aiCacheDuration);
-                    tags = [...tags, ...aiTags];
-                  }
-                } catch (_) {}
-              }
-              if (useAiSummary) {
+                  if (cached) return { type: "tags", result: cached };
+                  const prompt = buildTagPrompt(settings, t.title || t.url, t.url, tabPageInfo.pageText, "", []);
+                  const resp = await callAI(settings, prompt);
+                  const rawTags = parseAITags(resp, settings.aiTagSeparator);
+                  const aiTags = settings.optRespectTagCase
+                    ? rawTags.map(tag => resolveTagCase(tag, tagCaseMap))
+                    : rawTags;
+                  await setAICache(t.url, "tags", aiTags, settings.aiCacheDuration);
+                  return { type: "tags", result: aiTags };
+                } catch (_) { return null; }
+              })());
+              if (useAiSummary) aiJobs.push((async () => {
                 try {
                   const cached = await getAICache(t.url, "summary", settings.aiCacheDuration);
-                  if (cached) { notes = `[AI Summary]\n<blockquote>${cached}</blockquote>`; }
-                  else {
-                    const prompt = buildSummaryPrompt(settings, t.title || t.url, t.url, tabPageInfo.pageText, "");
-                    const summary = await callAI(settings, prompt);
-                    await setAICache(t.url, "summary", summary, settings.aiCacheDuration);
-                    notes = `[AI Summary]\n<blockquote>${summary}</blockquote>`;
-                  }
-                } catch (_) {}
+                  if (cached) return { type: "summary", result: cached };
+                  const prompt = buildSummaryPrompt(settings, t.title || t.url, t.url, tabPageInfo.pageText, "");
+                  const summary = await callAI(settings, prompt);
+                  await setAICache(t.url, "summary", summary, settings.aiCacheDuration);
+                  return { type: "summary", result: summary };
+                } catch (_) { return null; }
+              })());
+              const results = await Promise.all(aiJobs);
+              for (const r of results) {
+                if (!r) continue;
+                if (r.type === "tags") tags = [...tags, ...r.result];
+                if (r.type === "summary") notes = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
               }
             }
           }
@@ -309,6 +318,33 @@ function setupTabSet() {
   });
 }
 
+// ===================== Tag Presets (F4) =====================
+function setupTagPresets() {
+  const raw = settings.tagPresets || "";
+  if (!raw.trim()) return;
+  const container = document.getElementById("tag-presets");
+  const presetsRow = document.getElementById("presets-row");
+  if (!container || !presetsRow) return;
+  const presets = raw.split("\n").map(line => {
+    const m = line.match(/^(.+?)[:：]\s*(.+)$/);
+    if (!m) return null;
+    return { name: m[1].trim(), tags: m[2].split(/[,，]+/).map(t => t.trim()).filter(Boolean) };
+  }).filter(Boolean);
+  if (!presets.length) return;
+  presetsRow.classList.remove("hidden");
+  presets.forEach(p => {
+    const btn = document.createElement("span");
+    btn.className = "preset-btn";
+    btn.textContent = p.name;
+    btn.title = p.tags.join(", ");
+    btn.addEventListener("click", () => {
+      p.tags.forEach(t => addTag(t));
+      btn.classList.add("used");
+    });
+    container.appendChild(btn);
+  });
+}
+
 // ===================== Existing URL Set Cache (for batch dedup) =====================
 async function fetchExistingUrlSet(token) {
   const cacheKey = "cached_existing_urls";
@@ -323,7 +359,7 @@ async function fetchExistingUrlSet(token) {
   } catch (_) {}
   // Cache miss — fetch from API
   try {
-    const recentData = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${token}&format=json&results=1000`)).json();
+    const recentData = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${token}&format=json&results=1000&meta=no`)).json();
     const urls = recentData.map(p => p.href);
     await chrome.storage.local.set({ [cacheKey]: { urls, timestamp: Date.now() } });
     return new Set(urls);
@@ -349,12 +385,14 @@ async function checkExistingBookmark(token, url) {
       document.getElementById("delete-btn").classList.remove("hidden");
       updateCharCount();
       setTimeout(() => autoResizeTextarea(document.getElementById("description-input")), 50);
-      // Show bookmark timestamp
+      // F2: Show existing bookmark banner with save date
+      const banner = document.getElementById("existing-banner");
       const timeStr = existingBookmark.time;
-      if (timeStr) {
+      if (timeStr && banner) {
         const d = new Date(timeStr);
-        const formatted = d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-        showStatus("status-msg", `Last saved: ${formatted}`, "success");
+        const formatted = d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+        banner.textContent = `✏️ Editing existing bookmark (saved ${formatted})`;
+        banner.classList.remove("hidden");
       }
     }
   } catch (e) { console.error(e); }
@@ -483,9 +521,10 @@ function setupTagsInput() {
         input.value.trim().split(/[\s,]+/).filter(Boolean).forEach((t) => addTag(t));
       }
       input.value = ""; dropdown.classList.add("hidden");
-    } else if (e.key === " ") {
-      const v = input.value.trim();
+    } else if (e.key === " " || e.key === "," || e.key === "，") {
+      const v = input.value.replace(/[,，]/g, "").trim();
       if (v) { e.preventDefault(); addTag(v); input.value = ""; dropdown.classList.add("hidden"); }
+      else if (e.key !== " ") e.preventDefault(); // swallow comma even if empty
     } else if (e.key === "Backspace" && !input.value && currentTags.length) { removeTag(currentTags[currentTags.length - 1]); }
     else if (e.key === "Escape") { dropdown.classList.add("hidden"); }
   });
@@ -576,7 +615,7 @@ function setupSubmit(token) {
         setTimeout(() => { btn.classList.remove("saved-success"); }, 1200);
         // 通知 background 更新图标
         chrome.runtime.sendMessage({ type: "bookmark_saved", url: url });
-        setTimeout(() => window.close(), 1200);
+        if (settings.optAutoCloseAfterSave) setTimeout(() => window.close(), 1200);
       } else showStatus("status-msg", `Error: ${data.result_code}`, "error");
     } catch (e) { showStatus("status-msg", "Network error", "error"); }
     btn.disabled = false; btn.classList.remove("loading"); btn.textContent = orig;
@@ -870,7 +909,9 @@ async function fetchRecentBookmarks(token) {
       a.target = "_blank";
       a.className = "recent-bm-item";
       a.title = p.description;
-      a.textContent = (p.description || p.href).substring(0, 55);
+      const titleText = (p.description || p.href).substring(0, 50);
+      try { const host = new URL(p.href).hostname.replace(/^www\./, ""); a.innerHTML = esc(titleText) + ` <span class="recent-bm-domain">${esc(host)}</span>`; }
+      catch (_) { a.textContent = titleText; }
       row.appendChild(a);
       const del = document.createElement("span");
       del.className = "recent-bm-del";
@@ -935,3 +976,18 @@ function showElement(id, text) { const el = document.getElementById(id); el.text
 function showStatus(id, text, type) { const el = document.getElementById(id); el.textContent = text; el.className = `status-msg ${type}`; el.classList.remove("hidden"); }
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function enc(s) { return encodeURIComponent(s); }
+
+// F5: Alt+1~9 to add suggest/AI tags by index
+document.addEventListener("keydown", (e) => {
+  if (!e.altKey || e.ctrlKey || e.metaKey) return;
+  const n = parseInt(e.key);
+  if (n < 1 || n > 9 || isNaN(n)) return;
+  // Collect all visible, not-yet-used suggest + AI tags in order
+  const allStags = [...document.querySelectorAll("#pinboard-suggest-tags .stag:not(.used), #ai-suggest-tags .stag:not(.used)")];
+  if (n <= allStags.length) {
+    e.preventDefault();
+    const el = allStags[n - 1];
+    addTag(el.dataset.tag);
+    el.classList.add("used");
+  }
+});

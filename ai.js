@@ -18,7 +18,8 @@ async function getPageInfoFromTab(tabId) {
         if (sel && sel.rangeCount > 0) { const t = sel.toString().trim(); if (t) info.selectedText = t; }
         const md = document.querySelector('meta[name="description"]') || document.querySelector('meta[property="og:description"]');
         if (md) info.metaDescription = md.getAttribute("content") || "";
-        info.pageText = (document.body ? document.body.innerText : "").substring(0, 8000);
+        const mainEl = document.querySelector("article") || document.querySelector("main") || document.querySelector('[role="main"]') || document.body;
+        info.pageText = (mainEl ? mainEl.innerText : "").substring(0, 8000);
         return info;
       }
     });
