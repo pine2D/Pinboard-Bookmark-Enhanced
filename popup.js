@@ -119,11 +119,10 @@ async function showMain(token) {
   if (settings.optReadlaterDefault) document.getElementById("readlater-check").checked = true;
 
   await checkExistingBookmark(token, pageInfo.url);
-  // Suggest tags toggle
+  // Suggest tags toggle (row starts hidden in HTML, show only if enabled)
   if (settings.optShowSuggestTags) {
+    document.getElementById("suggest-row").classList.remove("hidden");
     setTimeout(() => fetchPinboardSuggestTags(token, pageInfo.url), 500);
-  } else {
-    document.getElementById("suggest-row").classList.add("hidden");
   }
   setupTagsInput();
   setupSubmit(token);
