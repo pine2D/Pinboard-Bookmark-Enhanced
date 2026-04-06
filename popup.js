@@ -394,13 +394,20 @@ async function checkExistingBookmark(token, url) {
       document.getElementById("delete-btn").classList.remove("hidden");
       updateCharCount();
       setTimeout(() => autoResizeTextarea(document.getElementById("description-input")), 50);
-      // F2: Show existing bookmark banner with save date
+      // F2: Show existing bookmark banner with save date and tag count
       const banner = document.getElementById("existing-banner");
       const timeStr = existingBookmark.time;
-      if (timeStr && banner) {
-        const d = new Date(timeStr);
-        const formatted = d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-        banner.textContent = `✏️ Editing existing bookmark (saved ${formatted})`;
+      if (banner) {
+        let info = "✏️ Editing existing bookmark";
+        const parts = [];
+        if (timeStr) {
+          const d = new Date(timeStr);
+          parts.push("saved " + d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }));
+        }
+        const tagCount = existingBookmark.tags?.trim() ? existingBookmark.tags.trim().split(/\s+/).length : 0;
+        if (tagCount > 0) parts.push(tagCount + " tag" + (tagCount > 1 ? "s" : ""));
+        if (parts.length) info += " (" + parts.join(", ") + ")";
+        banner.textContent = info;
         banner.classList.remove("hidden");
       }
     }
@@ -624,7 +631,7 @@ function setupSubmit(token) {
         setTimeout(() => { btn.classList.remove("saved-success"); }, 1200);
         // 通知 background 更新图标
         chrome.runtime.sendMessage({ type: "bookmark_saved", url: url });
-        if (settings.optAutoCloseAfterSave) setTimeout(() => window.close(), 1200);
+        if (settings.optAutoCloseAfterSave) setTimeout(() => window.close(), 1800);
       } else showStatus("status-msg", `Error: ${data.result_code}`, "error");
     } catch (e) { showStatus("status-msg", "Network error", "error"); }
     btn.disabled = false; btn.classList.remove("loading"); btn.textContent = orig;

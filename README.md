@@ -10,10 +10,10 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 
 ## Highlights
 
-- **AI tags & summaries** from 9 providers (OpenAI, Claude, Gemini, DeepSeek, Qwen, MiniMax, OpenRouter, Ollama, Custom)
+- **AI tags & summaries** from 13 providers (OpenAI, Claude, Gemini, DeepSeek, Groq, Mistral, Qwen, MiniMax, Cohere, SiliconFlow, OpenRouter, Ollama, Custom)
 - **7 built-in themes** that style both Pinboard.in and the extension UI simultaneously
 - **Quick Actions** — one-click save, read-later, and batch-save all tabs
-- **Zero dependencies** — pure vanilla JS, no build step, no framework
+- **Privacy first** — all data stored locally, no analytics, no tracking
 
 ---
 
@@ -51,8 +51,12 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 | OpenAI | gpt-4o-mini | API Key (custom base URL) |
 | Anthropic Claude | claude-sonnet-4-20250514 | API Key |
 | DeepSeek | deepseek-chat | API Key |
+| Groq | llama-3.3-70b-versatile | API Key |
+| Mistral AI | mistral-small-latest | API Key |
 | Alibaba Qwen | qwen-turbo | API Key |
 | MiniMax | MiniMax-Text-01 | API Key |
+| Cohere | command-r-plus | API Key |
+| SiliconFlow | Qwen2.5-7B-Instruct | API Key |
 | OpenRouter | gemini-2.0-flash-exp:free | API Key |
 | Ollama | llama3 | Local, no key |
 | Custom | configurable | Custom base URL + optional key |
@@ -93,6 +97,9 @@ Plus:
 - Offline queue — saves are queued when offline, synced when back
 - Import/export settings
 - API connectivity test per provider
+- API key show/hide toggle for all provider inputs
+- Auto-growing notes field — starts compact, expands as you type
+- Enhanced duplicate detection — shows save date and tag count
 
 ---
 
@@ -159,10 +166,10 @@ Plus:
 
 ## 亮点
 
-- **AI 标签 & 摘要** — 支持 9 个 AI 服务商（OpenAI、Claude、Gemini、DeepSeek、通义千问、MiniMax、OpenRouter、Ollama、自定义）
+- **AI 标签 & 摘要** — 支持 13 个 AI 服务商（OpenAI、Claude、Gemini、DeepSeek、Groq、Mistral、通义千问、MiniMax、Cohere、硅基流动、OpenRouter、Ollama、自定义）
 - **7 套内置主题** — 同时美化 Pinboard 网站和扩展界面
 - **快捷操作** — 一键保存、稍后阅读、批量保存所有标签页
-- **零依赖** — 纯原生 JS，无构建步骤，无框架
+- **隐私优先** — 所有数据本地存储，无分析、无追踪
 
 ---
 

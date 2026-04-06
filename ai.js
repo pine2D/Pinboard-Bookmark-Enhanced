@@ -50,7 +50,7 @@ async function handleAIError(res, provider) {
 function hasAIKey(s) {
   const p = s.aiProvider || "gemini";
   if (p === "ollama") return true;
-  const keyMap = { gemini: "geminiApiKey", openai: "openaiApiKey", claude: "claudeApiKey", deepseek: "deepseekApiKey", qwen: "qwenApiKey", minimax: "minimaxApiKey", openrouter: "openrouterApiKey", custom: "customApiKey" };
+  const keyMap = { gemini: "geminiApiKey", openai: "openaiApiKey", claude: "claudeApiKey", deepseek: "deepseekApiKey", qwen: "qwenApiKey", minimax: "minimaxApiKey", openrouter: "openrouterApiKey", groq: "groqApiKey", mistral: "mistralApiKey", cohere: "cohereApiKey", siliconflow: "siliconflowApiKey", custom: "customApiKey" };
   return !!s[keyMap[p]];
 }
 
@@ -65,6 +65,10 @@ async function callAI(s, prompt) {
     case "qwen": return callOpenAICompat("https://dashscope.aliyuncs.com/compatible-mode/v1", s.qwenApiKey, s.qwenModel || "qwen-turbo", prompt);
     case "minimax": return callOpenAICompat("https://api.minimax.chat/v1", s.minimaxApiKey, s.minimaxModel || "MiniMax-Text-01", prompt);
     case "openrouter": return callOpenAICompat("https://openrouter.ai/api/v1", s.openrouterApiKey, s.openrouterModel || "google/gemini-2.0-flash-exp:free", prompt);
+    case "groq": return callOpenAICompat("https://api.groq.com/openai/v1", s.groqApiKey, s.groqModel || "llama-3.3-70b-versatile", prompt);
+    case "mistral": return callOpenAICompat("https://api.mistral.ai/v1", s.mistralApiKey, s.mistralModel || "mistral-small-latest", prompt);
+    case "cohere": return callOpenAICompat("https://api.cohere.com/v2", s.cohereApiKey, s.cohereModel || "command-r-plus", prompt);
+    case "siliconflow": return callOpenAICompat("https://api.siliconflow.cn/v1", s.siliconflowApiKey, s.siliconflowModel || "Qwen/Qwen2.5-7B-Instruct", prompt);
     case "ollama": return callOllama(s, prompt);
     case "custom": return callOpenAICompat(s.customBaseUrl, s.customApiKey, s.customModel, prompt);
     default: throw new Error("Unknown provider: " + p);

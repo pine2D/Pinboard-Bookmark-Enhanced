@@ -167,6 +167,11 @@
     /* Terminal monospace font override */
     html[data-theme="terminal"] body { font-family: "Courier New", Consolas, monospace; }
     html[data-theme="terminal"] .fg textarea { font-family: "Courier New", Consolas, monospace; }
+    /* API key show/hide toggle */
+    .key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px 4px; color: #888; }
+    .key-toggle:hover { color: #555; }
+    html[data-theme] .key-toggle { color: var(--opt-fg-hint); }
+    html[data-theme] .key-toggle:hover { color: var(--opt-fg); }
   </style>
 </head>
 <body>
@@ -296,6 +301,10 @@
           <option value="qwen">Qwen (通义千问)</option>
           <option value="minimax">MiniMax</option>
           <option value="openrouter">OpenRouter</option>
+          <option value="groq">Groq</option>
+          <option value="mistral">Mistral AI</option>
+          <option value="cohere">Cohere</option>
+          <option value="siliconflow">SiliconFlow (硅基流动)</option>
           <option value="ollama">Ollama (Local)</option>
           <option value="custom">Custom OpenAI-compatible</option>
         </select>
@@ -304,7 +313,7 @@
       <!-- Gemini -->
       <div class="pf" id="fields-gemini">
         <h3>Google Gemini</h3>
-        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-gemini-key" placeholder="AIza..." /><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-gemini-key" placeholder="AIza..." /><button type="button" class="key-toggle" data-target="opt-gemini-key" title="Show/hide key">👁</button><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-gemini-model" value="gemini-2.0-flash" /></div>
         <button class="btn btn-sm" id="test-gemini">Test Connection</button>
         <span class="save-status" id="test-gemini-status"></span>
@@ -313,7 +322,7 @@
       <!-- OpenAI -->
       <div class="pf hidden" id="fields-openai">
         <h3>OpenAI</h3>
-        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-openai-key" placeholder="sk-..." /><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-openai-key" placeholder="sk-..." /><button type="button" class="key-toggle" data-target="opt-openai-key" title="Show/hide key">👁</button><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-openai-model" value="gpt-4o-mini" /></div>
         <div class="fg"><label class="bl">Base URL</label><input type="text" id="opt-openai-baseurl" value="https://api.openai.com/v1" /><p class="hint">Change for proxy or compatible endpoint</p></div>
         <button class="btn btn-sm" id="test-openai">Test Connection</button>
@@ -323,7 +332,7 @@
       <!-- Claude -->
       <div class="pf hidden" id="fields-claude">
         <h3>Anthropic Claude</h3>
-        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-claude-key" placeholder="sk-ant-..." /><p class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-claude-key" placeholder="sk-ant-..." /><button type="button" class="key-toggle" data-target="opt-claude-key" title="Show/hide key">👁</button><p class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-claude-model" value="claude-sonnet-4-20250514" /><p class="hint">e.g. claude-sonnet-4-20250514, claude-3-5-haiku-20241022</p></div>
         <button class="btn btn-sm" id="test-claude">Test Connection</button>
         <span class="save-status" id="test-claude-status"></span>
@@ -332,7 +341,7 @@
       <!-- DeepSeek -->
       <div class="pf hidden" id="fields-deepseek">
         <h3>DeepSeek</h3>
-        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-deepseek-key" placeholder="sk-..." /><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-deepseek-key" placeholder="sk-..." /><button type="button" class="key-toggle" data-target="opt-deepseek-key" title="Show/hide key">👁</button><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-chat" /></div>
         <button class="btn btn-sm" id="test-deepseek">Test Connection</button>
         <span class="save-status" id="test-deepseek-status"></span>
@@ -341,7 +350,7 @@
       <!-- Qwen -->
       <div class="pf hidden" id="fields-qwen">
         <h3>Qwen (通义千问)</h3>
-        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-qwen-key" placeholder="sk-..." /><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-qwen-key" placeholder="sk-..." /><button type="button" class="key-toggle" data-target="opt-qwen-key" title="Show/hide key">👁</button><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-qwen-model" value="qwen-turbo" /></div>
         <button class="btn btn-sm" id="test-qwen">Test Connection</button>
         <span class="save-status" id="test-qwen-status"></span>
@@ -350,7 +359,7 @@
       <!-- MiniMax -->
       <div class="pf hidden" id="fields-minimax">
         <h3>MiniMax</h3>
-        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-minimax-key" /><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-minimax-key" /><button type="button" class="key-toggle" data-target="opt-minimax-key" title="Show/hide key">👁</button><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank">Get key</a></p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-Text-01" /></div>
         <button class="btn btn-sm" id="test-minimax">Test Connection</button>
         <span class="save-status" id="test-minimax-status"></span>
@@ -359,10 +368,46 @@
       <!-- OpenRouter -->
       <div class="pf hidden" id="fields-openrouter">
         <h3>OpenRouter</h3>
-        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-openrouter-key" placeholder="sk-or-..." /><p class="hint"><a href="https://openrouter.ai/keys" target="_blank">Get key</a>. Access 100+ models from one API.</p></div>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-openrouter-key" placeholder="sk-or-..." /><button type="button" class="key-toggle" data-target="opt-openrouter-key" title="Show/hide key">👁</button><p class="hint"><a href="https://openrouter.ai/keys" target="_blank">Get key</a>. Access 100+ models from one API.</p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-openrouter-model" value="google/gemini-2.0-flash-exp:free" /><p class="hint">Browse models at <a href="https://openrouter.ai/models" target="_blank">openrouter.ai/models</a></p></div>
         <button class="btn btn-sm" id="test-openrouter">Test Connection</button>
         <span class="save-status" id="test-openrouter-status"></span>
+      </div>
+
+      <!-- Groq -->
+      <div class="pf hidden" id="fields-groq">
+        <h3>Groq</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-groq-key" placeholder="gsk_..." /><button type="button" class="key-toggle" data-target="opt-groq-key" title="Show/hide key">👁</button><p class="hint"><a href="https://console.groq.com/keys" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-groq-model" value="llama-3.3-70b-versatile" /></div>
+        <button class="btn btn-sm" id="test-groq">Test Connection</button>
+        <span class="save-status" id="test-groq-status"></span>
+      </div>
+
+      <!-- Mistral -->
+      <div class="pf hidden" id="fields-mistral">
+        <h3>Mistral AI</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-mistral-key" /><button type="button" class="key-toggle" data-target="opt-mistral-key" title="Show/hide key">👁</button><p class="hint"><a href="https://console.mistral.ai/api-keys" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-mistral-model" value="mistral-small-latest" /></div>
+        <button class="btn btn-sm" id="test-mistral">Test Connection</button>
+        <span class="save-status" id="test-mistral-status"></span>
+      </div>
+
+      <!-- Cohere -->
+      <div class="pf hidden" id="fields-cohere">
+        <h3>Cohere</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-cohere-key" /><button type="button" class="key-toggle" data-target="opt-cohere-key" title="Show/hide key">👁</button><p class="hint"><a href="https://dashboard.cohere.com/api-keys" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-cohere-model" value="command-r-plus" /></div>
+        <button class="btn btn-sm" id="test-cohere">Test Connection</button>
+        <span class="save-status" id="test-cohere-status"></span>
+      </div>
+
+      <!-- SiliconFlow -->
+      <div class="pf hidden" id="fields-siliconflow">
+        <h3>SiliconFlow (硅基流动)</h3>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-siliconflow-key" placeholder="sk-..." /><button type="button" class="key-toggle" data-target="opt-siliconflow-key" title="Show/hide key">👁</button><p class="hint"><a href="https://cloud.siliconflow.cn/account/ak" target="_blank">Get key</a></p></div>
+        <div class="fg"><label class="bl">Model</label><input type="text" id="opt-siliconflow-model" value="Qwen/Qwen2.5-7B-Instruct" /></div>
+        <button class="btn btn-sm" id="test-siliconflow">Test Connection</button>
+        <span class="save-status" id="test-siliconflow-status"></span>
       </div>
 
       <!-- Ollama -->
@@ -379,7 +424,7 @@
         <h3>Custom OpenAI-compatible API</h3>
         <div class="fg"><label class="bl">Display Name</label><input type="text" id="opt-custom-name" value="Custom" /></div>
         <div class="fg"><label class="bl">Base URL</label><input type="text" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /><p class="hint">Must support <code>/chat/completions</code> endpoint</p></div>
-        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-custom-key" /><p class="hint">Leave empty if not required</p></div>
+        <div class="fg"><label class="bl">API Key</label><input type="password" id="opt-custom-key" /><button type="button" class="key-toggle" data-target="opt-custom-key" title="Show/hide key">👁</button><p class="hint">Leave empty if not required</p></div>
         <div class="fg"><label class="bl">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
         <button class="btn btn-sm" id="test-custom">Test Connection</button>
         <span class="save-status" id="test-custom-status"></span>

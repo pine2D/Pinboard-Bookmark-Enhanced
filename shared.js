@@ -37,6 +37,10 @@ const SETTINGS_DEFAULTS = {
   qwenApiKey: "", qwenModel: "qwen-turbo",
   minimaxApiKey: "", minimaxModel: "MiniMax-Text-01",
   openrouterApiKey: "", openrouterModel: "google/gemini-2.0-flash-exp:free",
+  groqApiKey: "", groqModel: "llama-3.3-70b-versatile",
+  mistralApiKey: "", mistralModel: "mistral-small-latest",
+  cohereApiKey: "", cohereModel: "command-r-plus",
+  siliconflowApiKey: "", siliconflowModel: "Qwen/Qwen2.5-7B-Instruct",
   ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3",
   customApiKey: "", customModel: "", customBaseUrl: "", customName: "Custom",
   aiSummaryLang: "auto", aiCacheDuration: 60,
@@ -122,7 +126,7 @@ async function _processPinboardQueue() {
   _pinboardProcessing = false;
 }
 
-const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","customApiKey"];
+const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","customApiKey"];
 
 function deobfuscateSettings(s) {
   API_KEY_FIELDS.forEach(k => { if (s[k]) s[k] = deobfuscateKey(s[k]); });

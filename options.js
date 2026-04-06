@@ -16,6 +16,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
+  // ---- API key show/hide toggle ----
+  document.querySelectorAll(".key-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const input = document.getElementById(btn.dataset.target);
+      if (input) {
+        const isPassword = input.type === "password";
+        input.type = isPassword ? "text" : "password";
+        btn.textContent = isPassword ? "🔒" : "👁";
+      }
+    });
+  });
+
   // ---- All settings with defaults (from shared.js) ----
   const s = await chrome.storage.sync.get(SETTINGS_DEFAULTS);
   deobfuscateSettings(s);
@@ -37,6 +49,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-qwen-key": s.qwenApiKey, "opt-qwen-model": s.qwenModel,
     "opt-minimax-key": s.minimaxApiKey, "opt-minimax-model": s.minimaxModel,
     "opt-openrouter-key": s.openrouterApiKey, "opt-openrouter-model": s.openrouterModel,
+    "opt-groq-key": s.groqApiKey, "opt-groq-model": s.groqModel,
+    "opt-mistral-key": s.mistralApiKey, "opt-mistral-model": s.mistralModel,
+    "opt-cohere-key": s.cohereApiKey, "opt-cohere-model": s.cohereModel,
+    "opt-siliconflow-key": s.siliconflowApiKey, "opt-siliconflow-model": s.siliconflowModel,
     "opt-ollama-baseurl": s.ollamaBaseUrl, "opt-ollama-model": s.ollamaModel,
     "opt-custom-name": s.customName, "opt-custom-baseurl": s.customBaseUrl,
     "opt-custom-key": s.customApiKey, "opt-custom-model": s.customModel,
@@ -113,7 +129,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- Provider field toggle ----
-  const providers = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","ollama","custom"];
+  const providers = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","ollama","custom"];
   function updateProviderFields() {
     const selected = document.getElementById("opt-ai-provider").value;
     providers.forEach(p => {
@@ -182,6 +198,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       minimaxModel: document.getElementById("opt-minimax-model").value.trim() || "MiniMax-Text-01",
       openrouterApiKey: obfuscateKey(document.getElementById("opt-openrouter-key").value.trim()),
       openrouterModel: document.getElementById("opt-openrouter-model").value.trim() || "google/gemini-2.0-flash-exp:free",
+      groqApiKey: obfuscateKey(document.getElementById("opt-groq-key").value.trim()),
+      groqModel: document.getElementById("opt-groq-model").value.trim() || "llama-3.3-70b-versatile",
+      mistralApiKey: obfuscateKey(document.getElementById("opt-mistral-key").value.trim()),
+      mistralModel: document.getElementById("opt-mistral-model").value.trim() || "mistral-small-latest",
+      cohereApiKey: obfuscateKey(document.getElementById("opt-cohere-key").value.trim()),
+      cohereModel: document.getElementById("opt-cohere-model").value.trim() || "command-r-plus",
+      siliconflowApiKey: obfuscateKey(document.getElementById("opt-siliconflow-key").value.trim()),
+      siliconflowModel: document.getElementById("opt-siliconflow-model").value.trim() || "Qwen/Qwen2.5-7B-Instruct",
       ollamaBaseUrl: document.getElementById("opt-ollama-baseurl").value.trim() || "http://localhost:11434",
       ollamaModel: document.getElementById("opt-ollama-model").value.trim() || "llama3",
       customName: document.getElementById("opt-custom-name").value.trim() || "Custom",
@@ -254,7 +278,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Export Settings ----
   document.getElementById("export-settings").addEventListener("click", async () => {
     const raw = await chrome.storage.sync.get(null);
-    const sensitiveKeys = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","customApiKey"];
+    const sensitiveKeys = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","customApiKey"];
     const exportData = Object.fromEntries(
       Object.entries(raw).filter(([k]) => !sensitiveKeys.includes(k))
     );
@@ -275,7 +299,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      const sensitiveKeys = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","customApiKey"];
+      const sensitiveKeys = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","customApiKey"];
       // Route customCSS to local storage
       const { customCSS, ...rest } = data;
       const safeData = Object.fromEntries(
@@ -321,6 +345,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       openrouterModel: document.getElementById("opt-openrouter-model")?.value?.trim() || "google/gemini-2.0-flash-exp:free",
       ollamaBaseUrl: document.getElementById("opt-ollama-baseurl")?.value?.trim() || "http://localhost:11434",
       ollamaModel: document.getElementById("opt-ollama-model")?.value?.trim() || "llama3",
+      groqApiKey: document.getElementById("opt-groq-key")?.value?.trim() || "",
+      groqModel: document.getElementById("opt-groq-model")?.value?.trim() || "llama-3.3-70b-versatile",
+      mistralApiKey: document.getElementById("opt-mistral-key")?.value?.trim() || "",
+      mistralModel: document.getElementById("opt-mistral-model")?.value?.trim() || "mistral-small-latest",
+      cohereApiKey: document.getElementById("opt-cohere-key")?.value?.trim() || "",
+      cohereModel: document.getElementById("opt-cohere-model")?.value?.trim() || "command-r-plus",
+      siliconflowApiKey: document.getElementById("opt-siliconflow-key")?.value?.trim() || "",
+      siliconflowModel: document.getElementById("opt-siliconflow-model")?.value?.trim() || "Qwen/Qwen2.5-7B-Instruct",
       customApiKey: document.getElementById("opt-custom-key")?.value?.trim() || "",
       customModel: document.getElementById("opt-custom-model")?.value?.trim() || "",
       customBaseUrl: document.getElementById("opt-custom-baseurl")?.value?.trim() || "",
@@ -361,9 +393,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         result = (await res.json()).message?.content?.trim() || "OK";
       } else {
-        const baseUrlMap = { openai: cs.openaiBaseUrl, deepseek: "https://api.deepseek.com/v1", qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1", minimax: "https://api.minimax.chat/v1", openrouter: "https://openrouter.ai/api/v1", custom: cs.customBaseUrl };
-        const apiKeyMap = { openai: cs.openaiApiKey, deepseek: cs.deepseekApiKey, qwen: cs.qwenApiKey, minimax: cs.minimaxApiKey, openrouter: cs.openrouterApiKey, custom: cs.customApiKey };
-        const modelMap = { openai: cs.openaiModel, deepseek: cs.deepseekModel, qwen: cs.qwenModel, minimax: cs.minimaxModel, openrouter: cs.openrouterModel, custom: cs.customModel };
+        const baseUrlMap = { openai: cs.openaiBaseUrl, deepseek: "https://api.deepseek.com/v1", qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1", minimax: "https://api.minimax.chat/v1", openrouter: "https://openrouter.ai/api/v1", groq: "https://api.groq.com/openai/v1", mistral: "https://api.mistral.ai/v1", cohere: "https://api.cohere.com/v2", siliconflow: "https://api.siliconflow.cn/v1", custom: cs.customBaseUrl };
+        const apiKeyMap = { openai: cs.openaiApiKey, deepseek: cs.deepseekApiKey, qwen: cs.qwenApiKey, minimax: cs.minimaxApiKey, openrouter: cs.openrouterApiKey, groq: cs.groqApiKey, mistral: cs.mistralApiKey, cohere: cs.cohereApiKey, siliconflow: cs.siliconflowApiKey, custom: cs.customApiKey };
+        const modelMap = { openai: cs.openaiModel, deepseek: cs.deepseekModel, qwen: cs.qwenModel, minimax: cs.minimaxModel, openrouter: cs.openrouterModel, groq: cs.groqModel, mistral: cs.mistralModel, cohere: cs.cohereModel, siliconflow: cs.siliconflowModel, custom: cs.customModel };
         const baseUrl = baseUrlMap[provider];
         const apiKey = apiKeyMap[provider];
         if (!baseUrl) throw new Error("No base URL configured");
@@ -389,7 +421,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","ollama","custom"].forEach(p => {
+  ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","ollama","custom"].forEach(p => {
     document.getElementById(`test-${p}`)?.addEventListener("click", () => testAIProvider(p));
   });
 
