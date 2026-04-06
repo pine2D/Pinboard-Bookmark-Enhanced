@@ -129,10 +129,10 @@ async function showMain(token) {
   if (settings.optReadlaterDefault) document.getElementById("readlater-check").checked = true;
 
   await checkExistingBookmark(token, pageInfo.url);
-  // Suggest tags toggle (row starts hidden in HTML, show only if enabled)
+  // Suggest tags — high priority, enqueue right after bookmark check
   if (settings.optShowSuggestTags) {
     document.getElementById("suggest-row").classList.remove("hidden");
-    setTimeout(() => fetchPinboardSuggestTags(token, pageInfo.url), 500);
+    fetchPinboardSuggestTags(token, pageInfo.url);
   }
   setupTagsInput();
   setupSubmit(token);
@@ -140,12 +140,13 @@ async function showMain(token) {
   setupDescriptionCounter();
   setupTabSet();
   setupTagPresets();
-  if (settings.optShowRecent) fetchRecentBookmarks(token);
-  document.querySelector(".tags-input-wrap").addEventListener("click", () => document.getElementById("tags-input").focus());
-  // Fetch all user tags first (uses local cache, populates tagCaseMap), then trigger auto AI tags
+  // Fetch all user tags (uses local cache, populates tagCaseMap), then trigger auto AI tags
   fetchAllUserTags(token).then(() => {
     if (settings.optAiAutoTags && hasAIKey(settings)) document.getElementById("ai-tags-btn").click();
   });
+  // Recent bookmarks — lowest priority, enqueue last
+  if (settings.optShowRecent) fetchRecentBookmarks(token);
+  document.querySelector(".tags-input-wrap").addEventListener("click", () => document.getElementById("tags-input").focus());
   showOfflineQueueStatus();
 
   // Focus optimization: tags input for new bookmarks, description for existing
