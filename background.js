@@ -319,8 +319,8 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
   clearTimeout(_checkDebounceTimer);
   _checkDebounceTimer = setTimeout(async () => {
     try {
-      const tab = await chrome.tabs.get(tabId);
-      await debouncedCheck(tabId, tab.url);
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id === tabId && tab.url) await debouncedCheck(tabId, tab.url);
     } catch (_) {}
   }, 150);
 });
