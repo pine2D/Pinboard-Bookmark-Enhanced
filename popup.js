@@ -147,10 +147,13 @@ async function showMain(token) {
   const isUnsupportedUrl = !pageInfo.url || (!pageInfo.url.startsWith("http://") && !pageInfo.url.startsWith("https://"));
   if (isUnsupportedUrl) {
     document.getElementById("url-warning").classList.remove("hidden");
+    document.getElementById("url-input").value = "";
+    document.getElementById("title-input").value = "";
     document.getElementById("submit-btn").disabled = true;
     document.getElementById("submit-btn").title = t("urlCannotSave");
     document.getElementById("ai-summary-btn").classList.add("disabled-link");
     document.getElementById("ai-tags-btn").classList.add("disabled-link");
+    return;
   }
 
   document.getElementById("url-input").addEventListener("input", () => {
