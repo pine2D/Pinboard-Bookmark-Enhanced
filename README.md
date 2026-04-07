@@ -3,7 +3,7 @@
 A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking with AI-powered tags, summaries, and a fully themeable interface.
 
 ![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-2.4-blue)
+[![Version](https://img.shields.io/github/v/release/oumu/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/oumu/Pinboard-Bookmark-Enhanced/releases/latest)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -134,17 +134,21 @@ Language can be set in Settings → Appearance, or auto-detected from browser lo
 
 ## Installation
 
-1. Clone this repository:
+### Option 1 — Download ZIP (recommended)
 
-   ```bash
-   git clone https://github.com/oumu/Pinboard-Bookmark-Enhanced.git
-   ```
+1. Go to [Releases](https://github.com/oumu/Pinboard-Bookmark-Enhanced/releases/latest) and download the latest `pinboard-bookmark-enhanced-vX.X.zip`
+2. Unzip to a local folder
+3. Open `chrome://extensions/`, enable **Developer mode**
+4. Click **Load unpacked**, select the unzipped folder
+5. Pin the extension to your toolbar
 
-2. Open `chrome://extensions/`, enable **Developer mode**
+### Option 2 — Clone source
 
-3. Click **Load unpacked**, select the extension folder
+```bash
+git clone https://github.com/oumu/Pinboard-Bookmark-Enhanced.git
+```
 
-4. Pin the extension to your toolbar
+Then follow steps 3–5 above, selecting the cloned folder.
 
 ### Prerequisites
 
