@@ -1,0 +1,895 @@
+{
+  "extName": {
+    "message": "Pinboard Bookmark Plus"
+  },
+  "extDescription": {
+    "message": "Zakładki w Pinboard ze znacznikami i podsumowaniami AI"
+  },
+  "cmdOpenPopup": {
+    "message": "Otwórz Pinboard Bookmark Plus"
+  },
+  "cmdQuickSave": {
+    "message": "Szybki zapis do Pinboard (bez okna)"
+  },
+  "cmdReadLater": {
+    "message": "Szybki zapis jako Przeczytaj później (bez okna)"
+  },
+
+  "appName": {
+    "message": "Pinboard Bookmark Plus"
+  },
+  "settings": {
+    "message": "ustawienia"
+  },
+  "login": {
+    "message": "Zaloguj"
+  },
+  "logout": {
+    "message": "wyloguj"
+  },
+  "cancel": {
+    "message": "Anuluj"
+  },
+  "reset": {
+    "message": "Resetuj"
+  },
+  "submit": {
+    "message": "Zapisz"
+  },
+  "update": {
+    "message": "Aktualizuj"
+  },
+  "delete": {
+    "message": "Usuń"
+  },
+  "clearAll": {
+    "message": "Wyczyść wszystko"
+  },
+  "loading": {
+    "message": "ładowanie..."
+  },
+  "private": {
+    "message": "prywatność"
+  },
+  "readLater": {
+    "message": "przeczytaj później"
+  },
+  "networkError": {
+    "message": "Błąd sieci"
+  },
+  "clear": {
+    "message": "wyczyść"
+  },
+
+  "loginPrompt": {
+    "message": "Wprowadź swój API Token z"
+  },
+  "loginTokenPlaceholder": {
+    "message": "nazwa_użytkownika:XXXXXXXXXXXXXX"
+  },
+  "loginInvalidFormat": {
+    "message": "Nieprawidłowy format. Użyj nazwa_użytkownika:TOKEN"
+  },
+  "loginFailed": {
+    "message": "Uwierzytelnianie nie powiodło się."
+  },
+  "settingsPassword": {
+    "message": "settings/password"
+  },
+
+  "labelUrl": {
+    "message": "URL"
+  },
+  "labelTitle": {
+    "message": "Tytuł"
+  },
+  "labelNotes": {
+    "message": "Notki"
+  },
+  "labelTags": {
+    "message": "Tagi"
+  },
+  "labelPresets": {
+    "message": "Predefiniowane"
+  },
+  "labelSuggest": {
+    "message": "Sugestie"
+  },
+  "labelAiTags": {
+    "message": "Tagi AI"
+  },
+  "urlWarning": {
+    "message": "⚠ Tej strony nie można zapisać w Pinboard (nieobsługiwany URL)"
+  },
+  "urlCannotSave": {
+    "message": "Nie można zapisać: nieobsługiwany URL"
+  },
+  "urlAndTitleRequired": {
+    "message": "URL i tytuł są wymagane"
+  },
+  "placeholderAddTags": {
+    "message": "Dodaj tagi"
+  },
+  "placeholderSearchBookmarks": {
+    "message": "Szukaj w zakładkach..."
+  },
+
+  "saving": {
+    "message": "Zapisywanie..."
+  },
+  "bookmarkSaved": {
+    "message": "Zakładka zapisana."
+  },
+  "savedSuccess": {
+    "message": "✅ Zapisano!"
+  },
+  "deleting": {
+    "message": "Usuwanie..."
+  },
+  "deleted": {
+    "message": "Usunięto."
+  },
+  "confirmDelete": {
+    "message": "Usunąć tę zakładkę?"
+  },
+  "confirmLogout": {
+    "message": "Wylogować? Twój API Token zostanie usunięty."
+  },
+  "hintCtrlEnter": {
+    "message": "Ctrl+Enter"
+  },
+
+  "editingExisting": {
+    "message": "✏️ Edytowanie istniejącej zakładki"
+  },
+  "savedOnDate": {
+    "message": "zapisano $DATE$",
+    "placeholders": {
+      "date": { "content": "$1" }
+    }
+  },
+  "tagCount": {
+    "message": "$COUNT$ tag",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "tagCountPlural": {
+    "message": "$COUNT$ tagów",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "userInfoPrefix": {
+    "message": "Pinboard — $USER$",
+    "placeholders": {
+      "user": { "content": "$1" }
+    }
+  },
+
+  "aiSummaryBtn": {
+    "message": "🤖 Podsumowanie AI"
+  },
+  "aiGenerateBtn": {
+    "message": "🤖 generuj"
+  },
+  "aiSummarizing": {
+    "message": "podsumowywanie..."
+  },
+  "aiGenerating": {
+    "message": "generowanie..."
+  },
+  "aiGenerate": {
+    "message": "generuj"
+  },
+  "aiSummaryGenerated": {
+    "message": "Podsumowanie wygenerowane"
+  },
+  "aiSummaryRegenerated": {
+    "message": "Podsumowanie wygenerowane ponownie"
+  },
+  "aiSummaryRemoved": {
+    "message": "Podsumowanie usunięte"
+  },
+  "aiTagsRegenerated": {
+    "message": "Tagi wygenerowane ponownie"
+  },
+  "aiNoTags": {
+    "message": "nie wygenerowano tagów"
+  },
+  "aiNoContent": {
+    "message": "Brak treści strony do podsumowania"
+  },
+  "aiSetKey": {
+    "message": "Ustaw klucz AI API w ustawieniach"
+  },
+  "aiSetKeyIn": {
+    "message": "ustaw klucz AI w "
+  },
+  "aiCached": {
+    "message": "z pamięci podręcznej"
+  },
+  "aiRegenerate": {
+    "message": "↻ generuj ponownie"
+  },
+  "aiReplace": {
+    "message": "↻ zamień"
+  },
+  "aiRemove": {
+    "message": "✕ usuń"
+  },
+  "aiRegenerating": {
+    "message": "ponowne generowanie..."
+  },
+  "aiReplacing": {
+    "message": "zamiana..."
+  },
+  "aiError": {
+    "message": "Błąd AI: $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "addAll": {
+    "message": "Dodaj wszystkie"
+  },
+
+  "suggestNoSuggestions": {
+    "message": "brak sugestii"
+  },
+  "suggestPopular": {
+    "message": "popularne:"
+  },
+  "suggestRecommended": {
+    "message": "polecane:"
+  },
+  "suggestFailed": {
+    "message": "błąd ładowania: $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+
+  "qlSets": {
+    "message": "Zestawy"
+  },
+  "qlNetwork": {
+    "message": "Sieć"
+  },
+  "qlUnread": {
+    "message": "Nieprzeczytane"
+  },
+  "qlNotes": {
+    "message": "Notki"
+  },
+  "qlPopular": {
+    "message": "Popularne"
+  },
+
+  "saveTabsBtn": {
+    "message": "📑 Zapisz karty"
+  },
+  "batchSaveBtn": {
+    "message": "📌 Zapisz zbiorczo"
+  },
+  "batchSaving": {
+    "message": "⏳ Zapisywanie..."
+  },
+  "batchNoValidTabs": {
+    "message": "Brak prawidłowych kart do zapisania"
+  },
+  "batchNoTabs": {
+    "message": "Brak prawidłowych kart"
+  },
+  "batchNotLoggedIn": {
+    "message": "Nie zalogowano"
+  },
+  "batchSent": {
+    "message": "✅ Wysłano!"
+  },
+  "batchProgress": {
+    "message": "⏳ $CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
+    "placeholders": {
+      "current": { "content": "$1" },
+      "total": { "content": "$2" },
+      "saved": { "content": "$3" },
+      "failed": { "content": "$4" }
+    }
+  },
+  "batchDone": {
+    "message": "Gotowe: $SAVED$ zapisanych, $FAILED$ nieudanych",
+    "placeholders": {
+      "saved": { "content": "$1" },
+      "failed": { "content": "$2" }
+    }
+  },
+  "batchSkipped": {
+    "message": ", $COUNT$ pominiętych",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchSavedCount": {
+    "message": "✅ $COUNT$ zapisanych",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchFailed": {
+    "message": "Zapis zbiorczy nie powiódł się: $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "batchSavedNotify": {
+    "message": "Zapisano $COUNT$ zakładek$TAGS$.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "tags": { "content": "$2" }
+    }
+  },
+  "batchTaggedSuffix": {
+    "message": " (tagi: $TAGS$)",
+    "placeholders": {
+      "tags": { "content": "$1" }
+    }
+  },
+
+  "offlineQueued": {
+    "message": "$COUNT$ zakładek w kolejce (offline)",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "offlineClearConfirm": {
+    "message": "Wyczyścić wszystkie zakładki w kolejce?"
+  },
+
+  "recentLabel": {
+    "message": "Ostatnie:"
+  },
+  "recentFailed": {
+    "message": "błąd ładowania: $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "recentDeleteTitle": {
+    "message": "Usuń tę zakładkę"
+  },
+
+  "bgNotLoggedIn": {
+    "message": "Pinboard: Nie zalogowano"
+  },
+  "bgSetToken": {
+    "message": "Ustaw swój API Token w ustawieniach rozszerzenia."
+  },
+  "bgUndone": {
+    "message": "Pinboard: Cofnięto"
+  },
+  "bgBookmarkRemoved": {
+    "message": "Zakładka usunięta."
+  },
+  "bgQuickSaved": {
+    "message": "Pinboard: Szybko zapisano!"
+  },
+  "bgReadLater": {
+    "message": "Pinboard: Przeczytaj później!"
+  },
+  "bgCannotSave": {
+    "message": "Pinboard: Nie można zapisać"
+  },
+  "bgCannotBookmark": {
+    "message": "Tej strony nie można dodać do zakładek."
+  },
+  "bgTabSetSaved": {
+    "message": "Pinboard: Zestaw kart zapisany!"
+  },
+  "bgTabsSavedCount": {
+    "message": "Zapisano $COUNT$ kart.",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "bgTabSetFailed": {
+    "message": "Pinboard: Zapis zestawu kart nie powiódł się"
+  },
+  "bgLoginRequired": {
+    "message": "Najpierw zaloguj się na pinboard.in w przeglądarce."
+  },
+  "bgQuickSaveFailed": {
+    "message": "Pinboard: Szybki zapis nie powiódł się"
+  },
+  "bgReadLaterFailed": {
+    "message": "Pinboard: Przeczytaj później nie powiodło się"
+  },
+  "bgSaveFailed": {
+    "message": "Pinboard: Zapis nie powiódł się"
+  },
+  "bgNetworkError": {
+    "message": "Pinboard: Błąd sieci"
+  },
+  "bgQueuedOffline": {
+    "message": "Pinboard: Dodano do kolejki offline"
+  },
+  "bgTitleSaved": {
+    "message": "\"$TITLE$\" zapisano.",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgTitleQueued": {
+    "message": "\"$TITLE$\" zostanie zapisane po przywróceniu połączenia.",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgBatchSaved": {
+    "message": "Pinboard: Zapis zbiorczy zakończony!"
+  },
+  "bgUndo": {
+    "message": "Cofnij"
+  },
+
+  "optTitle": {
+    "message": "Pinboard Bookmark Plus — Ustawienia"
+  },
+  "optAutoSave": {
+    "message": "automatyczny zapis włączony"
+  },
+  "optAutoSaved": {
+    "message": "✓ Zapisano"
+  },
+  "tabBookmarks": {
+    "message": "Zakładki"
+  },
+  "tabAI": {
+    "message": "AI"
+  },
+  "tabQuickActions": {
+    "message": "Skróty"
+  },
+  "tabAppearance": {
+    "message": "Wygląd"
+  },
+  "resetTabBtn": {
+    "message": "Resetuj tę kartę"
+  },
+  "resetTabTitle": {
+    "message": "Przywróć domyślne ustawienia bieżącej karty"
+  },
+  "resetConfirm": {
+    "message": "Zresetować \u201E$TAB$\u201D?",
+    "placeholders": {
+      "tab": { "content": "$1" }
+    }
+  },
+  "resetKeysKept": {
+    "message": " (klucze zachowane)"
+  },
+
+  "secPinboardAccount": {
+    "message": "Konto Pinboard"
+  },
+  "labelApiToken": {
+    "message": "API Token"
+  },
+  "hintApiToken": {
+    "message": "Pobierz z"
+  },
+  "secSaveDefaults": {
+    "message": "Domyślne ustawienia zapisu"
+  },
+  "optPrivateDefault": {
+    "message": "Domyślnie prywatne"
+  },
+  "optPrivateIncognito": {
+    "message": "Prywatne w trybie incognito"
+  },
+  "optReadlaterDefault": {
+    "message": "Domyślnie Przeczytaj później"
+  },
+  "secNotesBehavior": {
+    "message": "Zachowanie notek"
+  },
+  "optAutoDescription": {
+    "message": "Automatycznie wypełniaj opis strony w notkach"
+  },
+  "optBlockquote": {
+    "message": "Zawijaj zaznaczony tekst w <blockquote>"
+  },
+  "optIncludeReferrer": {
+    "message": "Dołączaj adres strony źródłowej do notek"
+  },
+  "secTags": {
+    "message": "Tagi"
+  },
+  "optRespectTagCase": {
+    "message": "Respektuj wielkość liter tagów (dopasuj do najczęściej używanej)"
+  },
+  "optShowSuggestTags": {
+    "message": "Pokaż sugerowane tagi Pinboard w okienku"
+  },
+  "labelTagPresets": {
+    "message": "Predefiniowane tagi"
+  },
+  "tagPresetsPlaceholder": {
+    "message": "Jeden zestaw na linię:\nPraca: projekt, recenzja, raport\nDev: programming, tutorial, tool"
+  },
+  "tagPresetsHint": {
+    "message": "Format: Nazwa: tag1, tag2, tag3 — wyświetlane jako przyciski szybkiego dodawania."
+  },
+  "secPopupBehavior": {
+    "message": "Zachowanie okienka"
+  },
+  "optCheckBookmarkStatus": {
+    "message": "Pokaż status zakładki na ikonie (sprawdź, czy strona jest zapisana)"
+  },
+  "optAutoClose": {
+    "message": "Automatycznie zamknij okienko po zapisaniu"
+  },
+  "optOfflineQueue": {
+    "message": "Włącz kolejkę zapisu offline"
+  },
+  "secBackupRestore": {
+    "message": "Archiwum i przywracanie"
+  },
+  "backupHint": {
+    "message": "Eksportuj/importuj ustawienia (klucze API nie są eksportowane ze względów bezpieczeństwa)."
+  },
+  "exportSettings": {
+    "message": "Eksportuj ustawienia"
+  },
+  "importSettings": {
+    "message": "Importuj ustawienia"
+  },
+  "importedReload": {
+    "message": "✓ Zaimportowano — odśwież, aby zobaczyć zmiany"
+  },
+  "importInvalid": {
+    "message": "✗ Nieprawidłowy plik"
+  },
+
+  "secQuickSave": {
+    "message": "Szybki zapis"
+  },
+  "qsHint": {
+    "message": "Zapisz bieżącą stronę natychmiast skrótem klawiszowym (bez otwierania okienka)."
+  },
+  "openShortcuts": {
+    "message": "Otwórz ustawienia skrótów Chrome"
+  },
+  "shortcutsManual": {
+    "message": "Lub przejdź ręcznie:"
+  },
+  "qsAutoNotes": {
+    "message": "Automatycznie dodawaj opis strony do notek"
+  },
+  "qsBlockquote": {
+    "message": "Zawijaj zaznaczony tekst w blockquote"
+  },
+  "labelDefaultTags": {
+    "message": "Domyślne tagi (rozdzielone przecinkami)"
+  },
+  "placeholderTags": {
+    "message": "tag1, tag2"
+  },
+  "qsAiTags": {
+    "message": "Automatycznie generuj tagi AI"
+  },
+  "qsAiSummary": {
+    "message": "Automatycznie generuj podsumowanie AI w notkach"
+  },
+
+  "secReadLater": {
+    "message": "Przeczytaj później"
+  },
+  "rlHint": {
+    "message": "Zapisz bieżącą stronę jako \u201EPrzeczytaj później\u201D skrótem klawiszowym. Automatycznie oznaczana jako nieprzeczytana."
+  },
+
+  "secBatchSave": {
+    "message": "Zapis zbiorczy"
+  },
+  "batchHint": {
+    "message": "Zapisz każdą otwartą kartę jako osobną zakładkę."
+  },
+  "batchAutoAddTags": {
+    "message": "Automatycznie dodawaj tagi"
+  },
+  "batchTagsLabel": {
+    "message": "Tagi (rozdzielone przecinkami)"
+  },
+  "batchTagsHint": {
+    "message": "Wiele tagów rozdzielonych przecinkami, np. batch_saved, research"
+  },
+  "batchAiTags": {
+    "message": "Automatycznie generuj tagi AI dla każdej karty"
+  },
+  "batchAiSummary": {
+    "message": "Automatycznie generuj podsumowanie AI dla każdej karty"
+  },
+  "batchSkipExisting": {
+    "message": "Pomiń już dodane URL-e"
+  },
+  "batchWarning": {
+    "message": "⚠ Funkcje AI w zapisie zbiorczym będą wolne — każda karta wymaga osobnego wywołania AI z 3-sekundowym odstępem."
+  },
+
+  "secAiProvider": {
+    "message": "Dostawca AI"
+  },
+  "labelApiKey": {
+    "message": "API Key"
+  },
+  "labelModel": {
+    "message": "Model"
+  },
+  "labelBaseUrl": {
+    "message": "Base URL"
+  },
+  "labelDisplayName": {
+    "message": "Nazwa wyświetlana"
+  },
+  "getKey": {
+    "message": "Pobierz klucz"
+  },
+  "testConnection": {
+    "message": "Testuj połączenie"
+  },
+  "testTesting": {
+    "message": "Testowanie..."
+  },
+  "testConnected": {
+    "message": "✓ Połączono ($RESULT$)",
+    "placeholders": {
+      "result": { "content": "$1" }
+    }
+  },
+  "testTimeout": {
+    "message": "Limit czasu (15s)"
+  },
+  "testNoApiKey": {
+    "message": "Brak klucza API"
+  },
+  "testNoBaseUrl": {
+    "message": "Nie skonfigurowano Base URL"
+  },
+  "showHideKey": {
+    "message": "Pokaż/ukryj klucz"
+  },
+
+  "hintOpenAIBaseUrl": {
+    "message": "Zmień dla proxy lub kompatybilnego endpointu"
+  },
+  "hintClaudeModel": {
+    "message": "np. claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
+  },
+  "hintOllamaModel": {
+    "message": "Najpierw uruchom ollama pull llama3"
+  },
+  "hintOpenRouterKey": {
+    "message": "Dostęp do 100+ modeli z jednego API."
+  },
+  "hintOpenRouterModels": {
+    "message": "Przeglądaj modele na"
+  },
+  "hintCustomBaseUrl": {
+    "message": "Musi obsługiwać endpoint /chat/completions"
+  },
+  "hintCustomKey": {
+    "message": "Pozostaw puste, jeśli nie jest wymagane"
+  },
+
+  "secAiBehavior": {
+    "message": "Zachowanie AI"
+  },
+  "optAiAutoTags": {
+    "message": "Automatycznie generuj tagi AI po otwarciu okienka"
+  },
+  "labelAiSummaryLang": {
+    "message": "Język podsumowania AI"
+  },
+  "aiLangAuto": {
+    "message": "Auto (zgodnie z treścią)"
+  },
+  "langZh": {
+    "message": "中文 (chiński)"
+  },
+  "langEn": {
+    "message": "English (angielski)"
+  },
+  "langJa": {
+    "message": "日本語 (japoński)"
+  },
+  "langKo": {
+    "message": "한국어 (koreański)"
+  },
+  "langFr": {
+    "message": "Français (francuski)"
+  },
+  "langDe": {
+    "message": "Deutsch (niemiecki)"
+  },
+  "langEs": {
+    "message": "Español (hiszpański)"
+  },
+  "langRu": {
+    "message": "Русский (rosyjski)"
+  },
+  "labelAiCache": {
+    "message": "Czas pamięci podręcznej AI (minuty)"
+  },
+  "aiCacheHint": {
+    "message": "Pamięć podręczna per URL. Ustaw 0, aby wyłączyć."
+  },
+  "labelTagSeparator": {
+    "message": "Separator tagów wielowyrazowych"
+  },
+  "sepHyphen": {
+    "message": "łącznik (machine-learning)"
+  },
+  "sepUnderscore": {
+    "message": "podkreślenie (machine_learning)"
+  },
+
+  "secPrompts": {
+    "message": "Prompty"
+  },
+  "promptsHint": {
+    "message": "Dostosuj prompty wysyłane do AI. Zmienne: {{title}} {{url}} {{content}} {{description}} {{lang_instruction}} {{separator_instruction}}. Pozostaw puste, aby użyć domyślnych."
+  },
+  "labelTagPrompt": {
+    "message": "Prompt tagów AI"
+  },
+  "tagPromptHint": {
+    "message": "Pozostaw puste, aby użyć domyślnego promptu. Musi instruować AI, by zwracał format [\"tag1\",\"tag2\"]."
+  },
+  "resetToDefault": {
+    "message": "Przywróć domyślne"
+  },
+  "labelSummaryPrompt": {
+    "message": "Prompt podsumowania AI"
+  },
+  "summaryPromptHint": {
+    "message": "Pozostaw puste, aby użyć domyślnego promptu. Użyj {{lang_instruction}} dla automatycznego języka."
+  },
+
+  "secLanguage": {
+    "message": "Język"
+  },
+  "langAuto": {
+    "message": "Auto (według przeglądarki)"
+  },
+
+  "secTheme": {
+    "message": "Motyw"
+  },
+  "themeAuto": {
+    "message": "Auto (według systemu)"
+  },
+  "themeLight": {
+    "message": "Jasny"
+  },
+  "themeDark": {
+    "message": "Ciemny"
+  },
+  "optPopupFollowTheme": {
+    "message": "Okienko zgodne z motywem Pinboard"
+  },
+  "popupFollowHint": {
+    "message": "Po włączeniu wygląd okienka odpowiada wybranemu motywowi CSS Pinboard."
+  },
+  "secPopupElements": {
+    "message": "Elementy okienka"
+  },
+  "optShowSearch": {
+    "message": "Pokaż pasek wyszukiwania w okienku"
+  },
+  "optShowRecent": {
+    "message": "Pokaż ostatnie zakładki w okienku"
+  },
+  "optShowBadge": {
+    "message": "Pokaż licznik nieprzeczytanych na ikonie"
+  },
+  "secNotifications": {
+    "message": "Powiadomienia"
+  },
+  "notifyQuickSave": {
+    "message": "Szybki zapis"
+  },
+  "notifyReadLater": {
+    "message": "Przeczytaj później"
+  },
+  "notifyTabSet": {
+    "message": "Zestaw kart"
+  },
+  "notifyBatchSave": {
+    "message": "Zapis zbiorczy"
+  },
+  "notifyErrors": {
+    "message": "Powiadomienia o błędach"
+  },
+  "secCustomStyle": {
+    "message": "Niestandardowy styl Pinboard.in"
+  },
+  "customStyleHint": {
+    "message": "Wstrzyknij własny CSS na stronach pinboard.in. Przydatne do zmiany czcionek, kolorów, układu itp."
+  },
+  "labelCustomFont": {
+    "message": "Niestandardowa czcionka"
+  },
+  "customFontPlaceholder": {
+    "message": "np. 'Noto Sans SC', 'Fira Code', sans-serif"
+  },
+  "customFontHint": {
+    "message": "Stosowana do body na pinboard.in. Pozostaw puste, aby zachować domyślną."
+  },
+  "labelThemePresets": {
+    "message": "Motywy predefiniowane"
+  },
+  "themeGroupNone": {
+    "message": "Brak"
+  },
+  "themeGroupAdaptive": {
+    "message": "Adaptacyjny"
+  },
+  "themeGroupLight": {
+    "message": "Jasny"
+  },
+  "themeGroupDark": {
+    "message": "Ciemny"
+  },
+  "themePresetsHint": {
+    "message": "Kliknij motyw, aby załadować CSS. Motywy adaptacyjne dostosowują się do ustawienia jasny/ciemny."
+  },
+  "labelSavedThemes": {
+    "message": "Zapisane motywy"
+  },
+  "labelCustomCSS": {
+    "message": "Niestandardowy CSS"
+  },
+  "saveAsTheme": {
+    "message": "Zapisz jako motyw"
+  },
+  "saveAsThemeHint": {
+    "message": "Zapisz bieżący CSS jako motyw wielokrotnego użytku."
+  },
+  "customCSSPlaceholder": {
+    "message": "/* Niestandardowy CSS dla pinboard.in */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
+  },
+  "deleteTheme": {
+    "message": "Usuń motyw"
+  },
+  "themeName": {
+    "message": "Nazwa motywu:"
+  },
+  "themeOverwrite": {
+    "message": "\"$NAME$\" już istnieje. Nadpisać?",
+    "placeholders": {
+      "name": { "content": "$1" }
+    }
+  },
+
+  "saveTabsTitle": {
+    "message": "Zapisz wszystkie karty jako zestaw kart (wymaga logowania na pinboard.in)"
+  },
+  "batchSaveTitle": {
+    "message": "Zapisz każdą otwartą kartę jako osobną zakładkę"
+  },
+  "qlSetsTitle": {
+    "message": "Zestawy kart"
+  },
+  "qlNetworkTitle": {
+    "message": "Sieć"
+  },
+  "qlUnreadTitle": {
+    "message": "Nieprzeczytane zakładki"
+  },
+  "qlNotesTitle": {
+    "message": "Notki"
+  },
+  "qlPopularTitle": {
+    "message": "Popularne"
+  }
+}

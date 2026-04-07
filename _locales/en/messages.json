@@ -690,7 +690,7 @@
   "labelAiSummaryLang": {
     "message": "AI Summary Language"
   },
-  "langAuto": {
+  "aiLangAuto": {
     "message": "Auto (same as content)"
   },
   "langZh": {

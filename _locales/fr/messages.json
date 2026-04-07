@@ -1,0 +1,895 @@
+{
+  "extName": {
+    "message": "Pinboard Bookmark Plus"
+  },
+  "extDescription": {
+    "message": "Ajouter des signets sur Pinboard avec tags et résumés générés par IA"
+  },
+  "cmdOpenPopup": {
+    "message": "Ouvrir Pinboard Bookmark Plus"
+  },
+  "cmdQuickSave": {
+    "message": "Enregistrement rapide sur Pinboard (sans popup)"
+  },
+  "cmdReadLater": {
+    "message": "Enregistrement rapide comme À lire (sans popup)"
+  },
+
+  "appName": {
+    "message": "Pinboard Bookmark Plus"
+  },
+  "settings": {
+    "message": "paramètres"
+  },
+  "login": {
+    "message": "Connexion"
+  },
+  "logout": {
+    "message": "déconnexion"
+  },
+  "cancel": {
+    "message": "Annuler"
+  },
+  "reset": {
+    "message": "Réinitialiser"
+  },
+  "submit": {
+    "message": "Envoyer"
+  },
+  "update": {
+    "message": "Mettre à jour"
+  },
+  "delete": {
+    "message": "Supprimer"
+  },
+  "clearAll": {
+    "message": "Tout effacer"
+  },
+  "loading": {
+    "message": "chargement..."
+  },
+  "private": {
+    "message": "privé"
+  },
+  "readLater": {
+    "message": "à lire"
+  },
+  "networkError": {
+    "message": "Erreur réseau"
+  },
+  "clear": {
+    "message": "effacer"
+  },
+
+  "loginPrompt": {
+    "message": "Entrez votre jeton API depuis"
+  },
+  "loginTokenPlaceholder": {
+    "message": "utilisateur:XXXXXXXXXXXXXX"
+  },
+  "loginInvalidFormat": {
+    "message": "Format invalide. Utilisez utilisateur:JETON"
+  },
+  "loginFailed": {
+    "message": "Échec de l'authentification."
+  },
+  "settingsPassword": {
+    "message": "paramètres/mot de passe"
+  },
+
+  "labelUrl": {
+    "message": "URL"
+  },
+  "labelTitle": {
+    "message": "Titre"
+  },
+  "labelNotes": {
+    "message": "Notes"
+  },
+  "labelTags": {
+    "message": "Tags"
+  },
+  "labelPresets": {
+    "message": "Préréglages"
+  },
+  "labelSuggest": {
+    "message": "Suggestions"
+  },
+  "labelAiTags": {
+    "message": "Tags IA"
+  },
+  "urlWarning": {
+    "message": "⚠ Cette page ne peut pas être enregistrée sur Pinboard (URL non prise en charge)"
+  },
+  "urlCannotSave": {
+    "message": "Impossible d'enregistrer : URL non prise en charge"
+  },
+  "urlAndTitleRequired": {
+    "message": "URL et titre requis"
+  },
+  "placeholderAddTags": {
+    "message": "Ajouter des tags"
+  },
+  "placeholderSearchBookmarks": {
+    "message": "Rechercher dans vos signets..."
+  },
+
+  "saving": {
+    "message": "Enregistrement..."
+  },
+  "bookmarkSaved": {
+    "message": "Signet enregistré."
+  },
+  "savedSuccess": {
+    "message": "✅ Enregistré !"
+  },
+  "deleting": {
+    "message": "Suppression..."
+  },
+  "deleted": {
+    "message": "Supprimé."
+  },
+  "confirmDelete": {
+    "message": "Supprimer ce signet ?"
+  },
+  "confirmLogout": {
+    "message": "Se déconnecter ? Votre jeton API sera supprimé."
+  },
+  "hintCtrlEnter": {
+    "message": "Ctrl+Entrée"
+  },
+
+  "editingExisting": {
+    "message": "✏️ Modification du signet existant"
+  },
+  "savedOnDate": {
+    "message": "enregistré le $DATE$",
+    "placeholders": {
+      "date": { "content": "$1" }
+    }
+  },
+  "tagCount": {
+    "message": "$COUNT$ tag",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "tagCountPlural": {
+    "message": "$COUNT$ tags",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "userInfoPrefix": {
+    "message": "Pinboard — $USER$",
+    "placeholders": {
+      "user": { "content": "$1" }
+    }
+  },
+
+  "aiSummaryBtn": {
+    "message": "🤖 Résumé IA"
+  },
+  "aiGenerateBtn": {
+    "message": "🤖 générer"
+  },
+  "aiSummarizing": {
+    "message": "résumé en cours..."
+  },
+  "aiGenerating": {
+    "message": "génération..."
+  },
+  "aiGenerate": {
+    "message": "générer"
+  },
+  "aiSummaryGenerated": {
+    "message": "Résumé généré"
+  },
+  "aiSummaryRegenerated": {
+    "message": "Résumé régénéré"
+  },
+  "aiSummaryRemoved": {
+    "message": "Résumé supprimé"
+  },
+  "aiTagsRegenerated": {
+    "message": "Tags régénérés"
+  },
+  "aiNoTags": {
+    "message": "aucun tag généré"
+  },
+  "aiNoContent": {
+    "message": "Aucun contenu de page à résumer"
+  },
+  "aiSetKey": {
+    "message": "Définir la clé API IA dans les paramètres"
+  },
+  "aiSetKeyIn": {
+    "message": "définir la clé IA dans "
+  },
+  "aiCached": {
+    "message": "en cache"
+  },
+  "aiRegenerate": {
+    "message": "↻ régénérer"
+  },
+  "aiReplace": {
+    "message": "↻ remplacer"
+  },
+  "aiRemove": {
+    "message": "✕ supprimer"
+  },
+  "aiRegenerating": {
+    "message": "régénération..."
+  },
+  "aiReplacing": {
+    "message": "remplacement..."
+  },
+  "aiError": {
+    "message": "Erreur IA : $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "addAll": {
+    "message": "Tout ajouter"
+  },
+
+  "suggestNoSuggestions": {
+    "message": "aucune suggestion"
+  },
+  "suggestPopular": {
+    "message": "populaire :"
+  },
+  "suggestRecommended": {
+    "message": "recommandé :"
+  },
+  "suggestFailed": {
+    "message": "échec du chargement : $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+
+  "qlSets": {
+    "message": "Ensembles"
+  },
+  "qlNetwork": {
+    "message": "Réseau"
+  },
+  "qlUnread": {
+    "message": "Non lu"
+  },
+  "qlNotes": {
+    "message": "Notes"
+  },
+  "qlPopular": {
+    "message": "Populaire"
+  },
+
+  "saveTabsBtn": {
+    "message": "📑 Enregistrer les onglets"
+  },
+  "batchSaveBtn": {
+    "message": "📌 Enregistrement groupé"
+  },
+  "batchSaving": {
+    "message": "⏳ Enregistrement..."
+  },
+  "batchNoValidTabs": {
+    "message": "Aucun onglet valide à enregistrer"
+  },
+  "batchNoTabs": {
+    "message": "Aucun onglet valide"
+  },
+  "batchNotLoggedIn": {
+    "message": "Non connecté"
+  },
+  "batchSent": {
+    "message": "✅ Envoyé !"
+  },
+  "batchProgress": {
+    "message": "⏳ $CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
+    "placeholders": {
+      "current": { "content": "$1" },
+      "total": { "content": "$2" },
+      "saved": { "content": "$3" },
+      "failed": { "content": "$4" }
+    }
+  },
+  "batchDone": {
+    "message": "Traitement terminé : $SAVED$ enregistrés, $FAILED$ échoués",
+    "placeholders": {
+      "saved": { "content": "$1" },
+      "failed": { "content": "$2" }
+    }
+  },
+  "batchSkipped": {
+    "message": ", $COUNT$ ignorés",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchSavedCount": {
+    "message": "✅ $COUNT$ enregistrés",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchFailed": {
+    "message": "Échec de l'enregistrement groupé : $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "batchSavedNotify": {
+    "message": "$COUNT$ signets enregistrés$TAGS$.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "tags": { "content": "$2" }
+    }
+  },
+  "batchTaggedSuffix": {
+    "message": " (tags : $TAGS$)",
+    "placeholders": {
+      "tags": { "content": "$1" }
+    }
+  },
+
+  "offlineQueued": {
+    "message": "$COUNT$ signet(s) en file d'attente (hors ligne)",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "offlineClearConfirm": {
+    "message": "Effacer tous les signets en file d'attente ?"
+  },
+
+  "recentLabel": {
+    "message": "Récents :"
+  },
+  "recentFailed": {
+    "message": "échec du chargement : $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "recentDeleteTitle": {
+    "message": "Supprimer ce signet"
+  },
+
+  "bgNotLoggedIn": {
+    "message": "Pinboard : Non connecté"
+  },
+  "bgSetToken": {
+    "message": "Définissez votre jeton API dans les paramètres de l'extension."
+  },
+  "bgUndone": {
+    "message": "Pinboard : Annulé"
+  },
+  "bgBookmarkRemoved": {
+    "message": "Signet supprimé."
+  },
+  "bgQuickSaved": {
+    "message": "Pinboard : Enregistrement rapide !"
+  },
+  "bgReadLater": {
+    "message": "Pinboard : À lire !"
+  },
+  "bgCannotSave": {
+    "message": "Pinboard : Impossible d'enregistrer"
+  },
+  "bgCannotBookmark": {
+    "message": "Cette page ne peut pas être ajoutée aux signets."
+  },
+  "bgTabSetSaved": {
+    "message": "Pinboard : Ensemble d'onglets enregistré !"
+  },
+  "bgTabsSavedCount": {
+    "message": "$COUNT$ onglets enregistrés.",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "bgTabSetFailed": {
+    "message": "Pinboard : Échec de l'ensemble d'onglets"
+  },
+  "bgLoginRequired": {
+    "message": "Veuillez d'abord vous connecter à pinboard.in dans votre navigateur."
+  },
+  "bgQuickSaveFailed": {
+    "message": "Pinboard : Échec de l'enregistrement rapide"
+  },
+  "bgReadLaterFailed": {
+    "message": "Pinboard : Échec de À lire"
+  },
+  "bgSaveFailed": {
+    "message": "Pinboard : Échec de l'enregistrement"
+  },
+  "bgNetworkError": {
+    "message": "Pinboard : Erreur réseau"
+  },
+  "bgQueuedOffline": {
+    "message": "Pinboard : Mis en file d'attente hors ligne"
+  },
+  "bgTitleSaved": {
+    "message": "« $TITLE$ » enregistré.",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgTitleQueued": {
+    "message": "« $TITLE$ » sera enregistré une fois en ligne.",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgBatchSaved": {
+    "message": "Pinboard : Enregistrement groupé terminé !"
+  },
+  "bgUndo": {
+    "message": "Annuler"
+  },
+
+  "optTitle": {
+    "message": "Pinboard Bookmark Plus — Paramètres"
+  },
+  "optAutoSave": {
+    "message": "enregistrement automatique activé"
+  },
+  "optAutoSaved": {
+    "message": "✓ Enregistré"
+  },
+  "tabBookmarks": {
+    "message": "Signets"
+  },
+  "tabAI": {
+    "message": "IA"
+  },
+  "tabQuickActions": {
+    "message": "Actions rapides"
+  },
+  "tabAppearance": {
+    "message": "Apparence"
+  },
+  "resetTabBtn": {
+    "message": "Réinitialiser cet onglet"
+  },
+  "resetTabTitle": {
+    "message": "Réinitialiser les paramètres de l'onglet actuel aux valeurs par défaut"
+  },
+  "resetConfirm": {
+    "message": "Réinitialiser « $TAB$ » ?",
+    "placeholders": {
+      "tab": { "content": "$1" }
+    }
+  },
+  "resetKeysKept": {
+    "message": " (clés conservées)"
+  },
+
+  "secPinboardAccount": {
+    "message": "Compte Pinboard"
+  },
+  "labelApiToken": {
+    "message": "Jeton API"
+  },
+  "hintApiToken": {
+    "message": "Depuis"
+  },
+  "secSaveDefaults": {
+    "message": "Paramètres d'enregistrement par défaut"
+  },
+  "optPrivateDefault": {
+    "message": "Privé par défaut"
+  },
+  "optPrivateIncognito": {
+    "message": "Privé en navigation privée"
+  },
+  "optReadlaterDefault": {
+    "message": "À lire par défaut"
+  },
+  "secNotesBehavior": {
+    "message": "Comportement des notes"
+  },
+  "optAutoDescription": {
+    "message": "Remplir automatiquement la méta-description dans les notes"
+  },
+  "optBlockquote": {
+    "message": "Encadrer le texte sélectionné avec <blockquote>"
+  },
+  "optIncludeReferrer": {
+    "message": "Inclure le référent dans les notes"
+  },
+  "secTags": {
+    "message": "Tags"
+  },
+  "optRespectTagCase": {
+    "message": "Respecter la casse des tags existants (correspondre à la casse la plus utilisée)"
+  },
+  "optShowSuggestTags": {
+    "message": "Afficher les tags suggérés par Pinboard dans le popup"
+  },
+  "labelTagPresets": {
+    "message": "Préréglages de tags"
+  },
+  "tagPresetsPlaceholder": {
+    "message": "Un préréglage par ligne :\nTravail : projet, revue, rapport\nDév : programmation, tutoriel, outil"
+  },
+  "tagPresetsHint": {
+    "message": "Format : Nom : tag1, tag2, tag3 — affiché comme boutons d'ajout rapide dans le popup."
+  },
+  "secPopupBehavior": {
+    "message": "Comportement du popup"
+  },
+  "optCheckBookmarkStatus": {
+    "message": "Afficher l'état du signet via l'icône (vérifier si la page actuelle est enregistrée)"
+  },
+  "optAutoClose": {
+    "message": "Fermer automatiquement le popup après l'enregistrement"
+  },
+  "optOfflineQueue": {
+    "message": "Activer la file d'attente d'enregistrement hors ligne"
+  },
+  "secBackupRestore": {
+    "message": "Backup et restauration"
+  },
+  "backupHint": {
+    "message": "Exporter/importer vos paramètres (les clés API sont exclues de l'export pour des raisons de sécurité)."
+  },
+  "exportSettings": {
+    "message": "Exporter les paramètres"
+  },
+  "importSettings": {
+    "message": "Importer les paramètres"
+  },
+  "importedReload": {
+    "message": "✓ Importé — rechargez pour voir les modifications"
+  },
+  "importInvalid": {
+    "message": "✗ Fichier invalide"
+  },
+
+  "secQuickSave": {
+    "message": "Enregistrement rapide"
+  },
+  "qsHint": {
+    "message": "Enregistrer la page actuelle instantanément via un raccourci clavier (sans ouvrir le popup)."
+  },
+  "openShortcuts": {
+    "message": "Ouvrir les paramètres de raccourcis Chrome"
+  },
+  "shortcutsManual": {
+    "message": "Ou naviguez manuellement :"
+  },
+  "qsAutoNotes": {
+    "message": "Ajouter automatiquement la description de la page aux notes"
+  },
+  "qsBlockquote": {
+    "message": "Encadrer le texte sélectionné avec blockquote"
+  },
+  "labelDefaultTags": {
+    "message": "Tags par défaut (séparés par des virgules)"
+  },
+  "placeholderTags": {
+    "message": "tag1, tag2"
+  },
+  "qsAiTags": {
+    "message": "Générer automatiquement des tags IA"
+  },
+  "qsAiSummary": {
+    "message": "Générer automatiquement un résumé IA dans les notes"
+  },
+
+  "secReadLater": {
+    "message": "À lire"
+  },
+  "rlHint": {
+    "message": "Enregistrer la page actuelle comme « À lire » via un raccourci clavier. Marqué automatiquement comme non lu."
+  },
+
+  "secBatchSave": {
+    "message": "Enregistrement groupé"
+  },
+  "batchHint": {
+    "message": "Enregistrer chaque onglet ouvert comme un signet individuel."
+  },
+  "batchAutoAddTags": {
+    "message": "Ajouter automatiquement des tags"
+  },
+  "batchTagsLabel": {
+    "message": "Tags (séparés par des virgules)"
+  },
+  "batchTagsHint": {
+    "message": "Plusieurs tags séparés par des virgules. Ex. batch_saved, research"
+  },
+  "batchAiTags": {
+    "message": "Générer automatiquement des tags IA pour chaque onglet"
+  },
+  "batchAiSummary": {
+    "message": "Générer automatiquement un résumé IA pour chaque onglet"
+  },
+  "batchSkipExisting": {
+    "message": "Ignorer les URL déjà enregistrées"
+  },
+  "batchWarning": {
+    "message": "⚠ Les fonctionnalités IA en enregistrement groupé seront lentes — chaque onglet nécessite un appel IA séparé avec un délai de 3 s entre les enregistrements."
+  },
+
+  "secAiProvider": {
+    "message": "Fournisseur IA"
+  },
+  "labelApiKey": {
+    "message": "Clé API"
+  },
+  "labelModel": {
+    "message": "Modèle"
+  },
+  "labelBaseUrl": {
+    "message": "URL de base"
+  },
+  "labelDisplayName": {
+    "message": "Nom d'affichage"
+  },
+  "getKey": {
+    "message": "Obtenir une clé"
+  },
+  "testConnection": {
+    "message": "Tester la connexion"
+  },
+  "testTesting": {
+    "message": "Test en cours..."
+  },
+  "testConnected": {
+    "message": "✓ Connecté ($RESULT$)",
+    "placeholders": {
+      "result": { "content": "$1" }
+    }
+  },
+  "testTimeout": {
+    "message": "Délai dépassé (15 s)"
+  },
+  "testNoApiKey": {
+    "message": "Pas de clé API"
+  },
+  "testNoBaseUrl": {
+    "message": "Aucune URL de base configurée"
+  },
+  "showHideKey": {
+    "message": "Afficher/masquer la clé"
+  },
+
+  "hintOpenAIBaseUrl": {
+    "message": "Modifier pour un proxy ou un endpoint compatible"
+  },
+  "hintClaudeModel": {
+    "message": "ex. claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
+  },
+  "hintOllamaModel": {
+    "message": "Exécutez d'abord ollama pull llama3"
+  },
+  "hintOpenRouterKey": {
+    "message": "Accédez à plus de 100 modèles depuis une seule API."
+  },
+  "hintOpenRouterModels": {
+    "message": "Parcourir les modèles sur"
+  },
+  "hintCustomBaseUrl": {
+    "message": "Doit prendre en charge l'endpoint /chat/completions"
+  },
+  "hintCustomKey": {
+    "message": "Laisser vide si non requis"
+  },
+
+  "secAiBehavior": {
+    "message": "Comportement IA"
+  },
+  "optAiAutoTags": {
+    "message": "Générer automatiquement des tags IA à l'ouverture du popup"
+  },
+  "labelAiSummaryLang": {
+    "message": "Langue du résumé IA"
+  },
+  "aiLangAuto": {
+    "message": "Auto (même langue que le contenu)"
+  },
+  "langZh": {
+    "message": "中文 (Chinois)"
+  },
+  "langEn": {
+    "message": "English (Anglais)"
+  },
+  "langJa": {
+    "message": "日本語 (Japonais)"
+  },
+  "langKo": {
+    "message": "한국어 (Coréen)"
+  },
+  "langFr": {
+    "message": "Français"
+  },
+  "langDe": {
+    "message": "Deutsch (Allemand)"
+  },
+  "langEs": {
+    "message": "Español (Espagnol)"
+  },
+  "langRu": {
+    "message": "Русский (Russe)"
+  },
+  "labelAiCache": {
+    "message": "Durée du cache IA (minutes)"
+  },
+  "aiCacheHint": {
+    "message": "Mis en cache par URL. Mettre 0 pour désactiver."
+  },
+  "labelTagSeparator": {
+    "message": "Séparateur de tags multi-mots"
+  },
+  "sepHyphen": {
+    "message": "tiret (machine-learning)"
+  },
+  "sepUnderscore": {
+    "message": "underscore (machine_learning)"
+  },
+
+  "secPrompts": {
+    "message": "Prompts"
+  },
+  "promptsHint": {
+    "message": "Personnalisez les prompts envoyés à l'IA. Utilisez les variables : {{title}} {{url}} {{content}} {{description}} {{lang_instruction}} {{separator_instruction}}. Laissez vide pour utiliser les valeurs par défaut."
+  },
+  "labelTagPrompt": {
+    "message": "Prompt pour les tags IA"
+  },
+  "tagPromptHint": {
+    "message": "Laissez vide pour utiliser le prompt par défaut affiché ci-dessus. Doit indiquer à l'IA de renvoyer le format [\"tag1\",\"tag2\"]."
+  },
+  "resetToDefault": {
+    "message": "Réinitialiser par défaut"
+  },
+  "labelSummaryPrompt": {
+    "message": "Prompt pour le résumé IA"
+  },
+  "summaryPromptHint": {
+    "message": "Laissez vide pour utiliser le prompt par défaut affiché ci-dessus. Utilisez {{lang_instruction}} pour la langue automatique."
+  },
+
+  "secLanguage": {
+    "message": "Langue"
+  },
+  "langAuto": {
+    "message": "Auto (suivre le navigateur)"
+  },
+
+  "secTheme": {
+    "message": "Thème"
+  },
+  "themeAuto": {
+    "message": "Auto (suivre le système)"
+  },
+  "themeLight": {
+    "message": "Clair"
+  },
+  "themeDark": {
+    "message": "Sombre"
+  },
+  "optPopupFollowTheme": {
+    "message": "Le popup suit le thème Pinboard sélectionné"
+  },
+  "popupFollowHint": {
+    "message": "Lorsqu'activé, l'apparence du popup correspond au thème CSS Pinboard sélectionné."
+  },
+  "secPopupElements": {
+    "message": "Éléments du popup"
+  },
+  "optShowSearch": {
+    "message": "Afficher la barre de recherche dans le popup"
+  },
+  "optShowRecent": {
+    "message": "Afficher les signets récents dans le popup"
+  },
+  "optShowBadge": {
+    "message": "Afficher le compteur de non lus sur l'icône"
+  },
+  "secNotifications": {
+    "message": "Notifications"
+  },
+  "notifyQuickSave": {
+    "message": "Enregistrement rapide"
+  },
+  "notifyReadLater": {
+    "message": "Enregistrement À lire"
+  },
+  "notifyTabSet": {
+    "message": "Enregistrement d'ensemble d'onglets"
+  },
+  "notifyBatchSave": {
+    "message": "Enregistrement groupé"
+  },
+  "notifyErrors": {
+    "message": "Notifications d'erreur"
+  },
+  "secCustomStyle": {
+    "message": "Style personnalisé Pinboard.in"
+  },
+  "customStyleHint": {
+    "message": "Injecter du CSS personnalisé dans les pages pinboard.in. Utile pour modifier les polices, couleurs, mise en page, etc."
+  },
+  "labelCustomFont": {
+    "message": "Police personnalisée"
+  },
+  "customFontPlaceholder": {
+    "message": "ex. 'Noto Sans SC', 'Fira Code', sans-serif"
+  },
+  "customFontHint": {
+    "message": "Appliquée au body sur pinboard.in. Laisser vide pour conserver la police par défaut."
+  },
+  "labelThemePresets": {
+    "message": "Thèmes prédéfinis"
+  },
+  "themeGroupNone": {
+    "message": "Aucun"
+  },
+  "themeGroupAdaptive": {
+    "message": "Adaptatif"
+  },
+  "themeGroupLight": {
+    "message": "Clair"
+  },
+  "themeGroupDark": {
+    "message": "Sombre"
+  },
+  "themePresetsHint": {
+    "message": "Cliquez sur un préréglage pour charger son CSS. Les thèmes adaptatifs suivent votre paramètre de thème (clair/sombre)."
+  },
+  "labelSavedThemes": {
+    "message": "Thèmes enregistrés"
+  },
+  "labelCustomCSS": {
+    "message": "CSS personnalisé"
+  },
+  "saveAsTheme": {
+    "message": "Enregistrer comme thème"
+  },
+  "saveAsThemeHint": {
+    "message": "Enregistrer le CSS actuel comme thème réutilisable."
+  },
+  "customCSSPlaceholder": {
+    "message": "/* CSS personnalisé pour pinboard.in */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
+  },
+  "deleteTheme": {
+    "message": "Supprimer le thème"
+  },
+  "themeName": {
+    "message": "Nom du thème :"
+  },
+  "themeOverwrite": {
+    "message": "« $NAME$ » existe déjà. Écraser ?",
+    "placeholders": {
+      "name": { "content": "$1" }
+    }
+  },
+
+  "saveTabsTitle": {
+    "message": "Enregistrer tous les onglets ouverts comme un ensemble d'onglets (nécessite une connexion à pinboard.in)"
+  },
+  "batchSaveTitle": {
+    "message": "Enregistrer chaque onglet ouvert comme un signet individuel"
+  },
+  "qlSetsTitle": {
+    "message": "Ensembles d'onglets"
+  },
+  "qlNetworkTitle": {
+    "message": "Réseau"
+  },
+  "qlUnreadTitle": {
+    "message": "Signets non lus"
+  },
+  "qlNotesTitle": {
+    "message": "Notes"
+  },
+  "qlPopularTitle": {
+    "message": "Populaire"
+  }
+}

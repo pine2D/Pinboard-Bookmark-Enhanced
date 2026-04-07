@@ -1,6 +1,9 @@
 document.addEventListener("DOMContentLoaded", async () => {
   await initI18n();
   applyI18n();
+  // Fade in after i18n applied (prevents flash of untranslated/unstyled content)
+  document.body.style.transition = "opacity 0.18s";
+  document.body.style.opacity = "1";
 
   // ---- Tab switching ----
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -11,6 +14,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.getElementById(`panel-${btn.dataset.panel}`).classList.add("active");
     });
   });
+
+  // Restore active tab after language switch
+  const savedTab = sessionStorage.getItem("activeTab");
+  if (savedTab) {
+    sessionStorage.removeItem("activeTab");
+    const btn = document.querySelector(`.tab-btn[data-panel="${savedTab}"]`);
+    if (btn) btn.click();
+  }
 
   // ---- Reset current tab to defaults ----
   const PANEL_DEFAULTS = {
@@ -230,8 +241,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Language change: save immediately and reload to apply
   document.getElementById("opt-lang").addEventListener("change", async () => {
     const lang = document.getElementById("opt-lang").value;
+    const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "bookmarks";
     await chrome.storage.sync.set({ optLang: lang });
-    location.reload();
+    sessionStorage.setItem("activeTab", activePanel);
+    document.body.style.transition = "opacity 0.18s";
+    document.body.style.opacity = "0";
+    setTimeout(() => location.reload(), 180);
   });
   // Real-time switch when theme dropdown changes (affects Flexoki Adaptive + no-preset dark)
   document.getElementById("opt-theme").addEventListener("change", () => {

@@ -1,0 +1,895 @@
+{
+  "extName": {
+    "message": "Pinboard Bookmark Plus"
+  },
+  "extDescription": {
+    "message": "AI によるタグ・要約機能付きで Pinboard にブックマークを保存"
+  },
+  "cmdOpenPopup": {
+    "message": "Pinboard Bookmark Plus を開く"
+  },
+  "cmdQuickSave": {
+    "message": "Pinboard にクイック保存（ポップアップなし）"
+  },
+  "cmdReadLater": {
+    "message": "あとで読むとしてクイック保存（ポップアップなし）"
+  },
+
+  "appName": {
+    "message": "Pinboard Bookmark Plus"
+  },
+  "settings": {
+    "message": "設定"
+  },
+  "login": {
+    "message": "ログイン"
+  },
+  "logout": {
+    "message": "ログアウト"
+  },
+  "cancel": {
+    "message": "キャンセル"
+  },
+  "reset": {
+    "message": "リセット"
+  },
+  "submit": {
+    "message": "保存"
+  },
+  "update": {
+    "message": "更新"
+  },
+  "delete": {
+    "message": "削除"
+  },
+  "clearAll": {
+    "message": "すべてクリア"
+  },
+  "loading": {
+    "message": "読み込み中..."
+  },
+  "private": {
+    "message": "非公開"
+  },
+  "readLater": {
+    "message": "あとで読む"
+  },
+  "networkError": {
+    "message": "ネットワークエラー"
+  },
+  "clear": {
+    "message": "クリア"
+  },
+
+  "loginPrompt": {
+    "message": "API Token を入力してください。取得先："
+  },
+  "loginTokenPlaceholder": {
+    "message": "ユーザー名:XXXXXXXXXXXXXX"
+  },
+  "loginInvalidFormat": {
+    "message": "形式が正しくありません。ユーザー名:TOKEN の形式で入力してください"
+  },
+  "loginFailed": {
+    "message": "認証に失敗しました。"
+  },
+  "settingsPassword": {
+    "message": "設定/パスワード"
+  },
+
+  "labelUrl": {
+    "message": "URL"
+  },
+  "labelTitle": {
+    "message": "タイトル"
+  },
+  "labelNotes": {
+    "message": "メモ"
+  },
+  "labelTags": {
+    "message": "タグ"
+  },
+  "labelPresets": {
+    "message": "プリセット"
+  },
+  "labelSuggest": {
+    "message": "おすすめ"
+  },
+  "labelAiTags": {
+    "message": "AI タグ"
+  },
+  "urlWarning": {
+    "message": "⚠ このページは Pinboard に保存できません（非対応の URL）"
+  },
+  "urlCannotSave": {
+    "message": "保存できません：非対応の URL"
+  },
+  "urlAndTitleRequired": {
+    "message": "URL とタイトルは必須です"
+  },
+  "placeholderAddTags": {
+    "message": "タグを追加"
+  },
+  "placeholderSearchBookmarks": {
+    "message": "ブックマークを検索..."
+  },
+
+  "saving": {
+    "message": "保存中..."
+  },
+  "bookmarkSaved": {
+    "message": "ブックマークを保存しました。"
+  },
+  "savedSuccess": {
+    "message": "✅ 保存しました！"
+  },
+  "deleting": {
+    "message": "削除中..."
+  },
+  "deleted": {
+    "message": "削除しました。"
+  },
+  "confirmDelete": {
+    "message": "このブックマークを削除しますか？"
+  },
+  "confirmLogout": {
+    "message": "ログアウトしますか？API Token が削除されます。"
+  },
+  "hintCtrlEnter": {
+    "message": "Ctrl+Enter"
+  },
+
+  "editingExisting": {
+    "message": "✏️ 既存のブックマークを編集中"
+  },
+  "savedOnDate": {
+    "message": "$DATE$ に保存",
+    "placeholders": {
+      "date": { "content": "$1" }
+    }
+  },
+  "tagCount": {
+    "message": "$COUNT$ 個のタグ",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "tagCountPlural": {
+    "message": "$COUNT$ 個のタグ",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "userInfoPrefix": {
+    "message": "Pinboard — $USER$",
+    "placeholders": {
+      "user": { "content": "$1" }
+    }
+  },
+
+  "aiSummaryBtn": {
+    "message": "🤖 AI 要約"
+  },
+  "aiGenerateBtn": {
+    "message": "🤖 生成"
+  },
+  "aiSummarizing": {
+    "message": "要約を生成中..."
+  },
+  "aiGenerating": {
+    "message": "生成中..."
+  },
+  "aiGenerate": {
+    "message": "生成"
+  },
+  "aiSummaryGenerated": {
+    "message": "要約を生成しました"
+  },
+  "aiSummaryRegenerated": {
+    "message": "要約を再生成しました"
+  },
+  "aiSummaryRemoved": {
+    "message": "要約を削除しました"
+  },
+  "aiTagsRegenerated": {
+    "message": "タグを再生成しました"
+  },
+  "aiNoTags": {
+    "message": "タグが生成されませんでした"
+  },
+  "aiNoContent": {
+    "message": "要約するページ内容がありません"
+  },
+  "aiSetKey": {
+    "message": "設定で AI API Key を設定してください"
+  },
+  "aiSetKeyIn": {
+    "message": "AI Key を"
+  },
+  "aiCached": {
+    "message": "キャッシュ済み"
+  },
+  "aiRegenerate": {
+    "message": "↻ 再生成"
+  },
+  "aiReplace": {
+    "message": "↻ 置換"
+  },
+  "aiRemove": {
+    "message": "✕ 削除"
+  },
+  "aiRegenerating": {
+    "message": "再生成中..."
+  },
+  "aiReplacing": {
+    "message": "置換中..."
+  },
+  "aiError": {
+    "message": "AI エラー：$ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "addAll": {
+    "message": "すべて追加"
+  },
+
+  "suggestNoSuggestions": {
+    "message": "おすすめなし"
+  },
+  "suggestPopular": {
+    "message": "人気："
+  },
+  "suggestRecommended": {
+    "message": "おすすめ："
+  },
+  "suggestFailed": {
+    "message": "読み込みに失敗：$ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+
+  "qlSets": {
+    "message": "セット"
+  },
+  "qlNetwork": {
+    "message": "ネットワーク"
+  },
+  "qlUnread": {
+    "message": "未読"
+  },
+  "qlNotes": {
+    "message": "Notes"
+  },
+  "qlPopular": {
+    "message": "人気"
+  },
+
+  "saveTabsBtn": {
+    "message": "📑 タブを保存"
+  },
+  "batchSaveBtn": {
+    "message": "📌 一括保存"
+  },
+  "batchSaving": {
+    "message": "⏳ 保存中..."
+  },
+  "batchNoValidTabs": {
+    "message": "保存できるタブがありません"
+  },
+  "batchNoTabs": {
+    "message": "有効なタブがありません"
+  },
+  "batchNotLoggedIn": {
+    "message": "ログインしていません"
+  },
+  "batchSent": {
+    "message": "✅ 送信しました！"
+  },
+  "batchProgress": {
+    "message": "⏳ $CURRENT$/$TOTAL$（✓$SAVED$ ✗$FAILED$）",
+    "placeholders": {
+      "current": { "content": "$1" },
+      "total": { "content": "$2" },
+      "saved": { "content": "$3" },
+      "failed": { "content": "$4" }
+    }
+  },
+  "batchDone": {
+    "message": "一括完了：$SAVED$ 件保存、$FAILED$ 件失敗",
+    "placeholders": {
+      "saved": { "content": "$1" },
+      "failed": { "content": "$2" }
+    }
+  },
+  "batchSkipped": {
+    "message": "、$COUNT$ 件スキップ",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchSavedCount": {
+    "message": "✅ $COUNT$ 件保存",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchFailed": {
+    "message": "一括保存に失敗：$ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "batchSavedNotify": {
+    "message": "$COUNT$ 件のブックマークを保存しました$TAGS$。",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "tags": { "content": "$2" }
+    }
+  },
+  "batchTaggedSuffix": {
+    "message": "（タグ：$TAGS$）",
+    "placeholders": {
+      "tags": { "content": "$1" }
+    }
+  },
+
+  "offlineQueued": {
+    "message": "$COUNT$ 件のブックマークを待機中（オフライン）",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "offlineClearConfirm": {
+    "message": "待機中のブックマークをすべてクリアしますか？"
+  },
+
+  "recentLabel": {
+    "message": "最近："
+  },
+  "recentFailed": {
+    "message": "読み込みに失敗：$ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "recentDeleteTitle": {
+    "message": "このブックマークを削除"
+  },
+
+  "bgNotLoggedIn": {
+    "message": "Pinboard：未ログイン"
+  },
+  "bgSetToken": {
+    "message": "拡張機能の設定で API Token を設定してください。"
+  },
+  "bgUndone": {
+    "message": "Pinboard：取り消しました"
+  },
+  "bgBookmarkRemoved": {
+    "message": "ブックマークを削除しました。"
+  },
+  "bgQuickSaved": {
+    "message": "Pinboard：クイック保存しました！"
+  },
+  "bgReadLater": {
+    "message": "Pinboard：あとで読むに保存しました！"
+  },
+  "bgCannotSave": {
+    "message": "Pinboard：保存できません"
+  },
+  "bgCannotBookmark": {
+    "message": "このページはブックマークできません。"
+  },
+  "bgTabSetSaved": {
+    "message": "Pinboard：タブセットを保存しました！"
+  },
+  "bgTabsSavedCount": {
+    "message": "$COUNT$ 個のタブを保存しました。",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "bgTabSetFailed": {
+    "message": "Pinboard：タブセットの保存に失敗"
+  },
+  "bgLoginRequired": {
+    "message": "先にブラウザで pinboard.in にログインしてください。"
+  },
+  "bgQuickSaveFailed": {
+    "message": "Pinboard：クイック保存に失敗"
+  },
+  "bgReadLaterFailed": {
+    "message": "Pinboard：あとで読むの保存に失敗"
+  },
+  "bgSaveFailed": {
+    "message": "Pinboard：保存に失敗"
+  },
+  "bgNetworkError": {
+    "message": "Pinboard：ネットワークエラー"
+  },
+  "bgQueuedOffline": {
+    "message": "Pinboard：オフラインキューに追加"
+  },
+  "bgTitleSaved": {
+    "message": "\"$TITLE$\" を保存しました。",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgTitleQueued": {
+    "message": "\"$TITLE$\" はオンライン復帰後に保存されます。",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgBatchSaved": {
+    "message": "Pinboard：一括保存が完了しました！"
+  },
+  "bgUndo": {
+    "message": "取り消し"
+  },
+
+  "optTitle": {
+    "message": "Pinboard Bookmark Plus — 設定"
+  },
+  "optAutoSave": {
+    "message": "自動保存が有効です"
+  },
+  "optAutoSaved": {
+    "message": "✓ 保存しました"
+  },
+  "tabBookmarks": {
+    "message": "ブックマーク"
+  },
+  "tabAI": {
+    "message": "AI"
+  },
+  "tabQuickActions": {
+    "message": "クイック操作"
+  },
+  "tabAppearance": {
+    "message": "外観"
+  },
+  "resetTabBtn": {
+    "message": "このタブをリセット"
+  },
+  "resetTabTitle": {
+    "message": "現在のタブの設定をデフォルトに戻す"
+  },
+  "resetConfirm": {
+    "message": "「$TAB$」をリセットしますか？",
+    "placeholders": {
+      "tab": { "content": "$1" }
+    }
+  },
+  "resetKeysKept": {
+    "message": "（キーは保持）"
+  },
+
+  "secPinboardAccount": {
+    "message": "Pinboard アカウント"
+  },
+  "labelApiToken": {
+    "message": "API Token"
+  },
+  "hintApiToken": {
+    "message": "取得先："
+  },
+  "secSaveDefaults": {
+    "message": "保存のデフォルト設定"
+  },
+  "optPrivateDefault": {
+    "message": "デフォルトで非公開にする"
+  },
+  "optPrivateIncognito": {
+    "message": "シークレットモードでは非公開にする"
+  },
+  "optReadlaterDefault": {
+    "message": "デフォルトであとで読むにする"
+  },
+  "secNotesBehavior": {
+    "message": "メモの動作"
+  },
+  "optAutoDescription": {
+    "message": "ページの説明をメモに自動入力"
+  },
+  "optBlockquote": {
+    "message": "選択テキストを <blockquote> で囲む"
+  },
+  "optIncludeReferrer": {
+    "message": "メモにリファラーを含める"
+  },
+  "secTags": {
+    "message": "タグ"
+  },
+  "optRespectTagCase": {
+    "message": "既存タグの大文字小文字を尊重（最も使われている表記に合わせる）"
+  },
+  "optShowSuggestTags": {
+    "message": "ポップアップに Pinboard のおすすめタグを表示"
+  },
+  "labelTagPresets": {
+    "message": "タグプリセット"
+  },
+  "tagPresetsPlaceholder": {
+    "message": "1行に1セット：\n仕事: project, review, report\n開発: programming, tutorial, tool"
+  },
+  "tagPresetsHint": {
+    "message": "形式：名前: タグ1, タグ2, タグ3 — ポップアップにクイック追加ボタンとして表示されます。"
+  },
+  "secPopupBehavior": {
+    "message": "ポップアップの動作"
+  },
+  "optCheckBookmarkStatus": {
+    "message": "アイコンでブックマーク状態を表示（現在のページが保存済みか確認）"
+  },
+  "optAutoClose": {
+    "message": "保存後にポップアップを自動で閉じる"
+  },
+  "optOfflineQueue": {
+    "message": "オフライン保存キューを有効にする"
+  },
+  "secBackupRestore": {
+    "message": "バックアップと復元"
+  },
+  "backupHint": {
+    "message": "設定のエクスポート・インポート（セキュリティのため API キーはエクスポートに含まれません）。"
+  },
+  "exportSettings": {
+    "message": "設定をエクスポート"
+  },
+  "importSettings": {
+    "message": "設定をインポート"
+  },
+  "importedReload": {
+    "message": "✓ インポート完了 — リロードすると反映されます"
+  },
+  "importInvalid": {
+    "message": "✗ 無効なファイル"
+  },
+
+  "secQuickSave": {
+    "message": "クイック保存"
+  },
+  "qsHint": {
+    "message": "キーボードショートカットで現在のページを即座に保存（ポップアップを開かずに）。"
+  },
+  "openShortcuts": {
+    "message": "Chrome ショートカット設定を開く"
+  },
+  "shortcutsManual": {
+    "message": "または手動で移動："
+  },
+  "qsAutoNotes": {
+    "message": "ページの説明をメモに自動追加"
+  },
+  "qsBlockquote": {
+    "message": "選択テキストを blockquote で囲む"
+  },
+  "labelDefaultTags": {
+    "message": "デフォルトタグ（カンマ区切り）"
+  },
+  "placeholderTags": {
+    "message": "タグ1, タグ2"
+  },
+  "qsAiTags": {
+    "message": "AI タグを自動生成"
+  },
+  "qsAiSummary": {
+    "message": "メモに AI 要約を自動生成"
+  },
+
+  "secReadLater": {
+    "message": "あとで読む"
+  },
+  "rlHint": {
+    "message": "キーボードショートカットで現在のページを「あとで読む」として保存します。自動的に未読としてマークされます。"
+  },
+
+  "secBatchSave": {
+    "message": "一括保存"
+  },
+  "batchHint": {
+    "message": "開いている各タブを個別のブックマークとして保存します。"
+  },
+  "batchAutoAddTags": {
+    "message": "タグを自動追加"
+  },
+  "batchTagsLabel": {
+    "message": "タグ（カンマ区切り）"
+  },
+  "batchTagsHint": {
+    "message": "複数のタグはカンマで区切ります。例：batch_saved, research"
+  },
+  "batchAiTags": {
+    "message": "各タブに AI タグを自動生成"
+  },
+  "batchAiSummary": {
+    "message": "各タブに AI 要約を自動生成"
+  },
+  "batchSkipExisting": {
+    "message": "既にブックマーク済みの URL をスキップ"
+  },
+  "batchWarning": {
+    "message": "⚠ 一括保存での AI 機能は時間がかかります — 各タブに個別の AI 呼び出しが必要で、保存間隔が3秒あります。"
+  },
+
+  "secAiProvider": {
+    "message": "AI プロバイダー"
+  },
+  "labelApiKey": {
+    "message": "API Key"
+  },
+  "labelModel": {
+    "message": "モデル"
+  },
+  "labelBaseUrl": {
+    "message": "Base URL"
+  },
+  "labelDisplayName": {
+    "message": "表示名"
+  },
+  "getKey": {
+    "message": "キーを取得"
+  },
+  "testConnection": {
+    "message": "接続テスト"
+  },
+  "testTesting": {
+    "message": "テスト中..."
+  },
+  "testConnected": {
+    "message": "✓ 接続成功（$RESULT$）",
+    "placeholders": {
+      "result": { "content": "$1" }
+    }
+  },
+  "testTimeout": {
+    "message": "タイムアウト（15秒）"
+  },
+  "testNoApiKey": {
+    "message": "API Key が未入力です"
+  },
+  "testNoBaseUrl": {
+    "message": "Base URL が未設定です"
+  },
+  "showHideKey": {
+    "message": "キーの表示/非表示"
+  },
+
+  "hintOpenAIBaseUrl": {
+    "message": "プロキシや互換エンドポイントに変更可能"
+  },
+  "hintClaudeModel": {
+    "message": "例：claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
+  },
+  "hintOllamaModel": {
+    "message": "先に ollama pull llama3 を実行してください"
+  },
+  "hintOpenRouterKey": {
+    "message": "1つの API で100以上のモデルにアクセス。"
+  },
+  "hintOpenRouterModels": {
+    "message": "モデル一覧："
+  },
+  "hintCustomBaseUrl": {
+    "message": "/chat/completions エンドポイントに対応している必要があります"
+  },
+  "hintCustomKey": {
+    "message": "不要な場合は空欄のままにしてください"
+  },
+
+  "secAiBehavior": {
+    "message": "AI の動作"
+  },
+  "optAiAutoTags": {
+    "message": "ポップアップを開いたときに AI タグを自動生成"
+  },
+  "labelAiSummaryLang": {
+    "message": "AI 要約の言語"
+  },
+  "aiLangAuto": {
+    "message": "自動（コンテンツの言語に合わせる）"
+  },
+  "langZh": {
+    "message": "中文（中国語）"
+  },
+  "langEn": {
+    "message": "English（英語）"
+  },
+  "langJa": {
+    "message": "日本語"
+  },
+  "langKo": {
+    "message": "한국어（韓国語）"
+  },
+  "langFr": {
+    "message": "Français（フランス語）"
+  },
+  "langDe": {
+    "message": "Deutsch（ドイツ語）"
+  },
+  "langEs": {
+    "message": "Español（スペイン語）"
+  },
+  "langRu": {
+    "message": "Русский（ロシア語）"
+  },
+  "labelAiCache": {
+    "message": "AI キャッシュ時間（分）"
+  },
+  "aiCacheHint": {
+    "message": "URL ごとにキャッシュ。0 で無効にします。"
+  },
+  "labelTagSeparator": {
+    "message": "複数語タグの区切り文字"
+  },
+  "sepHyphen": {
+    "message": "ハイフン（machine-learning）"
+  },
+  "sepUnderscore": {
+    "message": "アンダースコア（machine_learning）"
+  },
+
+  "secPrompts": {
+    "message": "プロンプト"
+  },
+  "promptsHint": {
+    "message": "AI に送るプロンプトをカスタマイズできます。変数：{{title}} {{url}} {{content}} {{description}} {{lang_instruction}} {{separator_instruction}}。空欄の場合はデフォルトを使用します。"
+  },
+  "labelTagPrompt": {
+    "message": "AI タグプロンプト"
+  },
+  "tagPromptHint": {
+    "message": "空欄の場合は上のデフォルトプロンプトを使用します。AI に [\"tag1\",\"tag2\"] 形式で返すよう指示する必要があります。"
+  },
+  "resetToDefault": {
+    "message": "デフォルトに戻す"
+  },
+  "labelSummaryPrompt": {
+    "message": "AI 要約プロンプト"
+  },
+  "summaryPromptHint": {
+    "message": "空欄の場合は上のデフォルトプロンプトを使用します。{{lang_instruction}} で自動言語設定が可能です。"
+  },
+
+  "secLanguage": {
+    "message": "言語"
+  },
+  "langAuto": {
+    "message": "自動（ブラウザに合わせる）"
+  },
+
+  "secTheme": {
+    "message": "テーマ"
+  },
+  "themeAuto": {
+    "message": "自動（システムに合わせる）"
+  },
+  "themeLight": {
+    "message": "ライト"
+  },
+  "themeDark": {
+    "message": "ダーク"
+  },
+  "optPopupFollowTheme": {
+    "message": "ポップアップを Pinboard テーマプリセットに合わせる"
+  },
+  "popupFollowHint": {
+    "message": "有効にすると、ポップアップの外観が選択した Pinboard CSS テーマに合わせて変わります。"
+  },
+  "secPopupElements": {
+    "message": "ポップアップの要素"
+  },
+  "optShowSearch": {
+    "message": "ポップアップに検索バーを表示"
+  },
+  "optShowRecent": {
+    "message": "ポップアップに最近のブックマークを表示"
+  },
+  "optShowBadge": {
+    "message": "アイコンに未読数バッジを表示"
+  },
+  "secNotifications": {
+    "message": "通知"
+  },
+  "notifyQuickSave": {
+    "message": "クイック保存"
+  },
+  "notifyReadLater": {
+    "message": "あとで読む"
+  },
+  "notifyTabSet": {
+    "message": "タブセット保存"
+  },
+  "notifyBatchSave": {
+    "message": "一括保存"
+  },
+  "notifyErrors": {
+    "message": "エラー通知"
+  },
+  "secCustomStyle": {
+    "message": "Pinboard.in カスタムスタイル"
+  },
+  "customStyleHint": {
+    "message": "pinboard.in のページにカスタム CSS を適用します。フォント、配色、レイアウトなどを変更できます。"
+  },
+  "labelCustomFont": {
+    "message": "カスタムフォント"
+  },
+  "customFontPlaceholder": {
+    "message": "例：'Noto Sans JP', 'Fira Code', sans-serif"
+  },
+  "customFontHint": {
+    "message": "pinboard.in の body に適用されます。空欄の場合はデフォルトのままです。"
+  },
+  "labelThemePresets": {
+    "message": "テーマプリセット"
+  },
+  "themeGroupNone": {
+    "message": "なし"
+  },
+  "themeGroupAdaptive": {
+    "message": "アダプティブ"
+  },
+  "themeGroupLight": {
+    "message": "ライト"
+  },
+  "themeGroupDark": {
+    "message": "ダーク"
+  },
+  "themePresetsHint": {
+    "message": "プリセットをクリックして CSS を読み込みます。アダプティブテーマはテーマ設定（ライト/ダーク）に連動します。"
+  },
+  "labelSavedThemes": {
+    "message": "保存済みテーマ"
+  },
+  "labelCustomCSS": {
+    "message": "カスタム CSS"
+  },
+  "saveAsTheme": {
+    "message": "テーマとして保存"
+  },
+  "saveAsThemeHint": {
+    "message": "現在の CSS を再利用可能なテーマとして保存します。"
+  },
+  "customCSSPlaceholder": {
+    "message": "/* pinboard.in 用カスタム CSS */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
+  },
+  "deleteTheme": {
+    "message": "テーマを削除"
+  },
+  "themeName": {
+    "message": "テーマ名："
+  },
+  "themeOverwrite": {
+    "message": "\"$NAME$\" は既に存在します。上書きしますか？",
+    "placeholders": {
+      "name": { "content": "$1" }
+    }
+  },
+
+  "saveTabsTitle": {
+    "message": "開いている全タブをタブセットとして保存（pinboard.in へのログインが必要）"
+  },
+  "batchSaveTitle": {
+    "message": "開いている各タブを個別のブックマークとして保存"
+  },
+  "qlSetsTitle": {
+    "message": "タブセット"
+  },
+  "qlNetworkTitle": {
+    "message": "ネットワーク"
+  },
+  "qlUnreadTitle": {
+    "message": "未読ブックマーク"
+  },
+  "qlNotesTitle": {
+    "message": "Notes"
+  },
+  "qlPopularTitle": {
+    "message": "人気"
+  }
+}

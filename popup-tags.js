@@ -7,7 +7,10 @@ async function fetchPinboardSuggestTags(token, url) {
   const container = document.getElementById("pinboard-suggest-tags");
   try {
     const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/suggest?url=${enc(url)}&auth_token=${token}&format=json`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) {
+      if (resp.status === 500) { container.textContent = t("suggestNoSuggestions"); container.classList.add("muted"); return; }
+      throw new Error(`HTTP ${resp.status}`);
+    }
     const data = await resp.json();
     container.innerHTML = "";
     const popular = data[0]?.popular || [];

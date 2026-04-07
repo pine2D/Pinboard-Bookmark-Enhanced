@@ -1,0 +1,895 @@
+{
+  "extName": {
+    "message": "Pinboard Bookmark Plus"
+  },
+  "extDescription": {
+    "message": "Сохраняйте закладки в Pinboard с AI-метками и аннотациями"
+  },
+  "cmdOpenPopup": {
+    "message": "Открыть Pinboard Bookmark Plus"
+  },
+  "cmdQuickSave": {
+    "message": "Быстрое сохранение в Pinboard (без окна)"
+  },
+  "cmdReadLater": {
+    "message": "Быстрое сохранение как Напочитать (без окна)"
+  },
+
+  "appName": {
+    "message": "Pinboard Bookmark Plus"
+  },
+  "settings": {
+    "message": "настройки"
+  },
+  "login": {
+    "message": "Вход"
+  },
+  "logout": {
+    "message": "выход"
+  },
+  "cancel": {
+    "message": "Отмена"
+  },
+  "reset": {
+    "message": "Сбросить"
+  },
+  "submit": {
+    "message": "Сохранить"
+  },
+  "update": {
+    "message": "Сохранить"
+  },
+  "delete": {
+    "message": "Удалить"
+  },
+  "clearAll": {
+    "message": "Очистить всё"
+  },
+  "loading": {
+    "message": "загрузка..."
+  },
+  "private": {
+    "message": "приватная"
+  },
+  "readLater": {
+    "message": "напочитать"
+  },
+  "networkError": {
+    "message": "Ошибка сети"
+  },
+  "clear": {
+    "message": "очистить"
+  },
+
+  "loginPrompt": {
+    "message": "Введите ваш API-токен со страницы"
+  },
+  "loginTokenPlaceholder": {
+    "message": "имя_пользователя:XXXXXXXXXXXXXX"
+  },
+  "loginInvalidFormat": {
+    "message": "Неверный формат. Используйте имя_пользователя:TOKEN"
+  },
+  "loginFailed": {
+    "message": "Ошибка аутентификации."
+  },
+  "settingsPassword": {
+    "message": "settings/password"
+  },
+
+  "labelUrl": {
+    "message": "Ссылка"
+  },
+  "labelTitle": {
+    "message": "Заголовок"
+  },
+  "labelNotes": {
+    "message": "Заметки"
+  },
+  "labelTags": {
+    "message": "Метки"
+  },
+  "labelPresets": {
+    "message": "Предустановки"
+  },
+  "labelSuggest": {
+    "message": "Рекомендации"
+  },
+  "labelAiTags": {
+    "message": "AI-метки"
+  },
+  "urlWarning": {
+    "message": "\u26a0 Эту страницу нельзя сохранить в Pinboard (неподдерживаемый URL)"
+  },
+  "urlCannotSave": {
+    "message": "Невозможно сохранить: неподдерживаемый URL"
+  },
+  "urlAndTitleRequired": {
+    "message": "Необходимо указать ссылку и заголовок"
+  },
+  "placeholderAddTags": {
+    "message": "Добавить метки"
+  },
+  "placeholderSearchBookmarks": {
+    "message": "Поиск по закладкам..."
+  },
+
+  "saving": {
+    "message": "Сохранение..."
+  },
+  "bookmarkSaved": {
+    "message": "Закладка сохранена."
+  },
+  "savedSuccess": {
+    "message": "\u2705 Сохранено!"
+  },
+  "deleting": {
+    "message": "Удаление..."
+  },
+  "deleted": {
+    "message": "Удалено."
+  },
+  "confirmDelete": {
+    "message": "Удалить эту закладку?"
+  },
+  "confirmLogout": {
+    "message": "Выйти? Ваш API-токен будет удалён."
+  },
+  "hintCtrlEnter": {
+    "message": "Ctrl+Enter"
+  },
+
+  "editingExisting": {
+    "message": "\u270f\ufe0f Редактирование существующей закладки"
+  },
+  "savedOnDate": {
+    "message": "сохранено $DATE$",
+    "placeholders": {
+      "date": { "content": "$1" }
+    }
+  },
+  "tagCount": {
+    "message": "$COUNT$ метка",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "tagCountPlural": {
+    "message": "$COUNT$ меток",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "userInfoPrefix": {
+    "message": "Pinboard \u2014 $USER$",
+    "placeholders": {
+      "user": { "content": "$1" }
+    }
+  },
+
+  "aiSummaryBtn": {
+    "message": "\ud83e\udd16 AI-аннотация"
+  },
+  "aiGenerateBtn": {
+    "message": "\ud83e\udd16 сгенерировать"
+  },
+  "aiSummarizing": {
+    "message": "генерация аннотации..."
+  },
+  "aiGenerating": {
+    "message": "генерация..."
+  },
+  "aiGenerate": {
+    "message": "сгенерировать"
+  },
+  "aiSummaryGenerated": {
+    "message": "Аннотация сгенерирована"
+  },
+  "aiSummaryRegenerated": {
+    "message": "Аннотация пересоздана"
+  },
+  "aiSummaryRemoved": {
+    "message": "Аннотация удалена"
+  },
+  "aiTagsRegenerated": {
+    "message": "Метки пересозданы"
+  },
+  "aiNoTags": {
+    "message": "метки не сгенерированы"
+  },
+  "aiNoContent": {
+    "message": "Нет содержимого страницы для аннотации"
+  },
+  "aiSetKey": {
+    "message": "Укажите AI API-ключ в настройках"
+  },
+  "aiSetKeyIn": {
+    "message": "укажите AI-ключ в "
+  },
+  "aiCached": {
+    "message": "из кэша"
+  },
+  "aiRegenerate": {
+    "message": "\u21bb пересоздать"
+  },
+  "aiReplace": {
+    "message": "\u21bb заменить"
+  },
+  "aiRemove": {
+    "message": "\u2715 удалить"
+  },
+  "aiRegenerating": {
+    "message": "пересоздание..."
+  },
+  "aiReplacing": {
+    "message": "замена..."
+  },
+  "aiError": {
+    "message": "Ошибка AI: $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "addAll": {
+    "message": "Добавить все"
+  },
+
+  "suggestNoSuggestions": {
+    "message": "нет рекомендаций"
+  },
+  "suggestPopular": {
+    "message": "популярные:"
+  },
+  "suggestRecommended": {
+    "message": "рекомендуемые:"
+  },
+  "suggestFailed": {
+    "message": "ошибка загрузки: $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+
+  "qlSets": {
+    "message": "Sets"
+  },
+  "qlNetwork": {
+    "message": "связи"
+  },
+  "qlUnread": {
+    "message": "Непрочитанные"
+  },
+  "qlNotes": {
+    "message": "notes"
+  },
+  "qlPopular": {
+    "message": "популярные"
+  },
+
+  "saveTabsBtn": {
+    "message": "\ud83d\udcd1 Сохранить вкладки"
+  },
+  "batchSaveBtn": {
+    "message": "\ud83d\udccc Пакетное сохранение"
+  },
+  "batchSaving": {
+    "message": "\u231b Сохранение..."
+  },
+  "batchNoValidTabs": {
+    "message": "Нет подходящих вкладок для сохранения"
+  },
+  "batchNoTabs": {
+    "message": "Нет подходящих вкладок"
+  },
+  "batchNotLoggedIn": {
+    "message": "Вы не авторизованы"
+  },
+  "batchSent": {
+    "message": "\u2705 Отправлено!"
+  },
+  "batchProgress": {
+    "message": "\u231b $CURRENT$/$TOTAL$ (\u2713$SAVED$ \u2717$FAILED$)",
+    "placeholders": {
+      "current": { "content": "$1" },
+      "total": { "content": "$2" },
+      "saved": { "content": "$3" },
+      "failed": { "content": "$4" }
+    }
+  },
+  "batchDone": {
+    "message": "Готово: $SAVED$ сохранено, $FAILED$ с ошибкой",
+    "placeholders": {
+      "saved": { "content": "$1" },
+      "failed": { "content": "$2" }
+    }
+  },
+  "batchSkipped": {
+    "message": ", $COUNT$ пропущено",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchSavedCount": {
+    "message": "\u2705 $COUNT$ сохранено",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchFailed": {
+    "message": "Пакетное сохранение не удалось: $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "batchSavedNotify": {
+    "message": "$COUNT$ закладок сохранено$TAGS$.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "tags": { "content": "$2" }
+    }
+  },
+  "batchTaggedSuffix": {
+    "message": " (метки: $TAGS$)",
+    "placeholders": {
+      "tags": { "content": "$1" }
+    }
+  },
+
+  "offlineQueued": {
+    "message": "$COUNT$ закладок в очереди (офлайн)",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "offlineClearConfirm": {
+    "message": "Очистить все закладки в очереди?"
+  },
+
+  "recentLabel": {
+    "message": "Недавние:"
+  },
+  "recentFailed": {
+    "message": "ошибка загрузки: $ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "recentDeleteTitle": {
+    "message": "Удалить эту закладку"
+  },
+
+  "bgNotLoggedIn": {
+    "message": "Pinboard: Вы не авторизованы"
+  },
+  "bgSetToken": {
+    "message": "Укажите API-токен в настройках расширения."
+  },
+  "bgUndone": {
+    "message": "Pinboard: Отменено"
+  },
+  "bgBookmarkRemoved": {
+    "message": "Закладка удалена."
+  },
+  "bgQuickSaved": {
+    "message": "Pinboard: Быстро сохранено!"
+  },
+  "bgReadLater": {
+    "message": "Pinboard: Отложено на потом!"
+  },
+  "bgCannotSave": {
+    "message": "Pinboard: Невозможно сохранить"
+  },
+  "bgCannotBookmark": {
+    "message": "Эту страницу нельзя добавить в закладки."
+  },
+  "bgTabSetSaved": {
+    "message": "Pinboard: Набор вкладок сохранён!"
+  },
+  "bgTabsSavedCount": {
+    "message": "$COUNT$ вкладок сохранено.",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "bgTabSetFailed": {
+    "message": "Pinboard: Ошибка сохранения набора вкладок"
+  },
+  "bgLoginRequired": {
+    "message": "Сначала войдите в pinboard.in в вашем браузере."
+  },
+  "bgQuickSaveFailed": {
+    "message": "Pinboard: Ошибка быстрого сохранения"
+  },
+  "bgReadLaterFailed": {
+    "message": "Pinboard: Ошибка сохранения \u00abНапочитать\u00bb"
+  },
+  "bgSaveFailed": {
+    "message": "Pinboard: Ошибка сохранения"
+  },
+  "bgNetworkError": {
+    "message": "Pinboard: Ошибка сети"
+  },
+  "bgQueuedOffline": {
+    "message": "Pinboard: Добавлено в офлайн-очередь"
+  },
+  "bgTitleSaved": {
+    "message": "\u00ab$TITLE$\u00bb сохранено.",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgTitleQueued": {
+    "message": "\u00ab$TITLE$\u00bb будет сохранено при подключении к сети.",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgBatchSaved": {
+    "message": "Pinboard: Пакетное сохранение завершено!"
+  },
+  "bgUndo": {
+    "message": "Отменить"
+  },
+
+  "optTitle": {
+    "message": "Pinboard Bookmark Plus \u2014 Настройки"
+  },
+  "optAutoSave": {
+    "message": "автосохранение включено"
+  },
+  "optAutoSaved": {
+    "message": "\u2713 Сохранено"
+  },
+  "tabBookmarks": {
+    "message": "Закладки"
+  },
+  "tabAI": {
+    "message": "AI"
+  },
+  "tabQuickActions": {
+    "message": "Быстрые действия"
+  },
+  "tabAppearance": {
+    "message": "Оформление"
+  },
+  "resetTabBtn": {
+    "message": "Сбросить вкладку"
+  },
+  "resetTabTitle": {
+    "message": "Сбросить настройки текущей вкладки на значения по умолчанию"
+  },
+  "resetConfirm": {
+    "message": "Сбросить \u00ab$TAB$\u00bb?",
+    "placeholders": {
+      "tab": { "content": "$1" }
+    }
+  },
+  "resetKeysKept": {
+    "message": " (ключи сохранены)"
+  },
+
+  "secPinboardAccount": {
+    "message": "Аккаунт Pinboard"
+  },
+  "labelApiToken": {
+    "message": "API-токен"
+  },
+  "hintApiToken": {
+    "message": "Получить на"
+  },
+  "secSaveDefaults": {
+    "message": "Параметры по умолчанию"
+  },
+  "optPrivateDefault": {
+    "message": "Приватная по умолчанию"
+  },
+  "optPrivateIncognito": {
+    "message": "Приватная в режиме инкогнито"
+  },
+  "optReadlaterDefault": {
+    "message": "Напочитать по умолчанию"
+  },
+  "secNotesBehavior": {
+    "message": "Поведение заметок"
+  },
+  "optAutoDescription": {
+    "message": "Автоматически заполнять мета-описание в заметки"
+  },
+  "optBlockquote": {
+    "message": "Оборачивать выделенный текст в <blockquote>"
+  },
+  "optIncludeReferrer": {
+    "message": "Включать реферер в заметки"
+  },
+  "secTags": {
+    "message": "Метки"
+  },
+  "optRespectTagCase": {
+    "message": "Учитывать регистр существующих меток (использовать наиболее частый вариант)"
+  },
+  "optShowSuggestTags": {
+    "message": "Показывать рекомендуемые метки Pinboard во всплывающем окне"
+  },
+  "labelTagPresets": {
+    "message": "Предустановки меток"
+  },
+  "tagPresetsPlaceholder": {
+    "message": "По одной предустановке на строку:\n\u0420\u0430\u0431\u043e\u0442\u0430: project, review, report\n\u0420\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0430: programming, tutorial, tool"
+  },
+  "tagPresetsHint": {
+    "message": "Формат: Название: метка1, метка2, метка3 \u2014 отображаются как кнопки быстрого добавления."
+  },
+  "secPopupBehavior": {
+    "message": "Поведение всплывающего окна"
+  },
+  "optCheckBookmarkStatus": {
+    "message": "Показывать статус закладки через значок (проверять, сохранена ли текущая страница)"
+  },
+  "optAutoClose": {
+    "message": "Автоматически закрывать окно после сохранения"
+  },
+  "optOfflineQueue": {
+    "message": "Включить офлайн-очередь сохранения"
+  },
+  "secBackupRestore": {
+    "message": "Резервное копирование и восстановление"
+  },
+  "backupHint": {
+    "message": "Экспорт/импорт настроек (API-ключи исключаются из экспорта в целях безопасности)."
+  },
+  "exportSettings": {
+    "message": "Экспорт настроек"
+  },
+  "importSettings": {
+    "message": "Импорт настроек"
+  },
+  "importedReload": {
+    "message": "\u2713 Импортировано \u2014 перезагрузите для применения"
+  },
+  "importInvalid": {
+    "message": "\u2717 Недопустимый файл"
+  },
+
+  "secQuickSave": {
+    "message": "Быстрое сохранение"
+  },
+  "qsHint": {
+    "message": "Мгновенно сохраняйте текущую страницу с помощью горячей клавиши (без открытия окна)."
+  },
+  "openShortcuts": {
+    "message": "Открыть настройки горячих клавиш Chrome"
+  },
+  "shortcutsManual": {
+    "message": "Или перейдите вручную:"
+  },
+  "qsAutoNotes": {
+    "message": "Автоматически добавлять описание страницы в заметки"
+  },
+  "qsBlockquote": {
+    "message": "Оборачивать выделенный текст в blockquote"
+  },
+  "labelDefaultTags": {
+    "message": "Метки по умолчанию (через запятую)"
+  },
+  "placeholderTags": {
+    "message": "метка1, метка2"
+  },
+  "qsAiTags": {
+    "message": "Автоматически генерировать AI-метки"
+  },
+  "qsAiSummary": {
+    "message": "Автоматически генерировать AI-аннотацию в заметках"
+  },
+
+  "secReadLater": {
+    "message": "Напочитать"
+  },
+  "rlHint": {
+    "message": "Сохраняйте текущую страницу как \u00abНапочитать\u00bb с помощью горячей клавиши. Автоматически отмечается как непрочитанное."
+  },
+
+  "secBatchSave": {
+    "message": "Пакетное сохранение"
+  },
+  "batchHint": {
+    "message": "Сохранить каждую открытую вкладку как отдельную закладку."
+  },
+  "batchAutoAddTags": {
+    "message": "Автоматически добавлять метки"
+  },
+  "batchTagsLabel": {
+    "message": "Метки (через запятую)"
+  },
+  "batchTagsHint": {
+    "message": "Несколько меток через запятую. Например: batch_saved, research"
+  },
+  "batchAiTags": {
+    "message": "Автоматически генерировать AI-метки для каждой вкладки"
+  },
+  "batchAiSummary": {
+    "message": "Автоматически генерировать AI-аннотацию для каждой вкладки"
+  },
+  "batchSkipExisting": {
+    "message": "Пропускать уже сохранённые URL"
+  },
+  "batchWarning": {
+    "message": "\u26a0 AI-функции при пакетном сохранении работают медленно \u2014 для каждой вкладки нужен отдельный AI-запрос с интервалом 3 сек между сохранениями."
+  },
+
+  "secAiProvider": {
+    "message": "AI-провайдер"
+  },
+  "labelApiKey": {
+    "message": "API-ключ"
+  },
+  "labelModel": {
+    "message": "Модель"
+  },
+  "labelBaseUrl": {
+    "message": "Базовый URL"
+  },
+  "labelDisplayName": {
+    "message": "Отображаемое имя"
+  },
+  "getKey": {
+    "message": "Получить ключ"
+  },
+  "testConnection": {
+    "message": "Проверить соединение"
+  },
+  "testTesting": {
+    "message": "Проверка..."
+  },
+  "testConnected": {
+    "message": "\u2713 Подключено ($RESULT$)",
+    "placeholders": {
+      "result": { "content": "$1" }
+    }
+  },
+  "testTimeout": {
+    "message": "Тайм-аут (15 сек)"
+  },
+  "testNoApiKey": {
+    "message": "API-ключ не указан"
+  },
+  "testNoBaseUrl": {
+    "message": "Базовый URL не настроен"
+  },
+  "showHideKey": {
+    "message": "Показать/скрыть ключ"
+  },
+
+  "hintOpenAIBaseUrl": {
+    "message": "Измените для прокси или совместимого эндпоинта"
+  },
+  "hintClaudeModel": {
+    "message": "напр. claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
+  },
+  "hintOllamaModel": {
+    "message": "Сначала выполните ollama pull llama3"
+  },
+  "hintOpenRouterKey": {
+    "message": "Доступ к 100+ моделям через один API."
+  },
+  "hintOpenRouterModels": {
+    "message": "Каталог моделей на"
+  },
+  "hintCustomBaseUrl": {
+    "message": "Должен поддерживать эндпоинт /chat/completions"
+  },
+  "hintCustomKey": {
+    "message": "Оставьте пустым, если не требуется"
+  },
+
+  "secAiBehavior": {
+    "message": "Поведение AI"
+  },
+  "optAiAutoTags": {
+    "message": "Автоматически генерировать AI-метки при открытии окна"
+  },
+  "labelAiSummaryLang": {
+    "message": "Язык AI-аннотации"
+  },
+  "aiLangAuto": {
+    "message": "Авто (как у содержимого)"
+  },
+  "langZh": {
+    "message": "\u4e2d\u6587 (Китайский)"
+  },
+  "langEn": {
+    "message": "English (Английский)"
+  },
+  "langJa": {
+    "message": "\u65e5\u672c\u8a9e (Японский)"
+  },
+  "langKo": {
+    "message": "\ud55c\uad6d\uc5b4 (Корейский)"
+  },
+  "langFr": {
+    "message": "Fran\u00e7ais (Французский)"
+  },
+  "langDe": {
+    "message": "Deutsch (Немецкий)"
+  },
+  "langEs": {
+    "message": "Espa\u00f1ol (Испанский)"
+  },
+  "langRu": {
+    "message": "Русский"
+  },
+  "labelAiCache": {
+    "message": "Время кэширования AI (минуты)"
+  },
+  "aiCacheHint": {
+    "message": "Кэш по URL. Установите 0, чтобы отключить."
+  },
+  "labelTagSeparator": {
+    "message": "Разделитель составных меток"
+  },
+  "sepHyphen": {
+    "message": "дефис (machine-learning)"
+  },
+  "sepUnderscore": {
+    "message": "подчёркивание (machine_learning)"
+  },
+
+  "secPrompts": {
+    "message": "Промпты"
+  },
+  "promptsHint": {
+    "message": "Настройте промпты, отправляемые AI. Используйте переменные: {{title}} {{url}} {{content}} {{description}} {{lang_instruction}} {{separator_instruction}}. Оставьте пустым для значений по умолчанию."
+  },
+  "labelTagPrompt": {
+    "message": "Промпт для AI-меток"
+  },
+  "tagPromptHint": {
+    "message": "Оставьте пустым для использования промпта по умолчанию (показан выше). AI должен вернуть формат [\"tag1\",\"tag2\"]."
+  },
+  "resetToDefault": {
+    "message": "Сбросить на значение по умолчанию"
+  },
+  "labelSummaryPrompt": {
+    "message": "Промпт для AI-аннотации"
+  },
+  "summaryPromptHint": {
+    "message": "Оставьте пустым для использования промпта по умолчанию (показан выше). Используйте {{lang_instruction}} для автоопределения языка."
+  },
+
+  "secLanguage": {
+    "message": "Язык"
+  },
+  "langAuto": {
+    "message": "Авто (по настройкам браузера)"
+  },
+
+  "secTheme": {
+    "message": "Тема"
+  },
+  "themeAuto": {
+    "message": "Авто (по настройкам системы)"
+  },
+  "themeLight": {
+    "message": "Светлая"
+  },
+  "themeDark": {
+    "message": "Тёмная"
+  },
+  "optPopupFollowTheme": {
+    "message": "Окно следует теме Pinboard"
+  },
+  "popupFollowHint": {
+    "message": "Если включено, оформление окна соответствует выбранной CSS-теме Pinboard."
+  },
+  "secPopupElements": {
+    "message": "Элементы всплывающего окна"
+  },
+  "optShowSearch": {
+    "message": "Показывать строку поиска во всплывающем окне"
+  },
+  "optShowRecent": {
+    "message": "Показывать недавние закладки во всплывающем окне"
+  },
+  "optShowBadge": {
+    "message": "Показывать счётчик непрочитанных на значке"
+  },
+  "secNotifications": {
+    "message": "Уведомления"
+  },
+  "notifyQuickSave": {
+    "message": "Быстрое сохранение"
+  },
+  "notifyReadLater": {
+    "message": "Напочитать"
+  },
+  "notifyTabSet": {
+    "message": "Сохранение набора вкладок"
+  },
+  "notifyBatchSave": {
+    "message": "Пакетное сохранение"
+  },
+  "notifyErrors": {
+    "message": "Уведомления об ошибках"
+  },
+  "secCustomStyle": {
+    "message": "Пользовательский стиль Pinboard.in"
+  },
+  "customStyleHint": {
+    "message": "Внедрить пользовательский CSS на страницы pinboard.in. Полезно для изменения шрифтов, цветов, компоновки и т.д."
+  },
+  "labelCustomFont": {
+    "message": "Пользовательский шрифт"
+  },
+  "customFontPlaceholder": {
+    "message": "напр. 'Noto Sans SC', 'Fira Code', sans-serif"
+  },
+  "customFontHint": {
+    "message": "Применяется к body на pinboard.in. Оставьте пустым, чтобы сохранить шрифт по умолчанию."
+  },
+  "labelThemePresets": {
+    "message": "Предустановки тем"
+  },
+  "themeGroupNone": {
+    "message": "Нет"
+  },
+  "themeGroupAdaptive": {
+    "message": "Адаптивная"
+  },
+  "themeGroupLight": {
+    "message": "Светлая"
+  },
+  "themeGroupDark": {
+    "message": "Тёмная"
+  },
+  "themePresetsHint": {
+    "message": "Нажмите на предустановку, чтобы загрузить её CSS. Адаптивные темы следуют настройке светлой/тёмной темы."
+  },
+  "labelSavedThemes": {
+    "message": "Сохранённые темы"
+  },
+  "labelCustomCSS": {
+    "message": "Пользовательский CSS"
+  },
+  "saveAsTheme": {
+    "message": "Сохранить как тему"
+  },
+  "saveAsThemeHint": {
+    "message": "Сохранить текущий CSS как многоразовую тему."
+  },
+  "customCSSPlaceholder": {
+    "message": "/* \u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0438\u0439 CSS \u0434\u043b\u044f pinboard.in */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
+  },
+  "deleteTheme": {
+    "message": "Удалить тему"
+  },
+  "themeName": {
+    "message": "Название темы:"
+  },
+  "themeOverwrite": {
+    "message": "\u00ab$NAME$\u00bb уже существует. Перезаписать?",
+    "placeholders": {
+      "name": { "content": "$1" }
+    }
+  },
+
+  "saveTabsTitle": {
+    "message": "Сохранить все открытые вкладки как набор (требуется вход в pinboard.in)"
+  },
+  "batchSaveTitle": {
+    "message": "Сохранить каждую открытую вкладку как отдельную закладку"
+  },
+  "qlSetsTitle": {
+    "message": "Наборы вкладок"
+  },
+  "qlNetworkTitle": {
+    "message": "Связи"
+  },
+  "qlUnreadTitle": {
+    "message": "Непрочитанные закладки"
+  },
+  "qlNotesTitle": {
+    "message": "Заметки"
+  },
+  "qlPopularTitle": {
+    "message": "Популярные"
+  }
+}

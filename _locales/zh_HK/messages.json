@@ -1,0 +1,895 @@
+{
+  "extName": {
+    "message": "Pinboard 書籤增強"
+  },
+  "extDescription": {
+    "message": "一鍵儲存書籤到 Pinboard，支援 AI 智能標籤與摘要"
+  },
+  "cmdOpenPopup": {
+    "message": "開啟 Pinboard 書籤增強"
+  },
+  "cmdQuickSave": {
+    "message": "快速儲存到 Pinboard（無彈出窗口）"
+  },
+  "cmdReadLater": {
+    "message": "快速標記為稍後閱讀（無彈出窗口）"
+  },
+
+  "appName": {
+    "message": "Pinboard 書籤增強"
+  },
+  "settings": {
+    "message": "設定"
+  },
+  "login": {
+    "message": "登入"
+  },
+  "logout": {
+    "message": "登出"
+  },
+  "cancel": {
+    "message": "取消"
+  },
+  "reset": {
+    "message": "重設"
+  },
+  "submit": {
+    "message": "儲存"
+  },
+  "update": {
+    "message": "更新"
+  },
+  "delete": {
+    "message": "刪除"
+  },
+  "clearAll": {
+    "message": "全部清除"
+  },
+  "loading": {
+    "message": "載入中..."
+  },
+  "private": {
+    "message": "私人"
+  },
+  "readLater": {
+    "message": "稍後閱讀"
+  },
+  "networkError": {
+    "message": "網絡錯誤"
+  },
+  "clear": {
+    "message": "清除"
+  },
+
+  "loginPrompt": {
+    "message": "請輸入你的 API Token，取得地址："
+  },
+  "loginTokenPlaceholder": {
+    "message": "用戶名:XXXXXXXXXXXXXX"
+  },
+  "loginInvalidFormat": {
+    "message": "格式錯誤，請使用 用戶名:TOKEN 格式"
+  },
+  "loginFailed": {
+    "message": "認證失敗"
+  },
+  "settingsPassword": {
+    "message": "settings/password"
+  },
+
+  "labelUrl": {
+    "message": "網址"
+  },
+  "labelTitle": {
+    "message": "標題"
+  },
+  "labelNotes": {
+    "message": "備註"
+  },
+  "labelTags": {
+    "message": "標籤"
+  },
+  "labelPresets": {
+    "message": "預設"
+  },
+  "labelSuggest": {
+    "message": "推薦"
+  },
+  "labelAiTags": {
+    "message": "AI 標籤"
+  },
+  "urlWarning": {
+    "message": "⚠ 此頁面無法儲存到 Pinboard（不支援的網址類型）"
+  },
+  "urlCannotSave": {
+    "message": "無法儲存：不支援的網址類型"
+  },
+  "urlAndTitleRequired": {
+    "message": "網址和標題不能為空"
+  },
+  "placeholderAddTags": {
+    "message": "新增標籤"
+  },
+  "placeholderSearchBookmarks": {
+    "message": "搜尋你的書籤..."
+  },
+
+  "saving": {
+    "message": "儲存中..."
+  },
+  "bookmarkSaved": {
+    "message": "書籤已儲存"
+  },
+  "savedSuccess": {
+    "message": "✅ 已儲存！"
+  },
+  "deleting": {
+    "message": "刪除中..."
+  },
+  "deleted": {
+    "message": "已刪除"
+  },
+  "confirmDelete": {
+    "message": "確定刪除此書籤？"
+  },
+  "confirmLogout": {
+    "message": "確定登出？API Token 將被移除。"
+  },
+  "hintCtrlEnter": {
+    "message": "Ctrl+Enter"
+  },
+
+  "editingExisting": {
+    "message": "✏️ 正在編輯已有書籤"
+  },
+  "savedOnDate": {
+    "message": "儲存於 $DATE$",
+    "placeholders": {
+      "date": { "content": "$1" }
+    }
+  },
+  "tagCount": {
+    "message": "$COUNT$ 個標籤",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "tagCountPlural": {
+    "message": "$COUNT$ 個標籤",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "userInfoPrefix": {
+    "message": "Pinboard — $USER$",
+    "placeholders": {
+      "user": { "content": "$1" }
+    }
+  },
+
+  "aiSummaryBtn": {
+    "message": "🤖 AI 摘要"
+  },
+  "aiGenerateBtn": {
+    "message": "🤖 產生"
+  },
+  "aiSummarizing": {
+    "message": "產生摘要中..."
+  },
+  "aiGenerating": {
+    "message": "產生標籤中..."
+  },
+  "aiGenerate": {
+    "message": "產生"
+  },
+  "aiSummaryGenerated": {
+    "message": "摘要已產生"
+  },
+  "aiSummaryRegenerated": {
+    "message": "摘要已重新產生"
+  },
+  "aiSummaryRemoved": {
+    "message": "摘要已移除"
+  },
+  "aiTagsRegenerated": {
+    "message": "標籤已重新產生"
+  },
+  "aiNoTags": {
+    "message": "未產生標籤"
+  },
+  "aiNoContent": {
+    "message": "頁面無可用內容"
+  },
+  "aiSetKey": {
+    "message": "請先在設定中配置 AI API Key"
+  },
+  "aiSetKeyIn": {
+    "message": "請在 "
+  },
+  "aiCached": {
+    "message": "已快取"
+  },
+  "aiRegenerate": {
+    "message": "↻ 重新產生"
+  },
+  "aiReplace": {
+    "message": "↻ 替換"
+  },
+  "aiRemove": {
+    "message": "✕ 移除"
+  },
+  "aiRegenerating": {
+    "message": "重新產生中..."
+  },
+  "aiReplacing": {
+    "message": "替換中..."
+  },
+  "aiError": {
+    "message": "AI 出錯：$ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "addAll": {
+    "message": "全部新增"
+  },
+
+  "suggestNoSuggestions": {
+    "message": "暫無推薦"
+  },
+  "suggestPopular": {
+    "message": "熱門："
+  },
+  "suggestRecommended": {
+    "message": "推薦："
+  },
+  "suggestFailed": {
+    "message": "載入失敗：$ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+
+  "qlSets": {
+    "message": "標籤集"
+  },
+  "qlNetwork": {
+    "message": "社交網絡"
+  },
+  "qlUnread": {
+    "message": "待讀"
+  },
+  "qlNotes": {
+    "message": "筆記"
+  },
+  "qlPopular": {
+    "message": "熱門"
+  },
+
+  "saveTabsBtn": {
+    "message": "📑 儲存標籤頁"
+  },
+  "batchSaveBtn": {
+    "message": "📌 批量儲存"
+  },
+  "batchSaving": {
+    "message": "⏳ 儲存中..."
+  },
+  "batchNoValidTabs": {
+    "message": "沒有可儲存的標籤頁"
+  },
+  "batchNoTabs": {
+    "message": "沒有可用的標籤頁"
+  },
+  "batchNotLoggedIn": {
+    "message": "尚未登入"
+  },
+  "batchSent": {
+    "message": "✅ 已發送！"
+  },
+  "batchProgress": {
+    "message": "⏳ $CURRENT$/$TOTAL$（✓$SAVED$ ✗$FAILED$）",
+    "placeholders": {
+      "current": { "content": "$1" },
+      "total": { "content": "$2" },
+      "saved": { "content": "$3" },
+      "failed": { "content": "$4" }
+    }
+  },
+  "batchDone": {
+    "message": "批量完成：$SAVED$ 已儲存，$FAILED$ 失敗",
+    "placeholders": {
+      "saved": { "content": "$1" },
+      "failed": { "content": "$2" }
+    }
+  },
+  "batchSkipped": {
+    "message": "，$COUNT$ 已跳過",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchSavedCount": {
+    "message": "✅ 已儲存 $COUNT$ 個",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchFailed": {
+    "message": "批量儲存失敗：$ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "batchSavedNotify": {
+    "message": "已儲存 $COUNT$ 個書籤$TAGS$。",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "tags": { "content": "$2" }
+    }
+  },
+  "batchTaggedSuffix": {
+    "message": "（標籤：$TAGS$）",
+    "placeholders": {
+      "tags": { "content": "$1" }
+    }
+  },
+
+  "offlineQueued": {
+    "message": "$COUNT$ 個書籤排隊中（離線）",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "offlineClearConfirm": {
+    "message": "確定清除所有排隊中的書籤？"
+  },
+
+  "recentLabel": {
+    "message": "最近："
+  },
+  "recentFailed": {
+    "message": "載入失敗：$ERROR$",
+    "placeholders": {
+      "error": { "content": "$1" }
+    }
+  },
+  "recentDeleteTitle": {
+    "message": "刪除此書籤"
+  },
+
+  "bgNotLoggedIn": {
+    "message": "Pinboard：未登入"
+  },
+  "bgSetToken": {
+    "message": "請先在擴充功能設定中配置 API Token。"
+  },
+  "bgUndone": {
+    "message": "Pinboard：已撤銷"
+  },
+  "bgBookmarkRemoved": {
+    "message": "書籤已移除。"
+  },
+  "bgQuickSaved": {
+    "message": "Pinboard：快速儲存成功！"
+  },
+  "bgReadLater": {
+    "message": "Pinboard：已標記為稍後閱讀！"
+  },
+  "bgCannotSave": {
+    "message": "Pinboard：無法儲存"
+  },
+  "bgCannotBookmark": {
+    "message": "此頁面無法新增書籤。"
+  },
+  "bgTabSetSaved": {
+    "message": "Pinboard：標籤集已儲存！"
+  },
+  "bgTabsSavedCount": {
+    "message": "已儲存 $COUNT$ 個標籤頁。",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "bgTabSetFailed": {
+    "message": "Pinboard：標籤集儲存失敗"
+  },
+  "bgLoginRequired": {
+    "message": "請先在瀏覽器中登入 pinboard.in。"
+  },
+  "bgQuickSaveFailed": {
+    "message": "Pinboard：快速儲存失敗"
+  },
+  "bgReadLaterFailed": {
+    "message": "Pinboard：稍後閱讀儲存失敗"
+  },
+  "bgSaveFailed": {
+    "message": "Pinboard：儲存失敗"
+  },
+  "bgNetworkError": {
+    "message": "Pinboard：網絡錯誤"
+  },
+  "bgQueuedOffline": {
+    "message": "Pinboard：已加入離線佇列"
+  },
+  "bgTitleSaved": {
+    "message": "\"$TITLE$\" 已儲存。",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgTitleQueued": {
+    "message": "\"$TITLE$\" 將在聯網後自動儲存。",
+    "placeholders": {
+      "title": { "content": "$1" }
+    }
+  },
+  "bgBatchSaved": {
+    "message": "Pinboard：批量儲存完成！"
+  },
+  "bgUndo": {
+    "message": "撤銷"
+  },
+
+  "optTitle": {
+    "message": "Pinboard 書籤增強 — 設定"
+  },
+  "optAutoSave": {
+    "message": "自動儲存已啟用"
+  },
+  "optAutoSaved": {
+    "message": "✓ 已儲存"
+  },
+  "tabBookmarks": {
+    "message": "書籤"
+  },
+  "tabAI": {
+    "message": "AI"
+  },
+  "tabQuickActions": {
+    "message": "快捷操作"
+  },
+  "tabAppearance": {
+    "message": "外觀"
+  },
+  "resetTabBtn": {
+    "message": "重設此頁"
+  },
+  "resetTabTitle": {
+    "message": "將當前頁面設定恢復為預設值"
+  },
+  "resetConfirm": {
+    "message": "確定重設「$TAB$」？",
+    "placeholders": {
+      "tab": { "content": "$1" }
+    }
+  },
+  "resetKeysKept": {
+    "message": "（密鑰保留）"
+  },
+
+  "secPinboardAccount": {
+    "message": "Pinboard 帳戶"
+  },
+  "labelApiToken": {
+    "message": "API Token"
+  },
+  "hintApiToken": {
+    "message": "取得地址："
+  },
+  "secSaveDefaults": {
+    "message": "儲存預設設定"
+  },
+  "optPrivateDefault": {
+    "message": "預設設為私人"
+  },
+  "optPrivateIncognito": {
+    "message": "無痕模式下自動設為私人"
+  },
+  "optReadlaterDefault": {
+    "message": "預設標記為稍後閱讀"
+  },
+  "secNotesBehavior": {
+    "message": "備註行為"
+  },
+  "optAutoDescription": {
+    "message": "自動填充頁面描述到備註"
+  },
+  "optBlockquote": {
+    "message": "以引用格式包裹選取文字"
+  },
+  "optIncludeReferrer": {
+    "message": "在備註中附加來源頁地址"
+  },
+  "secTags": {
+    "message": "標籤"
+  },
+  "optRespectTagCase": {
+    "message": "尊重已有標籤大小寫（匹配使用最多的寫法）"
+  },
+  "optShowSuggestTags": {
+    "message": "在彈出窗口中顯示 Pinboard 推薦標籤"
+  },
+  "labelTagPresets": {
+    "message": "標籤預設"
+  },
+  "tagPresetsPlaceholder": {
+    "message": "每行一組預設：\n工作: project, review, report\n開發: programming, tutorial, tool"
+  },
+  "tagPresetsHint": {
+    "message": "格式：名稱: 標籤1, 標籤2, 標籤3 — 在彈出窗口中顯示為快捷新增按鈕。"
+  },
+  "secPopupBehavior": {
+    "message": "彈出窗口行為"
+  },
+  "optCheckBookmarkStatus": {
+    "message": "透過圖示顯示收藏狀態（偵測當前頁面是否已儲存）"
+  },
+  "optAutoClose": {
+    "message": "儲存後自動關閉彈出窗口"
+  },
+  "optOfflineQueue": {
+    "message": "啟用離線儲存佇列"
+  },
+  "secBackupRestore": {
+    "message": "備份與恢復"
+  },
+  "backupHint": {
+    "message": "匯出或匯入設定（出於安全考慮，API 密鑰不包含在匯出檔案中）。"
+  },
+  "exportSettings": {
+    "message": "匯出設定"
+  },
+  "importSettings": {
+    "message": "匯入設定"
+  },
+  "importedReload": {
+    "message": "✓ 已匯入 — 重新整理頁面後生效"
+  },
+  "importInvalid": {
+    "message": "✗ 檔案格式無效"
+  },
+
+  "secQuickSave": {
+    "message": "快速儲存"
+  },
+  "qsHint": {
+    "message": "透過鍵盤快捷鍵即時儲存當前頁面（無需開啟彈出窗口）。"
+  },
+  "openShortcuts": {
+    "message": "開啟 Chrome 快捷鍵設定"
+  },
+  "shortcutsManual": {
+    "message": "或手動前往："
+  },
+  "qsAutoNotes": {
+    "message": "自動將頁面描述新增到備註"
+  },
+  "qsBlockquote": {
+    "message": "以引用格式包裹選取文字"
+  },
+  "labelDefaultTags": {
+    "message": "預設標籤（逗號分隔）"
+  },
+  "placeholderTags": {
+    "message": "標籤1, 標籤2"
+  },
+  "qsAiTags": {
+    "message": "自動產生 AI 標籤"
+  },
+  "qsAiSummary": {
+    "message": "自動在備註中產生 AI 摘要"
+  },
+
+  "secReadLater": {
+    "message": "稍後閱讀"
+  },
+  "rlHint": {
+    "message": "透過鍵盤快捷鍵將當前頁面標記為「稍後閱讀」，自動標記為未讀。"
+  },
+
+  "secBatchSave": {
+    "message": "批量儲存"
+  },
+  "batchHint": {
+    "message": "將每個已開啟的標籤頁分別儲存為獨立書籤。"
+  },
+  "batchAutoAddTags": {
+    "message": "自動新增標籤"
+  },
+  "batchTagsLabel": {
+    "message": "標籤（逗號分隔）"
+  },
+  "batchTagsHint": {
+    "message": "多個標籤用逗號分隔，如 batch_saved, research"
+  },
+  "batchAiTags": {
+    "message": "為每個標籤頁自動產生 AI 標籤"
+  },
+  "batchAiSummary": {
+    "message": "為每個標籤頁自動產生 AI 摘要"
+  },
+  "batchSkipExisting": {
+    "message": "跳過已收藏的網址"
+  },
+  "batchWarning": {
+    "message": "⚠ 批量儲存中的 AI 功能會比較慢——每個標籤頁都需要單獨調用 AI，且儲存間隔為 3 秒。"
+  },
+
+  "secAiProvider": {
+    "message": "AI 服務商"
+  },
+  "labelApiKey": {
+    "message": "API Key"
+  },
+  "labelModel": {
+    "message": "模型"
+  },
+  "labelBaseUrl": {
+    "message": "接口地址"
+  },
+  "labelDisplayName": {
+    "message": "顯示名稱"
+  },
+  "getKey": {
+    "message": "取得 Key"
+  },
+  "testConnection": {
+    "message": "測試連接"
+  },
+  "testTesting": {
+    "message": "測試中..."
+  },
+  "testConnected": {
+    "message": "✓ 已連接（$RESULT$）",
+    "placeholders": {
+      "result": { "content": "$1" }
+    }
+  },
+  "testTimeout": {
+    "message": "連接逾時（15秒）"
+  },
+  "testNoApiKey": {
+    "message": "未填寫 API Key"
+  },
+  "testNoBaseUrl": {
+    "message": "未配置接口地址"
+  },
+  "showHideKey": {
+    "message": "顯示/隱藏密鑰"
+  },
+
+  "hintOpenAIBaseUrl": {
+    "message": "可修改為代理或兼容接口地址"
+  },
+  "hintClaudeModel": {
+    "message": "如 claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
+  },
+  "hintOllamaModel": {
+    "message": "需先執行 ollama pull llama3"
+  },
+  "hintOpenRouterKey": {
+    "message": "透過一個 API 存取 100+ 模型。"
+  },
+  "hintOpenRouterModels": {
+    "message": "瀏覽可用模型："
+  },
+  "hintCustomBaseUrl": {
+    "message": "必須支援 /chat/completions 接口"
+  },
+  "hintCustomKey": {
+    "message": "無需密鑰時留空"
+  },
+
+  "secAiBehavior": {
+    "message": "AI 行為"
+  },
+  "optAiAutoTags": {
+    "message": "開啟彈出窗口時自動產生 AI 標籤"
+  },
+  "labelAiSummaryLang": {
+    "message": "AI 摘要語言"
+  },
+  "aiLangAuto": {
+    "message": "自動（與內容語言一致）"
+  },
+  "langZh": {
+    "message": "中文"
+  },
+  "langEn": {
+    "message": "English（英語）"
+  },
+  "langJa": {
+    "message": "日本語（日語）"
+  },
+  "langKo": {
+    "message": "한국어（韓語）"
+  },
+  "langFr": {
+    "message": "Français（法語）"
+  },
+  "langDe": {
+    "message": "Deutsch（德語）"
+  },
+  "langEs": {
+    "message": "Español（西班牙語）"
+  },
+  "langRu": {
+    "message": "Русский（俄語）"
+  },
+  "labelAiCache": {
+    "message": "AI 快取時長（分鐘）"
+  },
+  "aiCacheHint": {
+    "message": "按網址快取，設為 0 則停用。"
+  },
+  "labelTagSeparator": {
+    "message": "多詞標籤分隔符"
+  },
+  "sepHyphen": {
+    "message": "連字符（machine-learning）"
+  },
+  "sepUnderscore": {
+    "message": "下劃線（machine_learning）"
+  },
+
+  "secPrompts": {
+    "message": "提示詞"
+  },
+  "promptsHint": {
+    "message": "自訂發送給 AI 的提示詞。可用變數：{{title}} {{url}} {{content}} {{description}} {{lang_instruction}} {{separator_instruction}}。留空則使用預設提示詞。"
+  },
+  "labelTagPrompt": {
+    "message": "AI 標籤提示詞"
+  },
+  "tagPromptHint": {
+    "message": "留空則使用上方顯示的預設提示詞。需指示 AI 傳回 [\"tag1\",\"tag2\"] 格式。"
+  },
+  "resetToDefault": {
+    "message": "恢復預設"
+  },
+  "labelSummaryPrompt": {
+    "message": "AI 摘要提示詞"
+  },
+  "summaryPromptHint": {
+    "message": "留空則使用上方顯示的預設提示詞。使用 {{lang_instruction}} 控制自動語言。"
+  },
+
+  "secLanguage": {
+    "message": "語言"
+  },
+  "langAuto": {
+    "message": "自動（跟隨瀏覽器）"
+  },
+
+  "secTheme": {
+    "message": "主題"
+  },
+  "themeAuto": {
+    "message": "自動（跟隨系統）"
+  },
+  "themeLight": {
+    "message": "淺色"
+  },
+  "themeDark": {
+    "message": "深色"
+  },
+  "optPopupFollowTheme": {
+    "message": "彈出窗口跟隨 Pinboard 主題預設"
+  },
+  "popupFollowHint": {
+    "message": "啟用後，彈出窗口外觀將與所選的 Pinboard CSS 主題保持一致。"
+  },
+  "secPopupElements": {
+    "message": "彈出窗口元素"
+  },
+  "optShowSearch": {
+    "message": "在彈出窗口中顯示搜尋欄"
+  },
+  "optShowRecent": {
+    "message": "在彈出窗口中顯示最近書籤"
+  },
+  "optShowBadge": {
+    "message": "在圖示上顯示未讀數量角標"
+  },
+  "secNotifications": {
+    "message": "通知"
+  },
+  "notifyQuickSave": {
+    "message": "快速儲存"
+  },
+  "notifyReadLater": {
+    "message": "稍後閱讀"
+  },
+  "notifyTabSet": {
+    "message": "標籤集儲存"
+  },
+  "notifyBatchSave": {
+    "message": "批量儲存"
+  },
+  "notifyErrors": {
+    "message": "錯誤通知"
+  },
+  "secCustomStyle": {
+    "message": "Pinboard.in 自訂樣式"
+  },
+  "customStyleHint": {
+    "message": "為 pinboard.in 頁面注入自訂 CSS，可用於調整字體、配色、佈局等。"
+  },
+  "labelCustomFont": {
+    "message": "自訂字體"
+  },
+  "customFontPlaceholder": {
+    "message": "如 'Noto Sans SC', 'Fira Code', sans-serif"
+  },
+  "customFontHint": {
+    "message": "應用於 pinboard.in 頁面 body 元素，留空則保持預設。"
+  },
+  "labelThemePresets": {
+    "message": "主題預設"
+  },
+  "themeGroupNone": {
+    "message": "無"
+  },
+  "themeGroupAdaptive": {
+    "message": "自適應"
+  },
+  "themeGroupLight": {
+    "message": "淺色"
+  },
+  "themeGroupDark": {
+    "message": "深色"
+  },
+  "themePresetsHint": {
+    "message": "點擊預設載入對應 CSS。自適應主題會跟隨你的淺色/深色設定自動切換。"
+  },
+  "labelSavedThemes": {
+    "message": "已儲存的主題"
+  },
+  "labelCustomCSS": {
+    "message": "自訂 CSS"
+  },
+  "saveAsTheme": {
+    "message": "儲存為主題"
+  },
+  "saveAsThemeHint": {
+    "message": "將當前 CSS 儲存為可複用的主題。"
+  },
+  "customCSSPlaceholder": {
+    "message": "/* pinboard.in 自訂 CSS */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
+  },
+  "deleteTheme": {
+    "message": "刪除主題"
+  },
+  "themeName": {
+    "message": "主題名稱："
+  },
+  "themeOverwrite": {
+    "message": "\"$NAME$\" 已存在，是否覆蓋？",
+    "placeholders": {
+      "name": { "content": "$1" }
+    }
+  },
+
+  "saveTabsTitle": {
+    "message": "將所有開啟的標籤頁儲存為標籤集（需登入 pinboard.in）"
+  },
+  "batchSaveTitle": {
+    "message": "將每個開啟的標籤頁分別儲存為獨立書籤"
+  },
+  "qlSetsTitle": {
+    "message": "標籤集"
+  },
+  "qlNetworkTitle": {
+    "message": "社交網絡動態"
+  },
+  "qlUnreadTitle": {
+    "message": "未讀書籤"
+  },
+  "qlNotesTitle": {
+    "message": "筆記"
+  },
+  "qlPopularTitle": {
+    "message": "熱門"
+  }
+}

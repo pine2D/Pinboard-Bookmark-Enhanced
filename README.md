@@ -3,7 +3,7 @@
 A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking with AI-powered tags, summaries, and a fully themeable interface.
 
 ![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-2.1-blue)
+![Version](https://img.shields.io/badge/version-2.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -11,7 +11,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 ## Highlights
 
 - **AI tags & summaries** from 13 providers (OpenAI, Claude, Gemini, DeepSeek, Groq, Mistral, Qwen, MiniMax, Cohere, SiliconFlow, OpenRouter, Ollama, Custom)
-- **7 built-in themes** that style both Pinboard.in and the extension UI simultaneously
+- **13 built-in themes** that style both Pinboard.in and the extension UI simultaneously
 - **Quick Actions** — one-click save, read-later, and batch-save all tabs
 - **Privacy first** — all data stored locally, no analytics, no tracking
 
@@ -63,7 +63,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 
 ### Themes
 
-7 built-in presets that style **both** pinboard.in pages **and** the extension popup + settings page:
+13 built-in presets that style **both** pinboard.in pages **and** the extension popup + settings page:
 
 | Theme | Style |
 |-------|-------|
@@ -73,6 +73,13 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 | Paper & Ink | Warm parchment, classic readability |
 | Dracula | Gothic dark with vibrant accents |
 | Flexoki Adaptive | Auto light/dark based on system preference |
+| Solarized Light | Ethan Schoonover's warm light palette |
+| Solarized Dark | Ethan Schoonover's dark palette |
+| Catppuccin Latte | Pastel light theme |
+| Catppuccin Mocha | Soothing dark with pastel accents |
+| Gruvbox Dark | Retro warm dark with earthy tones |
+| Rose Pine | Soft romantic dark palette |
+| GitHub Light | GitHub-inspired clean light theme |
 
 Plus:
 - **Save custom themes** — name and reuse your CSS modifications
@@ -100,6 +107,24 @@ Plus:
 - API key show/hide toggle for all provider inputs
 - Auto-growing notes field — starts compact, expands as you type
 - Enhanced duplicate detection — shows save date and tag count
+
+### Languages
+
+UI available in 9 languages, matching Pinboard's official supported locales:
+
+| Language | Locale |
+|----------|--------|
+| English | en |
+| 简体中文 | zh_CN |
+| 繁體中文（台灣）| zh_TW |
+| 中文（香港）| zh_HK |
+| 日本語 | ja |
+| Deutsch | de |
+| Français | fr |
+| Polski | pl |
+| Русский | ru |
+
+Language can be set in Settings → Appearance, or auto-detected from browser locale.
 
 ---
 
@@ -167,7 +192,7 @@ Plus:
 ## 亮点
 
 - **AI 标签 & 摘要** — 支持 13 个 AI 服务商（OpenAI、Claude、Gemini、DeepSeek、Groq、Mistral、通义千问、MiniMax、Cohere、硅基流动、OpenRouter、Ollama、自定义）
-- **7 套内置主题** — 同时美化 Pinboard 网站和扩展界面
+- **13 套内置主题** — 同时美化 Pinboard 网站和扩展界面
 - **快捷操作** — 一键保存、稍后阅读、批量保存所有标签页
 - **隐私优先** — 所有数据本地存储，无分析、无追踪
 
@@ -201,7 +226,7 @@ Plus:
 
 ### 主题系统
 
-7 套内置主题预设，**同时**美化 Pinboard 网站**和**扩展弹窗 + 设置页面：
+13 套内置主题预设，**同时**美化 Pinboard 网站**和**扩展弹窗 + 设置页面：
 
 | 主题 | 风格 |
 |------|------|
@@ -211,6 +236,13 @@ Plus:
 | Paper & Ink | 暖色羊皮纸，经典阅读体验 |
 | Dracula | 哥特暗色搭配鲜明强调色 |
 | Flexoki Adaptive | 自动跟随系统亮色/暗色偏好 |
+| Solarized Light | Ethan Schoonover 暖色浅色调色板 |
+| Solarized Dark | Ethan Schoonover 暗色调色板 |
+| Catppuccin Latte | 柔和粉彩浅色主题 |
+| Catppuccin Mocha | 舒适暗色搭配粉彩强调色 |
+| Gruvbox Dark | 复古暖色暗色主题 |
+| Rose Pine | 柔和浪漫暗色调色板 |
+| GitHub Light | GitHub 风格简洁浅色主题 |
 
 此外：
 - **自定义主题保存** — 命名并复用你的 CSS 修改
@@ -224,6 +256,24 @@ Plus:
 - **稍后阅读** — 一键标记为稍后阅读
 - **批量保存** — 将所有标签页分别保存为独立书签，支持 AI 标签/摘要
 - **键盘快捷键** — 通过 `chrome://extensions/shortcuts` 配置
+
+### 多语言支持
+
+界面支持 9 种语言，覆盖 Pinboard 官方支持的所有语言：
+
+| 语言 | Locale |
+|------|--------|
+| English | en |
+| 简体中文 | zh_CN |
+| 繁體中文（台灣）| zh_TW |
+| 中文（香港）| zh_HK |
+| 日本語 | ja |
+| Deutsch | de |
+| Français | fr |
+| Polski | pl |
+| Русский | ru |
+
+可在 设置 → 外观 中手动切换语言，或自动跟随浏览器语言。
 
 ---
 
