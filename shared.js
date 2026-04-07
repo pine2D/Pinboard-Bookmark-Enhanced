@@ -129,22 +129,38 @@ async function _processPinboardQueue() {
   _pinboardProcessing = false;
 }
 
+// ---- Settings storage selector (sync vs local based on user preference) ----
+// The preference itself is always stored in chrome.storage.local (bootstrap location)
+async function getSettingsStorage() {
+  try {
+    const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
+    return optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+  } catch (_) {
+    return chrome.storage.local;
+  }
+}
+
 // ---- Chunked sync storage for large values ----
 // chrome.storage.sync has 8KB per-key limit; split large strings into chunks
+// When sync is disabled, local storage is used directly (5MB limit, no chunking needed)
 const SYNC_CHUNK_SIZE = 7000; // bytes, leave margin under 8KB (QUOTA_BYTES_PER_ITEM)
 
 async function syncSetLarge(key, value) {
+  const storage = await getSettingsStorage();
   const str = typeof value === "string" ? value : JSON.stringify(value);
-  // Remove old chunks first
+  if (storage === chrome.storage.local) {
+    // Local storage: no chunking needed
+    if (!str) { await chrome.storage.local.remove(key); return; }
+    await chrome.storage.local.set({ [key]: str });
+    return;
+  }
+  // Sync storage: use chunking (8KB per-key limit)
   const meta = await chrome.storage.sync.get(key);
   if (meta[key]?._chunks) {
     const oldKeys = Array.from({ length: meta[key]._chunks }, (_, i) => `${key}_${i}`);
     await chrome.storage.sync.remove(oldKeys);
   }
-  if (!str) {
-    await chrome.storage.sync.remove(key);
-    return;
-  }
+  if (!str) { await chrome.storage.sync.remove(key); return; }
   const chunks = [];
   for (let i = 0; i < str.length; i += SYNC_CHUNK_SIZE) {
     chunks.push(str.substring(i, i + SYNC_CHUNK_SIZE));
@@ -155,6 +171,12 @@ async function syncSetLarge(key, value) {
 }
 
 async function syncGetLarge(key, defaultValue) {
+  const storage = await getSettingsStorage();
+  if (storage === chrome.storage.local) {
+    const data = await chrome.storage.local.get({ [key]: defaultValue });
+    return data[key];
+  }
+  // Sync storage: read chunked value
   const meta = await chrome.storage.sync.get(key);
   if (!meta[key] || !meta[key]._chunks) return defaultValue;
   const chunkKeys = Array.from({ length: meta[key]._chunks }, (_, i) => `${key}_${i}`);
@@ -162,7 +184,6 @@ async function syncGetLarge(key, defaultValue) {
   let str = "";
   for (const k of chunkKeys) str += (chunks[k] || "");
   if (!str) return defaultValue;
-  // If defaultValue is string, return string; otherwise parse JSON
   if (typeof defaultValue === "string") return str;
   try { return JSON.parse(str); } catch (_) { return defaultValue; }
 }

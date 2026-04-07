@@ -1,0 +1,2 @@
+[    4119ms] [WARNING] Error parsing a meta element's content: ';' is not a valid key-value pair separator. Please use ',' instead. @ https://pinboard.in/popular/:5
+[    5615ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ https://pinboard.in/popular/:0

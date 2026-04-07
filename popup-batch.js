@@ -59,7 +59,7 @@ function setupTabSet() {
     batchBtn.disabled = true;
     batchBtn.textContent = t("batchSaving");
     try {
-      const rawToken = await chrome.storage.sync.get("pinboardToken");
+      const rawToken = await (await getSettingsStorage()).get("pinboardToken");
       const pinboardToken = deobfuscateKey(rawToken.pinboardToken);
       if (!pinboardToken) {
         showStatus("status-msg", t("batchNotLoggedIn"), "error");

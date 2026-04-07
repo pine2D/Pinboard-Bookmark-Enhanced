@@ -889,6 +889,15 @@
   "qlNotesTitle": {
     "message": "Notizen"
   },
+  "secSync": {
+    "message": "Datensynchronisierung"
+  },
+  "optSyncEnabled": {
+    "message": "Einstellungen geräteübergreifend über Google-Konto synchronisieren"
+  },
+  "optSyncHint": {
+    "message": "Bei Aktivierung werden Einstellungen zwischen Chrome-Installationen mit demselben Google-Konto synchronisiert."
+  },
   "qlPopularTitle": {
     "message": "Beliebt"
   }

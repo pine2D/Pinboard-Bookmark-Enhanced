@@ -889,6 +889,15 @@
   "qlNotesTitle": {
     "message": "笔记"
   },
+  "secSync": {
+    "message": "数据同步"
+  },
+  "optSyncEnabled": {
+    "message": "通过 Google 账户跨设备同步设置"
+  },
+  "optSyncHint": {
+    "message": "开启后，设置将在登录同一 Google 账户的所有 Chrome 之间同步。"
+  },
   "qlPopularTitle": {
     "message": "热门"
   }

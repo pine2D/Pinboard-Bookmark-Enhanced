@@ -128,7 +128,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- All settings with defaults (from shared.js) ----
-  const s = await chrome.storage.sync.get(SETTINGS_DEFAULTS);
+  const s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
   deobfuscateSettings(s);
 
   // ---- Load large sync data (chunked to bypass 8KB per-key limit) ----
@@ -209,6 +209,37 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (el) el.checked = val;
   }
 
+  // ---- Load sync toggle (stored in local, not in settings storage) ----
+  const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
+  const syncToggle = document.getElementById("opt-sync-enabled");
+  if (syncToggle) syncToggle.checked = optSyncEnabled;
+
+  // Sync toggle change: migrate settings then reload
+  syncToggle?.addEventListener("change", async () => {
+    const enabling = syncToggle.checked;
+    const oldStorage = enabling ? chrome.storage.local : chrome.storage.sync;
+    const newStorage = enabling ? chrome.storage.sync : chrome.storage.local;
+    // 1. Migrate regular settings
+    try {
+      const data = await oldStorage.get(Object.keys(SETTINGS_DEFAULTS));
+      await newStorage.set(data);
+    } catch (e) { console.error("sync migration:", e); }
+    // 2. Migrate customCSS (large value) — read from old, then switch pref, then write to new
+    try {
+      const customCSS = await syncGetLarge("customCSS", ""); // reads from current (old) storage
+      await chrome.storage.local.set({ optSyncEnabled: enabling }); // switch pref NOW
+      await syncSetLarge("customCSS", customCSS); // writes to new storage
+    } catch (e) { console.error("customCSS migration:", e); }
+    // Ensure pref is saved even if CSS migration failed
+    await chrome.storage.local.set({ optSyncEnabled: enabling });
+    // Fade out and reload
+    const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "appearance";
+    sessionStorage.setItem("activeTab", activePanel);
+    document.body.style.transition = "opacity 0.18s";
+    document.body.style.opacity = "0";
+    setTimeout(() => location.reload(), 180);
+  });
+
   // ---- Apply options page theme based on Pinboard theme preset ----
   function applyOptionsPageTheme(presetKey, themeMode) {
     const prefersDark = themeMode === "dark" ||
@@ -242,7 +273,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("opt-lang").addEventListener("change", async () => {
     const lang = document.getElementById("opt-lang").value;
     const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "bookmarks";
-    await chrome.storage.sync.set({ optLang: lang });
+    await (await getSettingsStorage()).set({ optLang: lang });
     sessionStorage.setItem("activeTab", activePanel);
     document.body.style.transition = "opacity 0.18s";
     document.body.style.opacity = "0";
@@ -381,7 +412,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       tagPresets: document.getElementById("opt-tag-presets").value,
       themePresetKey: currentPresetKey
     };
-    await chrome.storage.sync.set(data);
+    await (await getSettingsStorage()).set(data);
     // Save customCSS via chunked sync (supports cross-device sync)
     await syncSetLarge("customCSS", document.getElementById("opt-custom-css").value);
     flashAutoSave();
@@ -418,7 +449,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- Export Settings ----
   document.getElementById("export-settings").addEventListener("click", async () => {
-    const raw = await chrome.storage.sync.get(null);
+    const raw = await (await getSettingsStorage()).get(null);
     const sensitiveKeys = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","customApiKey"];
     const exportData = Object.fromEntries(
       Object.entries(raw).filter(([k]) => !sensitiveKeys.includes(k))
@@ -450,7 +481,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const safeData = Object.fromEntries(
         Object.entries(rest).filter(([k]) => !sensitiveKeys.includes(k) && !/^(customCSS|savedThemes)_\d+$/.test(k))
       );
-      await chrome.storage.sync.set(safeData);
+      await (await getSettingsStorage()).set(safeData);
       if (customCSS !== undefined) await syncSetLarge("customCSS", customCSS);
       if (importedThemes !== undefined) await syncSetLarge("savedThemes", importedThemes);
       const status = document.getElementById("import-status");

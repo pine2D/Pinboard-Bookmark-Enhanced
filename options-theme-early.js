@@ -1,5 +1,9 @@
 // Apply theme early to prevent flash (MV3 requires external script, no inline)
-chrome.storage.sync.get({ optTheme: "auto", themePresetKey: "" }).then(s => {
+// shared.js not yet loaded here — inline storage selector
+chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {
+  return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
+    .get({ optTheme: "auto", themePresetKey: "" });
+}).then(s => {
   const prefersDark = s.optTheme === "dark" ||
     (s.optTheme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 

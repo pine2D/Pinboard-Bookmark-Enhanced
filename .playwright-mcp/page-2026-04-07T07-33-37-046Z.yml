@@ -1,0 +1,318 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - link [ref=e5] [cursor=pointer]:
+        - /url: /recent
+        - img [ref=e6]
+      - link "Pinboard" [ref=e7] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e8]:
+        - text: (
+        - link "oumu" [ref=e9] [cursor=pointer]:
+          - /url: /u:oumu
+        - text: )
+    - generic [ref=e11]:
+      - link "réseau" [ref=e12] [cursor=pointer]:
+        - /url: /network/
+      - text: ‧
+      - link "notes" [ref=e13] [cursor=pointer]:
+        - /url: /notes/
+      - text: ‧
+      - link "populaire" [ref=e14] [cursor=pointer]:
+        - /url: /popular/
+      - text: ‧
+      - link "lien" [ref=e15] [cursor=pointer]:
+        - /url: /add/?next=https%3A%2F%2Fpinboard.in%2Fu%3Aoumu
+      - text: ‧
+      - link "note" [ref=e16] [cursor=pointer]:
+        - /url: /note/add/
+      - text: ‧
+      - link "paramètres" [ref=e17] [cursor=pointer]:
+        - /url: /settings/
+      - text: ‧
+      - link "compte" [ref=e18] [cursor=pointer]:
+        - /url: /u:oumu/profile/
+      - link "déconnexion" [ref=e19] [cursor=pointer]:
+        - /url: /logout/
+  - generic [ref=e21]:
+    - generic [ref=e22]:
+      - link "paramètres" [ref=e24] [cursor=pointer]:
+        - /url: /settings/settings
+      - link "confidentialité" [ref=e26] [cursor=pointer]:
+        - /url: /settings/privacy
+      - link "mot de passe" [ref=e28] [cursor=pointer]:
+        - /url: /settings/password
+      - link "importer" [ref=e30] [cursor=pointer]:
+        - /url: /settings/import
+      - link "backup" [ref=e32] [cursor=pointer]:
+        - /url: /settings/backup
+    - generic [ref=e35]:
+      - button "Mettre à jour" [ref=e36]
+      - table [ref=e37]:
+        - rowgroup [ref=e38]:
+          - row [ref=e39]:
+            - cell [ref=e40]
+            - cell [ref=e41]
+          - 'row "Langue: Français" [ref=e42]':
+            - cell "Langue:" [ref=e43]
+            - cell "Français" [ref=e44]:
+              - combobox [ref=e45]:
+                - option "English"
+                - option "日本語"
+                - option "Polski"
+                - option "Deutsch"
+                - option "Français" [selected]
+                - option "中文"
+                - option "Русский"
+          - 'row "Fuseau horaire: +8:00 : Beijing, Hong Kong" [ref=e46]':
+            - cell "Fuseau horaire:" [ref=e47]
+            - 'cell "+8:00 : Beijing, Hong Kong" [ref=e48]':
+              - combobox [ref=e49]:
+                - option "UTC (default)"
+                - 'option "-9:00 : Alaska"'
+                - 'option "-8:00 : Tijuana, Baja California"'
+                - 'option "-8:00 : Pacific Time"'
+                - 'option "-7:00 : Mountain Time"'
+                - 'option "-7:00 : Chihuahua, La Paz"'
+                - 'option "-7:00 : Arizona"'
+                - 'option "-6:00 : Saskatchewan, Central America"'
+                - 'option "-6:00 : Guadalajara, Mexico City"'
+                - 'option "-6:00 : Central Time"'
+                - 'option "-5:00 : Eastern Time"'
+                - 'option "-5:00 : Cuba"'
+                - 'option "-5:00 : Bogota, Lima, Quito"'
+                - 'option "-4:30 : Caracas"'
+                - 'option "-4:00 : Santiago"'
+                - 'option "-4:00 : La Paz"'
+                - 'option "-4:00 : Brazil"'
+                - 'option "-4:00 : Atlantic Time"'
+                - 'option "-3:30 : Newfoundland"'
+                - 'option "-3:00 : Montevideo"'
+                - 'option "-3:00 : Buenos Aires"'
+                - 'option "-3:00 : Brasilia"'
+                - 'option "+0:00 : London, Reykjavik, GMT"'
+                - 'option "+1:00 : Amsterdam, Berlin, Rome"'
+                - 'option "+1:00 : Belgrade, Budapest, Prague"'
+                - 'option "+2:00 : Beirut"'
+                - 'option "+2:00 : Cairo"'
+                - 'option "+2:00 : Harare, Pretoria"'
+                - 'option "+2:00 : Jerusalem"'
+                - 'option "+3:00 : Moscow, St. Petersburg"'
+                - 'option "+3:00 : Nairobi"'
+                - 'option "+3:30 : Tehran"'
+                - 'option "+4:00 : Abu Dhabi, Muscat"'
+                - 'option "+4:00 : Yerevan"'
+                - 'option "+4:30 : Kabul"'
+                - 'option "+5:00 : Ekaterinburg"'
+                - 'option "+5:00 : Tashkent"'
+                - 'option "+5:30 : Chennai, Mumbai, New Delhi"'
+                - 'option "+5:45 : Kathmandu"'
+                - 'option "+6:00 : Astana, Dhaka"'
+                - 'option "+6:00 : Novosibirsk"'
+                - 'option "+6:30 : Yangon (Rangoon)"'
+                - 'option "+7:00 : Bangkok, Hanoi, Jakarta"'
+                - 'option "+7:00 : Krasnoyarsk"'
+                - 'option "+8:00 : Beijing, Hong Kong" [selected]'
+                - 'option "+8:00 : Irkutsk, Ulaan Bataar"'
+                - 'option "+8:00 : Perth"'
+                - 'option "+9:00 : Osaka, Sapporo, Tokyo"'
+                - 'option "+9:00 : Seoul"'
+                - 'option "+9:30 : Adelaide"'
+                - 'option "+9:30 : Darwin"'
+                - 'option "+10:00 : Brisbane"'
+                - 'option "+10:00 : Hobart"'
+                - 'option "+10:00 : Vladivostok"'
+                - 'option "+11:00 : Magadan"'
+                - 'option "+12:00 : Auckland, Wellington"'
+                - 'option "+12:00 : Fiji, Kamchatka, Marshall Is."'
+                - 'option "-11:00 : Midway Island, Samoa"'
+                - 'option "-10:00 : Hawaii, Aleutians"'
+          - row "Général" [ref=e50]:
+            - cell "Général" [ref=e51]:
+              - heading "Général" [level=2] [ref=e52]
+          - row "Compléter automatiquement les tags ?" [ref=e53]:
+            - cell [ref=e54]:
+              - checkbox [checked] [ref=e55]
+            - cell "Compléter automatiquement les tags ?" [ref=e56]:
+              - text: Compléter automatiquement les tags
+              - link "?" [ref=e57] [cursor=pointer]:
+                - /url: "#"
+          - row "Ranger les tags par fréquence dans le menu de complétion automatique ?" [ref=e58]:
+            - cell [ref=e59]:
+              - checkbox [checked] [ref=e60]
+            - cell "Ranger les tags par fréquence dans le menu de complétion automatique ?" [ref=e61]:
+              - text: Ranger les tags par fréquence dans le menu de complétion automatique
+              - link "?" [ref=e62] [cursor=pointer]:
+                - /url: "#"
+          - row "La touche entrée active la complétion automatique ?" [ref=e63]:
+            - cell [ref=e64]:
+              - checkbox [ref=e65]
+            - cell "La touche entrée active la complétion automatique ?" [ref=e66]:
+              - text: La touche entrée active la complétion automatique
+              - link "?" [ref=e67] [cursor=pointer]:
+                - /url: "#"
+          - row "Marquer des signets 'à lire' comme lu lors du clic ?" [ref=e68]:
+            - cell [ref=e69]:
+              - checkbox [ref=e70]
+            - cell "Marquer des signets 'à lire' comme lu lors du clic ?" [ref=e71]:
+              - text: Marquer des signets 'à lire' comme lu lors du clic
+              - link "?" [ref=e72] [cursor=pointer]:
+                - /url: "#"
+          - row "Ouvrir les liens dans une nouvelle fenêtre ?" [ref=e73]:
+            - cell [ref=e74]:
+              - checkbox [ref=e75]
+            - cell "Ouvrir les liens dans une nouvelle fenêtre ?" [ref=e76]:
+              - text: Ouvrir les liens dans une nouvelle fenêtre
+              - link "?" [ref=e77] [cursor=pointer]:
+                - /url: "#"
+          - row "Activer les raccourcis clavier ?" [ref=e78]:
+            - cell [ref=e79]:
+              - checkbox [ref=e80]
+            - cell "Activer les raccourcis clavier ?" [ref=e81]:
+              - text: Activer les raccourcis clavier
+              - link "?" [ref=e82] [cursor=pointer]:
+                - /url: "#"
+          - row "Laissez-moi m'abonner à des tags ?" [ref=e83]:
+            - cell [ref=e84]:
+              - checkbox [checked] [ref=e85]
+            - cell "Laissez-moi m'abonner à des tags ?" [ref=e86]:
+              - text: Laissez-moi m'abonner à des tags
+              - link "?" [ref=e87] [cursor=pointer]:
+                - /url: "#"
+          - row "J'utilise Pinboard surtout pour du fanfic ?" [ref=e88]:
+            - cell [ref=e89]:
+              - checkbox [ref=e90]
+            - cell "J'utilise Pinboard surtout pour du fanfic ?" [ref=e91]:
+              - text: J'utilise Pinboard surtout pour du fanfic
+              - link "?" [ref=e92] [cursor=pointer]:
+                - /url: "#"
+          - row "Activer les groupes de tags, ou «tag bundles» ?" [ref=e93]:
+            - cell [ref=e94]:
+              - checkbox [checked] [ref=e95]
+            - cell "Activer les groupes de tags, ou «tag bundles» ?" [ref=e96]:
+              - text: Activer les groupes de tags, ou «tag bundles»
+              - link "?" [ref=e97] [cursor=pointer]:
+                - /url: "#"
+          - row [ref=e98]:
+            - cell [ref=e99]
+            - cell [ref=e100]
+          - row "Affichage Des Signets" [ref=e101]:
+            - cell "Affichage Des Signets" [ref=e102]:
+              - heading "Affichage Des Signets" [level=2] [ref=e103]
+          - row "Toujours afficher les tags par ordre alphabetique ?" [ref=e104]:
+            - cell [ref=e105]:
+              - checkbox [ref=e106]
+            - cell "Toujours afficher les tags par ordre alphabetique ?" [ref=e107]:
+              - text: Toujours afficher les tags par ordre alphabetique
+              - link "?" [ref=e108] [cursor=pointer]:
+                - /url: "#"
+          - row "Afficher le URL de chaque signet sous le titre ?" [ref=e109]:
+            - cell [ref=e110]:
+              - checkbox [checked] [ref=e111]
+            - cell "Afficher le URL de chaque signet sous le titre ?" [ref=e112]:
+              - text: Afficher le URL de chaque signet sous le titre
+              - link "?" [ref=e113] [cursor=pointer]:
+                - /url: "#"
+          - row "Indiquer combien d'utilisateurs ont sauvegardé chaque signet ?" [ref=e114]:
+            - cell [ref=e115]:
+              - checkbox [checked] [ref=e116]
+            - cell "Indiquer combien d'utilisateurs ont sauvegardé chaque signet ?" [ref=e117]:
+              - text: Indiquer combien d'utilisateurs ont sauvegardé chaque signet
+              - link "?" [ref=e118] [cursor=pointer]:
+                - /url: "#"
+          - row "Afficher la date et l'heure sur les signets ?" [ref=e119]:
+            - cell [ref=e120]:
+              - checkbox [checked] [ref=e121]
+            - cell "Afficher la date et l'heure sur les signets ?" [ref=e122]:
+              - text: Afficher la date et l'heure sur les signets
+              - link "?" [ref=e123] [cursor=pointer]:
+                - /url: "#"
+          - row [ref=e124]:
+            - cell [ref=e125]
+            - cell [ref=e126]
+          - row "Instapaper" [ref=e127]:
+            - cell "Instapaper" [ref=e128]:
+              - heading "Instapaper" [level=2] [ref=e129]
+          - 'row "URL de votre flux Instapaper: http://www.instapaper.com/rss/1017398/4wEPY3B0p75ttxuZVXRjbziwR4" [ref=e130]':
+            - 'cell "URL de votre flux Instapaper: http://www.instapaper.com/rss/1017398/4wEPY3B0p75ttxuZVXRjbziwR4" [ref=e131]':
+              - text: "URL de votre flux Instapaper:"
+              - textbox [ref=e132]: http://www.instapaper.com/rss/1017398/4wEPY3B0p75ttxuZVXRjbziwR4
+          - row "Ajouter automatiquement les signets depuis ce flux Instapaper ?" [ref=e133]:
+            - cell [ref=e134]:
+              - checkbox [ref=e135]
+            - cell "Ajouter automatiquement les signets depuis ce flux Instapaper ?" [ref=e136]:
+              - text: Ajouter automatiquement les signets depuis ce flux Instapaper
+              - link "?" [ref=e137] [cursor=pointer]:
+                - /url: "#"
+          - row "et marquer comme lu à lire" [ref=e138]:
+            - cell [ref=e139]
+            - cell "et marquer comme lu à lire" [ref=e140]:
+              - text: et marquer comme
+              - radio "lu" [checked] [ref=e141]
+              - text: lu
+              - radio "à lire" [ref=e142]
+              - text: à lire
+          - row "Pocket" [ref=e143]:
+            - cell "Pocket" [ref=e144]:
+              - heading "Pocket" [level=2] [ref=e145]
+          - 'row "Nom d''utilisateur Pocket: oumu" [ref=e146]':
+            - 'cell "Nom d''utilisateur Pocket: oumu" [ref=e147]':
+              - text: "Nom d'utilisateur Pocket:"
+              - textbox [ref=e148]: oumu
+          - row "Ajouter automatiquement les signets depuis ce compte Pocket ?" [ref=e149]:
+            - cell [ref=e150]:
+              - checkbox [ref=e151]
+            - cell "Ajouter automatiquement les signets depuis ce compte Pocket ?" [ref=e152]:
+              - text: Ajouter automatiquement les signets depuis ce compte Pocket
+              - link "?" [ref=e153] [cursor=pointer]:
+                - /url: "#"
+          - row "et marquer comme lu à lire" [ref=e154]:
+            - cell [ref=e155]
+            - cell "et marquer comme lu à lire" [ref=e156]:
+              - text: et marquer comme
+              - radio "lu" [checked] [ref=e157]
+              - text: lu
+              - radio "à lire" [ref=e158]
+              - text: à lire
+          - row "Courriel" [ref=e159]:
+            - cell "Courriel" [ref=e160]:
+              - heading "Courriel" [level=2] [ref=e161]
+          - row "Permettre l'ajout des signets par courriel depuis mon iPhone/mobile ? post+oumu+fb73af@pinboard.in (instructions)" [ref=e162]:
+            - cell [ref=e163]:
+              - checkbox [checked] [ref=e164]
+            - cell "Permettre l'ajout des signets par courriel depuis mon iPhone/mobile ? post+oumu+fb73af@pinboard.in (instructions)" [ref=e165]:
+              - text: Permettre l'ajout des signets par courriel depuis mon iPhone/mobile
+              - link "?" [ref=e166] [cursor=pointer]:
+                - /url: "#"
+              - paragraph [ref=e167]:
+                - text: post+oumu+fb73af@pinboard.in (
+                - link "instructions" [ref=e168] [cursor=pointer]:
+                  - /url: /howto/#post_by_mail
+                - text: )
+      - button "Mettre à jour" [ref=e169]
+  - generic [ref=e170]:
+    - text: © Nine Fives Software. Questions ou problèmes? Contactez-nous! <
+    - link "support@pinboard.in" [ref=e171] [cursor=pointer]:
+      - /url: mailto:support@pinboard.in
+    - text: ">"
+    - separator [ref=e172]
+    - link "termes de service" [ref=e173] [cursor=pointer]:
+      - /url: /tos/
+    - text: ‧
+    - link "confidentialité" [ref=e174] [cursor=pointer]:
+      - /url: /privacy/
+    - text: ‧
+    - link "à propos" [ref=e175] [cursor=pointer]:
+      - /url: /about/
+    - text: ‧
+    - link "blog" [ref=e176] [cursor=pointer]:
+      - /url: http://blog.pinboard.in
+    - text: ‧
+    - link "FAQ" [ref=e177] [cursor=pointer]:
+      - /url: /faq/
+    - text: ‧
+    - link "ressources" [ref=e178] [cursor=pointer]:
+      - /url: /resources/
+    - text: ‧
+    - link "securité" [ref=e179] [cursor=pointer]:
+      - /url: /security/

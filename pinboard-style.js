@@ -10,8 +10,19 @@ _pbpCloak.textContent = "html { opacity: 0 !important; }";
 (document.head || document.documentElement).appendChild(_pbpCloak);
 
 (async () => {
-  // Read chunked sync data (mirrors syncGetLarge from shared.js)
+  // Inline storage selector (shared.js not available in content scripts)
+  async function getStorage() {
+    const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
+    return optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+  }
+
+  // Read large value — chunked from sync, direct from local
   async function readChunkedSync(key, defaultValue) {
+    const storage = await getStorage();
+    if (storage === chrome.storage.local) {
+      const data = await chrome.storage.local.get({ [key]: defaultValue });
+      return data[key];
+    }
     const meta = await chrome.storage.sync.get(key);
     if (!meta[key] || !meta[key]._chunks) return defaultValue;
     const chunkKeys = Array.from({ length: meta[key]._chunks }, (_, i) => `${key}_${i}`);
@@ -30,7 +41,7 @@ _pbpCloak.textContent = "html { opacity: 0 !important; }";
   setTimeout(uncloak, 800);
 
   try {
-    const syncData = await chrome.storage.sync.get({ customFont: "", optTheme: "auto" });
+    const syncData = await (await getStorage()).get({ customFont: "", optTheme: "auto" });
     const customCSS = await readChunkedSync("customCSS", "");
 
     const { customFont, optTheme } = syncData;

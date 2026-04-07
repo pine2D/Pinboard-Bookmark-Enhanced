@@ -14,7 +14,12 @@ async function initI18n() {
   if (_i18nInitPromise) return _i18nInitPromise;
   _i18nInitPromise = (async () => {
     try {
-      const result = await chrome.storage.sync.get({ optLang: "auto" });
+      // getSettingsStorage is defined in shared.js; safe to call here since
+      // initI18n() is always invoked after all scripts are loaded
+      const _storage = typeof getSettingsStorage === "function"
+        ? await getSettingsStorage()
+        : chrome.storage.local;
+      const result = await _storage.get({ optLang: "auto" });
       const lang = result.optLang;
       if (lang && lang !== "auto") {
         const url = chrome.runtime.getURL(`_locales/${lang}/messages.json`);

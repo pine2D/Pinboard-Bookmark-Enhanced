@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initI18n();
   applyI18n();
 
-  settings = await chrome.storage.sync.get(SETTINGS_DEFAULTS);
+  settings = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
   deobfuscateSettings(settings);
 
   // Apply theme: preset-based data-theme (if enabled), or fallback to generic .dark
@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("logout-link").addEventListener("click", async (e) => {
     e.preventDefault();
     if (!confirm(t("confirmLogout"))) return;
-    await chrome.storage.sync.remove("pinboardToken");
+    await (await getSettingsStorage()).remove("pinboardToken");
     settings.pinboardToken = "";
     document.getElementById("main-section").classList.add("hidden");
     showLogin();
@@ -71,7 +71,7 @@ function showLogin() {
     if (!token || !token.includes(":")) { showElement("login-error", t("loginInvalidFormat")); return; }
     try {
       const res = await fetch(`https://api.pinboard.in/v1/user/api_token/?auth_token=${token}&format=json`);
-      if (res.ok) { await chrome.storage.sync.set({ pinboardToken: obfuscateKey(token) }); settings.pinboardToken = token; showMain(token); }
+      if (res.ok) { await (await getSettingsStorage()).set({ pinboardToken: obfuscateKey(token) }); settings.pinboardToken = token; showMain(token); }
       else showElement("login-error", t("loginFailed"));
     } catch (e) { showElement("login-error", t("networkError")); }
   });

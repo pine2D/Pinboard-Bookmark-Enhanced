@@ -50,7 +50,7 @@ async function debouncedCheck(tabId, url) {
   }
   // Check if bookmark status icon is enabled
   try {
-    const { optCheckBookmarkStatus } = await chrome.storage.sync.get({ optCheckBookmarkStatus: true });
+    const { optCheckBookmarkStatus } = await (await getSettingsStorage()).get({ optCheckBookmarkStatus: true });
     if (!optCheckBookmarkStatus) return;
   } catch (_) {}
   // Dedup: if same URL is already being checked, reuse promise
@@ -71,7 +71,7 @@ async function debouncedCheck(tabId, url) {
 
 // ---- Load settings with deobfuscation ----
 async function loadSettings() {
-  const s = await chrome.storage.sync.get(SETTINGS_DEFAULTS);
+  const s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
   deobfuscateSettings(s);
   return s;
 }
@@ -82,7 +82,7 @@ const _recentSaves = new Map(); // notificationId -> { url, token }
 // ---- Show Chrome notification (with category filter) ----
 async function showNotification(id, title, message, category, undoInfo) {
   try {
-    const cats = await chrome.storage.sync.get({
+    const cats = await (await getSettingsStorage()).get({
       notifyQuickSave: true, notifyReadLater: true,
       notifyTabSet: true, notifyBatchSave: true, notifyErrors: true
     });
@@ -354,7 +354,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 async function cleanupExpiredAICache() {
   try {
     const all = await chrome.storage.local.get(null);
-    const { aiCacheDuration = 60 } = await chrome.storage.sync.get({ aiCacheDuration: 60 });
+    const { aiCacheDuration = 60 } = await (await getSettingsStorage()).get({ aiCacheDuration: 60 });
     const maxAge = (aiCacheDuration || 60) * 60 * 1000;
     const now = Date.now();
     const expired = Object.keys(all).filter(k =>

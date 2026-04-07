@@ -889,6 +889,15 @@
   "qlNotesTitle": {
     "message": "Заметки"
   },
+  "secSync": {
+    "message": "Синхронизация данных"
+  },
+  "optSyncEnabled": {
+    "message": "Синхронизация настроек между устройствами через Google"
+  },
+  "optSyncHint": {
+    "message": "При включении настройки синхронизируются между Chrome на устройствах, вошедших в один аккаунт Google."
+  },
   "qlPopularTitle": {
     "message": "Популярные"
   }

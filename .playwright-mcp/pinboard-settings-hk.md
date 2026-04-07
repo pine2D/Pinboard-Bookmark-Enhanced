@@ -1,0 +1,314 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - link [ref=e5] [cursor=pointer]:
+        - /url: /recent
+        - img [ref=e6]
+      - link "Pinboard" [ref=e7] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e8]:
+        - text: (
+        - link "oumu" [ref=e9] [cursor=pointer]:
+          - /url: /u:oumu
+        - text: )
+    - generic [ref=e11]:
+      - link "社交網絡" [ref=e12] [cursor=pointer]:
+        - /url: /network/
+      - text: ‧
+      - link "notes" [ref=e13] [cursor=pointer]:
+        - /url: /notes/
+      - text: ‧
+      - link "熱門" [ref=e14] [cursor=pointer]:
+        - /url: /popular/
+      - text: ‧
+      - link "添加連結" [ref=e15] [cursor=pointer]:
+        - /url: /add/?next=https%3A%2F%2Fpinboard.in%2Fu%3Aoumu
+      - text: ‧
+      - link "添加備註" [ref=e16] [cursor=pointer]:
+        - /url: /note/add/
+      - text: ‧
+      - link "設定" [ref=e17] [cursor=pointer]:
+        - /url: /settings/
+      - text: ‧
+      - link "賬戶" [ref=e18] [cursor=pointer]:
+        - /url: /u:oumu/profile/
+      - link "登出" [ref=e19] [cursor=pointer]:
+        - /url: /logout/
+  - generic [ref=e21]:
+    - generic [ref=e22]:
+      - link "設定" [ref=e24] [cursor=pointer]:
+        - /url: /settings/settings
+      - link "隱私" [ref=e26] [cursor=pointer]:
+        - /url: /settings/privacy
+      - link "密碼" [ref=e28] [cursor=pointer]:
+        - /url: /settings/password
+      - link "匯入" [ref=e30] [cursor=pointer]:
+        - /url: /settings/import
+      - link "匯出" [ref=e32] [cursor=pointer]:
+        - /url: /settings/backup
+    - generic [ref=e35]:
+      - button "更新設定" [ref=e36]
+      - table [ref=e37]:
+        - rowgroup [ref=e38]:
+          - row [ref=e39]:
+            - cell [ref=e40]
+            - cell [ref=e41]
+          - 'row "Language: 中文" [ref=e42]':
+            - cell "Language:" [ref=e43]
+            - cell "中文" [ref=e44]:
+              - combobox [ref=e45]:
+                - option "English"
+                - option "日本語"
+                - option "Polski"
+                - option "Deutsch"
+                - option "Français"
+                - option "中文" [selected]
+                - option "Русский"
+          - 'row "時區: +8:00 : Beijing, Hong Kong" [ref=e46]':
+            - cell "時區:" [ref=e47]
+            - 'cell "+8:00 : Beijing, Hong Kong" [ref=e48]':
+              - combobox [ref=e49]:
+                - option "UTC (default)"
+                - 'option "-9:00 : Alaska"'
+                - 'option "-8:00 : Tijuana, Baja California"'
+                - 'option "-8:00 : Pacific Time"'
+                - 'option "-7:00 : Mountain Time"'
+                - 'option "-7:00 : Chihuahua, La Paz"'
+                - 'option "-7:00 : Arizona"'
+                - 'option "-6:00 : Saskatchewan, Central America"'
+                - 'option "-6:00 : Guadalajara, Mexico City"'
+                - 'option "-6:00 : Central Time"'
+                - 'option "-5:00 : Eastern Time"'
+                - 'option "-5:00 : Cuba"'
+                - 'option "-5:00 : Bogota, Lima, Quito"'
+                - 'option "-4:30 : Caracas"'
+                - 'option "-4:00 : Santiago"'
+                - 'option "-4:00 : La Paz"'
+                - 'option "-4:00 : Brazil"'
+                - 'option "-4:00 : Atlantic Time"'
+                - 'option "-3:30 : Newfoundland"'
+                - 'option "-3:00 : Montevideo"'
+                - 'option "-3:00 : Buenos Aires"'
+                - 'option "-3:00 : Brasilia"'
+                - 'option "+0:00 : London, Reykjavik, GMT"'
+                - 'option "+1:00 : Amsterdam, Berlin, Rome"'
+                - 'option "+1:00 : Belgrade, Budapest, Prague"'
+                - 'option "+2:00 : Beirut"'
+                - 'option "+2:00 : Cairo"'
+                - 'option "+2:00 : Harare, Pretoria"'
+                - 'option "+2:00 : Jerusalem"'
+                - 'option "+3:00 : Moscow, St. Petersburg"'
+                - 'option "+3:00 : Nairobi"'
+                - 'option "+3:30 : Tehran"'
+                - 'option "+4:00 : Abu Dhabi, Muscat"'
+                - 'option "+4:00 : Yerevan"'
+                - 'option "+4:30 : Kabul"'
+                - 'option "+5:00 : Ekaterinburg"'
+                - 'option "+5:00 : Tashkent"'
+                - 'option "+5:30 : Chennai, Mumbai, New Delhi"'
+                - 'option "+5:45 : Kathmandu"'
+                - 'option "+6:00 : Astana, Dhaka"'
+                - 'option "+6:00 : Novosibirsk"'
+                - 'option "+6:30 : Yangon (Rangoon)"'
+                - 'option "+7:00 : Bangkok, Hanoi, Jakarta"'
+                - 'option "+7:00 : Krasnoyarsk"'
+                - 'option "+8:00 : Beijing, Hong Kong" [selected]'
+                - 'option "+8:00 : Irkutsk, Ulaan Bataar"'
+                - 'option "+8:00 : Perth"'
+                - 'option "+9:00 : Osaka, Sapporo, Tokyo"'
+                - 'option "+9:00 : Seoul"'
+                - 'option "+9:30 : Adelaide"'
+                - 'option "+9:30 : Darwin"'
+                - 'option "+10:00 : Brisbane"'
+                - 'option "+10:00 : Hobart"'
+                - 'option "+10:00 : Vladivostok"'
+                - 'option "+11:00 : Magadan"'
+                - 'option "+12:00 : Auckland, Wellington"'
+                - 'option "+12:00 : Fiji, Kamchatka, Marshall Is."'
+                - 'option "-11:00 : Midway Island, Samoa"'
+                - 'option "-10:00 : Hawaii, Aleutians"'
+          - row "General" [ref=e50]:
+            - cell "General" [ref=e51]:
+              - heading "General" [level=2] [ref=e52]
+          - row "自動完成標籤 ?" [ref=e53]:
+            - cell [ref=e54]:
+              - checkbox [checked] [ref=e55]
+            - cell "自動完成標籤 ?" [ref=e56]:
+              - text: 自動完成標籤
+              - link "?" [ref=e57] [cursor=pointer]:
+                - /url: "#"
+          - row "按使用頻率顯示預測標籤 ?" [ref=e58]:
+            - cell [ref=e59]:
+              - checkbox [checked] [ref=e60]
+            - cell "按使用頻率顯示預測標籤 ?" [ref=e61]:
+              - text: 按使用頻率顯示預測標籤
+              - link "?" [ref=e62] [cursor=pointer]:
+                - /url: "#"
+          - row "按返回鍵自動完成 ?" [ref=e63]:
+            - cell [ref=e64]:
+              - checkbox [ref=e65]
+            - cell "按返回鍵自動完成 ?" [ref=e66]:
+              - text: 按返回鍵自動完成
+              - link "?" [ref=e67] [cursor=pointer]:
+                - /url: "#"
+          - row "開啟即將閱讀的項目會把標籤更改為已讀 ?" [ref=e68]:
+            - cell [ref=e69]:
+              - checkbox [ref=e70]
+            - cell "開啟即將閱讀的項目會把標籤更改為已讀 ?" [ref=e71]:
+              - text: 開啟即將閱讀的項目會把標籤更改為已讀
+              - link "?" [ref=e72] [cursor=pointer]:
+                - /url: "#"
+          - row "在新視窗開啟連結 ?" [ref=e73]:
+            - cell [ref=e74]:
+              - checkbox [ref=e75]
+            - cell "在新視窗開啟連結 ?" [ref=e76]:
+              - text: 在新視窗開啟連結
+              - link "?" [ref=e77] [cursor=pointer]:
+                - /url: "#"
+          - row "啟用快捷鍵 ?" [ref=e78]:
+            - cell [ref=e79]:
+              - checkbox [ref=e80]
+            - cell "啟用快捷鍵 ?" [ref=e81]:
+              - text: 啟用快捷鍵
+              - link "?" [ref=e82] [cursor=pointer]:
+                - /url: "#"
+          - row "容許訂閱標籤 ?" [ref=e83]:
+            - cell [ref=e84]:
+              - checkbox [checked] [ref=e85]
+            - cell "容許訂閱標籤 ?" [ref=e86]:
+              - text: 容許訂閱標籤
+              - link "?" [ref=e87] [cursor=pointer]:
+                - /url: "#"
+          - row "我主要用Pinboard作... ?" [ref=e88]:
+            - cell [ref=e89]:
+              - checkbox [ref=e90]
+            - cell "我主要用Pinboard作... ?" [ref=e91]:
+              - text: 我主要用Pinboard作...
+              - link "?" [ref=e92] [cursor=pointer]:
+                - /url: "#"
+          - row "?" [ref=e93]:
+            - cell [ref=e94]:
+              - checkbox [checked] [ref=e95]
+            - cell "?" [ref=e96]:
+              - link "?" [ref=e97] [cursor=pointer]:
+                - /url: "#"
+          - row [ref=e98]:
+            - cell [ref=e99]
+            - cell [ref=e100]
+          - row "Bookmark Display" [ref=e101]:
+            - cell "Bookmark Display" [ref=e102]:
+              - heading "Bookmark Display" [level=2] [ref=e103]
+          - row "按字母排標籤 ?" [ref=e104]:
+            - cell [ref=e105]:
+              - checkbox [ref=e106]
+            - cell "按字母排標籤 ?" [ref=e107]:
+              - text: 按字母排標籤
+              - link "?" [ref=e108] [cursor=pointer]:
+                - /url: "#"
+          - row "在書籤標題下顯示連結 ?" [ref=e109]:
+            - cell [ref=e110]:
+              - checkbox [checked] [ref=e111]
+            - cell "在書籤標題下顯示連結 ?" [ref=e112]:
+              - text: 在書籤標題下顯示連結
+              - link "?" [ref=e113] [cursor=pointer]:
+                - /url: "#"
+          - row "顯示全球書籤數量 ?" [ref=e114]:
+            - cell [ref=e115]:
+              - checkbox [checked] [ref=e116]
+            - cell "顯示全球書籤數量 ?" [ref=e117]:
+              - text: 顯示全球書籤數量
+              - link "?" [ref=e118] [cursor=pointer]:
+                - /url: "#"
+          - row "顯示書籤時間和日期 ?" [ref=e119]:
+            - cell [ref=e120]:
+              - checkbox [checked] [ref=e121]
+            - cell "顯示書籤時間和日期 ?" [ref=e122]:
+              - text: 顯示書籤時間和日期
+              - link "?" [ref=e123] [cursor=pointer]:
+                - /url: "#"
+          - row [ref=e124]:
+            - cell [ref=e125]
+            - cell [ref=e126]
+          - row "Instapaper" [ref=e127]:
+            - cell "Instapaper" [ref=e128]:
+              - heading "Instapaper" [level=2] [ref=e129]
+          - 'row "Your Instapaper feed URL: http://www.instapaper.com/rss/1017398/4wEPY3B0p75ttxuZVXRjbziwR4" [ref=e130]':
+            - 'cell "Your Instapaper feed URL: http://www.instapaper.com/rss/1017398/4wEPY3B0p75ttxuZVXRjbziwR4" [ref=e131]':
+              - text: "Your Instapaper feed URL:"
+              - textbox [ref=e132]: http://www.instapaper.com/rss/1017398/4wEPY3B0p75ttxuZVXRjbziwR4
+          - row "mirror_instapaper ?" [ref=e133]:
+            - cell [ref=e134]:
+              - checkbox [ref=e135]
+            - cell "mirror_instapaper ?" [ref=e136]:
+              - text: mirror_instapaper
+              - link "?" [ref=e137] [cursor=pointer]:
+                - /url: "#"
+          - row "and mark them as 已讀 unread" [ref=e138]:
+            - cell [ref=e139]
+            - cell "and mark them as 已讀 unread" [ref=e140]:
+              - text: and mark them as
+              - radio "已讀" [checked] [ref=e141]
+              - text: 已讀
+              - radio "unread" [ref=e142]
+              - text: unread
+          - row "Pocket" [ref=e143]:
+            - cell "Pocket" [ref=e144]:
+              - heading "Pocket" [level=2] [ref=e145]
+          - 'row "Pocket使用者名稱: oumu" [ref=e146]':
+            - 'cell "Pocket使用者名稱: oumu" [ref=e147]':
+              - text: "Pocket使用者名稱:"
+              - textbox [ref=e148]: oumu
+          - row "mirror_ril ?" [ref=e149]:
+            - cell [ref=e150]:
+              - checkbox [ref=e151]
+            - cell "mirror_ril ?" [ref=e152]:
+              - text: mirror_ril
+              - link "?" [ref=e153] [cursor=pointer]:
+                - /url: "#"
+          - row "and mark them as 已讀 unread" [ref=e154]:
+            - cell [ref=e155]
+            - cell "and mark them as 已讀 unread" [ref=e156]:
+              - text: and mark them as
+              - radio "已讀" [checked] [ref=e157]
+              - text: 已讀
+              - radio "unread" [ref=e158]
+              - text: unread
+          - row "Email" [ref=e159]:
+            - cell "Email" [ref=e160]:
+              - heading "Email" [level=2] [ref=e161]
+          - row "容許我從iPhone/Blackberry手機用電郵發佈內容 ? post+oumu+fb73af@pinboard.in (instructions)" [ref=e162]:
+            - cell [ref=e163]:
+              - checkbox [checked] [ref=e164]
+            - cell "容許我從iPhone/Blackberry手機用電郵發佈內容 ? post+oumu+fb73af@pinboard.in (instructions)" [ref=e165]:
+              - text: 容許我從iPhone/Blackberry手機用電郵發佈內容
+              - link "?" [ref=e166] [cursor=pointer]:
+                - /url: "#"
+              - paragraph [ref=e167]:
+                - text: post+oumu+fb73af@pinboard.in (
+                - link "instructions" [ref=e168] [cursor=pointer]:
+                  - /url: /howto/#post_by_mail
+                - text: )
+      - button "更新設定" [ref=e169]
+  - generic [ref=e170]:
+    - text: 光復香港，時代革命
+    - separator [ref=e171]
+    - link "TOS" [ref=e172] [cursor=pointer]:
+      - /url: /tos/
+    - text: ‧
+    - link "隱私" [ref=e173] [cursor=pointer]:
+      - /url: /privacy/
+    - text: ‧
+    - link "關於" [ref=e174] [cursor=pointer]:
+      - /url: /about/
+    - text: ‧
+    - link "blog" [ref=e175] [cursor=pointer]:
+      - /url: http://blog.pinboard.in
+    - text: ‧
+    - link "FAQ" [ref=e176] [cursor=pointer]:
+      - /url: /faq/
+    - text: ‧
+    - link "資源" [ref=e177] [cursor=pointer]:
+      - /url: /resources/
+    - text: ‧
+    - link "安全" [ref=e178] [cursor=pointer]:
+      - /url: /security/

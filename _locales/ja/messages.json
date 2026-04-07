@@ -889,6 +889,15 @@
   "qlNotesTitle": {
     "message": "Notes"
   },
+  "secSync": {
+    "message": "データ同期"
+  },
+  "optSyncEnabled": {
+    "message": "Google アカウントでデバイス間の設定を同期"
+  },
+  "optSyncHint": {
+    "message": "有効にすると、同じ Google アカウントにサインインした Chrome 間で設定が同期されます。"
+  },
   "qlPopularTitle": {
     "message": "人気"
   }
