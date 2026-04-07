@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Bookmark to Pinboard with AI-powered tags and summaries"
   },
   "cmdOpenPopup": {
-    "message": "Open Pinboard Bookmark Plus"
+    "message": "Open Pinboard Bookmark Enhanced"
   },
   "cmdQuickSave": {
     "message": "Quick save to Pinboard (no popup)"
@@ -15,7 +15,7 @@
     "message": "Quick save as Read Later (no popup)"
   },
   "appName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "settings": {
     "message": "settings"
@@ -465,7 +465,7 @@
     "message": "Undo"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Plus — Settings"
+    "message": "Pinboard Bookmark Enhanced — Settings"
   },
   "optAutoSave": {
     "message": "auto-save enabled"

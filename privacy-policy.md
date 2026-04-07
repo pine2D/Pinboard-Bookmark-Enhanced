@@ -1,10 +1,10 @@
-# Privacy Policy — Pinboard Bookmark Plus
+# Privacy Policy — Pinboard Bookmark Enhanced
 
 **Last updated:** 2026-04-06
 
 ## Data Collection
 
-Pinboard Bookmark Plus does **not** collect, transmit, or store any personal data on external servers. The extension has no analytics, no tracking, and no telemetry.
+Pinboard Bookmark Enhanced does **not** collect, transmit, or store any personal data on external servers. The extension has no analytics, no tracking, and no telemetry.
 
 ## Data Storage
 
@@ -54,4 +54,4 @@ If this privacy policy changes, the update will be included in the extension rel
 
 ## Contact
 
-For questions about this privacy policy, open an issue at: https://github.com/oumu/Pinboard-Bookmark-Plus/issues
+For questions about this privacy policy, open an issue at: https://github.com/oumu/Pinboard-Bookmark-Enhanced/issues

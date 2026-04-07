@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - Background Service Worker (v4.0)
+// Pinboard Bookmark Enhanced - Background Service Worker (v4.0)
 // ============================================================
 
 importScripts("i18n.js", "shared.js", "ai.js");

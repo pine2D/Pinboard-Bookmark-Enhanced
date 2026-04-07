@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
     "message": "AI によるタグ・要約機能付きで Pinboard にブックマークを保存"
   },
   "cmdOpenPopup": {
-    "message": "Pinboard Bookmark Plus を開く"
+    "message": "Pinboard Bookmark Enhanced を開く"
   },
   "cmdQuickSave": {
     "message": "Pinboard にクイック保存（ポップアップなし）"
@@ -15,7 +15,7 @@
     "message": "あとで読むとしてクイック保存（ポップアップなし）"
   },
   "appName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "settings": {
     "message": "設定"
@@ -465,7 +465,7 @@
     "message": "取り消し"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Plus — 設定"
+    "message": "Pinboard Bookmark Enhanced — 設定"
   },
   "optAutoSave": {
     "message": "自動保存が有効です"

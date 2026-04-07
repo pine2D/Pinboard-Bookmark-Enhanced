@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - AI Summary & Tags
+// Pinboard Bookmark Enhanced - AI Summary & Tags
 // ============================================================
 
 const AI_SUMMARY_TAG = "[AI Summary]";

@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - Custom Style Injector
+// Pinboard Bookmark Enhanced - Custom Style Injector
 // Content script for pinboard.in pages (runs at document_start)
 // ============================================================
 

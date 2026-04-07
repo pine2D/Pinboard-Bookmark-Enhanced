@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Сохраняйте закладки в Pinboard с AI-метками и аннотациями"
   },
   "cmdOpenPopup": {
-    "message": "Открыть Pinboard Bookmark Plus"
+    "message": "Открыть Pinboard Bookmark Enhanced"
   },
   "cmdQuickSave": {
     "message": "Быстрое сохранение в Pinboard (без окна)"
@@ -15,7 +15,7 @@
     "message": "Быстрое сохранение как Напочитать (без окна)"
   },
   "appName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "settings": {
     "message": "настройки"
@@ -465,7 +465,7 @@
     "message": "Отменить"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Plus — Настройки"
+    "message": "Pinboard Bookmark Enhanced — Настройки"
   },
   "optAutoSave": {
     "message": "автосохранение включено"

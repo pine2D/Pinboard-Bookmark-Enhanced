@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - Tab Set, Batch Save & Tag Presets
+// Pinboard Bookmark Enhanced - Tab Set, Batch Save & Tag Presets
 // ============================================================
 
 // ---- Tab Set & Batch Bookmark Save ----

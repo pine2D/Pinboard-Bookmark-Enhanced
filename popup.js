@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - Popup (v2.3)
+// Pinboard Bookmark Enhanced - Popup (v2.3)
 // ============================================================
 
 // Override pinboardFetch to route through background service worker.

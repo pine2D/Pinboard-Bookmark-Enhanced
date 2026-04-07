@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - i18n Helper
+// Pinboard Bookmark Enhanced - i18n Helper
 // ============================================================
 
 let _i18nMessages = null;

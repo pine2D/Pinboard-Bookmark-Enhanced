@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - Tag Input & Autocomplete
+// Pinboard Bookmark Enhanced - Tag Input & Autocomplete
 // ============================================================
 
 // ---- Suggest Tags (Pinboard API) ----

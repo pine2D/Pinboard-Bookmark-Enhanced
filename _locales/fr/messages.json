@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Ajouter des signets sur Pinboard avec tags et résumés générés par IA"
   },
   "cmdOpenPopup": {
-    "message": "Ouvrir Pinboard Bookmark Plus"
+    "message": "Ouvrir Pinboard Bookmark Enhanced"
   },
   "cmdQuickSave": {
     "message": "Enregistrement rapide sur Pinboard (sans popup)"
@@ -15,7 +15,7 @@
     "message": "Enregistrement rapide comme À lire (sans popup)"
   },
   "appName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "settings": {
     "message": "paramètres"
@@ -465,7 +465,7 @@
     "message": "Annuler"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Plus — Paramètres"
+    "message": "Pinboard Bookmark Enhanced — Paramètres"
   },
   "optAutoSave": {
     "message": "enregistrement automatique activé"

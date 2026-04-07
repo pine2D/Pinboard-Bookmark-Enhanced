@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - Shared Constants
+// Pinboard Bookmark Enhanced - Shared Constants
 // ============================================================
 
 const DEFAULT_TAG_PROMPT = `Suggest 5-10 bookmark tags for the following webpage. Tags should be lowercase, {{separator_instruction}}. Return ONLY a JSON array.

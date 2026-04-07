@@ -1,4 +1,4 @@
-# Pinboard Bookmark Plus
+# Pinboard Bookmark Enhanced
 
 A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking with AI-powered tags, summaries, and a fully themeable interface.
 
@@ -137,7 +137,7 @@ Language can be set in Settings → Appearance, or auto-detected from browser lo
 1. Clone this repository:
 
    ```bash
-   git clone https://github.com/oumu/Pinboard-Bookmark-Plus.git
+   git clone https://github.com/oumu/Pinboard-Bookmark-Enhanced.git
    ```
 
 2. Open `chrome://extensions/`, enable **Developer mode**
@@ -187,7 +187,7 @@ Language can be set in Settings → Appearance, or auto-detected from browser lo
 <details>
 <summary><strong>中文说明</strong></summary>
 
-# Pinboard Bookmark Plus
+# Pinboard Bookmark Enhanced
 
 一款为 [Pinboard](https://pinboard.in) 打造的 Chrome 扩展，支持 AI 智能标签、摘要生成和全面主题定制。
 
@@ -291,7 +291,7 @@ Language can be set in Settings → Appearance, or auto-detected from browser lo
 1. 克隆本仓库：
 
    ```bash
-   git clone https://github.com/oumu/Pinboard-Bookmark-Plus.git
+   git clone https://github.com/oumu/Pinboard-Bookmark-Enhanced.git
    ```
 
 2. 打开 `chrome://extensions/`，启用**开发者模式**

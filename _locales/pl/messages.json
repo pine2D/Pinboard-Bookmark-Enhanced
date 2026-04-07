@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Zakładki w Pinboard ze znacznikami i podsumowaniami AI"
   },
   "cmdOpenPopup": {
-    "message": "Otwórz Pinboard Bookmark Plus"
+    "message": "Otwórz Pinboard Bookmark Enhanced"
   },
   "cmdQuickSave": {
     "message": "Szybki zapis do Pinboard (bez okna)"
@@ -15,7 +15,7 @@
     "message": "Szybki zapis jako Przeczytaj później (bez okna)"
   },
   "appName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "settings": {
     "message": "ustawienia"
@@ -465,7 +465,7 @@
     "message": "Cofnij"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Plus — Ustawienia"
+    "message": "Pinboard Bookmark Enhanced — Ustawienia"
   },
   "optAutoSave": {
     "message": "automatyczny zapis włączony"

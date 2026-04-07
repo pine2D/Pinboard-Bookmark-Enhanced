@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Lesezeichen mit KI-gestützten Tags und Zusammenfassungen in Pinboard speichern"
   },
   "cmdOpenPopup": {
-    "message": "Pinboard Bookmark Plus öffnen"
+    "message": "Pinboard Bookmark Enhanced öffnen"
   },
   "cmdQuickSave": {
     "message": "Schnell in Pinboard speichern (ohne Popup)"
@@ -15,7 +15,7 @@
     "message": "Schnell als Später lesen speichern (ohne Popup)"
   },
   "appName": {
-    "message": "Pinboard Bookmark Plus"
+    "message": "Pinboard Bookmark Enhanced"
   },
   "settings": {
     "message": "Einstellungen"
@@ -465,7 +465,7 @@
     "message": "Rückgängig"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Plus — Einstellungen"
+    "message": "Pinboard Bookmark Enhanced — Einstellungen"
   },
   "optAutoSave": {
     "message": "Automatisches Speichern aktiviert"

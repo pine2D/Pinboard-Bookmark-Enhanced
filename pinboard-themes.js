@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - CSS Theme Presets for pinboard.in
+// Pinboard Bookmark Enhanced - CSS Theme Presets for pinboard.in
 // ============================================================
 
 const PINBOARD_THEMES = {

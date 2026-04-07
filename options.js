@@ -470,7 +470,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "Pinboard Bookmark Plus settings backup.json"; a.click();
+    a.href = url; a.download = "Pinboard Bookmark Enhanced settings backup.json"; a.click();
     URL.revokeObjectURL(url);
   });
 

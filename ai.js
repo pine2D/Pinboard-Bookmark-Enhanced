@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Plus - AI & Content Extraction (shared)
+// Pinboard Bookmark Enhanced - AI & Content Extraction (shared)
 // ============================================================
 
 // ---- Page content extraction (used by popup and background) ----
