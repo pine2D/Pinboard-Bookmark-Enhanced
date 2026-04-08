@@ -742,10 +742,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function loadSavedThemes() {
     savedThemes = await syncGetLarge("savedThemes", []);
+    if (!Array.isArray(savedThemes)) savedThemes = [];
     // One-time migration from local
     if (!savedThemes.length) {
       const local = await chrome.storage.local.get({ savedThemes: [] });
-      if (local.savedThemes?.length) {
+      if (Array.isArray(local.savedThemes) && local.savedThemes.length) {
         savedThemes = local.savedThemes;
         await syncSetLarge("savedThemes", savedThemes);
         await chrome.storage.local.remove("savedThemes");

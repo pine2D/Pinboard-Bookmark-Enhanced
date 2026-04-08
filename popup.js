@@ -271,7 +271,9 @@ function setupSubmit(token) {
         chrome.runtime.sendMessage({ type: "bookmark_saved", url: url });
         if (settings.optAutoCloseAfterSave) {
           autoCloseTimer = setTimeout(() => window.close(), 1800);
-          document.addEventListener("mousemove", () => { clearTimeout(autoCloseTimer); autoCloseTimer = null; }, { once: true });
+          // Cancel auto-close on deliberate click, not mousemove
+          // (mousemove fires too easily during Ctrl+Enter keyboard save)
+          document.addEventListener("mousedown", () => { clearTimeout(autoCloseTimer); autoCloseTimer = null; }, { once: true });
         }
       } else showStatus("status-msg", `Error: ${data.result_code}`, "error");
     } catch (e) { showStatus("status-msg", t("networkError"), "error"); }
