@@ -77,6 +77,7 @@ async function callAI(s, prompt) {
 
 async function callGemini(s, prompt) {
   const model = s.geminiModel || "gemini-2.0-flash";
+  // Gemini API requires key as URL param (no Authorization header support) — API design limitation
   const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${s.geminiApiKey}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 1024 } })

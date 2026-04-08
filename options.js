@@ -250,13 +250,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   function applyOptionsPageTheme(presetKey, themeMode) {
     const prefersDark = themeMode === "dark" ||
       (themeMode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    const adaptiveMap = {
-      flexoki: ["flexoki-light", "flexoki-dark"],
-      solarized: ["solarized-light", "solarized-dark"],
-      catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
-    };
-    if (adaptiveMap[presetKey]) {
-      const [light, dark] = adaptiveMap[presetKey];
+    if (ADAPTIVE_THEME_MAP[presetKey]) {
+      const [light, dark] = ADAPTIVE_THEME_MAP[presetKey];
       document.documentElement.dataset.theme = prefersDark ? dark : light;
     } else if (presetKey) {
       document.documentElement.dataset.theme = presetKey;
@@ -290,13 +285,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const mode = document.getElementById("opt-theme").value;
     applyOptionsPageTheme(currentPresetKey, mode);
     // Adaptive pinboard themes: swap CSS when light/dark mode changes
-    const adaptivePinboard = {
-      solarized: ["solarized-light", "solarized-dark"],
-      catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
-    };
-    if (adaptivePinboard[currentPresetKey]) {
+    if (ADAPTIVE_THEME_MAP[currentPresetKey]) {
       const prefersDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      const themeKey = adaptivePinboard[currentPresetKey][prefersDark ? 1 : 0];
+      const themeKey = ADAPTIVE_THEME_MAP[currentPresetKey][prefersDark ? 1 : 0];
       const theme = PINBOARD_THEMES[themeKey];
       if (theme) {
         document.getElementById("opt-custom-css").value = theme.css;
@@ -456,9 +447,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Export Settings ----
   document.getElementById("export-settings").addEventListener("click", async () => {
     const raw = await (await getSettingsStorage()).get(null);
-    const sensitiveKeys = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","customApiKey"];
     const exportData = Object.fromEntries(
-      Object.entries(raw).filter(([k]) => !sensitiveKeys.includes(k))
+      Object.entries(raw).filter(([k]) => !API_KEY_FIELDS.includes(k))
     );
     // Include chunked sync data
     const customCSS = await syncGetLarge("customCSS", "");
@@ -481,11 +471,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      const sensitiveKeys = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","customApiKey"];
       // Separate large data for chunked sync
       const { customCSS, savedThemes: importedThemes, ...rest } = data;
       const safeData = Object.fromEntries(
-        Object.entries(rest).filter(([k]) => !sensitiveKeys.includes(k) && !/^(customCSS|savedThemes)_\d+$/.test(k))
+        Object.entries(rest).filter(([k]) => !API_KEY_FIELDS.includes(k) && !/^(customCSS|savedThemes)_\d+$/.test(k))
       );
       await (await getSettingsStorage()).set(safeData);
       if (customCSS !== undefined) await syncSetLarge("customCSS", customCSS);
@@ -502,7 +491,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     e.target.value = "";
   });
 
-  // ---- API Connectivity Tests ----
+  // ---- API Connectivity Tests (reuses callAI from ai.js) ----
+  function getOptVal(id, fallback) { return document.getElementById(id)?.value?.trim() || fallback || ""; }
+
   async function testAIProvider(provider) {
     const statusEl = document.getElementById(`test-${provider}-status`);
     if (!statusEl) return;
@@ -511,89 +502,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const cs = {
       aiProvider: provider,
-      geminiApiKey: document.getElementById("opt-gemini-key")?.value?.trim() || "",
-      geminiModel: document.getElementById("opt-gemini-model")?.value?.trim() || "gemini-2.0-flash",
-      openaiApiKey: document.getElementById("opt-openai-key")?.value?.trim() || "",
-      openaiModel: document.getElementById("opt-openai-model")?.value?.trim() || "gpt-4o-mini",
-      openaiBaseUrl: document.getElementById("opt-openai-baseurl")?.value?.trim() || "https://api.openai.com/v1",
-      claudeApiKey: document.getElementById("opt-claude-key")?.value?.trim() || "",
-      claudeModel: document.getElementById("opt-claude-model")?.value?.trim() || "claude-sonnet-4-20250514",
-      deepseekApiKey: document.getElementById("opt-deepseek-key")?.value?.trim() || "",
-      deepseekModel: document.getElementById("opt-deepseek-model")?.value?.trim() || "deepseek-chat",
-      qwenApiKey: document.getElementById("opt-qwen-key")?.value?.trim() || "",
-      qwenModel: document.getElementById("opt-qwen-model")?.value?.trim() || "qwen-turbo",
-      minimaxApiKey: document.getElementById("opt-minimax-key")?.value?.trim() || "",
-      minimaxModel: document.getElementById("opt-minimax-model")?.value?.trim() || "MiniMax-Text-01",
-      openrouterApiKey: document.getElementById("opt-openrouter-key")?.value?.trim() || "",
-      openrouterModel: document.getElementById("opt-openrouter-model")?.value?.trim() || "google/gemini-2.0-flash-exp:free",
-      ollamaBaseUrl: document.getElementById("opt-ollama-baseurl")?.value?.trim() || "http://localhost:11434",
-      ollamaModel: document.getElementById("opt-ollama-model")?.value?.trim() || "llama3",
-      groqApiKey: document.getElementById("opt-groq-key")?.value?.trim() || "",
-      groqModel: document.getElementById("opt-groq-model")?.value?.trim() || "llama-3.3-70b-versatile",
-      mistralApiKey: document.getElementById("opt-mistral-key")?.value?.trim() || "",
-      mistralModel: document.getElementById("opt-mistral-model")?.value?.trim() || "mistral-small-latest",
-      cohereApiKey: document.getElementById("opt-cohere-key")?.value?.trim() || "",
-      cohereModel: document.getElementById("opt-cohere-model")?.value?.trim() || "command-r-plus",
-      siliconflowApiKey: document.getElementById("opt-siliconflow-key")?.value?.trim() || "",
-      siliconflowModel: document.getElementById("opt-siliconflow-model")?.value?.trim() || "Qwen/Qwen2.5-7B-Instruct",
-      customApiKey: document.getElementById("opt-custom-key")?.value?.trim() || "",
-      customModel: document.getElementById("opt-custom-model")?.value?.trim() || "",
-      customBaseUrl: document.getElementById("opt-custom-baseurl")?.value?.trim() || "",
+      geminiApiKey: getOptVal("opt-gemini-key"), geminiModel: getOptVal("opt-gemini-model", "gemini-2.0-flash"),
+      openaiApiKey: getOptVal("opt-openai-key"), openaiModel: getOptVal("opt-openai-model", "gpt-4o-mini"), openaiBaseUrl: getOptVal("opt-openai-baseurl", "https://api.openai.com/v1"),
+      claudeApiKey: getOptVal("opt-claude-key"), claudeModel: getOptVal("opt-claude-model", "claude-sonnet-4-20250514"),
+      deepseekApiKey: getOptVal("opt-deepseek-key"), deepseekModel: getOptVal("opt-deepseek-model", "deepseek-chat"),
+      qwenApiKey: getOptVal("opt-qwen-key"), qwenModel: getOptVal("opt-qwen-model", "qwen-turbo"),
+      minimaxApiKey: getOptVal("opt-minimax-key"), minimaxModel: getOptVal("opt-minimax-model", "MiniMax-Text-01"),
+      openrouterApiKey: getOptVal("opt-openrouter-key"), openrouterModel: getOptVal("opt-openrouter-model", "google/gemini-2.0-flash-exp:free"),
+      ollamaBaseUrl: getOptVal("opt-ollama-baseurl", "http://localhost:11434"), ollamaModel: getOptVal("opt-ollama-model", "llama3"),
+      groqApiKey: getOptVal("opt-groq-key"), groqModel: getOptVal("opt-groq-model", "llama-3.3-70b-versatile"),
+      mistralApiKey: getOptVal("opt-mistral-key"), mistralModel: getOptVal("opt-mistral-model", "mistral-small-latest"),
+      cohereApiKey: getOptVal("opt-cohere-key"), cohereModel: getOptVal("opt-cohere-model", "command-r-plus"),
+      siliconflowApiKey: getOptVal("opt-siliconflow-key"), siliconflowModel: getOptVal("opt-siliconflow-model", "Qwen/Qwen2.5-7B-Instruct"),
+      customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
     };
 
     try {
-      const testPrompt = "Reply with just the word: OK";
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
-      async function doFetch(url, options) {
-        return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
-      }
+      if (!hasAIKey(cs)) throw new Error(t("testNoApiKey"));
+      const result = await callAI(cs, "Reply with just the word: OK");
 
-      let result = "";
-      if (provider === "gemini") {
-        if (!cs.geminiApiKey) throw new Error(t("testNoApiKey"));
-        const res = await doFetch(`https://generativelanguage.googleapis.com/v1beta/models/${cs.geminiModel}:generateContent?key=${cs.geminiApiKey}`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: testPrompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 10 } })
-        });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `HTTP ${res.status}`); }
-        result = (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "OK";
-      } else if (provider === "claude") {
-        if (!cs.claudeApiKey) throw new Error(t("testNoApiKey"));
-        const res = await doFetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": cs.claudeApiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-          body: JSON.stringify({ model: cs.claudeModel, max_tokens: 10, messages: [{ role: "user", content: testPrompt }] })
-        });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `HTTP ${res.status}`); }
-        result = (await res.json()).content?.[0]?.text?.trim() || "OK";
-      } else if (provider === "ollama") {
-        const base = (cs.ollamaBaseUrl || "http://localhost:11434").replace(/\/+$/, "");
-        const res = await doFetch(`${base}/api/chat`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: cs.ollamaModel, messages: [{ role: "user", content: testPrompt }], stream: false })
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        result = (await res.json()).message?.content?.trim() || "OK";
-      } else {
-        const baseUrlMap = { openai: cs.openaiBaseUrl, deepseek: "https://api.deepseek.com/v1", qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1", minimax: "https://api.minimax.chat/v1", openrouter: "https://openrouter.ai/api/v1", groq: "https://api.groq.com/openai/v1", mistral: "https://api.mistral.ai/v1", cohere: "https://api.cohere.com/v2", siliconflow: "https://api.siliconflow.cn/v1", custom: cs.customBaseUrl };
-        const apiKeyMap = { openai: cs.openaiApiKey, deepseek: cs.deepseekApiKey, qwen: cs.qwenApiKey, minimax: cs.minimaxApiKey, openrouter: cs.openrouterApiKey, groq: cs.groqApiKey, mistral: cs.mistralApiKey, cohere: cs.cohereApiKey, siliconflow: cs.siliconflowApiKey, custom: cs.customApiKey };
-        const modelMap = { openai: cs.openaiModel, deepseek: cs.deepseekModel, qwen: cs.qwenModel, minimax: cs.minimaxModel, openrouter: cs.openrouterModel, groq: cs.groqModel, mistral: cs.mistralModel, cohere: cs.cohereModel, siliconflow: cs.siliconflowModel, custom: cs.customModel };
-        const baseUrl = baseUrlMap[provider];
-        const apiKey = apiKeyMap[provider];
-        if (!baseUrl) throw new Error(t("testNoBaseUrl"));
-        if (!apiKey && provider !== "custom") throw new Error(t("testNoApiKey"));
-        const headers = { "Content-Type": "application/json" };
-        if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-        const res = await doFetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-          method: "POST", headers,
-          body: JSON.stringify({ model: modelMap[provider], messages: [{ role: "user", content: testPrompt }], temperature: 0, max_tokens: 10 })
-        });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `HTTP ${res.status}`); }
-        result = (await res.json()).choices?.[0]?.message?.content?.trim() || "OK";
-      }
-
-      statusEl.textContent = t("testConnected", result.substring(0, 20));
+      statusEl.textContent = t("testConnected", (result || "OK").substring(0, 20));
       statusEl.style.color = "#080";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 4000);
     } catch (err) {

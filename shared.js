@@ -2,6 +2,16 @@
 // Pinboard Bookmark Enhanced - Shared Constants
 // ============================================================
 
+const ADAPTIVE_THEME_MAP = {
+  flexoki: ["flexoki-light", "flexoki-dark"],
+  solarized: ["solarized-light", "solarized-dark"],
+  catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
+};
+
+const TEXTAREA_MIN_HEIGHT = 54;
+const TEXTAREA_MAX_HEIGHT = 300;
+const TAG_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 const DEFAULT_TAG_PROMPT = `Suggest 5-10 bookmark tags for the following webpage. Tags should be lowercase, {{separator_instruction}}. Return ONLY a JSON array.
 
 Title: {{title}}

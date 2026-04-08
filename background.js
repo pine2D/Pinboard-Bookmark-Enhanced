@@ -467,50 +467,31 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
-// ===================== Read Later (keyboard shortcut) =====================
+// ===================== Keyboard Shortcuts =====================
 chrome.commands.onCommand.addListener(async (command) => {
-  if (command !== "read_later") return;
+  const commandConfig = {
+    read_later: { prefix: "rl", toread: true, notifyId: "rl", notifyTitle: () => t("bgReadLater"), notifyCategory: "readLater", errorTitle: () => t("bgReadLaterFailed") },
+    quick_save: { prefix: "qs", toread: false, notifyId: "qs", notifyTitle: () => t("bgQuickSaved"), notifyCategory: "quickSave", errorTitle: () => t("bgQuickSaveFailed") },
+  };
+  const cfg = commandConfig[command];
+  if (!cfg) return;
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url || !tab.url.startsWith("http")) {
-      showNotification("rl-error", t("bgCannotSave"), t("bgCannotBookmark"), "error");
+      showNotification(`${cfg.notifyId}-error`, t("bgCannotSave"), t("bgCannotBookmark"), "error");
       return;
     }
     const s = await loadSettings();
-    const overrides = resolvePrefixSettings(s, "rl");
+    const overrides = resolvePrefixSettings(s, cfg.prefix);
     await saveFromBackground({
       url: tab.url, title: tab.title || tab.url, tab,
       settingsOverrides: overrides,
-      toread: true,
-      notifyId: "rl",
-      notifyTitle: t("bgReadLater"),
-      notifyCategory: "readLater"
+      toread: cfg.toread,
+      notifyId: cfg.notifyId,
+      notifyTitle: cfg.notifyTitle(),
+      notifyCategory: cfg.notifyCategory
     });
   } catch (e) {
-    showNotification("rl-error", t("bgReadLaterFailed"), e.message, "error");
-  }
-});
-
-// ===================== Quick Save (keyboard shortcut) =====================
-chrome.commands.onCommand.addListener(async (command) => {
-  if (command !== "quick_save") return;
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.url || !tab.url.startsWith("http")) {
-      showNotification("qs-error", t("bgCannotSave"), t("bgCannotBookmark"), "error");
-      return;
-    }
-    const s = await loadSettings();
-    const overrides = resolvePrefixSettings(s, "qs");
-    await saveFromBackground({
-      url: tab.url, title: tab.title || tab.url, tab,
-      settingsOverrides: overrides,
-      toread: false,
-      notifyId: "qs",
-      notifyTitle: t("bgQuickSaved"),
-      notifyCategory: "quickSave"
-    });
-  } catch (e) {
-    showNotification("qs-error", t("bgQuickSaveFailed"), e.message, "error");
+    showNotification(`${cfg.notifyId}-error`, cfg.errorTitle(), e.message, "error");
   }
 });

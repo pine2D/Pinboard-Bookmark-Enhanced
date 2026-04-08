@@ -800,3 +800,7 @@ html[data-theme] .bottom-bar input[type="checkbox"]:focus-visible { outline: 2px
 /* Terminal monospace */
 html[data-theme="terminal"] body { font-family: "Courier New", Consolas, monospace; }
 html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Consolas, monospace; }
+
+/* ===================== High-DPI Scaling ===================== */
+@media (min-resolution: 144dpi) { body { zoom: 1.12; } }
+@media (min-resolution: 192dpi) { body { zoom: 1.22; } }

@@ -89,7 +89,7 @@ async function fetchAllUserTags(token) {
     const cached = await chrome.storage.local.get(cacheKey);
     if (cached[cacheKey]) {
       const { tags, counts, timestamp } = cached[cacheKey];
-      if (Date.now() - timestamp < 10 * 60 * 1000) {
+      if (Date.now() - timestamp < TAG_CACHE_TTL) {
         allUserTagCounts = counts;
         allUserTags = tags;
         tagCaseMap = buildTagCaseMap(counts);
@@ -114,7 +114,12 @@ async function fetchAllUserTags(token) {
 function setupTagsInput() {
   const input = document.getElementById("tags-input");
   const dropdown = document.getElementById("tags-autocomplete");
+  let acDebounceTimer = null;
   input.addEventListener("input", () => {
+    clearTimeout(acDebounceTimer);
+    acDebounceTimer = setTimeout(handleTagInput, 120);
+  });
+  function handleTagInput() {
     const val = input.value.trim().toLowerCase(); acIndex = -1;
     if (!val) { dropdown.classList.add("hidden"); return; }
     const matches = allUserTags.filter((t) =>
@@ -153,7 +158,7 @@ function setupTagsInput() {
       dropdown.appendChild(item);
     });
     dropdown.classList.remove("hidden");
-  });
+  }
   input.addEventListener("paste", (e) => {
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData("text");

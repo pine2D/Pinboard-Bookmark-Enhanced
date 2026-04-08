@@ -53,13 +53,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const prefersDark = settings.optTheme === "dark" ||
       (settings.optTheme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     const key = settings.optPopupFollowTheme !== false ? (settings.themePresetKey || "") : "";
-    const adaptiveMap = {
-      flexoki: ["flexoki-light", "flexoki-dark"],
-      solarized: ["solarized-light", "solarized-dark"],
-      catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
-    };
-    if (adaptiveMap[key]) {
-      const [light, dark] = adaptiveMap[key];
+    if (ADAPTIVE_THEME_MAP[key]) {
+      const [light, dark] = ADAPTIVE_THEME_MAP[key];
       document.documentElement.dataset.theme = prefersDark ? dark : light;
       document.documentElement.classList.remove("dark");
     } else if (key) {
@@ -95,16 +90,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 function showLogin() {
   document.getElementById("login-section").classList.remove("hidden");
   document.getElementById("main-section").classList.add("hidden");
-  document.getElementById("login-btn").addEventListener("click", async () => {
-    const token = document.getElementById("token-input").value.trim();
-    if (!token || !token.includes(":")) { showElement("login-error", t("loginInvalidFormat")); return; }
-    try {
-      const res = await fetch(`https://api.pinboard.in/v1/user/api_token/?auth_token=${token}&format=json`);
-      if (res.ok) { await (await getSettingsStorage()).set({ pinboardToken: obfuscateKey(token) }); settings.pinboardToken = token; showMain(token); }
-      else showElement("login-error", t("loginFailed"));
-    } catch (e) { showElement("login-error", t("networkError")); }
-  });
 }
+// Login listener — bound once outside showLogin() to avoid duplicate listeners
+document.getElementById("login-btn").addEventListener("click", async () => {
+  const token = document.getElementById("token-input").value.trim();
+  if (!token || !token.includes(":")) { showElement("login-error", t("loginInvalidFormat")); return; }
+  try {
+    const res = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: "test_pinboard_token", token }, (resp) => {
+        if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+        resolve(resp);
+      });
+    });
+    if (res.ok) { await (await getSettingsStorage()).set({ pinboardToken: obfuscateKey(token) }); settings.pinboardToken = token; showMain(token); }
+    else showElement("login-error", t("loginFailed"));
+  } catch (e) { showElement("login-error", t("networkError")); }
+});
 
 // ===================== Main =====================
 async function showMain(token) {
@@ -275,6 +276,9 @@ function setupSubmit(token) {
           // (mousemove fires too easily during Ctrl+Enter keyboard save)
           document.addEventListener("mousedown", () => { clearTimeout(autoCloseTimer); autoCloseTimer = null; }, { once: true });
         }
+        btn.disabled = false; btn.classList.remove("loading");
+        setTimeout(() => { btn.textContent = orig; }, 1200);
+        return;
       } else showStatus("status-msg", `Error: ${data.result_code}`, "error");
     } catch (e) { showStatus("status-msg", t("networkError"), "error"); }
     btn.disabled = false; btn.classList.remove("loading"); btn.textContent = orig;
@@ -419,7 +423,7 @@ function setupDescriptionCounter() {
 }
 function autoResizeTextarea(el) {
   el.style.height = "auto";
-  el.style.height = Math.min(Math.max(el.scrollHeight, 54), 300) + "px";
+  el.style.height = Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_HEIGHT), TEXTAREA_MAX_HEIGHT) + "px";
 }
 function updateCharCount() {
   const len = document.getElementById("description-input").value.length;
