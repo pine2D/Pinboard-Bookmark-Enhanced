@@ -181,7 +181,14 @@ async function syncSetLarge(key, value) {
   }
   const data = { [key]: { _chunks: chunks.length } };
   chunks.forEach((chunk, i) => { data[`${key}_${i}`] = chunk; });
-  await chrome.storage.sync.set(data);
+  try {
+    await chrome.storage.sync.set(data);
+  } catch (e) {
+    // Quota exceeded — fall back to local storage
+    console.warn("sync storage quota exceeded, falling back to local:", e.message);
+    await chrome.storage.local.set({ [key]: str });
+    throw e; // re-throw so callers know sync failed
+  }
 }
 
 async function syncGetLarge(key, defaultValue) {

@@ -30,14 +30,17 @@ function setupTabSet() {
         url: t.url
       }));
 
-      chrome.runtime.sendMessage(
-        { action: "saveTabSet", tabsData: tabsData },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.error("sendMessage error:", chrome.runtime.lastError);
+      await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { action: "saveTabSet", tabsData: tabsData },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.error("sendMessage error:", chrome.runtime.lastError);
+            }
+            resolve(response);
           }
-        }
-      );
+        );
+      });
 
       btn.textContent = t("batchSent");
       setTimeout(() => {
@@ -97,7 +100,7 @@ function setupTabSet() {
 
           if (useAiTags || useAiSummary) {
             let tabPageInfo = null;
-            try { tabPageInfo = await getPageInfoFromTab(t.id); } catch (_) {}
+            try { tabPageInfo = await getPageInfoFromTab(t.id); } catch (e) { console.warn("batch: cannot extract page content for", t.url, e.message); }
             if (tabPageInfo?.pageText) {
               const aiJobs = [];
               if (useAiTags) aiJobs.push((async () => {

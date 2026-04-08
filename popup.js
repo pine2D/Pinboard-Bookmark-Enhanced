@@ -137,9 +137,13 @@ async function showMain(token) {
   }
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  pageInfo = (await getPageInfoFromTab(tab.id)) || {
-    url: tab.url || "", title: tab.title || "", selectedText: "", metaDescription: "", referrer: "", pageText: ""
-  };
+  if (!tab) {
+    pageInfo = { url: "", title: "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
+  } else {
+    pageInfo = (await getPageInfoFromTab(tab.id)) || {
+      url: tab.url || "", title: tab.title || "", selectedText: "", metaDescription: "", referrer: "", pageText: ""
+    };
+  }
 
   document.getElementById("url-input").value = pageInfo.url;
   document.getElementById("title-input").value = pageInfo.title;
@@ -199,7 +203,7 @@ async function showMain(token) {
   // Recent bookmarks — lowest priority, enqueue last
   if (settings.optShowRecent) fetchRecentBookmarks(token);
 
-  document.querySelector(".tags-input-wrap").addEventListener("click", () => document.getElementById("tags-input").focus());
+  document.querySelector(".tags-input-wrap")?.addEventListener("click", () => document.getElementById("tags-input").focus());
   showOfflineQueueStatus();
 
   // Focus optimization: tags input for new bookmarks, description for existing
@@ -305,7 +309,7 @@ function setupSubmit(token) {
   const hintSpan = document.createElement("span");
   hintSpan.className = "submit-hint";
   hintSpan.textContent = t("hintCtrlEnter");
-  document.querySelector(".submit-bar").appendChild(hintSpan);
+  document.querySelector(".submit-bar")?.appendChild(hintSpan);
 
   document.getElementById("delete-btn").addEventListener("click", () => {
     const delBtn = document.getElementById("delete-btn");

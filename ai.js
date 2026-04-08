@@ -83,7 +83,9 @@ async function callGemini(s, prompt) {
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 1024 } })
   });
   if (!res.ok) await handleAIError(res, "Gemini");
-  return (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+  const text = (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!text) throw new Error("Gemini returned empty response");
+  return text;
 }
 
 async function callClaude(s, prompt) {
@@ -93,7 +95,9 @@ async function callClaude(s, prompt) {
     body: JSON.stringify({ model: s.claudeModel || "claude-sonnet-4-20250514", max_tokens: 1024, messages: [{ role: "user", content: prompt }] })
   });
   if (!res.ok) await handleAIError(res, "Claude");
-  return (await res.json()).content?.[0]?.text?.trim() || "";
+  const text = (await res.json()).content?.[0]?.text?.trim();
+  if (!text) throw new Error("Claude returned empty response");
+  return text;
 }
 
 async function callOpenAICompat(baseUrl, apiKey, model, prompt) {
@@ -104,7 +108,9 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt) {
     body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0.3, max_tokens: 1024 })
   });
   if (!res.ok) await handleAIError(res, "API");
-  return (await res.json()).choices?.[0]?.message?.content?.trim() || "";
+  const text = (await res.json()).choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error("API returned empty response");
+  return text;
 }
 
 async function callOllama(s, prompt) {
@@ -114,7 +120,9 @@ async function callOllama(s, prompt) {
     body: JSON.stringify({ model: s.ollamaModel || "llama3", messages: [{ role: "user", content: prompt }], stream: false })
   });
   if (!res.ok) await handleAIError(res, "Ollama");
-  return (await res.json()).message?.content?.trim() || "";
+  const text = (await res.json()).message?.content?.trim();
+  if (!text) throw new Error("Ollama returned empty response");
+  return text;
 }
 
 // ---- Prompt builders (no DOM dependency) ----

@@ -225,19 +225,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     const enabling = syncToggle.checked;
     const oldStorage = enabling ? chrome.storage.local : chrome.storage.sync;
     const newStorage = enabling ? chrome.storage.sync : chrome.storage.local;
-    // 1. Migrate regular settings
     try {
+      // 1. Migrate regular settings
       const data = await oldStorage.get(Object.keys(SETTINGS_DEFAULTS));
       await newStorage.set(data);
-    } catch (e) { console.error("sync migration:", e); }
-    // 2. Migrate customCSS (large value) — read from old, then switch pref, then write to new
-    try {
-      const customCSS = await syncGetLarge("customCSS", ""); // reads from current (old) storage
-      await chrome.storage.local.set({ optSyncEnabled: enabling }); // switch pref NOW
-      await syncSetLarge("customCSS", customCSS); // writes to new storage
-    } catch (e) { console.error("customCSS migration:", e); }
-    // Ensure pref is saved even if CSS migration failed
-    await chrome.storage.local.set({ optSyncEnabled: enabling });
+      // 2. Migrate customCSS (large value) — read from old, then switch pref, then write to new
+      const customCSS = await syncGetLarge("customCSS", "");
+      const savedThemes = await syncGetLarge("savedThemes", []);
+      await chrome.storage.local.set({ optSyncEnabled: enabling });
+      await syncSetLarge("customCSS", customCSS);
+      await syncSetLarge("savedThemes", savedThemes);
+    } catch (e) {
+      // Migration failed — revert toggle and abort
+      console.error("sync migration failed:", e);
+      syncToggle.checked = !enabling;
+      await chrome.storage.local.set({ optSyncEnabled: !enabling });
+      alert(t("syncMigrationFailed") || "Sync migration failed. Please try again or reduce custom CSS size.");
+      return;
+    }
     // Fade out and reload
     const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "general";
     sessionStorage.setItem("activeTab", activePanel);

@@ -282,21 +282,23 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
 
   try {
     const resp = await pinboardFetch(apiUrl);
-    const data = await resp.json();
+    let data;
+    try { data = await resp.json(); } catch (parseErr) {
+      showNotification(notifyId + "-error", t("bgSaveFailed"), `Invalid response (HTTP ${resp.status})`, "error");
+      return;
+    }
 
     if (data.result_code === "done") {
       statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
       if (tab?.id) setIcon(tab.id, true);
       showNotification(notifyId + "-saved", notifyTitle, t("bgTitleSaved", title.substring(0, 60)), notifyCategory, { url, token: s.pinboardToken });
-      // Opportunistic: process offline queue after successful save
       processOfflineQueue().catch(() => {});
-      // Update badge if toread
       if (toread) updateBadge().catch(() => {});
     } else {
       showNotification(notifyId + "-error", t("bgSaveFailed"), data.result_code || "Unknown error", "error");
     }
   } catch (e) {
-    // Network error — queue for offline retry if enabled
+    // Network/timeout error — queue for offline retry if enabled
     if (s.offlineQueueEnabled) {
       await enqueueOfflineSave({ url, title, notes, tags: tagsStr, toread: !!toread, token: obfuscateKey(s.pinboardToken) });
       showNotification(notifyId + "-queued", t("bgQueuedOffline"), t("bgTitleQueued", title.substring(0, 60)), notifyCategory);
