@@ -34,6 +34,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .fg textarea { resize: vertical; min-height: 80px; font-family: monospace; font-size: 11px; line-height: 1.5; }
 .fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: #4477bb; }
 .fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible { box-shadow: 0 0 0 2px rgba(68,119,187,0.2); }
+.fg input[type="checkbox"]:focus-visible { outline: 2px solid #4477bb; outline-offset: 1px; box-shadow: none; }
 
 /* ---- Common elements ---- */
 .hint { font-size: 11px; color: #999; margin-top: 2px; }
@@ -63,6 +64,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
   user-select: none; transition: color 0.15s;
 }
 .accordion-header:hover { color: #2255aa; }
+.accordion-header:focus-visible { outline: 2px solid #4477bb; outline-offset: -2px; }
 .accordion-arrow {
   font-size: 10px; transition: transform 0.2s; display: inline-block; width: 12px;
 }
@@ -82,6 +84,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 /* ---- Theme preset buttons ---- */
 .theme-presets-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
 .theme-group-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; width: 52px; flex-shrink: 0; }
+.theme-preset-btn:focus-visible { outline: 2px solid #4477bb; outline-offset: 2px; }
 .theme-preset-btn.active { background: #4477bb; color: #fff; border-color: #3366aa; }
 
 /* ---- Saved theme buttons ---- */
@@ -97,6 +100,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 /* ---- API key toggle ---- */
 .key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px 4px; color: #888; }
 .key-toggle:hover { color: #555; }
+.key-toggle:focus-visible { outline: 2px solid #4477bb; outline-offset: 1px; }
 
 /* ============================================================
    Theme System (CSS Custom Properties)
@@ -281,6 +285,12 @@ html[data-theme] .theme-preset-btn.active { background: var(--opt-accent); borde
 html[data-theme] .theme-group-label { color: var(--opt-fg-hint); }
 html[data-theme] .key-toggle { color: var(--opt-fg-hint); }
 html[data-theme] .key-toggle:hover { color: var(--opt-fg); }
+html[data-theme] .key-toggle:focus-visible { outline-color: var(--opt-accent); }
+html[data-theme] .theme-preset-btn:focus-visible { outline-color: var(--opt-accent); }
+html[data-theme] .accordion-header:focus-visible { outline-color: var(--opt-accent); }
+html[data-theme] .fg input[type="checkbox"]:focus-visible { outline-color: var(--opt-accent); }
+html[data-theme] .btn:focus-visible { outline-color: var(--opt-accent); }
+html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--opt-accent); }
 
 /* ---- Confirm popover (replaces native confirm()) ---- */
 .reset-tab-btn { position: relative; }
@@ -300,6 +310,7 @@ html[data-theme] .key-toggle:hover { color: var(--opt-fg); }
 .confirm-popover .confirm-yes:hover { background: #a00; }
 .confirm-popover .confirm-no { background: none; color: #666; border-color: #ccc; }
 .confirm-popover .confirm-no:hover { background: #eee; }
+.confirm-popover button:focus-visible { outline: 2px solid #4477bb; outline-offset: 1px; }
 @keyframes confirmFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
 html[data-theme] .confirm-popover { color: #e55; background: var(--opt-panel); border-color: var(--opt-border); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
@@ -323,6 +334,7 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--opt-btn-
   font-size: 12px; padding: 3px 7px; border: 1px solid #ccc; border-radius: 3px; width: 100%; box-sizing: border-box;
 }
 .theme-name-popover input[type="text"]:focus { outline: none; border-color: #4477bb; }
+.theme-name-popover input[type="text"]:focus-visible { box-shadow: 0 0 0 2px rgba(68,119,187,0.2); }
 .theme-name-popover .tnp-overwrite {
   font-size: 11px; color: #b85c00; margin: 0;
 }
@@ -342,6 +354,7 @@ html[data-theme] .theme-name-popover { background: var(--opt-panel); border-colo
 html[data-theme] .theme-name-popover label { color: var(--opt-fg-muted); }
 html[data-theme] .theme-name-popover input[type="text"] { background: var(--opt-input-bg); border-color: var(--opt-border); color: var(--opt-fg); }
 html[data-theme] .theme-name-popover input[type="text"]:focus { border-color: var(--opt-accent); }
+html[data-theme] .theme-name-popover input[type="text"]:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--opt-accent) 25%, transparent); }
 html[data-theme] .theme-name-popover .tnp-overwrite { color: var(--opt-warn, #e08040); }
 html[data-theme] .theme-name-popover .tnp-save { background: var(--opt-accent); border-color: var(--opt-accent); }
 html[data-theme] .theme-name-popover .tnp-cancel { color: var(--opt-fg-muted); border-color: var(--opt-border); background: none; }
