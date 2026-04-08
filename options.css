@@ -14,7 +14,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .tab-btn:focus-visible { outline: 2px solid #4477bb; outline-offset: -2px; }
 .tab-btn:hover:not(.active) { background: #e0e0e0; }
 .tab-btn.active { background: #fff; font-weight: bold; position: relative; top: 1px; }
-.reset-tab-btn { margin-left: auto; padding: 3px 10px; font-size: 11px; color: #999; background: none; border: 1px solid #ddd; cursor: pointer; border-radius: 3px; white-space: nowrap; transition: color 0.15s, border-color 0.15s; }
+.reset-tab-btn { margin-left: auto; padding: 3px 10px; font-size: 11px; color: #757575; background: none; border: 1px solid #ddd; cursor: pointer; border-radius: 3px; white-space: nowrap; transition: color 0.15s, border-color 0.15s; }
 .reset-tab-btn:hover { color: #c00; border-color: #c00; }
 
 /* ---- Panels ---- */
@@ -37,7 +37,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .fg input[type="checkbox"]:focus-visible { outline: 2px solid #4477bb; outline-offset: 1px; box-shadow: none; }
 
 /* ---- Common elements ---- */
-.hint { font-size: 11px; color: #999; margin-top: 2px; }
+.hint { font-size: 11px; color: #757575; margin-top: 2px; }
 .hint a { color: #4477bb; }
 .hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; }
 .divider { border-top: 1px solid #ddd; margin: 14px 0; }
@@ -76,14 +76,14 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 
 /* ---- Auto-save indicator ---- */
 .auto-save-hint {
-  float: right; font-size: 11px; color: #999; font-weight: normal;
+  float: right; font-size: 11px; color: #757575; font-weight: normal;
   transition: color 0.3s;
 }
 .auto-save-hint.saved { color: #080; }
 
 /* ---- Theme preset buttons ---- */
 .theme-presets-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
-.theme-group-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; width: 52px; flex-shrink: 0; }
+.theme-group-label { font-size: 10px; color: #757575; text-transform: uppercase; letter-spacing: 0.05em; width: 52px; flex-shrink: 0; }
 .theme-preset-btn:focus-visible { outline: 2px solid #4477bb; outline-offset: 2px; }
 .theme-preset-btn.active { background: #4477bb; color: #fff; border-color: #3366aa; }
 
@@ -108,7 +108,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 
 html[data-theme="modern-card"] {
   --opt-bg: #f0f2f5; --opt-panel: #fff; --opt-tab: #e8eaed; --opt-tab-active: #fff;
-  --opt-fg: #333; --opt-fg-muted: #555; --opt-fg-hint: #999;
+  --opt-fg: #333; --opt-fg-muted: #555; --opt-fg-hint: #757575;
   --opt-accent: #1a73e8; --opt-save: #1a73e8;
   --opt-border: #d0d0d0; --opt-border-section: #e0e0e0;
   --opt-input-bg: #fff; --opt-input-border: #d0d0d0;
@@ -117,7 +117,7 @@ html[data-theme="modern-card"] {
 }
 html[data-theme="nord-night"] {
   --opt-bg: #2e3440; --opt-panel: #3b4252; --opt-tab: #434c5e; --opt-tab-active: #3b4252;
-  --opt-fg: #d8dee9; --opt-fg-muted: #7b88a1; --opt-fg-hint: #6b7894;
+  --opt-fg: #d8dee9; --opt-fg-muted: #7b88a1; --opt-fg-hint: #8b9cc1;
   --opt-accent: #88c0d0; --opt-save: #a3be8c;
   --opt-border: #434c5e; --opt-border-section: #434c5e;
   --opt-input-bg: #434c5e; --opt-input-border: #4c566a;
@@ -135,7 +135,7 @@ html[data-theme="terminal"] {
 }
 html[data-theme="paper-ink"] {
   --opt-bg: #f5f0e8; --opt-panel: #faf8f5; --opt-tab: #f0ebe0; --opt-tab-active: #faf8f5;
-  --opt-fg: #2c2c2c; --opt-fg-muted: #7a6f60; --opt-fg-hint: #998f80;
+  --opt-fg: #2c2c2c; --opt-fg-muted: #7a6f60; --opt-fg-hint: #797165;
   --opt-accent: #1a3a5c; --opt-save: #1a3a5c;
   --opt-border: #e8dfd0; --opt-border-section: #e8dfd0;
   --opt-input-bg: #faf8f5; --opt-input-border: #d8cfc0;
@@ -144,7 +144,7 @@ html[data-theme="paper-ink"] {
 }
 html[data-theme="dracula"] {
   --opt-bg: #282a36; --opt-panel: #21222c; --opt-tab: #343746; --opt-tab-active: #21222c;
-  --opt-fg: #f8f8f2; --opt-fg-muted: #6272a4; --opt-fg-hint: #6272a4;
+  --opt-fg: #f8f8f2; --opt-fg-muted: #6272a4; --opt-fg-hint: #7b8fce;
   --opt-accent: #ff79c6; --opt-save: #50fa7b;
   --opt-border: #44475a; --opt-border-section: #44475a;
   --opt-input-bg: #343746; --opt-input-border: #44475a;
@@ -153,7 +153,7 @@ html[data-theme="dracula"] {
 }
 html[data-theme="flexoki-light"] {
   --opt-bg: #FFFCF0; --opt-panel: #FFFCF0; --opt-tab: #F2F0E5; --opt-tab-active: #FFFCF0;
-  --opt-fg: #100F0F; --opt-fg-muted: #6F6E69; --opt-fg-hint: #878580;
+  --opt-fg: #100F0F; --opt-fg-muted: #6F6E69; --opt-fg-hint: #75736f;
   --opt-accent: #205EA6; --opt-save: #66800B;
   --opt-border: #E6E4D9; --opt-border-section: #E6E4D9;
   --opt-input-bg: #FFFCF0; --opt-input-border: #E6E4D9;
@@ -162,7 +162,7 @@ html[data-theme="flexoki-light"] {
 }
 html[data-theme="flexoki-dark"] {
   --opt-bg: #1C1B1A; --opt-panel: #1C1B1A; --opt-tab: #282726; --opt-tab-active: #1C1B1A;
-  --opt-fg: #CECDC3; --opt-fg-muted: #878580; --opt-fg-hint: #6F6E69;
+  --opt-fg: #CECDC3; --opt-fg-muted: #878580; --opt-fg-hint: #85837e;
   --opt-accent: #4385BE; --opt-save: #879A39;
   --opt-border: #403E3C; --opt-border-section: #403E3C;
   --opt-input-bg: #282726; --opt-input-border: #403E3C;
@@ -172,7 +172,7 @@ html[data-theme="flexoki-dark"] {
 
 html[data-theme="solarized-light"] {
   --opt-bg: #fdf6e3; --opt-panel: #fdf6e3; --opt-tab: #eee8d5; --opt-tab-active: #fdf6e3;
-  --opt-fg: #586e75; --opt-fg-muted: #657b83; --opt-fg-hint: #93a1a1;
+  --opt-fg: #586e75; --opt-fg-muted: #657b83; --opt-fg-hint: #697373;
   --opt-accent: #268bd2; --opt-save: #859900;
   --opt-border: #d3cbb7; --opt-border-section: #eee8d5;
   --opt-input-bg: #fdf6e3; --opt-input-border: #d3cbb7;
@@ -181,7 +181,7 @@ html[data-theme="solarized-light"] {
 }
 html[data-theme="solarized-dark"] {
   --opt-bg: #002b36; --opt-panel: #002b36; --opt-tab: #073642; --opt-tab-active: #002b36;
-  --opt-fg: #839496; --opt-fg-muted: #93a1a1; --opt-fg-hint: #586e75;
+  --opt-fg: #839496; --opt-fg-muted: #93a1a1; --opt-fg-hint: #75929b;
   --opt-accent: #268bd2; --opt-save: #859900;
   --opt-border: #094b5a; --opt-border-section: #073642;
   --opt-input-bg: #0a3d4a; --opt-input-border: #0a4a5a;
@@ -190,7 +190,7 @@ html[data-theme="solarized-dark"] {
 }
 html[data-theme="catppuccin-latte"] {
   --opt-bg: #eff1f5; --opt-panel: #eff1f5; --opt-tab: #e6e9ef; --opt-tab-active: #eff1f5;
-  --opt-fg: #4c4f69; --opt-fg-muted: #6c6f85; --opt-fg-hint: #8c8fa1;
+  --opt-fg: #4c4f69; --opt-fg-muted: #6c6f85; --opt-fg-hint: #6b6d7b;
   --opt-accent: #1e66f5; --opt-save: #40a02b;
   --opt-border: #ccd0da; --opt-border-section: #dce0e8;
   --opt-input-bg: #eff1f5; --opt-input-border: #ccd0da;
@@ -199,7 +199,7 @@ html[data-theme="catppuccin-latte"] {
 }
 html[data-theme="catppuccin-mocha"] {
   --opt-bg: #1e1e2e; --opt-panel: #1e1e2e; --opt-tab: #313244; --opt-tab-active: #1e1e2e;
-  --opt-fg: #cdd6f4; --opt-fg-muted: #a6adc8; --opt-fg-hint: #7f849c;
+  --opt-fg: #cdd6f4; --opt-fg-muted: #a6adc8; --opt-fg-hint: #81869f;
   --opt-accent: #89b4fa; --opt-save: #a6e3a1;
   --opt-border: #45475a; --opt-border-section: #45475a;
   --opt-input-bg: #262637; --opt-input-border: #45475a;
@@ -208,7 +208,7 @@ html[data-theme="catppuccin-mocha"] {
 }
 html[data-theme="gruvbox-dark"] {
   --opt-bg: #282828; --opt-panel: #282828; --opt-tab: #3c3836; --opt-tab-active: #282828;
-  --opt-fg: #ebdbb2; --opt-fg-muted: #a89984; --opt-fg-hint: #928374;
+  --opt-fg: #ebdbb2; --opt-fg-muted: #a89984; --opt-fg-hint: #9c8c7c;
   --opt-accent: #83a598; --opt-save: #b8bb26;
   --opt-border: #504945; --opt-border-section: #504945;
   --opt-input-bg: #32302f; --opt-input-border: #504945;
@@ -217,7 +217,7 @@ html[data-theme="gruvbox-dark"] {
 }
 html[data-theme="rose-pine"] {
   --opt-bg: #191724; --opt-panel: #191724; --opt-tab: #1f1d2e; --opt-tab-active: #191724;
-  --opt-fg: #e0def4; --opt-fg-muted: #908caa; --opt-fg-hint: #6e6a86;
+  --opt-fg: #e0def4; --opt-fg-muted: #908caa; --opt-fg-hint: #827d9e;
   --opt-accent: #c4a7e7; --opt-save: #9ccfd8;
   --opt-border: #393552; --opt-border-section: #26233a;
   --opt-input-bg: #26233a; --opt-input-border: #393552;
@@ -226,7 +226,7 @@ html[data-theme="rose-pine"] {
 }
 html[data-theme="github-light"] {
   --opt-bg: #f6f8fa; --opt-panel: #ffffff; --opt-tab: #eaeef2; --opt-tab-active: #ffffff;
-  --opt-fg: #1f2328; --opt-fg-muted: #656d76; --opt-fg-hint: #8b949e;
+  --opt-fg: #1f2328; --opt-fg-muted: #656d76; --opt-fg-hint: #70777f;
   --opt-accent: #0969da; --opt-save: #1a7f37;
   --opt-border: #d0d7de; --opt-border-section: #d8dee4;
   --opt-input-bg: #ffffff; --opt-input-border: #d0d7de;
