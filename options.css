@@ -10,7 +10,8 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 
 /* ---- Tabs ---- */
 .tabs { display: flex; gap: 0; border-bottom: 1px solid #ccc; margin-bottom: 0; align-items: center; }
-.tab-btn { padding: 6px 16px; border: 1px solid #ccc; border-bottom: none; background: #eee; cursor: pointer; font-size: 12px; margin-right: -1px; transition: background 0.15s, color 0.15s; }
+.tab-btn { padding: 6px 16px; border: 1px solid #ccc; border-bottom: none; background: #eee; cursor: pointer; font-size: 12px; margin-right: -1px; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+.tab-btn:focus-visible { outline: 2px solid #4477bb; outline-offset: -2px; }
 .tab-btn:hover:not(.active) { background: #e0e0e0; }
 .tab-btn.active { background: #fff; font-weight: bold; position: relative; top: 1px; }
 .reset-tab-btn { margin-left: auto; padding: 3px 10px; font-size: 11px; color: #999; background: none; border: 1px solid #ddd; cursor: pointer; border-radius: 3px; white-space: nowrap; transition: color 0.15s, border-color 0.15s; }
@@ -22,28 +23,31 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 @keyframes panelFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ---- Form groups ---- */
-.fg { margin-bottom: 12px; }
+.fg { margin-bottom: 10px; }
 .fg label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; margin-bottom: 4px; }
 .fg label.bl { display: block; font-weight: bold; margin-bottom: 4px; cursor: default; font-size: 12px; color: #555; }
 .fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea {
   width: 100%; padding: 4px 8px; border: 1px solid #bbb; font-size: 13px; font-family: inherit;
   -webkit-appearance: none; appearance: none; box-shadow: none;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .fg textarea { resize: vertical; min-height: 80px; font-family: monospace; font-size: 11px; line-height: 1.5; }
 .fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: #4477bb; }
+.fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible { box-shadow: 0 0 0 2px rgba(68,119,187,0.2); }
 
 /* ---- Common elements ---- */
 .hint { font-size: 11px; color: #999; margin-top: 2px; }
 .hint a { color: #4477bb; }
 .hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; }
 .divider { border-top: 1px solid #ddd; margin: 14px 0; }
-.btn { padding: 4px 16px; font-size: 12px; cursor: pointer; border: 1px solid #999; background: #f5f5f0; }
+.btn { padding: 4px 16px; font-size: 12px; cursor: pointer; border: 1px solid #999; background: #f5f5f0; transition: background 0.15s, border-color 0.15s, transform 0.15s; }
 .btn:hover { background: #eee; }
+.btn:focus-visible { outline: 2px solid #4477bb; outline-offset: 2px; }
 .btn-sm { padding: 2px 10px; font-size: 11px; }
 .save-status { font-size: 12px; color: #080; margin-left: 8px; }
 .field-warn { display:none; font-size: 12px; color: #b85c00; margin-top: 4px; }
 .field-warn.visible { display: block; }
-.section-title { font-size: 13px; font-weight: bold; color: #444; margin-bottom: 8px; margin-top: 4px; }
+.section-title { font-size: 13px; font-weight: bold; color: #444; margin-bottom: 8px; margin-top: 8px; }
 
 /* ---- Provider fields ---- */
 .pf { margin-top: 8px; padding: 10px; background: #f9f9f6; border: 1px solid #e0e0d8; }
@@ -56,7 +60,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .accordion-header {
   display: flex; align-items: center; gap: 6px;
   padding: 10px 0; cursor: pointer; font-size: 13px; font-weight: bold; color: #444;
-  user-select: none;
+  user-select: none; transition: color 0.15s;
 }
 .accordion-header:hover { color: #2255aa; }
 .accordion-arrow {
@@ -254,6 +258,9 @@ html[data-theme] .fg input[type="number"], html[data-theme] .fg select, html[dat
 }
 html[data-theme] .fg input:focus, html[data-theme] .fg select:focus, html[data-theme] .fg textarea:focus {
   border-color: var(--opt-accent);
+}
+html[data-theme] .fg input:focus-visible, html[data-theme] .fg select:focus-visible, html[data-theme] .fg textarea:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--opt-accent) 25%, transparent);
 }
 html[data-theme] .hint { color: var(--opt-fg-hint); }
 html[data-theme] .hint a { color: var(--opt-accent); }
