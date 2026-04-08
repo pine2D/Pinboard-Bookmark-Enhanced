@@ -77,18 +77,18 @@ a:hover { text-decoration: underline; }
 }
 .label.top { padding-top: 4px; align-self: flex-start; }
 .field { flex: 1; min-width: 0; }
-.field input[type="text"], .field textarea {
+.field > input[type="text"], .field > textarea {
   width: 100%; padding: 3px 5px; border: 1px solid #bbb;
   font-size: 12px; font-family: inherit; background: #fafaf8;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
-.field input[type="text"]:focus, .field textarea:focus {
+.field > input[type="text"]:focus, .field > textarea:focus {
   outline: none; border-color: #4477bb; background: #fff;
 }
-.field input[type="text"]:focus-visible, .field textarea:focus-visible {
+.field > input[type="text"]:focus-visible, .field > textarea:focus-visible {
   box-shadow: 0 0 0 2px rgba(68,119,187,0.2);
 }
-.field textarea {
+.field > textarea {
   resize: vertical;
   min-height: 54px;
   max-height: 300px;
@@ -398,9 +398,9 @@ html.dark .header-bar { background: #252525; border-color: #444; color: #aaa; }
 html.dark .header-bar a { color: #aaa; }
 html.dark .login-body p { color: #bbb; }
 html.dark .login-body input { background: #2a2a2a; border-color: #555; color: #e0e0e0; }
-html.dark .field input[type="text"], html.dark .field textarea { background: #2a2a2a; border-color: #555; color: #e0e0e0; }
-html.dark .field input[type="text"]:focus, html.dark .field textarea:focus { border-color: #4477bb; background: #1e2a3a; }
-html.dark .field input[type="text"]:focus-visible, html.dark .field textarea:focus-visible { box-shadow: 0 0 0 2px rgba(68,119,187,0.25); }
+html.dark .field > input[type="text"], html.dark .field > textarea { background: #2a2a2a; border-color: #555; color: #e0e0e0; }
+html.dark .field > input[type="text"]:focus, html.dark .field > textarea:focus { border-color: #4477bb; background: #1e2a3a; }
+html.dark .field > input[type="text"]:focus-visible, html.dark .field > textarea:focus-visible { box-shadow: 0 0 0 2px rgba(68,119,187,0.25); }
 html.dark .tags-input-wrap { background: #2a2a2a; border-color: #555; }
 html.dark .tags-input-wrap:focus-within { border-color: #4477bb; background: #1e2a3a; box-shadow: 0 0 0 2px rgba(68,119,187,0.25); }
 html.dark .tags-input-wrap input { background: transparent; color: #e0e0e0; }
@@ -700,13 +700,13 @@ html[data-theme] .login-body input:focus { border-color: var(--pp-accent); backg
 html[data-theme] .login-body input:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 25%, transparent); }
 html[data-theme] .login-body button { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-fg); }
 html[data-theme] .login-body button:hover { background: var(--pp-input-focus-bg); }
-html[data-theme] .field input[type="text"], html[data-theme] .field textarea {
+html[data-theme] .field > input[type="text"], html[data-theme] .field > textarea {
   background: var(--pp-input-bg); border-color: var(--pp-border); color: var(--pp-fg);
 }
-html[data-theme] .field input[type="text"]:focus, html[data-theme] .field textarea:focus {
+html[data-theme] .field > input[type="text"]:focus, html[data-theme] .field > textarea:focus {
   border-color: var(--pp-accent); background: var(--pp-input-focus-bg);
 }
-html[data-theme] .field input[type="text"]:focus-visible, html[data-theme] .field textarea:focus-visible {
+html[data-theme] .field > input[type="text"]:focus-visible, html[data-theme] .field > textarea:focus-visible {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 25%, transparent);
 }
 html[data-theme] .tags-input-wrap { background: var(--pp-input-bg); border-color: var(--pp-border); }
@@ -784,4 +784,4 @@ html[data-theme] .status-msg.success { color: var(--pp-ok-fg); }
 html[data-theme] .status-msg.error { color: var(--pp-danger); }
 /* Terminal monospace */
 html[data-theme="terminal"] body { font-family: "Courier New", Consolas, monospace; }
-html[data-theme="terminal"] .field textarea { font-family: "Courier New", Consolas, monospace; }
+html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Consolas, monospace; }
