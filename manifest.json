@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "2.4.6",
+  "version": "2.4.7",
   "description": "__MSG_extDescription__",
   "default_locale": "en",
   "permissions": [
@@ -25,9 +25,12 @@
     "https://api.groq.com/*",
     "https://api.mistral.ai/*",
     "https://api.cohere.com/*",
-    "https://api.siliconflow.cn/*"
+    "https://api.siliconflow.cn/*",
+    "https://open.bigmodel.cn/*",
+    "https://api.moonshot.cn/*"
   ],
   "optional_host_permissions": [
+    "*://*/*",
     "http://localhost:*/*",
     "http://127.0.0.1:*/*"
   ],

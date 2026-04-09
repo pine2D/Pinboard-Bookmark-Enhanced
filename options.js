@@ -47,16 +47,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-ai-provider": "gemini", "opt-ai-summary-lang": "auto", "opt-ai-cache-duration": "60",
         "opt-ai-auto-tags": false, "opt-ai-tag-separator": "-",
         "opt-custom-tag-prompt": "", "opt-custom-summary-prompt": "",
-        "opt-gemini-model": "gemini-2.0-flash", "opt-openai-model": "gpt-4o-mini",
-        "opt-openai-baseurl": "https://api.openai.com/v1", "opt-claude-model": "claude-sonnet-4-20250514",
-        "opt-deepseek-model": "deepseek-chat", "opt-qwen-model": "qwen-turbo",
-        "opt-minimax-model": "MiniMax-Text-01", "opt-openrouter-model": "google/gemini-2.0-flash-exp:free",
-        "opt-groq-model": "llama-3.3-70b-versatile", "opt-mistral-model": "mistral-small-latest",
-        "opt-cohere-model": "command-r-plus", "opt-siliconflow-model": "Qwen/Qwen2.5-7B-Instruct",
+        "opt-gemini-model": "gemini-2.5-flash-lite", "opt-openai-model": "gpt-4.1-nano",
+        "opt-openai-baseurl": "https://api.openai.com/v1", "opt-claude-model": "claude-haiku-4-5-20251001",
+        "opt-deepseek-model": "deepseek-chat", "opt-qwen-model": "qwen-flash",
+        "opt-minimax-model": "MiniMax-Text-01", "opt-openrouter-model": "meta-llama/llama-4-scout:free",
+        "opt-groq-model": "meta-llama/llama-4-scout-17b-16e-instruct", "opt-mistral-model": "mistral-small-latest",
+        "opt-cohere-model": "command-r-08-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B",
+        "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.5",
         "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3",
         "opt-custom-name": "Custom", "opt-custom-baseurl": "", "opt-custom-model": ""
       },
-      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-custom-key"]
+      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-custom-key"]
     },
     quick: {
       fields: {
@@ -164,10 +165,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-mistral-key": s.mistralApiKey, "opt-mistral-model": s.mistralModel,
     "opt-cohere-key": s.cohereApiKey, "opt-cohere-model": s.cohereModel,
     "opt-siliconflow-key": s.siliconflowApiKey, "opt-siliconflow-model": s.siliconflowModel,
+    "opt-zhipu-key": s.zhipuApiKey, "opt-zhipu-model": s.zhipuModel,
+    "opt-kimi-key": s.kimiApiKey, "opt-kimi-model": s.kimiModel,
     "opt-ollama-baseurl": s.ollamaBaseUrl, "opt-ollama-model": s.ollamaModel,
     "opt-custom-name": s.customName, "opt-custom-baseurl": s.customBaseUrl,
     "opt-custom-key": s.customApiKey, "opt-custom-model": s.customModel,
-    "opt-ai-summary-lang": s.aiSummaryLang, "opt-ai-cache-duration": s.aiCacheDuration,
+    "opt-ai-tag-lang": s.aiTagLang, "opt-ai-summary-lang": s.aiSummaryLang, "opt-ai-cache-duration": s.aiCacheDuration,
     "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
     "opt-batch-tag": s.optBatchTag, "opt-lang": s.optLang, "opt-theme": s.optTheme,
     "qs-default-tags": s.qsDefaultTags, "rl-default-tags": s.rlDefaultTags,
@@ -302,7 +305,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- Provider field toggle ----
-  const providers = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","ollama","custom"];
+  const providers = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ollama","custom"];
   function updateProviderFields() {
     const selected = document.getElementById("opt-ai-provider").value;
     providers.forEach(p => {
@@ -357,28 +360,32 @@ document.addEventListener("DOMContentLoaded", async () => {
       // AI Provider & Keys
       aiProvider: document.getElementById("opt-ai-provider").value,
       geminiApiKey: obfuscateKey(document.getElementById("opt-gemini-key").value.trim()),
-      geminiModel: document.getElementById("opt-gemini-model").value.trim() || "gemini-2.0-flash",
+      geminiModel: document.getElementById("opt-gemini-model").value.trim() || "gemini-2.5-flash-lite",
       openaiApiKey: obfuscateKey(document.getElementById("opt-openai-key").value.trim()),
-      openaiModel: document.getElementById("opt-openai-model").value.trim() || "gpt-4o-mini",
+      openaiModel: document.getElementById("opt-openai-model").value.trim() || "gpt-4.1-nano",
       openaiBaseUrl: document.getElementById("opt-openai-baseurl").value.trim() || "https://api.openai.com/v1",
       claudeApiKey: obfuscateKey(document.getElementById("opt-claude-key").value.trim()),
-      claudeModel: document.getElementById("opt-claude-model").value.trim() || "claude-sonnet-4-20250514",
+      claudeModel: document.getElementById("opt-claude-model").value.trim() || "claude-haiku-4-5-20251001",
       deepseekApiKey: obfuscateKey(document.getElementById("opt-deepseek-key").value.trim()),
       deepseekModel: document.getElementById("opt-deepseek-model").value.trim() || "deepseek-chat",
       qwenApiKey: obfuscateKey(document.getElementById("opt-qwen-key").value.trim()),
-      qwenModel: document.getElementById("opt-qwen-model").value.trim() || "qwen-turbo",
+      qwenModel: document.getElementById("opt-qwen-model").value.trim() || "qwen-flash",
       minimaxApiKey: obfuscateKey(document.getElementById("opt-minimax-key").value.trim()),
       minimaxModel: document.getElementById("opt-minimax-model").value.trim() || "MiniMax-Text-01",
       openrouterApiKey: obfuscateKey(document.getElementById("opt-openrouter-key").value.trim()),
-      openrouterModel: document.getElementById("opt-openrouter-model").value.trim() || "google/gemini-2.0-flash-exp:free",
+      openrouterModel: document.getElementById("opt-openrouter-model").value.trim() || "meta-llama/llama-4-scout:free",
       groqApiKey: obfuscateKey(document.getElementById("opt-groq-key").value.trim()),
-      groqModel: document.getElementById("opt-groq-model").value.trim() || "llama-3.3-70b-versatile",
+      groqModel: document.getElementById("opt-groq-model").value.trim() || "meta-llama/llama-4-scout-17b-16e-instruct",
       mistralApiKey: obfuscateKey(document.getElementById("opt-mistral-key").value.trim()),
       mistralModel: document.getElementById("opt-mistral-model").value.trim() || "mistral-small-latest",
       cohereApiKey: obfuscateKey(document.getElementById("opt-cohere-key").value.trim()),
-      cohereModel: document.getElementById("opt-cohere-model").value.trim() || "command-r-plus",
+      cohereModel: document.getElementById("opt-cohere-model").value.trim() || "command-r-08-2024",
       siliconflowApiKey: obfuscateKey(document.getElementById("opt-siliconflow-key").value.trim()),
-      siliconflowModel: document.getElementById("opt-siliconflow-model").value.trim() || "Qwen/Qwen2.5-7B-Instruct",
+      siliconflowModel: document.getElementById("opt-siliconflow-model").value.trim() || "Qwen/Qwen3-8B",
+      zhipuApiKey: obfuscateKey(document.getElementById("opt-zhipu-key").value.trim()),
+      zhipuModel: document.getElementById("opt-zhipu-model").value.trim() || "glm-4.7-flash",
+      kimiApiKey: obfuscateKey(document.getElementById("opt-kimi-key").value.trim()),
+      kimiModel: document.getElementById("opt-kimi-model").value.trim() || "kimi-k2.5",
       ollamaBaseUrl: document.getElementById("opt-ollama-baseurl").value.trim() || "http://localhost:11434",
       ollamaModel: document.getElementById("opt-ollama-model").value.trim() || "llama3",
       customName: document.getElementById("opt-custom-name").value.trim() || "Custom",
@@ -387,6 +394,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       customModel: document.getElementById("opt-custom-model").value.trim(),
       // AI Behavior & Prompts
       optAiAutoTags: document.getElementById("opt-ai-auto-tags").checked,
+      aiTagLang: document.getElementById("opt-ai-tag-lang").value,
       aiSummaryLang: document.getElementById("opt-ai-summary-lang").value,
       aiCacheDuration: Math.max(0, parseInt(document.getElementById("opt-ai-cache-duration").value) || 60),
       aiTagSeparator: document.getElementById("opt-ai-tag-separator").value,
@@ -507,18 +515,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const cs = {
       aiProvider: provider,
-      geminiApiKey: getOptVal("opt-gemini-key"), geminiModel: getOptVal("opt-gemini-model", "gemini-2.0-flash"),
-      openaiApiKey: getOptVal("opt-openai-key"), openaiModel: getOptVal("opt-openai-model", "gpt-4o-mini"), openaiBaseUrl: getOptVal("opt-openai-baseurl", "https://api.openai.com/v1"),
-      claudeApiKey: getOptVal("opt-claude-key"), claudeModel: getOptVal("opt-claude-model", "claude-sonnet-4-20250514"),
+      geminiApiKey: getOptVal("opt-gemini-key"), geminiModel: getOptVal("opt-gemini-model", "gemini-2.5-flash-lite"),
+      openaiApiKey: getOptVal("opt-openai-key"), openaiModel: getOptVal("opt-openai-model", "gpt-4.1-nano"), openaiBaseUrl: getOptVal("opt-openai-baseurl", "https://api.openai.com/v1"),
+      claudeApiKey: getOptVal("opt-claude-key"), claudeModel: getOptVal("opt-claude-model", "claude-haiku-4-5-20251001"),
       deepseekApiKey: getOptVal("opt-deepseek-key"), deepseekModel: getOptVal("opt-deepseek-model", "deepseek-chat"),
-      qwenApiKey: getOptVal("opt-qwen-key"), qwenModel: getOptVal("opt-qwen-model", "qwen-turbo"),
+      qwenApiKey: getOptVal("opt-qwen-key"), qwenModel: getOptVal("opt-qwen-model", "qwen-flash"),
       minimaxApiKey: getOptVal("opt-minimax-key"), minimaxModel: getOptVal("opt-minimax-model", "MiniMax-Text-01"),
-      openrouterApiKey: getOptVal("opt-openrouter-key"), openrouterModel: getOptVal("opt-openrouter-model", "google/gemini-2.0-flash-exp:free"),
+      openrouterApiKey: getOptVal("opt-openrouter-key"), openrouterModel: getOptVal("opt-openrouter-model", "meta-llama/llama-4-scout:free"),
       ollamaBaseUrl: getOptVal("opt-ollama-baseurl", "http://localhost:11434"), ollamaModel: getOptVal("opt-ollama-model", "llama3"),
-      groqApiKey: getOptVal("opt-groq-key"), groqModel: getOptVal("opt-groq-model", "llama-3.3-70b-versatile"),
+      groqApiKey: getOptVal("opt-groq-key"), groqModel: getOptVal("opt-groq-model", "meta-llama/llama-4-scout-17b-16e-instruct"),
       mistralApiKey: getOptVal("opt-mistral-key"), mistralModel: getOptVal("opt-mistral-model", "mistral-small-latest"),
-      cohereApiKey: getOptVal("opt-cohere-key"), cohereModel: getOptVal("opt-cohere-model", "command-r-plus"),
-      siliconflowApiKey: getOptVal("opt-siliconflow-key"), siliconflowModel: getOptVal("opt-siliconflow-model", "Qwen/Qwen2.5-7B-Instruct"),
+      cohereApiKey: getOptVal("opt-cohere-key"), cohereModel: getOptVal("opt-cohere-model", "command-r-08-2024"),
+      siliconflowApiKey: getOptVal("opt-siliconflow-key"), siliconflowModel: getOptVal("opt-siliconflow-model", "Qwen/Qwen3-8B"),
+      zhipuApiKey: getOptVal("opt-zhipu-key"), zhipuModel: getOptVal("opt-zhipu-model", "glm-4.7-flash"),
+      kimiApiKey: getOptVal("opt-kimi-key"), kimiModel: getOptVal("opt-kimi-model", "kimi-k2.5"),
       customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
     };
 
@@ -537,7 +547,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","ollama","custom"].forEach(p => {
+  ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ollama","custom"].forEach(p => {
     document.getElementById(`test-${p}`)?.addEventListener("click", () => testAIProvider(p));
   });
 

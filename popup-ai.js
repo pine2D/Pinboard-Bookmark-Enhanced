@@ -196,11 +196,25 @@ function renderAITags(tags, fromCache) {
     return;
   }
 
-  tags.forEach((tag) => {
+  // Sort: matched tags (by count desc) first, unmatched keep original order
+  const sorted = [...tags].sort((a, b) => {
+    const ca = allUserTagCounts[a] || 0, cb = allUserTagCounts[b] || 0;
+    if (ca && !cb) return -1;
+    if (!ca && cb) return 1;
+    return 0;
+  });
+  sorted.forEach((tag) => {
     const el = document.createElement("span");
     el.className = "stag ai";
-    el.textContent = tag;
     el.dataset.tag = tag;
+    el.appendChild(document.createTextNode(tag));
+    const count = allUserTagCounts[tag];
+    if (count) {
+      const cs = document.createElement("span");
+      cs.className = "ac-count";
+      cs.textContent = ` (${count})`;
+      el.appendChild(cs);
+    }
     el.addEventListener("click", () => { addTag(tag); el.classList.add("used"); });
     container.appendChild(el);
   });

@@ -169,7 +169,7 @@ a.help { color: #9aa0a6 !important; background: #e4e6e9 !important; text-decorat
 #note_right_column { background: #fff !important; border-radius: 8px !important; padding: 16px !important; }
 
 /* ---- Profile Page ---- */
-.service_box {
+.service_box, .help_box {
   background: #fff !important; border: 1px solid #e8e8e8 !important;
   border-radius: 8px !important; padding: 16px !important; margin-bottom: 12px !important;
   box-sizing: border-box !important;
@@ -326,7 +326,7 @@ input[type="radio"] { accent-color: #88c0d0 !important; }
 #note_right_column { background: #3b4252 !important; color: #d8dee9 !important; padding: 16px !important; border-left: 1px solid #434c5e !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #3b4252 !important; border: 1px solid #434c5e !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #3b4252 !important; border: 1px solid #434c5e !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #81a1c1 !important; }
 #profile_main_column table td, #profile_right_column table td { color: #d8dee9 !important; }
 
@@ -494,7 +494,7 @@ input[type="radio"] { accent-color: #33ff33 !important; }
 #note_right_column { background: #0a0a0a !important; color: #22aa22 !important; padding: 16px !important; border-left: 1px dashed #33ff3325 !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #111 !important; border: 1px dashed #33ff3340 !important; color: #33ff33 !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #111 !important; border: 1px dashed #33ff3340 !important; color: #33ff33 !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #33ff33 !important; }
 #profile_main_column table td, #profile_right_column table td { color: #33ff33 !important; }
 
@@ -655,7 +655,7 @@ a.help { color: #aaa !important; background: #1a1a1a !important; }
 #note_right_column { background: #f5f0e8 !important; padding: 16px !important; border-left: 1px solid #d4c5a9 !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #f5f0e8 !important; border: 1px solid #e8dfd0 !important; border-radius: 4px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #f5f0e8 !important; border: 1px solid #e8dfd0 !important; border-radius: 4px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 {
   color: #6b4c3b !important; font-family: "Georgia", serif !important;
 }
@@ -814,7 +814,7 @@ input[type="radio"] { accent-color: #bd93f9 !important; }
 #note_right_column { background: #21222c !important; color: #f8f8f2 !important; padding: 16px !important; border-left: 1px solid #44475a !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #21222c !important; border: 1px solid #44475a !important; color: #f8f8f2 !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #21222c !important; border: 1px solid #44475a !important; color: #f8f8f2 !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #bd93f9 !important; }
 #profile_main_column table td, #profile_right_column table td { color: #f8f8f2 !important; }
 
@@ -968,7 +968,7 @@ a.help { color: #B7B5AC !important; background: #F2F0E5 !important; }
 #note_right_column { background: #F2F0E5 !important; padding: 16px !important; border-left: 1px solid #E6E4D9 !important; }
 
 /* Profile */
-.service_box { background: #F2F0E5 !important; border: 1px solid #E6E4D9 !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #F2F0E5 !important; border: 1px solid #E6E4D9 !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #5E409D !important; }
 
 /* Bulk */
@@ -1086,7 +1086,7 @@ html.pbp-dark .note a { color: #4385BE !important; }
 html.pbp-dark #note_right_column { background: #282726 !important; color: #CECDC3 !important; padding: 16px !important; border-left: 1px solid #403E3C !important; }
 
 /* Profile (dark) */
-html.pbp-dark .service_box { background: #282726 !important; border: 1px solid #403E3C !important; color: #CECDC3 !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+html.pbp-dark .service_box, html.pbp-dark .help_box { background: #282726 !important; border: 1px solid #403E3C !important; color: #CECDC3 !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 html.pbp-dark #profile_main_column h2, html.pbp-dark #profile_left_column h2,
 html.pbp-dark #profile_right_column h2 { color: #8B7EC8 !important; }
 html.pbp-dark #profile_main_column table td, html.pbp-dark #profile_right_column table td { color: #CECDC3 !important; }
@@ -1244,7 +1244,7 @@ input[type="radio"] { accent-color: #268bd2 !important; }
 #note_right_column { background: #eee8d5 !important; color: #657b83 !important; padding: 16px !important; border-left: 1px solid #d6cdb5 !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #eee8d5 !important; border: 1px solid #d6cdb5 !important; border-radius: 2px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #eee8d5 !important; border: 1px solid #d6cdb5 !important; border-radius: 2px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #586e75 !important; }
 #profile_main_column table td, #profile_right_column table td { color: #657b83 !important; }
 
@@ -1400,7 +1400,7 @@ input[type="radio"] { accent-color: #268bd2 !important; }
 #note_right_column { background: #073642 !important; color: #839496 !important; padding: 16px !important; border-left: 1px solid #094b5a !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #073642 !important; border: 1px solid #094b5a !important; border-radius: 2px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #073642 !important; border: 1px solid #094b5a !important; border-radius: 2px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #93a1a1 !important; }
 #profile_main_column table td, #profile_right_column table td { color: #839496 !important; }
 
@@ -1555,7 +1555,7 @@ input[type="radio"] { accent-color: #1e66f5 !important; }
 #note_right_column { background: #e6e9ef !important; color: #4c4f69 !important; padding: 16px !important; border-left: 1px solid #ccd0da !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #e6e9ef !important; border: 1px solid #ccd0da !important; border-radius: 12px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important; }
+.service_box, .help_box { background: #e6e9ef !important; border: 1px solid #ccd0da !important; border-radius: 12px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #6c6f85 !important; }
 #profile_main_column table td, #profile_right_column table td { color: #4c4f69 !important; }
 
@@ -1710,7 +1710,7 @@ input[type="radio"] { accent-color: #89b4fa !important; }
 #note_right_column { background: #313244 !important; color: #cdd6f4 !important; padding: 16px !important; border-left: 1px solid #45475a !important; border-radius: 8px !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #313244 !important; border: 1px solid #45475a !important; border-radius: 12px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; }
+.service_box, .help_box { background: #313244 !important; border: 1px solid #45475a !important; border-radius: 12px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #cba6f7 !important; }
 #profile_main_column table td, #profile_right_column table td { color: #cdd6f4 !important; }
 
@@ -1868,7 +1868,7 @@ input[type="radio"] { accent-color: #83a598 !important; }
 #note_right_column { background: #3c3836 !important; color: #ebdbb2 !important; padding: 16px !important; border-left: 2px solid #504945 !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #3c3836 !important; border: 2px solid #504945 !important; border-radius: 0 !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #3c3836 !important; border: 2px solid #504945 !important; border-radius: 0 !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #d3869b !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; }
 #profile_main_column table td, #profile_right_column table td { color: #ebdbb2 !important; }
 
@@ -2026,7 +2026,7 @@ input[type="radio"] { accent-color: #c4a7e7 !important; }
 #note_right_column { background: #1f1d2e !important; color: #e0def4 !important; padding: 16px !important; border-left: 1px solid #26233a !important; border-radius: 8px !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #1f1d2e !important; border: 1px solid #26233a !important; border-radius: 8px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #1f1d2e !important; border: 1px solid #26233a !important; border-radius: 8px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #ebbcba !important; }
 #profile_main_column table td, #profile_right_column table td { color: #e0def4 !important; }
 
@@ -2181,7 +2181,7 @@ input[type="radio"] { accent-color: #0969da !important; }
 #note_right_column { background: #ffffff !important; color: #1f2328 !important; padding: 16px !important; border-left: 1px solid #d0d7de !important; }
 
 /* ---- Profile Page ---- */
-.service_box { background: #ffffff !important; border: 1px solid #d0d7de !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
+.service_box, .help_box { background: #ffffff !important; border: 1px solid #d0d7de !important; border-radius: 6px !important; padding: 16px !important; box-sizing: border-box !important; margin-bottom: 12px !important; }
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: #656d76 !important; }
 #profile_main_column table td, #profile_right_column table td { color: #1f2328 !important; }
 

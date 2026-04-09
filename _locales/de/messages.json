@@ -646,8 +646,11 @@
   "batchSkipExisting": {
     "message": "Bereits gespeicherte URLs überspringen"
   },
-  "batchWarning": {
-    "message": "⚠ AI-Funktionen bei Stapelspeicherung sind langsam — jeder Tab benötigt einen separaten AI-Aufruf mit 3s Wartezeit zwischen den Speicherungen."
+  "batchAiHint": {
+    "message": "⚠ AI-Funktionen sind langsam (separater AI-Aufruf pro Tab + 3s Wartezeit). Erfordert die Berechtigung 'Zugriff auf alle Websites' zum Lesen nicht aktiver Tabs — wird bei der ersten Nutzung angefordert."
+  },
+  "batchPermDenied": {
+    "message": "Berechtigung verweigert — AI-Funktionen benötigen Zugriff auf alle Websites, um Tab-Inhalte zu lesen."
   },
   "secAiProvider": {
     "message": "AI Anbieter"
@@ -720,6 +723,9 @@
   "optAiAutoTags": {
     "message": "AI Tags beim Öffnen des Popups automatisch generieren"
   },
+  "labelAiTagLang": {
+    "message": "AI Tag-Sprache"
+  },
   "labelAiSummaryLang": {
     "message": "AI Zusammenfassungssprache"
   },
@@ -728,6 +734,12 @@
   },
   "langZh": {
     "message": "中文 (Chinesisch)"
+  },
+  "langZhTW": {
+    "message": "中文（台灣）(Traditionell, Taiwan)"
+  },
+  "langZhHK": {
+    "message": "中文（香港）(Traditionell, Hongkong)"
   },
   "langEn": {
     "message": "English (Englisch)"
@@ -937,5 +949,50 @@
   },
   "qlPopularTitle": {
     "message": "Beliebt"
+  },
+  "provGemini": {
+    "message": "Google Gemini"
+  },
+  "provOpenai": {
+    "message": "OpenAI (ChatGPT)"
+  },
+  "provClaude": {
+    "message": "Anthropic Claude"
+  },
+  "provDeepseek": {
+    "message": "DeepSeek"
+  },
+  "provQwen": {
+    "message": "Qwen"
+  },
+  "provMinimax": {
+    "message": "MiniMax"
+  },
+  "provOpenrouter": {
+    "message": "OpenRouter"
+  },
+  "provGroq": {
+    "message": "Groq"
+  },
+  "provMistral": {
+    "message": "Mistral AI"
+  },
+  "provCohere": {
+    "message": "Cohere"
+  },
+  "provSiliconflow": {
+    "message": "SiliconFlow"
+  },
+  "provZhipu": {
+    "message": "Zhipu"
+  },
+  "provKimi": {
+    "message": "Kimi"
+  },
+  "provOllama": {
+    "message": "Ollama (Local)"
+  },
+  "provCustom": {
+    "message": "Custom OpenAI-compatible"
   }
 }

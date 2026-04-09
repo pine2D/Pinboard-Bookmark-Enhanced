@@ -646,8 +646,11 @@
   "batchSkipExisting": {
     "message": "跳過已收藏的網址"
   },
-  "batchWarning": {
-    "message": "⚠ 批量儲存中的 AI 功能會比較慢——每個標籤頁都需要單獨調用 AI，且儲存間隔為 3 秒。"
+  "batchAiHint": {
+    "message": "⚠ AI 功能會比較慢（每個標籤頁單獨調用 AI + 儲存間隔 3 秒）。需要「存取所有網站」權限以讀取非當前標籤頁內容，首次使用時會彈出授權。"
+  },
+  "batchPermDenied": {
+    "message": "權限被拒絕——AI 功能需要存取所有網站以讀取標籤頁內容。"
   },
   "secAiProvider": {
     "message": "AI 服務商"
@@ -720,6 +723,9 @@
   "optAiAutoTags": {
     "message": "開啟彈出窗口時自動產生 AI 標籤"
   },
+  "labelAiTagLang": {
+    "message": "AI 標籤語言"
+  },
   "labelAiSummaryLang": {
     "message": "AI 摘要語言"
   },
@@ -728,6 +734,12 @@
   },
   "langZh": {
     "message": "中文"
+  },
+  "langZhTW": {
+    "message": "中文（台灣）"
+  },
+  "langZhHK": {
+    "message": "中文（香港）"
   },
   "langEn": {
     "message": "English（英語）"
@@ -937,5 +949,50 @@
   },
   "qlPopularTitle": {
     "message": "熱門"
+  },
+  "provGemini": {
+    "message": "Google Gemini"
+  },
+  "provOpenai": {
+    "message": "OpenAI (ChatGPT)"
+  },
+  "provClaude": {
+    "message": "Anthropic Claude"
+  },
+  "provDeepseek": {
+    "message": "DeepSeek (深度求索)"
+  },
+  "provQwen": {
+    "message": "通义千问"
+  },
+  "provMinimax": {
+    "message": "MiniMax"
+  },
+  "provOpenrouter": {
+    "message": "OpenRouter"
+  },
+  "provGroq": {
+    "message": "Groq"
+  },
+  "provMistral": {
+    "message": "Mistral AI"
+  },
+  "provCohere": {
+    "message": "Cohere"
+  },
+  "provSiliconflow": {
+    "message": "SiliconFlow (矽基流動)"
+  },
+  "provZhipu": {
+    "message": "智譜"
+  },
+  "provKimi": {
+    "message": "Kimi (月之暗面)"
+  },
+  "provOllama": {
+    "message": "Ollama (本機)"
+  },
+  "provCustom": {
+    "message": "自訂 OpenAI 兼容"
   }
 }

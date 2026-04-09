@@ -646,8 +646,11 @@
   "batchSkipExisting": {
     "message": "跳过已收藏的网址"
   },
-  "batchWarning": {
-    "message": "⚠ 批量保存中的 AI 功能会比较慢——每个标签页都需要单独调用 AI，且保存间隔为 3 秒。"
+  "batchAiHint": {
+    "message": "⚠ AI 功能会比较慢（每个标签页单独调用 AI + 保存间隔 3 秒）。需要「访问所有网站」权限以读取非当前标签页内容，首次使用时会弹出授权。"
+  },
+  "batchPermDenied": {
+    "message": "权限被拒绝——AI 功能需要访问所有网站以读取标签页内容。"
   },
   "secAiProvider": {
     "message": "AI 服务商"
@@ -720,6 +723,9 @@
   "optAiAutoTags": {
     "message": "打开弹窗时自动生成 AI 标签"
   },
+  "labelAiTagLang": {
+    "message": "AI 标签语言"
+  },
   "labelAiSummaryLang": {
     "message": "AI 摘要语言"
   },
@@ -728,6 +734,12 @@
   },
   "langZh": {
     "message": "中文"
+  },
+  "langZhTW": {
+    "message": "中文（台灣）"
+  },
+  "langZhHK": {
+    "message": "中文（香港）"
   },
   "langEn": {
     "message": "English（英语）"
@@ -937,5 +949,50 @@
   },
   "qlPopularTitle": {
     "message": "热门"
+  },
+  "provGemini": {
+    "message": "Google Gemini"
+  },
+  "provOpenai": {
+    "message": "OpenAI (ChatGPT)"
+  },
+  "provClaude": {
+    "message": "Anthropic Claude"
+  },
+  "provDeepseek": {
+    "message": "DeepSeek (深度求索)"
+  },
+  "provQwen": {
+    "message": "通义千问"
+  },
+  "provMinimax": {
+    "message": "MiniMax"
+  },
+  "provOpenrouter": {
+    "message": "OpenRouter"
+  },
+  "provGroq": {
+    "message": "Groq"
+  },
+  "provMistral": {
+    "message": "Mistral AI"
+  },
+  "provCohere": {
+    "message": "Cohere"
+  },
+  "provSiliconflow": {
+    "message": "硅基流动"
+  },
+  "provZhipu": {
+    "message": "智谱"
+  },
+  "provKimi": {
+    "message": "Kimi (月之暗面)"
+  },
+  "provOllama": {
+    "message": "Ollama (本地)"
+  },
+  "provCustom": {
+    "message": "自定义 OpenAI 兼容"
   }
 }

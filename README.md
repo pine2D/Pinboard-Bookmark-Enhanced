@@ -10,7 +10,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 
 ## Highlights
 
-- **AI tags & summaries** from 13 providers (OpenAI, Claude, Gemini, DeepSeek, Groq, Mistral, Qwen, MiniMax, Cohere, SiliconFlow, OpenRouter, Ollama, Custom)
+- **AI tags & summaries** from 15 providers (Gemini, OpenAI, Claude, DeepSeek, Groq, Mistral, Qwen, MiniMax, Cohere, SiliconFlow, Zhipu, Kimi, OpenRouter, Ollama, Custom)
 - **13 built-in themes** that style both Pinboard.in and the extension UI simultaneously
 - **Quick Actions** — one-click save, read-later, and batch-save all tabs
 - **Privacy first** — all data stored locally, no analytics, no tracking
@@ -43,23 +43,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 | Result caching | Configurable TTL (default 60 min), cache indicator with regenerate option |
 | Auto-generate on open | Optional: trigger AI tags when popup opens |
 
-**Supported providers:**
-
-| Provider | Default Model | Auth |
-|----------|---------------|------|
-| Google Gemini | gemini-2.0-flash | API Key |
-| OpenAI | gpt-4o-mini | API Key (custom base URL) |
-| Anthropic Claude | claude-sonnet-4-20250514 | API Key |
-| DeepSeek | deepseek-chat | API Key |
-| Groq | llama-3.3-70b-versatile | API Key |
-| Mistral AI | mistral-small-latest | API Key |
-| Alibaba Qwen | qwen-turbo | API Key |
-| MiniMax | MiniMax-Text-01 | API Key |
-| Cohere | command-r-plus | API Key |
-| SiliconFlow | Qwen2.5-7B-Instruct | API Key |
-| OpenRouter | gemini-2.0-flash-exp:free | API Key |
-| Ollama | llama3 | Local, no key |
-| Custom | configurable | Custom base URL + optional key |
+**15 providers supported:** Gemini, OpenAI, Claude, DeepSeek, Groq, Mistral, Qwen, MiniMax, Cohere, SiliconFlow, Zhipu (智谱), Kimi, OpenRouter, Ollama (local), and any OpenAI-compatible endpoint.
 
 ### Themes
 
@@ -91,7 +75,7 @@ Plus:
 
 - **Quick Save** — save current page with default tags, no form needed
 - **Read Later** — one-click mark as read-later with default tags
-- **Batch Save** — save all open tabs as individual bookmarks with AI tags/summaries
+- **Batch Save** — save all open tabs as individual bookmarks with AI tags/summaries (requires optional "Access all websites" permission for AI features, prompted on first use)
 - **Keyboard shortcuts** — configurable via `chrome://extensions/shortcuts`
 
 ### Other
@@ -199,7 +183,7 @@ Then follow steps 3–5 above, selecting the cloned folder.
 
 ## 亮点
 
-- **AI 标签 & 摘要** — 支持 13 个 AI 服务商（OpenAI、Claude、Gemini、DeepSeek、Groq、Mistral、通义千问、MiniMax、Cohere、硅基流动、OpenRouter、Ollama、自定义）
+- **AI 标签 & 摘要** — 支持 15 个 AI 服务商（Gemini、OpenAI、Claude、DeepSeek、Groq、Mistral、通义千问、MiniMax、Cohere、硅基流动、智谱、Kimi、OpenRouter、Ollama、自定义）
 - **13 套内置主题** — 同时美化 Pinboard 网站和扩展界面
 - **快捷操作** — 一键保存、稍后阅读、批量保存所有标签页
 - **隐私优先** — 所有数据本地存储，无分析、无追踪
@@ -262,7 +246,7 @@ Then follow steps 3–5 above, selecting the cloned folder.
 
 - **快速保存** — 使用默认标签一键保存，无需填写表单
 - **稍后阅读** — 一键标记为稍后阅读
-- **批量保存** — 将所有标签页分别保存为独立书签，支持 AI 标签/摘要
+- **批量保存** — 将所有标签页分别保存为独立书签，支持 AI 标签/摘要（AI 功能需授权"访问所有网站"权限，首次使用时弹窗提示）
 - **键盘快捷键** — 通过 `chrome://extensions/shortcuts` 配置
 - `Escape` 关闭弹窗（或取消保存成功后的自动关闭倒计时）；`Ctrl+Enter` 保存
 - 保存后自动关闭可通过移动鼠标或按 Escape 取消

@@ -14,8 +14,8 @@ function setupTabSet() {
 
     try {
       const tabs = await chrome.tabs.query({ currentWindow: true });
-      const validTabs = tabs.filter(t =>
-        t.url && (t.url.startsWith("http://") || t.url.startsWith("https://"))
+      const validTabs = tabs.filter(tab =>
+        tab.url && (tab.url.startsWith("http://") || tab.url.startsWith("https://"))
       );
 
       if (validTabs.length === 0) {
@@ -25,9 +25,9 @@ function setupTabSet() {
         return;
       }
 
-      const tabsData = validTabs.map(t => ({
-        title: t.title || t.url,
-        url: t.url
+      const tabsData = validTabs.map(tab => ({
+        title: tab.title || tab.url,
+        url: tab.url
       }));
 
       await new Promise((resolve) => {
@@ -70,27 +70,41 @@ function setupTabSet() {
         return;
       }
       const tabs = await chrome.tabs.query({ currentWindow: true });
-      const validTabs = tabs.filter(t => t.url && (t.url.startsWith("http://") || t.url.startsWith("https://")));
+      const validTabs = tabs.filter(tab => tab.url && (tab.url.startsWith("http://") || tab.url.startsWith("https://")));
       if (!validTabs.length) {
         showStatus("status-msg", t("batchNoTabs"), "error");
         batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false;
         return;
       }
       const baseTags = settings.optBatchTagEnabled && settings.optBatchTag
-        ? settings.optBatchTag.split(/[,，]+/).map(t => t.trim().replace(/\s+/g, "-")).filter(Boolean)
+        ? settings.optBatchTag.split(/[,，]+/).map(s => s.trim().replace(/\s+/g, "-")).filter(Boolean)
         : [];
       const useAiTags = settings.batchAiTags && hasAIKey(settings);
       const useAiSummary = settings.batchAiSummary && hasAIKey(settings);
+
+      // Request host permission for content extraction (needed for non-active tabs)
+      if (useAiTags || useAiSummary) {
+        const hasPermission = await chrome.permissions.contains({ origins: ["*://*/*"] });
+        if (!hasPermission) {
+          const granted = await chrome.permissions.request({ origins: ["*://*/*"] });
+          if (!granted) {
+            showStatus("status-msg", t("batchPermDenied"), "error");
+            batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false;
+            return;
+          }
+        }
+      }
 
       let saved = 0, failed = 0, skipped = 0;
       let existingUrls = new Set();
       if (settings.batchSkipExisting) {
         existingUrls = await fetchExistingUrlSet(pinboardToken);
       }
+      let aiFailed = 0;
       for (let i = 0; i < validTabs.length; i++) {
-        const t = validTabs[i];
+        const tab = validTabs[i];
         batchBtn.textContent = t("batchProgress", String(i + 1), String(validTabs.length), String(saved), String(failed));
-        if (settings.batchSkipExisting && existingUrls.has(t.url)) {
+        if (settings.batchSkipExisting && existingUrls.has(tab.url)) {
           skipped++;
           continue;
         }
@@ -100,32 +114,32 @@ function setupTabSet() {
 
           if (useAiTags || useAiSummary) {
             let tabPageInfo = null;
-            try { tabPageInfo = await getPageInfoFromTab(t.id); } catch (e) { console.warn("batch: cannot extract page content for", t.url, e.message); }
+            try { tabPageInfo = await getPageInfoFromTab(tab.id); } catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
             if (tabPageInfo?.pageText) {
               const aiJobs = [];
               if (useAiTags) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(t.url, "tags", settings.aiCacheDuration);
+                  const cached = await getAICache(tab.url, "tags", settings.aiCacheDuration);
                   if (cached) return { type: "tags", result: cached };
-                  const prompt = buildTagPrompt(settings, t.title || t.url, t.url, tabPageInfo.pageText, "", []);
+                  const prompt = buildTagPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "", []);
                   const resp = await callAI(settings, prompt);
                   const rawTags = parseAITags(resp, settings.aiTagSeparator);
                   const aiTags = settings.optRespectTagCase
                     ? rawTags.map(tag => resolveTagCase(tag, tagCaseMap))
                     : rawTags;
-                  await setAICache(t.url, "tags", aiTags, settings.aiCacheDuration);
+                  await setAICache(tab.url, "tags", aiTags, settings.aiCacheDuration);
                   return { type: "tags", result: aiTags };
-                } catch (_) { return null; }
+                } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
               })());
               if (useAiSummary) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(t.url, "summary", settings.aiCacheDuration);
+                  const cached = await getAICache(tab.url, "summary", settings.aiCacheDuration);
                   if (cached) return { type: "summary", result: cached };
-                  const prompt = buildSummaryPrompt(settings, t.title || t.url, t.url, tabPageInfo.pageText, "");
+                  const prompt = buildSummaryPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "");
                   const summary = await callAI(settings, prompt);
-                  await setAICache(t.url, "summary", summary, settings.aiCacheDuration);
+                  await setAICache(tab.url, "summary", summary, settings.aiCacheDuration);
                   return { type: "summary", result: summary };
-                } catch (_) { return null; }
+                } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
               })());
               const results = await Promise.all(aiJobs);
               for (const r of results) {
@@ -137,14 +151,14 @@ function setupTabSet() {
           }
 
           const dedupedTags = [...new Set(tags.map(tag => tag.toLowerCase()))].map(lower => tags.find(tag => tag.toLowerCase() === lower));
-          const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${pinboardToken}&format=json&url=${enc(t.url)}&description=${enc(t.title || t.url)}&extended=${enc(notes)}&tags=${enc(dedupedTags.join(" "))}&replace=yes`;
+          const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${pinboardToken}&format=json&url=${enc(tab.url)}&description=${enc(tab.title || tab.url)}&extended=${enc(notes)}&tags=${enc(dedupedTags.join(" "))}&replace=yes`;
           const data = await (await pinboardFetch(apiUrl)).json();
           if (data.result_code === "done") saved++;
           else failed++;
         } catch (_) { failed++; }
       }
       if (saved > 0) {
-        const newUrls = validTabs.filter(t => !existingUrls.has(t.url)).map(t => t.url);
+        const newUrls = validTabs.filter(tab => !existingUrls.has(tab.url)).map(tab => tab.url);
         newUrls.forEach(u => existingUrls.add(u));
         try {
           await chrome.storage.local.set({
@@ -154,7 +168,8 @@ function setupTabSet() {
       }
       const tagStr = baseTags.join(", ");
       const skipMsg = skipped > 0 ? t("batchSkipped", String(skipped)) : "";
-      showStatus("status-msg", t("batchDone", String(saved), String(failed)) + skipMsg, saved > 0 ? "success" : "error");
+      const aiWarnMsg = aiFailed > 0 ? ` (AI failed: ${aiFailed})` : "";
+      showStatus("status-msg", t("batchDone", String(saved), String(failed)) + skipMsg + aiWarnMsg, saved > 0 ? "success" : "error");
       if (saved > 0) {
         const tagsSuffix = tagStr ? t("batchTaggedSuffix", tagStr) : "";
         chrome.runtime.sendMessage({ type: "show_notification", id: "batch-saved-" + Date.now(), title: t("bgBatchSaved"), message: t("batchSavedNotify", String(saved), tagsSuffix), category: "batchSave" });
@@ -178,7 +193,7 @@ function setupTagPresets() {
   const presets = raw.split("\n").map(line => {
     const m = line.match(/^(.+?)[:：]\s*(.+)$/);
     if (!m) return null;
-    return { name: m[1].trim(), tags: m[2].split(/[,，]+/).map(t => t.trim()).filter(Boolean) };
+    return { name: m[1].trim(), tags: m[2].split(/[,，]+/).map(s => s.trim()).filter(Boolean) };
   }).filter(Boolean);
   if (!presets.length) return;
   presetsRow.classList.remove("hidden");
@@ -188,7 +203,7 @@ function setupTagPresets() {
     btn.textContent = p.name;
     btn.title = p.tags.join(", ");
     btn.addEventListener("click", () => {
-      p.tags.forEach(t => addTag(t));
+      p.tags.forEach(tag => addTag(tag));
       btn.classList.add("used");
     });
     container.appendChild(btn);

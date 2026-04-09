@@ -12,7 +12,7 @@ const TEXTAREA_MIN_HEIGHT = 54;
 const TEXTAREA_MAX_HEIGHT = 300;
 const TAG_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-const DEFAULT_TAG_PROMPT = `Suggest 5-10 bookmark tags for the following webpage. Tags should be lowercase, {{separator_instruction}}. Return ONLY a JSON array.
+const DEFAULT_TAG_PROMPT = `Suggest 5-10 bookmark tags for the following webpage. {{lang_instruction}} Tags should be lowercase, {{separator_instruction}}. Return ONLY a JSON array.
 
 Title: {{title}}
 URL: {{url}}
@@ -40,20 +40,22 @@ function deobfuscateKey(val) {
 const SETTINGS_DEFAULTS = {
   pinboardToken: "",
   aiProvider: "gemini",
-  geminiApiKey: "", geminiModel: "gemini-2.0-flash",
-  openaiApiKey: "", openaiModel: "gpt-4o-mini", openaiBaseUrl: "https://api.openai.com/v1",
-  claudeApiKey: "", claudeModel: "claude-sonnet-4-20250514",
+  geminiApiKey: "", geminiModel: "gemini-2.5-flash-lite",
+  openaiApiKey: "", openaiModel: "gpt-4.1-nano", openaiBaseUrl: "https://api.openai.com/v1",
+  claudeApiKey: "", claudeModel: "claude-haiku-4-5-20251001",
   deepseekApiKey: "", deepseekModel: "deepseek-chat",
-  qwenApiKey: "", qwenModel: "qwen-turbo",
+  qwenApiKey: "", qwenModel: "qwen-flash",
   minimaxApiKey: "", minimaxModel: "MiniMax-Text-01",
-  openrouterApiKey: "", openrouterModel: "google/gemini-2.0-flash-exp:free",
-  groqApiKey: "", groqModel: "llama-3.3-70b-versatile",
+  openrouterApiKey: "", openrouterModel: "meta-llama/llama-4-scout:free",
+  groqApiKey: "", groqModel: "meta-llama/llama-4-scout-17b-16e-instruct",
   mistralApiKey: "", mistralModel: "mistral-small-latest",
-  cohereApiKey: "", cohereModel: "command-r-plus",
-  siliconflowApiKey: "", siliconflowModel: "Qwen/Qwen2.5-7B-Instruct",
+  cohereApiKey: "", cohereModel: "command-r-08-2024",
+  siliconflowApiKey: "", siliconflowModel: "Qwen/Qwen3-8B",
+  zhipuApiKey: "", zhipuModel: "glm-4.7-flash",
+  kimiApiKey: "", kimiModel: "kimi-k2.5",
   ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3",
   customApiKey: "", customModel: "", customBaseUrl: "", customName: "Custom",
-  aiSummaryLang: "auto", aiCacheDuration: 60,
+  aiTagLang: "en", aiSummaryLang: "auto", aiCacheDuration: 60,
   customTagPrompt: "", customSummaryPrompt: "",
   optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false,
   optAutoDescription: true, optBlockquote: true, optIncludeReferrer: false,
@@ -209,7 +211,7 @@ async function syncGetLarge(key, defaultValue) {
   try { return JSON.parse(str); } catch (_) { return defaultValue; }
 }
 
-const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","customApiKey"];
+const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey"];
 
 function deobfuscateSettings(s) {
   API_KEY_FIELDS.forEach(k => { if (s[k]) s[k] = deobfuscateKey(s[k]); });

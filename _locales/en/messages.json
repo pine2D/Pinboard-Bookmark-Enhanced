@@ -646,8 +646,11 @@
   "batchSkipExisting": {
     "message": "Skip already bookmarked URLs"
   },
-  "batchWarning": {
-    "message": "⚠ AI features in batch save will be slow — each tab needs a separate AI call with 3s rate limit between saves."
+  "batchAiHint": {
+    "message": "⚠ AI features will be slow (separate AI call per tab + 3s rate limit). Requires \"Access all websites\" permission to read non-active tabs — prompted on first use."
+  },
+  "batchPermDenied": {
+    "message": "Permission denied — AI features need access to all websites to read tab content."
   },
   "secAiProvider": {
     "message": "AI Provider"
@@ -720,6 +723,9 @@
   "optAiAutoTags": {
     "message": "Auto-generate AI tags on popup open"
   },
+  "labelAiTagLang": {
+    "message": "AI Tag Language"
+  },
   "labelAiSummaryLang": {
     "message": "AI Summary Language"
   },
@@ -728,6 +734,12 @@
   },
   "langZh": {
     "message": "中文 (Chinese)"
+  },
+  "langZhTW": {
+    "message": "中文（台灣）(Traditional Chinese, Taiwan)"
+  },
+  "langZhHK": {
+    "message": "中文（香港）(Traditional Chinese, Hong Kong)"
   },
   "langEn": {
     "message": "English"
@@ -937,5 +949,50 @@
   },
   "qlPopularTitle": {
     "message": "Popular"
+  },
+  "provGemini": {
+    "message": "Google Gemini"
+  },
+  "provOpenai": {
+    "message": "OpenAI (ChatGPT)"
+  },
+  "provClaude": {
+    "message": "Anthropic Claude"
+  },
+  "provDeepseek": {
+    "message": "DeepSeek"
+  },
+  "provQwen": {
+    "message": "Qwen"
+  },
+  "provMinimax": {
+    "message": "MiniMax"
+  },
+  "provOpenrouter": {
+    "message": "OpenRouter"
+  },
+  "provGroq": {
+    "message": "Groq"
+  },
+  "provMistral": {
+    "message": "Mistral AI"
+  },
+  "provCohere": {
+    "message": "Cohere"
+  },
+  "provSiliconflow": {
+    "message": "SiliconFlow"
+  },
+  "provZhipu": {
+    "message": "Zhipu"
+  },
+  "provKimi": {
+    "message": "Kimi"
+  },
+  "provOllama": {
+    "message": "Ollama (Local)"
+  },
+  "provCustom": {
+    "message": "Custom OpenAI-compatible"
   }
 }

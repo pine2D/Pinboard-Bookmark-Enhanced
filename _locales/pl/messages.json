@@ -646,8 +646,11 @@
   "batchSkipExisting": {
     "message": "Pomiń już dodane URL-e"
   },
-  "batchWarning": {
-    "message": "⚠ Funkcje AI w zapisie zbiorczym będą wolne — każda karta wymaga osobnego wywołania AI z 3-sekundowym odstępem."
+  "batchAiHint": {
+    "message": "⚠ Funkcje AI będą wolne (osobne wywołanie AI na kartę + 3s odstęp). Wymaga uprawnienia 'Dostęp do wszystkich stron' do odczytu nieaktywnych kart — zapytanie przy pierwszym użyciu."
+  },
+  "batchPermDenied": {
+    "message": "Odmówiono uprawnień — funkcje AI wymagają dostępu do wszystkich stron, aby odczytać zawartość kart."
   },
   "secAiProvider": {
     "message": "Dostawca AI"
@@ -720,6 +723,9 @@
   "optAiAutoTags": {
     "message": "Automatycznie generuj tagi AI po otwarciu okienka"
   },
+  "labelAiTagLang": {
+    "message": "Język tagów AI"
+  },
   "labelAiSummaryLang": {
     "message": "Język podsumowania AI"
   },
@@ -728,6 +734,12 @@
   },
   "langZh": {
     "message": "中文 (chiński)"
+  },
+  "langZhTW": {
+    "message": "中文（台灣）(tradycyjny, Tajwan)"
+  },
+  "langZhHK": {
+    "message": "中文（香港）(tradycyjny, Hongkong)"
   },
   "langEn": {
     "message": "English (angielski)"
@@ -937,5 +949,50 @@
   },
   "qlPopularTitle": {
     "message": "Popularne"
+  },
+  "provGemini": {
+    "message": "Google Gemini"
+  },
+  "provOpenai": {
+    "message": "OpenAI (ChatGPT)"
+  },
+  "provClaude": {
+    "message": "Anthropic Claude"
+  },
+  "provDeepseek": {
+    "message": "DeepSeek"
+  },
+  "provQwen": {
+    "message": "Qwen"
+  },
+  "provMinimax": {
+    "message": "MiniMax"
+  },
+  "provOpenrouter": {
+    "message": "OpenRouter"
+  },
+  "provGroq": {
+    "message": "Groq"
+  },
+  "provMistral": {
+    "message": "Mistral AI"
+  },
+  "provCohere": {
+    "message": "Cohere"
+  },
+  "provSiliconflow": {
+    "message": "SiliconFlow"
+  },
+  "provZhipu": {
+    "message": "Zhipu"
+  },
+  "provKimi": {
+    "message": "Kimi"
+  },
+  "provOllama": {
+    "message": "Ollama (Local)"
+  },
+  "provCustom": {
+    "message": "Custom OpenAI-compatible"
   }
 }

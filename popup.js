@@ -149,6 +149,9 @@ async function showMain(token) {
   document.getElementById("title-input").value = pageInfo.title;
 
   // Check if URL is supported by Pinboard
+  // Tab set & batch save work regardless of current page URL
+  setupTabSet();
+
   const isUnsupportedUrl = !pageInfo.url || (!pageInfo.url.startsWith("http://") && !pageInfo.url.startsWith("https://"));
   if (isUnsupportedUrl) {
     document.getElementById("url-warning").classList.remove("hidden");
@@ -186,20 +189,19 @@ async function showMain(token) {
   setupSubmit(token);
   setupAIFeatures();
   setupDescriptionCounter();
-  setupTabSet();
   setupTagPresets();
 
-  // Fire suggest tags — enqueue before bookmark check
+  // Fetch all user tags first (cache hit is instant, populates tagCaseMap for case resolution)
+  fetchAllUserTags(token).then(() => {
+    if (settings.optAiAutoTags && hasAIKey(settings)) document.getElementById("ai-tags-btn").click();
+  });
+  // Suggest tags — enqueue after user tags so tagCaseMap is ready
   if (settings.optShowSuggestTags) {
     document.getElementById("suggest-row").classList.remove("hidden");
     fetchPinboardSuggestTags(token, pageInfo.url);
   }
   // Bookmark check — non-blocking, updates UI when ready
   checkExistingBookmark(token, pageInfo.url);
-  // Fetch all user tags (uses local cache, populates tagCaseMap), then trigger auto AI tags
-  fetchAllUserTags(token).then(() => {
-    if (settings.optAiAutoTags && hasAIKey(settings)) document.getElementById("ai-tags-btn").click();
-  });
   // Recent bookmarks — lowest priority, enqueue last
   if (settings.optShowRecent) fetchRecentBookmarks(token);
 

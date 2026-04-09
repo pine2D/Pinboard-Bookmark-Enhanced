@@ -47,12 +47,26 @@ async function fetchPinboardSuggestTags(token, url) {
       lbl.className = "group-label";
       lbl.textContent = label;
       g.appendChild(lbl);
-      tags.forEach((t) => {
-        const resolved = resolveTag(t);
+      // Resolve tags then sort: matched (by count desc) first, unmatched keep original order
+      const resolvedTags = tags.map(t => resolveTag(t));
+      resolvedTags.sort((a, b) => {
+        const ca = allUserTagCounts[a] || 0, cb = allUserTagCounts[b] || 0;
+        if (ca && !cb) return -1;
+        if (!ca && cb) return 1;
+        return 0;
+      });
+      resolvedTags.forEach((resolved) => {
         const el = document.createElement("span");
         el.className = "stag";
         el.dataset.tag = resolved;
-        el.textContent = resolved;
+        el.appendChild(document.createTextNode(resolved));
+        const count = allUserTagCounts[resolved];
+        if (count) {
+          const cs = document.createElement("span");
+          cs.className = "ac-count";
+          cs.textContent = ` (${count})`;
+          el.appendChild(cs);
+        }
         el.addEventListener("click", () => { addTag(resolved); el.classList.add("used"); });
         g.appendChild(el);
         g.appendChild(document.createTextNode(" "));
