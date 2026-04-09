@@ -3,14 +3,14 @@
 A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking with AI-powered tags, summaries, and a fully themeable interface.
 
 ![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)
-[![Version](https://img.shields.io/github/v/release/oumu/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/oumu/Pinboard-Bookmark-Enhanced/releases/latest)
+![Version](https://img.shields.io/badge/version-2.5-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
 ## Highlights
 
-- **AI tags & summaries** from 15 providers (Gemini, OpenAI, Claude, DeepSeek, Groq, Mistral, Qwen, MiniMax, Cohere, SiliconFlow, Zhipu, Kimi, OpenRouter, Ollama, Custom)
+- **AI tags & summaries** via your own API key — 15 providers supported (Gemini, OpenAI, Claude, DeepSeek, Groq, Mistral, Qwen, MiniMax, Cohere, SiliconFlow, Zhipu, Kimi, OpenRouter, Ollama, Custom)
 - **13 built-in themes** that style both Pinboard.in and the extension UI simultaneously
 - **Quick Actions** — one-click save, read-later, and batch-save all tabs
 - **Privacy first** — all data stored locally, no analytics, no tracking
@@ -43,7 +43,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 | Result caching | Configurable TTL (default 60 min), cache indicator with regenerate option |
 | Auto-generate on open | Optional: trigger AI tags when popup opens |
 
-**15 providers supported:** Gemini, OpenAI, Claude, DeepSeek, Groq, Mistral, Qwen, MiniMax, Cohere, SiliconFlow, Zhipu (智谱), Kimi, OpenRouter, Ollama (local), and any OpenAI-compatible endpoint.
+**15 providers supported (bring your own API key):** Gemini, OpenAI, Claude, DeepSeek, Groq, Mistral, Qwen, MiniMax, Cohere, SiliconFlow, Zhipu (智谱), Kimi, OpenRouter, Ollama (local), and any OpenAI-compatible endpoint.
 
 ### Themes
 
@@ -183,7 +183,7 @@ Then follow steps 3–5 above, selecting the cloned folder.
 
 ## 亮点
 
-- **AI 标签 & 摘要** — 支持 15 个 AI 服务商（Gemini、OpenAI、Claude、DeepSeek、Groq、Mistral、通义千问、MiniMax、Cohere、硅基流动、智谱、Kimi、OpenRouter、Ollama、自定义）
+- **AI 标签 & 摘要** — 使用你自己的 API Key，支持 15 个 AI 服务商（Gemini、OpenAI、Claude、DeepSeek、Groq、Mistral、通义千问、MiniMax、Cohere、硅基流动、智谱、Kimi、OpenRouter、Ollama、自定义）
 - **13 套内置主题** — 同时美化 Pinboard 网站和扩展界面
 - **快捷操作** — 一键保存、稍后阅读、批量保存所有标签页
 - **隐私优先** — 所有数据本地存储，无分析、无追踪
