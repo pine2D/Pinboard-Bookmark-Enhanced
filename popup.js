@@ -239,7 +239,7 @@ async function showMain(token) {
         // Rebind to open preview on next click
         jinaMdBtn.onclick = async () => {
           await chrome.storage.local.set({
-            jina_preview_data: {
+            md_preview_data: {
               markdown: result.markdown,
               title: result.title || document.getElementById("title-input")?.value || "",
               url: result.url || url,
@@ -247,7 +247,7 @@ async function showMain(token) {
               hasApiKey: !!jinaKey
             }
           });
-          chrome.tabs.create({ url: "jina-preview.html" });
+          chrome.tabs.create({ url: "md-preview.html" });
         };
       }, 1500);
     });

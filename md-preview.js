@@ -1,17 +1,17 @@
 // ============================================================
-// Jina Reader Markdown Preview Page
+// Markdown Preview Page
 // ============================================================
 
 (async function () {
   // Read preview data from storage
-  const data = await chrome.storage.local.get("jina_preview_data");
-  const info = data.jina_preview_data;
+  const data = await chrome.storage.local.get("md_preview_data");
+  const info = data.md_preview_data;
   if (!info) {
     document.getElementById("rendered-view").textContent = "No preview data available. Please use the Markdown button in the popup first.";
     return;
   }
   // Clear temporary data
-  await chrome.storage.local.remove("jina_preview_data");
+  await chrome.storage.local.remove("md_preview_data");
 
   const { markdown, title, url, tokens } = info;
 
@@ -32,7 +32,7 @@
   document.getElementById("raw-view").textContent = markdown;
   const renderedHtml = renderMarkdown(markdown);
   // Security note: renderMarkdown() HTML-escapes all input before processing.
-  // Content is from Jina Reader API (server-processed), not raw user input.
+  // Content is from Defuddle or Jina Reader API (server-processed), not raw user input.
   // This is an extension-internal page, not exposed to the web.
   // nosec: intentional innerHTML for Markdown rendering
   document.getElementById("rendered-view").innerHTML = renderedHtml; // nosec
@@ -83,7 +83,7 @@ async function copyToClipboard(text, btn) {
 
 // ---- Simple Markdown to HTML renderer ----
 // Security note: Input is HTML-escaped before any Markdown processing.
-// Content comes from Jina Reader API (server-side processed web pages),
+// Content comes from Defuddle or Jina Reader API (server-side processed web pages),
 // not from arbitrary user input. This page is an extension-internal tool.
 function renderMarkdown(md) {
   if (!md) return "";
