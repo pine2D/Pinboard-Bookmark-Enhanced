@@ -191,6 +191,67 @@ async function showMain(token) {
   setupDescriptionCounter();
   setupTagPresets();
 
+  // ---- Jina Reader Markdown button ----
+  const jinaMdBtn = document.getElementById("jina-md-btn");
+  if (jinaMdBtn) {
+    // Disable on non-http pages
+    const currentUrl = document.getElementById("url-input")?.value || "";
+    if (!currentUrl.startsWith("http://") && !currentUrl.startsWith("https://")) {
+      jinaMdBtn.disabled = true;
+      jinaMdBtn.title = "Only works on web pages";
+    }
+    jinaMdBtn.addEventListener("click", async () => {
+      if (jinaMdBtn.disabled) return;
+      const url = document.getElementById("url-input").value;
+      if (!url) return;
+
+      const origText = jinaMdBtn.textContent;
+      jinaMdBtn.textContent = t("jinaConverting");
+      jinaMdBtn.disabled = true;
+
+      const jinaKey = settings.jinaApiKey ? deobfuscateKey(settings.jinaApiKey) : "";
+      const result = await fetchJinaMarkdown(url, {
+        apiKey: jinaKey,
+        cacheDuration: settings.aiCacheDuration
+      });
+
+      if (result.error) {
+        jinaMdBtn.textContent = "❌ " + t("jinaFailed");
+        jinaMdBtn.title = result.error;
+        setTimeout(() => { jinaMdBtn.textContent = origText; jinaMdBtn.disabled = false; jinaMdBtn.title = ""; }, 2000);
+        return;
+      }
+
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(result.markdown);
+      } catch (_) {
+        jinaMdBtn.textContent = "❌ " + t("jinaFailed");
+        setTimeout(() => { jinaMdBtn.textContent = origText; jinaMdBtn.disabled = false; }, 2000);
+        return;
+      }
+
+      // Show success with View link
+      jinaMdBtn.textContent = "✅ " + t("jinaCopied");
+      setTimeout(() => {
+        jinaMdBtn.textContent = "👁 " + t("jinaViewBtn");
+        jinaMdBtn.disabled = false;
+        // Rebind to open preview on next click
+        jinaMdBtn.onclick = async () => {
+          await chrome.storage.local.set({
+            jina_preview_data: {
+              markdown: result.markdown,
+              title: result.title || document.getElementById("title-input")?.value || "",
+              url: result.url || url,
+              tokens: result.tokens || 0
+            }
+          });
+          chrome.tabs.create({ url: "jina-preview.html" });
+        };
+      }, 1500);
+    });
+  }
+
   // Fetch all user tags first (cache hit is instant, populates tagCaseMap for case resolution)
   fetchAllUserTags(token).then(() => {
     if (settings.optAiAutoTags && hasAIKey(settings)) document.getElementById("ai-tags-btn").click();
