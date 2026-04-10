@@ -41,7 +41,10 @@
   // Rendered = Defuddle HTML directly (best quality), or Markdown fallback for Jina
   const renderedView = document.getElementById("rendered-view");
   if (contentHtml) {
-    renderedView.innerHTML = contentHtml;
+    // Lazy-load images and async decode to prevent CPU spike from concurrent media loading
+    const safeHtml = contentHtml
+      .replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');
+    renderedView.innerHTML = safeHtml;
   } else {
     renderedView.innerHTML = renderMarkdown(getMarkdown());
   }
