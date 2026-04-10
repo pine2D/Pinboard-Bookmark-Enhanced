@@ -119,7 +119,7 @@ function setupTabSet() {
               const aiJobs = [];
               if (useAiTags) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(tab.url, "tags", settings.aiCacheDuration);
+                  const cached = await getAICache(tab.url, "tags", settings.aiCacheDuration, settings.aiContentSource);
                   if (cached) return { type: "tags", result: cached };
                   const prompt = buildTagPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "", []);
                   const resp = await callAI(settings, prompt);
@@ -127,17 +127,17 @@ function setupTabSet() {
                   const aiTags = settings.optRespectTagCase
                     ? rawTags.map(tag => resolveTagCase(tag, tagCaseMap))
                     : rawTags;
-                  await setAICache(tab.url, "tags", aiTags, settings.aiCacheDuration);
+                  await setAICache(tab.url, "tags", aiTags, settings.aiCacheDuration, settings.aiContentSource);
                   return { type: "tags", result: aiTags };
                 } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
               })());
               if (useAiSummary) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(tab.url, "summary", settings.aiCacheDuration);
+                  const cached = await getAICache(tab.url, "summary", settings.aiCacheDuration, settings.aiContentSource);
                   if (cached) return { type: "summary", result: cached };
                   const prompt = buildSummaryPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "");
                   const summary = await callAI(settings, prompt);
-                  await setAICache(tab.url, "summary", summary, settings.aiCacheDuration);
+                  await setAICache(tab.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
                   return { type: "summary", result: summary };
                 } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
               })());

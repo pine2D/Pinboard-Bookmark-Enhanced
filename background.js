@@ -234,12 +234,12 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       aiPromises.push(
         (async () => {
           try {
-            const cached = await getAICache(url, "tags", s.aiCacheDuration);
+            const cached = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource);
             if (cached) return { type: "tags", result: cached };
             const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
             const resp = await callAI(s, prompt);
             const aiTags = parseAITags(resp, s.aiTagSeparator);
-            await setAICache(url, "tags", aiTags, s.aiCacheDuration);
+            await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
             return { type: "tags", result: aiTags };
           } catch (e) { console.warn(`${notifyCategory} AI tags failed:`, e.message); return null; }
         })()
@@ -249,11 +249,11 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       aiPromises.push(
         (async () => {
           try {
-            const cached = await getAICache(url, "summary", s.aiCacheDuration);
+            const cached = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource);
             if (cached) return { type: "summary", result: cached };
             const prompt = buildSummaryPrompt(s, title, url, pageInfo.pageText, notes);
             const summary = await callAI(s, prompt);
-            await setAICache(url, "summary", summary, s.aiCacheDuration);
+            await setAICache(url, "summary", summary, s.aiCacheDuration, s.aiContentSource);
             return { type: "summary", result: summary };
           } catch (e) { console.warn(`${notifyCategory} AI summary failed:`, e.message); return null; }
         })()

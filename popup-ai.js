@@ -32,7 +32,7 @@ function setupAIFeatures() {
 
   // Auto-restore cached summary if description doesn't already contain one
   if (!AI_BQ_REGEX.test(document.getElementById("description-input").value)) {
-    getAICache(pageInfo.url, "summary", settings.aiCacheDuration).then(cached => {
+    getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource).then(cached => {
       if (cached && !AI_BQ_REGEX.test(document.getElementById("description-input").value)) {
         upsertSummary(cached);
         showSummaryActions(true);
@@ -76,7 +76,7 @@ async function doAISummary(forceRefresh) {
   if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
 
   if (!forceRefresh) {
-    const cached = await getAICache(pageInfo.url, "summary", settings.aiCacheDuration);
+    const cached = await getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource);
     if (cached) {
       upsertSummary(cached);
       showSummaryActions(true);
@@ -91,7 +91,7 @@ async function doAISummary(forceRefresh) {
   try {
     await enrichPageTextIfJina();
     const summary = await callAI(settings, buildSummaryPrompt(settings, document.getElementById("title-input").value, document.getElementById("url-input").value, pageInfo.pageText, document.getElementById("description-input").value));
-    await setAICache(pageInfo.url, "summary", summary, settings.aiCacheDuration);
+    await setAICache(pageInfo.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
     upsertSummary(summary);
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
@@ -171,7 +171,7 @@ async function doAITags(forceRefresh) {
   }
 
   if (!forceRefresh) {
-    const cached = await getAICache(pageInfo.url, "tags", settings.aiCacheDuration);
+    const cached = await getAICache(pageInfo.url, "tags", settings.aiCacheDuration, settings.aiContentSource);
     if (cached) {
       renderAITags(cached, true);
       return;
@@ -190,7 +190,7 @@ async function doAITags(forceRefresh) {
     const tags = settings.optRespectTagCase
       ? rawTags.map(t => resolveTagCase(t, tagCaseMap))
       : rawTags;
-    await setAICache(pageInfo.url, "tags", tags, settings.aiCacheDuration);
+    await setAICache(pageInfo.url, "tags", tags, settings.aiCacheDuration, settings.aiContentSource);
     renderAITags(tags, false);
     if (forceRefresh) {
       showStatus("status-msg", t("aiTagsRegenerated"), "success");

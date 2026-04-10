@@ -211,10 +211,10 @@ function parseAITags(resp, separator) {
 }
 
 // ---- AI cache helpers ----
-function getCacheKey(url, type) { return `ai_cache_${type}_${url}`; }
+function getCacheKey(url, type, source) { return `ai_cache_${type}_${source || "local"}_${url}`; }
 
-async function getAICache(url, type, cacheDuration) {
-  const key = getCacheKey(url, type);
+async function getAICache(url, type, cacheDuration, source) {
+  const key = getCacheKey(url, type, source);
   const data = await chrome.storage.local.get(key);
   if (!data[key]) return null;
   const { result, timestamp } = data[key];
@@ -224,9 +224,9 @@ async function getAICache(url, type, cacheDuration) {
   return result;
 }
 
-async function setAICache(url, type, result, cacheDuration) {
+async function setAICache(url, type, result, cacheDuration, source) {
   if ((cacheDuration || 60) === 0) return;
-  await chrome.storage.local.set({ [getCacheKey(url, type)]: { result, timestamp: Date.now() } });
+  await chrome.storage.local.set({ [getCacheKey(url, type, source)]: { result, timestamp: Date.now() } });
 }
 
 // ---- Build notes/description for a page ----
