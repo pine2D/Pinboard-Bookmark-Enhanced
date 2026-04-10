@@ -56,6 +56,7 @@ const SETTINGS_DEFAULTS = {
   ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3",
   customApiKey: "", customModel: "", customBaseUrl: "", customName: "Custom",
   aiTagLang: "en", aiSummaryLang: "auto", aiCacheDuration: 60,
+  aiContentSource: "local", jinaApiKey: "",
   customTagPrompt: "", customSummaryPrompt: "",
   optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false,
   optAutoDescription: true, optBlockquote: true, optIncludeReferrer: false,

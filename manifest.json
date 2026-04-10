@@ -27,7 +27,8 @@
     "https://api.cohere.com/*",
     "https://api.siliconflow.cn/*",
     "https://open.bigmodel.cn/*",
-    "https://api.moonshot.cn/*"
+    "https://api.moonshot.cn/*",
+    "https://r.jina.ai/*"
   ],
   "optional_host_permissions": [
     "*://*/*",
