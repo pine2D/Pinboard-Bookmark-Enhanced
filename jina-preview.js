@@ -20,7 +20,12 @@
   const urlEl = document.getElementById("preview-url");
   urlEl.textContent = url || "";
   urlEl.href = url || "#";
-  document.getElementById("token-count").textContent = tokens ? `${tokens} tokens` : "";
+  const tokenEl = document.getElementById("token-count");
+  if (tokens && info.hasApiKey) {
+    tokenEl.textContent = `${tokens} tokens`;
+  } else {
+    tokenEl.style.display = "none";
+  }
   document.title = `${title || "Markdown"} — Preview`;
 
   // Fill content
@@ -53,24 +58,26 @@
 
   // Copy buttons
   document.getElementById("btn-copy-md").addEventListener("click", async (e) => {
-    await copyToClipboard(markdown, e.target);
+    await copyToClipboard(markdown, e.currentTarget);
   });
   document.getElementById("btn-copy-html").addEventListener("click", async (e) => {
-    await copyToClipboard(renderedView.innerHTML, e.target); // nosec: reading back own generated HTML
+    await copyToClipboard(renderedView.innerHTML, e.currentTarget); // nosec: reading back own generated HTML
   });
 })();
 
 // ---- Copy to clipboard with visual feedback ----
 async function copyToClipboard(text, btn) {
-  const orig = btn.textContent;
+  const label = btn.querySelector(".btn-label");
+  const orig = label ? label.textContent : btn.textContent;
+  const setLabel = (t) => { if (label) label.textContent = t; else btn.textContent = t; };
   try {
     await navigator.clipboard.writeText(text);
-    btn.textContent = "Copied!";
+    setLabel("Copied!");
     btn.classList.add("copied");
-    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1500);
+    setTimeout(() => { setLabel(orig); btn.classList.remove("copied"); }, 1500);
   } catch (_) {
-    btn.textContent = "Failed";
-    setTimeout(() => { btn.textContent = orig; }, 1500);
+    setLabel("Failed");
+    setTimeout(() => { setLabel(orig); }, 1500);
   }
 }
 
