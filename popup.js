@@ -216,6 +216,78 @@ async function extractLocalMarkdown(tabId) {
   } catch (e) { return { error: e.message }; }
 }
 
+// Convert HTML to Markdown via Turndown (runs in popup context for clipboard copy)
+function htmlToMarkdown(html) {
+  if (typeof TurndownService === "undefined") return html;
+  const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced", bulletListMarker: "-" });
+  td.addRule("preformattedCode", {
+    filter: (n) => n.nodeName === "PRE",
+    replacement: (content, node) => {
+      const code = node.querySelector("code");
+      let lang = "";
+      if (code) {
+        const cls = code.getAttribute("class") || "";
+        const m = cls.match(/language-(\S+)/);
+        lang = (m && m[1]) || code.getAttribute("data-lang") || code.getAttribute("data-language") || "";
+      }
+      if (!lang) lang = node.getAttribute("data-language") || "";
+      const text = (code || node).textContent || "";
+      return "\n\n```" + lang + "\n" + text.replace(/`/g, "\\`") + "\n```\n\n";
+    }
+  });
+  td.addRule("table", {
+    filter: "table",
+    replacement: (content, node) => {
+      const rows = Array.from(node.querySelectorAll("tr"));
+      if (!rows.length) return content;
+      const out = [];
+      rows.forEach((row, i) => {
+        const cells = Array.from(row.querySelectorAll("th, td"))
+          .map(c => (c.textContent || "").trim().replace(/\|/g, "\\|").replace(/\n/g, " "));
+        out.push("| " + cells.join(" | ") + " |");
+        if (i === 0) out.push("| " + cells.map(() => "---").join(" | ") + " |");
+      });
+      return "\n\n" + out.join("\n") + "\n\n";
+    }
+  });
+  td.addRule("highlight", { filter: "mark", replacement: (c) => "==" + c + "==" });
+  td.addRule("strikethrough", {
+    filter: (n) => n.nodeName === "DEL" || n.nodeName === "S" || n.nodeName === "STRIKE",
+    replacement: (c) => "~~" + c + "~~"
+  });
+  td.addRule("figure", {
+    filter: "figure",
+    replacement: (content, node) => {
+      const img = node.querySelector("img");
+      const caption = node.querySelector("figcaption");
+      if (!img) return content;
+      const alt = caption ? caption.textContent.trim() : (img.getAttribute("alt") || "");
+      const src = img.getAttribute("src") || "";
+      return "\n\n![" + alt + "](" + src + ")" + (caption ? "\n*" + caption.textContent.trim() + "*" : "") + "\n\n";
+    }
+  });
+  td.addRule("listItem", {
+    filter: "li",
+    replacement: (content, node) => {
+      content = content.replace(/^\n+/, "").replace(/\n+$/, "\n").replace(/\n/gm, "\n    ");
+      const parent = node.parentNode;
+      let prefix = "- ";
+      if (parent && parent.nodeName === "OL") {
+        const start = parseInt(parent.getAttribute("start") || "1", 10);
+        const index = Array.from(parent.children).indexOf(node);
+        prefix = (start + index) + ". ";
+      }
+      const cb = node.querySelector("input[type=checkbox]");
+      if (cb) {
+        prefix += cb.checked ? "[x] " : "[ ] ";
+        content = content.replace(/^\s*\[[ x]\]\s*/, "");
+      }
+      return prefix + content.trim() + "\n";
+    }
+  });
+  return td.turndown(html);
+}
+
   // ---- Markdown export button ----
   const jinaMdBtn = document.getElementById("jina-md-btn");
   if (jinaMdBtn) {
@@ -251,23 +323,17 @@ async function extractLocalMarkdown(tabId) {
         return;
       }
 
-      // Jina returns markdown directly; Local returns contentHtml (Turndown deferred to preview)
-      const hasMarkdown = !!result.markdown;
+      // Convert to markdown for clipboard (Jina already has it, Local needs Turndown)
+      const markdown = result.markdown || htmlToMarkdown(result.contentHtml);
 
-      if (hasMarkdown) {
-        // Jina mode: markdown available, copy to clipboard immediately
-        try {
-          await navigator.clipboard.writeText(result.markdown);
-        } catch (_) {
-          jinaMdBtn.textContent = "❌ " + t("jinaFailed");
-          setTimeout(() => { jinaMdBtn.textContent = origText; jinaMdBtn.disabled = false; }, 2000);
-          return;
-        }
-        jinaMdBtn.textContent = "✅ " + t("jinaCopied");
-      } else {
-        // Local mode: skip heavy Turndown in popup, open preview directly
-        jinaMdBtn.textContent = "✅ Done";
+      try {
+        await navigator.clipboard.writeText(markdown);
+      } catch (_) {
+        jinaMdBtn.textContent = "❌ " + t("jinaFailed");
+        setTimeout(() => { jinaMdBtn.textContent = origText; jinaMdBtn.disabled = false; }, 2000);
+        return;
       }
+      jinaMdBtn.textContent = "✅ " + t("jinaCopied");
 
       setTimeout(() => {
         jinaMdBtn.textContent = "👁 " + t("jinaViewBtn");

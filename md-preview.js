@@ -41,10 +41,26 @@
   // Rendered = Defuddle HTML directly (best quality), or Markdown fallback for Jina
   const renderedView = document.getElementById("rendered-view");
   if (contentHtml) {
-    // Lazy-load images and async decode to prevent CPU spike from concurrent media loading
+    // Lazy-load all images, async decode
     const safeHtml = contentHtml
       .replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');
     renderedView.innerHTML = safeHtml;
+    // Freeze animated GIFs: replace with click-to-play placeholder
+    renderedView.querySelectorAll('img').forEach(img => {
+      const src = img.getAttribute("src") || "";
+      if (!/\.gif(\?|#|$)/i.test(src)) return;
+      const realSrc = src;
+      img.removeAttribute("src");
+      img.dataset.gifSrc = realSrc;
+      img.classList.add("gif-placeholder");
+      img.title = "Click to play GIF";
+      img.addEventListener("click", function handler() {
+        img.src = img.dataset.gifSrc;
+        img.classList.remove("gif-placeholder");
+        img.title = "";
+        img.removeEventListener("click", handler);
+      });
+    });
   } else {
     renderedView.innerHTML = renderMarkdown(getMarkdown());
   }
