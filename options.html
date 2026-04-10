@@ -325,6 +325,24 @@
       </div>
 
       <div class="divider"></div>
+      <div class="section-title" data-i18n="secAiContentSource">AI Content Source</div>
+      <div class="fg">
+        <label><input type="radio" name="ai-content-source" id="opt-ai-src-local" value="local" checked /> <span data-i18n="aiContentSourceLocal">Local (built-in extraction)</span></label>
+      </div>
+      <div class="fg">
+        <label><input type="radio" name="ai-content-source" id="opt-ai-src-jina" value="jina" /> <span data-i18n="aiContentSourceJina">Jina Reader (higher quality)</span></label>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-title" data-i18n="secJinaReader">Jina Reader</div>
+      <div class="fg">
+        <label class="bl" data-i18n="jinaApiKeyLabel">API Key (optional)</label>
+        <input type="password" id="opt-jina-key" placeholder="jina_xxxx (leave empty for free tier)" data-i18n-placeholder="jinaApiKeyPlaceholder" />
+        <button type="button" class="key-toggle" data-target="opt-jina-key" title="Show/hide key" data-i18n-title="showHideKey">👁</button>
+        <p class="hint">Free tier: 20 RPM. Add key for higher quota. <a href="https://jina.ai/reader#pricing" target="_blank">Get key</a></p>
+      </div>
+
+      <div class="divider"></div>
       <div class="section-title" data-i18n="secAiBehavior">AI Behavior</div>
       <div class="fg"><label><input type="checkbox" id="opt-ai-auto-tags" /> <span data-i18n="optAiAutoTags">Auto-generate AI tags on popup open</span></label></div>
       <div class="fg">

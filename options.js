@@ -176,6 +176,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "qs-default-tags": s.qsDefaultTags, "rl-default-tags": s.rlDefaultTags,
     "opt-custom-font": s.customFont, "opt-custom-css": s.customCSS,
     "opt-ai-tag-separator": s.aiTagSeparator,
+    "opt-jina-key": s.jinaApiKey,
     "opt-tag-presets": s.tagPresets
   };
   for (const [id, val] of Object.entries(fieldMap)) {
@@ -186,6 +187,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Show default prompts as placeholder so users see them when field is empty
   document.getElementById("opt-custom-tag-prompt").placeholder = DEFAULT_TAG_PROMPT;
   document.getElementById("opt-custom-summary-prompt").placeholder = DEFAULT_SUMMARY_PROMPT;
+
+  // AI Content Source radio
+  const srcRadio = document.querySelector(`input[name="ai-content-source"][value="${s.aiContentSource || 'local'}"]`);
+  if (srcRadio) srcRadio.checked = true;
 
   // ---- Fill checkbox fields ----
   const checkMap = {
@@ -398,6 +403,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       aiSummaryLang: document.getElementById("opt-ai-summary-lang").value,
       aiCacheDuration: Math.max(0, parseInt(document.getElementById("opt-ai-cache-duration").value) || 60),
       aiTagSeparator: document.getElementById("opt-ai-tag-separator").value,
+      aiContentSource: document.querySelector('input[name="ai-content-source"]:checked')?.value || "local",
+      jinaApiKey: obfuscateKey(document.getElementById("opt-jina-key").value.trim()),
       customTagPrompt: document.getElementById("opt-custom-tag-prompt").value,
       customSummaryPrompt: document.getElementById("opt-custom-summary-prompt").value,
       // Appearance
