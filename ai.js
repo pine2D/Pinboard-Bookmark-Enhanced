@@ -10,6 +10,14 @@ async function getPageInfoFromTab(tabId) {
     if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("file://")) {
       return { url, title: tab.title || "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
     }
+
+    // Inject Defuddle library first
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
+    } catch (_) {
+      // Defuddle injection failed — fall through to legacy extraction
+    }
+
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
@@ -18,6 +26,20 @@ async function getPageInfoFromTab(tabId) {
         if (sel && sel.rangeCount > 0) { const t = sel.toString().trim(); if (t) info.selectedText = t; }
         const md = document.querySelector('meta[name="description"]') || document.querySelector('meta[property="og:description"]');
         if (md) info.metaDescription = md.getAttribute("content") || "";
+
+        // Try Defuddle for high-quality content extraction
+        if (typeof Defuddle !== "undefined") {
+          try {
+            const clone = document.cloneNode(true);
+            const result = new Defuddle(clone).parse();
+            if (result?.textContent && result.textContent.length > 50) {
+              info.pageText = result.textContent.substring(0, 8000);
+              return info;
+            }
+          } catch (_) { /* fall through to legacy */ }
+        }
+
+        // Fallback: legacy innerText extraction
         const mainEl = document.querySelector("article") || document.querySelector("main") || document.querySelector('[role="main"]') || document.body;
         info.pageText = (mainEl ? mainEl.innerText : "").substring(0, 8000);
         return info;
