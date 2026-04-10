@@ -994,5 +994,18 @@
   },
   "provCustom": {
     "message": "カスタム OpenAI互換"
-  }
+  },
+  "jinaMarkdownBtn": { "message": "📄 Markdown" },
+  "jinaMarkdownTitle": { "message": "Jina Reader でページを Markdown に変換" },
+  "jinaConverting": { "message": "⏳ 変換中..." },
+  "jinaCopied": { "message": "コピー済み!" },
+  "jinaFailed": { "message": "失敗" },
+  "jinaViewBtn": { "message": "表示" },
+  "secAiContentSource": { "message": "AIコンテンツソース" },
+  "aiContentSourceLocal": { "message": "ローカル（内蔵抽出）" },
+  "aiContentSourceJina": { "message": "Jina Reader（高品質）" },
+  "secJinaReader": { "message": "Jina Reader" },
+  "jinaApiKeyLabel": { "message": "APIキー（任意）" },
+  "jinaApiKeyPlaceholder": { "message": "jina_xxxx（空欄で無料枠を使用）" },
+  "jinaKeyHint": { "message": "無料: 20リクエスト/分。キーを追加でクォータ増加。" }
 }

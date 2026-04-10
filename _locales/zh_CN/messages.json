@@ -994,5 +994,18 @@
   },
   "provCustom": {
     "message": "自定义 OpenAI 兼容"
-  }
+  },
+  "jinaMarkdownBtn": { "message": "📄 Markdown" },
+  "jinaMarkdownTitle": { "message": "通过 Jina Reader 将页面转换为 Markdown" },
+  "jinaConverting": { "message": "⏳ 转换中..." },
+  "jinaCopied": { "message": "已复制!" },
+  "jinaFailed": { "message": "失败" },
+  "jinaViewBtn": { "message": "查看" },
+  "secAiContentSource": { "message": "AI 内容来源" },
+  "aiContentSourceLocal": { "message": "本地提取（内置）" },
+  "aiContentSourceJina": { "message": "Jina Reader（更高质量）" },
+  "secJinaReader": { "message": "Jina Reader" },
+  "jinaApiKeyLabel": { "message": "API Key（可选）" },
+  "jinaApiKeyPlaceholder": { "message": "jina_xxxx（留空使用免费配额）" },
+  "jinaKeyHint": { "message": "免费：20次/分钟。添加 Key 获得更高配额。" }
 }

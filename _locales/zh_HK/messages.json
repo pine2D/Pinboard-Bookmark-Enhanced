@@ -994,5 +994,18 @@
   },
   "provCustom": {
     "message": "自訂 OpenAI 兼容"
-  }
+  },
+  "jinaMarkdownBtn": { "message": "📄 Markdown" },
+  "jinaMarkdownTitle": { "message": "Convert page to Markdown via Jina Reader" },
+  "jinaConverting": { "message": "⏳ Converting..." },
+  "jinaCopied": { "message": "Copied!" },
+  "jinaFailed": { "message": "Failed" },
+  "jinaViewBtn": { "message": "View" },
+  "secAiContentSource": { "message": "AI Content Source" },
+  "aiContentSourceLocal": { "message": "Local (built-in extraction)" },
+  "aiContentSourceJina": { "message": "Jina Reader (higher quality)" },
+  "secJinaReader": { "message": "Jina Reader" },
+  "jinaApiKeyLabel": { "message": "API Key (optional)" },
+  "jinaApiKeyPlaceholder": { "message": "jina_xxxx (leave empty for free tier)" },
+  "jinaKeyHint": { "message": "Free tier: 20 RPM. Add key for higher quota." }
 }
