@@ -996,7 +996,8 @@
     "message": "Custom OpenAI-compatible"
   },
   "jinaMarkdownBtn": { "message": "📄 Markdown" },
-  "jinaMarkdownTitle": { "message": "Convert page to Markdown via Jina Reader" },
+  "jinaMarkdownTitle": { "message": "Convert page to Markdown (Local)" },
+  "jinaMarkdownTitleJina": { "message": "Convert page to Markdown (Jina Reader)" },
   "jinaConverting": { "message": "⏳ Converting..." },
   "jinaCopied": { "message": "Copied!" },
   "jinaFailed": { "message": "Failed" },

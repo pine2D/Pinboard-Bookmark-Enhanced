@@ -996,7 +996,8 @@
     "message": "カスタム OpenAI互換"
   },
   "jinaMarkdownBtn": { "message": "📄 Markdown" },
-  "jinaMarkdownTitle": { "message": "Jina Reader でページを Markdown に変換" },
+  "jinaMarkdownTitle": { "message": "ページを Markdown に変換（ローカル）" },
+  "jinaMarkdownTitleJina": { "message": "ページを Markdown に変換（Jina Reader）" },
   "jinaConverting": { "message": "⏳ 変換中..." },
   "jinaCopied": { "message": "コピー済み!" },
   "jinaFailed": { "message": "失敗" },

@@ -291,6 +291,7 @@ function htmlToMarkdown(html) {
   // ---- Markdown export button ----
   const jinaMdBtn = document.getElementById("jina-md-btn");
   if (jinaMdBtn) {
+    jinaMdBtn.title = settings.aiContentSource === "jina" ? t("jinaMarkdownTitleJina") : t("jinaMarkdownTitle");
     // Disable on non-http pages
     const currentUrl = document.getElementById("url-input")?.value || "";
     if (!currentUrl.startsWith("http://") && !currentUrl.startsWith("https://")) {

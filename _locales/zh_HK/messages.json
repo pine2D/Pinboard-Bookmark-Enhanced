@@ -996,7 +996,8 @@
     "message": "自訂 OpenAI 兼容"
   },
   "jinaMarkdownBtn": { "message": "📄 Markdown" },
-  "jinaMarkdownTitle": { "message": "Convert page to Markdown via Jina Reader" },
+  "jinaMarkdownTitle": { "message": "將頁面轉換為 Markdown（本地）" },
+  "jinaMarkdownTitleJina": { "message": "將頁面轉換為 Markdown（Jina Reader）" },
   "jinaConverting": { "message": "⏳ Converting..." },
   "jinaCopied": { "message": "Copied!" },
   "jinaFailed": { "message": "Failed" },
