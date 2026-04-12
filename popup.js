@@ -216,8 +216,24 @@ async function extractLocalMarkdown(tabId) {
   } catch (e) { return { error: e.message }; }
 }
 
+// Lazy-load Turndown library on demand (saves ~27KB from popup startup)
+let _turndownLoadPromise = null;
+function ensureTurndown() {
+  if (typeof TurndownService !== "undefined") return Promise.resolve();
+  if (_turndownLoadPromise) return _turndownLoadPromise;
+  _turndownLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "vendor/turndown.js";
+    s.onload = () => resolve();
+    s.onerror = () => { _turndownLoadPromise = null; reject(new Error("turndown load failed")); };
+    document.head.appendChild(s);
+  });
+  return _turndownLoadPromise;
+}
+
 // Convert HTML to Markdown via Turndown (runs in popup context for clipboard copy)
-function htmlToMarkdown(html) {
+async function htmlToMarkdown(html) {
+  try { await ensureTurndown(); } catch (_) { return html; }
   if (typeof TurndownService === "undefined") return html;
   const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced", bulletListMarker: "-" });
   td.addRule("preformattedCode", {
@@ -325,7 +341,7 @@ function htmlToMarkdown(html) {
       }
 
       // Convert to markdown for clipboard (Jina already has it, Local needs Turndown)
-      const markdown = result.markdown || htmlToMarkdown(result.contentHtml);
+      const markdown = result.markdown || await htmlToMarkdown(result.contentHtml);
 
       try {
         await navigator.clipboard.writeText(markdown);

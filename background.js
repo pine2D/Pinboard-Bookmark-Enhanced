@@ -68,12 +68,16 @@ async function debouncedCheck(tabId, url) {
   }
 }
 
-// ---- Load settings with deobfuscation ----
+// ---- Load settings with deobfuscation (module-level cache, invalidated on storage.onChanged) ----
+let _settingsCache = null;
 async function loadSettings() {
+  if (_settingsCache) return _settingsCache;
   const s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
   deobfuscateSettings(s);
+  _settingsCache = s;
   return s;
 }
+function invalidateSettingsCache() { _settingsCache = null; }
 
 // F7: Track recent saves for undo via notification button
 const _recentSaves = new Map(); // notificationId -> { url, token }
@@ -404,6 +408,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // React to settings change: toggle the prewarm alarm on/off (settings live in sync or local based on optSyncEnabled)
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "sync" || area === "local") invalidateSettingsCache();
   if ((area === "sync" || area === "local") && (changes.tagSyncMode || changes.pinboardToken)) {
     syncPrewarmTagsAlarm().catch(() => {});
   }
@@ -411,17 +416,39 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // Initial check
 syncPrewarmTagsAlarm().catch(() => {});
 
-// F1: Cleanup expired AI cache entries
+// F1: Cleanup expired AI cache entries (index-based; falls back to full scan for migration)
 async function cleanupExpiredAICache() {
   try {
-    const all = await chrome.storage.local.get(null);
     const { aiCacheDuration = 60 } = await (await getSettingsStorage()).get({ aiCacheDuration: 60 });
     const maxAge = (aiCacheDuration || 60) * 60 * 1000;
     const now = Date.now();
-    const expired = Object.keys(all).filter(k =>
-      k.startsWith("ai_cache_") && all[k]?.timestamp && (now - all[k].timestamp > maxAge)
-    );
+
+    const { ai_cache_index } = await chrome.storage.local.get("ai_cache_index");
+    if (ai_cache_index && typeof ai_cache_index === "object") {
+      // Fast path: O(index size), no bulk load
+      const expired = Object.keys(ai_cache_index).filter(k => now - (ai_cache_index[k] || 0) > maxAge);
+      if (expired.length) {
+        await chrome.storage.local.remove(expired);
+        const next = { ...ai_cache_index };
+        expired.forEach(k => delete next[k]);
+        await chrome.storage.local.set({ ai_cache_index: next });
+      }
+      return;
+    }
+
+    // Migration fallback: old data has no index — scan once and build it
+    const all = await chrome.storage.local.get(null);
+    const expired = [];
+    const rebuiltIndex = {};
+    for (const k of Object.keys(all)) {
+      if (!k.startsWith("ai_cache_") || k === "ai_cache_index") continue;
+      const ts = all[k]?.timestamp;
+      if (!ts) continue;
+      if (now - ts > maxAge) expired.push(k);
+      else rebuiltIndex[k] = ts;
+    }
     if (expired.length) await chrome.storage.local.remove(expired);
+    await chrome.storage.local.set({ ai_cache_index: rebuiltIndex });
   } catch (_) {}
 }
 

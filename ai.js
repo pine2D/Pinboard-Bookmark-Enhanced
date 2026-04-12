@@ -212,6 +212,15 @@ function parseAITags(resp, separator) {
 
 // ---- AI cache helpers ----
 function getCacheKey(url, type, source) { return `ai_cache_${type}_${source || "local"}_${url}`; }
+const AI_CACHE_INDEX_KEY = "ai_cache_index";
+
+async function _updateAICacheIndex(mutator) {
+  try {
+    const { [AI_CACHE_INDEX_KEY]: idx = {} } = await chrome.storage.local.get(AI_CACHE_INDEX_KEY);
+    const next = mutator(idx);
+    await chrome.storage.local.set({ [AI_CACHE_INDEX_KEY]: next });
+  } catch (_) { /* best-effort index — cleanup falls back to full scan when missing */ }
+}
 
 async function getAICache(url, type, cacheDuration, source) {
   const key = getCacheKey(url, type, source);
@@ -220,13 +229,20 @@ async function getAICache(url, type, cacheDuration, source) {
   const { result, timestamp } = data[key];
   const dur = (cacheDuration || 60) * 60 * 1000;
   if (dur === 0) return null;
-  if (Date.now() - timestamp > dur) { await chrome.storage.local.remove(key); return null; }
+  if (Date.now() - timestamp > dur) {
+    await chrome.storage.local.remove(key);
+    _updateAICacheIndex((idx) => { delete idx[key]; return idx; });
+    return null;
+  }
   return result;
 }
 
 async function setAICache(url, type, result, cacheDuration, source) {
   if ((cacheDuration || 60) === 0) return;
-  await chrome.storage.local.set({ [getCacheKey(url, type, source)]: { result, timestamp: Date.now() } });
+  const key = getCacheKey(url, type, source);
+  const timestamp = Date.now();
+  await chrome.storage.local.set({ [key]: { result, timestamp } });
+  _updateAICacheIndex((idx) => { idx[key] = timestamp; return idx; });
 }
 
 // ---- Build notes/description for a page ----
