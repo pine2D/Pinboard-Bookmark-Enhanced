@@ -29,6 +29,22 @@ async function getPageInfoFromTab(tabId) {
 
         // Try Defuddle for high-quality content extraction
         if (typeof Defuddle !== "undefined") {
+          // Swallow a known defuddle v0.16.0 async bug where `new URL(href)` on
+          // relative/weird hrefs (GitHub pages, etc.) throws and escapes try/catch.
+          const swallowURL = (ev) => {
+            const msg = (ev && (ev.message || (ev.reason && ev.reason.message))) || "";
+            if (/Failed to construct 'URL'|Invalid URL/i.test(msg)) {
+              ev.preventDefault && ev.preventDefault();
+              ev.stopImmediatePropagation && ev.stopImmediatePropagation();
+              return true;
+            }
+          };
+          window.addEventListener("error", swallowURL, true);
+          window.addEventListener("unhandledrejection", swallowURL, true);
+          setTimeout(() => {
+            window.removeEventListener("error", swallowURL, true);
+            window.removeEventListener("unhandledrejection", swallowURL, true);
+          }, 1500);
           try {
             const clone = document.cloneNode(true);
             const result = new Defuddle(clone).parse();

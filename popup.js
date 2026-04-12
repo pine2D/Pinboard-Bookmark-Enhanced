@@ -203,6 +203,22 @@ async function extractLocalMarkdown(tabId) {
       target: { tabId },
       func: () => {
         if (typeof Defuddle === "undefined") return { error: "Defuddle not available" };
+        // Swallow a known defuddle v0.16.0 async bug: `new URL(href)` on relative/weird
+        // hrefs (GitHub pages, etc.) throws asynchronously and escapes the try/catch below.
+        const swallowURL = (ev) => {
+          const msg = (ev && (ev.message || (ev.reason && ev.reason.message))) || "";
+          if (/Failed to construct 'URL'|Invalid URL/i.test(msg)) {
+            ev.preventDefault && ev.preventDefault();
+            ev.stopImmediatePropagation && ev.stopImmediatePropagation();
+            return true;
+          }
+        };
+        window.addEventListener("error", swallowURL, true);
+        window.addEventListener("unhandledrejection", swallowURL, true);
+        setTimeout(() => {
+          window.removeEventListener("error", swallowURL, true);
+          window.removeEventListener("unhandledrejection", swallowURL, true);
+        }, 1500);
         try {
           const clone = document.cloneNode(true);
           const result = new Defuddle(clone).parse();
