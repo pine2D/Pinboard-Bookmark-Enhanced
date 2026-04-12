@@ -109,9 +109,13 @@
       <button id="jina-md-btn" class="qbtn" title="" data-i18n="jinaMarkdownBtn">📄 Markdown</button>
     </div>
     <div id="offline-queue-bar" class="offline-bar hidden">
-      <span id="offline-queue-text"></span>
+      <a href="#" id="offline-queue-toggle" class="offline-toggle" role="button" aria-expanded="false">
+        <span id="offline-queue-chevron">▸</span>
+        <span id="offline-queue-text"></span>
+      </a>
       <a href="#" id="offline-queue-clear" class="offline-clear" data-i18n="clear">clear</a>
     </div>
+    <div id="offline-queue-list" class="offline-queue-list hidden"></div>
     <div id="recent-bookmarks" class="recent-bm-area hidden"></div>
   </div>
 
@@ -123,6 +127,7 @@
   <script src="popup-tags.js"></script>
   <script src="popup-ai.js"></script>
   <script src="popup-batch.js"></script>
+  <script src="popup-offline.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

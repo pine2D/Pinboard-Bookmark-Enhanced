@@ -622,16 +622,11 @@ async function fetchRecentBookmarks(token) {
 async function showOfflineQueueStatus() {
   const bar = document.getElementById("offline-queue-bar");
   if (!bar) return;
-  try {
-    const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
-    if (offlineQueue.length > 0) {
-      bar.classList.remove("hidden");
-      document.getElementById("offline-queue-text").textContent = t("offlineQueued", String(offlineQueue.length));
-    } else {
-      bar.classList.add("hidden");
-    }
-  } catch (_) { bar.classList.add("hidden"); }
-
+  // Delegate list rendering + per-item actions to popup-offline.js
+  if (window.PPOffline) {
+    window.PPOffline.init();
+    await window.PPOffline.refresh();
+  }
   document.getElementById("offline-queue-clear")?.addEventListener("click", async (e) => {
     e.preventDefault();
     if (!confirm(t("offlineClearConfirm"))) return;

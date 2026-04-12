@@ -375,6 +375,42 @@
       }
     }
   },
+  "offlineRetry": {
+    "message": "Réessayer maintenant"
+  },
+  "offlineRemove": {
+    "message": "Retirer de la file"
+  },
+  "offlineQueueEmpty": {
+    "message": "La file est vide"
+  },
+  "offlineJustNow": {
+    "message": "à l'instant"
+  },
+  "offlineMinAgo": {
+    "message": "il y a $MIN$ min",
+    "placeholders": {
+      "min": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineHourAgo": {
+    "message": "il y a $HOUR$ h",
+    "placeholders": {
+      "hour": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineDayAgo": {
+    "message": "il y a $DAY$ j",
+    "placeholders": {
+      "day": {
+        "content": "$1"
+      }
+    }
+  },
   "offlineClearConfirm": {
     "message": "Effacer tous les signets en file d'attente ?"
   },
@@ -1001,18 +1037,46 @@
   "provCustom": {
     "message": "Custom OpenAI-compatible"
   },
-  "jinaMarkdownBtn": { "message": "📄 Markdown" },
-  "jinaMarkdownTitle": { "message": "Convert page to Markdown (Local)" },
-  "jinaMarkdownTitleJina": { "message": "Convert page to Markdown (Jina Reader)" },
-  "jinaConverting": { "message": "⏳ Converting..." },
-  "jinaCopied": { "message": "Copied!" },
-  "jinaFailed": { "message": "Failed" },
-  "jinaViewBtn": { "message": "View" },
-  "secAiContentSource": { "message": "AI Content Source" },
-  "aiContentSourceLocal": { "message": "Local (Defuddle)" },
-  "aiContentSourceJina": { "message": "Jina Reader" },
-  "secJinaReader": { "message": "Jina Reader" },
-  "jinaApiKeyLabel": { "message": "API Key (optional)" },
-  "jinaApiKeyPlaceholder": { "message": "jina_xxxx (leave empty for free tier)" },
-  "jinaKeyHint": { "message": "Free tier: 20 RPM. Add key for higher quota." }
+  "jinaMarkdownBtn": {
+    "message": "📄 Markdown"
+  },
+  "jinaMarkdownTitle": {
+    "message": "Convert page to Markdown (Local)"
+  },
+  "jinaMarkdownTitleJina": {
+    "message": "Convert page to Markdown (Jina Reader)"
+  },
+  "jinaConverting": {
+    "message": "⏳ Converting..."
+  },
+  "jinaCopied": {
+    "message": "Copied!"
+  },
+  "jinaFailed": {
+    "message": "Failed"
+  },
+  "jinaViewBtn": {
+    "message": "View"
+  },
+  "secAiContentSource": {
+    "message": "AI Content Source"
+  },
+  "aiContentSourceLocal": {
+    "message": "Local (Defuddle)"
+  },
+  "aiContentSourceJina": {
+    "message": "Jina Reader"
+  },
+  "secJinaReader": {
+    "message": "Jina Reader"
+  },
+  "jinaApiKeyLabel": {
+    "message": "API Key (optional)"
+  },
+  "jinaApiKeyPlaceholder": {
+    "message": "jina_xxxx (leave empty for free tier)"
+  },
+  "jinaKeyHint": {
+    "message": "Free tier: 20 RPM. Add key for higher quota."
+  }
 }

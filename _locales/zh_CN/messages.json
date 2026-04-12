@@ -375,6 +375,42 @@
       }
     }
   },
+  "offlineRetry": {
+    "message": "立即重试"
+  },
+  "offlineRemove": {
+    "message": "从队列移除"
+  },
+  "offlineQueueEmpty": {
+    "message": "队列为空"
+  },
+  "offlineJustNow": {
+    "message": "刚刚"
+  },
+  "offlineMinAgo": {
+    "message": "$MIN$ 分钟前",
+    "placeholders": {
+      "min": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineHourAgo": {
+    "message": "$HOUR$ 小时前",
+    "placeholders": {
+      "hour": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineDayAgo": {
+    "message": "$DAY$ 天前",
+    "placeholders": {
+      "day": {
+        "content": "$1"
+      }
+    }
+  },
   "offlineClearConfirm": {
     "message": "确定清除所有排队中的书签？"
   },
@@ -1001,18 +1037,46 @@
   "provCustom": {
     "message": "自定义 OpenAI 兼容"
   },
-  "jinaMarkdownBtn": { "message": "📄 Markdown" },
-  "jinaMarkdownTitle": { "message": "将页面转换为 Markdown（本地）" },
-  "jinaMarkdownTitleJina": { "message": "将页面转换为 Markdown（Jina Reader）" },
-  "jinaConverting": { "message": "⏳ 转换中..." },
-  "jinaCopied": { "message": "已复制!" },
-  "jinaFailed": { "message": "失败" },
-  "jinaViewBtn": { "message": "查看" },
-  "secAiContentSource": { "message": "AI 内容来源" },
-  "aiContentSourceLocal": { "message": "本地提取（Defuddle）" },
-  "aiContentSourceJina": { "message": "Jina Reader" },
-  "secJinaReader": { "message": "Jina Reader" },
-  "jinaApiKeyLabel": { "message": "API Key（可选）" },
-  "jinaApiKeyPlaceholder": { "message": "jina_xxxx（留空使用免费配额）" },
-  "jinaKeyHint": { "message": "免费：20次/分钟。添加 Key 获得更高配额。" }
+  "jinaMarkdownBtn": {
+    "message": "📄 Markdown"
+  },
+  "jinaMarkdownTitle": {
+    "message": "将页面转换为 Markdown（本地）"
+  },
+  "jinaMarkdownTitleJina": {
+    "message": "将页面转换为 Markdown（Jina Reader）"
+  },
+  "jinaConverting": {
+    "message": "⏳ 转换中..."
+  },
+  "jinaCopied": {
+    "message": "已复制!"
+  },
+  "jinaFailed": {
+    "message": "失败"
+  },
+  "jinaViewBtn": {
+    "message": "查看"
+  },
+  "secAiContentSource": {
+    "message": "AI 内容来源"
+  },
+  "aiContentSourceLocal": {
+    "message": "本地提取（Defuddle）"
+  },
+  "aiContentSourceJina": {
+    "message": "Jina Reader"
+  },
+  "secJinaReader": {
+    "message": "Jina Reader"
+  },
+  "jinaApiKeyLabel": {
+    "message": "API Key（可选）"
+  },
+  "jinaApiKeyPlaceholder": {
+    "message": "jina_xxxx（留空使用免费配额）"
+  },
+  "jinaKeyHint": {
+    "message": "免费：20次/分钟。添加 Key 获得更高配额。"
+  }
 }

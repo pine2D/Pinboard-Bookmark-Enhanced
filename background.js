@@ -169,29 +169,49 @@ async function enqueueOfflineSave(params) {
   await chrome.storage.local.set({ offlineQueue });
 }
 
+async function sendOfflineItem(item) {
+  const token = deobfuscateKey(item.token);
+  const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${token}&format=json` +
+    `&url=${encodeURIComponent(item.url)}&description=${encodeURIComponent(item.title)}` +
+    `&extended=${encodeURIComponent(item.notes)}&tags=${encodeURIComponent(item.tags)}` +
+    (item.toread ? "&toread=yes" : "") + "&replace=yes";
+  const resp = await pinboardFetch(apiUrl);
+  const data = await resp.json();
+  return data.result_code === "done";
+}
+
 async function processOfflineQueue() {
   const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
   if (!offlineQueue.length) return;
   const remaining = [];
   for (const item of offlineQueue) {
     try {
-      const token = deobfuscateKey(item.token);
-      const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${token}&format=json` +
-        `&url=${encodeURIComponent(item.url)}&description=${encodeURIComponent(item.title)}` +
-        `&extended=${encodeURIComponent(item.notes)}&tags=${encodeURIComponent(item.tags)}` +
-        (item.toread ? "&toread=yes" : "") + "&replace=yes";
-      const resp = await pinboardFetch(apiUrl);
-      const data = await resp.json();
-      if (data.result_code !== "done") {
-        remaining.push(item); // keep for retry
-      } else {
+      if (await sendOfflineItem(item)) {
         statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
+      } else {
+        remaining.push(item); // keep for retry
       }
     } catch (_) {
       remaining.push(item); // network still down, keep
     }
   }
   await chrome.storage.local.set({ offlineQueue: remaining });
+}
+
+async function retryOfflineItem(index) {
+  const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
+  if (index < 0 || index >= offlineQueue.length) return false;
+  const item = offlineQueue[index];
+  try {
+    const ok = await sendOfflineItem(item);
+    if (!ok) return false;
+    offlineQueue.splice(index, 1);
+    await chrome.storage.local.set({ offlineQueue });
+    statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 // ---- P1: Shared save function ----
@@ -425,6 +445,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: res.ok, status: res.status, text });
       })
       .catch(err => sendResponse({ ok: false, status: 0, text: "", error: err.message }));
+    return true;
+  }
+
+  if (message.type === "retry_offline_item" && typeof message.index === "number") {
+    retryOfflineItem(message.index)
+      .then((ok) => sendResponse({ ok }))
+      .catch(() => sendResponse({ ok: false }));
     return true;
   }
 

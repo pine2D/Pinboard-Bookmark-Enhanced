@@ -375,6 +375,42 @@
       }
     }
   },
+  "offlineRetry": {
+    "message": "今すぐ再試行"
+  },
+  "offlineRemove": {
+    "message": "キューから削除"
+  },
+  "offlineQueueEmpty": {
+    "message": "キューは空です"
+  },
+  "offlineJustNow": {
+    "message": "たった今"
+  },
+  "offlineMinAgo": {
+    "message": "$MIN$ 分前",
+    "placeholders": {
+      "min": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineHourAgo": {
+    "message": "$HOUR$ 時間前",
+    "placeholders": {
+      "hour": {
+        "content": "$1"
+      }
+    }
+  },
+  "offlineDayAgo": {
+    "message": "$DAY$ 日前",
+    "placeholders": {
+      "day": {
+        "content": "$1"
+      }
+    }
+  },
   "offlineClearConfirm": {
     "message": "待機中のブックマークをすべてクリアしますか？"
   },
@@ -1001,18 +1037,46 @@
   "provCustom": {
     "message": "カスタム OpenAI互換"
   },
-  "jinaMarkdownBtn": { "message": "📄 Markdown" },
-  "jinaMarkdownTitle": { "message": "ページを Markdown に変換（ローカル）" },
-  "jinaMarkdownTitleJina": { "message": "ページを Markdown に変換（Jina Reader）" },
-  "jinaConverting": { "message": "⏳ 変換中..." },
-  "jinaCopied": { "message": "コピー済み!" },
-  "jinaFailed": { "message": "失敗" },
-  "jinaViewBtn": { "message": "表示" },
-  "secAiContentSource": { "message": "AIコンテンツソース" },
-  "aiContentSourceLocal": { "message": "ローカル（Defuddle）" },
-  "aiContentSourceJina": { "message": "Jina Reader" },
-  "secJinaReader": { "message": "Jina Reader" },
-  "jinaApiKeyLabel": { "message": "APIキー（任意）" },
-  "jinaApiKeyPlaceholder": { "message": "jina_xxxx（空欄で無料枠を使用）" },
-  "jinaKeyHint": { "message": "無料: 20リクエスト/分。キーを追加でクォータ増加。" }
+  "jinaMarkdownBtn": {
+    "message": "📄 Markdown"
+  },
+  "jinaMarkdownTitle": {
+    "message": "ページを Markdown に変換（ローカル）"
+  },
+  "jinaMarkdownTitleJina": {
+    "message": "ページを Markdown に変換（Jina Reader）"
+  },
+  "jinaConverting": {
+    "message": "⏳ 変換中..."
+  },
+  "jinaCopied": {
+    "message": "コピー済み!"
+  },
+  "jinaFailed": {
+    "message": "失敗"
+  },
+  "jinaViewBtn": {
+    "message": "表示"
+  },
+  "secAiContentSource": {
+    "message": "AIコンテンツソース"
+  },
+  "aiContentSourceLocal": {
+    "message": "ローカル（Defuddle）"
+  },
+  "aiContentSourceJina": {
+    "message": "Jina Reader"
+  },
+  "secJinaReader": {
+    "message": "Jina Reader"
+  },
+  "jinaApiKeyLabel": {
+    "message": "APIキー（任意）"
+  },
+  "jinaApiKeyPlaceholder": {
+    "message": "jina_xxxx（空欄で無料枠を使用）"
+  },
+  "jinaKeyHint": {
+    "message": "無料: 20リクエスト/分。キーを追加でクォータ増加。"
+  }
 }

@@ -357,6 +357,74 @@ a:hover { text-decoration: underline; }
   font-size: 10px;
   cursor: pointer;
 }
+.offline-toggle {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.offline-toggle:hover { text-decoration: none; }
+#offline-queue-chevron { font-size: 9px; opacity: 0.7; }
+.offline-queue-list {
+  max-height: 180px;
+  overflow-y: auto;
+  background: #fffbea;
+  border-top: 1px dashed #e8d88c;
+  font-size: 11px;
+}
+.offline-queue-empty {
+  padding: 8px;
+  text-align: center;
+  color: #999;
+}
+.offline-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.offline-queue-item:last-child { border-bottom: none; }
+.offline-queue-body {
+  flex: 1;
+  min-width: 0;
+}
+.offline-queue-title {
+  color: #555;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.offline-queue-meta {
+  color: #999;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.offline-queue-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.offline-queue-actions button {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: #666;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.offline-queue-actions button:hover:not(:disabled) { background: rgba(0,0,0,0.06); color: #4477bb; }
+.offline-queue-actions button:disabled { opacity: 0.5; cursor: default; }
+.offline-queue-actions .offline-queue-remove:hover:not(:disabled) { color: #c00; }
+.offline-queue-actions .offline-queue-failed { color: #c00; border-color: #c00; }
 
 /* Recent Bookmarks */
 .recent-bm-area {
@@ -500,6 +568,14 @@ html.dark .quick-links a { color: #6699ff; }
 html.dark .ql-sep { color: #444; }
 html.dark .offline-bar { background: #2a2510; border-color: #4a4020; color: #d4a800; }
 html.dark .offline-clear { color: #ff6666; }
+html.dark .offline-queue-list { background: #1f1c0e; border-top-color: #4a4020; }
+html.dark .offline-queue-item { border-bottom-color: rgba(255,255,255,0.06); }
+html.dark .offline-queue-title { color: #d4c890; }
+html.dark .offline-queue-meta { color: #7a6f4a; }
+html.dark .offline-queue-actions button { border-color: #4a4020; color: #aaa; }
+html.dark .offline-queue-actions button:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: #88aaff; }
+html.dark .offline-queue-actions .offline-queue-remove:hover:not(:disabled) { color: #ff6666; }
+html.dark .offline-queue-empty { color: #6a6a6a; }
 html.dark .submit-bar button.saved-success { background: #1a3a1a; border-color: #2a6a2a; color: #88cc88; }
 html.dark .add-all-link { color: #666; }
 html.dark .add-all-link:hover { color: #999; }
@@ -826,6 +902,14 @@ html[data-theme] .edit-cancel:hover { background: color-mix(in srgb, var(--pp-da
 html[data-theme] .edit-cancel:focus-visible { outline-color: var(--pp-accent); }
 html[data-theme] .offline-bar { background: var(--pp-offline-bg); border-color: var(--pp-offline-bd); color: var(--pp-offline-fg); }
 html[data-theme] .offline-clear { color: var(--pp-danger); }
+html[data-theme] .offline-queue-list { background: color-mix(in srgb, var(--pp-offline-bg) 75%, var(--pp-bg)); border-top-color: var(--pp-offline-bd); }
+html[data-theme] .offline-queue-item { border-bottom-color: color-mix(in srgb, var(--pp-fg) 10%, transparent); }
+html[data-theme] .offline-queue-title { color: var(--pp-fg); }
+html[data-theme] .offline-queue-meta { color: var(--pp-fg-hint); }
+html[data-theme] .offline-queue-actions button { border-color: color-mix(in srgb, var(--pp-fg) 18%, transparent); color: var(--pp-fg-muted); background: transparent; }
+html[data-theme] .offline-queue-actions button:hover:not(:disabled) { background: color-mix(in srgb, var(--pp-accent) 10%, transparent); color: var(--pp-accent); }
+html[data-theme] .offline-queue-actions .offline-queue-remove:hover:not(:disabled) { color: var(--pp-danger); background: color-mix(in srgb, var(--pp-danger) 12%, transparent); }
+html[data-theme] .offline-queue-empty { color: var(--pp-fg-hint); }
 html[data-theme] .error-text { color: var(--pp-danger); }
 html[data-theme] .status-msg.success { color: var(--pp-ok-fg); }
 html[data-theme] .status-msg.error { color: var(--pp-danger); }
