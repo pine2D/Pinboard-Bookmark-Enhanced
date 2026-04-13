@@ -135,10 +135,20 @@ chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
 });
 
 // ---- 设置图标 ----
-async function setIcon(tabId, bookmarked) {
+// Use callback form (not promise) so chrome.runtime.lastError is consumed
+// inside the callback — the only Chromium-guaranteed way to mark it handled.
+// Reading lastError after `await` (promise form) is too late: the unchecked
+// check fires in the same microtask the promise settles, before user code runs.
+// Symptoms otherwise: "Unchecked runtime.lastError: No tab with id: X"
+// with Context: Unknown and Stack: :0 (anonymous function).
+function setIcon(tabId, bookmarked) {
+  if (typeof tabId !== "number" || tabId < 0) return;
   try {
-    await chrome.action.setIcon({ tabId, path: bookmarked ? ICONS_BOOKMARKED : ICONS_DEFAULT });
-  } catch (_) {}
+    chrome.action.setIcon(
+      { tabId, path: bookmarked ? ICONS_BOOKMARKED : ICONS_DEFAULT },
+      () => { void chrome.runtime.lastError; /* consume to mark handled */ }
+    );
+  } catch (_) { /* synchronous throw on invalid args — ignore */ }
 }
 
 // ---- 检查 URL 是否已收藏 (uses cached token, direct fetch for latency) ----

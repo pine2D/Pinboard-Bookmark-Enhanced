@@ -3,22 +3,38 @@
 // ============================================================
 
 // ---- Page content extraction (used by popup and background) ----
+// Callback-wrapped chrome APIs: when tab closes mid-call, promise form leaks
+// "Unchecked runtime.lastError: No tab with id" via the legacy lastError channel
+// that await/try-catch cannot consume. Callback form lets us read lastError
+// inside the callback — the only Chromium-guaranteed consumption path.
+function _cbTabsGet(tabId) {
+  return new Promise((resolve) => {
+    chrome.tabs.get(tabId, (tab) => {
+      void chrome.runtime.lastError; resolve(tab || null);
+    });
+  });
+}
+function _cbExecuteScript(args) {
+  return new Promise((resolve) => {
+    chrome.scripting.executeScript(args, (results) => {
+      void chrome.runtime.lastError; resolve(results || null);
+    });
+  });
+}
+
 async function getPageInfoFromTab(tabId) {
   try {
-    const tab = await chrome.tabs.get(tabId);
+    const tab = await _cbTabsGet(tabId);
+    if (!tab) return null;
     const url = tab.url || "";
     if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("file://")) {
       return { url, title: tab.title || "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
     }
 
-    // Inject Defuddle library first
-    try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
-    } catch (_) {
-      // Defuddle injection failed — fall through to legacy extraction
-    }
+    // Inject Defuddle library first (ignore failure — e.g. tab closed mid-inject)
+    await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
 
-    const results = await chrome.scripting.executeScript({
+    const results = await _cbExecuteScript({
       target: { tabId },
       func: () => {
         const info = { url: location.href, title: document.title, selectedText: "", metaDescription: "", referrer: document.referrer || "", pageText: "" };
@@ -80,6 +96,7 @@ async function getPageInfoFromTab(tabId) {
   } catch (e) { console.warn("getPageInfoFromTab failed:", e.message); }
   return null;
 }
+
 
 // ---- Fetch with timeout ----
 function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {

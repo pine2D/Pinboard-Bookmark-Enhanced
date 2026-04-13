@@ -192,14 +192,14 @@ async function showMain(token) {
   setupTagPresets();
 
 // ---- Local Markdown extraction via Defuddle ----
+// Uses _cbExecuteScript from ai.js to consume chrome.runtime.lastError via
+// callback — promise form leaks "Unchecked runtime.lastError: No tab with id"
+// when tab closes mid-injection (see ai.js:_cbExecuteScript for detail).
 async function extractLocalMarkdown(tabId) {
+  const injectRes = await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
+  if (!injectRes) return { error: "Cannot access this page" };
   try {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
-  } catch (_) {
-    return { error: "Cannot access this page" };
-  }
-  try {
-    const results = await chrome.scripting.executeScript({
+    const results = await _cbExecuteScript({
       target: { tabId },
       func: () => {
         if (typeof Defuddle === "undefined") return { error: "Defuddle not available" };
