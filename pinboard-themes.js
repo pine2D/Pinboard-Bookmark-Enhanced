@@ -207,7 +207,26 @@ h2 { color: #3c4043 !important; }
 #main_column form[name="sort"] table td a.edit { color: #5f6368 !important; opacity: 0.7 !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #d93025 !important; opacity: 0.85 !important; font-weight: 600 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #1a73e8 !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #f1f3f4 !important; }
+#right_bar table td a.tag { color: #3c4043 !important; }
+#right_bar table td a.delete { color: #9aa0a6 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #d93025 !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #f8f9fa !important; color: #3c4043 !important; border: 1px solid #dadce0 !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #1a73e8 !important; box-shadow: 0 0 0 2px rgba(26,115,232,0.2) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #1a73e8 !important; color: #fff !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #1765cc !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #f8f9fa !important; color: #3c4043 !important; border: 1px solid #dadce0 !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #1a73e8 !important; box-shadow: 0 0 0 2px rgba(26,115,232,0.2) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #1a73e8 !important; color: #fff !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #1765cc !important; }`
   },
 
   // ---- 2. Nord Night (Dark) ----
@@ -378,7 +397,26 @@ h2 { color: #81a1c1 !important; }
 #main_column form[name="sort"] table td a.edit { color: #4c566a !important; opacity: 0.75 !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #bf616a !important; opacity: 0.85 !important; font-weight: 600 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #88c0d0 !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #434c5e !important; }
+#right_bar table td a.tag { color: #d8dee9 !important; }
+#right_bar table td a.delete { color: #7b8594 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #bf616a !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #3b4252 !important; color: #d8dee9 !important; border: 1px solid #4c566a !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #88c0d0 !important; box-shadow: 0 0 0 2px rgba(136,192,208,0.25) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #5e81ac !important; color: #eceff4 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #81a1c1 !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #3b4252 !important; color: #d8dee9 !important; border: 1px solid #4c566a !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #88c0d0 !important; box-shadow: 0 0 0 2px rgba(136,192,208,0.25) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #5e81ac !important; color: #eceff4 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #81a1c1 !important; }`
   },
 
   // ---- 3. Terminal (Dark) ----
@@ -563,7 +601,26 @@ h2 { color: #33ff33 !important; }
 #main_column form[name="sort"] table td a.edit { color: #22aa22 !important; opacity: 0.75 !important; transition: opacity 0.15s ease, text-shadow 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #ff5555 !important; opacity: 0.9 !important; font-weight: 700 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #33ff33 !important; opacity: 1 !important; text-shadow: 0 0 4px rgba(51,255,51,0.6) !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; text-shadow: 0 0 4px rgba(255,85,85,0.6) !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; text-shadow: 0 0 4px rgba(255,85,85,0.6) !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #0f2a0f !important; }
+#right_bar table td a.tag { color: #33ff33 !important; }
+#right_bar table td a.delete { color: #22aa22 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #ff5555 !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #0a0a0a !important; color: #33ff33 !important; border: 1px solid #33ff3350 !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #33ff33 !important; box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #003300 !important; color: #33ff33 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #005500 !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #0a0a0a !important; color: #33ff33 !important; border: 1px solid #33ff3350 !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #33ff33 !important; box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #003300 !important; color: #33ff33 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #005500 !important; }`
   },
 
   // ---- 4. Paper & Ink (Light) ----
@@ -739,7 +796,26 @@ h2 { color: #6b4c3b !important; font-family: "Georgia", serif !important; }
 #main_column form[name="sort"] table td a.edit { color: #8b7c6a !important; opacity: 0.75 !important; font-style: italic !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #a03024 !important; opacity: 0.85 !important; font-weight: 600 !important; font-style: italic !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #8b4513 !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #ede4d0 !important; }
+#right_bar table td a.tag { color: #3b2e20 !important; }
+#right_bar table td a.delete { color: #8b6c5b !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #a0522d !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #f5f0e8 !important; color: #3b2e20 !important; border: 1px solid #c9b896 !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #8b4513 !important; box-shadow: 0 0 0 2px rgba(139,69,19,0.18) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #6b4c3b !important; color: #f5f0e8 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #8b4513 !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #f5f0e8 !important; color: #3b2e20 !important; border: 1px solid #c9b896 !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #8b4513 !important; box-shadow: 0 0 0 2px rgba(139,69,19,0.18) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #6b4c3b !important; color: #f5f0e8 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #8b4513 !important; }`
   },
 
   // ---- 5. Dracula (Dark) ----
@@ -915,7 +991,26 @@ h2 { color: #bd93f9 !important; }
 #main_column form[name="sort"] table td a.edit { color: #6272a4 !important; opacity: 0.75 !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #ff5555 !important; opacity: 0.9 !important; font-weight: 600 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #ff79c6 !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #44475a !important; }
+#right_bar table td a.tag { color: #f8f8f2 !important; }
+#right_bar table td a.delete { color: #6272a4 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #ff5555 !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #282a36 !important; color: #f8f8f2 !important; border: 1px solid #6272a4 !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #bd93f9 !important; box-shadow: 0 0 0 2px rgba(189,147,249,0.25) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #bd93f9 !important; color: #282a36 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #ff79c6 !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #282a36 !important; color: #f8f8f2 !important; border: 1px solid #6272a4 !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #bd93f9 !important; box-shadow: 0 0 0 2px rgba(189,147,249,0.25) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #bd93f9 !important; color: #282a36 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #ff79c6 !important; }`
   },
 
   // ---- 6. Flexoki Adaptive (Light + Dark) ----
@@ -1217,7 +1312,46 @@ html.pbp-dark #main_column form[name="sort"] table a[style*="color:#aaa"], html.
 html.pbp-dark #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: #4385BE !important; }
 html.pbp-dark #main_column form[name="sort"] table td a.edit { color: #878580 !important; }
 html.pbp-dark #main_column form[name="sort"] table td a.destroy { color: #D14D41 !important; }
-html.pbp-dark #main_column form[name="sort"] table tr:hover td a.edit { color: #4385BE !important; }`
+html.pbp-dark #main_column form[name="sort"] table tr:hover td a.edit { color: #4385BE !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #e6e4d9 !important; }
+#right_bar table td a.tag { color: #100F0F !important; }
+#right_bar table td a.delete { color: #6F6E69 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #AF3029 !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #F2F0E5 !important; color: #100F0F !important; border: 1px solid #CECDC3 !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #24837B !important; box-shadow: 0 0 0 2px rgba(36,131,123,0.2) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #24837B !important; color: #FFFCF0 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #3AA29A !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #F2F0E5 !important; color: #100F0F !important; border: 1px solid #CECDC3 !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #24837B !important; box-shadow: 0 0 0 2px rgba(36,131,123,0.2) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #24837B !important; color: #FFFCF0 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #3AA29A !important; }
+
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+html.pbp-dark #right_bar table tr[onmouseover] { background: transparent !important; }
+html.pbp-dark #right_bar table tr[onmouseover]:hover { background: #282726 !important; }
+html.pbp-dark #right_bar table td a.tag { color: #CECDC3 !important; }
+html.pbp-dark #right_bar table td a.delete { color: #878580 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+html.pbp-dark #right_bar table tr:hover td a.delete { color: #D14D41 !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+html.pbp-dark #right_bar input#key { background: #1C1B1A !important; color: #CECDC3 !important; border: 1px solid #403E3C !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+html.pbp-dark #right_bar input#key:focus { border-color: #87D3C3 !important; box-shadow: 0 0 0 2px rgba(135,211,195,0.22) !important; outline: none !important; }
+html.pbp-dark #right_bar input[type="submit"] { background: #87D3C3 !important; color: #1C1B1A !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+html.pbp-dark #right_bar input[type="submit"]:hover { background: #A8E4D5 !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+html.pbp-dark #tweet_searchbox { margin-bottom: 12px !important; }
+html.pbp-dark #tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+html.pbp-dark #tweet_searchbox br { display: none !important; }
+html.pbp-dark #tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #1C1B1A !important; color: #CECDC3 !important; border: 1px solid #403E3C !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+html.pbp-dark #tweet_searchbox #search_query_field:focus { border-color: #87D3C3 !important; box-shadow: 0 0 0 2px rgba(135,211,195,0.22) !important; outline: none !important; }
+html.pbp-dark #tweet_searchbox input[type="submit"] { background: #87D3C3 !important; color: #1C1B1A !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 !important; }`
   },
 
   // ---- 7. Solarized Light ----
@@ -1388,7 +1522,26 @@ h2 { color: #586e75 !important; }
 #main_column form[name="sort"] table td a.edit { color: #93a1a1 !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #dc322f !important; opacity: 0.85 !important; font-weight: 600 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #268bd2 !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #eee8d5 !important; }
+#right_bar table td a.tag { color: #586e75 !important; }
+#right_bar table td a.delete { color: #93a1a1 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #dc322f !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #fdf6e3 !important; color: #586e75 !important; border: 1px solid #93a1a1 !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #268bd2 !important; box-shadow: 0 0 0 2px rgba(38,139,210,0.2) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #268bd2 !important; color: #fdf6e3 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #2aa198 !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #fdf6e3 !important; color: #586e75 !important; border: 1px solid #93a1a1 !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #268bd2 !important; box-shadow: 0 0 0 2px rgba(38,139,210,0.2) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #268bd2 !important; color: #fdf6e3 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #2aa198 !important; }`
   },
 
   // ---- 8. Solarized Dark ----
@@ -1561,7 +1714,26 @@ h2 { color: #93a1a1 !important; }
 #main_column form[name="sort"] table td a.edit { color: #586e75 !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #dc322f !important; opacity: 0.85 !important; font-weight: 600 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #268bd2 !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #073642 !important; }
+#right_bar table td a.tag { color: #93a1a1 !important; }
+#right_bar table td a.delete { color: #586e75 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #dc322f !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #002b36 !important; color: #93a1a1 !important; border: 1px solid #586e75 !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #268bd2 !important; box-shadow: 0 0 0 2px rgba(38,139,210,0.25) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #268bd2 !important; color: #fdf6e3 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #2aa198 !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #002b36 !important; color: #93a1a1 !important; border: 1px solid #586e75 !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #268bd2 !important; box-shadow: 0 0 0 2px rgba(38,139,210,0.25) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #268bd2 !important; color: #fdf6e3 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #2aa198 !important; }`
   },
 
   // ---- 9. Catppuccin Latte ----
@@ -1731,7 +1903,26 @@ h2 { color: #6c6f85 !important; }
 #main_column form[name="sort"] table td a.edit { color: #8c8fa1 !important; opacity: 0.75 !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #d20f39 !important; opacity: 0.85 !important; font-weight: 600 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #1e66f5 !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #ccd0da !important; }
+#right_bar table td a.tag { color: #4c4f69 !important; }
+#right_bar table td a.delete { color: #8c8fa1 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #d20f39 !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #eff1f5 !important; color: #4c4f69 !important; border: 1px solid #bcc0cc !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #1e66f5 !important; box-shadow: 0 0 0 2px rgba(30,102,245,0.2) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #1e66f5 !important; color: #eff1f5 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #7287fd !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #eff1f5 !important; color: #4c4f69 !important; border: 1px solid #bcc0cc !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #1e66f5 !important; box-shadow: 0 0 0 2px rgba(30,102,245,0.2) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #1e66f5 !important; color: #eff1f5 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #7287fd !important; }`
   },
 
   // ---- 10. Catppuccin Mocha ----
@@ -1903,7 +2094,26 @@ h2 { color: #cba6f7 !important; }
 #main_column form[name="sort"] table td a.edit { color: #7f849c !important; opacity: 0.75 !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #f38ba8 !important; opacity: 0.9 !important; font-weight: 600 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #89b4fa !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #313244 !important; }
+#right_bar table td a.tag { color: #cdd6f4 !important; }
+#right_bar table td a.delete { color: #6c7086 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #f38ba8 !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #1e1e2e !important; color: #cdd6f4 !important; border: 1px solid #45475a !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #89b4fa !important; box-shadow: 0 0 0 2px rgba(137,180,250,0.22) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #89b4fa !important; color: #1e1e2e !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #b4befe !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #1e1e2e !important; color: #cdd6f4 !important; border: 1px solid #45475a !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #89b4fa !important; box-shadow: 0 0 0 2px rgba(137,180,250,0.22) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #89b4fa !important; color: #1e1e2e !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #b4befe !important; }`
   },
 
   // ---- 11. Gruvbox Dark ----
@@ -2077,7 +2287,26 @@ h2 { color: #d3869b !important; }
 #main_column form[name="sort"] table td a.edit { color: #a89984 !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #fb4934 !important; opacity: 0.9 !important; font-weight: 700 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #83a598 !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #3c3836 !important; }
+#right_bar table td a.tag { color: #ebdbb2 !important; }
+#right_bar table td a.delete { color: #928374 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #fb4934 !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #282828 !important; color: #ebdbb2 !important; border: 1px solid #504945 !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #83a598 !important; box-shadow: 0 0 0 2px rgba(131,165,152,0.25) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #458588 !important; color: #fbf1c7 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #689d6a !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #282828 !important; color: #ebdbb2 !important; border: 1px solid #504945 !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #83a598 !important; box-shadow: 0 0 0 2px rgba(131,165,152,0.25) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #458588 !important; color: #fbf1c7 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #689d6a !important; }`
   },
 
   // ---- 12. Rose Pine ----
@@ -2251,7 +2480,26 @@ h2 { color: #ebbcba !important; }
 #main_column form[name="sort"] table td a.edit { color: #908caa !important; opacity: 0.8 !important; font-style: italic !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #eb6f92 !important; opacity: 0.9 !important; font-weight: 600 !important; font-style: italic !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #c4a7e7 !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #26233a !important; }
+#right_bar table td a.tag { color: #e0def4 !important; }
+#right_bar table td a.delete { color: #6e6a86 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #eb6f92 !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #1f1d2e !important; color: #e0def4 !important; border: 1px solid #403d52 !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #c4a7e7 !important; box-shadow: 0 0 0 2px rgba(196,167,231,0.22) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #ebbcba !important; color: #191724 !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #f6c177 !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #1f1d2e !important; color: #e0def4 !important; border: 1px solid #403d52 !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #c4a7e7 !important; box-shadow: 0 0 0 2px rgba(196,167,231,0.22) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #ebbcba !important; color: #191724 !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #f6c177 !important; }`
   },
 
   // ---- 13. GitHub Light ----
@@ -2421,7 +2669,26 @@ h2 { color: #656d76 !important; }
 #main_column form[name="sort"] table td a.edit { color: #656d76 !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
 #main_column form[name="sort"] table td a.destroy { color: #cf222e !important; opacity: 0.85 !important; font-weight: 600 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: #0969da !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }`
+#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+/* ---- Subscriptions: tag-list row hover (beats inline onmouseover) ---- */
+#right_bar table tr[onmouseover] { background: transparent !important; }
+#right_bar table tr[onmouseover]:hover { background: #f6f8fa !important; }
+#right_bar table td a.tag { color: #24292f !important; }
+#right_bar table td a.delete { color: #6e7781 !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: #cf222e !important; opacity: 1 !important; }
+/* ---- Subscribe form (input#key) ---- */
+#right_bar input#key { background: #ffffff !important; color: #24292f !important; border: 1px solid #d0d7de !important; border-radius: 4px !important; padding: 4px 8px !important; box-sizing: border-box !important; font-size: 12px !important; }
+#right_bar input#key:focus { border-color: #0969da !important; box-shadow: 0 0 0 2px rgba(9,105,218,0.2) !important; outline: none !important; }
+#right_bar input[type="submit"] { background: #2da44e !important; color: #ffffff !important; border: none !important; border-radius: 4px !important; padding: 4px 10px !important; margin-left: 6px !important; cursor: pointer !important; font-size: 12px !important; transition: background 0.15s ease !important; }
+#right_bar input[type="submit"]:hover { background: #2c974b !important; }
+/* ---- Tweets page: #tweet_searchbox ---- */
+#tweet_searchbox { margin-bottom: 12px !important; }
+#tweet_searchbox form { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; }
+#tweet_searchbox br { display: none !important; }
+#tweet_searchbox #search_query_field { width: 100% !important; box-sizing: border-box !important; background: #ffffff !important; color: #24292f !important; border: 1px solid #d0d7de !important; border-radius: 4px !important; padding: 6px 10px !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { border-color: #0969da !important; box-shadow: 0 0 0 2px rgba(9,105,218,0.2) !important; outline: none !important; }
+#tweet_searchbox input[type="submit"] { background: #2da44e !important; color: #ffffff !important; border: none !important; border-radius: 4px !important; padding: 5px 14px !important; cursor: pointer !important; font-size: 12px !important; align-self: flex-start !important; transition: background 0.15s ease !important; }
+#tweet_searchbox input[type="submit"]:hover { background: #2c974b !important; }`
   }
 
 };
