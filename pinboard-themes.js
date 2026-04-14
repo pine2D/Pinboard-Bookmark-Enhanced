@@ -381,7 +381,8 @@ hr { border-color: #434c5e !important; }
 a { color: #81a1c1 !important; }
 a:hover { color: #88c0d0 !important; }
 h2 { color: #81a1c1 !important; }
-::selection { background: #434c5e !important; }
+::selection { background: #5e81ac !important; color: #eceff4 !important; }
+::-moz-selection { background: #5e81ac !important; color: #eceff4 !important; }
 
 /* ---- Bundles page (/u:/bundles/) ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
@@ -1506,7 +1507,8 @@ input[type="radio"] { accent-color: #268bd2 !important; }
 a { color: #268bd2 !important; }
 a:hover { color: #2aa198 !important; }
 h2 { color: #586e75 !important; }
-::selection { background: #eee8d5 !important; }
+::selection { background: #268bd2 !important; color: #fdf6e3 !important; }
+::-moz-selection { background: #268bd2 !important; color: #fdf6e3 !important; }
 
 /* ---- Bundles page (/u:/bundles/) — Solarized Light ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
@@ -1887,7 +1889,8 @@ input[type="radio"] { accent-color: #1e66f5 !important; }
 a { color: #1e66f5 !important; }
 a:hover { color: #179299 !important; }
 h2 { color: #6c6f85 !important; }
-::selection { background: #e6e9ef !important; }
+::selection { background: #7287fd !important; color: #eff1f5 !important; }
+::-moz-selection { background: #7287fd !important; color: #eff1f5 !important; }
 
 /* ---- Bundles page (/u:/bundles/) — Catppuccin Latte ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
