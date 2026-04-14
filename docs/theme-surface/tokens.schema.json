@@ -217,6 +217,59 @@
       }
     },
 
+    "patterns": {
+      "type": "object",
+      "description": "Stylistic / personality patterns. Each key is a named design decision the composer knows how to emit. Values are enum strings or short literal strings (for prefix glyphs). A theme that sets no patterns falls back to plain composer output.",
+      "additionalProperties": false,
+      "properties": {
+        "tag-style": {
+          "type": "string",
+          "enum": ["plain", "hash-prefix", "pill", "bracketed"],
+          "description": "Visual treatment of a.tag. plain=composer default, hash-prefix=prepend '#', pill=rounded chip with padding, bracketed=wrap in [ ]."
+        },
+        "bookmark-title-prefix": {
+          "type": "string",
+          "maxLength": 8,
+          "description": "Literal glyph(s) prepended to a.bookmark_title via ::before (e.g. '> ' for terminal)."
+        },
+        "heading-prefix": {
+          "type": "string",
+          "maxLength": 8,
+          "description": "Literal glyph(s) prepended to .settings_heading via ::before (e.g. '$ ' for terminal)."
+        },
+        "url-link-style": {
+          "type": "string",
+          "enum": ["plain", "capsule", "pill", "underline"],
+          "description": "Treatment of a.url_link. capsule=rounded bg chip (default), pill=fully-rounded, underline=no bg+underline, plain=no chrome."
+        },
+        "private-badge": {
+          "type": "string",
+          "enum": ["tint-bg", "border-left", "dashed", "stripe"],
+          "description": "How .private is visually marked. tint-bg=colored background (default), border-left=accent stripe on left edge, dashed=dashed outline, stripe=diagonal stripe bg."
+        },
+        "focus-ring": {
+          "type": "string",
+          "enum": ["none", "thin-solid", "dashed", "glow"],
+          "description": "Focus outline style on inputs. thin-solid=1px accent ring (default), glow=soft box-shadow halo, dashed=dashed outline, none=no ring."
+        },
+        "shape": {
+          "type": "string",
+          "enum": ["sharp", "rounded", "pill"],
+          "description": "Macro over radii. sharp=0 everywhere, rounded=use radius.md token, pill=use radius.pill token. Overrides individual radius tokens if set."
+        },
+        "density": {
+          "type": "string",
+          "enum": ["compact", "default", "roomy"],
+          "description": "Macro over spacing. compact=tight padding+gaps, default=composer baseline, roomy=extra breathing room."
+        },
+        "hover-effect": {
+          "type": "string",
+          "enum": ["underline", "lift", "color-shift", "fade-bg"],
+          "description": "Bookmark row hover treatment. underline=title underlines only, lift=subtle translateY, color-shift=hover changes color, fade-bg=row background tints."
+        }
+      }
+    },
+
     "overrides": {
       "type": "object",
       "description": "Escape hatch: surface-keyed CSS rule fragments emitted verbatim AFTER the composer output. Use sparingly for bespoke surfaces the composer cannot express. Keys MUST match a surface id in manifest.json.",

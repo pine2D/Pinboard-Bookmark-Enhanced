@@ -13,17 +13,18 @@
 // extensions below (success, muted-soft, private-accent, url-link-*).
 
 import { baseLayer } from "./_base.mjs";
+import { patternsLayer } from "./_patterns.mjs";
 import { v } from "./_util.mjs";
 
 export function compose(tokens) {
-  return baseLayer(tokens) + emit(tokens);
+  return baseLayer(tokens) + emit(tokens) + patternsLayer(tokens);
 }
 
 function emit(tokens) {
   const maxWidth = tokens.layout?.["max-width"];
   const bookmarkStyle = tokens.layout?.["bookmark-style"] || "flat"; // "flat" | "card"
-  const privateStyle = tokens.ext?.["private-style"] || "bg"; // "bg" | "border-left"
-  const privateBorderWidth = tokens.ext?.["private-border-width"] || "3px";
+  // Private-bookmark treatment moved to patterns.private-badge (emitted by _patterns.mjs).
+  // Composer now only provides the tint-bg default; patterns overrides it if set.
   const sizeBase = tokens.typo?.["size-base"] || "13px";
   const sizeSm = tokens.typo?.["size-sm"] || sizeBase;
   const sizeXs = tokens.typo?.["size-xs"] || sizeSm;
@@ -129,10 +130,8 @@ a.unread { color: ${v("destroy")} !important; font-weight: bold !important; }
 a.copy_link { color: ${v("accent")} !important; }
 a.delete, a.destroy { color: ${v("destroy")} !important; }
 
-/* ---- Private bookmarks (two styles via ext token) ---- */
-${privateStyle === "border-left"
-  ? `.private { background: ${v("bg-surface")} !important; border-left: ${privateBorderWidth} solid ${v("private-accent")} !important; }`
-  : `.private { background: ${v("private-bg")} !important; }`}
+/* ---- Private bookmarks (composer default: tint-bg; patterns.private-badge overrides) ---- */
+.private { background: ${v("private-bg")} !important; }
 
 /* ---- Right bar ---- */
 #right_bar {

@@ -1,0 +1,182 @@
+// Composer add-on: patterns
+//
+// Emits stylistic/personality CSS based on tokens.patterns. This is the
+// "interface" layer that lets tokens drive decisions beyond color/font/space
+// — things like "prepend '#' before every tag" or "show private bookmarks
+// with a left-border instead of a tinted background".
+//
+// Contract:
+//   patternsLayer(tokens) -> css string (possibly empty)
+//
+// Output is concatenated AFTER classic-list-v2's main output but BEFORE any
+// hand-authored tokens.overrides.css, so:
+//   composer defaults  <  patterns  <  overrides (escape hatch)
+//
+// Each pattern emits `!important` rules scoped to the same selectors the main
+// composer uses, ensuring predictable cascade order.
+
+import { v } from "./_util.mjs";
+
+export function patternsLayer(tokens) {
+  const pat = tokens.patterns || {};
+  const sizeXs = tokens.typo?.["size-xs"] || tokens.typo?.["size-sm"] || "12px";
+  const out = [];
+
+  // ---- P0: tag-style ----
+  const tagStyle = pat["tag-style"];
+  if (tagStyle === "hash-prefix") {
+    out.push(`a.tag::before { content: "#" !important; }`);
+  } else if (tagStyle === "bracketed") {
+    out.push(
+      `a.tag::before { content: "[" !important; opacity: 0.6 !important; }`,
+      `a.tag::after  { content: "]" !important; opacity: 0.6 !important; }`
+    );
+  } else if (tagStyle === "pill") {
+    // Fully rounded chip; override composer's radius-lg with a pill shape.
+    out.push(
+      `a.tag { border-radius: 9999px !important; padding: 2px 10px !important; }`
+    );
+  }
+  // "plain" or missing → composer default
+
+  // ---- P0: bookmark-title-prefix ----
+  const titlePrefix = pat["bookmark-title-prefix"];
+  if (typeof titlePrefix === "string" && titlePrefix.length > 0) {
+    const escaped = escapeCssContent(titlePrefix);
+    out.push(
+      `a.bookmark_title::before { content: "${escaped}" !important; color: ${v("muted-soft")} !important; }`
+    );
+  }
+
+  // ---- P0: heading-prefix ----
+  const headingPrefix = pat["heading-prefix"];
+  if (typeof headingPrefix === "string" && headingPrefix.length > 0) {
+    const escaped = escapeCssContent(headingPrefix);
+    out.push(
+      `.settings_heading::before { content: "${escaped}" !important; opacity: 0.7 !important; }`
+    );
+  }
+
+  // ---- P1: url-link-style ----
+  const urlStyle = pat["url-link-style"];
+  if (urlStyle === "pill") {
+    out.push(
+      `a.url_link { border-radius: 9999px !important; padding: 1px 10px !important; }`
+    );
+  } else if (urlStyle === "underline") {
+    out.push(
+      `a.url_link { background: transparent !important; padding: 0 !important; border-radius: 0 !important; text-decoration: underline !important; color: ${v("muted-soft")} !important; }`
+    );
+  } else if (urlStyle === "plain") {
+    out.push(
+      `a.url_link { background: transparent !important; padding: 0 !important; border-radius: 0 !important; color: ${v("muted-soft")} !important; font-size: ${sizeXs} !important; }`
+    );
+  }
+  // "capsule" or missing → composer default
+
+  // ---- P1: private-badge ----
+  const privBadge = pat["private-badge"];
+  if (privBadge === "border-left") {
+    const w = tokens.ext?.["private-border-width"] || "3px";
+    out.push(
+      `.private { background: ${v("bg-surface")} !important; border-left: ${w} solid ${v("private-accent")} !important; padding-left: 10px !important; }`
+    );
+  } else if (privBadge === "dashed") {
+    out.push(
+      `.private { background: transparent !important; outline: 1px dashed ${v("private-accent")} !important; outline-offset: -2px !important; }`
+    );
+  } else if (privBadge === "stripe") {
+    out.push(
+      `.private { background: repeating-linear-gradient(135deg, ${v("private-bg")}, ${v("private-bg")} 6px, ${v("bg-surface")} 6px, ${v("bg-surface")} 12px) !important; }`
+    );
+  }
+  // "tint-bg" or missing → composer default (`.private { background: private-bg }`)
+
+  // ---- P1: focus-ring ----
+  const ring = pat["focus-ring"];
+  if (ring === "glow") {
+    // 2px solid ring — matches shipped convention (every theme uses this).
+    // Individual alpha strength controlled by each theme's accent-alpha token.
+    out.push(
+      `#search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus {`,
+      `  box-shadow: 0 0 0 2px ${v("accent-alpha")} !important;`,
+      `  outline: none !important;`,
+      `}`
+    );
+  } else if (ring === "dashed") {
+    out.push(
+      `input:focus, textarea:focus, select:focus { outline: 2px dashed ${v("accent")} !important; outline-offset: 2px !important; box-shadow: none !important; }`
+    );
+  } else if (ring === "none") {
+    out.push(
+      `input:focus, textarea:focus, select:focus { outline: none !important; box-shadow: none !important; }`
+    );
+  }
+  // "thin-solid" or missing → composer default
+
+  // ---- P2: shape ----
+  // Rewrites the radius custom properties at :root so every composer rule that
+  // references var(--pinboard-radius-*) gets the macro value.
+  const shape = pat["shape"];
+  if (shape === "sharp") {
+    out.push(
+      `:root { --pinboard-radius-sm: 0 !important; --pinboard-radius-md: 0 !important; --pinboard-radius-lg: 0 !important; }`
+    );
+  } else if (shape === "pill") {
+    out.push(
+      `:root { --pinboard-radius-sm: 9999px !important; --pinboard-radius-md: 9999px !important; --pinboard-radius-lg: 9999px !important; }`
+    );
+  }
+  // "rounded" → uses whatever radius.* tokens the theme already declared
+
+  // ---- P2: density ----
+  const density = pat["density"];
+  if (density === "compact") {
+    out.push(
+      `:root { --pinboard-space-bookmark-gap: 2px !important; --pinboard-space-right-bar-gap: 8px !important; }`,
+      `.bookmark { padding: 4px 8px !important; }`
+    );
+  } else if (density === "roomy") {
+    out.push(
+      `:root { --pinboard-space-bookmark-gap: 16px !important; --pinboard-space-right-bar-gap: 20px !important; }`,
+      `.bookmark { padding: 16px 20px !important; }`
+    );
+  }
+  // "default" or missing → composer baseline
+
+  // ---- P2: hover-effect ----
+  const hover = pat["hover-effect"];
+  if (hover === "underline") {
+    out.push(
+      `.bookmark { transition: none !important; }`,
+      `.bookmark:hover { background: transparent !important; }`,
+      `.bookmark:hover a.bookmark_title { text-decoration: underline !important; }`
+    );
+  } else if (hover === "lift") {
+    out.push(
+      `.bookmark { transition: transform 0.15s ease, box-shadow 0.15s ease !important; }`,
+      `.bookmark:hover { transform: translateY(-1px) !important; box-shadow: 0 2px 8px ${v("accent-alpha")} !important; }`
+    );
+  } else if (hover === "color-shift") {
+    out.push(
+      `.bookmark { transition: color 0.15s ease !important; }`,
+      `.bookmark:hover { background: transparent !important; color: ${v("accent")} !important; }`,
+      `.bookmark:hover a.bookmark_title { color: ${v("link-hover")} !important; }`
+    );
+  } else if (hover === "fade-bg") {
+    out.push(
+      `.bookmark { transition: background 0.2s ease !important; }`,
+      `.bookmark:hover { background: ${v("row-hover")} !important; }`
+    );
+  }
+
+  if (!out.length) return "";
+  return `\n/* === patterns layer (tokens.patterns) === */\n` + out.join("\n") + "\n";
+}
+
+// CSS ::before/::after `content:` must be a quoted string. We already wrap in
+// double-quotes, so escape any " and \ in the user glyph. Keep printable-ASCII
+// glyphs (schema caps at 8 chars, typical values: "> ", "$ ", "# ", "» ").
+function escapeCssContent(s) {
+  return String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}

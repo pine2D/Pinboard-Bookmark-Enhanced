@@ -14,6 +14,14 @@ pilots/*.apply-report.json
 pilots/*.overrides-patch.css
 aggregate-report.json
 
-# Dev-time reference fixtures (large PNG captures) — regenerate via capture tooling
-snapshots/
+# Dev-time reference fixtures — contain AUTHOR'S PINBOARD ACCOUNT DATA
+# (usernames in page captures, bookmark lists in raw.html, selection text in state-capture.json).
+# NEVER remove these rules. See snapshots/README.md for the full threat model.
+#
+# NOTE: We use `snapshots/*` (not `snapshots/`) so the negation below can let
+# README.md through. If the parent dir is wholly excluded, git refuses to
+# descend and negation of contained files doesn't work.
+snapshots/*
 theme-screenshots/
+# Negation: let the warning README through so it shows up in the repo.
+!snapshots/README.md

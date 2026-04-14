@@ -52,6 +52,17 @@ if (slug === "all") {
 
 const TOKENS_PATH = resolve(PILOTS, `${slug}.tokens.json`);
 const tokens = JSON.parse(readFileSync(TOKENS_PATH, "utf8"));
+
+// Idempotency fix: strip any prior auto-patch from tokens.overrides.css BEFORE
+// computing `generated`. Otherwise the tool diffs shipped against a view that
+// includes the stale patch, decides "nothing missing", then writes back an
+// overrides.css that no longer contains those decls — losing real coverage.
+// (Manifested as generate-overrides on gruvbox-dark emitting 0 decls while
+//  diff-all reported 95 missing immediately after.)
+const AUTO_BANNER_RE_STRIP = /\/\*\s*={2,}\s*overrides-patch for [\s\S]*?\*\/[\s\S]*?(?=(?:\n\s*\/\*|$))/g;
+if (tokens.overrides?.css) {
+  tokens.overrides.css = tokens.overrides.css.replace(AUTO_BANNER_RE_STRIP, "").trimEnd() + (tokens.overrides.css.endsWith("\n") ? "\n" : "");
+}
 const generated = composeTheme(tokens, compose);
 const re = new RegExp(`"${slug}":\\s*\\{[\\s\\S]*?css:\\s*\`([\\s\\S]*?)\`\\s*\\}`, "m");
 const m = src.match(re);
@@ -189,7 +200,11 @@ if (INJECT) {
   // hand-authored ::before decorations etc.) and strip any prior auto-patch
   // block before appending the fresh one.
   const existing = tokens.overrides?.css || "";
-  const AUTO_BANNER_RE = /\/\*\s*={2,}\s*overrides-patch for [^]*?={2,}\s*\*\/[\s\S]*?(?=(?:\n\s*\/\*|$))/g;
+  // Match banner comment (/* ======... overrides-patch for X ...===  * Restores... */)
+  // and everything up to the next /* comment or end-of-string. The prior regex
+  // required `={2,}\s*\*\/` which failed when the banner body contained prose
+  // like "Restores shipped decls..." between the === and the closing */.
+  const AUTO_BANNER_RE = /\/\*\s*={2,}\s*overrides-patch for [\s\S]*?\*\/[\s\S]*?(?=(?:\n\s*\/\*|$))/g;
   const preserved = existing.replace(AUTO_BANNER_RE, "").trim();
   const merged = [preserved, banner, patchBody].filter(Boolean).join("\n\n").trim();
   tokens.overrides = tokens.overrides || {};
