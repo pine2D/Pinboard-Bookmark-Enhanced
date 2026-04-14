@@ -266,6 +266,21 @@
           "type": "string",
           "enum": ["underline", "lift", "color-shift", "fade-bg"],
           "description": "Bookmark row hover treatment. underline=title underlines only, lift=subtle translateY, color-shift=hover changes color, fade-bg=row background tints."
+        },
+        "row-divider": {
+          "type": "string",
+          "enum": ["none", "hairline", "dashed", "left-accent"],
+          "description": "Separator between bookmark rows. hairline=1px solid border (default), dashed=1px dashed, left-accent=3px accent stripe on left instead of bottom rule, none=no divider."
+        },
+        "heading-accent": {
+          "type": "string",
+          "enum": ["plain", "caps", "dashed-underline"],
+          "description": "Extra treatment on .settings_heading. plain=composer default, caps=uppercase+letter-spacing+smaller font (editorial), dashed-underline=dashed bottom rule instead of solid."
+        },
+        "card-shadow": {
+          "type": "string",
+          "enum": ["none", "soft", "strong"],
+          "description": "box-shadow on .bookmark rows. Only takes effect when bookmark-style is 'card'. soft=subtle lift, strong=pronounced drop shadow."
         }
       }
     },

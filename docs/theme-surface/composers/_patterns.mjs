@@ -170,6 +170,64 @@ export function patternsLayer(tokens) {
     );
   }
 
+  // ---- P3: row-divider ----
+  // Emits the border treatment on .bookmark rows. Composer's base leaves row
+  // borders unspecified (shipped themes uniformly override), so this pattern
+  // absorbs that repeated work. Padding is NOT touched here — that stays
+  // under density control so the two axes remain independent.
+  const divider = pat["row-divider"];
+  if (divider === "hairline") {
+    out.push(
+      `.bookmark { border-bottom: 1px solid ${v("border")} !important; }`
+    );
+  } else if (divider === "dashed") {
+    out.push(
+      `.bookmark { border-bottom: 1px dashed ${v("border")} !important; }`
+    );
+  } else if (divider === "left-accent") {
+    const w = tokens.ext?.["row-accent-width"] || "3px";
+    out.push(
+      `.bookmark { border-left: ${w} solid ${v("border")} !important; border-bottom: none !important; border-top: none !important; border-right: none !important; }`
+    );
+  } else if (divider === "none") {
+    out.push(
+      `.bookmark { border: none !important; }`
+    );
+  }
+
+  // ---- P3: heading-accent ----
+  // Layered ON TOP of composer's default .settings_heading (color + solid
+  // border-bottom + padding-bottom). Only emits the *delta*, so composer
+  // baseline stays intact for themes that opt out.
+  const headAccent = pat["heading-accent"];
+  if (headAccent === "caps") {
+    out.push(
+      `.settings_heading { text-transform: uppercase !important; font-size: 12px !important; letter-spacing: 0.08em !important; }`
+    );
+  } else if (headAccent === "dashed-underline") {
+    out.push(
+      `.settings_heading { border-bottom-style: dashed !important; }`
+    );
+  }
+  // "plain" or missing → composer default
+
+  // ---- P3: card-shadow ----
+  // Drop shadow on .bookmark rows. Meant for themes whose rows read as cards
+  // (background + rounded corners) — apply alongside row-divider:"none" for
+  // the intended look. Applied unconditionally: opt-in via tokens.patterns.
+  const cardShadow = pat["card-shadow"];
+  if (cardShadow === "soft") {
+    out.push(
+      `.bookmark { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important; transition: box-shadow 0.2s !important; }`,
+      `.bookmark:hover { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important; }`
+    );
+  } else if (cardShadow === "strong") {
+    out.push(
+      `.bookmark { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important; transition: box-shadow 0.2s !important; }`,
+      `.bookmark:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22) !important; }`
+    );
+  }
+
   if (!out.length) return "";
   return `\n/* === patterns layer (tokens.patterns) === */\n` + out.join("\n") + "\n";
 }

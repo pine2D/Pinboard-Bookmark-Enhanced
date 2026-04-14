@@ -728,7 +728,10 @@
       "focus-ring": { "values": ["none", "thin-solid", "dashed", "glow"], "affects": "input/textarea/select :focus outline" },
       "shape": { "values": ["sharp", "rounded", "pill"], "affects": "macro rewrite of --pinboard-radius-* at :root" },
       "density": { "values": ["compact", "default", "roomy"], "affects": "macro rewrite of --pinboard-space-* + .bookmark padding" },
-      "hover-effect": { "values": ["underline", "lift", "color-shift", "fade-bg"], "affects": ".bookmark:hover + title underline" }
+      "hover-effect": { "values": ["underline", "lift", "color-shift", "fade-bg"], "affects": ".bookmark:hover + title underline" },
+      "row-divider": { "values": ["none", "hairline", "dashed", "left-accent"], "affects": ".bookmark border treatment (border-bottom rule or border-left stripe)" },
+      "heading-accent": { "values": ["plain", "caps", "dashed-underline"], "affects": ".settings_heading delta: uppercase+letter-spacing OR dashed bottom rule" },
+      "card-shadow": { "values": ["none", "soft", "strong"], "affects": ".bookmark box-shadow; pair with row-divider:none for card-like rows" }
     },
     "when_to_add_new_pattern": [
       "Theme-personality rule you find in 3+ themes' overrides.css — promote it to a pattern",
