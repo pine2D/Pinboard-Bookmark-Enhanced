@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "id": "catppuccin-mocha",
+    "name": "Catppuccin Mocha",
+    "mode": "dark",
+    "description": "Sprint 3 migration: rich dark theme from the Catppuccin palette with pastel blue/mauve accents and card-style bookmarks. Source: pinboard-themes.js §catppuccin-mocha."
+  },
+  "layout": {
+    "mode": "classic-list",
+    "max-width": "1030px",
+    "bookmark-style": "card",
+    "right-bar": "visible"
+  },
+  "palette": {
+    "bg":             "#1e1e2e",
+    "bg-surface":     "#313244",
+    "fg":             "#cdd6f4",
+    "fg-strong":      "#cba6f7",
+    "muted":          "#a6adc8",
+    "muted-soft":     "#585b70",
+    "border":         "#45475a",
+    "border-strong":  "#45475a",
+    "border-soft":    "#45475a",
+    "accent":         "#89b4fa",
+    "accent-hover":   "#cba6f7",
+    "accent-soft":    "#313244",
+    "accent-alpha":   "rgba(137,180,250,0.25)",
+    "input-bg":       "#1e1e2e",
+    "private-bg":     "#313244",
+    "private-accent": "#f9e2af",
+    "selection-bg":   "#585b70",
+    "selection-fg":   "#cdd6f4",
+    "tag-bg":         "#45475a",
+    "tag-fg":         "#94e2d5",
+    "row-hover":      "#313244",
+    "destroy":        "#f38ba8",
+    "btn-bg":         "#89b4fa",
+    "btn-fg":         "#1e1e2e",
+    "success":        "#94e2d5",
+    "success-hover":  "#a6e3a1",
+    "url-link-bg":    "#313244",
+    "url-link-fg":    "#f9e2af",
+    "link-hover":     "#cba6f7",
+    "link-visited":   "#89b4fa",
+    "focus-ring":     "#89b4fa",
+    "unread":         "#f38ba8"
+  },
+  "typo": {
+    "family": "\"Nunito\", \"Inter\", -apple-system, sans-serif",
+    "size-base": "13px",
+    "size-lg":   "15px",
+    "size-sm":   "12px",
+    "size-xs":   "11px",
+    "line-height": 1.6,
+    "weight-body": 400,
+    "weight-heading": 700
+  },
+  "space": {
+    "unit":           "4px",
+    "bookmark-gap":   "8px",
+    "main-padding":   "14px",
+    "sub-banner-y":   "8px",
+    "right-bar-gap":  "12px",
+    "form-gap":       "8px"
+  },
+  "radius": {
+    "sm": "8px",
+    "md": "12px",
+    "lg": "10px"
+  },
+  "border": {
+    "width": "1px",
+    "style": "solid"
+  },
+  "ext": {
+    "private-style": "border-left",
+    "private-border-width": "3px"
+  }
+}

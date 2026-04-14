@@ -1,0 +1,2177 @@
+{
+  "themes": [
+    {
+      "slug": "modern-card",
+      "name": "Modern Card",
+      "bytes": 15689
+    },
+    {
+      "slug": "nord-night",
+      "name": "Nord Night",
+      "bytes": 14583
+    },
+    {
+      "slug": "terminal",
+      "name": "Terminal",
+      "bytes": 15349
+    },
+    {
+      "slug": "paper-ink",
+      "name": "Paper & Ink",
+      "bytes": 14720
+    },
+    {
+      "slug": "dracula",
+      "name": "Dracula",
+      "bytes": 14696
+    },
+    {
+      "slug": "flexoki",
+      "name": "Flexoki Adaptive",
+      "bytes": 25569
+    },
+    {
+      "slug": "solarized-light",
+      "name": "Solarized Light",
+      "bytes": 15067
+    },
+    {
+      "slug": "solarized-dark",
+      "name": "Solarized Dark",
+      "bytes": 15205
+    },
+    {
+      "slug": "catppuccin-latte",
+      "name": "Catppuccin Latte",
+      "bytes": 15047
+    },
+    {
+      "slug": "catppuccin-mocha",
+      "name": "Catppuccin Mocha",
+      "bytes": 15185
+    },
+    {
+      "slug": "gruvbox-dark",
+      "name": "Gruvbox Dark",
+      "bytes": 15357
+    },
+    {
+      "slug": "rose-pine",
+      "name": "Ros\\u00e9 Pine",
+      "bytes": 15622
+    },
+    {
+      "slug": "github-light",
+      "name": "GitHub Light",
+      "bytes": 14751
+    }
+  ],
+  "unique_selectors_total": 264,
+  "theme_unique_selectors": 113,
+  "scope_distribution": {
+    "app": 11,
+    "bare": 167,
+    "tagcloud": 7,
+    "notes": 3,
+    "profile": 8,
+    "popup": 8,
+    "banner": 10,
+    "right": 12,
+    "pagination": 3,
+    "edit": 1,
+    "settings": 10,
+    "savepopup": 1,
+    "main": 15,
+    "tweets": 6,
+    "selection": 2
+  },
+  "ubiquitous_selectors": [
+    {
+      "sel": "#main_column form[name=\"sort\"] table input[name^=\"id_\"]",
+      "themes": 13,
+      "decls": 198
+    },
+    {
+      "sel": "#right_bar input[type=\"submit\"]",
+      "themes": 13,
+      "decls": 117
+    },
+    {
+      "sel": "#tweet_searchbox input[type=\"submit\"]",
+      "themes": 13,
+      "decls": 117
+    },
+    {
+      "sel": "#tweet_searchbox #search_query_field",
+      "themes": 13,
+      "decls": 104
+    },
+    {
+      "sel": ".service_box .service_box",
+      "themes": 13,
+      "decls": 91
+    },
+    {
+      "sel": ".settings_tab_selected",
+      "themes": 13,
+      "decls": 89
+    },
+    {
+      "sel": "#search_query_field",
+      "themes": 13,
+      "decls": 73
+    },
+    {
+      "sel": "a.url_link",
+      "themes": 13,
+      "decls": 69
+    },
+    {
+      "sel": ".search_button input[type=\"submit\"]",
+      "themes": 13,
+      "decls": 67
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table a[style*=\"color:#aaa\"]",
+      "themes": 13,
+      "decls": 67
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table a[style*=\"color: #aaa\"]",
+      "themes": 13,
+      "decls": 67
+    },
+    {
+      "sel": ".star",
+      "themes": 13,
+      "decls": 66
+    },
+    {
+      "sel": ".note .note",
+      "themes": 13,
+      "decls": 66
+    },
+    {
+      "sel": ".selected_star",
+      "themes": 13,
+      "decls": 65
+    },
+    {
+      "sel": ".settings_heading",
+      "themes": 13,
+      "decls": 65
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table a.bundle",
+      "themes": 13,
+      "decls": 65
+    },
+    {
+      "sel": "input[type=\"submit\"]",
+      "themes": 13,
+      "decls": 63
+    },
+    {
+      "sel": "input[type=\"button\"]",
+      "themes": 13,
+      "decls": 63
+    },
+    {
+      "sel": "a.tag",
+      "themes": 13,
+      "decls": 60
+    },
+    {
+      "sel": ".bookmark .display",
+      "themes": 13,
+      "decls": 52
+    },
+    {
+      "sel": "#right_bar table td a.delete",
+      "themes": 13,
+      "decls": 52
+    },
+    {
+      "sel": "#tweet_searchbox form",
+      "themes": 13,
+      "decls": 52
+    },
+    {
+      "sel": "a.bookmark_title",
+      "themes": 13,
+      "decls": 51
+    },
+    {
+      "sel": "#note_right_column",
+      "themes": 13,
+      "decls": 51
+    },
+    {
+      "sel": "#banner_searchbox input[type=\"text\"]",
+      "themes": 13,
+      "decls": 47
+    },
+    {
+      "sel": "body:not(#pinboard)",
+      "themes": 13,
+      "decls": 43
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table td",
+      "themes": 13,
+      "decls": 43
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table td a.edit",
+      "themes": 13,
+      "decls": 41
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table td a.destroy",
+      "themes": 13,
+      "decls": 41
+    },
+    {
+      "sel": ".settings_tab",
+      "themes": 13,
+      "decls": 39
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table td[style*=\"text-align:right\"]",
+      "themes": 13,
+      "decls": 39
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table input[name^=\"id_\"]:focus",
+      "themes": 13,
+      "decls": 39
+    },
+    {
+      "sel": "#right_bar input#key:focus",
+      "themes": 13,
+      "decls": 39
+    },
+    {
+      "sel": "#tweet_searchbox #search_query_field:focus",
+      "themes": 13,
+      "decls": 39
+    },
+    {
+      "sel": ".description",
+      "themes": 13,
+      "decls": 38
+    },
+    {
+      "sel": ".bookmark",
+      "themes": 13,
+      "decls": 33
+    },
+    {
+      "sel": "a.url_display",
+      "themes": 13,
+      "decls": 32
+    },
+    {
+      "sel": "#edit_bookmark_form",
+      "themes": 13,
+      "decls": 32
+    },
+    {
+      "sel": "input[type=\"text\"]:focus",
+      "themes": 13,
+      "decls": 31
+    },
+    {
+      "sel": "input:not([type]):focus",
+      "themes": 13,
+      "decls": 31
+    },
+    {
+      "sel": "textarea:focus",
+      "themes": 13,
+      "decls": 31
+    },
+    {
+      "sel": "select:focus",
+      "themes": 13,
+      "decls": 31
+    },
+    {
+      "sel": "a.when",
+      "themes": 13,
+      "decls": 29
+    },
+    {
+      "sel": ".suggested_tag",
+      "themes": 13,
+      "decls": 29
+    },
+    {
+      "sel": "a.tag:hover",
+      "themes": 13,
+      "decls": 28
+    },
+    {
+      "sel": "a.help",
+      "themes": 13,
+      "decls": 27
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table tr:hover td a.edit",
+      "themes": 13,
+      "decls": 27
+    },
+    {
+      "sel": "#tag_cloud",
+      "themes": 13,
+      "decls": 26
+    },
+    {
+      "sel": "#pinboard_name a",
+      "themes": 13,
+      "decls": 26
+    },
+    {
+      "sel": "#sub_banner",
+      "themes": 13,
+      "decls": 26
+    },
+    {
+      "sel": ".private",
+      "themes": 13,
+      "decls": 26
+    },
+    {
+      "sel": "a.tag.selected",
+      "themes": 13,
+      "decls": 26
+    },
+    {
+      "sel": "a.sort_order_selected",
+      "themes": 13,
+      "decls": 26
+    },
+    {
+      "sel": ".settings_tab a",
+      "themes": 13,
+      "decls": 26
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table a[style*=\"color:#aaa\"]:hover",
+      "themes": 13,
+      "decls": 26
+    },
+    {
+      "sel": "#right_bar table tr:hover td a.delete",
+      "themes": 13,
+      "decls": 26
+    },
+    {
+      "sel": "a.unread",
+      "themes": 13,
+      "decls": 24
+    },
+    {
+      "sel": "a.bookmark_title:hover",
+      "themes": 13,
+      "decls": 23
+    },
+    {
+      "sel": "#search_query_field:focus",
+      "themes": 13,
+      "decls": 21
+    },
+    {
+      "sel": "#banner_searchbox input[type=\"text\"]:focus",
+      "themes": 13,
+      "decls": 21
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table tr",
+      "themes": 13,
+      "decls": 17
+    },
+    {
+      "sel": ".edit_links a",
+      "themes": 13,
+      "decls": 16
+    },
+    {
+      "sel": "#profile_main_column h2",
+      "themes": 13,
+      "decls": 16
+    },
+    {
+      "sel": "#profile_left_column h2",
+      "themes": 13,
+      "decls": 16
+    },
+    {
+      "sel": "#profile_right_column h2",
+      "themes": 13,
+      "decls": 16
+    },
+    {
+      "sel": "a.cached",
+      "themes": 13,
+      "decls": 15
+    },
+    {
+      "sel": "#banner a",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "#top_menu a",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": ".banner_username",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "#banner a:hover",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "#top_menu a:hover",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": ".search_button input[type=\"submit\"]:hover",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "#right_bar h3",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "#right_bar h4",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "#right_bar b",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "a.bundle",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "#tag_cloud_header a",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "a.tag_heading_selected",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "input[type=\"submit\"]:hover",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "input[type=\"button\"]:hover",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "h2",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table tr:hover td a.destroy",
+      "themes": 13,
+      "decls": 14
+    },
+    {
+      "sel": "#profile_left_column",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#profile_right_column",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "body:not(#pinboard) #popup_header",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "body:not(#pinboard) table",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "body:not(#pinboard) td",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "body:not(#pinboard) p",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "body:not(#pinboard) label",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "body:not(#pinboard) span",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#sub_banner a",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#sub_banner a:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#sub_banner a.selected",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".edit_links a:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "a.copy_link",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "a.delete",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#right_bar a",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#right_bar a:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "a.bundle:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#tag_cloud a",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#tag_cloud a:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#tag_cloud_header a:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#tag_cloud a.tag",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#tag_cloud a.tag:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#nextprev a.edit",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".settings_tabs",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".settings_tab:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".settings_tab_selected a",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "[class*=\"settings_tab_spacer\"]",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".email_secret",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#settings_tab_panes",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#settings_tab_panes table td",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".note a",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".formtable td",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".user_navbar a",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".rss_link",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": ".rss_linkbox a",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "a",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "a:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#right_bar table tr[onmouseover]:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#right_bar table td a.tag",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#right_bar input[type=\"submit\"]:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#tweet_searchbox br",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "#tweet_searchbox input[type=\"submit\"]:hover",
+      "themes": 13,
+      "decls": 13
+    },
+    {
+      "sel": "body#pinboard table",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard td",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard th",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard p",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard b",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard strong",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard label",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard span",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard li",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard dd",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "body#pinboard dt",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "a.destroy",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": ".next_prev:hover",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": ".next_prev_widget a:hover",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": ".bookmark_count",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": ".bookmark_count_box",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": "#main_column form[name=\"sort\"] table tr:hover",
+      "themes": 12,
+      "decls": 12
+    },
+    {
+      "sel": ".description blockquote",
+      "themes": 10,
+      "decls": 41
+    },
+    {
+      "sel": "::selection",
+      "themes": 10,
+      "decls": 19
+    },
+    {
+      "sel": "input[type=\"checkbox\"]",
+      "themes": 10,
+      "decls": 10
+    },
+    {
+      "sel": "input[type=\"radio\"]",
+      "themes": 10,
+      "decls": 10
+    },
+    {
+      "sel": "#profile_main_column table td",
+      "themes": 10,
+      "decls": 10
+    },
+    {
+      "sel": "#profile_right_column table td",
+      "themes": 10,
+      "decls": 10
+    }
+  ],
+  "per_scope": {
+    "app": [
+      {
+        "sel": "body#pinboard table",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard td",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard th",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard p",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard b",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard strong",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard label",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard span",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard li",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard dd",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "body#pinboard dt",
+        "themes": 12,
+        "decls": 12
+      }
+    ],
+    "bare": [
+      {
+        "sel": "#search_query_field",
+        "themes": 13,
+        "decls": 73
+      },
+      {
+        "sel": "a.url_link",
+        "themes": 13,
+        "decls": 69
+      },
+      {
+        "sel": ".search_button input[type=\"submit\"]",
+        "themes": 13,
+        "decls": 67
+      },
+      {
+        "sel": ".star",
+        "themes": 13,
+        "decls": 66
+      },
+      {
+        "sel": ".selected_star",
+        "themes": 13,
+        "decls": 65
+      },
+      {
+        "sel": "input[type=\"submit\"]",
+        "themes": 13,
+        "decls": 63
+      },
+      {
+        "sel": "input[type=\"button\"]",
+        "themes": 13,
+        "decls": 63
+      },
+      {
+        "sel": "a.tag",
+        "themes": 13,
+        "decls": 60
+      },
+      {
+        "sel": ".bookmark .display",
+        "themes": 13,
+        "decls": 52
+      },
+      {
+        "sel": "a.bookmark_title",
+        "themes": 13,
+        "decls": 51
+      },
+      {
+        "sel": ".description",
+        "themes": 13,
+        "decls": 38
+      },
+      {
+        "sel": ".bookmark",
+        "themes": 13,
+        "decls": 33
+      },
+      {
+        "sel": "a.url_display",
+        "themes": 13,
+        "decls": 32
+      },
+      {
+        "sel": "input[type=\"text\"]:focus",
+        "themes": 13,
+        "decls": 31
+      },
+      {
+        "sel": "input:not([type]):focus",
+        "themes": 13,
+        "decls": 31
+      },
+      {
+        "sel": "textarea:focus",
+        "themes": 13,
+        "decls": 31
+      },
+      {
+        "sel": "select:focus",
+        "themes": 13,
+        "decls": 31
+      },
+      {
+        "sel": "a.when",
+        "themes": 13,
+        "decls": 29
+      },
+      {
+        "sel": ".suggested_tag",
+        "themes": 13,
+        "decls": 29
+      },
+      {
+        "sel": "a.tag:hover",
+        "themes": 13,
+        "decls": 28
+      },
+      {
+        "sel": "a.help",
+        "themes": 13,
+        "decls": 27
+      },
+      {
+        "sel": "#pinboard_name a",
+        "themes": 13,
+        "decls": 26
+      },
+      {
+        "sel": ".private",
+        "themes": 13,
+        "decls": 26
+      },
+      {
+        "sel": "a.tag.selected",
+        "themes": 13,
+        "decls": 26
+      },
+      {
+        "sel": "a.sort_order_selected",
+        "themes": 13,
+        "decls": 26
+      },
+      {
+        "sel": "a.unread",
+        "themes": 13,
+        "decls": 24
+      },
+      {
+        "sel": "a.bookmark_title:hover",
+        "themes": 13,
+        "decls": 23
+      },
+      {
+        "sel": "#search_query_field:focus",
+        "themes": 13,
+        "decls": 21
+      },
+      {
+        "sel": ".edit_links a",
+        "themes": 13,
+        "decls": 16
+      },
+      {
+        "sel": "a.cached",
+        "themes": 13,
+        "decls": 15
+      },
+      {
+        "sel": ".banner_username",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": ".search_button input[type=\"submit\"]:hover",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "a.bundle",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "a.tag_heading_selected",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "input[type=\"submit\"]:hover",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "input[type=\"button\"]:hover",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "h2",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": ".edit_links a:hover",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "a.copy_link",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "a.delete",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "a.bundle:hover",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "[class*=\"settings_tab_spacer\"]",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": ".email_secret",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": ".user_navbar a",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": ".rss_link",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": ".rss_linkbox a",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "a",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "a:hover",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "a.destroy",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": ".bookmark_count",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": ".bookmark_count_box",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": ".description blockquote",
+        "themes": 10,
+        "decls": 41
+      },
+      {
+        "sel": "input[type=\"checkbox\"]",
+        "themes": 10,
+        "decls": 10
+      },
+      {
+        "sel": "input[type=\"radio\"]",
+        "themes": 10,
+        "decls": 10
+      },
+      {
+        "sel": ".bookmark:hover",
+        "themes": 8,
+        "decls": 8
+      },
+      {
+        "sel": "hr",
+        "themes": 7,
+        "decls": 7
+      },
+      {
+        "sel": "a.tag::before",
+        "themes": 2,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark #right_bar input[type=\"submit\"]",
+        "themes": 1,
+        "decls": 9
+      },
+      {
+        "sel": "html.pbp-dark #tweet_searchbox input[type=\"submit\"]",
+        "themes": 1,
+        "decls": 9
+      },
+      {
+        "sel": "html.pbp-dark #tweet_searchbox #search_query_field",
+        "themes": 1,
+        "decls": 8
+      },
+      {
+        "sel": "html.pbp-dark .settings_tab_selected",
+        "themes": 1,
+        "decls": 6
+      },
+      {
+        "sel": "html.pbp-dark .description blockquote",
+        "themes": 1,
+        "decls": 4
+      },
+      {
+        "sel": "html.pbp-dark .settings_heading",
+        "themes": 1,
+        "decls": 4
+      },
+      {
+        "sel": "html.pbp-dark #note_right_column",
+        "themes": 1,
+        "decls": 4
+      },
+      {
+        "sel": "html.pbp-dark #right_bar table td a.delete",
+        "themes": 1,
+        "decls": 4
+      },
+      {
+        "sel": "html.pbp-dark #tweet_searchbox form",
+        "themes": 1,
+        "decls": 4
+      },
+      {
+        "sel": "html.pbp-dark a.url_link",
+        "themes": 1,
+        "decls": 3
+      },
+      {
+        "sel": "html.pbp-dark #main_column form[name=\"sort\"] table input[name^=\"id_\"]",
+        "themes": 1,
+        "decls": 3
+      },
+      {
+        "sel": "html.pbp-dark #right_bar input#key:focus",
+        "themes": 1,
+        "decls": 3
+      },
+      {
+        "sel": "html.pbp-dark #tweet_searchbox #search_query_field:focus",
+        "themes": 1,
+        "decls": 3
+      },
+      {
+        "sel": "a.bookmark_title::before",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark #sub_banner",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark .search_button input[type=\"submit\"]",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark .private",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark a.tag.selected",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark a.sort_order_selected",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark input[type=\"submit\"]",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark input[type=\"button\"]",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark #edit_bookmark_form",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark .settings_tab",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark a.help",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark #main_column form[name=\"sort\"] table input[name^=\"id_\"]:focus",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": "html.pbp-dark #right_bar table tr:hover td a.delete",
+        "themes": 1,
+        "decls": 2
+      },
+      {
+        "sel": ".edit_checkbox input",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": ".user_navbar a:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #banner a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #top_menu a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .banner_username",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #banner a:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #top_menu a:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #pinboard_name a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #sub_banner a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #sub_banner a:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #sub_banner a.selected",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #search_query_field:focus",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #banner_searchbox input[type=\"text\"]:focus",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .search_button input[type=\"submit\"]:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.bookmark_title",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.bookmark_title:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.url_display",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .description",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.tag",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.tag:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.cached",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.when",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .edit_links a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .edit_links a:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.copy_link",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.delete",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.destroy",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.unread",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .star",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .selected_star",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #right_bar h3",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #right_bar h4",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #right_bar b",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #right_bar a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #right_bar a:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.bundle",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.bundle:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #tag_cloud a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #tag_cloud a:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #tag_cloud_header a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a.tag_heading_selected",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #tag_cloud_header a:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #tag_cloud a.tag",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #tag_cloud a.tag:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #nextprev a.edit",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark input[type=\"text\"]:focus",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark input:not([type]):focus",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark textarea:focus",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark select:focus",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark input[type=\"submit\"]:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark input[type=\"button\"]:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .suggested_tag",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .settings_tabs",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .settings_tab:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .settings_tab_selected a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark [class*=\"settings_tab_spacer\"]",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .email_secret",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #settings_tab_panes",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #settings_tab_panes table td",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .note a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #profile_main_column h2",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #profile_left_column h2",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #profile_right_column h2",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #profile_main_column table td",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #profile_right_column table td",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .formtable td",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .user_navbar a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .rss_link",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark .rss_linkbox a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark hr",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark a:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark h2",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #main_column form[name=\"sort\"] table a[style*=\"color:#aaa\"]",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #main_column form[name=\"sort\"] table a[style*=\"color: #aaa\"]",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #main_column form[name=\"sort\"] table a[style*=\"color:#aaa\"]:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #main_column form[name=\"sort\"] table td a.edit",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #main_column form[name=\"sort\"] table td a.destroy",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #main_column form[name=\"sort\"] table tr:hover td a.edit",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #right_bar table tr[onmouseover]:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #right_bar table td a.tag",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #right_bar input[type=\"submit\"]:hover",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #tweet_searchbox br",
+        "themes": 1,
+        "decls": 1
+      },
+      {
+        "sel": "html.pbp-dark #tweet_searchbox input[type=\"submit\"]:hover",
+        "themes": 1,
+        "decls": 1
+      }
+    ],
+    "tagcloud": [
+      {
+        "sel": "#tag_cloud",
+        "themes": 13,
+        "decls": 26
+      },
+      {
+        "sel": "#tag_cloud_header a",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "#tag_cloud a",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#tag_cloud a:hover",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#tag_cloud_header a:hover",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#tag_cloud a.tag",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#tag_cloud a.tag:hover",
+        "themes": 13,
+        "decls": 13
+      }
+    ],
+    "notes": [
+      {
+        "sel": ".note .note",
+        "themes": 13,
+        "decls": 66
+      },
+      {
+        "sel": "#note_right_column",
+        "themes": 13,
+        "decls": 51
+      },
+      {
+        "sel": ".note a",
+        "themes": 13,
+        "decls": 13
+      }
+    ],
+    "profile": [
+      {
+        "sel": ".service_box .service_box",
+        "themes": 13,
+        "decls": 91
+      },
+      {
+        "sel": "#profile_main_column h2",
+        "themes": 13,
+        "decls": 16
+      },
+      {
+        "sel": "#profile_left_column h2",
+        "themes": 13,
+        "decls": 16
+      },
+      {
+        "sel": "#profile_right_column h2",
+        "themes": 13,
+        "decls": 16
+      },
+      {
+        "sel": "#profile_left_column",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#profile_right_column",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#profile_main_column table td",
+        "themes": 10,
+        "decls": 10
+      },
+      {
+        "sel": "#profile_right_column table td",
+        "themes": 10,
+        "decls": 10
+      }
+    ],
+    "popup": [
+      {
+        "sel": "body:not(#pinboard)",
+        "themes": 13,
+        "decls": 43
+      },
+      {
+        "sel": "body:not(#pinboard) #popup_header",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "body:not(#pinboard) table",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "body:not(#pinboard) td",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "body:not(#pinboard) p",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "body:not(#pinboard) label",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "body:not(#pinboard) span",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "html.pbp-dark body:not(#pinboard)",
+        "themes": 1,
+        "decls": 2
+      }
+    ],
+    "banner": [
+      {
+        "sel": "#banner_searchbox input[type=\"text\"]",
+        "themes": 13,
+        "decls": 47
+      },
+      {
+        "sel": "#sub_banner",
+        "themes": 13,
+        "decls": 26
+      },
+      {
+        "sel": "#banner_searchbox input[type=\"text\"]:focus",
+        "themes": 13,
+        "decls": 21
+      },
+      {
+        "sel": "#banner a",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "#top_menu a",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "#banner a:hover",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "#top_menu a:hover",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "#sub_banner a",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#sub_banner a:hover",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#sub_banner a.selected",
+        "themes": 13,
+        "decls": 13
+      }
+    ],
+    "right": [
+      {
+        "sel": "#right_bar input[type=\"submit\"]",
+        "themes": 13,
+        "decls": 117
+      },
+      {
+        "sel": "#right_bar table td a.delete",
+        "themes": 13,
+        "decls": 52
+      },
+      {
+        "sel": "#right_bar input#key:focus",
+        "themes": 13,
+        "decls": 39
+      },
+      {
+        "sel": "#right_bar table tr:hover td a.delete",
+        "themes": 13,
+        "decls": 26
+      },
+      {
+        "sel": "#right_bar h3",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "#right_bar h4",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "#right_bar b",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "#right_bar a",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#right_bar a:hover",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#right_bar table tr[onmouseover]:hover",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#right_bar table td a.tag",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#right_bar input[type=\"submit\"]:hover",
+        "themes": 13,
+        "decls": 13
+      }
+    ],
+    "pagination": [
+      {
+        "sel": "#nextprev a.edit",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": ".next_prev:hover",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": ".next_prev_widget a:hover",
+        "themes": 12,
+        "decls": 12
+      }
+    ],
+    "edit": [
+      {
+        "sel": "#edit_bookmark_form",
+        "themes": 13,
+        "decls": 32
+      }
+    ],
+    "settings": [
+      {
+        "sel": ".settings_tab_selected",
+        "themes": 13,
+        "decls": 89
+      },
+      {
+        "sel": ".settings_heading",
+        "themes": 13,
+        "decls": 65
+      },
+      {
+        "sel": ".settings_tab",
+        "themes": 13,
+        "decls": 39
+      },
+      {
+        "sel": ".settings_tab a",
+        "themes": 13,
+        "decls": 26
+      },
+      {
+        "sel": ".settings_tabs",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": ".settings_tab:hover",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": ".settings_tab_selected a",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#settings_tab_panes",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#settings_tab_panes table td",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": ".settings_heading::before",
+        "themes": 1,
+        "decls": 1
+      }
+    ],
+    "savepopup": [
+      {
+        "sel": ".formtable td",
+        "themes": 13,
+        "decls": 13
+      }
+    ],
+    "main": [
+      {
+        "sel": "#main_column form[name=\"sort\"] table input[name^=\"id_\"]",
+        "themes": 13,
+        "decls": 198
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table a[style*=\"color:#aaa\"]",
+        "themes": 13,
+        "decls": 67
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table a[style*=\"color: #aaa\"]",
+        "themes": 13,
+        "decls": 67
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table a.bundle",
+        "themes": 13,
+        "decls": 65
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table td",
+        "themes": 13,
+        "decls": 43
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table td a.edit",
+        "themes": 13,
+        "decls": 41
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table td a.destroy",
+        "themes": 13,
+        "decls": 41
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table td[style*=\"text-align:right\"]",
+        "themes": 13,
+        "decls": 39
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table input[name^=\"id_\"]:focus",
+        "themes": 13,
+        "decls": 39
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table tr:hover td a.edit",
+        "themes": 13,
+        "decls": 27
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table a[style*=\"color:#aaa\"]:hover",
+        "themes": 13,
+        "decls": 26
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table tr",
+        "themes": 13,
+        "decls": 17
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table tr:hover td a.destroy",
+        "themes": 13,
+        "decls": 14
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table tr:hover",
+        "themes": 12,
+        "decls": 12
+      },
+      {
+        "sel": "#main_column form[name=\"sort\"] table a.bundle::before",
+        "themes": 1,
+        "decls": 2
+      }
+    ],
+    "tweets": [
+      {
+        "sel": "#tweet_searchbox input[type=\"submit\"]",
+        "themes": 13,
+        "decls": 117
+      },
+      {
+        "sel": "#tweet_searchbox #search_query_field",
+        "themes": 13,
+        "decls": 104
+      },
+      {
+        "sel": "#tweet_searchbox form",
+        "themes": 13,
+        "decls": 52
+      },
+      {
+        "sel": "#tweet_searchbox #search_query_field:focus",
+        "themes": 13,
+        "decls": 39
+      },
+      {
+        "sel": "#tweet_searchbox br",
+        "themes": 13,
+        "decls": 13
+      },
+      {
+        "sel": "#tweet_searchbox input[type=\"submit\"]:hover",
+        "themes": 13,
+        "decls": 13
+      }
+    ],
+    "selection": [
+      {
+        "sel": "::selection",
+        "themes": 10,
+        "decls": 19
+      },
+      {
+        "sel": "::-moz-selection",
+        "themes": 3,
+        "decls": 6
+      }
+    ]
+  }
+}

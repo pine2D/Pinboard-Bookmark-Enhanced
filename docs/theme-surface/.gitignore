@@ -1,0 +1,16 @@
+# Derivable artifacts from render-*.mjs — regenerate via `node pilots/render-all.mjs`
+pilots/*.generated.css
+pilots/*.generated-v2.css
+pilots/*.shipped.css
+pilots/*-report.json
+pilots/report.json
+pilots/report-v2.json
+pilots/migration-matrix.json
+pilots/coverage-all13.json
+pilots/flexoki-report.json
+pilots/nord-night-report.json
+aggregate-report.json
+
+# Dev-time reference fixtures (large PNG captures) — regenerate via capture tooling
+snapshots/
+theme-screenshots/

@@ -1,0 +1,266 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://pinboard-bookmark-enhanced/theme-surface/tokens.schema.json",
+  "title": "Pinboard Theme Tokens v1",
+  "version": "1.0.0",
+  "description": "Token dictionary for the Pinboard Theme Surface spec. Required slots cover every surface referenced by manifest.json; extension namespaces (fx/motion/assets/ext) are open for richer themes. Any theme that supplies the required slots can be composed by any composer.",
+
+  "type": "object",
+  "required": ["meta", "layout", "palette", "typo", "space"],
+  "additionalProperties": false,
+
+  "properties": {
+
+    "meta": {
+      "type": "object",
+      "required": ["id", "name", "mode"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Stable slug; used as CSS class hook and registry key."
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "mode": {
+          "type": "string",
+          "enum": ["light", "dark", "auto"],
+          "description": "Hint for UA color-scheme + selection fallbacks."
+        },
+        "family": {
+          "type": "string",
+          "description": "Optional family key for grouping variants (e.g. 'flexoki', 'solarized')."
+        },
+        "description": { "type": "string" },
+        "author": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+
+    "layout": {
+      "type": "object",
+      "required": ["mode"],
+      "additionalProperties": true,
+      "description": "Composer selection + layout-scoped knobs. `mode` picks which composer renders the theme.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["classic-list", "card-grid", "dense", "magazine"],
+          "description": "Determines the composer used to emit CSS. Themes may still override individual surfaces via `overrides`."
+        },
+        "density": {
+          "type": "string",
+          "enum": ["comfortable", "compact", "dense"],
+          "default": "comfortable"
+        },
+        "max-width": {
+          "type": "string",
+          "description": "Optional constraint on #main_column; e.g. '780px' or 'none'."
+        },
+        "right-bar": {
+          "type": "string",
+          "enum": ["visible", "collapsed", "hidden"],
+          "default": "visible",
+          "description": "How P3 rightbar-heavy templates render the sidebar."
+        }
+      }
+    },
+
+    "palette": {
+      "type": "object",
+      "description": "Color slots. Required slots below MUST be provided; any additional slot is allowed and may be referenced by composers or overrides.",
+      "required": [
+        "bg", "fg", "muted",
+        "border",
+        "accent", "accent-alpha",
+        "input-bg",
+        "private-bg",
+        "selection-bg", "selection-fg",
+        "tag-bg",
+        "row-hover",
+        "destroy",
+        "btn-bg", "btn-fg"
+      ],
+      "additionalProperties": { "$ref": "#/definitions/color" },
+      "properties": {
+        "bg":             { "$ref": "#/definitions/color", "description": "Page background (shell.page)." },
+        "fg":             { "$ref": "#/definitions/color", "description": "Primary body text." },
+        "muted":          { "$ref": "#/definitions/color", "description": "Secondary / meta text (bookmark.meta, action.destroy, sub_banner counters)." },
+        "border":         { "$ref": "#/definitions/color", "description": "Hairlines: bookmark separator, table dividers, input borders." },
+        "accent":         { "$ref": "#/definitions/color", "description": "Link + interactive emphasis (a, banner brand, tweet_searchbox submit)." },
+        "accent-alpha":   { "$ref": "#/definitions/color", "description": "Transparent accent for focus ring / halo (e.g. rgba(accent, 0.25))." },
+        "input-bg":       { "$ref": "#/definitions/color", "description": "Form field surface (input/textarea/select)." },
+        "private-bg":     { "$ref": "#/definitions/color", "description": "Background for items marked private (inline quirk `background:#fff1f1`)." },
+        "selection-bg":   { "$ref": "#/definitions/color", "description": "::selection background. Must pass AA vs selection-fg." },
+        "selection-fg":   { "$ref": "#/definitions/color", "description": "::selection foreground." },
+        "tag-bg":         { "$ref": "#/definitions/color", "description": "Tag chip surface." },
+        "row-hover":      { "$ref": "#/definitions/color", "description": "tr[onmouseover] hover — overrides Pinboard's inline yellow." },
+        "destroy":        { "$ref": "#/definitions/color", "description": "Delete / destroy action affordance." },
+        "btn-bg":         { "$ref": "#/definitions/color" },
+        "btn-fg":         { "$ref": "#/definitions/color" },
+
+        "fg-strong":      { "$ref": "#/definitions/color", "description": "Optional: headings. Defaults to fg." },
+        "border-strong":  { "$ref": "#/definitions/color", "description": "Optional: emphasized divider. Defaults to border." },
+        "link-hover":     { "$ref": "#/definitions/color", "description": "Optional: link hover. Defaults to accent." },
+        "link-visited":   { "$ref": "#/definitions/color", "description": "Optional: visited link. Defaults to accent." },
+        "focus-ring":     { "$ref": "#/definitions/color", "description": "Optional: focus outline. Defaults to accent." }
+      }
+    },
+
+    "typo": {
+      "type": "object",
+      "required": ["family", "size-base", "line-height"],
+      "additionalProperties": true,
+      "properties": {
+        "family":        { "type": "string", "description": "Body font-family stack." },
+        "family-mono":   { "type": "string" },
+        "family-heading":{ "type": "string" },
+        "size-base":     { "type": "string", "description": "Body text size, e.g. '14px'." },
+        "size-lg":       { "type": "string" },
+        "size-sm":       { "type": "string" },
+        "size-xs":       { "type": "string" },
+        "line-height":   { "type": ["string", "number"] },
+        "weight-body":   { "type": ["string", "number"] },
+        "weight-heading":{ "type": ["string", "number"] }
+      }
+    },
+
+    "space": {
+      "type": "object",
+      "required": ["unit", "bookmark-gap", "main-padding"],
+      "additionalProperties": true,
+      "properties": {
+        "unit":           { "type": "string", "description": "Base spacing unit; e.g. '4px'. Composers may derive scaled values." },
+        "bookmark-gap":   { "type": "string", "description": "Gap between bookmark rows / cards." },
+        "main-padding":   { "type": "string" },
+        "sub-banner-y":   { "type": "string" },
+        "right-bar-gap":  { "type": "string" },
+        "form-gap":       { "type": "string" },
+        "gap-1":          { "type": "string" },
+        "gap-2":          { "type": "string" },
+        "gap-3":          { "type": "string" },
+        "gap-4":          { "type": "string" }
+      }
+    },
+
+    "radius": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional. Composers fall back to 0 if absent.",
+      "properties": {
+        "sm":   { "type": "string" },
+        "md":   { "type": "string" },
+        "lg":   { "type": "string" },
+        "pill": { "type": "string" }
+      }
+    },
+
+    "border": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional border descriptors. Composers default to '1px solid {palette.border}'.",
+      "properties": {
+        "width":    { "type": "string" },
+        "style":    { "type": "string" },
+        "hairline": { "type": "string", "description": "Shorthand for bookmark separator; defaults to '1px dotted {palette.border}' to honor the 12/13-page inline quirk." }
+      }
+    },
+
+    "fx": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional visual effects namespace (shadows, blur, gradients, glow). Consumed by composers that opt in.",
+      "properties": {
+        "shadow-sm":     { "type": "string" },
+        "shadow-md":     { "type": "string" },
+        "shadow-lg":     { "type": "string" },
+        "blur":          { "type": "string" },
+        "backdrop":      { "type": "string" },
+        "bookmark-bg":   { "type": "string", "description": "Optional gradient/image for card-grid/magazine." }
+      }
+    },
+
+    "motion": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional motion tokens. Composers should default to instant transitions if absent.",
+      "properties": {
+        "duration-fast": { "type": "string" },
+        "duration-med":  { "type": "string" },
+        "easing":        { "type": "string" },
+        "hover-lift":    { "type": "string", "description": "Optional transform applied on bookmark.item:hover (card-grid/magazine)." }
+      }
+    },
+
+    "assets": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional static asset URLs (background images, custom glyphs). Prefer data: URIs or same-origin paths.",
+      "properties": {
+        "body-bg":   { "type": "string" },
+        "banner-bg": { "type": "string" }
+      }
+    },
+
+    "states": {
+      "type": "object",
+      "description": "Optional per-state overrides. Keys match manifest `state_hooks`. Values are partial palette/typo deltas.",
+      "additionalProperties": false,
+      "properties": {
+        "hover":         { "$ref": "#/definitions/stateDelta" },
+        "focus-visible": { "$ref": "#/definitions/stateDelta" },
+        "active":        { "$ref": "#/definitions/stateDelta" },
+        "disabled":      { "$ref": "#/definitions/stateDelta" },
+        "visited":       { "$ref": "#/definitions/stateDelta" },
+        "placeholder":   { "$ref": "#/definitions/stateDelta" },
+        "selected":      { "$ref": "#/definitions/stateDelta" }
+      }
+    },
+
+    "overrides": {
+      "type": "object",
+      "description": "Escape hatch: surface-keyed CSS rule fragments emitted verbatim AFTER the composer output. Use sparingly for bespoke surfaces the composer cannot express. Keys MUST match a surface id in manifest.json.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string" },
+        "description": "Map of `&[:state]` -> CSS declarations string (without braces)."
+      }
+    },
+
+    "ext": {
+      "type": "object",
+      "description": "Open namespace for theme-specific tokens that composers may read by agreement. No schema enforcement.",
+      "additionalProperties": true
+    }
+  },
+
+  "definitions": {
+    "color": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Any CSS <color>: hex, rgb()/rgba(), hsl()/hsla(), oklch(), color(), named, or var()."
+    },
+    "stateDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "palette": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/color" }
+        },
+        "typo": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "fx": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "motion": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

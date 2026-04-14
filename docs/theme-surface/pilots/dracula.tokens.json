@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "id": "dracula",
+    "name": "Dracula",
+    "mode": "dark",
+    "description": "Sprint 3 migration: popular dark theme with vibrant purple/cyan/pink accents on a deep blue-gray canvas. Source: pinboard-themes.js §dracula."
+  },
+  "layout": {
+    "mode": "classic-list",
+    "max-width": "1030px",
+    "bookmark-style": "flat",
+    "right-bar": "visible"
+  },
+  "palette": {
+    "bg":             "#282a36",
+    "bg-surface":     "#21222c",
+    "fg":             "#f8f8f2",
+    "fg-strong":      "#bd93f9",
+    "muted":          "#bd93f9",
+    "muted-soft":     "#6272a4",
+    "border":         "#44475a",
+    "border-strong":  "#6272a4",
+    "border-soft":    "#44475a",
+    "accent":         "#8be9fd",
+    "accent-hover":   "#a4f0ff",
+    "accent-soft":    "#21222c",
+    "accent-alpha":   "rgba(139,233,253,0.25)",
+    "input-bg":       "#44475a",
+    "private-bg":     "#282a36",
+    "private-accent": "#f1fa8c",
+    "selection-bg":   "#6272a4",
+    "selection-fg":   "#f8f8f2",
+    "tag-bg":         "transparent",
+    "tag-fg":         "#50fa7b",
+    "row-hover":      "#44475a",
+    "destroy":        "#ff5555",
+    "btn-bg":         "#bd93f9",
+    "btn-fg":         "#282a36",
+    "success":        "#50fa7b",
+    "success-hover":  "#69ff94",
+    "url-link-bg":    "#44475a",
+    "url-link-fg":    "#ffb86c",
+    "link-hover":     "#ff79c6",
+    "link-visited":   "#bd93f9",
+    "focus-ring":     "#bd93f9",
+    "unread":         "#ff5555"
+  },
+  "typo": {
+    "family": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    "size-base": "13px",
+    "size-lg":   "15px",
+    "size-sm":   "12px",
+    "size-xs":   "11px",
+    "line-height": 1.5,
+    "weight-body": 400,
+    "weight-heading": 700
+  },
+  "space": {
+    "unit":           "4px",
+    "bookmark-gap":   "6px",
+    "main-padding":   "12px",
+    "sub-banner-y":   "8px",
+    "right-bar-gap":  "12px",
+    "form-gap":       "8px"
+  },
+  "radius": {
+    "sm": "2px",
+    "md": "4px",
+    "lg": "3px"
+  },
+  "border": {
+    "width": "1px",
+    "style": "solid"
+  },
+  "ext": {
+    "private-style": "border-left",
+    "private-border-width": "3px"
+  }
+}

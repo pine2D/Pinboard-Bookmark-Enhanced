@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "id": "nord-night",
+    "name": "Nord Night",
+    "mode": "dark",
+    "description": "Sprint 3 migration sample: Nord palette (polar night bg + frost + aurora accents). Source: pinboard-themes.js §nord-night."
+  },
+  "layout": {
+    "mode": "classic-list",
+    "max-width": "1030px",
+    "bookmark-style": "card",
+    "right-bar": "visible"
+  },
+  "palette": {
+    "bg":             "#2e3440",
+    "bg-surface":     "#3b4252",
+    "fg":             "#d8dee9",
+    "fg-strong":      "#eceff4",
+    "muted":          "#81a1c1",
+    "muted-soft":     "#4c566a",
+    "border":         "#434c5e",
+    "border-strong":  "#4c566a",
+    "border-soft":    "#434c5e",
+    "accent":         "#88c0d0",
+    "accent-hover":   "#8fbcbb",
+    "accent-soft":    "#3b4252",
+    "accent-alpha":   "rgba(136,192,208,0.25)",
+    "input-bg":       "#434c5e",
+    "private-bg":     "#3b4252",
+    "private-accent": "#ebcb8b",
+    "selection-bg":   "#5e81ac",
+    "selection-fg":   "#eceff4",
+    "tag-bg":         "transparent",
+    "tag-fg":         "#a3be8c",
+    "row-hover":      "#434c5e",
+    "destroy":        "#bf616a",
+    "btn-bg":         "#5e81ac",
+    "btn-fg":         "#eceff4",
+    "success":        "#a3be8c",
+    "success-hover":  "#b5d19c",
+    "url-link-bg":    "#3b4252",
+    "url-link-fg":    "#ebcb8b",
+    "link-hover":     "#88c0d0",
+    "link-visited":   "#81a1c1",
+    "focus-ring":     "#88c0d0",
+    "unread":         "#bf616a"
+  },
+  "typo": {
+    "family": "\"Inter\", -apple-system, sans-serif",
+    "size-base": "13px",
+    "size-lg":   "15px",
+    "size-sm":   "12px",
+    "size-xs":   "11px",
+    "line-height": 1.5,
+    "weight-body": 400,
+    "weight-heading": 700
+  },
+  "space": {
+    "unit":           "4px",
+    "bookmark-gap":   "6px",
+    "main-padding":   "12px",
+    "sub-banner-y":   "8px",
+    "right-bar-gap":  "12px",
+    "form-gap":       "8px"
+  },
+  "radius": {
+    "sm": "4px",
+    "md": "4px",
+    "lg": "3px"
+  },
+  "border": {
+    "width": "1px",
+    "style": "solid"
+  },
+  "ext": {
+    "private-style": "border-left",
+    "private-border-width": "3px"
+  }
+}

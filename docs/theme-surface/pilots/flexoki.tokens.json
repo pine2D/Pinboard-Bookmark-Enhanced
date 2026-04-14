@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "id": "flexoki",
+    "name": "Flexoki Adaptive",
+    "mode": "adaptive",
+    "description": "Pilot: validate modes feature of compose-theme.mjs. Base = flexoki paper (light); modes.dark = flexoki cave, triggered by html.pbp-dark class injected by pinboard-style.js based on extension Theme setting."
+  },
+  "layout": {
+    "mode": "classic-list",
+    "max-width": "1030px",
+    "bookmark-style": "flat",
+    "right-bar": "visible"
+  },
+  "palette": {
+    "bg":             "#FFFCF0",
+    "bg-surface":     "#F2F0E5",
+    "fg":             "#100F0F",
+    "fg-strong":      "#100F0F",
+    "muted":          "#6F6E69",
+    "muted-soft":     "#B7B5AC",
+    "border":         "#E6E4D9",
+    "border-strong":  "#DAD8CE",
+    "border-soft":    "#E6E4D9",
+    "accent":         "#205EA6",
+    "accent-hover":   "#4385BE",
+    "accent-soft":    "#F2F0E5",
+    "accent-alpha":   "rgba(32,94,166,0.15)",
+    "input-bg":       "#FFFCF0",
+    "private-bg":     "#FBF7EE",
+    "private-accent": "#D0A215",
+    "selection-bg":   "#F2F0E5",
+    "selection-fg":   "#100F0F",
+    "tag-bg":         "transparent",
+    "tag-fg":         "#AD8301",
+    "row-hover":      "#F2F0E5",
+    "destroy":        "#AF3029",
+    "btn-bg":         "#205EA6",
+    "btn-fg":         "#FFFCF0",
+    "success":        "#66800B",
+    "success-hover":  "#879A39",
+    "url-link-bg":    "#F2F0E5",
+    "url-link-fg":    "#AD8301",
+    "link-hover":     "#4385BE",
+    "link-visited":   "#205EA6",
+    "focus-ring":     "#205EA6",
+    "unread":         "#AF3029"
+  },
+  "typo": {
+    "family": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    "size-base": "13px",
+    "size-lg":   "15px",
+    "size-sm":   "12px",
+    "size-xs":   "11px",
+    "line-height": 1.5,
+    "weight-body": 400,
+    "weight-heading": 700
+  },
+  "space": {
+    "unit":           "4px",
+    "bookmark-gap":   "12px",
+    "main-padding":   "12px",
+    "sub-banner-y":   "8px",
+    "right-bar-gap":  "12px",
+    "form-gap":       "8px"
+  },
+  "radius": {
+    "sm": "3px",
+    "md": "6px"
+  },
+  "border": {
+    "width": "1px",
+    "style": "solid"
+  },
+  "ext": {
+    "private-style": "border-left",
+    "private-border-width": "3px"
+  },
+  "modes": {
+    "dark": {
+      "trigger": "html.pbp-dark",
+      "palette": {
+        "bg":             "#1C1B1A",
+        "bg-surface":     "#282726",
+        "fg":             "#CECDC3",
+        "fg-strong":      "#CECDC3",
+        "muted":          "#878580",
+        "muted-soft":     "#575653",
+        "border":         "#343331",
+        "border-strong":  "#403E3C",
+        "border-soft":    "#343331",
+        "accent":         "#4385BE",
+        "accent-hover":   "#5DA0D0",
+        "accent-soft":    "#282726",
+        "accent-alpha":   "rgba(67,133,190,0.2)",
+        "input-bg":       "#282726",
+        "private-bg":     "#282726",
+        "private-accent": "#D0A215",
+        "selection-bg":   "#343331",
+        "selection-fg":   "#CECDC3",
+        "tag-bg":         "transparent",
+        "tag-fg":         "#D0A215",
+        "row-hover":      "#282726",
+        "destroy":        "#D14D41",
+        "btn-bg":         "#4385BE",
+        "btn-fg":         "#1C1B1A",
+        "success":        "#879A39",
+        "success-hover":  "#A4B454",
+        "url-link-bg":    "#1C1B1A",
+        "url-link-fg":    "#D0A215",
+        "link-hover":     "#5DA0D0",
+        "link-visited":   "#4385BE",
+        "focus-ring":     "#4385BE",
+        "unread":         "#D14D41"
+      }
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "id": "modern-card",
+    "name": "Modern Card",
+    "mode": "light",
+    "description": "Sprint 3 migration sample: Clean card layout with subtle shadows (Material-like blue accent on white cards). Source: pinboard-themes.js §modern-card."
+  },
+  "layout": {
+    "mode": "classic-list",
+    "max-width": "1030px",
+    "bookmark-style": "card",
+    "right-bar": "visible"
+  },
+  "palette": {
+    "bg":             "#f0f2f5",
+    "bg-surface":     "#ffffff",
+    "fg":             "#1a1a2e",
+    "fg-strong":      "#3c4043",
+    "muted":          "#5f6368",
+    "muted-soft":     "#9aa0a6",
+    "border":         "#e8e8e8",
+    "border-strong":  "#dadce0",
+    "border-soft":    "#e8e8e8",
+    "accent":         "#1a73e8",
+    "accent-hover":   "#174ea6",
+    "accent-soft":    "#e8f0fe",
+    "accent-alpha":   "rgba(26,115,232,0.15)",
+    "input-bg":       "#ffffff",
+    "private-bg":     "#fff8e1",
+    "private-accent": "#ffeaa7",
+    "selection-bg":   "rgba(26,115,232,0.25)",
+    "selection-fg":   "#ffffff",
+    "tag-bg":         "#e8f0fe",
+    "tag-fg":         "#1967d2",
+    "row-hover":      "#f1f3f4",
+    "destroy":        "#d93025",
+    "btn-bg":         "#1a73e8",
+    "btn-fg":         "#ffffff",
+    "success":        "#1a73e8",
+    "success-hover":  "#1765cc",
+    "url-link-bg":    "#fff3e0",
+    "url-link-fg":    "#e8710a",
+    "link-hover":     "#174ea6",
+    "link-visited":   "#1a73e8",
+    "focus-ring":     "#1a73e8",
+    "unread":         "#d93025"
+  },
+  "typo": {
+    "family": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+    "size-base": "13px",
+    "size-lg":   "15px",
+    "size-sm":   "12px",
+    "size-xs":   "11px",
+    "line-height": 1.5,
+    "weight-body": 400,
+    "weight-heading": 600
+  },
+  "space": {
+    "unit":           "4px",
+    "bookmark-gap":   "10px",
+    "main-padding":   "16px",
+    "sub-banner-y":   "8px",
+    "right-bar-gap":  "16px",
+    "form-gap":       "8px"
+  },
+  "radius": {
+    "sm": "4px",
+    "md": "8px",
+    "lg": "12px"
+  },
+  "border": {
+    "width": "1px",
+    "style": "solid"
+  },
+  "ext": {
+    "private-style": "bg",
+    "private-border-width": "3px"
+  },
+  "overrides": {
+    "css": "/* Modern-card-specific: main column wrapper + checkbox accent + user nav hover */\n#main_column { padding-top: 16px !important; }\n.edit_checkbox input { accent-color: #1a73e8 !important; }\n.user_navbar a:hover { color: #1a73e8 !important; }\n"
+  }
+}

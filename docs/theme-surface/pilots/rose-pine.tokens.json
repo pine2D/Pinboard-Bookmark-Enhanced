@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "id": "rose-pine",
+    "name": "Rosé Pine",
+    "mode": "dark",
+    "description": "Sprint 3 migration: Rosé Pine — all-natural pine, faux fur and soho vibes with italic serif typography. Source: pinboard-themes.js §rose-pine."
+  },
+  "layout": {
+    "mode": "classic-list",
+    "max-width": "1030px",
+    "bookmark-style": "card",
+    "right-bar": "visible"
+  },
+  "palette": {
+    "bg":             "#191724",
+    "bg-surface":     "#1f1d2e",
+    "fg":             "#e0def4",
+    "fg-strong":      "#ebbcba",
+    "muted":          "#908caa",
+    "muted-soft":     "#6e6a86",
+    "border":         "#26233a",
+    "border-strong":  "#403d52",
+    "border-soft":    "#393552",
+    "accent":         "#c4a7e7",
+    "accent-hover":   "#ebbcba",
+    "accent-soft":    "#26233a",
+    "accent-alpha":   "rgba(196,167,231,0.25)",
+    "input-bg":       "#26233a",
+    "private-bg":     "#1f1d2e",
+    "private-accent": "#f6c177",
+    "selection-bg":   "#3e3a5e",
+    "selection-fg":   "#e0def4",
+    "tag-bg":         "transparent",
+    "tag-fg":         "#9ccfd8",
+    "row-hover":      "#26233a",
+    "destroy":        "#eb6f92",
+    "btn-bg":         "#c4a7e7",
+    "btn-fg":         "#191724",
+    "success":        "#9ccfd8",
+    "success-hover":  "#ebbcba",
+    "url-link-bg":    "#26233a",
+    "url-link-fg":    "#f6c177",
+    "link-hover":     "#ebbcba",
+    "link-visited":   "#c4a7e7",
+    "focus-ring":     "#c4a7e7",
+    "unread":         "#eb6f92"
+  },
+  "typo": {
+    "family": "\"Lora\", \"Georgia\", \"Noto Serif\", serif",
+    "size-base": "14px",
+    "size-lg":   "15px",
+    "size-sm":   "12px",
+    "size-xs":   "11px",
+    "line-height": 1.65,
+    "weight-body": 400,
+    "weight-heading": 700
+  },
+  "space": {
+    "unit":           "4px",
+    "bookmark-gap":   "8px",
+    "main-padding":   "12px",
+    "sub-banner-y":   "8px",
+    "right-bar-gap":  "12px",
+    "form-gap":       "8px"
+  },
+  "radius": {
+    "sm": "4px",
+    "md": "6px",
+    "lg": "8px"
+  },
+  "border": {
+    "width": "1px",
+    "style": "solid"
+  },
+  "ext": {
+    "private-style": "border-left",
+    "private-border-width": "3px"
+  }
+}

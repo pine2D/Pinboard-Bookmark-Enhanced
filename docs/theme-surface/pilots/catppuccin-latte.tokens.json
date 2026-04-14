@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "id": "catppuccin-latte",
+    "name": "Catppuccin Latte",
+    "mode": "light",
+    "description": "Sprint 3 migration: Catppuccin Latte — soothing pastel light palette with rounded pill cards. Source: pinboard-themes.js §catppuccin-latte."
+  },
+  "layout": {
+    "mode": "classic-list",
+    "max-width": "1030px",
+    "bookmark-style": "card",
+    "right-bar": "visible"
+  },
+  "palette": {
+    "bg":             "#eff1f5",
+    "bg-surface":     "#e6e9ef",
+    "fg":             "#4c4f69",
+    "fg-strong":      "#6c6f85",
+    "muted":          "#6c6f85",
+    "muted-soft":     "#9ca0b0",
+    "border":         "#ccd0da",
+    "border-strong":  "#8c8fa1",
+    "border-soft":    "#bcc0cc",
+    "accent":         "#1e66f5",
+    "accent-hover":   "#179299",
+    "accent-soft":    "#dce0e8",
+    "accent-alpha":   "rgba(30,102,245,0.25)",
+    "input-bg":       "#eff1f5",
+    "private-bg":     "#e6e9ef",
+    "private-accent": "#df8e1d",
+    "selection-bg":   "#7287fd",
+    "selection-fg":   "#eff1f5",
+    "tag-bg":         "#dce0e8",
+    "tag-fg":         "#179299",
+    "row-hover":      "#ccd0da",
+    "destroy":        "#d20f39",
+    "btn-bg":         "#1e66f5",
+    "btn-fg":         "#eff1f5",
+    "success":        "#40a02b",
+    "success-hover":  "#179299",
+    "url-link-bg":    "#eff1f5",
+    "url-link-fg":    "#df8e1d",
+    "link-hover":     "#179299",
+    "link-visited":   "#8839ef",
+    "focus-ring":     "#1e66f5",
+    "unread":         "#d20f39"
+  },
+  "typo": {
+    "family": "\"Nunito\", \"Inter\", -apple-system, sans-serif",
+    "size-base": "13px",
+    "size-lg":   "15px",
+    "size-sm":   "12px",
+    "size-xs":   "11px",
+    "line-height": 1.6,
+    "weight-body": 400,
+    "weight-heading": 700
+  },
+  "space": {
+    "unit":           "4px",
+    "bookmark-gap":   "8px",
+    "main-padding":   "12px",
+    "sub-banner-y":   "8px",
+    "right-bar-gap":  "12px",
+    "form-gap":       "8px"
+  },
+  "radius": {
+    "sm": "8px",
+    "md": "10px",
+    "lg": "12px"
+  },
+  "border": {
+    "width": "1px",
+    "style": "solid"
+  },
+  "ext": {
+    "private-style": "border-left",
+    "private-border-width": "3px"
+  }
+}

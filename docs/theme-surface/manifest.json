@@ -1,0 +1,766 @@
+{
+  "version": "2.0",
+  "generated": "2026-04-14",
+  "source": "Empirical capture of 13 Pinboard pages + cross-theme census of 13 shipped themes (pilots/theme-census.json)",
+  "_note": "v2 aligns surfaces with classic-list-v2 composer emission (195 selectors). Sprint 2 v1 missed bare + body:not(#pinboard) scoping and 25+ surfaces (url_link, stars, settings page, profile, notes, bulk, popup, pagination, tag_cloud, bundles). v2 closes that gap. Every surface.sel verified against real Pinboard DOM AND classic-list-v2 emission.",
+
+  "scoping_worlds": {
+    "_note": "Shipped themes use three selector scopes. Composers must emit all three where applicable. Pilot discovery, see pilots/FINDINGS.md.",
+    "body#pinboard": "Logged-in app pages (home/network/notes/settings/profile). Use for typography inheritance and page chrome bg/fg.",
+    "body:not(#pinboard)": "Save-bookmark popup + edit-bookmark frame (iframe contexts). Must be re-themed independently — same tokens, different root.",
+    "bare": "Element-level selectors without body scope (`.bookmark`, `a.tag`, `input[type=submit]`...). Covers both worlds + any future context."
+  },
+
+  "pages": {
+    "home": { "url": "https://pinboard.in/u:oumu", "template": "P1-list", "regions": ["banner","top_menu","sub_banner","main_column","right_bar","footer"], "counts": { "inlineStyled": 318, "events": 1, "fixedWidths": 7, "tables": 4 } },
+    "network": { "url": "https://pinboard.in/network/", "template": "P1-list", "regions": ["banner","top_menu","sub_banner","main_column","right_bar","footer"], "counts": { "inlineStyled": 82, "events": 0, "fixedWidths": 74, "tables": 4 } },
+    "notes": { "url": "https://pinboard.in/notes/", "template": "P1-list", "regions": ["banner","top_menu","sub_banner","main_column","footer"], "counts": { "inlineStyled": 86, "events": 0, "fixedWidths": 7, "tables": 2 } },
+    "popular": { "url": "https://pinboard.in/popular/", "template": "P1-list", "regions": ["banner","top_menu","sub_banner","main_column","right_bar","footer"], "counts": { "inlineStyled": 65, "events": 0, "fixedWidths": 1, "tables": 0 } },
+    "add": { "url": "https://pinboard.in/add/", "template": "P2-form", "regions": ["banner","top_menu","main_column"], "counts": { "inlineStyled": 4, "events": 0, "fixedWidths": 0, "tables": 0 } },
+    "note-add": { "url": "https://pinboard.in/note/add/", "template": "P2-form", "regions": ["banner","top_menu","sub_banner","main_column","footer"], "counts": { "inlineStyled": 5, "events": 0, "fixedWidths": 1, "tables": 1 } },
+    "settings": { "url": "https://pinboard.in/settings/", "template": "P2-form", "regions": ["banner","top_menu","sub_banner","main_column","footer"], "counts": { "inlineStyled": 17, "events": 0, "fixedWidths": 1, "tables": 1 } },
+    "profile": { "url": "https://pinboard.in/u:oumu/profile/", "template": "P2-form", "regions": ["banner","top_menu","sub_banner","main_column","footer"], "counts": { "inlineStyled": 8, "events": 0, "fixedWidths": 3, "tables": 0 } },
+    "unread": { "url": "https://pinboard.in/u:oumu/unread/", "template": "P1-list", "regions": ["banner","top_menu","sub_banner","main_column","right_bar","footer"], "counts": { "inlineStyled": 335, "events": 0, "fixedWidths": 7, "tables": 4 } },
+    "tweets": { "url": "https://pinboard.in/u:oumu/tweets/", "template": "P3-rightbar-heavy", "regions": ["banner","top_menu","sub_banner","main_column","right_bar","footer"], "counts": { "inlineStyled": 30, "events": 0, "fixedWidths": 4, "tables": 3 } },
+    "subscriptions-tags": { "url": "https://pinboard.in/u:oumu/subscriptions/tags/", "template": "P3-rightbar-heavy", "regions": ["banner","top_menu","sub_banner","main_column","right_bar","footer"], "counts": { "inlineStyled": 213, "events": 31, "fixedWidths": 2, "tables": 1 } },
+    "tabs": { "url": "https://pinboard.in/u:oumu/tabs/", "template": "P4-table", "regions": ["banner","top_menu","sub_banner","main_column","footer"], "counts": { "inlineStyled": 173, "events": 0, "fixedWidths": 4, "tables": 1 } },
+    "bundles": { "url": "https://pinboard.in/u:oumu/bundles/", "template": "P4-table", "regions": ["banner","top_menu","sub_banner","main_column","footer"], "counts": { "inlineStyled": 81, "events": 16, "fixedWidths": 17, "tables": 1 } }
+  },
+
+  "surfaces": {
+    "shell.page": {
+      "sel": "body#pinboard",
+      "role": "page chrome — root bg + fg + font on logged-in app pages",
+      "states": ["default"],
+      "tokens": ["palette.bg", "palette.fg", "typo.family", "typo.size-base", "typo.line-height"],
+      "scope": "body#pinboard"
+    },
+    "shell.popup": {
+      "sel": "body:not(#pinboard)",
+      "role": "page chrome for save-bookmark popup + edit frame (iframe contexts)",
+      "states": ["default"],
+      "tokens": ["palette.bg", "palette.fg", "typo.family"],
+      "scope": "body:not(#pinboard)"
+    },
+    "shell.text_inherit": {
+      "sel": "body#pinboard table, body#pinboard td, body#pinboard th, body#pinboard p, body#pinboard b, body#pinboard strong, body#pinboard label, body#pinboard span, body#pinboard li, body#pinboard dd, body#pinboard dt",
+      "role": "force color:inherit across typed elements — defeats Pinboard's per-element color attributes",
+      "states": ["default"],
+      "tokens": [],
+      "scope": "body#pinboard"
+    },
+
+    "banner.root": {
+      "sel": "#banner",
+      "role": "top bar (logo + username + banner_user + top_menu + banner_searchbox)",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface", "palette.border", "layout.max-width"],
+      "layout_hook": true
+    },
+    "banner.logo": {
+      "sel": "#logo, #logo img.pin_logo, #pinboard_name, #pinboard_name a",
+      "role": "Pinboard wordmark",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent", "typo.weight-heading"]
+    },
+    "banner.user": {
+      "sel": "#banner_user, a.banner_username",
+      "role": "logged-in username badge",
+      "states": ["default", "hover", "visited"],
+      "tokens": ["palette.accent"]
+    },
+    "banner.menu": {
+      "sel": "#banner a, #top_menu a, .user_navbar a",
+      "role": "primary nav links (network/popular/tags/settings/add)",
+      "states": ["default", "hover", "visited"],
+      "tokens": ["palette.accent", "palette.link-hover"]
+    },
+    "banner.searchbox": {
+      "sel": "#searchbox, #banner_searchbox input[type=\"text\"], #search_query_field",
+      "role": "universal search at top-right",
+      "states": ["default", "hover", "focus-visible", "placeholder"],
+      "tokens": ["palette.input-bg", "palette.fg", "palette.border", "palette.accent", "radius.sm"]
+    },
+    "banner.search_submit": {
+      "sel": ".search_button input[type=\"submit\"]",
+      "role": "search button",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent", "palette.btn-fg", "palette.link-hover"]
+    },
+
+    "sub_banner.root": {
+      "sel": "#sub_banner",
+      "role": "page-specific sub-nav (you/network/notes or all/private/public/unread filters)",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface", "palette.border", "space.sub-banner-y"]
+    },
+    "sub_banner.link": {
+      "sel": "#sub_banner a",
+      "role": "filter links",
+      "states": ["default", "hover", "selected"],
+      "tokens": ["palette.muted", "palette.accent"]
+    },
+    "sub_banner.link.selected": {
+      "sel": "#sub_banner a.selected, #sub_banner a:hover",
+      "role": "active filter state",
+      "states": ["selected", "hover"],
+      "tokens": ["palette.accent"]
+    },
+    "sub_banner.counts": {
+      "sel": ".bookmark_count, .bookmark_count_box",
+      "role": "total count (13127)",
+      "states": ["default"],
+      "tokens": ["palette.muted", "typo.size-lg"],
+      "inline_quirks": [
+        { "style": "color:#aa5511;font-size:14px", "pages": 3 },
+        { "style": "color:#aa5511;font-size:16px", "pages": 3 },
+        { "style": "color:#aa5511;font-size:21px", "pages": 3 }
+      ]
+    },
+
+    "main.column": {
+      "sel": "#main_column",
+      "role": "primary content column",
+      "states": ["default"],
+      "tokens": ["palette.bg", "palette.fg", "space.main-padding"],
+      "layout_hook": true
+    },
+
+    "bookmark.item": {
+      "sel": ".bookmark",
+      "role": "a saved bookmark entry (one row). layout.bookmark-style toggles flat vs card",
+      "states": ["default", "hover"],
+      "tokens": ["palette.bg-surface", "palette.border", "palette.row-hover", "palette.accent-alpha", "radius.md", "space.bookmark-gap"],
+      "scope": "bare",
+      "inline_quirks": [
+        { "style": "border-top:1px dotted #aaa", "pages": 12, "note": "bookmark separator — defeated by inline_base_rules.bookmark-separator" }
+      ],
+      "layout_hook": true
+    },
+    "bookmark.display": {
+      "sel": ".bookmark .display",
+      "role": "inner flex container (title + url + desc + tags)",
+      "states": ["default"],
+      "tokens": [],
+      "scope": "bare"
+    },
+    "bookmark.star": {
+      "sel": ".star, .selected_star",
+      "role": "private/public star toggle icon",
+      "states": ["default", "selected"],
+      "tokens": ["palette.border", "palette.private-accent"],
+      "scope": "bare"
+    },
+    "bookmark.title": {
+      "sel": "a.bookmark_title",
+      "role": "bookmark title link (the main tap target)",
+      "states": ["default", "hover", "visited", "focus-visible"],
+      "tokens": ["palette.accent", "palette.link-hover", "typo.size-lg", "typo.weight-heading"],
+      "scope": "bare"
+    },
+    "bookmark.url_display": {
+      "sel": "a.url_display, a.when, a.cached",
+      "role": "URL/time/cached metadata strip (muted small text)",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted-soft", "typo.size-xs"],
+      "scope": "bare"
+    },
+    "bookmark.url_link": {
+      "sel": "a.url_link",
+      "role": "amber pill — shows full URL domain as chip",
+      "states": ["default", "hover"],
+      "tokens": ["palette.url-link-fg", "palette.url-link-bg", "radius.lg"],
+      "scope": "bare"
+    },
+    "bookmark.description": {
+      "sel": ".description",
+      "role": "user description / excerpt text",
+      "states": ["default"],
+      "tokens": ["palette.fg", "typo.line-height"],
+      "scope": "bare"
+    },
+    "bookmark.description_blockquote": {
+      "sel": ".description blockquote",
+      "role": "quoted text inside bookmark description",
+      "states": ["default"],
+      "tokens": ["palette.muted", "palette.accent-alpha"],
+      "scope": "bare"
+    },
+    "bookmark.tag": {
+      "sel": "a.tag",
+      "role": "tag chip in bookmark row",
+      "states": ["default", "hover", "selected"],
+      "tokens": ["palette.tag-fg", "palette.tag-bg", "palette.accent", "palette.btn-fg", "radius.lg"],
+      "scope": "bare"
+    },
+    "bookmark.tag.selected": {
+      "sel": "a.tag.selected, a.sort_order_selected",
+      "role": "currently-filtered tag",
+      "states": ["selected"],
+      "tokens": ["palette.destroy", "palette.tag-bg", "palette.accent"],
+      "scope": "bare"
+    },
+    "bookmark.unread": {
+      "sel": "a.unread",
+      "role": "unread indicator on bookmark",
+      "states": ["default"],
+      "tokens": ["palette.unread", "palette.destroy"],
+      "scope": "bare"
+    },
+    "bookmark.edit_links": {
+      "sel": ".edit_links a, a.copy_link",
+      "role": "inline edit/copy actions (shown on hover in some themes)",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted-soft", "palette.accent", "palette.fg"],
+      "scope": "bare"
+    },
+    "bookmark.delete": {
+      "sel": "a.delete, a.destroy",
+      "role": "delete action on bookmark",
+      "states": ["default", "hover"],
+      "tokens": ["palette.destroy"],
+      "scope": "bare"
+    },
+    "bookmark.private": {
+      "sel": ".private",
+      "role": "private (non-public) bookmark — two styles via ext.private-style: 'bg' | 'border-left'",
+      "states": ["default"],
+      "tokens": ["palette.private-bg", "palette.private-accent", "palette.bg-surface", "ext.private-style", "ext.private-border-width"],
+      "scope": "bare",
+      "inline_quirks": [
+        { "style": "background:#fff1f1", "pages": 4, "note": "defeated by inline_base_rules.private-bg" },
+        { "style": "background:#fff4f4", "pages": 4 }
+      ]
+    },
+
+    "right_bar.root": {
+      "sel": "#right_bar",
+      "role": "secondary column (tags, subs, sidebar widgets)",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface", "palette.fg", "space.right-bar-gap"],
+      "layout_hook": true
+    },
+    "right_bar.heading": {
+      "sel": "#right_bar h3, #right_bar h4, #right_bar b",
+      "role": "section labels",
+      "states": ["default"],
+      "tokens": ["palette.muted", "typo.weight-heading"]
+    },
+    "right_bar.link": {
+      "sel": "#right_bar a",
+      "role": "all sidebar anchor links (tags, actions)",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent", "palette.link-hover"]
+    },
+    "right_bar.table.row": {
+      "sel": "#right_bar table tr[onmouseover]",
+      "role": "data rows (tag subscriptions, common tags)",
+      "states": ["default", "hover"],
+      "tokens": ["palette.row-hover"],
+      "inline_quirks": [
+        { "handlers": { "onmouseover": "this.style.background='#ffc';", "onmouseout": "this.style.background='#fff'" }, "pages": ["subscriptions-tags"], "count": 31, "note": "defeated by inline_base_rules.tr-onmouseover-yellow" }
+      ]
+    },
+    "right_bar.tag": {
+      "sel": "#right_bar table td a.tag",
+      "role": "tag link in right-bar table (differs from bookmark.tag — different fg)",
+      "states": ["default", "hover", "visited"],
+      "tokens": ["palette.fg", "palette.accent"]
+    },
+    "right_bar.delete": {
+      "sel": "#right_bar table td a.delete",
+      "role": "inline delete action — revealed on row hover",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted-soft", "palette.destroy", "typo.size-xs"]
+    },
+    "right_bar.input_key": {
+      "sel": "#right_bar input#key",
+      "role": "right-bar search input (subscriptions page)",
+      "states": ["default", "focus-visible", "placeholder"],
+      "tokens": ["palette.input-bg", "palette.fg", "palette.border", "palette.accent", "palette.accent-alpha", "radius.sm"]
+    },
+    "right_bar.submit": {
+      "sel": "#right_bar input[type=\"submit\"]",
+      "role": "right-bar submit button (subscribe)",
+      "states": ["default", "hover"],
+      "tokens": ["palette.success", "palette.success-hover", "palette.btn-fg", "radius.sm"]
+    },
+    "right_bar.tweet_searchbox": {
+      "sel": "#tweet_searchbox, #tweet_searchbox form, #tweet_searchbox br, #tweet_searchbox #search_query_field, #tweet_searchbox input[type=\"submit\"]",
+      "role": "tweets page right-bar search form",
+      "states": ["default", "focus-visible", "hover"],
+      "tokens": ["palette.input-bg", "palette.fg", "palette.border", "palette.accent", "palette.success", "space.form-gap"],
+      "layout_hook": true
+    },
+    "right_bar.bundle": {
+      "sel": "a.bundle",
+      "role": "bundle link in sidebar and bundles table",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent", "palette.link-hover"],
+      "scope": "bare"
+    },
+
+    "tag_cloud.root": {
+      "sel": "#tag_cloud",
+      "role": "tag cloud widget in right bar",
+      "states": ["default"],
+      "tokens": [],
+      "layout_hook": true
+    },
+    "tag_cloud.link": {
+      "sel": "#tag_cloud a, #tag_cloud a.tag",
+      "role": "tag cloud individual tags",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent", "palette.link-hover"]
+    },
+    "tag_cloud.header": {
+      "sel": "#tag_cloud_header a, a.tag_heading_selected",
+      "role": "tag cloud section headers + selected heading",
+      "states": ["default", "hover", "selected"],
+      "tokens": ["palette.muted-soft", "palette.accent"]
+    },
+
+    "form.input": {
+      "sel": "input[type=\"text\"], input:not([type]), input[type=\"password\"], textarea, select",
+      "role": "form text inputs — bare selectors cover both body#pinboard and body:not(#pinboard)",
+      "states": ["default", "hover", "focus-visible", "disabled", "placeholder"],
+      "tokens": ["palette.input-bg", "palette.fg", "palette.border", "palette.accent"],
+      "scope": "bare"
+    },
+    "form.submit": {
+      "sel": "input[type=\"submit\"], input[type=\"button\"]",
+      "role": "primary submit button",
+      "states": ["default", "hover", "focus-visible", "disabled"],
+      "tokens": ["palette.accent", "palette.btn-fg", "palette.link-hover"],
+      "scope": "bare"
+    },
+    "form.checkbox": {
+      "sel": "input[type=\"checkbox\"], input[type=\"radio\"]",
+      "role": "toggle inputs — uses CSS accent-color",
+      "states": ["default", "checked", "hover", "focus-visible"],
+      "tokens": ["palette.accent"],
+      "scope": "bare"
+    },
+    "form.edit_bookmark": {
+      "sel": "#edit_bookmark_form",
+      "role": "edit-bookmark inline panel",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface", "palette.border"]
+    },
+    "form.suggested_tag": {
+      "sel": ".suggested_tag",
+      "role": "AI/heuristic tag suggestions on /add/",
+      "states": ["default", "hover"],
+      "tokens": ["palette.success"],
+      "scope": "bare"
+    },
+    "form.help_badge": {
+      "sel": "a.help",
+      "role": "help tooltip badge on settings page",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted-soft", "palette.accent-soft"],
+      "scope": "bare"
+    },
+    "form.email_secret": {
+      "sel": ".email_secret",
+      "role": "secret email badge on settings page",
+      "states": ["default"],
+      "tokens": ["palette.accent"],
+      "scope": "bare"
+    },
+
+    "settings.panel": {
+      "sel": "#settings_panel",
+      "role": "settings page wrapper",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface"],
+      "layout_hook": true
+    },
+    "settings.tabs": {
+      "sel": ".settings_tabs, [class*=\"settings_tab_spacer\"]",
+      "role": "settings tab rail",
+      "states": ["default"],
+      "tokens": ["palette.border"],
+      "scope": "bare"
+    },
+    "settings.tab": {
+      "sel": ".settings_tab, .settings_tab a",
+      "role": "single tab",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted", "palette.accent", "palette.border"],
+      "scope": "bare"
+    },
+    "settings.tab_selected": {
+      "sel": ".settings_tab_selected, .settings_tab_selected a",
+      "role": "active tab",
+      "states": ["selected"],
+      "tokens": ["palette.accent", "palette.border", "palette.bg-surface", "ext.settings-tab-selected-border-width"],
+      "scope": "bare"
+    },
+    "settings.heading": {
+      "sel": ".settings_heading",
+      "role": "section headings within settings panes",
+      "states": ["default"],
+      "tokens": ["palette.muted", "palette.border"],
+      "scope": "bare"
+    },
+    "settings.tab_panes": {
+      "sel": "#settings_tab_panes, #settings_tab_panes table td",
+      "role": "settings content panes",
+      "states": ["default"],
+      "tokens": ["palette.fg"]
+    },
+
+    "profile.columns": {
+      "sel": "#profile_left_column, #profile_right_column",
+      "role": "profile page column layout",
+      "states": ["default"],
+      "tokens": [],
+      "layout_hook": true
+    },
+    "profile.heading": {
+      "sel": "#profile_main_column h2, #profile_left_column h2, #profile_right_column h2",
+      "role": "profile section headings",
+      "states": ["default"],
+      "tokens": ["palette.muted"]
+    },
+    "profile.service_box": {
+      "sel": ".service_box, .help_box",
+      "role": "linked-service and help boxes on profile page",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface", "palette.border", "radius.md"],
+      "scope": "bare"
+    },
+    "profile.service_box_nested": {
+      "sel": ".service_box .service_box",
+      "role": "nested service box — must not double-border",
+      "states": ["default"],
+      "tokens": [],
+      "scope": "bare"
+    },
+    "profile.table": {
+      "sel": "#profile_main_column table td, #profile_right_column table td",
+      "role": "profile table cells",
+      "states": ["default"],
+      "tokens": ["palette.fg"]
+    },
+
+    "note.root": {
+      "sel": ".note",
+      "role": "single note entry",
+      "states": ["default"],
+      "tokens": ["palette.border"],
+      "scope": "bare"
+    },
+    "note.link": {
+      "sel": ".note a",
+      "role": "links within a note",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent"],
+      "scope": "bare"
+    },
+    "note.nested": {
+      "sel": ".note .note",
+      "role": "nested note — must not double-border",
+      "states": ["default"],
+      "tokens": [],
+      "scope": "bare"
+    },
+    "note.right_column": {
+      "sel": "#note_right_column",
+      "role": "note detail sidebar",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface", "palette.fg", "palette.border"],
+      "layout_hook": true
+    },
+
+    "bulk.bars": {
+      "sel": "#bulk_top_bar, #bulk_edit_box",
+      "role": "bulk-edit toolbar + selection box",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface", "palette.border", "palette.fg"]
+    },
+
+    "popup.header": {
+      "sel": "#popup_header, body:not(#pinboard) #popup_header",
+      "role": "save-bookmark popup header",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface", "palette.fg"]
+    },
+    "popup.formtable": {
+      "sel": ".formtable td",
+      "role": "save-bookmark popup form cells",
+      "states": ["default"],
+      "tokens": ["palette.fg"],
+      "scope": "bare"
+    },
+
+    "bundles.table": {
+      "sel": "#main_column form[name=\"sort\"] > table, #main_column form[name=\"sort\"] table tr, #main_column form[name=\"sort\"] table td",
+      "role": "bundles page sortable table",
+      "states": ["default", "hover"],
+      "tokens": ["palette.row-hover", "radius.md"],
+      "inline_quirks": [
+        { "style": "width:830px", "pages": ["bundles"], "note": "defeated by inline_base_rules.bundle-table-width" }
+      ],
+      "layout_hook": true
+    },
+    "bundles.slot_input": {
+      "sel": "#main_column form[name=\"sort\"] table input[name^=\"id_\"]",
+      "role": "numeric bundle-slot input (1-3 digits)",
+      "states": ["default", "focus-visible"],
+      "tokens": ["palette.input-bg", "palette.border", "palette.fg", "palette.accent", "radius.sm"],
+      "inline_quirks": [
+        { "style": "border:1px dotted #bbb;width:20px;margin-right:10px;", "pages": ["bundles"], "count": 16, "note": "defeated by inline_base_rules.bundle-slot-input" }
+      ]
+    },
+    "bundles.bundle_link": {
+      "sel": "#main_column form[name=\"sort\"] table a.bundle",
+      "role": "bundle name link in table",
+      "states": ["default"],
+      "tokens": ["typo.weight-heading", "radius.sm"]
+    },
+    "bundles.actions": {
+      "sel": "#main_column form[name=\"sort\"] table td a.edit, #main_column form[name=\"sort\"] table td a.destroy",
+      "role": "edit/destroy actions in bundle rows",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted", "palette.accent", "palette.destroy"]
+    },
+
+    "pagination.controls": {
+      "sel": ".next_prev, .next_prev_widget a",
+      "role": "previous/next links at bottom of list pages",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent", "palette.link-hover"],
+      "scope": "bare"
+    },
+    "pagination.edit": {
+      "sel": "#nextprev a.edit",
+      "role": "edit link in pagination area",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted-soft"]
+    },
+
+    "global.anchor": {
+      "sel": "a, a:link, a:hover, a:visited, a:focus-visible",
+      "role": "site-wide anchor fallback — last-resort coverage for untyped links",
+      "states": ["default", "hover", "visited", "focus-visible"],
+      "tokens": ["palette.accent", "palette.link-hover", "palette.link-visited", "palette.focus-ring"],
+      "scope": "bare"
+    },
+    "global.heading": {
+      "sel": "h2",
+      "role": "bare h2 fallback",
+      "states": ["default"],
+      "tokens": ["palette.muted"],
+      "scope": "bare"
+    },
+    "global.hr": {
+      "sel": "hr",
+      "role": "horizontal rule",
+      "states": ["default"],
+      "tokens": ["palette.border"],
+      "scope": "bare"
+    },
+    "global.selection": {
+      "sel": "::selection, ::-moz-selection",
+      "role": "text selection highlight (in _base + optionally re-emitted by composer)",
+      "states": ["::selection"],
+      "tokens": ["palette.selection-bg", "palette.selection-fg"],
+      "scope": "bare"
+    },
+
+    "misc.rss_link": {
+      "sel": ".rss_link, .rss_linkbox a",
+      "role": "RSS feed badge",
+      "states": ["default"],
+      "tokens": ["palette.muted-soft"],
+      "scope": "bare"
+    },
+    "misc.colophon": {
+      "sel": "#footer, .colophon, .colophon a",
+      "role": "page footer / colophon",
+      "states": ["default"],
+      "tokens": ["palette.muted-soft"],
+      "scope": "bare"
+    }
+  },
+
+  "inline_base_rules": [
+    {
+      "id": "override.tr-onmouseover-yellow",
+      "applies_to": ["right_bar.table.row", "bundles.table"],
+      "reason": "Pinboard writes inline style.background on mouseover/mouseout. CSS !important wins over inline style.",
+      "selector": "#right_bar table tr[onmouseover], #main_column table tr[onmouseover]",
+      "rule_default": "background: transparent !important;",
+      "rule_hover": "background: var(--pinboard-row-hover) !important;"
+    },
+    {
+      "id": "override.bookmark-separator",
+      "applies_to": ["bookmark.item"],
+      "reason": "Pinboard injects `border-top:1px dotted #aaa` inline on each bookmark. Token it.",
+      "selector": "#main_column .bookmark[style*='border-top']",
+      "rule": "border-top: var(--pinboard-border-hairline) !important;"
+    },
+    {
+      "id": "override.private-bg",
+      "applies_to": ["bookmark.private"],
+      "reason": "Pinboard inline `background:#fff1f1` / `#fff4f4` for private — replace with themed token.",
+      "selector": ".bookmark.private[style*='background'], .bookmark[style*='#fff1f1'], .bookmark[style*='#fff4f4']",
+      "rule": "background: var(--pinboard-private-bg) !important;"
+    },
+    {
+      "id": "override.sub-banner-count-color",
+      "applies_to": ["sub_banner.counts"],
+      "reason": "Pinboard hardcodes `color:#aa5511` on count spans.",
+      "selector": "#sub_banner [style*='#aa5511'], .bookmark_count[style*='color']",
+      "rule": "color: var(--pinboard-accent) !important;"
+    },
+    {
+      "id": "override.muted-aaa",
+      "applies_to": ["bookmark.edit_links", "bookmark.url_display"],
+      "reason": "Widespread inline `color:#aaa` for muted text.",
+      "selector": "[style*='color:#aaa'], [style*='color: #aaa']",
+      "rule": "color: var(--pinboard-muted) !important;"
+    },
+    {
+      "id": "override.bundle-table-width",
+      "applies_to": ["bundles.table"],
+      "reason": "Inline `style=\"width:830px\"` on bundles table breaks narrow viewports.",
+      "selector": "#main_column table[style*='width:830']",
+      "rule": "width: 100% !important; max-width: 100% !important;"
+    },
+    {
+      "id": "override.bundle-slot-input",
+      "applies_to": ["bundles.slot_input"],
+      "reason": "Inline `border:1px dotted #bbb;width:20px` on every bundle slot input.",
+      "selector": "input[type=\"text\"][name^='id_'][style*='border']",
+      "rule": "border: var(--pinboard-border-width) solid var(--pinboard-border) !important; background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important; width: 32px !important;"
+    },
+    {
+      "id": "override.per-page-active",
+      "applies_to": ["pagination.controls"],
+      "reason": "Inline `background:#ffa` marks active per-page selection.",
+      "selector": "table.per_page_widget [style*='background:#ffa']",
+      "rule": "background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important;"
+    },
+    {
+      "id": "override.generic-bgcolor",
+      "applies_to": ["*"],
+      "reason": "Defensive: any HTML `bgcolor=` attribute still lurking.",
+      "selector": "[bgcolor]",
+      "rule": "background-color: transparent !important;"
+    },
+    {
+      "id": "override.generic-html-color",
+      "applies_to": ["*"],
+      "reason": "Defensive: legacy font color/size attributes.",
+      "selector": "font[color], font[size]",
+      "rule": "color: inherit !important; font-size: inherit !important;"
+    },
+    {
+      "id": "override.generic-fixed-width",
+      "applies_to": ["*"],
+      "reason": "Defensive: `width=\"NNN\"` HTML attrs on layout tables.",
+      "selector": "table[width]:not([width='100%'])",
+      "rule": "width: auto !important; max-width: 100% !important;"
+    }
+  ],
+
+  "composers": {
+    "_note": "Each composer is a function (tokens) -> css. All composers call baseLayer(tokens) first to emit :root CSS vars + inline_base_rules. The remaining emission covers the surface set below.",
+    "classic-list-v2": {
+      "file": "composers/classic-list-v2.mjs",
+      "status": "canonical",
+      "layout_mode": "classic-list",
+      "selector_count": 195,
+      "emits_surfaces": ["shell.page", "shell.popup", "shell.text_inherit", "banner.*", "sub_banner.*", "main.column", "bookmark.*", "right_bar.*", "tag_cloud.*", "form.*", "settings.*", "profile.*", "note.*", "bulk.*", "popup.*", "bundles.*", "pagination.*", "global.*", "misc.*"],
+      "ext_tokens": ["private-style", "private-border-width"]
+    },
+    "dense": {
+      "file": "composers/dense.mjs",
+      "status": "demo",
+      "layout_mode": "dense",
+      "base": "classic-list (v1) with spacing compression"
+    },
+    "card-grid": {
+      "file": "composers/card-grid.mjs",
+      "status": "demo",
+      "layout_mode": "card-grid",
+      "notes": "CSS Grid auto-fill minmax cards"
+    },
+    "magazine": {
+      "file": "composers/magazine.mjs",
+      "status": "demo",
+      "layout_mode": "magazine",
+      "notes": "editorial two-column grid with hero bookmark + drop-caps"
+    }
+  },
+
+  "modes": {
+    "_note": "Dark mode (and other variants) are emitted by composers/compose-theme.mjs, which runs the base composer once, then re-runs it with tokens.modes.<name>.palette merged on top, prefixing every selector with modes.<name>.trigger. This is the mechanism behind Flexoki Adaptive (verified pilot: flexoki achieves 100% selector coverage, both light+dark).",
+    "trigger_convention": "tokens.modes.<name>.trigger — any CSS selector string (typically 'html.pbp-dark'). Selection logic is injected by pinboard-style.js based on extension Theme setting.",
+    "supported_modes": ["dark"],
+    "example": {
+      "tokens.modes.dark": {
+        "trigger": "html.pbp-dark",
+        "palette": { "bg": "#1C1B1A", "fg": "#CECDC3" }
+      }
+    },
+    "prefixing_rules": {
+      "skipped_selectors": [":root", "@-rules"],
+      "preserved": "CSS comments (via placeholder swap-out during scan)",
+      "comma_groups": "each fragment prefixed independently — `a, b { }` becomes `html.pbp-dark a, html.pbp-dark b { }`"
+    }
+  },
+
+  "overrides": {
+    "_note": "Escape hatch for theme-specific decorations that the shared composer cannot know about (::before badges, theme-only animations, custom cursor effects). composeTheme() appends tokens.overrides.css verbatim after modes. Used by terminal (CRT ::before markers), gruvbox-dark (a.tag::before $), modern-card (#main_column wrapper radius). Keep overrides.css short — if a rule is common across themes, promote it to the composer or a new ext.* slot.",
+    "shape": {
+      "tokens.overrides.css": "string — raw CSS appended verbatim. Not validated, not mode-prefixed."
+    },
+    "when_to_use": [
+      "Pseudo-elements (::before/::after) that encode theme personality",
+      "Theme-unique animations (CRT scanlines, terminal cursor blink)",
+      "One-off selectors not worth adding to the shared composer",
+      "Custom cursor/text-shadow effects"
+    ],
+    "when_NOT_to_use": [
+      "Any rule with a selector the composer already emits — that's a palette mismatch, fix tokens.palette instead",
+      "Defensive overrides against Pinboard inline styles — those live in _base.mjs inline_base_rules"
+    ]
+  },
+
+  "page_templates": {
+    "P1-list": {
+      "desc": "Bookmark list pages",
+      "pages": ["home", "network", "notes", "popular", "unread"],
+      "required_surfaces": ["shell.page","banner.root","banner.searchbox","banner.menu","sub_banner.root","main.column","bookmark.item","bookmark.title","bookmark.tag","bookmark.url_display","misc.colophon"],
+      "optional_surfaces": ["right_bar.root","right_bar.tag","bookmark.star","bookmark.url_link","bookmark.private","bookmark.unread","pagination.controls"]
+    },
+    "P2-form": {
+      "desc": "Form-first pages (add / edit / settings / profile)",
+      "pages": ["add", "note-add", "settings", "profile"],
+      "required_surfaces": ["shell.page","banner.root","banner.searchbox","banner.menu","main.column","form.input","form.submit","misc.colophon"],
+      "optional_surfaces": ["form.checkbox","form.suggested_tag","form.help_badge","form.email_secret","settings.panel","settings.tabs","settings.tab","settings.tab_selected","settings.heading","profile.columns","profile.heading","profile.service_box","sub_banner.root"]
+    },
+    "P3-rightbar-heavy": {
+      "desc": "Pages where right_bar carries the primary UI",
+      "pages": ["tweets", "subscriptions-tags"],
+      "required_surfaces": ["shell.page","banner.root","banner.searchbox","main.column","right_bar.root","right_bar.heading","right_bar.link","right_bar.table.row","right_bar.tag","right_bar.delete","right_bar.input_key","right_bar.submit","right_bar.tweet_searchbox","misc.colophon"],
+      "optional_surfaces": ["tag_cloud.root", "tag_cloud.link", "tag_cloud.header"]
+    },
+    "P4-table": {
+      "desc": "Table-centric pages (bundles / tabs)",
+      "pages": ["bundles", "tabs"],
+      "required_surfaces": ["shell.page","banner.root","main.column","bundles.table","bundles.slot_input","bundles.bundle_link","bundles.actions","misc.colophon"],
+      "optional_surfaces": ["pagination.controls"]
+    }
+  },
+
+  "state_hooks": {
+    "description": "Every surface must declare which of these states it needs. Validator checks coverage.",
+    "all_states": ["default", "hover", "focus-visible", "active", "selected", "checked", "disabled", "visited", "placeholder", "::selection", "::-moz-selection"],
+    "selection_css": "::selection (+ ::-moz-selection for Firefox compat)"
+  }
+}

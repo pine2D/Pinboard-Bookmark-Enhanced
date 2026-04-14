@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "id": "solarized-light",
+    "name": "Solarized Light",
+    "mode": "light",
+    "description": "Sprint 3 migration: Ethan Schoonover Solarized — precision palette of base3 paper + ANSI accent rainbow. Source: pinboard-themes.js §solarized-light."
+  },
+  "layout": {
+    "mode": "classic-list",
+    "max-width": "1030px",
+    "bookmark-style": "card",
+    "right-bar": "visible"
+  },
+  "palette": {
+    "bg":             "#fdf6e3",
+    "bg-surface":     "#eee8d5",
+    "fg":             "#657b83",
+    "fg-strong":      "#586e75",
+    "muted":          "#586e75",
+    "muted-soft":     "#93a1a1",
+    "border":         "#d6cdb5",
+    "border-strong":  "#93a1a1",
+    "border-soft":    "#d6cdb5",
+    "accent":         "#268bd2",
+    "accent-hover":   "#2aa198",
+    "accent-soft":    "#eee8d5",
+    "accent-alpha":   "rgba(38,139,210,0.25)",
+    "input-bg":       "#fdf6e3",
+    "private-bg":     "#eee8d5",
+    "private-accent": "#b58900",
+    "selection-bg":   "#268bd2",
+    "selection-fg":   "#fdf6e3",
+    "tag-bg":         "transparent",
+    "tag-fg":         "#2aa198",
+    "row-hover":      "#eee8d5",
+    "destroy":        "#dc322f",
+    "btn-bg":         "#268bd2",
+    "btn-fg":         "#fdf6e3",
+    "success":        "#2aa198",
+    "success-hover":  "#268bd2",
+    "url-link-bg":    "#fdf6e3",
+    "url-link-fg":    "#b58900",
+    "link-hover":     "#2aa198",
+    "link-visited":   "#268bd2",
+    "focus-ring":     "#268bd2",
+    "unread":         "#dc322f"
+  },
+  "typo": {
+    "family": "\"Inter\", -apple-system, sans-serif",
+    "size-base": "13px",
+    "size-lg":   "15px",
+    "size-sm":   "12px",
+    "size-xs":   "11px",
+    "line-height": 1.5,
+    "weight-body": 400,
+    "weight-heading": 700
+  },
+  "space": {
+    "unit":           "4px",
+    "bookmark-gap":   "6px",
+    "main-padding":   "12px",
+    "sub-banner-y":   "8px",
+    "right-bar-gap":  "12px",
+    "form-gap":       "8px"
+  },
+  "radius": {
+    "sm": "2px",
+    "md": "4px",
+    "lg": "2px"
+  },
+  "border": {
+    "width": "1px",
+    "style": "solid"
+  },
+  "ext": {
+    "private-style": "border-left",
+    "private-border-width": "3px"
+  }
+}
