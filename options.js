@@ -483,18 +483,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---- Export Settings ----
+  // Whitelist: only keys declared in SETTINGS_DEFAULTS (minus API keys).
+  // Keeps caches (ai_cache_*, cached_user_tags, lastUsedTags, offlineQueue,
+  // _pbRateLimitTs, md_preview_data, ai_cache_index, batch caches) out of
+  // the backup file.
+  const EXPORTABLE_KEYS = Object.keys(SETTINGS_DEFAULTS).filter(k => !API_KEY_FIELDS.includes(k));
   document.getElementById("export-settings").addEventListener("click", async () => {
-    const raw = await (await getSettingsStorage()).get(null);
+    const raw = await (await getSettingsStorage()).get(EXPORTABLE_KEYS);
     const exportData = Object.fromEntries(
-      Object.entries(raw).filter(([k]) => !API_KEY_FIELDS.includes(k))
+      Object.entries(raw).filter(([, v]) => v !== undefined)
     );
-    // Include chunked sync data
+    // Include chunked sync data (handled separately via syncGetLarge)
     const customCSS = await syncGetLarge("customCSS", "");
     if (customCSS) exportData.customCSS = customCSS;
     const savedThemesData = await syncGetLarge("savedThemes", []);
     if (savedThemesData.length) exportData.savedThemes = savedThemesData;
-    // Remove chunk keys from export (they're internal)
-    Object.keys(exportData).forEach(k => { if (/^(customCSS|savedThemes)_\d+$/.test(k) || (exportData[k] && exportData[k]._chunks)) delete exportData[k]; });
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -511,8 +514,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = JSON.parse(text);
       // Separate large data for chunked sync
       const { customCSS, savedThemes: importedThemes, ...rest } = data;
+      // Whitelist-restrict imported keys to known settings (strips any
+      // caches that might be present in older backups).
       const safeData = Object.fromEntries(
-        Object.entries(rest).filter(([k]) => !API_KEY_FIELDS.includes(k) && !/^(customCSS|savedThemes)_\d+$/.test(k))
+        Object.entries(rest).filter(([k]) => EXPORTABLE_KEYS.includes(k))
       );
       await (await getSettingsStorage()).set(safeData);
       if (customCSS !== undefined) await syncSetLarge("customCSS", customCSS);
