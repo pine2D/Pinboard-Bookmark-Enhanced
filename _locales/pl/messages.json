@@ -428,6 +428,9 @@
   "offlineRemove": {
     "message": "Usuń z kolejki"
   },
+  "offlineRemoveConfirm": {
+    "message": "Usunąć ten element?"
+  },
   "offlineQueueEmpty": {
     "message": "Kolejka jest pusta"
   },
@@ -643,7 +646,7 @@
     "message": "Pokaż panel tagów AI w okienku"
   },
   "optShowQuickLinks": {
-    "message": "Pokaż szybkie linki w okienku (Sets · Network · Unread · Notes · Popular)"
+    "message": "Pokaż szybkie linki w okienku"
   },
   "optShowQuickRow": {
     "message": "Pokaż przyciski szybkich akcji w okienku (Zapisz karty · Zapis zbiorczy · Markdown)"

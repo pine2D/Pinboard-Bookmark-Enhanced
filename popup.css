@@ -54,6 +54,10 @@ a:hover { text-decoration: underline; }
   padding: 0 4px;
   font-size: 14px;
   line-height: 1;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
 .ai-error-dismiss:hover { color: #c00; text-decoration: none; }
 .ai-error-message {
@@ -432,6 +436,7 @@ a:hover { text-decoration: underline; }
   color: #c00;
   font-size: 10px;
   cursor: pointer;
+  position: relative;
 }
 .offline-toggle {
   flex: 1;
@@ -496,6 +501,7 @@ a:hover { text-decoration: underline; }
   color: #666;
   cursor: pointer;
   line-height: 1.4;
+  position: relative;
 }
 .offline-queue-actions button:hover:not(:disabled) { background: rgba(0,0,0,0.06); color: #4477bb; }
 .offline-queue-actions button:disabled { opacity: 0.5; cursor: default; }
@@ -1045,6 +1051,39 @@ html[data-theme] .bottom-bar input[type="checkbox"]:focus-visible { outline: 2px
 /* Terminal monospace */
 html[data-theme="terminal"] body { font-family: "Courier New", Consolas, monospace; }
 html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Consolas, monospace; }
+
+/* ===================== Confirm Popover (shared helper) ===================== */
+.confirm-popover {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 10;
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; font-size: 11px; color: #c00; white-space: nowrap;
+  background: #fff; border: 1px solid #ccc; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  animation: confirmFadeIn 0.12s ease;
+}
+.confirm-popover .confirm-msg { font-weight: bold; color: inherit; }
+.confirm-popover button {
+  padding: 2px 10px; font-size: 11px; cursor: pointer; border-radius: 3px; border: 1px solid;
+}
+.confirm-popover .confirm-yes { background: #c00; color: #fff; border-color: #a00; }
+.confirm-popover .confirm-yes:hover { background: #a00; }
+.confirm-popover .confirm-no { background: none; color: #666; border-color: #ccc; }
+.confirm-popover .confirm-no:hover { background: #eee; }
+.confirm-popover button:focus-visible { outline: 2px solid #4477bb; outline-offset: 1px; }
+@keyframes confirmFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+html.dark .confirm-popover { color: #ff6666; background: #1a1a1a; border-color: #3a3a3a; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+html.dark .confirm-popover .confirm-yes { background: #c33; color: #fff; border-color: #a22; }
+html.dark .confirm-popover .confirm-yes:hover { background: #a22; }
+html.dark .confirm-popover .confirm-no { color: #aaa; border-color: #444; }
+html.dark .confirm-popover .confirm-no:hover { background: #2a2a2a; }
+
+html[data-theme] .confirm-popover { color: var(--pp-danger); background: var(--pp-bg); border-color: var(--pp-border); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+html[data-theme] .confirm-popover .confirm-yes { background: var(--pp-danger); color: #fff; border-color: var(--pp-danger); }
+html[data-theme] .confirm-popover .confirm-yes:hover { filter: brightness(0.9); }
+html[data-theme] .confirm-popover .confirm-no { color: var(--pp-fg-muted); border-color: var(--pp-border); background: none; }
+html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-drop-hover); }
+html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp-accent); }
 
 /* ===================== High-DPI Scaling ===================== */
 @media (min-resolution: 144dpi) { body { zoom: 1.12; } }

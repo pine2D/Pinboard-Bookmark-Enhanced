@@ -428,6 +428,9 @@
   "offlineRemove": {
     "message": "キューから削除"
   },
+  "offlineRemoveConfirm": {
+    "message": "この項目を削除しますか？"
+  },
   "offlineQueueEmpty": {
     "message": "キューは空です"
   },
@@ -643,7 +646,7 @@
     "message": "ポップアップに AI タグ欄を表示"
   },
   "optShowQuickLinks": {
-    "message": "ポップアップにクイックリンクを表示（Sets · Network · Unread · Notes · Popular）"
+    "message": "ポップアップにクイックリンクを表示"
   },
   "optShowQuickRow": {
     "message": "ポップアップにクイック操作ボタンを表示（タブセット保存 · 一括保存 · Markdown）"

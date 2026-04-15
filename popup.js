@@ -744,12 +744,19 @@ async function showOfflineQueueStatus() {
     window.PPOffline.init();
     await window.PPOffline.refresh();
   }
-  $id("offline-queue-clear")?.addEventListener("click", async (e) => {
+  $id("offline-queue-clear")?.addEventListener("click", (e) => {
     e.preventDefault();
-    if (!confirm(t("offlineClearConfirm"))) return;
-    await chrome.storage.local.set({ offlineQueue: [] });
-    bar.classList.add("hidden");
-  }, { once: true });
+    const anchor = e.currentTarget;
+    showConfirmPopover(anchor, {
+      msg: t("offlineClearConfirm"),
+      yesText: t("clear"),
+      noText: t("cancel"),
+      onConfirm: async () => {
+        await chrome.storage.local.set({ offlineQueue: [] });
+        bar.classList.add("hidden");
+      },
+    });
+  });
 }
 
 // ===================== Helpers =====================

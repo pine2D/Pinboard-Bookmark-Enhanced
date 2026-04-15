@@ -234,3 +234,39 @@ function $id(id) {
   if (el) _domRefs[id] = el;
   return el;
 }
+
+// Render an inline .confirm-popover anchored inside `anchor`.
+// Caller supplies pre-translated strings via { msg, yesText, noText }.
+// Popover self-dismisses on Escape / Cancel / Confirm; de-dupes if already open.
+function showConfirmPopover(anchor, opts) {
+  if (!anchor || anchor.querySelector(".confirm-popover")) return;
+  const { msg, yesText, noText, onConfirm, onCancel } = opts || {};
+  const pop = document.createElement("div");
+  pop.className = "confirm-popover";
+  const m = document.createElement("span");
+  m.className = "confirm-msg";
+  m.textContent = msg || "";
+  const yes = document.createElement("button");
+  yes.type = "button";
+  yes.className = "confirm-yes";
+  yes.textContent = yesText || "OK";
+  const no = document.createElement("button");
+  no.type = "button";
+  no.className = "confirm-no";
+  no.textContent = noText || "Cancel";
+  pop.append(m, yes, no);
+  anchor.appendChild(pop);
+
+  function dismiss() {
+    pop.remove();
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(ev) {
+    if (ev.key === "Escape") { dismiss(); if (onCancel) onCancel(); }
+  }
+  pop.addEventListener("click", (e) => e.stopPropagation());
+  no.addEventListener("click", () => { dismiss(); if (onCancel) onCancel(); });
+  yes.addEventListener("click", () => { dismiss(); if (onConfirm) onConfirm(); });
+  document.addEventListener("keydown", onKey);
+  no.focus();
+}

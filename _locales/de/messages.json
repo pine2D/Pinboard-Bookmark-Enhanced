@@ -428,6 +428,9 @@
   "offlineRemove": {
     "message": "Aus Warteschlange entfernen"
   },
+  "offlineRemoveConfirm": {
+    "message": "Diesen Eintrag entfernen?"
+  },
   "offlineQueueEmpty": {
     "message": "Warteschlange ist leer"
   },
@@ -643,7 +646,7 @@
     "message": "KI-Tag-Bereich im Popup anzeigen"
   },
   "optShowQuickLinks": {
-    "message": "Schnelllinks im Popup anzeigen (Sets · Network · Unread · Notes · Popular)"
+    "message": "Schnelllinks im Popup anzeigen"
   },
   "optShowQuickRow": {
     "message": "Schnellaktionsschaltflächen im Popup anzeigen (Tabs speichern · Batch-Speichern · Markdown)"

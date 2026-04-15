@@ -428,6 +428,9 @@
   "offlineRemove": {
     "message": "Удалить из очереди"
   },
+  "offlineRemoveConfirm": {
+    "message": "Удалить этот элемент?"
+  },
   "offlineQueueEmpty": {
     "message": "Очередь пуста"
   },
@@ -643,7 +646,7 @@
     "message": "Показывать блок AI-меток во всплывающем окне"
   },
   "optShowQuickLinks": {
-    "message": "Показывать быстрые ссылки во всплывающем окне (Sets · Network · Unread · Notes · Popular)"
+    "message": "Показывать быстрые ссылки во всплывающем окне"
   },
   "optShowQuickRow": {
     "message": "Показывать кнопки быстрых действий во всплывающем окне (Сохранить вкладки · Пакетное сохранение · Markdown)"

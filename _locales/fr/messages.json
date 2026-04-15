@@ -428,6 +428,9 @@
   "offlineRemove": {
     "message": "Retirer de la file"
   },
+  "offlineRemoveConfirm": {
+    "message": "Retirer cet élément ?"
+  },
   "offlineQueueEmpty": {
     "message": "La file est vide"
   },
@@ -643,7 +646,7 @@
     "message": "Afficher la zone de tags IA dans le popup"
   },
   "optShowQuickLinks": {
-    "message": "Afficher les liens rapides dans le popup (Sets · Network · Unread · Notes · Popular)"
+    "message": "Afficher les liens rapides dans le popup"
   },
   "optShowQuickRow": {
     "message": "Afficher les boutons d'actions rapides dans le popup (Enregistrer les onglets · Enregistrement par lot · Markdown)"

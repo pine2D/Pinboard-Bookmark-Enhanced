@@ -110,7 +110,15 @@
       remove.className = "offline-queue-remove";
       remove.textContent = "✕";
       remove.title = t("offlineRemove");
-      remove.addEventListener("click", () => onRemove(idx));
+      remove.setAttribute("aria-label", t("offlineRemove"));
+      remove.addEventListener("click", () => {
+        showConfirmPopover(remove, {
+          msg: t("offlineRemoveConfirm"),
+          yesText: t("delete"),
+          noText: t("cancel"),
+          onConfirm: () => onRemove(idx),
+        });
+      });
 
       actions.appendChild(retry);
       actions.appendChild(remove);

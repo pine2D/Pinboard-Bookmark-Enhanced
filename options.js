@@ -83,37 +83,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const panel = activeBtn.dataset.panel;
     const def = PANEL_DEFAULTS[panel];
     if (!def) return;
-    // Prevent double-click while popover is showing
-    if (resetBtn.querySelector(".confirm-popover")) return;
-
-    const pop = document.createElement("div");
-    pop.className = "confirm-popover";
-    const msg = document.createElement("span");
-    msg.className = "confirm-msg";
-    msg.textContent = t("resetConfirm", activeBtn.textContent) + (def.skip ? t("resetKeysKept") : "");
-    const yes = document.createElement("button");
-    yes.className = "confirm-yes";
-    yes.textContent = t("reset");
-    const no = document.createElement("button");
-    no.className = "confirm-no";
-    no.textContent = t("cancel");
-    pop.appendChild(msg);
-    pop.appendChild(yes);
-    pop.appendChild(no);
-    resetBtn.appendChild(pop);
-
-    function dismiss() { pop.remove(); }
-    pop.addEventListener("click", (e) => e.stopPropagation());
-    no.addEventListener("click", dismiss);
-    yes.addEventListener("click", () => {
-      for (const [id, val] of Object.entries(def.fields)) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-        if (el.type === "checkbox") el.checked = val;
-        else el.value = val;
-      }
-      saveAll();
-      dismiss();
+    showConfirmPopover(resetBtn, {
+      msg: t("resetConfirm", activeBtn.textContent) + (def.skip ? t("resetKeysKept") : ""),
+      yesText: t("reset"),
+      noText: t("cancel"),
+      onConfirm: () => {
+        for (const [id, val] of Object.entries(def.fields)) {
+          const el = document.getElementById(id);
+          if (!el) continue;
+          if (el.type === "checkbox") el.checked = val;
+          else el.value = val;
+        }
+        saveAll();
+      },
     });
   });
 
@@ -258,7 +240,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.error("sync migration failed:", e);
       syncToggle.checked = !enabling;
       await chrome.storage.local.set({ optSyncEnabled: !enabling });
-      alert(t("syncMigrationFailed") || "Sync migration failed. Please try again or reduce custom CSS size.");
+      const errEl = document.getElementById("opt-sync-error");
+      if (errEl) {
+        errEl.textContent = t("syncMigrationFailed") || "Sync migration failed. Please try again or reduce custom CSS size.";
+        errEl.classList.remove("hidden");
+        setTimeout(() => errEl.classList.add("hidden"), 8000);
+      }
       return;
     }
     // Fade out and reload
@@ -718,35 +705,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Dirty-state guard: if user has hand-edited CSS that doesn't match any
       // preset or saved theme, confirm before overwriting.
       if (!cssMatchesAnyKnownTheme(currentCSS)) {
-        // Prevent stacking popovers
-        if (btn.querySelector(".confirm-popover")) return;
-
-        const pop = document.createElement("div");
-        pop.className = "confirm-popover";
-        const msg = document.createElement("span");
-        msg.className = "confirm-msg";
-        msg.textContent = t("replaceCSSConfirm");
-        const yes = document.createElement("button");
-        yes.className = "confirm-yes";
-        yes.textContent = t("replace");
-        const no = document.createElement("button");
-        no.className = "confirm-no";
-        no.textContent = t("cancel");
-        pop.appendChild(msg);
-        pop.appendChild(yes);
-        pop.appendChild(no);
-        btn.appendChild(pop);
-
-        function dismiss() {
-          pop.remove();
-          document.removeEventListener("keydown", onEsc);
-        }
-        function onEsc(ev) { if (ev.key === "Escape") dismiss(); }
-        document.addEventListener("keydown", onEsc);
-        pop.addEventListener("click", (ev) => ev.stopPropagation());
-        no.addEventListener("click", dismiss);
-        yes.addEventListener("click", () => { applyPreset(key); dismiss(); });
-        no.focus();
+        showConfirmPopover(btn, {
+          msg: t("replaceCSSConfirm"),
+          yesText: t("replace"),
+          noText: t("cancel"),
+          onConfirm: () => applyPreset(key),
+        });
         return;
       }
 
@@ -835,44 +799,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       del.setAttribute("aria-label", t("deleteThemeNamed", theme.name));
       del.addEventListener("click", (e) => {
         e.stopPropagation();
-        // Prevent double-click while popover is showing
-        if (wrap.querySelector(".confirm-popover")) return;
-
-        const pop = document.createElement("div");
-        pop.className = "confirm-popover";
-        const msg = document.createElement("span");
-        msg.className = "confirm-msg";
-        msg.textContent = t("deleteThemeConfirm", theme.name);
-        const yes = document.createElement("button");
-        yes.className = "confirm-yes";
-        yes.textContent = t("delete");
-        const no = document.createElement("button");
-        no.className = "confirm-no";
-        no.textContent = t("cancel");
-        pop.appendChild(msg);
-        pop.appendChild(yes);
-        pop.appendChild(no);
-        wrap.appendChild(pop);
-
-        function dismiss() {
-          pop.remove();
-          document.removeEventListener("keydown", onEsc);
-        }
-        function onEsc(ev) { if (ev.key === "Escape") dismiss(); }
-        document.addEventListener("keydown", onEsc);
-        pop.addEventListener("click", (ev) => ev.stopPropagation());
-        no.addEventListener("click", dismiss);
-        yes.addEventListener("click", async () => {
-          // Re-find by name in case the array mutated while popover was open.
-          const current = savedThemes.findIndex(th => th.name === theme.name);
-          if (current >= 0) {
-            savedThemes.splice(current, 1);
-            await persistSavedThemes();
-            renderSavedThemes();
-          }
-          dismiss();
+        showConfirmPopover(wrap, {
+          msg: t("deleteThemeConfirm", theme.name),
+          yesText: t("delete"),
+          noText: t("cancel"),
+          onConfirm: async () => {
+            // Re-find by name in case the array mutated while popover was open.
+            const current = savedThemes.findIndex(th => th.name === theme.name);
+            if (current >= 0) {
+              savedThemes.splice(current, 1);
+              await persistSavedThemes();
+              renderSavedThemes();
+            }
+          },
         });
-        no.focus();
       });
       wrap.append(btn, del);
       container.appendChild(wrap);

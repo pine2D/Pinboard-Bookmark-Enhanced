@@ -428,6 +428,9 @@
   "offlineRemove": {
     "message": "從佇列移除"
   },
+  "offlineRemoveConfirm": {
+    "message": "移除此項目？"
+  },
   "offlineQueueEmpty": {
     "message": "佇列為空"
   },
@@ -643,7 +646,7 @@
     "message": "在彈出窗口中顯示 AI 標籤區"
   },
   "optShowQuickLinks": {
-    "message": "在彈出窗口中顯示快捷連結（Sets · Network · Unread · Notes · Popular）"
+    "message": "在彈出窗口中顯示快捷連結"
   },
   "optShowQuickRow": {
     "message": "在彈出窗口中顯示快捷操作按鈕（儲存分頁 · 批次儲存 · Markdown）"

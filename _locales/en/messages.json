@@ -428,6 +428,9 @@
   "offlineRemove": {
     "message": "Remove from queue"
   },
+  "offlineRemoveConfirm": {
+    "message": "Remove this item?"
+  },
   "offlineQueueEmpty": {
     "message": "Queue is empty"
   },
@@ -643,7 +646,7 @@
     "message": "Show AI tags row in popup"
   },
   "optShowQuickLinks": {
-    "message": "Show quick links row (Sets · Network · Unread · Notes · Popular)"
+    "message": "Show quick links row"
   },
   "optShowQuickRow": {
     "message": "Show quick action buttons (Save Tabs · Batch Save · Markdown)"

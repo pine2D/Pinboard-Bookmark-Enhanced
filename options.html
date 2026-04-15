@@ -23,8 +23,8 @@
     <div id="panel-general" class="panel active">
       <div class="section-title" data-i18n="secPinboardAccount">Pinboard Account</div>
       <div class="fg">
-        <label class="bl" data-i18n="labelApiToken">API Token</label>
-        <input type="text" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" />
+        <label class="bl" for="opt-pinboard-token" data-i18n="labelApiToken">API Token</label>
+        <input type="text" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" autocomplete="off" />
         <span id="token-format-warn" class="field-warn" data-i18n="loginInvalidFormat">Invalid format. Use username:TOKEN</span>
         <p class="hint"><span data-i18n="hintApiToken">From</span> <a href="https://pinboard.in/settings/password" target="_blank">pinboard.in/settings/password</a></p>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
@@ -61,7 +61,7 @@
       <div class="fg"><label><input type="checkbox" id="opt-show-suggest-tags" checked /> <span data-i18n="optShowSuggestTags">Show Pinboard suggested tags in popup</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-show-ai-summary" checked /> <span data-i18n="optShowAiSummary">Show AI summary button in popup</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-show-ai-tags" checked /> <span data-i18n="optShowAiTags">Show AI tags row in popup</span></label></div>
-      <div class="fg"><label><input type="checkbox" id="opt-show-quick-links" checked /> <span data-i18n="optShowQuickLinks">Show quick links row (Sets · Network · Unread · Notes · Popular)</span></label></div>
+      <div class="fg"><label><input type="checkbox" id="opt-show-quick-links" checked /> <span data-i18n="optShowQuickLinks">Show quick links row</span> (<span data-i18n="qlSets">Sets</span> · <span data-i18n="qlNetwork">Network</span> · <span data-i18n="qlUnread">Unread</span> · <span data-i18n="qlNotes">Notes</span> · <span data-i18n="qlPopular">Popular</span>)</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-show-quick-row" checked /> <span data-i18n="optShowQuickRow">Show quick action buttons (Save Tabs · Batch Save · Markdown)</span></label></div>
       <div class="divider"></div>
       <div class="section-title" data-i18n="secNotifications">Notifications</div>
@@ -74,6 +74,7 @@
       <div class="section-title" data-i18n="secSync">Data Sync</div>
       <div class="fg"><label><input type="checkbox" id="opt-sync-enabled" /> <span data-i18n="optSyncEnabled">Sync settings across devices via Google account</span></label></div>
       <p class="hint" style="margin-top:-4px;margin-bottom:8px" data-i18n="optSyncHint">When enabled, settings sync across Chrome installations signed into the same Google account.</p>
+      <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
       <div class="divider"></div>
       <div class="section-title" data-i18n="secBackupRestore">Backup &amp; Restore</div>
       <p class="hint" style="margin-bottom:8px" data-i18n="backupHint">Export/import your settings (API keys are excluded from export for security).</p>
