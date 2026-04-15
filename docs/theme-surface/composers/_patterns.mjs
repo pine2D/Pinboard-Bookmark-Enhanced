@@ -168,6 +168,13 @@ export function patternsLayer(tokens) {
       `.bookmark { transition: background 0.2s ease !important; }`,
       `.bookmark:hover { background: ${v("row-hover")} !important; }`
     );
+  } else if (hover === "left-bar") {
+    // Reading-focused themes: accent-colored left border on hover, no background change.
+    // Zero reading disruption — ideal for paper/ink and editorial aesthetics.
+    out.push(
+      `.bookmark { border-left: 3px solid transparent !important; padding-left: 5px !important; transition: border-left-color 0.15s ease !important; }`,
+      `.bookmark:hover { background: transparent !important; border-left-color: ${v("accent")} !important; }`
+    );
   }
 
   // ---- P3: row-divider ----
