@@ -53,7 +53,9 @@
   "tagsCopied": {
     "message": "Copied $COUNT$",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "lastUsedTagsLabel": {
@@ -1024,15 +1026,27 @@
   },
   "deleteThemeNamed": {
     "message": "Delete theme $NAME$",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "deleteThemeConfirm": {
     "message": "Delete theme \"$NAME$\"?",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "loadTheme": {
     "message": "Load theme $NAME$",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "replaceCSSConfirm": {
     "message": "Replace your current CSS?"
@@ -1149,6 +1163,23 @@
   },
   "jinaFailed": {
     "message": "Failed"
+  },
+  "aiContentSourceLocalHint": {
+    "message": "Extract the main content of the page locally (offline, fast)."
+  },
+  "aiContentSourceJinaHint": {
+    "message": "Fetch cleaned Markdown via Jina Reader API (requires network; API key optional for higher quota)."
+  },
+  "jinaAuthFailed": {
+    "message": "Jina API key is invalid or expired. Open Settings → Jina Reader to update it."
+  },
+  "jinaFailedDetail": {
+    "message": "Markdown fetch failed: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
   },
   "jinaViewBtn": {
     "message": "View"

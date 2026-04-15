@@ -53,7 +53,9 @@
   "tagsCopied": {
     "message": "Скопировано $COUNT$",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "lastUsedTagsLabel": {
@@ -1024,15 +1026,27 @@
   },
   "deleteThemeNamed": {
     "message": "Удалить тему $NAME$",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "deleteThemeConfirm": {
     "message": "Удалить тему «$NAME$»?",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "loadTheme": {
     "message": "Загрузить тему $NAME$",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "replaceCSSConfirm": {
     "message": "Заменить текущий CSS?"
@@ -1149,6 +1163,23 @@
   },
   "jinaFailed": {
     "message": "Failed"
+  },
+  "aiContentSourceLocalHint": {
+    "message": "Извлечение основного содержимого страницы локально (офлайн, быстро)."
+  },
+  "aiContentSourceJinaHint": {
+    "message": "Получение очищенного Markdown через API Jina Reader (требуется сеть; API-ключ опционален для большего лимита)."
+  },
+  "jinaAuthFailed": {
+    "message": "API-ключ Jina недействителен или просрочен. Откройте Настройки → Jina Reader, чтобы обновить его."
+  },
+  "jinaFailedDetail": {
+    "message": "Не удалось получить Markdown: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
   },
   "jinaViewBtn": {
     "message": "View"

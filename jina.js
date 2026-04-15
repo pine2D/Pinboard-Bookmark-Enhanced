@@ -28,7 +28,12 @@ async function fetchJinaMarkdown(url, options = {}) {
   try {
     const res = await fetchWithTimeout(`https://r.jina.ai/${url}`, { headers }, 30000);
     if (!res.ok) {
-      return { error: `Jina API returned ${res.status}`, fallback: true };
+      return {
+        error: `Jina API returned ${res.status}`,
+        status: res.status,
+        authFailed: res.status === 401 || res.status === 403,
+        fallback: true
+      };
     }
     const json = await res.json();
     const d = json.data || {};

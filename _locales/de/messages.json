@@ -53,7 +53,9 @@
   "tagsCopied": {
     "message": "$COUNT$ kopiert",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "lastUsedTagsLabel": {
@@ -1024,15 +1026,27 @@
   },
   "deleteThemeNamed": {
     "message": "Theme $NAME$ löschen",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "deleteThemeConfirm": {
     "message": "Theme „$NAME$\" löschen?",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "loadTheme": {
     "message": "Theme $NAME$ laden",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "replaceCSSConfirm": {
     "message": "Aktuelles CSS ersetzen?"
@@ -1149,6 +1163,23 @@
   },
   "jinaFailed": {
     "message": "Failed"
+  },
+  "aiContentSourceLocalHint": {
+    "message": "Hauptinhalt der Seite lokal extrahieren (offline, schnell)."
+  },
+  "aiContentSourceJinaHint": {
+    "message": "Bereinigtes Markdown über die Jina Reader API abrufen (Netzwerk erforderlich; API-Schlüssel optional für höheres Kontingent)."
+  },
+  "jinaAuthFailed": {
+    "message": "Jina API-Schlüssel ist ungültig oder abgelaufen. Öffne Einstellungen → Jina Reader, um ihn zu aktualisieren."
+  },
+  "jinaFailedDetail": {
+    "message": "Markdown-Abruf fehlgeschlagen: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
   },
   "jinaViewBtn": {
     "message": "View"

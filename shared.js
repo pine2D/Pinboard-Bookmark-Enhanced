@@ -33,8 +33,12 @@ function obfuscateKey(key) {
 }
 function deobfuscateKey(val) {
   if (!val) return "";
-  if (!val.startsWith("obf:")) return val; // backwards compatible with plaintext
-  try { return decodeURIComponent(escape(atob(val.substring(4)))); } catch (_) { return val; }
+  // Loop-strip up to 4 layers to handle legacy double-wrapped keys
+  // (pre-fix save path could re-obfuscate an already-obfuscated value).
+  for (let i = 0; i < 4 && typeof val === "string" && val.startsWith("obf:"); i++) {
+    try { val = decodeURIComponent(escape(atob(val.substring(4)))); } catch (_) { return val; }
+  }
+  return val;
 }
 
 const SETTINGS_DEFAULTS = {
@@ -215,7 +219,7 @@ async function syncGetLarge(key, defaultValue) {
   try { return JSON.parse(str); } catch (_) { return defaultValue; }
 }
 
-const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey"];
+const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey"];
 
 function deobfuscateSettings(s) {
   API_KEY_FIELDS.forEach(k => { if (s[k]) s[k] = deobfuscateKey(s[k]); });

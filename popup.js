@@ -370,6 +370,12 @@ async function htmlToMarkdown(html) {
       if (result.error) {
         jinaMdBtn.textContent = "❌ " + t("jinaFailed");
         jinaMdBtn.title = result.error;
+        // Persistent, specific status — so the user can tell API-key vs other failures
+        if (settings.aiContentSource === "jina" && result.authFailed) {
+          showStatus("status-msg", t("jinaAuthFailed"), "error");
+        } else {
+          showStatus("status-msg", t("jinaFailedDetail", result.error), "error");
+        }
         setTimeout(() => { jinaMdBtn.textContent = origText; jinaMdBtn.disabled = false; jinaMdBtn.title = ""; }, 2000);
         return;
       }

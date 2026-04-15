@@ -53,7 +53,9 @@
   "tagsCopied": {
     "message": "$COUNT$ 個コピー",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "lastUsedTagsLabel": {
@@ -1024,15 +1026,27 @@
   },
   "deleteThemeNamed": {
     "message": "テーマ $NAME$ を削除",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "deleteThemeConfirm": {
     "message": "テーマ「$NAME$」を削除しますか？",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "loadTheme": {
     "message": "テーマ $NAME$ を読み込む",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "replaceCSSConfirm": {
     "message": "現在の CSS を置き換えますか？"
@@ -1149,6 +1163,23 @@
   },
   "jinaFailed": {
     "message": "失敗"
+  },
+  "aiContentSourceLocalHint": {
+    "message": "ページの主要コンテンツをローカルで抽出します（オフライン、高速）。"
+  },
+  "aiContentSourceJinaHint": {
+    "message": "Jina Reader API で整形済み Markdown を取得します（ネットワーク必須、API キーは任意・より高いクォータに）。"
+  },
+  "jinaAuthFailed": {
+    "message": "Jina API キーが無効または期限切れです。設定 → Jina Reader で更新してください。"
+  },
+  "jinaFailedDetail": {
+    "message": "Markdown の取得に失敗しました：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
   },
   "jinaViewBtn": {
     "message": "表示"

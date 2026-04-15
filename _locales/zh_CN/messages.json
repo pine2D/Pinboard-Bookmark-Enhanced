@@ -53,7 +53,9 @@
   "tagsCopied": {
     "message": "已复制 $COUNT$ 个",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "lastUsedTagsLabel": {
@@ -1024,15 +1026,27 @@
   },
   "deleteThemeNamed": {
     "message": "删除主题 $NAME$",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "deleteThemeConfirm": {
     "message": "删除主题「$NAME$」？",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "loadTheme": {
     "message": "加载主题 $NAME$",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "replaceCSSConfirm": {
     "message": "替换当前 CSS？"
@@ -1149,6 +1163,23 @@
   },
   "jinaFailed": {
     "message": "失败"
+  },
+  "aiContentSourceLocalHint": {
+    "message": "在本地抓取页面主要内容（离线，速度快）。"
+  },
+  "aiContentSourceJinaHint": {
+    "message": "通过 Jina Reader API 获取清洗过的 Markdown（需联网；可选填 API Key 以获得更高配额）。"
+  },
+  "jinaAuthFailed": {
+    "message": "Jina API Key 无效或已过期，请到 设置 → Jina Reader 中更新。"
+  },
+  "jinaFailedDetail": {
+    "message": "Markdown 抓取失败：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
   },
   "jinaViewBtn": {
     "message": "查看"

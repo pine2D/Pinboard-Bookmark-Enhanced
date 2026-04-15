@@ -340,9 +340,11 @@
       <div class="section-title" data-i18n="secAiContentSource">AI Content Source</div>
       <div class="fg">
         <label><input type="radio" name="ai-content-source" id="opt-ai-src-local" value="local" checked /> <span data-i18n="aiContentSourceLocal">Local (Defuddle)</span></label>
+        <p class="hint" data-i18n="aiContentSourceLocalHint">Extract the main content of the page locally (offline, fast).</p>
       </div>
       <div class="fg">
         <label><input type="radio" name="ai-content-source" id="opt-ai-src-jina" value="jina" /> <span data-i18n="aiContentSourceJina">Jina Reader</span></label>
+        <p class="hint" data-i18n="aiContentSourceJinaHint">Fetch cleaned Markdown via Jina Reader API (requires network; API key optional for higher quota).</p>
       </div>
 
       <div class="divider"></div>
