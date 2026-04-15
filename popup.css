@@ -250,6 +250,7 @@ a:hover { text-decoration: underline; }
 .tag-copied-flash { color: #2a8a2a !important; }
 
 .suggest-area { line-height: 1.9; word-wrap: break-word; overflow-wrap: break-word; }
+.suggest-area.muted { padding-top: 2px; }
 .suggest-group { margin-bottom: 2px; }
 .suggest-group:last-child { margin-bottom: 0; }
 .group-label { font-size: 10px; color: #757575; font-weight: bold; margin-right: 3px; }
