@@ -74,23 +74,25 @@ const rewritten = rawHtml
 
 // CSS + JS patch that activates forced-hover mode
 const HOVER_PATCH_CSS = `
-/* QA: force hover on every a.tag so screenshots capture hover state */
+/* QA: force hover on every a.tag and .bookmark so screenshots capture hover state */
 a.tag.forced-hover { /* these rules inherit via :hover clones we inject below */ }
+.bookmark.forced-hover { /* same mechanism for bookmark row hover */ }
 `;
 const HOVER_PATCH_JS = `
 (function() {
-  // 1. Find the theme <style> block, duplicate every a.tag:hover rule into an
-  //    a.tag.forced-hover rule so we don't rely on actual cursor position.
+  // 1. Find the theme <style> block, duplicate every a.tag:hover and .bookmark:hover
+  //    rule into a .forced-hover variant so we don't rely on actual cursor position.
   const styleEl = document.getElementById('pinboard-theme-inject');
   if (styleEl) {
-    const patched = styleEl.textContent.replace(
-      /(a\\.tag[^{]*?):hover\\b/g,
-      '$1:hover, $1.forced-hover'
-    );
+    const patched = styleEl.textContent
+      .replace(/(a\\.tag[^{]*?):hover\\b/g, '$1:hover, $1.forced-hover')
+      .replace(/(\\.bookmark[^{]*?):hover\\b/g, '$1:hover, $1.forced-hover');
     styleEl.textContent = patched;
   }
-  // 2. Add the class to every .tag.
+  // 2. Add the class to every .tag and the first .bookmark (representative row).
   document.querySelectorAll('a.tag').forEach(el => el.classList.add('forced-hover'));
+  const firstBookmark = document.querySelector('#main_column .bookmark');
+  if (firstBookmark) firstBookmark.classList.add('forced-hover');
 })();
 `;
 
