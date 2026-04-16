@@ -25,7 +25,7 @@ const PINBOARD_THEMES = {
   --pinboard-input-bg: #ffffff;
   --pinboard-private-bg: #fff0c8;
   --pinboard-private-accent: #ffeaa7;
-  --pinboard-selection-bg: rgba(26,115,232,0.25);
+  --pinboard-selection-bg: #1a73e8;
   --pinboard-selection-fg: #ffffff;
   --pinboard-tag-bg: #e8f0fe;
   --pinboard-tag-fg: #1967d2;
@@ -80,11 +80,14 @@ const PINBOARD_THEMES = {
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -230,7 +233,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -604,11 +608,14 @@ h2 { color: #3c4043 !important; }
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -754,7 +761,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -1084,11 +1092,14 @@ a { color: #81a1c1 !important; }
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -1234,7 +1245,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -1601,11 +1613,14 @@ h2 { color: #33ff33 !important; }
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -1751,7 +1766,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -2135,11 +2151,14 @@ h2 { font-family: "Georgia", serif !important; }`
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -2285,7 +2304,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -2641,11 +2661,14 @@ a { color: #bd93f9 !important; }`
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -2791,7 +2814,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -3056,9 +3080,12 @@ html.pbp-dark #main_column .bookmark[style*="border-top"] {
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 html.pbp-dark .bookmark.private[style*="background"], html.pbp-dark .bookmark[style*="#fff1f1"], html.pbp-dark .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -3197,7 +3224,7 @@ html.pbp-dark a.copy_link { color: var(--pinboard-accent) !important; }
 html.pbp-dark a.delete, html.pbp-dark a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-html.pbp-dark .private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+html.pbp-dark .bookmark.private, html.pbp-dark .bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 html.pbp-dark #right_bar {
@@ -3599,11 +3626,14 @@ html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -3749,7 +3779,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -4059,11 +4090,14 @@ a.sort_order_selected { background: #eee8d5 !important; }
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -4209,7 +4243,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -4531,11 +4566,14 @@ h2 { color: #93a1a1 !important; }
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -4681,7 +4719,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -5003,11 +5042,14 @@ a.help { background: #e6e9ef !important; }
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -5153,7 +5195,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -5487,11 +5530,14 @@ h2 { color: #cba6f7 !important; }`
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -5637,7 +5683,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -5964,11 +6011,14 @@ h2 { color: #d3869b !important; }
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -6114,7 +6164,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {
@@ -6447,11 +6498,14 @@ h2 { color: #ebbcba !important; }`
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
@@ -6597,7 +6651,8 @@ a.copy_link { color: var(--pinboard-accent) !important; }
 a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: var(--pinboard-private-bg) !important; box-shadow: inset 3px 0 0 var(--pinboard-private-accent) !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {

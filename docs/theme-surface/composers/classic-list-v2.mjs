@@ -131,7 +131,8 @@ a.copy_link { color: ${v("accent")} !important; }
 a.delete, a.destroy { color: ${v("destroy")} !important; }
 
 /* ---- Private bookmarks ---- */
-.private { background: ${v("private-bg")} !important; box-shadow: inset 3px 0 0 ${v("private-accent")} !important; }
+.bookmark.private,
+.bookmark.private[style*="background"] { background: ${v("private-bg")} !important; box-shadow: inset 3px 0 0 ${v("private-accent")} !important; border-top-color: transparent !important; border-right-color: transparent !important; border-left-color: transparent !important; }
 
 /* ---- Right bar ---- */
 #right_bar {

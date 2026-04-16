@@ -28,7 +28,7 @@
     "input-bg": "#ffffff",
     "private-bg": "#fff0c8",
     "private-accent": "#ffeaa7",
-    "selection-bg": "rgba(26,115,232,0.25)",
+    "selection-bg": "#1a73e8",
     "selection-fg": "#ffffff",
     "tag-bg": "#e8f0fe",
     "tag-fg": "#1967d2",

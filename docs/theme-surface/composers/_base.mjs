@@ -82,11 +82,14 @@ const INLINE_OVERRIDES = `
   border-top: var(--pinboard-border-hairline) !important;
 }
 
-/* override.private-bg — tokenize inline pink private bg */
+/* override.private-bg — tokenize inline pink private bg + suppress pink border */
 .bookmark.private[style*="background"],
 .bookmark[style*="#fff1f1"],
 .bookmark[style*="#fff4f4"] {
   background: var(--pinboard-private-bg) !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-left-color: transparent !important;
 }
 
 /* override.sub-banner-count-color — tokenize hardcoded #aa5511 */
