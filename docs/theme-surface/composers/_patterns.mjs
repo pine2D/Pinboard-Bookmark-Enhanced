@@ -143,38 +143,11 @@ export function patternsLayer(tokens) {
   }
   // "default" or missing → composer baseline
 
-  // ---- P2: hover-effect ----
-  const hover = pat["hover-effect"];
-  if (hover === "underline") {
-    out.push(
-      `.bookmark { transition: none !important; }`,
-      `.bookmark:hover { background: transparent !important; }`,
-      `.bookmark:hover a.bookmark_title { text-decoration: underline !important; }`
-    );
-  } else if (hover === "lift") {
-    out.push(
-      `.bookmark { transition: transform 0.15s ease, box-shadow 0.15s ease !important; }`,
-      `.bookmark:hover { transform: translateY(-1px) !important; box-shadow: 0 2px 8px ${v("accent-alpha")} !important; }`
-    );
-  } else if (hover === "color-shift") {
-    out.push(
-      `.bookmark { transition: color 0.15s ease !important; }`,
-      `.bookmark:hover { background: transparent !important; color: ${v("accent")} !important; }`,
-      `.bookmark:hover a.bookmark_title { color: ${v("link-hover")} !important; }`
-    );
-  } else if (hover === "fade-bg") {
-    out.push(
-      `.bookmark { transition: background 0.2s ease !important; }`,
-      `.bookmark:hover { background: ${v("row-hover")} !important; }`
-    );
-  } else if (hover === "left-bar") {
-    // Reading-focused themes: accent-colored left border on hover, no background change.
-    // Zero reading disruption — ideal for paper/ink and editorial aesthetics.
-    out.push(
-      `.bookmark { border-left: 3px solid transparent !important; padding-left: 5px !important; transition: border-left-color 0.15s ease !important; }`,
-      `.bookmark:hover { background: transparent !important; border-left-color: ${v("accent")} !important; }`
-    );
-  }
+  // ---- P2: hover-effect (REMOVED) ----
+  // All bookmark-row hover effects removed — background/border changes distract
+  // from reading. Title hover (a.bookmark_title:hover) is handled by the
+  // composer and provides sufficient feedback. Card themes use card-shadow
+  // patterns for subtle elevation on hover instead.
 
   // ---- P3: row-divider ----
   // Emits the border treatment on .bookmark rows. Composer's base leaves row
