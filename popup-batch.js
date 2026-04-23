@@ -95,7 +95,7 @@ function setupTabSet() {
         }
       }
 
-      let saved = 0, failed = 0, skipped = 0;
+      let saved = 0, failed = 0, skipped = 0, tooLong = 0;
       let existingUrls = new Set();
       if (settings.batchSkipExisting) {
         existingUrls = await fetchExistingUrlSet(pinboardToken);
@@ -151,7 +151,18 @@ function setupTabSet() {
           }
 
           const dedupedTags = [...new Set(tags.map(tag => tag.toLowerCase()))].map(lower => tags.find(tag => tag.toLowerCase() === lower));
-          const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${pinboardToken}&format=json&url=${enc(tab.url)}&description=${enc(tab.title || tab.url)}&extended=${enc(notes)}&tags=${enc(dedupedTags.join(" "))}&replace=yes`;
+          const apiUrl = buildPostsAddUri({
+            token: pinboardToken,
+            url: tab.url,
+            title: tab.title || tab.url,
+            extended: notes,
+            tags: dedupedTags.join(" "),
+          });
+          if (apiUrl.length > POSTS_ADD_URI_BUDGET) {
+            console.warn(`[batch] skipping oversize URI (${apiUrl.length}/${POSTS_ADD_URI_BUDGET}):`, tab.url);
+            tooLong++;
+            continue;
+          }
           const data = await (await pinboardFetch(apiUrl)).json();
           if (data.result_code === "done") saved++;
           else failed++;
@@ -169,8 +180,9 @@ function setupTabSet() {
       }
       const tagStr = baseTags.join(", ");
       const skipMsg = skipped > 0 ? t("batchSkipped", String(skipped)) : "";
+      const tooLongMsg = tooLong > 0 ? t("batchTooLong", String(tooLong)) : "";
       const aiWarnMsg = aiFailed > 0 ? ` (AI failed: ${aiFailed})` : "";
-      showStatus("status-msg", t("batchDone", String(saved), String(failed)) + skipMsg + aiWarnMsg, saved > 0 ? "success" : "error");
+      showStatus("status-msg", t("batchDone", String(saved), String(failed)) + skipMsg + tooLongMsg + aiWarnMsg, saved > 0 ? "success" : "error");
       if (saved > 0) {
         const tagsSuffix = tagStr ? t("batchTaggedSuffix", tagStr) : "";
         chrome.runtime.sendMessage({ type: "show_notification", id: "batch-saved-" + Date.now(), title: t("bgBatchSaved"), message: t("batchSavedNotify", String(saved), tagsSuffix), category: "batchSave" });

@@ -73,6 +73,13 @@
   "networkError": {
     "message": "Ошибка сети"
   },
+  "uriTooLong": {
+    "message": "Запрос слишком длинный ($LEN$/$MAX$ симв.). Сократите заметки или теги.",
+    "placeholders": {
+      "len": { "content": "$1" },
+      "max": { "content": "$2" }
+    }
+  },
   "clear": {
     "message": "очистить"
   },
@@ -393,6 +400,14 @@
   },
   "batchSkipped": {
     "message": ", $COUNT$ пропущено",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "batchTooLong": {
+    "message": ", $COUNT$ слишком длинных",
     "placeholders": {
       "count": {
         "content": "$1"

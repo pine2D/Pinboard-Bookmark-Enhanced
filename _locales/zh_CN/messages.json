@@ -406,6 +406,14 @@
       }
     }
   },
+  "batchTooLong": {
+    "message": "，$COUNT$ 过长跳过",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "batchSavedCount": {
     "message": "✅ 已保存 $COUNT$ 个",
     "placeholders": {

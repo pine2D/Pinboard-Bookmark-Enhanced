@@ -406,6 +406,14 @@
       }
     }
   },
+  "batchTooLong": {
+    "message": ", $COUNT$ oversized",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "batchSavedCount": {
     "message": "✅ $COUNT$ saved",
     "placeholders": {

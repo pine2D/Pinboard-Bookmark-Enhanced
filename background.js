@@ -198,10 +198,14 @@ async function enqueueOfflineSave(params) {
 
 async function sendOfflineItem(item) {
   const token = deobfuscateKey(item.token);
-  const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${token}&format=json` +
-    `&url=${encodeURIComponent(item.url)}&description=${encodeURIComponent(item.title)}` +
-    `&extended=${encodeURIComponent(item.notes)}&tags=${encodeURIComponent(item.tags)}` +
-    (item.toread ? "&toread=yes" : "") + "&replace=yes";
+  const apiUrl = buildPostsAddUri({
+    token,
+    url: item.url,
+    title: item.title,
+    extended: item.notes,
+    tags: item.tags,
+    toread: item.toread ? "yes" : undefined,
+  });
   const resp = await pinboardFetch(apiUrl);
   const data = await resp.json();
   return data.result_code === "done";
@@ -321,10 +325,14 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
 
   // Save bookmark via pinboardFetch (rate-limited)
   const tagsStr = tags.join(" ");
-  const apiUrl = `https://api.pinboard.in/v1/posts/add?auth_token=${s.pinboardToken}&format=json` +
-    `&url=${encodeURIComponent(url)}&description=${encodeURIComponent(title)}` +
-    `&extended=${encodeURIComponent(notes)}&tags=${encodeURIComponent(tagsStr)}` +
-    (toread ? "&toread=yes" : "") + "&replace=yes";
+  const apiUrl = buildPostsAddUri({
+    token: s.pinboardToken,
+    url,
+    title,
+    extended: notes,
+    tags: tagsStr,
+    toread: toread ? "yes" : undefined,
+  });
 
   try {
     const resp = await pinboardFetch(apiUrl);

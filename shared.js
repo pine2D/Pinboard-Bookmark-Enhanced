@@ -173,6 +173,24 @@ function _executePinboardFetch(url, options, resolve, reject) {
     .then(resolve, reject);
 }
 
+// ---- Pinboard posts/add URI builder ----
+// Pinboard's CGI only reads query-string params (POST body is ignored, verified 2026-04-23),
+// so every field must fit in the URI. Server returns 414 around ~3KB. CJK chars encode to
+// 9 bytes each, so ~266 CJK chars alone can blow the budget. 2500 leaves headroom.
+const POSTS_ADD_URI_BUDGET = 2500;
+function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", shared, toread, replace = true }) {
+  const enc = encodeURIComponent;
+  let uri = `https://api.pinboard.in/v1/posts/add?auth_token=${token}&format=json`;
+  uri += `&url=${enc(url || "")}`;
+  uri += `&description=${enc(title)}`;
+  uri += `&extended=${enc(extended)}`;
+  uri += `&tags=${enc(tags)}`;
+  if (shared !== undefined) uri += `&shared=${shared}`;
+  if (toread !== undefined) uri += `&toread=${toread}`;
+  if (replace) uri += `&replace=yes`;
+  return uri;
+}
+
 // ---- Pinboard error classifier ----
 // Returns an i18n key describing a Pinboard API failure.
 // Input: HTTP Response, Error, or status number. Caller handles 401 (pinboardFetch redirects)

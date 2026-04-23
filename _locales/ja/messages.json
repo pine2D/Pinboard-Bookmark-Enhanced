@@ -73,6 +73,13 @@
   "networkError": {
     "message": "ネットワークエラー"
   },
+  "uriTooLong": {
+    "message": "リクエストが長すぎます（$LEN$/$MAX$ 文字）。メモまたはタグを短くしてください。",
+    "placeholders": {
+      "len": { "content": "$1" },
+      "max": { "content": "$2" }
+    }
+  },
   "clear": {
     "message": "クリア"
   },
@@ -393,6 +400,14 @@
   },
   "batchSkipped": {
     "message": "、$COUNT$ 件スキップ",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "batchTooLong": {
+    "message": "、$COUNT$ 件長すぎ",
     "placeholders": {
       "count": {
         "content": "$1"

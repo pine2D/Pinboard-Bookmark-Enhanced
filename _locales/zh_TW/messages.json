@@ -73,6 +73,13 @@
   "networkError": {
     "message": "網路錯誤"
   },
+  "uriTooLong": {
+    "message": "請求過長（$LEN$/$MAX$ 字元），請縮短備註或標籤",
+    "placeholders": {
+      "len": { "content": "$1" },
+      "max": { "content": "$2" }
+    }
+  },
   "clear": {
     "message": "清除"
   },
@@ -393,6 +400,14 @@
   },
   "batchSkipped": {
     "message": "，$COUNT$ 已跳過",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "batchTooLong": {
+    "message": "，$COUNT$ 過長略過",
     "placeholders": {
       "count": {
         "content": "$1"

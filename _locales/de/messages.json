@@ -73,6 +73,13 @@
   "networkError": {
     "message": "Netzwerkfehler"
   },
+  "uriTooLong": {
+    "message": "Anfrage zu lang ($LEN$/$MAX$ Zeichen). Notizen oder Tags kürzen.",
+    "placeholders": {
+      "len": { "content": "$1" },
+      "max": { "content": "$2" }
+    }
+  },
   "clear": {
     "message": "Löschen"
   },
@@ -393,6 +400,14 @@
   },
   "batchSkipped": {
     "message": ", $COUNT$ übersprungen",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "batchTooLong": {
+    "message": ", $COUNT$ zu lang",
     "placeholders": {
       "count": {
         "content": "$1"
