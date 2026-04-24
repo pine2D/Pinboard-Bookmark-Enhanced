@@ -76,8 +76,12 @@
   "uriTooLong": {
     "message": "リクエストが長すぎます（$LEN$/$MAX$ 文字）。メモまたはタグを短くしてください。",
     "placeholders": {
-      "len": { "content": "$1" },
-      "max": { "content": "$2" }
+      "len": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
     }
   },
   "clear": {
@@ -1237,5 +1241,11 @@
   },
   "jinaKeyHint": {
     "message": "無料: 20リクエスト/分。キーを追加でクォータ増加。"
+  },
+  "submitUriTooLong": {
+    "message": "リクエストが大きすぎます — ノート・タイトル・タグを短くしてください"
+  },
+  "saveAsThemeDisabledHint": {
+    "message": "カスタム CSS を編集してからテーマとして保存できます"
   }
 }

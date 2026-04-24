@@ -201,7 +201,7 @@
       <!-- Gemini -->
       <div class="pf" id="fields-gemini">
         <h3 data-i18n="provGemini">Google Gemini</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-gemini-key" placeholder="AIza..." /><button type="button" class="key-toggle" data-target="opt-gemini-key" title="Show/hide key" data-i18n-title="showHideKey">👁</button><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" data-i18n="getKey">Get key</a></p></div>
+        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-gemini-key" placeholder="AIzaSy..." /><button type="button" class="key-toggle" data-target="opt-gemini-key" title="Show/hide key" data-i18n-title="showHideKey">👁</button><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" data-i18n="getKey">Get key</a></p></div>
         <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-gemini-model" value="gemini-2.5-flash-lite" /></div>
         <button class="btn btn-sm" id="test-gemini" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-gemini-status"></span>
@@ -484,7 +484,7 @@
         <textarea id="opt-custom-css" rows="12" placeholder="/* Custom CSS for pinboard.in */&#10;body { line-height: 1.6; }&#10;.bookmark_title { font-size: 14px; }" data-i18n-placeholder="customCSSPlaceholder"></textarea>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
           <span class="save-theme-wrap">
-            <button class="btn btn-sm" id="save-custom-theme" data-i18n="saveAsTheme" disabled>Save as theme</button>
+            <button class="btn btn-sm" id="save-custom-theme" data-i18n="saveAsTheme" data-i18n-title="saveAsThemeDisabledHint" title="Modify Custom CSS first to save as theme" disabled>Save as theme</button>
           </span>
           <p class="hint" style="margin:0" data-i18n="saveAsThemeHint">Save current CSS as a reusable theme.</p>
         </div>

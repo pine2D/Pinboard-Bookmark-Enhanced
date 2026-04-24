@@ -76,8 +76,12 @@
   "uriTooLong": {
     "message": "Anfrage zu lang ($LEN$/$MAX$ Zeichen). Notizen oder Tags kürzen.",
     "placeholders": {
-      "len": { "content": "$1" },
-      "max": { "content": "$2" }
+      "len": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
     }
   },
   "clear": {
@@ -1237,5 +1241,11 @@
   },
   "jinaKeyHint": {
     "message": "Free tier: 20 RPM. Add key for higher quota."
+  },
+  "submitUriTooLong": {
+    "message": "Anfrage zu groß — Notizen, Titel oder Tags kürzen"
+  },
+  "saveAsThemeDisabledHint": {
+    "message": "Zuerst Custom CSS ändern, um als Theme zu speichern"
   }
 }

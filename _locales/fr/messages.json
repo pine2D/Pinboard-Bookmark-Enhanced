@@ -76,8 +76,12 @@
   "uriTooLong": {
     "message": "Requête trop longue ($LEN$/$MAX$ car.). Raccourcissez notes ou tags.",
     "placeholders": {
-      "len": { "content": "$1" },
-      "max": { "content": "$2" }
+      "len": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
     }
   },
   "clear": {
@@ -1237,5 +1241,11 @@
   },
   "jinaKeyHint": {
     "message": "Free tier: 20 RPM. Add key for higher quota."
+  },
+  "submitUriTooLong": {
+    "message": "Requête trop longue — raccourcissez les notes, le titre ou les tags"
+  },
+  "saveAsThemeDisabledHint": {
+    "message": "Modifiez d'abord le CSS personnalisé pour sauvegarder comme thème"
   }
 }

@@ -76,8 +76,12 @@
   "uriTooLong": {
     "message": "Żądanie zbyt długie ($LEN$/$MAX$ zn.). Skróć notatki lub tagi.",
     "placeholders": {
-      "len": { "content": "$1" },
-      "max": { "content": "$2" }
+      "len": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
     }
   },
   "clear": {
@@ -1237,5 +1241,11 @@
   },
   "jinaKeyHint": {
     "message": "Free tier: 20 RPM. Add key for higher quota."
+  },
+  "submitUriTooLong": {
+    "message": "Żądanie zbyt duże — skróć notatki, tytuł lub tagi"
+  },
+  "saveAsThemeDisabledHint": {
+    "message": "Najpierw zmodyfikuj Custom CSS, aby zapisać jako motyw"
   }
 }

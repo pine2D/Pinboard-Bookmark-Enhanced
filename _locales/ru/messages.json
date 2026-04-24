@@ -76,8 +76,12 @@
   "uriTooLong": {
     "message": "Запрос слишком длинный ($LEN$/$MAX$ симв.). Сократите заметки или теги.",
     "placeholders": {
-      "len": { "content": "$1" },
-      "max": { "content": "$2" }
+      "len": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
     }
   },
   "clear": {
@@ -1237,5 +1241,11 @@
   },
   "jinaKeyHint": {
     "message": "Free tier: 20 RPM. Add key for higher quota."
+  },
+  "submitUriTooLong": {
+    "message": "Запрос слишком большой — сократите заметки, заголовок или теги"
+  },
+  "saveAsThemeDisabledHint": {
+    "message": "Сначала измените Custom CSS, чтобы сохранить как тему"
   }
 }

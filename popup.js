@@ -90,6 +90,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 function showLogin() {
   $id("login-section").classList.remove("hidden");
   $id("main-section").classList.add("hidden");
+  const qa = document.querySelector(".quick-actions");
+  if (qa) qa.classList.add("hidden");
 }
 // Login listener — bound once outside showLogin() to avoid duplicate listeners
 $id("login-btn").addEventListener("click", async () => {
@@ -111,6 +113,8 @@ $id("login-btn").addEventListener("click", async () => {
 async function showMain(token) {
   $id("login-section").classList.add("hidden");
   $id("main-section").classList.remove("hidden");
+  const qa = document.querySelector(".quick-actions");
+  if (qa) qa.classList.remove("hidden");
   const username = token.split(":")[0];
   const userInfo = $id("user-info");
   userInfo.innerHTML = "";
@@ -824,10 +828,18 @@ function updateCharCount() {
     toread: $id("readlater-check").checked ? "yes" : "no",
   }).length;
   const el = $id("desc-char-count");
-  el.textContent = `${len} · URI ${uriLen}/${POSTS_ADD_URI_BUDGET}`;
+  el.textContent = `${len} chars · ${uriLen}/${POSTS_ADD_URI_BUDGET} B`;
   const over = uriLen > POSTS_ADD_URI_BUDGET || len > 65000;
   const near = uriLen > POSTS_ADD_URI_BUDGET * 0.8 || len > 60000;
   el.style.color = over ? "#c00" : near ? "#e80" : "";
+  el.classList.toggle("over-limit", over);
+
+  // Gate submit on over-limit (without overriding unsupported-url disable path)
+  const url = $id("url-input").value.trim();
+  const urlBad = !url || (!url.startsWith("http://") && !url.startsWith("https://"));
+  const sub = $id("submit-btn");
+  sub.disabled = urlBad || over;
+  sub.title = over ? t("submitUriTooLong") : urlBad ? t("urlCannotSave") : "";
 }
 function showElement(id, text) { const el = $id(id); el.textContent = text; el.classList.remove("hidden"); }
 function showStatus(id, text, type) { const el = $id(id); el.textContent = text; el.className = `status-msg ${type}`; el.classList.remove("hidden"); }

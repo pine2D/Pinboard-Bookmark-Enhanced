@@ -76,8 +76,12 @@
   "uriTooLong": {
     "message": "请求过长（$LEN$/$MAX$ 字符），请缩短备注或标签",
     "placeholders": {
-      "len": { "content": "$1" },
-      "max": { "content": "$2" }
+      "len": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
     }
   },
   "clear": {
@@ -1237,5 +1241,11 @@
   },
   "jinaKeyHint": {
     "message": "免费：20次/分钟。添加 Key 获得更高配额。"
+  },
+  "submitUriTooLong": {
+    "message": "请求过长 — 请精简笔记、标题或标签"
+  },
+  "saveAsThemeDisabledHint": {
+    "message": "请先修改 Custom CSS 才能保存为主题"
   }
 }
