@@ -2,3 +2,10 @@
 .playwright-mcp/
 release/
 .qa-scan/
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/skills/
+
+# Internal planning/design drafts (superpowers skill output)
+docs/superpowers/
