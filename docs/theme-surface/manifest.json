@@ -43,8 +43,8 @@
       "scope": "body:not(#pinboard)"
     },
     "shell.text_inherit": {
-      "sel": "body#pinboard table, body#pinboard td, body#pinboard th, body#pinboard p, body#pinboard b, body#pinboard strong, body#pinboard label, body#pinboard span, body#pinboard li, body#pinboard dd, body#pinboard dt",
-      "role": "force color:inherit across typed elements — defeats Pinboard's per-element color attributes",
+      "sel": "body#pinboard table, body#pinboard td, body#pinboard th, body#pinboard p, body#pinboard b, body#pinboard strong, body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li), body#pinboard dd, body#pinboard dt",
+      "role": "force color:inherit across typed elements — defeats Pinboard's per-element color attributes; excludes .pin-ac li so tag-completion popup keeps its own contrast",
       "states": ["default"],
       "tokens": [],
       "scope": "body#pinboard"
@@ -352,6 +352,13 @@
       "role": "AI/heuristic tag suggestions on /add/",
       "states": ["default", "hover"],
       "tokens": ["palette.success"],
+      "scope": "bare"
+    },
+    "form.tag_completion": {
+      "sel": ".pin-ac, .pin-ac .bd, .pin-ac li, .pin-ac .active, .pin-ac li:hover",
+      "role": "Pin.Tags autocomplete popup on /add/, edit-bookmark, note-add — empirically captured at https://pinboard.in/stylesheets/autocomplete.css; default styling collides with shell.text_inherit (li color:inherit) and breaks contrast on every theme",
+      "states": ["default", "active", "hover"],
+      "tokens": ["palette.bg-surface", "palette.border", "palette.fg", "palette.accent", "palette.accent-alpha", "palette.selection-bg", "palette.selection-fg", "radius.sm"],
       "scope": "bare"
     },
     "form.help_badge": {

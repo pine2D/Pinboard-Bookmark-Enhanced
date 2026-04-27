@@ -147,7 +147,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -319,6 +319,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -675,7 +693,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -847,6 +865,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -1159,7 +1195,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -1331,6 +1367,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -1680,7 +1734,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -1852,6 +1906,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -2218,7 +2290,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -2390,6 +2462,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -2728,7 +2818,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -2900,6 +2990,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -3141,7 +3249,7 @@ html.pbp-dark body#pinboard {
   font-size: 13px !important;
   line-height: var(--pinboard-line-height) !important;
 }
-html.pbp-dark body#pinboard table, html.pbp-dark body#pinboard td, html.pbp-dark body#pinboard th, html.pbp-dark body#pinboard p, html.pbp-dark body#pinboard b, html.pbp-dark body#pinboard strong, html.pbp-dark body#pinboard label, html.pbp-dark body#pinboard span, html.pbp-dark body#pinboard li, html.pbp-dark body#pinboard dd, html.pbp-dark body#pinboard dt { color: inherit !important; }
+html.pbp-dark body#pinboard table, html.pbp-dark body#pinboard td, html.pbp-dark body#pinboard th, html.pbp-dark body#pinboard p, html.pbp-dark body#pinboard b, html.pbp-dark body#pinboard strong, html.pbp-dark body#pinboard label, html.pbp-dark body#pinboard span, html.pbp-dark body#pinboard li:not(.pin-ac li), html.pbp-dark body#pinboard dd, html.pbp-dark body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
 html.pbp-dark body:not(#pinboard) {
@@ -3309,6 +3417,24 @@ html.pbp-dark input[type="submit"]:hover, html.pbp-dark input[type="button"]:hov
 html.pbp-dark input[type="checkbox"], html.pbp-dark input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 html.pbp-dark .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 html.pbp-dark #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+html.pbp-dark .pin-ac { z-index: 1000 !important; }
+html.pbp-dark .pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+html.pbp-dark .pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+html.pbp-dark .pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+html.pbp-dark .pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 html.pbp-dark #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -3693,7 +3819,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -3865,6 +3991,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -4157,7 +4301,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -4329,6 +4473,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -4633,7 +4795,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -4805,6 +4967,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -5109,7 +5289,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -5281,6 +5461,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -5597,7 +5795,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -5769,6 +5967,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -6078,7 +6294,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -6250,6 +6466,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
@@ -6565,7 +6799,7 @@ body#pinboard {
 }
 body#pinboard table, body#pinboard td, body#pinboard th,
 body#pinboard p, body#pinboard b, body#pinboard strong,
-body#pinboard label, body#pinboard span, body#pinboard li,
+body#pinboard label, body#pinboard span, body#pinboard li:not(.pin-ac li),
 body#pinboard dd, body#pinboard dt { color: inherit !important; }
 
 /* ---- Popup / iframe frame (body:not(#pinboard)) ---- */
@@ -6737,6 +6971,24 @@ input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinbo
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; }
+
+/* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
+.pin-ac { z-index: 1000 !important; }
+.pin-ac .bd {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  box-shadow: 0 2px 8px var(--pinboard-accent-alpha) !important;
+}
+.pin-ac li {
+  background: transparent !important;
+  color: var(--pinboard-fg) !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
+.pin-ac li:hover { background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important; cursor: pointer !important; }
+.pin-ac .active { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* ---- Settings page ---- */
 #settings_panel { background: var(--pinboard-bg-surface) !important; }
