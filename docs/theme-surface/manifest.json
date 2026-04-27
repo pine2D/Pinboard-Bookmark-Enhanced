@@ -329,16 +329,16 @@
     },
     "form.submit": {
       "sel": "input[type=\"submit\"], input[type=\"button\"]",
-      "role": "primary submit button",
+      "role": "primary submit button — shares structure tokens (radius.sm + padding 4px 12px + 0.15s transition) with form.cancel; differs only on fill (accent vs bg-surface) so primary/secondary read as a paired set in the edit-bookmark footer",
       "states": ["default", "hover", "focus-visible", "disabled"],
-      "tokens": ["palette.accent", "palette.btn-fg", "palette.link-hover"],
+      "tokens": ["palette.accent", "palette.btn-fg", "palette.link-hover", "radius.sm"],
       "scope": "bare"
     },
     "form.cancel": {
       "sel": "input[type=\"reset\"], input[type=\"reset\"].reset, button[type=\"reset\"]",
-      "role": "secondary cancel/reset button (Pinboard ships <input type=reset class=reset style=\"background:#eee\"> on edit-bookmark form); needs !important on background to defeat the inline #eee, uses bg-surface + border to read as a secondary action against the primary form.submit",
+      "role": "secondary cancel/reset button (Pinboard ships <input type=reset class=reset style=\"background:#eee\"> on edit-bookmark form). Mirrors form.submit's structure tokens (radius.sm + padding 4px 12px + 0.15s transition) so save/cancel form a paired primary+secondary set. Hover: bg → row-hover, border+text → accent (lift toward primary).",
       "states": ["default", "hover", "focus-visible"],
-      "tokens": ["palette.bg-surface", "palette.fg", "palette.border", "palette.row-hover"],
+      "tokens": ["palette.bg-surface", "palette.fg", "palette.border", "palette.row-hover", "palette.accent", "radius.sm"],
       "scope": "bare"
     },
     "form.checkbox": {

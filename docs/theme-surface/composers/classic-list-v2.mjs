@@ -212,15 +212,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: ${v("accent")} !important; color: ${v("btn-fg")} !important;
   border: ${v("border-width")} ${v("border-style")} ${v("accent")} !important;
+  border-radius: ${v("radius-sm")} !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: ${v("link-hover")} !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: ${v("link-hover")} !important; border-color: ${v("link-hover")} !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: ${v("bg-surface")} !important; color: ${v("fg")} !important;
   border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
   border-radius: ${v("radius-sm")} !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: ${v("row-hover")} !important; border-color: ${v("accent")} !important; color: ${v("accent")} !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: ${v("accent")} !important; }

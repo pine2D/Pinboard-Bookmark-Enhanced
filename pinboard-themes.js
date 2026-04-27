@@ -314,15 +314,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -869,15 +873,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -1380,15 +1388,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -1928,15 +1940,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -2493,15 +2509,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -3030,15 +3050,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -3466,15 +3490,19 @@ html.pbp-dark input[type="text"]:focus, html.pbp-dark input:not([type]):focus, h
 html.pbp-dark input[type="submit"], html.pbp-dark input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-html.pbp-dark input[type="submit"]:hover, html.pbp-dark input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+html.pbp-dark input[type="submit"]:hover, html.pbp-dark input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 html.pbp-dark input[type="reset"], html.pbp-dark input[type="reset"].reset, html.pbp-dark button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 html.pbp-dark input[type="reset"]:hover, html.pbp-dark input[type="reset"].reset:hover, html.pbp-dark button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 html.pbp-dark input[type="checkbox"], html.pbp-dark input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -4049,15 +4077,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -4540,15 +4572,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -5043,15 +5079,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -5546,15 +5586,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -6061,15 +6105,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -6569,15 +6617,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
@@ -7083,15 +7135,19 @@ input[type="text"]:focus, input:not([type]):focus, textarea:focus, select:focus 
 input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
-input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; }
+input[type="submit"]:hover, input[type="button"]:hover { background: var(--pinboard-link-hover) !important; border-color: var(--pinboard-link-hover) !important; }
 input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  cursor: pointer !important;
   padding: 4px 12px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
