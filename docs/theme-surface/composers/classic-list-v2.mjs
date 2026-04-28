@@ -338,9 +338,9 @@ a.help { color: ${v("muted-soft")} !important; background: ${v("accent-soft")} !
 .homepage_subheading { color: ${v("muted")} !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: ${v("accent")} !important;
+  background: ${v("btn-bg")} !important;
   color: ${v("btn-fg")} !important;
-  border: ${v("border-width")} ${v("border-style")} ${v("accent")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("btn-bg")} !important;
   border-radius: ${v("radius-sm")} !important;
   padding: 10px 16px !important;
   text-align: center !important;

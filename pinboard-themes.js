@@ -440,9 +440,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -1052,9 +1052,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -1620,9 +1620,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -2225,9 +2225,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -2847,9 +2847,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -3441,9 +3441,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -3932,9 +3932,9 @@ html.pbp-dark #main_welcome, html.pbp-dark .homepage_quad { color: var(--pinboar
 html.pbp-dark .homepage_heading { color: var(--pinboard-fg-strong) !important; font-weight: var(--pinboard-weight-heading) !important; }
 html.pbp-dark .homepage_subheading { color: var(--pinboard-muted) !important; }
 html.pbp-dark .signup_button, html.pbp-dark .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -4572,9 +4572,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -5120,9 +5120,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -5680,9 +5680,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -6240,9 +6240,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -6812,9 +6812,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -7377,9 +7377,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
@@ -7948,9 +7948,9 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .homepage_subheading { color: var(--pinboard-muted) !important; }
 .signup_button,
 .signup_button[style*="background"] {
-  background: var(--pinboard-accent) !important;
+  background: var(--pinboard-btn-bg) !important;
   color: var(--pinboard-btn-fg) !important;
-  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
   border-radius: var(--pinboard-radius-sm) !important;
   padding: 10px 16px !important;
   text-align: center !important;
