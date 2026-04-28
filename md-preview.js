@@ -187,15 +187,18 @@ function renderMarkdown(md) {
     }
 
     // Inline formatting (applied to all blocks)
+    // Allow only safe schemes — defeats javascript:/data:/vbscript: injection
+    // from AI-generated markdown that lands in the preview tab.
+    const safeUrl = (u) => /^(https?:|mailto:|#|\/|\.\/|\.\.\/)/i.test(u) ? u : "#";
     // Images — note: src URLs were escaped, unescape for valid URLs
     block = block.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
-      src = src.replace(/&amp;/g, "&");
+      src = safeUrl(src.replace(/&amp;/g, "&"));
       return `<img src="${src}" alt="${alt}" />`;
     });
     // Links
     block = block.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => {
-      href = href.replace(/&amp;/g, "&");
-      return `<a href="${href}" target="_blank">${text}</a>`;
+      href = safeUrl(href.replace(/&amp;/g, "&"));
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
     });
     // Bold + italic
     block = block.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");

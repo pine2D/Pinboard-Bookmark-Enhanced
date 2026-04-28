@@ -490,7 +490,7 @@ async function checkExistingBookmark(token, url) {
         banner.classList.remove("hidden");
       }
     }
-  } catch (e) { console.error(e); }
+  } catch (e) { console.error("user info banner error:", e); }
 }
 
 // ===================== Submit / Delete =====================

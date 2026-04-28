@@ -151,7 +151,7 @@ async function fetchAllUserTags(token) {
     applyTagData(data);
     await chrome.storage.local.set({ [cacheKey]: { tags: allUserTags, counts: allUserTagCounts, timestamp: Date.now() } });
   } catch (e) {
-    console.error(e);
+    console.error("user-tag sync failed:", e);
     showTagSyncError(classifyPinboardError(e));
   }
 }
