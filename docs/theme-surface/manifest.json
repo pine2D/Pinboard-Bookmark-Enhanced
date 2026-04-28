@@ -368,6 +368,69 @@
       "tokens": ["palette.success"],
       "scope": "bare"
     },
+    "landing.welcome": {
+      "sel": "#main_welcome, .homepage_quad",
+      "role": "Logged-out landing page (https://pinboard.in/) main 4-quad welcome grid; uses bg-surface to lift quads above the page background",
+      "states": ["default"],
+      "tokens": ["palette.bg-surface", "palette.fg"],
+      "scope": "bare"
+    },
+    "landing.heading": {
+      "sel": ".homepage_heading, .homepage_subheading",
+      "role": "Welcome H1 + subheading on landing page",
+      "states": ["default"],
+      "tokens": ["palette.fg-strong", "palette.muted", "palette.weight-heading"],
+      "scope": "bare"
+    },
+    "landing.signup_button": {
+      "sel": ".signup_button",
+      "role": "Login + Sign-up CTA buttons on landing — Pinboard ships them as <div class=signup_button> with inline style=\"background:#ddeeff\" (the login variant). Composer overrides with theme accent + radius + centered padding + transition, defeating the inline pale-blue with !important.",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent", "palette.btn-fg", "palette.link-hover", "radius.sm"],
+      "scope": "bare"
+    },
+    "landing.blurb_root": {
+      "sel": "#blurb_div, .blurb_column",
+      "role": "Press-quote section root + columns",
+      "states": ["default"],
+      "tokens": ["palette.fg"],
+      "scope": "bare"
+    },
+    "landing.blurb_box": {
+      "sel": "#blurb_div a, .blurb_box",
+      "role": "Press-quote card. Default browser color/hover styling looks alien against custom themes — composer paints with bg-surface + border + radius + accent-alpha hover, removes underline on the wrapping <a>.",
+      "states": ["default", "hover"],
+      "tokens": ["palette.bg-surface", "palette.border", "palette.fg", "palette.row-hover", "palette.accent-alpha", "radius.md"],
+      "scope": "bare"
+    },
+    "landing.magazine_title": {
+      "sel": ".magazine_title",
+      "role": "Press-quote source name (Time / Wired / Guardian / etc.) — accent color, smaller weight",
+      "states": ["default"],
+      "tokens": ["palette.accent", "palette.weight-heading"],
+      "scope": "bare"
+    },
+    "landing.blurb_text": {
+      "sel": ".blurb",
+      "role": "Press-quote italic body text",
+      "states": ["default"],
+      "tokens": ["palette.fg", "palette.muted"],
+      "scope": "bare"
+    },
+    "landing.language_box": {
+      "sel": "#language_box, #language_box p, #language_box a",
+      "role": "Logged-out landing language switcher (top-left). Active language is marked with inline style=\"background:#ffa\" — composer's inline_base_rules.per-page-active selector now covers this too via tokenized accent-alpha override.",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted", "palette.accent", "palette.accent-alpha", "radius.sm"],
+      "scope": "bare"
+    },
+    "landing.top_menu_nli": {
+      "sel": ".nli, .nav_nli",
+      "role": "Logged-out top_menu links (recent / popular / tour / howto / log in)",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent", "palette.link-hover"],
+      "scope": "bare"
+    },
     "form.tag_completion": {
       "sel": ".pin-ac, .pin-ac .bd, .pin-ac li, .pin-ac .active, .pin-ac li:hover",
       "role": "Pin.Tags autocomplete popup on /add/, edit-bookmark, note-add — empirically captured at https://pinboard.in/stylesheets/autocomplete.css; default styling collides with shell.text_inherit (li color:inherit) and breaks contrast on every theme",

@@ -332,6 +332,48 @@ a.help { color: ${v("muted-soft")} !important; background: ${v("accent-soft")} !
 .next_prev:hover, .next_prev_widget a:hover { color: ${v("link-hover")} !important; }
 #nextprev a.edit { color: ${v("muted-soft")} !important; }
 
+/* ---- Logged-out landing page (https://pinboard.in/) ---- */
+#main_welcome, .homepage_quad { color: ${v("fg")} !important; }
+.homepage_heading { color: ${v("fg-strong")} !important; font-weight: ${v("weight-heading")} !important; }
+.homepage_subheading { color: ${v("muted")} !important; }
+.signup_button,
+.signup_button[style*="background"] {
+  background: ${v("accent")} !important;
+  color: ${v("btn-fg")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("accent")} !important;
+  border-radius: ${v("radius-sm")} !important;
+  padding: 10px 16px !important;
+  text-align: center !important;
+  font-weight: ${v("weight-heading")} !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+}
+.signup_button:hover { background: ${v("link-hover")} !important; border-color: ${v("link-hover")} !important; }
+#blurb_div { color: ${v("fg")} !important; }
+.blurb_column { color: ${v("fg")} !important; }
+#blurb_div a { text-decoration: none !important; color: ${v("fg")} !important; display: block !important; }
+.blurb_box {
+  background: ${v("bg-surface")} !important;
+  color: ${v("fg")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
+  border-radius: ${v("radius-md")} !important;
+  padding: 12px 14px !important;
+  margin-bottom: 10px !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+}
+#blurb_div a:hover .blurb_box { background: ${v("row-hover")} !important; border-color: ${v("accent-alpha")} !important; }
+.magazine_title { color: ${v("accent")} !important; font-weight: ${v("weight-heading")} !important; }
+.blurb { color: ${v("fg")} !important; opacity: 0.85 !important; }
+#language_box { color: ${v("muted")} !important; }
+#language_box p { margin: 2px 0 !important; }
+#language_box a { color: ${v("muted")} !important; padding: 1px 6px !important; border-radius: ${v("radius-sm")} !important; text-decoration: none !important; }
+#language_box a:hover { color: ${v("accent")} !important; background: ${v("accent-alpha")} !important; }
+#language_box a[style*="background:#ffa"],
+#language_box a[style*="background: #ffa"] { background: ${v("accent-alpha")} !important; color: ${v("accent")} !important; }
+.nli { color: ${v("muted")} !important; }
+.nav_nli { color: ${v("accent")} !important; text-decoration: none !important; }
+.nav_nli:hover { color: ${v("link-hover")} !important; }
+
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: ${v("muted-soft")} !important; }
 
