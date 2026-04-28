@@ -29,7 +29,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 
 ## Privacy
 
-No tracking, no analytics, no telemetry. All data lives on your device via `chrome.storage`. AI requests fire **only** when you click "AI tags" or "AI summary" and go directly to the provider you configured. Full policy: <https://pine2D.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+No tracking, no analytics, no telemetry. All data lives on your device via `chrome.storage`. AI requests fire **only** when you click "AI tags" or "AI summary" and go directly to the provider you configured. Full policy: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## License
 
