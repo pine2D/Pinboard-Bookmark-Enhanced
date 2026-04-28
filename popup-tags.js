@@ -192,6 +192,7 @@ function setupTagsInput() {
       dropdown.innerHTML = "";
       const hint = document.createElement("div");
       hint.className = "ac-item ac-new-hint";
+      hint.dataset.tag = input.value.trim();
       const icon = document.createElement("span"); icon.className = "ac-new-icon"; icon.textContent = "+ ";
       hint.appendChild(icon); hint.appendChild(document.createTextNode(input.value.trim()));
       hint.addEventListener("click", () => { addTag(input.value.trim()); input.value = ""; dropdown.classList.add("hidden"); input.focus(); });
@@ -326,6 +327,7 @@ function updateAc(items) { items.forEach((el, i) => el.classList.toggle("selecte
 let _newlyAddedTag = null;
 
 function addTag(tag) {
+  if (typeof tag !== "string" || !tag) return;
   tag = tag.trim().replace(/\s+/g, settings.aiTagSeparator || "-");
   if (!tag) return;
   if (settings.optRespectTagCase && tagCaseMap) {
