@@ -346,7 +346,14 @@ a.help { color: ${v("muted-soft")} !important; background: ${v("accent-soft")} !
   text-align: center !important;
   font-weight: ${v("weight-heading")} !important;
   cursor: pointer !important;
-  transition: background 0.15s ease, border-color 0.15s ease !important;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
+  /* defeat Pinboard landing.css legacy chrome: drop-shadow that reads as "sunken" on dark themes,
+   * fixed 230×20 box that prevents vertical centering, asymmetric 5px/2px padding */
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
 }
 .signup_button:hover { background: ${v("btn-bg-hover")} !important; border-color: ${v("btn-bg-hover")} !important; }
 #blurb_div { color: ${v("fg")} !important; }
@@ -360,8 +367,11 @@ a.help { color: ${v("muted-soft")} !important; background: ${v("accent-soft")} !
   padding: 12px 14px !important;
   margin-bottom: 10px !important;
   transition: background 0.15s ease, border-color 0.15s ease !important;
+  /* defeat Pinboard landing.css fixed height:180px so taller quotes don't clip */
+  height: auto !important;
+  min-height: 180px !important;
 }
-#blurb_div a:hover .blurb_box { background: ${v("row-hover")} !important; border-color: ${v("accent-alpha")} !important; }
+.blurb_box:hover, #blurb_div a:hover .blurb_box { background: ${v("row-hover")} !important; border-color: ${v("accent-alpha")} !important; }
 .magazine_title { color: ${v("accent")} !important; font-weight: ${v("weight-heading")} !important; }
 .blurb { color: ${v("fg")} !important; opacity: 0.85 !important; }
 #language_box { color: ${v("muted")} !important; }
