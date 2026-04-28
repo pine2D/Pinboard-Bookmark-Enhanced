@@ -10,14 +10,14 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 
 ## Features
 
-- **One-click save** — title, URL, description, tags pre-filled from the current tab
-- **AI tags & summaries** — 13 providers (OpenAI, Anthropic, Gemini, DeepSeek, Groq, Mistral, Cohere, Qwen, MiniMax, OpenRouter, Ollama, custom)
-- **13 themes for `pinboard.in`** — Modern Card · Dracula · Nord · Terminal · Paper-Ink · Solarized · Catppuccin · Gruvbox · Rose Pine · GitHub Light · Flexoki Adaptive
+- **Smart pre-fill** — title, URL, page meta description, selected text and referrer are auto-inserted into the bookmark form
+- **AI tags & summaries** — bring your own API key for OpenAI, Anthropic, Gemini, DeepSeek, Groq, Mistral, Cohere, Qwen, MiniMax, OpenRouter, Ollama, or any custom OpenAI-compatible endpoint
+- **Themes for `pinboard.in`** — multiple curated palettes (Modern Card · Dracula · Nord · Terminal · Paper-Ink · Solarized · Catppuccin · Gruvbox · Rose Pine · GitHub Light · Flexoki Adaptive · …) plus your own custom CSS
 - **Tag autocomplete** — recall your existing Pinboard tag cloud while typing
 - **Batch save** — capture all open tabs in one go
 - **Offline queue** — saves drafts when offline, syncs when reconnected
 - **9 languages** — en · de · fr · ja · pl · ru · zh-CN · zh-HK · zh-TW
-- **Keyboard shortcuts** — `Alt+B` open · `Alt+Shift+B` quick save · `Alt+Shift+R` read later
+- **Keyboard shortcut** — `Alt+B` opens the popup. Two more (`quick_save`, `read_later`) are declared but unbound by default — assign them at `chrome://extensions/shortcuts`
 
 ## Install
 
