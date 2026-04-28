@@ -335,6 +335,17 @@ a.help { color: ${v("muted-soft")} !important; background: ${v("accent-soft")} !
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: ${v("muted-soft")} !important; }
 
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: ${v("muted")} ${v("bg-surface")} !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: ${v("bg-surface")} !important; border-left: 1px solid ${v("border")} !important; }
+::-webkit-scrollbar-thumb { background: ${v("muted-soft")} !important; border: 2px solid ${v("bg-surface")} !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: ${v("accent")} !important; }
+::-webkit-scrollbar-corner { background: ${v("bg-surface")} !important; }
+
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: ${v("accent")} !important; }
 a:hover { color: ${v("link-hover")} !important; }

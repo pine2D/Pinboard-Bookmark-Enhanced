@@ -49,6 +49,13 @@
       "tokens": [],
       "scope": "body#pinboard"
     },
+    "shell.scrollbar": {
+      "sel": "html, body, textarea, .description, .pin-ac .bd, ::-webkit-scrollbar, ::-webkit-scrollbar-track, ::-webkit-scrollbar-thumb, ::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-corner",
+      "role": "Custom scrollbar styling — fixes default light scrollbars showing through dark themes (notably visible on edit-form description textarea). Webkit pseudo-elements style Chrome/Edge; standard scrollbar-color + scrollbar-width covers Firefox. Themed via palette.bg-surface (track) + palette.muted (thumb) + palette.accent (thumb-hover).",
+      "states": ["default", "hover"],
+      "tokens": ["palette.bg-surface", "palette.muted", "palette.muted-soft", "palette.accent", "palette.border"],
+      "scope": "bare"
+    },
 
     "banner.root": {
       "sel": "#banner",

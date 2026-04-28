@@ -437,6 +437,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
+
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
 a:hover { color: var(--pinboard-link-hover) !important; }
@@ -996,6 +1007,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
+
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
 a:hover { color: var(--pinboard-link-hover) !important; }
@@ -1510,6 +1532,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
 
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
@@ -2062,6 +2095,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
 
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
@@ -2632,6 +2676,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
+
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
 a:hover { color: var(--pinboard-link-hover) !important; }
@@ -3173,6 +3228,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
+
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
 a:hover { color: var(--pinboard-link-hover) !important; }
@@ -3611,6 +3677,17 @@ html.pbp-dark #nextprev a.edit { color: var(--pinboard-muted-soft) !important; }
 
 /* ---- Footer / colophon ---- */
 html.pbp-dark #footer, html.pbp-dark .colophon, html.pbp-dark .colophon a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html.pbp-dark html, html.pbp-dark body, html.pbp-dark textarea, html.pbp-dark .description, html.pbp-dark .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+html.pbp-dark ::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+html.pbp-dark ::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+html.pbp-dark ::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+html.pbp-dark ::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+html.pbp-dark ::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
 
 /* ---- Global anchor fallbacks ---- */
 html.pbp-dark a, html.pbp-dark a:link { color: var(--pinboard-accent) !important; }
@@ -4200,6 +4277,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
+
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
 a:hover { color: var(--pinboard-link-hover) !important; }
@@ -4694,6 +4782,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
 
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
@@ -5202,6 +5301,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
+
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
 a:hover { color: var(--pinboard-link-hover) !important; }
@@ -5708,6 +5818,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
 
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
@@ -6228,6 +6349,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
+
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
 a:hover { color: var(--pinboard-link-hover) !important; }
@@ -6739,6 +6871,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
 
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
@@ -7257,6 +7400,17 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
+
+/* ---- Scrollbars (Webkit + Firefox standard) ---- */
+html, body, textarea, .description, .pin-ac .bd {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--pinboard-muted) var(--pinboard-bg-surface) !important;
+}
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: var(--pinboard-bg-surface) !important; border-left: 1px solid var(--pinboard-border) !important; }
+::-webkit-scrollbar-thumb { background: var(--pinboard-muted-soft) !important; border: 2px solid var(--pinboard-bg-surface) !important; border-radius: 6px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pinboard-accent) !important; }
+::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface) !important; }
 
 /* ---- Global anchor fallbacks ---- */
 a, a:link { color: var(--pinboard-accent) !important; }
