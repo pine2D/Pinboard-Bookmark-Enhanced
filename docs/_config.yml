@@ -1,10 +1,9 @@
 title: Pinboard Bookmark Enhanced
 description: A Chrome extension that supercharges Pinboard bookmarking with AI-powered tags, summaries, and a fully themeable interface.
-theme: jekyll-theme-cayman
+markdown: kramdown
 exclude:
   - superpowers
   - theme-surface
   - "*.json"
   - "*.mjs"
-  - "*.css"
   - README.md
