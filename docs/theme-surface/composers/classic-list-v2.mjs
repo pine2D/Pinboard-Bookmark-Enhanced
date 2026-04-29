@@ -67,10 +67,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: $
 #sub_banner a:hover, #sub_banner a.selected { color: ${v("accent")} !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: ${v("muted")} !important; }
-#bmarks_page_nav a.filter { color: ${v("muted")} !important; padding: 2px 8px !important; border-radius: ${v("radius-sm")} !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: ${v("link-hover")} !important; background: ${v("bg-surface")} !important; }
-#bmarks_page_nav a.filter.selected { background: ${v("accent")} !important; color: ${v("btn-fg")} !important; font-weight: ${v("weight-heading")} !important; }
+#bmarks_page_nav a.filter { color: ${v("muted")} !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: ${v("link-hover")} !important; }
+#bmarks_page_nav a.filter.selected { background: ${v("accent")} !important; color: ${v("btn-fg")} !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: ${v("radius-sm")} !important; font-weight: ${v("weight-heading")} !important; }
 #bmarks_page_nav a.filter.selected:hover { background: ${v("link-hover")} !important; color: ${v("btn-fg")} !important; }
 #bmarks_page_nav a.rss_link { color: ${v("muted")} !important; }
 #bmarks_page_nav a.rss_link:hover { color: ${v("link-hover")} !important; }

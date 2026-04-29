@@ -172,10 +172,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -861,10 +864,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -1506,10 +1512,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -2188,10 +2197,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -2887,10 +2899,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -3558,10 +3573,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -4129,10 +4147,13 @@ html.pbp-dark #sub_banner a { color: var(--pinboard-muted) !important; }
 html.pbp-dark #sub_banner a:hover, html.pbp-dark #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 html.pbp-dark #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-html.pbp-dark #bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-html.pbp-dark #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-html.pbp-dark #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+html.pbp-dark #bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+html.pbp-dark #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+html.pbp-dark #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 html.pbp-dark #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 html.pbp-dark #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 html.pbp-dark #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -4843,10 +4864,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -5468,10 +5492,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -6105,10 +6132,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -6742,10 +6772,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -7391,10 +7424,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -8033,10 +8069,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
@@ -8681,10 +8720,13 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
+   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
+   margin to neutralize its added padding so siblings don't shift. */
 #bmarks_page_nav { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
-#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
-#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; transition: color 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
 #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
 #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }

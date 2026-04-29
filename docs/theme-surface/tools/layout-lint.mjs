@@ -80,6 +80,33 @@ if (!inputBody || !submitBody || !resetBody) {
   }
 }
 
+// RULE 4: composer — #bmarks_page_nav a.filter (non-selected) must NOT declare horizontal padding.
+// Pinboard's filter row is a single inline text line; padding on every link overflows and wraps "tabs".
+// Only the .selected pill may have padding, and only when balanced by negative margin (zero inline drift).
+function pickInlineRule(prefix) {
+  // For single-line rules like `selector { decls }`. Extracts the content between { and the matching }.
+  const idx = composerSrc.indexOf(prefix);
+  if (idx < 0) return null;
+  const start = composerSrc.indexOf("{", idx);
+  const end = composerSrc.indexOf("}", start);
+  if (start < 0 || end < 0) return null;
+  return composerSrc.slice(start + 1, end);
+}
+const filterBaseBody = pickInlineRule("#bmarks_page_nav a.filter {");
+const filterSelBody  = pickInlineRule("#bmarks_page_nav a.filter.selected {");
+if (filterBaseBody && /\bpadding\s*:/.test(filterBaseBody)) {
+  console.log(`  composer  #bmarks_page_nav a.filter (base) declares padding — would wrap the inline filter row. Move padding to .selected only.`);
+  blockers++;
+}
+if (filterSelBody) {
+  const padX = (filterSelBody.match(/\bpadding\s*:\s*[\d.]+\w*\s+([\d.]+)(\w+)/) || [])[1];
+  const marX = (filterSelBody.match(/\bmargin\s*:\s*[\d.]+\w*\s+(-?[\d.]+)(\w+)/) || [])[1];
+  if (padX && (!marX || Number(marX) !== -Number(padX))) {
+    console.log(`  composer  #bmarks_page_nav a.filter.selected has padding-x=${padX} but margin-x=${marX || 'missing'} — must be exact negative to neutralize inline drift.`);
+    blockers++;
+  }
+}
+
 console.log("");
 if (blockers > 0) {
   console.log(`=== layout-lint: FAIL — ${blockers} blocker(s), ${warnings} warning(s) ===`);

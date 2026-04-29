@@ -78,13 +78,12 @@ const driftOk = perfect === total && missing === "0" && extra === "0";
 console.log("\n--- step 4/6: contrast-audit (WCAG AA gate) ---");
 const auditOk = spawnSync("node", [resolve(SURFACE, "tools/contrast-audit.mjs")], { stdio: "inherit" }).status === 0;
 
-console.log("\n--- step 5/6: layout-lint (advisory) ---");
-spawnSync("node", [resolve(SURFACE, "tools/layout-lint.mjs")], { stdio: "inherit" });
-// advisory only — does not gate
+console.log("\n--- step 5/6: layout-lint (warnings advisory; blockers HARD GATE) ---");
+const layoutOk = spawnSync("node", [resolve(SURFACE, "tools/layout-lint.mjs")], { stdio: "inherit" }).status === 0;
 
 console.log("\n--- step 6/6: url-lint (hardcoded URL drift) ---");
 const urlOk = spawnSync("node", [resolve(SURFACE, "tools/url-lint.mjs")], { stdio: "inherit" }).status === 0;
 
-const ok = driftOk && auditOk && urlOk;
-console.log(`\n=== sync-all: ${ok ? "✅ ALL GATES PASSED" : "❌ FAILED"} — drift ${driftOk ? "ZERO" : "DETECTED"}, contrast ${auditOk ? "PASS" : "FAIL"}, url ${urlOk ? "PASS" : "FAIL"} ===`);
+const ok = driftOk && auditOk && layoutOk && urlOk;
+console.log(`\n=== sync-all: ${ok ? "✅ ALL GATES PASSED" : "❌ FAILED"} — drift ${driftOk ? "ZERO" : "DETECTED"}, contrast ${auditOk ? "PASS" : "FAIL"}, layout ${layoutOk ? "PASS" : "FAIL"}, url ${urlOk ? "PASS" : "FAIL"} ===`);
 process.exit(ok ? 0 : 1);
