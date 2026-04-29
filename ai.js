@@ -45,11 +45,26 @@ async function getPageInfoFromTab(tabId) {
 
         // Try Defuddle for high-quality content extraction
         if (typeof Defuddle !== "undefined") {
-          // Swallow defuddle v0.16.0 async errors that escape try/catch:
-          //   1. Sync `new URL(href)` on relative/weird hrefs (GitHub, etc.)
-          //   2. Async extractors (YouTube/Reddit) via __awaiter Promise chains
-          //      — these reject AFTER parse() returns, bypassing try/catch
-          // Match by URL-error text OR defuddle-origin filename/stack.
+          // Patch window.URL in the ISOLATED world to prevent defuddle v0.16.0 from
+          // throwing "Failed to construct 'URL': Invalid URL" on relative/weird hrefs
+          // (GitHub releases pages etc.). Mirrors popup.js extractLocalMarkdown shim.
+          // Without this, throws still get reported in chrome://extensions Errors panel
+          // even when our window.error listener "swallows" them post-throw.
+          const OriginalURL = window.URL;
+          if (!window.__pp_urlShimInstalled) {
+            const SafeURL = function(u, b) {
+              try { return b !== undefined ? new OriginalURL(u, b) : new OriginalURL(u); }
+              catch (_) { return new OriginalURL("about:blank"); }
+            };
+            SafeURL.prototype = OriginalURL.prototype;
+            try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) {}
+            try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) {}
+            try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) {}
+            window.URL = SafeURL;
+            window.__pp_urlShimInstalled = true;
+          }
+          // Belt-and-suspenders: still swallow async errors that escape try/catch
+          // (YouTube/Reddit __awaiter promises reject AFTER parse() returns).
           const swallowDefuddle = (ev) => {
             try {
               const reason = ev && ev.reason;
