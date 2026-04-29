@@ -151,6 +151,32 @@ A composer that wants to reuse another composer's work can do so — see
 5. Add `my-mode` to `tokens.schema.json`'s `layout.mode` enum.
 6. Smoke test with the sample theme: `node scripts/smoke-compose.mjs my-mode`.
 
+### Contrast guard (automated)
+
+Every theme passes `tools/contrast-audit.mjs`, which the `tools/sync-all.mjs`
+pipeline runs automatically as Step 4/4. The audit fails the run when a
+token pair drops below WCAG AA — the failure modes that produced past
+regressions:
+
+| Pair | Min ratio | Why |
+|------|-----------|-----|
+| `pinboard.bg vs fg` | 4.5:1 | body text |
+| `pinboard.btn-bg vs btn-fg` | 4.5:1 | save/cancel/sign-up button text |
+| `pinboard.muted vs bg-surface` | 3:1 | scrollbar thumb visibility |
+| `popup.fg vs bg` (`--pp-*`) | 4.5:1 | popup body |
+| `popup.fg-hint vs bg` | 4.5:1 | char counters, hints |
+| `popup.fg-muted vs bg` | 4.5:1 | labels, group headers |
+| `options.fg vs bg` (`--opt-*`) | 4.5:1 | settings body |
+| `options.fg-hint vs bg` | 4.5:1 | inline hint text |
+| `options.fg-muted vs bg` | 4.5:1 | tab labels, accordion headers |
+
+Already-shipped legacy violations (Solarized's intentional low-contrast
+palette + a couple of historical hand-tuned dark themes) are pinned in the
+`ALLOWLIST` constant inside `contrast-audit.mjs`; they print as `KNOWN`
+without blocking. **Adding a new theme that hits the same pair fails the
+audit** — the allowlist matches `<scope>:<theme>:<pair>` exactly, so the
+exemption never carries over.
+
 ### State coverage checklist
 
 For every interactive surface:

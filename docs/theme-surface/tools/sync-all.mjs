@@ -61,7 +61,7 @@ for (const slug of slugs) {
 }
 console.log(`[sync-all] total bytes delta across 13 themes: ${totalDelta >= 0 ? "+" : ""}${totalDelta} B\n`);
 
-console.log("--- step 3/3: diff-all (strict) ---");
+console.log("--- step 3/4: diff-all (strict) ---");
 const diffOut = run("diff-all", [resolve(SURFACE, "tools/diff-all.mjs")]);
 const diffTail = diffOut.trim().split("\n").slice(-5).join("\n");
 console.log(diffTail);
@@ -73,7 +73,13 @@ if (!m) {
   process.exit(1);
 }
 const [, perfect, total, missing, extra] = m;
-const ok = perfect === total && missing === "0" && extra === "0";
+const driftOk = perfect === total && missing === "0" && extra === "0";
 
-console.log(`\n=== sync-all: ${ok ? "✅ DRIFT ZERO" : "❌ DRIFT DETECTED"} (${perfect}/${total} perfect, ${missing} missing, ${extra} extra) ===`);
+console.log("\n--- step 4/4: contrast-audit (WCAG AA gate) ---");
+const auditPath = resolve(SURFACE, "tools/contrast-audit.mjs");
+const auditResult = spawnSync("node", [auditPath], { stdio: "inherit" });
+const auditOk = auditResult.status === 0;
+
+const ok = driftOk && auditOk;
+console.log(`\n=== sync-all: ${ok ? "✅ ALL GATES PASSED" : "❌ FAILED"} — drift ${driftOk ? "ZERO" : "DETECTED"} (${perfect}/${total} perfect), contrast ${auditOk ? "PASS" : "FAIL"} ===`);
 process.exit(ok ? 0 : 1);
