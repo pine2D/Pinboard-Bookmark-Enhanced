@@ -126,6 +126,31 @@
       ]
     },
 
+    "bmarks_nav.root": {
+      "sel": "#bmarks_page_nav",
+      "role": "secondary filter row on /u:* and /u:*/unread (all/private/public/unread/untagged/starred/...)",
+      "states": ["default"],
+      "tokens": ["palette.muted"]
+    },
+    "bmarks_nav.filter": {
+      "sel": "#bmarks_page_nav a.filter",
+      "role": "individual filter link (default + hover state)",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted", "palette.link-hover"]
+    },
+    "bmarks_nav.filter.selected": {
+      "sel": "#bmarks_page_nav a.filter.selected",
+      "role": "active filter pill (uses accent bg + btn-fg text — same contract as form.submit)",
+      "states": ["selected"],
+      "tokens": ["palette.accent", "palette.btn-fg", "radius.sm"]
+    },
+    "bmarks_nav.rss": {
+      "sel": "#bmarks_page_nav a.rss_link",
+      "role": "RSS link inside the filter row",
+      "states": ["default", "hover"],
+      "tokens": ["palette.muted", "palette.link-hover"]
+    },
+
     "main.column": {
       "sel": "#main_column",
       "role": "primary content column",

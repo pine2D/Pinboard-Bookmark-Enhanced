@@ -171,6 +171,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
 a.bundle { color: var(--pinboard-accent) !important; }
@@ -851,6 +860,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
 a.bundle { color: var(--pinboard-accent) !important; }
@@ -1486,6 +1504,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -2159,6 +2186,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -2850,6 +2886,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
 a.bundle { color: var(--pinboard-accent) !important; }
@@ -3512,6 +3557,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
 a.bundle { color: var(--pinboard-accent) !important; }
@@ -4073,6 +4127,15 @@ html.pbp-dark #pinboard_name a { color: var(--pinboard-accent) !important; font-
 html.pbp-dark #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 html.pbp-dark #sub_banner a { color: var(--pinboard-muted) !important; }
 html.pbp-dark #sub_banner a:hover, html.pbp-dark #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+html.pbp-dark #bmarks_page_nav { color: var(--pinboard-muted) !important; }
+html.pbp-dark #bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+html.pbp-dark #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+html.pbp-dark #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+html.pbp-dark #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+html.pbp-dark #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+html.pbp-dark #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
 
 /* ---- Search (banner + main) ---- */
 html.pbp-dark #searchbox { margin-bottom: 12px !important; }
@@ -4779,6 +4842,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
 a.bundle { color: var(--pinboard-accent) !important; }
@@ -5394,6 +5466,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -6023,6 +6104,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
 a.bundle { color: var(--pinboard-accent) !important; }
@@ -6650,6 +6740,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -7291,6 +7390,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
 
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
 a.bundle { color: var(--pinboard-accent) !important; }
@@ -7923,6 +8031,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -8562,6 +8679,15 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #sub_banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; }
 #sub_banner a { color: var(--pinboard-muted) !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: var(--pinboard-accent) !important; }
+
+/* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
+#bmarks_page_nav { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.filter { color: var(--pinboard-muted) !important; padding: 2px 8px !important; border-radius: var(--pinboard-radius-sm) !important; transition: color 0.15s ease, background 0.15s ease !important; }
+#bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; background: var(--pinboard-bg-surface) !important; }
+#bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; font-weight: var(--pinboard-weight-heading) !important; }
+#bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
+#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
