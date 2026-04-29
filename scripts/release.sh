@@ -220,3 +220,15 @@ echo ""
 echo "  Release published: ${TAG}"
 echo "  https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/releases/tag/${TAG}"
 echo ""
+
+# ---- Step 4: Purge GitHub camo cache so README shields.io badge updates immediately ----
+REPO_FULL=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+README_URL="https://github.com/${REPO_FULL}"
+CAMO_URL=$(curl -sL "${README_URL}" | grep -oE 'https://camo\.githubusercontent\.com/[^"]*' \
+  | grep -E 'release%2F|release/' | head -1)
+if [ -n "${CAMO_URL}" ]; then
+  STATUS=$(curl -s -X PURGE -o /dev/null -w "%{http_code}" "${CAMO_URL}")
+  echo "  Camo cache PURGE → HTTP ${STATUS} (badge refreshes within seconds)"
+else
+  echo "  (no camo URL detected for version badge — skipping purge)"
+fi

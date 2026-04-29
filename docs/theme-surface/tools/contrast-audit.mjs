@@ -54,6 +54,14 @@ const ALLOWLIST = new Set([
   "pinboard:solarized-dark:muted vs bg-surface",
   "pinboard:nord-night:btn-bg vs btn-fg",
   "pinboard:catppuccin-latte:btn-bg vs btn-fg",
+  // Hover state contrast — surfaced after the audit added btn-bg-hover. These
+  // are pre-existing token choices on themes already shipped; queued as a
+  // follow-up to retune btn-bg-hover so save:hover stays readable.
+  "pinboard:catppuccin-latte:btn-bg-hover vs btn-fg",
+  "pinboard:flexoki:btn-bg-hover vs btn-fg",
+  "pinboard:nord-night:btn-bg-hover vs btn-fg",
+  "pinboard:solarized-dark:btn-bg-hover vs btn-fg",
+  "pinboard:solarized-light:btn-bg-hover vs btn-fg",
 ]);
 
 const violations = [];
@@ -79,6 +87,7 @@ for (const f of pinFiles) {
   const fg = hexRgb(p["fg"] || "");
   const bgSurface = hexRgb(p["bg-surface"] || p["bg"] || "");
   const btnBg = hexRgb(p["btn-bg"] || p["accent"] || "");
+  const btnBgHover = hexRgb(p["btn-bg-hover"] || p["link-hover"] || p["accent-hover"] || p["btn-bg"] || p["accent"] || "");
   const btnFg = hexRgb(p["btn-fg"] || "");
   const muted = hexRgb(p["muted"] || "");
   // WCAG AA threshold (4.5:1) for body text. AAA-grade themes will exceed this naturally.
@@ -87,6 +96,8 @@ for (const f of pinFiles) {
   // when btn-bg unset, so this also catches the terminal-style accent==btn-fg crash since the
   // effective button bg would equal accent and contrast against btn-fg would collapse.
   if (btnBg && btnFg) console.log(check("pinboard", slug, "btn-bg vs btn-fg", cr(btnBg, btnFg), 4.5));
+  // Hover state: btn-bg-hover must also keep the label readable (same regression class as terminal accent==btn-fg).
+  if (btnBgHover && btnFg) console.log(check("pinboard", slug, "btn-bg-hover vs btn-fg", cr(btnBgHover, btnFg), 4.5));
   // Scrollbar thumb visibility against track (composer uses muted on bg-surface).
   if (bgSurface && muted) console.log(check("pinboard", slug, "muted vs bg-surface", cr(bgSurface, muted), 3));
 }
