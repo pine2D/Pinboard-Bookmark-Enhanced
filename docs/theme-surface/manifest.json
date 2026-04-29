@@ -24,7 +24,8 @@
     "tweets": { "url": "https://pinboard.in/u:oumu/tweets/", "template": "P3-rightbar-heavy", "regions": ["banner","top_menu","sub_banner","main_column","right_bar","footer"], "counts": { "inlineStyled": 30, "events": 0, "fixedWidths": 4, "tables": 3 } },
     "subscriptions-tags": { "url": "https://pinboard.in/u:oumu/subscriptions/tags/", "template": "P3-rightbar-heavy", "regions": ["banner","top_menu","sub_banner","main_column","right_bar","footer"], "counts": { "inlineStyled": 213, "events": 31, "fixedWidths": 2, "tables": 1 } },
     "tabs": { "url": "https://pinboard.in/u:oumu/tabs/", "template": "P4-table", "regions": ["banner","top_menu","sub_banner","main_column","footer"], "counts": { "inlineStyled": 173, "events": 0, "fixedWidths": 4, "tables": 1 } },
-    "bundles": { "url": "https://pinboard.in/u:oumu/bundles/", "template": "P4-table", "regions": ["banner","top_menu","sub_banner","main_column","footer"], "counts": { "inlineStyled": 81, "events": 16, "fixedWidths": 17, "tables": 1 } }
+    "bundles": { "url": "https://pinboard.in/u:oumu/bundles/", "template": "P4-table", "regions": ["banner","top_menu","sub_banner","main_column","footer"], "counts": { "inlineStyled": 81, "events": 16, "fixedWidths": 17, "tables": 1 } },
+    "url-detail": { "url": "https://pinboard.in/url:<hash>/", "template": "P1-list", "regions": ["banner","top_menu","main_column","right_bar","footer"], "_note": "Public URL detail page — lists every user who saved the same URL. #right_bar exists in DOM but #tag_cloud is empty for this page. The #main_column header carries a 140%-font link + a check-this-URL form. Surfaces: url_detail.heading_link / .summary_text / .check_form / .source / .empty_right_bar." }
   },
 
   "surfaces": {
@@ -429,6 +430,41 @@
       "role": "Logged-out top_menu links (recent / popular / tour / howto / log in)",
       "states": ["default", "hover"],
       "tokens": ["palette.accent", "palette.link-hover"],
+      "scope": "bare"
+    },
+    "url_detail.heading_link": {
+      "sel": "#main_column > p > a[style*=\"font-size:140%\"]",
+      "role": "URL detail page (https://pinboard.in/url:<hash>/) — the giant 140%-font link that displays the URL itself. Pinboard ships with no padding/wrap, so long URLs overflow. Composer themes it as a wrapping accent link with breathing space.",
+      "states": ["default", "hover"],
+      "tokens": ["palette.accent", "palette.link-hover"],
+      "scope": "bare"
+    },
+    "url_detail.summary_text": {
+      "sel": "#main_column > p",
+      "role": "URL detail summary text (e.g. '129 bookmarks. First posted by dandv april 2016.') — bare <p> elements directly under #main_column on the URL detail page; default browser style is jarring against any theme. Themed as muted body copy with comfortable line-height. Excluded by descendant: bookmark items have their own .description selector under .bookmark > .display.",
+      "states": ["default"],
+      "tokens": ["palette.muted", "typo.size-sm"],
+      "scope": "bare"
+    },
+    "url_detail.check_form": {
+      "sel": "#main_column > form[action=\"/url/\"]",
+      "role": "URL-check form on the URL detail page — Pinboard ships <input size=\"50\" name=\"url\"> + <input type=\"submit\" value=\"check\">. The size attribute fights box-sizing; composer overrides with width:100% + the shared form.input + form.submit chrome.",
+      "states": ["default"],
+      "tokens": ["palette.input-bg", "palette.fg", "palette.border", "palette.accent"],
+      "scope": "bare"
+    },
+    "url_detail.source": {
+      "sel": ".source, .twitter_user",
+      "role": "Source attribution badges on URL detail bookmarks (the 'via Twitter @user' / source-of-bookmark labels). Composer paints with muted-soft + smaller font so they read as metadata.",
+      "states": ["default"],
+      "tokens": ["palette.muted-soft", "typo.size-xs"],
+      "scope": "bare"
+    },
+    "url_detail.empty_right_bar": {
+      "sel": "#right_bar:has(#tag_cloud:empty)",
+      "role": "URL detail page renders #right_bar but its #tag_cloud child is empty — composer's normal #right_bar bg/border surface looks like a phantom panel. Use :has() (CSS Selectors L4, Chrome 105+) to suppress the chrome when there is no actual content.",
+      "states": ["default"],
+      "tokens": [],
       "scope": "bare"
     },
     "form.tag_completion": {

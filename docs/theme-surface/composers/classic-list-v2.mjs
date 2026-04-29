@@ -384,6 +384,50 @@ a.help { color: ${v("muted-soft")} !important; background: ${v("accent-soft")} !
 .nav_nli { color: ${v("accent")} !important; text-decoration: none !important; }
 .nav_nli:hover { color: ${v("link-hover")} !important; }
 
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: ${v("accent")} !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: ${v("weight-heading")} !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: ${v("link-hover")} !important; }
+#main_column > p {
+  color: ${v("muted")} !important;
+  font-size: ${sizeSm} !important;
+  line-height: ${v("line-height")} !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: ${v("muted-soft")} !important;
+  font-size: ${sizeXs} !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: ${v("muted-soft")} !important; }
 

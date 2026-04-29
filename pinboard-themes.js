@@ -487,6 +487,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
 
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
@@ -1114,6 +1158,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
 
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
@@ -1696,6 +1784,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nli { color: var(--pinboard-muted) !important; }
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
+
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
@@ -2316,6 +2448,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nli { color: var(--pinboard-muted) !important; }
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
+
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
@@ -2954,6 +3130,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
 
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
@@ -3563,6 +3783,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
 
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
@@ -4067,6 +4331,50 @@ html.pbp-dark #language_box a[style*="background:#ffa"], html.pbp-dark #language
 html.pbp-dark .nli { color: var(--pinboard-muted) !important; }
 html.pbp-dark .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 html.pbp-dark .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
+
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+html.pbp-dark #main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+html.pbp-dark #main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+html.pbp-dark #main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+html.pbp-dark #main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+html.pbp-dark #main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+html.pbp-dark #main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+html.pbp-dark .source, html.pbp-dark .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+html.pbp-dark #right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
 
 /* ---- Footer / colophon ---- */
 html.pbp-dark #footer, html.pbp-dark .colophon, html.pbp-dark .colophon a { color: var(--pinboard-muted-soft) !important; }
@@ -4724,6 +5032,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
 
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
@@ -5286,6 +5638,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nli { color: var(--pinboard-muted) !important; }
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
+
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
@@ -5862,6 +6258,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
 
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
@@ -6436,6 +6876,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nli { color: var(--pinboard-muted) !important; }
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
+
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
@@ -7024,6 +7508,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
 
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
 
@@ -7603,6 +8131,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nli { color: var(--pinboard-muted) !important; }
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
+
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
@@ -8189,6 +8761,50 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .nli { color: var(--pinboard-muted) !important; }
 .nav_nli { color: var(--pinboard-accent) !important; text-decoration: none !important; }
 .nav_nli:hover { color: var(--pinboard-link-hover) !important; }
+
+/* ---- URL detail page (https://pinboard.in/url:<hash>/) ---- */
+#main_column > p > a[style*="font-size:140%"] {
+  color: var(--pinboard-accent) !important;
+  word-break: break-all !important;
+  display: inline-block !important;
+  padding: 4px 0 !important;
+  font-weight: var(--pinboard-weight-heading) !important;
+}
+#main_column > p > a[style*="font-size:140%"]:hover { color: var(--pinboard-link-hover) !important; }
+#main_column > p {
+  color: var(--pinboard-muted) !important;
+  font-size: 12px !important;
+  line-height: var(--pinboard-line-height) !important;
+  margin: 8px 0 !important;
+}
+#main_column > form[action="/url/"] {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  margin: 8px 0 16px !important;
+}
+#main_column > form[action="/url/"] p {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+#main_column > form[action="/url/"] input[type="text"][name="url"] {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+.source, .twitter_user {
+  color: var(--pinboard-muted-soft) !important;
+  font-size: 11px !important;
+}
+#right_bar:has(#tag_cloud:empty) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
 
 /* ---- Footer / colophon ---- */
 #footer, .colophon, .colophon a { color: var(--pinboard-muted-soft) !important; }
