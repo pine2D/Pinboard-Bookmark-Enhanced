@@ -306,13 +306,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -321,7 +323,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -330,7 +333,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -982,13 +986,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -997,7 +1003,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -1006,7 +1013,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -1614,13 +1622,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -1629,7 +1639,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -1638,7 +1649,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -2283,13 +2295,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -2298,7 +2312,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -2307,7 +2322,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -2969,13 +2985,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -2984,7 +3002,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -2993,7 +3012,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -3627,13 +3647,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -3642,7 +3664,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -3651,7 +3674,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -4184,13 +4208,15 @@ html.pbp-dark #tweet_searchbox input[type="submit"] {
 html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 html.pbp-dark input[type="text"], html.pbp-dark input:not([type]), html.pbp-dark input[type="password"], html.pbp-dark textarea, html.pbp-dark select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -4199,7 +4225,8 @@ html.pbp-dark input[type="submit"], html.pbp-dark input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -4208,7 +4235,8 @@ html.pbp-dark input[type="reset"], html.pbp-dark input[type="reset"].reset, html
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -4886,13 +4914,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -4901,7 +4931,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -4910,7 +4941,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -5498,13 +5530,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -5513,7 +5547,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -5522,7 +5557,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -6122,13 +6158,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -6137,7 +6175,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -6146,7 +6185,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -6746,13 +6786,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -6761,7 +6803,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -6770,7 +6813,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -7382,13 +7426,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -7397,7 +7443,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -7406,7 +7453,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -8011,13 +8059,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -8026,7 +8076,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -8035,7 +8086,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -8646,13 +8698,15 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tweet_searchbox input[type="submit"]:hover { background: var(--pinboard-success-hover) !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: var(--pinboard-radius-sm) !important;
   line-height: 1.4 !important;
 }
@@ -8661,7 +8715,8 @@ input[type="submit"], input[type="button"] {
   background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -8670,7 +8725,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
   border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
   border-radius: var(--pinboard-radius-sm) !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }

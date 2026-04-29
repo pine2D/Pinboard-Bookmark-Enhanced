@@ -203,13 +203,15 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
 #tweet_searchbox input[type="submit"]:hover { background: ${v("success-hover")} !important; }
 
 /* ---- Forms (global) ----
- * input/textarea/select pair the same paddings + radius as form.submit/cancel
- * so their box heights align and rounded corners do not crowd the text. */
+ * input/textarea/select share the EXACT same padding (5px 12px) +
+ * border-radius + border-width + line-height with form.submit/form.cancel,
+ * so their box-sizing:border-box heights match pixel-for-pixel. Any
+ * deviation here causes input/button mis-alignment in inline forms. */
 input[type="text"], input:not([type]), input[type="password"], textarea, select {
   background: ${v("input-bg")} !important; color: ${v("fg")} !important;
   border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
   box-sizing: border-box !important; max-width: 100% !important;
-  padding: 5px 10px !important;
+  padding: 5px 12px !important;
   border-radius: ${v("radius-sm")} !important;
   line-height: 1.4 !important;
 }
@@ -218,7 +220,8 @@ input[type="submit"], input[type="button"] {
   background: ${v("accent")} !important; color: ${v("btn-fg")} !important;
   border: ${v("border-width")} ${v("border-style")} ${v("accent")} !important;
   border-radius: ${v("radius-sm")} !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
@@ -227,7 +230,8 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   background: ${v("bg-surface")} !important; color: ${v("fg")} !important;
   border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
   border-radius: ${v("radius-sm")} !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
+  line-height: 1.4 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }

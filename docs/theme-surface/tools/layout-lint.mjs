@@ -42,30 +42,42 @@ for (const path of TARGETS) {
   // Skip — too many legit uses; rule 1 covers the high-risk case.
 }
 
-// RULE 3: composer (classic-list-v2.mjs) form.input rule must declare padding + border-radius
-// so input/textarea/select align with form.submit/form.cancel heights and rounded corners.
-// Detection note: composer is a JS template literal so ${v(...)} interpolations contain
-// real `{`/`}` chars — naive [^{]/[^}] regexes break. Slice a window after the selector
-// header and scan within that window instead.
+// RULE 3: composer (classic-list-v2.mjs) — form.input + form.submit + form.reset must declare
+// EXACTLY the same padding + border-radius + line-height so their box-sizing:border-box
+// heights match pixel-for-pixel in inline forms (input next to submit, etc).
 const composerPath = resolve(__dirname, "..", "composers", "classic-list-v2.mjs");
 const composerSrc = readFileSync(composerPath, "utf8");
-const headerIdx = composerSrc.indexOf('input[type="text"], input:not([type])');
-if (headerIdx >= 0) {
-  // Take everything up to the next blank line + selector at column 0 (next CSS rule).
-  const after = composerSrc.slice(headerIdx);
-  const blockEnd = after.search(/\n\}\s*\n/);
-  const body = blockEnd > 0 ? after.slice(0, blockEnd) : after.slice(0, 600);
-  if (!/\bpadding\s*:/.test(body)) {
-    console.log("  composer  form.input rule missing `padding:` — input/button heights will not align");
-    blockers++;
-  }
-  if (!/\bborder-radius\s*:/.test(body)) {
-    console.log("  composer  form.input rule missing `border-radius:` — rounded corners will crowd the text");
-    blockers++;
-  }
-} else {
-  console.log("  composer  form.input rule could not be located — skipped padding/radius lint");
+function pickBlock(headerNeedle) {
+  const idx = composerSrc.indexOf(headerNeedle);
+  if (idx < 0) return null;
+  const after = composerSrc.slice(idx);
+  const end = after.search(/\n\}\s*\n/);
+  return end > 0 ? after.slice(0, end) : after.slice(0, 600);
+}
+function extract(body, prop) {
+  const m = body && body.match(new RegExp("\\b" + prop + "\\s*:\\s*([^;\\n]+)"));
+  return m ? m[1].trim().replace(/\s*!important\s*$/, "") : null;
+}
+const inputBody = pickBlock('input[type="text"], input:not([type])');
+const submitBody = pickBlock('input[type="submit"], input[type="button"]');
+const resetBody = pickBlock('input[type="reset"], input[type="reset"].reset');
+if (!inputBody || !submitBody || !resetBody) {
+  console.log("  composer  could not locate one or more form rules — skipped padding/radius/line-height lint");
   warnings++;
+} else {
+  const props = ["padding", "border-radius", "line-height"];
+  for (const prop of props) {
+    const ip = extract(inputBody, prop);
+    const sp = extract(submitBody, prop);
+    const rp = extract(resetBody, prop);
+    if (!ip || !sp || !rp) {
+      console.log(`  composer  ${prop}: missing — input=${ip} submit=${sp} reset=${rp}`);
+      blockers++;
+    } else if (ip !== sp || sp !== rp) {
+      console.log(`  composer  ${prop} mismatch — input='${ip}' submit='${sp}' reset='${rp}' (must be identical for height alignment)`);
+      blockers++;
+    }
+  }
 }
 
 console.log("");
