@@ -180,8 +180,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -872,8 +873,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -1520,8 +1522,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -2205,8 +2208,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -2907,8 +2911,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -3581,8 +3586,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -4155,8 +4161,9 @@ html.pbp-dark #bmarks_page_nav a.filter { color: var(--pinboard-muted) !importan
 html.pbp-dark #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 html.pbp-dark #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 html.pbp-dark #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-html.pbp-dark #bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-html.pbp-dark #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+html.pbp-dark #bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+html.pbp-dark #bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 html.pbp-dark #searchbox { margin-bottom: 12px !important; }
@@ -4872,8 +4879,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -5500,8 +5508,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -6140,8 +6149,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -6780,8 +6790,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -7432,8 +7443,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -8077,8 +8089,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }
@@ -8728,8 +8741,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: v
 #bmarks_page_nav a.filter:hover { color: var(--pinboard-link-hover) !important; }
 #bmarks_page_nav a.filter.selected { background: var(--pinboard-accent) !important; color: var(--pinboard-btn-fg) !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: var(--pinboard-radius-sm) !important; font-weight: var(--pinboard-weight-heading) !important; }
 #bmarks_page_nav a.filter.selected:hover { background: var(--pinboard-link-hover) !important; color: var(--pinboard-btn-fg) !important; }
-#bmarks_page_nav a.rss_link { color: var(--pinboard-muted) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-link-hover) !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: var(--pinboard-accent) !important; background: transparent !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-accent) !important; padding: 0 6px !important; border-radius: var(--pinboard-radius-sm) !important; font-size: 11px !important; font-weight: var(--pinboard-weight-heading) !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-btn-fg) !important; background: var(--pinboard-accent) !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }

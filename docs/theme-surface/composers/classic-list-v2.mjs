@@ -75,8 +75,9 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: $
 #bmarks_page_nav a.filter:hover { color: ${v("link-hover")} !important; }
 #bmarks_page_nav a.filter.selected { background: ${v("accent")} !important; color: ${v("btn-fg")} !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: ${v("radius-sm")} !important; font-weight: ${v("weight-heading")} !important; }
 #bmarks_page_nav a.filter.selected:hover { background: ${v("link-hover")} !important; color: ${v("btn-fg")} !important; }
-#bmarks_page_nav a.rss_link { color: ${v("muted")} !important; }
-#bmarks_page_nav a.rss_link:hover { color: ${v("link-hover")} !important; }
+/* RSS = feed export (semantically distinct from view-switch filters above): outlined chip in accent color. */
+#bmarks_page_nav a.rss_link { color: ${v("accent")} !important; background: transparent !important; border: ${v("border-width")} ${v("border-style")} ${v("accent")} !important; padding: 0 6px !important; border-radius: ${v("radius-sm")} !important; font-size: ${sizeXs} !important; font-weight: ${v("weight-heading")} !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; transition: background 0.15s ease, color 0.15s ease !important; }
+#bmarks_page_nav a.rss_link:hover { color: ${v("btn-fg")} !important; background: ${v("accent")} !important; }
 
 /* ---- Search (banner + main) ---- */
 #searchbox { margin-bottom: 12px !important; }

@@ -146,9 +146,9 @@
     },
     "bmarks_nav.rss": {
       "sel": "#bmarks_page_nav a.rss_link",
-      "role": "RSS link inside the filter row",
+      "role": "RSS feed chip — outlined badge to distinguish from left-side filter links (semantic: feed export vs view switch)",
       "states": ["default", "hover"],
-      "tokens": ["palette.muted", "palette.link-hover"]
+      "tokens": ["palette.accent", "palette.accent-alpha", "radius.sm", "typo.size-xs"]
     },
 
     "main.column": {
