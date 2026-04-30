@@ -81,21 +81,28 @@ if (!inputBody || !submitBody || !resetBody) {
 }
 
 // RULE 4: composer — #bmarks_page_nav a.filter (non-selected) must NOT declare horizontal padding.
-// Pinboard's filter row is a single inline text line; padding on every link overflows and wraps "tabs".
+// Pinboard's filter row sits inside a flex container; padding on every link still adds to flex item
+// width and pushes RSS chip to wrap on narrow themes.
 // Only the .selected pill may have padding, and only when balanced by negative margin (zero inline drift).
 function pickInlineRule(prefix) {
-  // For single-line rules like `selector { decls }`. Extracts the content between { and the matching }.
+  // For single-line rules like `selector { decls }`. Extracts content between the
+  // first `{` and the LAST `}` on the same line, so embedded `${v("...")}` template
+  // literals don't truncate the body early.
   const idx = composerSrc.indexOf(prefix);
   if (idx < 0) return null;
-  const start = composerSrc.indexOf("{", idx);
-  const end = composerSrc.indexOf("}", start);
-  if (start < 0 || end < 0) return null;
-  return composerSrc.slice(start + 1, end);
+  const lineEnd = composerSrc.indexOf("\n", idx);
+  const line = composerSrc.slice(idx, lineEnd > 0 ? lineEnd : composerSrc.length);
+  const start = line.indexOf("{");
+  const end = line.lastIndexOf("}");
+  if (start < 0 || end < 0 || end <= start) return null;
+  return line.slice(start + 1, end);
 }
 const filterBaseBody = pickInlineRule("#bmarks_page_nav a.filter {");
 const filterSelBody  = pickInlineRule("#bmarks_page_nav a.filter.selected {");
+const navRootBody    = pickInlineRule("#bmarks_page_nav {");
+const rssBoxBody     = pickInlineRule("#bmarks_page_nav .rss_linkbox {");
 if (filterBaseBody && /\bpadding\s*:/.test(filterBaseBody)) {
-  console.log(`  composer  #bmarks_page_nav a.filter (base) declares padding — would wrap the inline filter row. Move padding to .selected only.`);
+  console.log(`  composer  #bmarks_page_nav a.filter (base) declares padding — would wrap the flex filter row. Move padding to .selected only.`);
   blockers++;
 }
 if (filterSelBody) {
@@ -105,6 +112,16 @@ if (filterSelBody) {
     console.log(`  composer  #bmarks_page_nav a.filter.selected has padding-x=${padX} but margin-x=${marX || 'missing'} — must be exact negative to neutralize inline drift.`);
     blockers++;
   }
+}
+// RSS chip pinning contract: nav must be flexbox + .rss_linkbox must use margin-left:auto.
+// Without this, RSS wraps to a second line on themes with size-base > 13px.
+if (navRootBody && !/display\s*:\s*flex/.test(navRootBody)) {
+  console.log(`  composer  #bmarks_page_nav must declare display:flex — otherwise .rss_linkbox margin-left:auto won't pin RSS to right.`);
+  blockers++;
+}
+if (rssBoxBody && !/margin-left\s*:\s*auto/.test(rssBoxBody)) {
+  console.log(`  composer  #bmarks_page_nav .rss_linkbox must declare margin-left:auto — otherwise RSS won't be right-aligned in flex layout.`);
+  blockers++;
 }
 
 console.log("");

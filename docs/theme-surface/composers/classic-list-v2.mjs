@@ -70,10 +70,11 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: $
 /* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
    on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
    margin to neutralize its added padding so siblings don't shift.
-   .rss_linkbox is positioned absolutely so themes with larger size-base (14px) don't push it to a 2nd line
-   when float:right runs out of horizontal space on the current line. */
-#bmarks_page_nav { color: ${v("muted")} !important; position: relative !important; padding-right: 56px !important; }
-#bmarks_page_nav .rss_linkbox { position: absolute !important; right: 0 !important; top: 0 !important; float: none !important; }
+   Layout uses CSS flexbox so the RSS chip is always pinned to the right via margin-left:auto, regardless
+   of theme font size (paper-ink/rose-pine use 14px serif which made the prior float:right approach wrap).
+   flex-wrap allows graceful overflow on very narrow viewports without overlapping last filter. */
+#bmarks_page_nav { color: ${v("muted")} !important; display: flex !important; flex-wrap: wrap !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; }
+#bmarks_page_nav .rss_linkbox { margin-left: auto !important; padding-left: 12px !important; float: none !important; position: static !important; }
 #bmarks_page_nav a.filter { color: ${v("muted")} !important; transition: color 0.15s ease !important; }
 #bmarks_page_nav a.filter:hover { color: ${v("link-hover")} !important; }
 #bmarks_page_nav a.filter.selected { background: ${v("accent")} !important; color: ${v("btn-fg")} !important; padding: 1px 5px !important; margin: 0 -5px !important; border-radius: ${v("radius-sm")} !important; font-weight: ${v("weight-heading")} !important; }

@@ -128,13 +128,13 @@
 
     "bmarks_nav.root": {
       "sel": "#bmarks_page_nav",
-      "role": "secondary filter row on /u:* and /u:*/unread (all/private/public/unread/untagged/starred/...). Uses position:relative + padding-right to host the absolutely-positioned RSS chip without inline-flow contention (themes with size-base 14px would otherwise wrap the float-right RSS).",
+      "role": "secondary filter row on /u:* and /u:*/unread (all/private/public/unread/untagged/starred/...). Uses CSS flexbox layout so the RSS chip stays pinned to the right via margin-left:auto regardless of theme font size or container width — the float:right approach previously wrapped on themes with size-base 14px.",
       "states": ["default"],
       "tokens": ["palette.muted"]
     },
     "bmarks_nav.rss_box": {
       "sel": "#bmarks_page_nav .rss_linkbox",
-      "role": "RSS chip wrapper — absolutely positioned right edge so it never wraps regardless of filter row width or theme font size",
+      "role": "RSS chip wrapper — margin-left:auto in flex layout pushes it to right end of last line; flex-wrap allows graceful wrap on very narrow viewports without overlapping the last filter",
       "states": ["default"]
     },
     "bmarks_nav.filter": {
