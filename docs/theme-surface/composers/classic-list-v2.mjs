@@ -66,14 +66,20 @@ body:not(#pinboard) #popup_header { background: transparent !important; color: $
 #sub_banner a { color: ${v("muted")} !important; }
 #sub_banner a:hover, #sub_banner a.selected { color: ${v("accent")} !important; }
 
+/* ---- User navbar: hosts [.small_username] [.bookmark_count_box] [#bmarks_page_nav] on a single row.
+   Pinboard's vanilla layout uses float:left on the first two siblings + a block-level #bmarks_page_nav
+   that lets inline content wrap around them. Switching #bmarks_page_nav to display:flex would create a
+   BFC and clear those floats, dropping the filter row to a 2nd line. Solution: turn the OUTER .user_navbar
+   into a flex container so all three siblings stay on one row, then nest a flex inside #bmarks_page_nav
+   to pin the RSS chip right via margin-left:auto. ---- */
+.user_navbar { display: flex !important; flex-wrap: nowrap !important; align-items: baseline !important; }
+.user_navbar > .small_username, .user_navbar > .bookmark_count_box { float: none !important; flex-shrink: 0 !important; }
+
 /* ---- Bookmarks page nav (#bmarks_page_nav: all/private/public/unread/untagged/starred/...) ---- */
-/* Pinboard's filter row is a single inline text line with " ‧ " separators between links — extra padding
-   on every link overflows and wraps the row. Only the selected link gets a pill, with negative inline
-   margin to neutralize its added padding so siblings don't shift.
-   Layout uses CSS flexbox so the RSS chip is always pinned to the right via margin-left:auto, regardless
-   of theme font size (paper-ink/rose-pine use 14px serif which made the prior float:right approach wrap).
-   flex-wrap allows graceful overflow on very narrow viewports without overlapping last filter. */
-#bmarks_page_nav { color: ${v("muted")} !important; display: flex !important; flex-wrap: wrap !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; }
+/* Inner flex container: filters flow inline, .rss_linkbox pinned right via margin-left:auto.
+   Only the selected filter gets a pill with negative margin to neutralize its padding (zero inline drift).
+   flex:1 + min-width:0 lets nav shrink to fit available space after the leftward siblings. */
+#bmarks_page_nav { color: ${v("muted")} !important; flex: 1 !important; min-width: 0 !important; display: flex !important; flex-wrap: wrap !important; align-items: center !important; box-sizing: border-box !important; }
 #bmarks_page_nav .rss_linkbox { margin-left: auto !important; padding-left: 12px !important; float: none !important; position: static !important; }
 #bmarks_page_nav a.filter { color: ${v("muted")} !important; transition: color 0.15s ease !important; }
 #bmarks_page_nav a.filter:hover { color: ${v("link-hover")} !important; }

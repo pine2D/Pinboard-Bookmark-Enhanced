@@ -123,6 +123,13 @@ if (rssBoxBody && !/margin-left\s*:\s*auto/.test(rssBoxBody)) {
   console.log(`  composer  #bmarks_page_nav .rss_linkbox must declare margin-left:auto — otherwise RSS won't be right-aligned in flex layout.`);
   blockers++;
 }
+// Outer .user_navbar must ALSO be flex so the inner #bmarks_page_nav (flex item with BFC) doesn't
+// drop below the float-left siblings (.small_username, .bookmark_count_box).
+const userNavbarBody = pickInlineRule(".user_navbar {");
+if (!userNavbarBody || !/display\s*:\s*flex/.test(userNavbarBody)) {
+  console.log(`  composer  .user_navbar must declare display:flex — otherwise inner #bmarks_page_nav (flex BFC) drops to a 2nd line below .small_username/.bookmark_count_box floats.`);
+  blockers++;
+}
 
 console.log("");
 if (blockers > 0) {

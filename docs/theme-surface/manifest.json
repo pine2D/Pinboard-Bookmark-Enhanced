@@ -126,9 +126,14 @@
       ]
     },
 
+    "user_navbar.root": {
+      "sel": ".user_navbar",
+      "role": "Outer container with three siblings on a single row: .small_username (float:left → flex item), .bookmark_count_box (float:left → flex item), #bmarks_page_nav (block → flex:1 child). Promoted to display:flex so swapping the inner nav to flex no longer drops it to a 2nd line via BFC float-clearing.",
+      "states": ["default"]
+    },
     "bmarks_nav.root": {
       "sel": "#bmarks_page_nav",
-      "role": "secondary filter row on /u:* and /u:*/unread (all/private/public/unread/untagged/starred/...). Uses CSS flexbox layout so the RSS chip stays pinned to the right via margin-left:auto regardless of theme font size or container width — the float:right approach previously wrapped on themes with size-base 14px.",
+      "role": "Inner flex container for filter row (all/private/public/unread/...). flex:1 + min-width:0 takes available space; nested flex pins .rss_linkbox right via margin-left:auto regardless of theme font size or container width.",
       "states": ["default"],
       "tokens": ["palette.muted"]
     },
