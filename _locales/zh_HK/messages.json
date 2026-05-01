@@ -1247,5 +1247,38 @@
   },
   "saveAsThemeDisabledHint": {
     "message": "請先修改 Custom CSS 才能儲存為主題"
+  },
+  "labelCustomCSSOverlay": {
+    "message": "自訂 CSS 疊加"
+  },
+  "customCSSOverlayHelp": {
+    "message": "你的 CSS 會疊加在所選預設之上。留空則只使用預設；這裡寫的規則會覆蓋預設裡同名規則。"
+  },
+  "presetPreviewToggle": {
+    "message": "檢視目前預設 CSS（唯讀）"
+  },
+  "migrationBannerTitle": {
+    "message": "主題儲存已升級至 v2 格式"
+  },
+  "migrationBannerDetails": {
+    "message": "節省同步空間約 {bytes}；預設 CSS 不再佔用 Google 同步配額。"
+  },
+  "migrationUndoBtn": {
+    "message": "復原"
+  },
+  "migrationDismissBtn": {
+    "message": "知道了"
+  },
+  "migrationUndoConfirm": {
+    "message": "復原舊格式？這會把 CSS 寫回同步儲存空間。"
+  },
+  "migrationUndoExpired": {
+    "message": "復原視窗已過期"
+  },
+  "overlayQuotaFallback": {
+    "message": "CSS 僅儲存到本機（同步配額已滿）"
+  },
+  "confirm": {
+    "message": "確認"
   }
 }

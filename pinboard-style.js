@@ -1,7 +1,19 @@
 // ============================================================
 // Pinboard Bookmark Enhanced - Custom Style Injector
 // Content script for pinboard.in pages (runs at document_start)
+//
+// Schema v2 (2026-05-01):
+//   themePresetKey   → string, looks up CSS from PINBOARD_THEMES (loaded above)
+//   customOverlayCSS → user's tweak CSS, appended after preset (CSS later wins)
+//   optOverlayInLocal → flag: overlay exceeded sync quota, lives in local
 // ============================================================
+
+// Adaptive theme map (mirrors shared.js — content scripts can't import it)
+const PBP_ADAPTIVE_THEME_MAP = {
+  flexoki: ["flexoki-light", "flexoki-dark"],
+  solarized: ["solarized-light", "solarized-dark"],
+  catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
+};
 
 // Immediately hide page to prevent FOUC while loading custom theme
 const _pbpCloak = document.createElement("style");
@@ -41,26 +53,54 @@ _pbpCloak.textContent = "html { opacity: 0 !important; }";
   setTimeout(uncloak, 800);
 
   try {
-    const syncData = await (await getStorage()).get({ customFont: "", optTheme: "auto" });
-    const customCSS = await readChunkedSync("customCSS", "");
+    const storage = await getStorage();
+    const data = await storage.get({
+      customFont: "",
+      optTheme: "auto",
+      themePresetKey: "",
+    });
 
-    const { customFont, optTheme } = syncData;
+    // Overlay may live in sync (chunked) or local fallback (when sync quota hit)
+    const { optOverlayInLocal } = await chrome.storage.sync.get({ optOverlayInLocal: false });
+    let overlay = "";
+    if (optOverlayInLocal) {
+      const local = await chrome.storage.local.get({ customOverlayCSS_localFallback: "" });
+      overlay = local.customOverlayCSS_localFallback;
+    } else {
+      overlay = await readChunkedSync("customOverlayCSS", "");
+    }
 
     // Inject pbp-dark class based on extension theme setting
-    const isDark = optTheme === "dark" ||
-      (optTheme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const isDark = data.optTheme === "dark" ||
+      (data.optTheme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("pbp-dark", isDark);
 
-    if (customFont || customCSS) {
-      let css = "";
-      if (customFont) {
-        css += `body, .bookmark_title, .bookmark_description, .tag { font-family: ${customFont} !important; }\n`;
+    // Resolve preset CSS from PINBOARD_THEMES (loaded above us as content script)
+    let presetCss = "";
+    if (data.themePresetKey && typeof PINBOARD_THEMES !== "undefined") {
+      // Adaptive themes resolve to light/dark variant based on current mode
+      let themeKey = data.themePresetKey;
+      if (PBP_ADAPTIVE_THEME_MAP[themeKey]) {
+        themeKey = PBP_ADAPTIVE_THEME_MAP[themeKey][isDark ? 1 : 0];
       }
-      if (customCSS) {
-        css += customCSS;
-      }
+      if (PINBOARD_THEMES[themeKey]) presetCss = PINBOARD_THEMES[themeKey].css || "";
+    }
+
+    let combined = "";
+    if (data.customFont) {
+      combined += `body, .bookmark_title, .bookmark_description, .tag { font-family: ${data.customFont} !important; }\n`;
+    }
+    if (presetCss) {
+      combined += `/* === preset: ${data.themePresetKey} === */\n${presetCss}\n`;
+    }
+    if (overlay) {
+      combined += `/* === user overlay === */\n${overlay}\n`;
+    }
+
+    if (combined) {
       const style = document.createElement("style");
-      style.textContent = css;
+      style.id = "pbp-injected";
+      style.textContent = combined;
       (document.head || document.documentElement).appendChild(style);
     }
   } catch (_) {}

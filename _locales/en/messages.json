@@ -1247,5 +1247,38 @@
   },
   "saveAsThemeDisabledHint": {
     "message": "Modify Custom CSS first to save as theme"
+  },
+  "labelCustomCSSOverlay": {
+    "message": "Custom CSS Overlay"
+  },
+  "customCSSOverlayHelp": {
+    "message": "Your CSS is appended on top of the selected preset. Leave empty to use the preset only; rules written here override the preset's rules of the same name."
+  },
+  "presetPreviewToggle": {
+    "message": "View current preset CSS (read-only)"
+  },
+  "migrationBannerTitle": {
+    "message": "Theme storage upgraded to v2"
+  },
+  "migrationBannerDetails": {
+    "message": "Saved about {bytes} of sync space; preset CSS no longer counts against your Google sync quota."
+  },
+  "migrationUndoBtn": {
+    "message": "Undo"
+  },
+  "migrationDismissBtn": {
+    "message": "Got it"
+  },
+  "migrationUndoConfirm": {
+    "message": "Restore the old format? This rewrites the CSS back to sync storage."
+  },
+  "migrationUndoExpired": {
+    "message": "Undo window has expired"
+  },
+  "overlayQuotaFallback": {
+    "message": "CSS saved locally (sync quota full)"
+  },
+  "confirm": {
+    "message": "Confirm"
   }
 }

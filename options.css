@@ -412,6 +412,74 @@ html[data-theme] .theme-name-popover .tnp-cancel:hover { background: var(--opt-b
 html[data-theme="terminal"] body { font-family: "Courier New", Consolas, monospace; }
 html[data-theme="terminal"] .fg textarea { font-family: "Courier New", Consolas, monospace; }
 
+/* ---- Migration banner (schema v2) ---- */
+.migration-banner {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #b6d4b6;
+  border-left: 3px solid #4a8c4a;
+  border-radius: 6px;
+  background: #f1f8f1;
+  color: #2a5a2a;
+  font-size: 13px;
+}
+.migration-banner strong { display: block; margin-bottom: 4px; font-size: 13px; }
+.migration-banner p { margin: 0 0 8px; line-height: 1.5; }
+.migration-banner-actions { display: flex; gap: 8px; }
+html[data-theme] .migration-banner {
+  background: color-mix(in srgb, var(--opt-accent) 10%, var(--opt-panel));
+  border-color: color-mix(in srgb, var(--opt-accent) 30%, var(--opt-border));
+  border-left-color: var(--opt-accent);
+  color: var(--opt-fg);
+}
+
+/* ---- Overlay byte counter ---- */
+.overlay-meta-row { margin-top: 6px; display: flex; justify-content: flex-end; }
+.overlay-byte-counter {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #888;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+}
+.overlay-byte-counter.warn { color: #d97706; }
+.overlay-byte-counter.over { color: #c00; font-weight: 600; }
+#opt-custom-css.over-limit { border-color: #c00 !important; box-shadow: 0 0 0 2px rgba(204,0,0,0.15) !important; }
+html[data-theme] .overlay-byte-counter { color: var(--opt-fg-muted); }
+html[data-theme] .overlay-byte-counter.warn { color: var(--opt-warn, #e08040); }
+html[data-theme] .overlay-byte-counter.over { color: #ff5050; }
+
+/* ---- Preset preview (collapsible read-only) ---- */
+.preset-preview-section {
+  margin-top: 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.preset-preview-section summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  background: #fafafa;
+  user-select: none;
+}
+.preset-preview-section summary:hover { background: #f0f0f0; }
+.preset-preview-content {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 320px;
+  overflow: auto;
+  background: #f6f8fa;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre;
+  border-top: 1px solid #ddd;
+}
+html[data-theme] .preset-preview-section { border-color: var(--opt-border); }
+html[data-theme] .preset-preview-section summary { background: var(--opt-panel); color: var(--opt-fg-muted); }
+html[data-theme] .preset-preview-section summary:hover { background: var(--opt-btn-hover); }
+html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var(--opt-fg); border-top-color: var(--opt-border); }
+
 /* ---- High-DPI Scaling ---- */
 @media (min-resolution: 144dpi) and (min-width: 1200px) { body { zoom: 1.12; } }
 @media (min-resolution: 192dpi) and (min-width: 1200px) { body { zoom: 1.22; } }

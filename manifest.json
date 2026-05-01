@@ -61,6 +61,7 @@
         "https://*.pinboard.in/*"
       ],
       "js": [
+        "pinboard-themes.js",
         "pinboard-style.js"
       ],
       "run_at": "document_start"

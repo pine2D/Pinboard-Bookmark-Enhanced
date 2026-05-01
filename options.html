@@ -10,6 +10,8 @@
   <div class="container">
     <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced — Settings</span> <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span></h1>
 
+    <div id="migration-banner" class="migration-banner" style="display:none" role="status" aria-live="polite"></div>
+
     <div class="tabs">
       <button class="tab-btn active" data-panel="general" data-i18n="tabGeneral">General</button>
       <button class="tab-btn" data-panel="bookmarks" data-i18n="tabBookmarks">Bookmarks</button>
@@ -480,8 +482,12 @@
         <div id="saved-themes-list" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
       </div>
       <div class="fg">
-        <label class="bl" data-i18n="labelCustomCSS">Custom CSS</label>
-        <textarea id="opt-custom-css" rows="12" placeholder="/* Custom CSS for pinboard.in */&#10;body { line-height: 1.6; }&#10;.bookmark_title { font-size: 14px; }" data-i18n-placeholder="customCSSPlaceholder"></textarea>
+        <label class="bl" data-i18n="labelCustomCSSOverlay">Custom CSS Overlay</label>
+        <p class="hint" data-i18n="customCSSOverlayHelp">Your CSS is appended on top of the selected preset. Leave empty to use the preset only; rules written here override the preset's rules of the same name.</p>
+        <textarea id="opt-custom-css" rows="12" placeholder="/* Override rules go here */&#10;body { line-height: 1.6; }&#10;.bookmark_title { font-size: 14px; }" data-i18n-placeholder="customCSSPlaceholder"></textarea>
+        <div class="overlay-meta-row">
+          <span id="overlay-byte-counter" class="overlay-byte-counter">0 B / 50 KB</span>
+        </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
           <span class="save-theme-wrap">
             <button class="btn btn-sm" id="save-custom-theme" data-i18n="saveAsTheme" data-i18n-title="saveAsThemeDisabledHint" title="Modify Custom CSS first to save as theme" disabled>Save as theme</button>
@@ -489,6 +495,11 @@
           <p class="hint" style="margin:0" data-i18n="saveAsThemeHint">Save current CSS as a reusable theme.</p>
         </div>
       </div>
+
+      <details id="preset-preview-section" class="preset-preview-section" style="display:none">
+        <summary data-i18n="presetPreviewToggle">View current preset CSS (read-only)</summary>
+        <pre id="preset-preview-content" class="preset-preview-content"></pre>
+      </details>
 
     </div>
   </div>

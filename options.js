@@ -122,15 +122,89 @@ document.addEventListener("DOMContentLoaded", async () => {
   const s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
   deobfuscateSettings(s);
 
-  // ---- Load large sync data (chunked to bypass 8KB per-key limit) ----
-  s.customCSS = await syncGetLarge("customCSS", "");
-  // One-time migration: move customCSS from local to sync
-  if (!s.customCSS) {
-    const localData = await chrome.storage.local.get({ customCSS: "" });
-    if (localData.customCSS) {
-      s.customCSS = localData.customCSS;
-      await syncSetLarge("customCSS", s.customCSS);
-      await chrome.storage.local.remove("customCSS");
+  // ---- Schema v2 migration: split customCSS into themePresetKey + customOverlayCSS ----
+  // Runs once per profile. Cleared sync.customCSS chunks; saves diff in local for 7-day undo.
+  const OVERLAY_BYTE_LIMIT = 50 * 1024;
+  let migrationResult = null; // { savedBytes, banner } or null
+  {
+    const flags = await chrome.storage.sync.get({ _migrationV2: false });
+    const oldCSSFromSync = await syncGetLarge("customCSS", "");
+    let oldCSS = oldCSSFromSync;
+    if (!oldCSS) {
+      const localOldCSS = await chrome.storage.local.get({ customCSS: "" });
+      if (localOldCSS.customCSS) oldCSS = localOldCSS.customCSS;
+    }
+    const oldKeyForMigration = s.themePresetKey || "";
+    const hasOldData = !!oldCSS || !!oldKeyForMigration;
+    if (!flags._migrationV2 && hasOldData) {
+      // Resolve preset key: trust stored key, fall back to CSS-text reverse lookup
+      let resolvedKey = oldKeyForMigration;
+      if (!resolvedKey && oldCSS) {
+        for (const [key, theme] of Object.entries(PINBOARD_THEMES)) {
+          if (theme.css.trim() === oldCSS.trim()) { resolvedKey = key; break; }
+        }
+        // Adaptive parent fallback: catppuccin-latte → catppuccin
+        if (resolvedKey) {
+          for (const [parent, [light, dark]] of Object.entries(ADAPTIVE_THEME_MAP)) {
+            if (resolvedKey === light || resolvedKey === dark) { resolvedKey = parent; break; }
+          }
+        }
+      }
+      // Decide overlay value (X1: equal to preset → empty; X2/X3: keep full)
+      let newOverlay = "";
+      if (oldCSS) {
+        const preset = resolvedKey ? PINBOARD_THEMES[resolvedKey] : null;
+        const presetCSS = preset ? preset.css : "";
+        // Adaptive: also compare against light/dark variants
+        const adaptiveVariants = ADAPTIVE_THEME_MAP[resolvedKey] || [];
+        const allowed = [presetCSS, ...adaptiveVariants.map(k => PINBOARD_THEMES[k]?.css || "")];
+        const matchesPreset = allowed.some(css => css && css.trim() === oldCSS.trim());
+        newOverlay = matchesPreset ? "" : oldCSS;
+      }
+      try {
+        // Cap overlay at 50KB; oversize → throw to skip migration (rare)
+        if (newOverlay.length > OVERLAY_BYTE_LIMIT) {
+          await chrome.storage.local.set({ customOverlayCSS_localFallback: newOverlay });
+          await chrome.storage.sync.set({ optOverlayInLocal: true });
+        } else {
+          await syncSetLarge("customOverlayCSS", newOverlay);
+          await chrome.storage.sync.set({ optOverlayInLocal: false });
+        }
+        // Persist resolved preset key in sync
+        await chrome.storage.sync.set({ themePresetKey: resolvedKey || "" });
+        // Cleanup old customCSS (sync chunks + local backup)
+        const meta = await chrome.storage.sync.get("customCSS");
+        if (meta.customCSS && meta.customCSS._chunks) {
+          const oldChunks = Array.from({ length: meta.customCSS._chunks }, (_, i) => `customCSS_${i}`);
+          await chrome.storage.sync.remove(["customCSS", ...oldChunks]);
+        }
+        await chrome.storage.local.remove("customCSS");
+        // 7-day undo backup
+        await chrome.storage.local.set({
+          _migrationBackup: { ts: Date.now(), oldCSS, oldKey: oldKeyForMigration }
+        });
+        await chrome.storage.sync.set({ _migrationV2: true });
+        migrationResult = {
+          savedBytes: oldCSS.length - newOverlay.length,
+          banner: true
+        };
+        // Update s.* with new schema for the rest of the page init
+        s.themePresetKey = resolvedKey || "";
+        s.customOverlayCSS = newOverlay;
+      } catch (e) {
+        console.error("[migrationV2] failed", e);
+        // Don't set _migrationV2 flag — will retry on next load
+      }
+    }
+    // Always read overlay (post-migration or fresh install)
+    if (s.customOverlayCSS === undefined) {
+      const overlayFlags = await chrome.storage.sync.get({ optOverlayInLocal: false });
+      if (overlayFlags.optOverlayInLocal) {
+        const local = await chrome.storage.local.get({ customOverlayCSS_localFallback: "" });
+        s.customOverlayCSS = local.customOverlayCSS_localFallback;
+      } else {
+        s.customOverlayCSS = await syncGetLarge("customOverlayCSS", "");
+      }
     }
   }
 
@@ -158,7 +232,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
     "opt-batch-tag": s.optBatchTag, "opt-lang": s.optLang, "opt-theme": s.optTheme,
     "qs-default-tags": s.qsDefaultTags, "rl-default-tags": s.rlDefaultTags,
-    "opt-custom-font": s.customFont, "opt-custom-css": s.customCSS,
+    "opt-custom-font": s.customFont, "opt-custom-css": s.customOverlayCSS,
     "opt-ai-tag-separator": s.aiTagSeparator,
     "opt-jina-key": s.jinaApiKey,
     "opt-tag-presets": s.tagPresets
@@ -229,11 +303,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       // 1. Migrate regular settings
       const data = await oldStorage.get(Object.keys(SETTINGS_DEFAULTS));
       await newStorage.set(data);
-      // 2. Migrate customCSS (large value) — read from old, then switch pref, then write to new
-      const customCSS = await syncGetLarge("customCSS", "");
+      // 2. Migrate customOverlayCSS (large value) — read from old, then switch pref, then write to new
+      const customOverlayCSS = await syncGetLarge("customOverlayCSS", "");
       const savedThemes = await syncGetLarge("savedThemes", []);
       await chrome.storage.local.set({ optSyncEnabled: enabling });
-      await syncSetLarge("customCSS", customCSS);
+      await syncSetLarge("customOverlayCSS", customOverlayCSS);
       await syncSetLarge("savedThemes", savedThemes);
     } catch (e) {
       // Migration failed — revert toggle and abort
@@ -271,15 +345,74 @@ document.addEventListener("DOMContentLoaded", async () => {
       delete document.documentElement.dataset.theme;
     }
   }
-  // Track active preset key — used by saveAll() and theme dropdown listener
+  // Track active preset key — schema v2: themePresetKey is authoritative
   let currentPresetKey = s.themePresetKey || "";
-  if (!currentPresetKey && s.customCSS) {
-    // Backward compat: detect from CSS text if themePresetKey not yet stored
-    for (const [key, theme] of Object.entries(PINBOARD_THEMES)) {
-      if (theme.css.trim() === s.customCSS.trim()) { currentPresetKey = key; break; }
-    }
-  }
   applyOptionsPageTheme(currentPresetKey, s.optTheme);
+
+  // Render migration banner if migration just ran AND user hasn't dismissed.
+  if (migrationResult && migrationResult.banner) {
+    const dismissed = (await chrome.storage.local.get({ _migrationBannerDismissed: false }))._migrationBannerDismissed;
+    if (!dismissed) renderMigrationBanner(migrationResult.savedBytes);
+  }
+
+  function renderMigrationBanner(savedBytes) {
+    const host = document.getElementById("migration-banner");
+    if (!host) return;
+    host.style.display = "";
+    while (host.firstChild) host.removeChild(host.firstChild);
+    const title = document.createElement("strong");
+    title.textContent = t("migrationBannerTitle") || "Theme storage upgraded to v2";
+    const desc = document.createElement("p");
+    const savedKB = (savedBytes / 1024).toFixed(1);
+    const tmpl = t("migrationBannerDetails") || "Saved about {bytes} of sync space; preset CSS no longer counts against your Google sync quota.";
+    desc.textContent = tmpl.replace("{bytes}", `${savedKB} KB`);
+    const actions = document.createElement("div");
+    actions.className = "migration-banner-actions";
+    const undoBtn = document.createElement("button");
+    undoBtn.className = "btn btn-sm";
+    undoBtn.textContent = t("migrationUndoBtn") || "Undo";
+    undoBtn.addEventListener("click", async () => {
+      const backup = (await chrome.storage.local.get({ _migrationBackup: null }))._migrationBackup;
+      if (!backup || (Date.now() - backup.ts) > 7 * 24 * 60 * 60 * 1000) {
+        undoBtn.disabled = true;
+        undoBtn.title = t("migrationUndoExpired") || "Undo window has expired";
+        return;
+      }
+      showConfirmPopover(undoBtn, {
+        msg: t("migrationUndoConfirm") || "Restore old format? This rewrites the CSS back to sync storage.",
+        yesText: t("confirm") || "Confirm",
+        noText: t("cancel") || "Cancel",
+        onConfirm: async () => {
+          try {
+            await syncSetLarge("customCSS", backup.oldCSS);
+            const setOld = {};
+            if (backup.oldKey !== undefined) setOld.themePresetKey = backup.oldKey;
+            await chrome.storage.sync.set(setOld);
+            await chrome.storage.sync.remove(["customOverlayCSS", "_migrationV2", "optOverlayInLocal"]);
+            // Remove all customOverlayCSS_N chunks too
+            const meta = await chrome.storage.sync.get("customOverlayCSS");
+            if (meta.customOverlayCSS && meta.customOverlayCSS._chunks) {
+              const chunks = Array.from({ length: meta.customOverlayCSS._chunks }, (_, i) => `customOverlayCSS_${i}`);
+              await chrome.storage.sync.remove(chunks);
+            }
+            await chrome.storage.local.remove(["customOverlayCSS_localFallback", "_migrationBackup"]);
+            location.reload();
+          } catch (e) {
+            console.error("[migrationV2] undo failed", e);
+          }
+        }
+      });
+    });
+    const dismissBtn = document.createElement("button");
+    dismissBtn.className = "btn btn-sm";
+    dismissBtn.textContent = t("migrationDismissBtn") || "Got it";
+    dismissBtn.addEventListener("click", async () => {
+      await chrome.storage.local.set({ _migrationBannerDismissed: true });
+      host.style.display = "none";
+    });
+    actions.append(undoBtn, dismissBtn);
+    host.append(title, desc, actions);
+  }
   // Language change: save immediately and reload to apply
   document.getElementById("opt-lang").addEventListener("change", async () => {
     const lang = document.getElementById("opt-lang").value;
@@ -290,20 +423,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.body.style.opacity = "0";
     setTimeout(() => location.reload(), 180);
   });
-  // Real-time switch when theme dropdown changes (affects Flexoki Adaptive + no-preset dark)
+  // Real-time switch when theme dropdown changes (affects options-page theme + preset preview)
+  // Adaptive presets resolve to light/dark variant in pinboard-style.js content script;
+  // options page only re-renders its own dataset.theme here.
   document.getElementById("opt-theme").addEventListener("change", () => {
     const mode = document.getElementById("opt-theme").value;
     applyOptionsPageTheme(currentPresetKey, mode);
-    // Adaptive pinboard themes: swap CSS when light/dark mode changes
-    if (ADAPTIVE_THEME_MAP[currentPresetKey]) {
-      const prefersDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      const themeKey = ADAPTIVE_THEME_MAP[currentPresetKey][prefersDark ? 1 : 0];
-      const theme = PINBOARD_THEMES[themeKey];
-      if (theme) {
-        document.getElementById("opt-custom-css").value = theme.css;
-        scheduleAutoSave();
-      }
-    }
+    renderPresetPreview();
   });
 
   // ---- Provider field toggle ----
@@ -417,7 +543,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       notifyTabSet: document.getElementById("notify-tab-set").checked,
       notifyBatchSave: document.getElementById("notify-batch-save").checked,
       notifyErrors: document.getElementById("notify-errors").checked,
-      // Custom Style (font only — CSS stored in local)
+      // Custom Style (font here; overlay CSS saved separately via syncSetLarge below)
       customFont: document.getElementById("opt-custom-font").value.trim(),
       // New toggles
       optCheckBookmarkStatus: document.getElementById("opt-check-bookmark-status").checked,
@@ -432,9 +558,38 @@ document.addEventListener("DOMContentLoaded", async () => {
       themePresetKey: currentPresetKey
     };
     await (await getSettingsStorage()).set(data);
-    // Save customCSS via chunked sync (supports cross-device sync)
-    await syncSetLarge("customCSS", document.getElementById("opt-custom-css").value);
+    // Save customOverlayCSS with quota-aware fallback (sync → local on QUOTA_BYTES)
+    await saveOverlayWithFallback(document.getElementById("opt-custom-css").value);
     flashAutoSave();
+  }
+
+  // Quota-aware overlay save. On sync QUOTA_BYTES, write to local + flag,
+  // so the content script and other devices know overlay isn't synced.
+  async function saveOverlayWithFallback(value) {
+    if (value.length > OVERLAY_BYTE_LIMIT) {
+      // UI-side counter blocks before this; final guard
+      console.warn("[overlay] exceeds 50KB cap, refusing save");
+      return;
+    }
+    try {
+      await syncSetLarge("customOverlayCSS", value);
+      await chrome.storage.sync.set({ optOverlayInLocal: false });
+      await chrome.storage.local.remove("customOverlayCSS_localFallback");
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e);
+      if (/QUOTA|quota/i.test(msg)) {
+        await chrome.storage.local.set({ customOverlayCSS_localFallback: value });
+        await chrome.storage.sync.set({ optOverlayInLocal: true });
+        const status = document.getElementById("auto-save-status");
+        if (status) {
+          status.textContent = t("overlayQuotaFallback") || "CSS saved locally (sync quota full)";
+          status.classList.add("saved");
+          setTimeout(() => { status.textContent = t("optAutoSave"); status.classList.remove("saved"); }, 4000);
+        }
+      } else {
+        throw e;
+      }
+    }
   }
 
   // Debounced auto-save: triggers 500ms after last change
@@ -480,9 +635,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const exportData = Object.fromEntries(
       Object.entries(raw).filter(([, v]) => v !== undefined)
     );
-    // Include chunked sync data (handled separately via syncGetLarge)
-    const customCSS = await syncGetLarge("customCSS", "");
-    if (customCSS) exportData.customCSS = customCSS;
+    exportData._schemaVersion = 2;
+    // Read overlay from sync OR local fallback (preserve user data either way)
+    const overlayFlags = await chrome.storage.sync.get({ optOverlayInLocal: false });
+    let overlay = "";
+    if (overlayFlags.optOverlayInLocal) {
+      const local = await chrome.storage.local.get({ customOverlayCSS_localFallback: "" });
+      overlay = local.customOverlayCSS_localFallback;
+    } else {
+      overlay = await syncGetLarge("customOverlayCSS", "");
+    }
+    if (overlay) exportData.customOverlayCSS = overlay;
     const savedThemesData = await syncGetLarge("savedThemes", []);
     if (savedThemesData.length) exportData.savedThemes = savedThemesData;
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
@@ -493,26 +656,57 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- Import Settings ----
+  // Schema-version aware: v2 backups use customOverlayCSS, v1 uses customCSS.
   document.getElementById("import-settings-file").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      // Separate large data for chunked sync
-      const { customCSS, savedThemes: importedThemes, ...rest } = data;
+      const schemaVersion = data._schemaVersion || 1;
+      const { _schemaVersion, customCSS, customOverlayCSS, savedThemes: importedThemes, ...rest } = data;
       // Whitelist-restrict imported keys to known settings (strips any
       // caches that might be present in older backups).
       const safeData = Object.fromEntries(
         Object.entries(rest).filter(([k]) => EXPORTABLE_KEYS.includes(k))
       );
       await (await getSettingsStorage()).set(safeData);
-      if (customCSS !== undefined) await syncSetLarge("customCSS", customCSS);
+
+      if (schemaVersion >= 2) {
+        // v2: direct write
+        if (customOverlayCSS !== undefined) await saveOverlayWithFallback(customOverlayCSS);
+      } else {
+        // v1 → v2: detect preset match, derive overlay
+        const oldKey = safeData.themePresetKey || "";
+        let resolvedKey = oldKey;
+        if (!resolvedKey && customCSS) {
+          for (const [key, theme] of Object.entries(PINBOARD_THEMES)) {
+            if (theme.css.trim() === customCSS.trim()) { resolvedKey = key; break; }
+          }
+          if (resolvedKey) {
+            for (const [parent, [light, dark]] of Object.entries(ADAPTIVE_THEME_MAP)) {
+              if (resolvedKey === light || resolvedKey === dark) { resolvedKey = parent; break; }
+            }
+          }
+        }
+        let newOverlay = "";
+        if (customCSS) {
+          const preset = resolvedKey ? PINBOARD_THEMES[resolvedKey] : null;
+          const presetCSS = preset ? preset.css : "";
+          const variants = ADAPTIVE_THEME_MAP[resolvedKey] || [];
+          const allowed = [presetCSS, ...variants.map(k => PINBOARD_THEMES[k]?.css || "")];
+          newOverlay = allowed.some(c => c && c.trim() === customCSS.trim()) ? "" : customCSS;
+        }
+        await chrome.storage.sync.set({ themePresetKey: resolvedKey || "" });
+        await saveOverlayWithFallback(newOverlay);
+      }
+
       if (importedThemes !== undefined) await syncSetLarge("savedThemes", importedThemes);
       const status = document.getElementById("import-status");
       status.textContent = t("importedReload");
       setTimeout(() => { status.textContent = ""; }, 3000);
     } catch (err) {
+      console.error("[import] failed", err);
       const status = document.getElementById("import-status");
       status.textContent = t("importInvalid");
       status.style.color = "#c00";
@@ -629,93 +823,52 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- Theme preset buttons ----
+  // Schema v2: preset selection only updates currentPresetKey;
+  // textarea (overlay) is never touched. Active state mirrors the key.
   function updateThemePresetButtons() {
-    const css = document.getElementById("opt-custom-css").value;
     document.querySelectorAll(".theme-preset-btn").forEach(btn => {
-      const key = btn.dataset.theme;
-      let isActive;
-      if (!key) {
-        // "None" button: active when CSS is empty
-        isActive = !css.trim();
-      } else {
-        // Adaptive themes: match either light or dark variant
-        const adaptivePinboard = {
-          solarized: ["solarized-light", "solarized-dark"],
-          catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
-        };
-        const keysToCheck = adaptivePinboard[key] ? adaptivePinboard[key] : [key];
-        isActive = keysToCheck.some(k => {
-          const theme = PINBOARD_THEMES[k];
-          return theme && css.trim() === theme.css.trim();
-        });
-      }
+      const key = btn.dataset.theme || "";
+      const isActive = key === currentPresetKey;
       btn.classList.toggle("active", isActive);
       btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
   }
   updateThemePresetButtons();
 
-  // Check whether the current CSS matches any preset or saved theme. Used to
-  // detect "dirty" unsaved edits before overwriting them with a preset load.
-  function cssMatchesAnyKnownTheme(css) {
-    const trimmed = css.trim();
-    if (!trimmed) return true; // empty counts as "not dirty"
-    for (const theme of Object.values(PINBOARD_THEMES)) {
-      if (theme.css.trim() === trimmed) return true;
+  // Render a read-only preview of the selected preset's CSS (collapsible panel).
+  function renderPresetPreview() {
+    const previewEl = document.getElementById("preset-preview-content");
+    const previewSection = document.getElementById("preset-preview-section");
+    if (!previewEl || !previewSection) return;
+    if (!currentPresetKey) {
+      previewSection.style.display = "none";
+      previewEl.textContent = "";
+      return;
     }
-    for (const theme of savedThemes) {
-      if (theme.css.trim() === trimmed) return true;
+    let themeKey = currentPresetKey;
+    if (ADAPTIVE_THEME_MAP[themeKey]) {
+      const mode = document.getElementById("opt-theme").value;
+      const prefersDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      themeKey = ADAPTIVE_THEME_MAP[themeKey][prefersDark ? 1 : 0];
     }
-    return false;
+    const theme = PINBOARD_THEMES[themeKey];
+    previewSection.style.display = "";
+    previewEl.textContent = theme ? theme.css : "";
   }
+  renderPresetPreview();
 
   function applyPreset(key) {
-    const cssEl = document.getElementById("opt-custom-css");
-    if (!key) {
-      cssEl.value = "";
-    } else {
-      // Adaptive themes: resolve to light/dark variant based on current theme mode
-      const adaptivePinboard = {
-        solarized: ["solarized-light", "solarized-dark"],
-        catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
-      };
-      let themeKey = key;
-      if (adaptivePinboard[key]) {
-        const mode = document.getElementById("opt-theme").value;
-        const prefersDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        themeKey = adaptivePinboard[key][prefersDark ? 1 : 0];
-      }
-      const theme = PINBOARD_THEMES[themeKey];
-      if (theme) cssEl.value = theme.css;
-    }
+    currentPresetKey = key || "";
     updateThemePresetButtons();
     updateSavedThemeButtons();
     updateSaveThemeBtnState();
-    // Update tracked key and apply options page theme instantly
-    currentPresetKey = key || "";
     applyOptionsPageTheme(currentPresetKey, document.getElementById("opt-theme").value);
+    renderPresetPreview();
     scheduleAutoSave();
   }
 
   document.querySelectorAll(".theme-preset-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const key = btn.dataset.theme;
-      const currentCSS = document.getElementById("opt-custom-css").value;
-
-      // Dirty-state guard: if user has hand-edited CSS that doesn't match any
-      // preset or saved theme, confirm before overwriting.
-      if (!currentPresetKey && !cssMatchesAnyKnownTheme(currentCSS)) {
-        showConfirmPopover(btn, {
-          msg: t("replaceCSSConfirm"),
-          yesText: t("replace"),
-          noText: t("cancel"),
-          onConfirm: () => applyPreset(key),
-        });
-        return;
-      }
-
-      applyPreset(key);
-    });
+    btn.addEventListener("click", () => applyPreset(btn.dataset.theme));
   });
 
   // Toggle "Save as theme" button disabled state based on whether there's
@@ -728,20 +881,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     saveBtn.disabled = !css.trim();
   }
 
-  // Update active state and options page theme when user manually edits CSS
+  // Update saved-theme/save-button state and byte counter when user edits overlay CSS.
+  // Schema v2: textarea is the overlay; it does NOT determine the preset.
   document.getElementById("opt-custom-css").addEventListener("input", () => {
-    updateThemePresetButtons();
     updateSavedThemeButtons();
     updateSaveThemeBtnState();
-    // Detect if edited CSS matches a built-in preset, update options page theme accordingly
-    const css = document.getElementById("opt-custom-css").value;
-    let matchedKey = "";
-    for (const [key, theme] of Object.entries(PINBOARD_THEMES)) {
-      if (theme.css.trim() === css.trim()) { matchedKey = key; break; }
-    }
-    currentPresetKey = matchedKey;
-    applyOptionsPageTheme(currentPresetKey, document.getElementById("opt-theme").value);
+    updateOverlayByteCounter();
   });
+
+  // Byte counter: shows N B / 50 KB; warns at 80%, blocks save at 100%.
+  function updateOverlayByteCounter() {
+    const ta = document.getElementById("opt-custom-css");
+    const counter = document.getElementById("overlay-byte-counter");
+    if (!ta || !counter) return;
+    const bytes = new Blob([ta.value]).size;
+    const pct = bytes / OVERLAY_BYTE_LIMIT;
+    counter.textContent = `${formatBytes(bytes)} / 50 KB`;
+    counter.classList.toggle("warn", pct >= 0.8 && pct < 1);
+    counter.classList.toggle("over", pct >= 1);
+    ta.classList.toggle("over-limit", pct >= 1);
+  }
+  function formatBytes(b) {
+    if (b < 1024) return `${b} B`;
+    return `${(b / 1024).toFixed(1)} KB`;
+  }
+  updateOverlayByteCounter();
 
   // ---- Saved custom themes ----
   let savedThemes = []; // [{ name: "My Theme", css: "..." }, ...]
