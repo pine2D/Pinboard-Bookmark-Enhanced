@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Pinboard Bookmark Enhanced</title>
+  <script src="popup-theme-early.js"></script>
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
@@ -87,6 +88,7 @@
         <div id="ai-error-message" class="ai-error-message"></div>
         <div class="ai-error-actions">
           <button type="button" id="ai-error-retry" class="ai-error-btn" data-i18n="aiErrorRetry">Retry</button>
+          <button type="button" id="ai-error-fallback" class="ai-error-btn hidden"></button>
           <a href="#" id="ai-error-details-toggle" class="ai-error-details-toggle" data-i18n="aiErrorDetails">Details</a>
         </div>
         <pre id="ai-error-details" class="ai-error-details hidden"></pre>
@@ -124,6 +126,10 @@
       <button id="save-tabset-btn" class="qbtn" title="Save all open tabs as a tab set (requires pinboard.in login)" data-i18n="saveTabsBtn" data-i18n-title="saveTabsTitle">📑 Save Tabs</button>
       <button id="batch-bookmark-btn" class="qbtn" title="Save each open tab as an individual bookmark" data-i18n="batchSaveBtn" data-i18n-title="batchSaveTitle">📌 Batch Save</button>
       <button id="jina-md-btn" class="qbtn" title="" data-i18n="jinaMarkdownBtn">📄 Markdown</button>
+    </div>
+    <div id="batch-progress" class="batch-progress hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div id="batch-progress-fill" class="batch-progress-fill"></div>
+      <span id="batch-progress-text" class="batch-progress-text"></span>
     </div>
     <div id="offline-queue-bar" class="offline-bar hidden">
       <a href="#" id="offline-queue-toggle" class="offline-toggle" role="button" aria-expanded="false">

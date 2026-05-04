@@ -1280,5 +1280,15 @@
   },
   "confirm": {
     "message": "Potwierdź"
+  },
+  "aiErrorTryWith": {
+    "message": "Spróbuj z $PROVIDER$",
+    "description": "Button label on AI error card to retry with a different provider",
+    "placeholders": {
+      "provider": {
+        "content": "$1",
+        "example": "Spróbuj z OpenAI"
+      }
+    }
   }
 }

@@ -101,9 +101,22 @@ function setupTabSet() {
         existingUrls = await fetchExistingUrlSet(pinboardToken);
       }
       let aiFailed = 0;
+      const progress = $id("batch-progress");
+      const fill = $id("batch-progress-fill");
+      const ptext = $id("batch-progress-text");
+      if (progress) progress.classList.remove("hidden");
+      const updateProgress = (i) => {
+        const total = validTabs.length;
+        const pct = Math.round((i / total) * 100);
+        if (fill) fill.style.width = pct + "%";
+        if (ptext) ptext.textContent = `${i}/${total}  ✓${saved}  ✗${failed}${aiFailed ? `  AI✗${aiFailed}` : ""}`;
+        if (progress) progress.setAttribute("aria-valuenow", String(pct));
+      };
+      updateProgress(0);
       for (let i = 0; i < validTabs.length; i++) {
         const tab = validTabs[i];
         batchBtn.textContent = t("batchProgress", String(i + 1), String(validTabs.length), String(saved), String(failed));
+        updateProgress(i);
         if (settings.batchSkipExisting && existingUrls.has(tab.url)) {
           skipped++;
           continue;
@@ -188,9 +201,16 @@ function setupTabSet() {
         chrome.runtime.sendMessage({ type: "show_notification", id: "batch-saved-" + Date.now(), title: t("bgBatchSaved"), message: t("batchSavedNotify", String(saved), tagsSuffix), category: "batchSave" });
       }
       batchBtn.textContent = t("batchSavedCount", String(saved));
-      setTimeout(() => { batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false; }, 3000);
+      // Snap progress bar to 100% then fade out after 1.5s
+      updateProgress(validTabs.length);
+      setTimeout(() => {
+        if (progress) progress.classList.add("hidden");
+        batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false;
+      }, 1500);
     } catch (e) {
       showStatus("status-msg", t("batchFailed", e.message), "error");
+      const progress = $id("batch-progress");
+      if (progress) progress.classList.add("hidden");
       batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false;
     }
   });

@@ -24,7 +24,7 @@ echo ""
 
 INCLUDE=(
   manifest.json
-  popup.html popup.js popup.css
+  popup.html popup.js popup.css popup-theme-early.js
   popup-ai.js popup-batch.js popup-tags.js
   options.html options.js options.css options-theme-early.js
   background.js shared.js ai.js i18n.js

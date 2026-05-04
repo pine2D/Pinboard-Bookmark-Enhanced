@@ -374,6 +374,41 @@ a:hover { text-decoration: underline; }
   color: #2a7a2a;
 }
 
+/* Batch progress bar — visible while batch save iterates over tabs */
+.batch-progress {
+  position: relative;
+  margin: 6px 12px 0;
+  height: 14px;
+  background: #eef2f7;
+  border: 1px solid #d4dae3;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.batch-progress-fill {
+  position: absolute; inset: 0 auto 0 0;
+  width: 0%;
+  background: linear-gradient(90deg, #4a90d9, #4477bb);
+  transition: width 0.25s ease;
+}
+.batch-progress-text {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 10px;
+  line-height: 14px;
+  color: #1a3a6e;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  mix-blend-mode: difference;
+  filter: invert(1);
+}
+html[data-theme] .batch-progress { background: var(--pp-input-bg, var(--pp-bg-soft, #2a2a2a)); border-color: var(--pp-border); }
+html[data-theme] .batch-progress-fill { background: var(--pp-accent, #4477bb); }
+html[data-theme] .batch-progress-text { color: var(--pp-fg); mix-blend-mode: normal; filter: none; }
+html.dark .batch-progress { background: #252525; border-color: #444; }
+html.dark .batch-progress-fill { background: linear-gradient(90deg, #5599dd, #4477bb); }
+html.dark .batch-progress-text { color: #e0e0e0; mix-blend-mode: normal; filter: none; }
+
 /* Cache hint & regenerate */
 .cache-hint {
   font-size: 10px;

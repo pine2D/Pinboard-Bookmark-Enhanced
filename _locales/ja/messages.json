@@ -1280,5 +1280,15 @@
   },
   "confirm": {
     "message": "確認"
+  },
+  "aiErrorTryWith": {
+    "message": "$PROVIDER$ で再試行",
+    "description": "Button label on AI error card to retry with a different provider",
+    "placeholders": {
+      "provider": {
+        "content": "$1",
+        "example": "OpenAI で再試行"
+      }
+    }
   }
 }

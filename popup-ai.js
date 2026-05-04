@@ -27,12 +27,35 @@ const AI_BQ_REGEX = /(\n\n)?\[AI Summary\]\n<blockquote>[\s\S]*?<\/blockquote>\s
 // ---- AI Error Card ----
 let _aiErrorLastOp = null; // "summary" | "tags"
 
+// Fallback provider order: stable list, current provider gets skipped.
+const AI_PROVIDER_ORDER = [
+  "gemini", "openai", "claude", "deepseek", "qwen", "openrouter", "groq",
+  "mistral", "cohere", "siliconflow", "zhipu", "kimi", "minimax", "ollama", "custom"
+];
+const AI_PROVIDER_LABEL = {
+  gemini: "Gemini", openai: "OpenAI", claude: "Claude", deepseek: "DeepSeek",
+  qwen: "Qwen", minimax: "MiniMax", openrouter: "OpenRouter", groq: "Groq",
+  mistral: "Mistral", cohere: "Cohere", siliconflow: "SiliconFlow", zhipu: "Zhipu",
+  kimi: "Kimi", ollama: "Ollama", custom: "Custom"
+};
+
+// Find first provider OTHER than `current` that has a usable key, by iterating
+// AI_PROVIDER_ORDER. Returns null if no fallback is available.
+function pickFallbackProvider(s) {
+  const current = s.aiProvider || "gemini";
+  for (const p of AI_PROVIDER_ORDER) {
+    if (p === current) continue;
+    if (hasAIKey({ ...s, aiProvider: p })) return p;
+  }
+  return null;
+}
+
 function showAIError(op, err) {
   _aiErrorLastOp = op;
   const card = $id("ai-error-card");
   if (!card) return;
   const providerKey = (settings.aiProvider || "openai");
-  const provLabel = providerKey.charAt(0).toUpperCase() + providerKey.slice(1);
+  const provLabel = AI_PROVIDER_LABEL[providerKey] || providerKey;
   $id("ai-error-title").textContent = t("aiErrorTitle", op === "tags" ? t("aiErrorOpTags") : t("aiErrorOpSummary"));
   const msgEl = $id("ai-error-message");
   const short = (err && err.message) ? err.message : String(err || t("aiUnknownError"));
@@ -41,6 +64,22 @@ function showAIError(op, err) {
   detailsEl.textContent = (err && err.stack) ? err.stack : short;
   detailsEl.classList.add("hidden");
   $id("ai-error-details-toggle").textContent = t("aiErrorDetails");
+
+  // Fallback button: show when another provider has a valid key
+  const fallbackBtn = $id("ai-error-fallback");
+  if (fallbackBtn) {
+    const next = pickFallbackProvider(settings);
+    if (next) {
+      const nextLabel = AI_PROVIDER_LABEL[next] || next;
+      fallbackBtn.textContent = t("aiErrorTryWith", nextLabel) || `Try with ${nextLabel}`;
+      fallbackBtn.dataset.provider = next;
+      fallbackBtn.classList.remove("hidden");
+    } else {
+      fallbackBtn.classList.add("hidden");
+      delete fallbackBtn.dataset.provider;
+    }
+  }
+
   card.classList.remove("hidden");
 }
 
@@ -58,6 +97,22 @@ function setupAIFeatures() {
     hideAIError();
     if (op === "tags") doAITags(true);
     else if (op === "summary") doAISummary(true);
+  });
+  $id("ai-error-fallback")?.addEventListener("click", async (e) => {
+    const next = e.currentTarget.dataset.provider;
+    const op = _aiErrorLastOp;
+    if (!next || !op) return;
+    // One-shot override: swap provider, run op, restore. Don't persist —
+    // user may want their default to remain (e.g., Gemini quota resets next day).
+    const original = settings.aiProvider;
+    settings.aiProvider = next;
+    hideAIError();
+    try {
+      if (op === "tags") await doAITags(true);
+      else if (op === "summary") await doAISummary(true);
+    } finally {
+      settings.aiProvider = original;
+    }
   });
   $id("ai-error-details-toggle")?.addEventListener("click", (e) => {
     e.preventDefault();

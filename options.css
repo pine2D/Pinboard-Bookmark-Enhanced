@@ -307,6 +307,7 @@ html[data-theme] .accordion-header:hover { color: var(--opt-accent); }
 html[data-theme] .accordion-section { border-color: var(--opt-border-section); }
 html[data-theme] .theme-preset-btn.active,
 html[data-theme] .saved-theme-btn.active { background: var(--opt-accent); border-color: var(--opt-accent); color: var(--opt-bg); }
+html[data-theme] .saved-theme-del:focus-visible { outline-color: var(--opt-accent); }
 html[data-theme] .theme-group-label { color: var(--opt-fg-hint); }
 html[data-theme] .key-toggle { color: var(--opt-fg-hint); }
 html[data-theme] .key-toggle:hover { color: var(--opt-fg); }
