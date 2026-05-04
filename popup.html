@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="color-scheme" content="light dark" />
   <title>Pinboard Bookmark Enhanced</title>
   <script src="popup-theme-early.js"></script>
   <link rel="stylesheet" href="popup.css" />
@@ -20,7 +21,7 @@
   <div id="main-section" class="hidden">
     <div class="header-bar">
       <span id="user-info"></span>
-      <span><a href="#" id="options-link" data-i18n="settings">settings</a> · <a href="#" id="logout-link" data-i18n="logout">logout</a></span>
+      <span><button type="button" class="header-link" id="options-link" data-i18n="settings">settings</button> · <button type="button" class="header-link" id="logout-link" data-i18n="logout">logout</button></span>
     </div>
 
     <div class="form-body">
@@ -42,7 +43,7 @@
           <textarea id="description-input" rows="3" aria-label="Notes" data-i18n-aria="labelNotes"></textarea>
           <div class="notes-bar">
             <span id="desc-char-count">0</span>
-            <a href="#" id="ai-summary-btn" class="action-link" data-i18n="aiSummaryBtn">🤖 AI summary</a>
+            <button type="button" id="ai-summary-btn" class="action-link" data-i18n="aiSummaryBtn">🤖 AI summary</button>
           </div>
         </div>
       </div>
@@ -51,12 +52,12 @@
         <div class="field">
           <div class="tags-input-wrap">
             <div id="tags-display" class="tags-display"></div>
-            <input type="text" id="tags-input" autocomplete="off" aria-label="Add tags" data-i18n-aria="placeholderAddTags" />
+            <input type="text" id="tags-input" autocomplete="off" spellcheck="false" aria-label="Add tags" data-i18n-aria="placeholderAddTags" />
           </div>
           <div id="tags-autocomplete" class="autocomplete-dropdown hidden"></div>
           <div class="tag-actions-row">
-            <a href="#" id="tags-copy-all" class="clear-all-link hidden" data-i18n="copyAllTags" data-i18n-title="copyAllTagsTitle">Copy</a>
-            <a href="#" id="tags-clear-all" class="clear-all-link hidden" data-i18n="clearAll">Clear all</a>
+            <button type="button" id="tags-copy-all" class="clear-all-link hidden" data-i18n="copyAllTags" data-i18n-title="copyAllTagsTitle">Copy</button>
+            <button type="button" id="tags-clear-all" class="clear-all-link hidden" data-i18n="clearAll">Clear all</button>
           </div>
           <div id="tags-last-used" class="last-used-hint hidden"></div>
         </div>
@@ -76,7 +77,7 @@
       <div class="row">
         <span class="label top" data-i18n="labelAiTags">AI Tags</span>
         <div class="field">
-          <div id="ai-suggest-tags" class="suggest-area"><a href="#" id="ai-tags-btn" class="action-link" data-i18n="aiGenerateBtn">🤖 generate</a></div>
+          <div id="ai-suggest-tags" class="suggest-area"><button type="button" id="ai-tags-btn" class="action-link" data-i18n="aiGenerateBtn">🤖 generate</button></div>
         </div>
       </div>
       <div id="ai-error-card" class="ai-error-card hidden" role="alert" aria-live="polite">
@@ -89,7 +90,7 @@
         <div class="ai-error-actions">
           <button type="button" id="ai-error-retry" class="ai-error-btn" data-i18n="aiErrorRetry">Retry</button>
           <button type="button" id="ai-error-fallback" class="ai-error-btn hidden"></button>
-          <a href="#" id="ai-error-details-toggle" class="ai-error-details-toggle" data-i18n="aiErrorDetails">Details</a>
+          <button type="button" id="ai-error-details-toggle" class="ai-error-details-toggle" data-i18n="aiErrorDetails">Details</button>
         </div>
         <pre id="ai-error-details" class="ai-error-details hidden"></pre>
       </div>
@@ -109,7 +110,7 @@
   <div class="quick-actions">
     <hr class="divider">
     <div class="search-row">
-      <input type="text" id="search-input" placeholder="Search your bookmarks..." class="search-field" aria-label="Search bookmarks" data-i18n-placeholder="placeholderSearchBookmarks" data-i18n-aria="placeholderSearchBookmarks" />
+      <input type="text" id="search-input" placeholder="Search your bookmarks…" class="search-field" aria-label="Search bookmarks" data-i18n-placeholder="placeholderSearchBookmarks" data-i18n-aria="placeholderSearchBookmarks" />
     </div>
     <div class="quick-links">
       <a id="tabs-link" href="https://pinboard.in/tabs/" target="_blank" title="Tab Sets" data-i18n="qlSets" data-i18n-title="qlSetsTitle">Sets</a>
@@ -132,11 +133,11 @@
       <span id="batch-progress-text" class="batch-progress-text"></span>
     </div>
     <div id="offline-queue-bar" class="offline-bar hidden">
-      <a href="#" id="offline-queue-toggle" class="offline-toggle" role="button" aria-expanded="false">
+      <button type="button" id="offline-queue-toggle" class="offline-toggle" aria-expanded="false">
         <span id="offline-queue-chevron">▸</span>
         <span id="offline-queue-text"></span>
-      </a>
-      <a href="#" id="offline-queue-clear" class="offline-clear" data-i18n="clear">clear</a>
+      </button>
+      <button type="button" id="offline-queue-clear" class="offline-clear" data-i18n="clear">clear</button>
     </div>
     <div id="offline-queue-list" class="offline-queue-list hidden"></div>
     <div id="recent-bookmarks" class="recent-bm-area hidden"></div>

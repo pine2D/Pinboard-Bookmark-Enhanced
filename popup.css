@@ -22,6 +22,12 @@ a:hover { text-decoration: underline; }
   font-size: 11px; color: #666;
 }
 .header-bar a { color: #666; font-size: 11px; }
+.header-bar .header-link {
+  background: none; border: none; padding: 0; margin: 0;
+  font: inherit; color: #666; font-size: 11px; cursor: pointer; text-decoration: underline;
+}
+.header-bar .header-link:hover { color: #333; }
+.header-bar .header-link:focus-visible { outline: 2px solid #4477bb; outline-offset: 2px; border-radius: 2px; }
 
 .login-body { padding: 14px 12px; }
 .login-body p { margin-bottom: 8px; font-size: 12px; color: #333; }
@@ -174,6 +180,17 @@ a:hover { text-decoration: underline; }
 #desc-char-count.over-limit { font-weight: 600; }
 .tag-skel { display: inline-block; height: 18px; margin: 0 4px 2px 0; border-radius: 10px; background: linear-gradient(90deg, #eee 0%, #dcdcdc 50%, #eee 100%); background-size: 200% 100%; animation: tagSkelPulse 1.4s ease-in-out infinite; vertical-align: middle; }
 @keyframes tagSkelPulse { 0%, 100% { background-position: 200% 0; } 50% { background-position: -200% 0; } }
+/* Button-as-link reset: applied when these link-styled classes wrap a <button>
+   (so middle-click/Cmd+click don't try to navigate to "#"). */
+button.action-link, button.clear-all-link, button.offline-clear,
+button.offline-toggle, button.ai-error-details-toggle {
+  background: none; border: none; padding: 0; margin: 0;
+  font: inherit; line-height: inherit; cursor: pointer;
+}
+button.action-link:focus-visible, button.clear-all-link:focus-visible,
+button.offline-clear:focus-visible, button.offline-toggle:focus-visible,
+button.ai-error-details-toggle:focus-visible { outline: 2px solid #4477bb; outline-offset: 2px; border-radius: 2px; }
+
 .action-link { font-size: 11px; color: #7733aa; cursor: pointer; }
 .action-link:hover { text-decoration: underline; }
 .action-link.loading, .action-link.disabled-link { color: #aaa; pointer-events: none; }
@@ -343,7 +360,7 @@ a:hover { text-decoration: underline; }
   text-decoration: none;
   text-align: center;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   font-family: inherit;
   line-height: 1.3;
 }
@@ -1149,6 +1166,16 @@ html[data-theme] .confirm-popover .confirm-yes:hover { filter: brightness(0.9); 
 html[data-theme] .confirm-popover .confirm-no { color: var(--pp-fg-muted); border-color: var(--pp-border); background: none; }
 html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-drop-hover); }
 html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp-accent); }
+
+/* ===================== Reduced motion ===================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ===================== High-DPI Scaling ===================== */
 @media (min-resolution: 144dpi) { body { zoom: 1.12; } }
