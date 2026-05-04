@@ -1249,36 +1249,36 @@
     "message": "Zuerst Custom CSS ändern, um als Theme zu speichern"
   },
   "labelCustomCSSOverlay": {
-    "message": "Custom CSS Overlay"
+    "message": "Eigene CSS-Überlagerung"
   },
   "customCSSOverlayHelp": {
-    "message": "Your CSS is appended on top of the selected preset. Leave empty to use the preset only; rules written here override the preset's rules of the same name."
+    "message": "Dein CSS wird oben auf das ausgewählte Preset gelegt. Leer lassen, um nur das Preset zu nutzen; hier geschriebene Regeln überschreiben gleichnamige Regeln des Presets."
   },
   "presetPreviewToggle": {
-    "message": "View current preset CSS (read-only)"
+    "message": "Aktuelles Preset-CSS anzeigen (schreibgeschützt)"
   },
   "migrationBannerTitle": {
-    "message": "Theme storage upgraded to v2"
+    "message": "Theme-Speicher auf v2 aktualisiert"
   },
   "migrationBannerDetails": {
-    "message": "Saved about {bytes} of sync space; preset CSS no longer counts against your Google sync quota."
+    "message": "Etwa {bytes} Sync-Speicher gespart; Preset-CSS belastet dein Google-Sync-Kontingent nicht mehr."
   },
   "migrationUndoBtn": {
-    "message": "Undo"
+    "message": "Rückgängig"
   },
   "migrationDismissBtn": {
-    "message": "Got it"
+    "message": "Verstanden"
   },
   "migrationUndoConfirm": {
-    "message": "Restore the old format? This rewrites the CSS back to sync storage."
+    "message": "Altes Format wiederherstellen? Das CSS wird zurück in den Sync-Speicher geschrieben."
   },
   "migrationUndoExpired": {
-    "message": "Undo window has expired"
+    "message": "Rückgängig-Fenster abgelaufen"
   },
   "overlayQuotaFallback": {
-    "message": "CSS saved locally (sync quota full)"
+    "message": "CSS lokal gespeichert (Sync-Kontingent voll)"
   },
   "confirm": {
-    "message": "Confirm"
+    "message": "Bestätigen"
   }
 }

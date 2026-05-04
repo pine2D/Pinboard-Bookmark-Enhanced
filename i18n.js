@@ -26,7 +26,11 @@ async function initI18n() {
         const resp = await fetch(url);
         if (resp.ok) _i18nMessages = await resp.json();
       }
-    } catch (_) {}
+    } catch (e) {
+      // Locale fetch failure is non-fatal — t() falls back to chrome.i18n's
+      // built-in key lookup. Log so it's visible during dev / on broken installs.
+      console.warn("[i18n] locale fetch failed, using chrome.i18n fallback:", e?.message || e);
+    }
   })();
   return _i18nInitPromise;
 }

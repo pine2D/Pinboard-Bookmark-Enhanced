@@ -63,7 +63,10 @@ async function debouncedCheck(tabId, url) {
   try {
     const { optCheckBookmarkStatus } = await (await getSettingsStorage()).get({ optCheckBookmarkStatus: true });
     if (!optCheckBookmarkStatus) return;
-  } catch (_) {}
+  } catch (e) {
+    // Storage unavailable — fall through to default behavior (check enabled)
+    console.warn("[bookmark-status] settings read failed:", e?.message || e);
+  }
   // Dedup: if same URL is already being checked, reuse promise
   if (_pendingChecks.has(url)) {
     const bookmarked = await _pendingChecks.get(url);
@@ -106,7 +109,9 @@ async function showNotification(id, title, message, category, undoInfo) {
     if (category === "tabSet" && !cats.notifyTabSet) return;
     if (category === "batchSave" && !cats.notifyBatchSave) return;
     if (category === "error" && !cats.notifyErrors) return;
-  } catch (_) {}
+  } catch (_) {
+    // Storage failure: default to showing the notification (least surprising)
+  }
   const notifId = id + "-" + Date.now();
   const opts = { type: "basic", iconUrl: "icons/pin-default-48.png", title, message };
   if (undoInfo) {
@@ -131,7 +136,10 @@ chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
       statusCache.set(info.url, { bookmarked: false, timestamp: Date.now() });
       showNotification("undo-done", t("bgUndone"), t("bgBookmarkRemoved"));
     }
-  } catch (_) {}
+  } catch (e) {
+    // Undo path failure — user expects feedback, log so it's debuggable
+    console.warn("[undo] bookmark removal failed:", e?.message || e);
+  }
 });
 
 // ---- 设置图标 ----
@@ -186,7 +194,9 @@ async function updateBadge() {
     const count = Array.isArray(data) ? data.length : 0;
     chrome.action.setBadgeText({ text: count > 0 ? String(count > 99 ? "99+" : count) : "" });
     chrome.action.setBadgeBackgroundColor({ color: "#4477bb" });
-  } catch (_) {}
+  } catch (_) {
+    // chrome.action API failure is non-fatal — badge is informational only
+  }
 }
 
 // ---- F3: Offline queue ----
@@ -223,7 +233,9 @@ async function processOfflineQueue() {
         remaining.push(item); // keep for retry
       }
     } catch (_) {
-      remaining.push(item); // network still down, keep
+      // Network still down — re-enqueue for next online event; not logged
+      // because this is the expected steady-state path for offline mode
+      remaining.push(item);
     }
   }
   await chrome.storage.local.set({ offlineQueue: remaining });
@@ -241,6 +253,7 @@ async function retryOfflineItem(index) {
     statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
     return true;
   } catch (_) {
+    // Single-item retry failure: caller treats `false` as "still queued"
     return false;
   }
 }
@@ -259,7 +272,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // Extract page info if tab available
   let pageInfo = null;
   if (tab?.id) {
-    try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) {}
+    try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) { /* content script may not be injected yet — proceed with empty pageInfo */ }
   }
 
   // Build notes from page info
@@ -379,7 +392,9 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tab?.id === tabId && tab.url) await debouncedCheck(tabId, tab.url);
-    } catch (_) {}
+    } catch (_) {
+      // Tab closed/replaced between event and query — expected race, skip
+    }
   }, 150);
 });
 
@@ -425,7 +440,10 @@ async function prewarmTagsNow() {
     await chrome.storage.local.set({
       cached_user_tags: { tags, counts: data, timestamp: Date.now() }
     });
-  } catch (_) {}
+  } catch (e) {
+    // Tag cache write failure: stale data hurts autocomplete UX, log it
+    console.warn("[tag-cache] write failed:", e?.message || e);
+  }
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -484,7 +502,9 @@ async function cleanupExpiredAICache() {
     }
     if (expired.length) await chrome.storage.local.remove(expired);
     await chrome.storage.local.set({ ai_cache_index: rebuiltIndex });
-  } catch (_) {}
+  } catch (_) {
+    // Best-effort cache GC; quota writes will surface their own errors
+  }
 }
 
 // Startup: process offline queue + update badge

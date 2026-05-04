@@ -1249,36 +1249,36 @@
     "message": "カスタム CSS を編集してからテーマとして保存できます"
   },
   "labelCustomCSSOverlay": {
-    "message": "Custom CSS Overlay"
+    "message": "カスタム CSS オーバーレイ"
   },
   "customCSSOverlayHelp": {
-    "message": "Your CSS is appended on top of the selected preset. Leave empty to use the preset only; rules written here override the preset's rules of the same name."
+    "message": "あなたの CSS は選択したプリセットの上に追加されます。空のままにするとプリセットのみを使用し、ここに書いたルールはプリセットの同名ルールを上書きします。"
   },
   "presetPreviewToggle": {
-    "message": "View current preset CSS (read-only)"
+    "message": "現在のプリセット CSS を表示（読み取り専用）"
   },
   "migrationBannerTitle": {
-    "message": "Theme storage upgraded to v2"
+    "message": "テーマ保存形式を v2 にアップグレードしました"
   },
   "migrationBannerDetails": {
-    "message": "Saved about {bytes} of sync space; preset CSS no longer counts against your Google sync quota."
+    "message": "約 {bytes} の同期領域を節約しました。プリセット CSS は Google 同期容量を消費しなくなります。"
   },
   "migrationUndoBtn": {
-    "message": "Undo"
+    "message": "元に戻す"
   },
   "migrationDismissBtn": {
-    "message": "Got it"
+    "message": "了解"
   },
   "migrationUndoConfirm": {
-    "message": "Restore the old format? This rewrites the CSS back to sync storage."
+    "message": "旧形式に戻しますか？CSS が同期ストレージに書き戻されます。"
   },
   "migrationUndoExpired": {
-    "message": "Undo window has expired"
+    "message": "元に戻せる期間が終了しました"
   },
   "overlayQuotaFallback": {
-    "message": "CSS saved locally (sync quota full)"
+    "message": "CSS をローカルに保存しました（同期容量が満杯）"
   },
   "confirm": {
-    "message": "Confirm"
+    "message": "確認"
   }
 }

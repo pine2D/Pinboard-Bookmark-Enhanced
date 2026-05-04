@@ -78,10 +78,15 @@ _pbpCloak.textContent = "html { opacity: 0 !important; }";
     // Resolve preset CSS from PINBOARD_THEMES (loaded above us as content script)
     let presetCss = "";
     if (data.themePresetKey && typeof PINBOARD_THEMES !== "undefined") {
-      // Adaptive themes resolve to light/dark variant based on current mode
+      // Adaptive presets: prefer the explicit variant if it exists in
+      // PINBOARD_THEMES (solarized-light, catppuccin-mocha, etc.), otherwise
+      // fall back to the parent entry. Flexoki ships ONE css string that
+      // toggles via the `html.pbp-dark` class, so its variant keys don't
+      // exist as separate entries — using the parent is correct.
       let themeKey = data.themePresetKey;
       if (PBP_ADAPTIVE_THEME_MAP[themeKey]) {
-        themeKey = PBP_ADAPTIVE_THEME_MAP[themeKey][isDark ? 1 : 0];
+        const variantKey = PBP_ADAPTIVE_THEME_MAP[themeKey][isDark ? 1 : 0];
+        if (PINBOARD_THEMES[variantKey]) themeKey = variantKey;
       }
       if (PINBOARD_THEMES[themeKey]) presetCss = PINBOARD_THEMES[themeKey].css || "";
     }

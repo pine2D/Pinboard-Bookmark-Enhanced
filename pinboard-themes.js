@@ -2074,7 +2074,12 @@ h2 { color: #33ff33 !important; }
 #right_bar input#key { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; }
 #right_bar input#key:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }
 #tweet_searchbox #search_query_field { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; font-size: 13px !important; }
-#tweet_searchbox #search_query_field:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }`
+#tweet_searchbox #search_query_field:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }
+/* Terminal-specific overrides: btn-fg == accent (both #33ff33), so accent-filled pills/chips need
+   the dark bg for legible text (same kind of fix as 1e175b7 for .signup_button). */
+#bmarks_page_nav a.filter.selected,
+#bmarks_page_nav a.filter.selected:hover { color: var(--pinboard-bg) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-bg) !important; }`
   },
 
   // ---- 4. Paper & Ink (Light) ----

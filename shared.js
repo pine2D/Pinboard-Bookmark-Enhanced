@@ -242,11 +242,12 @@ async function syncSetLarge(key, value) {
     return;
   }
   // Sync storage: use chunking (8KB per-key limit)
-  const meta = await chrome.storage.sync.get(key);
-  if (meta[key]?._chunks) {
-    const oldKeys = Array.from({ length: meta[key]._chunks }, (_, i) => `${key}_${i}`);
-    await chrome.storage.sync.remove(oldKeys);
-  }
+  // Sweep ALL existing chunks for this key — both the count recorded in meta
+  // and any orphans left over from earlier writes (defensive against quota
+  // failures or interrupted writes that left stray ${key}_N entries).
+  const all = await chrome.storage.sync.get(null);
+  const orphanKeys = Object.keys(all).filter(k => new RegExp(`^${key}_\\d+$`).test(k));
+  if (orphanKeys.length) await chrome.storage.sync.remove(orphanKeys);
   if (!str) { await chrome.storage.sync.remove(key); return; }
   const chunks = [];
   for (let i = 0; i < str.length; i += SYNC_CHUNK_SIZE) {

@@ -1249,36 +1249,36 @@
     "message": "Сначала измените Custom CSS, чтобы сохранить как тему"
   },
   "labelCustomCSSOverlay": {
-    "message": "Custom CSS Overlay"
+    "message": "Пользовательское наложение CSS"
   },
   "customCSSOverlayHelp": {
-    "message": "Your CSS is appended on top of the selected preset. Leave empty to use the preset only; rules written here override the preset's rules of the same name."
+    "message": "Ваш CSS добавляется поверх выбранного пресета. Оставьте пустым, чтобы использовать только пресет; правила, написанные здесь, переопределяют одноимённые правила пресета."
   },
   "presetPreviewToggle": {
-    "message": "View current preset CSS (read-only)"
+    "message": "Показать CSS текущего пресета (только чтение)"
   },
   "migrationBannerTitle": {
-    "message": "Theme storage upgraded to v2"
+    "message": "Хранилище тем обновлено до v2"
   },
   "migrationBannerDetails": {
-    "message": "Saved about {bytes} of sync space; preset CSS no longer counts against your Google sync quota."
+    "message": "Сэкономлено около {bytes} места синхронизации; CSS пресетов больше не учитывается в квоте Google-синхронизации."
   },
   "migrationUndoBtn": {
-    "message": "Undo"
+    "message": "Отменить"
   },
   "migrationDismissBtn": {
-    "message": "Got it"
+    "message": "Понятно"
   },
   "migrationUndoConfirm": {
-    "message": "Restore the old format? This rewrites the CSS back to sync storage."
+    "message": "Восстановить старый формат? CSS будет записан обратно в хранилище синхронизации."
   },
   "migrationUndoExpired": {
-    "message": "Undo window has expired"
+    "message": "Окно отмены истекло"
   },
   "overlayQuotaFallback": {
-    "message": "CSS saved locally (sync quota full)"
+    "message": "CSS сохранён локально (квота синхронизации заполнена)"
   },
   "confirm": {
-    "message": "Confirm"
+    "message": "Подтвердить"
   }
 }

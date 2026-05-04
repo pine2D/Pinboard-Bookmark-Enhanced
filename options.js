@@ -125,7 +125,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Schema v2 migration: split customCSS into themePresetKey + customOverlayCSS ----
   // Runs once per profile. Cleared sync.customCSS chunks; saves diff in local for 7-day undo.
   const OVERLAY_BYTE_LIMIT = 50 * 1024;
+  const MIGRATION_BACKUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
   let migrationResult = null; // { savedBytes, banner } or null
+
+  // Sweep expired migration backup (older than 7 days) — frees local storage
+  {
+    const stored = await chrome.storage.local.get({ _migrationBackup: null });
+    if (stored._migrationBackup && stored._migrationBackup.ts) {
+      if (Date.now() - stored._migrationBackup.ts > MIGRATION_BACKUP_TTL_MS) {
+        await chrome.storage.local.remove("_migrationBackup");
+      }
+    }
+  }
+
   {
     const flags = await chrome.storage.sync.get({ _migrationV2: false });
     const oldCSSFromSync = await syncGetLarge("customCSS", "");
@@ -849,7 +861,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (ADAPTIVE_THEME_MAP[themeKey]) {
       const mode = document.getElementById("opt-theme").value;
       const prefersDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      themeKey = ADAPTIVE_THEME_MAP[themeKey][prefersDark ? 1 : 0];
+      const variantKey = ADAPTIVE_THEME_MAP[themeKey][prefersDark ? 1 : 0];
+      if (PINBOARD_THEMES[variantKey]) themeKey = variantKey;
+      // Fall back to parent (e.g., flexoki ships one CSS that toggles via .pbp-dark)
     }
     const theme = PINBOARD_THEMES[themeKey];
     previewSection.style.display = "";
