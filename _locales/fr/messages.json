@@ -198,14 +198,6 @@
       }
     }
   },
-  "userInfoPrefix": {
-    "message": "Pinboard — $USER$",
-    "placeholders": {
-      "user": {
-        "content": "$1"
-      }
-    }
-  },
   "aiSummaryBtn": {
     "message": "🤖 Résumé IA"
   },
@@ -262,14 +254,6 @@
   },
   "aiReplacing": {
     "message": "remplacement..."
-  },
-  "aiError": {
-    "message": "Erreur IA : $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
   },
   "aiErrorTitle": {
     "message": "Échec de la génération $OP$",
@@ -848,9 +832,6 @@
   "testNoApiKey": {
     "message": "Pas de clé API"
   },
-  "testNoBaseUrl": {
-    "message": "Aucune URL de base configurée"
-  },
   "showHideKey": {
     "message": "Afficher/masquer la clé"
   },
@@ -862,12 +843,6 @@
   },
   "hintOllamaModel": {
     "message": "Exécutez d'abord ollama pull llama3"
-  },
-  "hintOpenRouterKey": {
-    "message": "Accédez à plus de 100 modèles depuis une seule API."
-  },
-  "hintOpenRouterModels": {
-    "message": "Parcourir les modèles sur"
   },
   "hintCustomBaseUrl": {
     "message": "Doit prendre en charge l'endpoint /chat/completions"
@@ -1046,9 +1021,6 @@
   "labelSavedThemes": {
     "message": "Thèmes enregistrés"
   },
-  "labelCustomCSS": {
-    "message": "CSS personnalisé"
-  },
   "saveAsTheme": {
     "message": "Enregistrer comme thème"
   },
@@ -1084,12 +1056,6 @@
         "content": "$1"
       }
     }
-  },
-  "replaceCSSConfirm": {
-    "message": "Remplacer le CSS actuel ?"
-  },
-  "replace": {
-    "message": "Remplacer"
   },
   "themeName": {
     "message": "Nom du thème :"
@@ -1239,9 +1205,6 @@
   "jinaApiKeyPlaceholder": {
     "message": "jina_xxxx (leave empty for free tier)"
   },
-  "jinaKeyHint": {
-    "message": "Free tier: 20 RPM. Add key for higher quota."
-  },
   "submitUriTooLong": {
     "message": "Requête trop longue — raccourcissez les notes, le titre ou les tags"
   },
@@ -1290,5 +1253,8 @@
         "example": "Essayer avec OpenAI"
       }
     }
+  },
+  "syncMigrationFailed": {
+    "message": "Échec de la migration de synchronisation. Veuillez réessayer ou réduire la taille du CSS personnalisé."
   }
 }

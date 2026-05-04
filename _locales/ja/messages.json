@@ -198,14 +198,6 @@
       }
     }
   },
-  "userInfoPrefix": {
-    "message": "Pinboard — $USER$",
-    "placeholders": {
-      "user": {
-        "content": "$1"
-      }
-    }
-  },
   "aiSummaryBtn": {
     "message": "🤖 AI 要約"
   },
@@ -262,14 +254,6 @@
   },
   "aiReplacing": {
     "message": "置換中..."
-  },
-  "aiError": {
-    "message": "AI エラー：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
   },
   "aiErrorTitle": {
     "message": "$OP$ の生成に失敗",
@@ -848,9 +832,6 @@
   "testNoApiKey": {
     "message": "API Key が未入力です"
   },
-  "testNoBaseUrl": {
-    "message": "Base URL が未設定です"
-  },
   "showHideKey": {
     "message": "キーの表示/非表示"
   },
@@ -862,12 +843,6 @@
   },
   "hintOllamaModel": {
     "message": "先に ollama pull llama3 を実行してください"
-  },
-  "hintOpenRouterKey": {
-    "message": "1つの API で100以上のモデルにアクセス。"
-  },
-  "hintOpenRouterModels": {
-    "message": "モデル一覧："
   },
   "hintCustomBaseUrl": {
     "message": "/chat/completions エンドポイントに対応している必要があります"
@@ -1046,9 +1021,6 @@
   "labelSavedThemes": {
     "message": "保存済みテーマ"
   },
-  "labelCustomCSS": {
-    "message": "カスタム CSS"
-  },
   "saveAsTheme": {
     "message": "テーマとして保存"
   },
@@ -1084,12 +1056,6 @@
         "content": "$1"
       }
     }
-  },
-  "replaceCSSConfirm": {
-    "message": "現在の CSS を置き換えますか？"
-  },
-  "replace": {
-    "message": "置き換え"
   },
   "themeName": {
     "message": "テーマ名："
@@ -1239,9 +1205,6 @@
   "jinaApiKeyPlaceholder": {
     "message": "jina_xxxx（空欄で無料枠を使用）"
   },
-  "jinaKeyHint": {
-    "message": "無料: 20リクエスト/分。キーを追加でクォータ増加。"
-  },
   "submitUriTooLong": {
     "message": "リクエストが大きすぎます — ノート・タイトル・タグを短くしてください"
   },
@@ -1290,5 +1253,8 @@
         "example": "OpenAI で再試行"
       }
     }
+  },
+  "syncMigrationFailed": {
+    "message": "同期移行に失敗しました。再試行するか、カスタム CSS のサイズを減らしてください。"
   }
 }

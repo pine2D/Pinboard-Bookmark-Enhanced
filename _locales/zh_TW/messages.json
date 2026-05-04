@@ -198,14 +198,6 @@
       }
     }
   },
-  "userInfoPrefix": {
-    "message": "Pinboard — $USER$",
-    "placeholders": {
-      "user": {
-        "content": "$1"
-      }
-    }
-  },
   "aiSummaryBtn": {
     "message": "🤖 AI 摘要"
   },
@@ -262,14 +254,6 @@
   },
   "aiReplacing": {
     "message": "替換中..."
-  },
-  "aiError": {
-    "message": "AI 出錯：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
   },
   "aiErrorTitle": {
     "message": "$OP$ 產生失敗",
@@ -848,9 +832,6 @@
   "testNoApiKey": {
     "message": "未填寫 API Key"
   },
-  "testNoBaseUrl": {
-    "message": "未配置端點網址"
-  },
   "showHideKey": {
     "message": "顯示/隱藏金鑰"
   },
@@ -862,12 +843,6 @@
   },
   "hintOllamaModel": {
     "message": "需先執行 ollama pull llama3"
-  },
-  "hintOpenRouterKey": {
-    "message": "透過一個 API 存取 100+ 模型。"
-  },
-  "hintOpenRouterModels": {
-    "message": "瀏覽可用模型："
   },
   "hintCustomBaseUrl": {
     "message": "必須支援 /chat/completions 端點"
@@ -1046,9 +1021,6 @@
   "labelSavedThemes": {
     "message": "已儲存的主題"
   },
-  "labelCustomCSS": {
-    "message": "自訂 CSS"
-  },
   "saveAsTheme": {
     "message": "儲存為主題"
   },
@@ -1084,12 +1056,6 @@
         "content": "$1"
       }
     }
-  },
-  "replaceCSSConfirm": {
-    "message": "替換目前的 CSS？"
-  },
-  "replace": {
-    "message": "替換"
   },
   "themeName": {
     "message": "主題名稱："
@@ -1239,9 +1205,6 @@
   "jinaApiKeyPlaceholder": {
     "message": "jina_xxxx（留空使用免費額度）"
   },
-  "jinaKeyHint": {
-    "message": "免費：20次/分鐘。添加 Key 獲得更高額度。"
-  },
   "submitUriTooLong": {
     "message": "請求過長 — 請精簡筆記、標題或標籤"
   },
@@ -1290,5 +1253,8 @@
         "example": "改用 OpenAI"
       }
     }
+  },
+  "syncMigrationFailed": {
+    "message": "同步遷移失敗。請重試，或縮減自訂 CSS 大小。"
   }
 }
