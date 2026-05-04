@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
       document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
       btn.classList.add("active");
-      document.getElementById(`panel-${btn.dataset.panel}`).classList.add("active");
+      $id(`panel-${btn.dataset.panel}`).classList.add("active");
     });
   });
 
@@ -76,7 +76,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  document.getElementById("reset-panel-btn").addEventListener("click", function () {
+  $id("reset-panel-btn").addEventListener("click", function () {
     const resetBtn = this;
     const activeBtn = document.querySelector(".tab-btn.active");
     if (!activeBtn) return;
@@ -89,7 +89,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       noText: t("cancel"),
       onConfirm: () => {
         for (const [id, val] of Object.entries(def.fields)) {
-          const el = document.getElementById(id);
+          const el = $id(id);
           if (!el) continue;
           if (el.type === "checkbox") el.checked = val;
           else el.value = val;
@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- API key show/hide toggle ----
   document.querySelectorAll(".key-toggle").forEach(btn => {
     btn.addEventListener("click", () => {
-      const input = document.getElementById(btn.dataset.target);
+      const input = $id(btn.dataset.target);
       if (input) {
         const isPassword = input.type === "password";
         input.type = isPassword ? "text" : "password";
@@ -250,13 +250,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-tag-presets": s.tagPresets
   };
   for (const [id, val] of Object.entries(fieldMap)) {
-    const el = document.getElementById(id);
+    const el = $id(id);
     if (el) el.value = val;
   }
 
   // Show default prompts as placeholder so users see them when field is empty
-  document.getElementById("opt-custom-tag-prompt").placeholder = DEFAULT_TAG_PROMPT;
-  document.getElementById("opt-custom-summary-prompt").placeholder = DEFAULT_SUMMARY_PROMPT;
+  $id("opt-custom-tag-prompt").placeholder = DEFAULT_TAG_PROMPT;
+  $id("opt-custom-summary-prompt").placeholder = DEFAULT_SUMMARY_PROMPT;
 
   // AI Content Source radio
   const srcRadio = document.querySelector(`input[name="ai-content-source"][value="${s.aiContentSource || 'local'}"]`);
@@ -297,13 +297,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-popup-follow-theme": s.optPopupFollowTheme
   };
   for (const [id, val] of Object.entries(checkMap)) {
-    const el = document.getElementById(id);
+    const el = $id(id);
     if (el) el.checked = val;
   }
 
   // ---- Load sync toggle (stored in local, not in settings storage) ----
   const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
-  const syncToggle = document.getElementById("opt-sync-enabled");
+  const syncToggle = $id("opt-sync-enabled");
   if (syncToggle) syncToggle.checked = optSyncEnabled;
 
   // Sync toggle change: migrate settings then reload
@@ -326,7 +326,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.error("sync migration failed:", e);
       syncToggle.checked = !enabling;
       await chrome.storage.local.set({ optSyncEnabled: !enabling });
-      const errEl = document.getElementById("opt-sync-error");
+      const errEl = $id("opt-sync-error");
       if (errEl) {
         errEl.textContent = t("syncMigrationFailed") || "Sync migration failed. Please try again or reduce custom CSS size.";
         errEl.classList.remove("hidden");
@@ -368,7 +368,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderMigrationBanner(savedBytes) {
-    const host = document.getElementById("migration-banner");
+    const host = $id("migration-banner");
     if (!host) return;
     host.style.display = "";
     while (host.firstChild) host.removeChild(host.firstChild);
@@ -426,8 +426,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     host.append(title, desc, actions);
   }
   // Language change: save immediately and reload to apply
-  document.getElementById("opt-lang").addEventListener("change", async () => {
-    const lang = document.getElementById("opt-lang").value;
+  $id("opt-lang").addEventListener("change", async () => {
+    const lang = $id("opt-lang").value;
     const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "general";
     await (await getSettingsStorage()).set({ optLang: lang });
     sessionStorage.setItem("activeTab", activePanel);
@@ -438,8 +438,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Real-time switch when theme dropdown changes (affects options-page theme + preset preview)
   // Adaptive presets resolve to light/dark variant in pinboard-style.js content script;
   // options page only re-renders its own dataset.theme here.
-  document.getElementById("opt-theme").addEventListener("change", () => {
-    const mode = document.getElementById("opt-theme").value;
+  $id("opt-theme").addEventListener("change", () => {
+    const mode = $id("opt-theme").value;
     applyOptionsPageTheme(currentPresetKey, mode);
     renderPresetPreview();
   });
@@ -447,22 +447,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Provider field toggle ----
   const providers = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ollama","custom"];
   function updateProviderFields() {
-    const selected = document.getElementById("opt-ai-provider").value;
+    const selected = $id("opt-ai-provider").value;
     providers.forEach(p => {
-      const el = document.getElementById("fields-" + p);
+      const el = $id("fields-" + p);
       if (el) el.classList.toggle("hidden", p !== selected);
     });
   }
   updateProviderFields();
-  document.getElementById("opt-ai-provider").addEventListener("change", updateProviderFields);
+  $id("opt-ai-provider").addEventListener("change", updateProviderFields);
 
   // ---- Reset prompt buttons ----
-  document.getElementById("reset-tag-prompt").addEventListener("click", () => {
-    document.getElementById("opt-custom-tag-prompt").value = DEFAULT_TAG_PROMPT;
+  $id("reset-tag-prompt").addEventListener("click", () => {
+    $id("opt-custom-tag-prompt").value = DEFAULT_TAG_PROMPT;
     saveAll();
   });
-  document.getElementById("reset-summary-prompt").addEventListener("click", () => {
-    document.getElementById("opt-custom-summary-prompt").value = DEFAULT_SUMMARY_PROMPT;
+  $id("reset-summary-prompt").addEventListener("click", () => {
+    $id("opt-custom-summary-prompt").value = DEFAULT_SUMMARY_PROMPT;
     saveAll();
   });
 
@@ -471,107 +471,107 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function saveAll() {
     const data = {
       // Bookmarks
-      pinboardToken: obfuscateKey(document.getElementById("opt-pinboard-token").value.trim()),
-      optPrivateDefault: document.getElementById("opt-private-default").checked,
-      optPrivateIncognito: document.getElementById("opt-private-incognito").checked,
-      optReadlaterDefault: document.getElementById("opt-readlater-default").checked,
-      optAutoDescription: document.getElementById("opt-auto-description").checked,
-      optBlockquote: document.getElementById("opt-blockquote").checked,
-      optIncludeReferrer: document.getElementById("opt-include-referrer").checked,
-      optRespectTagCase: document.getElementById("opt-respect-tag-case").checked,
-      offlineQueueEnabled: document.getElementById("offline-queue-enabled").checked,
+      pinboardToken: obfuscateKey($id("opt-pinboard-token").value.trim()),
+      optPrivateDefault: $id("opt-private-default").checked,
+      optPrivateIncognito: $id("opt-private-incognito").checked,
+      optReadlaterDefault: $id("opt-readlater-default").checked,
+      optAutoDescription: $id("opt-auto-description").checked,
+      optBlockquote: $id("opt-blockquote").checked,
+      optIncludeReferrer: $id("opt-include-referrer").checked,
+      optRespectTagCase: $id("opt-respect-tag-case").checked,
+      offlineQueueEnabled: $id("offline-queue-enabled").checked,
       // Quick Actions
-      qsAutoNotes: document.getElementById("qs-auto-notes").checked,
-      qsBlockquote: document.getElementById("qs-blockquote").checked,
-      qsDefaultTags: document.getElementById("qs-default-tags").value.trim(),
-      qsAiTags: document.getElementById("qs-ai-tags").checked,
-      qsAiSummary: document.getElementById("qs-ai-summary").checked,
+      qsAutoNotes: $id("qs-auto-notes").checked,
+      qsBlockquote: $id("qs-blockquote").checked,
+      qsDefaultTags: $id("qs-default-tags").value.trim(),
+      qsAiTags: $id("qs-ai-tags").checked,
+      qsAiSummary: $id("qs-ai-summary").checked,
       // Read Later
-      rlAutoNotes: document.getElementById("rl-auto-notes").checked,
-      rlBlockquote: document.getElementById("rl-blockquote").checked,
-      rlDefaultTags: document.getElementById("rl-default-tags").value.trim(),
-      rlAiTags: document.getElementById("rl-ai-tags").checked,
-      rlAiSummary: document.getElementById("rl-ai-summary").checked,
-      optBatchTagEnabled: document.getElementById("opt-batch-tag-enabled").checked,
-      optBatchTag: document.getElementById("opt-batch-tag").value.trim() || "batch_saved",
-      batchAiTags: document.getElementById("batch-ai-tags").checked,
-      batchAiSummary: document.getElementById("batch-ai-summary").checked,
-      batchSkipExisting: document.getElementById("batch-skip-existing").checked,
+      rlAutoNotes: $id("rl-auto-notes").checked,
+      rlBlockquote: $id("rl-blockquote").checked,
+      rlDefaultTags: $id("rl-default-tags").value.trim(),
+      rlAiTags: $id("rl-ai-tags").checked,
+      rlAiSummary: $id("rl-ai-summary").checked,
+      optBatchTagEnabled: $id("opt-batch-tag-enabled").checked,
+      optBatchTag: $id("opt-batch-tag").value.trim() || "batch_saved",
+      batchAiTags: $id("batch-ai-tags").checked,
+      batchAiSummary: $id("batch-ai-summary").checked,
+      batchSkipExisting: $id("batch-skip-existing").checked,
       // AI Provider & Keys
-      aiProvider: document.getElementById("opt-ai-provider").value,
-      geminiApiKey: obfuscateKey(document.getElementById("opt-gemini-key").value.trim()),
-      geminiModel: document.getElementById("opt-gemini-model").value.trim() || "gemini-2.5-flash-lite",
-      openaiApiKey: obfuscateKey(document.getElementById("opt-openai-key").value.trim()),
-      openaiModel: document.getElementById("opt-openai-model").value.trim() || "gpt-4.1-nano",
-      openaiBaseUrl: document.getElementById("opt-openai-baseurl").value.trim() || "https://api.openai.com/v1",
-      claudeApiKey: obfuscateKey(document.getElementById("opt-claude-key").value.trim()),
-      claudeModel: document.getElementById("opt-claude-model").value.trim() || "claude-haiku-4-5-20251001",
-      deepseekApiKey: obfuscateKey(document.getElementById("opt-deepseek-key").value.trim()),
-      deepseekModel: document.getElementById("opt-deepseek-model").value.trim() || "deepseek-chat",
-      qwenApiKey: obfuscateKey(document.getElementById("opt-qwen-key").value.trim()),
-      qwenModel: document.getElementById("opt-qwen-model").value.trim() || "qwen-flash",
-      minimaxApiKey: obfuscateKey(document.getElementById("opt-minimax-key").value.trim()),
-      minimaxModel: document.getElementById("opt-minimax-model").value.trim() || "MiniMax-Text-01",
-      openrouterApiKey: obfuscateKey(document.getElementById("opt-openrouter-key").value.trim()),
-      openrouterModel: document.getElementById("opt-openrouter-model").value.trim() || "meta-llama/llama-4-scout:free",
-      groqApiKey: obfuscateKey(document.getElementById("opt-groq-key").value.trim()),
-      groqModel: document.getElementById("opt-groq-model").value.trim() || "meta-llama/llama-4-scout-17b-16e-instruct",
-      mistralApiKey: obfuscateKey(document.getElementById("opt-mistral-key").value.trim()),
-      mistralModel: document.getElementById("opt-mistral-model").value.trim() || "mistral-small-latest",
-      cohereApiKey: obfuscateKey(document.getElementById("opt-cohere-key").value.trim()),
-      cohereModel: document.getElementById("opt-cohere-model").value.trim() || "command-r-08-2024",
-      siliconflowApiKey: obfuscateKey(document.getElementById("opt-siliconflow-key").value.trim()),
-      siliconflowModel: document.getElementById("opt-siliconflow-model").value.trim() || "Qwen/Qwen3-8B",
-      zhipuApiKey: obfuscateKey(document.getElementById("opt-zhipu-key").value.trim()),
-      zhipuModel: document.getElementById("opt-zhipu-model").value.trim() || "glm-4.7-flash",
-      kimiApiKey: obfuscateKey(document.getElementById("opt-kimi-key").value.trim()),
-      kimiModel: document.getElementById("opt-kimi-model").value.trim() || "kimi-k2.5",
-      ollamaBaseUrl: document.getElementById("opt-ollama-baseurl").value.trim() || "http://localhost:11434",
-      ollamaModel: document.getElementById("opt-ollama-model").value.trim() || "llama3",
-      customName: document.getElementById("opt-custom-name").value.trim() || "Custom",
-      customBaseUrl: document.getElementById("opt-custom-baseurl").value.trim(),
-      customApiKey: obfuscateKey(document.getElementById("opt-custom-key").value.trim()),
-      customModel: document.getElementById("opt-custom-model").value.trim(),
+      aiProvider: $id("opt-ai-provider").value,
+      geminiApiKey: obfuscateKey($id("opt-gemini-key").value.trim()),
+      geminiModel: $id("opt-gemini-model").value.trim() || "gemini-2.5-flash-lite",
+      openaiApiKey: obfuscateKey($id("opt-openai-key").value.trim()),
+      openaiModel: $id("opt-openai-model").value.trim() || "gpt-4.1-nano",
+      openaiBaseUrl: $id("opt-openai-baseurl").value.trim() || "https://api.openai.com/v1",
+      claudeApiKey: obfuscateKey($id("opt-claude-key").value.trim()),
+      claudeModel: $id("opt-claude-model").value.trim() || "claude-haiku-4-5-20251001",
+      deepseekApiKey: obfuscateKey($id("opt-deepseek-key").value.trim()),
+      deepseekModel: $id("opt-deepseek-model").value.trim() || "deepseek-chat",
+      qwenApiKey: obfuscateKey($id("opt-qwen-key").value.trim()),
+      qwenModel: $id("opt-qwen-model").value.trim() || "qwen-flash",
+      minimaxApiKey: obfuscateKey($id("opt-minimax-key").value.trim()),
+      minimaxModel: $id("opt-minimax-model").value.trim() || "MiniMax-Text-01",
+      openrouterApiKey: obfuscateKey($id("opt-openrouter-key").value.trim()),
+      openrouterModel: $id("opt-openrouter-model").value.trim() || "meta-llama/llama-4-scout:free",
+      groqApiKey: obfuscateKey($id("opt-groq-key").value.trim()),
+      groqModel: $id("opt-groq-model").value.trim() || "meta-llama/llama-4-scout-17b-16e-instruct",
+      mistralApiKey: obfuscateKey($id("opt-mistral-key").value.trim()),
+      mistralModel: $id("opt-mistral-model").value.trim() || "mistral-small-latest",
+      cohereApiKey: obfuscateKey($id("opt-cohere-key").value.trim()),
+      cohereModel: $id("opt-cohere-model").value.trim() || "command-r-08-2024",
+      siliconflowApiKey: obfuscateKey($id("opt-siliconflow-key").value.trim()),
+      siliconflowModel: $id("opt-siliconflow-model").value.trim() || "Qwen/Qwen3-8B",
+      zhipuApiKey: obfuscateKey($id("opt-zhipu-key").value.trim()),
+      zhipuModel: $id("opt-zhipu-model").value.trim() || "glm-4.7-flash",
+      kimiApiKey: obfuscateKey($id("opt-kimi-key").value.trim()),
+      kimiModel: $id("opt-kimi-model").value.trim() || "kimi-k2.5",
+      ollamaBaseUrl: $id("opt-ollama-baseurl").value.trim() || "http://localhost:11434",
+      ollamaModel: $id("opt-ollama-model").value.trim() || "llama3",
+      customName: $id("opt-custom-name").value.trim() || "Custom",
+      customBaseUrl: $id("opt-custom-baseurl").value.trim(),
+      customApiKey: obfuscateKey($id("opt-custom-key").value.trim()),
+      customModel: $id("opt-custom-model").value.trim(),
       // AI Behavior & Prompts
-      optAiAutoTags: document.getElementById("opt-ai-auto-tags").checked,
-      aiTagLang: document.getElementById("opt-ai-tag-lang").value,
-      aiSummaryLang: document.getElementById("opt-ai-summary-lang").value,
-      aiCacheDuration: Math.max(0, parseInt(document.getElementById("opt-ai-cache-duration").value) || 60),
-      aiTagSeparator: document.getElementById("opt-ai-tag-separator").value,
+      optAiAutoTags: $id("opt-ai-auto-tags").checked,
+      aiTagLang: $id("opt-ai-tag-lang").value,
+      aiSummaryLang: $id("opt-ai-summary-lang").value,
+      aiCacheDuration: Math.max(0, parseInt($id("opt-ai-cache-duration").value) || 60),
+      aiTagSeparator: $id("opt-ai-tag-separator").value,
       aiContentSource: document.querySelector('input[name="ai-content-source"]:checked')?.value || "local",
       tagSyncMode: document.querySelector('input[name="tag-sync-mode"]:checked')?.value || "cached",
-      jinaApiKey: obfuscateKey(document.getElementById("opt-jina-key").value.trim()),
-      customTagPrompt: document.getElementById("opt-custom-tag-prompt").value,
-      customSummaryPrompt: document.getElementById("opt-custom-summary-prompt").value,
+      jinaApiKey: obfuscateKey($id("opt-jina-key").value.trim()),
+      customTagPrompt: $id("opt-custom-tag-prompt").value,
+      customSummaryPrompt: $id("opt-custom-summary-prompt").value,
       // Appearance
-      optLang: document.getElementById("opt-lang").value,
-      optTheme: document.getElementById("opt-theme").value,
-      optShowSearch: document.getElementById("opt-show-search").checked,
-      optShowRecent: document.getElementById("opt-show-recent").checked,
-      optShowBadge: document.getElementById("opt-show-badge").checked,
+      optLang: $id("opt-lang").value,
+      optTheme: $id("opt-theme").value,
+      optShowSearch: $id("opt-show-search").checked,
+      optShowRecent: $id("opt-show-recent").checked,
+      optShowBadge: $id("opt-show-badge").checked,
       // Notifications
-      notifyQuickSave: document.getElementById("notify-quick-save").checked,
-      notifyReadLater: document.getElementById("notify-read-later").checked,
-      notifyTabSet: document.getElementById("notify-tab-set").checked,
-      notifyBatchSave: document.getElementById("notify-batch-save").checked,
-      notifyErrors: document.getElementById("notify-errors").checked,
+      notifyQuickSave: $id("notify-quick-save").checked,
+      notifyReadLater: $id("notify-read-later").checked,
+      notifyTabSet: $id("notify-tab-set").checked,
+      notifyBatchSave: $id("notify-batch-save").checked,
+      notifyErrors: $id("notify-errors").checked,
       // Custom Style (font here; overlay CSS saved separately via syncSetLarge below)
-      customFont: document.getElementById("opt-custom-font").value.trim(),
+      customFont: $id("opt-custom-font").value.trim(),
       // New toggles
-      optCheckBookmarkStatus: document.getElementById("opt-check-bookmark-status").checked,
-      optShowSuggestTags: document.getElementById("opt-show-suggest-tags").checked,
-      optShowAiSummary: document.getElementById("opt-show-ai-summary").checked,
-      optShowAiTags: document.getElementById("opt-show-ai-tags").checked,
-      optShowQuickLinks: document.getElementById("opt-show-quick-links").checked,
-      optShowQuickRow: document.getElementById("opt-show-quick-row").checked,
-      optAutoCloseAfterSave: document.getElementById("opt-auto-close").checked,
-      optPopupFollowTheme: document.getElementById("opt-popup-follow-theme").checked,
-      tagPresets: document.getElementById("opt-tag-presets").value,
+      optCheckBookmarkStatus: $id("opt-check-bookmark-status").checked,
+      optShowSuggestTags: $id("opt-show-suggest-tags").checked,
+      optShowAiSummary: $id("opt-show-ai-summary").checked,
+      optShowAiTags: $id("opt-show-ai-tags").checked,
+      optShowQuickLinks: $id("opt-show-quick-links").checked,
+      optShowQuickRow: $id("opt-show-quick-row").checked,
+      optAutoCloseAfterSave: $id("opt-auto-close").checked,
+      optPopupFollowTheme: $id("opt-popup-follow-theme").checked,
+      tagPresets: $id("opt-tag-presets").value,
       themePresetKey: currentPresetKey
     };
     await (await getSettingsStorage()).set(data);
     // Save customOverlayCSS with quota-aware fallback (sync → local on QUOTA_BYTES)
-    await saveOverlayWithFallback(document.getElementById("opt-custom-css").value);
+    await saveOverlayWithFallback($id("opt-custom-css").value);
     flashAutoSave();
   }
 
@@ -592,7 +592,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (/QUOTA|quota/i.test(msg)) {
         await chrome.storage.local.set({ customOverlayCSS_localFallback: value });
         await chrome.storage.sync.set({ optOverlayInLocal: true });
-        const status = document.getElementById("auto-save-status");
+        const status = $id("auto-save-status");
         if (status) {
           status.textContent = t("overlayQuotaFallback") || "CSS saved locally (sync quota full)";
           status.classList.add("saved");
@@ -626,7 +626,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function flashAutoSave() {
-    const el = document.getElementById("auto-save-status");
+    const el = $id("auto-save-status");
     el.textContent = t("optAutoSaved");
     el.classList.add("saved");
     clearTimeout(el._timer);
@@ -636,203 +636,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 1500);
   }
 
-  // ---- Export Settings ----
-  // Whitelist: only keys declared in SETTINGS_DEFAULTS (minus API keys).
-  // Keeps caches (ai_cache_*, cached_user_tags, lastUsedTags, offlineQueue,
-  // _pbRateLimitTs, md_preview_data, ai_cache_index, batch caches) out of
-  // the backup file.
+  // ---- Export/Import: see options-backup.js ----
+  // EXPORTABLE_KEYS whitelist excludes API keys + cache entries from backup.
   const EXPORTABLE_KEYS = Object.keys(SETTINGS_DEFAULTS).filter(k => !API_KEY_FIELDS.includes(k));
-  document.getElementById("export-settings").addEventListener("click", async () => {
-    const raw = await (await getSettingsStorage()).get(EXPORTABLE_KEYS);
-    const exportData = Object.fromEntries(
-      Object.entries(raw).filter(([, v]) => v !== undefined)
-    );
-    exportData._schemaVersion = 2;
-    // Read overlay from sync OR local fallback (preserve user data either way)
-    const overlayFlags = await chrome.storage.sync.get({ optOverlayInLocal: false });
-    let overlay = "";
-    if (overlayFlags.optOverlayInLocal) {
-      const local = await chrome.storage.local.get({ customOverlayCSS_localFallback: "" });
-      overlay = local.customOverlayCSS_localFallback;
-    } else {
-      overlay = await syncGetLarge("customOverlayCSS", "");
-    }
-    if (overlay) exportData.customOverlayCSS = overlay;
-    const savedThemesData = await syncGetLarge("savedThemes", []);
-    if (savedThemesData.length) exportData.savedThemes = savedThemesData;
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "Pinboard Bookmark Enhanced settings backup.json"; a.click();
-    URL.revokeObjectURL(url);
-  });
+  setupBackup({ exportableKeys: EXPORTABLE_KEYS, saveOverlayWithFallback });
+  setupApiTests();
 
-  // ---- Import Settings ----
-  // Schema-version aware: v2 backups use customOverlayCSS, v1 uses customCSS.
-  document.getElementById("import-settings-file").addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      const schemaVersion = data._schemaVersion || 1;
-      const { _schemaVersion, customCSS, customOverlayCSS, savedThemes: importedThemes, ...rest } = data;
-      // Whitelist-restrict imported keys to known settings (strips any
-      // caches that might be present in older backups).
-      const safeData = Object.fromEntries(
-        Object.entries(rest).filter(([k]) => EXPORTABLE_KEYS.includes(k))
-      );
-      await (await getSettingsStorage()).set(safeData);
-
-      if (schemaVersion >= 2) {
-        // v2: direct write
-        if (customOverlayCSS !== undefined) await saveOverlayWithFallback(customOverlayCSS);
-      } else {
-        // v1 → v2: detect preset match, derive overlay
-        const oldKey = safeData.themePresetKey || "";
-        let resolvedKey = oldKey;
-        if (!resolvedKey && customCSS) {
-          for (const [key, theme] of Object.entries(PINBOARD_THEMES)) {
-            if (theme.css.trim() === customCSS.trim()) { resolvedKey = key; break; }
-          }
-          if (resolvedKey) {
-            for (const [parent, [light, dark]] of Object.entries(ADAPTIVE_THEME_MAP)) {
-              if (resolvedKey === light || resolvedKey === dark) { resolvedKey = parent; break; }
-            }
-          }
-        }
-        let newOverlay = "";
-        if (customCSS) {
-          const preset = resolvedKey ? PINBOARD_THEMES[resolvedKey] : null;
-          const presetCSS = preset ? preset.css : "";
-          const variants = ADAPTIVE_THEME_MAP[resolvedKey] || [];
-          const allowed = [presetCSS, ...variants.map(k => PINBOARD_THEMES[k]?.css || "")];
-          newOverlay = allowed.some(c => c && c.trim() === customCSS.trim()) ? "" : customCSS;
-        }
-        await chrome.storage.sync.set({ themePresetKey: resolvedKey || "" });
-        await saveOverlayWithFallback(newOverlay);
-      }
-
-      if (importedThemes !== undefined) await syncSetLarge("savedThemes", importedThemes);
-      const status = document.getElementById("import-status");
-      status.textContent = t("importedReload");
-      setTimeout(() => { status.textContent = ""; }, 3000);
-    } catch (err) {
-      console.error("[import] failed", err);
-      const status = document.getElementById("import-status");
-      status.textContent = t("importInvalid");
-      status.style.color = "#c00";
-      setTimeout(() => { status.textContent = ""; status.style.color = ""; }, 3000);
-    }
-    e.target.value = "";
-  });
-
-  // ---- API Connectivity Tests (reuses callAI from ai.js) ----
-  function getOptVal(id, fallback) { return document.getElementById(id)?.value?.trim() || fallback || ""; }
-
-  async function testAIProvider(provider) {
-    const statusEl = document.getElementById(`test-${provider}-status`);
-    if (!statusEl) return;
-    statusEl.textContent = t("testTesting");
-    statusEl.style.color = "#888";
-
-    const cs = {
-      aiProvider: provider,
-      geminiApiKey: getOptVal("opt-gemini-key"), geminiModel: getOptVal("opt-gemini-model", "gemini-2.5-flash-lite"),
-      openaiApiKey: getOptVal("opt-openai-key"), openaiModel: getOptVal("opt-openai-model", "gpt-4.1-nano"), openaiBaseUrl: getOptVal("opt-openai-baseurl", "https://api.openai.com/v1"),
-      claudeApiKey: getOptVal("opt-claude-key"), claudeModel: getOptVal("opt-claude-model", "claude-haiku-4-5-20251001"),
-      deepseekApiKey: getOptVal("opt-deepseek-key"), deepseekModel: getOptVal("opt-deepseek-model", "deepseek-chat"),
-      qwenApiKey: getOptVal("opt-qwen-key"), qwenModel: getOptVal("opt-qwen-model", "qwen-flash"),
-      minimaxApiKey: getOptVal("opt-minimax-key"), minimaxModel: getOptVal("opt-minimax-model", "MiniMax-Text-01"),
-      openrouterApiKey: getOptVal("opt-openrouter-key"), openrouterModel: getOptVal("opt-openrouter-model", "meta-llama/llama-4-scout:free"),
-      ollamaBaseUrl: getOptVal("opt-ollama-baseurl", "http://localhost:11434"), ollamaModel: getOptVal("opt-ollama-model", "llama3"),
-      groqApiKey: getOptVal("opt-groq-key"), groqModel: getOptVal("opt-groq-model", "meta-llama/llama-4-scout-17b-16e-instruct"),
-      mistralApiKey: getOptVal("opt-mistral-key"), mistralModel: getOptVal("opt-mistral-model", "mistral-small-latest"),
-      cohereApiKey: getOptVal("opt-cohere-key"), cohereModel: getOptVal("opt-cohere-model", "command-r-08-2024"),
-      siliconflowApiKey: getOptVal("opt-siliconflow-key"), siliconflowModel: getOptVal("opt-siliconflow-model", "Qwen/Qwen3-8B"),
-      zhipuApiKey: getOptVal("opt-zhipu-key"), zhipuModel: getOptVal("opt-zhipu-model", "glm-4.7-flash"),
-      kimiApiKey: getOptVal("opt-kimi-key"), kimiModel: getOptVal("opt-kimi-model", "kimi-k2.5"),
-      customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
-    };
-
-    try {
-      if (!hasAIKey(cs)) throw new Error(t("testNoApiKey"));
-      const result = await callAI(cs, "Reply with just the word: OK");
-
-      statusEl.textContent = t("testConnected", (result || "OK").substring(0, 20));
-      statusEl.style.color = "#080";
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 4000);
-    } catch (err) {
-      const msg = err.name === "AbortError" ? t("testTimeout") : err.message;
-      statusEl.textContent = `✗ ${msg}`;
-      statusEl.style.color = "#c00";
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
-    }
-  }
-
-  ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ollama","custom"].forEach(p => {
-    document.getElementById(`test-${p}`)?.addEventListener("click", () => testAIProvider(p));
-  });
-
-  // ---- Pinboard token: real-time format validation ----
-  function isValidTokenFormat(token) {
-    // Format: username:TOKEN — both parts non-empty, no spaces, token ≥ 8 chars
-    if (!token) return null; // empty — no warning
-    const idx = token.indexOf(":");
-    if (idx < 1) return false;
-    const user = token.slice(0, idx);
-    const key = token.slice(idx + 1);
-    return user.length > 0 && key.length >= 8 && !/\s/.test(token);
-  }
-
-  const tokenInput = document.getElementById("opt-pinboard-token");
-  const tokenWarn = document.getElementById("token-format-warn");
-  function validateTokenField() {
-    const val = tokenInput.value.trim();
-    const valid = isValidTokenFormat(val);
-    tokenWarn.classList.toggle("visible", valid === false);
-  }
-  tokenInput?.addEventListener("input", validateTokenField);
-  tokenInput?.addEventListener("blur", validateTokenField);
-  validateTokenField(); // run once on load
-
-  // ---- Test Pinboard API token (via background to avoid native auth dialog) ----
-  document.getElementById("test-pinboard-token")?.addEventListener("click", async () => {
-    const btn = document.getElementById("test-pinboard-token");
-    const statusEl = document.getElementById("test-pinboard-status");
-    const token = tokenInput.value.trim();
-    if (isValidTokenFormat(token) === false || !token) {
-      statusEl.textContent = `✗ ${t("loginInvalidFormat")}`;
-      statusEl.style.color = "#c00";
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 4000);
-      return;
-    }
-    btn.disabled = true;
-    statusEl.textContent = t("testTesting");
-    statusEl.style.color = "";
-    try {
-      const resp = await chrome.runtime.sendMessage({ type: "test_pinboard_token", token });
-      if (resp?.ok) {
-        statusEl.textContent = t("testConnected", token.split(":")[0]);
-        statusEl.style.color = "#080";
-      } else if (resp?.error === "timeout") {
-        statusEl.textContent = `✗ ${t("testTimeout")}`;
-        statusEl.style.color = "#c00";
-      } else if (resp?.error === "network") {
-        statusEl.textContent = `✗ ${t("networkError")}`;
-        statusEl.style.color = "#c00";
-      } else {
-        statusEl.textContent = `✗ ${t("loginFailed")}`;
-        statusEl.style.color = "#c00";
-      }
-    } catch (_) {
-      statusEl.textContent = `✗ ${t("networkError")}`;
-      statusEl.style.color = "#c00";
-    } finally {
-      btn.disabled = false;
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
-    }
-  });
 
   // ---- Theme preset buttons ----
   // Schema v2: preset selection only updates currentPresetKey;
@@ -849,8 +658,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Render a read-only preview of the selected preset's CSS (collapsible panel).
   function renderPresetPreview() {
-    const previewEl = document.getElementById("preset-preview-content");
-    const previewSection = document.getElementById("preset-preview-section");
+    const previewEl = $id("preset-preview-content");
+    const previewSection = $id("preset-preview-section");
     if (!previewEl || !previewSection) return;
     if (!currentPresetKey) {
       previewSection.style.display = "none";
@@ -859,7 +668,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     let themeKey = currentPresetKey;
     if (ADAPTIVE_THEME_MAP[themeKey]) {
-      const mode = document.getElementById("opt-theme").value;
+      const mode = $id("opt-theme").value;
       const prefersDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       const variantKey = ADAPTIVE_THEME_MAP[themeKey][prefersDark ? 1 : 0];
       if (PINBOARD_THEMES[variantKey]) themeKey = variantKey;
@@ -876,7 +685,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateThemePresetButtons();
     updateSavedThemeButtons();
     updateSaveThemeBtnState();
-    applyOptionsPageTheme(currentPresetKey, document.getElementById("opt-theme").value);
+    applyOptionsPageTheme(currentPresetKey, $id("opt-theme").value);
     renderPresetPreview();
     scheduleAutoSave();
   }
@@ -889,15 +698,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   // any non-whitespace CSS to save. Called from input handler, preset apply,
   // and on initial load.
   function updateSaveThemeBtnState() {
-    const saveBtn = document.getElementById("save-custom-theme");
+    const saveBtn = $id("save-custom-theme");
     if (!saveBtn) return;
-    const css = document.getElementById("opt-custom-css").value;
+    const css = $id("opt-custom-css").value;
     saveBtn.disabled = !css.trim();
   }
 
   // Update saved-theme/save-button state and byte counter when user edits overlay CSS.
   // Schema v2: textarea is the overlay; it does NOT determine the preset.
-  document.getElementById("opt-custom-css").addEventListener("input", () => {
+  $id("opt-custom-css").addEventListener("input", () => {
     updateSavedThemeButtons();
     updateSaveThemeBtnState();
     updateOverlayByteCounter();
@@ -905,8 +714,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Byte counter: shows N B / 50 KB; warns at 80%, blocks save at 100%.
   function updateOverlayByteCounter() {
-    const ta = document.getElementById("opt-custom-css");
-    const counter = document.getElementById("overlay-byte-counter");
+    const ta = $id("opt-custom-css");
+    const counter = $id("overlay-byte-counter");
     if (!ta || !counter) return;
     const bytes = new Blob([ta.value]).size;
     const pct = bytes / OVERLAY_BYTE_LIMIT;
@@ -944,11 +753,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderSavedThemes() {
-    const container = document.getElementById("saved-themes-list");
-    const section = document.getElementById("saved-themes-section");
+    const container = $id("saved-themes-list");
+    const section = $id("saved-themes-section");
     while (container.firstChild) container.removeChild(container.firstChild);
     section.style.display = savedThemes.length ? "" : "none";
-    const currentCSS = document.getElementById("opt-custom-css").value;
+    const currentCSS = $id("opt-custom-css").value;
     savedThemes.forEach((theme) => {
       const wrap = document.createElement("span");
       wrap.className = "saved-theme-wrap";
@@ -961,13 +770,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (isActive) btn.classList.add("active");
       btn.setAttribute("aria-pressed", isActive ? "true" : "false");
       btn.addEventListener("click", () => {
-        document.getElementById("opt-custom-css").value = theme.css;
+        $id("opt-custom-css").value = theme.css;
         updateThemePresetButtons();
         updateSavedThemeButtons();
         updateSaveThemeBtnState();
         // Custom saved themes do NOT affect options page styling — clear preset key
         currentPresetKey = "";
-        applyOptionsPageTheme("", document.getElementById("opt-theme").value);
+        applyOptionsPageTheme("", $id("opt-theme").value);
         scheduleAutoSave();
       });
       const del = document.createElement("button");
@@ -998,7 +807,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function updateSavedThemeButtons() {
-    const currentCSS = document.getElementById("opt-custom-css").value;
+    const currentCSS = $id("opt-custom-css").value;
     document.querySelectorAll(".saved-theme-btn").forEach(btn => {
       const theme = savedThemes.find(t => t.name === btn.textContent);
       const isActive = !!(theme && currentCSS.trim() === theme.css.trim());
@@ -1007,8 +816,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  document.getElementById("save-custom-theme").addEventListener("click", () => {
-    const css = document.getElementById("opt-custom-css").value.trim();
+  $id("save-custom-theme").addEventListener("click", () => {
+    const css = $id("opt-custom-css").value.trim();
     if (!css) return;
 
     const wrap = document.querySelector(".save-theme-wrap");
@@ -1093,11 +902,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateSaveThemeBtnState();
 
   // ---- Chrome shortcuts link ----
-  document.getElementById("open-shortcuts-link")?.addEventListener("click", (e) => {
+  $id("open-shortcuts-link")?.addEventListener("click", (e) => {
     e.preventDefault();
     chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
   });
-  document.getElementById("open-shortcuts-link-rl")?.addEventListener("click", (e) => {
+  $id("open-shortcuts-link-rl")?.addEventListener("click", (e) => {
     e.preventDefault();
     chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
   });

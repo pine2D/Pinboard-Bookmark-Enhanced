@@ -27,6 +27,7 @@ INCLUDE=(
   popup.html popup.js popup.css popup-theme-early.js
   popup-ai.js popup-batch.js popup-tags.js
   options.html options.js options.css options-theme-early.js
+  options-api-tests.js options-backup.js
   background.js shared.js ai.js i18n.js
   jina.js md-preview.html md-preview.js md-preview.css
   vendor
