@@ -842,7 +842,7 @@
     "message": "напр. claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
   },
   "hintOllamaModel": {
-    "message": "Сначала выполните ollama pull llama3"
+    "message": "Сначала выполните ollama pull llama3.2"
   },
   "hintCustomBaseUrl": {
     "message": "Должен поддерживать эндпоинт /chat/completions"
@@ -1270,9 +1270,39 @@
     "message": "напр. glm-4.7-flash, glm-4-flash, glm-4-plus"
   },
   "hintKimiModel": {
-    "message": "напр. kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
+    "message": "напр. kimi-k2.6, kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
   },
   "mdPreviewEmpty": {
     "message": "Нет данных предпросмотра. Сначала нажмите кнопку Markdown во всплывающем окне."
+  },
+  "freeTierTitle": {
+    "message": "Какие провайдеры предлагают бесплатный доступ к API?"
+  },
+  "freeTierGemini": {
+    "message": "— ~1000 запр./день, без карты, аккаунт Google."
+  },
+  "freeTierGroq": {
+    "message": "— ~1000 запр./день, самый быстрый инференс."
+  },
+  "freeTierMistral": {
+    "message": "— 1 млрд токенов/месяц, но 1–2 RPM."
+  },
+  "freeTierZhipu": {
+    "message": "— без дневного лимита, нужен китайский номер телефона."
+  },
+  "freeTierOpenrouter": {
+    "message": "— модели :free, строгие лимиты."
+  },
+  "freeTierCohere": {
+    "message": "— пробный ключ, ~1000 вызовов/месяц."
+  },
+  "freeTierTrial": {
+    "message": "— временные кредиты для новых аккаунтов."
+  },
+  "freeTierOllama": {
+    "message": "— полностью бесплатно, работает локально."
+  },
+  "freeTierDisclaimer": {
+    "message": "⚠ Политики провайдеров часто меняются. Информация на май 2026, может быть неточной. Проверяйте актуальные лимиты при регистрации."
   }
 }

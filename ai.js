@@ -149,17 +149,17 @@ async function callAI(s, prompt) {
   switch (p) {
     case "gemini": return callGemini(s, prompt);
     case "claude": return callClaude(s, prompt);
-    case "openai": return callOpenAICompat(s.openaiBaseUrl || "https://api.openai.com/v1", s.openaiApiKey, s.openaiModel || "gpt-4.1-nano", prompt);
-    case "deepseek": return callOpenAICompat("https://api.deepseek.com/v1", s.deepseekApiKey, s.deepseekModel || "deepseek-chat", prompt);
+    case "openai": return callOpenAICompat(s.openaiBaseUrl || "https://api.openai.com/v1", s.openaiApiKey, s.openaiModel || "gpt-5.4-nano", prompt);
+    case "deepseek": return callOpenAICompat("https://api.deepseek.com/v1", s.deepseekApiKey, s.deepseekModel || "deepseek-v4-flash", prompt);
     case "qwen": return callOpenAICompat("https://dashscope.aliyuncs.com/compatible-mode/v1", s.qwenApiKey, s.qwenModel || "qwen-flash", prompt);
-    case "minimax": return callOpenAICompat("https://api.minimax.chat/v1", s.minimaxApiKey, s.minimaxModel || "MiniMax-Text-01", prompt);
+    case "minimax": return callOpenAICompat("https://api.minimax.chat/v1", s.minimaxApiKey, s.minimaxModel || "MiniMax-M2", prompt);
     case "openrouter": return callOpenAICompat("https://openrouter.ai/api/v1", s.openrouterApiKey, s.openrouterModel || "meta-llama/llama-4-scout:free", prompt);
     case "groq": return callOpenAICompat("https://api.groq.com/openai/v1", s.groqApiKey, s.groqModel || "meta-llama/llama-4-scout-17b-16e-instruct", prompt);
     case "mistral": return callOpenAICompat("https://api.mistral.ai/v1", s.mistralApiKey, s.mistralModel || "mistral-small-latest", prompt);
     case "cohere": return callOpenAICompat("https://api.cohere.com/v2", s.cohereApiKey, s.cohereModel || "command-r-08-2024", prompt);
     case "siliconflow": return callOpenAICompat("https://api.siliconflow.cn/v1", s.siliconflowApiKey, s.siliconflowModel || "Qwen/Qwen3-8B", prompt);
     case "zhipu": return callOpenAICompat("https://open.bigmodel.cn/api/paas/v4", s.zhipuApiKey, s.zhipuModel || "glm-4.7-flash", prompt);
-    case "kimi": return callOpenAICompat("https://api.moonshot.cn/v1", s.kimiApiKey, s.kimiModel || "kimi-k2.5", prompt);
+    case "kimi": return callOpenAICompat("https://api.moonshot.cn/v1", s.kimiApiKey, s.kimiModel || "kimi-k2.6", prompt);
     case "ollama": return callOllama(s, prompt);
     case "custom": return callOpenAICompat(s.customBaseUrl, s.customApiKey, s.customModel, prompt);
     default: throw new Error("Unknown provider: " + p);
@@ -208,7 +208,7 @@ async function callOllama(s, prompt) {
   const base = (s.ollamaBaseUrl || "http://localhost:11434").replace(/\/+$/, "");
   const res = await fetchWithTimeout(`${base}/api/chat`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: s.ollamaModel || "llama3", messages: [{ role: "user", content: prompt }], stream: false })
+    body: JSON.stringify({ model: s.ollamaModel || "llama3.2", messages: [{ role: "user", content: prompt }], stream: false })
   });
   if (!res.ok) await handleAIError(res, "Ollama");
   const text = (await res.json()).message?.content?.trim();

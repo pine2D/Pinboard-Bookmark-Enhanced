@@ -842,7 +842,7 @@
     "message": "如 claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
   },
   "hintOllamaModel": {
-    "message": "需先執行 ollama pull llama3"
+    "message": "需先執行 ollama pull llama3.2"
   },
   "hintCustomBaseUrl": {
     "message": "必須支援 /chat/completions 端點"
@@ -1270,9 +1270,39 @@
     "message": "範例：glm-4.7-flash、glm-4-flash、glm-4-plus"
   },
   "hintKimiModel": {
-    "message": "範例：kimi-k2.5、moonshot-v1-32k、moonshot-v1-128k"
+    "message": "範例：kimi-k2.6、kimi-k2.5、moonshot-v1-32k、moonshot-v1-128k"
   },
   "mdPreviewEmpty": {
     "message": "沒有預覽資料。請先在 popup 中點擊 Markdown 按鈕。"
+  },
+  "freeTierTitle": {
+    "message": "哪些 AI 服務商提供免費 API？"
+  },
+  "freeTierGemini": {
+    "message": "— 約 1000 次/日，免信用卡，Google 帳號即可"
+  },
+  "freeTierGroq": {
+    "message": "— 約 1000 次/日，推理速度最快"
+  },
+  "freeTierMistral": {
+    "message": "— 每月 10 億 tokens，但限速 1–2 RPM"
+  },
+  "freeTierZhipu": {
+    "message": "— 不限日額，需中國手機門號"
+  },
+  "freeTierOpenrouter": {
+    "message": "— :free 模型，限速較緊"
+  },
+  "freeTierCohere": {
+    "message": "— 試用金鑰，約 1000 次/月"
+  },
+  "freeTierTrial": {
+    "message": "— 僅限新帳號，有時效"
+  },
+  "freeTierOllama": {
+    "message": "— 完全免費，本機執行"
+  },
+  "freeTierDisclaimer": {
+    "message": "⚠ 各服務商政策時常變動。以上資訊截至 2026-05，可能已失效。註冊時請以官方頁面為準。"
   }
 }

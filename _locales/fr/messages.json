@@ -842,7 +842,7 @@
     "message": "ex. claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
   },
   "hintOllamaModel": {
-    "message": "Exécutez d'abord ollama pull llama3"
+    "message": "Exécutez d'abord ollama pull llama3.2"
   },
   "hintCustomBaseUrl": {
     "message": "Doit prendre en charge l'endpoint /chat/completions"
@@ -1270,9 +1270,39 @@
     "message": "ex. : glm-4.7-flash, glm-4-flash, glm-4-plus"
   },
   "hintKimiModel": {
-    "message": "ex. : kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
+    "message": "ex. : kimi-k2.6, kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
   },
   "mdPreviewEmpty": {
     "message": "Aucune donnée d'aperçu disponible. Cliquez d'abord sur Markdown dans le popup."
+  },
+  "freeTierTitle": {
+    "message": "Quels fournisseurs offrent un accès API gratuit ?"
+  },
+  "freeTierGemini": {
+    "message": "— ~1000 req/jour, sans carte, compte Google."
+  },
+  "freeTierGroq": {
+    "message": "— ~1000 req/jour, inférence la plus rapide."
+  },
+  "freeTierMistral": {
+    "message": "— 1 Md tokens/mois, mais 1–2 RPM."
+  },
+  "freeTierZhipu": {
+    "message": "— illimité par jour, numéro chinois requis."
+  },
+  "freeTierOpenrouter": {
+    "message": "— modèles :free, limites de débit strictes."
+  },
+  "freeTierCohere": {
+    "message": "— clé d'essai, ~1000 appels/mois."
+  },
+  "freeTierTrial": {
+    "message": "— crédits limités dans le temps pour nouveaux comptes."
+  },
+  "freeTierOllama": {
+    "message": "— entièrement gratuit, fonctionne en local."
+  },
+  "freeTierDisclaimer": {
+    "message": "⚠ Les politiques des fournisseurs changent souvent. Informations à jour en mai 2026, susceptibles d'être inexactes. Vérifiez les limites actuelles à l'inscription."
   }
 }

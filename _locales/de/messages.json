@@ -842,7 +842,7 @@
     "message": "Z.B. claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
   },
   "hintOllamaModel": {
-    "message": "Führen Sie zuerst ollama pull llama3 aus"
+    "message": "Führen Sie zuerst ollama pull llama3.2 aus"
   },
   "hintCustomBaseUrl": {
     "message": "Muss den /chat/completions Endpunkt unterstützen"
@@ -1270,9 +1270,39 @@
     "message": "z. B. glm-4.7-flash, glm-4-flash, glm-4-plus"
   },
   "hintKimiModel": {
-    "message": "z. B. kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
+    "message": "z. B. kimi-k2.6, kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
   },
   "mdPreviewEmpty": {
     "message": "Keine Vorschaudaten verfügbar. Bitte zuerst im Popup auf Markdown klicken."
+  },
+  "freeTierTitle": {
+    "message": "Welche Anbieter bieten kostenlosen API-Zugang?"
+  },
+  "freeTierGemini": {
+    "message": "— ca. 1000 Anfragen/Tag, ohne Karte, Google-Konto."
+  },
+  "freeTierGroq": {
+    "message": "— ca. 1000 Anfragen/Tag, schnellste Inferenz."
+  },
+  "freeTierMistral": {
+    "message": "— 1 Mrd. Tokens/Monat, aber 1–2 RPM."
+  },
+  "freeTierZhipu": {
+    "message": "— unbegrenzt täglich, chinesische Telefonnummer erforderlich."
+  },
+  "freeTierOpenrouter": {
+    "message": "— :free Modelle, strenge Ratenlimits."
+  },
+  "freeTierCohere": {
+    "message": "— Trial-Key, ca. 1000 Aufrufe/Monat."
+  },
+  "freeTierTrial": {
+    "message": "— zeitlich begrenztes Guthaben für neue Konten."
+  },
+  "freeTierOllama": {
+    "message": "— komplett kostenlos, läuft lokal."
+  },
+  "freeTierDisclaimer": {
+    "message": "⚠ Anbieter-Richtlinien ändern sich häufig. Stand: Mai 2026, kann veraltet sein. Bitte aktuelle Limits bei der Anmeldung prüfen."
   }
 }

@@ -842,7 +842,7 @@
     "message": "例：claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
   },
   "hintOllamaModel": {
-    "message": "先に ollama pull llama3 を実行してください"
+    "message": "先に ollama pull llama3.2 を実行してください"
   },
   "hintCustomBaseUrl": {
     "message": "/chat/completions エンドポイントに対応している必要があります"
@@ -1270,9 +1270,39 @@
     "message": "例: glm-4.7-flash, glm-4-flash, glm-4-plus"
   },
   "hintKimiModel": {
-    "message": "例: kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
+    "message": "例: kimi-k2.6, kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
   },
   "mdPreviewEmpty": {
     "message": "プレビューデータがありません。まずポップアップの Markdown ボタンを使ってください。"
+  },
+  "freeTierTitle": {
+    "message": "無料 API を提供するプロバイダーは？"
+  },
+  "freeTierGemini": {
+    "message": "— 約 1000 リクエスト/日、カード不要、Google アカウント"
+  },
+  "freeTierGroq": {
+    "message": "— 約 1000 リクエスト/日、最速推論"
+  },
+  "freeTierMistral": {
+    "message": "— 月 10 億トークン、ただし 1–2 RPM"
+  },
+  "freeTierZhipu": {
+    "message": "— 日次無制限、中国の電話番号が必要"
+  },
+  "freeTierOpenrouter": {
+    "message": "— :free モデル、厳しいレート制限"
+  },
+  "freeTierCohere": {
+    "message": "— トライアルキー、約 1000 呼び出し/月"
+  },
+  "freeTierTrial": {
+    "message": "— 新規アカウント限定、期間限定クレジット"
+  },
+  "freeTierOllama": {
+    "message": "— 完全無料、ローカル実行"
+  },
+  "freeTierDisclaimer": {
+    "message": "⚠ 各プロバイダーのポリシーは頻繁に変わります。上記は 2026 年 5 月時点の情報で、不正確な場合があります。登録時に最新の制限を確認してください。"
   }
 }

@@ -201,6 +201,21 @@
         </select>
       </div>
 
+      <details class="free-tier-help">
+        <summary data-i18n="freeTierTitle">Which providers offer free API access?</summary>
+        <ul class="free-tier-list">
+          <li><strong>Gemini</strong> <span data-i18n="freeTierGemini">— ~1000 req/day, no card, Google account.</span></li>
+          <li><strong>Groq</strong> <span data-i18n="freeTierGroq">— ~1000 req/day, fastest inference.</span></li>
+          <li><strong>Mistral</strong> <span data-i18n="freeTierMistral">— 1B tokens/month, but 1–2 RPM.</span></li>
+          <li><strong>Zhipu</strong> <span data-i18n="freeTierZhipu">— unlimited daily, requires China phone number.</span></li>
+          <li><strong>OpenRouter</strong> <span data-i18n="freeTierOpenrouter">— :free models, tight rate limits.</span></li>
+          <li><strong>Cohere</strong> <span data-i18n="freeTierCohere">— trial key, ~1000 calls/month.</span></li>
+          <li><strong>DeepSeek / Qwen / MiniMax</strong> <span data-i18n="freeTierTrial">— time-limited credits for new accounts.</span></li>
+          <li><strong>Ollama</strong> <span data-i18n="freeTierOllama">— fully free, runs locally on your machine.</span></li>
+        </ul>
+        <p class="hint" data-i18n="freeTierDisclaimer">⚠ Provider policies change frequently. Information above is current as of 2026-05 and may be inaccurate. Always verify current limits at signup.</p>
+      </details>
+
       <!-- Gemini -->
       <div class="pf" id="fields-gemini">
         <h3 data-i18n="provGemini">Google Gemini</h3>
@@ -214,7 +229,7 @@
       <div class="pf hidden" id="fields-openai">
         <h3 data-i18n="provOpenai">OpenAI</h3>
         <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-openai-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-openai-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key">👁</button><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" data-i18n="getKey">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-openai-model" value="gpt-4.1-nano" /></div>
+        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-openai-model" value="gpt-5.4-nano" /></div>
         <div class="fg"><label class="bl" data-i18n="labelBaseUrl">Base URL</label><input type="text" id="opt-openai-baseurl" value="https://api.openai.com/v1" /><p class="hint" data-i18n="hintOpenAIBaseUrl">Change for proxy or compatible endpoint</p></div>
         <button class="btn btn-sm" id="test-openai" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-openai-status"></span>
@@ -233,7 +248,7 @@
       <div class="pf hidden" id="fields-deepseek">
         <h3 data-i18n="provDeepseek">DeepSeek</h3>
         <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-deepseek-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-deepseek-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key">👁</button><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank" data-i18n="getKey">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-chat" /></div>
+        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-v4-flash" /></div>
         <button class="btn btn-sm" id="test-deepseek" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-deepseek-status"></span>
       </div>
@@ -251,7 +266,7 @@
       <div class="pf hidden" id="fields-minimax">
         <h3 data-i18n="provMinimax">MiniMax</h3>
         <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-minimax-key" /><button type="button" class="key-toggle" data-target="opt-minimax-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key">👁</button><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank" data-i18n="getKey">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-Text-01" /></div>
+        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-M2" /></div>
         <button class="btn btn-sm" id="test-minimax" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-minimax-status"></span>
       </div>
@@ -314,7 +329,7 @@
       <div class="pf hidden" id="fields-kimi">
         <h3 data-i18n="provKimi">Kimi</h3>
         <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-kimi-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-kimi-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key">👁</button><p class="hint"><a href="https://platform.moonshot.cn/console/api-keys" target="_blank" data-i18n="getKey">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-kimi-model" value="kimi-k2.5" /><p class="hint" data-i18n="hintKimiModel">e.g. kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k</p></div>
+        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-kimi-model" value="kimi-k2.6" /><p class="hint" data-i18n="hintKimiModel">e.g. kimi-k2.6, kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k</p></div>
         <button class="btn btn-sm" id="test-kimi" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-kimi-status"></span>
       </div>
@@ -323,7 +338,7 @@
       <div class="pf hidden" id="fields-ollama">
         <h3 data-i18n="provOllama">Ollama (Local)</h3>
         <div class="fg"><label class="bl" data-i18n="labelBaseUrl">Base URL</label><input type="text" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-ollama-model" value="llama3" /><p class="hint" data-i18n="hintOllamaModel">Run <code>ollama pull llama3</code> first</p></div>
+        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-ollama-model" value="llama3.2" /><p class="hint" data-i18n="hintOllamaModel">Run <code>ollama pull llama3.2</code> first</p></div>
         <button class="btn btn-sm" id="test-ollama" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-ollama-status"></span>
       </div>
