@@ -226,7 +226,7 @@ async function extractLocalMarkdown(tabId) {
       target: { tabId },
       func: () => {
         if (typeof Defuddle === "undefined") return { error: "Defuddle not available" };
-        // Patch window.URL in the ISOLATED world to prevent defuddle v0.16.0 from
+        // Patch window.URL in the ISOLATED world to prevent defuddle from
         // throwing "Failed to construct 'URL': Invalid URL" on relative/weird hrefs
         // (GitHub pages etc.). Defuddle is UMD and resolves `URL` at runtime, so this
         // interception works. Only affects isolated world; page's window.URL untouched.

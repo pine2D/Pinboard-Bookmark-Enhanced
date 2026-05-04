@@ -8,19 +8,25 @@ For Chrome Web Store reviewers: every file in this directory is unmodified upstr
 
 | File | Version | Upstream | License | Purpose |
 |------|---------|----------|---------|---------|
-| `defuddle.js` | 0.16.0 | https://github.com/kepano/defuddle | MIT | Extracts main article content from arbitrary web pages so AI tag/summary requests can send clean text instead of full HTML. Injected via `chrome.scripting.executeScript` into the active tab on user action only. |
+| `defuddle.js` | 0.18.1 | https://github.com/kepano/defuddle | MIT | Extracts main article content from arbitrary web pages so AI tag/summary requests can send clean text instead of full HTML. Injected via `chrome.scripting.executeScript` into the active tab on user action only. |
 | `turndown.js` | 7.2.4 | https://github.com/mixmark-io/turndown | MIT | Converts captured HTML to Markdown for the in-extension preview tab. Loaded only inside `md-preview.html`. |
 
 ## Reproduction (for source verification)
 
 ### `defuddle.js`
 ```bash
+npm pack defuddle@0.18.1
+tar -xzf defuddle-0.18.1.tgz package/dist/index.js
+diff package/dist/index.js vendor/defuddle.js
+```
+Or build from source:
+```bash
 git clone https://github.com/kepano/defuddle.git
 cd defuddle
-git checkout v0.16.0
+git checkout 0.18.1
 npm install
 npm run build
-# Output: dist/defuddle.full.js (matches vendor/defuddle.js byte-for-byte)
+# Output: dist/index.js (matches vendor/defuddle.js byte-for-byte)
 ```
 
 ### `turndown.js`

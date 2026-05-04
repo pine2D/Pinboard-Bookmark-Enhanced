@@ -45,7 +45,7 @@ async function getPageInfoFromTab(tabId) {
 
         // Try Defuddle for high-quality content extraction
         if (typeof Defuddle !== "undefined") {
-          // Patch window.URL in the ISOLATED world to prevent defuddle v0.16.0 from
+          // Patch window.URL in the ISOLATED world to prevent defuddle from
           // throwing "Failed to construct 'URL': Invalid URL" on relative/weird hrefs
           // (GitHub releases pages etc.). Mirrors popup.js extractLocalMarkdown shim.
           // Without this, throws still get reported in chrome://extensions Errors panel
