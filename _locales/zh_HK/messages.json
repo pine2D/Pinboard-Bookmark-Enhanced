@@ -1256,5 +1256,23 @@
   },
   "syncMigrationFailed": {
     "message": "同步遷移失敗。請重試，或縮減自訂 CSS 大小。"
+  },
+  "jinaFreeTierHint": {
+    "message": "免費額度：20 RPM。設定 key 可提高配額。"
+  },
+  "openrouterTagline": {
+    "message": "透過單一 API 存取 100+ 模型。"
+  },
+  "browseModelsAt": {
+    "message": "瀏覽模型清單："
+  },
+  "hintZhipuModel": {
+    "message": "範例：glm-4.7-flash、glm-4-flash、glm-4-plus"
+  },
+  "hintKimiModel": {
+    "message": "範例：kimi-k2.5、moonshot-v1-32k、moonshot-v1-128k"
+  },
+  "mdPreviewEmpty": {
+    "message": "沒有預覽資料。請先在 popup 中點擊 Markdown 按鈕。"
   }
 }

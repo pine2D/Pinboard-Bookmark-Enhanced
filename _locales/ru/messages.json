@@ -1256,5 +1256,23 @@
   },
   "syncMigrationFailed": {
     "message": "Ошибка миграции синхронизации. Повторите попытку или уменьшите размер пользовательского CSS."
+  },
+  "jinaFreeTierHint": {
+    "message": "Бесплатно: 20 RPM. Добавьте ключ для увеличения квоты."
+  },
+  "openrouterTagline": {
+    "message": "Доступ к 100+ моделям через один API."
+  },
+  "browseModelsAt": {
+    "message": "Просмотр моделей:"
+  },
+  "hintZhipuModel": {
+    "message": "напр. glm-4.7-flash, glm-4-flash, glm-4-plus"
+  },
+  "hintKimiModel": {
+    "message": "напр. kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
+  },
+  "mdPreviewEmpty": {
+    "message": "Нет данных предпросмотра. Сначала нажмите кнопку Markdown во всплывающем окне."
   }
 }

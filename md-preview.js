@@ -7,7 +7,7 @@
   const data = await chrome.storage.local.get("md_preview_data");
   const info = data.md_preview_data;
   if (!info) {
-    document.getElementById("rendered-view").textContent = "No preview data available. Please use the Markdown button in the popup first.";
+    document.getElementById("rendered-view").textContent = chrome.i18n.getMessage("mdPreviewEmpty") || "No preview data available. Please use the Markdown button in the popup first.";
     return;
   }
   // Clear temporary data

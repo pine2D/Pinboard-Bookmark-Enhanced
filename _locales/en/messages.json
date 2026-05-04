@@ -1256,5 +1256,23 @@
   },
   "syncMigrationFailed": {
     "message": "Sync migration failed. Please try again or reduce custom CSS size."
+  },
+  "jinaFreeTierHint": {
+    "message": "Free tier: 20 RPM. Add key for higher quota."
+  },
+  "openrouterTagline": {
+    "message": "Access 100+ models from one API."
+  },
+  "browseModelsAt": {
+    "message": "Browse models at"
+  },
+  "hintZhipuModel": {
+    "message": "e.g. glm-4.7-flash, glm-4-flash, glm-4-plus"
+  },
+  "hintKimiModel": {
+    "message": "e.g. kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
+  },
+  "mdPreviewEmpty": {
+    "message": "No preview data available. Please use the Markdown button in the popup first."
   }
 }

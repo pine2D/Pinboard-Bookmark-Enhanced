@@ -1256,5 +1256,23 @@
   },
   "syncMigrationFailed": {
     "message": "Sync-Migration fehlgeschlagen. Bitte erneut versuchen oder die Größe des eigenen CSS reduzieren."
+  },
+  "jinaFreeTierHint": {
+    "message": "Kostenlos: 20 RPM. Key für höheres Kontingent hinzufügen."
+  },
+  "openrouterTagline": {
+    "message": "Greife auf 100+ Modelle über eine API zu."
+  },
+  "browseModelsAt": {
+    "message": "Modelle ansehen:"
+  },
+  "hintZhipuModel": {
+    "message": "z. B. glm-4.7-flash, glm-4-flash, glm-4-plus"
+  },
+  "hintKimiModel": {
+    "message": "z. B. kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
+  },
+  "mdPreviewEmpty": {
+    "message": "Keine Vorschaudaten verfügbar. Bitte zuerst im Popup auf Markdown klicken."
   }
 }

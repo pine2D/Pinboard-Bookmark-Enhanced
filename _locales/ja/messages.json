@@ -1256,5 +1256,23 @@
   },
   "syncMigrationFailed": {
     "message": "同期移行に失敗しました。再試行するか、カスタム CSS のサイズを減らしてください。"
+  },
+  "jinaFreeTierHint": {
+    "message": "無料枠: 20 RPM。キーを追加するとクォータが増えます。"
+  },
+  "openrouterTagline": {
+    "message": "1 つの API で 100+ モデルにアクセス。"
+  },
+  "browseModelsAt": {
+    "message": "モデル一覧:"
+  },
+  "hintZhipuModel": {
+    "message": "例: glm-4.7-flash, glm-4-flash, glm-4-plus"
+  },
+  "hintKimiModel": {
+    "message": "例: kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
+  },
+  "mdPreviewEmpty": {
+    "message": "プレビューデータがありません。まずポップアップの Markdown ボタンを使ってください。"
   }
 }

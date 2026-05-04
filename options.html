@@ -259,8 +259,8 @@
       <!-- OpenRouter -->
       <div class="pf hidden" id="fields-openrouter">
         <h3 data-i18n="provOpenrouter">OpenRouter</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-openrouter-key" placeholder="sk-or-…" /><button type="button" class="key-toggle" data-target="opt-openrouter-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key">👁</button><p class="hint"><a href="https://openrouter.ai/keys" target="_blank" data-i18n="getKey">Get key</a>. Access 100+ models from one API.</p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-openrouter-model" value="meta-llama/llama-4-scout:free" /><p class="hint">Browse models at <a href="https://openrouter.ai/models" target="_blank">openrouter.ai/models</a></p></div>
+        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-openrouter-key" placeholder="sk-or-…" /><button type="button" class="key-toggle" data-target="opt-openrouter-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key">👁</button><p class="hint"><a href="https://openrouter.ai/keys" target="_blank" data-i18n="getKey">Get key</a>. <span data-i18n="openrouterTagline">Access 100+ models from one API.</span></p></div>
+        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-openrouter-model" value="meta-llama/llama-4-scout:free" /><p class="hint"><span data-i18n="browseModelsAt">Browse models at</span> <a href="https://openrouter.ai/models" target="_blank">openrouter.ai/models</a></p></div>
         <button class="btn btn-sm" id="test-openrouter" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-openrouter-status"></span>
       </div>
@@ -305,7 +305,7 @@
       <div class="pf hidden" id="fields-zhipu">
         <h3 data-i18n="provZhipu">Zhipu</h3>
         <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-zhipu-key" /><button type="button" class="key-toggle" data-target="opt-zhipu-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key">👁</button><p class="hint"><a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" data-i18n="getKey">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-zhipu-model" value="glm-4.7-flash" /><p class="hint">e.g. glm-4.7-flash, glm-4-flash, glm-4-plus</p></div>
+        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-zhipu-model" value="glm-4.7-flash" /><p class="hint" data-i18n="hintZhipuModel">e.g. glm-4.7-flash, glm-4-flash, glm-4-plus</p></div>
         <button class="btn btn-sm" id="test-zhipu" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-zhipu-status"></span>
       </div>
@@ -314,7 +314,7 @@
       <div class="pf hidden" id="fields-kimi">
         <h3 data-i18n="provKimi">Kimi</h3>
         <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-kimi-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-kimi-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key">👁</button><p class="hint"><a href="https://platform.moonshot.cn/console/api-keys" target="_blank" data-i18n="getKey">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-kimi-model" value="kimi-k2.5" /><p class="hint">e.g. kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k</p></div>
+        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-kimi-model" value="kimi-k2.5" /><p class="hint" data-i18n="hintKimiModel">e.g. kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k</p></div>
         <button class="btn btn-sm" id="test-kimi" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-kimi-status"></span>
       </div>
@@ -356,7 +356,7 @@
         <label class="bl" data-i18n="jinaApiKeyLabel">API Key (optional)</label>
         <input type="password" id="opt-jina-key" placeholder="jina_xxxx (leave empty for free tier)" data-i18n-placeholder="jinaApiKeyPlaceholder" />
         <button type="button" class="key-toggle" data-target="opt-jina-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key">👁</button>
-        <p class="hint">Free tier: 20 RPM. Add key for higher quota. <a href="https://jina.ai/reader#pricing" target="_blank">Get key</a></p>
+        <p class="hint"><span data-i18n="jinaFreeTierHint">Free tier: 20 RPM. Add key for higher quota.</span> <a href="https://jina.ai/reader#pricing" target="_blank" data-i18n="getKey">Get key</a></p>
       </div>
 
       <div class="divider"></div>

@@ -1256,5 +1256,23 @@
   },
   "syncMigrationFailed": {
     "message": "Échec de la migration de synchronisation. Veuillez réessayer ou réduire la taille du CSS personnalisé."
+  },
+  "jinaFreeTierHint": {
+    "message": "Niveau gratuit : 20 RPM. Ajoutez une clé pour un quota plus élevé."
+  },
+  "openrouterTagline": {
+    "message": "Accédez à plus de 100 modèles via une seule API."
+  },
+  "browseModelsAt": {
+    "message": "Parcourir les modèles :"
+  },
+  "hintZhipuModel": {
+    "message": "ex. : glm-4.7-flash, glm-4-flash, glm-4-plus"
+  },
+  "hintKimiModel": {
+    "message": "ex. : kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k"
+  },
+  "mdPreviewEmpty": {
+    "message": "Aucune donnée d'aperçu disponible. Cliquez d'abord sur Markdown dans le popup."
   }
 }

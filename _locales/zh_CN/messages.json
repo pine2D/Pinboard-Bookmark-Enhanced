@@ -1256,5 +1256,23 @@
   },
   "syncMigrationFailed": {
     "message": "同步迁移失败。请重试，或缩减自定义 CSS 大小。"
+  },
+  "jinaFreeTierHint": {
+    "message": "免费额度：20 RPM。配置 key 可提高配额。"
+  },
+  "openrouterTagline": {
+    "message": "通过单一 API 访问 100+ 模型。"
+  },
+  "browseModelsAt": {
+    "message": "浏览模型列表："
+  },
+  "hintZhipuModel": {
+    "message": "示例：glm-4.7-flash、glm-4-flash、glm-4-plus"
+  },
+  "hintKimiModel": {
+    "message": "示例：kimi-k2.5、moonshot-v1-32k、moonshot-v1-128k"
+  },
+  "mdPreviewEmpty": {
+    "message": "没有预览数据。请先在 popup 中点击 Markdown 按钮。"
   }
 }
