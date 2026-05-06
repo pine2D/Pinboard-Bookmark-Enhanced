@@ -20,7 +20,7 @@
 - **已收藏检测** — 当前页若已收藏，工具栏图标会自动切换状态
 - **`pinboard.in` 主题** — 13 套精心调优的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），外加自定义 CSS 覆盖层，多设备同步
 - **离线队列** — 离线保存的草稿留在本地，重新联网时自动同步
-- **当前页转 Markdown** — 把当前网页转成干净的 Markdown，可预览、复制到剪贴板，或下载为 `.md`。本地由 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) 驱动，可选 [Jina Reader](https://jina.ai/reader) 云端兜底
+- **当前页转 Markdown** — 把当前网页转成干净的 Markdown，可预览、复制到剪贴板，或下载为 `.md`。可选 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本地）或 [Jina Reader](https://jina.ai/reader)（云端）两种后端
 - **9 种语言**、可自定义快捷键、零追踪
 
 ## 安装

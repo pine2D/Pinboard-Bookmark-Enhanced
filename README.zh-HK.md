@@ -20,7 +20,7 @@
 - **已收藏偵測** — 目前頁如果已經收藏咗，工具列圖示會自動切換狀態
 - **`pinboard.in` 佈景主題** — 13 套精心調校嘅配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），仲有自訂 CSS 覆蓋層，多裝置同步
 - **離線佇列** — 離線儲存嘅草稿留喺本機，重新連線時自動同步
-- **當前頁轉 Markdown** — 將目前網頁轉為乾淨嘅 Markdown，可預覽、複製到剪貼簿，或者下載做 `.md`。本機由 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) 驅動，可選 [Jina Reader](https://jina.ai/reader) 雲端備援
+- **當前頁轉 Markdown** — 將目前網頁轉為乾淨嘅 Markdown，可預覽、複製到剪貼簿，或者下載做 `.md`。可揀 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或者 [Jina Reader](https://jina.ai/reader)（雲端）兩種後端
 - **9 種語言**、可自訂快捷鍵、零追蹤
 
 ## 安裝

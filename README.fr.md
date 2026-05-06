@@ -20,7 +20,7 @@ Une extension Chrome qui booste les signets [Pinboard](https://pinboard.in) avec
 - **Détection des pages déjà sauvegardées** — l'icône change quand la page courante est déjà dans vos signets
 - **Thèmes pour `pinboard.in`** — 13 palettes soignées (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus un calque CSS personnalisé synchronisé entre vos appareils
 - **File d'attente hors-ligne** — les brouillons persistent localement et se synchronisent à la reconnexion
-- **Page vers Markdown** — convertir la page courante en Markdown propre — aperçu, copie dans le presse-papier ou téléchargement en `.md`. Propulsé localement par [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown), avec [Jina Reader](https://jina.ai/reader) en repli cloud optionnel
+- **Page vers Markdown** — convertir la page courante en Markdown propre — aperçu, copie dans le presse-papier ou téléchargement en `.md`. Choisissez [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (local) ou [Jina Reader](https://jina.ai/reader) (cloud)
 - **9 langues**, raccourcis clavier configurables, aucun tracking
 
 ## Installation
