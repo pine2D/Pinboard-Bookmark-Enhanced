@@ -1304,5 +1304,8 @@
   },
   "freeTierDisclaimer": {
     "message": "⚠ Polityki dostawców często się zmieniają. Informacje na maj 2026, mogą być niedokładne. Sprawdź aktualne limity przy rejestracji."
+  },
+  "freeTierResourcesPrefix": {
+    "message": "Pełniejsze, regularnie aktualizowane listy:"
   }
 }

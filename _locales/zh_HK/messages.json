@@ -1304,5 +1304,8 @@
   },
   "freeTierDisclaimer": {
     "message": "⚠ 各服務商政策時常變動。以上資料截至 2026-05，可能已失效。註冊時請以官方頁面為準。"
+  },
+  "freeTierResourcesPrefix": {
+    "message": "更全面、更新更勤嘅清單："
   }
 }

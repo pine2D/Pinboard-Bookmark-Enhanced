@@ -1304,5 +1304,8 @@
   },
   "freeTierDisclaimer": {
     "message": "⚠ Provider policies change frequently. Information above is current as of 2026-05 and may be inaccurate. Always verify current limits at signup."
+  },
+  "freeTierResourcesPrefix": {
+    "message": "More complete, regularly-updated lists:"
   }
 }

@@ -1304,5 +1304,8 @@
   },
   "freeTierDisclaimer": {
     "message": "⚠ Anbieter-Richtlinien ändern sich häufig. Stand: Mai 2026, kann veraltet sein. Bitte aktuelle Limits bei der Anmeldung prüfen."
+  },
+  "freeTierResourcesPrefix": {
+    "message": "Umfassendere, regelmäßig aktualisierte Listen:"
   }
 }
