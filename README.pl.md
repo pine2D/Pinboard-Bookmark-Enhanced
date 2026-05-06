@@ -20,7 +20,7 @@ Rozszerzenie Chrome, które wzbogaca zakładki [Pinboard](https://pinboard.in) o
 - **Wykrywanie już zapisanych stron** — ikona na pasku zmienia się, gdy bieżąca strona jest już w Twoich zakładkach
 - **Motywy dla `pinboard.in`** — 13 dopracowanych palet (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus własna nakładka CSS synchronizowana między urządzeniami
 - **Kolejka offline** — wersje robocze są zapisywane lokalnie i synchronizowane po ponownym połączeniu
-- **Strona do Markdown** — przekonwertuj bieżącą stronę na czysty Markdown — podgląd, skopiuj do schowka lub pobierz jako `.md`
+- **Strona do Markdown** — przekonwertuj bieżącą stronę na czysty Markdown — podgląd, skopiuj do schowka lub pobierz jako `.md`. Lokalnie napędzane przez [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown), z [Jina Reader](https://jina.ai/reader) jako opcjonalnym fallbackiem w chmurze
 - **9 języków**, konfigurowalne skróty, zero śledzenia
 
 ## Instalacja

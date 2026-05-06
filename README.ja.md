@@ -20,7 +20,7 @@
 - **既保存検知** — ツールバーアイコンが切り替わり、現在のページが既にブックマーク済みかすぐ分かります
 - **`pinboard.in` 用テーマ** — 13 種のキュレートされたパレット（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …）+ デバイス間で同期するカスタム CSS オーバーレイ
 - **オフラインキュー** — 下書きはローカル保存され、再接続時に自動同期
-- **ページを Markdown に** — 現在のページをクリーンな Markdown に変換 — プレビュー、クリップボードにコピー、または `.md` としてダウンロード
+- **ページを Markdown に** — 現在のページをクリーンな Markdown に変換 — プレビュー、クリップボードにコピー、または `.md` としてダウンロード。ローカルでは [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) で動作、オプションで [Jina Reader](https://jina.ai/reader) のクラウドフォールバックも利用可能
 - **9 言語対応**、カスタマイズ可能なショートカット、トラッキング一切なし
 
 ## インストール

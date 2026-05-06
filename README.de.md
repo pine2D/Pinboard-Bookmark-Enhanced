@@ -20,7 +20,7 @@ Eine Chrome-Erweiterung, die [Pinboard](https://pinboard.in)-Lesezeichen mit KI-
 - **Erkennung gespeicherter Seiten** — das Symbolleisten-Icon wechselt, wenn die aktuelle Seite bereits in deinen Lesezeichen ist
 - **Themes für `pinboard.in`** — 13 kuratierte Farbpaletten (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus eigenes CSS-Overlay, das geräteübergreifend synchronisiert wird
 - **Offline-Warteschlange** — Entwürfe bleiben lokal gespeichert und synchronisieren sich, sobald du wieder online bist
-- **Seite-zu-Markdown** — die aktuelle Seite in sauberes Markdown konvertieren — Vorschau, in die Zwischenablage kopieren oder als `.md` herunterladen
+- **Seite-zu-Markdown** — die aktuelle Seite in sauberes Markdown konvertieren — Vorschau, in die Zwischenablage kopieren oder als `.md` herunterladen. Lokal angetrieben von [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown), mit [Jina Reader](https://jina.ai/reader) als optionalem Cloud-Fallback
 - **9 Sprachen**, anpassbare Tastenkürzel, kein Tracking
 
 ## Installation
