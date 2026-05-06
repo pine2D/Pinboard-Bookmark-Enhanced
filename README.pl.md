@@ -25,10 +25,14 @@ Rozszerzenie Chrome, które wzbogaca zakładki [Pinboard](https://pinboard.in) o
 
 ## Instalacja
 
+**[→ Zainstaluj z Chrome Web Store](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)** — zalecane
+
+Lub załaduj rozpakowane z ZIP-a release:
 1. Pobierz najnowszy [ZIP z release](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 2. Rozpakuj
 3. `chrome://extensions/` → włącz **Tryb dewelopera** → **Załaduj rozpakowane** → wybierz rozpakowany folder
-4. Kliknij ikonę paska narzędzi → wklej swój [token API Pinboard](https://pinboard.in/settings/password) → zapisz
+
+Po instalacji: kliknij ikonę paska narzędzi → wklej swój [token API Pinboard](https://pinboard.in/settings/password) → zapisz
 
 ## Prywatność
 

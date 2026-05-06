@@ -25,10 +25,14 @@
 
 ## 安装
 
+**[→ 从 Chrome 网上应用店安装](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)** — 推荐
+
+或从 release ZIP 手动加载：
 1. 下载最新的 [release ZIP](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 2. 解压
 3. `chrome://extensions/` → 开启**开发者模式** → **加载已解压的扩展程序** → 选择解压后的目录
-4. 点击工具栏图标 → 粘贴你的 [Pinboard API token](https://pinboard.in/settings/password) → 保存
+
+安装完成后：点击工具栏图标 → 粘贴你的 [Pinboard API token](https://pinboard.in/settings/password) → 保存
 
 ## 隐私
 

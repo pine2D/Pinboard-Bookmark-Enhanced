@@ -25,10 +25,14 @@
 
 ## Установка
 
+**[→ Установить из Chrome Web Store](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)** — рекомендуется
+
+Или загрузите распакованное расширение из ZIP с релизом:
 1. Скачайте последний [ZIP с релизом](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 2. Распакуйте
 3. `chrome://extensions/` → включите **Режим разработчика** → **Загрузить распакованное расширение** → выберите распакованную папку
-4. Нажмите на иконку в панели инструментов → вставьте свой [API-токен Pinboard](https://pinboard.in/settings/password) → сохраните
+
+После установки: нажмите на иконку в панели инструментов → вставьте свой [API-токен Pinboard](https://pinboard.in/settings/password) → сохраните
 
 ## Конфиденциальность
 

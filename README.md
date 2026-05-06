@@ -25,10 +25,14 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 
 ## Install
 
+**[→ Install from Chrome Web Store](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)** — recommended
+
+Or load unpacked from a release ZIP:
 1. Download the latest [release ZIP](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 2. Unzip
 3. `chrome://extensions/` → enable **Developer mode** → **Load unpacked** → select the unzipped folder
-4. Click the toolbar icon → paste your [Pinboard API token](https://pinboard.in/settings/password) → save
+
+After installing, click the toolbar icon → paste your [Pinboard API token](https://pinboard.in/settings/password) → save
 
 ## Privacy
 
