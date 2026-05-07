@@ -124,6 +124,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 

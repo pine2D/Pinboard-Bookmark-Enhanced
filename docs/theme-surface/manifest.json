@@ -633,7 +633,11 @@
       "sel": "#bulk_top_bar, #bulk_edit_box",
       "role": "bulk-edit toolbar + selection box",
       "states": ["default"],
-      "tokens": ["palette.bg-surface", "palette.border", "palette.fg"]
+      "tokens": ["palette.bg-surface", "palette.border", "palette.fg"],
+      "inline_quirks": [
+        { "style": "color:white", "applies_to": "#bulk_edit_box #confirm > span#confirm_message", "note": "defeated by inline_base_rules.bulk-confirm-bar" },
+        { "style": "color:#ffa", "applies_to": "#bulk_edit_box #confirm a (confirm/cancel anchors)", "note": "defeated by inline_base_rules.bulk-confirm-bar" }
+      ]
     },
 
     "popup.header": {
@@ -798,6 +802,16 @@
       "reason": "Inline `background:#ffa` marks active per-page selection.",
       "selector": "table.per_page_widget [style*='background:#ffa']",
       "rule": "background: var(--pinboard-accent-alpha) !important; color: var(--pinboard-fg) !important;"
+    },
+    {
+      "id": "override.bulk-confirm-bar",
+      "applies_to": ["bulk.bars"],
+      "reason": "Pinboard injects inline `style=\"color:white\"` on #confirm > span#confirm_message and `style=\"color:#ffa\"` on the confirm/cancel anchors. Inline styles block color inheritance from the panel rule, so we restate colors with !important and treat #confirm as a panel-styled prompt with accent-colored buttons.",
+      "selector": "#bulk_edit_box #confirm",
+      "rule_panel": "background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important;",
+      "rule_text": "color: var(--pinboard-fg) !important; (also targets #confirm > span and #confirm > #confirm_message)",
+      "rule_link": "color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important;",
+      "rule_link_hover": "color: var(--pinboard-accent-hover) !important;"
     },
     {
       "id": "override.generic-bgcolor",

@@ -123,6 +123,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -435,11 +457,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -836,6 +853,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -1148,11 +1187,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -1505,6 +1539,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -1817,11 +1873,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -2002,45 +2053,56 @@ a.bookmark_title::before { content: "> " !important; color: var(--pinboard-muted
 /* === theme overrides (tokens.overrides.css) === */
 /* Terminal-specific decorative glyphs (CRT prompt markers) */
 #main_column form[name="sort"] table a.bundle::before { content: "> " !important; opacity: 0.6 !important; }
+
 /* ======== overrides-patch for terminal (auto-generated by tools/generate-overrides.mjs) ========
  * Restores shipped decls the composer's token-driven output doesn't match.
  */
+
+::selection { color: #fff !important; }
 #banner { padding: 8px 16px !important; background: #111 !important; border-bottom: 1px solid #33ff3340 !important; }
-#search_query_field { width: 100% !important; background: #111 !important; font-family: inherit !important; }
-.bookmark { border-bottom: 1px dashed #33ff3325 !important; padding: 10px 8px !important; }
-.star { color: #333 !important; }
 #banner a { text-decoration: none !important; }
 #top_menu a { text-decoration: none !important; }
 .banner_username { text-decoration: none !important; }
 #banner a:hover { text-decoration: underline !important; }
 #top_menu a:hover { text-decoration: underline !important; }
 #sub_banner { background: #0d0d0d !important; border-color: #33ff3325 !important; }
+#bmarks_page_nav a.filter.selected { color: var(--pinboard-bg) !important; }
+#bmarks_page_nav a.filter.selected:hover { color: var(--pinboard-bg) !important; }
+#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-bg) !important; }
+a.bundle { color: #22aa22 !important; }
+a.bundle:hover { color: #33ff33 !important; }
+#search_query_field { width: 100% !important; background: #111 !important; font-family: inherit !important; }
 #banner_searchbox input[type="text"] { background: #111 !important; font-family: inherit !important; }
 #search_query_field:focus { box-shadow: 0 0 6px #33ff3333 !important; }
 #banner_searchbox input[type="text"]:focus { box-shadow: 0 0 6px #33ff3333 !important; }
 .search_button input[type="submit"] { background: #1a3a1a !important; border: 1px solid #33ff3360 !important; font-family: inherit !important; }
 .search_button input[type="submit"]:hover { background: #2a5a2a !important; }
+.bookmark { border-bottom: 1px dashed #33ff3325 !important; padding: 10px 8px !important; }
+.star { color: #333 !important; }
 a.bookmark_title { font-weight: normal !important; }
-a.bookmark_title::before { color: #33ff3380 !important; }
 a.url_display { color: #22aa22 !important; font-size: 12px !important; }
 a.url_link { background: #1a1a1a !important; padding: 1px 5px !important; }
 .description { color: #22aa22 !important; font-size: 12px !important; font-style: italic !important; }
 .description blockquote { border-left: 2px solid #33ff3340 !important; }
 a.tag:hover { color: #00ffff !important; text-decoration: underline !important; }
+a.tag.selected { color: #33ff33 !important; }
+a.sort_order_selected { background: #1a1a1a !important; }
 #right_bar { background: #0a0a0a !important; border-left: 1px dashed #33ff3325 !important; }
 #right_bar h3 { color: #33ff33 !important; }
 #right_bar h4 { color: #33ff33 !important; }
 #right_bar b { color: #33ff33 !important; }
 #right_bar a { color: #22aa22 !important; }
 #right_bar a:hover { color: #33ff33 !important; }
-a.bundle { color: #22aa22 !important; }
-a.bundle:hover { color: #33ff33 !important; }
+#right_bar table td a.delete { color: #22aa22 !important; }
+#right_bar table tr:hover td a.delete { color: #ff5555 !important; }
+#right_bar input#key { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; }
+#right_bar input#key:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }
 #tag_cloud a { color: #22aa22 !important; }
-#tag_cloud a:hover { color: #33ff33 !important; }
 #tag_cloud a.tag { color: #22aa22 !important; }
+#tag_cloud a:hover { color: #33ff33 !important; }
 #tag_cloud a.tag:hover { color: #33ff33 !important; }
-a.tag.selected { color: #33ff33 !important; }
-a.sort_order_selected { background: #1a1a1a !important; }
+#tweet_searchbox #search_query_field { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; font-size: 13px !important; }
+#tweet_searchbox #search_query_field:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }
 input[type="text"] { background: #111 !important; font-family: inherit !important; }
 input:not([type]) { background: #111 !important; font-family: inherit !important; }
 input[type="password"] { background: #111 !important; font-family: inherit !important; }
@@ -2054,27 +2116,24 @@ input[type="submit"] { background: #1a3a1a !important; border: 1px solid #33ff33
 input[type="button"] { background: #1a3a1a !important; border: 1px solid #33ff3360 !important; font-family: inherit !important; }
 input[type="submit"]:hover { background: #2a5a2a !important; }
 input[type="button"]:hover { background: #2a5a2a !important; }
-#edit_bookmark_form { background: #111 !important; border: 1px dashed #33ff3340 !important; }
 .suggested_tag { color: #00cccc !important; }
+#edit_bookmark_form { background: #111 !important; border: 1px dashed #33ff3340 !important; }
 #settings_panel { background: #0a0a0a !important; color: #33ff33 !important; }
 .settings_tab_selected { border: 1px dashed #33ff3340 !important; border-bottom-color: #0a0a0a !important; background: #0a0a0a !important; }
 .settings_heading { color: #33ff33 !important; border-bottom: 1px dashed #33ff3340 !important; }
 a.help { background: #f0ede8 !important; }
 .email_secret { color: #00cccc !important; }
-.note { border-bottom: 1px dashed #33ff3325 !important; }
-#note_right_column { background: #0a0a0a !important; color: #22aa22 !important; border-left: 1px dashed #33ff3325 !important; }
 .service_box { background: #111 !important; border: 1px dashed #33ff3340 !important; color: #33ff33 !important; }
 .help_box { background: #111 !important; border: 1px dashed #33ff3340 !important; color: #33ff33 !important; }
 #profile_main_column h2 { color: #33ff33 !important; }
 #profile_left_column h2 { color: #33ff33 !important; }
 #profile_right_column h2 { color: #33ff33 !important; }
+.note { border-bottom: 1px dashed #33ff3325 !important; }
+#note_right_column { background: #0a0a0a !important; color: #22aa22 !important; border-left: 1px dashed #33ff3325 !important; }
 #bulk_top_bar { background: #111 !important; border: 1px dashed #33ff3340 !important; }
 #bulk_edit_box { background: #111 !important; border: 1px dashed #33ff3340 !important; }
 #popup_header { background: #0a0a0a !important; }
 .user_navbar a { color: #22aa22 !important; }
-hr { border-color: #33ff3325 !important; }
-h2 { color: #33ff33 !important; }
-::selection { color: #fff !important; }
 #main_column form[name="sort"] table tr:hover { background: rgba(51,255,51,0.1) !important; }
 #main_column form[name="sort"] table td { font-family: "Fira Code", "Cascadia Code", "Consolas", monospace !important; }
 #main_column form[name="sort"] table input[name^="id_"] { width: 38px !important; min-width: 38px !important; max-width: 38px !important; padding: 3px 4px !important; margin-right: 10px !important; font-size: 12px !important; line-height: 1.2 !important; border-radius: 0 !important; box-sizing: border-box !important; vertical-align: middle !important; border: 1px solid #33ff3380 !important; background: #0a0a0a !important; font-family: "Fira Code", "Consolas", monospace !important; font-weight: 600 !important; }
@@ -2084,17 +2143,9 @@ h2 { color: #33ff33 !important; }
 #main_column form[name="sort"] table td a.destroy { color: #ff5555 !important; opacity: 0.9 !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { text-shadow: 0 0 4px rgba(51,255,51,0.6) !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { text-shadow: 0 0 4px rgba(255,85,85,0.6) !important; }
-#right_bar table td a.delete { color: #22aa22 !important; }
-#right_bar table tr:hover td a.delete { color: #ff5555 !important; }
-#right_bar input#key { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; }
-#right_bar input#key:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }
-#tweet_searchbox #search_query_field { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; font-size: 13px !important; }
-#tweet_searchbox #search_query_field:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }
-/* Terminal-specific overrides: btn-fg == accent (both #33ff33), so accent-filled pills/chips need
-   the dark bg for legible text (same kind of fix as 1e175b7 for .signup_button). */
-#bmarks_page_nav a.filter.selected,
-#bmarks_page_nav a.filter.selected:hover { color: var(--pinboard-bg) !important; }
-#bmarks_page_nav a.rss_link:hover { color: var(--pinboard-bg) !important; }`
+h2 { color: #33ff33 !important; }
+hr { border-color: #33ff3325 !important; }
+a.bookmark_title::before { color: #33ff3380 !important; }`
   },
 
   // ---- 4. Paper & Ink (Light) ----
@@ -2214,6 +2265,28 @@ input[type="text"][name^="id_"][style*="border"] {
 table.per_page_widget [style*="background:#ffa"] {
   background: var(--pinboard-accent-alpha) !important;
   color: var(--pinboard-fg) !important;
+}
+
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
 }
 
 /* override.generic-bgcolor — defensive against legacy HTML attr */
@@ -2528,11 +2601,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -2939,6 +3007,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -3251,11 +3341,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -3634,6 +3719,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -3946,11 +4053,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -4232,6 +4334,26 @@ html.pbp-dark input[type="text"][name^="id_"][style*="border"] {
 html.pbp-dark table.per_page_widget [style*="background:#ffa"] {
   background: var(--pinboard-accent-alpha) !important;
   color: var(--pinboard-fg) !important;
+}
+
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+html.pbp-dark #bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+html.pbp-dark #bulk_edit_box #confirm, html.pbp-dark #bulk_edit_box #confirm > span, html.pbp-dark #bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+html.pbp-dark #bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+html.pbp-dark #bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
 }
 
 /* override.generic-bgcolor — defensive against legacy HTML attr */
@@ -4962,6 +5084,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -5274,11 +5418,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -5611,6 +5750,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -5923,11 +6084,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -6272,6 +6428,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -6584,11 +6762,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -6933,6 +7106,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -7245,11 +7440,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -7606,6 +7796,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -7918,11 +8130,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -8272,6 +8479,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -8584,11 +8813,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
@@ -8944,6 +9168,28 @@ table.per_page_widget [style*="background:#ffa"] {
   color: var(--pinboard-fg) !important;
 }
 
+/* override.bulk-confirm-bar — defeat inline color:#fff on #confirm > span and color:#ffa on confirm/cancel anchors */
+#bulk_edit_box #confirm {
+  background: var(--pinboard-bg-surface) !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--pinboard-border) !important;
+  margin-top: 4px !important;
+  border-radius: 4px !important;
+}
+#bulk_edit_box #confirm,
+#bulk_edit_box #confirm > span,
+#bulk_edit_box #confirm > #confirm_message {
+  color: var(--pinboard-fg) !important;
+}
+#bulk_edit_box #confirm a {
+  color: var(--pinboard-accent) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+#bulk_edit_box #confirm a:hover {
+  color: var(--pinboard-accent-hover) !important;
+}
+
 /* override.generic-bgcolor — defensive against legacy HTML attr */
 [bgcolor] { background-color: transparent !important; }
 
@@ -9256,11 +9502,6 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 
 /* ---- Bulk edit ---- */
 #bulk_top_bar, #bulk_edit_box { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; color: var(--pinboard-fg) !important; }
-/* #confirm: pinboard injects inline color:#ffa on confirm/cancel anchors; force theme-readable colors */
-#bulk_edit_box #confirm { background: var(--pinboard-bg-surface) !important; padding: 8px 12px !important; border-top: 1px solid var(--pinboard-border) !important; margin-top: 4px !important; border-radius: 4px !important; }
-#bulk_edit_box #confirm, #bulk_edit_box #confirm > span, #bulk_edit_box #confirm > #confirm_message { color: var(--pinboard-fg) !important; }
-#bulk_edit_box #confirm a { color: var(--pinboard-accent) !important; font-weight: 600 !important; text-decoration: underline !important; }
-#bulk_edit_box #confirm a:hover { color: var(--pinboard-accent-hover) !important; }
 
 /* ---- Save bookmark popup ---- */
 #popup_header { background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important; }
