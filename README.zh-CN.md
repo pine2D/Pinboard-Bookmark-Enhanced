@@ -15,7 +15,7 @@
 ## 功能特性
 
 - **智能填表** — 自动填充标题、URL、页面描述、来源链接和选中文本。提交给 AI 的是去除广告、菜单、侧边栏后的纯净正文
-- **AI 标签与摘要** — 自带 API key 接入 13 家服务商（OpenAI · Anthropic · Gemini · DeepSeek · Qwen · Kimi · Zhipu · Groq · Mistral · MiniMax · Cohere · OpenRouter · Ollama），或任意 OpenAI 兼容接口
+- **AI 标签与摘要** — 自备 API key 接入 13 家主流 LLM 服务商，或任意 OpenAI 兼容接口
 - **批量保存** — 一次性收藏所有打开的标签页，每个标签独立 AI 打标签并实时显示进度
 - **已收藏检测** — 当前页若已收藏，工具栏图标会自动切换状态
 - **`pinboard.in` 主题** — 13 套精心调优的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），外加自定义 CSS 覆盖层，多设备同步

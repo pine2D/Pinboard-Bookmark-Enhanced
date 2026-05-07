@@ -15,7 +15,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 ## Features
 
 - **Smart capture** — auto-fills title, URL, meta description, referrer, and selected text. AI receives the cleaned article body with ads, menus, and sidebars stripped out
-- **AI tags & summaries** — bring your own key for 13 providers (OpenAI · Anthropic · Gemini · DeepSeek · Qwen · Kimi · Zhipu · Groq · Mistral · MiniMax · Cohere · OpenRouter · Ollama) or any OpenAI-compatible endpoint
+- **AI tags & summaries** — bring your own key for 13 popular LLM providers, or any OpenAI-compatible endpoint
 - **Batch save** — capture every open tab in one go, with per-tab AI tagging and live progress
 - **Already-saved detection** — toolbar icon flips when the current page is already in your bookmarks
 - **Themes for `pinboard.in`** — 13 curated palettes (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus a custom-CSS overlay that syncs across devices

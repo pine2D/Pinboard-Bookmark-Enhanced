@@ -15,7 +15,7 @@ Une extension Chrome qui booste les signets [Pinboard](https://pinboard.in) avec
 ## Fonctionnalités
 
 - **Capture intelligente** — pré-remplit titre, URL, méta-description, referrer et texte sélectionné. L'IA reçoit le corps de l'article nettoyé — publicités, menus et barres latérales supprimés
-- **Tags et résumés IA** — votre propre clé pour 13 fournisseurs (OpenAI · Anthropic · Gemini · DeepSeek · Qwen · Kimi · Zhipu · Groq · Mistral · MiniMax · Cohere · OpenRouter · Ollama) ou tout endpoint compatible OpenAI
+- **Tags et résumés IA** — votre propre clé pour 13 fournisseurs LLM populaires, ou tout endpoint compatible OpenAI
 - **Sauvegarde groupée** — capturer tous les onglets ouverts d'un coup, avec tagging IA par onglet et progression en direct
 - **Détection des pages déjà sauvegardées** — l'icône change quand la page courante est déjà dans vos signets
 - **Thèmes pour `pinboard.in`** — 13 palettes soignées (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus un calque CSS personnalisé synchronisé entre vos appareils

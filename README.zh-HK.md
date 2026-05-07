@@ -15,7 +15,7 @@
 ## 功能特色
 
 - **智能填表** — 自動填入標題、URL、頁面描述、來源連結同選取嘅文字。送畀 AI 嘅係去除咗廣告、選單、側欄之後嘅乾淨正文
-- **AI 標籤同摘要** — 自備 API key 接入 13 家服務商（OpenAI · Anthropic · Gemini · DeepSeek · Qwen · Kimi · Zhipu · Groq · Mistral · MiniMax · Cohere · OpenRouter · Ollama），或者任何 OpenAI 相容端點
+- **AI 標籤同摘要** — 自備 API key 接入 13 家主流 LLM 服務商，或者任何 OpenAI 相容端點
 - **批次儲存** — 一次過儲存所有開咗嘅分頁，每個分頁獨立 AI 加標籤兼即時顯示進度
 - **已收藏偵測** — 目前頁如果已經收藏咗，工具列圖示會自動切換狀態
 - **`pinboard.in` 佈景主題** — 13 套精心調校嘅配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），仲有自訂 CSS 覆蓋層，多裝置同步

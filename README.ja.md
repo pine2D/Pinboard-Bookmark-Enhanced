@@ -15,7 +15,7 @@
 ## 機能
 
 - **スマート取り込み** — タイトル、URL、メタディスクリプション、リファラー、選択テキストを自動入力。AI には広告・メニュー・サイドバーを除去した記事本文だけが渡されます
-- **AI タグ・要約** — 自前の API キーで 13 プロバイダーに対応（OpenAI · Anthropic · Gemini · DeepSeek · Qwen · Kimi · Zhipu · Groq · Mistral · MiniMax · Cohere · OpenRouter · Ollama）または OpenAI 互換エンドポイント
+- **AI タグ・要約** — 自前の API キーで主要な LLM プロバイダー 13 種、または OpenAI 互換エンドポイントに対応
 - **一括保存** — 開いているすべてのタブを一度に保存、タブごとの AI タグ付けと進捗表示付き
 - **既保存検知** — ツールバーアイコンが切り替わり、現在のページが既にブックマーク済みかすぐ分かります
 - **`pinboard.in` 用テーマ** — 13 種のキュレートされたパレット（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …）+ デバイス間で同期するカスタム CSS オーバーレイ

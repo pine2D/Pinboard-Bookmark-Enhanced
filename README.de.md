@@ -15,7 +15,7 @@ Eine Chrome-Erweiterung, die [Pinboard](https://pinboard.in)-Lesezeichen mit KI-
 ## Funktionen
 
 - **Intelligente Erfassung** — füllt Titel, URL, Meta-Beschreibung, Referrer und ausgewählten Text automatisch aus. Die KI bekommt den bereinigten Artikel-Text — Anzeigen, Menüs und Sidebars werden entfernt
-- **KI-Tags & Zusammenfassungen** — eigener API-Key für 13 Anbieter (OpenAI · Anthropic · Gemini · DeepSeek · Qwen · Kimi · Zhipu · Groq · Mistral · MiniMax · Cohere · OpenRouter · Ollama) oder jeden OpenAI-kompatiblen Endpunkt
+- **KI-Tags & Zusammenfassungen** — eigener API-Key für 13 verbreitete LLM-Anbieter oder jeden OpenAI-kompatiblen Endpunkt
 - **Stapel-Speicherung** — alle offenen Tabs auf einmal erfassen, mit KI-Tagging pro Tab und Live-Fortschritt
 - **Erkennung gespeicherter Seiten** — das Symbolleisten-Icon wechselt, wenn die aktuelle Seite bereits in deinen Lesezeichen ist
 - **Themes für `pinboard.in`** — 13 kuratierte Farbpaletten (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus eigenes CSS-Overlay, das geräteübergreifend synchronisiert wird

@@ -15,7 +15,7 @@ Rozszerzenie Chrome, które wzbogaca zakładki [Pinboard](https://pinboard.in) o
 ## Funkcje
 
 - **Inteligentne przechwytywanie** — automatyczne wypełnianie tytułu, URL, meta-opisu, referrera i zaznaczonego tekstu. Do AI trafia oczyszczona treść artykułu — bez reklam, menu i pasków bocznych
-- **Tagi i streszczenia AI** — własny klucz dla 13 dostawców (OpenAI · Anthropic · Gemini · DeepSeek · Qwen · Kimi · Zhipu · Groq · Mistral · MiniMax · Cohere · OpenRouter · Ollama) lub dowolny endpoint zgodny z OpenAI
+- **Tagi i streszczenia AI** — własny klucz dla 13 popularnych dostawców LLM lub dowolnego endpointu zgodnego z OpenAI
 - **Zapis hurtowy** — zapisz wszystkie otwarte karty naraz, z tagowaniem AI dla każdej karty i postępem na żywo
 - **Wykrywanie już zapisanych stron** — ikona na pasku zmienia się, gdy bieżąca strona jest już w Twoich zakładkach
 - **Motywy dla `pinboard.in`** — 13 dopracowanych palet (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus własna nakładka CSS synchronizowana między urządzeniami
