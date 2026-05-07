@@ -162,11 +162,6 @@ a:hover { text-decoration: underline; }
   background: #d4edda;
   border-color: #a3d9a5;
   color: #155724;
-  animation: pp-saved-flash 0.6s ease-out;
-}
-@keyframes pp-saved-flash {
-  0% { background: #a8dab5; }
-  100% { background: #d4edda; }
 }
 
 /* URL Warning */
@@ -1131,7 +1126,7 @@ html[data-theme] .qbtn:hover { background: var(--pp-drop-hover); color: var(--pp
 html[data-theme] .qbtn.saving { background: var(--pp-offline-bg); border-color: var(--pp-offline-bd); color: var(--pp-offline-fg); }
 html[data-theme] .qbtn.saved { background: var(--pp-ok-bg); border-color: var(--pp-ok-bd); color: var(--pp-ok-fg); }
 html[data-theme] .existing-banner { background: var(--pp-banner-bg); border-color: var(--pp-banner-bd); color: var(--pp-banner-fg); }
-html[data-theme] .existing-banner.just-saved { background: var(--pp-ok-bg); border-color: var(--pp-ok-bd); color: var(--pp-ok-fg); }
+html[data-theme] .existing-banner.just-saved { background: var(--pp-ok-bg); border-color: var(--pp-ok-bg); color: var(--pp-ok-fg); }
 html[data-theme] .url-warning { background: var(--pp-warn-bg); border-color: var(--pp-warn-bd); color: var(--pp-warn-fg); }
 html[data-theme] .preset-btn { color: var(--pp-preset-fg); background: var(--pp-preset-bg); border-color: var(--pp-preset-bd); }
 html[data-theme] .preset-btn:hover { background: var(--pp-drop-hover); box-shadow: var(--pp-hover-shadow); }
