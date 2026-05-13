@@ -231,12 +231,15 @@ function setupTagsInput() {
     if (e.key === "ArrowDown") { e.preventDefault(); acIndex = acIndex >= items.length - 1 ? 0 : acIndex + 1; updateAc(items); }
     else if (e.key === "ArrowUp") { e.preventDefault(); acIndex = acIndex <= 0 ? items.length - 1 : acIndex - 1; updateAc(items); }
     else if (e.key === "Enter" || e.key === "Tab") {
+      const acVisible = !dropdown.classList.contains("hidden") && items.length > 0;
+      const hasPending = input.value.trim().length > 0;
+      if (e.key === "Tab" && !acVisible && !hasPending) return;
       e.preventDefault();
       if (acIndex >= 0 && items[acIndex]) {
         addTag(items[acIndex].dataset.tag);
-      } else if (items.length > 0 && !dropdown.classList.contains("hidden")) {
+      } else if (acVisible) {
         addTag(items[0].dataset.tag);
-      } else if (input.value.trim()) {
+      } else if (hasPending) {
         input.value.trim().split(/[\s,]+/).filter(Boolean).forEach((t) => addTag(t));
       }
       input.value = ""; dropdown.classList.add("hidden");
