@@ -76,7 +76,8 @@ a:hover { text-decoration: underline; }
   font: inherit; color: #666; font-size: 11px; cursor: pointer; text-decoration: underline;
 }
 .header-bar .header-link:hover { color: #333; }
-.header-bar .header-link:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; border-radius: var(--pp-radius-sm); }
+.header-bar .header-link:focus-visible,
+.header-bar a:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; border-radius: var(--pp-radius-sm); }
 
 .login-body { padding: 14px 12px; }
 .login-body p { margin-bottom: 8px; font-size: 12px; color: #333; }
