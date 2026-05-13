@@ -58,6 +58,12 @@
       }
     }
   },
+  "tagsHintSelect": {
+    "message": "choisir"
+  },
+  "tagsHintNew": {
+    "message": "nouveau tag"
+  },
   "lastUsedTagsLabel": {
     "message": "Dernière :"
   },

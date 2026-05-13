@@ -58,6 +58,12 @@
       }
     }
   },
+  "tagsHintSelect": {
+    "message": "选中候选"
+  },
+  "tagsHintNew": {
+    "message": "新建标签"
+  },
   "lastUsedTagsLabel": {
     "message": "上次："
   },

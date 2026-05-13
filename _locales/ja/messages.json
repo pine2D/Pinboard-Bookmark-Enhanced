@@ -58,6 +58,12 @@
       }
     }
   },
+  "tagsHintSelect": {
+    "message": "候補選択"
+  },
+  "tagsHintNew": {
+    "message": "新規作成"
+  },
   "lastUsedTagsLabel": {
     "message": "前回："
   },

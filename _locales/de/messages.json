@@ -58,6 +58,12 @@
       }
     }
   },
+  "tagsHintSelect": {
+    "message": "übernehmen"
+  },
+  "tagsHintNew": {
+    "message": "neues Tag"
+  },
   "lastUsedTagsLabel": {
     "message": "Zuletzt:"
   },

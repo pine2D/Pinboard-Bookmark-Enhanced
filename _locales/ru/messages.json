@@ -58,6 +58,12 @@
       }
     }
   },
+  "tagsHintSelect": {
+    "message": "выбрать"
+  },
+  "tagsHintNew": {
+    "message": "новый тег"
+  },
   "lastUsedTagsLabel": {
     "message": "Недавние:"
   },

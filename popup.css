@@ -294,6 +294,16 @@ button.ai-error-details-toggle:focus-visible { outline: 2px solid var(--pp-accen
 .ac-new-hint { color: #888; font-style: italic; cursor: pointer; }
 .ac-new-hint:hover { background: #d5e5f5; color: #333; font-style: normal; }
 .ac-new-icon { color: #4477bb; font-style: normal; font-weight: bold; margin-right: 3px; }
+.ac-hint-footer {
+  padding: 3px 6px; font-size: 10px; color: #888; border-top: 1px solid #eee;
+  background: #fafafa; user-select: none; cursor: default; line-height: 1.4;
+}
+.ac-hint-footer kbd {
+  display: inline-block; padding: 0 4px; margin: 0 1px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 9px;
+  color: #555; background: #fff; border: 1px solid #ccc; border-radius: 3px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04); vertical-align: baseline;
+}
 .submit-hint { color: #767676; font-size: 10px; margin-left: auto; align-self: center; }
 
 .clear-all-link {
@@ -718,6 +728,8 @@ html.dark .del-confirm-yes { color: #ff6666 !important; border-color: #ff6666 !i
 html.dark .bottom-bar label { color: #ddd; }
 html.dark .ac-new-hint { color: #777; }
 html.dark .ac-new-hint:hover { background: #2a3f5f; color: #ddd; }
+html.dark .ac-hint-footer { color: #888; border-top-color: #3a3a3a; background: #1f1f1f; }
+html.dark .ac-hint-footer kbd { color: #ccc; background: #2a2a2a; border-color: #555; box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
 html.dark .ac-new-icon { color: #6699ff; }
 html.dark { --pp-hover-shadow: 0 1px 2px rgba(120,150,255,0.15), 0 2px 8px rgba(120,150,255,0.18); }
 html.dark .quick-actions { background: #222; }
@@ -1120,6 +1132,8 @@ html[data-theme] .quick-actions .divider { border-color: var(--pp-divider); }
 html[data-theme] .bottom-bar label { color: var(--pp-fg); }
 html[data-theme] .ac-new-hint { color: var(--pp-fg-hint); }
 html[data-theme] .ac-new-hint:hover { background: var(--pp-drop-hover); color: var(--pp-fg); }
+html[data-theme] .ac-hint-footer { color: var(--pp-fg-hint); border-top-color: var(--pp-border); background: var(--pp-bg2); }
+html[data-theme] .ac-hint-footer kbd { color: var(--pp-fg); background: var(--pp-bg); border-color: var(--pp-border); box-shadow: none; }
 html[data-theme] .ac-new-icon { color: var(--pp-accent); }
 html[data-theme] .qbtn { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-fg-muted); }
 html[data-theme] { --pp-hover-shadow: 0 1px 2px color-mix(in srgb, var(--pp-accent) 12%, transparent), 0 2px 6px color-mix(in srgb, var(--pp-accent) 18%, transparent); }

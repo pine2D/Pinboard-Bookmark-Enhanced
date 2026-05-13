@@ -215,6 +215,18 @@ function setupTagsInput() {
       item.addEventListener("click", () => { addTag(tag); input.value = ""; dropdown.classList.add("hidden"); input.focus(); });
       dropdown.appendChild(item);
     });
+    const footer = document.createElement("div");
+    footer.className = "ac-hint-footer";
+    const kEnter = document.createElement("kbd"); kEnter.textContent = "Enter";
+    const kTab = document.createElement("kbd"); kTab.textContent = "Tab";
+    const kSpace = document.createElement("kbd"); kSpace.textContent = "Space";
+    footer.appendChild(kEnter);
+    footer.appendChild(document.createTextNode(" / "));
+    footer.appendChild(kTab);
+    footer.appendChild(document.createTextNode(" " + t("tagsHintSelect") + " · "));
+    footer.appendChild(kSpace);
+    footer.appendChild(document.createTextNode(" " + t("tagsHintNew")));
+    dropdown.appendChild(footer);
     dropdown.classList.remove("hidden");
   }
   input.addEventListener("paste", (e) => {
