@@ -203,6 +203,7 @@ function showSummaryActions(fromCache) {
   const btn = $id("ai-summary-btn");
   const bar = btn.parentElement;
   btn.classList.add("hidden");
+  $id("ai-summary-hint")?.classList.add("hidden");
   bar.querySelector(".cache-hint-wrap")?.remove();
 
   const wrap = document.createElement("span");
@@ -225,6 +226,7 @@ function showSummaryActions(fromCache) {
   }
 
   const regenLink = createActionLink(t("aiRegenerate"), "regenerate");
+  regenLink.title = t("aiSummaryBtnTitle");
   const removeLink = createActionLink(t("aiRemove"), "remove");
   wrap.appendChild(regenLink);
   wrap.appendChild(removeLink);
@@ -236,6 +238,8 @@ function showSummaryActions(fromCache) {
     wrap.remove();
     btn.textContent = t("aiSummaryBtn");
     btn.classList.remove("hidden", "loading");
+    const hint = $id("ai-summary-hint");
+    if (hint && settings.optShowAiSummary !== false) hint.classList.remove("hidden");
     showStatus("status-msg", t("aiSummaryRemoved"), "success");
   });
 

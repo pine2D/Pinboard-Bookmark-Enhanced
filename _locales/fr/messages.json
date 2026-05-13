@@ -207,6 +207,9 @@
   "aiSummaryBtn": {
     "message": "🤖 Résumé IA"
   },
+  "aiSummaryBtnTitle": {
+    "message": "Maj+Entrée"
+  },
   "aiGenerateBtn": {
     "message": "🤖 générer"
   },

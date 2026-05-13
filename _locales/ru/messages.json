@@ -207,6 +207,9 @@
   "aiSummaryBtn": {
     "message": "🤖 AI-аннотация"
   },
+  "aiSummaryBtnTitle": {
+    "message": "Shift+Enter"
+  },
   "aiGenerateBtn": {
     "message": "🤖 сгенерировать"
   },

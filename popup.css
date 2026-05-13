@@ -305,6 +305,8 @@ button.ai-error-details-toggle:focus-visible { outline: 2px solid var(--pp-accen
   box-shadow: 0 1px 0 rgba(0,0,0,0.04); vertical-align: baseline;
 }
 .submit-hint { color: #767676; font-size: 10px; margin-left: auto; align-self: center; }
+.kb-hint { color: #999; font-size: 10px; align-self: center; }
+#ai-summary-hint { margin-left: auto; margin-right: 6px; }
 
 .clear-all-link {
   font-size: 10px; color: #757575; cursor: pointer;
@@ -716,6 +718,7 @@ html.dark .ac-item { color: #ddd; }
 html.dark .ac-item:hover, html.dark .ac-item.selected { background: #2a3f5f; }
 html.dark .ac-count { color: #777; }
 html.dark .submit-hint { color: #666; }
+html.dark .kb-hint { color: #777; }
 html.dark .submit-bar button { background: #2a2a2a; border-color: #666; color: #ddd; }
 html.dark .submit-bar button:hover { background: #333; }
 html.dark #submit-btn { background: #4477bb; color: #fff; border-color: #4477bb; }
@@ -1083,6 +1086,7 @@ html[data-theme] .ac-item { color: var(--pp-fg); }
 html[data-theme] .ac-item:hover, html[data-theme] .ac-item.selected { background: var(--pp-drop-hover); }
 html[data-theme] .ac-count { color: var(--pp-fg-hint); }
 html[data-theme] .submit-hint { color: var(--pp-fg-hint); }
+html[data-theme] .kb-hint { color: var(--pp-fg-hint); }
 html[data-theme] .label { color: var(--pp-fg-muted); }
 html[data-theme] .muted { color: var(--pp-fg-hint); }
 html[data-theme] .group-label { color: var(--pp-fg-hint); }

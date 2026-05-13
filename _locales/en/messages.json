@@ -207,6 +207,9 @@
   "aiSummaryBtn": {
     "message": "🤖 AI summary"
   },
+  "aiSummaryBtnTitle": {
+    "message": "Shift+Enter"
+  },
   "aiGenerateBtn": {
     "message": "🤖 generate"
   },

@@ -134,6 +134,8 @@ async function showMain(token) {
   if (settings.optShowAiSummary === false) {
     const aiSummaryBtn = $id("ai-summary-btn");
     if (aiSummaryBtn) aiSummaryBtn.classList.add("hidden");
+    const aiSummaryHint = $id("ai-summary-hint");
+    if (aiSummaryHint) aiSummaryHint.classList.add("hidden");
   }
   if (settings.optShowAiTags === false) {
     const aiTagsBox = $id("ai-suggest-tags");
@@ -618,6 +620,18 @@ function setupSubmit(token) {
       const mainSection = $id("main-section");
       if (!mainSection.classList.contains("hidden")) {
         $id("submit-btn").click();
+      }
+    } else if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === "Enter") {
+      const mainSection = $id("main-section");
+      if (mainSection.classList.contains("hidden")) return;
+      const aiBtn = $id("ai-summary-btn");
+      const regen = document.querySelector('.regen-link[data-action="regenerate"]');
+      if (aiBtn && !aiBtn.classList.contains("hidden") && !aiBtn.classList.contains("disabled-link")) {
+        e.preventDefault();
+        aiBtn.click();
+      } else if (regen && !regen.classList.contains("loading")) {
+        e.preventDefault();
+        regen.click();
       }
     } else if (e.key === "Escape") {
       const delPop = document.querySelector(".del-confirm-popover");

@@ -207,6 +207,9 @@
   "aiSummaryBtn": {
     "message": "🤖 AI Zusammenfassung"
   },
+  "aiSummaryBtnTitle": {
+    "message": "Umschalt+Eingabe"
+  },
   "aiGenerateBtn": {
     "message": "🤖 Generieren"
   },
