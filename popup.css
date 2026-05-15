@@ -285,9 +285,11 @@ button.ai-error-details-toggle:focus-visible { outline: 2px solid var(--pp-accen
 .autocomplete-dropdown {
   background: #fff; border: 1px solid #ccc; border-top: none;
   border-radius: 0 0 3px 3px;
-  max-height: 150px; overflow-y: auto; z-index: 100;
+  max-height: 150px; z-index: 100;
   box-shadow: var(--pp-shadow-md);
+  display: flex; flex-direction: column;
 }
+.ac-scroll { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .ac-item { padding: 3px 6px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: space-between; }
 .ac-item:hover, .ac-item.selected { background: #d5e5f5; }
 .ac-count { color: #888; font-size: 10px; margin-left: 4px; flex-shrink: 0; }
@@ -295,6 +297,7 @@ button.ai-error-details-toggle:focus-visible { outline: 2px solid var(--pp-accen
 .ac-new-hint:hover { background: #d5e5f5; color: #333; font-style: normal; }
 .ac-new-icon { color: #4477bb; font-style: normal; font-weight: bold; margin-right: 3px; }
 .ac-hint-footer {
+  flex: 0 0 auto;
   padding: 3px 6px; font-size: 10px; color: #888; border-top: 1px solid #eee;
   background: #fafafa; user-select: none; cursor: default; line-height: 1.4;
 }

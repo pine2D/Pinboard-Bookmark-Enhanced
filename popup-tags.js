@@ -201,6 +201,8 @@ function setupTagsInput() {
       return;
     }
     dropdown.innerHTML = "";
+    const scrollEl = document.createElement("div");
+    scrollEl.className = "ac-scroll";
     matches.forEach((tag) => {
       const item = document.createElement("div"); item.className = "ac-item";
       item.dataset.tag = tag;
@@ -213,8 +215,9 @@ function setupTagsInput() {
         item.appendChild(countSpan);
       }
       item.addEventListener("click", () => { addTag(tag); input.value = ""; dropdown.classList.add("hidden"); input.focus(); });
-      dropdown.appendChild(item);
+      scrollEl.appendChild(item);
     });
+    dropdown.appendChild(scrollEl);
     const footer = document.createElement("div");
     footer.className = "ac-hint-footer";
     const kEnter = document.createElement("kbd"); kEnter.textContent = "Enter";
