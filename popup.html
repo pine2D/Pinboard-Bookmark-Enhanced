@@ -81,19 +81,19 @@
           <div id="ai-suggest-tags" class="suggest-area"><button type="button" id="ai-tags-btn" class="action-link" data-i18n="aiGenerateBtn">🤖 generate</button></div>
         </div>
       </div>
-      <div id="ai-error-card" class="ai-error-card hidden" role="alert" aria-live="polite">
-        <div class="ai-error-header">
-          <span class="ai-error-icon">⚠️</span>
-          <span id="ai-error-title" class="ai-error-title"></span>
-          <button type="button" id="ai-error-dismiss" class="ai-error-dismiss" title="" data-i18n-title="aiErrorDismiss" data-i18n-aria="aiErrorDismiss">×</button>
+      <div id="ai-error-card" class="feedback-card hidden" data-variant="error" role="alert" aria-live="polite">
+        <span class="fc-icon">⚠️</span>
+        <div class="fc-body">
+          <div id="ai-error-title" class="fc-title"></div>
+          <div id="ai-error-message" class="fc-message"></div>
+          <div class="fc-actions">
+            <button type="button" id="ai-error-retry" class="fc-btn" data-i18n="aiErrorRetry">Retry</button>
+            <button type="button" id="ai-error-fallback" class="fc-btn hidden"></button>
+            <button type="button" id="ai-error-details-toggle" class="fc-btn-secondary" data-i18n="aiErrorDetails">Details</button>
+          </div>
+          <pre id="ai-error-details" class="fc-details hidden"></pre>
         </div>
-        <div id="ai-error-message" class="ai-error-message"></div>
-        <div class="ai-error-actions">
-          <button type="button" id="ai-error-retry" class="ai-error-btn" data-i18n="aiErrorRetry">Retry</button>
-          <button type="button" id="ai-error-fallback" class="ai-error-btn hidden"></button>
-          <button type="button" id="ai-error-details-toggle" class="ai-error-details-toggle" data-i18n="aiErrorDetails">Details</button>
-        </div>
-        <pre id="ai-error-details" class="ai-error-details hidden"></pre>
+        <button type="button" id="ai-error-dismiss" class="fc-dismiss" title="" data-i18n-title="aiErrorDismiss" data-i18n-aria="aiErrorDismiss">×</button>
       </div>
       <div class="bottom-bar">
         <label><input type="checkbox" id="private-check" /> <span data-i18n="private">private</span></label>

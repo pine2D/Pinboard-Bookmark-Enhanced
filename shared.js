@@ -338,3 +338,74 @@ function showConfirmPopover(anchor, opts) {
   document.addEventListener("keydown", onKey);
   no.focus();
 }
+
+// ===================== Feedback Card (B2) =====================
+function showFeedback({ variant = "info", title = "", message = "", actions = [], details = "", autoHide = 0, target } = {}) {
+  const card = document.createElement("div");
+  card.className = "feedback-card";
+  card.dataset.variant = variant;
+  card.setAttribute("role", variant === "error" || variant === "warning" ? "alert" : "status");
+  card.setAttribute("aria-live", "polite");
+
+  const icon = document.createElement("span");
+  icon.className = "fc-icon";
+  icon.textContent = { error: "⚠️", success: "✓", warning: "!", info: "ℹ" }[variant] || "ℹ";
+  card.appendChild(icon);
+
+  const body = document.createElement("div");
+  body.className = "fc-body";
+  if (title) {
+    const t = document.createElement("div");
+    t.className = "fc-title"; t.textContent = title;
+    body.appendChild(t);
+  }
+  if (message) {
+    const m = document.createElement("div");
+    m.className = "fc-message"; m.textContent = message;
+    body.appendChild(m);
+  }
+  if (actions.length) {
+    const actRow = document.createElement("div");
+    actRow.className = "fc-actions";
+    actions.forEach(({ label, onClick, secondary }) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = secondary ? "fc-btn-secondary" : "fc-btn";
+      btn.textContent = label;
+      btn.addEventListener("click", () => onClick?.(card));
+      actRow.appendChild(btn);
+    });
+    body.appendChild(actRow);
+  }
+  if (details) {
+    const pre = document.createElement("pre");
+    pre.className = "fc-details";
+    pre.textContent = details;
+    body.appendChild(pre);
+  }
+  card.appendChild(body);
+
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "fc-dismiss";
+  dismiss.setAttribute("aria-label", "Dismiss");
+  dismiss.textContent = "×";
+  const remove = () => {
+    card.classList.add("dismissing");
+    setTimeout(() => card.remove(), 120);
+  };
+  dismiss.addEventListener("click", remove);
+  card.appendChild(dismiss);
+
+  const mount = target || document.querySelector(".bottom-bar")?.parentElement || document.body;
+  const beforeNode = target ? null : document.querySelector(".bottom-bar");
+  if (beforeNode && beforeNode.parentElement === mount) {
+    mount.insertBefore(card, beforeNode);
+  } else {
+    mount.appendChild(card);
+  }
+
+  if (autoHide > 0) setTimeout(remove, autoHide);
+
+  return { dismiss: remove, element: card };
+}

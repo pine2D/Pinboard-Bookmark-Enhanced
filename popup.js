@@ -856,7 +856,22 @@ function updateCharCount() {
   sub.title = over ? t("submitUriTooLong") : urlBad ? t("urlCannotSave") : "";
 }
 function showElement(id, text) { const el = $id(id); el.textContent = text; el.classList.remove("hidden"); }
-function showStatus(id, text, type) { const el = $id(id); el.textContent = text; el.className = `status-msg ${type}`; el.classList.remove("hidden"); }
+function showStatus(id, msg, kind) {
+  if (kind === "error") {
+    if (window._lastStatusFeedback) window._lastStatusFeedback.dismiss();
+    window._lastStatusFeedback = showFeedback({
+      variant: "error",
+      message: msg,
+      autoHide: 4000,
+    });
+    return;
+  }
+  const el = $id(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = "status-msg " + (kind || "");
+  el.classList.remove("hidden");
+}
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function enc(s) { return encodeURIComponent(s); }
 
