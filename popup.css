@@ -51,10 +51,18 @@
   --pp-shadow-focus: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 25%, transparent);
 
   --pp-hover-shadow: var(--pp-shadow-sm);
+
+  /* === Batch 1 additions (2026-05-18 popup-uiux) === */
+  --pp-info-bg: var(--pp-banner-bg);
+  --pp-info-bd: var(--pp-banner-bd);
+  --pp-info-fg: var(--pp-banner-fg);
+  --pp-toast-shadow: var(--pp-shadow-md);
+  --pp-motion-duration: 0.16s;
+  --pp-popup-width: 520px;
 }
 
 body {
-  width: 520px; max-width: 100%;
+  width: var(--pp-popup-width, 520px); max-width: 100%;
   font-family: "Helvetica Neue", Verdana, Geneva, Arial, sans-serif;
   font-size: 12px;
   color: #000;
@@ -1237,13 +1245,33 @@ html[data-theme] .confirm-popover .confirm-no { color: var(--pp-fg-muted); borde
 html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-drop-hover); }
 html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp-accent); }
 
-/* ===================== Reduced motion ===================== */
+/* ===================== Batch 1: Shared keyframes ===================== */
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes popinScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes dropdownOpen {
+  from { opacity: 0; max-height: 0; }
+  to   { opacity: 1; max-height: 280px; }
+}
+@keyframes autoCloseCountdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
-    animation-duration: 0.01ms !important;
+    animation-duration: 0s !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
   }
 }
 
