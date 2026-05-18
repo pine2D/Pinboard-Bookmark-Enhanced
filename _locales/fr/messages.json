@@ -1317,9 +1317,52 @@
   "freeTierResourcesPrefix": {
     "message": "Listes plus complètes, régulièrement mises à jour :"
   },
-  "aiStage_extracting": { "message": "extraction du contenu…" },
-  "aiStage_calling":    { "message": "appel à {provider}…" },
-  "aiStage_parsing":    { "message": "analyse de la réponse…" },
-  "aiSlowHint":         { "message": "plus long que d'habitude" },
-  "aiCancel":           { "message": "Annuler" }
+  "aiStage_extracting": {
+    "message": "extraction du contenu…"
+  },
+  "aiStage_calling": {
+    "message": "appel à {provider}…"
+  },
+  "aiStage_parsing": {
+    "message": "analyse de la réponse…"
+  },
+  "aiSlowHint": {
+    "message": "plus long que d'habitude"
+  },
+  "aiCancel": {
+    "message": "Annuler"
+  },
+  "urlCleanedN": {
+    "message": "{n} paramètres de suivi nettoyés"
+  },
+  "urlShowOriginal": {
+    "message": "afficher l'original"
+  },
+  "urlPasteCleanedN": {
+    "message": "{n} paramètres de suivi supprimés"
+  },
+  "undo": {
+    "message": "annuler"
+  },
+  "optUrlCleanTitle": {
+    "message": "Nettoyage des paramètres de suivi des URL"
+  },
+  "optUrlCleanEnabled": {
+    "message": "Nettoyer automatiquement les paramètres de suivi des URL"
+  },
+  "optUrlCleanOnOpen": {
+    "message": "Nettoyer à l'ouverture de la popup (silencieux, avec lien annuler)"
+  },
+  "optUrlCleanOnPaste": {
+    "message": "Nettoyer lors du collage d'une URL (notification toast)"
+  },
+  "optUrlCleanAggressive": {
+    "message": "Mode agressif : supprimer aussi ref/si/igshid et similaires"
+  },
+  "optUrlCleanCustom": {
+    "message": "Paramètres personnalisés (un par ligne, ajoutés à la liste par défaut)"
+  },
+  "optUrlCleanExclude": {
+    "message": "Paramètres à exclure (un par ligne, jamais nettoyés — ex. garder affiliate tag=)"
+  }
 }

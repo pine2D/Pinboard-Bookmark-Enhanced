@@ -1317,9 +1317,52 @@
   "freeTierResourcesPrefix": {
     "message": "更全面、更新更勤的清单："
   },
-  "aiStage_extracting": { "message": "抓取页面内容…" },
-  "aiStage_calling":    { "message": "调用 {provider}…" },
-  "aiStage_parsing":    { "message": "解析响应…" },
-  "aiSlowHint":         { "message": "比平常慢" },
-  "aiCancel":           { "message": "取消" }
+  "aiStage_extracting": {
+    "message": "抓取页面内容…"
+  },
+  "aiStage_calling": {
+    "message": "调用 {provider}…"
+  },
+  "aiStage_parsing": {
+    "message": "解析响应…"
+  },
+  "aiSlowHint": {
+    "message": "比平常慢"
+  },
+  "aiCancel": {
+    "message": "取消"
+  },
+  "urlCleanedN": {
+    "message": "已清理 {n} 个跟踪参数"
+  },
+  "urlShowOriginal": {
+    "message": "显示原始"
+  },
+  "urlPasteCleanedN": {
+    "message": "移除了 {n} 个跟踪参数"
+  },
+  "undo": {
+    "message": "撤销"
+  },
+  "optUrlCleanTitle": {
+    "message": "URL 跟踪参数清理"
+  },
+  "optUrlCleanEnabled": {
+    "message": "自动清理 URL 跟踪参数"
+  },
+  "optUrlCleanOnOpen": {
+    "message": "打开 popup 时清理（静默，含撤销链接）"
+  },
+  "optUrlCleanOnPaste": {
+    "message": "粘贴 URL 时清理（toast 提示）"
+  },
+  "optUrlCleanAggressive": {
+    "message": "激进模式：额外清除 ref / si / igshid 等可能影响功能的参数"
+  },
+  "optUrlCleanCustom": {
+    "message": "自定义参数（每行一个，追加到默认列表）"
+  },
+  "optUrlCleanExclude": {
+    "message": "排除参数（每行一个，永不清理 —— 例如保留 affiliate `tag=`）"
+  }
 }

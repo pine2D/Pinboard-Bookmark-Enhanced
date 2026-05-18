@@ -812,6 +812,21 @@ html.dark .add-all-link:hover { color: #999; }
 html.dark .submit-bar button.loading { color: #666; }
 html.dark .submit-bar button.loading::before, html.dark .action-link.loading::before { border-color: #555; border-top-color: #aaa; }
 
+/* ===================== URL Cleaned Hint (B4) ===================== */
+.url-clean-hint {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--pp-ok-fg);
+  display: flex; gap: 6px; align-items: center;
+}
+.url-clean-hint a {
+  color: var(--pp-fg-hint);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 10px;
+}
+.url-clean-hint a:hover { color: var(--pp-fg); }
+
 /* ===================== AI Progress (B3) ===================== */
 .action-link .ai-progress-label {
   color: var(--pp-fg-hint);

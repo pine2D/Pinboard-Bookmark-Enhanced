@@ -1317,9 +1317,52 @@
   "freeTierResourcesPrefix": {
     "message": "更全面、更新更勤嘅清單："
   },
-  "aiStage_extracting": { "message": "擷取頁面內容…" },
-  "aiStage_calling":    { "message": "呼叫 {provider}…" },
-  "aiStage_parsing":    { "message": "解析回應…" },
-  "aiSlowHint":         { "message": "比平常慢" },
-  "aiCancel":           { "message": "取消" }
+  "aiStage_extracting": {
+    "message": "擷取頁面內容…"
+  },
+  "aiStage_calling": {
+    "message": "呼叫 {provider}…"
+  },
+  "aiStage_parsing": {
+    "message": "解析回應…"
+  },
+  "aiSlowHint": {
+    "message": "比平常慢"
+  },
+  "aiCancel": {
+    "message": "取消"
+  },
+  "urlCleanedN": {
+    "message": "已清理 {n} 個追蹤參數"
+  },
+  "urlShowOriginal": {
+    "message": "顯示原始"
+  },
+  "urlPasteCleanedN": {
+    "message": "已移除 {n} 個追蹤參數"
+  },
+  "undo": {
+    "message": "撤銷"
+  },
+  "optUrlCleanTitle": {
+    "message": "URL 追蹤參數清理"
+  },
+  "optUrlCleanEnabled": {
+    "message": "自動清理 URL 追蹤參數"
+  },
+  "optUrlCleanOnOpen": {
+    "message": "打開 popup 時清理（靜默，含撤銷連結）"
+  },
+  "optUrlCleanOnPaste": {
+    "message": "貼上 URL 時清理（toast 提示）"
+  },
+  "optUrlCleanAggressive": {
+    "message": "激進模式：額外清除 ref / si / igshid 等可能影響功能的參數"
+  },
+  "optUrlCleanCustom": {
+    "message": "自訂參數（每行一個，附加到預設列表）"
+  },
+  "optUrlCleanExclude": {
+    "message": "排除參數（每行一個，永不清理 —— 例如保留 affiliate `tag=`）"
+  }
 }

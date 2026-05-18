@@ -412,3 +412,119 @@ function showFeedback({ variant = "info", title = "", message = "", actions = []
 
   return { dismiss: remove, element: card };
 }
+
+// ===================== URL Tracking Param Stripping (B4) =====================
+const TRACKING_PARAMS_TIER1 = [
+  "utm_source","utm_medium","utm_campaign","utm_term","utm_content","utm_id",
+  "gclid","gclsrc","dclid","gbraid","wbraid","fbclid","msclkid","yclid","ysclid","_openstat",
+  "mc_cid","mc_eid","mkt_tok",
+  "_hsenc","_hsmi","__hstc","__hssc","__hsfp","hsCtaTracking",
+  "vero_id","vero_conv","oly_anon_id","oly_enc_id",
+  "mtm_campaign","mtm_source","mtm_medium","mtm_keyword","mtm_content","mtm_cid",
+  "pk_campaign","pk_source","pk_medium","pk_keyword",
+  "__s","wickedid","rb_clickid","s_cid","twclid",
+  "ml_subscriber","ml_subscriber_hash",
+  "action_object_map","action_type_map","action_ref_map",
+  "cjevent","cjdata","ir_campaignid","ir_adid","ir_partnerid",
+];
+
+const TRACKING_PARAMS_TIER2 = [
+  "_ga","_gl","_branch_match_id","_branch_referrer","mc_tc","ICID","__twitter_impression",
+  "at_campaign","at_medium","at_custom1","at_custom2","at_custom3","at_custom4",
+  "hmb_campaign","hmb_source","hmb_medium","spm","_trkparms","_trksid",
+];
+
+const TRACKING_PARAMS_TIER3 = [
+  "si","igshid","igsh","ref","ref_src","ref_url","source","feature",
+];
+
+const HOST_TRACKING_RULES = {
+  "amazon": ["pd_rd_w","pd_rd_wg","pd_rd_r","pd_rd_p","pd_rd_i","pf_rd_p","pf_rd_r","pf_rd_s","pf_rd_t","pf_rd_i","pf_rd_m","_encoding","ref_","psc","qid","sr","srs","__mk_de_DE","__mk_en_US","spIA","smid","crid","keywords","sprefix"],
+  "youtube.com": ["feature","kw","pp","si"],
+  "youtu.be": ["feature","kw","pp","si"],
+  "google":   ["ved","ei","gs_lp","gs_lcrp","gs_lcp","gs_ssp","gws_rd","sxsrf","sourceid","rlz","aqs","uact","oq","usg","sca_esv","sca_upv","iflsig","bih","biw","dpr"],
+  "x.com":    ["s","t","cn","ref_src","ref_url","twclid"],
+  "twitter.com": ["s","t","cn","ref_src","ref_url","twclid"],
+  "linkedin.com": ["trk","trackingId","refId","lipi","midToken","midSig","eBP","lgCta","recommendedFlavor"],
+  "facebook.com": ["__tn__","__xts__","__cft__","eid","comment_tracking","dti","app","ls_ref","action_history"],
+  "bing.com": ["cvid","qs","qp","sk","sp","sc","form","pq"],
+  "aliexpress": ["ws_ab_test","algo_expid","algo_pvid","btsid","scm","scm_id","scm-url","aff_trace_key","aff_platform","aff_request_id","spm"],
+  "tiktok.com": ["_d","_t","_r","is_copy_url","is_from_webapp","sender_device","share_app_id","share_link_id","u_code","preview_pb"],
+  "reddit.com": ["share_id","correlation_id","rdt","$deep_link","_branch_match_id","ref_campaign","ref_source"],
+};
+
+const OAUTH_PATH_RE = /\/(oauth|auth|callback|sso|saml|openid|signin-callback|login\/callback)/i;
+const OAUTH_TOKEN_KEYS = new Set(["access_token","id_token","refresh_token","oauth_token","oauth_verifier"]);
+
+function _matchHostRule(hostname) {
+  const lower = hostname.toLowerCase();
+  for (const key of Object.keys(HOST_TRACKING_RULES)) {
+    if (lower === key || lower.endsWith("." + key) || lower.startsWith(key + ".") || lower.includes("." + key + ".")) {
+      return HOST_TRACKING_RULES[key];
+    }
+  }
+  return null;
+}
+
+function _isOAuthCallback(u) {
+  if (OAUTH_PATH_RE.test(u.pathname)) return true;
+  const params = u.searchParams;
+  if (params.has("code") && (params.has("state") || params.has("session_state"))) return true;
+  for (const key of params.keys()) if (OAUTH_TOKEN_KEYS.has(key)) return true;
+  if (u.hostname === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(u.hostname)) return true;
+  return false;
+}
+
+function stripTrackingParams(urlStr, settings = {}) {
+  const {
+    enabled = true,
+    aggressiveMode = false,
+    customParams = [],
+    excludeParams = [],
+  } = settings;
+  const original = urlStr;
+  if (!enabled) return { cleaned: urlStr, removedCount: 0, original };
+
+  let u;
+  try { u = new URL(urlStr); }
+  catch { return { cleaned: urlStr, removedCount: 0, original }; }
+
+  if (_isOAuthCallback(u)) return { cleaned: urlStr, removedCount: 0, original };
+
+  const exclude = new Set(excludeParams.map(s => s.trim()).filter(Boolean));
+  const toStrip = new Set([
+    ...TRACKING_PARAMS_TIER1,
+    ...TRACKING_PARAMS_TIER2,
+    ...(aggressiveMode ? TRACKING_PARAMS_TIER3 : []),
+    ...customParams.map(s => s.trim()).filter(Boolean),
+  ]);
+  const hostRule = _matchHostRule(u.hostname);
+  if (hostRule) hostRule.forEach(p => toStrip.add(p));
+
+  // Special-case Amazon `tag` preservation unless aggressive
+  const hostLower = u.hostname.toLowerCase();
+  const isAmazon = /(^|\.)amazon\./.test(hostLower);
+  if (isAmazon && !aggressiveMode) exclude.add("tag");
+
+  let removed = 0;
+  for (const k of [...u.searchParams.keys()]) {
+    if (exclude.has(k)) continue;
+    let shouldStrip = toStrip.has(k);
+    if (!shouldStrip && hostRule) {
+      for (const rule of hostRule) {
+        if (rule.endsWith("_") && k.startsWith(rule)) { shouldStrip = true; break; }
+      }
+    }
+    if (shouldStrip) {
+      u.searchParams.delete(k);
+      removed++;
+    }
+  }
+
+  let result = u.toString();
+  if (u.search === "" && result.includes("?")) {
+    result = result.replace(/\?(?=#|$)/, "");
+  }
+
+  return { cleaned: result, removedCount: removed, original };
+}

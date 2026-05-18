@@ -1317,9 +1317,52 @@
   "freeTierResourcesPrefix": {
     "message": "Pełniejsze, regularnie aktualizowane listy:"
   },
-  "aiStage_extracting": { "message": "pobieranie zawartości…" },
-  "aiStage_calling":    { "message": "wywoływanie {provider}…" },
-  "aiStage_parsing":    { "message": "analiza odpowiedzi…" },
-  "aiSlowHint":         { "message": "trwa dłużej niż zwykle" },
-  "aiCancel":           { "message": "Anuluj" }
+  "aiStage_extracting": {
+    "message": "pobieranie zawartości…"
+  },
+  "aiStage_calling": {
+    "message": "wywoływanie {provider}…"
+  },
+  "aiStage_parsing": {
+    "message": "analiza odpowiedzi…"
+  },
+  "aiSlowHint": {
+    "message": "trwa dłużej niż zwykle"
+  },
+  "aiCancel": {
+    "message": "Anuluj"
+  },
+  "urlCleanedN": {
+    "message": "wyczyszczono {n} parametrów śledzących"
+  },
+  "urlShowOriginal": {
+    "message": "pokaż oryginał"
+  },
+  "urlPasteCleanedN": {
+    "message": "Usunięto {n} parametrów śledzących"
+  },
+  "undo": {
+    "message": "cofnij"
+  },
+  "optUrlCleanTitle": {
+    "message": "Czyszczenie parametrów śledzących URL"
+  },
+  "optUrlCleanEnabled": {
+    "message": "Automatyczne czyszczenie parametrów śledzących URL"
+  },
+  "optUrlCleanOnOpen": {
+    "message": "Czyść przy otwarciu okienka (cicho, z linkiem cofnij)"
+  },
+  "optUrlCleanOnPaste": {
+    "message": "Czyść przy wklejaniu URL (powiadomienie toast)"
+  },
+  "optUrlCleanAggressive": {
+    "message": "Tryb agresywny: usuwa też ref/si/igshid i podobne"
+  },
+  "optUrlCleanCustom": {
+    "message": "Niestandardowe parametry (jeden na linię, dodawane do domyślnej listy)"
+  },
+  "optUrlCleanExclude": {
+    "message": "Parametry wykluczone (jeden na linię, nigdy nie czyszczone — np. zachowaj affiliate tag=)"
+  }
 }

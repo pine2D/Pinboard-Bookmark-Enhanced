@@ -301,6 +301,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (el) el.checked = val;
   }
 
+  // ---- URL Clean settings (B4) ----
+  const urlClean = s.urlClean || { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
+  $id("opt-urlclean-enabled").checked = !!urlClean.enabled;
+  $id("opt-urlclean-on-open").checked = !!urlClean.onPopupOpen;
+  $id("opt-urlclean-on-paste").checked = !!urlClean.onPaste;
+  $id("opt-urlclean-aggressive").checked = !!urlClean.aggressiveMode;
+  $id("opt-urlclean-custom").value = (urlClean.customParams || []).join("\n");
+  $id("opt-urlclean-exclude").value = (urlClean.excludeParams || []).join("\n");
+
   // ---- Load sync toggle (stored in local, not in settings storage) ----
   const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
   const syncToggle = $id("opt-sync-enabled");
@@ -567,7 +576,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       optAutoCloseAfterSave: $id("opt-auto-close").checked,
       optPopupFollowTheme: $id("opt-popup-follow-theme").checked,
       tagPresets: $id("opt-tag-presets").value,
-      themePresetKey: currentPresetKey
+      themePresetKey: currentPresetKey,
+      urlClean: {
+        enabled: $id("opt-urlclean-enabled").checked,
+        onPopupOpen: $id("opt-urlclean-on-open").checked,
+        onPaste: $id("opt-urlclean-on-paste").checked,
+        aggressiveMode: $id("opt-urlclean-aggressive").checked,
+        customParams: $id("opt-urlclean-custom").value.split("\n").map(s => s.trim()).filter(Boolean),
+        excludeParams: $id("opt-urlclean-exclude").value.split("\n").map(s => s.trim()).filter(Boolean),
+      }
     };
     await (await getSettingsStorage()).set(data);
     // Save customOverlayCSS with quota-aware fallback (sync → local on QUOTA_BYTES)

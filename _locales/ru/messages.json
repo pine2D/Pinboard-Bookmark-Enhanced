@@ -1317,9 +1317,52 @@
   "freeTierResourcesPrefix": {
     "message": "Более полные, регулярно обновляемые списки:"
   },
-  "aiStage_extracting": { "message": "извлечение содержимого…" },
-  "aiStage_calling":    { "message": "вызов {provider}…" },
-  "aiStage_parsing":    { "message": "разбор ответа…" },
-  "aiSlowHint":         { "message": "занимает дольше обычного" },
-  "aiCancel":           { "message": "Отмена" }
+  "aiStage_extracting": {
+    "message": "извлечение содержимого…"
+  },
+  "aiStage_calling": {
+    "message": "вызов {provider}…"
+  },
+  "aiStage_parsing": {
+    "message": "разбор ответа…"
+  },
+  "aiSlowHint": {
+    "message": "занимает дольше обычного"
+  },
+  "aiCancel": {
+    "message": "Отмена"
+  },
+  "urlCleanedN": {
+    "message": "очищено {n} параметров отслеживания"
+  },
+  "urlShowOriginal": {
+    "message": "показать оригинал"
+  },
+  "urlPasteCleanedN": {
+    "message": "Удалено {n} параметров отслеживания"
+  },
+  "undo": {
+    "message": "отменить"
+  },
+  "optUrlCleanTitle": {
+    "message": "Очистка параметров отслеживания URL"
+  },
+  "optUrlCleanEnabled": {
+    "message": "Автоматически очищать параметры отслеживания URL"
+  },
+  "optUrlCleanOnOpen": {
+    "message": "Очищать при открытии всплывающего окна (тихо, со ссылкой отмены)"
+  },
+  "optUrlCleanOnPaste": {
+    "message": "Очищать при вставке URL (всплывающее уведомление)"
+  },
+  "optUrlCleanAggressive": {
+    "message": "Агрессивный режим: также удалять ref/si/igshid и подобные"
+  },
+  "optUrlCleanCustom": {
+    "message": "Пользовательские параметры (по одному на строку, добавляются к стандартному списку)"
+  },
+  "optUrlCleanExclude": {
+    "message": "Исключённые параметры (по одному на строку, никогда не очищаются — напр. affiliate tag=)"
+  }
 }

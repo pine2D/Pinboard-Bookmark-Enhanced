@@ -1317,9 +1317,52 @@
   "freeTierResourcesPrefix": {
     "message": "Umfassendere, regelmäßig aktualisierte Listen:"
   },
-  "aiStage_extracting": { "message": "Seiteninhalt wird abgerufen…" },
-  "aiStage_calling":    { "message": "{provider} wird aufgerufen…" },
-  "aiStage_parsing":    { "message": "Antwort wird verarbeitet…" },
-  "aiSlowHint":         { "message": "dauert länger als üblich" },
-  "aiCancel":           { "message": "Abbrechen" }
+  "aiStage_extracting": {
+    "message": "Seiteninhalt wird abgerufen…"
+  },
+  "aiStage_calling": {
+    "message": "{provider} wird aufgerufen…"
+  },
+  "aiStage_parsing": {
+    "message": "Antwort wird verarbeitet…"
+  },
+  "aiSlowHint": {
+    "message": "dauert länger als üblich"
+  },
+  "aiCancel": {
+    "message": "Abbrechen"
+  },
+  "urlCleanedN": {
+    "message": "{n} Tracking-Parameter entfernt"
+  },
+  "urlShowOriginal": {
+    "message": "Original anzeigen"
+  },
+  "urlPasteCleanedN": {
+    "message": "{n} Tracking-Parameter entfernt"
+  },
+  "undo": {
+    "message": "Rückgängig"
+  },
+  "optUrlCleanTitle": {
+    "message": "URL-Tracking-Parameter bereinigen"
+  },
+  "optUrlCleanEnabled": {
+    "message": "URL-Tracking-Parameter automatisch bereinigen"
+  },
+  "optUrlCleanOnOpen": {
+    "message": "Beim Öffnen des Popups bereinigen (still, mit Rückgängig-Link)"
+  },
+  "optUrlCleanOnPaste": {
+    "message": "Beim Einfügen einer URL bereinigen (Toast-Hinweis)"
+  },
+  "optUrlCleanAggressive": {
+    "message": "Aggressiver Modus: auch ref/si/igshid und ähnliche entfernen"
+  },
+  "optUrlCleanCustom": {
+    "message": "Benutzerdefinierte Parameter (einer pro Zeile, zur Standardliste hinzufügen)"
+  },
+  "optUrlCleanExclude": {
+    "message": "Auszuschließende Parameter (einer pro Zeile, niemals bereinigen – z. B. Affiliate-tag= behalten)"
+  }
 }

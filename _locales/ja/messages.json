@@ -1317,9 +1317,52 @@
   "freeTierResourcesPrefix": {
     "message": "より網羅的で頻繁に更新されるリスト："
   },
-  "aiStage_extracting": { "message": "ページ内容を取得中…" },
-  "aiStage_calling":    { "message": "{provider} を呼び出し中…" },
-  "aiStage_parsing":    { "message": "応答を解析中…" },
-  "aiSlowHint":         { "message": "通常より時間がかかっています" },
-  "aiCancel":           { "message": "キャンセル" }
+  "aiStage_extracting": {
+    "message": "ページ内容を取得中…"
+  },
+  "aiStage_calling": {
+    "message": "{provider} を呼び出し中…"
+  },
+  "aiStage_parsing": {
+    "message": "応答を解析中…"
+  },
+  "aiSlowHint": {
+    "message": "通常より時間がかかっています"
+  },
+  "aiCancel": {
+    "message": "キャンセル"
+  },
+  "urlCleanedN": {
+    "message": "{n} 個のトラッキングパラメータをクリーンアップ"
+  },
+  "urlShowOriginal": {
+    "message": "元の URL を表示"
+  },
+  "urlPasteCleanedN": {
+    "message": "{n} 個のトラッキングパラメータを削除しました"
+  },
+  "undo": {
+    "message": "元に戻す"
+  },
+  "optUrlCleanTitle": {
+    "message": "URL トラッキングパラメータのクリーンアップ"
+  },
+  "optUrlCleanEnabled": {
+    "message": "URL トラッキングパラメータを自動的にクリーンアップ"
+  },
+  "optUrlCleanOnOpen": {
+    "message": "ポップアップを開いたときにクリーンアップ（無音、元に戻すリンク付き）"
+  },
+  "optUrlCleanOnPaste": {
+    "message": "URL を貼り付けたときにクリーンアップ（トースト通知）"
+  },
+  "optUrlCleanAggressive": {
+    "message": "アグレッシブモード: ref/si/igshid なども削除"
+  },
+  "optUrlCleanCustom": {
+    "message": "カスタムパラメータ（1 行に 1 つ、デフォルトリストに追加）"
+  },
+  "optUrlCleanExclude": {
+    "message": "除外パラメータ（1 行に 1 つ、クリーンアップしない — 例: アフィリエイト tag= を保持）"
+  }
 }

@@ -57,6 +57,22 @@
       <div class="fg"><label><input type="checkbox" id="opt-auto-close" checked /> <span data-i18n="optAutoClose">Auto-close popup after save</span></label></div>
       <div class="fg"><label><input type="checkbox" id="offline-queue-enabled" /> <span data-i18n="optOfflineQueue">Enable offline save queue</span></label></div>
       <div class="divider"></div>
+      <div class="section-title" data-i18n="optUrlCleanTitle">URL tracking parameter cleanup</div>
+      <div class="fg"><label><input type="checkbox" id="opt-urlclean-enabled" /> <span data-i18n="optUrlCleanEnabled">Auto-clean URL tracking parameters</span></label></div>
+      <div class="fg" style="margin-left:20px">
+        <label><input type="checkbox" id="opt-urlclean-on-open" /> <span data-i18n="optUrlCleanOnOpen">Clean when popup opens (silent, with undo link)</span></label><br>
+        <label><input type="checkbox" id="opt-urlclean-on-paste" /> <span data-i18n="optUrlCleanOnPaste">Clean when pasting URL (toast feedback)</span></label><br>
+        <label><input type="checkbox" id="opt-urlclean-aggressive" /> <span data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref/si/igshid and similar</span></label>
+      </div>
+      <div class="fg" style="margin-top:8px">
+        <label class="bl" data-i18n="optUrlCleanCustom">Custom parameters (one per line, appended to default list)</label>
+        <textarea id="opt-urlclean-custom" rows="3" style="width:100%"></textarea>
+      </div>
+      <div class="fg" style="margin-top:8px">
+        <label class="bl" data-i18n="optUrlCleanExclude">Exclude parameters (one per line, never cleaned — e.g. keep affiliate tag=)</label>
+        <textarea id="opt-urlclean-exclude" rows="3" style="width:100%"></textarea>
+      </div>
+      <div class="divider"></div>
       <div class="section-title" data-i18n="secPopupElements">Popup Elements</div>
       <div class="fg"><label><input type="checkbox" id="opt-show-search" /> <span data-i18n="optShowSearch">Show search bar in popup</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-show-recent" /> <span data-i18n="optShowRecent">Show recent bookmarks in popup</span></label></div>

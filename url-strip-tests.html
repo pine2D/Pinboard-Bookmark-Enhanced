@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>URL Strip Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 900px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; }
+.fail { color: #c00; font-weight: bold; }
+input { width: 100%; padding: 4px; margin-top: 8px; box-sizing: border-box; }
+</style></head>
+<body>
+<h1>stripTrackingParams() tests</h1>
+<div id="results"></div>
+<h2>Try your own:</h2>
+<input id="manual" placeholder="paste a URL" />
+<pre id="manual-out"></pre>
+<script src="shared.js"></script>
+<script>
+const cases = [
+  { in: "https://example.com/?utm_source=x&utm_medium=y&id=42", out: "https://example.com/?id=42", removed: 2 },
+  { in: "https://example.com/?fbclid=abc&q=hello", out: "https://example.com/?q=hello", removed: 1 },
+  { in: "https://www.amazon.com/dp/B0001/?tag=mytag-20&pd_rd_w=xyz", out: "https://www.amazon.com/dp/B0001/?tag=mytag-20", removed: 1 },
+  { in: "https://www.youtube.com/watch?v=abc&feature=share&t=42", out: "https://www.youtube.com/watch?v=abc&t=42", removed: 1 },
+  { in: "https://example.com/oauth/callback?code=abc&state=xyz", out: "https://example.com/oauth/callback?code=abc&state=xyz", removed: 0 },
+  { in: "https://example.com/?access_token=abc&utm_source=x", out: "https://example.com/?access_token=abc&utm_source=x", removed: 0 },
+  { in: "https://example.com/article#:~:text=hello", out: "https://example.com/article#:~:text=hello", removed: 0 },
+  { in: "https://example.com/?utm_source=x", out: "https://example.com/", removed: 1 },
+  { in: "https://x.com/user/status/1?s=20&t=abc", out: "https://x.com/user/status/1", removed: 2 },
+  { in: "https://example.com/?ref=github&utm_source=x", out: "https://example.com/?ref=github", removed: 1 },
+  { in: "https://example.com/?ref=github&utm_source=x", out: "https://example.com/", removed: 2, settings: { aggressiveMode: true } },
+];
+const root = document.getElementById("results");
+for (const c of cases) {
+  const r = stripTrackingParams(c.in, c.settings || {});
+  const ok = r.cleaned === c.out && r.removedCount === c.removed;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  IN: ${c.in}\n   OUT: ${r.cleaned}  (removed=${r.removedCount})${ok ? "" : `\n   EXPECTED: ${c.out}  (removed=${c.removed})`}`;
+  root.appendChild(div);
+}
+const m = document.getElementById("manual");
+m.addEventListener("input", () => {
+  const r = stripTrackingParams(m.value, { aggressiveMode: false });
+  document.getElementById("manual-out").textContent = `cleaned: ${r.cleaned}\nremoved: ${r.removedCount}`;
+});
+</script>
+</body></html>

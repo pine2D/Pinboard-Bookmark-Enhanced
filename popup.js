@@ -40,6 +40,33 @@ let existingBookmark = null;
 let acIndex = -1;
 let settings = {};
 
+// ===================== URL Clean Helpers (B4) =====================
+async function _loadUrlCleanSettings() {
+  const { urlClean } = await chrome.storage.sync.get({
+    urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] }
+  });
+  return urlClean;
+}
+
+function _renderCleanHint({ removedCount, original }) {
+  const hint = $id("url-clean-hint");
+  if (!hint) return;
+  while (hint.firstChild) hint.removeChild(hint.firstChild);
+  if (removedCount <= 0) { hint.classList.add("hidden"); return; }
+  hint.classList.remove("hidden");
+  const label = document.createElement("span");
+  label.textContent = t("urlCleanedN").replace("{n}", removedCount);
+  const sep = document.createElement("span");
+  sep.textContent = "·";
+  const link = document.createElement("a");
+  link.textContent = t("urlShowOriginal");
+  link.addEventListener("click", (e) => {
+    e.preventDefault();
+    $id("url-input").value = original;
+    hint.classList.add("hidden");
+  });
+  hint.appendChild(label); hint.appendChild(sep); hint.appendChild(link);
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   await initI18n();
@@ -168,7 +195,14 @@ async function showMain(token) {
     };
   }
 
-  $id("url-input").value = pageInfo.url;
+  const _ucs = await _loadUrlCleanSettings();
+  if (_ucs.enabled && _ucs.onPopupOpen && pageInfo.url) {
+    const { cleaned, removedCount, original } = stripTrackingParams(pageInfo.url, _ucs);
+    $id("url-input").value = cleaned;
+    _renderCleanHint({ removedCount, original });
+  } else {
+    $id("url-input").value = pageInfo.url;
+  }
   $id("title-input").value = pageInfo.title;
 
   // Check if URL is supported by Pinboard
@@ -195,6 +229,34 @@ async function showMain(token) {
     updateCharCount();
   });
   $id("title-input").addEventListener("input", updateCharCount);
+
+  $id("url-input").addEventListener("paste", async (e) => {
+    const settings = await _loadUrlCleanSettings();
+    if (!settings.enabled || !settings.onPaste) return;
+    const pasted = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+    if (!pasted) return;
+    const { cleaned, removedCount, original } = stripTrackingParams(pasted, settings);
+    if (removedCount > 0) {
+      e.preventDefault();
+      $id("url-input").value = cleaned;
+      // dispatch input event so any input listeners pick up the change
+      $id("url-input").dispatchEvent(new Event("input", { bubbles: true }));
+      showFeedback({
+        variant: "success",
+        message: t("urlPasteCleanedN").replace("{n}", removedCount),
+        actions: [{
+          label: t("undo"),
+          onClick: (card) => {
+            $id("url-input").value = original;
+            $id("url-input").dispatchEvent(new Event("input", { bubbles: true }));
+            card.classList.add("dismissing");
+            setTimeout(() => card.remove(), 120);
+          }
+        }],
+        autoHide: 1800,
+      });
+    }
+  });
 
   let desc = "";
   if (pageInfo.selectedText) {

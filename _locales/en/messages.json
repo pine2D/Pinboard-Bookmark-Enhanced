@@ -1317,9 +1317,52 @@
   "freeTierResourcesPrefix": {
     "message": "More complete, regularly-updated lists:"
   },
-  "aiStage_extracting": { "message": "extracting page content…" },
-  "aiStage_calling":    { "message": "calling {provider}…" },
-  "aiStage_parsing":    { "message": "parsing response…" },
-  "aiSlowHint":         { "message": "taking longer than usual" },
-  "aiCancel":           { "message": "Cancel" }
+  "aiStage_extracting": {
+    "message": "extracting page content…"
+  },
+  "aiStage_calling": {
+    "message": "calling {provider}…"
+  },
+  "aiStage_parsing": {
+    "message": "parsing response…"
+  },
+  "aiSlowHint": {
+    "message": "taking longer than usual"
+  },
+  "aiCancel": {
+    "message": "Cancel"
+  },
+  "urlCleanedN": {
+    "message": "cleaned {n} tracking params"
+  },
+  "urlShowOriginal": {
+    "message": "show original"
+  },
+  "urlPasteCleanedN": {
+    "message": "Removed {n} tracking params"
+  },
+  "undo": {
+    "message": "undo"
+  },
+  "optUrlCleanTitle": {
+    "message": "URL tracking parameter cleanup"
+  },
+  "optUrlCleanEnabled": {
+    "message": "Auto-clean URL tracking parameters"
+  },
+  "optUrlCleanOnOpen": {
+    "message": "Clean when popup opens (silent, with undo link)"
+  },
+  "optUrlCleanOnPaste": {
+    "message": "Clean when pasting URL (toast feedback)"
+  },
+  "optUrlCleanAggressive": {
+    "message": "Aggressive mode: also remove ref/si/igshid and similar"
+  },
+  "optUrlCleanCustom": {
+    "message": "Custom parameters (one per line, appended to default list)"
+  },
+  "optUrlCleanExclude": {
+    "message": "Exclude parameters (one per line, never cleaned — e.g. keep affiliate tag=)"
+  }
 }
