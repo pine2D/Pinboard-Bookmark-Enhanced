@@ -469,6 +469,9 @@ function _matchHostRule(hostname) {
 function _isOAuthCallback(u) {
   if (OAUTH_PATH_RE.test(u.pathname)) return true;
   const params = u.searchParams;
+  // Known false-negative: URLs like ?code=SAVE20&state=CA (promo + US state)
+  // will skip cleaning. Accepted trade-off — protecting OAuth callbacks
+  // is higher value than ensuring 100% cleanup on edge-case shopping URLs.
   if (params.has("code") && (params.has("state") || params.has("session_state"))) return true;
   for (const key of params.keys()) if (OAUTH_TOKEN_KEYS.has(key)) return true;
   if (u.hostname === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(u.hostname)) return true;

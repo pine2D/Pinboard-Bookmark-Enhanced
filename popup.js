@@ -41,10 +41,13 @@ let acIndex = -1;
 let settings = {};
 
 // ===================== URL Clean Helpers (B4) =====================
+let _urlCleanSettingsCache = null;
 async function _loadUrlCleanSettings() {
+  if (_urlCleanSettingsCache) return _urlCleanSettingsCache;
   const { urlClean } = await chrome.storage.sync.get({
     urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] }
   });
+  _urlCleanSettingsCache = urlClean;
   return urlClean;
 }
 
