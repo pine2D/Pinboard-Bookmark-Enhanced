@@ -1316,5 +1316,10 @@
   },
   "freeTierResourcesPrefix": {
     "message": "更全面、更新更勤的清单："
-  }
+  },
+  "aiStage_extracting": { "message": "抓取页面内容…" },
+  "aiStage_calling":    { "message": "调用 {provider}…" },
+  "aiStage_parsing":    { "message": "解析响应…" },
+  "aiSlowHint":         { "message": "比平常慢" },
+  "aiCancel":           { "message": "取消" }
 }

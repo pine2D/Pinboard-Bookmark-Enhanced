@@ -1316,5 +1316,10 @@
   },
   "freeTierResourcesPrefix": {
     "message": "Listes plus complètes, régulièrement mises à jour :"
-  }
+  },
+  "aiStage_extracting": { "message": "extraction du contenu…" },
+  "aiStage_calling":    { "message": "appel à {provider}…" },
+  "aiStage_parsing":    { "message": "analyse de la réponse…" },
+  "aiSlowHint":         { "message": "plus long que d'habitude" },
+  "aiCancel":           { "message": "Annuler" }
 }

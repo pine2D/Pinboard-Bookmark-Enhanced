@@ -1316,5 +1316,10 @@
   },
   "freeTierResourcesPrefix": {
     "message": "更全面、更新更勤嘅清單："
-  }
+  },
+  "aiStage_extracting": { "message": "擷取頁面內容…" },
+  "aiStage_calling":    { "message": "呼叫 {provider}…" },
+  "aiStage_parsing":    { "message": "解析回應…" },
+  "aiSlowHint":         { "message": "比平常慢" },
+  "aiCancel":           { "message": "取消" }
 }

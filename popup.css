@@ -812,6 +812,18 @@ html.dark .add-all-link:hover { color: #999; }
 html.dark .submit-bar button.loading { color: #666; }
 html.dark .submit-bar button.loading::before, html.dark .action-link.loading::before { border-color: #555; border-top-color: #aaa; }
 
+/* ===================== AI Progress (B3) ===================== */
+.action-link .ai-progress-label {
+  color: var(--pp-fg-hint);
+  font-size: 10px;
+  margin-left: 0;
+}
+.action-link.loading.slow .ai-progress-label::after {
+  content: " — " attr(data-slow-hint);
+  font-style: italic;
+  opacity: 0.8;
+}
+
 /* ===================== Preset Theme System ===================== */
 html[data-theme="modern-card"] {
   --pp-bg: #fff; --pp-bg2: #f0f2f5; --pp-fg: #333; --pp-fg-muted: #666; --pp-fg-hint: #5f6368;

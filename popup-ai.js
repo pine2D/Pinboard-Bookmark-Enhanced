@@ -2,6 +2,54 @@
 // Pinboard Bookmark Enhanced - AI Summary & Tags
 // ============================================================
 
+// ===================== AI Progress Indicator (B3) =====================
+const AI_STAGE_TIMERS = new Map();
+const AI_STAGE_STARTED = new Map();
+const AI_BUTTON_BASE_TEXT = new Map();
+
+function setAiProgress(buttonId, { provider, stage }) {
+  const btn = $id(buttonId);
+  if (!btn) return;
+  if (!AI_BUTTON_BASE_TEXT.has(buttonId)) {
+    // Capture original button text before first stage runs
+    let baseText = "";
+    for (const node of btn.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) baseText += node.textContent;
+    }
+    AI_BUTTON_BASE_TEXT.set(buttonId, baseText.trim());
+  }
+  let labelEl = btn.querySelector(".ai-progress-label");
+  if (!labelEl) {
+    labelEl = document.createElement("span");
+    labelEl.className = "ai-progress-label";
+    btn.appendChild(labelEl);
+  }
+  btn.dataset.stage = stage;
+  const tpl = t(`aiStage_${stage}`) || "";
+  labelEl.textContent = " · " + tpl.replace("{provider}", provider || "AI");
+  labelEl.setAttribute("data-slow-hint", t("aiSlowHint") || "");
+
+  const startedAt = AI_STAGE_STARTED.get(buttonId) || Date.now();
+  AI_STAGE_STARTED.set(buttonId, startedAt);
+  const prior = AI_STAGE_TIMERS.get(buttonId);
+  if (prior) clearTimeout(prior);
+  AI_STAGE_TIMERS.set(buttonId, setTimeout(() => {
+    if (btn.classList.contains("loading")) btn.classList.add("slow");
+  }, Math.max(0, 8000 - (Date.now() - startedAt))));
+}
+
+function clearAiProgress(buttonId) {
+  const btn = $id(buttonId);
+  if (!btn) return;
+  btn.classList.remove("slow");
+  delete btn.dataset.stage;
+  btn.querySelector(".ai-progress-label")?.remove();
+  const timer = AI_STAGE_TIMERS.get(buttonId);
+  if (timer) { clearTimeout(timer); AI_STAGE_TIMERS.delete(buttonId); }
+  AI_STAGE_STARTED.delete(buttonId);
+  AI_BUTTON_BASE_TEXT.delete(buttonId);
+}
+
 // ---- Enrich page content via Jina Reader if configured ----
 async function enrichPageTextIfJina() {
   if (settings.aiContentSource !== "jina") return;
@@ -181,13 +229,16 @@ async function doAISummary(forceRefresh) {
     }
   }
 
-  if (btn && !btn.classList.contains("hidden")) {
-    btn.textContent = t("aiSummarizing");
+  const showProgressOnBtn = btn && !btn.classList.contains("hidden");
+  if (showProgressOnBtn) {
     btn.classList.add("loading");
   }
   try {
+    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "extracting" });
     await enrichPageTextIfJina();
+    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "calling" });
     const summary = await callAI(settings, buildSummaryPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value));
+    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "parsing" });
     await setAICache(pageInfo.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
     upsertSummary(summary);
     showSummaryActions(false);
@@ -195,6 +246,11 @@ async function doAISummary(forceRefresh) {
   } catch (e) {
     showAIError("summary", e);
     if (forceRefresh) showSummaryActions(false);
+  } finally {
+    if (showProgressOnBtn) {
+      clearAiProgress("ai-summary-btn");
+      btn.classList.remove("loading");
+    }
   }
 }
 
@@ -281,13 +337,15 @@ async function doAITags(forceRefresh) {
   }
 
   if (btn) {
-    btn.textContent = t("aiGenerating");
     btn.classList.add("loading");
   }
 
   try {
+    if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "extracting" });
     await enrichPageTextIfJina();
+    if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "calling" });
     const resp = await callAI(settings, buildTagPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
+    if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "parsing" });
     const rawTags = parseAITags(resp, settings.aiTagSeparator);
     const tags = settings.optRespectTagCase
       ? rawTags.map(t => resolveTagCase(t, tagCaseMap))
@@ -301,11 +359,11 @@ async function doAITags(forceRefresh) {
     container.textContent = "";
     container.classList.add("muted");
     showAIError("tags", e);
-  }
-
-  if (btn) {
-    btn.textContent = t("aiGenerate");
-    btn.classList.remove("loading");
+  } finally {
+    if (btn) {
+      clearAiProgress("ai-tags-btn");
+      btn.classList.remove("loading");
+    }
   }
 }
 
