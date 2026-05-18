@@ -336,6 +336,9 @@ async function doAITags(forceRefresh) {
     }
   }
 
+  // doAITags uses bare `if (btn)` — ai-tags-btn is never hidden in normal flow,
+  // unlike ai-summary-btn (which hides via showSummaryActions). If that ever changes,
+  // mirror the showProgressOnBtn pattern from doAISummary.
   if (btn) {
     btn.classList.add("loading");
   }
