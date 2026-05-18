@@ -233,7 +233,7 @@ async function showMain(token) {
   $id("url-input").addEventListener("paste", async (e) => {
     const settings = await _loadUrlCleanSettings();
     if (!settings.enabled || !settings.onPaste) return;
-    const pasted = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+    const pasted = e.clipboardData?.getData("text") || "";
     if (!pasted) return;
     const { cleaned, removedCount, original } = stripTrackingParams(pasted, settings);
     if (removedCount > 0) {
