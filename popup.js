@@ -662,8 +662,16 @@ function setupSubmit(token) {
           setTimeout(() => bannerEl.classList.remove("just-saved"), 2000);
         }
         if (settings.optAutoCloseAfterSave) {
+          const bar = document.createElement("div");
+          bar.className = "auto-close-bar";
+          bar.setAttribute("aria-hidden", "true");
+          document.body.appendChild(bar);
           autoCloseTimer = setTimeout(() => window.close(), 1800);
-          document.addEventListener("mousedown", () => { clearTimeout(autoCloseTimer); autoCloseTimer = null; }, { once: true });
+          document.addEventListener("mousedown", () => {
+            clearTimeout(autoCloseTimer);
+            autoCloseTimer = null;
+            bar.remove();
+          }, { once: true });
         }
         setTimeout(() => { if (btn.classList.contains("saved-success")) setSubmitState("idle"); }, 1200);
         return;

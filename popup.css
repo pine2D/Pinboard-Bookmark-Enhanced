@@ -841,6 +841,17 @@ html.dark .submit-bar button.loading::before, html.dark .action-link.loading::be
 }
 .url-clean-hint a:hover { color: var(--pp-fg); }
 
+/* ===================== Auto-Close Countdown (B7) ===================== */
+.auto-close-bar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 3px; background: var(--pp-accent);
+  transform-origin: left;
+  animation: autoCloseCountdown 1.8s linear forwards;
+  z-index: 9999;
+  pointer-events: none;
+}
+body:hover .auto-close-bar { animation-play-state: paused; }
+
 /* ===================== AI Progress (B3) ===================== */
 .action-link .ai-progress-label {
   color: var(--pp-fg-hint);
