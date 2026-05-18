@@ -709,7 +709,7 @@ function setupSubmit(token) {
     } else if (e.key === "Escape") {
       const delPop = document.querySelector(".del-confirm-popover");
       if (delPop) { delPop.remove(); return; }
-      if (autoCloseTimer) { clearTimeout(autoCloseTimer); autoCloseTimer = null; return; }
+      if (autoCloseTimer) { clearTimeout(autoCloseTimer); autoCloseTimer = null; document.querySelector(".auto-close-bar")?.remove(); return; }
       const tagsInput = $id("tags-input");
       if (tagsInput && document.activeElement === tagsInput) return;
       window.close();
