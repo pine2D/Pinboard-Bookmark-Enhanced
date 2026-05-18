@@ -1,7 +1,7 @@
 # Pinboard Bookmark Plus 项目配置
 
-作者：wwj
-更新：2026-04-01
+作者：pine2D
+更新：2026-05-18
 
 ## 项目概述
 
