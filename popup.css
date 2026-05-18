@@ -1149,7 +1149,6 @@ html[data-theme] .tag-skel { background: linear-gradient(90deg, var(--pp-bg2, #e
 html[data-theme] .submit-bar button { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-fg); }
 html[data-theme] .submit-bar button:hover { background: var(--pp-input-focus-bg); }
 html[data-theme] #submit-btn { background: var(--pp-accent); color: var(--pp-bg); border-color: var(--pp-accent); }
-html[data-theme] #submit-btn:hover { opacity: 0.85; transform: translateY(-1px); box-shadow: var(--pp-shadow-sm); }
 html[data-theme] #submit-btn:active { opacity: 1; transform: translateY(0); box-shadow: none; }
 html[data-theme] #submit-btn:disabled { opacity: 0.4; transform: none; box-shadow: none; }
 html[data-theme] .quick-actions { background: var(--pp-bg2); }
