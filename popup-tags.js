@@ -48,7 +48,11 @@ async function fetchPinboardSuggestTags(token, url) {
     container.innerHTML = "";
     const popular = data[0]?.popular || [];
     const recommended = data[1]?.recommended || [];
-    if (!popular.length && !recommended.length) { container.textContent = t("suggestNoSuggestions"); container.classList.add("muted"); return; }
+    if (!popular.length && !recommended.length) {
+      injectEmptyState(container, "tag", t("emptyTagSuggestions"));
+      container.classList.add("muted");
+      return;
+    }
 
     const resolveTag = (t) => (settings.optRespectTagCase && tagCaseMap) ? resolveTagCase(t, tagCaseMap) : t;
 

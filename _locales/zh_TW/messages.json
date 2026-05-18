@@ -1364,5 +1364,8 @@
   },
   "optUrlCleanExclude": {
     "message": "排除參數（每行一個，永不清理 —— 例如保留 affiliate `tag=`）"
-  }
+  },
+  "emptyRecentBookmarks": { "message": "暫無最近書籤" },
+  "emptyTagSuggestions":  { "message": "暫無標籤建議" },
+  "emptyAiTagsHint":      { "message": "點擊 🤖 生成" }
 }

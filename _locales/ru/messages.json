@@ -1364,5 +1364,8 @@
   },
   "optUrlCleanExclude": {
     "message": "Исключённые параметры (по одному на строку, никогда не очищаются — напр. affiliate tag=)"
-  }
+  },
+  "emptyRecentBookmarks": { "message": "Нет недавних закладок" },
+  "emptyTagSuggestions":  { "message": "Нет предложений тегов" },
+  "emptyAiTagsHint":      { "message": "Нажмите 🤖, чтобы создать" }
 }

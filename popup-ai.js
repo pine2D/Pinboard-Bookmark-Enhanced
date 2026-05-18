@@ -375,7 +375,7 @@ function renderAITags(tags, fromCache) {
   container.innerHTML = "";
 
   if (!tags.length) {
-    container.textContent = t("aiNoTags");
+    injectEmptyState(container, "spark", t("emptyAiTagsHint"));
     container.classList.add("muted");
     return;
   }

@@ -1364,5 +1364,8 @@
   },
   "optUrlCleanExclude": {
     "message": "除外パラメータ（1 行に 1 つ、クリーンアップしない — 例: アフィリエイト tag= を保持）"
-  }
+  },
+  "emptyRecentBookmarks": { "message": "最近のブックマークはありません" },
+  "emptyTagSuggestions":  { "message": "タグの候補はありません" },
+  "emptyAiTagsHint":      { "message": "🤖 をクリックして生成" }
 }

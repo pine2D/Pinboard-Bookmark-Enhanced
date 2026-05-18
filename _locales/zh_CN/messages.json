@@ -1364,5 +1364,8 @@
   },
   "optUrlCleanExclude": {
     "message": "排除参数（每行一个，永不清理 —— 例如保留 affiliate `tag=`）"
-  }
+  },
+  "emptyRecentBookmarks": { "message": "暂无最近书签" },
+  "emptyTagSuggestions":  { "message": "暂无标签建议" },
+  "emptyAiTagsHint":      { "message": "点击 🤖 生成" }
 }

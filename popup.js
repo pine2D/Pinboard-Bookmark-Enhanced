@@ -813,7 +813,11 @@ async function fetchRecentBookmarks(token) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     const posts = data.posts || [];
-    if (!posts.length) return;
+    if (!posts.length) {
+      injectEmptyState(container, "bookmark", t("emptyRecentBookmarks"));
+      container.classList.remove("hidden");
+      return;
+    }
     container.classList.remove("hidden");
     const label = document.createElement("div");
     label.className = "recent-bm-label";

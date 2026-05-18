@@ -1364,5 +1364,8 @@
   },
   "optUrlCleanExclude": {
     "message": "Paramètres à exclure (un par ligne, jamais nettoyés — ex. garder affiliate tag=)"
-  }
+  },
+  "emptyRecentBookmarks": { "message": "Aucun favori récent" },
+  "emptyTagSuggestions":  { "message": "Aucune suggestion de tag" },
+  "emptyAiTagsHint":      { "message": "Cliquez sur 🤖 pour générer" }
 }

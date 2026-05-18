@@ -531,3 +531,28 @@ function stripTrackingParams(urlStr, settings = {}) {
 
   return { cleaned: result, removedCount: removed, original };
 }
+
+// ===================== Empty State Illustrations (B8) =====================
+const EMPTY_STATE_SVG = {
+  bookmark: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`,
+  tag: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`,
+  spark: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="M12 16v6"/><path d="M4.93 4.93l4.24 4.24"/><path d="M14.83 14.83l4.24 4.24"/><path d="M2 12h6"/><path d="M16 12h6"/><path d="M4.93 19.07l4.24-4.24"/><path d="M14.83 9.17l4.24-4.24"/></svg>`,
+};
+
+function _parseSvg(svgString) {
+  const doc = new DOMParser().parseFromString(svgString, "image/svg+xml");
+  return doc.documentElement;
+}
+
+function injectEmptyState(container, svgKey, messageText) {
+  if (!container) return;
+  while (container.firstChild) container.removeChild(container.firstChild);
+  const wrap = document.createElement("div");
+  wrap.className = "empty-state";
+  const svgNode = _parseSvg(EMPTY_STATE_SVG[svgKey] || EMPTY_STATE_SVG.bookmark);
+  wrap.appendChild(svgNode);
+  const msg = document.createElement("div");
+  msg.textContent = messageText;
+  wrap.appendChild(msg);
+  container.appendChild(wrap);
+}

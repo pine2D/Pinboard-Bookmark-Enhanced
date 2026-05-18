@@ -1364,5 +1364,8 @@
   },
   "optUrlCleanExclude": {
     "message": "Auszuschließende Parameter (einer pro Zeile, niemals bereinigen – z. B. Affiliate-tag= behalten)"
-  }
+  },
+  "emptyRecentBookmarks": { "message": "Keine aktuellen Lesezeichen" },
+  "emptyTagSuggestions":  { "message": "Keine Tag-Vorschläge" },
+  "emptyAiTagsHint":      { "message": "Klicken Sie auf 🤖, um zu generieren" }
 }

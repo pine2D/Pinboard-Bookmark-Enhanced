@@ -1364,5 +1364,8 @@
   },
   "optUrlCleanExclude": {
     "message": "Exclude parameters (one per line, never cleaned — e.g. keep affiliate tag=)"
-  }
+  },
+  "emptyRecentBookmarks": { "message": "No recent bookmarks" },
+  "emptyTagSuggestions":  { "message": "No tag suggestions" },
+  "emptyAiTagsHint":      { "message": "Click 🤖 to generate" }
 }
