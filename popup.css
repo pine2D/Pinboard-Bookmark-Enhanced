@@ -360,7 +360,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .submit-bar button:hover { background: #eee; }
 .submit-bar button:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
 #submit-btn { background: #4477bb; color: #fff; border-color: #3366aa; font-weight: bold; }
-#submit-btn:hover { background: #3366aa; transform: translateY(-1px); box-shadow: var(--pp-shadow-sm); }
+#submit-btn:hover {
+  background: color-mix(in srgb, var(--pp-accent) 92%, #000);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--pp-accent) 30%, transparent);
+  transform: translateY(-1px);
+}
 #submit-btn:active { transform: translateY(0); box-shadow: none; }
 #submit-btn:disabled { background: #aaa; border-color: #999; transform: none; box-shadow: none; }
 .del-btn { position: relative; color: #c00; border-color: #c00 !important; }
@@ -732,7 +736,6 @@ html.dark .kb-hint { color: #777; }
 html.dark .submit-bar button { background: #2a2a2a; border-color: #666; color: #ddd; }
 html.dark .submit-bar button:hover { background: #333; }
 html.dark #submit-btn { background: #4477bb; color: #fff; border-color: #4477bb; }
-html.dark #submit-btn:hover { background: #3366aa; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 html.dark #submit-btn:active { transform: translateY(0); box-shadow: none; }
 html.dark .del-btn:hover { background: #3a1a1a !important; }
 html.dark .del-confirm-popover { background: #252525; border-color: #555; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
