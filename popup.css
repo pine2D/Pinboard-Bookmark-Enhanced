@@ -265,10 +265,23 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tag-remove { cursor: pointer; color: #888; font-size: 13px; line-height: 1; transition: color 0.15s; }
 .tag-remove:hover { color: #c00; }
 .tag-item:hover { background: #d0cfca; }
+.tag-item { position: relative; transition: transform 80ms ease; }
 .tag-item[draggable] { cursor: grab; }
 .tag-item.dragging { opacity: 0.4; }
-.tag-item.drag-over { border-left: 2px solid #4477bb; }
+.tag-item.drag-over::before {
+  content: ""; position: absolute;
+  left: -3px; top: 2px; bottom: 2px; width: 2px;
+  background: var(--pp-accent); border-radius: 1px;
+}
 .tag-item.is-new { animation: tagPopin 0.14s ease; }
+.tag-drag-handle {
+  color: var(--pp-fg-hint); opacity: 0;
+  transition: opacity 0.1s; cursor: grab;
+  font-size: 9px; margin-right: 2px; user-select: none;
+  letter-spacing: -1px;
+}
+.tags-display:hover .tag-drag-handle { opacity: 0.5; }
+.tag-item.dragging .tag-drag-handle { opacity: 0.8; cursor: grabbing; }
 @keyframes tagPopin { from { transform: scale(0.75); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .tags-input-wrap input {
   border: none !important; outline: none; padding: 1px 2px;
@@ -786,7 +799,6 @@ html.dark .clear-all-link:hover { color: #ff6666; }
 html.dark #tags-copy-all:hover { color: #6699ff; }
 html.dark .last-used-hint { color: #666; }
 html.dark .last-used-hint:hover { color: #6699ff; }
-html.dark .tag-item.drag-over { border-left-color: #6699ff; }
 html.dark .existing-banner { background: #1a2a3a; border-color: #2a4a6a; color: #6699ff; }
 html.dark .existing-banner.just-saved { background: #1a3a20; border-color: #2d5a34; color: #66ff99; }
 html.dark .url-warning { background: #3a1a1a; border-color: #5a2a2a; color: #ff6666; }

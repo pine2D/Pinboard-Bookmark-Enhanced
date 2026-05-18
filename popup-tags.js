@@ -370,6 +370,11 @@ function renderTags() {
     if (_newlyAddedTag && tag.toLowerCase() === _newlyAddedTag) el.classList.add("is-new");
     el.draggable = true;
     el.dataset.idx = idx;
+    const handle = document.createElement("span");
+    handle.className = "tag-drag-handle";
+    handle.textContent = "⋮⋮";
+    handle.setAttribute("aria-hidden", "true");
+    el.appendChild(handle);
     const text = document.createTextNode(tag);
     const rm = document.createElement("span");
     rm.className = "tag-remove";
