@@ -234,9 +234,6 @@
   "aiTagsRegenerated": {
     "message": "Метки пересозданы"
   },
-  "aiNoTags": {
-    "message": "метки не сгенерированы"
-  },
   "aiNoContent": {
     "message": "Нет содержимого страницы для аннотации"
   },

@@ -234,9 +234,6 @@
   "aiTagsRegenerated": {
     "message": "タグを再生成しました"
   },
-  "aiNoTags": {
-    "message": "タグが生成されませんでした"
-  },
   "aiNoContent": {
     "message": "要約するページ内容がありません"
   },

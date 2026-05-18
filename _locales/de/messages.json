@@ -234,9 +234,6 @@
   "aiTagsRegenerated": {
     "message": "Tags neu generiert"
   },
-  "aiNoTags": {
-    "message": "Keine Tags generiert"
-  },
   "aiNoContent": {
     "message": "Kein Seiteninhalt zum Zusammenfassen"
   },

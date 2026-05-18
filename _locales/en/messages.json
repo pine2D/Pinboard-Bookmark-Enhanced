@@ -234,9 +234,6 @@
   "aiTagsRegenerated": {
     "message": "Tags regenerated"
   },
-  "aiNoTags": {
-    "message": "no tags generated"
-  },
   "aiNoContent": {
     "message": "No page content to summarize"
   },

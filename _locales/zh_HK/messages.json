@@ -234,9 +234,6 @@
   "aiTagsRegenerated": {
     "message": "標籤已重新產生"
   },
-  "aiNoTags": {
-    "message": "未產生標籤"
-  },
   "aiNoContent": {
     "message": "頁面無可用內容"
   },

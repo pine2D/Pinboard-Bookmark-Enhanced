@@ -234,9 +234,6 @@
   "aiTagsRegenerated": {
     "message": "Tagi wygenerowane ponownie"
   },
-  "aiNoTags": {
-    "message": "nie wygenerowano tagów"
-  },
   "aiNoContent": {
     "message": "Brak treści strony do podsumowania"
   },
