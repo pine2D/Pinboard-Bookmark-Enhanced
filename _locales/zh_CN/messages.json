@@ -1364,5 +1364,12 @@
   },
   "emptyRecentBookmarks": { "message": "暂无最近书签" },
   "emptyTagSuggestions":  { "message": "暂无标签建议" },
-  "emptyAiTagsHint":      { "message": "点击 🤖 生成" }
+  "emptyAiTagsHint":      { "message": "点击 🤖 生成" },
+  "optPopupWidthTitle":   { "message": "Popup 宽度" },
+  "optPopupWidth480":     { "message": "紧凑 (480px)" },
+  "optPopupWidth520":     { "message": "标准 (520px)" },
+  "optPopupWidth560":     { "message": "宽 (560px)" },
+  "optPopupWidth600":     { "message": "超宽 (600px)" },
+  "optPopupWidthCustom":  { "message": "自定义：" },
+  "optPopupWidthHelp":    { "message": "Chrome 限制 popup 最大宽度 800px，软上限设为 720px 以避免主题阴影/边距被裁切。" }
 }

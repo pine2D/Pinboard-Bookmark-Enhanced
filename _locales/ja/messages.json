@@ -1364,5 +1364,12 @@
   },
   "emptyRecentBookmarks": { "message": "最近のブックマークはありません" },
   "emptyTagSuggestions":  { "message": "タグの候補はありません" },
-  "emptyAiTagsHint":      { "message": "🤖 をクリックして生成" }
+  "emptyAiTagsHint":      { "message": "🤖 をクリックして生成" },
+  "optPopupWidthTitle":   { "message": "ポップアップの幅" },
+  "optPopupWidth480":     { "message": "コンパクト (480px)" },
+  "optPopupWidth520":     { "message": "標準 (520px)" },
+  "optPopupWidth560":     { "message": "広い (560px)" },
+  "optPopupWidth600":     { "message": "特に広い (600px)" },
+  "optPopupWidthCustom":  { "message": "カスタム：" },
+  "optPopupWidthHelp":    { "message": "Chrome ではポップアップの幅は最大 800px です。影や境界のクリッピングを防ぐため、ソフト上限を 720px に設定しています。" }
 }

@@ -1364,5 +1364,12 @@
   },
   "emptyRecentBookmarks": { "message": "Keine aktuellen Lesezeichen" },
   "emptyTagSuggestions":  { "message": "Keine Tag-Vorschläge" },
-  "emptyAiTagsHint":      { "message": "Klicken Sie auf 🤖, um zu generieren" }
+  "emptyAiTagsHint":      { "message": "Klicken Sie auf 🤖, um zu generieren" },
+  "optPopupWidthTitle":   { "message": "Popup-Breite" },
+  "optPopupWidth480":     { "message": "Kompakt (480px)" },
+  "optPopupWidth520":     { "message": "Standard (520px)" },
+  "optPopupWidth560":     { "message": "Breit (560px)" },
+  "optPopupWidth600":     { "message": "Extra breit (600px)" },
+  "optPopupWidthCustom":  { "message": "Benutzerdefiniert:" },
+  "optPopupWidthHelp":    { "message": "Chrome begrenzt die Popup-Breite auf 800px. Die Obergrenze ist auf 720px gesetzt, um Schatten/Rand-Beschneidung zu vermeiden." }
 }

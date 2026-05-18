@@ -1364,5 +1364,12 @@
   },
   "emptyRecentBookmarks": { "message": "Brak ostatnich zakładek" },
   "emptyTagSuggestions":  { "message": "Brak sugestii tagów" },
-  "emptyAiTagsHint":      { "message": "Kliknij 🤖, aby wygenerować" }
+  "emptyAiTagsHint":      { "message": "Kliknij 🤖, aby wygenerować" },
+  "optPopupWidthTitle":   { "message": "Szerokość okienka" },
+  "optPopupWidth480":     { "message": "Wąskie (480px)" },
+  "optPopupWidth520":     { "message": "Standardowe (520px)" },
+  "optPopupWidth560":     { "message": "Szerokie (560px)" },
+  "optPopupWidth600":     { "message": "Bardzo szerokie (600px)" },
+  "optPopupWidthCustom":  { "message": "Niestandardowe:" },
+  "optPopupWidthHelp":    { "message": "Chrome ogranicza szerokość okienka do 800px. Miękki limit ustawiono na 720px, aby zapobiec przycinaniu cieni/krawędzi." }
 }

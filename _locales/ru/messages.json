@@ -1364,5 +1364,12 @@
   },
   "emptyRecentBookmarks": { "message": "Нет недавних закладок" },
   "emptyTagSuggestions":  { "message": "Нет предложений тегов" },
-  "emptyAiTagsHint":      { "message": "Нажмите 🤖, чтобы создать" }
+  "emptyAiTagsHint":      { "message": "Нажмите 🤖, чтобы создать" },
+  "optPopupWidthTitle":   { "message": "Ширина всплывающего окна" },
+  "optPopupWidth480":     { "message": "Компактная (480px)" },
+  "optPopupWidth520":     { "message": "Стандартная (520px)" },
+  "optPopupWidth560":     { "message": "Широкая (560px)" },
+  "optPopupWidth600":     { "message": "Очень широкая (600px)" },
+  "optPopupWidthCustom":  { "message": "Произвольная:" },
+  "optPopupWidthHelp":    { "message": "Chrome ограничивает ширину всплывающего окна до 800px. Программный лимит установлен на 720px, чтобы избежать обрезки теней/границ." }
 }

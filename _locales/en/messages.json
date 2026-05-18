@@ -1364,5 +1364,12 @@
   },
   "emptyRecentBookmarks": { "message": "No recent bookmarks" },
   "emptyTagSuggestions":  { "message": "No tag suggestions" },
-  "emptyAiTagsHint":      { "message": "Click 🤖 to generate" }
+  "emptyAiTagsHint":      { "message": "Click 🤖 to generate" },
+  "optPopupWidthTitle":   { "message": "Popup width" },
+  "optPopupWidth480":     { "message": "Compact (480px)" },
+  "optPopupWidth520":     { "message": "Standard (520px)" },
+  "optPopupWidth560":     { "message": "Wide (560px)" },
+  "optPopupWidth600":     { "message": "Extra wide (600px)" },
+  "optPopupWidthCustom":  { "message": "Custom:" },
+  "optPopupWidthHelp":    { "message": "Chrome limits popup width to 800px. Soft cap is 720px to prevent shadow/border clipping." }
 }

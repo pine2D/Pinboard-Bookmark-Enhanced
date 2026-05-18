@@ -8,7 +8,7 @@ const PBP_POPUP_ADAPTIVE_MAP = {
 
 chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {
   return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
-    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true });
+    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 520 });
 }).then(s => {
   const prefersDark = s.optTheme === "dark" ||
     (s.optTheme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -22,4 +22,7 @@ chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) =>
   } else if (prefersDark) {
     document.documentElement.classList.add("dark");
   }
+
+  const w = Math.max(420, Math.min(720, Number(s.popupWidth) || 520));
+  document.documentElement.style.setProperty("--pp-popup-width", w + "px");
 }).catch(() => { /* storage unavailable: leave default styling, popup.js will apply on full load */ });

@@ -301,6 +301,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (el) el.checked = val;
   }
 
+  // ---- Popup width (B9) ----
+  const popupWidth = Number(s.popupWidth) || 520;
+  const presetValues = [480, 520, 560, 600];
+  if (presetValues.includes(popupWidth)) {
+    const radio = document.querySelector(`input[name="popup-width-preset"][value="${popupWidth}"]`);
+    if (radio) radio.checked = true;
+  } else {
+    const radio = document.querySelector(`input[name="popup-width-preset"][value="custom"]`);
+    if (radio) radio.checked = true;
+  }
+  const customInput = $id("opt-popup-width-custom");
+  if (customInput) customInput.value = popupWidth;
+
   // ---- URL Clean settings (B4) ----
   const urlClean = s.urlClean || { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
   $id("opt-urlclean-enabled").checked = !!urlClean.enabled;
@@ -584,7 +597,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         aggressiveMode: $id("opt-urlclean-aggressive").checked,
         customParams: $id("opt-urlclean-custom").value.split("\n").map(s => s.trim()).filter(Boolean),
         excludeParams: $id("opt-urlclean-exclude").value.split("\n").map(s => s.trim()).filter(Boolean),
-      }
+      },
+      // ---- Popup width (B9) ----
+      ...(() => {
+        const selectedPreset = document.querySelector('input[name="popup-width-preset"]:checked')?.value;
+        let popupWidthToSave = 520;
+        if (selectedPreset === "custom") {
+          const raw = parseInt($id("opt-popup-width-custom").value, 10);
+          popupWidthToSave = Math.max(420, Math.min(720, isNaN(raw) ? 520 : raw));
+          $id("opt-popup-width-custom").value = popupWidthToSave;
+        } else if (selectedPreset) {
+          popupWidthToSave = parseInt(selectedPreset, 10);
+        }
+        return { popupWidth: popupWidthToSave };
+      })()
     };
     await (await getSettingsStorage()).set(data);
     // Save customOverlayCSS with quota-aware fallback (sync → local on QUOTA_BYTES)
