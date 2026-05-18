@@ -125,7 +125,7 @@ a:hover { text-decoration: underline; }
   border-radius: var(--pp-radius-sm); color: inherit;
   padding: 2px 10px; font-size: 11px; cursor: pointer; font-family: inherit;
 }
-.fc-btn:hover { background: currentColor; color: var(--pp-bg); }
+.fc-btn:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
 .fc-btn-secondary { border: 0; color: var(--pp-fg-hint); font-size: 10px; padding: 2px 6px; }
 .fc-btn-secondary:hover { background: transparent; color: var(--pp-fg); }
 .fc-dismiss {

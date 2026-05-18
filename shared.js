@@ -390,7 +390,10 @@ function showFeedback({ variant = "info", title = "", message = "", actions = []
   dismiss.className = "fc-dismiss";
   dismiss.setAttribute("aria-label", "Dismiss");
   dismiss.textContent = "×";
+  let dismissed = false;
   const remove = () => {
+    if (dismissed) return;
+    dismissed = true;
     card.classList.add("dismissing");
     setTimeout(() => card.remove(), 120);
   };
