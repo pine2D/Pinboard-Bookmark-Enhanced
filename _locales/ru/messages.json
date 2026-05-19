@@ -1371,5 +1371,7 @@
   "optPopupWidth560":     { "message": "Широкая (560px)" },
   "optPopupWidth600":     { "message": "Очень широкая (600px)" },
   "optPopupWidthCustom":  { "message": "Произвольная:" },
-  "optPopupWidthHelp":    { "message": "Chrome ограничивает ширину всплывающего окна до 800px. Программный лимит установлен на 720px, чтобы избежать обрезки теней/границ." }
+  "optPopupWidthHelp":    { "message": "Chrome ограничивает ширину всплывающего окна до 800px. Программный лимит установлен на 720px, чтобы избежать обрезки теней/границ." },
+  "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
+  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
 }

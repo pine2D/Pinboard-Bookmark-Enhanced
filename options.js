@@ -312,7 +312,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (radio) radio.checked = true;
   }
   const customInput = $id("opt-popup-width-custom");
-  if (customInput) customInput.value = popupWidth;
+  if (customInput) {
+    customInput.value = popupWidth;
+    const selectCustomRadio = () => {
+      const customRadio = document.querySelector('input[name="popup-width-preset"][value="custom"]');
+      if (customRadio && !customRadio.checked) customRadio.checked = true;
+    };
+    customInput.addEventListener("focus", selectCustomRadio);
+    customInput.addEventListener("input", selectCustomRadio);
+  }
 
   // ---- URL Clean settings (B4) ----
   const urlClean = s.urlClean || { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
