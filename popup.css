@@ -383,7 +383,6 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .del-confirm-yes { color: #c00 !important; border-color: #c00 !important; }
 .del-confirm-yes:hover { background: #fee !important; }
 .del-confirm-no:hover { background: #eee; }
-@keyframes delConfirmIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .status-msg { padding: 3px 12px 4px 72px; font-size: 11px; }
 .status-msg.success { color: #080; }
 .status-msg.error { color: #c00; }
