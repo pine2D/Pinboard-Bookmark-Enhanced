@@ -320,6 +320,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
     customInput.addEventListener("focus", selectCustomRadio);
     customInput.addEventListener("input", selectCustomRadio);
+    // Clamp + writeback only on blur/Enter — never during input,
+    // because auto-save would re-clamp partial values (e.g. "6" → 420).
+    const clampAndCommit = () => {
+      const raw = parseInt(customInput.value, 10);
+      if (isNaN(raw)) return;
+      customInput.value = Math.max(420, Math.min(720, raw));
+    };
+    customInput.addEventListener("blur", clampAndCommit);
+    customInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); clampAndCommit(); customInput.blur(); }
+    });
   }
 
   // ---- URL Clean settings (B4) ----
@@ -612,8 +623,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         let popupWidthToSave = 520;
         if (selectedPreset === "custom") {
           const raw = parseInt($id("opt-popup-width-custom").value, 10);
+          // Clamp the stored value but do NOT write back to the input — that
+          // would clobber partial keystrokes during auto-save (e.g. typing "6"
+          // for an eventual "600" would snap to 420). The blur/Enter handler
+          // is responsible for cleaning up the displayed value.
           popupWidthToSave = Math.max(420, Math.min(720, isNaN(raw) ? 520 : raw));
-          $id("opt-popup-width-custom").value = popupWidthToSave;
         } else if (selectedPreset) {
           popupWidthToSave = parseInt(selectedPreset, 10);
         }
