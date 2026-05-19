@@ -1371,7 +1371,7 @@
   "optPopupWidth560":     { "message": "寬 (560px)" },
   "optPopupWidth600":     { "message": "超寬 (600px)" },
   "optPopupWidthCustom":  { "message": "自訂：" },
-  "optPopupWidthHelp":    { "message": "Chrome 限制 popup 最大寬度 800px，軟上限設為 720px 以避免主題陰影/邊距被裁切。" },
+  "optPopupWidthHelp":    { "message": "範圍：420–720px（Chrome popup 限制）" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
   "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
 }

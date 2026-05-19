@@ -1371,7 +1371,7 @@
   "optPopupWidth560":     { "message": "Szerokie (560px)" },
   "optPopupWidth600":     { "message": "Bardzo szerokie (600px)" },
   "optPopupWidthCustom":  { "message": "Niestandardowe:" },
-  "optPopupWidthHelp":    { "message": "Chrome ogranicza szerokość okienka do 800px. Miękki limit ustawiono na 720px, aby zapobiec przycinaniu cieni/krawędzi." },
+  "optPopupWidthHelp":    { "message": "Zakres: 420–720px (limit Chrome popup)" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
   "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
 }

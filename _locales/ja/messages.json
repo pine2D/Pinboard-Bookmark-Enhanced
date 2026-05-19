@@ -1371,7 +1371,7 @@
   "optPopupWidth560":     { "message": "広い (560px)" },
   "optPopupWidth600":     { "message": "特に広い (600px)" },
   "optPopupWidthCustom":  { "message": "カスタム：" },
-  "optPopupWidthHelp":    { "message": "Chrome ではポップアップの幅は最大 800px です。影や境界のクリッピングを防ぐため、ソフト上限を 720px に設定しています。" },
+  "optPopupWidthHelp":    { "message": "範囲: 420–720px (Chrome popup 制限)" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
   "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
 }
