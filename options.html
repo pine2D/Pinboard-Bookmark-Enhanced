@@ -83,24 +83,24 @@
       <div class="fg"><label><input type="checkbox" id="opt-check-bookmark-status" checked /> <span data-i18n="optCheckBookmarkStatus">Show bookmark status via icon (check if current page is saved)</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-auto-close" checked /> <span data-i18n="optAutoClose">Auto-close popup after save</span></label></div>
       <div class="fg"><label><input type="checkbox" id="offline-queue-enabled" /> <span data-i18n="optOfflineQueue">Enable offline save queue</span></label></div>
-      <div class="fg">
-        <div data-i18n="optPopupWidthTitle" style="font-weight:600;margin-bottom:4px">Popup width</div>
-        <label><input type="radio" name="popup-width-preset" value="480" /> <span data-i18n="optPopupWidth480">Compact (480px)</span></label><br>
-        <label><input type="radio" name="popup-width-preset" value="520" /> <span data-i18n="optPopupWidth520">Standard (520px)</span></label><br>
-        <label><input type="radio" name="popup-width-preset" value="560" /> <span data-i18n="optPopupWidth560">Wide (560px)</span></label><br>
-        <label><input type="radio" name="popup-width-preset" value="600" /> <span data-i18n="optPopupWidth600">Extra wide (600px)</span></label><br>
-        <label><input type="radio" name="popup-width-preset" value="custom" /> <span data-i18n="optPopupWidthCustom">Custom:</span>
+      <div class="fg fg-stack">
+        <label class="bl" data-i18n="optPopupWidthTitle">Popup width</label>
+        <div><label><input type="radio" name="popup-width-preset" value="480" /> <span data-i18n="optPopupWidth480">Compact (480px)</span></label></div>
+        <div><label><input type="radio" name="popup-width-preset" value="520" /> <span data-i18n="optPopupWidth520">Standard (520px)</span></label></div>
+        <div><label><input type="radio" name="popup-width-preset" value="560" /> <span data-i18n="optPopupWidth560">Wide (560px)</span></label></div>
+        <div><label><input type="radio" name="popup-width-preset" value="600" /> <span data-i18n="optPopupWidth600">Extra wide (600px)</span></label></div>
+        <div><label><input type="radio" name="popup-width-preset" value="custom" /> <span data-i18n="optPopupWidthCustom">Custom:</span>
           <input type="number" id="opt-popup-width-custom" min="420" max="720" step="10" style="width:80px" /> px
-        </label>
+        </label></div>
         <div style="color:#888;font-size:11px;margin-top:4px" data-i18n="optPopupWidthHelp">Range: 420–720px (Chrome popup limit)</div>
       </div>
       <div class="divider"></div>
       <div class="section-title" data-i18n="optUrlCleanTitle">URL tracking parameter cleanup</div>
       <div class="fg"><label><input type="checkbox" id="opt-urlclean-enabled" /> <span data-i18n="optUrlCleanEnabled">Auto-clean URL tracking parameters</span></label></div>
-      <div class="fg" style="margin-left:20px">
-        <label><input type="checkbox" id="opt-urlclean-on-open" /> <span data-i18n="optUrlCleanOnOpen">Clean when popup opens (silent, with undo link)</span></label><br>
-        <label><input type="checkbox" id="opt-urlclean-on-paste" /> <span data-i18n="optUrlCleanOnPaste">Clean when pasting URL (toast feedback)</span></label><br>
-        <label><input type="checkbox" id="opt-urlclean-aggressive" /> <span data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref/si/igshid and similar</span></label>
+      <div class="fg fg-stack" style="margin-left:20px">
+        <div><label><input type="checkbox" id="opt-urlclean-on-open" /> <span data-i18n="optUrlCleanOnOpen">Clean when popup opens (silent, with undo link)</span></label></div>
+        <div><label><input type="checkbox" id="opt-urlclean-on-paste" /> <span data-i18n="optUrlCleanOnPaste">Clean when pasting URL (toast feedback)</span></label></div>
+        <div><label><input type="checkbox" id="opt-urlclean-aggressive" /> <span data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref/si/igshid and similar</span></label></div>
       </div>
       <div class="fg" style="margin-top:8px">
         <label class="bl" data-i18n="optUrlCleanCustom">Custom parameters (one per line, appended to default list)</label>
@@ -136,7 +136,7 @@
       <div class="divider"></div>
       <div class="section-title" data-i18n="secTags">Tags</div>
       <div class="fg"><label><input type="checkbox" id="opt-respect-tag-case" /> <span data-i18n="optRespectTagCase">Respect existing tag case (match most-used casing)</span></label></div>
-      <div class="fg">
+      <div class="fg fg-stack">
         <label class="bl" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
         <div><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked /> <span data-i18n="tagSyncCached">Cached (default — refresh after 10 min)</span></label></div>
         <div><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" /> <span data-i18n="tagSyncFresh">Live (fetch on every popup — slower)</span></label></div>
