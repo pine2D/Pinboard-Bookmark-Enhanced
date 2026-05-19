@@ -152,6 +152,7 @@ a:hover { text-decoration: underline; }
   line-height: 1.4;
   /* P2.8: dropped border-color from transition — border change is imperceptible during 600ms fade; reduces paint layer count */
   transition: background 0.6s ease, color 0.6s ease;
+  animation: fadeSlideDown var(--pp-motion-duration) ease-out;
 }
 .existing-banner.just-saved {
   background: #d4edda;
@@ -167,6 +168,7 @@ a:hover { text-decoration: underline; }
   color: #c00;
   font-size: 11px;
   line-height: 1.4;
+  animation: fadeSlideDown var(--pp-motion-duration) ease-out;
 }
 
 /* Tag Presets */
@@ -293,6 +295,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   max-height: 150px; z-index: 100;
   box-shadow: var(--pp-shadow-md);
   display: flex; flex-direction: column;
+  animation: dropdownOpen 0.10s ease-out;
 }
 .ac-scroll { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .ac-item { padding: 3px 6px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: space-between; }
@@ -374,7 +377,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   background: #fff; border: 1px solid #ddd; border-radius: var(--pp-radius-sm);
   padding: 5px 8px; font-size: 11px; white-space: nowrap;
   display: flex; align-items: center; gap: 6px;
-  box-shadow: var(--pp-shadow-md); animation: delConfirmIn 0.12s ease; z-index: 20;
+  box-shadow: var(--pp-shadow-md); animation: popinScale 0.12s ease-out; z-index: 20;
 }
 .del-confirm-popover button { padding: 1px 10px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; background: #f5f5f0; }
 .del-confirm-yes { color: #c00 !important; border-color: #c00 !important; }
@@ -469,6 +472,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   border: 1px solid #d4dae3;
   border-radius: var(--pp-radius-md);
   overflow: hidden;
+  animation: fadeSlideDown var(--pp-motion-duration) ease-out;
 }
 .batch-progress-fill {
   position: absolute; inset: 0 auto 0 0;
@@ -1299,7 +1303,7 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
 }
 @keyframes dropdownOpen {
   from { opacity: 0; max-height: 0; }
-  to   { opacity: 1; max-height: 280px; }
+  to   { opacity: 1; max-height: 150px; }
 }
 @keyframes autoCloseCountdown {
   from { transform: scaleX(1); }
