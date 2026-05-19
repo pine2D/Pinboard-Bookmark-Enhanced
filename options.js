@@ -28,20 +28,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     general: {
       fields: {
         "opt-lang": "auto",
-        "opt-check-bookmark-status": true, "opt-auto-close": true, "offline-queue-enabled": true,
-        "opt-show-search": false, "opt-show-recent": false, "opt-show-badge": false,
-        "opt-show-ai-summary": true, "opt-show-ai-tags": true,
-        "opt-show-quick-links": true, "opt-show-quick-row": true,
         "notify-quick-save": true, "notify-read-later": true, "notify-tab-set": true,
         "notify-batch-save": true, "notify-errors": true
       },
       skip: ["opt-pinboard-token", "opt-sync-enabled"] // never reset token or sync toggle
     },
+    popup: {
+      fields: {
+        "opt-check-bookmark-status": true, "opt-auto-close": true, "offline-queue-enabled": true,
+        "opt-show-search": false, "opt-show-recent": false, "opt-show-badge": false,
+        "opt-show-suggest-tags": true,
+        "opt-show-ai-summary": true, "opt-show-ai-tags": true,
+        "opt-show-quick-links": true, "opt-show-quick-row": true
+      }
+    },
     bookmarks: {
       fields: {
         "opt-private-default": false, "opt-private-incognito": true, "opt-readlater-default": false,
         "opt-auto-description": true, "opt-blockquote": true, "opt-include-referrer": false,
-        "opt-respect-tag-case": true, "opt-show-suggest-tags": true, "opt-tag-presets": ""
+        "opt-respect-tag-case": true, "opt-tag-presets": ""
       }
     },
     ai: {

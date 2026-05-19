@@ -600,6 +600,8 @@
   "tabBookmarks": {
     "message": "Zakładki"
   },
+  
+  "tabPopup":           { "message": "Popup" },
   "tabAI": {
     "message": "AI"
   },

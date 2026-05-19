@@ -600,6 +600,8 @@
   "tabBookmarks": {
     "message": "Закладки"
   },
+  
+  "tabPopup":           { "message": "Всплывающее окно" },
   "tabAI": {
     "message": "AI"
   },

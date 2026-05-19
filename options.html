@@ -15,6 +15,7 @@
 
     <div class="tabs">
       <button class="tab-btn active" data-panel="general" data-i18n="tabGeneral">General</button>
+      <button class="tab-btn" data-panel="popup" data-i18n="tabPopup">Popup</button>
       <button class="tab-btn" data-panel="bookmarks" data-i18n="tabBookmarks">Bookmarks</button>
       <button class="tab-btn" data-panel="ai" data-i18n="tabAI">AI</button>
       <button class="tab-btn" data-panel="quick" data-i18n="tabQuickActions">Quick Actions</button>
@@ -52,6 +53,32 @@
         </select>
       </div>
       <div class="divider"></div>
+      <div class="section-title" data-i18n="secSync">Data Sync</div>
+      <div class="fg"><label><input type="checkbox" id="opt-sync-enabled" /> <span data-i18n="optSyncEnabled">Sync settings across devices via Google account</span></label></div>
+      <p class="hint" style="margin-top:-4px;margin-bottom:8px" data-i18n="optSyncHint">When enabled, settings sync across Chrome installations signed into the same Google account.</p>
+      <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
+      <div class="divider"></div>
+      <div class="section-title" data-i18n="secBackupRestore">Backup &amp; Restore</div>
+      <p class="hint" style="margin-bottom:8px" data-i18n="backupHint">Export/import your settings (API keys are excluded from export for security).</p>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn" id="export-settings" data-i18n="exportSettings">Export Settings</button>
+        <label class="btn" style="cursor:pointer;" title="Import settings from JSON file">
+          <span data-i18n="importSettings">Import Settings</span>
+          <input type="file" id="import-settings-file" accept=".json" style="display:none;" />
+        </label>
+        <span class="save-status" id="import-status"></span>
+      </div>
+      <div class="divider"></div>
+      <div class="section-title" data-i18n="secNotifications">Notifications</div>
+      <div class="fg"><label><input type="checkbox" id="notify-quick-save" checked /> <span data-i18n="notifyQuickSave">Quick save</span></label></div>
+      <div class="fg"><label><input type="checkbox" id="notify-read-later" checked /> <span data-i18n="notifyReadLater">Read Later save</span></label></div>
+      <div class="fg"><label><input type="checkbox" id="notify-tab-set" checked /> <span data-i18n="notifyTabSet">Tab Set save</span></label></div>
+      <div class="fg"><label><input type="checkbox" id="notify-batch-save" checked /> <span data-i18n="notifyBatchSave">Batch save</span></label></div>
+      <div class="fg"><label><input type="checkbox" id="notify-errors" checked /> <span data-i18n="notifyErrors">Error notifications</span></label></div>
+    </div>
+
+    <!-- Tab 2: Popup -->
+    <div id="panel-popup" class="panel">
       <div class="section-title" data-i18n="secPopupBehavior">Popup Behavior</div>
       <div class="fg"><label><input type="checkbox" id="opt-check-bookmark-status" checked /> <span data-i18n="optCheckBookmarkStatus">Show bookmark status via icon (check if current page is saved)</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-auto-close" checked /> <span data-i18n="optAutoClose">Auto-close popup after save</span></label></div>
@@ -93,32 +120,9 @@
       <div class="fg"><label><input type="checkbox" id="opt-show-ai-tags" checked /> <span data-i18n="optShowAiTags">Show AI tags row in popup</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-show-quick-links" checked /> <span data-i18n="optShowQuickLinks">Show quick links row</span> (<span data-i18n="qlSets">Sets</span> · <span data-i18n="qlNetwork">Network</span> · <span data-i18n="qlUnread">Unread</span> · <span data-i18n="qlNotes">Notes</span> · <span data-i18n="qlPopular">Popular</span>)</label></div>
       <div class="fg"><label><input type="checkbox" id="opt-show-quick-row" checked /> <span data-i18n="optShowQuickRow">Show quick action buttons (Save Tabs · Batch Save · Markdown)</span></label></div>
-      <div class="divider"></div>
-      <div class="section-title" data-i18n="secNotifications">Notifications</div>
-      <div class="fg"><label><input type="checkbox" id="notify-quick-save" checked /> <span data-i18n="notifyQuickSave">Quick save</span></label></div>
-      <div class="fg"><label><input type="checkbox" id="notify-read-later" checked /> <span data-i18n="notifyReadLater">Read Later save</span></label></div>
-      <div class="fg"><label><input type="checkbox" id="notify-tab-set" checked /> <span data-i18n="notifyTabSet">Tab Set save</span></label></div>
-      <div class="fg"><label><input type="checkbox" id="notify-batch-save" checked /> <span data-i18n="notifyBatchSave">Batch save</span></label></div>
-      <div class="fg"><label><input type="checkbox" id="notify-errors" checked /> <span data-i18n="notifyErrors">Error notifications</span></label></div>
-      <div class="divider"></div>
-      <div class="section-title" data-i18n="secSync">Data Sync</div>
-      <div class="fg"><label><input type="checkbox" id="opt-sync-enabled" /> <span data-i18n="optSyncEnabled">Sync settings across devices via Google account</span></label></div>
-      <p class="hint" style="margin-top:-4px;margin-bottom:8px" data-i18n="optSyncHint">When enabled, settings sync across Chrome installations signed into the same Google account.</p>
-      <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
-      <div class="divider"></div>
-      <div class="section-title" data-i18n="secBackupRestore">Backup &amp; Restore</div>
-      <p class="hint" style="margin-bottom:8px" data-i18n="backupHint">Export/import your settings (API keys are excluded from export for security).</p>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn" id="export-settings" data-i18n="exportSettings">Export Settings</button>
-        <label class="btn" style="cursor:pointer;" title="Import settings from JSON file">
-          <span data-i18n="importSettings">Import Settings</span>
-          <input type="file" id="import-settings-file" accept=".json" style="display:none;" />
-        </label>
-        <span class="save-status" id="import-status"></span>
-      </div>
     </div>
 
-    <!-- Tab 2: Bookmarks -->
+    <!-- Tab 3: Bookmarks -->
     <div id="panel-bookmarks" class="panel">
       <div class="section-title" data-i18n="secSaveDefaults">Save Defaults</div>
       <div class="fg"><label><input type="checkbox" id="opt-private-default" /> <span data-i18n="optPrivateDefault">Private by default</span></label></div>
@@ -146,7 +150,7 @@
       </div>
     </div>
 
-    <!-- Tab 3: Quick Actions -->
+    <!-- Tab 4: Quick Actions -->
     <div id="panel-quick" class="panel">
       <div class="accordion-section open">
         <div class="accordion-header" data-target="acc-qs">
@@ -205,7 +209,7 @@
       </div>
     </div>
 
-    <!-- Tab 4: AI -->
+    <!-- Tab 5: AI -->
     <div id="panel-ai" class="panel">
       <div class="section-title" data-i18n="secAiProvider">AI Provider</div>
       <div class="fg">
@@ -476,7 +480,7 @@
       </div>
     </div>
 
-    <!-- Tab 5: Appearance -->
+    <!-- Tab 6: Appearance -->
     <div id="panel-appearance" class="panel">
       <div class="section-title" data-i18n="secTheme">Theme</div>
       <div class="fg">
