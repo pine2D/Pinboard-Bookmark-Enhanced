@@ -51,8 +51,9 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .fg label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; margin-bottom: 4px; }
 /* Stacked sub-options: gives each <div>-wrapped option row breathing room
    so visual density matches independent .fg rows. Apply via .fg.fg-stack. */
-.fg-stack > div { margin-bottom: 6px; }
+.fg-stack > div { margin-bottom: 10px; }
 .fg-stack > div:last-child { margin-bottom: 0; }
+.fg-stack > div > label { padding: 2px 0; margin-bottom: 0; }
 .fg label.bl { display: block; font-weight: bold; margin-bottom: 4px; cursor: default; font-size: 12px; color: #555; }
 .fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea {
   width: 100%; padding: 4px 8px; border: 1px solid #bbb; font-size: 13px; font-family: inherit;
