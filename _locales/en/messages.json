@@ -907,7 +907,7 @@
     "message": "AI Cache Duration (minutes)"
   },
   "aiCacheHint": {
-    "message": "Cached per URL. Set 0 to disable."
+    "message": "Cached per URL, up to 200 entries (LRU). Set 0 to disable."
   },
   "labelTagSeparator": {
     "message": "Multi-word tag separator"

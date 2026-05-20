@@ -907,7 +907,7 @@
     "message": "AI Cache-Dauer (Minuten)"
   },
   "aiCacheHint": {
-    "message": "Pro URL zwischengespeichert. Auf 0 setzen zum Deaktivieren."
+    "message": "Pro URL zwischengespeichert, max. 200 Einträge (LRU). Auf 0 setzen zum Deaktivieren."
   },
   "labelTagSeparator": {
     "message": "Trennzeichen für mehrteilige Tags"

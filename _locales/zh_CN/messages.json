@@ -907,7 +907,7 @@
     "message": "AI 缓存时长（分钟）"
   },
   "aiCacheHint": {
-    "message": "按网址缓存，设为 0 则禁用。"
+    "message": "按网址缓存，最多保留 200 条（LRU）。设为 0 则禁用。"
   },
   "labelTagSeparator": {
     "message": "多词标签分隔符"

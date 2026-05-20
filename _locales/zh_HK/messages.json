@@ -907,7 +907,7 @@
     "message": "AI 快取時長（分鐘）"
   },
   "aiCacheHint": {
-    "message": "按網址快取，設為 0 則停用。"
+    "message": "按網址快取，最多保留 200 條（LRU）。設為 0 則停用。"
   },
   "labelTagSeparator": {
     "message": "多詞標籤分隔符"

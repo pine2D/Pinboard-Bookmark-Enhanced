@@ -907,7 +907,7 @@
     "message": "AI キャッシュ時間（分）"
   },
   "aiCacheHint": {
-    "message": "URL ごとにキャッシュ。0 で無効にします。"
+    "message": "URL ごとにキャッシュ、最大 200 件（LRU）。0 で無効にします。"
   },
   "labelTagSeparator": {
     "message": "複数語タグの区切り文字"

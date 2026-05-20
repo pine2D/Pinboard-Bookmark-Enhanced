@@ -907,7 +907,7 @@
     "message": "Durée du cache IA (minutes)"
   },
   "aiCacheHint": {
-    "message": "Mis en cache par URL. Mettre 0 pour désactiver."
+    "message": "Mis en cache par URL, max. 200 entrées (LRU). Mettre 0 pour désactiver."
   },
   "labelTagSeparator": {
     "message": "Séparateur de tags multi-mots"

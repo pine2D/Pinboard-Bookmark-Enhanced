@@ -907,7 +907,7 @@
     "message": "Czas pamięci podręcznej AI (minuty)"
   },
   "aiCacheHint": {
-    "message": "Pamięć podręczna per URL. Ustaw 0, aby wyłączyć."
+    "message": "Pamięć podręczna per URL, do 200 wpisów (LRU). Ustaw 0, aby wyłączyć."
   },
   "labelTagSeparator": {
     "message": "Separator tagów wielowyrazowych"
