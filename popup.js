@@ -194,6 +194,12 @@ async function showMain(token) {
   }
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  // Fill URL/Title immediately from tab info so the form isn't visibly blank while the
+  // (slow) content-script injection runs. Tracking-param strip + selectedText/meta arrive later.
+  if (tab) {
+    $id("url-input").value = tab.url || "";
+    $id("title-input").value = tab.title || "";
+  }
   if (!tab) {
     pageInfo = { url: "", title: "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
   } else {
