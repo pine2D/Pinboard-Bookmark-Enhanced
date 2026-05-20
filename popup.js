@@ -41,14 +41,12 @@ let acIndex = -1;
 let settings = {};
 
 // ===================== URL Clean Helpers (B4) =====================
-let _urlCleanSettingsCache = null;
-async function _loadUrlCleanSettings() {
-  if (_urlCleanSettingsCache) return _urlCleanSettingsCache;
-  const { urlClean } = await chrome.storage.sync.get({
-    urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] }
-  });
-  _urlCleanSettingsCache = urlClean;
-  return urlClean;
+// urlClean is loaded as part of SETTINGS_DEFAULTS — no separate storage hit needed.
+// Also fixes a latent bug: the previous direct chrome.storage.sync.get bypassed the
+// optSyncEnabled toggle, so users with sync disabled would have read defaults instead
+// of their saved values (options.js writes via getSettingsStorage, which respects the toggle).
+function _loadUrlCleanSettings() {
+  return settings.urlClean || { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
 }
 
 function _renderCleanHint({ removedCount, original }) {

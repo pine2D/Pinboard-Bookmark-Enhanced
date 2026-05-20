@@ -78,6 +78,10 @@ a:hover { text-decoration: underline; }
    .hidden (1,1,1 vs 0,1,0) overrides the default-hidden state on the correct section. */
 html[data-section="main"] #main-section { display: block !important; }
 html[data-section="login"] #login-section { display: block !important; }
+/* Hide bottom quick-actions for logged-out users on first paint — popup.js's showLogin()
+   adds .hidden via JS later but that's after first paint, so logged-out users would
+   briefly see the search bar and button rows. */
+html[data-section="login"] .quick-actions { display: none !important; }
 
 .header-bar {
   display: flex; justify-content: space-between; align-items: center;

@@ -81,7 +81,9 @@ const SETTINGS_DEFAULTS = {
   optShowAiSummary: true, optShowAiTags: true,
   optShowQuickLinks: true, optShowQuickRow: true,
   tagPresets: "", optAutoCloseAfterSave: true,
-  themePresetKey: "", optPopupFollowTheme: true
+  themePresetKey: "", optPopupFollowTheme: true,
+  popupWidth: 520,
+  urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] }
 };
 
 // ---- Tag case normalization helpers ----
