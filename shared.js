@@ -227,6 +227,26 @@ async function getSettingsStorage() {
   }
 }
 
+// ---- Prime SETTINGS_DEFAULTS into storage (one-time fix for popup boot lag) ----
+// chrome.storage.{local,sync}.get({ k: default }) is measurably slower when k is missing
+// vs when k exists explicitly. For users who never customized most settings, this slows
+// popup boot enough to surface the main-section flash. Calling primeSettings() on install/
+// update/startup writes only the missing keys (existing values are preserved).
+async function primeSettings() {
+  try {
+    const storage = await getSettingsStorage();
+    const keys = Object.keys(SETTINGS_DEFAULTS);
+    const existing = await storage.get(keys); // array form: returns only keys that are set
+    const missing = {};
+    for (const k of keys) {
+      if (!(k in existing)) missing[k] = SETTINGS_DEFAULTS[k];
+    }
+    if (Object.keys(missing).length > 0) {
+      await storage.set(missing);
+    }
+  } catch (_) { /* best-effort */ }
+}
+
 // ---- Chunked sync storage for large values ----
 // chrome.storage.sync has 8KB per-key limit; split large strings into chunks
 // When sync is disabled, local storage is used directly (5MB limit, no chunking needed)

@@ -507,10 +507,19 @@ async function cleanupExpiredAICache() {
   }
 }
 
-// Startup: process offline queue + update badge
+// Startup: process offline queue + update badge + prime settings (cheap no-op when already primed)
 chrome.runtime.onStartup.addListener(() => {
+  primeSettings().catch(() => {});
   processOfflineQueue().catch(() => {});
   updateBadge().catch(() => {});
+});
+
+// Install/update: prime SETTINGS_DEFAULTS so the first popup open is fast for users whose
+// storage doesn't have every key yet (storage.get(missing-key) is measurably slower).
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === "install" || reason === "update") {
+    primeSettings().catch(() => {});
+  }
 });
 
 // ---- 监听来自 popup 的消息 ----
