@@ -415,6 +415,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Keep service worker alive + periodic tasks
 chrome.alarms.create("keepalive", { periodInMinutes: 4 });
 chrome.alarms.create("ai-cache-cleanup", { periodInMinutes: 60 * 24 }); // daily
+// Periodically re-prime SETTINGS_DEFAULTS so chrome.storage doesn't go cold between
+// uses (Chrome evicts storage backend after inactivity, causing slow first-open).
+chrome.alarms.create("storage-warm", { periodInMinutes: 5 });
 
 async function syncPrewarmTagsAlarm() {
   const s = await loadSettings();
@@ -456,6 +459,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
   if (alarm.name === "prewarm-tags") {
     prewarmTagsNow().catch(() => {});
+  }
+  if (alarm.name === "storage-warm") {
+    primeSettings().catch(() => {});
   }
 });
 
