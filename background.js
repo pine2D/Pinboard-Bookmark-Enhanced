@@ -414,7 +414,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // Keep service worker alive + periodic tasks
 chrome.alarms.create("keepalive", { periodInMinutes: 4 });
-chrome.alarms.create("ai-cache-cleanup", { periodInMinutes: 60 * 24 }); // daily
+chrome.alarms.create("ai-cache-cleanup", { periodInMinutes: 60 }); // hourly — was daily; daily allowed up to 24h of stale-but-expired entries to accumulate
 // Periodically re-prime SETTINGS_DEFAULTS so chrome.storage doesn't go cold between
 // uses (Chrome evicts storage backend after inactivity, causing slow first-open).
 chrome.alarms.create("storage-warm", { periodInMinutes: 5 });

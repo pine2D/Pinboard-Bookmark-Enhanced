@@ -280,6 +280,9 @@ function parseAITags(resp, separator) {
 // ---- AI cache helpers ----
 function getCacheKey(url, type, source) { return `ai_cache_${type}_${source || "local"}_${url}`; }
 const AI_CACHE_INDEX_KEY = "ai_cache_index";
+// LRU cap: prevents unbounded growth of one-shot URL cache entries (those that get
+// summarized once and never re-visited; per-read TTL doesn't help them).
+const AI_CACHE_MAX_ENTRIES = 200;
 
 async function _updateAICacheIndex(mutator) {
   try {
@@ -309,7 +312,21 @@ async function setAICache(url, type, result, cacheDuration, source) {
   const key = getCacheKey(url, type, source);
   const timestamp = Date.now();
   await chrome.storage.local.set({ [key]: { result, timestamp } });
-  _updateAICacheIndex((idx) => { idx[key] = timestamp; return idx; });
+  // Atomic index update + LRU enforcement: read once, modify, write once.
+  try {
+    const { [AI_CACHE_INDEX_KEY]: idx = {} } = await chrome.storage.local.get(AI_CACHE_INDEX_KEY);
+    idx[key] = timestamp;
+    const entries = Object.entries(idx);
+    if (entries.length > AI_CACHE_MAX_ENTRIES) {
+      // Evict oldest by timestamp
+      entries.sort((a, b) => a[1] - b[1]);
+      const overflow = entries.length - AI_CACHE_MAX_ENTRIES;
+      const evictKeys = entries.slice(0, overflow).map(([k]) => k);
+      await chrome.storage.local.remove(evictKeys);
+      evictKeys.forEach(k => delete idx[k]);
+    }
+    await chrome.storage.local.set({ [AI_CACHE_INDEX_KEY]: idx });
+  } catch (_) { /* best-effort */ }
 }
 
 // ---- Build notes/description for a page ----
