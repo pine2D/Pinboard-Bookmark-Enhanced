@@ -73,6 +73,12 @@ a { color: #2255aa; text-decoration: none; transition: color 0.15s; }
 a:hover { text-decoration: underline; }
 .hidden { display: none !important; }
 
+/* Early section visibility — popup-theme-early.js sets html[data-section] from a synchronous
+   localStorage mirror so the right section paints immediately. Higher specificity than
+   .hidden (1,1,1 vs 0,1,0) overrides the default-hidden state on the correct section. */
+html[data-section="main"] #main-section { display: block !important; }
+html[data-section="login"] #login-section { display: block !important; }
+
 .header-bar {
   display: flex; justify-content: space-between; align-items: center;
   padding: 6px 12px; background: #f5f5f0; border-bottom: 1px solid #ddd;

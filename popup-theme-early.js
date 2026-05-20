@@ -1,3 +1,11 @@
+// Synchronous login-state hint via localStorage — sets html[data-section] BEFORE first paint
+// so the correct top-level section (main vs login) is visible immediately, eliminating the
+// flash where only quick-actions paints first. popup.js's showMain/showLogin maintains the
+// localStorage mirror on login success / logout. Storage source of truth remains chrome.storage;
+// this is just a fast-read mirror.
+document.documentElement.dataset.section =
+  localStorage.getItem("pp-logged-in") === "1" ? "main" : "login";
+
 // Apply theme early to prevent FOUC (popup opens light → flashes to dark).
 // Mirrors popup.js applyTheme(); shared.js not yet loaded — inline the map + selector.
 const PBP_POPUP_ADAPTIVE_MAP = {

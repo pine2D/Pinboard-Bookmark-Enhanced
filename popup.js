@@ -118,6 +118,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // ===================== Login =====================
 function showLogin() {
+  document.documentElement.dataset.section = "login";
+  try { localStorage.removeItem("pp-logged-in"); } catch (_) {}
   $id("login-section").classList.remove("hidden");
   $id("main-section").classList.add("hidden");
   const qa = document.querySelector(".quick-actions");
@@ -141,6 +143,8 @@ $id("login-btn").addEventListener("click", async () => {
 
 // ===================== Main =====================
 async function showMain(token) {
+  document.documentElement.dataset.section = "main";
+  try { localStorage.setItem("pp-logged-in", "1"); } catch (_) {}
   $id("login-section").classList.add("hidden");
   $id("main-section").classList.remove("hidden");
   const qa = document.querySelector(".quick-actions");
