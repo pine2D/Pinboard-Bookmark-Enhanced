@@ -51,6 +51,23 @@ function clearAiProgress(buttonId) {
 }
 
 // ---- Enrich page content via Jina Reader if configured ----
+// Populate pageInfo.pageText on demand. Avoids Defuddle injection on popup boot — the
+// content script for AI quality is only fetched when the user actually invokes AI.
+async function ensurePageText() {
+  if (pageInfo.pageText) return; // already populated (cache from earlier AI call this session)
+  if (settings.aiContentSource === "jina") {
+    await enrichPageTextIfJina();
+    return;
+  }
+  // Local source: lazy-inject Defuddle and pull full page text
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+    const info = await getPageInfoFromTab(tab.id, { withDefuddle: true });
+    if (info?.pageText) pageInfo.pageText = info.pageText;
+  } catch (_) { /* tab gone / inject failed — pageText stays empty, caller will surface aiNoContent */ }
+}
+
 async function enrichPageTextIfJina() {
   if (settings.aiContentSource !== "jina") return;
   if (!pageInfo?.url) return;
@@ -217,7 +234,6 @@ function removeSummary() {
 async function doAISummary(forceRefresh) {
   const btn = $id("ai-summary-btn");
   if (!hasAIKey(settings)) { showStatus("status-msg", t("aiSetKey"), "error"); return; }
-  if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
   hideAIError();
 
   if (!forceRefresh) {
@@ -235,7 +251,8 @@ async function doAISummary(forceRefresh) {
   }
   try {
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "extracting" });
-    await enrichPageTextIfJina();
+    await ensurePageText();
+    if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "calling" });
     const summary = await callAI(settings, buildSummaryPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value));
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "parsing" });
@@ -345,7 +362,8 @@ async function doAITags(forceRefresh) {
 
   try {
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "extracting" });
-    await enrichPageTextIfJina();
+    await ensurePageText();
+    if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "calling" });
     const resp = await callAI(settings, buildTagPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "parsing" });

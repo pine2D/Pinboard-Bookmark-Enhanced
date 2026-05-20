@@ -22,7 +22,12 @@ function _cbExecuteScript(args) {
   });
 }
 
-async function getPageInfoFromTab(tabId) {
+async function getPageInfoFromTab(tabId, opts = {}) {
+  // Defuddle is a ~120KB content extractor injected into the target tab. It's only needed
+  // for AI summary/tags + batch save with AI enabled — NOT for filling the popup form
+  // (which only needs url/title/selectedText/metaDescription). Default off saves 50-200ms
+  // per popup open for users not invoking AI right away. AI/batch paths pass {withDefuddle: true}.
+  const withDefuddle = !!opts.withDefuddle;
   try {
     const tab = await _cbTabsGet(tabId);
     if (!tab) return null;
@@ -31,17 +36,23 @@ async function getPageInfoFromTab(tabId) {
       return { url, title: tab.title || "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
     }
 
-    // Inject Defuddle library first (ignore failure — e.g. tab closed mid-inject)
-    await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
+    if (withDefuddle) {
+      // Inject Defuddle library first (ignore failure — e.g. tab closed mid-inject)
+      await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
+    }
 
     const results = await _cbExecuteScript({
       target: { tabId },
-      func: () => {
+      args: [withDefuddle],
+      func: (useDefuddle) => {
         const info = { url: location.href, title: document.title, selectedText: "", metaDescription: "", referrer: document.referrer || "", pageText: "" };
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) { const t = sel.toString().trim(); if (t) info.selectedText = t; }
         const md = document.querySelector('meta[name="description"]') || document.querySelector('meta[property="og:description"]');
         if (md) info.metaDescription = md.getAttribute("content") || "";
+
+        // Fast path (default): no pageText extraction. Popup form only needs the fields above.
+        if (!useDefuddle) return info;
 
         // Try Defuddle for high-quality content extraction
         if (typeof Defuddle !== "undefined") {

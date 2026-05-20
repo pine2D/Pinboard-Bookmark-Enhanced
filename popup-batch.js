@@ -127,7 +127,7 @@ function setupTabSet() {
 
           if (useAiTags || useAiSummary) {
             let tabPageInfo = null;
-            try { tabPageInfo = await getPageInfoFromTab(tab.id); } catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
+            try { tabPageInfo = await getPageInfoFromTab(tab.id, { withDefuddle: true }); } catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
             if (tabPageInfo?.pageText) {
               const aiJobs = [];
               if (useAiTags) aiJobs.push((async () => {
