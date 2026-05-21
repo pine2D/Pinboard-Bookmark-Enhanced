@@ -594,6 +594,9 @@
   "optAutoSaved": {
     "message": "✓ 已儲存"
   },
+  "optFeedback": {
+    "message": "回饋與問題"
+  },
   "tabGeneral": {
     "message": "一般"
   },

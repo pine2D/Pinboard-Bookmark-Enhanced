@@ -594,6 +594,9 @@
   "optAutoSaved": {
     "message": "✓ 已保存"
   },
+  "optFeedback": {
+    "message": "反馈与问题"
+  },
   "tabGeneral": {
     "message": "通用"
   },

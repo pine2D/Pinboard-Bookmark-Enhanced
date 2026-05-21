@@ -86,6 +86,15 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible { box-shadow: 0 0 0 3px rgba(68,119,187,0.15); }
 .fg input[type="checkbox"]:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 1px; box-shadow: none; }
 
+/* ---- Panel footer (e.g. General tab feedback link) ---- */
+.panel-foot { margin-top: 18px; padding-top: 12px; border-top: 1px solid #e8e8e8; font-size: 11px; text-align: center; }
+.panel-foot a { color: #888; text-decoration: none; transition: color 0.18s ease; display: inline-flex; align-items: center; gap: 4px; }
+.panel-foot a:hover { color: var(--opt-accent, #4477bb); text-decoration: underline; }
+.panel-foot .ext-icon { width: 10px; height: 10px; flex-shrink: 0; }
+html[data-theme] .panel-foot { border-top-color: var(--opt-border-section, var(--opt-border)); }
+html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted)); }
+html[data-theme] .panel-foot a:hover { color: var(--opt-accent); }
+
 /* ---- Common elements ---- */
 .hint { font-size: 11px; color: #757575; margin-top: 2px; }
 .hint a { color: #4477bb; }

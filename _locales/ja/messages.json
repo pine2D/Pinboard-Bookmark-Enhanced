@@ -594,6 +594,9 @@
   "optAutoSaved": {
     "message": "✓ 保存しました"
   },
+  "optFeedback": {
+    "message": "フィードバック・問題報告"
+  },
   "tabGeneral": {
     "message": "一般"
   },

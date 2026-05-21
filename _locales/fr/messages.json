@@ -594,6 +594,9 @@
   "optAutoSaved": {
     "message": "✓ Enregistré"
   },
+  "optFeedback": {
+    "message": "Commentaires et problèmes"
+  },
   "tabGeneral": {
     "message": "Général"
   },
