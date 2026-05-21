@@ -293,12 +293,6 @@
   "addAll": {
     "message": "すべて追加"
   },
-  "suggestNoSuggestions": {
-    "message": "おすすめなし"
-  },
-  "suggestUnavailable": {
-    "message": "おすすめなし（PinboardはこのURLに対応できません）"
-  },
   "suggestPopular": {
     "message": "人気："
   },

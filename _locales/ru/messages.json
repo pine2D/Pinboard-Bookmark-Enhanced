@@ -293,12 +293,6 @@
   "addAll": {
     "message": "Добавить все"
   },
-  "suggestNoSuggestions": {
-    "message": "нет рекомендаций"
-  },
-  "suggestUnavailable": {
-    "message": "нет рекомендаций (Pinboard недоступен для этого URL)"
-  },
   "suggestPopular": {
     "message": "популярные:"
   },

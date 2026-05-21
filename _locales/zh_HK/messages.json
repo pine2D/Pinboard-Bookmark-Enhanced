@@ -293,12 +293,6 @@
   "addAll": {
     "message": "全部新增"
   },
-  "suggestNoSuggestions": {
-    "message": "暫無推薦"
-  },
-  "suggestUnavailable": {
-    "message": "暫無推薦（Pinboard 無法為此 URL 生成建議）"
-  },
   "suggestPopular": {
     "message": "熱門："
   },

@@ -293,12 +293,6 @@
   "addAll": {
     "message": "Dodaj wszystkie"
   },
-  "suggestNoSuggestions": {
-    "message": "brak sugestii"
-  },
-  "suggestUnavailable": {
-    "message": "brak sugestii (Pinboard niedostępny dla tego URL)"
-  },
   "suggestPopular": {
     "message": "popularne:"
   },

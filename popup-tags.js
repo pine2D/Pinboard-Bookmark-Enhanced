@@ -22,34 +22,31 @@ async function fetchPinboardSuggestTags(token, url) {
       // on popup open instead of waiting 3.1s+ behind fetchAllUserTags. 429 is handled.
       const resp = await pinboardFetchImmediate(`https://api.pinboard.in/v1/posts/suggest?url=${enc(url)}&auth_token=${token}&format=json`, { timeoutMs: 8000 });
       if (!resp.ok) {
-        // 500: Pinboard's way of saying "no suggestions for this niche URL"
-        if (resp.status === 500) { container.textContent = t("suggestNoSuggestions"); container.classList.add("muted"); return; }
         // Auth and rate-limit failures are actionable — show specific guidance
         if (resp.status === 401 || resp.status === 403) { container.textContent = t("pinboardErrorAuth"); container.classList.add("muted"); return; }
         if (resp.status === 429) { container.textContent = t("pinboardErrorRateLimit"); container.classList.add("muted"); return; }
-        // All other server errors: Pinboard cannot handle this URL
-        container.textContent = t("suggestUnavailable");
+        // Everything else (500, other server errors): surface as neutral "no suggestions"
+        container.textContent = t("emptyTagSuggestions");
         container.classList.add("muted");
         return;
       }
       data = await resp.json();
       chrome.storage.local.set({ [cacheKey]: { data, timestamp: Date.now() } }).catch(() => {});
     } catch (e) {
-      // Network-level errors (TypeError from connection reset, AbortError from timeout)
-      // for the suggest endpoint typically mean Pinboard can't process this URL, not that
-      // the user's network is broken — surface a neutral "unavailable" message instead.
-      container.textContent = t("suggestUnavailable");
+      // Network-level errors for the suggest endpoint typically mean Pinboard can't process
+      // this URL, not that the user's network is broken — surface the same neutral message.
+      container.textContent = t("emptyTagSuggestions");
       container.classList.add("muted");
       return;
     }
   }
 
   try {
-    container.innerHTML = "";
+    while (container.firstChild) container.removeChild(container.firstChild);
     const popular = data[0]?.popular || [];
     const recommended = data[1]?.recommended || [];
     if (!popular.length && !recommended.length) {
-      injectEmptyState(container, "tag", t("emptyTagSuggestions"));
+      container.textContent = t("emptyTagSuggestions");
       container.classList.add("muted");
       return;
     }
