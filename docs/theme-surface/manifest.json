@@ -889,7 +889,7 @@
       "tokens.patterns": "object — see tokens.schema.json §patterns. All keys optional; unset means composer default."
     },
     "available": {
-      "tag-style": { "values": ["plain", "hash-prefix", "pill", "bracketed"], "affects": "a.tag pseudo-elements and/or radius" },
+      "tag-style": { "values": ["flat", "underline"], "affects": "a.tag — full visual (base + :hover + .selected); supersedes the legacy chip + hash-prefix layout", "required": true },
       "bookmark-title-prefix": { "values": "literal string ≤8 chars", "affects": "a.bookmark_title::before content" },
       "heading-prefix": { "values": "literal string ≤8 chars", "affects": ".settings_heading::before content" },
       "url-link-style": { "values": ["plain", "capsule", "pill", "underline"], "affects": "a.url_link chrome" },

@@ -142,14 +142,12 @@ a.url_link {
 
 a.tag {
   color: ${v("tag-fg")} !important;
-  background: ${v("tag-bg")} !important;
-  padding: 1px 8px !important;
-  border-radius: ${v("radius-lg")} !important;
+  padding: 0 4px !important;
+  border-radius: 3px !important;
   font-size: ${sizeXs} !important;
   text-decoration: none !important;
 }
-a.tag:hover { color: ${v("tag-fg")} !important; background: ${v("accent-alpha")} !important; text-decoration: none !important; }
-a.tag.selected { color: ${v("destroy")} !important; font-weight: bold !important; }
+/* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: ${v("tag-bg")} !important; color: ${v("accent")} !important; }
 
 a.unread { color: ${v("destroy")} !important; font-weight: bold !important; }
@@ -176,7 +174,6 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
 #right_bar a:hover { color: ${v("link-hover")} !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: ${v("row-hover")} !important; }
-#right_bar table td a.tag { color: ${v("fg")} !important; }
 #right_bar table td a.delete { color: ${v("muted-soft")} !important; font-size: ${sizeXs} !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #right_bar table tr:hover td a.delete { color: ${v("destroy")} !important; opacity: 1 !important; }
 #right_bar input#key {
