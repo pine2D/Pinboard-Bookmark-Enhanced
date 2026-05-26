@@ -39,9 +39,9 @@ export function patternsLayer(tokens) {
     );
   } else if (tagStyle === "underline") {
     out.push(
-      `a.tag { text-decoration: underline !important; text-decoration-color: ${v("accent-alpha")} !important; text-decoration-thickness: 1px !important; text-underline-offset: 2px !important; }`,
-      `a.tag:hover { color: ${v("accent")} !important; background: ${v("accent-soft")} !important; text-decoration-color: ${v("accent")} !important; text-decoration-thickness: 2.5px !important; text-shadow: 0.5px 0 0 currentColor !important; }`,
-      `a.tag.selected { color: ${v("destroy")} !important; text-decoration-color: ${v("destroy")} !important; font-weight: 600 !important; }`
+      `a.tag { text-decoration: underline !important; text-decoration-color: ${v("accent-alpha")} !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }`,
+      `a.tag:hover { color: ${v("accent")} !important; background: ${v("accent-soft")} !important; text-decoration-color: ${v("accent")} !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }`,
+      `a.tag.selected { color: ${v("destroy")} !important; text-decoration-color: ${v("destroy")} !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }`
     );
   } else if (tagStyle != null) {
     throw new Error(`tag-style: unknown value "${tagStyle}" (expected "flat" or "underline")`);

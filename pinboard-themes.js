@@ -267,6 +267,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -330,6 +331,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -990,6 +993,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -1053,6 +1057,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -1673,6 +1679,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -1736,6 +1743,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -2026,9 +2035,9 @@ hr { border-color: var(--pinboard-border) !important; }
 ::-moz-selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* === patterns layer (tokens.patterns) === */
-a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-underline-offset: 2px !important; }
-a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-shadow: 0.5px 0 0 currentColor !important; }
-a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; font-weight: 600 !important; }
+a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }
+a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
+a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }
 a.bookmark_title::before { content: "> " !important; color: var(--pinboard-muted-soft) !important; }
 .settings_heading::before { content: "$ " !important; opacity: 0.7 !important; }
 #search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus {
@@ -2394,6 +2403,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -2457,6 +2467,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -2747,9 +2759,9 @@ hr { border-color: var(--pinboard-border) !important; }
 ::-moz-selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* === patterns layer (tokens.patterns) === */
-a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-underline-offset: 2px !important; }
-a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-shadow: 0.5px 0 0 currentColor !important; }
-a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; font-weight: 600 !important; }
+a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }
+a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
+a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }
 #search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus {
   box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important;
   outline: none !important;
@@ -3126,6 +3138,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -3189,6 +3202,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -3835,6 +3850,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -3898,6 +3914,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -4188,9 +4206,9 @@ hr { border-color: var(--pinboard-border) !important; }
 ::-moz-selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* === patterns layer (tokens.patterns) === */
-a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-underline-offset: 2px !important; }
-a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-shadow: 0.5px 0 0 currentColor !important; }
-a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; font-weight: 600 !important; }
+a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }
+a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
+a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }
 #search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus {
   box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important;
   outline: none !important;
@@ -4445,6 +4463,7 @@ html.pbp-dark .description blockquote { color: var(--pinboard-muted) !important;
 
 html.pbp-dark a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -4507,6 +4526,8 @@ html.pbp-dark #tag_cloud a:not(.tag) { color: var(--pinboard-accent) !important;
 html.pbp-dark #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 html.pbp-dark #tag_cloud_header a, html.pbp-dark a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 html.pbp-dark #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+html.pbp-dark #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+html.pbp-dark #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 html.pbp-dark #tweet_searchbox { margin-bottom: 12px !important; }
@@ -4794,9 +4815,9 @@ html.pbp-dark ::selection { background: var(--pinboard-selection-bg) !important;
 html.pbp-dark ::-moz-selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* === patterns layer (tokens.patterns) === */
-html.pbp-dark a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-underline-offset: 2px !important; }
-html.pbp-dark a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-shadow: 0.5px 0 0 currentColor !important; }
-html.pbp-dark a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; font-weight: 600 !important; }
+html.pbp-dark a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }
+html.pbp-dark a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
+html.pbp-dark a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }
 html.pbp-dark #search_query_field:focus, html.pbp-dark #banner_searchbox input[type="text"]:focus, html.pbp-dark #right_bar input#key:focus, html.pbp-dark #tweet_searchbox #search_query_field:focus {
   box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important;
   outline: none !important;
@@ -5186,6 +5207,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -5249,6 +5271,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -5539,9 +5563,9 @@ hr { border-color: var(--pinboard-border) !important; }
 ::-moz-selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* === patterns layer (tokens.patterns) === */
-a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-underline-offset: 2px !important; }
-a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-shadow: 0.5px 0 0 currentColor !important; }
-a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; font-weight: 600 !important; }
+a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }
+a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
+a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }
 #search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus {
   box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important;
   outline: none !important;
@@ -5848,6 +5872,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -5911,6 +5936,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -6201,9 +6228,9 @@ hr { border-color: var(--pinboard-border) !important; }
 ::-moz-selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* === patterns layer (tokens.patterns) === */
-a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-underline-offset: 2px !important; }
-a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-shadow: 0.5px 0 0 currentColor !important; }
-a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; font-weight: 600 !important; }
+a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }
+a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
+a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }
 #search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus {
   box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important;
   outline: none !important;
@@ -6522,6 +6549,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -6585,6 +6613,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -7199,6 +7229,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -7262,6 +7293,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -7889,6 +7922,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -7952,6 +7986,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -8242,9 +8278,9 @@ hr { border-color: var(--pinboard-border) !important; }
 ::-moz-selection { background: var(--pinboard-selection-bg) !important; color: var(--pinboard-selection-fg) !important; }
 
 /* === patterns layer (tokens.patterns) === */
-a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-underline-offset: 2px !important; }
-a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-shadow: 0.5px 0 0 currentColor !important; }
-a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; font-weight: 600 !important; }
+a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }
+a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
+a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }
 #search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus {
   box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important;
   outline: none !important;
@@ -8568,6 +8604,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -8631,6 +8668,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -9256,6 +9295,7 @@ a.url_link {
 
 a.tag {
   color: var(--pinboard-tag-fg) !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: 11px !important;
@@ -9319,6 +9359,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:hover { color: var(--pinboard-accent) !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }

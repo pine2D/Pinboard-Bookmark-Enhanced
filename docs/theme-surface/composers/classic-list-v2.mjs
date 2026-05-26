@@ -142,6 +142,7 @@ a.url_link {
 
 a.tag {
   color: ${v("tag-fg")} !important;
+  background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
   font-size: ${sizeXs} !important;
@@ -205,6 +206,8 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
 #tag_cloud a:not(.tag):hover { color: ${v("link-hover")} !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: ${v("muted-soft")} !important; }
 #tag_cloud_header a:hover { color: ${v("accent")} !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 11px !important; opacity: 0.7 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
