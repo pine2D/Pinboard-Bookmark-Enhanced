@@ -171,8 +171,8 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
   word-wrap: break-word !important;
 }
 #right_bar h3, #right_bar h4, #right_bar b { color: ${v("muted")} !important; }
-#right_bar a { color: ${v("accent")} !important; }
-#right_bar a:hover { color: ${v("link-hover")} !important; }
+#right_bar a:not(.tag) { color: ${v("accent")} !important; }
+#right_bar a:not(.tag):hover { color: ${v("link-hover")} !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: ${v("row-hover")} !important; }
 #right_bar table td a.delete { color: ${v("muted-soft")} !important; font-size: ${sizeXs} !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
