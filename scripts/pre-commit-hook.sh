@@ -33,3 +33,21 @@ if ! node tools/diff-all.mjs --strict; then
   echo "  Bypass (not recommended): git commit --no-verify" >&2
   exit 1
 fi
+
+echo "[cascade-lint] checking pattern cascade resolution"
+if ! node tools/cascade-lint.mjs; then
+  echo ""
+  echo "[cascade-lint] COMMIT BLOCKED — cascade conflict detected" >&2
+  echo "  Diagnose: node docs/theme-surface/tools/cascade-lint.mjs --verbose" >&2
+  echo "  Bypass (not recommended): git commit --no-verify" >&2
+  exit 1
+fi
+
+echo "[override-drift] checking per-theme overrides for unscoped duplicates"
+if ! node tools/override-drift.mjs; then
+  echo ""
+  echo "[override-drift] COMMIT BLOCKED — override re-broadens composer-narrowed selector" >&2
+  echo "  Fix: add the composer's :not(...) exclusions to the override selector" >&2
+  echo "  Bypass (not recommended): git commit --no-verify" >&2
+  exit 1
+fi
