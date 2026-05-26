@@ -30,33 +30,73 @@ const VERBOSE = process.argv.includes("--verbose");
 // ----------------------------------------------------------------------------
 const PROBES = [
   { name: "a.tag at rest (inline)",
+    mode: "light",
     elem: { tag: "a", classes: ["tag"] },
     expected: { color: "a.tag", background: "a.tag" } },
   { name: "a.tag :hover (inline)",
+    mode: "light",
     elem: { tag: "a", classes: ["tag"], state: ["hover"] },
     expected: { color: "a.tag:hover", background: "a.tag:hover" } },
   { name: "a.tag.selected (inline)",
+    mode: "light",
     elem: { tag: "a", classes: ["tag", "selected"] },
     expected: { color: "a.tag.selected", background: "a.tag" } },
   { name: "a.tag inside #right_bar at rest",
+    mode: "light",
     elem: { tag: "a", classes: ["tag"], ancestors: [{ id: "right_bar" }] },
     expected: { color: "a.tag", background: "a.tag" } },
   { name: "a.tag inside #right_bar :hover",
+    mode: "light",
     elem: { tag: "a", classes: ["tag"], ancestors: [{ id: "right_bar" }], state: ["hover"] },
     expected: { color: "a.tag:hover", background: "a.tag:hover" } },
   { name: "a.tag.selected inside #right_bar",
+    mode: "light",
     elem: { tag: "a", classes: ["tag", "selected"], ancestors: [{ id: "right_bar" }] },
     expected: { color: "a.tag.selected" } },
   { name: "a.tag inside #tag_cloud_header at rest",
+    mode: "light",
     elem: { tag: "a", classes: ["tag"], ancestors: [{ id: "tag_cloud_header" }] },
     expected: { color: "a.tag" } },
   { name: "a.tag.selected inside #tag_cloud_header",
+    mode: "light",
     elem: { tag: "a", classes: ["tag", "selected"], ancestors: [{ id: "tag_cloud_header" }] },
     expected: { color: "a.tag.selected" } },
   { name: "non-tag <a> inside #right_bar at rest",
+    mode: "light",
     elem: { tag: "a", classes: [], ancestors: [{ id: "right_bar" }] },
-    expected: { color: "#right_bar a:not(.tag)" } }
+    expected: { color: "#right_bar a:not(.tag)" } },
+
+  // ----- dark-mode (html.pbp-dark) cascade paths -----
+  // Skipped for non-adaptive themes (those whose shipped CSS contains no
+  // `html.pbp-dark` rules). flexoki is the only adaptive theme at present.
+  { name: "html.pbp-dark a.tag (inline)",
+    mode: "dark",
+    elem: { tag: "a", classes: ["tag"], ancestors: [{ tag: "html", classes: ["pbp-dark"] }] },
+    expected: { color: "a.tag" } },
+  { name: "html.pbp-dark a.tag :hover (inline)",
+    mode: "dark",
+    elem: { tag: "a", classes: ["tag"], ancestors: [{ tag: "html", classes: ["pbp-dark"] }], state: ["hover"] },
+    expected: { color: "a.tag:hover" } },
+  { name: "html.pbp-dark a.tag.selected (inline)",
+    mode: "dark",
+    elem: { tag: "a", classes: ["tag", "selected"], ancestors: [{ tag: "html", classes: ["pbp-dark"] }] },
+    expected: { color: "a.tag.selected" } },
+  { name: "html.pbp-dark a.tag inside #right_bar at rest",
+    mode: "dark",
+    elem: { tag: "a", classes: ["tag"], ancestors: [{ tag: "html", classes: ["pbp-dark"] }, { id: "right_bar" }] },
+    expected: { color: "a.tag" } },
+  { name: "html.pbp-dark a.tag.selected inside #right_bar",
+    mode: "dark",
+    elem: { tag: "a", classes: ["tag", "selected"], ancestors: [{ tag: "html", classes: ["pbp-dark"] }, { id: "right_bar" }] },
+    expected: { color: "a.tag.selected" } },
+  { name: "html.pbp-dark a.tag.selected inside #tag_cloud_header",
+    mode: "dark",
+    elem: { tag: "a", classes: ["tag", "selected"], ancestors: [{ tag: "html", classes: ["pbp-dark"] }, { id: "tag_cloud_header" }] },
+    expected: { color: "a.tag.selected" } }
 ];
+
+const LIGHT_PROBES = PROBES.filter(p => p.mode === "light");
+const DARK_PROBES  = PROBES.filter(p => p.mode === "dark");
 
 // ----------------------------------------------------------------------------
 // Extract per-theme CSS blocks from pinboard-themes.js.
@@ -355,13 +395,25 @@ if (themes.length === 0) {
   process.exit(1);
 }
 
+// A theme is "adaptive" if its shipped CSS carries any `html.pbp-dark` rules
+// (the convention emitted by composeTheme's prefixSelectors for dark mode).
+// Non-adaptive themes skip dark probes silently — running them would always
+// report "no rule matched" since the ancestor chain can never be satisfied.
+function isAdaptive(css) {
+  return /html\.pbp-dark\b/.test(css);
+}
+
 let totalConflicts = 0;
+let adaptiveCount = 0;
 const conflictReports = [];
 
 for (const theme of themes) {
   const rules = parseRules(theme.css);
+  const adaptive = isAdaptive(theme.css);
+  if (adaptive) adaptiveCount++;
+  const probesForTheme = adaptive ? PROBES : LIGHT_PROBES;
   const themeConflicts = [];
-  for (const probe of PROBES) {
+  for (const probe of probesForTheme) {
     for (const [prop, wantedSubstr] of Object.entries(probe.expected)) {
       const { winner, candidates } = resolveCascade(rules, probe.elem, prop);
       if (!winner) {
@@ -402,9 +454,11 @@ function explainReason(winner, candidates, wanted) {
 if (VERBOSE) {
   for (const theme of themes) {
     const rules = parseRules(theme.css);
-    console.log(`\n# theme: ${theme.slug}`);
-    for (const probe of PROBES) {
-      console.log(`  probe: ${probe.name}`);
+    const adaptive = isAdaptive(theme.css);
+    const probesForTheme = adaptive ? PROBES : LIGHT_PROBES;
+    console.log(`\n# theme: ${theme.slug}${adaptive ? " (adaptive — running dark probes)" : ""}`);
+    for (const probe of probesForTheme) {
+      console.log(`  probe: ${probe.name} [${probe.mode}]`);
       for (const [prop, wantedSubstr] of Object.entries(probe.expected)) {
         const { candidates } = resolveCascade(rules, probe.elem, prop);
         console.log(`    ${prop} (want substr "${wantedSubstr}"):`);
@@ -420,7 +474,7 @@ if (VERBOSE) {
 }
 
 if (conflictReports.length === 0) {
-  console.log(`[cascade-lint] PASS - ${themes.length} themes, ${PROBES.length} probes per theme, 0 conflicts`);
+  console.log(`[cascade-lint] PASS - ${themes.length} themes (${adaptiveCount} adaptive), ${LIGHT_PROBES.length} light + ${DARK_PROBES.length} dark probes, 0 conflicts`);
   process.exit(0);
 }
 
