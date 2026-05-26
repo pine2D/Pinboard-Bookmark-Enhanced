@@ -197,15 +197,16 @@ export function patternsLayer(tokens) {
   const cardShadow = pat["card-shadow"];
   if (cardShadow === "soft") {
     out.push(
-      `.bookmark { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important; transition: box-shadow 0.2s !important; }`,
-      `.bookmark:hover { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important; }`
+      `.bookmark { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important; transition: box-shadow 0.2s !important; }`
     );
   } else if (cardShadow === "strong") {
     out.push(
-      `.bookmark { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important; transition: box-shadow 0.2s !important; }`,
-      `.bookmark:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22) !important; }`
+      `.bookmark { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important; transition: box-shadow 0.2s !important; }`
     );
   }
+  // .bookmark:hover deltas removed: invisibly subtle AND override the .bookmark.private
+  // inset stripe (same specificity, !important, declared later → wins). Cards still elevate
+  // visually via the base box-shadow above; row-hover is intentionally absent per P2.
 
   // ---- P4: blockquote-style ----
   // 11/13 themes add a left border + padding to `.description blockquote`.

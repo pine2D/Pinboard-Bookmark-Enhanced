@@ -631,7 +631,6 @@ hr { border-color: var(--pinboard-border) !important; }
 }
 .bookmark { border: none !important; }
 .bookmark { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important; transition: box-shadow 0.2s !important; }
-.bookmark:hover { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important; }
 
 
 /* === theme overrides (tokens.overrides.css) === */
@@ -6954,7 +6953,6 @@ hr { border-color: var(--pinboard-border) !important; }
 }
 .bookmark { border: none !important; }
 .bookmark { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important; transition: box-shadow 0.2s !important; }
-.bookmark:hover { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important; }
 input[type="submit"], input[type="button"], .search_button input[type="submit"] { border-radius: 12px !important; }
 
 
@@ -7634,7 +7632,6 @@ hr { border-color: var(--pinboard-border) !important; }
 }
 .bookmark { border: none !important; }
 .bookmark { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important; transition: box-shadow 0.2s !important; }
-.bookmark:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22) !important; }
 input[type="submit"], input[type="button"], .search_button input[type="submit"] { border-radius: 12px !important; }
 
 
@@ -9702,7 +9699,6 @@ hr { border-color: var(--pinboard-border) !important; }
 }
 .bookmark { border: none !important; }
 .bookmark { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important; transition: box-shadow 0.2s !important; }
-.bookmark:hover { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important; }
 
 
 /* === theme overrides (tokens.overrides.css) === */
