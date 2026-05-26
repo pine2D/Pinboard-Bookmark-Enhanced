@@ -377,7 +377,7 @@ export function patternsLayer(tokens) {
     const r = tokens.ext?.["searchbox-radius"] || "4px";
     const sel = `#search_query_field, #banner_searchbox input[type="text"], #right_bar input#key, #tweet_searchbox #search_query_field`;
     out.push(
-      `${sel} { background: ${v("bg-surface")} !important; color: ${v("text")} !important; border: 1px solid ${v("border")} !important; border-radius: ${r} !important; }`
+      `${sel} { background: ${v("bg-surface")} !important; color: ${v("fg")} !important; border: 1px solid ${v("border")} !important; border-radius: ${r} !important; }`
     );
     if (searchbox === "outlined-accent") {
       out.push(
@@ -405,7 +405,7 @@ export function patternsLayer(tokens) {
   if (sortTable === "enabled") {
     const r = tokens.ext?.["sort-input-radius"] || tokens.ext?.["searchbox-radius"] || "3px";
     out.push(
-      `#main_column form[name="sort"] table input[name^="id_"] { width: 38px !important; min-width: 38px !important; max-width: 38px !important; padding: 3px 4px !important; margin-right: 10px !important; font-size: 12px !important; line-height: 1.2 !important; font-weight: 600 !important; box-sizing: border-box !important; vertical-align: middle !important; background: ${v("bg-surface")} !important; color: ${v("text")} !important; border: 1px solid ${v("border")} !important; border-radius: ${r} !important; }`,
+      `#main_column form[name="sort"] table input[name^="id_"] { width: 38px !important; min-width: 38px !important; max-width: 38px !important; padding: 3px 4px !important; margin-right: 10px !important; font-size: 12px !important; line-height: 1.2 !important; font-weight: 600 !important; box-sizing: border-box !important; vertical-align: middle !important; background: ${v("bg-surface")} !important; color: ${v("fg")} !important; border: 1px solid ${v("border")} !important; border-radius: ${r} !important; }`,
       `#main_column form[name="sort"] table input[name^="id_"]:focus { border-color: ${v("accent")} !important; box-shadow: 0 0 0 2px ${v("accent-alpha")} !important; outline: none !important; }`,
       `#main_column form[name="sort"] table tr:hover { background: ${v("accent-alpha")} !important; }`
     );

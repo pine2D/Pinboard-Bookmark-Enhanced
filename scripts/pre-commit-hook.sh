@@ -34,6 +34,16 @@ if ! node tools/diff-all.mjs --strict; then
   exit 1
 fi
 
+echo "[token-coverage] checking composer v() references against resolved tokens"
+if ! node tools/token-coverage.mjs; then
+  echo ""
+  echo "[token-coverage] COMMIT BLOCKED — composer references a token no theme defines" >&2
+  echo "  Fix: define the token in palette/typo/space/radius/border, add a fallback" >&2
+  echo "       in composers/_util.mjs#expandPalette, or correct the typo in the composer" >&2
+  echo "  Bypass (not recommended): git commit --no-verify" >&2
+  exit 1
+fi
+
 echo "[cascade-lint] checking pattern cascade resolution"
 if ! node tools/cascade-lint.mjs; then
   echo ""
