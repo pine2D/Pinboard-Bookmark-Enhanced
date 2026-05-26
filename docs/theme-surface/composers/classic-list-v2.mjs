@@ -201,8 +201,8 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
 
 /* ---- Tag cloud ---- */
 #tag_cloud { max-width: 100% !important; overflow-wrap: break-word !important; }
-#tag_cloud a, #tag_cloud a.tag { color: ${v("accent")} !important; }
-#tag_cloud a:hover, #tag_cloud a.tag:hover { color: ${v("link-hover")} !important; }
+#tag_cloud a:not(.tag) { color: ${v("accent")} !important; }
+#tag_cloud a:not(.tag):hover { color: ${v("link-hover")} !important; }
 #tag_cloud_header a, a.tag_heading_selected { color: ${v("muted-soft")} !important; }
 #tag_cloud_header a:hover { color: ${v("accent")} !important; }
 
