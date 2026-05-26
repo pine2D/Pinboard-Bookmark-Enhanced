@@ -674,8 +674,6 @@ a.unread { font-weight: 600 !important; }
 #right_bar a:hover { color: #1a73e8 !important; }
 a.bundle { color: #5f6368 !important; text-decoration: none !important; }
 a.bundle:hover { color: #1a73e8 !important; }
-#tag_cloud a { color: #5f6368 !important; }
-#tag_cloud a:hover { color: #1a73e8 !important; }
 #tag_cloud_header a { font-size: 11px !important; }
 a.tag_heading_selected { font-size: 11px !important; }
 .next_prev { text-decoration: none !important; }
@@ -1377,7 +1375,6 @@ a.url_link { padding: 1px 5px !important; background: rgba(59,66,82,0.8) !import
 a.copy_link { color: #81a1c1 !important; }
 #right_bar a { color: #81a1c1 !important; }
 a.bundle { color: #81a1c1 !important; }
-#tag_cloud a { color: #81a1c1 !important; }
 a.sort_order_selected { background: #434c5e !important; }
 .next_prev { color: #81a1c1 !important; }
 .next_prev_widget a { color: #81a1c1 !important; }
@@ -2087,8 +2084,6 @@ a.sort_order_selected { background: #1a1a1a !important; }
 #right_bar table tr:hover td a.delete { color: #ff5555 !important; }
 #right_bar input#key { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; }
 #right_bar input#key:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }
-#tag_cloud a { color: #22aa22 !important; }
-#tag_cloud a:hover { color: #33ff33 !important; }
 #tweet_searchbox #search_query_field { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; font-size: 13px !important; }
 #tweet_searchbox #search_query_field:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }
 input[type="text"] { background: #111 !important; font-family: inherit !important; }
@@ -2808,8 +2803,6 @@ a.sort_order_selected { background: #e0d5c1 !important; color: #6b4c3b !importan
 #right_bar input#key:focus { border-color: #8b4513 !important; box-shadow: 0 0 0 2px rgba(139,69,19,0.18) !important; }
 #right_bar input[type="submit"] { background: #6b4c3b !important; color: #f5f0e8 !important; border-radius: 4px !important; }
 #right_bar input[type="submit"]:hover { background: #8b4513 !important; }
-#tag_cloud a { color: #6b4c3b !important; }
-#tag_cloud a:hover { color: #8b4513 !important; }
 #tag_cloud_header a { color: #999 !important; }
 a.tag_heading_selected { color: #999 !important; }
 #tag_cloud_header a:hover { color: #6b4c3b !important; }
@@ -3530,7 +3523,6 @@ a.copy_link { color: #bd93f9 !important; }
 #right_bar input#key:focus { border-color: #bd93f9 !important; box-shadow: 0 0 0 2px rgba(189,147,249,0.25) !important; }
 #right_bar input[type="submit"] { background: #bd93f9 !important; border-radius: 4px !important; }
 #right_bar input[type="submit"]:hover { background: #ff79c6 !important; }
-#tag_cloud a { color: #bd93f9 !important; }
 #tag_cloud_header a:hover { color: #ff79c6 !important; }
 #tweet_searchbox #search_query_field { background: #282a36 !important; border: 1px solid #6272a4 !important; border-radius: 4px !important; font-size: 13px !important; }
 #tweet_searchbox #search_query_field:focus { border-color: #bd93f9 !important; box-shadow: 0 0 0 2px rgba(189,147,249,0.25) !important; }
@@ -4833,8 +4825,6 @@ a.url_link { padding: 1px 5px !important; border-radius: 3px !important; }
 #right_bar a:hover { color: #8B7EC8 !important; }
 a.bundle { color: #5E409D !important; }
 a.bundle:hover { color: #8B7EC8 !important; }
-#tag_cloud a { color: #5E409D !important; }
-#tag_cloud a:hover { color: #8B7EC8 !important; }
 #tag_cloud_header a:hover { color: #5E409D !important; }
 a.sort_order_selected { background: #DAD8CE !important; color: #5E409D !important; }
 input[type="submit"] { border: none !important; }
@@ -4867,8 +4857,6 @@ html.pbp-dark #right_bar a { color: #8B7EC8 !important; }
 html.pbp-dark #right_bar a:hover { color: #A699D0 !important; }
 html.pbp-dark a.bundle { color: #8B7EC8 !important; }
 html.pbp-dark a.bundle:hover { color: #A699D0 !important; }
-html.pbp-dark #tag_cloud a { color: #8B7EC8 !important; }
-html.pbp-dark #tag_cloud a:hover { color: #A699D0 !important; }
 html.pbp-dark #tag_cloud_header a { color: #575653 !important; }
 html.pbp-dark #tag_cloud_header a:hover { color: #8B7EC8 !important; }
 html.pbp-dark a.sort_order_selected { background: #343331 !important; color: #8B7EC8 !important; }
