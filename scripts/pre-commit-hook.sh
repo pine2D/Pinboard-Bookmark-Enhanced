@@ -8,7 +8,7 @@
 #
 # Bypass (rare): git commit --no-verify
 
-CHANGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^docs/theme-surface/(pilots/[^/]+\.tokens\.json|composers/[^/]+\.mjs|tools/[^/]+\.mjs)$')
+CHANGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(docs/theme-surface/(pilots/[^/]+\.tokens\.json|composers/[^/]+\.mjs|tools/[^/]+\.mjs)|pinboard-themes\.js)$')
 
 if [ -z "$CHANGED" ]; then
   exit 0
@@ -58,6 +58,16 @@ if ! node tools/override-drift.mjs; then
   echo ""
   echo "[override-drift] COMMIT BLOCKED — override re-broadens composer-narrowed selector" >&2
   echo "  Fix: add the composer's :not(...) exclusions to the override selector" >&2
+  echo "  Bypass (not recommended): git commit --no-verify" >&2
+  exit 1
+fi
+
+echo "[handedit-audit] checking pinboard-themes.js for rules not produced by composer"
+if ! node tools/handedit-audit.mjs; then
+  echo ""
+  echo "[handedit-audit] COMMIT BLOCKED — hand-edited rule detected in pinboard-themes.js" >&2
+  echo "  Diagnose: node docs/theme-surface/tools/handedit-audit.mjs --verbose" >&2
+  echo "  Fix: migrate the rule to composers/ or pilots/<slug>.tokens.json overrides.css, then re-run sync-all" >&2
   echo "  Bypass (not recommended): git commit --no-verify" >&2
   exit 1
 fi

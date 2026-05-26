@@ -270,3 +270,24 @@ git commit -m "feat(theme): add <slug> theme"
 ```
 
 `sync-all` regenerates `pinboard-themes.js` in place, so stage both files.
+
+---
+
+## Don't hand-edit pinboard-themes.js
+
+`pinboard-themes.js` is the runtime artifact. It is fully regenerated
+on every `sync-all` invocation from composer output + per-theme tokens.
+Any rule you add directly will be silently overwritten the next time
+sync-all runs.
+
+If you need a rule that doesn't fit the composer:
+
+- **Applies to all 13 themes** → add it to `composers/classic-list-v2.mjs`
+  (or `_patterns.mjs` if it should be opt-in per theme).
+- **Applies to one theme only** → add it to that theme's
+  `pilots/<slug>.tokens.json` `overrides.css` string.
+
+The `handedit-audit` pre-commit hook detects any rule in
+`pinboard-themes.js` not derivable from the composer pipeline and
+blocks the commit. If you see it fire, follow its diagnostic hint
+to migrate the rule to the proper layer.
