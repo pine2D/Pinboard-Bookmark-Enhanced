@@ -119,7 +119,7 @@ a:focus-visible { outline: 2px solid ${v("focus-ring")}; outline-offset: 2px; bo
   color: ${v("fg")};
   font-weight: ${v("weight-heading")};
 }
-#right_bar a { color: ${v("accent")}; }
+#right_bar a:not(.tag) { color: ${v("accent")}; }
 #right_bar table { width: 100%; border-collapse: collapse; }
 #right_bar .delete,
 #main_column .bookmark .delete {

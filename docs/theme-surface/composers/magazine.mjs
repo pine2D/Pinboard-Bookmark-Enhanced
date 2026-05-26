@@ -110,7 +110,7 @@ a:focus-visible { outline: 2px solid ${v("focus-ring")}; outline-offset: 3px; }
   margin: 0;
   letter-spacing: 0.04em;
 }
-#right_bar a { color: ${v("accent")}; }
+#right_bar a:not(.tag) { color: ${v("accent")}; }
 #right_bar table { width: auto; }
 
 /* main column: two-column reading grid with hero */
