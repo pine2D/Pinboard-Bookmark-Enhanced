@@ -38,7 +38,7 @@ const PINBOARD_THEMES = {
   --pinboard-url-link-bg: #fff3e0;
   --pinboard-url-link-fg: #e8710a;
   --pinboard-link-hover: #174ea6;
-  --pinboard-link-visited: #1a73e8;
+  --pinboard-link-visited: #7b1fa2;
   --pinboard-focus-ring: #1a73e8;
   --pinboard-unread: #d93025;
   --pinboard-btn-bg-hover: #174ea6;
@@ -764,7 +764,7 @@ h2 { color: #3c4043 !important; }
   --pinboard-url-link-bg: #3b4252;
   --pinboard-url-link-fg: #ebcb8b;
   --pinboard-link-hover: #88c0d0;
-  --pinboard-link-visited: #81a1c1;
+  --pinboard-link-visited: #b48ead;
   --pinboard-focus-ring: #88c0d0;
   --pinboard-unread: #bf616a;
   --pinboard-font-family: "Inter", -apple-system, sans-serif;
@@ -1450,7 +1450,7 @@ a { color: #81a1c1 !important; }
   --pinboard-url-link-bg: #0d1a0d;
   --pinboard-url-link-fg: #cccc00;
   --pinboard-link-hover: #66ff66;
-  --pinboard-link-visited: #33ff33;
+  --pinboard-link-visited: #aaaa33;
   --pinboard-focus-ring: #33ff33;
   --pinboard-unread: #ff3333;
   --pinboard-font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
@@ -2174,7 +2174,7 @@ a.bookmark_title::before { color: #33ff3380 !important; }`
   --pinboard-url-link-bg: #f5f0e8;
   --pinboard-url-link-fg: #a0522d;
   --pinboard-link-hover: #2a5a8c;
-  --pinboard-link-visited: #1a3a5c;
+  --pinboard-link-visited: #8b4513;
   --pinboard-focus-ring: #8b6c5b;
   --pinboard-unread: #c0392b;
   --pinboard-font-family: "Georgia", "Noto Serif", "Source Serif Pro", serif;
@@ -3621,7 +3621,7 @@ a { color: #bd93f9 !important; }`
   --pinboard-url-link-bg: #F2F0E5;
   --pinboard-url-link-fg: #AD8301;
   --pinboard-link-hover: #4385BE;
-  --pinboard-link-visited: #205EA6;
+  --pinboard-link-visited: #AD5097;
   --pinboard-focus-ring: #205EA6;
   --pinboard-unread: #AF3029;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -4247,7 +4247,7 @@ html.pbp-dark {
   --pinboard-url-link-bg: #343331;
   --pinboard-url-link-fg: #D0A215;
   --pinboard-link-hover: #5DA0D0;
-  --pinboard-link-visited: #4385BE;
+  --pinboard-link-visited: #CE5D97;
   --pinboard-focus-ring: #4385BE;
   --pinboard-unread: #D14D41;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -4978,7 +4978,7 @@ html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 
   --pinboard-url-link-bg: #fdf6e3;
   --pinboard-url-link-fg: #b58900;
   --pinboard-link-hover: #2aa198;
-  --pinboard-link-visited: #268bd2;
+  --pinboard-link-visited: #6c71c4;
   --pinboard-focus-ring: #268bd2;
   --pinboard-unread: #dc322f;
   --pinboard-font-family: "Inter", -apple-system, sans-serif;
@@ -5643,7 +5643,7 @@ a.sort_order_selected { background: #eee8d5 !important; }
   --pinboard-url-link-bg: #073642;
   --pinboard-url-link-fg: #b58900;
   --pinboard-link-hover: #2aa198;
-  --pinboard-link-visited: #268bd2;
+  --pinboard-link-visited: #6c71c4;
   --pinboard-focus-ring: #268bd2;
   --pinboard-unread: #dc322f;
   --pinboard-font-family: "Inter", -apple-system, sans-serif;
@@ -6999,7 +6999,7 @@ a.help { background: #e6e9ef !important; }
   --pinboard-url-link-bg: #313244;
   --pinboard-url-link-fg: #f9e2af;
   --pinboard-link-hover: #cba6f7;
-  --pinboard-link-visited: #89b4fa;
+  --pinboard-link-visited: #cba6f7;
   --pinboard-focus-ring: #89b4fa;
   --pinboard-unread: #f38ba8;
   --pinboard-btn-bg-hover: #cba6f7;
@@ -7692,7 +7692,7 @@ h2 { color: #cba6f7 !important; }`
   --pinboard-url-link-bg: #32302f;
   --pinboard-url-link-fg: #fabd2f;
   --pinboard-link-hover: #d3869b;
-  --pinboard-link-visited: #83a598;
+  --pinboard-link-visited: #d3869b;
   --pinboard-focus-ring: #83a598;
   --pinboard-unread: #fb4934;
   --pinboard-btn-bg-hover: #d3869b;
@@ -8374,7 +8374,7 @@ h2 { color: #d3869b !important; }
   --pinboard-url-link-bg: #26233a;
   --pinboard-url-link-fg: #f6c177;
   --pinboard-link-hover: #ebbcba;
-  --pinboard-link-visited: #c4a7e7;
+  --pinboard-link-visited: #f6c177;
   --pinboard-focus-ring: #c4a7e7;
   --pinboard-unread: #eb6f92;
   --pinboard-btn-bg-hover: #ebbcba;
@@ -9062,7 +9062,7 @@ h2 { color: #ebbcba !important; }`
   --pinboard-url-link-bg: #fff8c5;
   --pinboard-url-link-fg: #bf8700;
   --pinboard-link-hover: #0550ae;
-  --pinboard-link-visited: #0969da;
+  --pinboard-link-visited: #8250df;
   --pinboard-focus-ring: #0969da;
   --pinboard-fg-strong: #1f2328;
   --pinboard-border-strong: #d0d7de;

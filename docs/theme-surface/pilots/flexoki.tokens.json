@@ -42,7 +42,7 @@
     "url-link-bg": "#F2F0E5",
     "url-link-fg": "#AD8301",
     "link-hover": "#4385BE",
-    "link-visited": "#205EA6",
+    "link-visited": "#AD5097",
     "focus-ring": "#205EA6",
     "unread": "#AF3029"
   },
@@ -111,7 +111,7 @@
         "url-link-bg": "#343331",
         "url-link-fg": "#D0A215",
         "link-hover": "#5DA0D0",
-        "link-visited": "#4385BE",
+        "link-visited": "#CE5D97",
         "focus-ring": "#4385BE",
         "unread": "#D14D41"
       }

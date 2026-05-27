@@ -42,7 +42,7 @@
     "url-link-bg": "#0d1a0d",
     "url-link-fg": "#cccc00",
     "link-hover": "#66ff66",
-    "link-visited": "#33ff33",
+    "link-visited": "#aaaa33",
     "focus-ring": "#33ff33",
     "unread": "#ff3333"
   },

@@ -41,7 +41,7 @@
     "url-link-bg": "#313244",
     "url-link-fg": "#f9e2af",
     "link-hover": "#cba6f7",
-    "link-visited": "#89b4fa",
+    "link-visited": "#cba6f7",
     "focus-ring": "#89b4fa",
     "unread": "#f38ba8"
   },
