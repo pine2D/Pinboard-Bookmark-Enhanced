@@ -994,4 +994,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   pbpMark("options-settings-filled");
   pbpMeasure("options-settings-filled", "options-t0", "options-settings-filled");
+
+  // B5: Write high-frequency UI fields mirror for next options open.
+  // Never stores API keys or tokens — only boolean "loggedIn" and visible UI state.
+  try {
+    const mirror = {
+      ts: Date.now(),
+      loggedIn: !!(s.pinboardToken),
+      aiProvider: s.aiProvider || "gemini",
+      notify: {
+        "notify-quick-save": s.notifyQuickSave !== false,
+        "notify-read-later": s.notifyReadLater !== false,
+        "notify-tab-set": s.notifyTabSet !== false,
+        "notify-batch-save": s.notifyBatchSave !== false,
+        "notify-errors": s.notifyErrors !== false,
+      }
+    };
+    localStorage.setItem("pp-options-fields", JSON.stringify(mirror));
+  } catch (_) {}
 });
