@@ -2,6 +2,18 @@
 // Pinboard Bookmark Enhanced - Popup (v2.3)
 // ============================================================
 
+// Perf: capture FCP for popup-t0 → popup-fcp measure
+try {
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries()) {
+      if (e.name === "first-contentful-paint") {
+        performance.mark("pbp:popup-fcp");
+        pbpMeasure("popup-fcp", "popup-t0", "popup-fcp");
+      }
+    }
+  }).observe({ type: "paint", buffered: true });
+} catch (_) {}
+
 // Override pinboardFetch to route through background service worker.
 // This prevents Chrome's native credentials dialog when Pinboard returns 401.
 // (function declarations on window are writable, so reassignment works)
@@ -198,6 +210,8 @@ async function showMain(token) {
     $id("url-input").value = tab.url || "";
     $id("title-input").value = tab.title || "";
   }
+  pbpMark("popup-form-ready");
+  pbpMeasure("popup-form-ready", "popup-t0", "popup-form-ready");
   if (!tab) {
     pageInfo = { url: "", title: "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
   } else {
@@ -566,6 +580,8 @@ async function checkExistingBookmark(token, url) {
       }
     }
   } catch (e) { console.error("user info banner error:", e); }
+  pbpMark("popup-status-ready");
+  pbpMeasure("popup-status-ready", "popup-t0", "popup-status-ready");
 }
 
 // ===================== Submit / Delete =====================
