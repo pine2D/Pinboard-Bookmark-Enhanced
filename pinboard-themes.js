@@ -248,7 +248,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -973,7 +973,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -1659,7 +1659,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -2383,7 +2383,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -3118,7 +3118,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -3830,7 +3830,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -4443,7 +4443,7 @@ html.pbp-dark .bookmark {
 }
 html.pbp-dark .bookmark { transition: box-shadow 0.2s ease !important; }
 html.pbp-dark .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-html.pbp-dark .star, html.pbp-dark .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+html.pbp-dark .star, html.pbp-dark .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 html.pbp-dark .star { color: var(--pinboard-border) !important; }
 html.pbp-dark .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -5187,7 +5187,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -5852,7 +5852,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -6529,7 +6529,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -7209,7 +7209,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -7902,7 +7902,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -8584,7 +8584,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
@@ -9275,7 +9275,7 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: var(--pinboard-border) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
