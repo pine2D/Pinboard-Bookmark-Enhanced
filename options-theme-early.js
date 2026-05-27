@@ -1,3 +1,4 @@
+pbpMark("options-t0");
 // Apply theme early to prevent flash (MV3 requires external script, no inline)
 // shared.js not yet loaded here — inline storage selector
 chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {

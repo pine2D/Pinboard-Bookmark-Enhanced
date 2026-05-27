@@ -1,6 +1,20 @@
+// Perf: capture FCP for options-t0 → options-fcp measure
+try {
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries()) {
+      if (e.name === "first-contentful-paint") {
+        performance.mark("pbp:options-fcp");
+        pbpMeasure("options-fcp", "options-t0", "options-fcp");
+      }
+    }
+  }).observe({ type: "paint", buffered: true });
+} catch (_) {}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await initI18n();
   applyI18n();
+  pbpMark("options-first-panel-painted");
+  pbpMeasure("options-first-panel-painted", "options-t0", "options-first-panel-painted");
   // Fade in after i18n applied (prevents flash of untranslated/unstyled content)
   document.body.style.transition = "opacity 0.18s";
   document.body.style.opacity = "1";
@@ -980,4 +994,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     e.preventDefault();
     chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
   });
+
+  pbpMark("options-settings-filled");
+  pbpMeasure("options-settings-filled", "options-t0", "options-settings-filled");
 });
