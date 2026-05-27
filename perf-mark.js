@@ -35,9 +35,14 @@ function pbpMeasure(name, fromMark, toMark) {
         : "sw"
     });
     if (_pbpBuf.length > _PBP_BUF_CAP) _pbpBuf.shift();
-  } catch (_) {}
+  } catch (e) {
+    if (_pbpEnabled) console.debug(`pbpMeasure(${name}) failed:`, e?.message || e);
+  }
 }
 
+// NOTE: get+set is not atomic. Concurrent flushes from multiple contexts
+// (e.g., SW + popup at the same time) can lose samples to the read-modify-write
+// window. Phase 0 sampling drives a single context per run, so this is acceptable.
 async function pbpFlush() {
   if (!_pbpBuf.length) return;
   if (!(await _pbpEnsureEnabled())) { _pbpBuf.length = 0; return; }
@@ -69,8 +74,8 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
 
 // Content-script T0: mark when perf-mark.js finishes loading on a non-extension page.
 // This sidesteps modifying pinboard-themes.js (handedit-audit lint forbids non-composer
-// lines there). perf-mark.js is listed first in manifest.content_scripts.js, so this
-// mark fires immediately before pinboard-themes.js starts parsing.
+// lines there). Phase 0 Task 5 wires perf-mark.js as the first content_scripts.js
+// entry, so this mark fires immediately before pinboard-themes.js starts parsing.
 if (typeof location !== "undefined" && location.protocol !== "chrome-extension:") {
   pbpMark("ct-t0");
 }
