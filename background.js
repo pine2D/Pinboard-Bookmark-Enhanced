@@ -391,12 +391,30 @@ function resolvePrefixSettings(s, prefix) {
   };
 }
 
+// B4: write current tab data to session storage for popup mirror prefill (Phase 1)
+async function _writeCurrentTabMirror(tabId, url, title) {
+  if (!url || !url.startsWith("http")) {
+    try { await chrome.storage.session.remove("_currentTab"); } catch (_) {}
+    return;
+  }
+  const cached = statusCache.get(url);
+  const posts = (cached && Date.now() - cached.timestamp < CACHE_TTL) ? (cached.posts || null) : null;
+  try {
+    await chrome.storage.session.set({
+      _currentTab: { tabId, url, title: title || "", posts, ts: Date.now() }
+    });
+  } catch (_) {}
+}
+
 // ---- 标签页激活/更新时刷新图标 (P3: debounced + deduped) ----
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   _scheduleTabCheck(tabId, async () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === tabId && tab.url) await debouncedCheck(tabId, tab.url);
+      if (tab?.id === tabId && tab.url) {
+        await debouncedCheck(tabId, tab.url);
+        await _writeCurrentTabMirror(tabId, tab.url, tab.title);
+      }
     } catch (_) {
       // Tab closed/replaced between event and query — expected race, skip
     }
@@ -407,6 +425,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url && tab.url.startsWith("http")) {
     _scheduleTabCheck(tabId, () => {
       debouncedCheck(tabId, tab.url).catch(() => {});
+      _writeCurrentTabMirror(tabId, tab.url, tab.title).catch(() => {});
     }, 150);
   }
 });

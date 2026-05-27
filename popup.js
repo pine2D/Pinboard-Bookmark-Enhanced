@@ -85,6 +85,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   initI18n();
   applyI18n();
 
+  // B4: validate tab-data mirror against chrome.storage.session._currentTab
+  // (set by SW on tab change). If mismatched (tabId or ts > 60s), clear prefill.
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const sess = await chrome.storage.session.get("_currentTab");
+    const _currentTab = sess._currentTab;
+    const mirrorFresh = _currentTab && _currentTab.ts && (Date.now() - _currentTab.ts < 60000);
+    if (!mirrorFresh || !activeTab || _currentTab?.tabId !== activeTab.id) {
+      const u = document.getElementById("url-input");
+      const ti = document.getElementById("title-input");
+      const banner = document.getElementById("existing-banner");
+      if (u && !document.activeElement?.isSameNode(u)) u.value = "";
+      if (ti && !document.activeElement?.isSameNode(ti)) ti.value = "";
+      if (banner && banner.dataset.mirror === "1") {
+        banner.classList.add("hidden");
+        delete banner.dataset.mirror;
+      }
+    }
+  } catch (_) {}
+
   settings = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
   deobfuscateSettings(settings);
 
@@ -580,6 +600,22 @@ async function checkExistingBookmark(token, url) {
       }
     }
   } catch (e) { console.error("user info banner error:", e); }
+  // B4: Write tab mirror for next popup boot.
+  // Stores public-on-pinboard data (url/title/tags) only — no tokens or keys.
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (activeTab && activeTab.url) {
+      const banner = document.getElementById("existing-banner");
+      const mirror = {
+        tabId: activeTab.id,
+        url: $id("url-input").value || activeTab.url,
+        title: $id("title-input").value || activeTab.title || "",
+        bannerText: (banner && !banner.classList.contains("hidden")) ? (banner.textContent || "") : "",
+        ts: Date.now()
+      };
+      localStorage.setItem("pp-last-tab", JSON.stringify(mirror));
+    }
+  } catch (_) {}
   pbpMark("popup-status-ready");
   pbpMeasure("popup-status-ready", "popup-t0", "popup-status-ready");
 }

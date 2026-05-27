@@ -36,6 +36,33 @@ const PBP_POPUP_ADAPTIVE_MAP = {
   }
 })();
 
+// B4: tab data prefill — populate url-input / title-input / existing-banner
+//     synchronously from the last-known tab. popup.js will validate against
+//     chrome.storage.session asynchronously and clear stale prefill if mismatched.
+(function applyTabMirror() {
+  const _TAB_MIRROR_TTL_MS = 10 * 60 * 1000;
+  try {
+    const raw = localStorage.getItem("pp-last-tab");
+    if (!raw) return;
+    const m = JSON.parse(raw);
+    if (!m || !m.ts || (Date.now() - m.ts) >= _TAB_MIRROR_TTL_MS || !m.url) return;
+    document.addEventListener("DOMContentLoaded", () => {
+      const u = document.getElementById("url-input");
+      const ti = document.getElementById("title-input");
+      if (u && !u.value) u.value = m.url;
+      if (ti && !ti.value) ti.value = m.title || "";
+      if (m.bannerText) {
+        const banner = document.getElementById("existing-banner");
+        if (banner) {
+          banner.textContent = m.bannerText;
+          banner.classList.remove("hidden");
+          banner.dataset.mirror = "1";
+        }
+      }
+    }, { once: true });
+  } catch (_) {}
+})();
+
 // Async source-of-truth read — corrects mirror if stale, populates on first run.
 chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {
   return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
