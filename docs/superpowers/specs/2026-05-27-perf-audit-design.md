@@ -340,11 +340,81 @@ pbpFlush()                           // 写入 chrome.storage.local._perfSamples
 
 ---
 
-## 附录 A：埋点字段定义
+## 附录 A：基线数据（Phase 0 采样结果）
 
-（待 Phase 0 实施时落地，本 spec 仅列接口）
+### A.1 采样元数据
 
-## 附录 B：手测清单
+- **采样日期**: 2026-05-27
+- **采样脚本**: `scripts/perf-sample.mjs`（commit `691b8fa` + `ede5374`）
+- **环境**: 开发机 / chrome-dbg :9222 / Chrome 148 / 在线 / 当前账户（已登录 pinboard.in）/ 无 CPU throttle
+- **样本数**: warm scenarios N=5（每场景 prime 2 次 + 测 5 次取中位）；pinboard-inject N=10
+- **基线文件**: `perf-baseline.json`（commit `9ef33dc`）
+
+### A.2 测得 measures
+
+| 入口 | measure | p50 (ms) | p90 (ms) | max (ms) | n | 备注 |
+|------|---------|---------|---------|---------|---|------|
+| popup-warm | popup-form-ready | 62.8 | 69.3 | 69.3 | 5 | 用户首次能看到完整表单的时刻；稳定 |
+| popup-warm | popup-fcp | 453.7 | 977.9 | 977.9 | 3 | FCP backfill 不稳定；高方差 |
+| options-warm | options-first-panel-painted | 61.1 | 92.1 | 92.1 | 5 | applyI18n() 完成时 |
+| options-warm | options-settings-filled | 92.3 | 106.3 | 106.3 | 5 | DOMContentLoaded handler 末尾 |
+| options-warm | options-fcp | 1330.1 | — | — | 1 | **最痛入口**；与 spec 预测一致 |
+| pinboard-inject | ct-inject | 26.5 | 31.7 | 31.7 | 10 | pbp-injected style 挂载完成 |
+| pinboard-inject | ct-uncloak | 26.8 | 32.0 | 32.0 | 10 | pbp-cloak 移除完成 |
+
+### A.3 关键洞察（影响后续 Phase 取舍）
+
+1. **`options-fcp ≈ 1330ms` 是单一最大瓶颈** — 触发原因：8 个 script 没 defer + 588KB `pinboard-themes.js` 同步加载阻塞 HTML 解析。Phase 1（Group B 的 C1 defer）+ Phase 3（C2 拆 themes 出 options）应当可分阶段攻克。预估收益：Phase 1 之后 < 800ms，Phase 3 之后 < 400ms。
+
+2. **`ct-inject` 仅 ~25ms** — 远低于 spec 预测 200-500ms。588KB 主题表 parse 在 V8 上比预想快得多（字符串字面量优化 + JIT cache）。
+   - **重大决策**：**C3（拆主题表 + thin loader）的预期收益从 200-500ms 下调到 5-25ms**。
+   - **ROI 档次从「高」降到「低/中」**。Phase 3 实施前应重新评估是否值得 — 工作量大、风险高（主题闪烁），但实际节省可能只有 ~20ms。
+   - **建议**：把 C3 拆主题表挪到 Phase 0.5 follow-up 或 Phase 4 末尾，Phase 3 改聚焦 C2（options 懒加载 themes，可吞掉大部分收益）+ C4（SW module worker）。
+
+3. **`popup-form-ready ≈ 63ms`** — 暖启动很快。冷启动数据缺失，无法判断 P1/P2 mirror 预填的真实收益是否值得。
+
+4. **`popup-status-ready` 未测得** — 在 Playwright newPage 上下文里 `showMain` 函数在中途某处早退（很可能 `getPageInfoFromTab(tab.id)` 在扩展页面 tab 上 throw 后 catch 吃掉）。**P2 测量（existing-banner 解决时刻）的当前实现路径在 CDP 自动化下不可观测**，需要移到更可靠的位置（如 banner DOM mutation observer 触发的 mark）。
+
+5. **`popup-fcp` 方差大** — n=3, stddev 253ms。`PerformanceObserver` 的 `buffered: true` 在 Playwright newPage 上下文里不一致。Phase 1+ 验收对这一指标只看 p90 上限。
+
+### A.4 未测得的 measures（Phase 0 范围内本应捕获，但因技术或环境限制缺失）
+
+| measure | 原因 | 补救路径 |
+|---------|------|---------|
+| popup-cold / options-cold 全部 | `chrome.runtime.reload()` 触发 ERR_BLOCKED_BY_CLIENT 中断后续 navigation | Phase 0.5 follow-up：要么手动 reload + 单次跑，要么用 chrome.management API 切换 enabled 状态 |
+| popup-status-ready | showMain 在自动化上下文早退 | 移埋点位置或加 MutationObserver |
+| sw-wakeup | 需要 SW 显式重启 | 手动 chrome://serviceworker-internals/ 停止 SW，再触发任意事件 |
+| batch-first-write / batch-last-write | 需要真实点击 batch 按钮 + 真实写入 | 手动跑 + 读 storage._perfSamples |
+| ai-summary-e2e / ai-tags-e2e | 需要真实 AI 调用 | 同上 |
+
+这些 measures 的埋点代码本身已落地，运行时数据捕获留给手测。Phase 1+ 验收时按需补齐对应 baseline 数。
+
+### A.5 spec 修订意向（基于本节洞察）
+
+需要在 Phase 1 之前确认是否更新 spec 主体：
+
+- **C3 ROI 重新分档**：从「高」降到「低/中」。
+- **P1/P2 mirror 收益不确定**：冷启动数据缺失，无法验证预填的真实价值。建议 Phase 1 完成后用其改善的指标反推。
+- **Phase 实施顺序可能调整**：spec 原本是 Group B → C → A → D，但根据基线数据，A 中的 C2（options themes 懒加载）可能比 A 中的 C3（拆主题表）更划算，应优先做。
+
+具体修订留到 Phase 1 plan 撰写时统一处理。
+
+## 附录 B：埋点字段定义
+
+样本 schema（写入 `chrome.storage.local._perfSamples` 数组）：
+
+```typescript
+{
+  name: string;     // measure name, e.g. "popup-fcp", "ct-inject"
+  ms: number;       // duration in milliseconds, rounded to 2 decimals
+  ts: number;       // Date.now() when measure was emitted
+  ctx: string;      // "popup.html" / "options.html" / "sw" / pinboard URL末段
+}
+```
+
+Buffer caps: 200 in-memory per context, 2000 in storage. Storage trim drops oldest (FIFO).
+
+## 附录 C：手测清单
 
 每个 commit release 前手测：
 
@@ -356,9 +426,10 @@ pbpFlush()                           // 写入 chrome.storage.local._perfSamples
 6. AI tags / summary（gemini + ollama 各一次）
 7. SW 唤醒（关 chrome 5 分钟 → 重开 → 切 tab → 验图标）
 
-## 附录 C：决策记录
+## 附录 D：决策记录
 
 - **2026-05-27 用户确认范围**：全栈普查 + 全部实测 + 接受拆大文件/重排 manifest/SW 重构
 - **2026-05-27 用户确认实施集**：高 ROI 5 项 + 中 ROI 10 项 = 共 15 项
 - **2026-05-27 用户确认 C4**：接受 SW module worker 改动
 - **2026-05-27 用户委托判断**：B4 mirror 陈旧 → 骨架兜底；A3 shared 分裂 → 接受；D2 大账户 → 阈值回落
+- **2026-05-27 Phase 0 完成**：埋点 + warm baseline 落地，cold-start 延后至 Phase 0.5；C3 ROI 因 ct-inject 实测仅 25ms 需重新评估
