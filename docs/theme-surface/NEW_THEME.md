@@ -257,6 +257,64 @@ The four pages most worth checking by eye:
 - `settings` — heavyweight forms, `.settings_heading`
 - `tweets` — right_bar-heavy layout, sort tables
 
+### Automated cross-theme screenshot (`screenshot-themes.mjs`)
+
+For a quick per-theme regression sweep — especially useful after touching
+a `_patterns.mjs` rule that affects multiple themes — drive your live Chrome
+via CDP and screenshot every theme on the same page in one go.
+
+**Prereqs** (one-time):
+
+```bash
+# 1. Install playwright into the qa-scan workspace
+cd .qa-scan && npm install && cd -
+
+# 2. Launch Chrome with remote debugging on port 9222
+#    (close all existing Chrome windows first; Chrome only opens the debug
+#     port for a fresh launch)
+google-chrome --remote-debugging-port=9222 \
+              --user-data-dir="$HOME/.chrome-debug-profile" &
+
+# 3. In that Chrome: install the unpacked extension, log into Pinboard,
+#    leave a tag-detail tab open (e.g. https://pinboard.in/u:you/t:some-tag/).
+#    Tag-detail pages exercise tag cloud + bookmark rows + "by" meta lines.
+```
+
+**Run** (every time you want a sweep):
+
+```bash
+# Default: all 13 themes, viewport-only, screenshots to .qa-scan/visual-qa-YYYY-MM-DD/
+node docs/theme-surface/tools/screenshot-themes.mjs
+
+# Subset of themes
+node docs/theme-surface/tools/screenshot-themes.mjs --only flexoki,paper-ink
+
+# Custom output dir or port
+node docs/theme-surface/tools/screenshot-themes.mjs --port 9222 --out /tmp/qa
+```
+
+The driver:
+- Auto-discovers themes from `pilots/*.tokens.json`
+- Reads each theme's `pilots/<slug>.generated.css` (errors if missing — run
+  `sync-all` first)
+- Saves your current `<style id="pbp-injected">` content on entry and
+  **restores it on exit**, so your extension's actual theme state is
+  preserved when the run finishes
+- Logs each theme's extracted `--pinboard-accent` value as a sanity check
+- Exits non-zero if any theme failed to inject or screenshot
+
+Review the resulting `.qa-scan/visual-qa-YYYY-MM-DD/*.png` for: tag cloud
+readability, selected-tag distinguishability, hover affordance, the `by`
+meta line not being stark white, `⊕/⊖` button sizing, star alignment with
+title's first line. The 8-round QA chain on the tag-style refactor surfaced
+all of these as classes of bugs that lints can't catch but eye-balling
+catches immediately.
+
+This is **complementary** to `visual-qa.mjs` (the static HTML harness
+generator): screenshot-themes runs against your real Pinboard session DOM;
+visual-qa.mjs builds standalone HTML files from saved snapshots that you
+open in any browser. Use whichever fits the situation.
+
 ---
 
 ## 9 · Submitting
