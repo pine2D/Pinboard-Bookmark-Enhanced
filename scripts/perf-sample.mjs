@@ -55,22 +55,37 @@ console.log(`[perf-sample] connecting to chrome :${PORT}`);
 const browser = await chromium.connectOverCDP(`http://localhost:${PORT}`);
 const ctx = browser.contexts()[0];
 
-// Find extension ID
-const swTargets = await browser.newBrowserCDPSession().then(s =>
-  s.send('Target.getTargets')
-).catch(() => ({ targetInfos: [] }));
-const swInfo = swTargets.targetInfos?.find(t =>
-  t.type === 'service_worker' &&
-  t.url.includes('chrome-extension://') &&
-  t.url.endsWith('/background.js')
-);
-if (!swInfo) {
-  console.error('[perf-sample] could not find extension service worker. Is the extension loaded?');
+// Detect Pinboard extension by ANY target type pointing to our resource paths.
+// MV3 service workers evict after ~30s idle, so SW-only lookup is fragile;
+// accepting page/background_page targets too lets us find the ID even when
+// SW is dormant. Excludes known other-extension paths to avoid grabbing
+// claude-mem (service-worker-loader.js / offscreen.html).
+const PINBOARD_PATTERNS = ['/background.js', '/popup.html', '/options.html'];
+const isPinboardTarget = (url) => {
+  if (!url.startsWith('chrome-extension://')) return false;
+  if (url.includes('/service-worker-loader.js')) return false;
+  if (url.includes('/offscreen.html')) return false;
+  return PINBOARD_PATTERNS.some(p => url.endsWith(p));
+};
+
+const cdpSession = await browser.newBrowserCDPSession();
+let extTarget = null;
+for (let attempt = 0; attempt < 5 && !extTarget; attempt++) {
+  if (attempt > 0) await new Promise(r => setTimeout(r, 1500));
+  const result = await cdpSession.send('Target.getTargets').catch(() => ({ targetInfos: [] }));
+  extTarget = result.targetInfos?.find(t => isPinboardTarget(t.url));
+}
+
+if (!extTarget) {
+  console.error('[perf-sample] could not find Pinboard extension. Either:');
+  console.error('  - the extension is not loaded in this chrome-dbg, or');
+  console.error('  - its service worker is dormant and no extension pages are open.');
+  console.error('  Click the extension toolbar icon once to wake it, then re-run.');
   await browser.close();
   process.exit(2);
 }
-const EXT_ID = new URL(swInfo.url).hostname;
-console.log(`[perf-sample] extension id: ${EXT_ID}`);
+const EXT_ID = new URL(extTarget.url).hostname;
+console.log(`[perf-sample] extension id: ${EXT_ID} (found via ${extTarget.type})`);
 
 // Helper: read/write chrome.storage.local from any extension context.
 // We open the extension's popup.html in a fresh tab as a sandbox.
