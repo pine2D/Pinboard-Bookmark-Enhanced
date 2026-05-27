@@ -61,6 +61,7 @@
         "https://*.pinboard.in/*"
       ],
       "js": [
+        "perf-mark.js",
         "pinboard-themes.js",
         "pinboard-style.js"
       ],
