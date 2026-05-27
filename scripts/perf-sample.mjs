@@ -15,7 +15,7 @@
 //   node scripts/perf-sample.mjs --only popup-cold,options-cold
 
 import { createRequire } from 'node:module';
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -71,14 +71,6 @@ if (!swInfo) {
 }
 const EXT_ID = new URL(swInfo.url).hostname;
 console.log(`[perf-sample] extension id: ${EXT_ID}`);
-
-// Use an existing pinboard tab (or any tab) to talk to chrome.storage
-const anyTab = ctx.pages().find(p => p.url().startsWith('http')) || ctx.pages()[0];
-if (!anyTab) {
-  console.error('[perf-sample] no open tabs available');
-  await browser.close();
-  process.exit(2);
-}
 
 // Helper: read/write chrome.storage.local from any extension context.
 // We open the extension's popup.html in a fresh tab as a sandbox.
@@ -140,7 +132,7 @@ async function runPopupOpen(times) {
     await p.goto(`chrome-extension://${EXT_ID}/popup.html`);
     await p.waitForLoadState('networkidle').catch(() => {});
     await new Promise(r => setTimeout(r, 800));
-    await p.evaluate(() => pbpFlush().catch(() => {})).catch(() => {});
+    await p.evaluate(() => { if (typeof pbpFlush === "function") return pbpFlush().catch(() => {}); }).catch(() => {});
     await new Promise(r => setTimeout(r, 200));
     await p.close();
     await new Promise(r => setTimeout(r, 200));
@@ -153,7 +145,7 @@ async function runOptionsOpen(times) {
     await p.goto(`chrome-extension://${EXT_ID}/options.html`);
     await p.waitForLoadState('networkidle').catch(() => {});
     await new Promise(r => setTimeout(r, 800));
-    await p.evaluate(() => pbpFlush().catch(() => {})).catch(() => {});
+    await p.evaluate(() => { if (typeof pbpFlush === "function") return pbpFlush().catch(() => {}); }).catch(() => {});
     await new Promise(r => setTimeout(r, 200));
     await p.close();
     await new Promise(r => setTimeout(r, 200));
