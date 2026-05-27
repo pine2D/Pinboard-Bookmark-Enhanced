@@ -27,7 +27,6 @@
 | `options.js` | 修改 | DOMContentLoaded + settings-filled mark |
 | `background.js` | 修改 | importScripts 增加 perf-mark.js；SW wakeup T0/T1 marks |
 | `pinboard-style.js` | 修改 | content_script T1（pbp-injected mounted）+ T2（uncloak） marks |
-| `pinboard-themes.js` | 修改 | 顶部 1 行 mark 作为 content_script T0 |
 | `popup-batch.js` | 修改 | batch button click + first/last write marks |
 | `popup-ai.js` | 修改 | AI 端到端 marks |
 
@@ -158,6 +157,14 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes._perfEnabled) _pbpEnabled = null;
   });
+}
+
+// Content-script T0: mark when perf-mark.js finishes loading on a non-extension page.
+// This sidesteps modifying pinboard-themes.js (handedit-audit lint forbids non-composer
+// lines there). perf-mark.js is listed first in manifest.content_scripts.js, so this
+// mark fires immediately before pinboard-themes.js starts parsing.
+if (typeof location !== "undefined" && location.protocol !== "chrome-extension:") {
+  pbpMark("ct-t0");
 }
 ```
 
@@ -469,17 +476,18 @@ git commit -m "feat(perf): instrument service worker wakeup with T0/T1 marks"
 
 **Files:**
 - Modify: `manifest.json`
-- Modify: `pinboard-themes.js` (顶部第 1 行)
 - Modify: `pinboard-style.js`
+
+> **不修改 `pinboard-themes.js`** — handedit-audit lint 禁止该文件出现非 composer 产出行。T0 由 perf-mark.js 底部的 content_script 分支自动标记（Task 1 已包含）。
 
 - [ ] **Step 1: 定义期望行为**
 
 ```
-- T0: pinboard-themes.js 第 1 行（content_script 整组第一个 parse 的脚本）
+- T0: perf-mark.js 末尾在 content_script 上下文条件标记（已在 Task 1 内置）
 - T1: pbp-injected style 元素 appendChild 完成那一行
 - T2: pbp-cloak 移除那一行
 - pbpFlush 在 T2 之后立即调用
-- 期望 ctx="" 或类似 pinboard.in URL 路径（content_script 在页面上下文里跑）
+- 期望 ctx 为 pinboard.in URL 路径末段（content_script 在页面上下文里跑）
 ```
 
 - [ ] **Step 2: 修改 `manifest.json` content_scripts**
@@ -519,15 +527,7 @@ git commit -m "feat(perf): instrument service worker wakeup with T0/T1 marks"
 ],
 ```
 
-- [ ] **Step 3: 修改 `pinboard-themes.js` 第 1 行**
-
-在文件顶部第一行（在 `// ====` 注释之前）插入：
-
-```javascript
-pbpMark("ct-t0");
-```
-
-- [ ] **Step 4: 修改 `pinboard-style.js`**
+- [ ] **Step 3: 修改 `pinboard-style.js`**
 
 在文件末尾的 IIFE 内部，找到 `style.id = "pbp-injected"; style.textContent = combined; (document.head || document.documentElement).appendChild(style);` 这一段（约 105-110 行）。
 
@@ -546,7 +546,7 @@ pbpMark("ct-t0");
   pbpFlush().catch(() => {});
 ```
 
-- [ ] **Step 5: 手动验证**
+- [ ] **Step 4: 手动验证**
 
 ```javascript
 // 1. 任意上下文 console:
@@ -559,15 +559,15 @@ await chrome.storage.local.get("_perfSamples").then(r =>
 );
 ```
 
-- [ ] **Step 6: 验证输出**
+- [ ] **Step 5: 验证输出**
 
 Expected: 2 条样本 — `ct-inject` 和 `ct-uncloak`，ctx 为 pinboard 页面 URL 末段。`ct-inject` ms 通常 50-300ms（含 588KB pinboard-themes.js parse 时间），`ct-uncloak` ms 略大于 `ct-inject`。
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add manifest.json pinboard-themes.js pinboard-style.js
-git commit -m "feat(perf): instrument pinboard.in content_script inject path with T0/T1/T2 marks"
+git add manifest.json pinboard-style.js
+git commit -m "feat(perf): instrument pinboard.in content_script inject path with T1/T2 marks"
 ```
 
 ---
