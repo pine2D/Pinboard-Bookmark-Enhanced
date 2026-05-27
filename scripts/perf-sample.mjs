@@ -13,6 +13,7 @@
 //   node scripts/perf-sample.mjs
 //   node scripts/perf-sample.mjs --port 9222 --out ./perf-baseline.json --runs 10
 //   node scripts/perf-sample.mjs --only popup-cold,options-cold
+//   node scripts/perf-sample.mjs --ext-id aghcegglioapkbgjmbgkmkiiijccoiln  # bypass auto-detect
 
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
@@ -43,6 +44,7 @@ const PORT = flag('--port', '9222');
 const OUT = flag('--out', resolve(REPO, 'perf-baseline.json'));
 const RUNS = parseInt(flag('--runs', '10'), 10);
 const ONLY = flag('--only', null);
+const EXT_ID_OVERRIDE = flag('--ext-id', null);
 const WARM_RUNS = 5;
 
 const SCENARIOS = ['popup-cold', 'popup-warm', 'options-cold', 'options-warm', 'pinboard-inject'];
@@ -68,24 +70,32 @@ const isPinboardTarget = (url) => {
   return PINBOARD_PATTERNS.some(p => url.endsWith(p));
 };
 
-const cdpSession = await browser.newBrowserCDPSession();
-let extTarget = null;
-for (let attempt = 0; attempt < 5 && !extTarget; attempt++) {
-  if (attempt > 0) await new Promise(r => setTimeout(r, 1500));
-  const result = await cdpSession.send('Target.getTargets').catch(() => ({ targetInfos: [] }));
-  extTarget = result.targetInfos?.find(t => isPinboardTarget(t.url));
-}
+let EXT_ID;
+if (EXT_ID_OVERRIDE) {
+  EXT_ID = EXT_ID_OVERRIDE;
+  console.log(`[perf-sample] extension id: ${EXT_ID} (--ext-id override)`);
+} else {
+  const cdpSession = await browser.newBrowserCDPSession();
+  let extTarget = null;
+  for (let attempt = 0; attempt < 5 && !extTarget; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, 1500));
+    const result = await cdpSession.send('Target.getTargets').catch(() => ({ targetInfos: [] }));
+    extTarget = result.targetInfos?.find(t => isPinboardTarget(t.url));
+  }
 
-if (!extTarget) {
-  console.error('[perf-sample] could not find Pinboard extension. Either:');
-  console.error('  - the extension is not loaded in this chrome-dbg, or');
-  console.error('  - its service worker is dormant and no extension pages are open.');
-  console.error('  Click the extension toolbar icon once to wake it, then re-run.');
-  await browser.close();
-  process.exit(2);
+  if (!extTarget) {
+    console.error('[perf-sample] could not find Pinboard extension. Either:');
+    console.error('  - the extension is not loaded in this chrome-dbg, or');
+    console.error('  - its service worker is dormant and no extension pages are open.');
+    console.error('  Workarounds:');
+    console.error('    (a) Click the extension toolbar icon once to wake it, then re-run.');
+    console.error('    (b) Pass --ext-id <extension-id> to bypass auto-detection.');
+    await browser.close();
+    process.exit(2);
+  }
+  EXT_ID = new URL(extTarget.url).hostname;
+  console.log(`[perf-sample] extension id: ${EXT_ID} (found via ${extTarget.type})`);
 }
-const EXT_ID = new URL(extTarget.url).hostname;
-console.log(`[perf-sample] extension id: ${EXT_ID} (found via ${extTarget.type})`);
 
 // Helper: read/write chrome.storage.local from any extension context.
 // We open the extension's popup.html in a fresh tab as a sandbox.
