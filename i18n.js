@@ -3,36 +3,85 @@
 // ============================================================
 
 let _i18nMessages = null;
-let _i18nInitPromise = null;
+let _i18nReady = false;
 
 /**
- * Initialize i18n: if user has set a manual language, load that locale's
- * messages.json. Must be called (and awaited) before applyI18n().
- * Safe to call multiple times — subsequent calls return the same promise.
+ * Synchronously populate _i18nMessages from localStorage mirror (if user
+ * set manual language). Auto-mode users hit chrome.i18n.getMessage which
+ * is already synchronous, so no mirror is needed for them. Then kicks off
+ * an async refresh that updates the mirror and re-applies translations if
+ * data changed.
+ *
+ * Signature is callable as both sync (returns undefined) and via `await`
+ * (await on non-Promise resolves immediately) — preserves call sites in
+ * popup.js / options.js / background.js that do `await initI18n();`.
  */
-async function initI18n() {
-  if (_i18nInitPromise) return _i18nInitPromise;
-  _i18nInitPromise = (async () => {
-    try {
-      // getSettingsStorage is defined in shared.js; safe to call here since
-      // initI18n() is always invoked after all scripts are loaded
-      const _storage = typeof getSettingsStorage === "function"
-        ? await getSettingsStorage()
-        : chrome.storage.local;
-      const result = await _storage.get({ optLang: "auto" });
-      const lang = result.optLang;
-      if (lang && lang !== "auto") {
-        const url = chrome.runtime.getURL(`_locales/${lang}/messages.json`);
-        const resp = await fetch(url);
-        if (resp.ok) _i18nMessages = await resp.json();
+function initI18n() {
+  if (_i18nReady) {
+    _refreshI18nAsync().catch(() => {});
+    return;
+  }
+  // Sync mirror apply
+  try {
+    const lang = localStorage.getItem("pp-i18n-lang");
+    if (lang && lang !== "auto") {
+      const msgs = localStorage.getItem("pp-i18n-msgs");
+      if (msgs) {
+        try { _i18nMessages = JSON.parse(msgs); } catch (_) {}
       }
-    } catch (e) {
-      // Locale fetch failure is non-fatal — t() falls back to chrome.i18n's
-      // built-in key lookup. Log so it's visible during dev / on broken installs.
-      console.warn("[i18n] locale fetch failed, using chrome.i18n fallback:", e?.message || e);
     }
-  })();
-  return _i18nInitPromise;
+  } catch (_) {}
+  _i18nReady = true;
+  // Async refresh (fire-and-forget)
+  _refreshI18nAsync().catch(() => {});
+}
+
+/**
+ * Async refresh: read latest optLang from storage, fetch locale messages
+ * if needed, update localStorage mirror + _i18nMessages, re-apply
+ * translations if anything changed.
+ */
+async function _refreshI18nAsync() {
+  try {
+    const _storage = typeof getSettingsStorage === "function"
+      ? await getSettingsStorage()
+      : chrome.storage.local;
+    const { optLang = "auto" } = await _storage.get({ optLang: "auto" });
+
+    const prevLang = (typeof localStorage !== "undefined" ? localStorage.getItem("pp-i18n-lang") : null) || "auto";
+
+    if (optLang === "auto") {
+      try {
+        localStorage.setItem("pp-i18n-lang", "auto");
+        localStorage.removeItem("pp-i18n-msgs");
+      } catch (_) {}
+      const changed = _i18nMessages !== null;
+      if (changed) {
+        _i18nMessages = null;
+        if (typeof applyI18n === "function") applyI18n();
+      }
+      return;
+    }
+
+    // Manual language: fetch locale messages
+    const url = chrome.runtime.getURL(`_locales/${optLang}/messages.json`);
+    const resp = await fetch(url);
+    if (!resp.ok) return;
+    const msgs = await resp.json();
+
+    try {
+      localStorage.setItem("pp-i18n-lang", optLang);
+      localStorage.setItem("pp-i18n-msgs", JSON.stringify(msgs));
+    } catch (_) {
+      // localStorage may be full or unavailable (e.g. SW context); proceed without mirror
+    }
+
+    const changed = prevLang !== optLang || _i18nMessages === null;
+    _i18nMessages = msgs;
+    if (changed && typeof applyI18n === "function") applyI18n();
+  } catch (e) {
+    console.warn("[i18n] async refresh failed:", e?.message || e);
+  }
 }
 
 /**
@@ -57,8 +106,8 @@ function _resolveMsg(entry, args) {
 
 /**
  * Shorthand for chrome.i18n.getMessage with placeholder support.
- * When a manual language is loaded, uses that; otherwise falls back
- * to chrome.i18n.getMessage (browser locale).
+ * When a manual language is loaded (via mirror or async refresh), uses
+ * that; otherwise falls back to chrome.i18n.getMessage (browser locale).
  * Usage: t("key") or t("key", "arg1", "arg2")
  */
 function t(key, ...args) {
@@ -84,7 +133,6 @@ function applyI18n(root) {
   root = root || document;
 
   // P1.5: Merged 4 separate querySelectorAll passes into 1 DOM walk.
-  // Each element may have multiple i18n attributes — apply whichever are present.
   root.querySelectorAll("[data-i18n],[data-i18n-placeholder],[data-i18n-title],[data-i18n-aria]").forEach(el => {
     const k1 = el.getAttribute("data-i18n");
     if (k1) el.textContent = t(k1);
