@@ -11,7 +11,7 @@ try {
 } catch (_) {}
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await initI18n();
+  initI18n();
   applyI18n();
   pbpMark("options-first-panel-painted");
   pbpMeasure("options-first-panel-painted", "options-t0", "options-first-panel-painted");

@@ -82,7 +82,7 @@ function _renderCleanHint({ removedCount, original }) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await initI18n();
+  initI18n();
   applyI18n();
 
   settings = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
