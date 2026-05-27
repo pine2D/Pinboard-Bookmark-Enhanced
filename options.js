@@ -15,9 +15,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   applyI18n();
   pbpMark("options-first-panel-painted");
   pbpMeasure("options-first-panel-painted", "options-t0", "options-first-panel-painted");
-  // Fade in after i18n applied (prevents flash of untranslated/unstyled content)
-  document.body.style.transition = "opacity 0.18s";
-  document.body.style.opacity = "1";
 
   // ---- Tab switching ----
   document.querySelectorAll(".tab-btn").forEach((btn) => {
