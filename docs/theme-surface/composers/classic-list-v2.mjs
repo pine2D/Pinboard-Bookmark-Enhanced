@@ -122,7 +122,7 @@ a.bundle:hover { color: ${v("link-hover")} !important; }
   align-items: flex-start !important;
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
-.bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
+.bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: ${v("muted-soft")} !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
 .star { color: ${v("border")} !important; }
 .selected_star { color: ${v("private-accent")} !important; }
@@ -137,7 +137,7 @@ a.url_link {
   border-radius: ${v("radius-lg")} !important;
   font-size: ${sizeXs} !important;
 }
-.description { color: ${v("fg")} !important; opacity: 0.85 !important; line-height: ${v("line-height")} !important; }
+.bookmark .description { color: ${v("fg")} !important; opacity: 0.85 !important; line-height: ${v("line-height")} !important; }
 .description blockquote { color: ${v("muted")} !important; border-left: 3px solid ${v("accent-alpha")} !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
