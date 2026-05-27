@@ -10,6 +10,11 @@ on:
   pull_request_review:
     types: [submitted]
 
+env:
+  # Opt into Node.js 24 for JS-based actions now (GitHub will force this in June 2026,
+  # remove Node 20 entirely in Sept 2026). Silences deprecation warnings on @v4 actions.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   claude:
     if: |
