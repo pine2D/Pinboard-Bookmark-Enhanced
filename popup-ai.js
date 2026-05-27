@@ -188,7 +188,11 @@ function setupAIFeatures() {
 
   $id("ai-summary-btn").addEventListener("click", async (e) => {
     e.preventDefault();
+    pbpMark("ai-summary-t0");
     await doAISummary(false);
+    pbpMark("ai-summary-rendered");
+    pbpMeasure("ai-summary-e2e", "ai-summary-t0", "ai-summary-rendered");
+    pbpFlush().catch(() => {});
   });
 
   // Auto-restore cached summary if description doesn't already contain one
@@ -203,7 +207,11 @@ function setupAIFeatures() {
 
   $id("ai-tags-btn").addEventListener("click", async (e) => {
     e.preventDefault();
+    pbpMark("ai-tags-t0");
     await doAITags(false);
+    pbpMark("ai-tags-rendered");
+    pbpMeasure("ai-tags-e2e", "ai-tags-t0", "ai-tags-rendered");
+    pbpFlush().catch(() => {});
   });
 }
 
