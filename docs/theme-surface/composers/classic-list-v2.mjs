@@ -123,7 +123,7 @@ a.bundle:hover { color: ${v("link-hover")} !important; }
 }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; }
-.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; }
+.star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -2px !important; }
 .star { color: ${v("border")} !important; }
 .selected_star { color: ${v("private-accent")} !important; }
 
