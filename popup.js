@@ -232,10 +232,19 @@ async function showMain(token) {
   }
   pbpMark("popup-form-ready");
   pbpMeasure("popup-form-ready", "popup-t0", "popup-form-ready");
+  // Kick off page-info extraction AND the bookmark cache lookup in parallel — both depend
+  // only on `tab` (already obtained). Awaiting them sequentially wastes overlap potential.
+  // Bookmark prefetch is keyed on tab.url (best-effort); if pageInfo later resolves to a
+  // different URL, checkExistingBookmark falls back to a fresh fetch.
+  const _pageInfoPromise = tab ? getPageInfoFromTab(tab.id) : Promise.resolve(null);
+  const _bookmarkPrefetchUrl = tab?.url || "";
+  const _bookmarkPrefetchPromise = _bookmarkPrefetchUrl
+    ? chrome.runtime.sendMessage({ type: "get_bookmark_data", url: _bookmarkPrefetchUrl }).catch(() => null)
+    : Promise.resolve(null);
   if (!tab) {
     pageInfo = { url: "", title: "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
   } else {
-    pageInfo = (await getPageInfoFromTab(tab.id)) || {
+    pageInfo = (await _pageInfoPromise) || {
       url: tab.url || "", title: tab.title || "", selectedText: "", metaDescription: "", referrer: "", pageText: ""
     };
   }
@@ -541,8 +550,13 @@ async function htmlToMarkdown(html) {
     $id("suggest-row").classList.remove("hidden");
     fetchPinboardSuggestTags(token, pageInfo.url);
   }
-  // Bookmark check — non-blocking, updates UI when ready
-  checkExistingBookmark(token, pageInfo.url);
+  // Bookmark check — non-blocking, updates UI when ready.
+  // Pass the prefetched cache promise (started right after popup-form-ready) so the
+  // service-worker round-trip overlaps with getPageInfoFromTab instead of running after it.
+  checkExistingBookmark(token, pageInfo.url, {
+    prefetchUrl: _bookmarkPrefetchUrl,
+    prefetchPromise: _bookmarkPrefetchPromise,
+  });
   // Recent bookmarks — lowest priority, enqueue last
   if (settings.optShowRecent) fetchRecentBookmarks(token);
 
@@ -557,11 +571,19 @@ async function htmlToMarkdown(html) {
 }
 
 // ===================== Existing Bookmark =====================
-async function checkExistingBookmark(token, url) {
+// prefetch (optional): { prefetchUrl, prefetchPromise } — a get_bookmark_data lookup
+// kicked off in parallel from showMain. Used only when prefetchUrl matches the url we
+// actually need (else a stale prefetch would mislead). Misses fall back to a live fetch.
+async function checkExistingBookmark(token, url, prefetch) {
   try {
     let data;
     try {
-      const cached = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url });
+      let cached;
+      if (prefetch && prefetch.prefetchUrl === url && prefetch.prefetchPromise) {
+        cached = await prefetch.prefetchPromise;
+      } else {
+        cached = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url });
+      }
       if (cached?.posts) data = { posts: cached.posts };
     } catch (_) {}
     if (!data) {
