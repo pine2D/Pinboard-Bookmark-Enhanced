@@ -132,6 +132,23 @@ bash scripts/release.sh
 
 **新增其他类型的运行时资源**（如 `themes/*.js` / 子目录 / 非 `.js`/`.html`/`.css` 后缀的文件）：必须更新 `scripts/release.sh` 的 `INCLUDE_DIRS` 或 `TOP_LEVEL_PATTERNS`。
 
+### Release ZIP smoke test
+
+`release.sh` 在 ZIP 构建后、`gh release create` 前会自动跑 `scripts/zip-install-smoke.mjs`：
+
+- 解压 ZIP 到临时目录
+- 用 Playwright bundled Chromium + `--load-extension` 安装该 ZIP
+- 校验 Service Worker 注册成功（catch importScripts 404 等）
+- 校验 popup.html 打开无 pageerror（catch `ReferenceError` 等）
+- 校验 options.html 打开无 pageerror
+- 任一失败 → release.sh 中止，不发 GitHub release
+
+**跳过 smoke**：`bash scripts/release.sh --skip-smoke`（仅在调试 release 脚本本身时使用）
+
+**单独运行 smoke**：`node scripts/zip-install-smoke.mjs` 默认拿 release/ 里最新 ZIP；`--zip <path>` 指定。
+
+**前置**：`.qa-scan/` 装好 playwright + bundled Chromium（`cd .qa-scan && npm install && npx playwright install chromium`）。
+
 ## API 规范
 
 - Pinboard API v1：通过 `auth_token` 认证

@@ -132,6 +132,27 @@ PYEOF
 
 echo ""
 
+# ---- Step 1.5: ZIP install smoke test ----
+# Real Chromium install + SW + popup + options smoke. Catches the bug class
+# where ZIP packaging silently dropped a referenced file. Run BEFORE gh
+# release create so a broken ZIP never reaches users.
+#
+# Skip with --skip-smoke (e.g. when iterating on the release script itself).
+
+if [[ " $* " == *" --skip-smoke "* ]]; then
+  echo "  --skip-smoke: skipping zip-install-smoke test"
+else
+  echo "  Smoke-testing ZIP..."
+  if ! node "${REPO_ROOT}/scripts/zip-install-smoke.mjs" --zip "${ZIP_PATH}"; then
+    echo "" >&2
+    echo "  [release] ZIP smoke test FAILED — aborting before publish." >&2
+    echo "  ZIP retained at: ${ZIP_PATH}" >&2
+    echo "  Rerun manually:  node scripts/zip-install-smoke.mjs --zip ${ZIP_PATH}" >&2
+    exit 1
+  fi
+  echo ""
+fi
+
 # ---- Step 2: Check gh CLI ----
 
 if ! command -v gh &>/dev/null; then
