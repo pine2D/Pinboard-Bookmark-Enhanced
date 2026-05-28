@@ -133,6 +133,45 @@ brainstorming → writing-plans → subagent-driven-development
 2. **theme factory 工具链是 sunk cost**。A1 真的拆主题表需要适配 5 道 pre-commit lint + sync-all.mjs + handedit-audit — 不值得为 < 5ms 改善付。
 3. **mirror pattern 是低悬果**。localStorage 同步预填 + chrome.storage 异步校对，几乎对每个 boot 场景都适用，且实现简单。
 
+### Build / Release 层面（事后才发现的最严重 bug）
+
+**故事**：项目收尾、retrospective 都写完了，用户随手问"release 里 manifest 还引用 `perf-mark.js`，有必要保留吗"——一查 release ZIP 发现 **根本就没有这个文件**。
+
+**Bug 详情**：
+- `scripts/release.sh` 用硬编码 INCLUDE allowlist 决定打包哪些文件
+- Phase 0 加了 `perf-mark.js` 到 manifest + popup.html / options.html / background.js，**没人记得改 release.sh**
+- Phase 4 加了 `ai-cache.js`，同样漏掉
+- 实际上 `popup-offline.js`（早于 perf audit 项目）也一直没在 INCLUDE 里
+- 结果：v2.70 缺 perf-mark.js + popup-offline.js，v2.71 多缺 ai-cache.js
+- 用户安装效应：`importScripts("perf-mark.js")` 抛 NetworkError → SW 启动崩溃 → 扩展几乎瘫痪
+- 万幸 Chrome Web Store 还停在 v2.69，只影响从 GitHub release 直接装的用户
+
+**为什么没在 Phase 0/1/2/3/4 任一 validate 阶段发现**：
+- 测量都是用 chrome-dbg + "已解压加载"模式（直接读 repo 源文件），从不走 ZIP 安装流程
+- 没有自动化测试覆盖 "manifest 引用的文件是否真的能加载"
+- pre-commit hooks 都是针对 theme factory 的，对 release packaging 一无所知
+- subagent 实施 Task 时改 manifest + 加 script tag，但 release.sh 不在 spec scope 里
+
+**真正的教训**：
+1. **"列表需要手动维护" = 定时炸弹**。任何"添加 X 时记得更新 Y"的约定都会被忘记。INCLUDE allowlist、`/etc/hosts` 风格的配置、"记得也加进文档" 都是同类。
+2. **manifest 与 build 之间必须有断言**。manifest 是声明（"我需要这些文件"），build 是执行（"我打包这些文件"）。中间没有断言 = 两边可以自由漂移。
+3. **测量阶段 ≠ 发布阶段**。所有 perf 验证用 chrome-dbg 加载源目录，没人测过 ZIP 安装。发布前应有一个"安装 ZIP → 验证基本功能"的 smoke test。
+4. **"全部 phase ✅"的庆功也可能假阳性**。Retrospective 已经写完、项目宣告完成时，最严重的 bug 还在那里。**直到用户随手问一句**才被发现。
+
+**修复**（fix commit `d5fd5dd`）：
+- `release.sh` 从 hardcoded allowlist 改 glob-pattern 自动扫描 + EXCLUDE 规则
+- 加 sanity check：解析 manifest 的 SW / content_scripts / action.popup / options_page + 解析所有 included HTML 的 `<script src>` / `<link href>`，**断言每个引用都在 ZIP 内**，少一个直接 exit 1
+- CLAUDE.md 加"Release 打包规则"章节文档化
+
+**为什么这个机制更好**：
+- 新增 root 下的 .js/.html/.css 文件自动包含——无需人工维护清单
+- sanity check 是 build-time 强约束，不依赖人记得检查
+- 即使未来有人改 release.sh 改坏了（例如把 EXCLUDE 写宽了），sanity check 也会捕获
+
+**应该但还没做**：
+- ZIP-install smoke test（自动化把新 ZIP 装进 chrome-dbg → 验证 SW 启动 + popup 打开 + pinboard 主题注入）
+- 这个 retrospective 应当在 release 流程 finalize **之前**写而非之后
+
 ---
 
 ## 六、可复用资产
