@@ -21,19 +21,20 @@ echo ""
 # so no manual sync step is required here.
 
 # ---- Step 1: Build ZIP ----
-
-INCLUDE=(
-  manifest.json
-  popup.html popup.js popup.css popup-theme-early.js
-  popup-ai.js popup-batch.js popup-tags.js
-  options.html options.js options.css options-theme-early.js
-  options-api-tests.js options-backup.js
-  background.js shared.js ai.js i18n.js
-  jina.js md-preview.html md-preview.js md-preview.css
-  vendor
-  pinboard-style.js pinboard-themes.js
-  _locales icons
-)
+#
+# Auto-scan + exclude pattern (replaces former hardcoded INCLUDE list, which
+# silently dropped new extension files added between releases).
+#
+# Top-level extension files are auto-included by glob pattern (*.html, *.js,
+# *.css, manifest.json). Recursive directories vendor/, icons/, _locales/
+# are always included. Everything else at root (README, LICENSE, perf data,
+# test pages, hidden files/dirs, scripts/, docs/, release/, etc.) is excluded.
+#
+# A post-build sanity check parses manifest.json + included HTML files to
+# extract every <script src> / <link href> / SW / content_script reference,
+# then asserts every referenced file is in the ZIP. This catches the bug
+# class where a new JS file is added to the codebase but forgotten in the
+# release manifest.
 
 mkdir -p "${RELEASE_DIR}"
 
@@ -43,29 +44,92 @@ if [ -f "${ZIP_PATH}" ]; then
 fi
 
 cd "${REPO_ROOT}"
-python3 - "${ZIP_PATH}" "${VERSION}" "${INCLUDE[@]}" <<'PYEOF'
-import sys, zipfile, pathlib
+python3 - "${ZIP_PATH}" "${VERSION}" <<'PYEOF'
+import sys, zipfile, pathlib, fnmatch, re, json
 
 zip_path = sys.argv[1]
 version  = sys.argv[2]
-targets  = sys.argv[3:]
 prefix   = f"pinboard-bookmark-enhanced-v{version}/"
 
+REPO = pathlib.Path('.')
+
+# Top-level extension files (whitelist by pattern)
+TOP_LEVEL_PATTERNS = ['*.html', '*.js', '*.css', 'manifest.json']
+
+# Directories included recursively
+INCLUDE_DIRS = ['vendor', 'icons', '_locales']
+
+# Top-level files to exclude even if matching a pattern
+EXCLUDE_FILES = {'url-strip-tests.html'}
+
+# Top-level patterns to exclude
+EXCLUDE_PATTERNS = ['perf-baseline.json', 'perf-after-*.json', '.*', '*.md', 'LICENSE']
+
+def included_at_root(name: str) -> bool:
+    if name in EXCLUDE_FILES:
+        return False
+    for pat in EXCLUDE_PATTERNS:
+        if fnmatch.fnmatch(name, pat):
+            return False
+    return any(fnmatch.fnmatch(name, pat) for pat in TOP_LEVEL_PATTERNS)
+
+included = []
 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-    for target in targets:
-        p = pathlib.Path(target)
+    # Top-level files
+    for entry in sorted(REPO.iterdir()):
+        if entry.is_file() and included_at_root(entry.name):
+            zf.write(entry, prefix + entry.name)
+            included.append(entry.name)
+    # Recursive directories
+    for d in INCLUDE_DIRS:
+        p = REPO / d
         if not p.exists():
-            print(f"  Warning: {target} not found, skipping")
+            print(f"  Warning: dir {d}/ not found, skipping")
             continue
-        if p.is_dir():
-            for file in sorted(p.rglob('*')):
-                if file.is_file() and '.DS_Store' not in file.name:
-                    zf.write(file, prefix + str(file))
-        else:
-            zf.write(p, prefix + str(p))
+        for f in sorted(p.rglob('*')):
+            if f.is_file() and '.DS_Store' not in f.name:
+                rel = str(f.relative_to(REPO))
+                zf.write(f, prefix + rel)
+                included.append(rel)
+
+# Sanity check: every file referenced by manifest + included HTML must be present
+referenced = set()
+manifest = json.load(open('manifest.json'))
+if 'background' in manifest and 'service_worker' in manifest['background']:
+    referenced.add(manifest['background']['service_worker'])
+for cs in manifest.get('content_scripts', []):
+    referenced.update(cs.get('js', []))
+    referenced.update(cs.get('css', []))
+if 'action' in manifest and 'default_popup' in manifest['action']:
+    referenced.add(manifest['action']['default_popup'])
+if 'options_page' in manifest:
+    referenced.add(manifest['options_page'])
+
+script_re = re.compile(r'<script[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
+link_re   = re.compile(r'<link[^>]+href=["\']([^"\']+)["\']', re.IGNORECASE)
+for html_name in [f for f in included if f.endswith('.html')]:
+    text = open(html_name, encoding='utf-8').read()
+    for m in script_re.finditer(text):
+        ref = m.group(1)
+        if not ref.startswith(('http:', 'https:', '//')):
+            referenced.add(ref)
+    for m in link_re.finditer(text):
+        ref = m.group(1)
+        if not ref.startswith(('http:', 'https:', '//')):
+            referenced.add(ref)
+
+included_set = set(included)
+missing = sorted(r for r in referenced if r not in included_set)
+if missing:
+    print(f"  ERROR: referenced by manifest/HTML but missing from ZIP:", file=sys.stderr)
+    for m in missing:
+        print(f"    - {m}", file=sys.stderr)
+    print(f"  Fix release.sh INCLUDE_DIRS / TOP_LEVEL_PATTERNS / EXCLUDE_* rules.", file=sys.stderr)
+    sys.exit(1)
+
+print(f"  ZIP created — {len(included)} files (all manifest + HTML references resolved).")
 PYEOF
 
-echo "  ZIP created."
 echo ""
 
 # ---- Step 2: Check gh CLI ----

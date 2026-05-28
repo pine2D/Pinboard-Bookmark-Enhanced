@@ -114,6 +114,24 @@ git push origin main
 bash scripts/release.sh
 ```
 
+### Release 打包规则（release.sh）
+
+`release.sh` 自动扫描 + sanity check，不再硬编码文件清单：
+
+- **自动包含**（root 下匹配 glob）：`*.html` / `*.js` / `*.css` / `manifest.json`
+- **递归包含目录**：`vendor/` / `icons/` / `_locales/`
+- **显式排除**：
+  - `url-strip-tests.html`（dev 测试页）
+  - `perf-baseline.json` / `perf-after-*.json`（measurement 数据）
+  - `*.md` / `LICENSE`（文档）
+  - 隐藏文件/目录（`.git/` / `.claude/` / `.qa-scan/` 等）
+  - 项目目录 `scripts/` / `docs/` / `release/`（不在 INCLUDE_DIRS 里自动 skip）
+- **Sanity check**：扫 `manifest.json` 的 `background.service_worker` / `content_scripts.js+css` / `action.default_popup` / `options_page`，再扫所有 included HTML 的 `<script src>` / `<link href>`，**断言**每个引用都在 ZIP 内。少一个就 release.sh exit 1。
+
+**新增扩展运行时文件时**：只要文件落在 root 且 `.js` / `.html` / `.css` 后缀，自动被 release.sh 包含——无需手动改脚本。Sanity check 会兜底报错。
+
+**新增其他类型的运行时资源**（如 `themes/*.js` / 子目录 / 非 `.js`/`.html`/`.css` 后缀的文件）：必须更新 `scripts/release.sh` 的 `INCLUDE_DIRS` 或 `TOP_LEVEL_PATTERNS`。
+
 ## API 规范
 
 - Pinboard API v1：通过 `auth_token` 认证
