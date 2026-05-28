@@ -33,7 +33,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const s = document.createElement("script");
       s.src = "pinboard-themes.js";
       s.onload = () => resolve();
-      s.onerror = () => reject(new Error("Failed to load pinboard-themes.js"));
+      s.onerror = () => {
+        _pinboardThemesPromise = null; // allow retry on transient failure
+        reject(new Error("Failed to load pinboard-themes.js"));
+      };
       document.head.appendChild(s);
     });
     return _pinboardThemesPromise;
