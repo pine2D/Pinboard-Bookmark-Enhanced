@@ -99,8 +99,14 @@ function setupTabSet() {
 
       let saved = 0, failed = 0, skipped = 0, tooLong = 0;
       let existingUrls = new Set();
+      let existingPerTabFallback = false;
       if (settings.batchSkipExisting) {
-        existingUrls = await fetchExistingUrlSet(pinboardToken);
+        const result = await fetchExistingUrlSet(pinboardToken);
+        if (result === null) {
+          existingPerTabFallback = true; // > 5000 bookmarks; query per-tab inside loop
+        } else {
+          existingUrls = result;
+        }
       }
       let aiFailed = 0;
       const progress = $id("batch-progress");
@@ -119,9 +125,19 @@ function setupTabSet() {
         const tab = validTabs[i];
         batchBtn.textContent = t("batchProgress", String(i + 1), String(validTabs.length), String(saved), String(failed));
         updateProgress(i);
-        if (settings.batchSkipExisting && existingUrls.has(tab.url)) {
-          skipped++;
-          continue;
+        if (settings.batchSkipExisting) {
+          let isExisting = existingUrls.has(tab.url);
+          if (existingPerTabFallback) {
+            // Per-tab posts/get via SW message (uses statusCache in SW; 5-min TTL)
+            try {
+              const r = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url: tab.url });
+              if (r?.posts?.length > 0) isExisting = true;
+            } catch (_) {}
+          }
+          if (isExisting) {
+            skipped++;
+            continue;
+          }
         }
         try {
           let tags = [...baseTags];
@@ -268,6 +284,12 @@ async function fetchExistingUrlSet(token) {
   } catch (_) {}
   try {
     const recentData = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${token}&format=json&results=1000&meta=no`)).json();
+    if (Array.isArray(recentData) && recentData.length >= 1000) {
+      // D2 Phase 4: likely > 5000 bookmarks; skip-existing falls back to per-tab
+      // posts/get inside the batch loop to avoid false-not-existing for older bookmarks.
+      console.log("[batch] account likely > 5000 bookmarks, skip-existing falls back to per-tab posts/get");
+      return null;
+    }
     const urls = recentData.map(p => p.href);
     await chrome.storage.local.set({ [cacheKey]: { urls, timestamp: Date.now() } });
     return new Set(urls);
