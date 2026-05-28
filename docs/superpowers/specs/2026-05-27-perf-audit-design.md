@@ -399,6 +399,46 @@ pbpFlush()                           // 写入 chrome.storage.local._perfSamples
 
 具体修订留到 Phase 1 plan 撰写时统一处理。
 
+### A.6 Phase 1 完成后基线（2026-05-28）
+
+Phase 1 完成于 commits `e7de326` (B1 defer) → `4a9ca5c` (B3 i18n mirror) → `4ea2ac8` (await cleanup) → `ce84344` (B2 opacity) → `84355a3` (B5 options mirror) → `9a02bd8` (B4 popup mirror)。共 6 个 commits 在 `perf/phase-1` 分支。
+
+| 入口 | measure | baseline p50 | after p50 | Δ | % | 阈值 | 通过 |
+|------|---------|-------------|-----------|----|---|------|------|
+| options-warm | options-fcp | 1330.1 | **383.3** | -946.8 | **-71.2%** | < 931 (×0.7) | ✅ |
+| options-warm | options-first-panel-painted | 61.1 | 6.8 | -54.3 | -88.9% | < 55 (×0.9) | ✅ |
+| options-warm | options-settings-filled | 92.3 | 32.6 | -59.7 | -64.7% | < 83 (×0.9) | ✅ |
+| popup-warm | popup-form-ready | 62.8 | 24.3 | -38.5 | -61.3% | < 57 (×0.9) | ✅ |
+| popup-warm | popup-fcp | 453.7 | 400.6 | -53.1 | -11.7% | < 408 (×0.9) | ✅ |
+| pinboard-inject | ct-inject | 26.5 | 28.1 → **26.4** | ~0 | ~0% | 无退化 | ✅ |
+| pinboard-inject | ct-uncloak | 26.8 | 28.2 → **26.6** | ~0 | ~0% | 无退化 | ✅ |
+
+#### 关键发现
+
+1. **options-fcp 从 1330ms 砍到 383ms（-71%）** — 远超 ×0.7 阈值（931ms）。主要功臣是 B1（defer）：删 8 个 script 阻塞 HTML 解析后，浏览器能更早 paint 出 HTML 骨架，而 588KB `pinboard-themes.js` 的 parse 转到并行后台。
+
+2. **options-first-panel-painted 从 61ms 降到 7ms（-89%）** — B3 (i18n mirror) 消除了 `await initI18n()` 的 storage round-trip。`applyI18n()` 现在跑在第一帧前就完成。
+
+3. **popup-form-ready 从 63ms 砍到 24ms（-61%）** — B4 mirror 预填 url/title 后，showMain 完成填充的时刻被压到 perf-mark.js 启动后 24ms。
+
+4. **ct-inject 初次采样 +1.6ms 是单次噪声** — re-sample 跑出 26.4ms，几乎跟 baseline 完全一致。Phase 1 没有触碰 pinboard content_script，符合预期。
+
+5. **popup-fcp 改善 12%（454→401ms）** — 边际改善。popup 启动的瓶颈不在 i18n / 数据填充，更可能在 popup-theme-early.js 的 localStorage mirror 同步读 + popup.css (63KB) 的解析。Phase 2 (Group C) 可能进一步压缩。
+
+#### 已知技术债（待 Phase 2+ 处理）
+
+- **popup-status-ready 仍未测得** — Phase 0 已发现 showMain 在 Playwright 上下文里早退，Phase 1 没修。Phase 2/3 时若需要这一指标可加 MutationObserver 兜底。
+- **冷启动数据缺失** — `chrome.runtime.reload()` race 仍未解决，无法 CDP 自动化 cold-start 采样。Phase 1 的指标都是 warm。冷启动改善预计更大（解了 storage prime footgun + 加上 mirror），但无数据佐证。
+- **pinboard-inject 不影响** — 即使 Phase 1 间接修改的 popup-theme-early.js 行数变多（新增 applyTabMirror IIFE），content_script 已经独立 parse 这两个 IIFE 没影响。
+
+#### Phase 1 体感验收（手测核对清单，由用户在真实使用中确认）
+
+- [ ] options 打开后**不再有 180ms 白屏渐入**
+- [ ] popup 打开后 **url-input / title-input 不再先空再跳**
+- [ ] **existing-banner** 状态在 popup 出现的同一瞬间就是稳态
+- [ ] options 切换 6 个 panel，**没看到设置值"先空后填"**
+- [ ] 切换语言后再开 options/popup，**无未翻译字符串闪烁**
+
 ## 附录 B：埋点字段定义
 
 样本 schema（写入 `chrome.storage.local._perfSamples` 数组）：
