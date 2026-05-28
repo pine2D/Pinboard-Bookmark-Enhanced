@@ -476,6 +476,54 @@ Phase 2 的实测收益**小于预期**（spec 原本预估 R5/W1/W3 各省 10-5
 - 完整 lazy init 框架（plan Path B）—— 路 A 已捕获主要收益，路 B 复杂度对 marginal 收益不值得
 - popup.js / options.js 拆文件 —— 项目暂无强需求，留给未来真有维护痛点时再做
 
+### A.8 Phase 3 完成后基线（2026-05-28）
+
+Phase 3 完成于 commits `7887469` (A2 lazy-load) + `8de673e` (A2 retry fix) 在 `perf/phase-3` 分支。**仅实施 A2；A1 和 A3 决策跳过。**
+
+#### 实施清单
+
+| 项 | 状态 | 理由 |
+|----|------|------|
+| **A2** (C2 options 懒加载 themes) | ✓ 实施 commits `7887469` + `8de673e` | 移除 588KB sync parse；v2 migration 用 labeled-break 安全路径处理 |
+| **A1** (C3 拆主题表) | ⊘ skipped | (1) Phase 0 已下调 C3 ROI 到「低/中」；(2) Phase 2 R5 cache 已把 ct-inject 压到 20ms（spec 阈值附近）；(3) 实际可测收益 < 5ms；(4) 复杂度高（theme factory 工具链 + manifest + handedit-audit 五道 lint 适配）。主要剩余价值是 540KB/tab 内存节省，但用户典型场景 1-2 个 pinboard tab，影响小 |
+| **A3** (C4 SW module worker) | ⊘ deferred — needs separate R&D phase | (1) SW wakeup baseline 缺失（无法判断收益是否可测）；(2) 三条候选实施路径都有问题（路 1 需全链路 shared.js/i18n.js module 化影响 4 个 HTML，路 2 需 unsafe-eval 安全降级，路 3 即跳过）；(3) 收益不可见但风险高 |
+
+#### 四相对比（最终）
+
+| measure | baseline | p1 | p2 | p3 | 总改善 |
+|---------|---------|----|----|----|--------|
+| **options-fcp** | 1330.1 | 383.3 | 354.6 | 361.9 | **-73%** |
+| options-first-panel-painted | 61.1 | 6.8 | 10.9 | **5.2** | **-91%** |
+| options-settings-filled | 92.3 | 32.6 | 40.4 | **31.7** | **-66%** |
+| popup-fcp | 453.7 | 400.6 | 417.4 | 413.3 | -9% |
+| popup-form-ready | 62.8 | 24.3 | 26.7 | 25.3 | -60% |
+| ct-inject | 26.5 | 28.1 | 20.4 | 22.4 | -15% |
+| ct-uncloak | 26.8 | 28.2 | 20.7 | 22.7 | -15% |
+
+#### 关键诚实记录：测量稳定性
+
+Phase 3 实施过程中发现 **options-fcp 在 CDP 自动化下方差巨大**（连续 3 轮跑出 960 / 370 / 699 ms，stddev 高达 271ms）。原因推测：`PerformanceObserver` 的 `buffered: true` 在 Playwright `newPage` 上下文里行为不一致，加上 Chrome JIT/GC/网络的随机抖动。
+
+这意味着 spec section 4.1 的阈值（× 0.7 / × 0.9）在 options-fcp 上不可靠。**Phase 3 内部"options-fcp 是否仍有空间做 A1"的判断改为基于代码意图而非数据**，最终决定跳过 A1。
+
+对于稳定指标（n=5+ 且 stddev 低的 measure）阈值仍可靠：
+- options-first-panel-painted ↓91%（i18n mirror + lazy theme）
+- options-settings-filled ↓66%（mirror prefill + R5 cache）
+- popup-form-ready ↓60%（mirror prefill）
+
+#### Phase 3 体感验收
+
+- ✓ options 打开速度肉眼可见快了一截（vs v2.69 baseline）
+- ✓ Appearance panel 首次切换有 ~50-150ms 加载停顿（pinboard-themes.js 懒载入）— 显式用户操作触发，可接受
+- ✓ 切其他 5 个 panel 完全不付主题表 parse 代价
+
+#### A3 未来若要做
+
+需要先解决 SW wakeup baseline 测量问题（手测 + 自动化都没数据）。建议：
+1. 实现 SW wakeup 单独的 manual benchmark 工具（chrome://serviceworker-internals/ 控制 + storage 读样本）
+2. 若 baseline > 50ms，考虑路 1 全链路 module 化（需要单独 R&D phase）
+3. 若 baseline < 50ms，A3 永久 close-out
+
 ## 附录 B：埋点字段定义
 
 样本 schema（写入 `chrome.storage.local._perfSamples` 数组）：
