@@ -168,9 +168,26 @@ brainstorming → writing-plans → subagent-driven-development
 - sanity check 是 build-time 强约束，不依赖人记得检查
 - 即使未来有人改 release.sh 改坏了（例如把 EXCLUDE 写宽了），sanity check 也会捕获
 
-**应该但还没做**：
-- ZIP-install smoke test（自动化把新 ZIP 装进 chrome-dbg → 验证 SW 启动 + popup 打开 + pinboard 主题注入）
-- 这个 retrospective 应当在 release 流程 finalize **之前**写而非之后
+**完整防御链（事后补完）**：
+
+| 层 | 工具 | 时机 | 检测能力 | Commit |
+|----|------|------|---------|--------|
+| 1. 静态 | `release.sh` sanity check | ZIP 构建后 | 解析 manifest + HTML refs，**断言**每个引用都在 ZIP；少一个直接 exit 1 | `d5fd5dd` |
+| 2. 动态 | `scripts/zip-install-smoke.mjs` | ZIP 构建后、`gh release create` 前 | 真实 Chromium `--load-extension` → SW 注册 + popup pageerror + options pageerror | `11e66c2` |
+| 3. 文档 | CLAUDE.md "Release 打包规则" + "Release ZIP smoke test" | 永久 | 后续维护者直接看 spec | `d5fd5dd` / `11e66c2` |
+| 4. 流程 | release.sh 把 smoke test 设为强制 gate | 每次发布 | 失败 → release 中止，broken ZIP 不到用户手里 | `11e66c2` |
+
+**两层防御为什么都需要**：
+- 静态层 catch "manifest 引用但 ZIP 不含"（98% 的本次 bug）
+- 动态层 catch 其他破坏方式：`<script>` 有但内容语法错、SW importScripts 加载成功但执行抛、popup HTML 引用了 ZIP 内但 script 内部 ReferenceError on init 等。即"装上去能跑"才是真验证。
+- 静态层是 build-time 强约束（快、无依赖）
+- 动态层是 install-time 强约束（慢但全面）
+
+**元教训的元教训**：
+
+这个 retrospective 写完了**还能再被推翻**——本身就是项目过程中最深的元教训。**Retrospective 不是项目终点，是迭代的起点。** 真正的"完成"不是文档落地，而是防御机制实装：让同类问题不可能（或极难）再次发生。
+
+那位想"随手问一句 manifest 是否还需要 perf-mark.js"的用户，事后想来才意识到——这一问把整个项目从"完成"推回了"未完成"，又把"未完成"推到了真正的"完成"（系统级防御就位）。**保持开放：项目宣告完成的下一秒，可能就是发现最关键 bug 的瞬间。**
 
 ---
 
