@@ -26,10 +26,29 @@ document.addEventListener("DOMContentLoaded", async () => {
   let _appearanceInited = false;
   let _appearancePanelBootReady = false;
   let _appearancePendingInit = false;
-  function _initAppearancePanel() {
+  let _pinboardThemesPromise = null;
+  function _loadPinboardThemes() {
+    if (_pinboardThemesPromise) return _pinboardThemesPromise;
+    _pinboardThemesPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "pinboard-themes.js";
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("Failed to load pinboard-themes.js"));
+      document.head.appendChild(s);
+    });
+    return _pinboardThemesPromise;
+  }
+  async function _initAppearancePanel() {
     if (_appearanceInited) return;
     if (!_appearancePanelBootReady) { _appearancePendingInit = true; return; }
     _appearanceInited = true;
+    try {
+      await _loadPinboardThemes();
+    } catch (e) {
+      console.warn("[options] pinboard-themes lazy load failed:", e.message);
+      _appearanceInited = false; // allow retry on next switch
+      return;
+    }
     renderPresetPreview();
   }
 
@@ -173,7 +192,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  {
+  migrationV2: {
     const flags = await chrome.storage.sync.get({ _migrationV2: false });
     const oldCSSFromSync = await syncGetLarge("customCSS", "");
     let oldCSS = oldCSSFromSync;
@@ -184,6 +203,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     const oldKeyForMigration = s.themePresetKey || "";
     const hasOldData = !!oldCSS || !!oldKeyForMigration;
     if (!flags._migrationV2 && hasOldData) {
+      try {
+        // A2 Phase 3: migration uses PINBOARD_THEMES so we must load it now.
+        // This is a one-time cost for un-migrated users; future opens skip this entire block.
+        await _loadPinboardThemes();
+      } catch (e) {
+        console.error("[migrationV2] failed to load pinboard-themes.js", e);
+        // Don't set _migrationV2 flag — will retry on next load
+        break migrationV2;
+      }
       // Resolve preset key: trust stored key, fall back to CSS-text reverse lookup
       let resolvedKey = oldKeyForMigration;
       if (!resolvedKey && oldCSS) {
