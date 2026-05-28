@@ -219,14 +219,44 @@ function classifyPinboardError(input) {
 }
 
 // ---- Settings storage selector (sync vs local based on user preference) ----
-// The preference itself is always stored in chrome.storage.local (bootstrap location)
+// The preference itself is always stored in chrome.storage.local (bootstrap location).
+// R5: cached + invalidated on optSyncEnabled change. First call seeds from localStorage
+// mirror if present (synchronous fast path), then storage.get confirms.
+let _settingsStorageCache = null;
+
+// Sync fast-path: hydrate from localStorage mirror if available.
+// Caller still treats getSettingsStorage as async (signature preserved).
+try {
+  if (typeof localStorage !== "undefined") {
+    const m = localStorage.getItem("pp-sync-enabled");
+    if (m === "1") _settingsStorageCache = chrome.storage.sync;
+    else if (m === "0") _settingsStorageCache = chrome.storage.local;
+  }
+} catch (_) {}
+
 async function getSettingsStorage() {
+  if (_settingsStorageCache) return _settingsStorageCache;
   try {
     const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
-    return optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+    _settingsStorageCache = optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+    try { localStorage.setItem("pp-sync-enabled", optSyncEnabled ? "1" : "0"); } catch (_) {}
+    return _settingsStorageCache;
   } catch (_) {
     return chrome.storage.local;
   }
+}
+
+// Invalidate cache + mirror when user toggles optSyncEnabled
+if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.optSyncEnabled) {
+      _settingsStorageCache = null;
+      try {
+        const v = changes.optSyncEnabled.newValue;
+        if (typeof v === "boolean") localStorage.setItem("pp-sync-enabled", v ? "1" : "0");
+      } catch (_) {}
+    }
+  });
 }
 
 // ---- Prime SETTINGS_DEFAULTS into storage (one-time fix for popup boot lag) ----
