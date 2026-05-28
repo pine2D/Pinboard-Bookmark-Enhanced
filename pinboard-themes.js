@@ -331,6 +331,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -1056,6 +1060,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -1742,6 +1750,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -2466,6 +2478,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -3201,6 +3217,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -3913,6 +3933,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -4525,6 +4549,10 @@ html.pbp-dark #tag_cloud a:not(.tag) { color: var(--pinboard-accent) !important;
 html.pbp-dark #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 html.pbp-dark #tag_cloud_header a:not(.tag), html.pbp-dark a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 html.pbp-dark #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 html.pbp-dark #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 html.pbp-dark #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -5270,6 +5298,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -5935,6 +5967,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -6612,6 +6648,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -7292,6 +7332,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -7985,6 +8029,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -8667,6 +8715,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
@@ -9358,6 +9410,10 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #tag_cloud a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: var(--pinboard-muted-soft) !important; }
 #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent) !important; }
+/* 7px is intentionally small for visual subtlety. Windows fonts (Segoe UI Symbol)
+   render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
+   Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
+   would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
