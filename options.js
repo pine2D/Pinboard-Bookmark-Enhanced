@@ -16,6 +16,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   pbpMark("options-first-panel-painted");
   pbpMeasure("options-first-panel-painted", "options-t0", "options-first-panel-painted");
 
+  // W3: Lazy-init scaffolding for the appearance panel.
+  // Hoisted to the top of DOMContentLoaded so the tab-switch handler and the
+  // saved-tab restore (both below) can safely reference _initAppearancePanel.
+  // The actual render depends on currentPresetKey + PINBOARD_THEMES, which
+  // aren't initialized until the settings load completes much further down.
+  // Until that bootstrap finishes, we record a pending request and flush it
+  // when _appearancePanelBootReady flips to true.
+  let _appearanceInited = false;
+  let _appearancePanelBootReady = false;
+  let _appearancePendingInit = false;
+  function _initAppearancePanel() {
+    if (_appearanceInited) return;
+    if (!_appearancePanelBootReady) { _appearancePendingInit = true; return; }
+    _appearanceInited = true;
+    renderPresetPreview();
+  }
+
   // ---- Tab switching ----
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -23,6 +40,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
       btn.classList.add("active");
       $id(`panel-${btn.dataset.panel}`).classList.add("active");
+      // W3: lazy-init expensive per-panel rendering on first view.
+      if (btn.dataset.panel === "appearance") _initAppearancePanel();
     });
   });
 
@@ -759,7 +778,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     previewSection.style.display = "";
     previewEl.textContent = theme ? theme.css : "";
   }
-  renderPresetPreview();
+
+  // W3: appearance panel's render deps (currentPresetKey, PINBOARD_THEMES,
+  // ADAPTIVE_THEME_MAP, $id targets) are now initialized — flip the boot-ready
+  // flag, flush any queued init from earlier saved-tab clicks, then handle the
+  // boot-active case. Dumping a full PINBOARD_THEMES entry (~50KB CSS) into the
+  // preview textarea costs noticeable boot time, so we only render when the
+  // appearance panel is actually viewed. Settings VALUE population for
+  // appearance fields still happens unconditionally above, so saveAll() sees
+  // correct values regardless of which panel was viewed.
+  _appearancePanelBootReady = true;
+  if (_appearancePendingInit) _initAppearancePanel();
+  const _activePanelAtBoot = document.querySelector(".tab-btn.active")?.dataset?.panel;
+  if (_activePanelAtBoot === "appearance") _initAppearancePanel();
 
   function applyPreset(key) {
     currentPresetKey = key || "";
