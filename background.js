@@ -438,10 +438,13 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // Keep service worker alive + periodic tasks
 chrome.alarms.create("keepalive", { periodInMinutes: 4 });
-chrome.alarms.create("ai-cache-cleanup", { periodInMinutes: 60 }); // hourly — was daily; daily allowed up to 24h of stale-but-expired entries to accumulate
 // Periodically re-prime SETTINGS_DEFAULTS so chrome.storage doesn't go cold between
 // uses (Chrome evicts storage backend after inactivity, causing slow first-open).
 chrome.alarms.create("storage-warm", { periodInMinutes: 5 });
+
+// D1 Phase 4: trigger one-time AI cache migration + sweep expired backup
+migrateAICacheToIDB().catch(() => {});
+sweepAICacheMigrationBackup().catch(() => {});
 
 async function syncPrewarmTagsAlarm() {
   const s = await loadSettings();
@@ -478,9 +481,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     processOfflineQueue().catch(() => {});
     updateBadge().catch(() => {});
   }
-  if (alarm.name === "ai-cache-cleanup") {
-    cleanupExpiredAICache().catch(() => {});
-  }
   if (alarm.name === "prewarm-tags") {
     prewarmTagsNow().catch(() => {});
   }
@@ -499,42 +499,47 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // Initial check
 syncPrewarmTagsAlarm().catch(() => {});
 
-// F1: Cleanup expired AI cache entries (index-based; falls back to full scan for migration)
-async function cleanupExpiredAICache() {
+// D1 Phase 4: one-time migration of legacy ai_cache_* from chrome.storage.local to IDB
+async function migrateAICacheToIDB() {
   try {
-    const { aiCacheDuration = 60 } = await (await getSettingsStorage()).get({ aiCacheDuration: 60 });
-    const maxAge = (aiCacheDuration || 60) * 60 * 1000;
-    const now = Date.now();
+    const { _aiCacheMigrationV4 = false } = await chrome.storage.local.get({ _aiCacheMigrationV4: false });
+    if (_aiCacheMigrationV4) return; // already done
+    if (typeof pbpAiCacheSet !== "function") return; // ai-cache.js not loaded
 
-    const { ai_cache_index } = await chrome.storage.local.get("ai_cache_index");
-    if (ai_cache_index && typeof ai_cache_index === "object") {
-      // Fast path: O(index size), no bulk load
-      const expired = Object.keys(ai_cache_index).filter(k => now - (ai_cache_index[k] || 0) > maxAge);
-      if (expired.length) {
-        await chrome.storage.local.remove(expired);
-        const next = { ...ai_cache_index };
-        expired.forEach(k => delete next[k]);
-        await chrome.storage.local.set({ ai_cache_index: next });
-      }
-      return;
-    }
-
-    // Migration fallback: old data has no index — scan once and build it
     const all = await chrome.storage.local.get(null);
-    const expired = [];
-    const rebuiltIndex = {};
-    for (const k of Object.keys(all)) {
+    const backup = {};
+    let migrated = 0;
+    for (const [k, v] of Object.entries(all)) {
       if (!k.startsWith("ai_cache_") || k === "ai_cache_index") continue;
-      const ts = all[k]?.timestamp;
-      if (!ts) continue;
-      if (now - ts > maxAge) expired.push(k);
-      else rebuiltIndex[k] = ts;
+      if (!v || typeof v !== "object" || !v.timestamp) continue;
+      backup[k] = v;
+      await pbpAiCacheSet(k, v.result, v.timestamp);
+      migrated++;
     }
-    if (expired.length) await chrome.storage.local.remove(expired);
-    await chrome.storage.local.set({ ai_cache_index: rebuiltIndex });
-  } catch (_) {
-    // Best-effort cache GC; quota writes will surface their own errors
+    if (migrated > 0) {
+      // 7-day backup for rollback
+      await chrome.storage.local.set({
+        _aiCacheMigrationBackup: { entries: backup, ts: Date.now() }
+      });
+    }
+    await chrome.storage.local.set({ _aiCacheMigrationV4: true });
+    console.log(`[ai-cache] migrated ${migrated} entries to IndexedDB`);
+  } catch (e) {
+    console.warn("[ai-cache] migration failed:", e.message);
   }
+}
+
+// Sweep expired migration backup (7 days)
+async function sweepAICacheMigrationBackup() {
+  try {
+    const { _aiCacheMigrationBackup } = await chrome.storage.local.get("_aiCacheMigrationBackup");
+    if (!_aiCacheMigrationBackup) return;
+    const ageMs = Date.now() - (_aiCacheMigrationBackup.ts || 0);
+    if (ageMs > 7 * 24 * 60 * 60 * 1000) {
+      await chrome.storage.local.remove("_aiCacheMigrationBackup");
+      console.log("[ai-cache] migration backup swept after 7 days");
+    }
+  } catch (_) {}
 }
 
 // Startup: process offline queue + update badge + prime settings (cheap no-op when already primed)
