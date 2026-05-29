@@ -408,6 +408,7 @@ async function _writeCurrentTabMirror(tabId, url, title) {
 
 // ---- 标签页激活/更新时刷新图标 (P3: debounced + deduped) ----
 chrome.tabs.onActivated.addListener(({ tabId }) => {
+  noteActivity();
   _scheduleTabCheck(tabId, async () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -423,6 +424,7 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url && tab.url.startsWith("http")) {
+    noteActivity();
     _scheduleTabCheck(tabId, () => {
       debouncedCheck(tabId, tab.url).catch(() => {});
       _writeCurrentTabMirror(tabId, tab.url, tab.title).catch(() => {});
@@ -435,6 +437,59 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   const timer = _checkDebounceTimers.get(tabId);
   if (timer) { clearTimeout(timer); _checkDebounceTimers.delete(tabId); }
 });
+
+// ---- Activity-windowed keepalive ------------------------------------------
+// Keep the SW (and thus the extension renderer process) warm for a short window
+// after the user's last tab/popup activity, so clicking the toolbar icon during
+// active browsing opens the popup instantly instead of paying a ~2s cold start.
+// After the window lapses with no activity, ping stops and the SW sleeps normally
+// (no 24/7 drain). It is the chrome.* API CALL — not setInterval — that resets the
+// 30s idle timer (Chrome 110+). If a future Chrome stops honoring this, the SW just
+// sleeps = current behavior (graceful, no error).
+const KEEPALIVE_WINDOW_MS = 10 * 60 * 1000; // warm for ~10 min after last activity
+const KEEPALIVE_PING_MS = 15 * 1000;        // < 30s idle timeout; 2x margin vs timer jitter
+let _lastActivityTs = 0;
+let _lastActivitySessionWrite = 0;
+let _keepAliveTimer = null;
+
+function ensureKeepAlive() {
+  if (_keepAliveTimer) return; // already pinging
+  if (Date.now() - _lastActivityTs >= KEEPALIVE_WINDOW_MS) return; // window lapsed
+  _keepAliveTimer = setInterval(() => {
+    if (Date.now() - _lastActivityTs >= KEEPALIVE_WINDOW_MS) {
+      // Return BEFORE any chrome.* call, so this tick does NOT reset the idle
+      // timer → the SW can go idle and terminate normally. Do NOT add a ping
+      // above this guard, or the SW will never sleep.
+      clearInterval(_keepAliveTimer);
+      _keepAliveTimer = null;
+      return;
+    }
+    // The API call (not setInterval itself) resets the SW idle timer; empty cb is fine in MV3.
+    try { chrome.runtime.getPlatformInfo(() => {}); } catch (_) {}
+  }, KEEPALIVE_PING_MS);
+}
+
+function noteActivity() {
+  _lastActivityTs = Date.now();
+  // Mirror to session storage (throttled) so a SW restart within the window can
+  // resume keepalive even if the restarting event isn't itself a tab event.
+  if (_lastActivityTs - _lastActivitySessionWrite > 30000) {
+    _lastActivitySessionWrite = _lastActivityTs;
+    try { chrome.storage.session.set({ _lastActivityTs }); } catch (_) {}
+  }
+  ensureKeepAlive();
+}
+
+// On (cold) SW startup, restore last activity and resume keepalive if still in window.
+// Use Math.max(): a tab/popup event may cold-start the SW and run noteActivity()
+// (setting a fresh in-memory ts) BEFORE this async restore resolves. Without max(),
+// the stale session value (0 on a fresh session) would clobber the fresh ts, and the
+// next ping tick would see ">= window" and kill the just-started window.
+chrome.storage.session.get({ _lastActivityTs: 0 }).then(({ _lastActivityTs: ts }) => {
+  _lastActivityTs = Math.max(_lastActivityTs, ts || 0);
+  ensureKeepAlive();
+}).catch(() => {});
+// ---------------------------------------------------------------------------
 
 // Keep service worker alive + periodic tasks
 chrome.alarms.create("keepalive", { periodInMinutes: 4 });
@@ -480,6 +535,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "keepalive") {
     processOfflineQueue().catch(() => {});
     updateBadge().catch(() => {});
+    ensureKeepAlive(); // if SW was revived mid-window by the alarm, resume pinging
   }
   if (alarm.name === "prewarm-tags") {
     prewarmTagsNow().catch(() => {});
@@ -560,6 +616,7 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 // ---- 监听来自 popup 的消息 ----
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message !== "object") { sendResponse({ error: "invalid" }); return true; }
+  noteActivity(); // using the popup keeps the SW warm for the next open
 
   if (message.type === "get_bookmark_data" && message.url) {
     const cached = statusCache.get(message.url);
