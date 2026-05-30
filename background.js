@@ -22,6 +22,34 @@ const ICONS_BOOKMARKED = {
   48: "icons/pin-saved-48.png", 128: "icons/pin-saved-128.png"
 };
 
+// setIcon with a path: map makes Chrome RE-FETCH all 4 PNGs from disk on every
+// call. Combined with tabs.onUpdated re-firing "complete" repeatedly (and the
+// keepalive keeping the SW warm to service each one), this produced a sustained
+// stream of pin-default-*.png requests that dragged page loads (the options page
+// showed DOMContentLoaded ~2.4s). Decode each icon to ImageData ONCE at startup so
+// setIcon never touches the network; setIcon falls back to path: until ready.
+const _iconImageData = { default: null, bookmarked: null };
+async function _decodeIconSet(pathMap) {
+  const out = {};
+  for (const size of Object.keys(pathMap)) {
+    const resp = await fetch(chrome.runtime.getURL(pathMap[size]));
+    const blob = await resp.blob();
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+    out[size] = canvas.getContext("2d").getImageData(0, 0, bitmap.width, bitmap.height);
+    bitmap.close();
+  }
+  return out;
+}
+(async () => {
+  try {
+    const [def, bm] = await Promise.all([_decodeIconSet(ICONS_DEFAULT), _decodeIconSet(ICONS_BOOKMARKED)]);
+    _iconImageData.default = def;
+    _iconImageData.bookmarked = bm;
+  } catch (_) { /* decode failed — setIcon keeps using the path: fallback */ }
+})();
+
 // URL 状态缓存
 const statusCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
@@ -154,13 +182,20 @@ chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
 // check fires in the same microtask the promise settles, before user code runs.
 // Symptoms otherwise: "Unchecked runtime.lastError: No tab with id: X"
 // with Context: Unknown and Stack: :0 (anonymous function).
+const _lastIconState = new Map(); // tabId -> last bookmarked bool set (dedup)
 function setIcon(tabId, bookmarked) {
   if (typeof tabId !== "number" || tabId < 0) return;
+  // Dedup: skip if this tab's icon is already in the desired state. A tab that
+  // re-fires onUpdated "complete" repeatedly would otherwise re-set the same icon
+  // over and over — this guard eliminates that storm regardless of trigger frequency.
+  if (_lastIconState.get(tabId) === bookmarked) return;
+  _lastIconState.set(tabId, bookmarked);
   try {
-    chrome.action.setIcon(
-      { tabId, path: bookmarked ? ICONS_BOOKMARKED : ICONS_DEFAULT },
-      () => { void chrome.runtime.lastError; /* consume to mark handled */ }
-    );
+    const cached = bookmarked ? _iconImageData.bookmarked : _iconImageData.default;
+    const details = cached
+      ? { tabId, imageData: cached }                                   // in-memory, zero network
+      : { tabId, path: bookmarked ? ICONS_BOOKMARKED : ICONS_DEFAULT }; // fallback until decoded
+    chrome.action.setIcon(details, () => { void chrome.runtime.lastError; /* consume to mark handled */ });
   } catch (_) { /* synchronous throw on invalid args — ignore */ }
 }
 
@@ -436,6 +471,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   const timer = _checkDebounceTimers.get(tabId);
   if (timer) { clearTimeout(timer); _checkDebounceTimers.delete(tabId); }
+  _lastIconState.delete(tabId); // prevent Map leak over long sessions
 });
 
 // ---- Activity-windowed keepalive ------------------------------------------
