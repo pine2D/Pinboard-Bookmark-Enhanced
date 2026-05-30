@@ -21,6 +21,11 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 MANIFEST="${REPO_ROOT}/manifest.json"
 cd "${REPO_ROOT}"
 
+# Release tags are created on the remote by release.sh (gh release create) and are
+# frequently absent locally, which made `git log <tag>..HEAD` fail with exit 128.
+# Fetch tags first so the range resolves. Best-effort: offline / no-remote is fine.
+git fetch --tags --quiet 2>/dev/null || true
+
 DRY_RUN=0
 FORCE=""
 for arg in "$@"; do
@@ -42,8 +47,12 @@ if [ -z "${PREV_TAG}" ]; then
   PREV_TAG=$(git tag --sort=-version:refname | head -1 || true)
 fi
 
-if [ -z "${PREV_TAG}" ]; then
-  echo "  No previous release tag found. Will scan last 50 commits."
+if [ -z "${PREV_TAG}" ] || ! git rev-parse -q --verify "${PREV_TAG}^{commit}" >/dev/null 2>&1; then
+  if [ -n "${PREV_TAG}" ]; then
+    echo "  Release tag ${PREV_TAG} not resolvable locally (even after fetch). Scanning last 50 commits."
+  else
+    echo "  No previous release tag found. Will scan last 50 commits."
+  fi
   RANGE_ARGS=(-50)
 else
   echo "  Scanning commits since ${PREV_TAG}..HEAD"
@@ -58,7 +67,7 @@ git_args = sys.argv[2:]
 
 result = subprocess.run(
     ["git", "log", "--pretty=format:%B%x1e", "--no-merges", *git_args],
-    capture_output=True, text=True, check=True,
+    capture_output=True, text=True, check=False,
 )
 messages = [m.strip() for m in result.stdout.split("\x1e") if m.strip()]
 
