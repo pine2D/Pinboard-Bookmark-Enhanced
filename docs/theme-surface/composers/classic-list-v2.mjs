@@ -271,6 +271,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: ${v("accent")} !important; }
 .suggested_tag { color: ${v("success")} !important; cursor: pointer !important; }
 #edit_bookmark_form { background: ${v("bg-surface")} !important; border: ${v("border-width")} ${v("border-style")} ${v("border")} !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }

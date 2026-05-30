@@ -396,6 +396,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -1125,6 +1128,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -1815,6 +1821,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -2543,6 +2552,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -3282,6 +3294,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -3998,6 +4013,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -4614,6 +4632,9 @@ html.pbp-dark input[type="reset"]:hover, html.pbp-dark input[type="reset"].reset
 html.pbp-dark input[type="checkbox"], html.pbp-dark input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 html.pbp-dark .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 html.pbp-dark #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+html.pbp-dark #edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 html.pbp-dark .pin-ac { z-index: 1000 !important; }
@@ -5363,6 +5384,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -6032,6 +6056,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -6713,6 +6740,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -7397,6 +7427,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -8094,6 +8127,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -8780,6 +8816,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
@@ -9475,6 +9514,9 @@ input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
+/* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
+   the right of the wider .bookmark row. Stretch the fields (all carry .edit_form_input) to fill. */
+#edit_bookmark_form .edit_form_input { width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
