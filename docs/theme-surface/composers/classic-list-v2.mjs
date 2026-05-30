@@ -270,7 +270,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: ${v("row-hover")} !important; border-color: ${v("accent")} !important; color: ${v("accent")} !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: ${v("accent")} !important; }
 .suggested_tag { color: ${v("success")} !important; cursor: pointer !important; }
-#edit_bookmark_form { background: ${v("bg-surface")} !important; border: ${v("border-width")} ${v("border-style")} ${v("border")} !important; }
+#edit_bookmark_form { background: ${v("bg-surface")} !important; border: ${v("border-width")} ${v("border-style")} ${v("border")} !important; width: 100% !important; box-sizing: border-box !important; }
 
 /* ---- Tag completion popup (Pin.Tags widget on /add/, edit-bookmark, note-add) ---- */
 .pin-ac { z-index: 1000 !important; }
