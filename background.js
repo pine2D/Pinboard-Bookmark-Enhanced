@@ -497,8 +497,8 @@ chrome.alarms.create("keepalive", { periodInMinutes: 4 });
 // uses (Chrome evicts storage backend after inactivity, causing slow first-open).
 chrome.alarms.create("storage-warm", { periodInMinutes: 5 });
 
-// D1 Phase 4: trigger one-time AI cache migration + sweep expired backup
-migrateAICacheToIDB().catch(() => {});
+// D1 Phase 4: trigger one-time AI cache migration, then GC the legacy leftovers
+migrateAICacheToIDB().then(() => gcLegacyAICache()).catch(() => {});
 sweepAICacheMigrationBackup().catch(() => {});
 
 async function syncPrewarmTagsAlarm() {
@@ -596,6 +596,31 @@ async function sweepAICacheMigrationBackup() {
       console.log("[ai-cache] migration backup swept after 7 days");
     }
   } catch (_) {}
+}
+
+// One-time GC of legacy chrome.storage.local AI cache left behind by the IDB
+// migration: the original ai_cache_* keys (the migration copied them to IDB but
+// never deleted them) plus the full _aiCacheMigrationBackup copy. IndexedDB is now
+// the sole AI-cache source of truth; these are dead weight that bloated
+// storage.local and slowed reads for heavy users. Flag-guarded → runs once per
+// machine. TRANSITIONAL: safe to delete this function (together with
+// migrateAICacheToIDB + the legacy rollback path) in a later release once the
+// upgraded user base has run it.
+async function gcLegacyAICache() {
+  try {
+    const { _aiCacheMigrationV4 = false, _aiCacheLegacyGCDone = false } =
+      await chrome.storage.local.get({ _aiCacheMigrationV4: false, _aiCacheLegacyGCDone: false });
+    if (_aiCacheLegacyGCDone) return;  // already cleaned on this machine
+    if (!_aiCacheMigrationV4) return;  // wait until migration has copied data into IDB
+    const all = await chrome.storage.local.get(null);
+    const stale = Object.keys(all).filter((k) => k.startsWith("ai_cache_")); // incl. ai_cache_index
+    stale.push("_aiCacheMigrationBackup"); // the full backup copy — also dead weight
+    if (stale.length) await chrome.storage.local.remove(stale);
+    await chrome.storage.local.set({ _aiCacheLegacyGCDone: true });
+    console.log(`[ai-cache] GC removed ${stale.length} legacy storage.local keys`);
+  } catch (e) {
+    console.warn("[ai-cache] legacy GC failed:", e?.message || e);
+  }
 }
 
 // Startup: process offline queue + update badge + prime settings (cheap no-op when already primed)
