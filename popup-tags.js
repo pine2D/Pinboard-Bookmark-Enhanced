@@ -118,29 +118,36 @@ function applyTagData(counts) {
   tagCaseMap = buildTagCaseMap(counts);
 }
 
+// Prewarmed mode serves cache ignoring the 10-min TTL (the SW alarm refreshes it),
+// but with a staleness ceiling: if the alarm clearly hasn't run (cache older than
+// this), fall through to a one-shot fetch so tags can't be stuck stale forever.
+const PREWARM_STALE_CEILING = 2 * 60 * 60 * 1000; // 2 hours
+
 async function fetchAllUserTags(token) {
   const cacheKey = "cached_user_tags";
-  // Sync mode: "cached" (default, TTL-based) / "fresh" (bypass cache) / "prewarmed" (cache-only; alarm refreshes)
+  // Sync mode: "cached" (default, TTL-based) / "fresh" (bypass cache) / "prewarmed" (cache-first; alarm refreshes)
   const mode = (settings && settings.tagSyncMode) || "cached";
 
   // Try cache first for cached/prewarmed
   if (mode !== "fresh") {
     try {
       const cached = await chrome.storage.local.get(cacheKey);
-      if (cached[cacheKey]) {
-        const { tags, counts, timestamp } = cached[cacheKey];
-        const fresh = Date.now() - timestamp < TAG_CACHE_TTL;
-        if (mode === "prewarmed" || fresh) {
-          applyTagData(counts);
-          allUserTags = tags; // preserve cached sort order
+      const entry = cached[cacheKey];
+      if (entry && entry.counts) {
+        const age = Date.now() - (entry.timestamp || 0);
+        const usable = mode === "prewarmed"
+          ? age < PREWARM_STALE_CEILING
+          : age < TAG_CACHE_TTL;
+        if (usable) {
+          applyTagData(entry.counts); // rebuilds the sorted tag list from counts
           return;
         }
       }
     } catch (_) {}
-    // In prewarmed mode without any cache yet, fall through to fetch once so UI is usable
+    // No usable cache (missing / expired / prewarmed-but-too-stale): fetch once so UI is usable
   }
 
-  // Fetch from Pinboard (fresh or cached-expired or prewarmed-missing)
+  // Fetch from Pinboard (fresh, or cached-expired, or prewarmed-stale/missing)
   try {
     const resp = await pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${token}&format=json`);
     if (resp.status === 401) return; // pinboardFetch already redirected to login
@@ -150,7 +157,7 @@ async function fetchAllUserTags(token) {
     }
     const data = await resp.json();
     applyTagData(data);
-    await chrome.storage.local.set({ [cacheKey]: { tags: allUserTags, counts: allUserTagCounts, timestamp: Date.now() } });
+    await chrome.storage.local.set({ [cacheKey]: { counts: allUserTagCounts, timestamp: Date.now() } });
   } catch (e) {
     console.error("user-tag sync failed:", e);
     showTagSyncError(classifyPinboardError(e));

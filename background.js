@@ -500,6 +500,7 @@ chrome.alarms.create("storage-warm", { periodInMinutes: 5 });
 // D1 Phase 4: trigger one-time AI cache migration, then GC the legacy leftovers
 migrateAICacheToIDB().then(() => gcLegacyAICache()).catch(() => {});
 sweepAICacheMigrationBackup().catch(() => {});
+sweepSuggestCache().catch(() => {});
 
 async function syncPrewarmTagsAlarm() {
   const s = await loadSettings();
@@ -507,6 +508,7 @@ async function syncPrewarmTagsAlarm() {
   const shouldRun = s.tagSyncMode === "prewarmed" && !!s.pinboardToken;
   if (shouldRun && !existing) {
     chrome.alarms.create("prewarm-tags", { periodInMinutes: 15, delayInMinutes: 0.5 });
+    prewarmTagsNow().catch(() => {}); // populate now; don't wait ~30s for the first alarm
   } else if (!shouldRun && existing) {
     chrome.alarms.clear("prewarm-tags");
   }
@@ -519,11 +521,10 @@ async function prewarmTagsNow() {
     const resp = await pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${s.pinboardToken}&format=json`);
     if (!resp.ok) return;
     const data = await resp.json();
-    const tags = Object.entries(data)
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([tag]) => tag);
+    // Store only the count map + timestamp; the popup rebuilds the sorted tag list
+    // from counts on read (deterministic), so storing the array too is dead weight.
     await chrome.storage.local.set({
-      cached_user_tags: { tags, counts: data, timestamp: Date.now() }
+      cached_user_tags: { counts: data, timestamp: Date.now() }
     });
   } catch (e) {
     // Tag cache write failure: stale data hurts autocomplete UX, log it
@@ -621,6 +622,28 @@ async function gcLegacyAICache() {
   } catch (e) {
     console.warn("[ai-cache] legacy GC failed:", e?.message || e);
   }
+}
+
+// Recurring sweep of the per-URL suggest-tag cache (cached_suggest_*). The popup
+// writes one key per visited URL with a 10-min read-TTL but never evicts them, so
+// without this they accumulate unbounded in storage.local and slow reads. Gated to
+// ~once / 6h to bound the get(null) scan; drops entries older than 1h (past the TTL).
+const SUGGEST_SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const SUGGEST_STALE_MS = 60 * 60 * 1000;
+async function sweepSuggestCache() {
+  try {
+    const now = Date.now();
+    const { _suggestSweepTs = 0 } = await chrome.storage.local.get({ _suggestSweepTs: 0 });
+    if (now - _suggestSweepTs < SUGGEST_SWEEP_INTERVAL_MS) return;
+    const all = await chrome.storage.local.get(null);
+    const stale = Object.keys(all).filter((k) =>
+      k.startsWith("cached_suggest_") &&
+      (!all[k] || typeof all[k] !== "object" || (now - (all[k].timestamp || 0)) > SUGGEST_STALE_MS)
+    );
+    if (stale.length) await chrome.storage.local.remove(stale);
+    await chrome.storage.local.set({ _suggestSweepTs: now });
+    if (stale.length) console.log(`[suggest-cache] swept ${stale.length} stale entries`);
+  } catch (_) {}
 }
 
 // Startup: process offline queue + update badge + prime settings (cheap no-op when already primed)
