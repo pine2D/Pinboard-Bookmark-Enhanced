@@ -317,7 +317,7 @@ function showSummaryActions(fromCache) {
     e.preventDefault();
     removeSummary();
     wrap.remove();
-    btn.textContent = t("aiSummaryBtn");
+    setBtnIcon(btn, "robot", t("aiSummaryBtn"));
     btn.classList.remove("hidden", "loading");
     const hint = $id("ai-summary-hint");
     if (hint && settings.optShowAiSummary !== false) hint.classList.remove("hidden");

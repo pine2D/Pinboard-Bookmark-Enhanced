@@ -26,6 +26,17 @@ const PBP_ICONS = {
   cross: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
 };
 
+// Set a button's content to "icon + label" without losing the SVG icon. Use this
+// instead of `btn.textContent = label` on buttons that carry a .btn-ic SVG span,
+// otherwise textContent wipes the icon. iconKey is a PBP_ICONS key; label is plain text.
+function setBtnIcon(btn, iconKey, label) {
+  if (!btn) return;
+  const svg = PBP_ICONS[iconKey] || "";
+  btn.innerHTML = '<span class="btn-ic">' + svg + '</span><span>' + "" + '</span>';
+  // label set via textContent on the label span to avoid any HTML injection
+  btn.lastElementChild.textContent = label != null ? String(label) : "";
+}
+
 const DEFAULT_TAG_PROMPT = `Suggest 5-10 bookmark tags for the following webpage. {{lang_instruction}} Tags should be lowercase, {{separator_instruction}}. Return ONLY a JSON array.
 
 Title: {{title}}

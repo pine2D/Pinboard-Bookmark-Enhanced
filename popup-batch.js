@@ -9,8 +9,8 @@ function setupTabSet() {
 
   btn.addEventListener("click", async () => {
     btn.disabled = true;
-    const origText = btn.textContent;
-    btn.textContent = t("batchSaving");
+    const origLabel = t("saveTabsBtn");
+    setBtnIcon(btn, "tabs", t("batchSaving"));
 
     try {
       const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -20,7 +20,7 @@ function setupTabSet() {
 
       if (validTabs.length === 0) {
         showStatus("status-msg", t("batchNoValidTabs"), "error");
-        btn.textContent = origText;
+        setBtnIcon(btn, "tabs", origLabel);
         btn.disabled = false;
         return;
       }
@@ -42,16 +42,16 @@ function setupTabSet() {
         );
       });
 
-      btn.textContent = t("batchSent");
+      setBtnIcon(btn, "tabs", t("batchSent"));
       setTimeout(() => {
-        btn.textContent = origText;
+        setBtnIcon(btn, "tabs", origLabel);
         btn.disabled = false;
       }, 2000);
 
     } catch (e) {
       console.error("Save tab set error:", e);
       showStatus("status-msg", t("batchFailed", e.message), "error");
-      btn.textContent = origText;
+      setBtnIcon(btn, "tabs", origLabel);
       btn.disabled = false;
     }
   });
@@ -62,20 +62,20 @@ function setupTabSet() {
     pbpMark("batch-t0");
     let _batchFirstWriteMarked = false;
     batchBtn.disabled = true;
-    batchBtn.textContent = t("batchSaving");
+    setBtnIcon(batchBtn, "pin", t("batchSaving"));
     try {
       const rawToken = await (await getSettingsStorage()).get("pinboardToken");
       const pinboardToken = deobfuscateKey(rawToken.pinboardToken);
       if (!pinboardToken) {
         showStatus("status-msg", t("batchNotLoggedIn"), "error");
-        batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false;
+        setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
         return;
       }
       const tabs = await chrome.tabs.query({ currentWindow: true });
       const validTabs = tabs.filter(tab => tab.url && (tab.url.startsWith("http://") || tab.url.startsWith("https://")));
       if (!validTabs.length) {
         showStatus("status-msg", t("batchNoTabs"), "error");
-        batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false;
+        setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
         return;
       }
       const baseTags = settings.optBatchTagEnabled && settings.optBatchTag
@@ -91,7 +91,7 @@ function setupTabSet() {
           const granted = await chrome.permissions.request({ origins: ["*://*/*"] });
           if (!granted) {
             showStatus("status-msg", t("batchPermDenied"), "error");
-            batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false;
+            setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
             return;
           }
         }
@@ -123,7 +123,7 @@ function setupTabSet() {
       updateProgress(0);
       for (let i = 0; i < validTabs.length; i++) {
         const tab = validTabs[i];
-        batchBtn.textContent = t("batchProgress", String(i + 1), String(validTabs.length), String(saved), String(failed));
+        setBtnIcon(batchBtn, "pin", t("batchProgress", String(i + 1), String(validTabs.length), String(saved), String(failed)));
         updateProgress(i);
         if (settings.batchSkipExisting) {
           let isExisting = existingUrls.has(tab.url);
@@ -227,18 +227,18 @@ function setupTabSet() {
         const tagsSuffix = tagStr ? t("batchTaggedSuffix", tagStr) : "";
         chrome.runtime.sendMessage({ type: "show_notification", id: "batch-saved-" + Date.now(), title: t("bgBatchSaved"), message: t("batchSavedNotify", String(saved), tagsSuffix), category: "batchSave" });
       }
-      batchBtn.textContent = t("batchSavedCount", String(saved));
+      setBtnIcon(batchBtn, "pin", t("batchSavedCount", String(saved)));
       // Snap progress bar to 100% then fade out after 1.5s
       updateProgress(validTabs.length);
       setTimeout(() => {
         if (progress) progress.classList.add("hidden");
-        batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false;
+        setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
       }, 1500);
     } catch (e) {
       showStatus("status-msg", t("batchFailed", e.message), "error");
       const progress = $id("batch-progress");
       if (progress) progress.classList.add("hidden");
-      batchBtn.textContent = t("batchSaveBtn"); batchBtn.disabled = false;
+      setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
     }
   });
 }

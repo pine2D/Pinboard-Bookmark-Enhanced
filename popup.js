@@ -482,8 +482,8 @@ async function htmlToMarkdown(html) {
       const url = $id("url-input").value;
       if (!url) return;
 
-      const origText = jinaMdBtn.textContent;
-      jinaMdBtn.textContent = t("jinaConverting");
+      const origLabel = t("jinaMarkdownBtn");
+      setBtnIcon(jinaMdBtn, "doc", t("jinaConverting"));
       jinaMdBtn.disabled = true;
 
       let result;
@@ -505,7 +505,7 @@ async function htmlToMarkdown(html) {
         } else {
           showStatus("status-msg", t("jinaFailedDetail", result.error), "error");
         }
-        setTimeout(() => { jinaMdBtn.textContent = origText; jinaMdBtn.disabled = false; jinaMdBtn.title = ""; }, 2000);
+        setTimeout(() => { setBtnIcon(jinaMdBtn, "doc", origLabel); jinaMdBtn.disabled = false; jinaMdBtn.title = ""; }, 2000);
         return;
       }
 
@@ -516,7 +516,7 @@ async function htmlToMarkdown(html) {
         await navigator.clipboard.writeText(markdown);
       } catch (_) {
         jinaMdBtn.innerHTML = PBP_ICONS.cross + " " + t("jinaFailed");
-        setTimeout(() => { jinaMdBtn.textContent = origText; jinaMdBtn.disabled = false; }, 2000);
+        setTimeout(() => { setBtnIcon(jinaMdBtn, "doc", origLabel); jinaMdBtn.disabled = false; }, 2000);
         return;
       }
       jinaMdBtn.innerHTML = PBP_ICONS.check + " " + t("jinaCopied");
