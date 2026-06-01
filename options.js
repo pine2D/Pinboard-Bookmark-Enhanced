@@ -164,13 +164,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- API key show/hide toggle ----
+  // SVG (not emoji) — emoji here triggered a 1-3s Segoe UI Emoji font-load stall
+  // when the AI panel first rendered on Windows high-DPI. Set initial icon from JS
+  // so the static HTML eye glyph never reaches layout.
   document.querySelectorAll(".key-toggle").forEach(btn => {
+    btn.innerHTML = PBP_ICONS.eye;
     btn.addEventListener("click", () => {
       const input = $id(btn.dataset.target);
       if (input) {
         const isPassword = input.type === "password";
         input.type = isPassword ? "text" : "password";
-        btn.textContent = isPassword ? "🔒" : "👁";
+        btn.innerHTML = isPassword ? PBP_ICONS.eyeOff : PBP_ICONS.eye;
       }
     });
   });

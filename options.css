@@ -28,6 +28,10 @@
 
 /* ---- Base ---- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* Force monochrome text presentation for dual-presentation symbols (⚠ ✓ ✗ etc.)
+   so they never fall back to the color-emoji font (Segoe UI Emoji), which costs a
+   1-3s first-render stall on Windows high-DPI. True color emoji are handled via SVG. */
+:root { font-variant-emoji: text; }
 body { font-family: "Helvetica Neue", Verdana, sans-serif; background: #f5f5f0; color: #333; font-size: 13px; }
 .container { max-width: 700px; margin: 0 auto; padding: 24px 16px; }
 h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
@@ -138,8 +142,13 @@ html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--
 }
 .accordion-header:hover { color: #2255aa; }
 .accordion-header:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: -2px; }
-.accordion-arrow {
-  font-size: 10px; transition: transform 0.2s; display: inline-block; width: 12px;
+/* CSS border-triangle instead of the ▶ glyph (which fell back to Segoe UI Emoji
+   on Windows and caused a font-load stall). The rotate(90deg) on .open still works. */
+.accordion-arrow { display: inline-block; width: 12px; font-size: 0; transition: transform 0.2s; }
+.accordion-arrow::before {
+  content: ""; display: inline-block;
+  border-style: solid; border-width: 4px 0 4px 6px;
+  border-color: transparent transparent transparent currentColor;
 }
 .accordion-section.open .accordion-arrow { transform: rotate(90deg); }
 .accordion-body {
