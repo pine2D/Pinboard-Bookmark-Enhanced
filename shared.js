@@ -11,6 +11,20 @@ const ADAPTIVE_THEME_MAP = {
 const TEXTAREA_MIN_HEIGHT = 54;
 const TEXTAREA_MAX_HEIGHT = 300;
 const TAG_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+// Inline SVG icons — replace emoji/color-glyphs that trigger a 1-3s Segoe UI Emoji
+// font-load stall on Windows high-DPI Chrome (DirectWrite system-font enumeration,
+// cached process-wide after first paint). currentColor = inherits theme text color.
+const PBP_ICONS = {
+  eye: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="2"/></svg>',
+  eyeOff: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="2"/><path d="M2 2l12 12"/></svg>',
+  robot: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="5" width="10" height="8" rx="2"/><circle cx="6" cy="9" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="9" r="1" fill="currentColor" stroke="none"/><path d="M8 2v3M5.5 13v1M10.5 13v1"/></svg>',
+  tabs: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="4" width="9" height="9" rx="1.5"/><path d="M5 4V2.5h9V11h-1.5"/></svg>',
+  pin: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1.5v6M8 14.5V10M4 7.5h8l-1.5 2.5h-5L4 7.5Z"/></svg>',
+  doc: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 1.5h5l3 3v10H4Z"/><path d="M9 1.5v3h3"/></svg>',
+  pencil: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3L11 2.5Z"/></svg>',
+  check: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8.5l3.5 3.5L13 4.5"/></svg>',
+  cross: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+};
 
 const DEFAULT_TAG_PROMPT = `Suggest 5-10 bookmark tags for the following webpage. {{lang_instruction}} Tags should be lowercase, {{separator_instruction}}. Return ONLY a JSON array.
 
