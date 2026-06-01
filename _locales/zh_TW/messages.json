@@ -130,7 +130,7 @@
     "message": "AI 標籤"
   },
   "urlWarning": {
-    "message": "⚠ 此頁面無法儲存到 Pinboard（不支援的網址類型）"
+    "message": "此頁面無法儲存到 Pinboard（不支援的網址類型）"
   },
   "urlCannotSave": {
     "message": "無法儲存：不支援的網址類型"
@@ -151,7 +151,7 @@
     "message": "書籤已儲存"
   },
   "savedSuccess": {
-    "message": "✅ 已儲存！"
+    "message": "已儲存！"
   },
   "saveRetry": {
     "message": "重試"
@@ -172,7 +172,7 @@
     "message": "Ctrl+Enter"
   },
   "editingExisting": {
-    "message": "✏️ 正在編輯已有書籤"
+    "message": "正在編輯已有書籤"
   },
   "recentEditTitle": {
     "message": "載入並編輯"
@@ -794,7 +794,7 @@
     "message": "跳過已收藏的網址"
   },
   "batchAiHint": {
-    "message": "⚠ AI 功能會比較慢（每個分頁單獨調用 AI + 儲存間隔 3 秒）。需要「存取所有網站」權限以讀取非當前分頁內容，首次使用時會彈出授權。"
+    "message": "AI 功能會比較慢（每個分頁單獨調用 AI + 儲存間隔 3 秒）。需要「存取所有網站」權限以讀取非當前分頁內容，首次使用時會彈出授權。"
   },
   "batchPermDenied": {
     "message": "權限被拒絕——AI 功能需要存取所有網站以讀取分頁內容。"
@@ -1308,7 +1308,7 @@
     "message": "— 完全免費，本機執行"
   },
   "freeTierDisclaimer": {
-    "message": "⚠ 各服務商政策時常變動。以上資訊截至 2026-05，可能已失效。註冊時請以官方頁面為準。"
+    "message": "各服務商政策時常變動。以上資訊截至 2026-05，可能已失效。註冊時請以官方頁面為準。"
   },
   "freeTierResourcesPrefix": {
     "message": "更全面、更新更勤的清單："

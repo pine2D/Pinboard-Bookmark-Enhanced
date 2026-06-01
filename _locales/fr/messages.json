@@ -130,7 +130,7 @@
     "message": "Tags IA"
   },
   "urlWarning": {
-    "message": "⚠ Cette page ne peut pas être enregistrée sur Pinboard (URL non prise en charge)"
+    "message": "Cette page ne peut pas être enregistrée sur Pinboard (URL non prise en charge)"
   },
   "urlCannotSave": {
     "message": "Impossible d'enregistrer : URL non prise en charge"
@@ -151,7 +151,7 @@
     "message": "Signet enregistré."
   },
   "savedSuccess": {
-    "message": "✅ Enregistré !"
+    "message": "Enregistré !"
   },
   "saveRetry": {
     "message": "Réessayer"
@@ -172,7 +172,7 @@
     "message": "Ctrl+Entrée"
   },
   "editingExisting": {
-    "message": "✏️ Modification du signet existant"
+    "message": "Modification du signet existant"
   },
   "recentEditTitle": {
     "message": "Charger pour modifier"
@@ -794,7 +794,7 @@
     "message": "Ignorer les URL déjà enregistrées"
   },
   "batchAiHint": {
-    "message": "⚠ Les fonctionnalités IA seront lentes (appel IA par onglet + 3 s entre les sauvegardes). Requiert l'autorisation d'accès à tous les sites pour lire les onglets non actifs — demandée lors de la première utilisation."
+    "message": "Les fonctionnalités IA seront lentes (appel IA par onglet + 3 s entre les sauvegardes). Requiert l'autorisation d'accès à tous les sites pour lire les onglets non actifs — demandée lors de la première utilisation."
   },
   "batchPermDenied": {
     "message": "Autorisation refusée — les fonctionnalités IA nécessitent l'accès à tous les sites web pour lire le contenu des onglets."
@@ -1308,7 +1308,7 @@
     "message": "— entièrement gratuit, fonctionne en local."
   },
   "freeTierDisclaimer": {
-    "message": "⚠ Les politiques des fournisseurs changent souvent. Informations à jour en mai 2026, susceptibles d'être inexactes. Vérifiez les limites actuelles à l'inscription."
+    "message": "Les politiques des fournisseurs changent souvent. Informations à jour en mai 2026, susceptibles d'être inexactes. Vérifiez les limites actuelles à l'inscription."
   },
   "freeTierResourcesPrefix": {
     "message": "Listes plus complètes, régulièrement mises à jour :"

@@ -130,7 +130,7 @@
     "message": "Tagi AI"
   },
   "urlWarning": {
-    "message": "⚠ Tej strony nie można zapisać w Pinboard (nieobsługiwany URL)"
+    "message": "Tej strony nie można zapisać w Pinboard (nieobsługiwany URL)"
   },
   "urlCannotSave": {
     "message": "Nie można zapisać: nieobsługiwany URL"
@@ -151,7 +151,7 @@
     "message": "Zakładka zapisana."
   },
   "savedSuccess": {
-    "message": "✅ Zapisano!"
+    "message": "Zapisano!"
   },
   "saveRetry": {
     "message": "Ponów"
@@ -172,7 +172,7 @@
     "message": "Ctrl+Enter"
   },
   "editingExisting": {
-    "message": "✏️ Edytowanie istniejącej zakładki"
+    "message": "Edytowanie istniejącej zakładki"
   },
   "recentEditTitle": {
     "message": "Załaduj do edycji"
@@ -794,7 +794,7 @@
     "message": "Pomiń już dodane URL-e"
   },
   "batchAiHint": {
-    "message": "⚠ Funkcje AI będą wolne (osobne wywołanie AI na kartę + 3s odstęp). Wymaga uprawnienia 'Dostęp do wszystkich stron' do odczytu nieaktywnych kart — zapytanie przy pierwszym użyciu."
+    "message": "Funkcje AI będą wolne (osobne wywołanie AI na kartę + 3s odstęp). Wymaga uprawnienia 'Dostęp do wszystkich stron' do odczytu nieaktywnych kart — zapytanie przy pierwszym użyciu."
   },
   "batchPermDenied": {
     "message": "Odmówiono uprawnień — funkcje AI wymagają dostępu do wszystkich stron, aby odczytać zawartość kart."
@@ -1308,7 +1308,7 @@
     "message": "— całkowicie darmowy, działa lokalnie."
   },
   "freeTierDisclaimer": {
-    "message": "⚠ Polityki dostawców często się zmieniają. Informacje na maj 2026, mogą być niedokładne. Sprawdź aktualne limity przy rejestracji."
+    "message": "Polityki dostawców często się zmieniają. Informacje na maj 2026, mogą być niedokładne. Sprawdź aktualne limity przy rejestracji."
   },
   "freeTierResourcesPrefix": {
     "message": "Pełniejsze, regularnie aktualizowane listy:"

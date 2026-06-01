@@ -130,7 +130,7 @@
     "message": "AI Tags"
   },
   "urlWarning": {
-    "message": "⚠ This page cannot be saved to Pinboard (unsupported URL)"
+    "message": "This page cannot be saved to Pinboard (unsupported URL)"
   },
   "urlCannotSave": {
     "message": "Cannot save: unsupported URL"
@@ -151,7 +151,7 @@
     "message": "Bookmark saved."
   },
   "savedSuccess": {
-    "message": "✅ Saved!"
+    "message": "Saved!"
   },
   "saveRetry": {
     "message": "Retry"
@@ -172,7 +172,7 @@
     "message": "Ctrl+Enter"
   },
   "editingExisting": {
-    "message": "✏️ Editing existing bookmark"
+    "message": "Editing existing bookmark"
   },
   "recentEditTitle": {
     "message": "Load for editing"
@@ -794,7 +794,7 @@
     "message": "Skip already bookmarked URLs"
   },
   "batchAiHint": {
-    "message": "⚠ AI features will be slow (separate AI call per tab + 3s rate limit). Requires \"Access all websites\" permission to read non-active tabs — prompted on first use."
+    "message": "AI features will be slow (separate AI call per tab + 3s rate limit). Requires \"Access all websites\" permission to read non-active tabs — prompted on first use."
   },
   "batchPermDenied": {
     "message": "Permission denied — AI features need access to all websites to read tab content."
@@ -1308,7 +1308,7 @@
     "message": "— fully free, runs locally on your machine."
   },
   "freeTierDisclaimer": {
-    "message": "⚠ Provider policies change frequently. Information above is current as of 2026-05 and may be inaccurate. Always verify current limits at signup."
+    "message": "Provider policies change frequently. Information above is current as of 2026-05 and may be inaccurate. Always verify current limits at signup."
   },
   "freeTierResourcesPrefix": {
     "message": "More complete, regularly-updated lists:"

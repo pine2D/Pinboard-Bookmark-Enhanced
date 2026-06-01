@@ -24,6 +24,7 @@ const PBP_ICONS = {
   pencil: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3L11 2.5Z"/></svg>',
   check: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8.5l3.5 3.5L13 4.5"/></svg>',
   cross: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  warning: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 2 15 14H1Z"/><path d="M8 6.5v3.5" stroke-linecap="round"/><circle cx="8" cy="12" r="0.6" fill="currentColor" stroke="none"/></svg>',
 };
 
 // Set a button's content to "icon + label" without losing the SVG icon. Use this
@@ -426,7 +427,13 @@ function showFeedback({ variant = "info", title = "", message = "", actions = []
 
   const icon = document.createElement("span");
   icon.className = "fc-icon";
-  icon.textContent = { error: "⚠︎", success: "✓", warning: "!", info: "ℹ︎" }[variant] || "ℹ︎";
+  // error/warning use the inline-SVG warning triangle (a literal ⚠ pulls Segoe UI
+  // Emoji on Windows → ~1.6s first-render stall); success/info are plain text chars.
+  if (variant === "error" || variant === "warning") {
+    icon.innerHTML = PBP_ICONS.warning;
+  } else {
+    icon.textContent = { success: "✓", info: "ℹ︎" }[variant] || "ℹ︎";
+  }
   card.appendChild(icon);
 
   const body = document.createElement("div");

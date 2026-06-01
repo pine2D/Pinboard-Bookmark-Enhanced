@@ -130,7 +130,7 @@
     "message": "AI Tags"
   },
   "urlWarning": {
-    "message": "⚠ Diese Seite kann nicht in Pinboard gespeichert werden (nicht unterstützte URL)"
+    "message": "Diese Seite kann nicht in Pinboard gespeichert werden (nicht unterstützte URL)"
   },
   "urlCannotSave": {
     "message": "Speichern nicht möglich: nicht unterstützte URL"
@@ -151,7 +151,7 @@
     "message": "Lesezeichen gespeichert."
   },
   "savedSuccess": {
-    "message": "✅ Gespeichert!"
+    "message": "Gespeichert!"
   },
   "saveRetry": {
     "message": "Wiederholen"
@@ -172,7 +172,7 @@
     "message": "Strg+Eingabe"
   },
   "editingExisting": {
-    "message": "✏️ Vorhandenes Lesezeichen bearbeiten"
+    "message": "Vorhandenes Lesezeichen bearbeiten"
   },
   "recentEditTitle": {
     "message": "Zum Bearbeiten laden"
@@ -794,7 +794,7 @@
     "message": "Bereits gespeicherte URLs überspringen"
   },
   "batchAiHint": {
-    "message": "⚠ AI-Funktionen sind langsam (separater AI-Aufruf pro Tab + 3s Wartezeit). Erfordert die Berechtigung 'Zugriff auf alle Websites' zum Lesen nicht aktiver Tabs — wird bei der ersten Nutzung angefordert."
+    "message": "AI-Funktionen sind langsam (separater AI-Aufruf pro Tab + 3s Wartezeit). Erfordert die Berechtigung 'Zugriff auf alle Websites' zum Lesen nicht aktiver Tabs — wird bei der ersten Nutzung angefordert."
   },
   "batchPermDenied": {
     "message": "Berechtigung verweigert — AI-Funktionen benötigen Zugriff auf alle Websites, um Tab-Inhalte zu lesen."
@@ -1308,7 +1308,7 @@
     "message": "— komplett kostenlos, läuft lokal."
   },
   "freeTierDisclaimer": {
-    "message": "⚠ Anbieter-Richtlinien ändern sich häufig. Stand: Mai 2026, kann veraltet sein. Bitte aktuelle Limits bei der Anmeldung prüfen."
+    "message": "Anbieter-Richtlinien ändern sich häufig. Stand: Mai 2026, kann veraltet sein. Bitte aktuelle Limits bei der Anmeldung prüfen."
   },
   "freeTierResourcesPrefix": {
     "message": "Umfassendere, regelmäßig aktualisierte Listen:"

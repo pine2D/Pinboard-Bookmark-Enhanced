@@ -130,7 +130,7 @@
     "message": "AI 标签"
   },
   "urlWarning": {
-    "message": "⚠ 此页面无法保存到 Pinboard（不支持的网址类型）"
+    "message": "此页面无法保存到 Pinboard（不支持的网址类型）"
   },
   "urlCannotSave": {
     "message": "无法保存：不支持的网址类型"
@@ -151,7 +151,7 @@
     "message": "书签已保存"
   },
   "savedSuccess": {
-    "message": "✅ 已保存！"
+    "message": "已保存！"
   },
   "saveRetry": {
     "message": "重试"
@@ -172,7 +172,7 @@
     "message": "Ctrl+Enter"
   },
   "editingExisting": {
-    "message": "✏️ 正在编辑已有书签"
+    "message": "正在编辑已有书签"
   },
   "recentEditTitle": {
     "message": "加载并编辑"
@@ -794,7 +794,7 @@
     "message": "跳过已收藏的网址"
   },
   "batchAiHint": {
-    "message": "⚠ AI 功能会比较慢（每个标签页单独调用 AI + 保存间隔 3 秒）。需要「访问所有网站」权限以读取非当前标签页内容，首次使用时会弹出授权。"
+    "message": "AI 功能会比较慢（每个标签页单独调用 AI + 保存间隔 3 秒）。需要「访问所有网站」权限以读取非当前标签页内容，首次使用时会弹出授权。"
   },
   "batchPermDenied": {
     "message": "权限被拒绝——AI 功能需要访问所有网站以读取标签页内容。"
@@ -1308,7 +1308,7 @@
     "message": "— 完全免费，本地运行"
   },
   "freeTierDisclaimer": {
-    "message": "⚠ 各提供商政策经常变化。以上信息截至 2026-05，可能已失效。注册时请以官方页面为准。"
+    "message": "各提供商政策经常变化。以上信息截至 2026-05，可能已失效。注册时请以官方页面为准。"
   },
   "freeTierResourcesPrefix": {
     "message": "更全面、更新更勤的清单："
