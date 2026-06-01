@@ -48,7 +48,7 @@
           <div class="notes-bar">
             <span id="desc-char-count">0</span>
             <span id="ai-summary-hint" class="kb-hint" data-i18n="aiSummaryBtnTitle"></span>
-            <button type="button" id="ai-summary-btn" class="action-link" data-i18n="aiSummaryBtn" data-i18n-title="aiSummaryBtnTitle">🤖 AI summary</button>
+            <button type="button" id="ai-summary-btn" class="action-link" data-i18n-title="aiSummaryBtnTitle"><span class="btn-ic" data-ic="robot"></span><span data-i18n="aiSummaryBtn">AI summary</span></button>
           </div>
         </div>
       </div>
@@ -82,11 +82,11 @@
       <div class="row">
         <span class="label top" data-i18n="labelAiTags">AI Tags</span>
         <div class="field">
-          <div id="ai-suggest-tags" class="suggest-area"><button type="button" id="ai-tags-btn" class="action-link" data-i18n="aiGenerateBtn">🤖 generate</button></div>
+          <div id="ai-suggest-tags" class="suggest-area"><button type="button" id="ai-tags-btn" class="action-link"><span class="btn-ic" data-ic="robot"></span><span data-i18n="aiGenerateBtn">generate</span></button></div>
         </div>
       </div>
       <div id="ai-error-card" class="feedback-card hidden" data-variant="error" role="alert" aria-live="polite">
-        <span class="fc-icon">⚠️</span>
+        <span class="fc-icon">⚠</span>
         <div class="fc-body">
           <div id="ai-error-title" class="fc-title"></div>
           <div id="ai-error-message" class="fc-message"></div>
@@ -129,9 +129,9 @@
       <a href="https://pinboard.in/popular/" target="_blank" title="Popular" data-i18n="qlPopular" data-i18n-title="qlPopularTitle">Popular</a>
     </div>
     <div class="quick-row">
-      <button id="save-tabset-btn" class="qbtn" title="Save all open tabs as a tab set (requires pinboard.in login)" data-i18n="saveTabsBtn" data-i18n-title="saveTabsTitle">📑 Save Tabs</button>
-      <button id="batch-bookmark-btn" class="qbtn" title="Save each open tab as an individual bookmark" data-i18n="batchSaveBtn" data-i18n-title="batchSaveTitle">📌 Batch Save</button>
-      <button id="jina-md-btn" class="qbtn" title="" data-i18n="jinaMarkdownBtn">📄 Markdown</button>
+      <button id="save-tabset-btn" class="qbtn" data-i18n-title="saveTabsTitle"><span class="btn-ic" data-ic="tabs"></span><span data-i18n="saveTabsBtn">Save Tabs</span></button>
+      <button id="batch-bookmark-btn" class="qbtn" data-i18n-title="batchSaveTitle"><span class="btn-ic" data-ic="pin"></span><span data-i18n="batchSaveBtn">Batch Save</span></button>
+      <button id="jina-md-btn" class="qbtn" title="" data-i18n-title="jinaMarkdownBtn"><span class="btn-ic" data-ic="doc"></span><span class="jina-md-label" data-i18n="jinaMarkdownBtn">Markdown</span></button>
     </div>
     <div id="batch-progress" class="batch-progress hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
       <div id="batch-progress-fill" class="batch-progress-fill"></div>

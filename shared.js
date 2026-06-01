@@ -415,7 +415,7 @@ function showFeedback({ variant = "info", title = "", message = "", actions = []
 
   const icon = document.createElement("span");
   icon.className = "fc-icon";
-  icon.textContent = { error: "⚠️", success: "✓", warning: "!", info: "ℹ" }[variant] || "ℹ";
+  icon.textContent = { error: "⚠︎", success: "✓", warning: "!", info: "ℹ︎" }[variant] || "ℹ︎";
   card.appendChild(icon);
 
   const body = document.createElement("div");

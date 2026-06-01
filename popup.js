@@ -82,6 +82,7 @@ function _renderCleanHint({ removedCount, original }) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  document.querySelectorAll(".btn-ic[data-ic]").forEach(s => { s.innerHTML = PBP_ICONS[s.dataset.ic] || ""; });
   initI18n();
   applyI18n();
 
@@ -496,7 +497,7 @@ async function htmlToMarkdown(html) {
       }
 
       if (result.error) {
-        jinaMdBtn.textContent = "❌ " + t("jinaFailed");
+        jinaMdBtn.innerHTML = PBP_ICONS.cross + " " + t("jinaFailed");
         jinaMdBtn.title = result.error;
         // Persistent, specific status — so the user can tell API-key vs other failures
         if (settings.aiContentSource === "jina" && result.authFailed) {
@@ -514,14 +515,14 @@ async function htmlToMarkdown(html) {
       try {
         await navigator.clipboard.writeText(markdown);
       } catch (_) {
-        jinaMdBtn.textContent = "❌ " + t("jinaFailed");
+        jinaMdBtn.innerHTML = PBP_ICONS.cross + " " + t("jinaFailed");
         setTimeout(() => { jinaMdBtn.textContent = origText; jinaMdBtn.disabled = false; }, 2000);
         return;
       }
-      jinaMdBtn.textContent = "✅ " + t("jinaCopied");
+      jinaMdBtn.innerHTML = PBP_ICONS.check + " " + t("jinaCopied");
 
       setTimeout(() => {
-        jinaMdBtn.textContent = "👁 " + t("jinaViewBtn");
+        jinaMdBtn.innerHTML = PBP_ICONS.eye + " " + t("jinaViewBtn");
         jinaMdBtn.disabled = false;
         jinaMdBtn.onclick = async () => {
           await chrome.storage.local.set({
@@ -664,7 +665,7 @@ function setupSubmit(token) {
     } else if (state === "error") {
       btn.disabled = false;
       btn.classList.add("save-error");
-      btn.textContent = label || `↻ ${t("saveRetry")}`;
+      btn.textContent = label || ("↻︎ " + t("saveRetry"));
     } else { // idle
       btn.disabled = false;
       btn.textContent = submitOriginalText;
@@ -920,7 +921,7 @@ async function fetchRecentBookmarks(token) {
       row.appendChild(a);
       const edit = document.createElement("span");
       edit.className = "recent-bm-edit";
-      edit.textContent = "✏️";
+      edit.innerHTML = PBP_ICONS.pencil;
       edit.title = t("recentEditTitle");
       edit.addEventListener("click", async (e) => {
         e.preventDefault();

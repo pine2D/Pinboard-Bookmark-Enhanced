@@ -49,7 +49,7 @@
     const chev = $id("offline-queue-chevron");
     const toggle = $id("offline-queue-toggle");
     if (list) { list.classList.add("hidden"); clearChildren(list); }
-    if (chev) chev.textContent = "▸";
+    if (chev) chev.textContent = "▸︎";
     if (toggle) toggle.setAttribute("aria-expanded", "false");
   }
 
@@ -63,7 +63,7 @@
     const toggle = $id("offline-queue-toggle");
     if (!list) return;
     list.classList.remove("hidden");
-    if (chev) chev.textContent = "▾";
+    if (chev) chev.textContent = "▾︎";
     if (toggle) toggle.setAttribute("aria-expanded", "true");
     clearChildren(list);
     if (!queue.length) {
@@ -101,7 +101,7 @@
       const retry = document.createElement("button");
       retry.type = "button";
       retry.className = "offline-queue-retry";
-      retry.textContent = "↻";
+      retry.textContent = "↻︎";
       retry.title = t("offlineRetry");
       retry.addEventListener("click", () => onRetry(idx, retry));
 
@@ -140,7 +140,7 @@
       });
       if (!ok) {
         btn.disabled = false;
-        btn.textContent = "↻";
+        btn.textContent = "↻︎";
         btn.classList.add("offline-queue-failed");
         setTimeout(() => btn.classList.remove("offline-queue-failed"), 1200);
         return;
@@ -149,7 +149,7 @@
       await refreshBar();
     } catch (_) {
       btn.disabled = false;
-      btn.textContent = "↻";
+      btn.textContent = "↻︎";
     }
   }
 
