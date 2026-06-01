@@ -46,8 +46,13 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .reset-tab-btn:hover { color: #c00; border-color: #c00; }
 
 /* ---- Panels ---- */
-.panel { background: #fff; border: 1px solid #ccc; border-top: none; padding: 16px; visibility: hidden; height: 0; overflow: hidden; padding: 0; border-width: 0; }
-.panel.active { visibility: visible; height: auto; overflow: visible; padding: 16px; border-width: 0 1px 1px 1px; animation: panelFadeIn 0.18s ease; }
+/* display:none (not visibility:hidden) so opening Settings only lays out the active
+   panel, not all 6 (the AI panel alone is ~350 nodes — laying out all panels at once
+   cost seconds at 4K). Inactive panels lay out lazily on first tab-switch; that switch
+   used to be slow too, but the emoji→SVG fix removed the per-panel stall, so both
+   open AND switch are now fast. */
+.panel { background: #fff; border: 1px solid #ccc; border-top: none; display: none; }
+.panel.active { display: block; padding: 16px; border-width: 0 1px 1px 1px; animation: panelFadeIn 0.18s ease; }
 @keyframes panelFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ---- Form groups ---- */
@@ -153,6 +158,11 @@ html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--
 .accordion-section.open .accordion-arrow { transform: rotate(90deg); }
 .accordion-body {
   display: none; padding: 0 0 12px 18px;
+  /* Layout isolation: the 3 Quick-Actions accordions ship open, so switching to
+     that tab laid out all their bodies at once (~153ms at 4K, felt like ~1s with
+     paint). contain:layout keeps each body's internal layout from joining the
+     panel-wide reflow, dropping first-layout cost to ~0 without changing the UX. */
+  contain: layout style;
 }
 .accordion-section.open .accordion-body { display: block; }
 
