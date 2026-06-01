@@ -205,13 +205,13 @@
     }
   },
   "aiSummaryBtn": {
-    "message": "🤖 AI 摘要"
+    "message": "AI 摘要"
   },
   "aiSummaryBtnTitle": {
     "message": "Shift+Enter"
   },
   "aiGenerateBtn": {
-    "message": "🤖 生成"
+    "message": "生成"
   },
   "aiSummarizing": {
     "message": "生成摘要中..."
@@ -338,13 +338,13 @@
     "message": "热门"
   },
   "saveTabsBtn": {
-    "message": "📑 保存标签页"
+    "message": "保存标签页"
   },
   "batchSaveBtn": {
-    "message": "📌 批量保存"
+    "message": "批量保存"
   },
   "batchSaving": {
-    "message": "⏳ 保存中..."
+    "message": "保存中..."
   },
   "batchNoValidTabs": {
     "message": "没有可保存的标签页"
@@ -356,10 +356,10 @@
     "message": "尚未登录"
   },
   "batchSent": {
-    "message": "✅ 已发送！"
+    "message": "已发送！"
   },
   "batchProgress": {
-    "message": "⏳ $CURRENT$/$TOTAL$（✓$SAVED$ ✗$FAILED$）",
+    "message": "$CURRENT$/$TOTAL$（✓$SAVED$ ✗$FAILED$）",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -403,7 +403,7 @@
     }
   },
   "batchSavedCount": {
-    "message": "✅ 已保存 $COUNT$ 个",
+    "message": "已保存 $COUNT$ 个",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1155,7 +1155,7 @@
     "message": "自定义 OpenAI 兼容"
   },
   "jinaMarkdownBtn": {
-    "message": "📄 Markdown"
+    "message": "Markdown"
   },
   "jinaMarkdownTitle": {
     "message": "将页面转换为 Markdown（本地）"
@@ -1164,7 +1164,7 @@
     "message": "将页面转换为 Markdown（Jina Reader）"
   },
   "jinaConverting": {
-    "message": "⏳ 转换中..."
+    "message": "转换中..."
   },
   "jinaCopied": {
     "message": "已复制!"
@@ -1363,7 +1363,7 @@
   },
   "emptyRecentBookmarks": { "message": "暂无最近书签" },
   "emptyTagSuggestions":  { "message": "暂无标签建议" },
-  "emptyAiTagsHint":      { "message": "点击 🤖 生成" },
+ "emptyAiTagsHint":      { "message": "点击生成" },
   "optPopupWidthTitle":   { "message": "Popup 宽度" },
   "optPopupWidth480":     { "message": "紧凑 (480px)" },
   "optPopupWidth520":     { "message": "标准 (520px)" },

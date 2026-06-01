@@ -205,13 +205,13 @@
     }
   },
   "aiSummaryBtn": {
-    "message": "🤖 AI Zusammenfassung"
+    "message": "AI Zusammenfassung"
   },
   "aiSummaryBtnTitle": {
     "message": "Umschalt+Eingabe"
   },
   "aiGenerateBtn": {
-    "message": "🤖 Generieren"
+    "message": "Generieren"
   },
   "aiSummarizing": {
     "message": "Zusammenfassung wird erstellt..."
@@ -338,13 +338,13 @@
     "message": "Beliebt"
   },
   "saveTabsBtn": {
-    "message": "📑 Tabs speichern"
+    "message": "Tabs speichern"
   },
   "batchSaveBtn": {
-    "message": "📌 Stapelspeicherung"
+    "message": "Stapelspeicherung"
   },
   "batchSaving": {
-    "message": "⏳ Speichern..."
+    "message": "Speichern..."
   },
   "batchNoValidTabs": {
     "message": "Keine gültigen Tabs zum Speichern"
@@ -356,10 +356,10 @@
     "message": "Nicht angemeldet"
   },
   "batchSent": {
-    "message": "✅ Gesendet!"
+    "message": "Gesendet!"
   },
   "batchProgress": {
-    "message": "⏳ $CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -403,7 +403,7 @@
     }
   },
   "batchSavedCount": {
-    "message": "✅ $COUNT$ gespeichert",
+    "message": "$COUNT$ gespeichert",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1155,7 +1155,7 @@
     "message": "Custom OpenAI-compatible"
   },
   "jinaMarkdownBtn": {
-    "message": "📄 Markdown"
+    "message": "Markdown"
   },
   "jinaMarkdownTitle": {
     "message": "Convert page to Markdown (Local)"
@@ -1164,7 +1164,7 @@
     "message": "Convert page to Markdown (Jina Reader)"
   },
   "jinaConverting": {
-    "message": "⏳ Converting..."
+    "message": "Converting..."
   },
   "jinaCopied": {
     "message": "Copied!"
@@ -1363,7 +1363,7 @@
   },
   "emptyRecentBookmarks": { "message": "Keine aktuellen Lesezeichen" },
   "emptyTagSuggestions":  { "message": "Keine Tag-Vorschläge" },
-  "emptyAiTagsHint":      { "message": "Klicken Sie auf 🤖, um zu generieren" },
+  "emptyAiTagsHint":      { "message": "Zum Generieren klicken" },
   "optPopupWidthTitle":   { "message": "Popup-Breite" },
   "optPopupWidth480":     { "message": "Kompakt (480px)" },
   "optPopupWidth520":     { "message": "Standard (520px)" },

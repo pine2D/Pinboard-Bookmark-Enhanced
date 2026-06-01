@@ -205,13 +205,13 @@
     }
   },
   "aiSummaryBtn": {
-    "message": "🤖 AI 要約"
+    "message": "AI 要約"
   },
   "aiSummaryBtnTitle": {
     "message": "Shift+Enter"
   },
   "aiGenerateBtn": {
-    "message": "🤖 生成"
+    "message": "生成"
   },
   "aiSummarizing": {
     "message": "要約を生成中..."
@@ -338,13 +338,13 @@
     "message": "人気"
   },
   "saveTabsBtn": {
-    "message": "📑 タブを保存"
+    "message": "タブを保存"
   },
   "batchSaveBtn": {
-    "message": "📌 一括保存"
+    "message": "一括保存"
   },
   "batchSaving": {
-    "message": "⏳ 保存中..."
+    "message": "保存中..."
   },
   "batchNoValidTabs": {
     "message": "保存できるタブがありません"
@@ -356,10 +356,10 @@
     "message": "ログインしていません"
   },
   "batchSent": {
-    "message": "✅ 送信しました！"
+    "message": "送信しました！"
   },
   "batchProgress": {
-    "message": "⏳ $CURRENT$/$TOTAL$（✓$SAVED$ ✗$FAILED$）",
+    "message": "$CURRENT$/$TOTAL$（✓$SAVED$ ✗$FAILED$）",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -403,7 +403,7 @@
     }
   },
   "batchSavedCount": {
-    "message": "✅ $COUNT$ 件保存",
+    "message": "$COUNT$ 件保存",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1155,7 +1155,7 @@
     "message": "カスタム OpenAI互換"
   },
   "jinaMarkdownBtn": {
-    "message": "📄 Markdown"
+    "message": "Markdown"
   },
   "jinaMarkdownTitle": {
     "message": "ページを Markdown に変換（ローカル）"
@@ -1164,7 +1164,7 @@
     "message": "ページを Markdown に変換（Jina Reader）"
   },
   "jinaConverting": {
-    "message": "⏳ 変換中..."
+    "message": "変換中..."
   },
   "jinaCopied": {
     "message": "コピー済み!"
@@ -1363,7 +1363,7 @@
   },
   "emptyRecentBookmarks": { "message": "最近のブックマークはありません" },
   "emptyTagSuggestions":  { "message": "タグの候補はありません" },
-  "emptyAiTagsHint":      { "message": "🤖 をクリックして生成" },
+ "emptyAiTagsHint":      { "message": "クリックして生成" },
   "optPopupWidthTitle":   { "message": "ポップアップの幅" },
   "optPopupWidth480":     { "message": "コンパクト (480px)" },
   "optPopupWidth520":     { "message": "標準 (520px)" },

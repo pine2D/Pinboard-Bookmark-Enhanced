@@ -205,13 +205,13 @@
     }
   },
   "aiSummaryBtn": {
-    "message": "🤖 AI-аннотация"
+    "message": "AI-аннотация"
   },
   "aiSummaryBtnTitle": {
     "message": "Shift+Enter"
   },
   "aiGenerateBtn": {
-    "message": "🤖 сгенерировать"
+    "message": "сгенерировать"
   },
   "aiSummarizing": {
     "message": "генерация аннотации..."
@@ -338,13 +338,13 @@
     "message": "популярные"
   },
   "saveTabsBtn": {
-    "message": "📑 Сохранить вкладки"
+    "message": "Сохранить вкладки"
   },
   "batchSaveBtn": {
-    "message": "📌 Пакетное сохранение"
+    "message": "Пакетное сохранение"
   },
   "batchSaving": {
-    "message": "⌛ Сохранение..."
+    "message": "Сохранение..."
   },
   "batchNoValidTabs": {
     "message": "Нет подходящих вкладок для сохранения"
@@ -356,10 +356,10 @@
     "message": "Вы не авторизованы"
   },
   "batchSent": {
-    "message": "✅ Отправлено!"
+    "message": "Отправлено!"
   },
   "batchProgress": {
-    "message": "⌛ $CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -403,7 +403,7 @@
     }
   },
   "batchSavedCount": {
-    "message": "✅ $COUNT$ сохранено",
+    "message": "$COUNT$ сохранено",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1155,7 +1155,7 @@
     "message": "Custom OpenAI-compatible"
   },
   "jinaMarkdownBtn": {
-    "message": "📄 Markdown"
+    "message": "Markdown"
   },
   "jinaMarkdownTitle": {
     "message": "Convert page to Markdown (Local)"
@@ -1164,7 +1164,7 @@
     "message": "Convert page to Markdown (Jina Reader)"
   },
   "jinaConverting": {
-    "message": "⏳ Converting..."
+    "message": "Converting..."
   },
   "jinaCopied": {
     "message": "Copied!"
@@ -1363,7 +1363,7 @@
   },
   "emptyRecentBookmarks": { "message": "Нет недавних закладок" },
   "emptyTagSuggestions":  { "message": "Нет предложений тегов" },
-  "emptyAiTagsHint":      { "message": "Нажмите 🤖, чтобы создать" },
+ "emptyAiTagsHint":      { "message": "Нажмите, чтобы создать" },
   "optPopupWidthTitle":   { "message": "Ширина всплывающего окна" },
   "optPopupWidth480":     { "message": "Компактная (480px)" },
   "optPopupWidth520":     { "message": "Стандартная (520px)" },
