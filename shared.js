@@ -203,9 +203,15 @@ function _executePinboardFetch(url, options, resolve, reject) {
 
 // ---- Pinboard posts/add URI builder ----
 // Pinboard's CGI only reads query-string params (POST body is ignored, verified 2026-04-23),
-// so every field must fit in the URI. Server returns 414 around ~3KB. CJK chars encode to
-// 9 bytes each, so ~266 CJK chars alone can blow the budget. 2500 leaves headroom.
-const POSTS_ADD_URI_BUDGET = 2500;
+// so every field must fit in the request URI. Measured 2026-06-02 (invalid-token probe): the
+// server returns 414 once the full URI exceeds ~4100 bytes (flips between 4100 and 4110 — the
+// cap is on the HTTP request line). CJK chars cost 9 bytes each once percent-encoded (3 UTF-8
+// bytes → %XX%XX%XX), so notes fill the budget fast. 3900 sits ~200 bytes below the 414 cliff
+// and allows ~3700 bytes of encoded fields. The earlier 2500 was over-conservative and rejected
+// mixed-CJK notes that Pinboard's own web form accepts (the form POSTs to the site, bypassing
+// the URI-bound API). Every save path (popup, batch, background) and the live char counter use
+// buildPostsAddUri below, so the measured length equals what is actually sent.
+const POSTS_ADD_URI_BUDGET = 3900;
 function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", shared, toread, replace = true }) {
   const enc = encodeURIComponent;
   let uri = `https://api.pinboard.in/v1/posts/add?auth_token=${token}&format=json`;
