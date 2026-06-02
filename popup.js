@@ -577,6 +577,10 @@ async function checkExistingBookmark(token, url, prefetch) {
     if (!data) {
       const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?url=${enc(url)}&auth_token=${token}&format=json`);
       if (resp.status === 401) return; // pinboardFetch already redirected to login
+      if (resp.status === 0) return;   // network unreachable (offline / blocked / proxy) — the SW
+                                       // proxy returns status 0 on a failed fetch. Skip the
+                                       // existing-bookmark lookup silently; saving still works
+                                       // (offline queue) and surfacing a red "HTTP 0" is just noise.
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       data = await resp.json();
     }
