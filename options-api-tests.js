@@ -37,12 +37,12 @@ function setupApiTests() {
       if (!hasAIKey(cs)) throw new Error(t("testNoApiKey"));
       const result = await callAI(cs, "Reply with just the word: OK");
 
-      statusEl.textContent = t("testConnected", (result || "OK").substring(0, 20));
+      setStatusIcon(statusEl, true, t("testConnected", (result || "OK").substring(0, 20)));
       statusEl.style.color = "#080";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 4000);
     } catch (err) {
       const msg = err.name === "AbortError" ? t("testTimeout") : err.message;
-      statusEl.textContent = `✗ ${msg}`;
+      setStatusIcon(statusEl, false, msg);
       statusEl.style.color = "#c00";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
     }
@@ -80,7 +80,7 @@ function setupApiTests() {
     const statusEl = $id("test-pinboard-status");
     const token = tokenInput.value.trim();
     if (isValidTokenFormat(token) === false || !token) {
-      statusEl.textContent = `✗ ${t("loginInvalidFormat")}`;
+      setStatusIcon(statusEl, false, t("loginInvalidFormat"));
       statusEl.style.color = "#c00";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 4000);
       return;
@@ -91,20 +91,20 @@ function setupApiTests() {
     try {
       const resp = await chrome.runtime.sendMessage({ type: "test_pinboard_token", token });
       if (resp?.ok) {
-        statusEl.textContent = t("testConnected", token.split(":")[0]);
+        setStatusIcon(statusEl, true, t("testConnected", token.split(":")[0]));
         statusEl.style.color = "#080";
       } else if (resp?.error === "timeout") {
-        statusEl.textContent = `✗ ${t("testTimeout")}`;
+        setStatusIcon(statusEl, false, t("testTimeout"));
         statusEl.style.color = "#c00";
       } else if (resp?.error === "network") {
-        statusEl.textContent = `✗ ${t("networkError")}`;
+        setStatusIcon(statusEl, false, t("networkError"));
         statusEl.style.color = "#c00";
       } else {
-        statusEl.textContent = `✗ ${t("loginFailed")}`;
+        setStatusIcon(statusEl, false, t("loginFailed"));
         statusEl.style.color = "#c00";
       }
     } catch (_) {
-      statusEl.textContent = `✗ ${t("networkError")}`;
+      setStatusIcon(statusEl, false, t("networkError"));
       statusEl.style.color = "#c00";
     } finally {
       btn.disabled = false;

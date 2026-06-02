@@ -244,13 +244,13 @@
     "message": "из кэша"
   },
   "aiRegenerate": {
-    "message": "↻ пересоздать"
+    "message": "пересоздать"
   },
   "aiReplace": {
-    "message": "↻ заменить"
+    "message": "заменить"
   },
   "aiRemove": {
-    "message": "✕ удалить"
+    "message": "удалить"
   },
   "aiRegenerating": {
     "message": "пересоздание..."
@@ -356,7 +356,7 @@
     "message": "Отправлено!"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -583,7 +583,7 @@
     "message": "автосохранение включено"
   },
   "optAutoSaved": {
-    "message": "✓ Сохранено"
+    "message": "Сохранено"
   },
   "optFeedback": {
     "message": "Обратная связь и проблемы"
@@ -725,10 +725,10 @@
     "message": "Импорт настроек"
   },
   "importedReload": {
-    "message": "✓ Импортировано — перезагрузите для применения"
+    "message": "Импортировано — перезагрузите для применения"
   },
   "importInvalid": {
-    "message": "✗ Недопустимый файл"
+    "message": "Недопустимый файл"
   },
   "secQuickSave": {
     "message": "Быстрое сохранение"
@@ -821,7 +821,7 @@
     "message": "Проверка..."
   },
   "testConnected": {
-    "message": "✓ Подключено ($RESULT$)",
+    "message": "Подключено ($RESULT$)",
     "placeholders": {
       "result": {
         "content": "$1"

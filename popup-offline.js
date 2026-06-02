@@ -46,10 +46,9 @@
   function hideList() {
     expanded = false;
     const list = $id("offline-queue-list");
-    const chev = $id("offline-queue-chevron");
     const toggle = $id("offline-queue-toggle");
     if (list) { list.classList.add("hidden"); clearChildren(list); }
-    if (chev) chev.textContent = "▸︎";
+    // chevron is a CSS triangle rotated via [aria-expanded] — no ▸/▾ glyph (Segoe UI Emoji stall)
     if (toggle) toggle.setAttribute("aria-expanded", "false");
   }
 
@@ -59,11 +58,9 @@
 
   function renderList(queue) {
     const list = $id("offline-queue-list");
-    const chev = $id("offline-queue-chevron");
     const toggle = $id("offline-queue-toggle");
     if (!list) return;
     list.classList.remove("hidden");
-    if (chev) chev.textContent = "▾︎";
     if (toggle) toggle.setAttribute("aria-expanded", "true");
     clearChildren(list);
     if (!queue.length) {
@@ -101,14 +98,14 @@
       const retry = document.createElement("button");
       retry.type = "button";
       retry.className = "offline-queue-retry";
-      retry.textContent = "↻︎";
+      retry.innerHTML = PBP_ICONS.refresh;
       retry.title = t("offlineRetry");
       retry.addEventListener("click", () => onRetry(idx, retry));
 
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "offline-queue-remove";
-      remove.textContent = "✕";
+      remove.innerHTML = PBP_ICONS.cross;
       remove.title = t("offlineRemove");
       remove.setAttribute("aria-label", t("offlineRemove"));
       remove.addEventListener("click", () => {
@@ -140,7 +137,7 @@
       });
       if (!ok) {
         btn.disabled = false;
-        btn.textContent = "↻︎";
+        btn.innerHTML = PBP_ICONS.refresh;
         btn.classList.add("offline-queue-failed");
         setTimeout(() => btn.classList.remove("offline-queue-failed"), 1200);
         return;
@@ -149,7 +146,7 @@
       await refreshBar();
     } catch (_) {
       btn.disabled = false;
-      btn.textContent = "↻︎";
+      btn.innerHTML = PBP_ICONS.refresh;
     }
   }
 

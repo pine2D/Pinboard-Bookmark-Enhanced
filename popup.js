@@ -665,7 +665,7 @@ function setupSubmit(token) {
     } else if (state === "error") {
       btn.disabled = false;
       btn.classList.add("save-error");
-      btn.textContent = label || ("↻︎ " + t("saveRetry"));
+      btn.textContent = label || t("saveRetry");
     } else { // idle
       btn.disabled = false;
       btn.textContent = submitOriginalText;
@@ -930,7 +930,7 @@ async function fetchRecentBookmarks(token) {
       row.appendChild(edit);
       const del = document.createElement("span");
       del.className = "recent-bm-del";
-      del.textContent = "✕";
+      del.innerHTML = PBP_ICONS.cross;
       del.title = t("recentDeleteTitle");
       del.addEventListener("click", async () => {
         if (!confirm(t("confirmDelete"))) return;

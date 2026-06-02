@@ -100,7 +100,7 @@ async function fetchPinboardSuggestTags(token, url) {
     const addAllSuggest = $id("add-all-suggest");
     addAllSuggest?.addEventListener("click", () => {
       container.querySelectorAll(".stag:not(.used)").forEach((el) => { addTag(el.dataset.tag); el.classList.add("used"); });
-      if (addAllSuggest) { addAllSuggest.textContent = "✓"; addAllSuggest.style.pointerEvents = "none"; addAllSuggest.style.color = "#080"; }
+      if (addAllSuggest) { addAllSuggest.innerHTML = PBP_ICONS.check; addAllSuggest.style.pointerEvents = "none"; addAllSuggest.style.color = "#080"; }
     });
   } catch (e) {
     console.error("suggest tags error:", e);

@@ -244,13 +244,13 @@
     "message": "已缓存"
   },
   "aiRegenerate": {
-    "message": "↻ 重新生成"
+    "message": "重新生成"
   },
   "aiReplace": {
-    "message": "↻ 替换"
+    "message": "替换"
   },
   "aiRemove": {
-    "message": "✕ 移除"
+    "message": "移除"
   },
   "aiRegenerating": {
     "message": "重新生成中..."
@@ -356,7 +356,7 @@
     "message": "已发送！"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$（✓$SAVED$ ✗$FAILED$）",
+    "message": "$CURRENT$/$TOTAL$（$SAVED$/$FAILED$）",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -583,7 +583,7 @@
     "message": "自动保存已启用"
   },
   "optAutoSaved": {
-    "message": "✓ 已保存"
+    "message": "已保存"
   },
   "optFeedback": {
     "message": "反馈与问题"
@@ -725,10 +725,10 @@
     "message": "导入设置"
   },
   "importedReload": {
-    "message": "✓ 已导入 — 刷新页面后生效"
+    "message": "已导入 — 刷新页面后生效"
   },
   "importInvalid": {
-    "message": "✗ 文件格式无效"
+    "message": "文件格式无效"
   },
   "secQuickSave": {
     "message": "快速保存"
@@ -821,7 +821,7 @@
     "message": "测试中..."
   },
   "testConnected": {
-    "message": "✓ 已连接（$RESULT$）",
+    "message": "已连接（$RESULT$）",
     "placeholders": {
       "result": {
         "content": "$1"

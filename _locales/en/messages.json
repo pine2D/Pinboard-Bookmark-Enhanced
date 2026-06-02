@@ -244,13 +244,13 @@
     "message": "cached"
   },
   "aiRegenerate": {
-    "message": "↻ regenerate"
+    "message": "regenerate"
   },
   "aiReplace": {
-    "message": "↻ replace"
+    "message": "replace"
   },
   "aiRemove": {
-    "message": "✕ remove"
+    "message": "remove"
   },
   "aiRegenerating": {
     "message": "regenerating..."
@@ -356,7 +356,7 @@
     "message": "Sent!"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -583,7 +583,7 @@
     "message": "auto-save enabled"
   },
   "optAutoSaved": {
-    "message": "✓ Saved"
+    "message": "Saved"
   },
   "optFeedback": {
     "message": "Feedback & Issues"
@@ -725,10 +725,10 @@
     "message": "Import Settings"
   },
   "importedReload": {
-    "message": "✓ Imported — reload to see changes"
+    "message": "Imported — reload to see changes"
   },
   "importInvalid": {
-    "message": "✗ Invalid file"
+    "message": "Invalid file"
   },
   "secQuickSave": {
     "message": "Quick Save"
@@ -821,7 +821,7 @@
     "message": "Testing..."
   },
   "testConnected": {
-    "message": "✓ Connected ($RESULT$)",
+    "message": "Connected ($RESULT$)",
     "placeholders": {
       "result": {
         "content": "$1"

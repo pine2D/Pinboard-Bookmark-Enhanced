@@ -244,13 +244,13 @@
     "message": "z pamięci podręcznej"
   },
   "aiRegenerate": {
-    "message": "↻ generuj ponownie"
+    "message": "generuj ponownie"
   },
   "aiReplace": {
-    "message": "↻ zamień"
+    "message": "zamień"
   },
   "aiRemove": {
-    "message": "✕ usuń"
+    "message": "usuń"
   },
   "aiRegenerating": {
     "message": "ponowne generowanie..."
@@ -356,7 +356,7 @@
     "message": "Wysłano!"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -583,7 +583,7 @@
     "message": "automatyczny zapis włączony"
   },
   "optAutoSaved": {
-    "message": "✓ Zapisano"
+    "message": "Zapisano"
   },
   "optFeedback": {
     "message": "Opinie i problemy"
@@ -725,10 +725,10 @@
     "message": "Importuj ustawienia"
   },
   "importedReload": {
-    "message": "✓ Zaimportowano — odśwież, aby zobaczyć zmiany"
+    "message": "Zaimportowano — odśwież, aby zobaczyć zmiany"
   },
   "importInvalid": {
-    "message": "✗ Nieprawidłowy plik"
+    "message": "Nieprawidłowy plik"
   },
   "secQuickSave": {
     "message": "Szybki zapis"
@@ -821,7 +821,7 @@
     "message": "Testowanie..."
   },
   "testConnected": {
-    "message": "✓ Połączono ($RESULT$)",
+    "message": "Połączono ($RESULT$)",
     "placeholders": {
       "result": {
         "content": "$1"

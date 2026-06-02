@@ -117,7 +117,9 @@ function setupTabSet() {
         const total = validTabs.length;
         const pct = Math.round((i / total) * 100);
         if (fill) fill.style.width = pct + "%";
-        if (ptext) ptext.textContent = `${i}/${total}  ✓${saved}  ✗${failed}${aiFailed ? `  AI✗${aiFailed}` : ""}`;
+        // saved/failed/aiFailed are integer counters → safe to interpolate into innerHTML.
+        // Inline check/cross SVGs replace literal ✓/✗ (which pull Segoe UI Emoji on Windows).
+        if (ptext) ptext.innerHTML = `${i}/${total}  <span class="status-ic ok">${PBP_ICONS.check}</span>${saved}  <span class="status-ic bad">${PBP_ICONS.cross}</span>${failed}${aiFailed ? `  AI<span class="status-ic bad">${PBP_ICONS.cross}</span>${aiFailed}` : ""}`;
         if (progress) progress.setAttribute("aria-valuenow", String(pct));
       };
       updateProgress(0);

@@ -78,6 +78,13 @@ a:hover { text-decoration: underline; }
 :root { font-variant-emoji: text; }
 .btn-ic { display: inline-flex; align-items: center; vertical-align: -3px; margin-right: 4px; }
 .btn-ic svg { display: block; }
+/* Inline status/marker SVG icons that replace ✓ ✗ ✕ ↻ glyphs (those fall back to
+   Segoe UI Emoji and stall ~1.6s on first paint, Windows hi-DPI). currentColor inherits
+   the host element's colour; .ok/.bad force green/red where the host has no status colour. */
+.status-ic { display: inline-flex; vertical-align: -2px; }
+.status-ic.ok { color: #2a8a2a; }
+.status-ic.bad { color: #c0392b; }
+.status-ic svg, .add-all-link svg, .recent-bm-del svg, .offline-queue-remove svg, .offline-queue-retry svg { display: block; }
 
 /* Early section visibility — popup-theme-early.js sets html[data-section] from a synchronous
    localStorage mirror so the right section paints immediately. Higher specificity than
@@ -607,6 +614,15 @@ html.dark .batch-progress-text { color: #e0e0e0; mix-blend-mode: normal; filter:
   cursor: pointer;
   position: relative;
 }
+/* Expand/collapse caret as a CSS border-triangle (was a ▸/▾ glyph that fell back to
+   Segoe UI Emoji). Rotated 90° when the toggle's aria-expanded flips to true. */
+#offline-queue-chevron {
+  display: inline-block; width: 0; height: 0;
+  border-style: solid; border-width: 3.5px 0 3.5px 5px;
+  border-color: transparent transparent transparent currentColor;
+  transition: transform 0.15s;
+}
+.offline-toggle[aria-expanded="true"] #offline-queue-chevron { transform: rotate(90deg); }
 .offline-toggle {
   flex: 1;
   display: inline-flex;

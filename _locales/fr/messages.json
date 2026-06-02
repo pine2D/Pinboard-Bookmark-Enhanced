@@ -244,13 +244,13 @@
     "message": "en cache"
   },
   "aiRegenerate": {
-    "message": "↻ régénérer"
+    "message": "régénérer"
   },
   "aiReplace": {
-    "message": "↻ remplacer"
+    "message": "remplacer"
   },
   "aiRemove": {
-    "message": "✕ supprimer"
+    "message": "supprimer"
   },
   "aiRegenerating": {
     "message": "régénération..."
@@ -356,7 +356,7 @@
     "message": "Envoyé !"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -583,7 +583,7 @@
     "message": "enregistrement automatique activé"
   },
   "optAutoSaved": {
-    "message": "✓ Enregistré"
+    "message": "Enregistré"
   },
   "optFeedback": {
     "message": "Commentaires et problèmes"
@@ -725,10 +725,10 @@
     "message": "Importer les paramètres"
   },
   "importedReload": {
-    "message": "✓ Importé — rechargez pour voir les modifications"
+    "message": "Importé — rechargez pour voir les modifications"
   },
   "importInvalid": {
-    "message": "✗ Fichier invalide"
+    "message": "Fichier invalide"
   },
   "secQuickSave": {
     "message": "Enregistrement rapide"
@@ -821,7 +821,7 @@
     "message": "Test en cours..."
   },
   "testConnected": {
-    "message": "✓ Connecté ($RESULT$)",
+    "message": "Connecté ($RESULT$)",
     "placeholders": {
       "result": {
         "content": "$1"

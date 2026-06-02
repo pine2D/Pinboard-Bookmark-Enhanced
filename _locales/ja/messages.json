@@ -244,13 +244,13 @@
     "message": "キャッシュ済み"
   },
   "aiRegenerate": {
-    "message": "↻ 再生成"
+    "message": "再生成"
   },
   "aiReplace": {
-    "message": "↻ 置換"
+    "message": "置換"
   },
   "aiRemove": {
-    "message": "✕ 削除"
+    "message": "削除"
   },
   "aiRegenerating": {
     "message": "再生成中..."
@@ -356,7 +356,7 @@
     "message": "送信しました！"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$（✓$SAVED$ ✗$FAILED$）",
+    "message": "$CURRENT$/$TOTAL$（$SAVED$/$FAILED$）",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -583,7 +583,7 @@
     "message": "自動保存が有効です"
   },
   "optAutoSaved": {
-    "message": "✓ 保存しました"
+    "message": "保存しました"
   },
   "optFeedback": {
     "message": "フィードバック・問題報告"
@@ -725,10 +725,10 @@
     "message": "設定をインポート"
   },
   "importedReload": {
-    "message": "✓ インポート完了 — リロードすると反映されます"
+    "message": "インポート完了 — リロードすると反映されます"
   },
   "importInvalid": {
-    "message": "✗ 無効なファイル"
+    "message": "無効なファイル"
   },
   "secQuickSave": {
     "message": "クイック保存"
@@ -821,7 +821,7 @@
     "message": "テスト中..."
   },
   "testConnected": {
-    "message": "✓ 接続成功（$RESULT$）",
+    "message": "接続成功（$RESULT$）",
     "placeholders": {
       "result": {
         "content": "$1"

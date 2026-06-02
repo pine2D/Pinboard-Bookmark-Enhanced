@@ -25,7 +25,21 @@ const PBP_ICONS = {
   check: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8.5l3.5 3.5L13 4.5"/></svg>',
   cross: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
   warning: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 2 15 14H1Z"/><path d="M8 6.5v3.5" stroke-linecap="round"/><circle cx="8" cy="12" r="0.6" fill="currentColor" stroke="none"/></svg>',
+  info: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.5v4" stroke-linecap="round"/><circle cx="8" cy="4.8" r="0.6" fill="currentColor" stroke="none"/></svg>',
+  refresh: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.7-3.97M13.5 2.5V5h-2.5"/></svg>',
 };
+
+// Render "<check|cross icon> text" into a status element. The SVG uses currentColor so
+// it inherits the element's success/error colour. Replaces literal ✓/✗ glyphs, which
+// fall back to Segoe UI Emoji and stall ~1.6s on first paint (Windows hi-DPI). The label
+// goes through a text node, so interpolated values (errors, results) can't inject HTML.
+function setStatusIcon(el, ok, text) {
+  if (!el) return;
+  const ic = document.createElement("span");
+  ic.className = "status-ic";
+  ic.innerHTML = ok ? PBP_ICONS.check : PBP_ICONS.cross;
+  el.replaceChildren(ic, document.createTextNode(" " + (text != null ? String(text) : "")));
+}
 
 // Set a button's content to "icon + label" without losing the SVG icon. Use this
 // instead of `btn.textContent = label` on buttons that carry a .btn-ic SVG span,
@@ -433,13 +447,11 @@ function showFeedback({ variant = "info", title = "", message = "", messageNode 
 
   const icon = document.createElement("span");
   icon.className = "fc-icon";
-  // error/warning use the inline-SVG warning triangle (a literal ⚠ pulls Segoe UI
-  // Emoji on Windows → ~1.6s first-render stall); success/info are plain text chars.
-  if (variant === "error" || variant === "warning") {
-    icon.innerHTML = PBP_ICONS.warning;
-  } else {
-    icon.textContent = { success: "✓", info: "ℹ︎" }[variant] || "ℹ︎";
-  }
+  // All variants use inline SVG — literal ⚠ / ✓ / ℹ glyphs fall back to Segoe UI Emoji
+  // on Windows and stall ~1.6s on first paint. currentColor inherits the variant colour.
+  icon.innerHTML = (variant === "error" || variant === "warning") ? PBP_ICONS.warning
+    : variant === "success" ? PBP_ICONS.check
+    : PBP_ICONS.info;
   card.appendChild(icon);
 
   const body = document.createElement("div");

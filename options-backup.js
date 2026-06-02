@@ -73,12 +73,12 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
 
       if (importedThemes !== undefined) await syncSetLarge("savedThemes", importedThemes);
       const status = $id("import-status");
-      status.textContent = t("importedReload");
+      setStatusIcon(status, true, t("importedReload"));
       setTimeout(() => { status.textContent = ""; }, 3000);
     } catch (err) {
       console.error("[import] failed", err);
       const status = $id("import-status");
-      status.textContent = t("importInvalid");
+      setStatusIcon(status, false, t("importInvalid"));
       status.style.color = "#c00";
       setTimeout(() => { status.textContent = ""; status.style.color = ""; }, 3000);
     }

@@ -244,13 +244,13 @@
     "message": "Zwischengespeichert"
   },
   "aiRegenerate": {
-    "message": "↻ Neu generieren"
+    "message": "Neu generieren"
   },
   "aiReplace": {
-    "message": "↻ Ersetzen"
+    "message": "Ersetzen"
   },
   "aiRemove": {
-    "message": "✕ Entfernen"
+    "message": "Entfernen"
   },
   "aiRegenerating": {
     "message": "Wird neu generiert..."
@@ -356,7 +356,7 @@
     "message": "Gesendet!"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$ (✓$SAVED$ ✗$FAILED$)",
+    "message": "$CURRENT$/$TOTAL$ ($SAVED$/$FAILED$)",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -583,7 +583,7 @@
     "message": "Automatisches Speichern aktiviert"
   },
   "optAutoSaved": {
-    "message": "✓ Gespeichert"
+    "message": "Gespeichert"
   },
   "optFeedback": {
     "message": "Feedback & Probleme"
@@ -725,10 +725,10 @@
     "message": "Einstellungen importieren"
   },
   "importedReload": {
-    "message": "✓ Importiert — Seite neu laden, um Änderungen zu sehen"
+    "message": "Importiert — Seite neu laden, um Änderungen zu sehen"
   },
   "importInvalid": {
-    "message": "✗ Ungültige Datei"
+    "message": "Ungültige Datei"
   },
   "secQuickSave": {
     "message": "Schnellspeicherung"
@@ -821,7 +821,7 @@
     "message": "Testen..."
   },
   "testConnected": {
-    "message": "✓ Verbunden ($RESULT$)",
+    "message": "Verbunden ($RESULT$)",
     "placeholders": {
       "result": {
         "content": "$1"

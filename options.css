@@ -227,6 +227,10 @@ html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--
 /* ---- API key toggle ---- */
 .key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px 4px; color: #888; vertical-align: middle; }
 .key-toggle svg { display: block; }
+/* Inline status icon (replaces ✓/✗ in test/save/import messages; the glyphs fall back to
+   Segoe UI Emoji and stall on first paint at Windows hi-DPI). Inherits the status colour. */
+.status-ic { display: inline-flex; vertical-align: -2px; margin-right: 1px; }
+.status-ic svg { display: block; }
 .key-toggle:hover { color: #555; }
 .key-toggle:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 1px; }
 

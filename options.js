@@ -684,7 +684,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function flashAutoSave() {
     const el = $id("auto-save-status");
-    el.textContent = t("optAutoSaved");
+    setStatusIcon(el, true, t("optAutoSaved"));
     el.classList.add("saved");
     clearTimeout(el._timer);
     el._timer = setTimeout(() => {

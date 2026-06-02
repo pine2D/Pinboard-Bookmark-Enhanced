@@ -244,13 +244,13 @@
     "message": "已快取"
   },
   "aiRegenerate": {
-    "message": "↻ 重新產生"
+    "message": "重新產生"
   },
   "aiReplace": {
-    "message": "↻ 替換"
+    "message": "替換"
   },
   "aiRemove": {
-    "message": "✕ 移除"
+    "message": "移除"
   },
   "aiRegenerating": {
     "message": "重新產生中..."
@@ -356,7 +356,7 @@
     "message": "已發送！"
   },
   "batchProgress": {
-    "message": "$CURRENT$/$TOTAL$（✓$SAVED$ ✗$FAILED$）",
+    "message": "$CURRENT$/$TOTAL$（$SAVED$/$FAILED$）",
     "placeholders": {
       "current": {
         "content": "$1"
@@ -583,7 +583,7 @@
     "message": "自動儲存已啟用"
   },
   "optAutoSaved": {
-    "message": "✓ 已儲存"
+    "message": "已儲存"
   },
   "optFeedback": {
     "message": "回饋與問題"
@@ -725,10 +725,10 @@
     "message": "匯入設定"
   },
   "importedReload": {
-    "message": "✓ 已匯入 — 重新整理頁面後生效"
+    "message": "已匯入 — 重新整理頁面後生效"
   },
   "importInvalid": {
-    "message": "✗ 檔案格式無效"
+    "message": "檔案格式無效"
   },
   "secQuickSave": {
     "message": "快速儲存"
@@ -821,7 +821,7 @@
     "message": "測試中..."
   },
   "testConnected": {
-    "message": "✓ 已連接（$RESULT$）",
+    "message": "已連接（$RESULT$）",
     "placeholders": {
       "result": {
         "content": "$1"
