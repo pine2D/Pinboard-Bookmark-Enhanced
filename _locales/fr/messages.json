@@ -1222,24 +1222,6 @@
   "presetPreviewToggle": {
     "message": "Voir le CSS du préréglage actuel (lecture seule)"
   },
-  "migrationBannerTitle": {
-    "message": "Stockage des thèmes mis à niveau vers v2"
-  },
-  "migrationBannerDetails": {
-    "message": "Environ {bytes} d'espace de synchronisation économisés ; le CSS des préréglages ne compte plus dans votre quota de synchronisation Google."
-  },
-  "migrationUndoBtn": {
-    "message": "Annuler"
-  },
-  "migrationDismissBtn": {
-    "message": "Compris"
-  },
-  "migrationUndoConfirm": {
-    "message": "Restaurer l'ancien format ? Le CSS sera réécrit dans le stockage de synchronisation."
-  },
-  "migrationUndoExpired": {
-    "message": "Fenêtre d'annulation expirée"
-  },
   "overlayQuotaFallback": {
     "message": "CSS enregistré localement (quota de synchronisation plein)"
   },

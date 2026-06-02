@@ -1222,24 +1222,6 @@
   "presetPreviewToggle": {
     "message": "現在のプリセット CSS を表示（読み取り専用）"
   },
-  "migrationBannerTitle": {
-    "message": "テーマ保存形式を v2 にアップグレードしました"
-  },
-  "migrationBannerDetails": {
-    "message": "約 {bytes} の同期領域を節約しました。プリセット CSS は Google 同期容量を消費しなくなります。"
-  },
-  "migrationUndoBtn": {
-    "message": "元に戻す"
-  },
-  "migrationDismissBtn": {
-    "message": "了解"
-  },
-  "migrationUndoConfirm": {
-    "message": "旧形式に戻しますか？CSS が同期ストレージに書き戻されます。"
-  },
-  "migrationUndoExpired": {
-    "message": "元に戻せる期間が終了しました"
-  },
   "overlayQuotaFallback": {
     "message": "CSS をローカルに保存しました（同期容量が満杯）"
   },

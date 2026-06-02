@@ -1222,24 +1222,6 @@
   "presetPreviewToggle": {
     "message": "Показать CSS текущего пресета (только чтение)"
   },
-  "migrationBannerTitle": {
-    "message": "Хранилище тем обновлено до v2"
-  },
-  "migrationBannerDetails": {
-    "message": "Сэкономлено около {bytes} места синхронизации; CSS пресетов больше не учитывается в квоте Google-синхронизации."
-  },
-  "migrationUndoBtn": {
-    "message": "Отменить"
-  },
-  "migrationDismissBtn": {
-    "message": "Понятно"
-  },
-  "migrationUndoConfirm": {
-    "message": "Восстановить старый формат? CSS будет записан обратно в хранилище синхронизации."
-  },
-  "migrationUndoExpired": {
-    "message": "Окно отмены истекло"
-  },
   "overlayQuotaFallback": {
     "message": "CSS сохранён локально (квота синхронизации заполнена)"
   },

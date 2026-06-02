@@ -1222,24 +1222,6 @@
   "presetPreviewToggle": {
     "message": "Pokaż CSS bieżącego presetu (tylko do odczytu)"
   },
-  "migrationBannerTitle": {
-    "message": "Pamięć motywów zaktualizowana do v2"
-  },
-  "migrationBannerDetails": {
-    "message": "Zaoszczędzono ok. {bytes} miejsca synchronizacji; CSS presetów nie zajmuje już Twojego limitu synchronizacji Google."
-  },
-  "migrationUndoBtn": {
-    "message": "Cofnij"
-  },
-  "migrationDismissBtn": {
-    "message": "OK"
-  },
-  "migrationUndoConfirm": {
-    "message": "Przywrócić stary format? CSS zostanie zapisany z powrotem w pamięci synchronizacji."
-  },
-  "migrationUndoExpired": {
-    "message": "Okno cofania wygasło"
-  },
   "overlayQuotaFallback": {
     "message": "CSS zapisany lokalnie (limit synchronizacji pełny)"
   },

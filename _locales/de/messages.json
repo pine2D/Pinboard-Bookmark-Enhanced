@@ -1222,24 +1222,6 @@
   "presetPreviewToggle": {
     "message": "Aktuelles Preset-CSS anzeigen (schreibgeschützt)"
   },
-  "migrationBannerTitle": {
-    "message": "Theme-Speicher auf v2 aktualisiert"
-  },
-  "migrationBannerDetails": {
-    "message": "Etwa {bytes} Sync-Speicher gespart; Preset-CSS belastet dein Google-Sync-Kontingent nicht mehr."
-  },
-  "migrationUndoBtn": {
-    "message": "Rückgängig"
-  },
-  "migrationDismissBtn": {
-    "message": "Verstanden"
-  },
-  "migrationUndoConfirm": {
-    "message": "Altes Format wiederherstellen? Das CSS wird zurück in den Sync-Speicher geschrieben."
-  },
-  "migrationUndoExpired": {
-    "message": "Rückgängig-Fenster abgelaufen"
-  },
   "overlayQuotaFallback": {
     "message": "CSS lokal gespeichert (Sync-Kontingent voll)"
   },

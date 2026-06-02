@@ -1222,24 +1222,6 @@
   "presetPreviewToggle": {
     "message": "View current preset CSS (read-only)"
   },
-  "migrationBannerTitle": {
-    "message": "Theme storage upgraded to v2"
-  },
-  "migrationBannerDetails": {
-    "message": "Saved about {bytes} of sync space; preset CSS no longer counts against your Google sync quota."
-  },
-  "migrationUndoBtn": {
-    "message": "Undo"
-  },
-  "migrationDismissBtn": {
-    "message": "Got it"
-  },
-  "migrationUndoConfirm": {
-    "message": "Restore the old format? This rewrites the CSS back to sync storage."
-  },
-  "migrationUndoExpired": {
-    "message": "Undo window has expired"
-  },
   "overlayQuotaFallback": {
     "message": "CSS saved locally (sync quota full)"
   },

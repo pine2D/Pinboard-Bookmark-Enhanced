@@ -184,20 +184,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   deobfuscateSettings(s);
 
   // ---- Schema v2 migration: split customCSS into themePresetKey + customOverlayCSS ----
-  // Runs once per profile. Cleared sync.customCSS chunks; saves diff in local for 7-day undo.
+  // Runs once per profile (guarded by _migrationV2), then stays dormant. Silently converts
+  // un-migrated profiles so their old custom CSS keeps rendering; the one-time "upgraded"
+  // banner + 7-day undo it used to show were removed once all undo windows had expired.
   const OVERLAY_BYTE_LIMIT = 50 * 1024;
-  const MIGRATION_BACKUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-  let migrationResult = null; // { savedBytes, banner } or null
 
-  // Sweep expired migration backup (older than 7 days) — frees local storage
-  {
-    const stored = await chrome.storage.local.get({ _migrationBackup: null });
-    if (stored._migrationBackup && stored._migrationBackup.ts) {
-      if (Date.now() - stored._migrationBackup.ts > MIGRATION_BACKUP_TTL_MS) {
-        await chrome.storage.local.remove("_migrationBackup");
-      }
-    }
-  }
+  // The v2 theme-storage migration's one-time "upgraded" banner + 7-day undo were
+  // removed (every undo window had long expired). Reclaim their now-dead local keys.
+  chrome.storage.local.remove(["_migrationBackup", "_migrationBannerDismissed"]).catch(() => {});
 
   migrationV2: {
     const flags = await chrome.storage.sync.get({ _migrationV2: false });
@@ -261,15 +255,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           await chrome.storage.sync.remove(["customCSS", ...oldChunks]);
         }
         await chrome.storage.local.remove("customCSS");
-        // 7-day undo backup
-        await chrome.storage.local.set({
-          _migrationBackup: { ts: Date.now(), oldCSS, oldKey: oldKeyForMigration }
-        });
         await chrome.storage.sync.set({ _migrationV2: true });
-        migrationResult = {
-          savedBytes: oldCSS.length - newOverlay.length,
-          banner: true
-        };
         // Update s.* with new schema for the rest of the page init
         s.themePresetKey = resolvedKey || "";
         s.customOverlayCSS = newOverlay;
@@ -472,70 +458,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentPresetKey = s.themePresetKey || "";
   applyOptionsPageTheme(currentPresetKey, s.optTheme);
 
-  // Render migration banner if migration just ran AND user hasn't dismissed.
-  if (migrationResult && migrationResult.banner) {
-    const dismissed = (await chrome.storage.local.get({ _migrationBannerDismissed: false }))._migrationBannerDismissed;
-    if (!dismissed) renderMigrationBanner(migrationResult.savedBytes);
-  }
-
-  function renderMigrationBanner(savedBytes) {
-    const host = $id("migration-banner");
-    if (!host) return;
-    host.style.display = "";
-    while (host.firstChild) host.removeChild(host.firstChild);
-    const title = document.createElement("strong");
-    title.textContent = t("migrationBannerTitle") || "Theme storage upgraded to v2";
-    const desc = document.createElement("p");
-    const savedKB = (savedBytes / 1024).toFixed(1);
-    const tmpl = t("migrationBannerDetails") || "Saved about {bytes} of sync space; preset CSS no longer counts against your Google sync quota.";
-    desc.textContent = tmpl.replace("{bytes}", `${savedKB} KB`);
-    const actions = document.createElement("div");
-    actions.className = "migration-banner-actions";
-    const undoBtn = document.createElement("button");
-    undoBtn.className = "btn btn-sm";
-    undoBtn.textContent = t("migrationUndoBtn") || "Undo";
-    undoBtn.addEventListener("click", async () => {
-      const backup = (await chrome.storage.local.get({ _migrationBackup: null }))._migrationBackup;
-      if (!backup || (Date.now() - backup.ts) > 7 * 24 * 60 * 60 * 1000) {
-        undoBtn.disabled = true;
-        undoBtn.title = t("migrationUndoExpired") || "Undo window has expired";
-        return;
-      }
-      showConfirmPopover(undoBtn, {
-        msg: t("migrationUndoConfirm") || "Restore old format? This rewrites the CSS back to sync storage.",
-        yesText: t("confirm") || "Confirm",
-        noText: t("cancel") || "Cancel",
-        onConfirm: async () => {
-          try {
-            await syncSetLarge("customCSS", backup.oldCSS);
-            const setOld = {};
-            if (backup.oldKey !== undefined) setOld.themePresetKey = backup.oldKey;
-            await chrome.storage.sync.set(setOld);
-            await chrome.storage.sync.remove(["customOverlayCSS", "_migrationV2", "optOverlayInLocal"]);
-            // Remove all customOverlayCSS_N chunks too
-            const meta = await chrome.storage.sync.get("customOverlayCSS");
-            if (meta.customOverlayCSS && meta.customOverlayCSS._chunks) {
-              const chunks = Array.from({ length: meta.customOverlayCSS._chunks }, (_, i) => `customOverlayCSS_${i}`);
-              await chrome.storage.sync.remove(chunks);
-            }
-            await chrome.storage.local.remove(["customOverlayCSS_localFallback", "_migrationBackup"]);
-            location.reload();
-          } catch (e) {
-            console.error("[migrationV2] undo failed", e);
-          }
-        }
-      });
-    });
-    const dismissBtn = document.createElement("button");
-    dismissBtn.className = "btn btn-sm";
-    dismissBtn.textContent = t("migrationDismissBtn") || "Got it";
-    dismissBtn.addEventListener("click", async () => {
-      await chrome.storage.local.set({ _migrationBannerDismissed: true });
-      host.style.display = "none";
-    });
-    actions.append(undoBtn, dismissBtn);
-    host.append(title, desc, actions);
-  }
   // Language change: save immediately and reload to apply
   $id("opt-lang").addEventListener("change", async () => {
     const lang = $id("opt-lang").value;

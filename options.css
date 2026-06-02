@@ -532,45 +532,6 @@ html[data-theme] .theme-name-popover .tnp-cancel:hover { background: var(--opt-b
 html[data-theme="terminal"] body { font-family: "Courier New", Consolas, monospace; }
 html[data-theme="terminal"] .fg textarea { font-family: "Courier New", Consolas, monospace; }
 
-/* ---- Migration banner (schema v2) ---- */
-.migration-banner {
-  position: relative;
-  margin: 12px 0 16px;
-  padding: 14px 16px 14px 44px;
-  border: 1px solid #b6d4b6;
-  border-left: 3px solid #4a8c4a;
-  border-radius: var(--opt-radius-md);
-  background: linear-gradient(90deg, #ecf6ec 0%, #f5faf5 60%);
-  color: #2a5a2a;
-  font-size: 13px;
-  box-shadow: var(--opt-shadow-xs);
-}
-.migration-banner::before {
-  content: "✓";
-  position: absolute;
-  left: 14px; top: 14px;
-  width: 20px; height: 20px;
-  display: flex; align-items: center; justify-content: center;
-  background: #4a8c4a; color: #fff;
-  border-radius: var(--opt-radius-full);
-  font-size: 12px; font-weight: 600;
-}
-.migration-banner strong { display: block; margin-bottom: 4px; font-size: 13px; }
-.migration-banner p { margin: 0 0 10px; line-height: 1.5; }
-.migration-banner-actions { display: flex; gap: 8px; }
-html[data-theme] .migration-banner {
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--opt-accent) 12%, var(--opt-panel)) 0%,
-    color-mix(in srgb, var(--opt-accent) 4%, var(--opt-panel)) 60%);
-  border-color: color-mix(in srgb, var(--opt-accent) 30%, var(--opt-border));
-  border-left-color: var(--opt-accent);
-  color: var(--opt-fg);
-}
-html[data-theme] .migration-banner::before {
-  background: var(--opt-accent);
-  color: var(--opt-bg);
-}
-
 /* ---- Overlay byte counter ---- */
 .overlay-meta-row { margin-top: 6px; display: flex; justify-content: flex-end; }
 .overlay-byte-counter {

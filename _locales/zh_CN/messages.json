@@ -1222,24 +1222,6 @@
   "presetPreviewToggle": {
     "message": "查看当前预设 CSS（只读）"
   },
-  "migrationBannerTitle": {
-    "message": "主题存储已升级到 v2 格式"
-  },
-  "migrationBannerDetails": {
-    "message": "节省同步空间约 {bytes}；预设 CSS 不再占用 Google 同步配额。"
-  },
-  "migrationUndoBtn": {
-    "message": "撤销"
-  },
-  "migrationDismissBtn": {
-    "message": "知道了"
-  },
-  "migrationUndoConfirm": {
-    "message": "恢复旧格式？这会把 CSS 写回同步存储。"
-  },
-  "migrationUndoExpired": {
-    "message": "撤销窗口已过期"
-  },
   "overlayQuotaFallback": {
     "message": "CSS 仅保存到本机（同步配额已满）"
   },
