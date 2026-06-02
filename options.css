@@ -108,6 +108,16 @@ html[data-theme] .panel-foot a:hover { color: var(--opt-accent); }
 .hint { font-size: 11px; color: #757575; margin-top: 2px; }
 .hint a { color: #4477bb; }
 .hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; }
+.hint-warn::before {
+  content: "";
+  display: inline-block;
+  width: 11px; height: 11px;
+  margin-right: 4px;
+  vertical-align: -2px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23c0840a' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M8 2 15 14H1Z'/%3E%3Cpath d='M8 6.5v3.5' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12' r='0.6' fill='%23c0840a' stroke='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+}
 .free-tier-help { margin: 8px 0 14px; font-size: 12px; color: #555; }
 .free-tier-help summary { cursor: pointer; padding: 4px 0; color: #4477bb; user-select: none; }
 .free-tier-help summary:hover { text-decoration: underline; }
@@ -149,13 +159,18 @@ html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--
 .accordion-header:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: -2px; }
 /* CSS border-triangle instead of the ▶ glyph (which fell back to Segoe UI Emoji
    on Windows and caused a font-load stall). The rotate(90deg) on .open still works. */
-.accordion-arrow { display: inline-block; width: 12px; font-size: 0; transition: transform 0.2s; }
+/* Optical nudge lives on the .accordion-arrow element (not ::before) so it stays
+   screen-vertical regardless of the element's own rotate(). The box is line-centered,
+   but Segoe UI seats the bold header glyphs lower in the line box, so a box-centered
+   arrow reads high. Collapsed (▶) needs +1px; expanded (▼) is top-heavy after the
+   90° rotation and reads higher, so it needs +2px. */
+.accordion-arrow { display: inline-block; width: 12px; font-size: 0; transition: transform 0.2s; position: relative; top: 1px; }
 .accordion-arrow::before {
   content: ""; display: inline-block;
   border-style: solid; border-width: 4px 0 4px 6px;
   border-color: transparent transparent transparent currentColor;
 }
-.accordion-section.open .accordion-arrow { transform: rotate(90deg); }
+.accordion-section.open .accordion-arrow { transform: rotate(90deg); top: 2px; }
 .accordion-body {
   display: none; padding: 0 0 12px 18px;
   /* Layout isolation: the 3 Quick-Actions accordions ship open, so switching to
@@ -210,7 +225,8 @@ html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--
 }
 
 /* ---- API key toggle ---- */
-.key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px 4px; color: #888; }
+.key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px 4px; color: #888; vertical-align: middle; }
+.key-toggle svg { display: block; }
 .key-toggle:hover { color: #555; }
 .key-toggle:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 1px; }
 

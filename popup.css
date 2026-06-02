@@ -76,7 +76,7 @@ a:hover { text-decoration: underline; }
 /* Force text presentation for dual-presentation symbols (⚠ ▸ ▾ ✓ ✗ ↻ etc.) so
    they don't fall back to Segoe UI Emoji (1-3s first-render stall, Windows hi-DPI). */
 :root { font-variant-emoji: text; }
-.btn-ic { display: inline-flex; align-items: center; vertical-align: -2px; margin-right: 4px; }
+.btn-ic { display: inline-flex; align-items: center; vertical-align: -3px; margin-right: 4px; }
 .btn-ic svg { display: block; }
 
 /* Early section visibility — popup-theme-early.js sets html[data-section] from a synchronous
@@ -131,7 +131,9 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .feedback-card[data-variant="warning"] { background: var(--pp-offline-bg); border-color: var(--pp-offline-bd); color: var(--pp-offline-fg); }
 .feedback-card[data-variant="info"]    { background: var(--pp-info-bg);    border-color: var(--pp-info-bd);    color: var(--pp-info-fg); }
 .feedback-card.dismissing { animation: fadeOut 0.12s ease forwards; }
-.fc-icon { font-size: 12px; line-height: 1.2; flex-shrink: 0; }
+/* fc-icon is a flex item under .feedback-card{align-items:flex-start}, so vertical-align
+   is inert; margin-top drops the SVG onto the first text line's optical center. */
+.fc-icon { font-size: 12px; line-height: 1.2; flex-shrink: 0; margin-top: 2px; }
 .fc-body { flex: 1; min-width: 0; }
 .fc-title { font-weight: 600; }
 .fc-message { margin-top: 2px; word-break: break-word; }
@@ -185,6 +187,16 @@ html[data-section="login"] .quick-actions { display: none !important; }
   font-size: 11px;
   line-height: 1.4;
   animation: fadeSlideDown var(--pp-motion-duration) ease-out;
+}
+.hint-warn::before {
+  content: "";
+  display: inline-block;
+  width: 11px; height: 11px;
+  margin-right: 4px;
+  vertical-align: -2px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23c0840a' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M8 2 15 14H1Z'/%3E%3Cpath d='M8 6.5v3.5' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12' r='0.6' fill='%23c0840a' stroke='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
 /* Tag Presets */
