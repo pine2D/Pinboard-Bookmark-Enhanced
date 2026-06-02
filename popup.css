@@ -410,8 +410,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 #submit-btn:disabled { background: #aaa; border-color: #999; transform: none; box-shadow: none; }
 .del-btn { position: relative; color: #c00; border-color: #c00 !important; }
 .del-btn:hover { background: #fee !important; }
+/* Anchor left:0 (extend right from the Delete button's left edge) — the button sits
+   left-of-centre in the submit-bar, so the old right:0 made the popover extend left and
+   clip its leading text off the popup's left edge. There is ample free space to the right. */
 .del-confirm-popover {
-  position: absolute; bottom: calc(100% + 5px); right: 0;
+  position: absolute; bottom: calc(100% + 5px); left: 0;
   background: #fff; border: 1px solid #ddd; border-radius: var(--pp-radius-sm);
   padding: 5px 8px; font-size: 11px; white-space: nowrap;
   display: flex; align-items: center; gap: 6px;
