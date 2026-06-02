@@ -135,6 +135,10 @@ function t(key, ...args) {
  * to prevent XSS. No innerHTML injection is used.
  */
 function applyI18n(root) {
+  // No DOM (e.g. the service worker imports i18n.js for t() only) — nothing to translate.
+  // Without this, `root || document` throws "document is not defined" on every manual-language
+  // SW cold start (caught at the _refreshI18nAsync warn), spamming chrome://extensions errors.
+  if (typeof document === "undefined") return;
   root = root || document;
 
   // P1.5: Merged 4 separate querySelectorAll passes into 1 DOM walk.
