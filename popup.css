@@ -66,7 +66,7 @@ body {
   /* CJK fonts named before `sans-serif` so Chinese/Japanese text uses a fast system font
      (YaHei/PingFang) instead of falling through to the profile's Standard font, which may be
      a large slow-to-shape custom family (first-render stall on hi-DPI). */
-  font-family: "Helvetica Neue", Verdana, Geneva, Arial, "PingFang SC", "Microsoft YaHei", "Hiragino Sans", "Noto Sans CJK SC", sans-serif;
+  font-family: "Helvetica Neue", Verdana, Geneva, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
   font-size: 12px;
   color: #000;
   background: #fff;
@@ -117,7 +117,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .login-body p { margin-bottom: 8px; font-size: 12px; color: #333; }
 .login-body input {
   width: 100%; padding: 4px 6px; border: 1px solid #999; font-size: 12px;
-  font-family: ui-monospace, "SF Mono", Consolas, monospace; margin-bottom: 6px; background: #fafaf8;
+  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; margin-bottom: 6px; background: #fafaf8;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .login-body input:focus { outline: none; border-color: #4477bb; background: #fff; }
@@ -172,7 +172,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
   margin-top: 6px; padding: 6px 8px;
   max-height: 120px; overflow: auto;
   background: rgba(0,0,0,0.04);
-  font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 10px;
+  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 10px;
   white-space: pre-wrap; word-break: break-all;
   border-radius: var(--pp-radius-sm);
 }
@@ -359,7 +359,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 }
 .ac-hint-footer kbd {
   display: inline-block; padding: 0 4px; margin: 0 1px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 9px;
+  font-family: SFMono-Regular, "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 9px;
   color: #555; background: #fff; border: 1px solid #ccc; border-radius: 3px;
   box-shadow: 0 1px 0 rgba(0,0,0,0.04); vertical-align: baseline;
 }
@@ -538,7 +538,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   line-height: 14px;
   color: #1a3a6e;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
   mix-blend-mode: difference;
   filter: invert(1);
 }
@@ -1312,8 +1312,8 @@ html[data-theme] .qbtn:focus-visible { outline: 2px solid var(--pp-accent); outl
 html[data-theme] .quick-links a:focus-visible { outline: 2px solid var(--pp-accent); outline-offset: 1px; }
 html[data-theme] .bottom-bar input[type="checkbox"]:focus-visible { outline: 2px solid var(--pp-accent); outline-offset: 1px; }
 /* Terminal monospace */
-html[data-theme="terminal"] body { font-family: "Courier New", Consolas, monospace; }
-html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Consolas, monospace; }
+html[data-theme="terminal"] body { font-family: "Courier New", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
+html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 
 /* ===================== Confirm Popover (shared helper) ===================== */
 .confirm-popover {

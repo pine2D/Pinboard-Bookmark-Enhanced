@@ -36,7 +36,13 @@
    Latin fonts to the bare `sans-serif` keyword, which resolves to the profile's Standard font;
    if that's a large/slow font (e.g. a custom Sarasa/CJK family) its first-time glyph shaping on
    the text-heavy AI panel stalls >1s. Naming YaHei/PingFang uses a fast system CJK font instead. */
-body { font-family: "Helvetica Neue", Verdana, "PingFang SC", "Microsoft YaHei", "Hiragino Sans", "Noto Sans CJK SC", sans-serif; background: #f5f5f0; color: #333; font-size: 13px; }
+body { font-family: "Helvetica Neue", Verdana, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif; background: #f5f5f0; color: #333; font-size: 13px; }
+/* Form controls don't inherit font-family by default — without this, <button>/<input>/<select>
+   fall to the UA default ("Arial"), which has NO CJK glyphs, so their Chinese labels drop to the
+   profile's Standard font (e.g. Sarasa UI SC) and pay the slow first-load stall. Inherit the body
+   stack so their CJK uses the same fast named fonts. (.fg textarea keeps its monospace stack via
+   higher specificity.) */
+button, input, select { font-family: inherit; }
 .container { max-width: 700px; margin: 0 auto; padding: 24px 16px; }
 h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
 
@@ -93,12 +99,19 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
   padding-right: 26px;
   cursor: pointer;
 }
-/* Explicit monospace stack, NOT the bare `monospace` keyword: the keyword resolves to
-   Chrome's configurable "Fixed-width font" (chrome://settings/fonts). If a profile has set
-   that to a large/slow-to-load font (e.g. a CJK family), the AI panel — the first place that
-   renders monospace text (prompt textareas + <code> hints) — pays a >1s first-load stall on
-   reveal. Naming Consolas/SF Mono first uses an always-present fast system font instead. */
-.fg textarea { resize: vertical; min-height: 80px; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 11px; line-height: 1.5; }
+/* Monospace stack: NAMED Latin fonts first, then NAMED CJK fonts, generic `monospace` LAST.
+   Two traps, both routing to Chrome's "Fixed-width font" (chrome://settings/fonts) — if a
+   profile set that to a slow-to-load family (e.g. Sarasa Mono SC), the first panel rendering
+   such text pays a >1s first-load stall on reveal:
+     1. Latin: do NOT lead with bare `monospace` OR `ui-monospace` — BOTH resolve to the
+        Fixed-width generic (ui-monospace is NOT the OS mono UI font in Chrome). Name
+        Consolas/SF Mono first → always-present fast font, never the generic.
+     2. CJK-in-monospace: Consolas/SF Mono have NO CJK glyphs, so CJK chars in a monospace
+        element (e.g. the zh-CN textarea PLACEHOLDERS in Bookmark's tag-presets and
+        Appearance's custom-CSS) fall through to the trailing `monospace` generic → Fixed-width
+        CJK = Sarasa again. Must also name fast CJK fonts (YaHei/PingFang) BEFORE `monospace`.
+   This is why fixing only the Latin half left Bookmark/Appearance still stalling. */
+.fg textarea { resize: vertical; min-height: 80px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 11px; line-height: 1.5; }
 .fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus) { border-color: #9aa0a6; }
 .fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: #4477bb; }
 .fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible { box-shadow: 0 0 0 3px rgba(68,119,187,0.15); }
@@ -116,7 +129,7 @@ html[data-theme] .panel-foot a:hover { color: var(--opt-accent); }
 /* ---- Common elements ---- */
 .hint { font-size: 11px; color: #757575; margin-top: 2px; }
 .hint a { color: #4477bb; }
-.hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+.hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 .hint-warn::before {
   content: "";
   display: inline-block;
@@ -542,8 +555,8 @@ html[data-theme] .theme-name-popover .tnp-cancel { color: var(--opt-fg-muted); b
 html[data-theme] .theme-name-popover .tnp-cancel:hover { background: var(--opt-btn-hover); }
 
 /* ---- Terminal monospace override ---- */
-html[data-theme="terminal"] body { font-family: "Courier New", Consolas, monospace; }
-html[data-theme="terminal"] .fg textarea { font-family: "Courier New", Consolas, monospace; }
+html[data-theme="terminal"] body { font-family: "Courier New", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
+html[data-theme="terminal"] .fg textarea { font-family: "Courier New", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 
 /* ---- Overlay byte counter ---- */
 .overlay-meta-row { margin-top: 6px; display: flex; justify-content: flex-end; }
@@ -551,7 +564,7 @@ html[data-theme="terminal"] .fg textarea { font-family: "Courier New", Consolas,
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: #888;
-  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
 }
 .overlay-byte-counter.warn { color: #d97706; }
 .overlay-byte-counter.over { color: #c00; font-weight: 600; }
@@ -581,7 +594,7 @@ html[data-theme] .overlay-byte-counter.over { color: #ff5050; }
   max-height: 320px;
   overflow: auto;
   background: #f6f8fa;
-  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
   font-size: 11px;
   line-height: 1.5;
   white-space: pre;
