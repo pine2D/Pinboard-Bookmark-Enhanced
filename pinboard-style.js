@@ -107,13 +107,8 @@ _pbpCloak.textContent = "html { opacity: 0 !important; }";
       style.id = "pbp-injected";
       style.textContent = combined;
       (document.head || document.documentElement).appendChild(style);
-      pbpMark("ct-t1");
-      pbpMeasure("ct-inject", "ct-t0", "ct-t1");
     }
   } catch (_) {}
 
   uncloak();
-  pbpMark("ct-t2");
-  pbpMeasure("ct-uncloak", "ct-t0", "ct-t2");
-  pbpFlush().catch(() => {});
 })();

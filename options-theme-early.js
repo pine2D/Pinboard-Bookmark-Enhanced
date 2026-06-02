@@ -1,5 +1,3 @@
-pbpMark("options-t0");
-
 // ---- Mirror prefill: high-frequency UI fields ----
 // Synchronously apply cached field values from localStorage so the form
 // doesn't visibly jump from empty → populated. Async path below still

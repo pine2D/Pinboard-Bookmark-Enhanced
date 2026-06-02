@@ -1,4 +1,3 @@
-pbpMark("popup-t0");
 // All synchronous reads from localStorage mirror — applied BEFORE first paint to prevent
 // FOUC: section flash (main vs login), theme flash (light borders in dark mode), width jump.
 // chrome.storage is the source of truth; this file's async tail writes the mirror so the

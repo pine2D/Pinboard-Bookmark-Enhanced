@@ -2,17 +2,6 @@
 // Pinboard Bookmark Enhanced - Popup (v2.3)
 // ============================================================
 
-// Perf: capture FCP for popup-t0 → popup-fcp measure
-try {
-  new PerformanceObserver((list) => {
-    for (const e of list.getEntries()) {
-      if (e.name === "first-contentful-paint") {
-        performance.mark("pbp:popup-fcp");
-        pbpMeasure("popup-fcp", "popup-t0", "popup-fcp");
-      }
-    }
-  }).observe({ type: "paint", buffered: true });
-} catch (_) {}
 
 // Override pinboardFetch to route through background service worker.
 // This prevents Chrome's native credentials dialog when Pinboard returns 401.
@@ -231,8 +220,6 @@ async function showMain(token) {
     $id("url-input").value = tab.url || "";
     $id("title-input").value = tab.title || "";
   }
-  pbpMark("popup-form-ready");
-  pbpMeasure("popup-form-ready", "popup-t0", "popup-form-ready");
   // Kick off page-info extraction AND the bookmark cache lookup in parallel — both depend
   // only on `tab` (already obtained). Awaiting them sequentially wastes overlap potential.
   // Bookmark prefetch is keyed on tab.url (best-effort); if pageInfo later resolves to a
@@ -639,8 +626,6 @@ async function checkExistingBookmark(token, url, prefetch) {
       localStorage.setItem("pp-last-tab", JSON.stringify(mirror));
     }
   } catch (_) {}
-  pbpMark("popup-status-ready");
-  pbpMeasure("popup-status-ready", "popup-t0", "popup-status-ready");
 }
 
 // ===================== Submit / Delete =====================

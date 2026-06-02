@@ -59,8 +59,6 @@ function setupTabSet() {
   const batchBtn = $id("batch-bookmark-btn");
   if (!batchBtn) return;
   batchBtn.addEventListener("click", async () => {
-    pbpMark("batch-t0");
-    let _batchFirstWriteMarked = false;
     batchBtn.disabled = true;
     setBtnIcon(batchBtn, "pin", t("batchSaving"));
     try {
@@ -199,17 +197,9 @@ function setupTabSet() {
           const data = await (await pinboardFetch(apiUrl)).json();
           if (data.result_code === "done") {
             saved++;
-            if (!_batchFirstWriteMarked) {
-              pbpMark("batch-first-write");
-              pbpMeasure("batch-first-write", "batch-t0", "batch-first-write");
-              _batchFirstWriteMarked = true;
-            }
           } else failed++;
         } catch (_) { failed++; }
       }
-      pbpMark("batch-last-write");
-      pbpMeasure("batch-last-write", "batch-t0", "batch-last-write");
-      pbpFlush().catch(() => {});
       if (saved > 0) {
         const newUrls = validTabs.filter(tab => !existingUrls.has(tab.url)).map(tab => tab.url);
         newUrls.forEach(u => existingUrls.add(u));

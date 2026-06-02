@@ -2,12 +2,7 @@
 // Pinboard Bookmark Enhanced - Background Service Worker (v4.0)
 // ============================================================
 
-importScripts("perf-mark.js");
-pbpMark("sw-t0");
 importScripts("i18n.js", "shared.js", "ai-cache.js", "ai.js");
-pbpMark("sw-t1");
-pbpMeasure("sw-wakeup", "sw-t0", "sw-t1");
-pbpFlush().catch(() => {}); // fire-and-forget; SW may sleep before storage write completes
 
 // Load manual language setting (async, t() falls back to browser locale until ready)
 initI18n();
