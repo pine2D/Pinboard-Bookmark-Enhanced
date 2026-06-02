@@ -14,14 +14,15 @@ Rozszerzenie Chrome, które wzbogaca zakładki [Pinboard](https://pinboard.in) o
 
 ## Funkcje
 
-- **Inteligentne przechwytywanie** — automatyczne wypełnianie tytułu, URL, meta-opisu, referrera i zaznaczonego tekstu. Do AI trafia oczyszczona treść artykułu — bez reklam, menu i pasków bocznych
-- **Tagi i streszczenia AI** — własny klucz dla 13 popularnych dostawców LLM lub dowolnego endpointu zgodnego z OpenAI
-- **Zapis hurtowy** — zapisz wszystkie otwarte karty naraz, z tagowaniem AI dla każdej karty i postępem na żywo
-- **Wykrywanie już zapisanych stron** — ikona na pasku zmienia się, gdy bieżąca strona jest już w Twoich zakładkach
-- **Motywy dla `pinboard.in`** — 13 dopracowanych palet (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus własna nakładka CSS synchronizowana między urządzeniami
+- **Inteligentne przechwytywanie** — automatyczne wypełnianie tytułu, URL, meta-opisu, referrera i zaznaczonego tekstu, a także usuwanie parametrów śledzących (`utm_*`, `gclid`, `fbclid`, …) z zapisywanego URL przy przechwytywaniu lub wklejaniu, z trybem agresywnym oraz własnymi listami zachowywania/usuwania
+- **Tagi i streszczenia AI** — własny klucz dla 13 popularnych dostawców LLM lub dowolnego endpointu zgodnego z OpenAI; do AI trafia oczyszczona treść artykułu — bez reklam, menu i pasków bocznych
+- **Asystent tagów** — autouzupełnianie z Twoich własnych tagów, tagów sugerowanych przez Pinboard oraz gotowych zestawów tagów dodawanych jednym dotknięciem
+- **Szybki zapis** — zapisz stronę (lub jako *do przeczytania później*) bezpośrednio skrótem klawiszowym, bez otwierania okna; albo zapisz hurtowo wszystkie otwarte karty z tagowaniem AI dla każdej karty i postępem na żywo, łącząc je w Zestaw kart
+- **Wyszukiwanie i powroty** — przeszukuj swoje zakładki, przejdź do Nieprzeczytanych / Sieci / Notatek / Popularnych i przeglądaj ostatnie zapisy; ikona na pasku zmienia się, gdy bieżąca strona jest już w Twoich zakładkach
 - **Kolejka offline** — wersje robocze są zapisywane lokalnie i synchronizowane po ponownym połączeniu
+- **Motywy dla `pinboard.in`** — 13 dopracowanych palet (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus własna nakładka CSS synchronizowana między urządzeniami, z regulowaną szerokością okna
 - **Strona do Markdown** — przekonwertuj bieżącą stronę na czysty Markdown — podgląd, skopiuj do schowka lub pobierz jako `.md`. Wybierz [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokalnie) lub [Jina Reader](https://jina.ai/reader) (w chmurze)
-- **9 języków**, konfigurowalne skróty, zero śledzenia
+- **9 języków** · konfigurowalne skróty · zero śledzenia
 
 ## Instalacja
 

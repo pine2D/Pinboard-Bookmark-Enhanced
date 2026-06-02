@@ -14,12 +14,13 @@
 
 ## 功能特性
 
-- **智能填表** — 自动填充标题、URL、页面描述、来源链接和选中文本。提交给 AI 的是去除广告、菜单、侧边栏后的纯净正文
-- **AI 标签与摘要** — 自备 API key 接入 13 家主流 LLM 服务商，或任意 OpenAI 兼容接口
-- **批量保存** — 一次性收藏所有打开的标签页，每个标签独立 AI 打标签并实时显示进度
-- **已收藏检测** — 当前页若已收藏，工具栏图标会自动切换状态
-- **`pinboard.in` 主题** — 13 套精心调优的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），外加自定义 CSS 覆盖层，多设备同步
+- **智能填表** — 自动填充标题、URL、页面描述、来源链接和选中文本，并在保存或粘贴时去除 URL 里的追踪参数（`utm_*`、`gclid`、`fbclid`、…），支持激进模式和自定义保留/移除列表
+- **AI 标签与摘要** — 自备 API key 接入 13 家主流 LLM 服务商，或任意 OpenAI 兼容接口；AI 读取的是去除广告、菜单、侧边栏后的纯净正文
+- **标签助手** — 从你自己的标签、Pinboard 建议标签和一键标签预设中自动补全
+- **快速保存** — 用快捷键直接保存当前页（或保存为*稍后阅读*），无需打开弹窗；也可批量保存所有打开的标签页，每个标签独立 AI 打标签并实时显示进度，还能打包成一个 Tab Set
+- **查找与回顾** — 搜索你的书签，快速跳转到 Unread / Network / Notes / Popular，浏览最近保存；当前页若已收藏，工具栏图标会自动切换状态
 - **离线队列** — 离线保存的草稿留在本地，重新联网时自动同步
+- **`pinboard.in` 主题** — 13 套精心调优的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），外加自定义 CSS 覆盖层，多设备同步，弹窗宽度可调
 - **当前页转 Markdown** — 把当前网页转成干净的 Markdown，可预览、复制到剪贴板，或下载为 `.md`。可选 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本地）或 [Jina Reader](https://jina.ai/reader)（云端）两种后端
 - **9 种语言**、可自定义快捷键、零追踪
 

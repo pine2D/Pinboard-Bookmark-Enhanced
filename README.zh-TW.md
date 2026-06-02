@@ -14,12 +14,13 @@
 
 ## 功能特色
 
-- **智慧填表** — 自動填入標題、URL、頁面描述、來源連結和選取的文字。送往 AI 的是去除廣告、選單、側欄後的乾淨正文
-- **AI 標籤與摘要** — 自備 API key 接入 13 家主流 LLM 服務商，或任何 OpenAI 相容端點
-- **批次儲存** — 一次儲存所有開啟的分頁，每個分頁獨立 AI 標籤化並即時顯示進度
-- **已收藏偵測** — 目前頁若已收藏，工具列圖示會自動切換狀態
-- **`pinboard.in` 佈景主題** — 13 套精心調校的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），加上自訂 CSS 覆蓋層，多裝置同步
+- **智慧填表** — 自動填入標題、URL、頁面描述、來源連結和選取的文字，並在擷取或貼上時從儲存的 URL 移除追蹤參數（`utm_*`、`gclid`、`fbclid`、…），另有積極模式與自訂保留／移除清單
+- **AI 標籤與摘要** — 自備 API key 接入 13 家主流 LLM 服務商，或任何 OpenAI 相容端點；送往 AI 的是去除廣告、選單、側欄後的乾淨正文
+- **標籤助手** — 從你自己的標籤、Pinboard 建議標籤，以及一鍵標籤預設中自動補全
+- **快速儲存** — 直接用鍵盤快捷鍵儲存頁面（或標為*稍後閱讀*），無需開啟彈出視窗；或批次儲存所有開啟的分頁，每個分頁獨立 AI 標籤化並即時顯示進度，還能打包成 Tab Set
+- **搜尋與回顧** — 搜尋你的書籤，快速前往 Unread／Network／Notes／Popular，並瀏覽最近儲存的項目；目前頁若已收藏，工具列圖示會自動切換狀態
 - **離線佇列** — 離線儲存的草稿留在本機，重新連線時自動同步
+- **`pinboard.in` 佈景主題** — 13 套精心調校的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），加上多裝置同步的自訂 CSS 覆蓋層，以及可調整的彈出視窗寬度
 - **當前頁轉 Markdown** — 將目前網頁轉為乾淨的 Markdown，可預覽、複製到剪貼簿，或下載為 `.md`。可選 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或 [Jina Reader](https://jina.ai/reader)（雲端）兩種後端
 - **9 種語言**、可自訂快捷鍵、零追蹤
 

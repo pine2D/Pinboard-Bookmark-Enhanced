@@ -14,14 +14,15 @@ Une extension Chrome qui booste les signets [Pinboard](https://pinboard.in) avec
 
 ## Fonctionnalités
 
-- **Capture intelligente** — pré-remplit titre, URL, méta-description, referrer et texte sélectionné. L'IA reçoit le corps de l'article nettoyé — publicités, menus et barres latérales supprimés
-- **Tags et résumés IA** — votre propre clé pour 13 fournisseurs LLM populaires, ou tout endpoint compatible OpenAI
-- **Sauvegarde groupée** — capturer tous les onglets ouverts d'un coup, avec tagging IA par onglet et progression en direct
-- **Détection des pages déjà sauvegardées** — l'icône change quand la page courante est déjà dans vos signets
-- **Thèmes pour `pinboard.in`** — 13 palettes soignées (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus un calque CSS personnalisé synchronisé entre vos appareils
+- **Capture intelligente** — pré-remplit titre, URL, méta-description, referrer et texte sélectionné, et retire les paramètres de tracking (`utm_*`, `gclid`, `fbclid`, …) de l'URL enregistrée lors de la capture ou du collage, avec un mode agressif et des listes personnalisées à conserver ou supprimer
+- **Tags et résumés IA** — votre propre clé pour 13 fournisseurs LLM populaires, ou tout endpoint compatible OpenAI ; l'IA reçoit le corps de l'article nettoyé — publicités, menus et barres latérales supprimés
+- **Assistant de tags** — autocomplétion depuis vos propres tags, les tags suggérés par Pinboard et des presets de tags en un clic
+- **Sauvegarde rapide** — enregistrez la page (ou en *à lire plus tard*) directement depuis un raccourci clavier, sans ouvrir la popup ; ou sauvegardez en groupe tous les onglets ouverts, avec tagging IA par onglet et progression en direct, et regroupez-les dans un Tab Set
+- **Rechercher et retrouver** — cherchez dans vos signets, accédez aux Non lus / Réseau / Notes / Populaires et parcourez vos enregistrements récents ; l'icône de la barre d'outils change quand la page courante est déjà dans vos signets
 - **File d'attente hors-ligne** — les brouillons persistent localement et se synchronisent à la reconnexion
+- **Thèmes pour `pinboard.in`** — 13 palettes soignées (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus un calque CSS personnalisé synchronisé entre vos appareils, avec une largeur de popup ajustable
 - **Page vers Markdown** — convertir la page courante en Markdown propre — aperçu, copie dans le presse-papier ou téléchargement en `.md`. Choisissez [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (local) ou [Jina Reader](https://jina.ai/reader) (cloud)
-- **9 langues**, raccourcis clavier configurables, aucun tracking
+- **9 langues** · raccourcis clavier configurables · aucun tracking
 
 ## Installation
 

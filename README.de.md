@@ -14,14 +14,15 @@ Eine Chrome-Erweiterung, die [Pinboard](https://pinboard.in)-Lesezeichen mit KI-
 
 ## Funktionen
 
-- **Intelligente Erfassung** — füllt Titel, URL, Meta-Beschreibung, Referrer und ausgewählten Text automatisch aus. Die KI bekommt den bereinigten Artikel-Text — Anzeigen, Menüs und Sidebars werden entfernt
-- **KI-Tags & Zusammenfassungen** — eigener API-Key für 13 verbreitete LLM-Anbieter oder jeden OpenAI-kompatiblen Endpunkt
-- **Stapel-Speicherung** — alle offenen Tabs auf einmal erfassen, mit KI-Tagging pro Tab und Live-Fortschritt
-- **Erkennung gespeicherter Seiten** — das Symbolleisten-Icon wechselt, wenn die aktuelle Seite bereits in deinen Lesezeichen ist
-- **Themes für `pinboard.in`** — 13 kuratierte Farbpaletten (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus eigenes CSS-Overlay, das geräteübergreifend synchronisiert wird
+- **Intelligente Erfassung** — füllt Titel, URL, Meta-Beschreibung, Referrer und ausgewählten Text automatisch aus und entfernt Tracking-Parameter (`utm_*`, `gclid`, `fbclid`, …) beim Erfassen oder Einfügen aus der gespeicherten URL, mit aggressivem Modus und eigenen Behalten-/Entfernen-Listen
+- **KI-Tags & Zusammenfassungen** — eigener API-Key für 13 verbreitete LLM-Anbieter oder jeden OpenAI-kompatiblen Endpunkt; die KI bekommt den bereinigten Artikel-Text — Anzeigen, Menüs und Sidebars werden entfernt
+- **Tag-Assistent** — Autovervollständigung aus deinen eigenen Tags, Pinboards vorgeschlagenen Tags und Tag-Presets per Klick
+- **Schnellspeicherung** — die Seite (oder als *später lesen*) direkt per Tastenkürzel speichern, ohne Popup; oder alle offenen Tabs auf einmal erfassen, mit KI-Tagging pro Tab und Live-Fortschritt, und sie zu einem Tab-Set bündeln
+- **Finden & wiederfinden** — durchsuche deine Lesezeichen, springe zu Ungelesen / Netzwerk / Notizen / Beliebt und durchstöbere zuletzt Gespeichertes; das Symbolleisten-Icon wechselt, wenn die aktuelle Seite bereits in deinen Lesezeichen ist
 - **Offline-Warteschlange** — Entwürfe bleiben lokal gespeichert und synchronisieren sich, sobald du wieder online bist
+- **Themes für `pinboard.in`** — 13 kuratierte Farbpaletten (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus eigenes CSS-Overlay, das geräteübergreifend synchronisiert wird, mit einstellbarer Popup-Breite
 - **Seite-zu-Markdown** — die aktuelle Seite in sauberes Markdown konvertieren — Vorschau, in die Zwischenablage kopieren oder als `.md` herunterladen. Wähle zwischen [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokal) oder [Jina Reader](https://jina.ai/reader) (Cloud)
-- **9 Sprachen**, anpassbare Tastenkürzel, kein Tracking
+- **9 Sprachen** · anpassbare Tastenkürzel · kein Tracking
 
 ## Installation
 
