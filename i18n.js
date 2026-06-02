@@ -76,7 +76,12 @@ async function _refreshI18nAsync() {
       // localStorage may be full or unavailable (e.g. SW context); proceed without mirror
     }
 
-    const changed = prevLang !== optLang || _i18nMessages === null;
+    // Re-apply not only on a language switch but also when the fetched messages
+    // DIFFER from what we applied at boot (the sync localStorage mirror can be stale
+    // after any messages.json edit — new/changed keys would otherwise render via the
+    // chrome.i18n default-locale fallback, e.g. English, until the next open).
+    const changed = prevLang !== optLang || _i18nMessages === null
+      || JSON.stringify(_i18nMessages) !== JSON.stringify(msgs);
     _i18nMessages = msgs;
     if (changed && typeof applyI18n === "function") applyI18n();
   } catch (e) {
