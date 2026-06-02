@@ -238,10 +238,7 @@
     "message": "Kein Seiteninhalt zum Zusammenfassen"
   },
   "aiSetKey": {
-    "message": "Legen Sie den AI API Key in den Einstellungen fest"
-  },
-  "aiSetKeyIn": {
-    "message": "AI Key festlegen in "
+    "message": "Legen Sie den AI API Key in den [[Einstellungen]] fest"
   },
   "aiCached": {
     "message": "Zwischengespeichert"

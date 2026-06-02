@@ -238,10 +238,39 @@ function removeSummary() {
   autoResizeTextarea(di);
 }
 
+// Unified "no AI key" prompt: one feedback card shared by AI summary and AI tags so
+// both behave identically. The full standard sentence lives in the aiSetKey message,
+// which marks the word linking to the options page with [[...]] — e.g.
+// "Set AI API key in [[settings]]". Marking the word in place (rather than composing
+// a prefix + the settings word) keeps the sentence grammatical in every locale: CJK/JA
+// put the word mid-sentence and pl/ru decline it ("ustawieniach", "настройках"). The
+// link label is the marked word itself, so the declension is preserved. Persistent
+// (no autoHide): it's an actionable setup prompt, not a transient status.
+function showSetKeyError() {
+  if (window._lastStatusFeedback) window._lastStatusFeedback.dismiss();
+  const raw = t("aiSetKey");
+  const msg = document.createElement("span");
+  const m = raw.match(/\[\[(.+?)\]\]/);
+  if (m) {
+    if (m.index > 0) msg.appendChild(document.createTextNode(raw.slice(0, m.index)));
+    const link = document.createElement("a");
+    link.href = "#";
+    link.className = "go-settings";
+    link.textContent = m[1];
+    link.addEventListener("click", (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); });
+    msg.appendChild(link);
+    const rest = raw.slice(m.index + m[0].length);
+    if (rest) msg.appendChild(document.createTextNode(rest));
+  } else {
+    msg.textContent = raw;
+  }
+  window._lastStatusFeedback = showFeedback({ variant: "error", messageNode: msg });
+}
+
 // ---- AI Summary core logic ----
 async function doAISummary(forceRefresh) {
   const btn = $id("ai-summary-btn");
-  if (!hasAIKey(settings)) { showStatus("status-msg", t("aiSetKey"), "error"); return; }
+  if (!hasAIKey(settings)) { showSetKeyError(); return; }
   hideAIError();
 
   if (!forceRefresh) {
@@ -338,20 +367,7 @@ async function doAITags(forceRefresh) {
   const container = $id("ai-suggest-tags");
   hideAIError();
 
-  if (!hasAIKey(settings)) {
-    container.textContent = "";
-    const msg = document.createElement("span");
-    msg.className = "muted";
-    msg.textContent = t("aiSetKeyIn");
-    const link = document.createElement("a");
-    link.href = "#";
-    link.className = "go-settings";
-    link.textContent = t("settings");
-    link.addEventListener("click", (ev) => { ev.preventDefault(); chrome.runtime.openOptionsPage(); });
-    msg.appendChild(link);
-    container.appendChild(msg);
-    return;
-  }
+  if (!hasAIKey(settings)) { showSetKeyError(); return; }
 
   if (!forceRefresh) {
     const cached = await getAICache(pageInfo.url, "tags", settings.aiCacheDuration, settings.aiContentSource);

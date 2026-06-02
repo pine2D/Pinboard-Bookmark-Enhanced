@@ -238,10 +238,7 @@
     "message": "頁面無可用內容"
   },
   "aiSetKey": {
-    "message": "請先在設定中配置 AI API Key"
-  },
-  "aiSetKeyIn": {
-    "message": "請在 "
+    "message": "請先在[[設定]]中配置 AI API Key"
   },
   "aiCached": {
     "message": "已快取"

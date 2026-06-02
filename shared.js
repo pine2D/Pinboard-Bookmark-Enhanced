@@ -418,7 +418,7 @@ function showConfirmPopover(anchor, opts) {
 }
 
 // ===================== Feedback Card (B2) =====================
-function showFeedback({ variant = "info", title = "", message = "", actions = [], details = "", autoHide = 0, target } = {}) {
+function showFeedback({ variant = "info", title = "", message = "", messageNode = null, actions = [], details = "", autoHide = 0, target } = {}) {
   const card = document.createElement("div");
   card.className = "feedback-card";
   card.dataset.variant = variant;
@@ -443,7 +443,12 @@ function showFeedback({ variant = "info", title = "", message = "", actions = []
     t.className = "fc-title"; t.textContent = title;
     body.appendChild(t);
   }
-  if (message) {
+  if (messageNode) {
+    const m = document.createElement("div");
+    m.className = "fc-message";
+    m.appendChild(messageNode);
+    body.appendChild(m);
+  } else if (message) {
     const m = document.createElement("div");
     m.className = "fc-message"; m.textContent = message;
     body.appendChild(m);

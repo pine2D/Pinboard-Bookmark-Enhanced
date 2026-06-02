@@ -238,10 +238,7 @@
     "message": "Brak treści strony do podsumowania"
   },
   "aiSetKey": {
-    "message": "Ustaw klucz AI API w ustawieniach"
-  },
-  "aiSetKeyIn": {
-    "message": "ustaw klucz AI w "
+    "message": "Ustaw klucz AI API w [[ustawieniach]]"
   },
   "aiCached": {
     "message": "z pamięci podręcznej"

@@ -238,10 +238,7 @@
     "message": "No page content to summarize"
   },
   "aiSetKey": {
-    "message": "Set AI API key in settings"
-  },
-  "aiSetKeyIn": {
-    "message": "set AI key in "
+    "message": "Set AI API key in [[settings]]"
   },
   "aiCached": {
     "message": "cached"

@@ -238,10 +238,7 @@
     "message": "页面无可用内容"
   },
   "aiSetKey": {
-    "message": "请先在设置中配置 AI API Key"
-  },
-  "aiSetKeyIn": {
-    "message": "请在 "
+    "message": "请先在[[设置]]中配置 AI API Key"
   },
   "aiCached": {
     "message": "已缓存"

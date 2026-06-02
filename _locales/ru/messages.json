@@ -238,10 +238,7 @@
     "message": "Нет содержимого страницы для аннотации"
   },
   "aiSetKey": {
-    "message": "Укажите AI API-ключ в настройках"
-  },
-  "aiSetKeyIn": {
-    "message": "укажите AI-ключ в "
+    "message": "Укажите AI API-ключ в [[настройках]]"
   },
   "aiCached": {
     "message": "из кэша"

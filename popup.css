@@ -137,6 +137,13 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .fc-body { flex: 1; min-width: 0; }
 .fc-title { font-weight: 600; }
 .fc-message { margin-top: 2px; word-break: break-word; }
+/* Inline links inside a feedback message (e.g. the "settings" link in the
+   no-AI-key prompt) inherit the card's variant colour so they stay on-theme
+   across all popup themes (a fixed accent would fight the error semantics and
+   has no contrast floor — a blue link on some dark warn-bg drops below 2.5:1).
+   At 11px an underline alone is a weak cue, so bold (matching .fc-title) +
+   underline-offset make "clickable" unambiguous without recolouring. */
+.fc-message a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .fc-actions { display: flex; gap: 8px; margin-top: 4px; align-items: center; }
 .fc-btn {
   background: transparent; border: 1px solid currentColor;

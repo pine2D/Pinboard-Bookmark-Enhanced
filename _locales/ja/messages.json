@@ -238,10 +238,7 @@
     "message": "要約するページ内容がありません"
   },
   "aiSetKey": {
-    "message": "設定で AI API Key を設定してください"
-  },
-  "aiSetKeyIn": {
-    "message": "AI Key を"
+    "message": "[[設定]]で AI API Key を設定してください"
   },
   "aiCached": {
     "message": "キャッシュ済み"

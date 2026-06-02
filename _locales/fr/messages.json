@@ -238,10 +238,7 @@
     "message": "Aucun contenu de page à résumer"
   },
   "aiSetKey": {
-    "message": "Définir la clé API IA dans les paramètres"
-  },
-  "aiSetKeyIn": {
-    "message": "définir la clé IA dans "
+    "message": "Définir la clé API IA dans les [[paramètres]]"
   },
   "aiCached": {
     "message": "en cache"
