@@ -58,11 +58,11 @@
   --pp-info-fg: var(--pp-banner-fg);
   --pp-toast-shadow: var(--pp-shadow-md);
   --pp-motion-duration: 0.16s;
-  --pp-popup-width: 520px;
+  --pp-popup-width: 550px;
 }
 
 body {
-  width: var(--pp-popup-width, 520px); max-width: 100%;
+  width: var(--pp-popup-width, 550px); max-width: 100%;
   /* CJK fonts named before `sans-serif` so Chinese/Japanese text uses a fast system font
      (YaHei/PingFang) instead of falling through to the profile's Standard font, which may be
      a large slow-to-shape custom family (first-render stall on hi-DPI). */

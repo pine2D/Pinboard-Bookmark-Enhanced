@@ -15,7 +15,7 @@ const PBP_POPUP_ADAPTIVE_MAP = {
   root.dataset.section = localStorage.getItem("pp-logged-in") === "1" ? "main" : "login";
 
   // Popup width
-  const w = Number(localStorage.getItem("pp-popup-width")) || 520;
+  const w = Number(localStorage.getItem("pp-popup-width")) || 550;
   root.style.setProperty("--pp-popup-width", Math.max(420, Math.min(720, w)) + "px");
 
   // Theme: dark class or data-theme based on stored mode + preset + system preference
@@ -65,14 +65,14 @@ const PBP_POPUP_ADAPTIVE_MAP = {
 // Async source-of-truth read — corrects mirror if stale, populates on first run.
 chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {
   return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
-    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 520 });
+    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 550 });
 }).then(s => {
   // Update localStorage mirror for next popup boot
   try {
     localStorage.setItem("pp-theme", s.optTheme || "auto");
     localStorage.setItem("pp-theme-preset", s.themePresetKey || "");
     localStorage.setItem("pp-theme-follow", s.optPopupFollowTheme === false ? "0" : "1");
-    localStorage.setItem("pp-popup-width", String(s.popupWidth || 520));
+    localStorage.setItem("pp-popup-width", String(s.popupWidth || 550));
   } catch (_) {}
 
   // Re-apply in case the mirror was stale (will be a no-op if mirror was correct)
@@ -93,6 +93,6 @@ chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) =>
     root.classList.add("dark");
   }
 
-  const w = Math.max(420, Math.min(720, Number(s.popupWidth) || 520));
+  const w = Math.max(420, Math.min(720, Number(s.popupWidth) || 550));
   root.style.setProperty("--pp-popup-width", w + "px");
 }).catch(() => { /* storage unavailable: localStorage mirror already applied */ });

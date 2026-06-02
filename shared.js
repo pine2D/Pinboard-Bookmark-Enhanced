@@ -122,7 +122,7 @@ const SETTINGS_DEFAULTS = {
   optShowQuickLinks: true, optShowQuickRow: true,
   tagPresets: "", optAutoCloseAfterSave: true,
   themePresetKey: "", optPopupFollowTheme: true,
-  popupWidth: 520,
+  popupWidth: 550,
   urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] }
 };
 

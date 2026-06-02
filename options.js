@@ -344,8 +344,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---- Popup width (B9) ----
-  const popupWidth = Number(s.popupWidth) || 520;
-  const presetValues = [480, 520, 560, 600];
+  const popupWidth = Number(s.popupWidth) || 550;
+  const presetValues = [450, 550, 650];
   if (presetValues.includes(popupWidth)) {
     const radio = document.querySelector(`input[name="popup-width-preset"][value="${popupWidth}"]`);
     if (radio) radio.checked = true;
@@ -598,14 +598,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       // ---- Popup width (B9) ----
       ...(() => {
         const selectedPreset = document.querySelector('input[name="popup-width-preset"]:checked')?.value;
-        let popupWidthToSave = 520;
+        let popupWidthToSave = 550;
         if (selectedPreset === "custom") {
           const raw = parseInt($id("opt-popup-width-custom").value, 10);
           // Clamp the stored value but do NOT write back to the input — that
           // would clobber partial keystrokes during auto-save (e.g. typing "6"
           // for an eventual "600" would snap to 420). The blur/Enter handler
           // is responsible for cleaning up the displayed value.
-          popupWidthToSave = Math.max(420, Math.min(720, isNaN(raw) ? 520 : raw));
+          popupWidthToSave = Math.max(420, Math.min(720, isNaN(raw) ? 550 : raw));
         } else if (selectedPreset) {
           popupWidthToSave = parseInt(selectedPreset, 10);
         }
