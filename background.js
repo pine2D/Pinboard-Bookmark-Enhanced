@@ -387,6 +387,17 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     toread: toread ? "yes" : undefined,
   });
 
+  // Quick-save has no UI to trim the note, so gate on the URI budget before sending.
+  // Otherwise an oversize request 414s — resp.json() then throws into a vague "Invalid
+  // response (HTTP 414)" notice, the bookmark is silently lost, and (worse) auto AI
+  // summaries appended above can push notes over without the user realising. Fail fast
+  // with the same clear message the popup shows. (Gating here also keeps oversize items
+  // out of the offline queue, where they would 414-loop forever.)
+  if (apiUrl.length > POSTS_ADD_URI_BUDGET) {
+    showNotification(notifyId + "-error", t("bgSaveFailed"), t("uriTooLong", String(apiUrl.length), String(POSTS_ADD_URI_BUDGET)), "error");
+    return;
+  }
+
   try {
     const resp = await pinboardFetch(apiUrl);
     let data;
