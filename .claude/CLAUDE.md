@@ -1,7 +1,7 @@
 # Pinboard Bookmark Enhanced 项目配置
 
 作者：pine2D
-更新：2026-05-27
+更新：2026-06-02
 
 ## 项目概述
 
@@ -155,6 +155,32 @@ bash scripts/release.sh
 - AI 请求统一走各 provider 的 chat completion 接口
 - 所有 API key 存储在 `chrome.storage.sync`，不能硬编码
 - Defuddle 在 popup 打开时**懒注入**，避免冷启动开销
+
+## 性能与踩坑（hard-won，改 UI / SW / 字体前必读）
+
+> 真实事故的根因沉淀，**勿重新引入**。机制依据：Blink fonts README、crbug 1266022/491556、developer.chrome.com（SW lifecycle / storage / CSP / alarms）、web.dev（content-visibility / style 计算）。
+
+### 字体回退卡顿（2026-06 根因）
+
+popup/options 是**短命单次渲染、无暖 shape cache**——首屏要付满「字体匹配 + 回退 + HarfBuzz shaping + 字体首次加载」成本。任何「UI 文本回退到一个大/慢字体」都会在高 DPI Windows 上造成 **1-3s 冻结**（计入 Rendering / Recalc+Layout，Paint 反而很小）。已踩中三种形态，对应三条铁律：
+
+| 形态 | 机制 | 铁律 |
+|------|------|------|
+| emoji / dingbat（⚠ ✓ ✗ ✕ ↻ ▸ ▾ ℹ …） | 回退到 Segoe UI Emoji 彩色字体，首次加载 ~1.6s | UI 里**一律内联 SVG**（`PBP_ICONS` / `setBtnIcon` / `setStatusIcon` / CSS 三角），**禁止字面 emoji/符号字符**。`U+FE0E`(VS15) 和 `font-variant-emoji:text` 在 Chrome 实测**无效**，别依赖 |
+| CJK 正文 | font-family 只列拉丁字体 + 通用 `sans-serif` → 中文回退到 profile 的 **Standard 字体**（用户可能设了大 CJK 字体如 Sarasa） | body font-family **必须在 `sans-serif` 前显式列快 CJK 字体**：`"PingFang SC","Microsoft YaHei","Hiragino Sans","Noto Sans CJK SC"` |
+| 等宽 | 裸 `monospace` 关键字 → profile 的 **Fixed-width 字体** | 用显式栈 `ui-monospace,"SF Mono",Consolas,monospace`，**禁止裸 `monospace`** |
+
+**测量陷阱**：chrome-dbg / 已打开的页面是**暖态**，测不到冷首屏（同代码暖态 ~3ms vs 日常 Chrome 1.7s）。判定：第二次操作就快 = 一次性冷成本；**只能在用户真实机器冷启动验证**。预热（idle 强制 layout）会阻塞主线程造成「看着渲染完却卡死」，**不可取**——优先消除慢字体回退这个根因。热路径避免 `:has()` 等慢选择器；超长面板可考虑 `content-visibility:auto`。
+
+### MV3 不变量（改 background.js / 存储 / manifest 前别破坏）
+
+- **SW 无持久状态**：30s idle 即终止、全局变量被清空。状态一律落 `chrome.storage`，每个 handler 开头重读；全局只作单次调用内的暖缓存。
+- **监听器顶层同步注册**：`chrome.*.on*` 与 `importScripts` 只能在 SW 顶层同步执行；async 注册在 MV3 不保证生效。
+- **存储分层**：设置→`sync`（单 item ≤8KB、总 ~100KB、写入限流；写后查 `lastError`）；缓存/大/瞬态→`local`（已用 `chrome.alarms` 最小 30s 预热 SETTINGS_DEFAULTS）。
+- **消息异步响应**：`onMessage` 里 `return true` 保持通道，且**别**把该 listener 设成 `async`（二者只能取一）。
+- **CSP**：禁 `eval`/远程代码；只能远程取**数据**（JSON/CSS）。Defuddle 因此本地 vendor。
+- **content script**：仅 `pinboard.in` 注入、保持瘦身；`document_start` 仅主题注入需要。
+- **setIcon**：仅状态真正变化时调用 + 缓存 ImageData，别每个 tab 事件重新 fetch PNG（见 `9b689c1` 回归修复）。
 
 ## 与 Claude Code 协作
 
