@@ -273,6 +273,19 @@ function setupTagsInput() {
     } else if (e.key === "Backspace" && !input.value && currentTags.length) { removeTag(currentTags[currentTags.length - 1]); }
     else if (e.key === "Escape") { dropdown.classList.add("hidden"); }
   });
+  // Dropping a dragged tag past the last chip lands on this flex-grow input.
+  // Guard it so native DnD never inserts the index; move the tag to the end instead.
+  input.addEventListener("dragover", (e) => { if (_dragReorderFromIdx !== null) e.preventDefault(); });
+  input.addEventListener("drop", (e) => {
+    if (_dragReorderFromIdx === null) return;   // genuine external text drop -> leave native behavior intact
+    e.preventDefault();
+    const from = _dragReorderFromIdx;
+    if (from >= 0 && from < currentTags.length - 1) {
+      const [moved] = currentTags.splice(from, 1);
+      currentTags.push(moved);
+      renderTags();
+    }
+  });
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".tags-input-wrap") && !e.target.closest(".autocomplete-dropdown")) dropdown.classList.add("hidden");
   });
@@ -351,6 +364,7 @@ function saveLastUsedTags(tags) {
 function updateAc(items) { items.forEach((el, i) => el.classList.toggle("selected", i === acIndex)); }
 
 let _newlyAddedTag = null;
+let _dragReorderFromIdx = null;
 
 function addTag(tag) {
   if (typeof tag !== "string" || !tag) return;
@@ -390,15 +404,22 @@ function renderTags() {
     rm.addEventListener("click", () => removeTag(tag));
     el.appendChild(text);
     el.appendChild(rm);
-    el.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", idx); el.classList.add("dragging"); });
-    el.addEventListener("dragend", () => el.classList.remove("dragging"));
+    el.addEventListener("dragstart", (e) => {
+      _dragReorderFromIdx = idx;
+      e.dataTransfer.effectAllowed = "move";
+      // Custom MIME (not text/plain): a drop onto the text input can't then
+      // trigger the browser's native "insert dragged text" and stamp the index in.
+      e.dataTransfer.setData("application/x-pb-tag-reorder", String(idx));
+      el.classList.add("dragging");
+    });
+    el.addEventListener("dragend", () => { el.classList.remove("dragging"); _dragReorderFromIdx = null; });
     el.addEventListener("dragover", (e) => { e.preventDefault(); el.classList.add("drag-over"); });
     el.addEventListener("dragleave", () => el.classList.remove("drag-over"));
     el.addEventListener("drop", (e) => {
       e.preventDefault(); el.classList.remove("drag-over");
-      const fromIdx = parseInt(e.dataTransfer.getData("text/plain"));
+      const fromIdx = _dragReorderFromIdx;
       const toIdx = idx;
-      if (fromIdx !== toIdx) {
+      if (fromIdx !== null && fromIdx !== toIdx) {
         const [moved] = currentTags.splice(fromIdx, 1);
         currentTags.splice(toIdx, 0, moved);
         renderTags();
