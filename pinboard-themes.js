@@ -455,6 +455,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -1201,6 +1218,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -1907,6 +1941,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .email_secret { color: var(--pinboard-accent) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -2652,6 +2703,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .email_secret { color: var(--pinboard-accent) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -3409,6 +3477,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -4142,6 +4227,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -4774,6 +4876,23 @@ html.pbp-dark a.help { color: var(--pinboard-muted-soft) !important; background:
 html.pbp-dark .email_secret { color: var(--pinboard-accent) !important; }
 html.pbp-dark #settings_tab_panes { border: none !important; }
 html.pbp-dark #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+html.pbp-dark #main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+html.pbp-dark #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
 /* ---- Profile page ---- */
 html.pbp-dark .service_box, html.pbp-dark .help_box {
@@ -5541,6 +5660,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -6226,6 +6362,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .email_secret { color: var(--pinboard-accent) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -6924,6 +7077,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .email_secret { color: var(--pinboard-accent) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -7625,6 +7795,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .email_secret { color: var(--pinboard-accent) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -8340,6 +8527,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
 
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -9042,6 +9246,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .email_secret { color: var(--pinboard-accent) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -9754,6 +9975,23 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 .email_secret { color: var(--pinboard-accent) !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: var(--pinboard-fg) !important; }
+
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {

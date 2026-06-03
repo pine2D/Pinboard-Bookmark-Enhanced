@@ -330,6 +330,23 @@ a.help { color: ${v("muted-soft")} !important; background: ${v("accent-soft")} !
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: ${v("fg")} !important; }
 
+/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
+   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
+   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+#main_column > #import_history_table {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: ${v("bg-surface")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
+  border-radius: ${v("radius-md")} !important;
+  padding: 8px 12px !important;
+}
+#main_column > #import_history_table td { color: ${v("fg")} !important; padding: 2px 6px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: ${v("bg-surface")} !important;
