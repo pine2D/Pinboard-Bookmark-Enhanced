@@ -295,6 +295,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   overflow: hidden !important;
   word-wrap: break-word !important;
 }
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
+}
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
@@ -1027,6 +1041,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   overflow: hidden !important;
   word-wrap: break-word !important;
 }
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
+}
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
@@ -1719,6 +1747,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   overflow: hidden !important;
   word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
 }
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
@@ -2450,6 +2492,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   overflow: hidden !important;
   word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
 }
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
@@ -3193,6 +3249,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   overflow: hidden !important;
   word-wrap: break-word !important;
 }
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
+}
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
@@ -3912,6 +3982,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   overflow: hidden !important;
   word-wrap: break-word !important;
 }
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
+}
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
@@ -4530,6 +4614,20 @@ html.pbp-dark #right_bar {
   box-sizing: border-box !important;
   overflow: hidden !important;
   word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+html.pbp-dark #main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
 }
 html.pbp-dark #right_bar h3, html.pbp-dark #right_bar h4, html.pbp-dark #right_bar b { color: var(--pinboard-muted) !important; }
 html.pbp-dark #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
@@ -5283,6 +5381,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   overflow: hidden !important;
   word-wrap: break-word !important;
 }
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
+}
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
@@ -5954,6 +6066,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   overflow: hidden !important;
   word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
 }
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
@@ -6638,6 +6764,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   overflow: hidden !important;
   word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
 }
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
@@ -7325,6 +7465,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   overflow: hidden !important;
   word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
 }
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
@@ -8026,6 +8180,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   overflow: hidden !important;
   word-wrap: break-word !important;
 }
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
+}
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
@@ -8714,6 +8882,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   overflow: hidden !important;
   word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
 }
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
@@ -9412,6 +9594,20 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
   box-sizing: border-box !important;
   overflow: hidden !important;
   word-wrap: break-word !important;
+}
+/* On /popular/, /network/popular/ etc. Pinboard nests #right_bar INSIDE #main_column
+   (vs sibling-of-#main_column under #content on normal pages), so it gets trapped in
+   the 700px column and wraps below #bookmarks. #main_column is position:relative, so
+   absolutely position the mis-nested one into the right gutter — reproducing the native
+   x:938/320px sidebar. Child combinator scopes this to ONLY the broken nesting; pages
+   where #right_bar is a child of #content are untouched. */
+#main_column > #right_bar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 710px !important;
+  width: 320px !important;
+  margin-left: 0 !important;
+  box-sizing: border-box !important;
 }
 #right_bar h3, #right_bar h4, #right_bar b { color: var(--pinboard-muted) !important; }
 #right_bar a:not(.tag) { color: var(--pinboard-accent) !important; }
