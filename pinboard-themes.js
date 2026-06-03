@@ -472,6 +472,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -1235,6 +1243,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -1958,6 +1974,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
   padding: 8px 12px !important;
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -2720,6 +2744,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
   padding: 8px 12px !important;
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -3494,6 +3526,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -4244,6 +4284,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -4893,6 +4941,14 @@ html.pbp-dark #main_column > #import_history_table {
   padding: 8px 12px !important;
 }
 html.pbp-dark #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+html.pbp-dark #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+html.pbp-dark #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
 /* ---- Profile page ---- */
 html.pbp-dark .service_box, html.pbp-dark .help_box {
@@ -5677,6 +5733,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -6379,6 +6443,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
   padding: 8px 12px !important;
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -7094,6 +7166,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
   padding: 8px 12px !important;
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -7812,6 +7892,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
   padding: 8px 12px !important;
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -8544,6 +8632,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
 
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -9263,6 +9359,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
   padding: 8px 12px !important;
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {
@@ -9992,6 +10096,14 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
   padding: 8px 12px !important;
 }
 #main_column > #import_history_table td { color: var(--pinboard-fg) !important; padding: 2px 6px !important; }
+
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
 /* ---- Profile page ---- */
 .service_box, .help_box {

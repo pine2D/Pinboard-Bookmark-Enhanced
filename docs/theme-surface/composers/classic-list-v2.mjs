@@ -347,6 +347,14 @@ a.help { color: ${v("muted-soft")} !important; background: ${v("accent-soft")} !
 }
 #main_column > #import_history_table td { color: ${v("fg")} !important; padding: 2px 6px !important; }
 
+/* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
+/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
+   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
+   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
+   pages — /security/ (no #left_toc) keeps the native 490px column. */
+#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
+#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: ${v("bg-surface")} !important;
