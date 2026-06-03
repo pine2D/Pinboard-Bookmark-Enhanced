@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>md-convert tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+h2 { margin-top: 28px; border-bottom: 2px solid #ccc; padding-bottom: 4px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; }
+.fail { color: #c00; font-weight: bold; }
+</style></head>
+<body>
+<h1>md-convert test suite</h1>
+
+<h2>XSS vectors (DOMPurify)</h2>
+<div id="xss-results"></div>
+
+<script src="vendor/purify.min.js"></script>
+<script>
+// Mirror of the implementation config (spec §5). Kept here so the test page
+// is self-contained and validates the exact config before md-preview.js wires it.
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  if (node.tagName === "A") {
+    node.setAttribute("target", "_blank");
+    node.setAttribute("rel", "noopener noreferrer");
+  }
+});
+function sanitizeHtml(html) {
+  return DOMPurify.sanitize(html, { ADD_ATTR: ["id"] });
+}
+
+// ---- tiny assertion harness ----
+function runSection(rootId, cases) {
+  const root = document.getElementById(rootId);
+  for (const c of cases) {
+    const out = sanitizeHtml(c.in);
+    const ok = c.check(out);
+    const div = document.createElement("div");
+    div.className = "case " + (ok ? "pass" : "fail");
+    div.textContent =
+      `${ok ? "PASS" : "FAIL"}  ${c.name}\n` +
+      `   IN : ${c.in}\n` +
+      `   OUT: ${out}`;
+    root.appendChild(div);
+  }
+}
+
+// ---- XSS vector cases (spec §7) ----
+// Each check returns true when the dangerous payload is neutralized.
+runSection("xss-results", [
+  {
+    name: "markdown link with javascript: scheme (rendered as <a>)",
+    // marked would emit this; we feed the post-render HTML directly here.
+    in: '<a href="javascript:alert(1)">click</a>',
+    check: (o) => !/javascript:/i.test(o),
+  },
+  {
+    name: "<img src=x onerror=...> strips onerror handler",
+    in: '<img src="x" onerror="alert(1)">',
+    check: (o) => !/onerror/i.test(o),
+  },
+  {
+    name: "<script> tag removed entirely",
+    in: "<script>alert(1)<\/script>",
+    check: (o) => !/<script/i.test(o) && !/alert\(1\)/.test(o),
+  },
+  {
+    name: "<iframe> not in default allow-list, removed",
+    in: '<iframe src="https://evil.example"></iframe>',
+    check: (o) => !/<iframe/i.test(o),
+  },
+  {
+    name: "anchor with javascript: href neutralized",
+    in: '<a href="javascript:void(document.cookie)">x</a>',
+    check: (o) => !/javascript:/i.test(o),
+  },
+  {
+    name: "link hook adds rel=noopener on safe http link",
+    in: '<a href="https://example.com">ok</a>',
+    check: (o) => /rel="noopener noreferrer"/.test(o) && /target="_blank"/.test(o),
+  },
+  {
+    name: "heading id preserved (ADD_ATTR id) for TOC anchors",
+    in: '<h2 id="my-heading">Title</h2>',
+    check: (o) => /id="my-heading"/.test(o),
+  },
+]);
+</script>
+</body></html>
