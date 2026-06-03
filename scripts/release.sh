@@ -60,7 +60,7 @@ TOP_LEVEL_PATTERNS = ['*.html', '*.js', '*.css', 'manifest.json']
 INCLUDE_DIRS = ['vendor', 'icons', '_locales']
 
 # Top-level files to exclude even if matching a pattern
-EXCLUDE_FILES = {'url-strip-tests.html'}
+EXCLUDE_FILES = {'url-strip-tests.html', 'md-convert-tests.html'}
 
 # Top-level patterns to exclude
 EXCLUDE_PATTERNS = ['perf-baseline.json', 'perf-after-*.json', '.*', '*.md', 'LICENSE']
