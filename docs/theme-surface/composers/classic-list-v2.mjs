@@ -537,6 +537,19 @@ a:focus-visible { outline: 2px solid ${v("focus-ring")} !important; outline-offs
 h2 { color: ${v("muted")} !important; }
 hr { border-color: ${v("border")} !important; }
 
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: ${v("bg-surface")} !important;
+  color: ${v("fg")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
+  border-radius: ${v("radius-md")} !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */

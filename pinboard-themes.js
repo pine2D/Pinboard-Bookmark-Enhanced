@@ -662,6 +662,19 @@ a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outl
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -1433,6 +1446,19 @@ a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outl
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -2164,6 +2190,19 @@ a:visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
 
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
@@ -2934,6 +2973,19 @@ a:visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
 
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
@@ -3716,6 +3768,19 @@ a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outl
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -4474,6 +4539,19 @@ a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outl
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -5128,6 +5206,19 @@ html.pbp-dark a:visited { color: var(--pinboard-link-visited) !important; }
 html.pbp-dark a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 html.pbp-dark h2 { color: var(--pinboard-muted) !important; }
 html.pbp-dark hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+html.pbp-dark pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
 
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
@@ -5923,6 +6014,19 @@ a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outl
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -6633,6 +6737,19 @@ a:visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
 
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
@@ -7356,6 +7473,19 @@ a:visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
 
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
@@ -8082,6 +8212,19 @@ a:visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
 
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
@@ -8822,6 +8965,19 @@ a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outl
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
 
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -9549,6 +9705,19 @@ a:visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
 
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
@@ -10286,6 +10455,19 @@ a:visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
+
+/* ---- Code blocks (PGP key on /security/, doc samples) ---- */
+/* Pinboard's default <pre> is bare monospace in #3333aa with no surface. Theme it as a code panel.
+   Font-family left as the <pre> default monospace. */
+pre {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 12px 14px !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
 
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
