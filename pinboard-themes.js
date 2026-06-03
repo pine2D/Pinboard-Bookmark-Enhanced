@@ -407,7 +407,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -1170,7 +1170,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -1894,7 +1894,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -2656,7 +2656,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -3429,7 +3429,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -4179,7 +4179,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -4829,7 +4829,7 @@ html.pbp-dark input[type="reset"], html.pbp-dark input[type="reset"].reset, html
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 html.pbp-dark input[type="reset"]:hover, html.pbp-dark input[type="reset"].reset:hover, html.pbp-dark button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-html.pbp-dark input[type="checkbox"], html.pbp-dark input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+html.pbp-dark input[type="checkbox"], html.pbp-dark input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 html.pbp-dark .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 html.pbp-dark #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -5612,7 +5612,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -6315,7 +6315,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -7030,7 +7030,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -7748,7 +7748,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -8479,7 +8479,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -9199,7 +9199,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -9928,7 +9928,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on

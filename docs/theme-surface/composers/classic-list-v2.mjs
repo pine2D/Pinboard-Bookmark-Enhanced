@@ -282,7 +282,7 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: ${v("row-hover")} !important; border-color: ${v("accent")} !important; color: ${v("accent")} !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: ${v("accent")} !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: ${v("accent")} !important; vertical-align: middle !important; }
 .suggested_tag { color: ${v("success")} !important; cursor: pointer !important; }
 #edit_bookmark_form { background: ${v("bg-surface")} !important; border: ${v("border-width")} ${v("border-style")} ${v("border")} !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
