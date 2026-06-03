@@ -675,6 +675,18 @@ pre {
   box-sizing: border-box !important;
 }
 
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -1459,6 +1471,18 @@ pre {
   box-sizing: border-box !important;
 }
 
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -2201,6 +2225,18 @@ pre {
   border-radius: var(--pinboard-radius-md) !important;
   padding: 12px 14px !important;
   overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
   box-sizing: border-box !important;
 }
 
@@ -2984,6 +3020,18 @@ pre {
   border-radius: var(--pinboard-radius-md) !important;
   padding: 12px 14px !important;
   overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
   box-sizing: border-box !important;
 }
 
@@ -3781,6 +3829,18 @@ pre {
   box-sizing: border-box !important;
 }
 
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -4552,6 +4612,18 @@ pre {
   box-sizing: border-box !important;
 }
 
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -5217,6 +5289,18 @@ html.pbp-dark pre {
   border-radius: var(--pinboard-radius-md) !important;
   padding: 12px 14px !important;
   overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+html.pbp-dark #right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
   box-sizing: border-box !important;
 }
 
@@ -6027,6 +6111,18 @@ pre {
   box-sizing: border-box !important;
 }
 
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -6748,6 +6844,18 @@ pre {
   border-radius: var(--pinboard-radius-md) !important;
   padding: 12px 14px !important;
   overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
   box-sizing: border-box !important;
 }
 
@@ -7487,6 +7595,18 @@ pre {
   box-sizing: border-box !important;
 }
 
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -8223,6 +8343,18 @@ pre {
   border-radius: var(--pinboard-radius-md) !important;
   padding: 12px 14px !important;
   overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
   box-sizing: border-box !important;
 }
 
@@ -8978,6 +9110,18 @@ pre {
   box-sizing: border-box !important;
 }
 
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
@@ -9716,6 +9860,18 @@ pre {
   border-radius: var(--pinboard-radius-md) !important;
   padding: 12px 14px !important;
   overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
   box-sizing: border-box !important;
 }
 
@@ -10466,6 +10622,18 @@ pre {
   border-radius: var(--pinboard-radius-md) !important;
   padding: 12px 14px !important;
   overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: var(--pinboard-bg-surface) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
   box-sizing: border-box !important;
 }
 

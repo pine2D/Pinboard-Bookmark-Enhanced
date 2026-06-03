@@ -550,6 +550,18 @@ pre {
   box-sizing: border-box !important;
 }
 
+/* ---- blog.pinboard.in sidebar ---- */
+/* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
+   Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
+   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   Keep its native 20px padding. */
+#right_column {
+  background: ${v("bg-surface")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
+  border-radius: ${v("radius-md")} !important;
+  box-sizing: border-box !important;
+}
+
 /* ---- Bundle slot input override: already in inline_base_rules — redundant here ---- */
 
 /* ---- ::selection (also in _base but themes may want explicit) ---- */
