@@ -460,7 +460,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -1223,7 +1223,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -1947,7 +1947,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -2709,7 +2709,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -3482,7 +3482,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -4232,7 +4232,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -4882,7 +4882,7 @@ html.pbp-dark #settings_tab_panes table td { color: var(--pinboard-fg) !importan
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 html.pbp-dark #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -5665,7 +5665,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -6368,7 +6368,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -7083,7 +7083,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -7801,7 +7801,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -8532,7 +8532,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -9252,7 +9252,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
@@ -9981,7 +9981,7 @@ a.help { color: var(--pinboard-muted-soft) !important; background: var(--pinboar
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;

@@ -335,7 +335,7 @@ a.help { color: ${v("muted-soft")} !important; background: ${v("accent-soft")} !
    the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
 #main_column > #import_history_table {
   position: absolute !important;
-  top: 0 !important;
+  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
   left: 710px !important;
   width: 320px !important;
   margin: 0 !important;
