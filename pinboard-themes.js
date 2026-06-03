@@ -414,6 +414,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -1216,6 +1237,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -1979,6 +2021,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -2780,6 +2843,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -3592,6 +3676,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -4381,6 +4486,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -5070,6 +5196,27 @@ html.pbp-dark input[type="reset"], html.pbp-dark input[type="reset"].reset, html
 }
 html.pbp-dark input[type="reset"]:hover, html.pbp-dark input[type="reset"].reset:hover, html.pbp-dark button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 html.pbp-dark input[type="checkbox"], html.pbp-dark input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+html.pbp-dark input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+html.pbp-dark input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 html.pbp-dark .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 html.pbp-dark #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -5892,6 +6039,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -6634,6 +6802,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -7388,6 +7577,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -8145,6 +8355,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -8915,6 +9146,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -9674,6 +9926,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
@@ -10442,6 +10715,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pinboard-accent) !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: var(--pinboard-bg-surface) !important;
+  color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: var(--pinboard-row-hover) !important;
+  border-color: var(--pinboard-accent) !important;
+  color: var(--pinboard-accent) !important;
+}
 .suggested_tag { color: var(--pinboard-success) !important; cursor: pointer !important; }
 #edit_bookmark_form { background: var(--pinboard-bg-surface) !important; border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on

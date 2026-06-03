@@ -305,6 +305,27 @@ input[type="reset"], input[type="reset"].reset, button[type="reset"] {
 }
 input[type="reset"]:hover, input[type="reset"].reset:hover, button[type="reset"]:hover { background: ${v("row-hover")} !important; border-color: ${v("accent")} !important; color: ${v("accent")} !important; }
 input[type="checkbox"], input[type="radio"] { accent-color: ${v("accent")} !important; vertical-align: middle !important; }
+
+/* ---- File picker button (e.g. Choose File on /settings/import) ----
+   Native ::file-selector-button is a light #efefef outset button — unthemed on dark themes.
+   Style it as a SECONDARY button (mirrors input[type=reset] above), since the page's primary
+   action is the Import submit. No font-family (consistent with other themed buttons). */
+input[type="file"]::file-selector-button {
+  background: ${v("bg-surface")} !important;
+  color: ${v("fg")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
+  border-radius: ${v("radius-sm")} !important;
+  padding: 5px 12px !important;
+  margin-right: 8px !important;
+  line-height: 1.4 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+input[type="file"]::file-selector-button:hover {
+  background: ${v("row-hover")} !important;
+  border-color: ${v("accent")} !important;
+  color: ${v("accent")} !important;
+}
 .suggested_tag { color: ${v("success")} !important; cursor: pointer !important; }
 #edit_bookmark_form { background: ${v("bg-surface")} !important; border: ${v("border-width")} ${v("border-style")} ${v("border")} !important; width: 100% !important; box-sizing: border-box !important; }
 /* Pinboard fixes the form + its url/title/description/tags fields at 500/490px, leaving a gap on
