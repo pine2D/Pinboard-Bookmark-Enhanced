@@ -20,6 +20,22 @@ export function compose(tokens) {
   return baseLayer(tokens) + emit(tokens) + patternsLayer(tokens);
 }
 
+// Derive light/dark from a theme's bg luminance so native form controls (checkbox/radio/select/
+// scrollbar) render in the matching scheme. Independent of meta.mode, so Flexoki's dark-mode
+// re-compose (merged palette.bg = #1C1B1A) yields "dark" automatically — no pilot edits.
+function schemeFor(tokens) {
+  const bg = (tokens.palette?.bg || "").trim();
+  const m = bg.match(/^#?([0-9a-fA-F]{6})$/) || bg.match(/^#?([0-9a-fA-F]{3})$/);
+  if (m) {
+    let h = m[1];
+    if (h.length === 3) h = h.split("").map(c => c + c).join("");
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return lum < 0.5 ? "dark" : "light";
+  }
+  return tokens.meta?.mode === "dark" ? "dark" : "light";
+}
+
 function emit(tokens) {
   const maxWidth = tokens.layout?.["max-width"];
   const bookmarkStyle = tokens.layout?.["bookmark-style"] || "flat"; // "flat" | "card"
@@ -56,6 +72,12 @@ body:not(#pinboard) table, body:not(#pinboard) td,
 body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: ${v("fg")} !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: ${schemeFor(tokens)} !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: ${v("bg-surface")} !important; border-color: ${v("border")} !important; ${maxWidth && maxWidth !== "none" ? `max-width: ${maxWidth} !important; box-sizing: border-box !important;` : ""} }

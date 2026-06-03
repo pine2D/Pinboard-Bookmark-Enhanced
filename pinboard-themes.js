@@ -184,6 +184,12 @@ body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
 
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: light !important; }
+
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
 #banner a, #top_menu a, .banner_username { color: var(--pinboard-accent) !important; }
@@ -980,6 +986,12 @@ body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
 
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: dark !important; }
+
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
 #banner a, #top_menu a, .banner_username { color: var(--pinboard-accent) !important; }
@@ -1736,6 +1748,12 @@ body:not(#pinboard) table, body:not(#pinboard) td,
 body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: dark !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -2531,6 +2549,12 @@ body:not(#pinboard) table, body:not(#pinboard) td,
 body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: light !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -3338,6 +3362,12 @@ body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
 
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: dark !important; }
+
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
 #banner a, #top_menu a, .banner_username { color: var(--pinboard-accent) !important; }
@@ -4121,6 +4151,12 @@ body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
 
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: light !important; }
+
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
 #banner a, #top_menu a, .banner_username { color: var(--pinboard-accent) !important; }
@@ -4804,6 +4840,12 @@ html.pbp-dark body:not(#pinboard) {
 }
 html.pbp-dark body:not(#pinboard) table, html.pbp-dark body:not(#pinboard) td, html.pbp-dark body:not(#pinboard) p, html.pbp-dark body:not(#pinboard) label, html.pbp-dark body:not(#pinboard) span { color: inherit !important; }
 html.pbp-dark body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+html.pbp-dark body { color-scheme: dark !important; }
 
 /* ---- Banner & navigation ---- */
 html.pbp-dark #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -5620,6 +5662,12 @@ body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
 
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: light !important; }
+
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
 #banner a, #top_menu a, .banner_username { color: var(--pinboard-accent) !important; }
@@ -6355,6 +6403,12 @@ body:not(#pinboard) table, body:not(#pinboard) td,
 body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: dark !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -7103,6 +7157,12 @@ body:not(#pinboard) table, body:not(#pinboard) td,
 body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: light !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -7854,6 +7914,12 @@ body:not(#pinboard) table, body:not(#pinboard) td,
 body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: dark !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -8619,6 +8685,12 @@ body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
 
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: dark !important; }
+
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
 #banner a, #top_menu a, .banner_username { color: var(--pinboard-accent) !important; }
@@ -9371,6 +9443,12 @@ body:not(#pinboard) table, body:not(#pinboard) td,
 body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: dark !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -10133,6 +10211,12 @@ body:not(#pinboard) table, body:not(#pinboard) td,
 body:not(#pinboard) p, body:not(#pinboard) label,
 body:not(#pinboard) span { color: inherit !important; }
 body:not(#pinboard) #popup_header { background: transparent !important; color: var(--pinboard-fg) !important; }
+
+/* Native form controls (checkbox/radio/select/scrollbar) follow color-scheme (an INHERITED property),
+   so set it on bare body to reach both body#pinboard and the body:not(#pinboard) save/add frame.
+   body-level (not :root) keeps Flexoki's dark mode working: its dark re-compose prefixes to
+   "html.pbp-dark body { color-scheme: dark }". Pairs with the existing input accent-color. */
+body { color-scheme: light !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
