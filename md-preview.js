@@ -118,17 +118,9 @@
     });
     tocList.appendChild(frag);
     tocNav.hidden = false;
-    // Keep the fixed rail clear of the sticky toolbar, whose height varies
-    // (title length, export-options row wrapping). Measure it instead of a
-    // hardcoded top. (Inert in the responsive top-collapse mode, where the
-    // rail is position:static.)
-    const toolbarEl = document.getElementById("toolbar");
-    const positionToc = () => { if (toolbarEl) tocNav.style.top = (toolbarEl.offsetHeight + 16) + "px"; };
-    positionToc();
-    window.addEventListener("resize", positionToc);
-    setupTocToggle(tocNav);
     setupScrollSpy(renderedView, tocList);
   }
+  setupDrawer();
 
   // Raw view populated lazily on first switch
 
@@ -201,15 +193,20 @@ async function loadHljsCss() {
   } catch (_) { return ""; }
 }
 
-// ---- TOC collapse toggle (only visible/relevant in narrow top-mode) ----
-function setupTocToggle(tocNav) {
-  const btn = document.getElementById("toc-toggle");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    const collapsed = tocNav.dataset.collapsed === "true";
-    tocNav.dataset.collapsed = collapsed ? "false" : "true";
-    btn.setAttribute("aria-expanded", collapsed ? "true" : "false");
-  });
+// ---- Rail drawer (narrow viewports) ----
+// Toggle the off-canvas rail via the hamburger; close on scrim click or Esc.
+function setupDrawer() {
+  const toggle = document.getElementById("rail-toggle");
+  const scrim = document.getElementById("rail-scrim");
+  if (!toggle || !scrim) return;
+  const setOpen = (open) => {
+    document.body.classList.toggle("rail-open", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    scrim.hidden = !open;
+  };
+  toggle.addEventListener("click", () => setOpen(!document.body.classList.contains("rail-open")));
+  scrim.addEventListener("click", () => setOpen(false));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
 }
 
 // ---- Scroll-spy: highlight the TOC entry for the heading nearest the top ----
@@ -217,10 +214,9 @@ function setupScrollSpy(renderedView, tocList) {
   const links = Array.from(tocList.querySelectorAll("a"));
   if (!links.length) return;
 
-  // Clearance below the sticky toolbar (variable height) — reused by the
-  // observer's top margin and the "scrolled past" fallback threshold.
-  const tb = document.getElementById("toolbar");
-  const topClear = (tb ? tb.offsetHeight : 96) + 8;
+  // No sticky toolbar overlays the content now (rail is beside it); a small
+  // top clearance keeps the heading at the very top from flickering.
+  const topClear = 16;
 
   // Map slug -> link for O(1) activation.
   const linkBySlug = new Map(links.map((a) => [a.dataset.slug, a]));
