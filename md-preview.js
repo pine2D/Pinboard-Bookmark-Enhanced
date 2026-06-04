@@ -111,6 +111,14 @@
     });
     tocList.appendChild(frag);
     tocNav.hidden = false;
+    // Keep the fixed rail clear of the sticky toolbar, whose height varies
+    // (title length, export-options row wrapping). Measure it instead of a
+    // hardcoded top. (Inert in the responsive top-collapse mode, where the
+    // rail is position:static.)
+    const toolbarEl = document.getElementById("toolbar");
+    const positionToc = () => { if (toolbarEl) tocNav.style.top = (toolbarEl.offsetHeight + 16) + "px"; };
+    positionToc();
+    window.addEventListener("resize", positionToc);
     setupTocToggle(tocNav);
     setupScrollSpy(renderedView, tocList);
   }
@@ -198,6 +206,11 @@ function setupScrollSpy(renderedView, tocList) {
   const links = Array.from(tocList.querySelectorAll("a"));
   if (!links.length) return;
 
+  // Clearance below the sticky toolbar (variable height) — reused by the
+  // observer's top margin and the "scrolled past" fallback threshold.
+  const tb = document.getElementById("toolbar");
+  const topClear = (tb ? tb.offsetHeight : 96) + 8;
+
   // Map slug -> link for O(1) activation.
   const linkBySlug = new Map(links.map((a) => [a.dataset.slug, a]));
 
@@ -235,14 +248,14 @@ function setupScrollSpy(renderedView, tocList) {
     // keep the last heading above the viewport active.
     if (!topId) {
       for (let i = targets.length - 1; i >= 0; i--) {
-        if (targets[i].getBoundingClientRect().top < 120) { topId = targets[i].id; break; }
+        if (targets[i].getBoundingClientRect().top < topClear + 12) { topId = targets[i].id; break; }
       }
     }
     if (topId) setActive(topId);
   }, {
-    // -88px top margin = clear the sticky toolbar; -70% bottom keeps the
+    // top margin clears the (measured) sticky toolbar; -70% bottom keeps the
     // "current" heading active until the next one nears the top.
-    rootMargin: "-88px 0px -70% 0px",
+    rootMargin: "-" + topClear + "px 0px -70% 0px",
     threshold: 0,
   });
   targets.forEach((t) => observer.observe(t));

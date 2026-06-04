@@ -518,7 +518,9 @@ main {
      left edge is (100vw - 780px)/2; sit 28px to its left (220 + 28 = 248).
      max(8px, …) clamps it off the left edge near the breakpoint. */
   left: max(8px, calc((100vw - 780px) / 2 - 248px));
-  max-height: calc(100vh - 110px);
+  /* top is set dynamically in md-preview.js to clear the variable-height sticky
+     toolbar; this is the fallback. max-height leaves room below that offset. */
+  max-height: calc(100vh - 150px);
   overflow-y: auto;
   font-size: 13px;
   line-height: 1.5;
