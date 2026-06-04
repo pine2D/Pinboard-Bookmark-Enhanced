@@ -157,8 +157,20 @@
   document.getElementById("btn-dl-md").addEventListener("click", () => {
     downloadFile(safeTitle + ".md", buildExportMarkdown(), "text/markdown;charset=utf-8");
   });
-  document.getElementById("btn-dl-html").addEventListener("click", () => {
-    downloadFile(safeTitle + ".html", renderedView.innerHTML, "text/html;charset=utf-8");
+  document.getElementById("btn-dl-html").addEventListener("click", async () => {
+    const meta = {
+      title: title || "", url: url || "", date: todayIso(), tags,
+      source: source === "jina" ? "jina" : "defuddle"
+    };
+    if (description) meta.description = description;
+    const hljsCss = await loadHljsCss();
+    const doc = composeStyledHtml(getMarkdown(), meta, {
+      frontmatter: expFrontmatter ? expFrontmatter.checked : !!exportSettings.mdExportFrontmatter,
+      imagePolicy: expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep"),
+      includeToc: expIncludeToc ? expIncludeToc.checked : !!exportSettings.mdExportIncludeToc,
+      hljsCss
+    });
+    downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
   });
 })();
 
@@ -179,6 +191,18 @@ async function copyToClipboard(text, btn) {
 }
 
 // renderMarkdown + htmlToMarkdown + safeFilename + downloadFile now live in md-convert.js (single source of truth).
+
+// Inline the vendored hljs theme so the standalone .html highlights offline.
+// Light always; dark under a media query. Best-effort: "" if fetch/chrome absent.
+async function loadHljsCss() {
+  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.getURL) return "";
+  try {
+    const light = await (await fetch(chrome.runtime.getURL("vendor/hljs-github.min.css"))).text();
+    let dark = "";
+    try { dark = await (await fetch(chrome.runtime.getURL("vendor/hljs-github-dark.min.css"))).text(); } catch (_) {}
+    return light + (dark ? "\n@media (prefers-color-scheme:dark){\n" + dark + "\n}\n" : "");
+  } catch (_) { return ""; }
+}
 
 // ---- TOC collapse toggle (only visible/relevant in narrow top-mode) ----
 function setupTocToggle(tocNav) {
