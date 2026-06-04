@@ -170,12 +170,21 @@ function renderMarkdown(md) {
   });
 }
 
-// ---- Code highlighting stub (real implementation lands in Phase P3.2) ----
-// No-op until highlight.js is vendored (P3). Declared here so md-convert.js's
-// API surface (spec §4) is complete from P1 and md-preview.js can wire it
-// safely. P3.2 locates this exact function and replaces its body.
+// ── Code highlighting (preview page only; needs highlight.js global `hljs`) ──
+// Called AFTER renderMarkdown's sanitized HTML is injected into the DOM.
+// marked emits fenced blocks as <pre><code class="language-xxx">…</code></pre>.
+// No-op (not a throw) when hljs is absent — popup never vendors highlight.js,
+// and the pure string functions in this file must stay usable without it.
 function highlightCodeBlocks(root) {
-  // no-op stub — replaced in Phase P3.2
+  if (!root || typeof hljs === "undefined") return;
+  const blocks = root.querySelectorAll('pre > code[class*="language-"]');
+  blocks.forEach((block) => {
+    try {
+      hljs.highlightElement(block);
+    } catch (_) {
+      // A single malformed block must not abort the rest of the page.
+    }
+  });
 }
 
 // ── Export transform ①: YAML frontmatter ──

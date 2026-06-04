@@ -15,6 +15,7 @@ h2 { margin-top: 24px; }
 <script src="vendor/turndown.js"></script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
 <script src="md-convert.js"></script>
 <script>
 const root = document.getElementById("results");
@@ -294,6 +295,25 @@ function assertEq(actual, expected, label) {
   // imagePolicy resolves baseUrl from meta.url automatically
   const altd = composeExport("![cap](rel.png)", cmeta, { frontmatter: false, imagePolicy: "alt", includeToc: false });
   assertEq(altd.trim(), "cap", "alt policy uses meta.url baseUrl, yields alt text");
+</script>
+
+<script>
+  // ---- P3.2 highlightCodeBlocks (needs vendor/highlight.min.js loaded above) ----
+  section("P3.2 highlightCodeBlocks");
+  (() => {
+    const fixture = document.createElement("div");
+    fixture.innerHTML = renderMarkdown("```js\nconst x = 1;\nfunction f(){ return x; }\n```");
+    highlightCodeBlocks(fixture);
+    const codeEl = fixture.querySelector("pre > code");
+    check("hljs adds .hljs class to language-tagged block", !!codeEl && codeEl.classList.contains("hljs"), codeEl ? codeEl.className : "<no code el>");
+    check("hljs emits token spans", !!codeEl && codeEl.querySelector("span[class*='hljs-']") !== null, "no hljs-* span");
+    const plain = document.createElement("div");
+    plain.innerHTML = "<pre><code>plain text</code></pre>";
+    let threw = false; try { highlightCodeBlocks(plain); } catch (e) { threw = true; }
+    check("highlightCodeBlocks no-throw on untagged block", !threw, "threw on plain <pre><code>");
+    let threw2 = false; try { highlightCodeBlocks(document.createElement("div")); } catch (e) { threw2 = true; }
+    check("highlightCodeBlocks no-throw on empty root", !threw2, "threw on empty root");
+  })();
 </script>
 
 <script>
