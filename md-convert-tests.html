@@ -16,7 +16,7 @@ h2 { margin-top: 24px; }
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
 <script src="vendor/highlight.min.js"></script>
-<script src="md-convert.js?v=t1"></script>
+<script src="md-convert.js?v=t2"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -393,6 +393,36 @@ function assertEq(actual, expected, label) {
     const note = htmlToMarkdown('<div data-callout="note" class="callout"><div class="callout-title"><div class="callout-title-inner">Note</div></div><p>Line one.</p><p>Line two.</p></div>', {});
     check("multi-paragraph callout quotes every line",
       /> \[!NOTE\]/.test(note) && /> Line one\./.test(note) && /> Line two\./.test(note), note);
+  })();
+</script>
+
+<script>
+  // ---- composeStyledHtml (standalone styled .html export) ----
+  section("composeStyledHtml");
+  (() => {
+    const meta = { title: "My <Doc>", url: "https://e.com/a", date: "2026-06-04", tags: ["x", "y"], source: "defuddle" };
+    const md = "## Intro\n\nHello ![pic](/img.png) world.\n\n```js\nconst a=1;\n```\n";
+
+    const plain = composeStyledHtml(md, meta, { frontmatter: false, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+    assert(/^<!DOCTYPE html>/.test(plain), "starts with doctype");
+    assert(/<\/html>\s*$/.test(plain), "ends with </html>");
+    assert(/<style>[\s\S]*\.export-doc[\s\S]*<\/style>/.test(plain), "inlines READER_CSS");
+    assert(/<title>My &lt;Doc&gt;<\/title>/.test(plain), "title is HTML-escaped");
+    assert(/<h2 id="intro">/.test(plain), "renders heading with slug id");
+    assert(!/doc-header/.test(plain), "no visible header when frontmatter off");
+
+    const stripped = composeStyledHtml(md, meta, { frontmatter: false, imagePolicy: "strip", includeToc: false, hljsCss: "" });
+    assert(!/<img/.test(stripped), "imagePolicy:strip removes images");
+
+    const toc = composeStyledHtml(md, meta, { frontmatter: false, imagePolicy: "keep", includeToc: true, hljsCss: "" });
+    assert(/<h2 id="contents">/.test(toc), "includeToc injects a Contents heading");
+
+    const fm = composeStyledHtml(md, meta, { frontmatter: true, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+    assert(/<header class="doc-header">/.test(fm), "frontmatter renders a VISIBLE header");
+    assert(/<h1 class="doc-title">My &lt;Doc&gt;<\/h1>/.test(fm), "header shows escaped title");
+    assert(!/^---/m.test(fm.replace(/<[^>]+>/g, "")), "no YAML --- fences in styled HTML");
+
+    assert(/HLJSMARKER/.test(composeStyledHtml(md, meta, { hljsCss: "/*HLJSMARKER*/" })), "injects caller hljsCss");
   })();
 </script>
 
