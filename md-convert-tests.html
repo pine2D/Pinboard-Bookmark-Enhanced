@@ -30,6 +30,21 @@ function check(name, cond, detail) {
 // normalize whitespace for resilient HTML substring checks
 const norm = (h) => h.replace(/\s+/g, " ").trim();
 
+// ---- P2+ harness helpers (wrap check() so plan code blocks run verbatim) ----
+function section(name) {
+  const h = document.createElement("h2");
+  h.textContent = name;
+  root.appendChild(h);
+}
+function assert(cond, detail) {
+  check(detail || String(cond), cond, detail);
+}
+function assertEq(actual, expected, label) {
+  const ok = actual === expected;
+  check(label || (String(expected) + " === " + String(actual)), ok,
+    ok ? "" : "expected " + JSON.stringify(expected) + " got " + JSON.stringify(actual));
+}
+
 // ---- Regression: the FOUR old renderMarkdown defects are now correct ----
 
 // 1. Nested list must NOT be flattened.
@@ -106,6 +121,182 @@ const norm = (h) => h.replace(/\s+/g, " ").trim();
   check("renderMarkdown safe link gets target+rel", /rel="noopener noreferrer"/.test(s) && /target="_blank"/.test(s), s);
 })();
 
+// ---- END of existing tests ----
+</script>
+
+<script>
+  section("P2.1 applyFrontmatter / yamlString");
+
+  // yamlString escapes quotes, colons, newlines
+  assertEq(yamlString('Plain title'), '"Plain title"', "wraps plain in quotes");
+  assertEq(yamlString('Has: colon'), '"Has: colon"', "quotes colon");
+  assertEq(yamlString('Quote "x"'), '"Quote \\"x\\""', "escapes inner quotes");
+  assertEq(yamlString('Line1\nLine2'), '"Line1\\nLine2"', "escapes newline");
+
+  // Full block with all fields
+  const fm1 = applyFrontmatter("# Body\n", {
+    title: 'A: "quoted"',
+    url: "https://e.com/p",
+    date: "2026-06-03",
+    tags: ["dev", "go"],
+    source: "defuddle",
+    description: "Desc: with colon"
+  }, {});
+  assert(fm1.startsWith("---\n"), "starts with fence");
+  assert(fm1.includes('title: "A: \\"quoted\\""'), "title escaped");
+  assert(fm1.includes("url: https://e.com/p"), "url bare");
+  assert(fm1.includes("date: 2026-06-03"), "date bare");
+  assert(fm1.includes("tags: [dev, go]"), "tags inline array");
+  assert(fm1.includes("source: defuddle"), "source bare");
+  assert(fm1.includes('description: "Desc: with colon"'), "description escaped");
+  assert(fm1.includes("\n---\n\n# Body"), "closes fence then body");
+
+  // description omitted when absent
+  const fm2 = applyFrontmatter("body", { title: "T", url: "u", date: "d", tags: [], source: "jina" }, {});
+  assert(!fm2.includes("description:"), "no description field when absent");
+  assert(fm2.includes("tags: []"), "empty tags renders empty array");
+
+  // fields option restricts + orders output
+  const fm3 = applyFrontmatter("body", { title: "T", url: "u", date: "d", tags: ["a"], source: "x" }, { fields: ["url", "title"] });
+  const lines3 = fm3.split("\n");
+  assertEq(lines3[1], "url: u", "field order honored (url first)");
+  assertEq(lines3[2], 'title: "T"', "field order honored (title second)");
+  assert(!fm3.includes("source:"), "excluded field absent");
+</script>
+
+<script>
+  section("P2.2 applyImagePolicy");
+  const base = "https://e.com/blog/post/";
+
+  // keep: absolutize relative src, leave absolute untouched
+  const keep = applyImagePolicy("![a](pics/x.png) ![b](https://cdn.io/y.png) ![c](/z.png)", { policy: "keep", baseUrl: base });
+  assert(keep.includes("![a](https://e.com/blog/post/pics/x.png)"), "relative src absolutized");
+  assert(keep.includes("![b](https://cdn.io/y.png)"), "absolute src untouched");
+  assert(keep.includes("![c](https://e.com/z.png)"), "root-relative src absolutized");
+
+  // alt: ![alt](url) -> alt text; drop image entirely when no alt
+  const alt = applyImagePolicy("see ![my pic](pics/x.png) and ![](pics/y.png) end", { policy: "alt", baseUrl: base });
+  assert(alt.includes("see my pic and  end"), "alt kept, empty-alt image removed: " + alt);
+  assert(!alt.includes("!["), "no image syntax remains");
+
+  // strip: remove all images
+  const strip = applyImagePolicy("a ![x](pics/x.png) b ![y](z.png) c", { policy: "strip", baseUrl: base });
+  assert(!strip.includes("!["), "no images remain");
+  assert(strip.includes("a ") && strip.includes(" b ") && strip.includes(" c"), "surrounding text intact: " + strip);
+
+  // invalid/unparseable relative src under keep is left as-is (no throw)
+  const safe = applyImagePolicy("![a](::::)", { policy: "keep", baseUrl: base });
+  assert(safe.includes("![a]("), "unparseable src does not throw and is preserved");
+</script>
+
+<script>
+  section("P2.3 buildToc");
+
+  const tocMd = [
+    "# Title (h1 skipped)",
+    "## First Section",
+    "text",
+    "### Sub A",
+    "#### Deep",
+    "##### Too deep (skipped, >maxLevel)",
+    "```",
+    "## Fake heading in code",
+    "```",
+    "## 中文 标题"
+  ].join("\n");
+
+  const { tocMarkdown, headings } = buildToc(tocMd, { minLevel: 2, maxLevel: 4 });
+
+  // h1 excluded (below minLevel), h5 excluded (above maxLevel), fenced heading skipped
+  assertEq(headings.length, 4, "4 headings in range: " + JSON.stringify(headings.map(h => h.text)));
+  assertEq(headings[0].text, "First Section", "first heading text");
+  assertEq(headings[0].level, 2, "first heading level");
+  assertEq(headings[0].slug, "first-section", "slug uses P1 slugify");
+  assertEq(headings[1].text, "Sub A", "nested heading text");
+  assertEq(headings[3].text, "中文 标题", "CJK heading captured");
+  assertEq(headings[3].slug, "中文-标题", "CJK slug preserves CJK (P1 slugify)");
+  assert(!headings.some(h => h.text.includes("Fake heading")), "fenced code heading skipped");
+
+  // tocMarkdown is a nested bullet list under "## Contents", indented by (level-minLevel)
+  assert(tocMarkdown.startsWith("## Contents\n"), "TOC header present");
+  assert(tocMarkdown.includes("- [First Section](#first-section)"), "top-level entry, no indent");
+  assert(tocMarkdown.includes("  - [Sub A](#sub-a)"), "level-3 entry indented 2 spaces");
+  assert(tocMarkdown.includes("    - [Deep](#deep)"), "level-4 entry indented 4 spaces");
+
+  // empty input -> empty toc, empty headings
+  const none = buildToc("just a paragraph", {});
+  assertEq(none.headings.length, 0, "no headings");
+  assertEq(none.tocMarkdown, "", "empty tocMarkdown when no headings");
+</script>
+
+<script>
+  section("P2.4 readingStats");
+
+  // Pure Latin: markdown markup stripped first, word count from plain text
+  const lat = readingStats("# Heading\n\n**Hello** world this is a [link](http://x) test.");
+  assertEq(lat.words, 8, "latin word count after markdownToPlainText (Heading Hello world this is a link test): " + JSON.stringify(lat));
+  assertEq(lat.cjkChars, 0, "no CJK chars");
+  assertEq(lat.minutes, 1, "ceil(8/200 + 0/350) = 1");
+
+  // CJK: counted per character, not per whitespace word
+  const cjk = readingStats("这是一段中文文本");
+  assertEq(cjk.cjkChars, 8, "8 CJK chars");
+  assertEq(cjk.words, 0, "no latin words");
+  assertEq(cjk.minutes, 1, "ceil(0 + 8/350) = 1");
+
+  // Mixed: latin words + CJK chars combine in minutes
+  const mixed = readingStats("hello 世界 world 测试 done");
+  assertEq(mixed.words, 3, "3 latin words (hello world done)");
+  assertEq(mixed.cjkChars, 4, "4 CJK chars (世界测试)");
+  assertEq(mixed.minutes, 1, "ceil(3/200 + 4/350)=1");
+
+  // Larger volume crosses minute boundary
+  const big = readingStats(Array(420).fill("word").join(" "));
+  assertEq(big.words, 420, "420 words");
+  assertEq(big.minutes, 3, "ceil(420/200)=3");
+
+  // Empty
+  const empty = readingStats("");
+  assertEq(empty.words, 0, "empty words");
+  assertEq(empty.cjkChars, 0, "empty cjk");
+  assertEq(empty.minutes, 0, "empty minutes 0");
+</script>
+
+<script>
+  section("P2.5 composeExport");
+
+  const cmeta = {
+    title: "My Post",
+    url: "https://e.com/blog/post/",
+    date: "2026-06-03",
+    tags: ["dev"],
+    source: "defuddle"
+  };
+  const cmd = "## Section One\n\n![pic](pics/x.png)\n\n### Section Two\n\nbody text";
+
+  // All on: frontmatter at top, TOC after frontmatter & before body, images absolutized
+  const full = composeExport(cmd, cmeta, { frontmatter: true, imagePolicy: "keep", includeToc: true });
+  assert(full.startsWith("---\n"), "frontmatter first");
+  const afterFm = full.split("\n---\n\n")[1] || full;
+  assert(afterFm.indexOf("## Contents") < afterFm.indexOf("## Section One"), "TOC before body");
+  assert(full.includes("![pic](https://e.com/blog/post/pics/x.png)"), "image absolutized via baseUrl=url");
+
+  // All off: raw body only, no frontmatter, no TOC, images untouched (keep is default off path)
+  const bare = composeExport(cmd, cmeta, { frontmatter: false, imagePolicy: "keep", includeToc: false });
+  assert(!bare.startsWith("---"), "no frontmatter");
+  assert(!bare.includes("## Contents"), "no TOC");
+  assert(bare.includes("## Section One"), "body present");
+
+  // strip policy removes images even with frontmatter/toc off
+  const stripped = composeExport(cmd, cmeta, { frontmatter: false, imagePolicy: "strip", includeToc: false });
+  assert(!stripped.includes("!["), "images stripped");
+
+  // imagePolicy resolves baseUrl from meta.url automatically
+  const altd = composeExport("![cap](rel.png)", cmeta, { frontmatter: false, imagePolicy: "alt", includeToc: false });
+  assertEq(altd.trim(), "cap", "alt policy uses meta.url baseUrl, yields alt text");
+</script>
+
+<script>
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>

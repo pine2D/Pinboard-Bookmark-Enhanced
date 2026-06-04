@@ -177,3 +177,133 @@ function renderMarkdown(md) {
 function highlightCodeBlocks(root) {
   // no-op stub — replaced in Phase P3.2
 }
+
+// ── Export transform ①: YAML frontmatter ──
+
+// Escape a string for a YAML double-quoted scalar (quotes / colons / newlines).
+function yamlString(s) {
+  const str = s == null ? "" : String(s);
+  const escaped = str
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r\n/g, "\\n")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\n");
+  return '"' + escaped + '"';
+}
+
+// meta: {title,url,date,tags,source,description?}
+// opts.fields: ordered subset of [title,url,date,tags,source]; description always
+// trails (only when present). Bare scalars for url/date/source; quoted for
+// title/description; tags as an inline flow array.
+function applyFrontmatter(md, meta, opts) {
+  meta = meta || {};
+  opts = opts || {};
+  const fields = opts.fields || ["title", "url", "date", "tags", "source"];
+  const lines = ["---"];
+  for (const f of fields) {
+    if (f === "title") lines.push("title: " + yamlString(meta.title || ""));
+    else if (f === "url") lines.push("url: " + (meta.url || ""));
+    else if (f === "date") lines.push("date: " + (meta.date || ""));
+    else if (f === "tags") lines.push("tags: [" + (Array.isArray(meta.tags) ? meta.tags.join(", ") : "") + "]");
+    else if (f === "source") lines.push("source: " + (meta.source || ""));
+  }
+  if (meta.description) lines.push("description: " + yamlString(meta.description));
+  lines.push("---");
+  return lines.join("\n") + "\n\n" + (md || "");
+}
+
+// ── Export transform ②: image policy ──
+// policy: "keep" (absolutize relative src via new URL(src, baseUrl)) |
+//         "alt"  (![alt](src) -> alt text; drop image when alt empty) |
+//         "strip" (remove all images)
+function applyImagePolicy(md, opts) {
+  opts = opts || {};
+  const policy = opts.policy || "keep";
+  const baseUrl = opts.baseUrl || "";
+  const IMG = /!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
+  if (policy === "strip") {
+    return (md || "").replace(IMG, "");
+  }
+  if (policy === "alt") {
+    return (md || "").replace(IMG, (_, alt) => (alt || ""));
+  }
+  // keep: absolutize relative src
+  return (md || "").replace(IMG, (whole, alt, src) => {
+    let abs = src;
+    if (baseUrl && !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith("//")) {
+      try { abs = new URL(src, baseUrl).href; } catch (_) { return whole; }
+    }
+    return "![" + alt + "](" + abs + ")";
+  });
+}
+
+// ── Export transform ③: table of contents ──
+// Scans ATX headings in [minLevel,maxLevel], skipping fenced code blocks.
+// Slugs reuse P1 slugify() (GitHub-style, CJK preserved). De-dupes slugs with -1, -2…
+// Returns { tocMarkdown, headings:[{level,text,slug}] }.
+function buildToc(md, opts) {
+  opts = opts || {};
+  const minLevel = opts.minLevel || 2;
+  const maxLevel = opts.maxLevel || 4;
+  const lines = (md || "").split("\n");
+  const headings = [];
+  const seen = Object.create(null);
+  let inFence = false;
+  for (const line of lines) {
+    const fence = line.match(/^\s*(```|~~~)/);
+    if (fence) { inFence = !inFence; continue; }
+    if (inFence) continue;
+    const m = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (!m) continue;
+    const level = m[1].length;
+    if (level < minLevel || level > maxLevel) continue;
+    const text = m[2].trim();
+    let slug = slugify(text);
+    if (seen[slug] != null) { seen[slug] += 1; slug = slug + "-" + seen[slug]; }
+    else seen[slug] = 0;
+    headings.push({ level, text, slug });
+  }
+  if (!headings.length) return { tocMarkdown: "", headings };
+  const body = headings.map(h => {
+    const indent = "  ".repeat(h.level - minLevel);
+    return indent + "- [" + h.text + "](#" + h.slug + ")";
+  }).join("\n");
+  return { tocMarkdown: "## Contents\n" + body, headings };
+}
+
+// ── Export transform ④: reading stats ──
+// CJK-aware: Latin counted by whitespace words, CJK by character.
+// minutes = ceil(words/200 + cjkChars/350); 0 for empty input.
+function readingStats(md) {
+  const plain = markdownToPlainText(md || "");
+  // CJK ranges: CJK Unified + Ext-A, Hiragana/Katakana, Hangul, full-width forms
+  const cjkRe = /[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]/g;
+  const cjkMatches = plain.match(cjkRe);
+  const cjkChars = cjkMatches ? cjkMatches.length : 0;
+  // Strip CJK before tokenizing Latin so CJK runs don't inflate word count
+  const latinPart = plain.replace(cjkRe, " ").trim();
+  const words = latinPart ? latinPart.split(/\s+/).filter(Boolean).length : 0;
+  const minutes = (words === 0 && cjkChars === 0) ? 0 : Math.ceil(words / 200 + cjkChars / 350);
+  return { words, cjkChars, minutes };
+}
+
+// ── Export orchestrator ──
+// opts: { frontmatter:bool, imagePolicy:"keep"|"alt"|"strip", includeToc:bool }
+// Order: imagePolicy → (TOC prepend) → (frontmatter prepend). baseUrl = meta.url.
+function composeExport(canonicalMd, meta, opts) {
+  meta = meta || {};
+  opts = opts || {};
+  let body = applyImagePolicy(canonicalMd || "", {
+    policy: opts.imagePolicy || "keep",
+    baseUrl: meta.url || ""
+  });
+  if (opts.includeToc) {
+    const { tocMarkdown } = buildToc(body, { minLevel: 2, maxLevel: 4 });
+    if (tocMarkdown) body = tocMarkdown + "\n\n" + body;
+  }
+  if (opts.frontmatter) {
+    body = applyFrontmatter(body, meta, {});
+  }
+  return body;
+}
