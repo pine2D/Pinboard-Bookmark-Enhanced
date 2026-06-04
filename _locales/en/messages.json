@@ -1198,6 +1198,24 @@
   "mdStripDownloadMd": {
     "message": "Download .md"
   },
+  "mdViewRaw": { "message": "Raw" },
+  "mdViewRendered": { "message": "Rendered" },
+  "mdExportSection": { "message": "Export" },
+  "mdOptFrontmatter": { "message": "Frontmatter" },
+  "mdOptImages": { "message": "Images" },
+  "mdOptIncludeToc": { "message": "Include TOC" },
+  "mdCopy": { "message": "Copy" },
+  "mdCopyMarkdown": { "message": "Copy Markdown" },
+  "mdCopyHtml": { "message": "Copy HTML" },
+  "mdDownloadMd": { "message": "Download .md" },
+  "mdDownloadMdTitle": { "message": "Download Markdown file" },
+  "mdDownloadHtml": { "message": "Download .html" },
+  "mdDownloadHtmlTitle": { "message": "Download HTML file" },
+  "mdTocContents": { "message": "Contents" },
+  "mdToggleControls": { "message": "Toggle controls" },
+  "mdPreviewUntitled": { "message": "Untitled" },
+  "mdPreviewFailed": { "message": "Failed" },
+  "mdPreviewNoContent": { "message": "No content was extracted from this page." },
   "secAiContentSource": {
     "message": "AI Content Source"
   },

@@ -1198,6 +1198,24 @@
   "mdStripDownloadMd": {
     "message": "下載 .md"
   },
+  "mdViewRaw": { "message": "源碼" },
+  "mdViewRendered": { "message": "渲染" },
+  "mdExportSection": { "message": "匯出" },
+  "mdOptFrontmatter": { "message": "Frontmatter" },
+  "mdOptImages": { "message": "圖片" },
+  "mdOptIncludeToc": { "message": "含目錄" },
+  "mdCopy": { "message": "複製" },
+  "mdCopyMarkdown": { "message": "複製 Markdown" },
+  "mdCopyHtml": { "message": "複製 HTML" },
+  "mdDownloadMd": { "message": "下載 .md" },
+  "mdDownloadMdTitle": { "message": "下載 Markdown 文件" },
+  "mdDownloadHtml": { "message": "下載 .html" },
+  "mdDownloadHtmlTitle": { "message": "下載 HTML 文件" },
+  "mdTocContents": { "message": "目錄" },
+  "mdToggleControls": { "message": "切換控制列" },
+  "mdPreviewUntitled": { "message": "無標題" },
+  "mdPreviewFailed": { "message": "失敗" },
+  "mdPreviewNoContent": { "message": "未能從該頁面擷取到內容。" },
   "secAiContentSource": {
     "message": "AI Content Source"
   },
@@ -1266,7 +1284,7 @@
     "message": "範例：kimi-k2.6、kimi-k2.5、moonshot-v1-32k、moonshot-v1-128k"
   },
   "mdPreviewEmpty": {
-    "message": "沒有預覽資料。請先在 popup 中點擊 Markdown 按鈕。"
+    "message": "暫無預覽資料，請先在彈窗中點擊 Markdown 按鈕。"
   },
   "freeTierTitle": {
     "message": "邊啲 AI 服務商提供免費 API？"

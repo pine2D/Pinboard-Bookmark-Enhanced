@@ -1198,6 +1198,24 @@
   "mdStripDownloadMd": {
     "message": "Скачать .md"
   },
+  "mdViewRaw": { "message": "Исходник" },
+  "mdViewRendered": { "message": "Просмотр" },
+  "mdExportSection": { "message": "Экспорт" },
+  "mdOptFrontmatter": { "message": "Frontmatter" },
+  "mdOptImages": { "message": "Изображения" },
+  "mdOptIncludeToc": { "message": "Включить оглавление" },
+  "mdCopy": { "message": "Копировать" },
+  "mdCopyMarkdown": { "message": "Копировать Markdown" },
+  "mdCopyHtml": { "message": "Копировать HTML" },
+  "mdDownloadMd": { "message": "Скачать .md" },
+  "mdDownloadMdTitle": { "message": "Скачать файл Markdown" },
+  "mdDownloadHtml": { "message": "Скачать .html" },
+  "mdDownloadHtmlTitle": { "message": "Скачать файл HTML" },
+  "mdTocContents": { "message": "Содержание" },
+  "mdToggleControls": { "message": "Показать/скрыть панель управления" },
+  "mdPreviewUntitled": { "message": "Без названия" },
+  "mdPreviewFailed": { "message": "Ошибка" },
+  "mdPreviewNoContent": { "message": "Не удалось извлечь содержимое со страницы." },
   "secAiContentSource": {
     "message": "AI Content Source"
   },

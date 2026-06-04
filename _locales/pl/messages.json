@@ -1198,6 +1198,24 @@
   "mdStripDownloadMd": {
     "message": "Pobierz .md"
   },
+  "mdViewRaw": { "message": "Źródło" },
+  "mdViewRendered": { "message": "Podgląd" },
+  "mdExportSection": { "message": "Eksportuj" },
+  "mdOptFrontmatter": { "message": "Frontmatter" },
+  "mdOptImages": { "message": "Obrazy" },
+  "mdOptIncludeToc": { "message": "Dołącz spis treści" },
+  "mdCopy": { "message": "Kopiuj" },
+  "mdCopyMarkdown": { "message": "Kopiuj Markdown" },
+  "mdCopyHtml": { "message": "Kopiuj HTML" },
+  "mdDownloadMd": { "message": "Pobierz .md" },
+  "mdDownloadMdTitle": { "message": "Pobierz plik Markdown" },
+  "mdDownloadHtml": { "message": "Pobierz .html" },
+  "mdDownloadHtmlTitle": { "message": "Pobierz plik HTML" },
+  "mdTocContents": { "message": "Spis treści" },
+  "mdToggleControls": { "message": "Przełącz panel sterowania" },
+  "mdPreviewUntitled": { "message": "Bez tytułu" },
+  "mdPreviewFailed": { "message": "Błąd" },
+  "mdPreviewNoContent": { "message": "Nie udało się wyodrębnić treści z tej strony." },
   "secAiContentSource": {
     "message": "AI Content Source"
   },

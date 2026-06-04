@@ -1198,6 +1198,24 @@
   "mdStripDownloadMd": {
     "message": ".md laden"
   },
+  "mdViewRaw": { "message": "Quelltext" },
+  "mdViewRendered": { "message": "Vorschau" },
+  "mdExportSection": { "message": "Exportieren" },
+  "mdOptFrontmatter": { "message": "Frontmatter" },
+  "mdOptImages": { "message": "Bilder" },
+  "mdOptIncludeToc": { "message": "Inhaltsverzeichnis einfügen" },
+  "mdCopy": { "message": "Kopieren" },
+  "mdCopyMarkdown": { "message": "Markdown kopieren" },
+  "mdCopyHtml": { "message": "HTML kopieren" },
+  "mdDownloadMd": { "message": ".md laden" },
+  "mdDownloadMdTitle": { "message": "Markdown-Datei herunterladen" },
+  "mdDownloadHtml": { "message": ".html laden" },
+  "mdDownloadHtmlTitle": { "message": "HTML-Datei herunterladen" },
+  "mdTocContents": { "message": "Inhalt" },
+  "mdToggleControls": { "message": "Steuerleiste umschalten" },
+  "mdPreviewUntitled": { "message": "Ohne Titel" },
+  "mdPreviewFailed": { "message": "Fehlgeschlagen" },
+  "mdPreviewNoContent": { "message": "Aus dieser Seite konnte kein Inhalt extrahiert werden." },
   "secAiContentSource": {
     "message": "AI Content Source"
   },

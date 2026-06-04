@@ -1198,6 +1198,24 @@
   "mdStripDownloadMd": {
     "message": ".md をダウンロード"
   },
+  "mdViewRaw": { "message": "ソース" },
+  "mdViewRendered": { "message": "プレビュー" },
+  "mdExportSection": { "message": "エクスポート" },
+  "mdOptFrontmatter": { "message": "Frontmatter" },
+  "mdOptImages": { "message": "画像" },
+  "mdOptIncludeToc": { "message": "目次を含める" },
+  "mdCopy": { "message": "コピー" },
+  "mdCopyMarkdown": { "message": "Markdown をコピー" },
+  "mdCopyHtml": { "message": "HTML をコピー" },
+  "mdDownloadMd": { "message": ".md をダウンロード" },
+  "mdDownloadMdTitle": { "message": "Markdown ファイルをダウンロード" },
+  "mdDownloadHtml": { "message": ".html をダウンロード" },
+  "mdDownloadHtmlTitle": { "message": "HTML ファイルをダウンロード" },
+  "mdTocContents": { "message": "目次" },
+  "mdToggleControls": { "message": "コントロールを切り替え" },
+  "mdPreviewUntitled": { "message": "無題" },
+  "mdPreviewFailed": { "message": "失敗" },
+  "mdPreviewNoContent": { "message": "このページからコンテンツを抽出できませんでした。" },
   "secAiContentSource": {
     "message": "AIコンテンツソース"
   },

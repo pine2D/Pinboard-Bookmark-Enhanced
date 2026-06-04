@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)" />
 </head>
 <body>
-  <button id="rail-toggle" class="rail-toggle" type="button" aria-label="Toggle controls" aria-expanded="false" aria-controls="rail" hidden>
+  <button id="rail-toggle" class="rail-toggle" type="button" aria-label="Toggle controls" data-i18n-aria="mdToggleControls" aria-expanded="false" aria-controls="rail" hidden>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
   <div id="rail-scrim" class="rail-scrim" hidden></div>
@@ -24,45 +24,45 @@
       <span id="token-count" class="token-badge"></span>
     </div>
     <div class="view-toggle">
-      <button id="btn-raw" class="toggle-btn">Raw</button>
-      <button id="btn-rendered" class="toggle-btn active">Rendered</button>
+      <button id="btn-raw" class="toggle-btn" data-i18n="mdViewRaw">Raw</button>
+      <button id="btn-rendered" class="toggle-btn active" data-i18n="mdViewRendered">Rendered</button>
     </div>
     <div class="rail-section">
-      <div class="rail-label">Export</div>
-      <label class="exp-opt"><input type="checkbox" id="exp-frontmatter" /> <span>Frontmatter</span></label>
-      <label class="exp-opt"><span>Images</span>
+      <div class="rail-label" data-i18n="mdExportSection">Export</div>
+      <label class="exp-opt"><input type="checkbox" id="exp-frontmatter" /> <span data-i18n="mdOptFrontmatter">Frontmatter</span></label>
+      <label class="exp-opt"><span data-i18n="mdOptImages">Images</span>
         <select id="exp-image-policy">
           <option value="keep">keep</option>
           <option value="alt">alt</option>
           <option value="strip">strip</option>
         </select>
       </label>
-      <label class="exp-opt"><input type="checkbox" id="exp-include-toc" /> <span>Include TOC</span></label>
+      <label class="exp-opt"><input type="checkbox" id="exp-include-toc" /> <span data-i18n="mdOptIncludeToc">Include TOC</span></label>
       <div class="export-grid">
         <div class="export-fmt">
           <span class="fmt-name">Markdown</span>
-          <button id="btn-copy-md" class="action-btn" aria-label="Copy Markdown">
+          <button id="btn-copy-md" class="action-btn" aria-label="Copy Markdown" data-i18n-aria="mdCopyMarkdown">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <span class="btn-label">Copy</span>
+            <span class="btn-label" data-i18n="mdCopy">Copy</span>
           </button>
-          <button id="btn-dl-md" class="action-btn icon-only" title="Download Markdown file" aria-label="Download .md">
+          <button id="btn-dl-md" class="action-btn icon-only" title="Download Markdown file" data-i18n-title="mdDownloadMdTitle" aria-label="Download .md" data-i18n-aria="mdDownloadMd">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           </button>
         </div>
         <div class="export-fmt">
           <span class="fmt-name">HTML</span>
-          <button id="btn-copy-html" class="action-btn" aria-label="Copy HTML">
+          <button id="btn-copy-html" class="action-btn" aria-label="Copy HTML" data-i18n-aria="mdCopyHtml">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <span class="btn-label">Copy</span>
+            <span class="btn-label" data-i18n="mdCopy">Copy</span>
           </button>
-          <button id="btn-dl-html" class="action-btn icon-only" title="Download HTML file" aria-label="Download .html">
+          <button id="btn-dl-html" class="action-btn icon-only" title="Download HTML file" data-i18n-title="mdDownloadHtmlTitle" aria-label="Download .html" data-i18n-aria="mdDownloadHtml">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           </button>
         </div>
       </div>
     </div>
     <nav id="toc" class="toc rail-section" aria-label="Table of contents" hidden>
-      <div class="rail-label">Contents</div>
+      <div class="rail-label" data-i18n="mdTocContents">Contents</div>
       <ul id="toc-list" class="toc-list"></ul>
     </nav>
   </aside>
@@ -77,6 +77,7 @@
   <script src="vendor/purify.min.js"></script>
   <script src="vendor/highlight.min.js"></script>
   <script src="md-convert.js"></script>
+  <script src="i18n.js"></script>
   <script src="md-preview.js"></script>
 </body>
 </html>

@@ -18,6 +18,7 @@ function renderEmptyState(message) {
 }
 
 (async function () {
+  applyI18n();
   // Read preview data from storage
   const data = await chrome.storage.local.get("md_preview_data");
   const info = data.md_preview_data;
@@ -83,7 +84,7 @@ function renderEmptyState(message) {
   }
 
   // Fill header
-  document.getElementById("preview-title").textContent = title || "Untitled";
+  document.getElementById("preview-title").textContent = title || t("mdPreviewUntitled");
   const urlEl = document.getElementById("preview-url");
   urlEl.textContent = url || "";
   urlEl.href = url || "#";
@@ -196,11 +197,11 @@ async function copyToClipboard(text, btn) {
   const setLabel = (t) => { if (label) label.textContent = t; else btn.textContent = t; };
   try {
     await navigator.clipboard.writeText(text);
-    setLabel("Copied!");
+    setLabel(t("jinaCopied"));
     btn.classList.add("copied");
     setTimeout(() => { setLabel(orig); btn.classList.remove("copied"); }, 1500);
   } catch (_) {
-    setLabel("Failed");
+    setLabel(t("mdPreviewFailed"));
     setTimeout(() => { setLabel(orig); }, 1500);
   }
 }

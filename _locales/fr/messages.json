@@ -1198,6 +1198,24 @@
   "mdStripDownloadMd": {
     "message": "Télécharger .md"
   },
+  "mdViewRaw": { "message": "Source" },
+  "mdViewRendered": { "message": "Aperçu" },
+  "mdExportSection": { "message": "Exporter" },
+  "mdOptFrontmatter": { "message": "Frontmatter" },
+  "mdOptImages": { "message": "Images" },
+  "mdOptIncludeToc": { "message": "Inclure la TDM" },
+  "mdCopy": { "message": "Copier" },
+  "mdCopyMarkdown": { "message": "Copier le Markdown" },
+  "mdCopyHtml": { "message": "Copier le HTML" },
+  "mdDownloadMd": { "message": "Télécharger .md" },
+  "mdDownloadMdTitle": { "message": "Télécharger le fichier Markdown" },
+  "mdDownloadHtml": { "message": "Télécharger .html" },
+  "mdDownloadHtmlTitle": { "message": "Télécharger le fichier HTML" },
+  "mdTocContents": { "message": "Sommaire" },
+  "mdToggleControls": { "message": "Afficher/masquer les contrôles" },
+  "mdPreviewUntitled": { "message": "Sans titre" },
+  "mdPreviewFailed": { "message": "Échec" },
+  "mdPreviewNoContent": { "message": "Aucun contenu n'a pu être extrait de cette page." },
   "secAiContentSource": {
     "message": "AI Content Source"
   },
