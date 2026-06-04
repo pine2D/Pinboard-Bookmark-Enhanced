@@ -80,57 +80,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ---- Toolbar ---- */
-#toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 32px;
-  background: var(--toolbar-bg);
-  border-bottom: 1px solid var(--toolbar-border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.toolbar-left {
-  flex: 1;
-  min-width: 200px;
-  overflow: hidden;
-}
-
-.toolbar-left h1 {
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: -0.01em;
-  color: var(--fg);
-}
-
-.toolbar-left a {
-  display: inline-block;
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--fg-muted);
-  text-decoration: none;
-  word-break: break-all;
-  transition: color 150ms ease;
-}
-.toolbar-left a:hover { color: var(--link); }
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
 /* ---- Buttons ---- */
 .action-btn, .toggle-btn {
   padding: 6px 14px;
@@ -196,12 +145,12 @@ body {
 .view-toggle .toggle-btn:first-child { border-radius: 6px 0 0 6px; }
 .view-toggle .toggle-btn:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
 
-/* ---- Content Area ---- */
+/* ---- Layout: fixed left rail + centered doc body ---- */
 main {
-  max-width: 780px;
-  margin: 0 auto;
+  margin-left: 264px;
   padding: 48px 32px 96px;
 }
+.doc-body { max-width: 780px; margin: 0 auto; min-width: 0; }
 
 .content-view.hidden { display: none; }
 
@@ -397,25 +346,6 @@ main {
 }
 .empty-state p { font-size: 15px; line-height: 1.6; }
 
-/* ---- Responsive ---- */
-@media (max-width: 768px) {
-  #toolbar { padding: 10px 16px; gap: 8px; }
-  main { padding: 24px 16px 64px; }
-  #rendered-view { font-size: 15px; }
-  .action-btn .btn-label { display: none; }
-  .toolbar-left h1 { font-size: 14px; }
-}
-
-@media (max-width: 480px) {
-  .toolbar-right { width: 100%; justify-content: flex-end; }
-}
-
-/* ---- Print ---- */
-@media print {
-  #toolbar { display: none; }
-  main { max-width: 100%; padding: 0; }
-  body { background: white; color: black; }
-}
 
 /* ---- Content rendering optimization ---- */
 /* Skip layout/paint for off-screen content — massive scroll perf win on long pages */
@@ -443,40 +373,6 @@ main {
 }
 .stats-badge:empty { display: none; }
 
-/* ---- Export options row ---- */
-.export-options {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  width: 100%;
-  padding-top: 8px;
-  margin-top: 4px;
-  border-top: 1px solid var(--border-light);
-  font-size: 13px;
-  color: var(--fg-secondary);
-}
-.export-options .exp-opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.export-options select {
-  padding: 3px 8px;
-  border: 1px solid var(--btn-border);
-  border-radius: 6px;
-  background: var(--btn-bg);
-  color: var(--btn-fg);
-  font-size: 13px;
-  cursor: pointer;
-}
-.export-options input[type="checkbox"] { cursor: pointer; }
-
-@media (max-width: 480px) {
-  .export-options { gap: 12px; }
-}
 
 /* ---- Code highlighting (highlight.js) ---- */
 /* hljs themes set token colors on .hljs spans; keep our container chrome
@@ -497,107 +393,95 @@ main {
   padding: 20px 24px;
 }
 
-/* ---- TOC sidebar layout ---- */
-/* The doc body stays a page-centered reading column independent of the TOC, so a
-   hidden/empty TOC never narrows or shifts it. On wide screens the TOC rail is
-   FIXED in the left gutter beside the centered body (out of flow → no off-center
-   push); under the breakpoint it collapses to a top Contents block. */
-main {
-  /* keep the base `main` centered column (max-width:780; margin:0 auto) — NOT a
-     grid, so a display:none TOC can't reflow the body into a narrow track. */
-  max-width: 780px;
-  margin: 0 auto;
-}
-.doc-body { min-width: 0; }
-
-.toc {
+/* ---- Left control rail ---- */
+.rail {
   position: fixed;
-  top: 88px;
-  width: 220px;
-  /* Park in the left gutter, just left of the centered 780px column. The body's
-     left edge is (100vw - 780px)/2; sit 28px to its left (220 + 28 = 248).
-     max(8px, …) clamps it off the left edge near the breakpoint. */
-  left: max(8px, calc((100vw - 780px) / 2 - 248px));
-  /* top is set dynamically in md-preview.js to clear the variable-height sticky
-     toolbar; this is the fallback. max-height leaves room below that offset. */
-  max-height: calc(100vh - 150px);
-  overflow-y: auto;
-  font-size: 13px;
-  line-height: 1.5;
-  padding-right: 8px;
-}
-
-.toc-toggle {
-  display: none;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
+  top: 0; left: 0; bottom: 0;
+  width: 256px;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--fg-secondary);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  z-index: 20;
 }
-.toc-chevron { width: 16px; height: 16px; transition: transform 150ms ease; }
-.toc-toggle[aria-expanded="false"] .toc-chevron { transform: rotate(-90deg); }
+.rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); }
+.rail-ident a { display: block; margin-top: 3px; font-size: 11px; color: var(--fg-muted); text-decoration: none; word-break: break-all; }
+.rail-ident a:hover { color: var(--link); }
+.rail-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 12px; }
+.rail .view-toggle { width: 100%; }
+.rail .view-toggle .toggle-btn { flex: 1; justify-content: center; }
+.rail-section { margin-top: 4px; }
+.rail-label {
+  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--fg-muted);
+  margin: 15px 0 8px; padding-top: 12px; border-top: 1px solid var(--border);
+}
+.rail .exp-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 4px 0; font-size: 12.5px; color: var(--fg-secondary); cursor: pointer;
+}
+.rail .exp-opt select {
+  padding: 2px 6px; border: 1px solid var(--btn-border); border-radius: 5px;
+  background: var(--btn-bg); color: var(--btn-fg); font-size: 12px; cursor: pointer;
+}
+.rail .exp-opt input[type="checkbox"] { cursor: pointer; }
+.export-grid { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.export-fmt { display: flex; align-items: center; gap: 6px; }
+.export-fmt .fmt-name { width: 64px; flex: none; font-size: 12px; color: var(--fg-muted); }
+.export-fmt .action-btn { flex: 1; justify-content: center; }
+.export-fmt .action-btn.icon-only { flex: 0 0 auto; padding: 6px 9px; }
+.export-fmt .action-btn.icon-only svg { margin: 0; }
 
+/* TOC inside the rail (no longer a fixed gutter; the rail is fixed) */
+.toc { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .toc-list { list-style: none; margin: 0; padding: 0; }
 .toc-list li { margin: 0; }
 .toc-list a {
-  display: block;
-  padding: 4px 10px;
-  color: var(--fg-muted);
-  text-decoration: none;
-  border-left: 2px solid transparent;
-  border-radius: 0 4px 4px 0;
+  display: block; padding: 4px 10px; color: var(--fg-muted); text-decoration: none;
+  border-left: 2px solid transparent; border-radius: 0 4px 4px 0; font-size: 13px; line-height: 1.5;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .toc-list a:hover { color: var(--fg); background: var(--border-light); }
-/* Indent by heading depth (data-level set by JS). */
 .toc-list a[data-level="2"] { padding-left: 10px; }
 .toc-list a[data-level="3"] { padding-left: 24px; font-size: 0.95em; }
-.toc-list a[data-level="4"] { padding-left: 38px; font-size: 0.92em; color: var(--fg-muted); }
-/* Current-section highlight (toggled by IntersectionObserver in JS). */
-.toc-list a.active {
-  color: var(--link);
-  border-left-color: var(--link);
-  background: var(--border-light);
-  font-weight: 600;
+.toc-list a[data-level="4"] { padding-left: 38px; font-size: 0.92em; }
+.toc-list a.active { color: var(--link); border-left-color: var(--link); background: var(--border-light); font-weight: 600; }
+
+/* Drawer toggle (hamburger) + scrim — shown only in narrow mode */
+.rail-toggle {
+  position: fixed; top: 12px; left: 12px; z-index: 30;
+  display: none; align-items: center; justify-content: center;
+  width: 38px; height: 38px; padding: 0;
+  background: var(--btn-bg); color: var(--btn-fg);
+  border: 1px solid var(--btn-border); border-radius: 8px; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.12);
+}
+.rail-toggle svg { width: 18px; height: 18px; }
+.rail-scrim { position: fixed; inset: 0; z-index: 19; background: rgba(15,23,42,0.32); }
+.rail-scrim[hidden] { display: none; }
+
+/* ---- Responsive: collapse rail to an off-canvas drawer ---- */
+@media (max-width: 1000px) {
+  main { margin-left: 0; padding: 64px 20px 80px; }
+  #rendered-view { font-size: 15px; }
+  .rail-toggle { display: inline-flex; }
+  .rail {
+    transform: translateX(-100%);
+    transition: transform 200ms ease;
+    box-shadow: 6px 0 24px rgba(15,23,42,0.18);
+  }
+  body.rail-open .rail { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail { transition: none; }
 }
 
-/* Collapse to a top Contents block when there isn't room for a fixed left rail
-   beside the centered body (needs ~780 + 2×248 gutters ≈ 1276px). */
-@media (max-width: 1280px) {
-  .toc {
-    position: static;
-    width: auto;
-    left: auto;
-    top: auto;
-    max-height: none;
-    overflow: visible;
-    margin-bottom: 24px;
-    padding-right: 0;
-  }
-  .toc-toggle { display: flex; }
-  /* Collapsible: JS sets aria-expanded on the toggle; hide the list when collapsed. */
-  .toc[data-collapsed="true"] .toc-list { display: none; }
-  .toc-list {
-    margin-top: 8px;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-  }
-}
-
+/* ---- Print ---- */
 @media print {
-  main { display: block; max-width: 100%; }
-  .toc { display: none; }
+  .rail, .rail-toggle, .rail-scrim { display: none; }
+  main { margin-left: 0; max-width: 100%; padding: 0; }
+  body { background: white; color: black; }
 }
+
