@@ -445,3 +445,21 @@ function composeStyledHtml(canonicalMd, meta, opts) {
     READER_CSS + (opts.hljsCss || "") + "\n</style>\n</head>\n<body>\n" +
     '<main class="export-doc">\n' + header + article + "\n</main>\n</body>\n</html>\n";
 }
+
+// ── Obsidian export: build a core obsidian://new URI ──
+// (composeStyledHtml closes above)
+// clipboard=true → Obsidian reads the note body from the system clipboard (keeps
+// the URI short → no length limit, mirrors the official Obsidian Web Clipper);
+// otherwise the body rides in &content. vault/folder optional (empty vault =
+// current vault; empty folder = vault root). Pure string assembly — no chrome/DOM.
+function buildObsidianUri(opts) {
+  opts = opts || {};
+  const name = opts.name || "Untitled";
+  const folder = (opts.folder || "").replace(/^\/+|\/+$/g, "");
+  const path = (folder ? folder + "/" : "") + name;
+  let u = "obsidian://new?file=" + encodeURIComponent(path);
+  if (opts.vault) u += "&vault=" + encodeURIComponent(opts.vault);
+  if (opts.clipboard) u += "&clipboard";
+  if (opts.content) u += "&content=" + encodeURIComponent(opts.content);
+  return u;
+}
