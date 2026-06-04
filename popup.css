@@ -1392,8 +1392,8 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
   font-size: 11px;
 }
 .md-strip.hidden { display: none; }
-.md-strip-label { color: #2a7a2a; white-space: nowrap; }
-.md-strip-actions { margin-left: auto; display: flex; gap: 4px; }
+.md-strip-label { color: #2a7a2a; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.md-strip-actions { margin-left: auto; display: flex; gap: 4px; flex-shrink: 0; }
 .md-strip-btn {
   display: inline-flex;
   align-items: center;

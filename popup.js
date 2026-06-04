@@ -475,6 +475,30 @@ async function htmlToMarkdownAsync(html, opts) {
         });
         downloadFile(safeFilename(meta.title) + ".md", out, "text/markdown;charset=utf-8");
       };
+      const sendObsidian = async () => {
+        const meta = {
+          title: result.title || $id("title-input")?.value || "",
+          url: result.url || url,
+          date: (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(),
+          tags: Array.isArray(currentTags) ? currentTags.slice() : [],
+          source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
+        };
+        const out = composeExport(markdown, meta, {
+          frontmatter: settings.mdExportFrontmatter,
+          imagePolicy: settings.mdExportImagePolicy,
+          includeToc: settings.mdExportIncludeToc
+        });
+        let usedClipboard = false;
+        try { await navigator.clipboard.writeText(out); usedClipboard = true; } catch (_) {}
+        const uri = buildObsidianUri({
+          vault: settings.obsidianVault,
+          folder: settings.obsidianFolder,
+          name: safeFilename(meta.title),
+          clipboard: usedClipboard,
+          content: usedClipboard ? "" : out
+        });
+        window.open(uri, "_blank");
+      };
       const strip = $id("md-actions-strip");
       if (strip) {
         strip.classList.remove("hidden");
@@ -487,6 +511,14 @@ async function htmlToMarkdownAsync(html, opts) {
         // Assign (not addEventListener) so re-clicks don't stack handlers.
         if (previewBtn) previewBtn.onclick = openPreview;
         if (dlBtn) dlBtn.onclick = downloadMd;
+        const obsBtn = $id("md-strip-obsidian");
+        const dlLabel = dlBtn?.querySelector("span:last-child");
+        if (settings.obsidianEnabled) {
+          if (obsBtn) { obsBtn.style.display = ""; obsBtn.onclick = sendObsidian; }
+          if (dlLabel) dlLabel.textContent = ".md";
+        } else if (obsBtn) {
+          obsBtn.style.display = "none";
+        }
       }
 
       setTimeout(() => {
