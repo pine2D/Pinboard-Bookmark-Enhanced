@@ -466,10 +466,15 @@ main {
   .rail-toggle { display: inline-flex; }
   .rail {
     transform: translateX(-100%);
-    transition: transform 200ms ease;
+    visibility: hidden;
+    transition: transform 200ms ease, visibility 0s linear 200ms;
     box-shadow: 6px 0 24px rgba(15,23,42,0.18);
   }
-  body.rail-open .rail { transform: translateX(0); }
+  body.rail-open .rail {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 200ms ease, visibility 0s;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .rail { transition: none; }

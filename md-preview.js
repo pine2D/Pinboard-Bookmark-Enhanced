@@ -238,19 +238,48 @@ async function loadHljsCss() {
 }
 
 // ---- Rail drawer (narrow viewports) ----
-// Toggle the off-canvas rail via the hamburger; close on scrim click or Esc.
+// Off-canvas modal-style drawer: move focus in on open, trap Tab while open,
+// restore focus to the opener on close. Only engaged <1000px (toggle is
+// display:none above, so setOpen(true) never fires at wide widths).
 function setupDrawer() {
   const toggle = document.getElementById("rail-toggle");
   const scrim = document.getElementById("rail-scrim");
-  if (!toggle || !scrim) return;
+  const rail = document.getElementById("rail");
+  if (!toggle || !scrim || !rail) return;
+  let lastFocus = null;
+  const focusables = () => Array.from(
+    rail.querySelectorAll('button, a[href], input, select, [tabindex]:not([tabindex="-1"])')
+  ).filter((el) => el.offsetParent !== null);
+  const isOpen = () => document.body.classList.contains("rail-open");
   const setOpen = (open) => {
     document.body.classList.toggle("rail-open", open);
     toggle.setAttribute("aria-expanded", open ? "true" : "false");
     scrim.hidden = !open;
+    if (open) {
+      lastFocus = document.activeElement;
+      rail.setAttribute("role", "dialog");
+      rail.setAttribute("aria-modal", "true");
+      (document.getElementById("btn-rendered") || rail).focus();
+    } else {
+      rail.removeAttribute("role");
+      rail.removeAttribute("aria-modal");
+      if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+      else toggle.focus();
+    }
   };
-  toggle.addEventListener("click", () => setOpen(!document.body.classList.contains("rail-open")));
+  toggle.addEventListener("click", () => setOpen(!isOpen()));
   scrim.addEventListener("click", () => setOpen(false));
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
+  document.addEventListener("keydown", (e) => {
+    if (!isOpen()) return;
+    if (e.key === "Escape") { setOpen(false); return; }
+    if (e.key === "Tab") {
+      const f = focusables();
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
 }
 
 // ---- Scroll-spy: highlight the TOC entry for the heading nearest the top ----
