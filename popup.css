@@ -1379,9 +1379,6 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
   }
 }
 
-/* ===================== High-DPI Scaling ===================== */
-@media (min-resolution: 144dpi) { body { zoom: 1.12; } }
-
 /* ---- Markdown post-copy action strip (popup) ---- */
 .md-strip {
   display: flex;
@@ -1427,4 +1424,7 @@ html[data-theme] .md-strip-label { color: var(--pp-ok-fg); }
 html[data-theme] .md-strip-btn { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-link); }
 html[data-theme] .md-strip-btn:hover { background: var(--pp-drop-hover); box-shadow: var(--pp-hover-shadow); }
 html[data-theme] .md-strip-btn:focus-visible { outline: 2px solid var(--pp-accent); outline-offset: 2px; }
+
+/* ===================== High-DPI Scaling ===================== */
+@media (min-resolution: 144dpi) { body { zoom: 1.12; } }
 @media (min-resolution: 192dpi) { body { zoom: 1.22; } }
