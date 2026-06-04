@@ -484,3 +484,7 @@ main {
 /* Raw view: the TOC navigates the rendered doc, which is hidden in Raw mode. */
 body.raw-active #toc { display: none; }
 
+/* Empty state: hide the rail + reset the doc offset so the .empty-state centers. */
+body.md-empty .rail { display: none; }
+body.md-empty main { margin-left: 0; }
+

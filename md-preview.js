@@ -2,12 +2,27 @@
 // Markdown Preview Page
 // ============================================================
 
+// Render the styled empty state and hide the rail so the page reads as
+// intentional (not a half-rendered document). textContent only — no innerHTML.
+function renderEmptyState(message) {
+  const view = document.getElementById("rendered-view");
+  if (view) {
+    const wrap = document.createElement("div");
+    wrap.className = "empty-state";
+    const p = document.createElement("p");
+    p.textContent = message;
+    wrap.appendChild(p);
+    view.replaceChildren(wrap);
+  }
+  document.body.classList.add("md-empty");
+}
+
 (async function () {
   // Read preview data from storage
   const data = await chrome.storage.local.get("md_preview_data");
   const info = data.md_preview_data;
   if (!info) {
-    document.getElementById("rendered-view").textContent = chrome.i18n.getMessage("mdPreviewEmpty") || "No preview data available. Please use the Markdown button in the popup first.";
+    renderEmptyState(chrome.i18n.getMessage("mdPreviewEmpty") || "No preview data available. Please use the Markdown button in the popup first.");
     return;
   }
   // Clear temporary data
@@ -21,6 +36,10 @@
   // Single source of truth for Raw view, Copy MD, Download .md, and Rendered.
   const canonicalMarkdown = info.markdown || (contentHtml ? htmlToMarkdown(contentHtml, { baseUrl }) : "");
   function getMarkdown() { return canonicalMarkdown; }
+  if (!canonicalMarkdown.trim()) {
+    renderEmptyState(chrome.i18n.getMessage("mdPreviewNoContent") || "No content was extracted from this page.");
+    return;
+  }
 
   // Export-options defaults from settings (per-export overridable via the header row).
   const exportSettings = await chrome.storage.sync.get({
