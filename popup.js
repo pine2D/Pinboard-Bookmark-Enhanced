@@ -478,6 +478,10 @@ async function htmlToMarkdownAsync(html, opts) {
       const strip = $id("md-actions-strip");
       if (strip) {
         strip.classList.remove("hidden");
+        strip.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        // Re-assert the (localized) label so the aria-live strip announces to SR.
+        const stripLabel = $id("md-strip-label");
+        if (stripLabel) stripLabel.textContent = t("mdStripCopied");
         const previewBtn = $id("md-strip-preview");
         const dlBtn = $id("md-strip-dl");
         // Assign (not addEventListener) so re-clicks don't stack handlers.
