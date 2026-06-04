@@ -317,6 +317,38 @@ function assertEq(actual, expected, label) {
 </script>
 
 <script>
+  // ---- P3.6 buildToc -> sidebar slug-contract smoke (deterministic; no hljs/scroll) ----
+  section("P3.6 buildToc -> sidebar slug contract");
+  (() => {
+    const md = [
+      "# Title (h1, excluded by minLevel:2)",
+      "",
+      "## First Section",
+      "",
+      "Body text.",
+      "",
+      "### Nested Detail",
+      "",
+      "## 中文标题",
+      "",
+      "End."
+    ].join("\n");
+    const { headings } = buildToc(md, { minLevel: 2, maxLevel: 4 });
+    check("buildToc returns 3 headings in [2,4] (h1 excluded)",
+      headings.length === 3, "got " + JSON.stringify(headings.map((h) => h.text)));
+    const fixture = document.createElement("div");
+    fixture.innerHTML = renderMarkdown(md);
+    const allResolve = headings.every((h) =>
+      fixture.querySelector("#" + (window.CSS && CSS.escape ? CSS.escape(h.slug) : h.slug)) !== null);
+    check("every buildToc slug matches a rendered heading id (anchors resolve)",
+      allResolve, "slugs=" + JSON.stringify(headings.map((h) => h.slug)));
+    const cjk = headings.find((h) => h.text.indexOf("中文") !== -1);
+    check("CJK heading keeps a non-empty slug",
+      !!cjk && typeof cjk.slug === "string" && cjk.slug.length > 0, "cjk=" + JSON.stringify(cjk));
+  })();
+</script>
+
+<script>
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>
