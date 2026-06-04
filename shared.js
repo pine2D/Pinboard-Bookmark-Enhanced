@@ -123,6 +123,7 @@ const SETTINGS_DEFAULTS = {
   tagPresets: "", optAutoCloseAfterSave: true,
   themePresetKey: "", optPopupFollowTheme: true,
   popupWidth: 550,
+  mdExportFrontmatter: true, mdExportImagePolicy: "keep", mdExportIncludeToc: false,
   urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] }
 };
 
