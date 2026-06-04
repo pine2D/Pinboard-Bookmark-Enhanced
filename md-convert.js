@@ -429,7 +429,11 @@ function composeStyledHtml(canonicalMd, meta, opts) {
     const parts = [];
     if (meta.title) parts.push('<h1 class="doc-title">' + _xmlEscape(meta.title) + "</h1>");
     const sub = [];
-    if (meta.url) sub.push('<a href="' + _xmlEscape(meta.url) + '">' + _xmlEscape(meta.url) + "</a>");
+    if (meta.url) {
+      const safeUrl = /^https?:\/\//i.test(meta.url) ? meta.url : "";
+      if (safeUrl) sub.push('<a href="' + _xmlEscape(safeUrl) + '" rel="noopener noreferrer">' + _xmlEscape(safeUrl) + "</a>");
+      else sub.push("<span>" + _xmlEscape(meta.url) + "</span>");
+    }
     if (meta.date) sub.push("<span>" + _xmlEscape(meta.date) + "</span>");
     if (Array.isArray(meta.tags) && meta.tags.length) sub.push("<span>" + meta.tags.map(_xmlEscape).join(", ") + "</span>");
     if (sub.length) parts.push('<p class="doc-meta">' + sub.join(" &middot; ") + "</p>");

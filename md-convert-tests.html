@@ -16,7 +16,7 @@ h2 { margin-top: 24px; }
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
 <script src="vendor/highlight.min.js"></script>
-<script src="md-convert.js?v=t2"></script>
+<script src="md-convert.js?v=t2sX"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -423,6 +423,12 @@ function assertEq(actual, expected, label) {
     assert(!/^---/m.test(fm.replace(/<[^>]+>/g, "")), "no YAML --- fences in styled HTML");
 
     assert(/HLJSMARKER/.test(composeStyledHtml(md, meta, { hljsCss: "/*HLJSMARKER*/" })), "injects caller hljsCss");
+
+    const evil = composeStyledHtml(md, { ...meta, url: "javascript:alert(1)" }, { frontmatter: true, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+    assert(!/href="javascript:/i.test(evil), "non-http(s) url is NOT emitted as an href (XSS guard)");
+    assert(/<span>javascript:alert\(1\)<\/span>/.test(evil), "non-http(s) url falls back to a text span");
+    const amp = composeStyledHtml(md, { ...meta, url: "https://e.com/?a=1&b=2" }, { frontmatter: true, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+    assert(/href="https:\/\/e\.com\/\?a=1&amp;b=2"/.test(amp), "http url & is escaped in the href attribute");
   })();
 </script>
 
