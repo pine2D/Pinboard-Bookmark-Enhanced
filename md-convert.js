@@ -172,12 +172,15 @@ function renderMarkdown(md) {
 
 // ── Code highlighting (preview page only; needs highlight.js global `hljs`) ──
 // Called AFTER renderMarkdown's sanitized HTML is injected into the DOM.
-// marked emits fenced blocks as <pre><code class="language-xxx">…</code></pre>.
+// Targets ALL block code (`pre > code`): marked tags fenced blocks with a
+// language as `class="language-xxx"`, but content from Defuddle->Turndown often
+// loses the language (source used a non-standard class), so we also highlight
+// untagged blocks via hljs auto-detection. Inline `<code>` is not matched.
 // No-op (not a throw) when hljs is absent — popup never vendors highlight.js,
 // and the pure string functions in this file must stay usable without it.
 function highlightCodeBlocks(root) {
   if (!root || typeof hljs === "undefined") return;
-  const blocks = root.querySelectorAll('pre > code[class*="language-"]');
+  const blocks = root.querySelectorAll('pre > code');
   blocks.forEach((block) => {
     try {
       hljs.highlightElement(block);
