@@ -40,7 +40,8 @@
     const d = new Date();
     return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
   }
-  function buildExportMarkdown() {
+  // Shared export metadata + per-export option resolution (used by Copy/Download MD and Download .html).
+  function buildMeta() {
     const meta = {
       title: title || "",
       url: url || "",
@@ -49,11 +50,17 @@
       source: source === "jina" ? "jina" : "defuddle"
     };
     if (description) meta.description = description;
-    return composeExport(getMarkdown(), meta, {
+    return meta;
+  }
+  function buildExportOpts() {
+    return {
       frontmatter: expFrontmatter ? expFrontmatter.checked : !!exportSettings.mdExportFrontmatter,
       imagePolicy: expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep"),
       includeToc: expIncludeToc ? expIncludeToc.checked : !!exportSettings.mdExportIncludeToc
-    });
+    };
+  }
+  function buildExportMarkdown() {
+    return composeExport(getMarkdown(), buildMeta(), buildExportOpts());
   }
 
   // Fill header
@@ -158,18 +165,8 @@
     downloadFile(safeTitle + ".md", buildExportMarkdown(), "text/markdown;charset=utf-8");
   });
   document.getElementById("btn-dl-html").addEventListener("click", async () => {
-    const meta = {
-      title: title || "", url: url || "", date: todayIso(), tags,
-      source: source === "jina" ? "jina" : "defuddle"
-    };
-    if (description) meta.description = description;
     const hljsCss = await loadHljsCss();
-    const doc = composeStyledHtml(getMarkdown(), meta, {
-      frontmatter: expFrontmatter ? expFrontmatter.checked : !!exportSettings.mdExportFrontmatter,
-      imagePolicy: expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep"),
-      includeToc: expIncludeToc ? expIncludeToc.checked : !!exportSettings.mdExportIncludeToc,
-      hljsCss
-    });
+    const doc = composeStyledHtml(getMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
   });
 })();
