@@ -52,8 +52,17 @@
     </div>
   </header>
   <main>
-    <article id="rendered-view" class="content-view"></article>
-    <pre id="raw-view" class="content-view hidden"></pre>
+    <nav id="toc" class="toc" aria-label="Table of contents" hidden>
+      <button id="toc-toggle" class="toc-toggle" type="button" aria-expanded="true" aria-controls="toc-list">
+        <span class="toc-toggle-label">Contents</span>
+        <svg class="toc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <ul id="toc-list" class="toc-list"></ul>
+    </nav>
+    <div class="doc-body">
+      <article id="rendered-view" class="content-view"></article>
+      <pre id="raw-view" class="content-view hidden"></pre>
+    </div>
   </main>
   <script src="vendor/turndown.js"></script>
   <script src="vendor/marked.min.js"></script>

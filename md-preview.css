@@ -496,3 +496,101 @@ main {
 #rendered-view pre:has(code.hljs) {
   padding: 20px 24px;
 }
+
+/* ---- TOC sidebar layout ---- */
+/* Wide screens: sticky left rail + centered doc body. The doc body keeps the
+   original ~780px reading measure; the rail sits to its left. */
+main {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 780px);
+  justify-content: center;
+  gap: 40px;
+  max-width: 1100px;
+}
+.doc-body { min-width: 0; }
+
+.toc {
+  position: sticky;
+  top: 88px;
+  align-self: start;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  padding-right: 8px;
+}
+
+.toc-toggle {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg-secondary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toc-chevron { width: 16px; height: 16px; transition: transform 150ms ease; }
+.toc-toggle[aria-expanded="false"] .toc-chevron { transform: rotate(-90deg); }
+
+.toc-list { list-style: none; margin: 0; padding: 0; }
+.toc-list li { margin: 0; }
+.toc-list a {
+  display: block;
+  padding: 4px 10px;
+  color: var(--fg-muted);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 4px 4px 0;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toc-list a:hover { color: var(--fg); background: var(--border-light); }
+/* Indent by heading depth (data-level set by JS). */
+.toc-list a[data-level="2"] { padding-left: 10px; }
+.toc-list a[data-level="3"] { padding-left: 24px; font-size: 0.95em; }
+.toc-list a[data-level="4"] { padding-left: 38px; font-size: 0.92em; color: var(--fg-muted); }
+/* Current-section highlight (toggled by IntersectionObserver in JS). */
+.toc-list a.active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background: var(--border-light);
+  font-weight: 600;
+}
+
+/* Collapsed (top) mode under the breakpoint. */
+@media (max-width: 1024px) {
+  main {
+    display: block;
+    max-width: 820px;
+  }
+  .toc {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    margin-bottom: 24px;
+    padding-right: 0;
+  }
+  .toc-toggle { display: flex; }
+  /* Collapsible: JS sets aria-expanded on the toggle; hide the list when collapsed. */
+  .toc[data-collapsed="true"] .toc-list { display: none; }
+  .toc-list {
+    margin-top: 8px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+}
+
+@media print {
+  main { display: block; max-width: 100%; }
+  .toc { display: none; }
+}
