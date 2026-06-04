@@ -15,10 +15,46 @@
 
   const { contentHtml, title, url, tokens, source } = info;
   const baseUrl = info.baseUrl || url || "";
+  const tags = Array.isArray(info.tags) ? info.tags : [];
+  const description = info.description || "";
   // Canonical Markdown: Defuddle HTML -> Turndown; Jina already gives MD.
   // Single source of truth for Raw view, Copy MD, Download .md, and Rendered.
   const canonicalMarkdown = info.markdown || (contentHtml ? htmlToMarkdown(contentHtml, { baseUrl }) : "");
   function getMarkdown() { return canonicalMarkdown; }
+
+  // Export-options defaults from settings (per-export overridable via the header row).
+  const exportSettings = await chrome.storage.sync.get({
+    mdExportFrontmatter: true,
+    mdExportImagePolicy: "keep",
+    mdExportIncludeToc: false
+  });
+  const expFrontmatter = document.getElementById("exp-frontmatter");
+  const expImagePolicy = document.getElementById("exp-image-policy");
+  const expIncludeToc = document.getElementById("exp-include-toc");
+  if (expFrontmatter) expFrontmatter.checked = !!exportSettings.mdExportFrontmatter;
+  if (expImagePolicy) expImagePolicy.value = exportSettings.mdExportImagePolicy || "keep";
+  if (expIncludeToc) expIncludeToc.checked = !!exportSettings.mdExportIncludeToc;
+
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+  function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+  function buildExportMarkdown() {
+    const meta = {
+      title: title || "",
+      url: url || "",
+      date: todayIso(),
+      tags,
+      source: source === "jina" ? "jina" : "defuddle"
+    };
+    if (description) meta.description = description;
+    return composeExport(getMarkdown(), meta, {
+      frontmatter: expFrontmatter ? expFrontmatter.checked : !!exportSettings.mdExportFrontmatter,
+      imagePolicy: expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep"),
+      includeToc: expIncludeToc ? expIncludeToc.checked : !!exportSettings.mdExportIncludeToc
+    });
+  }
 
   // Fill header
   document.getElementById("preview-title").textContent = title || "Untitled";
@@ -36,6 +72,16 @@
     sourceEl.textContent = source === "jina" ? "Jina Reader" : "Defuddle";
   }
   document.title = `${title || "Markdown"} — Preview`;
+
+  // Reading stats (header) — computed from canonical Markdown
+  const statsEl = document.getElementById("reading-stats");
+  if (statsEl) {
+    const stats = readingStats(getMarkdown());
+    const wordLabel = stats.cjkChars > 0
+      ? `${stats.words.toLocaleString()} words · ${stats.cjkChars.toLocaleString()} CJK`
+      : `${stats.words.toLocaleString()} words`;
+    statsEl.textContent = `${wordLabel} · ~${stats.minutes} min`;
+  }
 
   // Single render path: canonical Markdown -> marked() -> DOMPurify -> innerHTML.
   // renderMarkdown() is now the lone sanitize point (XSS closed here).
@@ -67,7 +113,7 @@
 
   // Copy buttons
   document.getElementById("btn-copy-md").addEventListener("click", async (e) => {
-    await copyToClipboard(getMarkdown(), e.currentTarget);
+    await copyToClipboard(buildExportMarkdown(), e.currentTarget);
   });
   document.getElementById("btn-copy-html").addEventListener("click", async (e) => {
     await copyToClipboard(renderedView.innerHTML, e.currentTarget); // nosec: reading back own generated HTML
@@ -76,7 +122,7 @@
   // Download buttons
   const safeTitle = (title || "untitled").replace(/[^a-zA-Z0-9_\u4e00-\u9fff -]/g, "_").slice(0, 80);
   document.getElementById("btn-dl-md").addEventListener("click", () => {
-    downloadFile(safeTitle + ".md", getMarkdown(), "text/markdown;charset=utf-8");
+    downloadFile(safeTitle + ".md", buildExportMarkdown(), "text/markdown;charset=utf-8");
   });
   document.getElementById("btn-dl-html").addEventListener("click", () => {
     downloadFile(safeTitle + ".html", renderedView.innerHTML, "text/html;charset=utf-8");
