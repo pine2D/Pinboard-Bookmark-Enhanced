@@ -464,7 +464,7 @@ async function htmlToMarkdownAsync(html, opts) {
         const meta = {
           title: result.title || $id("title-input")?.value || "",
           url: result.url || url,
-          date: new Date().toISOString().slice(0, 10),
+          date: (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(),
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
           source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
         };
