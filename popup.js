@@ -447,7 +447,7 @@ async function htmlToMarkdownAsync(html, opts) {
       const openPreview = async () => {
         await chrome.storage.local.set({
           md_preview_data: {
-            markdown: result.markdown || "",
+            markdown: markdown || "",
             contentHtml: result.contentHtml || "",
             title: result.title || $id("title-input")?.value || "",
             url: result.url || url,
