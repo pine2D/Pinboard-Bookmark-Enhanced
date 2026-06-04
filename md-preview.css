@@ -10,8 +10,6 @@
   --fg-muted: #94a3b8;
   --border: #e2e8f0;
   --border-light: #f1f5f9;
-  --toolbar-bg: rgba(255, 255, 255, 0.85);
-  --toolbar-border: #e2e8f0;
   --code-bg: #f1f5f9;
   --code-fg: #334155;
   --link: #2563eb;
@@ -41,8 +39,6 @@
     --fg-muted: #64748b;
     --border: #1e293b;
     --border-light: #1e293b;
-    --toolbar-bg: rgba(30, 41, 59, 0.85);
-    --toolbar-border: #334155;
     --code-bg: #1e293b;
     --code-fg: #cbd5e1;
     --link: #60a5fa;
