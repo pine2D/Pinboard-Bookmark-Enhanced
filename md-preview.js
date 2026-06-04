@@ -48,6 +48,7 @@ function renderEmptyState(message) {
     mdExportFrontmatter: true,
     mdExportImagePolicy: "keep",
     mdExportIncludeToc: false,
+    obsidianEnabled: false,
     obsidianVault: "",
     obsidianFolder: ""
   });
@@ -198,21 +199,26 @@ function renderEmptyState(message) {
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
   });
 
-  document.getElementById("btn-obsidian").addEventListener("click", async (e) => {
-    const btn = e.currentTarget;
-    const md = buildExportMarkdown();
-    let usedClipboard = false;
-    try { await navigator.clipboard.writeText(md); usedClipboard = true; } catch (_) {}
-    const uri = buildObsidianUri({
-      vault: exportSettings.obsidianVault,
-      folder: exportSettings.obsidianFolder,
-      name: safeTitle,
-      clipboard: usedClipboard,
-      content: usedClipboard ? "" : md
+  const obsBtn = document.getElementById("btn-obsidian");
+  if (exportSettings.obsidianEnabled) {
+    obsBtn.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const md = buildExportMarkdown();
+      let usedClipboard = false;
+      try { await navigator.clipboard.writeText(md); usedClipboard = true; } catch (_) {}
+      const uri = buildObsidianUri({
+        vault: exportSettings.obsidianVault,
+        folder: exportSettings.obsidianFolder,
+        name: safeTitle,
+        clipboard: usedClipboard,
+        content: usedClipboard ? "" : md
+      });
+      window.open(uri, "_blank");
+      flashButtonLabel(btn, t("mdSentObsidian"));
     });
-    window.open(uri, "_blank");
-    flashButtonLabel(btn, t("mdSentObsidian"));
-  });
+  } else if (obsBtn) {
+    obsBtn.style.display = "none";
+  }
 })();
 
 // ---- Copy to clipboard with visual feedback ----
