@@ -373,6 +373,17 @@ function assertEq(actual, expected, label) {
     check("table keeps bold + a plain link in a cell", /\*\*bold\*\*/.test(md) && /\[Docs\]\(https:\/\/d\.com\)/.test(md), md);
     check("table still emits the header separator row", /\|\s*---\s*\|/.test(md), md);
   })();
+
+  // ---- GitHub alerts: Defuddle -> Obsidian callout (data-callout) -> > [!TYPE] ----
+  section("htmlToMarkdown GitHub alert (callout) restore");
+  (() => {
+    const tip = htmlToMarkdown('<div data-callout="tip" class="callout"><div class="callout-title"><div class="callout-title-inner">Tip</div></div> <p dir="auto">Questions? Email <strong><a href="mailto:x@e.com">x@e.com</a></strong>.</p> </div>', {});
+    check("tip callout -> > [!TIP] with inline formatting preserved",
+      /^> \[!TIP\]/m.test(tip) && /\*\*\[x@e\.com\]\(mailto:x@e\.com\)\*\*/.test(tip), tip);
+    const note = htmlToMarkdown('<div data-callout="note" class="callout"><div class="callout-title"><div class="callout-title-inner">Note</div></div><p>Line one.</p><p>Line two.</p></div>', {});
+    check("multi-paragraph callout quotes every line",
+      /> \[!NOTE\]/.test(note) && /> Line one\./.test(note) && /> Line two\./.test(note), note);
+  })();
 </script>
 
 <script>

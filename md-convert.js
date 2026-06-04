@@ -50,6 +50,23 @@ function htmlToMarkdown(html, opts) {
       return "\n\n" + out.join("\n") + "\n\n";
     }
   });
+  // GitHub alerts (> [!TIP] etc.): Defuddle normalizes them to Obsidian-style
+  // callouts (<div data-callout="tip" class="callout"><div class="callout-title">…
+  // </div><p>…</p></div>). Restore the `> [!TYPE]` blockquote so the export round-trips.
+  td.addRule("calloutAlert", {
+    filter: (n) => n.nodeName === "DIV" && (n.hasAttribute("data-callout") || (n.classList && n.classList.contains("callout"))),
+    replacement: (content, node) => {
+      const type = (node.getAttribute("data-callout") || "note").trim().toUpperCase();
+      const clone = node.cloneNode(true);
+      const titleEl = clone.querySelector(".callout-title");
+      if (titleEl) titleEl.remove();
+      let body;
+      try { body = td.turndown(clone.innerHTML); } catch (_) { body = clone.textContent || ""; }
+      body = body.replace(/^\n+/, "").replace(/\n+$/, "").trim();
+      const quoted = body ? body.split("\n").map((l) => (l.length ? "> " + l : ">")).join("\n") : ">";
+      return "\n\n> [!" + type + "]\n" + quoted + "\n\n";
+    }
+  });
   td.addRule("highlight", { filter: "mark", replacement: (c) => "==" + c + "==" });
   td.addRule("strikethrough", {
     filter: (n) => n.nodeName === "DEL" || n.nodeName === "S" || n.nodeName === "STRIKE",
