@@ -85,7 +85,9 @@ function renderEmptyState(message) {
   }
 
   // Fill header
-  document.getElementById("preview-title").textContent = title || t("mdPreviewUntitled");
+  const previewTitleEl = document.getElementById("preview-title");
+  previewTitleEl.textContent = title || t("mdPreviewUntitled");
+  previewTitleEl.title = title || t("mdPreviewUntitled");
   const urlEl = document.getElementById("preview-url");
   urlEl.textContent = url || "";
   urlEl.href = url || "#";

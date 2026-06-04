@@ -402,7 +402,7 @@ main {
   overflow-y: auto;
   z-index: 20;
 }
-.rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); }
+.rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .rail-ident a { display: block; margin-top: 3px; font-size: 11px; color: var(--fg-muted); text-decoration: none; word-break: break-all; }
 .rail-ident a:hover { color: var(--link); }
 .rail-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 12px; }
