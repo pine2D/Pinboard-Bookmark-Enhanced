@@ -90,6 +90,7 @@
   // Lazy-load images / async decode (sanitizer keeps these attributes).
   renderedHtml = renderedHtml.replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');
   renderedView.innerHTML = renderedHtml;
+  highlightCodeBlocks(renderedView);
   // Raw view populated lazily on first switch
 
   // View toggle
