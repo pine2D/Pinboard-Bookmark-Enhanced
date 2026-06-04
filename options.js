@@ -112,12 +112,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         "batch-ai-tags": false, "batch-ai-summary": false, "batch-skip-existing": false
       }
     },
+    markdown: {
+      fields: {
+        "opt-obsidian-enabled": false,
+        "opt-md-frontmatter": true, "opt-md-image-policy": "keep", "opt-md-include-toc": false,
+        "opt-obsidian-vault": "", "opt-obsidian-folder": ""
+      }
+    },
     appearance: {
       fields: {
         "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": ""
       }
     }
   };
+
+  // Gray out the Obsidian vault/folder inputs when the master toggle is off.
+  // Safe to call on any page/panel (guards on element existence); programmatic
+  // .checked changes (load, reset) don't fire 'change', so call it explicitly.
+  function syncObsidianEnabledState() {
+    const en = $id("opt-obsidian-enabled");
+    if (!en) return;
+    const off = !en.checked;
+    const v = $id("opt-obsidian-vault");
+    const f = $id("opt-obsidian-folder");
+    if (v) v.disabled = off;
+    if (f) f.disabled = off;
+  }
 
   $id("reset-panel-btn").addEventListener("click", function () {
     const resetBtn = this;
@@ -138,6 +158,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           else el.value = val;
         }
         saveAll();
+        syncObsidianEnabledState();
       },
     });
   });
@@ -346,12 +367,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-auto-close": s.optAutoCloseAfterSave,
     "opt-popup-follow-theme": s.optPopupFollowTheme,
     "opt-md-frontmatter": s.mdExportFrontmatter,
-    "opt-md-include-toc": s.mdExportIncludeToc
+    "opt-md-include-toc": s.mdExportIncludeToc,
+    "opt-obsidian-enabled": s.obsidianEnabled
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
     if (el) el.checked = val;
   }
+  syncObsidianEnabledState();
 
   // ---- Popup width (B9) ----
   const popupWidth = Number(s.popupWidth) || 550;
@@ -575,6 +598,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       mdExportFrontmatter: $id("opt-md-frontmatter").checked,
       mdExportImagePolicy: $id("opt-md-image-policy").value,
       mdExportIncludeToc: $id("opt-md-include-toc").checked,
+      obsidianEnabled: $id("opt-obsidian-enabled").checked,
       obsidianVault: $id("opt-obsidian-vault").value.trim(),
       obsidianFolder: $id("opt-obsidian-folder").value.trim(),
       // Appearance
@@ -682,6 +706,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll('.panel input[type="radio"]').forEach(el => {
     el.addEventListener("change", scheduleAutoSave);
   });
+  const obsEnabledEl = $id("opt-obsidian-enabled");
+  if (obsEnabledEl) obsEnabledEl.addEventListener("change", syncObsidianEnabledState);
 
   function flashAutoSave() {
     const el = $id("auto-save-status");

@@ -16,6 +16,7 @@
       <button class="tab-btn" data-panel="bookmarks" data-i18n="tabBookmarks">Bookmarks</button>
       <button class="tab-btn" data-panel="ai" data-i18n="tabAI">AI</button>
       <button class="tab-btn" data-panel="quick" data-i18n="tabQuickActions">Quick Actions</button>
+      <button class="tab-btn" data-panel="markdown" data-i18n="tabMarkdown">Markdown</button>
       <button class="tab-btn" data-panel="appearance" data-i18n="tabAppearance">Appearance</button>
       <button class="reset-tab-btn" id="reset-panel-btn" title="Reset current tab settings to defaults" data-i18n="resetTabBtn" data-i18n-title="resetTabTitle">Reset This Tab</button>
     </div>
@@ -479,8 +480,15 @@
         <button class="btn btn-sm" id="reset-summary-prompt" style="margin-top:4px" data-i18n="resetToDefault">Reset to default</button>
       </div>
 
-      <div class="divider"></div>
+    </div>
+
+    <!-- Tab: Markdown -->
+    <div id="panel-markdown" class="panel">
       <div class="section-title" data-i18n="secMdExport">Markdown Export Defaults</div>
+      <div class="fg">
+        <label><input type="checkbox" id="opt-obsidian-enabled" /> <span data-i18n="mdObsidianEnabled">Enable export to Obsidian</span></label>
+        <p class="hint" data-i18n="mdObsidianEnabledHint">Shows the Send-to-Obsidian buttons in the preview page and the popup.</p>
+      </div>
       <div class="fg"><label><input type="checkbox" id="opt-md-frontmatter" checked /> <span data-i18n="mdExportFrontmatter">Add YAML frontmatter to exported Markdown</span></label></div>
       <div class="fg">
         <label class="bl" data-i18n="mdExportImagePolicy">Image handling</label>
