@@ -1,87 +1,112 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>md-convert tests</title>
+<html><head><meta charset="UTF-8"><title>md-convert Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 1000px; }
-h2 { margin-top: 28px; border-bottom: 2px solid #ccc; padding-bottom: 4px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
 .pass { color: #0a0; }
 .fail { color: #c00; font-weight: bold; }
+h2 { margin-top: 24px; }
 </style></head>
 <body>
-<h1>md-convert test suite</h1>
+<h1>md-convert.js tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
 
-<h2>XSS vectors (DOMPurify)</h2>
-<div id="xss-results"></div>
-
+<script src="vendor/turndown.js"></script>
+<script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
+<script src="md-convert.js"></script>
 <script>
-// Mirror of the implementation config (spec §5). Kept here so the test page
-// is self-contained and validates the exact config before md-preview.js wires it.
-DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-  if (node.tagName === "A") {
-    node.setAttribute("target", "_blank");
-    node.setAttribute("rel", "noopener noreferrer");
-  }
-});
-function sanitizeHtml(html) {
-  return DOMPurify.sanitize(html, { ADD_ATTR: ["id"] });
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond;
+  ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
 }
+// normalize whitespace for resilient HTML substring checks
+const norm = (h) => h.replace(/\s+/g, " ").trim();
 
-// ---- tiny assertion harness ----
-function runSection(rootId, cases) {
-  const root = document.getElementById(rootId);
-  for (const c of cases) {
-    const out = sanitizeHtml(c.in);
-    const ok = c.check(out);
-    const div = document.createElement("div");
-    div.className = "case " + (ok ? "pass" : "fail");
-    div.textContent =
-      `${ok ? "PASS" : "FAIL"}  ${c.name}\n` +
-      `   IN : ${c.in}\n` +
-      `   OUT: ${out}`;
-    root.appendChild(div);
-  }
-}
+// ---- Regression: the FOUR old renderMarkdown defects are now correct ----
 
-// ---- XSS vector cases (spec §7) ----
-// Each check returns true when the dangerous payload is neutralized.
-runSection("xss-results", [
-  {
-    name: "markdown link with javascript: scheme (rendered as <a>)",
-    // marked would emit this; we feed the post-render HTML directly here.
-    in: '<a href="javascript:alert(1)">click</a>',
-    check: (o) => !/javascript:/i.test(o),
-  },
-  {
-    name: "<img src=x onerror=...> strips onerror handler",
-    in: '<img src="x" onerror="alert(1)">',
-    check: (o) => !/onerror/i.test(o),
-  },
-  {
-    name: "<script> tag removed entirely",
-    in: "<script>alert(1)<\/script>",
-    check: (o) => !/<script/i.test(o) && !/alert\(1\)/.test(o),
-  },
-  {
-    name: "<iframe> not in default allow-list, removed",
-    in: '<iframe src="https://evil.example"></iframe>',
-    check: (o) => !/<iframe/i.test(o),
-  },
-  {
-    name: "anchor with javascript: href neutralized",
-    in: '<a href="javascript:void(document.cookie)">x</a>',
-    check: (o) => !/javascript:/i.test(o),
-  },
-  {
-    name: "link hook adds rel=noopener on safe http link",
-    in: '<a href="https://example.com">ok</a>',
-    check: (o) => /rel="noopener noreferrer"/.test(o) && /target="_blank"/.test(o),
-  },
-  {
-    name: "heading id preserved (ADD_ATTR id) for TOC anchors",
-    in: '<h2 id="my-heading">Title</h2>',
-    check: (o) => /id="my-heading"/.test(o),
-  },
-]);
+// 1. Nested list must NOT be flattened.
+(() => {
+  const h = norm(renderMarkdown("- a\n  - b\n  - c\n- d"));
+  // a <ul> nested inside an <li> proves nesting survived
+  check("nested list keeps nesting", /<li>a\s*<ul>/.test(h), h);
+})();
+
+// 2. Multi-line blockquote -> one blockquote, both lines, not a literal newline in one <p>.
+(() => {
+  const h = norm(renderMarkdown("> line one\n> line two"));
+  const oneBq = (h.match(/<blockquote>/g) || []).length === 1;
+  check("multi-line blockquote merges", oneBq && /line one/.test(h) && /line two/.test(h), h);
+})();
+
+// 3. ** inside inline code must stay literal (not become <strong>).
+(() => {
+  const h = norm(renderMarkdown("use `a**b**c` here"));
+  check("** inside inline code stays literal", /<code>a\*\*b\*\*c<\/code>/.test(h) && !/<strong>/.test(h), h);
+})();
+
+// 4. GFM task list [x] -> checked checkbox that survives DOMPurify.
+(() => {
+  const h = norm(renderMarkdown("- [x] done\n- [ ] todo"));
+  const hasInput = /<input[^>]*type="checkbox"/.test(h);
+  const hasChecked = /<input[^>]*checked/.test(h);
+  check("task list renders checkbox input", hasInput && hasChecked, h);
+})();
+
+// ---- Heading slug id (renderer + slugify), incl CJK ----
+(() => {
+  const h = norm(renderMarkdown("## Hello World\n\n## 中文 标题"));
+  check("heading gets slug id", /<h2 id="hello-world">/.test(h), h);
+  check("heading slug keeps CJK", /<h2 id="中文-标题">/.test(h), h);
+})();
+
+// ---- Dedup smoke: htmlToMarkdown exists once and both contexts use the SAME global ----
+(() => {
+  check("htmlToMarkdown is a single global function",
+    typeof htmlToMarkdown === "function", "typeof = " + typeof htmlToMarkdown);
+  check("markdownToPlainText moved here (single global)",
+    typeof markdownToPlainText === "function", "typeof = " + typeof markdownToPlainText);
+  // round-trip proves the consolidated Turndown rules are live in this one definition
+  const md = htmlToMarkdown("<h1>Title</h1><pre><code class=\"language-js\">x=1</code></pre><table><tr><th>A</th></tr><tr><td>1</td></tr></table>", { baseUrl: "https://e.com" });
+  check("htmlToMarkdown emits atx heading", /^# Title/m.test(md), md);
+  check("htmlToMarkdown emits fenced code with lang", /```js\n/.test(md), md);
+  check("htmlToMarkdown emits pipe table", /\|\s*A\s*\|/.test(md) && /\|\s*---\s*\|/.test(md), md);
+})();
+
+// ---- Security: renderMarkdown is the lone sanitize point (XSS closed) ----
+(() => {
+  const s = norm(renderMarkdown("a <script>alert(1)<\/script> b"));
+  check("renderMarkdown strips <script>", !/<script/i.test(s) && !/alert\(1\)/.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown('text <img src="x" onerror="alert(1)"> end'));
+  check("renderMarkdown strips img onerror", /<img/i.test(s) && !/onerror/i.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown("[x](javascript:alert(1))"));
+  check("renderMarkdown neutralizes javascript: link", !/javascript:/i.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown("<iframe src=\"https://evil\"></iframe>"));
+  check("renderMarkdown drops iframe", !/<iframe/i.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown('<a href="javascript:void(document.cookie)">raw</a>'));
+  check("renderMarkdown neutralizes raw <a> javascript: href", !/javascript:/i.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown("[ok](https://example.com)"));
+  check("renderMarkdown safe link gets target+rel", /rel="noopener noreferrer"/.test(s) && /target="_blank"/.test(s), s);
+})();
+
+document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>
 </body></html>
