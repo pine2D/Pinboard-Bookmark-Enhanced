@@ -442,25 +442,52 @@ async function htmlToMarkdownAsync(html, opts) {
       }
       jinaMdBtn.innerHTML = PBP_ICONS.check + " " + t("jinaCopied");
 
-      setTimeout(() => {
-        jinaMdBtn.innerHTML = PBP_ICONS.eye + " " + t("jinaViewBtn");
-        jinaMdBtn.disabled = false;
-        jinaMdBtn.onclick = async () => {
-          await chrome.storage.local.set({
-            md_preview_data: {
-              markdown: result.markdown || "",
-              contentHtml: result.contentHtml || "",
-              title: result.title || $id("title-input")?.value || "",
-              url: result.url || url,
-              baseUrl: result.url || url,
-              tags: Array.isArray(currentTags) ? currentTags.slice() : [],
-              tokens: result.tokens || 0,
-              hasApiKey: !!result._hasApiKey,
-              source: settings.aiContentSource || "local"
-            }
-          });
-          chrome.tabs.create({ url: "md-preview.html" });
+      // Reveal the persistent post-copy strip (Preview + Download .md). It stays
+      // until the popup closes; main button reverts to "Markdown" (re-click = re-copy).
+      const openPreview = async () => {
+        await chrome.storage.local.set({
+          md_preview_data: {
+            markdown: result.markdown || "",
+            contentHtml: result.contentHtml || "",
+            title: result.title || $id("title-input")?.value || "",
+            url: result.url || url,
+            baseUrl: result.url || url,
+            tags: Array.isArray(currentTags) ? currentTags.slice() : [],
+            tokens: result.tokens || 0,
+            hasApiKey: !!result._hasApiKey,
+            source: settings.aiContentSource || "local"
+          }
+        });
+        chrome.tabs.create({ url: "md-preview.html" });
+      };
+      const downloadMd = () => {
+        const meta = {
+          title: result.title || $id("title-input")?.value || "",
+          url: result.url || url,
+          date: new Date().toISOString().slice(0, 10),
+          tags: Array.isArray(currentTags) ? currentTags.slice() : [],
+          source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
         };
+        const out = composeExport(markdown, meta, {
+          frontmatter: settings.mdExportFrontmatter,
+          imagePolicy: settings.mdExportImagePolicy,
+          includeToc: settings.mdExportIncludeToc
+        });
+        downloadFile(safeFilename(meta.title) + ".md", out, "text/markdown;charset=utf-8");
+      };
+      const strip = $id("md-actions-strip");
+      if (strip) {
+        strip.classList.remove("hidden");
+        const previewBtn = $id("md-strip-preview");
+        const dlBtn = $id("md-strip-dl");
+        // Assign (not addEventListener) so re-clicks don't stack handlers.
+        if (previewBtn) previewBtn.onclick = openPreview;
+        if (dlBtn) dlBtn.onclick = downloadMd;
+      }
+
+      setTimeout(() => {
+        setBtnIcon(jinaMdBtn, "doc", origLabel);
+        jinaMdBtn.disabled = false;
       }, 1500);
     });
   }
