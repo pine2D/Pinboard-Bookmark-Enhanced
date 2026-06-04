@@ -307,6 +307,17 @@ function assertEq(actual, expected, label) {
     const codeEl = fixture.querySelector("pre > code");
     check("hljs adds .hljs class to language-tagged block", !!codeEl && codeEl.classList.contains("hljs"), codeEl ? codeEl.className : "<no code el>");
     check("hljs emits token spans", !!codeEl && codeEl.querySelector("span[class*='hljs-']") !== null, "no hljs-* span");
+    // Untagged fenced block (no language-) must still highlight via hljs auto-detect —
+    // Defuddle/Turndown often drops the language, so this is the common real-world case.
+    // (hljs ADDS a language-<detected> class on auto-detect, so check untagged-ness BEFORE.)
+    const untagged = document.createElement("div");
+    untagged.innerHTML = renderMarkdown("```\nconst y = 2;\nfunction g(){ return y; }\n```");
+    const uCode = untagged.querySelector("pre > code");
+    const wasUntagged = !!uCode && !/language-/.test(uCode.className);
+    highlightCodeBlocks(untagged);
+    check("untagged code block (no language-) gets auto-detect highlighting",
+      wasUntagged && uCode.classList.contains("hljs") && uCode.querySelector("span[class*='hljs-']") !== null,
+      uCode ? ("untaggedInput=" + wasUntagged + " after=" + uCode.className) : "<no code el>");
     const plain = document.createElement("div");
     plain.innerHTML = "<pre><code>plain text</code></pre>";
     let threw = false; try { highlightCodeBlocks(plain); } catch (e) { threw = true; }
