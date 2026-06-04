@@ -91,6 +91,30 @@
   renderedHtml = renderedHtml.replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');
   renderedView.innerHTML = renderedHtml;
   highlightCodeBlocks(renderedView);
+
+  // ---- Build TOC sidebar from the canonical markdown ----
+  const tocNav = document.getElementById("toc");
+  const tocList = document.getElementById("toc-list");
+  const { headings } = buildToc(canonicalMarkdown, { minLevel: 2, maxLevel: 4 });
+
+  if (headings && headings.length) {
+    const frag = document.createDocumentFragment();
+    headings.forEach((h) => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "#" + h.slug;
+      a.textContent = h.text;
+      a.dataset.level = String(h.level);
+      a.dataset.slug = h.slug;
+      li.appendChild(a);
+      frag.appendChild(li);
+    });
+    tocList.appendChild(frag);
+    tocNav.hidden = false;
+    setupTocToggle(tocNav);
+    setupScrollSpy(renderedView, tocList);
+  }
+
   // Raw view populated lazily on first switch
 
   // View toggle
@@ -157,3 +181,75 @@ function downloadFile(filename, content, mimeType) {
 }
 
 // renderMarkdown + htmlToMarkdown now live in md-convert.js (single source of truth).
+
+// ---- TOC collapse toggle (only visible/relevant in narrow top-mode) ----
+function setupTocToggle(tocNav) {
+  const btn = document.getElementById("toc-toggle");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const collapsed = tocNav.dataset.collapsed === "true";
+    tocNav.dataset.collapsed = collapsed ? "false" : "true";
+    btn.setAttribute("aria-expanded", collapsed ? "true" : "false");
+  });
+}
+
+// ---- Scroll-spy: highlight the TOC entry for the heading nearest the top ----
+function setupScrollSpy(renderedView, tocList) {
+  const links = Array.from(tocList.querySelectorAll("a"));
+  if (!links.length) return;
+
+  // Map slug -> link for O(1) activation.
+  const linkBySlug = new Map(links.map((a) => [a.dataset.slug, a]));
+
+  // Resolve each link's target heading element by id (slug === heading id).
+  const targets = links
+    .map((a) => renderedView.querySelector("#" + cssEscape(a.dataset.slug)))
+    .filter(Boolean);
+  if (!targets.length) return;
+
+  let activeSlug = null;
+  const setActive = (slug) => {
+    if (slug === activeSlug) return;
+    if (activeSlug && linkBySlug.has(activeSlug)) linkBySlug.get(activeSlug).classList.remove("active");
+    const a = linkBySlug.get(slug);
+    if (a) {
+      a.classList.add("active");
+      activeSlug = slug;
+    }
+  };
+
+  // Track which headings are currently intersecting; the topmost wins.
+  const visible = new Set();
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      const id = entry.target.id;
+      if (entry.isIntersecting) visible.add(id);
+      else visible.delete(id);
+    });
+    // Pick the visible heading closest to the top of the doc order.
+    let topId = null;
+    for (const t of targets) {
+      if (visible.has(t.id)) { topId = t.id; break; }
+    }
+    // If nothing is intersecting (scrolled past all into a long section),
+    // keep the last heading above the viewport active.
+    if (!topId) {
+      for (let i = targets.length - 1; i >= 0; i--) {
+        if (targets[i].getBoundingClientRect().top < 120) { topId = targets[i].id; break; }
+      }
+    }
+    if (topId) setActive(topId);
+  }, {
+    // -88px top margin = clear the sticky toolbar; -70% bottom keeps the
+    // "current" heading active until the next one nears the top.
+    rootMargin: "-88px 0px -70% 0px",
+    threshold: 0,
+  });
+  targets.forEach((t) => observer.observe(t));
+}
+
+// CSS.escape fallback for slugs used in querySelector("#"+id).
+function cssEscape(s) {
+  if (window.CSS && typeof CSS.escape === "function") return CSS.escape(s);
+  return String(s).replace(/[^a-zA-Z0-9\-_ -￿]/g, (c) => "\\" + c);
+}
