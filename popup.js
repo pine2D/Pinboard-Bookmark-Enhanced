@@ -452,6 +452,8 @@ async function htmlToMarkdownAsync(html, opts) {
               contentHtml: result.contentHtml || "",
               title: result.title || $id("title-input")?.value || "",
               url: result.url || url,
+              baseUrl: result.url || url,
+              tags: Array.isArray(currentTags) ? currentTags.slice() : [],
               tokens: result.tokens || 0,
               hasApiKey: !!result._hasApiKey,
               source: settings.aiContentSource || "local"
