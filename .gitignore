@@ -9,3 +9,4 @@ release/
 
 # Internal planning/design drafts (superpowers skill output)
 docs/superpowers/
+.superpowers/
