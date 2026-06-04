@@ -56,31 +56,3 @@ async function fetchJinaMarkdown(url, options = {}) {
     return { error: e.message || "Jina API request failed", fallback: true };
   }
 }
-
-// ---- Convert Markdown to plain text (for AI prompts) ----
-function markdownToPlainText(markdown) {
-  if (!markdown) return "";
-  return markdown
-    // Remove images
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    // Convert links to text
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    // Remove headings markup
-    .replace(/^#{1,6}\s+/gm, "")
-    // Remove bold/italic
-    .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1")
-    .replace(/_{1,3}([^_]+)_{1,3}/g, "$1")
-    // Remove inline code
-    .replace(/`([^`]+)`/g, "$1")
-    // Remove code block fences
-    .replace(/```[\s\S]*?```/g, "")
-    // Remove blockquote markers
-    .replace(/^>\s?/gm, "")
-    // Remove horizontal rules
-    .replace(/^[-*_]{3,}\s*$/gm, "")
-    // Remove HTML tags
-    .replace(/<[^>]+>/g, "")
-    // Collapse multiple newlines
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
