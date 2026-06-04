@@ -308,6 +308,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tsRadio = document.querySelector(`input[name="tag-sync-mode"][value="${s.tagSyncMode || 'cached'}"]`);
   if (tsRadio) tsRadio.checked = true;
 
+  // Markdown export image policy select
+  const mdImgSel = $id("opt-md-image-policy");
+  if (mdImgSel) mdImgSel.value = s.mdExportImagePolicy || "keep";
+
   // ---- Fill checkbox fields ----
   const checkMap = {
     "opt-private-default": s.optPrivateDefault, "opt-private-incognito": s.optPrivateIncognito,
@@ -336,7 +340,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-show-quick-links": s.optShowQuickLinks,
     "opt-show-quick-row": s.optShowQuickRow,
     "opt-auto-close": s.optAutoCloseAfterSave,
-    "opt-popup-follow-theme": s.optPopupFollowTheme
+    "opt-popup-follow-theme": s.optPopupFollowTheme,
+    "opt-md-frontmatter": s.mdExportFrontmatter,
+    "opt-md-include-toc": s.mdExportIncludeToc
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
@@ -562,6 +568,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       jinaApiKey: obfuscateKey($id("opt-jina-key").value.trim()),
       customTagPrompt: $id("opt-custom-tag-prompt").value,
       customSummaryPrompt: $id("opt-custom-summary-prompt").value,
+      mdExportFrontmatter: $id("opt-md-frontmatter").checked,
+      mdExportImagePolicy: $id("opt-md-image-policy").value,
+      mdExportIncludeToc: $id("opt-md-include-toc").checked,
       // Appearance
       optLang: $id("opt-lang").value,
       optTheme: $id("opt-theme").value,

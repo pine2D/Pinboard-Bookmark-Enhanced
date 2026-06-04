@@ -478,6 +478,20 @@
         <p class="hint" data-i18n="summaryPromptHint">Leave empty to use the default prompt shown above. Use <code>{{lang_instruction}}</code> for auto language.</p>
         <button class="btn btn-sm" id="reset-summary-prompt" style="margin-top:4px" data-i18n="resetToDefault">Reset to default</button>
       </div>
+
+      <div class="divider"></div>
+      <div class="section-title" data-i18n="secMdExport">Markdown Export Defaults</div>
+      <div class="fg"><label><input type="checkbox" id="opt-md-frontmatter" checked /> <span data-i18n="mdExportFrontmatter">Add YAML frontmatter to exported Markdown</span></label></div>
+      <div class="fg">
+        <label class="bl" data-i18n="mdExportImagePolicy">Image handling</label>
+        <select id="opt-md-image-policy">
+          <option value="keep" data-i18n="mdImagePolicyKeep">Keep images (absolutize relative links)</option>
+          <option value="alt" data-i18n="mdImagePolicyAlt">Alt text only</option>
+          <option value="strip" data-i18n="mdImagePolicyStrip">Strip images</option>
+        </select>
+        <p class="hint" data-i18n="mdExportImagePolicyHint">Applied when copying or downloading Markdown from the preview page. Can be overridden per export.</p>
+      </div>
+      <div class="fg"><label><input type="checkbox" id="opt-md-include-toc" /> <span data-i18n="mdExportIncludeToc">Include table of contents</span></label></div>
     </div>
 
     <!-- Tab 6: Appearance -->

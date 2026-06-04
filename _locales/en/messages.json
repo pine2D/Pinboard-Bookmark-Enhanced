@@ -1350,5 +1350,13 @@
   "optPopupWidthCustom":  { "message": "Custom:" },
   "optPopupWidthHelp":    { "message": "Range: 420–720px (Chrome popup limit)" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
+  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "secMdExport": { "message": "Markdown Export Defaults" },
+  "mdExportFrontmatter": { "message": "Add YAML frontmatter to exported Markdown" },
+  "mdExportImagePolicy": { "message": "Image handling" },
+  "mdImagePolicyKeep": { "message": "Keep images (absolutize relative links)" },
+  "mdImagePolicyAlt": { "message": "Alt text only" },
+  "mdImagePolicyStrip": { "message": "Strip images" },
+  "mdExportImagePolicyHint": { "message": "Applied when copying or downloading Markdown from the preview page. Can be overridden per export." },
+  "mdExportIncludeToc": { "message": "Include table of contents" }
 }
