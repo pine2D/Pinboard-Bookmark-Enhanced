@@ -47,7 +47,9 @@ function renderEmptyState(message) {
   const exportSettings = await chrome.storage.sync.get({
     mdExportFrontmatter: true,
     mdExportImagePolicy: "keep",
-    mdExportIncludeToc: false
+    mdExportIncludeToc: false,
+    obsidianVault: "",
+    obsidianFolder: ""
   });
   const expFrontmatter = document.getElementById("exp-frontmatter");
   const expImagePolicy = document.getElementById("exp-image-policy");
@@ -195,6 +197,22 @@ function renderEmptyState(message) {
     const doc = composeStyledHtml(getMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
   });
+
+  document.getElementById("btn-obsidian").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const md = buildExportMarkdown();
+    let usedClipboard = false;
+    try { await navigator.clipboard.writeText(md); usedClipboard = true; } catch (_) {}
+    const uri = buildObsidianUri({
+      vault: exportSettings.obsidianVault,
+      folder: exportSettings.obsidianFolder,
+      name: safeTitle,
+      clipboard: usedClipboard,
+      content: usedClipboard ? "" : md
+    });
+    window.open(uri, "_blank");
+    flashButtonLabel(btn, t("mdSentObsidian"));
+  });
 })();
 
 // ---- Copy to clipboard with visual feedback ----
@@ -220,6 +238,26 @@ async function copyToClipboard(text, btn) {
     btn.classList.remove("copied");
     btn._copyOrig = null;
     announce("");
+  }, 1500);
+}
+
+// One-shot button feedback: swap the .btn-label to msg + .copied for 1.5s, then
+// revert; also announce to the #copy-status live region for screen readers. Uses
+// the same re-entry guard as copyToClipboard (persist orig once, clear pending timer).
+function flashButtonLabel(btn, msg) {
+  const label = btn.querySelector(".btn-label");
+  const setLabel = (s) => { if (label) label.textContent = s; else btn.textContent = s; };
+  if (btn._copyOrig == null) btn._copyOrig = label ? label.textContent : btn.textContent;
+  const el = document.getElementById("copy-status");
+  if (el) el.textContent = msg;
+  setLabel(msg);
+  btn.classList.add("copied");
+  clearTimeout(btn._copyTimer);
+  btn._copyTimer = setTimeout(() => {
+    setLabel(btn._copyOrig);
+    btn.classList.remove("copied");
+    btn._copyOrig = null;
+    if (el) el.textContent = "";
   }, 1500);
 }
 
