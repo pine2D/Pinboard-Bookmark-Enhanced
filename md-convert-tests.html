@@ -360,6 +360,22 @@ function assertEq(actual, expected, label) {
 </script>
 
 <script>
+  // ---- Table cells preserve inline markdown (code/links/bold), not flattened to text ----
+  section("htmlToMarkdown table cell fidelity");
+  (() => {
+    const html = '<table><thead><tr><th>Locale</th><th>Package</th></tr></thead><tbody>' +
+      '<tr><td><code>en</code></td><td><a href="https://e.com/p"><code>@x/pkg</code></a></td></tr>' +
+      '<tr><td><code>zh-CN</code></td><td><strong>bold</strong> and <a href="https://d.com">Docs</a></td></tr>' +
+      '</tbody></table>';
+    const md = htmlToMarkdown(html, { baseUrl: "https://e.com/" });
+    check("table keeps inline code in cells (`en`, `zh-CN`)", /`en`/.test(md) && /`zh-CN`/.test(md), md);
+    check("table keeps a link wrapping inline code", /\[`@x\/pkg`\]\(https:\/\/e\.com\/p\)/.test(md), md);
+    check("table keeps bold + a plain link in a cell", /\*\*bold\*\*/.test(md) && /\[Docs\]\(https:\/\/d\.com\)/.test(md), md);
+    check("table still emits the header separator row", /\|\s*---\s*\|/.test(md), md);
+  })();
+</script>
+
+<script>
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>

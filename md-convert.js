@@ -32,10 +32,18 @@ function htmlToMarkdown(html, opts) {
     replacement: (content, node) => {
       const rows = Array.from(node.querySelectorAll("tr"));
       if (!rows.length) return content;
+      // Convert each cell's INNER HTML to markdown so inline formatting
+      // (inline code, links, bold/em) survives — plain textContent would
+      // flatten e.g. `en` -> en and drop [text](url) links. Then collapse to a
+      // single pipe-safe line (GFM table cells can't span multiple lines).
+      const cellMd = (c) => {
+        let md;
+        try { md = td.turndown(c.innerHTML); } catch (_) { md = c.textContent || ""; }
+        return md.replace(/\n+/g, " ").replace(/\|/g, "\\|").trim();
+      };
       const out = [];
       rows.forEach((row, i) => {
-        const cells = Array.from(row.querySelectorAll("th, td"))
-          .map(c => (c.textContent || "").trim().replace(/\|/g, "\\|").replace(/\n/g, " "));
+        const cells = Array.from(row.querySelectorAll(":scope > th, :scope > td")).map(cellMd);
         out.push("| " + cells.join(" | ") + " |");
         if (i === 0) out.push("| " + cells.map(() => "---").join(" | ") + " |");
       });
