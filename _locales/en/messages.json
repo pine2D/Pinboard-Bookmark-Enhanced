@@ -1189,6 +1189,15 @@
   "jinaViewBtn": {
     "message": "View"
   },
+  "mdStripCopied": {
+    "message": "Copied"
+  },
+  "mdStripPreview": {
+    "message": "Preview"
+  },
+  "mdStripDownloadMd": {
+    "message": "Download .md"
+  },
   "secAiContentSource": {
     "message": "AI Content Source"
   },

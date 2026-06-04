@@ -1189,6 +1189,15 @@
   "jinaViewBtn": {
     "message": "查看"
   },
+  "mdStripCopied": {
+    "message": "已复制"
+  },
+  "mdStripPreview": {
+    "message": "预览"
+  },
+  "mdStripDownloadMd": {
+    "message": "下载 .md"
+  },
   "secAiContentSource": {
     "message": "AI 内容来源"
   },
