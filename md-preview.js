@@ -18,6 +18,7 @@ function renderEmptyState(message) {
 }
 
 (async function () {
+  initI18n();
   applyI18n();
   // Read preview data from storage
   const data = await chrome.storage.local.get("md_preview_data");
