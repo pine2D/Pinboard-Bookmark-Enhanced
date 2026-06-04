@@ -132,6 +132,13 @@
       <button id="batch-bookmark-btn" class="qbtn" data-i18n-title="batchSaveTitle"><span class="btn-ic" data-ic="pin"></span><span data-i18n="batchSaveBtn">Batch Save</span></button>
       <button id="jina-md-btn" class="qbtn" title="" data-i18n-title="jinaMarkdownBtn"><span class="btn-ic" data-ic="doc"></span><span class="jina-md-label" data-i18n="jinaMarkdownBtn">Markdown</span></button>
     </div>
+    <div id="md-actions-strip" class="md-strip hidden">
+      <span class="md-strip-label" data-i18n="mdStripCopied">Copied</span>
+      <span class="md-strip-actions">
+        <button type="button" id="md-strip-preview" class="md-strip-btn"><span class="btn-ic" data-ic="eye"></span><span data-i18n="mdStripPreview">Preview</span></button>
+        <button type="button" id="md-strip-dl" class="md-strip-btn"><span class="btn-ic" data-ic="download"></span><span data-i18n="mdStripDownloadMd">Download .md</span></button>
+      </span>
+    </div>
     <div id="batch-progress" class="batch-progress hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
       <div id="batch-progress-fill" class="batch-progress-fill"></div>
       <span id="batch-progress-text" class="batch-progress-text"></span>
