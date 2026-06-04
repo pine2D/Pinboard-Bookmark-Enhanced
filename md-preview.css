@@ -477,3 +477,22 @@ main {
 @media (max-width: 480px) {
   .export-options { gap: 12px; }
 }
+
+/* ---- Code highlighting (highlight.js) ---- */
+/* hljs themes set token colors on .hljs spans; keep our container chrome
+   (border/radius/padding from #rendered-view pre) and let hljs paint the
+   code surface + tokens. Light/dark are switched by the media-gated
+   <link>s in md-preview.html, matching this page's prefers-color-scheme. */
+#rendered-view pre code.hljs {
+  display: block;
+  padding: 0;
+  overflow-x: visible;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 400;
+}
+/* hljs adds .hljs background to the code element; route it to the <pre>
+   container so border/radius from the existing pre rule still frame it. */
+#rendered-view pre:has(code.hljs) {
+  padding: 20px 24px;
+}
