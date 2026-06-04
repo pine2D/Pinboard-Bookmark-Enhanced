@@ -14,6 +14,7 @@
     </div>
     <div class="toolbar-right">
       <span id="source-badge" class="source-badge"></span>
+      <span id="reading-stats" class="stats-badge"></span>
       <span id="token-count" class="token-badge"></span>
       <div class="view-toggle">
         <button id="btn-raw" class="toggle-btn">Raw</button>
@@ -35,6 +36,17 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span class="btn-label">.html</span>
       </button>
+    </div>
+    <div id="export-options" class="export-options">
+      <label class="exp-opt"><input type="checkbox" id="exp-frontmatter" /> <span>Frontmatter</span></label>
+      <label class="exp-opt">Images:
+        <select id="exp-image-policy">
+          <option value="keep">keep</option>
+          <option value="alt">alt</option>
+          <option value="strip">strip</option>
+        </select>
+      </label>
+      <label class="exp-opt"><input type="checkbox" id="exp-include-toc" /> <span>Include TOC</span></label>
     </div>
   </header>
   <main>

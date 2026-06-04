@@ -428,3 +428,52 @@ main {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0s !important; }
 }
+
+/* ---- Reading-stats badge (header) ---- */
+.stats-badge {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 3px 10px;
+  border-radius: 100px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.stats-badge:empty { display: none; }
+
+/* ---- Export options row ---- */
+.export-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border-light);
+  font-size: 13px;
+  color: var(--fg-secondary);
+}
+.export-options .exp-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.export-options select {
+  padding: 3px 8px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 13px;
+  cursor: pointer;
+}
+.export-options input[type="checkbox"] { cursor: pointer; }
+
+@media (max-width: 480px) {
+  .export-options { gap: 12px; }
+}
