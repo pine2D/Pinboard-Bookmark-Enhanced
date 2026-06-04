@@ -311,6 +311,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Markdown export image policy select
   const mdImgSel = $id("opt-md-image-policy");
   if (mdImgSel) mdImgSel.value = s.mdExportImagePolicy || "keep";
+  const obsVault = $id("opt-obsidian-vault");
+  if (obsVault) obsVault.value = s.obsidianVault || "";
+  const obsFolder = $id("opt-obsidian-folder");
+  if (obsFolder) obsFolder.value = s.obsidianFolder || "";
 
   // ---- Fill checkbox fields ----
   const checkMap = {
@@ -571,6 +575,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       mdExportFrontmatter: $id("opt-md-frontmatter").checked,
       mdExportImagePolicy: $id("opt-md-image-policy").value,
       mdExportIncludeToc: $id("opt-md-include-toc").checked,
+      obsidianVault: $id("opt-obsidian-vault").value.trim(),
+      obsidianFolder: $id("opt-obsidian-folder").value.trim(),
       // Appearance
       optLang: $id("opt-lang").value,
       optTheme: $id("opt-theme").value,
