@@ -44,7 +44,14 @@ function renderEmptyState(message) {
   }
 
   // Export-options defaults from settings (per-export overridable via the header row).
-  const exportSettings = await chrome.storage.sync.get({
+  // Read from the SAME storage area options.js writes to: sync when the user enabled
+  // sync, else local (the default). md-preview doesn't load shared.js, so resolve the
+  // area inline rather than via getSettingsStorage. Reading chrome.storage.sync directly
+  // would miss every customization for the default (sync-off) user — including the
+  // obsidianEnabled gate, the vault/folder, and the frontmatter/image/TOC defaults.
+  const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
+  const settingsArea = optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+  const exportSettings = await settingsArea.get({
     mdExportFrontmatter: true,
     mdExportImagePolicy: "keep",
     mdExportIncludeToc: false,
