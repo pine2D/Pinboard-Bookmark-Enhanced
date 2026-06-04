@@ -102,7 +102,12 @@
   // ---- Build TOC sidebar from the canonical markdown ----
   const tocNav = document.getElementById("toc");
   const tocList = document.getElementById("toc-list");
-  const { headings } = buildToc(canonicalMarkdown, { minLevel: 2, maxLevel: 4 });
+  // Walk the already-rendered (and sanitized) headings so each TOC anchor
+  // equals a real element id (buildToc's markdown-derived slugs can diverge from
+  // marked's rendered ids for headings with inline links/images or duplicates).
+  const headings = Array.from(renderedView.querySelectorAll("h2[id], h3[id], h4[id]"))
+    .map((el) => ({ level: +el.tagName[1], text: el.textContent, slug: el.id }))
+    .filter((h) => h.slug);
 
   if (headings && headings.length) {
     const frag = document.createDocumentFragment();
@@ -135,12 +140,14 @@
     renderedView.classList.add("hidden");
     btnRaw.classList.add("active");
     btnRendered.classList.remove("active");
+    document.body.classList.add("raw-active");
   });
   btnRendered.addEventListener("click", () => {
     renderedView.classList.remove("hidden");
     rawView.classList.add("hidden");
     btnRendered.classList.add("active");
     btnRaw.classList.remove("active");
+    document.body.classList.remove("raw-active");
   });
 
   // Copy buttons

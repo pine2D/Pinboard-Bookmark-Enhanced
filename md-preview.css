@@ -481,3 +481,6 @@ main {
   body { background: white; color: black; }
 }
 
+/* Raw view: the TOC navigates the rendered doc, which is hidden in Raw mode. */
+body.raw-active #toc { display: none; }
+
