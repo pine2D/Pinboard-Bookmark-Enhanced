@@ -124,5 +124,56 @@ function slugify(text) {
 }
 
 // ---- Markdown -> safe HTML (preview only; needs marked + DOMPurify) ----
-// Implemented in Task P1.4 (marked + DOMPurify single sanitize point).
-// Defined later in this file once the render deps are wired.
+let _markedConfigured = false;
+function _configureMarked() {
+  if (_markedConfigured || typeof marked === "undefined") return;
+  const renderer = new marked.Renderer();
+  // GitHub-style slug id on headings so the TOC anchors (P2/P3) resolve.
+  renderer.heading = function (text, level, raw) {
+    const id = slugify(typeof raw === "string" ? raw : text);
+    return `<h${level} id="${id}">${text}</h${level}>\n`;
+  };
+  marked.use({ gfm: true, breaks: false, renderer });
+  _markedConfigured = true;
+}
+
+let _purifyHooked = false;
+function _ensurePurifyHook() {
+  if (_purifyHooked || typeof DOMPurify === "undefined") return;
+  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.tagName === "A") {
+      node.setAttribute("target", "_blank");
+      node.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+  _purifyHooked = true;
+}
+
+// The SINGLE sanitize point for the preview page. Replaces both the old
+// hand-rolled renderMarkdown AND the raw contentHtml innerHTML injection.
+function renderMarkdown(md) {
+  if (!md) return "";
+  if (typeof marked === "undefined" || typeof DOMPurify === "undefined") {
+    // Fail safe: never inject unsanitized markup. Escape and return as text.
+    return String(md)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+  _configureMarked();
+  _ensurePurifyHook();
+  const rawHtml = marked.parse(md);
+  return DOMPurify.sanitize(rawHtml, {
+    // Keep heading slug ids for TOC anchors; allow GFM task-list checkboxes.
+    ADD_ATTR: ["id", "target", "rel"],
+    ADD_TAGS: ["input"]
+  });
+}
+
+// ---- Code highlighting stub (real implementation lands in Phase P3.2) ----
+// No-op until highlight.js is vendored (P3). Declared here so md-convert.js's
+// API surface (spec §4) is complete from P1 and md-preview.js can wire it
+// safely. P3.2 locates this exact function and replaces its body.
+function highlightCodeBlocks(root) {
+  // no-op stub — replaced in Phase P3.2
+}

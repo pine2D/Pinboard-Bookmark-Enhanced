@@ -13,28 +13,12 @@
   // Clear temporary data
   await chrome.storage.local.remove("md_preview_data");
 
-  // Single sanitization choke point (design spec §5). All untrusted HTML —
-  // Defuddle's contentHtml and renderMarkdown() output — passes through here
-  // before innerHTML. Closes the preview-page XSS surface.
-  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-    if (node.tagName === "A") {
-      node.setAttribute("target", "_blank");
-      node.setAttribute("rel", "noopener noreferrer");
-    }
-  });
-  function sanitizeHtml(html) {
-    // ADD_ATTR ["id"] keeps heading slug ids for TOC anchors (added in a later phase).
-    // Task-list <input type=checkbox> is preserved by DOMPurify's default profile (verified).
-    return DOMPurify.sanitize(html, { ADD_ATTR: ["id"] });
-  }
-
   const { contentHtml, title, url, tokens, source } = info;
-  // Lazy markdown conversion — only computed on first use (Raw view or Copy MD)
-  let _markdown = info.markdown || null;
-  function getMarkdown() {
-    if (_markdown === null) _markdown = contentHtml ? htmlToMarkdown(contentHtml) : "";
-    return _markdown;
-  }
+  const baseUrl = info.baseUrl || url || "";
+  // Canonical Markdown: Defuddle HTML -> Turndown; Jina already gives MD.
+  // Single source of truth for Raw view, Copy MD, Download .md, and Rendered.
+  const canonicalMarkdown = info.markdown || (contentHtml ? htmlToMarkdown(contentHtml, { baseUrl }) : "");
+  function getMarkdown() { return canonicalMarkdown; }
 
   // Fill header
   document.getElementById("preview-title").textContent = title || "Untitled";
@@ -53,17 +37,13 @@
   }
   document.title = `${title || "Markdown"} — Preview`;
 
-  // Rendered = Defuddle HTML directly (best quality), or Markdown fallback for Jina
+  // Single render path: canonical Markdown -> marked() -> DOMPurify -> innerHTML.
+  // renderMarkdown() is now the lone sanitize point (XSS closed here).
   const renderedView = document.getElementById("rendered-view");
-  if (contentHtml) {
-    // Sanitize Defuddle's raw page HTML before injection (XSS choke point).
-    // Then re-apply lazy-load/async-decode hints to surviving <img> tags.
-    const clean = sanitizeHtml(contentHtml)
-      .replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');
-    renderedView.innerHTML = clean;
-  } else {
-    renderedView.innerHTML = sanitizeHtml(renderMarkdown(getMarkdown()));
-  }
+  let renderedHtml = renderMarkdown(canonicalMarkdown);
+  // Lazy-load images / async decode (sanitizer keeps these attributes).
+  renderedHtml = renderedHtml.replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');
+  renderedView.innerHTML = renderedHtml;
   // Raw view populated lazily on first switch
 
   // View toggle
@@ -129,182 +109,4 @@ function downloadFile(filename, content, mimeType) {
   URL.revokeObjectURL(a.href);
 }
 
-// ---- Simple Markdown to HTML renderer ----
-// Security note: Input is HTML-escaped before any Markdown processing.
-// Content comes from Defuddle or Jina Reader API (server-side processed web pages),
-// not from arbitrary user input. This page is an extension-internal tool.
-function renderMarkdown(md) {
-  if (!md) return "";
-  // Escape HTML entities first to prevent injection
-  let html = md
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  // Code blocks (``` ... ```) — extract and protect with placeholders before block splitting
-  const codeBlocks = [];
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    const idx = codeBlocks.length;
-    codeBlocks.push(`<pre><code class="lang-${lang}">${code.trimEnd()}</code></pre>`);
-    return `\n\nCODEBLOCK_${idx}\n\n`;
-  });
-
-  // Split into blocks for block-level processing
-  const blocks = html.split(/\n\n+/);
-  const rendered = blocks.map(block => {
-    // Restore protected code blocks
-    const cbMatch = block.match(/^CODEBLOCK_(\d+)$/);
-    if (cbMatch) return codeBlocks[parseInt(cbMatch[1])];
-
-    // Headings
-    block = block.replace(/^(#{1,6})\s+(.+)$/gm, (_, hashes, text) => {
-      const level = hashes.length;
-      return `<h${level}>${text}</h${level}>`;
-    });
-
-    // Horizontal rules
-    block = block.replace(/^[-*_]{3,}\s*$/gm, "<hr>");
-
-    // Blockquotes
-    if (/^&gt;\s/m.test(block)) {
-      const lines = block.split("\n").map(l => l.replace(/^&gt;\s?/, "")).join("\n");
-      block = `<blockquote><p>${lines}</p></blockquote>`;
-    }
-
-    // Unordered lists
-    if (/^\s*[-*+]\s/m.test(block) && !block.startsWith("<")) {
-      const items = block.split(/\n/).filter(l => /^\s*[-*+]\s/.test(l))
-        .map(l => `<li>${l.replace(/^\s*[-*+]\s+/, "")}</li>`).join("\n");
-      block = `<ul>${items}</ul>`;
-    }
-
-    // Ordered lists
-    if (/^\s*\d+\.\s/m.test(block) && !block.startsWith("<")) {
-      const items = block.split(/\n/).filter(l => /^\s*\d+\.\s/.test(l))
-        .map(l => `<li>${l.replace(/^\s*\d+\.\s+/, "")}</li>`).join("\n");
-      block = `<ol>${items}</ol>`;
-    }
-
-    // Tables
-    if (/\|.*\|/.test(block) && /\|[-:\s|]+\|/.test(block)) {
-      const rows = block.split("\n").filter(r => r.trim().startsWith("|"));
-      if (rows.length >= 2) {
-        const parseRow = (r) => r.split("|").slice(1, -1).map(c => c.trim());
-        const headerCells = parseRow(rows[0]);
-        const bodyRows = rows.slice(2);
-        let table = "<table><thead><tr>" + headerCells.map(c => `<th>${c}</th>`).join("") + "</tr></thead><tbody>";
-        bodyRows.forEach(r => {
-          const cells = parseRow(r);
-          table += "<tr>" + cells.map(c => `<td>${c}</td>`).join("") + "</tr>";
-        });
-        table += "</tbody></table>";
-        block = table;
-      }
-    }
-
-    // Inline formatting (applied to all blocks)
-    // Allow only safe schemes — defeats javascript:/data:/vbscript: injection
-    // from AI-generated markdown that lands in the preview tab.
-    const safeUrl = (u) => /^(https?:|mailto:|#|\/|\.\/|\.\.\/)/i.test(u) ? u : "#";
-    // Images — note: src URLs were escaped, unescape for valid URLs
-    block = block.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
-      src = safeUrl(src.replace(/&amp;/g, "&"));
-      return `<img src="${src}" alt="${alt}" />`;
-    });
-    // Links
-    block = block.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => {
-      href = safeUrl(href.replace(/&amp;/g, "&"));
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
-    });
-    // Bold + italic
-    block = block.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
-    // Bold
-    block = block.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    // Italic
-    block = block.replace(/\*(.+?)\*/g, "<em>$1</em>");
-    // Inline code
-    block = block.replace(/`([^`]+)`/g, "<code>$1</code>");
-
-    // Wrap plain text blocks in <p>
-    if (!block.startsWith("<") && block.trim()) {
-      block = `<p>${block.replace(/\n/g, "<br>")}</p>`;
-    }
-
-    return block;
-  });
-
-  return rendered.join("\n");
-}
-
-// Convert HTML to Markdown via Turndown (for Raw view when only contentHtml is available)
-function htmlToMarkdown(html) {
-  if (typeof TurndownService === "undefined") return html;
-  const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced", bulletListMarker: "-" });
-  td.addRule("preformattedCode", {
-    filter: (n) => n.nodeName === "PRE",
-    replacement: (content, node) => {
-      const code = node.querySelector("code");
-      let lang = "";
-      if (code) {
-        const cls = code.getAttribute("class") || "";
-        const m = cls.match(/language-(\S+)/);
-        lang = (m && m[1]) || code.getAttribute("data-lang") || code.getAttribute("data-language") || "";
-      }
-      if (!lang) lang = node.getAttribute("data-language") || "";
-      const text = (code || node).textContent || "";
-      return "\n\n```" + lang + "\n" + text.replace(/`/g, "\\`") + "\n```\n\n";
-    }
-  });
-  td.addRule("table", {
-    filter: "table",
-    replacement: (content, node) => {
-      const rows = Array.from(node.querySelectorAll("tr"));
-      if (!rows.length) return content;
-      const out = [];
-      rows.forEach((row, i) => {
-        const cells = Array.from(row.querySelectorAll("th, td"))
-          .map(c => (c.textContent || "").trim().replace(/\|/g, "\\|").replace(/\n/g, " "));
-        out.push("| " + cells.join(" | ") + " |");
-        if (i === 0) out.push("| " + cells.map(() => "---").join(" | ") + " |");
-      });
-      return "\n\n" + out.join("\n") + "\n\n";
-    }
-  });
-  td.addRule("highlight", { filter: "mark", replacement: (c) => "==" + c + "==" });
-  td.addRule("strikethrough", {
-    filter: (n) => n.nodeName === "DEL" || n.nodeName === "S" || n.nodeName === "STRIKE",
-    replacement: (c) => "~~" + c + "~~"
-  });
-  td.addRule("figure", {
-    filter: "figure",
-    replacement: (content, node) => {
-      const img = node.querySelector("img");
-      const caption = node.querySelector("figcaption");
-      if (!img) return content;
-      const alt = caption ? caption.textContent.trim() : (img.getAttribute("alt") || "");
-      const src = img.getAttribute("src") || "";
-      return "\n\n![" + alt + "](" + src + ")" + (caption ? "\n*" + caption.textContent.trim() + "*" : "") + "\n\n";
-    }
-  });
-  td.addRule("listItem", {
-    filter: "li",
-    replacement: (content, node) => {
-      content = content.replace(/^\n+/, "").replace(/\n+$/, "\n").replace(/\n/gm, "\n    ");
-      const parent = node.parentNode;
-      let prefix = "- ";
-      if (parent && parent.nodeName === "OL") {
-        const start = parseInt(parent.getAttribute("start") || "1", 10);
-        const index = Array.from(parent.children).indexOf(node);
-        prefix = (start + index) + ". ";
-      }
-      // Checkbox support
-      const cb = node.querySelector("input[type=checkbox]");
-      if (cb) {
-        prefix += cb.checked ? "[x] " : "[ ] ";
-        content = content.replace(/^\s*\[[ x]\]\s*/, "");
-      }
-      return prefix + content.trim() + "\n";
-    }
-  });
-  return td.turndown(html);
-}
+// renderMarkdown + htmlToMarkdown now live in md-convert.js (single source of truth).
