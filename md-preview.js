@@ -163,6 +163,8 @@ function renderEmptyState(message) {
     renderedView.classList.add("hidden");
     btnRaw.classList.add("active");
     btnRendered.classList.remove("active");
+    btnRaw.setAttribute("aria-pressed", "true");
+    btnRendered.setAttribute("aria-pressed", "false");
     document.body.classList.add("raw-active");
   });
   btnRendered.addEventListener("click", () => {
@@ -170,6 +172,8 @@ function renderEmptyState(message) {
     rawView.classList.add("hidden");
     btnRendered.classList.add("active");
     btnRaw.classList.remove("active");
+    btnRendered.setAttribute("aria-pressed", "true");
+    btnRaw.setAttribute("aria-pressed", "false");
     document.body.classList.remove("raw-active");
   });
 
@@ -196,17 +200,27 @@ function renderEmptyState(message) {
 // ---- Copy to clipboard with visual feedback ----
 async function copyToClipboard(text, btn) {
   const label = btn.querySelector(".btn-label");
-  const orig = label ? label.textContent : btn.textContent;
-  const setLabel = (t) => { if (label) label.textContent = t; else btn.textContent = t; };
+  const setLabel = (s) => { if (label) label.textContent = s; else btn.textContent = s; };
+  // Persist the original label ONCE so a re-click within the revert window can't
+  // capture "Copied!" as the "original" and freeze the button on success text.
+  if (btn._copyOrig == null) btn._copyOrig = label ? label.textContent : btn.textContent;
+  const announce = (msg) => { const el = document.getElementById("copy-status"); if (el) el.textContent = msg; };
+  clearTimeout(btn._copyTimer);
   try {
     await navigator.clipboard.writeText(text);
     setLabel(t("jinaCopied"));
     btn.classList.add("copied");
-    setTimeout(() => { setLabel(orig); btn.classList.remove("copied"); }, 1500);
+    announce(t("jinaCopied"));
   } catch (_) {
     setLabel(t("mdPreviewFailed"));
-    setTimeout(() => { setLabel(orig); }, 1500);
+    announce(t("mdPreviewFailed"));
   }
+  btn._copyTimer = setTimeout(() => {
+    setLabel(btn._copyOrig);
+    btn.classList.remove("copied");
+    btn._copyOrig = null;
+    announce("");
+  }, 1500);
 }
 
 // renderMarkdown + htmlToMarkdown + safeFilename + downloadFile now live in md-convert.js (single source of truth).

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)" />
 </head>
 <body>
+  <div id="copy-status" class="sr-only" aria-live="polite"></div>
   <button id="rail-toggle" class="rail-toggle" type="button" aria-label="Toggle controls" data-i18n-aria="mdToggleControls" aria-expanded="false" aria-controls="rail" hidden>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
@@ -24,8 +25,8 @@
       <span id="token-count" class="token-badge"></span>
     </div>
     <div class="view-toggle">
-      <button id="btn-raw" class="toggle-btn" data-i18n="mdViewRaw">Raw</button>
-      <button id="btn-rendered" class="toggle-btn active" data-i18n="mdViewRendered">Rendered</button>
+      <button id="btn-raw" class="toggle-btn" data-i18n="mdViewRaw" aria-pressed="false">Raw</button>
+      <button id="btn-rendered" class="toggle-btn active" data-i18n="mdViewRendered" aria-pressed="true">Rendered</button>
     </div>
     <div class="rail-section">
       <div class="rail-label" data-i18n="mdExportSection">Export</div>
