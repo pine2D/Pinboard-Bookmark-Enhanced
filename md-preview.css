@@ -498,22 +498,27 @@ main {
 }
 
 /* ---- TOC sidebar layout ---- */
-/* Wide screens: sticky left rail + centered doc body. The doc body keeps the
-   original ~780px reading measure; the rail sits to its left. */
+/* The doc body stays a page-centered reading column independent of the TOC, so a
+   hidden/empty TOC never narrows or shifts it. On wide screens the TOC rail is
+   FIXED in the left gutter beside the centered body (out of flow → no off-center
+   push); under the breakpoint it collapses to a top Contents block. */
 main {
-  display: grid;
-  grid-template-columns: 240px minmax(0, 780px);
-  justify-content: center;
-  gap: 40px;
-  max-width: 1100px;
+  /* keep the base `main` centered column (max-width:780; margin:0 auto) — NOT a
+     grid, so a display:none TOC can't reflow the body into a narrow track. */
+  max-width: 780px;
+  margin: 0 auto;
 }
 .doc-body { min-width: 0; }
 
 .toc {
-  position: sticky;
+  position: fixed;
   top: 88px;
-  align-self: start;
-  max-height: calc(100vh - 120px);
+  width: 220px;
+  /* Park in the left gutter, just left of the centered 780px column. The body's
+     left edge is (100vw - 780px)/2; sit 28px to its left (220 + 28 = 248).
+     max(8px, …) clamps it off the left edge near the breakpoint. */
+  left: max(8px, calc((100vw - 780px) / 2 - 248px));
+  max-height: calc(100vh - 110px);
   overflow-y: auto;
   font-size: 13px;
   line-height: 1.5;
@@ -565,14 +570,14 @@ main {
   font-weight: 600;
 }
 
-/* Collapsed (top) mode under the breakpoint. */
-@media (max-width: 1024px) {
-  main {
-    display: block;
-    max-width: 820px;
-  }
+/* Collapse to a top Contents block when there isn't room for a fixed left rail
+   beside the centered body (needs ~780 + 2×248 gutters ≈ 1276px). */
+@media (max-width: 1280px) {
   .toc {
     position: static;
+    width: auto;
+    left: auto;
+    top: auto;
     max-height: none;
     overflow: visible;
     margin-bottom: 24px;
