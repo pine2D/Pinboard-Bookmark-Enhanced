@@ -13,6 +13,21 @@
   // Clear temporary data
   await chrome.storage.local.remove("md_preview_data");
 
+  // Single sanitization choke point (design spec §5). All untrusted HTML —
+  // Defuddle's contentHtml and renderMarkdown() output — passes through here
+  // before innerHTML. Closes the preview-page XSS surface.
+  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.tagName === "A") {
+      node.setAttribute("target", "_blank");
+      node.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+  function sanitizeHtml(html) {
+    // ADD_ATTR ["id"] keeps heading slug ids for TOC anchors (added in a later phase).
+    // Task-list <input type=checkbox> is preserved by DOMPurify's default profile (verified).
+    return DOMPurify.sanitize(html, { ADD_ATTR: ["id"] });
+  }
+
   const { contentHtml, title, url, tokens, source } = info;
   // Lazy markdown conversion — only computed on first use (Raw view or Copy MD)
   let _markdown = info.markdown || null;
@@ -41,12 +56,13 @@
   // Rendered = Defuddle HTML directly (best quality), or Markdown fallback for Jina
   const renderedView = document.getElementById("rendered-view");
   if (contentHtml) {
-    // Lazy-load images, async decode to avoid blocking main thread
-    const safeHtml = contentHtml
+    // Sanitize Defuddle's raw page HTML before injection (XSS choke point).
+    // Then re-apply lazy-load/async-decode hints to surviving <img> tags.
+    const clean = sanitizeHtml(contentHtml)
       .replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');
-    renderedView.innerHTML = safeHtml;
+    renderedView.innerHTML = clean;
   } else {
-    renderedView.innerHTML = renderMarkdown(getMarkdown());
+    renderedView.innerHTML = sanitizeHtml(renderMarkdown(getMarkdown()));
   }
   // Raw view populated lazily on first switch
 
