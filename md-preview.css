@@ -176,7 +176,7 @@ main {
   margin-left: 264px;
   padding: 48px 32px 96px;
 }
-.doc-body { max-width: min(72ch, 780px); margin: 0 auto; min-width: 0; }
+.doc-body { max-width: 880px; margin: 0 auto; min-width: 0; }
 
 .content-view.hidden { display: none; }
 
