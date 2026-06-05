@@ -528,6 +528,19 @@ const QUESTION_NODATA = `<!DOCTYPE html><html><head></head><body>
   check("zhihu degraded → note prepended", /仅提取到/.test(c), c);
 })();
 
+// --- Anonymous author + missing name attr (fallback paths) ---
+const QUESTION_ANON = `<!DOCTYPE html><html><head></head><body>
+<h1 class="QuestionHeader-title">匿名问题</h1>
+<div class="List-item"><div class="ContentItem AnswerItem"><div class="RichContent"><span class="RichText ztext"><p>无名氏的回答</p></span></div></div></div>
+</body></html>`;
+
+(() => {
+  const doc = new DOMParser().parseFromString(QUESTION_ANON, "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/200");
+  const c = r ? norm(r.contentHtml) : "";
+  check("zhihu anon → 匿名用户 fallback + body extracted", /<h2>匿名用户<\/h2>/.test(c) && /无名氏的回答/.test(c), c);
+})();
+
 // --- Truly empty zhihu page → null (Defuddle fallback) ---
 (() => {
   const doc = new DOMParser().parseFromString("<html><body></body></html>", "text/html");

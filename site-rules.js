@@ -133,8 +133,12 @@
     var seen = {};
 
     function pushAnswer(aid, author, voteup, bodyHtml) {
-      var key = aid || (author + ":" + bodyHtml.slice(0, 40));
-      if (!bodyHtml || seen[key]) return;
+      bodyHtml = (typeof bodyHtml === "string") ? bodyHtml : "";
+      if (!bodyHtml) return;
+      // No-aid fallback key includes length to avoid collisions between two
+      // same-author answers that share their first 40 chars.
+      var key = aid || (author + ":" + bodyHtml.length + ":" + bodyHtml.slice(0, 40));
+      if (seen[key]) return;
       seen[key] = 1;
       var permalink = (qid && aid) ? "https://www.zhihu.com/question/" + qid + "/answer/" + aid : "";
       sections.push(answerSection(author, voteup, permalink, cleanBodyHtml(doc, bodyHtml)));
