@@ -21,7 +21,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 - **Find & revisit** — search your bookmarks, jump to Unread / Network / Notes / Popular, and browse recent saves; the toolbar icon flips when the current page is already bookmarked
 - **Offline queue** — drafts persist locally and sync when you reconnect
 - **Themeable `pinboard.in`** — 13 curated palettes (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus a custom-CSS overlay that syncs across devices, with an adjustable popup width
-- **Page-to-Markdown** — convert the current page to clean Markdown — preview, copy, or download as `.md`. Choose [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (local) or [Jina Reader](https://jina.ai/reader) (cloud)
+- **Page-to-Markdown** — turn the current page into clean Markdown with a built-in preview (rendered/raw views, table of contents, and reading stats); copy or download as `.md` or styled `.html`, tune front-matter, image handling, and TOC inclusion, or optionally send it straight to [Obsidian](https://obsidian.md); pick [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (local) or [Jina Reader](https://jina.ai/reader) (cloud)
 - **9 languages** · configurable shortcuts · zero tracking
 
 ## Install

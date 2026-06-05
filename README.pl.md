@@ -21,7 +21,7 @@ Rozszerzenie Chrome, które wzbogaca zakładki [Pinboard](https://pinboard.in) o
 - **Wyszukiwanie i powroty** — przeszukuj swoje zakładki, przejdź do Nieprzeczytanych / Sieci / Notatek / Popularnych i przeglądaj ostatnie zapisy; ikona na pasku zmienia się, gdy bieżąca strona jest już w Twoich zakładkach
 - **Kolejka offline** — wersje robocze są zapisywane lokalnie i synchronizowane po ponownym połączeniu
 - **Motywy dla `pinboard.in`** — 13 dopracowanych palet (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus własna nakładka CSS synchronizowana między urządzeniami, z regulowaną szerokością okna
-- **Strona do Markdown** — przekonwertuj bieżącą stronę na czysty Markdown — podgląd, skopiuj do schowka lub pobierz jako `.md`. Wybierz [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokalnie) lub [Jina Reader](https://jina.ai/reader) (w chmurze)
+- **Strona do Markdown** — przekonwertuj bieżącą stronę na czysty Markdown z wbudowanym podglądem (widoki renderowany/źródłowy, spis treści, statystyki czytania); kopiuj lub pobieraj jako `.md` lub stylizowany `.html`, dostosuj front-matter, obsługę obrazów i dołączanie spisu treści albo opcjonalnie wyeksportuj do [Obsidian](https://obsidian.md); wybierz [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokalnie) lub [Jina Reader](https://jina.ai/reader) (w chmurze)
 - **9 języków** · konfigurowalne skróty · zero śledzenia
 
 ## Instalacja

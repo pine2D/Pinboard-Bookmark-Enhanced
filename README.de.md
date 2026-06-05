@@ -21,7 +21,7 @@ Eine Chrome-Erweiterung, die [Pinboard](https://pinboard.in)-Lesezeichen mit KI-
 - **Finden & wiederfinden** — durchsuche deine Lesezeichen, springe zu Ungelesen / Netzwerk / Notizen / Beliebt und durchstöbere zuletzt Gespeichertes; das Symbolleisten-Icon wechselt, wenn die aktuelle Seite bereits in deinen Lesezeichen ist
 - **Offline-Warteschlange** — Entwürfe bleiben lokal gespeichert und synchronisieren sich, sobald du wieder online bist
 - **Themes für `pinboard.in`** — 13 kuratierte Farbpaletten (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus eigenes CSS-Overlay, das geräteübergreifend synchronisiert wird, mit einstellbarer Popup-Breite
-- **Seite-zu-Markdown** — die aktuelle Seite in sauberes Markdown konvertieren — Vorschau, in die Zwischenablage kopieren oder als `.md` herunterladen. Wähle zwischen [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokal) oder [Jina Reader](https://jina.ai/reader) (Cloud)
+- **Seite-zu-Markdown** — die aktuelle Seite in sauberes Markdown konvertieren, mit eingebauter Vorschau (gerenderte/Roh-Ansicht, Inhaltsverzeichnis, Lesestatistik); als `.md` oder gestyltes `.html` kopieren oder herunterladen, Front-Matter, Bildbehandlung und Inhaltsverzeichnis anpassen oder optional direkt an [Obsidian](https://obsidian.md) senden; wähle [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokal) oder [Jina Reader](https://jina.ai/reader) (Cloud)
 - **9 Sprachen** · anpassbare Tastenkürzel · kein Tracking
 
 ## Installation

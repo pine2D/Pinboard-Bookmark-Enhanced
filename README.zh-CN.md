@@ -21,7 +21,7 @@
 - **查找与回顾** — 搜索你的书签，快速跳转到 Unread / Network / Notes / Popular，浏览最近保存；当前页若已收藏，工具栏图标会自动切换状态
 - **离线队列** — 离线保存的草稿留在本地，重新联网时自动同步
 - **`pinboard.in` 主题** — 13 套精心调优的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），外加自定义 CSS 覆盖层，多设备同步，弹窗宽度可调
-- **当前页转 Markdown** — 把当前网页转成干净的 Markdown，可预览、复制到剪贴板，或下载为 `.md`。可选 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本地）或 [Jina Reader](https://jina.ai/reader)（云端）两种后端
+- **当前页转 Markdown** — 把当前网页转成干净的 Markdown，内置预览（渲染/源码切换、目录、阅读统计）；可复制或下载为 `.md` 或带样式的 `.html`，可调整 front-matter、图片处理与目录，也可按需导出到 [Obsidian](https://obsidian.md)；后端可选 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本地）或 [Jina Reader](https://jina.ai/reader)（云端）
 - **9 种语言**、可自定义快捷键、零追踪
 
 ## 安装
