@@ -32,7 +32,10 @@
   /* Per-script font stacks — DRY building blocks for the :lang() rules below.
      Latin head first (handles en/de/fr/pl/ru + Latin in CJK articles), then the
      script-preferred Han/Kana/Hangul families, then a covering fallback. */
-  --latin: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Inter", Roboto, "Helvetica Neue";
+  /* NO system-ui: on Traditional-Chinese Windows it triggers a multi-second system-font
+     lookup that stalls first paint (~5s). "Segoe UI" already covers the Windows UI font;
+     popup.css/options.css never used system-ui either. Don't re-add it. */
+  --latin: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue";
   --mono-latin: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", Menlo;
   --han-tc: "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "Noto Sans TC";
   --han-sc: "PingFang SC", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Hiragino Sans GB";
