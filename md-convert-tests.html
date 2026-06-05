@@ -471,8 +471,8 @@ const QUESTION_HTML = `<!DOCTYPE html><html><head>
 <script id="js-initialData" type="text/json">{"initialState":{"entities":{
 "questions":{"659317023":{"id":659317023,"title":"测试问题标题","detail":"<p>这是问题描述。</p>"}},
 "answers":{
-"111":{"id":111,"content":"<p>回答一正文 <img data-original=\\"https://pic/a.jpg\\" src=\\"data:image/svg+xml,ph\\"></p>","voteup_count":1234,"author":{"name":"作者甲"}},
-"222":{"id":222,"content":"<p>回答二正文</p>","voteup_count":56,"author":{"name":"作者乙"}}
+"111":{"id":111,"content":"<p>回答一正文 <img data-original=\\"https://pic/a.jpg\\" src=\\"data:image/svg+xml,ph\\"></p>","voteupCount":1234,"author":{"name":"作者甲"}},
+"222":{"id":222,"content":"<p>回答二正文</p>","voteupCount":56,"author":{"name":"作者乙"}}
 }}}}<\/script></head><body>
 <h1 class="QuestionHeader-title">测试问题标题</h1>
 <div class="List-item"><div class="ContentItem AnswerItem" name="111"><div class="AuthorInfo"><a class="UserLink-link">作者甲</a></div><div class="RichContent"><span class="RichText ztext"><p>回答一正文</p></span></div></div></div>
@@ -487,7 +487,7 @@ const QUESTION_HTML = `<!DOCTYPE html><html><head>
   const c = r ? norm(r.contentHtml) : "";
   check("zhihu question → detail at top", /这是问题描述/.test(c) && c.indexOf("这是问题描述") < c.indexOf("<h2>"), c);
   check("zhihu question → both author H2 sections", /<h2>作者甲<\/h2>/.test(c) && /<h2>作者乙<\/h2>/.test(c), c);
-  check("zhihu question → voteup shown", /1234 赞同/.test(c), c);
+  check("zhihu question → voteup from camelCase entity (voteupCount)", /1234 赞同/.test(c), c);
   check("zhihu question → answer permalink", c.indexOf("/question/659317023/answer/111") !== -1, c);
   check("zhihu question → lazy image promoted", /src="https:\/\/pic\/a\.jpg"/.test(c) && !/data:image\/svg/.test(c), c);
   check("zhihu question → no H1 in content", !/<h1/.test(c), c);
@@ -526,6 +526,21 @@ const QUESTION_NODATA = `<!DOCTYPE html><html><head></head><body>
   const c = r ? norm(r.contentHtml) : "";
   check("zhihu degraded → DOM-card body extracted", /滚动加载的回答/.test(c) && /<h2>答主丙<\/h2>/.test(c), c);
   check("zhihu degraded → note prepended", /仅提取到/.test(c), c);
+})();
+
+// --- voteup DOM fallback (lazy-loaded answers absent from initialData) ---
+const QUESTION_VOTEDOM = `<!DOCTYPE html><html><head></head><body>
+<h1 class="QuestionHeader-title">投票数问题</h1>
+<div class="List-item"><div class="ContentItem AnswerItem" name="901"><div class="AuthorInfo"><a class="UserLink-link">答主甲</a></div><div class="RichContent"><span class="RichText ztext"><p>回答901</p></span></div><div class="ContentItem-actions"><button class="Button VoteButton" aria-label="赞同 430 ">​赞同 430</button><button class="Button VoteButton VoteButton--down" aria-label="反对">​</button></div></div></div>
+<div class="List-item"><div class="ContentItem AnswerItem" name="902"><div class="AuthorInfo"><a class="UserLink-link">答主乙</a></div><div class="RichContent"><span class="RichText ztext"><p>回答902</p></span></div><div class="ContentItem-actions"><button class="Button VoteButton" aria-label="赞同 1.2万 ">​赞同 1.2万</button></div></div></div>
+</body></html>`;
+
+(() => {
+  const doc = new DOMParser().parseFromString(QUESTION_VOTEDOM, "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/300");
+  const c = r ? norm(r.contentHtml) : "";
+  check("zhihu voteup DOM fallback → raw aria-label count", /430 赞同/.test(c), c);
+  check("zhihu voteup DOM fallback → 万 humanized → 12000", /12000 赞同/.test(c), c);
 })();
 
 // --- Anonymous author + missing name attr (fallback paths) ---

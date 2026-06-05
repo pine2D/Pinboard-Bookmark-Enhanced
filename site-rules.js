@@ -60,6 +60,34 @@
     return head + meta + (bodyHtml || "");
   }
 
+  // Parse a Zhihu vote count from text / aria-label: "赞同 430" -> 430, "1.2万" -> 12000.
+  function parseCount(s) {
+    s = String(s == null ? "" : s);
+    var m = s.match(/([\d.]+)\s*万/);
+    if (m) return Math.round(parseFloat(m[1]) * 10000);
+    m = s.match(/([\d.]+)\s*[kK]/);
+    if (m) return Math.round(parseFloat(m[1]) * 1000);
+    m = s.match(/(\d[\d,]*)/);
+    return m ? parseInt(m[1].replace(/,/g, ""), 10) : 0;
+  }
+
+  // Vote count from a js-initialData answer entity. Zhihu normalizes API fields to
+  // camelCase (voteupCount); tolerate api/v4 snake_case (voteup_count) too.
+  function entVoteup(ans) {
+    if (!ans) return 0;
+    var v = (ans.voteupCount != null) ? ans.voteupCount : ans.voteup_count;
+    return Number(v) || 0;
+  }
+
+  // Vote count from a rendered card/doc — the up-vote button (down = VoteButton--down).
+  // DOM fallback for lazy-loaded answers that aren't in js-initialData.
+  function domVoteup(root) {
+    if (!root || !root.querySelector) return 0;
+    var btn = root.querySelector(".VoteButton:not(.VoteButton--down)");
+    if (!btn) return 0;
+    return parseCount(btn.getAttribute("aria-label") || btn.textContent);
+  }
+
   // ---- Zhihu: zhuanlan article (zhuanlan.zhihu.com/p/{id}) ---------------
 
   function extractZhihuArticle(doc, url) {
@@ -109,7 +137,7 @@
     var ent = readEntities(doc);
     var ans = aid && ent.answers && ent.answers[aid];
     var bodyHtml = "", author = "", voteup = 0;
-    if (ans) { bodyHtml = ans.content || ""; author = (ans.author && ans.author.name) || ""; voteup = ans.voteup_count || 0; }
+    if (ans) { bodyHtml = ans.content || ""; author = (ans.author && ans.author.name) || ""; voteup = entVoteup(ans); }
     if (!bodyHtml) {
       var node = doc.querySelector(".RichText.ztext");
       if (node) bodyHtml = node.innerHTML;
@@ -118,6 +146,7 @@
       var aEl = doc.querySelector(".AuthorInfo-name") || doc.querySelector(".AuthorInfo .UserLink-link");
       if (aEl) author = aEl.textContent.trim();
     }
+    if (!voteup) voteup = domVoteup(doc);
     var body = cleanBodyHtml(doc, bodyHtml);
     if (!body) return null;
     var permalink = (qid && aid) ? "https://www.zhihu.com/question/" + qid + "/answer/" + aid : url;
@@ -150,9 +179,10 @@
       var aid = card.getAttribute("name") || "";
       var ans = aid && ent.answers && ent.answers[aid];
       var bodyHtml = "", author = "", voteup = 0;
-      if (ans) { bodyHtml = ans.content || ""; author = (ans.author && ans.author.name) || ""; voteup = ans.voteup_count || 0; }
+      if (ans) { bodyHtml = ans.content || ""; author = (ans.author && ans.author.name) || ""; voteup = entVoteup(ans); }
       if (!bodyHtml) { var node = card.querySelector(".RichText.ztext"); if (node) bodyHtml = node.innerHTML; }
       if (!author) { var aEl = card.querySelector(".AuthorInfo-name") || card.querySelector(".AuthorInfo .UserLink-link"); if (aEl) author = aEl.textContent.trim(); }
+      if (!voteup) voteup = domVoteup(card);
       pushAnswer(aid, author, voteup, bodyHtml);
     });
 
@@ -162,7 +192,7 @@
         if (seen[aid]) return;
         var ans = ent.answers[aid];
         if (!ans || !ans.content) return;
-        pushAnswer(aid, (ans.author && ans.author.name) || "", ans.voteup_count || 0, ans.content);
+        pushAnswer(aid, (ans.author && ans.author.name) || "", entVoteup(ans), ans.content);
       });
     }
 
