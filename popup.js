@@ -325,8 +325,12 @@ async function showMain(token) {
 // callback — promise form leaks "Unchecked runtime.lastError: No tab with id"
 // when tab closes mid-injection (see ai.js:_cbExecuteScript for detail).
 async function extractLocalMarkdown(tabId) {
-  const injectRes = await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js", "site-rules.js"] });
+  const injectRes = await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
   if (!injectRes) return { error: "Cannot access this page" };
+  // site-rules.js is OPTIONAL — inject separately and ignore failure so a broken
+  // rule file can never mask the working Defuddle path (the inline func guards on
+  // `typeof applySiteRule`). Mirrors the ignore-failure inject in ai.js.
+  await _cbExecuteScript({ target: { tabId }, files: ["site-rules.js"] });
   try {
     const results = await _cbExecuteScript({
       target: { tabId },
