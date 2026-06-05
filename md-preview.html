@@ -77,12 +77,13 @@
       <pre id="raw-view" class="content-view hidden"></pre>
     </div>
   </main>
-  <script src="vendor/turndown.js"></script>
-  <script src="vendor/marked.min.js"></script>
-  <script src="vendor/purify.min.js"></script>
-  <script src="vendor/highlight.min.js"></script>
-  <script src="md-convert.js"></script>
-  <script src="i18n.js"></script>
-  <script src="md-preview.js"></script>
+  <!-- Deferred so the page parses/paints before scripts run. highlight.min.js (122KB) is
+       NOT loaded here — md-preview.js lazy-injects it only when the article has code. -->
+  <script defer src="vendor/turndown.js"></script>
+  <script defer src="vendor/marked.min.js"></script>
+  <script defer src="vendor/purify.min.js"></script>
+  <script defer src="md-convert.js"></script>
+  <script defer src="i18n.js"></script>
+  <script defer src="md-preview.js"></script>
 </body>
 </html>

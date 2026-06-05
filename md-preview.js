@@ -51,6 +51,23 @@ function detectArticleLang(text) {
   return ""; // Latin / Cyrillic → default stack's Latin head
 }
 
+// Lazy-load the vendored highlight.js (~122KB) on demand: only articles that actually
+// contain code blocks pay its parse/compile cost, and never on the blocking first-paint
+// path. Cached so concurrent callers share one load; degrades to no-highlight on error.
+let _hljsPromise = null;
+function ensureHljs() {
+  if (typeof hljs !== "undefined") return Promise.resolve();
+  if (_hljsPromise) return _hljsPromise;
+  _hljsPromise = new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "vendor/highlight.min.js";
+    s.onload = () => resolve();
+    s.onerror = () => resolve(); // degrade gracefully: page works without highlighting
+    document.head.appendChild(s);
+  });
+  return _hljsPromise;
+}
+
 (async function () {
   initI18n();
   applyI18n();
@@ -167,7 +184,13 @@ function detectArticleLang(text) {
   renderedView.innerHTML = renderedHtml;
   const _articleLang = detectArticleLang(canonicalMarkdown);
   if (_articleLang) renderedView.lang = _articleLang; // article-script font for the reading content
-  highlightCodeBlocks(renderedView);
+  // Syntax highlighting is OFF the critical first-paint path: the article paints
+  // immediately, then — only if it actually contains code — highlight.js is lazy-loaded
+  // and applied after paint (rAF). Avoids blocking the page on a 122KB compile + a
+  // synchronous whole-document highlight pass (the cold-load spinner).
+  if (renderedView.querySelector("pre > code")) {
+    requestAnimationFrame(() => { ensureHljs().then(() => highlightCodeBlocks(renderedView)); });
+  }
 
   // ---- Build TOC sidebar from the canonical markdown ----
   const tocNav = document.getElementById("toc");
@@ -229,6 +252,11 @@ function detectArticleLang(text) {
     await copyToClipboard(buildExportMarkdown(), e.currentTarget);
   });
   document.getElementById("btn-copy-html").addEventListener("click", async (e) => {
+    // Ensure code is highlighted before copying the HTML (highlight is deferred/lazy on load).
+    if (renderedView.querySelector("pre > code:not(.hljs)")) {
+      await ensureHljs();
+      highlightCodeBlocks(renderedView);
+    }
     await copyToClipboard(renderedView.innerHTML, e.currentTarget); // nosec: reading back own generated HTML
   });
 
@@ -238,6 +266,7 @@ function detectArticleLang(text) {
     downloadFile(safeTitle + ".md", buildExportMarkdown(), "text/markdown;charset=utf-8");
   });
   document.getElementById("btn-dl-html").addEventListener("click", async () => {
+    if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights the export
     const hljsCss = await loadHljsCss();
     const doc = composeStyledHtml(getMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");

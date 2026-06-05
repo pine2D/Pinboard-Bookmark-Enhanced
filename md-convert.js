@@ -207,6 +207,7 @@ function highlightCodeBlocks(root) {
   if (!root || typeof hljs === "undefined") return;
   const blocks = root.querySelectorAll('pre > code');
   blocks.forEach((block) => {
+    if (block.classList.contains("hljs")) return; // idempotent: skip already-highlighted blocks
     try {
       hljs.highlightElement(block);
     } catch (_) {
