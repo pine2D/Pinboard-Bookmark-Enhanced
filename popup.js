@@ -430,20 +430,26 @@ async function htmlToMarkdownAsync(html, opts) {
         return;
       }
 
-      // Convert to markdown for clipboard (Jina already has it, Local needs Turndown)
+      // Convert to markdown (Jina already has it, Local needs Turndown)
       const markdown = result.markdown || await htmlToMarkdownAsync(result.contentHtml, { baseUrl: result.url || url });
 
-      try {
-        await navigator.clipboard.writeText(markdown);
-      } catch (_) {
-        jinaMdBtn.innerHTML = PBP_ICONS.cross + " " + t("jinaFailed");
-        setTimeout(() => { setBtnIcon(jinaMdBtn, "doc", origLabel); jinaMdBtn.disabled = false; }, 2000);
-        return;
-      }
-      jinaMdBtn.innerHTML = PBP_ICONS.check + " " + t("jinaCopied");
-
-      // Reveal the persistent post-copy strip (Preview + Download .md). It stays
-      // until the popup closes; main button reverts to "Markdown" (re-click = re-copy).
+      // Reveal the action strip; the user picks Copy / Preview / Download / Obsidian.
+      // No auto-copy: clicking Markdown must not silently clobber the clipboard, nor be
+      // aborted by a clipboard failure when the user only wanted preview/download/Obsidian.
+      const copyMd = async (e) => {
+        const btn = e.currentTarget;
+        const lbl = btn.querySelector("span:last-child");
+        if (btn._t) clearTimeout(btn._t);
+        if (btn._orig == null) btn._orig = lbl ? lbl.textContent : "";
+        try {
+          await navigator.clipboard.writeText(markdown);
+          if (lbl) lbl.textContent = t("jinaCopied");
+          btn.classList.add("copied");
+        } catch (_) {
+          if (lbl) lbl.textContent = t("jinaFailed");
+        }
+        btn._t = setTimeout(() => { if (lbl) lbl.textContent = btn._orig; btn.classList.remove("copied"); btn._orig = null; }, 1500);
+      };
       const openPreview = async () => {
         await chrome.storage.local.set({
           md_preview_data: {
@@ -503,12 +509,11 @@ async function htmlToMarkdownAsync(html, opts) {
       if (strip) {
         strip.classList.remove("hidden");
         strip.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        // Re-assert the (localized) label so the aria-live strip announces to SR.
-        const stripLabel = $id("md-strip-label");
-        if (stripLabel) stripLabel.textContent = t("mdStripCopied");
+        const copyBtn = $id("md-strip-copy");
         const previewBtn = $id("md-strip-preview");
         const dlBtn = $id("md-strip-dl");
         // Assign (not addEventListener) so re-clicks don't stack handlers.
+        if (copyBtn) copyBtn.onclick = copyMd;
         if (previewBtn) previewBtn.onclick = openPreview;
         if (dlBtn) dlBtn.onclick = downloadMd;
         const obsBtn = $id("md-strip-obsidian");
@@ -521,10 +526,9 @@ async function htmlToMarkdownAsync(html, opts) {
         }
       }
 
-      setTimeout(() => {
-        setBtnIcon(jinaMdBtn, "doc", origLabel);
-        jinaMdBtn.disabled = false;
-      }, 1500);
+      // No "Copied" state on the main button now — revert as soon as the strip is shown.
+      setBtnIcon(jinaMdBtn, "doc", origLabel);
+      jinaMdBtn.disabled = false;
     });
   }
 

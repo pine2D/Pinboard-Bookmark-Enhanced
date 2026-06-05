@@ -1382,8 +1382,9 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
 /* ---- Markdown post-copy action strip (popup) ---- */
 .md-strip {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 4px;
   margin-top: 6px;
   padding: 6px 8px;
   background: #f1f7f1;
@@ -1392,13 +1393,13 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
   font-size: 11px;
 }
 .md-strip.hidden { display: none; }
-.md-strip-label { color: #2a7a2a; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.md-strip-actions { margin-left: auto; display: flex; gap: 4px; flex-shrink: 0; }
 .md-strip-btn {
+  flex: 1 1 auto; /* equal-width buttons that fill + adapt to any popup width (450/550/650) */
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 4px 9px;
+  padding: 4px 8px;
   font-size: 11px;
   color: #2255aa;
   background: #fff;
@@ -1415,12 +1416,10 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
 .md-strip-btn .btn-ic { display: inline-flex; }
 
 html.dark .md-strip { background: #16271a; border-color: #2a4a2a; }
-html.dark .md-strip-label { color: #88cc88; }
 html.dark .md-strip-btn { background: #1e1e1e; border-color: #3a4a6a; color: #88aaff; }
 html.dark .md-strip-btn:hover { background: #232323; border-color: #4a5a8a; }
 
 html[data-theme] .md-strip { background: var(--pp-ok-bg); border-color: var(--pp-ok-bd); }
-html[data-theme] .md-strip-label { color: var(--pp-ok-fg); }
 html[data-theme] .md-strip-btn { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-link); }
 html[data-theme] .md-strip-btn:hover { background: var(--pp-drop-hover); box-shadow: var(--pp-hover-shadow); }
 html[data-theme] .md-strip-btn:focus-visible { outline: 2px solid var(--pp-accent); outline-offset: 2px; }
