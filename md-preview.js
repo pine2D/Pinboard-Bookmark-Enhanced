@@ -17,9 +17,44 @@ function renderEmptyState(message) {
   document.body.classList.add("md-empty");
 }
 
+// Map the active UI locale (manual-override mirror, else the browser UI language) to a
+// BCP-47 tag for <html lang>, so the rail/UI chrome renders in the locale's font via :lang().
+function uiLangToBCP47() {
+  let l = null;
+  try { l = (typeof localStorage !== "undefined") ? localStorage.getItem("pp-i18n-lang") : null; } catch (_) {}
+  if (!l || l === "auto") {
+    try { l = chrome.i18n.getUILanguage(); } catch (_) { l = "en"; }
+  }
+  l = (l || "en").replace(/_/g, "-").toLowerCase();
+  if (l === "zh-hk" || l === "zh-tw" || l.startsWith("zh-hant")) return "zh-Hant";
+  if (l === "zh-cn" || l === "zh-sg" || l === "zh" || l.startsWith("zh-hans")) return "zh-Hans";
+  if (l.startsWith("ja")) return "ja";
+  if (l.startsWith("ko")) return "ko";
+  return l.split("-")[0]; // en / de / fr / pl / ru
+}
+
+// Heuristic detection of the ARTICLE's script from its text, so #rendered-view gets a
+// lang attribute and :lang() picks the correct CJK font (a Simplified-only stack draws
+// Traditional text with wrong glyph forms). Zero-dependency; samples the head of the text.
+function detectArticleLang(text) {
+  if (!text) return "";
+  const s = text.slice(0, 4000);
+  if (/[぀-ゟ゠-ヿ]/.test(s)) return "ja"; // Hiragana / Katakana
+  if (/[가-힣]/.test(s)) return "ko";              // Hangul syllables
+  if (/[一-鿿]/.test(s)) {                          // Han → Simplified vs Traditional
+    const simp = (s.match(/[国对见图书龙东车马门话语说题际还买卖产权观难应当么这样实现单关闭过]/g) || []).length;
+    const trad = (s.match(/[國對見圖書龍東車馬門話語說題際還買賣產權觀難應當麼這樣實現單關閉過]/g) || []).length;
+    if (trad > simp) return "zh-Hant";
+    if (simp > trad) return "zh-Hans";
+    return ""; // ambiguous → default (TC-first) stack handles it
+  }
+  return ""; // Latin / Cyrillic → default stack's Latin head
+}
+
 (async function () {
   initI18n();
   applyI18n();
+  document.documentElement.lang = uiLangToBCP47(); // UI-locale font for the rail/UI chrome
   // Read preview data from storage
   const data = await chrome.storage.local.get("md_preview_data");
   const info = data.md_preview_data;
@@ -130,6 +165,8 @@ function renderEmptyState(message) {
   // Lazy-load images / async decode (sanitizer keeps these attributes).
   renderedHtml = renderedHtml.replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');
   renderedView.innerHTML = renderedHtml;
+  const _articleLang = detectArticleLang(canonicalMarkdown);
+  if (_articleLang) renderedView.lang = _articleLang; // article-script font for the reading content
   highlightCodeBlocks(renderedView);
 
   // ---- Build TOC sidebar from the canonical markdown ----

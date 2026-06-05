@@ -7,7 +7,7 @@
   --bg: #f8fafc;
   --fg: #0f172a;
   --fg-secondary: #475569;
-  --fg-muted: #94a3b8;
+  --fg-muted: #5b6878;
   --border: #e2e8f0;
   --border-light: #f1f5f9;
   --code-bg: #f1f5f9;
@@ -29,6 +29,17 @@
   --table-stripe: #f8fafc;
   --selection: #bfdbfe;
   --surface: #ffffff;
+  /* Per-script font stacks — DRY building blocks for the :lang() rules below.
+     Latin head first (handles en/de/fr/pl/ru + Latin in CJK articles), then the
+     script-preferred Han/Kana/Hangul families, then a covering fallback. */
+  --latin: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Inter", Roboto, "Helvetica Neue";
+  --mono-latin: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", Menlo;
+  --han-tc: "PingFang TC", "Microsoft JhengHei", "微軟正黑體", "Noto Sans TC";
+  --han-sc: "PingFang SC", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Hiragino Sans GB";
+  --han-ja: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic", "Meiryo", "Noto Sans JP";
+  --han-ko: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR";
+  --han-rest: "Source Han Sans", "Noto Sans CJK SC", "WenQuanYi Micro Hei";
+  font-variant-emoji: text;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,7 +47,7 @@
     --bg: #0f172a;
     --fg: #e2e8f0;
     --fg-secondary: #94a3b8;
-    --fg-muted: #64748b;
+    --fg-muted: #8a98ab;
     --border: #1e293b;
     --border-light: #1e293b;
     --code-bg: #1e293b;
@@ -63,11 +74,12 @@
 
 /* ---- Reset & Base ---- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 100%; } /* rem-based reading size honors the browser's default font */
 
 ::selection { background: var(--selection); }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--latin), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-ko), var(--han-rest), sans-serif;
   background: var(--bg);
   color: var(--fg);
   line-height: 1.7;
@@ -75,6 +87,14 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Per-script font selection. <html lang> = UI locale (rail/UI chrome); #rendered-view
+   lang = detected article language (reading content) — set in md-preview.js. :lang()
+   ((0,1,0), beats the `body` element default) picks the matching stack per subtree.
+   The body default above is TC-first, so zh-Hant needs no override. */
+:lang(zh-Hans) { font-family: var(--latin), var(--han-sc), var(--han-tc), var(--han-ja), var(--han-ko), var(--han-rest), sans-serif; }
+:lang(ja) { font-family: var(--latin), var(--han-ja), var(--han-tc), var(--han-sc), var(--han-ko), var(--han-rest), sans-serif; }
+:lang(ko) { font-family: var(--latin), var(--han-ko), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-rest), sans-serif; }
 
 /* ---- Buttons ---- */
 .action-btn, .toggle-btn {
@@ -104,7 +124,7 @@ body {
 }
 
 .action-btn:active, .toggle-btn:active {
-  transform: scale(0.97);
+  transform: translateY(1px);
 }
 
 .action-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
@@ -146,13 +166,13 @@ main {
   margin-left: 264px;
   padding: 48px 32px 96px;
 }
-.doc-body { max-width: 780px; margin: 0 auto; min-width: 0; }
+.doc-body { max-width: min(72ch, 780px); margin: 0 auto; min-width: 0; }
 
 .content-view.hidden { display: none; }
 
 /* ---- Raw View ---- */
 #raw-view {
-  font-family: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", Menlo, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
+  font-family: var(--mono-latin), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-ko), var(--han-rest), monospace;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -168,8 +188,9 @@ main {
 /* ---- Rendered View: Article Typography ---- */
 #rendered-view {
   color: var(--fg);
-  font-size: 17px;
+  font-size: clamp(1.0625rem, 1rem + 0.4vw, 1.375rem); /* 17px floor → ~22px on 4K; rem honors zoom */
   line-height: 1.75;
+  overflow-wrap: break-word; /* lang-agnostic guard for long de/ru compounds */
 }
 
 /* Headings */
@@ -229,7 +250,7 @@ main {
 
 /* Inline code */
 #rendered-view code {
-  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-family: var(--mono-latin), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-ko), var(--han-rest), monospace;
   background: var(--code-bg);
   color: var(--code-fg);
   padding: 2px 7px;
@@ -403,28 +424,28 @@ main {
   z-index: 20;
 }
 .rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.rail-ident a { display: block; margin-top: 3px; font-size: 11px; color: var(--fg-muted); text-decoration: none; word-break: break-all; }
+.rail-ident a { display: block; margin-top: 3px; font-size: 12px; color: var(--fg-muted); text-decoration: none; word-break: break-all; }
 .rail-ident a:hover { color: var(--link); }
 .rail-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 12px; }
 .rail .view-toggle { width: 100%; }
 .rail .view-toggle .toggle-btn { flex: 1; justify-content: center; }
 .rail-section { margin-top: 4px; }
 .rail-label {
-  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--fg-muted);
+  font-size: 12px; letter-spacing: 0.04em; text-transform: none; color: var(--fg-secondary);
   margin: 15px 0 8px; padding-top: 12px; border-top: 1px solid var(--border);
 }
 .rail .exp-opt {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 4px 0; font-size: 12.5px; color: var(--fg-secondary); cursor: pointer;
+  padding: 4px 0; font-size: 13px; color: var(--fg-secondary); cursor: pointer;
 }
 .rail .exp-opt select {
   padding: 2px 6px; border: 1px solid var(--btn-border); border-radius: 5px;
-  background: var(--btn-bg); color: var(--btn-fg); font-size: 12px; cursor: pointer;
+  background: var(--btn-bg); color: var(--btn-fg); font-size: 13px; cursor: pointer;
 }
 .rail .exp-opt input[type="checkbox"] { cursor: pointer; }
 .export-grid { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .export-fmt { display: flex; align-items: center; gap: 6px; }
-.export-fmt .fmt-name { width: 64px; flex: none; font-size: 12px; color: var(--fg-muted); }
+.export-fmt .fmt-name { width: 64px; flex: none; font-size: 13px; color: var(--fg-secondary); }
 .export-fmt .action-btn { flex: 1; justify-content: center; }
 .export-fmt .action-btn.icon-only { flex: 0 0 auto; padding: 6px 9px; }
 .export-fmt .action-btn.icon-only svg { margin: 0; }
@@ -434,15 +455,15 @@ main {
 .toc-list { list-style: none; margin: 0; padding: 0; }
 .toc-list li { margin: 0; }
 .toc-list a {
-  display: block; padding: 4px 10px; color: var(--fg-muted); text-decoration: none;
-  border-left: 2px solid transparent; border-radius: 0 4px 4px 0; font-size: 14px; line-height: 1.5;
+  display: block; padding: 4px 10px; color: var(--fg-secondary); text-decoration: none;
+  border-left: 2px solid transparent; border-radius: 0 4px 4px 0; font-size: 15px; line-height: 1.6;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 .toc-list a:hover { color: var(--fg); background: var(--border-light); }
 .toc-list a[data-level="2"] { padding-left: 10px; }
 .toc-list a[data-level="3"] { padding-left: 24px; font-size: 0.95em; }
-.toc-list a[data-level="4"] { padding-left: 38px; font-size: 0.92em; }
+.toc-list a[data-level="4"] { padding-left: 38px; font-size: 0.9em; }
 .toc-list a.active { color: var(--link); border-left-color: var(--link); background: var(--border-light); font-weight: 600; }
 .toc-list a:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
 
@@ -462,7 +483,6 @@ main {
 /* ---- Responsive: collapse rail to an off-canvas drawer ---- */
 @media (max-width: 1000px) {
   main { margin-left: 0; padding: 64px 20px 80px; }
-  #rendered-view { font-size: 16px; }
   .rail-toggle { display: inline-flex; }
   .rail {
     transform: translateX(-100%);
