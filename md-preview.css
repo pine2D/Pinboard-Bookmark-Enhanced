@@ -67,7 +67,7 @@
 ::selection { background: var(--selection); }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
   background: var(--bg);
   color: var(--fg);
   line-height: 1.7;
@@ -152,7 +152,7 @@ main {
 
 /* ---- Raw View ---- */
 #raw-view {
-  font-family: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  font-family: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", Menlo, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -168,7 +168,7 @@ main {
 /* ---- Rendered View: Article Typography ---- */
 #rendered-view {
   color: var(--fg);
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.75;
 }
 
@@ -435,7 +435,7 @@ main {
 .toc-list li { margin: 0; }
 .toc-list a {
   display: block; padding: 4px 10px; color: var(--fg-muted); text-decoration: none;
-  border-left: 2px solid transparent; border-radius: 0 4px 4px 0; font-size: 13px; line-height: 1.5;
+  border-left: 2px solid transparent; border-radius: 0 4px 4px 0; font-size: 14px; line-height: 1.5;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
@@ -462,7 +462,7 @@ main {
 /* ---- Responsive: collapse rail to an off-canvas drawer ---- */
 @media (max-width: 1000px) {
   main { margin-left: 0; padding: 64px 20px 80px; }
-  #rendered-view { font-size: 15px; }
+  #rendered-view { font-size: 16px; }
   .rail-toggle { display: inline-flex; }
   .rail {
     transform: translateX(-100%);
