@@ -325,12 +325,21 @@ async function showMain(token) {
 // callback — promise form leaks "Unchecked runtime.lastError: No tab with id"
 // when tab closes mid-injection (see ai.js:_cbExecuteScript for detail).
 async function extractLocalMarkdown(tabId) {
-  const injectRes = await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
+  const injectRes = await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js", "site-rules.js"] });
   if (!injectRes) return { error: "Cannot access this page" };
   try {
     const results = await _cbExecuteScript({
       target: { tabId },
       func: () => {
+        // Per-site custom extractor (site-rules.js) runs first; falls through to Defuddle.
+        try {
+          if (typeof applySiteRule === "function") {
+            const hit = applySiteRule(document, location.href);
+            if (hit && hit.contentHtml) {
+              return { contentHtml: hit.contentHtml, title: hit.title || document.title, url: location.href };
+            }
+          }
+        } catch (_) { /* fall through to Defuddle */ }
         if (typeof Defuddle === "undefined") return { error: "Defuddle not available" };
         // Patch window.URL in the ISOLATED world to prevent defuddle from
         // throwing "Failed to construct 'URL': Invalid URL" on relative/weird hrefs
