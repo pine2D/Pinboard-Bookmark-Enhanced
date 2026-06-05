@@ -96,6 +96,13 @@ body {
 :lang(ja) { font-family: var(--latin), var(--han-ja), var(--han-tc), var(--han-sc), var(--han-ko), var(--han-rest), sans-serif; }
 :lang(ko) { font-family: var(--latin), var(--han-ko), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-rest), sans-serif; }
 
+/* Form controls do NOT inherit font-family by default, so the <select> + buttons would
+   render their CJK labels (保留/复制/Raw/发送到 Obsidian…) in the UA default (Arial) →
+   no CJK glyphs → fallback to the OS Standard font (often a slow/large CJK family like
+   Sarasa) → a 1-3s first-paint stall. Inherit the CJK-rich stack above. Same fix already
+   shipped in options.css / popup.css; md-preview.css was the remaining holdout. */
+button, input, select, textarea { font-family: inherit; }
+
 /* ---- Buttons ---- */
 .action-btn, .toggle-btn {
   padding: 6px 14px;
