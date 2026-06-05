@@ -17,6 +17,7 @@ h2 { margin-top: 24px; }
 <script src="vendor/purify.min.js"></script>
 <script src="vendor/highlight.min.js"></script>
 <script src="md-convert.js?v=obs2"></script>
+<script src="site-rules.js?v=1"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -451,6 +452,88 @@ function assertEq(actual, expected, label) {
     const amp = composeStyledHtml(md, { ...meta, url: "https://e.com/?a=1&b=2" }, { frontmatter: true, imagePolicy: "keep", includeToc: false, hljsCss: "" });
     assert(/href="https:\/\/e\.com\/\?a=1&amp;b=2"/.test(amp), "http url & is escaped in the href attribute");
   })();
+</script>
+
+<script>
+// ============================================================
+// Site rules / Zhihu extraction
+// ============================================================
+section("site-rules: matcher + fallback");
+
+(() => {
+  const doc = new DOMParser().parseFromString("<html><body><p>hi</p></body></html>", "text/html");
+  check("non-matching host → applySiteRule null",
+    applySiteRule(doc, "https://example.com/foo") === null);
+})();
+
+// --- Zhihu question page fixture (initialData + DOM cards) ---
+const QUESTION_HTML = `<!DOCTYPE html><html><head>
+<script id="js-initialData" type="text/json">{"initialState":{"entities":{
+"questions":{"659317023":{"id":659317023,"title":"测试问题标题","detail":"<p>这是问题描述。</p>"}},
+"answers":{
+"111":{"id":111,"content":"<p>回答一正文 <img data-original=\\"https://pic/a.jpg\\" src=\\"data:image/svg+xml,ph\\"></p>","voteup_count":1234,"author":{"name":"作者甲"}},
+"222":{"id":222,"content":"<p>回答二正文</p>","voteup_count":56,"author":{"name":"作者乙"}}
+}}}}<\/script></head><body>
+<h1 class="QuestionHeader-title">测试问题标题</h1>
+<div class="List-item"><div class="ContentItem AnswerItem" name="111"><div class="AuthorInfo"><a class="UserLink-link">作者甲</a></div><div class="RichContent"><span class="RichText ztext"><p>回答一正文</p></span></div></div></div>
+<div class="List-item"><div class="ContentItem AnswerItem" name="222"><div class="AuthorInfo"><a class="UserLink-link">作者乙</a></div><div class="RichContent"><span class="RichText ztext"><p>回答二正文</p></span></div></div></div>
+</body></html>`;
+
+(() => {
+  const doc = new DOMParser().parseFromString(QUESTION_HTML, "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/659317023");
+  check("zhihu question → matched rule id", r && r.id === "zhihu-question", JSON.stringify(r && r.id));
+  check("zhihu question → title separate", r && r.title === "测试问题标题", r && r.title);
+  const c = r ? norm(r.contentHtml) : "";
+  check("zhihu question → detail at top", /这是问题描述/.test(c) && c.indexOf("这是问题描述") < c.indexOf("<h2>"), c);
+  check("zhihu question → both author H2 sections", /<h2>作者甲<\/h2>/.test(c) && /<h2>作者乙<\/h2>/.test(c), c);
+  check("zhihu question → voteup shown", /1234 赞同/.test(c), c);
+  check("zhihu question → answer permalink", c.indexOf("/question/659317023/answer/111") !== -1, c);
+  check("zhihu question → lazy image promoted", /src="https:\/\/pic\/a\.jpg"/.test(c) && !/data:image\/svg/.test(c), c);
+  check("zhihu question → no H1 in content", !/<h1/.test(c), c);
+})();
+
+(() => {
+  const doc = new DOMParser().parseFromString(QUESTION_HTML, "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/659317023/answer/111");
+  check("zhihu single answer → matched rule id", r && r.id === "zhihu-answer", r && r.id);
+  const c = r ? norm(r.contentHtml) : "";
+  check("zhihu single answer → only that author", /<h2>作者甲<\/h2>/.test(c) && !/作者乙/.test(c), c);
+  check("zhihu single answer → title is question title", r && r.title === "测试问题标题", r && r.title);
+})();
+
+// --- Zhihu zhuanlan article fixture ---
+const ART_HTML = `<html><head><script id="js-initialData" type="text/json">{"initialState":{"entities":{"articles":{"700":{"id":700,"title":"专栏文章标题","content":"<p>文章正文</p>"}}}}}<\/script></head><body></body></html>`;
+
+(() => {
+  const doc = new DOMParser().parseFromString(ART_HTML, "text/html");
+  const r = applySiteRule(doc, "https://zhuanlan.zhihu.com/p/700");
+  check("zhihu zhuanlan → matched rule id", r && r.id === "zhihu-zhuanlan", r && r.id);
+  check("zhihu zhuanlan → title", r && r.title === "专栏文章标题", r && r.title);
+  const c = r ? norm(r.contentHtml) : "";
+  check("zhihu zhuanlan → body present, no answer H2", /文章正文/.test(c) && !/<h2>/.test(c), c);
+})();
+
+// --- Degraded path: no initialData, DOM cards only → note prepended ---
+const QUESTION_NODATA = `<!DOCTYPE html><html><head></head><body>
+<h1 class="QuestionHeader-title">无数据问题</h1>
+<div class="List-item"><div class="ContentItem AnswerItem" name="333"><div class="AuthorInfo"><a class="UserLink-link">答主丙</a></div><div class="RichContent"><span class="RichText ztext"><p>滚动加载的回答</p></span></div></div></div>
+</body></html>`;
+
+(() => {
+  const doc = new DOMParser().parseFromString(QUESTION_NODATA, "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/100");
+  const c = r ? norm(r.contentHtml) : "";
+  check("zhihu degraded → DOM-card body extracted", /滚动加载的回答/.test(c) && /<h2>答主丙<\/h2>/.test(c), c);
+  check("zhihu degraded → note prepended", /仅提取到/.test(c), c);
+})();
+
+// --- Truly empty zhihu page → null (Defuddle fallback) ---
+(() => {
+  const doc = new DOMParser().parseFromString("<html><body></body></html>", "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/999");
+  check("zhihu empty → null (falls back to Defuddle)", r === null, JSON.stringify(r));
+})();
 </script>
 
 <script>
