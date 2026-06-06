@@ -563,6 +563,64 @@ const QUESTION_ANON = `<!DOCTYPE html><html><head></head><body>
   check("zhihu empty → null (falls back to Defuddle)", r === null, JSON.stringify(r));
 })();
 
+section("site-rules: cn/en blogs");
+(() => {
+  const html = `<!DOCTYPE html><html><head><meta property="og:title" content="微信标题"></head><body>
+  <h1 class="rich_media_title">微信标题</h1>
+  <div id="js_top_ad_area">ad</div>
+  <div id="js_content"><p>微信正文 <img data-src="https://mmbiz/x.jpg" src="data:image/gif,p"></p></div>
+  <div id="js_article_bottom_bar">footer</div></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://mp.weixin.qq.com/s/abc123");
+  const c = r ? norm(r.contentHtml) : "";
+  check("wechat → id+title", r && r.id === "wechat" && r.title === "微信标题", JSON.stringify(r && [r.id, r.title]));
+  check("wechat → body+lazy img (ad/footer are siblings, not in #js_content)", /微信正文/.test(c) && /src="https:\/\/mmbiz\/x\.jpg"/.test(c), c);
+})();
+
+(() => {
+  const html = `<!DOCTYPE html><html><head></head><body>
+  <h1 class="title-article" id="articleContentId">CSDN标题</h1>
+  <div id="content_views"><p>CSDN正文 <img data-src="https://csdn/x.png" src="data:image/gif,p"></p><div class="hide-article-box">mask</div><div class="recommend-box">推荐</div></div></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://blog.csdn.net/u/article/details/123456");
+  const c = r ? norm(r.contentHtml) : "";
+  check("csdn → id+title", r && r.id === "csdn" && r.title === "CSDN标题", JSON.stringify(r && [r.id, r.title]));
+  check("csdn → body+lazy img; mask & recommend stripped", /CSDN正文/.test(c) && /src="https:\/\/csdn\/x\.png"/.test(c) && !/hide-article-box|recommend-box/.test(c), c);
+})();
+
+(() => {
+  const html = `<!DOCTYPE html><html><head></head><body>
+  <h1 class="article-title">掘金标题</h1>
+  <article class="article-viewer markdown-body"><p>掘金正文</p><div class="copy-code-btn">复制</div></article></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://juejin.cn/post/7012345678901234567");
+  const c = r ? norm(r.contentHtml) : "";
+  check("juejin → id+title", r && r.id === "juejin" && r.title === "掘金标题", JSON.stringify(r && [r.id, r.title]));
+  check("juejin → body; copy-btn stripped", /掘金正文/.test(c) && !/copy-code-btn/.test(c), c);
+})();
+
+(() => {
+  const html = `<!DOCTYPE html><html><head></head><body>
+  <a id="cb_post_title_url">博客园标题</a>
+  <div id="cnblogs_post_body"><p>博客园正文</p><div class="cnblogs_code_toolbar">tb</div></div></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://www.cnblogs.com/u/p/123456.html");
+  const c = r ? norm(r.contentHtml) : "";
+  check("cnblogs → id+title", r && r.id === "cnblogs" && r.title === "博客园标题", JSON.stringify(r && [r.id, r.title]));
+  check("cnblogs → body; toolbar stripped", /博客园正文/.test(c) && !/cnblogs_code_toolbar/.test(c), c);
+})();
+
+(() => {
+  const html = `<!DOCTYPE html><html><head></head><body>
+  <h1 class="crayons-article__title">Dev Title</h1>
+  <div id="article-body"><p>dev body</p><div class="crayons-article__actions">react</div></div></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://dev.to/someuser/some-post-slug-123");
+  const c = r ? norm(r.contentHtml) : "";
+  check("devto → id+title", r && r.id === "devto" && r.title === "Dev Title", JSON.stringify(r && [r.id, r.title]));
+  check("devto → body; actions stripped", /dev body/.test(c) && !/crayons-article__actions/.test(c), c);
+})();
+
 section("site-rules: helpers");
 (() => {
   const doc = new DOMParser().parseFromString(

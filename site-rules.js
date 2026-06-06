@@ -277,6 +277,45 @@
     return { contentHtml: note + (detail || "") + sections.join("\n"), title: questionTitle(doc, qid, ent) };
   }
 
+  // ---- Simple container sites (extractContainer) ------------------------
+  function extractWechat(doc) {
+    return extractContainer(doc, {
+      title: ["h1.rich_media_title", ['meta[property="og:title"]', "content"]],
+      content: ["#js_content"],
+      clean: ["#js_top_ad_area", "#js_article_bottom_bar", "#js_pc_qr_code", ".qr_code_pc"]
+    });
+  }
+  function extractCsdn(doc) {
+    return extractContainer(doc, {
+      title: ["#articleContentId", ".title-article", "h1.title-article", "h1"],
+      content: ["#content_views"],
+      clean: [".recommend-box", ".csdn-tracking-statistics", ".hljs-button", ".article-copyright", ".blog-content-box .pre-numbering"],
+      collapseRemove: [".hide-article-box", ".btn-readmore", ".article-show-more", ".user-article-hide", ".readall_box", ".hide-preCode-box"],
+      collapseClear: ["#content_views", "#article_content", "pre.set-code-hide"]
+    });
+  }
+  function extractJuejin(doc) {
+    return extractContainer(doc, {
+      title: ["h1.article-title", "h1"],
+      content: ["article.article-viewer.markdown-body", ".article-viewer.markdown-body", "article.article"],
+      clean: [".copy-code-btn", ".code-block-extension-lang", ".article-end", ".author-info-block"]
+    });
+  }
+  function extractCnblogs(doc) {
+    return extractContainer(doc, {
+      title: ["#cb_post_title_url", "h1.postTitle a", "h1.postTitle", "#cb_post_title_url a"],
+      content: ["#cnblogs_post_body", "#post_detail .post"],
+      clean: [".cnblogs_code_toolbar", "#blog_post_info_block", "#comment_form"]
+    });
+  }
+  function extractDevto(doc) {
+    return extractContainer(doc, {
+      title: ["h1.crayons-article__title", ".crayons-article__header h1", "h1", ['meta[property="og:title"]', "content"]],
+      content: ["#article-body", ".crayons-article__body"],
+      clean: [".crayons-article__actions", ".comment-subscription-form", ".article-actions"]
+    });
+  }
+
   // ---- framework ---------------------------------------------------------
 
   function hostMatches(pattern, hostname) {
@@ -301,7 +340,17 @@
       match: { host: "zhihu.com", url: /\/question\/\d+\/?(?:[?#].*)?$/ }, extract: extractZhihuQuestion },
     { id: "zhihu-zhuanlan", source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
       match: { host: "zhuanlan.zhihu.com", url: /\/p\/\d+/ }, extract: extractZhihuArticle }
-    // batch-1 rules appended in Tasks 2 & 3
+    ,{ id: "wechat",  source: "wechat-article-exporter@2026-06", lastVerified: "2026-06-06", driftCheck: "auto",
+       sampleUrl: "", match: { host: "mp.weixin.qq.com", url: /\/s(\/|\?|$)/ }, extract: function (d) { return extractWechat(d); } }
+    ,{ id: "csdn",    source: "code-box@2026-05", lastVerified: "2026-06-06", driftCheck: "auto",
+       sampleUrl: "", match: { host: "csdn.net", url: /\/article\/details\// }, extract: function (d) { return extractCsdn(d); } }
+    ,{ id: "juejin",  source: "code-box@2026-05", lastVerified: "2026-06-06", driftCheck: "auto",
+       sampleUrl: "", match: { host: "juejin.cn", url: /\/post\/\d+/ }, extract: function (d) { return extractJuejin(d); } }
+    ,{ id: "cnblogs", source: "code-box@2026-05", lastVerified: "2026-06-06", driftCheck: "auto",
+       sampleUrl: "", match: { host: "cnblogs.com", url: /\/p\/|\/archive\/|\.html/ }, extract: function (d) { return extractCnblogs(d); } }
+    ,{ id: "devto",   source: "obsidian-templates@2026", lastVerified: "2026-06-06", driftCheck: "auto",
+       sampleUrl: "", match: { host: "dev.to", url: /\/[^/]+\/[^/]+/ }, extract: function (d) { return extractDevto(d); } }
+    // batch-1 multi-item rules appended in Task 3
   ];
 
   function applySiteRule(doc, url) {
