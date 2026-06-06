@@ -634,6 +634,17 @@ section("site-rules: multi-item");
 })();
 
 (() => {
+  // sparse JSON-LD: question text but NO answers → answers must come from the DOM fallback
+  const html = `<!DOCTYPE html><html><head>
+  <script type="application/ld+json">{"@type":"QAPage","mainEntity":{"@type":"Question","name":"Sparse Q","text":"<p>q body</p>"}}<\/script>
+  </head><body><div id="answers"><div class="answer accepted-answer"><div class="js-vote-count">9</div><div class="s-prose js-post-body"><p>dom answer body</p></div></div></div></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://stackoverflow.com/questions/999/sparse");
+  const c = r ? norm(r.contentHtml) : "";
+  check("so → DOM-answer fallback when JSON-LD lacks answers", /q body/.test(c) && /dom answer body/.test(c) && /\[accepted\]/.test(c) && /9 votes/.test(c), c);
+})();
+
+(() => {
   const v = `<!DOCTYPE html><html><head></head><body>
   <h1>测试主题</h1>
   <div class="topic_content"><p>主题正文 <img data-src="https://v/i.png" src="data:image/gif,p"></p></div>

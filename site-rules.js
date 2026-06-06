@@ -335,9 +335,13 @@
         parts.push("<h3>" + escapeHtml((x.accepted ? "[accepted] " : "") + votes + " votes") + "</h3>" + cleanBodyHtml(doc, x.a.text || ""));
       });
     }
-    if (!parts.length) {
+    // DOM fallback per-section: question if JSON-LD lacked its body, answers if
+    // JSON-LD carried none (a sparse QAPage can have the question but no answers).
+    if (!main || !main.text) {
       var q = doc.querySelector("#question .s-prose.js-post-body");
-      if (q) parts.push(cleanBodyHtml(doc, q.innerHTML));
+      if (q) parts.unshift(cleanBodyHtml(doc, q.innerHTML));
+    }
+    if (!answers.length) {
       doc.querySelectorAll("#answers .answer").forEach(function (ans) {
         var body = ans.querySelector(".s-prose.js-post-body");
         var vc = ans.querySelector(".js-vote-count");
