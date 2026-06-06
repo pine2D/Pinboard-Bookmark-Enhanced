@@ -109,8 +109,9 @@
   // Generic single-container extractor for simple article sites.
   // opts: { title:[sel|['sel','attr']...], content:[sel...], clean:[sel...], collapseRemove:[sel...], collapseClear:[sel...] }
   function extractContainer(doc, opts) {
+    var picks = (opts && opts.content) || [];
     var container = null;
-    for (var i = 0; i < opts.content.length; i++) { container = doc.querySelector(opts.content[i]); if (container) break; }
+    for (var i = 0; i < picks.length; i++) { container = doc.querySelector(picks[i]); if (container) break; }
     if (!container) return null;
     var clone = container.cloneNode(true);
     clearCollapseMask(clone, opts.collapseRemove, opts.collapseClear);
