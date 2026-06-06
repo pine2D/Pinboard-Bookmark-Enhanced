@@ -331,8 +331,8 @@
     if (answers.length) {
       parts.push("<h2>" + escapeHtml(answers.length + " Answers") + "</h2>");
       answers.forEach(function (x) {
-        var votes = x.a.upvoteCount != null ? x.a.upvoteCount : "";
-        parts.push("<h3>" + escapeHtml((x.accepted ? "[accepted] " : "") + votes + " votes") + "</h3>" + cleanBodyHtml(doc, x.a.text || ""));
+        var votes = x.a.upvoteCount != null ? x.a.upvoteCount + " votes" : "answer";
+        parts.push("<h3>" + escapeHtml((x.accepted ? "[accepted] " : "") + votes) + "</h3>" + cleanBodyHtml(doc, x.a.text || ""));
       });
     }
     // DOM fallback per-section: question if JSON-LD lacked its body, answers if
@@ -412,6 +412,8 @@
   }
 
   // Ordered: answer-permalink before question (a permalink URL contains /question/).
+  // NOTE: zhuanlan.zhihu.com suffix-matches the "zhihu.com" host gate; only the Zhihu
+  // URL regexes keep /p/<id> falling through to zhihu-zhuanlan — don't broaden them.
   var SITE_RULES = [
     { id: "zhihu-answer",   source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
       match: { host: "zhihu.com", url: /\/question\/\d+\/answer\/\d+/ }, extract: extractZhihuAnswer },
