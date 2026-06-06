@@ -316,6 +316,81 @@
     });
   }
 
+  // ---- StackOverflow / StackExchange (JSON-LD QAPage; DOM fallback) ------
+  function extractStackOverflow(doc) {
+    var qa = readJsonLd(doc, "QAPage");
+    var main = qa && qa.mainEntity;
+    var title = (main && (main.name || qa.name)) || pickText(doc, ["h1[itemprop=name]", "h1 .question-hyperlink", "h1"]);
+    var parts = [];
+    if (main && main.text) parts.push(cleanBodyHtml(doc, main.text));
+    var answers = [];
+    if (main) {
+      if (main.acceptedAnswer) [].push.apply(answers, [].concat(main.acceptedAnswer).map(function (a) { return { a: a, accepted: true }; }));
+      if (main.suggestedAnswer) [].push.apply(answers, [].concat(main.suggestedAnswer).map(function (a) { return { a: a, accepted: false }; }));
+    }
+    if (answers.length) {
+      parts.push("<h2>" + escapeHtml(answers.length + " Answers") + "</h2>");
+      answers.forEach(function (x) {
+        var votes = x.a.upvoteCount != null ? x.a.upvoteCount : "";
+        parts.push("<h3>" + escapeHtml((x.accepted ? "[accepted] " : "") + votes + " votes") + "</h3>" + cleanBodyHtml(doc, x.a.text || ""));
+      });
+    }
+    if (!parts.length) {
+      var q = doc.querySelector("#question .s-prose.js-post-body");
+      if (q) parts.push(cleanBodyHtml(doc, q.innerHTML));
+      doc.querySelectorAll("#answers .answer").forEach(function (ans) {
+        var body = ans.querySelector(".s-prose.js-post-body");
+        var vc = ans.querySelector(".js-vote-count");
+        var acc = ans.classList.contains("accepted-answer") || ans.querySelector(".js-accepted-answer-indicator");
+        if (body) parts.push("<h3>" + escapeHtml((acc ? "[accepted] " : "") + (vc ? vc.textContent.trim() + " votes" : "")) + "</h3>" + cleanBodyHtml(doc, body.innerHTML));
+      });
+    }
+    if (!parts.join("")) return null;
+    return { contentHtml: parts.join("\n"), title: title };
+  }
+
+  // ---- V2EX (topic + threaded replies) ----------------------------------
+  function extractV2ex(doc) {
+    var title = pickText(doc, ["h1"]);
+    var parts = [];
+    var topic = doc.querySelector(".topic_content");
+    if (topic) parts.push(cleanBodyHtml(doc, topic.innerHTML));
+    doc.querySelectorAll(".subtle .topic_content").forEach(function (ap) { parts.push(cleanBodyHtml(doc, ap.innerHTML)); });
+    var replies = doc.querySelectorAll('.cell[id^="r_"]');
+    if (replies.length) {
+      parts.push("<h2>" + escapeHtml("回复 (" + replies.length + ")") + "</h2>");
+      replies.forEach(function (cell) {
+        var author = pickText({ querySelector: function (s) { return cell.querySelector(s); } }, ["strong .member", ".member", "strong.dark", ".username"]);
+        var floor = (cell.querySelector(".no") || {}).textContent || "";
+        var thanks = (cell.querySelector(".small.fade") || {}).textContent || "";
+        var body = cell.querySelector(".reply_content");
+        var head = "<p><strong>" + escapeHtml("#" + floor.trim() + " · " + (author || "匿名")) +
+          (thanks.trim() ? escapeHtml(" · 感谢 " + thanks.trim()) : "") + "</strong></p>";
+        if (body) parts.push(head + cleanBodyHtml(doc, body.innerHTML));
+      });
+    }
+    if (!parts.join("")) return null;
+    var pages = doc.querySelectorAll("#Main .box .inner .page_normal, #Main .box .inner .page_current");
+    var note = "";
+    if (pages.length > 1) note = "<blockquote><p>" + escapeHtml("注：仅提取当前页回复（共 " + pages.length + " 页）。") + "</p></blockquote>";
+    return { contentHtml: note + parts.join("\n"), title: title };
+  }
+
+  // ---- arXiv (/abs/ citation_* meta card) -------------------------------
+  function extractArxiv(doc) {
+    function metas(name) { return Array.prototype.map.call(doc.querySelectorAll('meta[name="' + name + '"]'), function (m) { return m.getAttribute("content") || ""; }).filter(Boolean); }
+    var title = (metas("citation_title")[0]) || pickText(doc, ["h1.title", "h1"]);
+    var authors = metas("citation_author");
+    var abs = metas("citation_abstract")[0] || pickText(doc, ["blockquote.abstract"]);
+    var pdf = metas("citation_pdf_url")[0] || "";
+    if (!abs && !authors.length) return null;
+    var html = "";
+    if (authors.length) html += "<p><strong>" + escapeHtml(authors.join(", ")) + "</strong></p>";
+    if (abs) html += "<p>" + escapeHtml(abs) + "</p>";
+    if (pdf) html += '<p><a href="' + escapeHtml(pdf) + '">PDF</a></p>';
+    return { contentHtml: html, title: title };
+  }
+
   // ---- framework ---------------------------------------------------------
 
   function hostMatches(pattern, hostname) {
@@ -350,7 +425,14 @@
        sampleUrl: "", match: { host: "cnblogs.com", url: /\/p\/|\/archive\/|\.html/ }, extract: function (d) { return extractCnblogs(d); } }
     ,{ id: "devto",   source: "obsidian-templates@2026", lastVerified: "2026-06-06", driftCheck: "auto",
        sampleUrl: "", match: { host: "dev.to", url: /\/[^/?#]+\/[^/?#]+/ }, extract: function (d) { return extractDevto(d); } }
-    // batch-1 multi-item rules appended in Task 3
+    ,{ id: "stackoverflow", source: "json-ld+self", lastVerified: "2026-06-06", driftCheck: "auto",
+       sampleUrl: "", match: { host: "stackoverflow.com", url: /\/questions\/\d+/ }, extract: function (d) { return extractStackOverflow(d); } }
+    ,{ id: "stackexchange", source: "json-ld+self", lastVerified: "2026-06-06", driftCheck: "auto",
+       sampleUrl: "", match: { host: "stackexchange.com", url: /\/questions\/\d+/ }, extract: function (d) { return extractStackOverflow(d); } }
+    ,{ id: "v2ex",  source: "self", lastVerified: "2026-06-06", driftCheck: "auto",
+       sampleUrl: "", match: { host: "v2ex.com", url: /\/t\/\d+/ }, extract: function (d) { return extractV2ex(d); } }
+    ,{ id: "arxiv", source: "self", lastVerified: "2026-06-06", driftCheck: "auto",
+       sampleUrl: "", match: { host: "arxiv.org", url: /\/abs\// }, extract: function (d) { return extractArxiv(d); } }
   ];
 
   function applySiteRule(doc, url) {
