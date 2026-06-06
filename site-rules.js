@@ -30,16 +30,17 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  // Zhihu lazy-loads images: real URL in data-original / data-actualsrc. Promote
+  // Zhihu lazy-loads images: real URL in data-original / data-actualsrc / data-src. Promote
   // to src so markdown keeps them. Operates on a DETACHED node (never the live DOM).
   function fixLazyImages(root) {
     if (!root || !root.querySelectorAll) return root;
     root.querySelectorAll("img").forEach(function (img) {
-      var real = img.getAttribute("data-original") || img.getAttribute("data-actualsrc");
+      var real = img.getAttribute("data-original") || img.getAttribute("data-actualsrc") || img.getAttribute("data-src");
       var cur = img.getAttribute("src") || "";
       if (real && (!cur || cur.indexOf("data:") === 0)) img.setAttribute("src", real);
       img.removeAttribute("data-original");
       img.removeAttribute("data-actualsrc");
+      img.removeAttribute("data-src");
     });
     return root;
   }
@@ -51,6 +52,73 @@
     tmp.innerHTML = html;
     fixLazyImages(tmp);
     return tmp.innerHTML;
+  }
+
+  // Read a DOM <script type=application/json> blob by id (e.g. __NEXT_DATA__). Isolated-world-safe.
+  function readJsonScript(doc, id) {
+    try {
+      var el = doc.getElementById(id);
+      return el ? JSON.parse(el.textContent || "null") : null;
+    } catch (_) { return null; }
+  }
+  function readNextData(doc) { return readJsonScript(doc, "__NEXT_DATA__"); }
+
+  // Return the first JSON-LD graph node whose @type matches (string or in an array of @type).
+  function readJsonLd(doc, type) {
+    var nodes = doc.querySelectorAll('script[type="application/ld+json"]');
+    for (var i = 0; i < nodes.length; i++) {
+      var data;
+      try { data = JSON.parse(nodes[i].textContent || "null"); } catch (_) { continue; }
+      var arr = Array.isArray(data) ? data : (data && Array.isArray(data["@graph"]) ? data["@graph"] : [data]);
+      for (var j = 0; j < arr.length; j++) {
+        var t = arr[j] && arr[j]["@type"];
+        if (t === type || (Array.isArray(t) && t.indexOf(type) !== -1)) return arr[j];
+      }
+    }
+    return null;
+  }
+
+  function stripSelectors(root, selectors) {
+    if (!root || !selectors) return root;
+    selectors.forEach(function (sel) {
+      root.querySelectorAll(sel).forEach(function (n) { n.parentNode && n.parentNode.removeChild(n); });
+    });
+    return root;
+  }
+
+  // Defeat CSS-only "read more" folds: drop mask nodes + clear inline max-height/overflow.
+  function clearCollapseMask(root, removeSelectors, clearSelectors) {
+    stripSelectors(root, removeSelectors || []);
+    (clearSelectors || []).forEach(function (sel) {
+      root.querySelectorAll(sel).forEach(function (n) {
+        n.style && (n.style.maxHeight = "none", n.style.height = "auto", n.style.overflow = "visible");
+      });
+    });
+    return root;
+  }
+
+  function pickText(doc, picks) {
+    for (var i = 0; i < (picks || []).length; i++) {
+      var p = picks[i];
+      if (Array.isArray(p)) { var el = doc.querySelector(p[0]); if (el) { var v = el.getAttribute(p[1]); if (v) return v.trim(); } }
+      else { var e2 = doc.querySelector(p); if (e2 && e2.textContent.trim()) return e2.textContent.trim(); }
+    }
+    return "";
+  }
+
+  // Generic single-container extractor for simple article sites.
+  // opts: { title:[sel|['sel','attr']...], content:[sel...], clean:[sel...], collapseRemove:[sel...], collapseClear:[sel...] }
+  function extractContainer(doc, opts) {
+    var container = null;
+    for (var i = 0; i < opts.content.length; i++) { container = doc.querySelector(opts.content[i]); if (container) break; }
+    if (!container) return null;
+    var clone = container.cloneNode(true);
+    clearCollapseMask(clone, opts.collapseRemove, opts.collapseClear);
+    stripSelectors(clone, opts.clean || []);
+    fixLazyImages(clone);
+    var contentHtml = clone.innerHTML;
+    if (!contentHtml || !contentHtml.trim()) return null;
+    return { contentHtml: contentHtml, title: pickText(doc, opts.title) || doc.title };
   }
 
   function answerSection(author, voteup, permalink, bodyHtml) {
@@ -226,9 +294,13 @@
 
   // Ordered: answer-permalink before question (a permalink URL contains /question/).
   var SITE_RULES = [
-    { id: "zhihu-answer",   match: { host: "zhihu.com",          url: /\/question\/\d+\/answer\/\d+/ },   extract: extractZhihuAnswer },
-    { id: "zhihu-question", match: { host: "zhihu.com",          url: /\/question\/\d+\/?(?:[?#].*)?$/ }, extract: extractZhihuQuestion },
-    { id: "zhihu-zhuanlan", match: { host: "zhuanlan.zhihu.com", url: /\/p\/\d+/ },                       extract: extractZhihuArticle }
+    { id: "zhihu-answer",   source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
+      match: { host: "zhihu.com", url: /\/question\/\d+\/answer\/\d+/ }, extract: extractZhihuAnswer },
+    { id: "zhihu-question", source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
+      match: { host: "zhihu.com", url: /\/question\/\d+\/?(?:[?#].*)?$/ }, extract: extractZhihuQuestion },
+    { id: "zhihu-zhuanlan", source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
+      match: { host: "zhuanlan.zhihu.com", url: /\/p\/\d+/ }, extract: extractZhihuArticle }
+    // batch-1 rules appended in Tasks 2 & 3
   ];
 
   function applySiteRule(doc, url) {

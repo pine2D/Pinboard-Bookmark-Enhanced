@@ -562,6 +562,16 @@ const QUESTION_ANON = `<!DOCTYPE html><html><head></head><body>
   const r = applySiteRule(doc, "https://www.zhihu.com/question/999");
   check("zhihu empty → null (falls back to Defuddle)", r === null, JSON.stringify(r));
 })();
+
+section("site-rules: helpers");
+(() => {
+  const doc = new DOMParser().parseFromString(
+    '<div id="c"><p>hi <img data-src="https://x/i.jpg" src="data:image/gif,p"></p><span class="ad">x</span></div>', "text/html");
+  const c = doc.getElementById("c").cloneNode(true);
+  c.querySelectorAll(".ad").forEach(n => n.remove());
+  c.querySelectorAll("img").forEach(img => { const r = img.getAttribute("data-src"); if (r) img.setAttribute("src", r); });
+  check("data-src promoted (helper parity)", /src="https:\/\/x\/i\.jpg"/.test(norm(c.innerHTML)) && !/class="ad"/.test(c.innerHTML), c.innerHTML);
+})();
 </script>
 
 <script>
