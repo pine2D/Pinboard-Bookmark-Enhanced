@@ -54,21 +54,6 @@
     return tmp.innerHTML;
   }
 
-  // Return the first JSON-LD graph node whose @type matches (string or in an array of @type).
-  function readJsonLd(doc, type) {
-    var nodes = doc.querySelectorAll('script[type="application/ld+json"]');
-    for (var i = 0; i < nodes.length; i++) {
-      var data;
-      try { data = JSON.parse(nodes[i].textContent || "null"); } catch (_) { continue; }
-      var arr = Array.isArray(data) ? data : (data && Array.isArray(data["@graph"]) ? data["@graph"] : [data]);
-      for (var j = 0; j < arr.length; j++) {
-        var t = arr[j] && arr[j]["@type"];
-        if (t === type || (Array.isArray(t) && t.indexOf(type) !== -1)) return arr[j];
-      }
-    }
-    return null;
-  }
-
   function pickText(doc, picks) {
     for (var i = 0; i < (picks || []).length; i++) {
       var p = picks[i];
@@ -235,39 +220,30 @@
 
   // ---- StackOverflow / StackExchange (JSON-LD QAPage; DOM fallback) ------
   function extractStackOverflow(doc) {
-    var qa = readJsonLd(doc, "QAPage");
-    var main = qa && qa.mainEntity;
-    var title = (main && (main.name || qa.name)) || pickText(doc, ["h1[itemprop=name]", "h1 .question-hyperlink", "h1"]);
+    // DOM-only: modern SO emits no QAPage JSON-LD. Handles classic Q&A (#answers .answer)
+    // AND Discussions (#replies-container [id^=reply-], no votes/accepted).
+    var title = pickText(doc, ["#question-header h1", "h1 a.question-hyperlink", "h1[itemprop=name]"]); // NOT bare h1 — a SO onboarding modal can render an earlier h1
     var parts = [];
-    if (main && main.text) parts.push(cleanBodyHtml(doc, main.text));
-    var answers = [];
-    if (main) {
-      if (main.acceptedAnswer) [].push.apply(answers, [].concat(main.acceptedAnswer).map(function (a) { return { a: a, accepted: true }; }));
-      if (main.suggestedAnswer) [].push.apply(answers, [].concat(main.suggestedAnswer).map(function (a) { return { a: a, accepted: false }; }));
-    }
-    if (answers.length) {
-      parts.push("<h2>" + escapeHtml(answers.length + " Answers") + "</h2>");
-      answers.forEach(function (x) {
-        var votes = x.a.upvoteCount != null ? x.a.upvoteCount + " votes" : "answer";
-        parts.push("<h3>" + escapeHtml((x.accepted ? "[accepted] " : "") + votes) + "</h3>" + cleanBodyHtml(doc, x.a.text || ""));
-      });
-    }
-    // DOM fallback per-section: question if JSON-LD lacked its body, answers if
-    // JSON-LD carried none (a sparse QAPage can have the question but no answers).
-    if (!main || !main.text) {
-      var q = doc.querySelector("#question .s-prose.js-post-body");
-      if (q) parts.unshift(cleanBodyHtml(doc, q.innerHTML));
-    }
-    if (!answers.length) {
-      doc.querySelectorAll("#answers .answer").forEach(function (ans) {
-        var body = ans.querySelector(".s-prose.js-post-body");
-        var vc = ans.querySelector(".js-vote-count");
-        var acc = ans.classList.contains("accepted-answer") || ans.querySelector(".js-accepted-answer-indicator");
-        if (body) parts.push("<h3>" + escapeHtml((acc ? "[accepted] " : "") + (vc ? vc.textContent.trim() + " votes" : "")) + "</h3>" + cleanBodyHtml(doc, body.innerHTML));
+    var q = doc.querySelector("#question .s-prose.js-post-body");
+    if (q) parts.push(cleanBodyHtml(doc, q.innerHTML));
+    var posts = doc.querySelectorAll("#answers .answer, #replies-container [id^='reply-']");
+    if (posts.length) {
+      parts.push("<h2>" + escapeHtml(posts.length + (posts.length === 1 ? " Answer" : " Answers")) + "</h2>");
+      posts.forEach(function (post) {
+        var body = post.querySelector(".s-prose.js-post-body");
+        if (!body) return;
+        var us = post.querySelectorAll(".user-details a"); // classic: last = answerer (edit signatures render first)
+        var author = us.length ? us[us.length - 1].textContent.trim() : "";
+        if (!author) { var sc = post.querySelector(".s-user-card--link"); if (sc) author = sc.textContent.trim(); } // Discussions replies
+        var vc = post.querySelector(".js-vote-count");
+        var votes = vc ? vc.textContent.trim() : post.getAttribute("data-score");
+        var accepted = post.classList.contains("accepted-answer"); // class is set only on the accepted one; the .js-accepted-answer-indicator element exists (hidden) in EVERY answer
+        var head = (accepted ? "[accepted] " : "") + (author || "") + (votes ? " · " + votes + " votes" : "");
+        parts.push("<h3>" + escapeHtml(head.trim() || "answer") + "</h3>" + cleanBodyHtml(doc, body.innerHTML));
       });
     }
     if (!parts.join("")) return null;
-    return { contentHtml: parts.join("\n"), title: title };
+    return { contentHtml: parts.join("\n"), title: title || doc.title };
   }
 
   // ---- V2EX (topic + threaded replies) ----------------------------------

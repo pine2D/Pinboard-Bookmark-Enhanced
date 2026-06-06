@@ -565,25 +565,37 @@ const QUESTION_ANON = `<!DOCTYPE html><html><head></head><body>
 
 section("site-rules: multi-item");
 (() => {
-  const html = `<!DOCTYPE html><html><head>
-  <script type="application/ld+json">{"@type":"QAPage","mainEntity":{"@type":"Question","name":"How to X?","text":"<p>question body</p>","acceptedAnswer":{"@type":"Answer","text":"<p>accepted answer</p>","upvoteCount":42},"suggestedAnswer":[{"@type":"Answer","text":"<p>other answer</p>","upvoteCount":7}]}}<\/script>
-  </head><body><h1>How to X?</h1></body></html>`;
+  // Classic Q&A: #answers .answer + .js-vote-count + .accepted-answer + .user-details a (last = answerer)
+  const html = `<!DOCTYPE html><html><head></head><body>
+  <div id="question-header"><h1>How to X?</h1></div>
+  <div id="question"><div class="s-prose js-post-body"><p>question body</p></div></div>
+  <div id="answers">
+    <div class="answer accepted-answer" id="answer-111" data-score="42"><span class="js-accepted-answer-indicator"></span><div class="js-vote-count">42</div><div class="s-prose js-post-body"><p>accepted answer</p></div><div class="user-details"><a href="/users/2/ed">editor</a></div><div class="user-details"><a href="/users/1/alice">alice</a></div></div>
+    <div class="answer" id="answer-222" data-score="7"><span class="js-accepted-answer-indicator"></span><div class="js-vote-count">7</div><div class="s-prose js-post-body"><p>other answer</p></div><div class="user-details"><a href="/users/3/bob">bob</a></div></div>
+  </div></body></html>`;
   const doc = new DOMParser().parseFromString(html, "text/html");
   const r = applySiteRule(doc, "https://stackoverflow.com/questions/123456/how-to-x");
   const c = r ? norm(r.contentHtml) : "";
-  check("so → id+title", r && r.id === "stackoverflow" && r.title === "How to X?", JSON.stringify(r && [r.id, r.title]));
-  check("so → question+answers+accepted+votes, no dingbat", /question body/.test(c) && /accepted answer/.test(c) && /other answer/.test(c) && /\[accepted\]/.test(c) && /42 votes/.test(c) && /7 votes/.test(c) && !/✓/.test(c), c);
+  check("so classic → id+title", r && r.id === "stackoverflow" && r.title === "How to X?", JSON.stringify(r && [r.id, r.title]));
+  check("so classic → question+answers, accepted, votes, author=last user-details, no dingbat",
+    /question body/.test(c) && /accepted answer/.test(c) && /other answer/.test(c) && /\[accepted\] alice · 42 votes/.test(c) && /bob · 7 votes/.test(c) && !/\[accepted\] bob/.test(c) && !/editor/.test(c) && !/✓/.test(c), c);
 })();
 
 (() => {
-  // sparse JSON-LD: question text but NO answers → answers must come from the DOM fallback
-  const html = `<!DOCTYPE html><html><head>
-  <script type="application/ld+json">{"@type":"QAPage","mainEntity":{"@type":"Question","name":"Sparse Q","text":"<p>q body</p>"}}<\/script>
-  </head><body><div id="answers"><div class="answer accepted-answer"><div class="js-vote-count">9</div><div class="s-prose js-post-body"><p>dom answer body</p></div></div></div></body></html>`;
+  // Discussions: #replies-container [id^=reply-], no votes/accepted, author = .user-details a
+  const html = `<!DOCTYPE html><html><head></head><body>
+  <div id="question-header"><h1>Discussion topic?</h1></div>
+  <div id="question"><div class="s-prose js-post-body"><p>discussion question</p></div></div>
+  <div id="answers"><div id="replies-container">
+    <div class="post-layout" id="reply-901"><div class="s-prose js-post-body"><p>first reply</p></div><div class="s-user-card"><a class="s-avatar" href="/users/9/carol"></a><a class="s-user-card--link" href="/users/9/carol">carol</a></div></div>
+    <div class="post-layout" id="reply-902"><div class="s-prose js-post-body"><p>second reply</p></div><div class="s-user-card"><a class="s-avatar" href="/users/8/dave"></a><a class="s-user-card--link" href="/users/8/dave">dave</a></div></div>
+  </div></div></body></html>`;
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const r = applySiteRule(doc, "https://stackoverflow.com/questions/999/sparse");
+  const r = applySiteRule(doc, "https://stackoverflow.com/questions/79948695/discussion");
   const c = r ? norm(r.contentHtml) : "";
-  check("so → DOM-answer fallback when JSON-LD lacks answers", /q body/.test(c) && /dom answer body/.test(c) && /\[accepted\]/.test(c) && /9 votes/.test(c), c);
+  check("so discussions → id+title", r && r.id === "stackoverflow" && r.title === "Discussion topic?", JSON.stringify(r && [r.id, r.title]));
+  check("so discussions → question + replies, author, no votes",
+    /discussion question/.test(c) && /first reply/.test(c) && /<h3>carol<\/h3>/.test(c) && /second reply/.test(c) && /<h3>dave<\/h3>/.test(c) && !/votes/.test(c), c);
 })();
 
 (() => {
