@@ -6,10 +6,7 @@ How to add or maintain a per-site Markdown-extraction rule in `site-rules.js`. R
 
 1. **Inspect** — open the target page (logged in, fully scrolled if it lazy-loads), open DevTools Console, paste `docs/site-rules/inspect.js`. Read the summary: the content container selector, any embedded-JSON blob, lazy-image attrs, and fold/login markers.
 2. **Choose a source** for the selectors (see *Source-selection priority* below). Prefer an active, license-clean source; cross-check across ≥2 where possible.
-3. **Add the rule** to `SITE_RULES` in `site-rules.js`:
-   - Simple article site → a 3-line `extract` fn calling `extractContainer(doc, {...})`.
-   - Multi-item (Q&A, forum, feed) → a bespoke `extract` fn (see `extractZhihuQuestion`, `extractStackOverflow`, `extractV2ex`).
-   - Fill the metadata fields (schema below). Set `lastVerified` to the date YOU confirmed it against the live site.
+3. **Add the rule — but first decide if one is warranted.** Single-article pages (blogs, news, one article) are handled well by Defuddle generic, so do NOT write a rule for them: a custom rule adds maintenance + regression risk for no gain (verified 2026-06 — WeChat/CSDN/掘金/dev.to showed no improvement over Defuddle and 掘金 regressed by leaking `<style>`). Write a rule ONLY for **multi-item pages Defuddle structurally can't do**: Q&A (question + answers), forums (topic + replies), or structured-metadata cards (arXiv). Add a bespoke `extract(doc,url)` fn to `SITE_RULES` (see `extractZhihuQuestion`/`extractStackOverflow`/`extractV2ex`/`extractArxiv`); fill the metadata (schema below); set `lastVerified` to the date YOU confirmed it live.
 4. **Add a fixture** to `md-convert-tests.html` (copy a sibling rule's block): a `DOMParser` fixture + `check(...)` assertions for id/title/body/strip. Put noise nodes INSIDE the content container so the strip logic is actually exercised. Escape any literal `</script>` inside fixture strings as `<\/script>`.
 5. **Verify** — `cd .qa-scan && node run-md-tests.mjs` (offline, must be FAIL 0) and, if the site is public, add the rule's `sampleUrl` to `.qa-scan/site-rules-drift.mjs` and run `node site-rules-drift.mjs` (live).
 6. **Commit** with provenance, e.g. `feat(extract): site rule for <site>`.
@@ -37,8 +34,7 @@ How to add or maintain a per-site Markdown-extraction rule in `site-rules.js`. R
 |------|-----------|-------------------|
 | arxiv | auto | canary (validated live: ~1.3k chars) |
 | stackoverflow / stackexchange | auto | canary on YOUR machine (CI IP hits Cloudflare challenge) |
-| dev.to | auto | canary (fill sampleUrl) |
-| wechat / csdn / juejin / cnblogs / v2ex | auto | canary on YOUR machine (CN sites are anti-bot/IP-blocked from CI) |
+| v2ex | auto | canary on YOUR machine (reply author = `a[href^="/member/"]`) |
 | zhihu-* | manual | login-walled → periodic human check + cross-source |
 
 Note: the CI/WSL environment can't load most CN or Cloudflare-fronted sites (anti-bot). The canary reports those as "verify on your own machine", not as drift. Real-DOM verification for those rules is the maintainer's gate-1 step in a logged-in browser.
@@ -47,18 +43,17 @@ Note: the CI/WSL environment can't load most CN or Cloudflare-fronted sites (ant
 
 ```js
 {
-  id: "wechat",                  // unique id
-  source: "code-box@2026-05",    // where selectors came from (for re-check) | "self" | "ftr@<sha>"
-  lastVerified: "2026-06-06",    // date WE confirmed against the live site (NOT an upstream date)
+  id: "v2ex",                    // unique id
+  source: "self",                // where selectors came from (for re-check) | "ftr@<sha>" | "code-box@<date>"
+  lastVerified: "2026-06-07",    // date WE confirmed against the live site (NOT an upstream date)
   driftCheck: "auto",            // "auto" (public, canary-checkable) | "manual" (login/anti-bot)
-  sampleUrl: "https://...",      // a stable public article URL for the canary ("" if manual)
-  match: { host: "mp.weixin.qq.com", url: /\/s(\/|\?|$)/, test: (doc,url)=>... },  // host (cheap) → url regex → optional DOM probe
-  extract: function (doc) { return extractContainer(doc, { title:[...], content:[...], clean:[...], collapseRemove:[...], collapseClear:[...] }); }
-  // or a bespoke extract: (doc,url) => ({ contentHtml, title }) | null
+  sampleUrl: "https://...",      // a stable public URL for the canary ("" if manual)
+  match: { host: "v2ex.com", url: /\/t\/\d+/, test: (doc,url)=>... },  // host (cheap) → url regex → optional DOM probe
+  extract: function (doc, url) { /* assemble multi-item HTML using shared helpers; return { contentHtml, title } | null */ }
 }
 ```
 
-Shared helpers available to `extract`: `extractContainer`, `cleanBodyHtml`, `escapeHtml`, `pickText`, `stripSelectors`, `clearCollapseMask`, `fixLazyImages` (handles data-src/data-original/data-actualsrc), `readJsonLd(doc,type)`, `readNextData(doc)`, `readEntities(doc)` (Zhihu js-initialData). Reuse helpers; avoid new per-site code where a helper fits.
+Shared helpers available to `extract`: `cleanBodyHtml(doc,html)` (HTML string → detached div → fix lazy images → innerHTML), `escapeHtml`, `pickText(doc,[sel|['sel','attr']...])`, `fixLazyImages` (promotes data-src/data-original/data-actualsrc), `readJsonLd(doc,type)` (JSON-LD node by @type), `readEntities(doc)` (Zhihu js-initialData), plus the Zhihu vote helpers `answerSection`/`parseCount`/`domVoteup`. Reuse helpers; avoid new per-site code where a helper fits. (Note: single-article container helpers were intentionally removed — single-article extraction is Defuddle's job.)
 
 ## Constraints
 

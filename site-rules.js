@@ -54,15 +54,6 @@
     return tmp.innerHTML;
   }
 
-  // Read a DOM <script type=application/json> blob by id (e.g. __NEXT_DATA__). Isolated-world-safe.
-  function readJsonScript(doc, id) {
-    try {
-      var el = doc.getElementById(id);
-      return el ? JSON.parse(el.textContent || "null") : null;
-    } catch (_) { return null; }
-  }
-  function readNextData(doc) { return readJsonScript(doc, "__NEXT_DATA__"); }
-
   // Return the first JSON-LD graph node whose @type matches (string or in an array of @type).
   function readJsonLd(doc, type) {
     var nodes = doc.querySelectorAll('script[type="application/ld+json"]');
@@ -78,25 +69,6 @@
     return null;
   }
 
-  function stripSelectors(root, selectors) {
-    if (!root || !selectors) return root;
-    selectors.forEach(function (sel) {
-      root.querySelectorAll(sel).forEach(function (n) { n.parentNode && n.parentNode.removeChild(n); });
-    });
-    return root;
-  }
-
-  // Defeat CSS-only "read more" folds: drop mask nodes + clear inline max-height/overflow.
-  function clearCollapseMask(root, removeSelectors, clearSelectors) {
-    stripSelectors(root, removeSelectors || []);
-    (clearSelectors || []).forEach(function (sel) {
-      root.querySelectorAll(sel).forEach(function (n) {
-        n.style && (n.style.maxHeight = "none", n.style.height = "auto", n.style.overflow = "visible");
-      });
-    });
-    return root;
-  }
-
   function pickText(doc, picks) {
     for (var i = 0; i < (picks || []).length; i++) {
       var p = picks[i];
@@ -104,22 +76,6 @@
       else { var e2 = doc.querySelector(p); if (e2 && e2.textContent.trim()) return e2.textContent.trim(); }
     }
     return "";
-  }
-
-  // Generic single-container extractor for simple article sites.
-  // opts: { title:[sel|['sel','attr']...], content:[sel...], clean:[sel...], collapseRemove:[sel...], collapseClear:[sel...] }
-  function extractContainer(doc, opts) {
-    var picks = (opts && opts.content) || [];
-    var container = null;
-    for (var i = 0; i < picks.length; i++) { container = doc.querySelector(picks[i]); if (container) break; }
-    if (!container) return null;
-    var clone = container.cloneNode(true);
-    clearCollapseMask(clone, opts.collapseRemove, opts.collapseClear);
-    stripSelectors(clone, opts.clean || []);
-    fixLazyImages(clone);
-    var contentHtml = clone.innerHTML;
-    if (!contentHtml || !contentHtml.trim()) return null;
-    return { contentHtml: contentHtml, title: pickText(doc, opts.title) || doc.title };
   }
 
   function answerSection(author, voteup, permalink, bodyHtml) {
@@ -277,45 +233,6 @@
     return { contentHtml: note + (detail || "") + sections.join("\n"), title: questionTitle(doc, qid, ent) };
   }
 
-  // ---- Simple container sites (extractContainer) ------------------------
-  function extractWechat(doc) {
-    return extractContainer(doc, {
-      title: ["h1.rich_media_title", ['meta[property="og:title"]', "content"]],
-      content: ["#js_content"],
-      clean: ["#js_pc_qr_code", ".qr_code_pc"]
-    });
-  }
-  function extractCsdn(doc) {
-    return extractContainer(doc, {
-      title: ["#articleContentId", ".title-article", "h1.title-article", "h1"],
-      content: ["#content_views"],
-      clean: [".recommend-box", ".csdn-tracking-statistics", ".hljs-button", ".article-copyright", ".blog-content-box .pre-numbering"],
-      collapseRemove: [".hide-article-box", ".btn-readmore", ".article-show-more", ".user-article-hide", ".readall_box", ".hide-preCode-box"],
-      collapseClear: ["#article_content", "pre.set-code-hide"]
-    });
-  }
-  function extractJuejin(doc) {
-    return extractContainer(doc, {
-      title: ["h1.article-title", "h1"],
-      content: ["article.article-viewer.markdown-body", ".article-viewer.markdown-body", "article.article"],
-      clean: [".copy-code-btn", ".code-block-extension-lang", ".article-end", ".author-info-block"]
-    });
-  }
-  function extractCnblogs(doc) {
-    return extractContainer(doc, {
-      title: ["#cb_post_title_url", "h1.postTitle a", "h1.postTitle", "#cb_post_title_url a"],
-      content: ["#cnblogs_post_body", "#post_detail .post"],
-      clean: [".cnblogs_code_toolbar", "#blog_post_info_block", "#comment_form"]
-    });
-  }
-  function extractDevto(doc) {
-    return extractContainer(doc, {
-      title: ["h1.crayons-article__title", ".crayons-article__header h1", "h1", ['meta[property="og:title"]', "content"]],
-      content: ["#article-body", ".crayons-article__body"],
-      clean: [".crayons-article__actions", ".comment-subscription-form", ".article-actions"]
-    });
-  }
-
   // ---- StackOverflow / StackExchange (JSON-LD QAPage; DOM fallback) ------
   function extractStackOverflow(doc) {
     var qa = readJsonLd(doc, "QAPage");
@@ -364,7 +281,7 @@
     if (replies.length) {
       parts.push("<h2>" + escapeHtml("回复 (" + replies.length + ")") + "</h2>");
       replies.forEach(function (cell) {
-        var author = pickText({ querySelector: function (s) { return cell.querySelector(s); } }, ["strong .member", ".member", "strong.dark", ".username"]);
+        var author = pickText({ querySelector: function (s) { return cell.querySelector(s); } }, ["a[href^='/member/']", "strong a", "a.dark"]);
         var floor = (cell.querySelector(".no") || {}).textContent || "";
         var thanks = (cell.querySelector(".small.fade") || {}).textContent || "";
         var body = cell.querySelector(".reply_content");
@@ -421,16 +338,6 @@
       match: { host: "zhihu.com", url: /\/question\/\d+\/?(?:[?#].*)?$/ }, extract: extractZhihuQuestion },
     { id: "zhihu-zhuanlan", source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
       match: { host: "zhuanlan.zhihu.com", url: /\/p\/\d+/ }, extract: extractZhihuArticle }
-    ,{ id: "wechat",  source: "wechat-article-exporter@2026-06", lastVerified: "2026-06-06", driftCheck: "auto",
-       sampleUrl: "", match: { host: "mp.weixin.qq.com", url: /\/s(\/|\?|$)/ }, extract: function (d) { return extractWechat(d); } }
-    ,{ id: "csdn",    source: "code-box@2026-05", lastVerified: "2026-06-06", driftCheck: "auto",
-       sampleUrl: "", match: { host: "csdn.net", url: /\/article\/details\// }, extract: function (d) { return extractCsdn(d); } }
-    ,{ id: "juejin",  source: "code-box@2026-05", lastVerified: "2026-06-06", driftCheck: "auto",
-       sampleUrl: "", match: { host: "juejin.cn", url: /\/post\/\d+/ }, extract: function (d) { return extractJuejin(d); } }
-    ,{ id: "cnblogs", source: "code-box@2026-05", lastVerified: "2026-06-06", driftCheck: "auto",
-       sampleUrl: "", match: { host: "cnblogs.com", url: /\/p\/|\/archive\/|\.html/ }, extract: function (d) { return extractCnblogs(d); } }
-    ,{ id: "devto",   source: "obsidian-templates@2026", lastVerified: "2026-06-06", driftCheck: "auto",
-       sampleUrl: "", match: { host: "dev.to", url: /\/[^/?#]+\/[^/?#]+/ }, extract: function (d) { return extractDevto(d); } }
     ,{ id: "stackoverflow", source: "json-ld+self", lastVerified: "2026-06-06", driftCheck: "auto",
        sampleUrl: "", match: { host: "stackoverflow.com", url: /\/questions\/\d+/ }, extract: function (d) { return extractStackOverflow(d); } }
     ,{ id: "stackexchange", source: "json-ld+self", lastVerified: "2026-06-06", driftCheck: "auto",
