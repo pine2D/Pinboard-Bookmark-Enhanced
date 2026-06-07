@@ -386,7 +386,9 @@ html,body{margin:0;background:var(--x-bg)}
 .export-doc pre code{background:none;padding:0;border-radius:0;font-size:13px}
 .export-doc blockquote{border-left:3px solid var(--x-bq-bd);background:var(--x-bq-bg);color:var(--x-bq-fg);padding:12px 20px;margin:1.5em 0;border-radius:0 6px 6px 0}
 .export-doc blockquote p{margin:.4em 0}
-.export-doc blockquote blockquote{background:transparent;border-left:2px solid rgba(128,128,128,.4);padding:4px 0 4px 14px;margin:.6em 0;border-radius:0}
+.export-doc blockquote>p:first-child>strong:first-child{color:var(--x-bq-bd)}
+.export-doc blockquote blockquote{position:relative;background:transparent;border-left:2px solid rgba(128,128,128,.4);padding:4px 0 4px 16px;margin:.4em 0;border-radius:0}
+.export-doc blockquote blockquote::before{content:"";position:absolute;left:0;top:.9em;width:12px;height:2px;background:rgba(128,128,128,.4)}
 .export-doc img{max-width:100%;height:auto;border-radius:8px;margin:1.5em 0;border:1px solid var(--x-bd)}
 .export-doc ul,.export-doc ol{margin:1em 0;padding-left:1.75em}
 .export-doc li{margin:.35em 0}

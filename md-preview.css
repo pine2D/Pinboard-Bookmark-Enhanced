@@ -298,15 +298,27 @@ main {
   color: var(--bq-fg);
 }
 #rendered-view blockquote p { margin: 0.4em 0; }
-/* Nested levels (deep reply threads): thin neutral guide, no tint stacking, tighter.
-   Only the outermost quote shows the accent bar + tint; inner levels read as light
-   gray indent guides instead of several compounding blue bars. */
+/* Author/floor header line — accent colour so each reply's author scans easily. */
+#rendered-view blockquote > p:first-child > strong:first-child { color: var(--bq-border); }
+/* Nested levels (deep reply threads): thin neutral guide + a small elbow connector,
+   no tint stacking, tighter — reads as a comment tree instead of stacked blue bars.
+   Only the outermost quote keeps the accent bar + tint. */
 #rendered-view blockquote blockquote {
+  position: relative;
   background: transparent;
   border-left: 2px solid rgba(128, 128, 128, 0.4);
-  padding: 4px 0 4px 14px;
-  margin: 0.6em 0;
+  padding: 4px 0 4px 16px;
+  margin: 0.4em 0;
   border-radius: 0;
+}
+#rendered-view blockquote blockquote::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.9em;
+  width: 12px;
+  height: 2px;
+  background: rgba(128, 128, 128, 0.4);
 }
 
 /* Images */
