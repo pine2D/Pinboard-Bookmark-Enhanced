@@ -276,15 +276,34 @@
   // ---- arXiv (/abs/ citation_* meta card) -------------------------------
   function extractArxiv(doc) {
     function metas(name) { return Array.prototype.map.call(doc.querySelectorAll('meta[name="' + name + '"]'), function (m) { return m.getAttribute("content") || ""; }).filter(Boolean); }
-    var title = (metas("citation_title")[0]) || pickText(doc, ["h1.title", "h1"]);
-    var authors = metas("citation_author");
-    var abs = metas("citation_abstract")[0] || pickText(doc, ["blockquote.abstract"]);
-    var pdf = metas("citation_pdf_url")[0] || "";
+    function domText(sel) { var e = doc.querySelector(sel); return e ? e.textContent.replace(/\s+/g, " ").trim() : ""; }
+    var title = (metas("citation_title")[0]) || domText("h1.title");
+    // citation_author is "Last, First" -> render "First Last"
+    var authors = metas("citation_author").map(function (a) {
+      var p = a.split(","); return p.length >= 2 ? (p[1].trim() + " " + p[0].trim()) : a.trim();
+    });
+    var abs = metas("citation_abstract")[0] || domText("blockquote.abstract").replace(/^Abstract:?\s*/i, ""); // keep $...$ for KaTeX
+    var id = metas("citation_arxiv_id")[0] || "";
+    var date = metas("citation_date")[0] || domText(".dateline").replace(/[\[\]]/g, "").trim();
+    var subjects = domText(".subjects");
+    var comments = domText(".comments");
+    var msc = domText(".msc-classes");
+    var doi = domText(".doi a") || domText(".doi");
+    var jref = domText(".jref");
+    var pdf = metas("citation_pdf_url")[0] || (id ? "https://arxiv.org/pdf/" + id : "");
+    var absUrl = id ? "https://arxiv.org/abs/" + id : "";
     if (!abs && !authors.length) return null;
     var html = "";
     if (authors.length) html += "<p><strong>" + escapeHtml(authors.join(", ")) + "</strong></p>";
+    var line1 = []; if (id) line1.push("arXiv:" + id); if (subjects) line1.push(subjects); if (date) line1.push(date); if (comments) line1.push(comments);
+    if (line1.length) html += "<p>" + escapeHtml(line1.join(" · ")) + "</p>";
+    var line2 = []; if (msc) line2.push("MSC: " + msc); if (jref) line2.push("Journal: " + jref); if (doi) line2.push("DOI: " + doi);
+    if (line2.length) html += "<p>" + escapeHtml(line2.join(" · ")) + "</p>";
     if (abs) html += "<p>" + escapeHtml(abs) + "</p>";
-    if (pdf) html += '<p><a href="' + escapeHtml(pdf) + '">PDF</a></p>';
+    var links = [];
+    if (absUrl) links.push('<a href="' + escapeHtml(absUrl) + '">Abstract</a>');
+    if (pdf) links.push('<a href="' + escapeHtml(pdf) + '">PDF</a>');
+    if (links.length) html += "<p>" + links.join(" · ") + "</p>";
     return { contentHtml: html, title: title };
   }
 

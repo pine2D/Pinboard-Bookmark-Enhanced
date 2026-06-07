@@ -619,13 +619,18 @@ section("site-rules: multi-item");
   <meta name="citation_title" content="A Great Paper">
   <meta name="citation_author" content="Doe, Jane">
   <meta name="citation_author" content="Smith, John">
-  <meta name="citation_abstract" content="We prove things.">
-  <meta name="citation_pdf_url" content="https://arxiv.org/pdf/2401.00001"></head><body></body></html>`;
+  <meta name="citation_abstract" content="We prove $x \\geq 2$.">
+  <meta name="citation_arxiv_id" content="2401.00001">
+  <meta name="citation_date" content="2024/01/01">
+  <meta name="citation_pdf_url" content="https://arxiv.org/pdf/2401.00001">
+  </head><body><div class="subjects">Number Theory (math.NT)</div><div class="comments">10 pages</div><div class="msc-classes">11G30</div></body></html>`;
   const doc = new DOMParser().parseFromString(html, "text/html");
   const r = applySiteRule(doc, "https://arxiv.org/abs/2401.00001");
   const c = r ? norm(r.contentHtml) : "";
   check("arxiv → id+title", r && r.id === "arxiv" && r.title === "A Great Paper", JSON.stringify(r && [r.id, r.title]));
-  check("arxiv → authors+abstract+pdf", /Doe, Jane, Smith, John/.test(c) && /We prove things\./.test(c) && /arxiv\.org\/pdf\/2401\.00001/.test(c), c);
+  check("arxiv → authors as First Last", /Jane Doe, John Smith/.test(c) && !/Doe, Jane/.test(c), c);
+  check("arxiv → metadata line id·subjects·date·comments", /arXiv:2401\.00001/.test(c) && /Number Theory \(math\.NT\)/.test(c) && /2024\/01\/01/.test(c) && /10 pages/.test(c), c);
+  check("arxiv → MSC + abstract keeps $...$ + abs/pdf links", /MSC: 11G30/.test(c) && /We prove \$x \\geq 2\$\./.test(c) && /arxiv\.org\/abs\/2401\.00001/.test(c) && /arxiv\.org\/pdf\/2401\.00001/.test(c), c);
 })();
 
 section("site-rules: helpers");
