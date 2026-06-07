@@ -230,28 +230,31 @@
 
   // ---- StackOverflow / StackExchange (JSON-LD QAPage; DOM fallback) ------
   function extractStackOverflow(doc) {
-    // DOM-only: modern SO emits no QAPage JSON-LD. Handles classic Q&A (#answers .answer)
-    // AND Discussions (#replies-container [id^=reply-], no votes/accepted).
-    var title = pickText(doc, ["#question-header h1", "h1 a.question-hyperlink", "h1[itemprop=name]"]); // NOT bare h1 — a SO onboarding modal can render an earlier h1
+    var title = pickText(doc, ["#question-header h1", "h1 a.question-hyperlink", "h1[itemprop=name]"]); // NOT bare h1 — an onboarding modal can render an earlier h1
     var parts = [];
+    var counters = { total: 0, capped: false };
+    var qPost = doc.querySelector("#question");
     var q = doc.querySelector("#question .s-prose.js-post-body");
     if (q) parts.push(cleanBodyHtml(doc, q.innerHTML));
+    if (qPost) { var qc = soCommentsHtml(qPost, doc, counters); if (qc) parts.push(qc); }
     var posts = doc.querySelectorAll("#answers .answer, #replies-container [id^='reply-']");
     if (posts.length) {
       parts.push("<h2>" + escapeHtml(posts.length + (posts.length === 1 ? " Answer" : " Answers")) + "</h2>");
       posts.forEach(function (post) {
         var body = post.querySelector(".s-prose.js-post-body");
         if (!body) return;
-        var us = post.querySelectorAll(".user-details a"); // classic: last = answerer (edit signatures render first)
+        var us = post.querySelectorAll(".user-details a"); // classic: last = answerer
         var author = us.length ? us[us.length - 1].textContent.trim() : "";
-        if (!author) { var sc = post.querySelector(".s-user-card--link"); if (sc) author = sc.textContent.trim(); } // Discussions replies
+        if (!author) { var sc = post.querySelector(".s-user-card--link"); if (sc) author = sc.textContent.trim(); } // Discussions
         var vc = post.querySelector(".js-vote-count");
         var votes = vc ? vc.textContent.trim() : post.getAttribute("data-score");
-        var accepted = post.classList.contains("accepted-answer"); // class is set only on the accepted one; the .js-accepted-answer-indicator element exists (hidden) in EVERY answer
+        var accepted = post.classList.contains("accepted-answer"); // .js-accepted-answer-indicator exists (hidden) in every answer
         var head = (accepted ? "[accepted] " : "") + (author || "") + (votes ? " · " + votes + " votes" : "");
         parts.push("<h3>" + escapeHtml(head.trim() || "answer") + "</h3>" + cleanBodyHtml(doc, body.innerHTML));
+        var ac = soCommentsHtml(post, doc, counters); if (ac) parts.push(ac); // "" for Discussions posts (no .comments)
       });
     }
+    if (counters.capped) parts.push("<blockquote><p>" + escapeHtml("注：评论过多，部分未提取。") + "</p></blockquote>");
     if (!parts.join("")) return null;
     return { contentHtml: parts.join("\n"), title: title || doc.title };
   }

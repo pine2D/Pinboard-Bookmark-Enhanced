@@ -819,6 +819,52 @@ const SO_POST = (lis, extra) =>
   const out = norm(soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false }));
   check("so show-link → '… and 12 more comments' (link wins)", /and 12 more comments/.test(out), out);
 })();
+
+section("site-rules: so comments (end-to-end)");
+(() => {
+  const html = `<!DOCTYPE html><html><body>
+  <div id="question-header"><h1>Title?</h1></div>
+  <div id="question"><div class="s-prose js-post-body"><p>QBODY</p></div>
+    <div class="comments"><ul class="comments-list"><li class="comment"><div class="comment-text"><div class="comment-body"><span class="comment-copy">qcomment</span> <a class="comment-user" href="/users/1/qa">qa</a></div></div></li></ul></div></div>
+  <div id="answers"><div class="answer accepted-answer" id="answer-1" data-score="5"><div class="js-vote-count">5</div><div class="s-prose js-post-body"><p>ABODY</p></div><div class="user-details"><a href="/users/2/ans">ans</a></div>
+    <div class="comments"><ul class="comments-list"><li class="comment"><div class="comment-text"><div class="comment-body"><span class="comment-copy">acomment</span> <a class="comment-user" href="/users/3/ac">ac</a></div></div></li></ul></div></div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://stackoverflow.com/questions/1/x");
+  const c = r ? norm(r.contentHtml) : "";
+  check("so e2e → question comment before answers heading", /qcomment/.test(c) && c.indexOf("qcomment") < c.indexOf("<h2>"), c);
+  check("so e2e → answer comment after its body", /acomment/.test(c) && c.indexOf("ABODY") < c.indexOf("acomment"), c);
+  check("so e2e → answers stay flat h3", /<h3>\[accepted\] ans · 5 votes<\/h3>/.test(c), c);
+})();
+(() => {
+  const html = `<!DOCTYPE html><html><body>
+  <div id="question-header"><h1>QOnly?</h1></div>
+  <div id="question"><div class="s-prose js-post-body"><p>QB</p></div>
+    <div class="comments"><ul class="comments-list">
+      <li class="comment"><div class="comment-text"><div class="comment-body"><span class="comment-copy">cc1</span> <a class="comment-user" href="/users/1/a">a</a></div></div></li>
+      <li class="comment"><div class="comment-text"><div class="comment-body"><span class="comment-copy">cc2</span> <a class="comment-user" href="/users/2/b">b</a></div></div></li>
+    </ul></div></div></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://stackoverflow.com/questions/2/q");
+  const c = r ? norm(r.contentHtml) : "";
+  check("so question-only → non-null + both comments", r !== null && /cc1/.test(c) && /cc2/.test(c), JSON.stringify(r && r.id));
+  check("so question-only → no answers heading", !/<h2>/.test(c), c);
+})();
+(() => {
+  window.__PBP_SO_COMMENTS_GLOBAL = 1;
+  const cmt = (n, uid) => `<li class="comment"><div class="comment-text"><div class="comment-body"><span class="comment-copy">${n}</span> <a class="comment-user" href="/users/${uid}/u">u</a></div></div></li>`;
+  const html = `<!DOCTYPE html><html><body>
+  <div id="question-header"><h1>Cap?</h1></div>
+  <div id="question"><div class="s-prose js-post-body"><p>QB</p></div><div class="comments"><ul class="comments-list">${cmt("g1", 1)}</ul></div></div>
+  <div id="answers"><div class="answer" id="answer-1" data-score="0"><div class="s-prose js-post-body"><p>AB</p></div><div class="user-details"><a href="/users/2/ans">ans</a></div><div class="comments"><ul class="comments-list">${cmt("g2", 3)}</ul></div></div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://stackoverflow.com/questions/3/c");
+  window.__PBP_SO_COMMENTS_GLOBAL = undefined;
+  const c = r ? norm(r.contentHtml) : "";
+  check("so global cap → g1 rendered, g2 suppressed", /g1/.test(c) && !/g2/.test(c), c);
+  check("so global cap → one-time note exactly once", (c.match(/部分未提取/g) || []).length === 1, c);
+})();
 </script>
 
 <script>
