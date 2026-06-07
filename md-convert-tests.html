@@ -876,6 +876,34 @@ section("site-rules: so comments (end-to-end)");
   check("so global cap → g1 rendered, g2 suppressed", /g1/.test(c) && !/g2/.test(c), c);
   check("so global cap → one-time note exactly once", (c.match(/部分未提取/g) || []).length === 1, c);
 })();
+
+section("site-rules: v2ex author robustness (avatar link)");
+(() => {
+  // V2EX Polish / avatar adds <a href="/member/X"><img></a> (EMPTY text) BEFORE the username link.
+  // Regression guard: author must be the username, not "" (匿名), and threading must still nest.
+  const v = `<!DOCTYPE html><html><body>
+  <h1>头像主题</h1>
+  <div class="topic_content"><p>正文</p></div>
+  <div class="cell" id="r_1"><a href="/member/alice"><img class="avatar" src="data:,"></a><strong><a href="/member/alice" class="dark">alice</a></strong><span class="no">1</span><div class="reply_content">第一层</div></div>
+  <div class="cell" id="r_2"><a href="/member/bob"><img class="avatar" src="data:,"></a><strong><a href="/member/bob" class="dark">bob</a></strong><span class="no">2</span><div class="reply_content"><a href="/member/alice">@alice</a> 回应</div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(v, "text/html");
+  const r = applySiteRule(doc, "https://www.v2ex.com/t/9");
+  const c = r ? norm(r.contentHtml) : "";
+  check("v2ex avatar → author is username, not 匿名", /#1 · alice/.test(c) && /#2 · bob/.test(c) && !/匿名/.test(c), c);
+  check("v2ex avatar → threading still nests bob under alice", /#1 · alice[\s\S]*<blockquote>[\s\S]*#2 · bob/.test(c), c);
+})();
+
+(() => {
+  // A non-comment <li class="comment"> (no .comment-copy / no .comment-user) must be skipped — no 匿名 junk bullet.
+  const junk = `<li class="comment"><div class="comment-text"><div class="comment-actions"></div></div></li>`;
+  const real = `<li class="comment"><div class="comment-text"><div class="comment-body"><span class="comment-copy">real one</span> <a class="comment-user" href="/users/1/al">al</a></div></div></li>`;
+  const html = `<!DOCTYPE html><html><body><div id="question"><div class="s-prose js-post-body"><p>q</p></div><div class="comments"><ul class="comments-list">${real}${junk}</ul></div></div></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://stackoverflow.com/questions/9/x");
+  const c = r ? norm(r.contentHtml) : "";
+  check("so junk row → skipped, no 匿名 bullet", /real one/.test(c) && !/匿名/.test(c), c);
+})();
 </script>
 
 <script>

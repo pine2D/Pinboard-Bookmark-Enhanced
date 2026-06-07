@@ -270,8 +270,13 @@
     if (cells.length) {
       var replies = [];
       cells.forEach(function (cell) {
-        var aEl = cell.querySelector("a[href^='/member/']") || cell.querySelector("strong a") || cell.querySelector("a.dark");
-        var author = aEl ? aEl.textContent.trim() : "";
+        // First /member/ link WITH text — skips avatar <a href="/member/..">​<img></a>
+        // (empty text, injected by V2EX Polish etc.) which would yield 匿名 AND break
+        // @mention→author threading. pickText-style fallthrough, restored after a regression.
+        var author = "";
+        var mlinks = cell.querySelectorAll("a[href^='/member/']");
+        for (var ai = 0; ai < mlinks.length; ai++) { var at = mlinks[ai].textContent.trim(); if (at) { author = at; break; } }
+        if (!author) { var sEl = cell.querySelector("strong a") || cell.querySelector("a.dark"); if (sEl) author = sEl.textContent.trim(); }
         var floor = ((cell.querySelector(".no") || {}).textContent || "").trim();
         var thanks = parseCount(((cell.querySelector(".small.fade") || {}).textContent || ""));
         var bodyEl = cell.querySelector(".reply_content");
@@ -492,9 +497,11 @@
       var um = (userEl ? (userEl.getAttribute("href") || "") : "").match(/\/users\/(\d+)/);
       var scoreEl = li.querySelector(".comment-score") || li.querySelector("span.cool");
       var score = scoreEl ? parseInt((scoreEl.textContent || "").replace(/[^\d]/g, ""), 10) : 0;
+      var bodyHtml = soFlatten(copy ? copy.innerHTML : "");
+      if (!bodyHtml && !author) continue; // skip non-comment li.comment rows (add-comment form / JS templates)
       items.push({
         author: author, authorKey: collapseName(author), uid: um ? um[1] : null,
-        bodyHtml: soFlatten(copy ? copy.innerHTML : ""), score: score > 0 ? score : 0,
+        bodyHtml: bodyHtml, score: score > 0 ? score : 0,
         target: soCommentTarget(li), children: [], rendered: false
       });
     }
