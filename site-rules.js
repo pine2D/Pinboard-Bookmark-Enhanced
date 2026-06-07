@@ -361,6 +361,8 @@
     for (var i = 0; i < replies.length; i++) {
       var r = nodes[i], parentIdx = -1, mentions = r.mentions;
       if (mentions.length) {
+        // Multiple @-mentions: V2EX Polish treats the LAST-mentioned member as the
+        // primary parent, so reverse the arrays and attach to the first that resolves.
         var multi = mentions.length > 1;
         var names = multi ? mentions.slice().reverse() : mentions;
         var floors = multi ? r.refFloors.slice().reverse() : r.refFloors;
@@ -378,6 +380,59 @@
       floorMemberToIndex[r.author + ":" + r.floor] = i;
     }
     return roots;
+  }
+
+  // Strip the leading "@name" of a reply body once nesting makes it redundant.
+  // DOM-first: drop a leading <a href="/member/..">@..</a>; else a leading "@token".
+  function hideRefName(html) {
+    if (!html) return html;
+    var doc = (typeof document !== "undefined") ? document : null;
+    if (doc) {
+      var tmp = doc.createElement("div");
+      tmp.innerHTML = html;
+      while (tmp.firstChild && tmp.firstChild.nodeType === 3 && !tmp.firstChild.nodeValue.trim()) tmp.removeChild(tmp.firstChild);
+      var first = tmp.firstChild;
+      if (first && first.nodeType === 1 && first.tagName === "A" &&
+          /^\/member\//.test(first.getAttribute("href") || "") &&
+          /^@/.test((first.textContent || "").trim())) {
+        tmp.removeChild(first);
+        if (tmp.firstChild && tmp.firstChild.nodeType === 3) tmp.firstChild.nodeValue = tmp.firstChild.nodeValue.replace(/^[\s,，]+/, "");
+        return tmp.innerHTML;
+      }
+    }
+    return html.replace(/^\s*@[A-Za-z0-9_]+[ ,，]?/, "");
+  }
+
+  function replyInnerHtml(node, depth) {
+    var thanks = Number(node.thanks) || 0;
+    var head = "<p><strong>" + escapeHtml("#" + (node.floor || "") + " · " + (node.author || "匿名")) + "</strong>" +
+      (thanks > 0 ? escapeHtml(" · 感谢 " + thanks) : "") + "</p>";
+    var body = node.bodyHtml || "";
+    if (depth > 0 && (node.mentions || []).length === 1) body = hideRefName(body);
+    return head + body;
+  }
+
+  // Beyond V2EX_MAX_DEPTH: render descendants as labeled blocks (no extra blockquote),
+  // so deep chains flatten onto the deepest allowed level — never dropped.
+  function flattenChildren(nodes, depth) {
+    if (!nodes || !nodes.length) return "";
+    var out = "";
+    for (var i = 0; i < nodes.length; i++) out += replyInnerHtml(nodes[i], depth) + flattenChildren(nodes[i].children, depth + 1);
+    return out;
+  }
+
+  function renderThreadHtml(nodes, depth) {
+    if (!nodes || !nodes.length) return "";
+    var maxDepth = cfg("V2EX_MAX_DEPTH", V2EX_MAX_DEPTH);
+    var out = "";
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var children = (depth + 1 >= maxDepth)
+        ? flattenChildren(node.children, depth + 1)
+        : renderThreadHtml(node.children, depth + 1);
+      out += "<blockquote>" + replyInnerHtml(node, depth) + children + "</blockquote>";
+    }
+    return out;
   }
 
   // ---- framework ---------------------------------------------------------
@@ -436,4 +491,5 @@
   g.matchRule = matchRule;
   g.applySiteRule = applySiteRule;
   g.buildReplyTree = buildReplyTree;
+  g.renderThreadHtml = renderThreadHtml;
 })();

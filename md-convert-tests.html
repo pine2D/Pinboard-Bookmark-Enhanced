@@ -678,6 +678,54 @@ check("buildReplyTree is a global function", typeof buildReplyTree === "function
   const roots = buildReplyTree([R("op", "1", []), R("z", "2", ["nobody"])]);
   check("v2ex tree → zero-@ and unseen-@ are roots", roots.length === 2, JSON.stringify(roots.map(r => r.author)));
 })();
+
+section("site-rules: v2ex renderThreadHtml");
+check("renderThreadHtml is a global function", typeof renderThreadHtml === "function");
+(() => {
+  const tree = buildReplyTree([
+    { id:"r1", author:"alice", floor:"1", mentions:[], refFloors:[], bodyHtml:"<p>aaa</p>", thanks:3 },
+    { id:"r2", author:"bob", floor:"2", mentions:["alice"], refFloors:[], bodyHtml:'<a href="/member/alice">@alice</a> bbb', thanks:0 },
+    { id:"r3", author:"carol", floor:"3", mentions:["bob"], refFloors:[], bodyHtml:'<a href="/member/bob">@bob</a> ccc', thanks:0 },
+  ]);
+  const html = renderThreadHtml(tree, 0);
+  check("v2ex render → 3 nested blockquotes", /<blockquote>[\s\S]*<blockquote>[\s\S]*<blockquote>/.test(html), html);
+  check("v2ex render → floor·author labels", /#1 · alice/.test(html) && /#2 · bob/.test(html) && /#3 · carol/.test(html), html);
+  check("v2ex render → 感谢 only when >0", /· 感谢 3/.test(html) && (html.match(/感谢/g) || []).length === 1, html);
+  check("v2ex render → hideRefName strips leading @alice/@bob when nested", !/@alice/.test(html) && !/@bob/.test(html), norm(html));
+  check("v2ex render → roundtrip yields '> > > '", /> > > /.test(htmlToMarkdown(html)), htmlToMarkdown(html));
+})();
+(() => {
+  const tree = [
+    { author:"alice", floor:"1", mentions:[], refFloors:[], bodyHtml:"<p>aaa</p>", thanks:0, children:[
+      { author:"bob", floor:"2", mentions:["alice","carol"], refFloors:[], bodyHtml:'<a href="/member/alice">@alice</a> <a href="/member/carol">@carol</a> multi', thanks:0, children:[] }
+    ]},
+    { author:"dan", floor:"9", mentions:["ghost"], refFloors:[], bodyHtml:'<a href="/member/ghost">@ghost</a> top', thanks:0, children:[] }
+  ];
+  const html = norm(renderThreadHtml(tree, 0));
+  check("v2ex render → multi-@ nested keeps @alice/@carol", /@alice/.test(html) && /@carol/.test(html), html);
+  check("v2ex render → top-level keeps @ghost", /@ghost/.test(html), html);
+})();
+(() => {
+  window.__PBP_V2EX_MAX_DEPTH = 2;
+  const tree = [
+    { author:"a", floor:"1", mentions:[], refFloors:[], bodyHtml:"L0", thanks:0, children:[
+      { author:"b", floor:"2", mentions:["a"], refFloors:[], bodyHtml:"L1", thanks:0, children:[
+        { author:"c", floor:"3", mentions:["b"], refFloors:[], bodyHtml:"L2", thanks:0, children:[
+          { author:"d", floor:"4", mentions:["c"], refFloors:[], bodyHtml:"DEEPBODY", thanks:0, children:[] }
+        ]}
+      ]}
+    ]}
+  ];
+  const html = renderThreadHtml(tree, 0);
+  window.__PBP_V2EX_MAX_DEPTH = undefined;
+  check("v2ex clamp → no 3rd nested blockquote at cap 2", !/<blockquote>(?:[\s\S]*?<blockquote>){2}/.test(html), html);
+  check("v2ex clamp → deepest reply kept (clamp-not-drop)", /DEEPBODY/.test(html) && /#4 · d/.test(html), html);
+})();
+(() => {
+  const R = (author, floor, mentions) => ({ id: author+floor, author, floor, mentions, refFloors: [], bodyHtml: "", thanks: 0 });
+  const roots = buildReplyTree([R("op","1",[]), R("bob","2",["op"])]);
+  check("v2ex tree → index-0 node can be a parent", roots.length === 1 && roots[0].children.length === 1, JSON.stringify(roots.map(r=>r.author)));
+})();
 </script>
 
 <script>
