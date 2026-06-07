@@ -17,6 +17,7 @@
   // Edit-time constants (no settings UI). Tests may override via window.__PBP_<NAME>
   // hooks read at use-site by cfg().
   var V2EX_MAX_DEPTH = 4;
+  var SO_DISC_MAX_DEPTH = 6;   // StackOverflow Discussions threads (deeper than V2EX)
   var SO_COMMENTS_PER_POST = 5;
   var SO_COMMENTS_GLOBAL = 60;
   function cfg(name, def) {
@@ -237,22 +238,38 @@
     var q = doc.querySelector("#question .s-prose.js-post-body");
     if (q) parts.push(cleanBodyHtml(doc, q.innerHTML));
     if (qPost) { var qc = soCommentsHtml(qPost, doc, counters); if (qc) parts.push(qc); }
-    var posts = doc.querySelectorAll("#answers .answer, #replies-container [id^='reply-']");
-    if (posts.length) {
-      parts.push("<h2>" + escapeHtml(posts.length + (posts.length === 1 ? " Answer" : " Answers")) + "</h2>");
-      posts.forEach(function (post) {
-        var body = post.querySelector(".s-prose.js-post-body");
-        if (!body) return;
-        var us = post.querySelectorAll(".user-details a"); // classic: last = answerer
-        var author = us.length ? us[us.length - 1].textContent.trim() : "";
-        if (!author) { var sc = post.querySelector(".s-user-card--link"); if (sc) author = sc.textContent.trim(); } // Discussions
-        var vc = post.querySelector(".js-vote-count");
-        var votes = vc ? vc.textContent.trim() : post.getAttribute("data-score");
-        var accepted = post.classList.contains("accepted-answer"); // .js-accepted-answer-indicator exists (hidden) in every answer
-        var head = (accepted ? "[accepted] " : "") + (author || "") + (votes ? " · " + votes + " votes" : "");
-        parts.push("<h3>" + escapeHtml(head.trim() || "answer") + "</h3>" + cleanBodyHtml(doc, body.innerHTML));
-        var ac = soCommentsHtml(post, doc, counters); if (ac) parts.push(ac); // "" for Discussions posts (no .comments)
+    var disc = doc.querySelector("#replies-container");
+    var discReplies = disc ? disc.querySelectorAll("[id^='reply-']") : [];
+    if (discReplies.length) {
+      // StackOverflow Discussions: one topic + THREADED replies (nested blockquotes).
+      // Replies are flat siblings; depth comes from .flex--item.fl-grow1 wrapper nesting.
+      parts.push("<h2>" + escapeHtml(discReplies.length + (discReplies.length === 1 ? " Reply" : " Replies")) + "</h2>");
+      var rlist = [];
+      Array.prototype.forEach.call(discReplies, function (rep) {
+        var author = (rep.getAttribute("data-author-username") || "").trim();
+        if (!author) { var uc = rep.querySelector(".s-user-card--link"); if (uc) author = uc.textContent.trim(); }
+        var rbody = rep.querySelector(".s-prose.js-post-body") || rep.querySelector(".s-prose");
+        rlist.push({ author: author, bodyHtml: rbody ? cleanBodyHtml(doc, rbody.innerHTML) : "", depth: soReplyDepth(rep, disc) });
       });
+      parts.push(renderThreadHtml(buildDepthTree(rlist), 0, { headFn: soDiscReplyHtml, maxDepth: cfg("SO_DISC_MAX_DEPTH", SO_DISC_MAX_DEPTH) }));
+    } else {
+      var posts = doc.querySelectorAll("#answers .answer");
+      if (posts.length) {
+        parts.push("<h2>" + escapeHtml(posts.length + (posts.length === 1 ? " Answer" : " Answers")) + "</h2>");
+        posts.forEach(function (post) {
+          var body = post.querySelector(".s-prose.js-post-body");
+          if (!body) return;
+          var us = post.querySelectorAll(".user-details a"); // classic: last = answerer
+          var author = us.length ? us[us.length - 1].textContent.trim() : "";
+          if (!author) { var sc = post.querySelector(".s-user-card--link"); if (sc) author = sc.textContent.trim(); }
+          var vc = post.querySelector(".js-vote-count");
+          var votes = vc ? vc.textContent.trim() : post.getAttribute("data-score");
+          var accepted = post.classList.contains("accepted-answer"); // .js-accepted-answer-indicator exists (hidden) in every answer
+          var head = (accepted ? "[accepted] " : "") + (author || "") + (votes ? " · " + votes + " votes" : "");
+          parts.push("<h3>" + escapeHtml(head.trim() || "answer") + "</h3>" + cleanBodyHtml(doc, body.innerHTML));
+          var ac = soCommentsHtml(post, doc, counters); if (ac) parts.push(ac);
+        });
+      }
     }
     if (counters.capped) parts.push("<blockquote><p>" + escapeHtml("注：评论过多，部分未提取。") + "</p></blockquote>");
     if (!parts.join("")) return null;
@@ -427,27 +444,67 @@
     return head + body;
   }
 
-  // Beyond V2EX_MAX_DEPTH: render descendants as labeled blocks (no extra blockquote),
+  // Beyond maxDepth: render descendants as labeled blocks (no extra blockquote),
   // so deep chains flatten onto the deepest allowed level — never dropped.
-  function flattenChildren(nodes, depth) {
+  // opts.headFn(node, depth) renders one node's header+body (default = V2EX replyInnerHtml).
+  function flattenChildren(nodes, depth, opts) {
     if (!nodes || !nodes.length) return "";
+    var headFn = (opts && opts.headFn) || replyInnerHtml;
     var out = "";
-    for (var i = 0; i < nodes.length; i++) out += replyInnerHtml(nodes[i], depth) + flattenChildren(nodes[i].children, depth + 1);
+    for (var i = 0; i < nodes.length; i++) out += headFn(nodes[i], depth) + flattenChildren(nodes[i].children, depth + 1, opts);
     return out;
   }
 
-  function renderThreadHtml(nodes, depth) {
+  // opts: { headFn?(node,depth)->html, maxDepth?:number }. Defaults render a V2EX thread.
+  function renderThreadHtml(nodes, depth, opts) {
     if (!nodes || !nodes.length) return "";
-    var maxDepth = cfg("V2EX_MAX_DEPTH", V2EX_MAX_DEPTH);
+    opts = opts || {};
+    var maxDepth = opts.maxDepth != null ? opts.maxDepth : cfg("V2EX_MAX_DEPTH", V2EX_MAX_DEPTH);
+    var headFn = opts.headFn || replyInnerHtml;
     var out = "";
     for (var i = 0; i < nodes.length; i++) {
       var node = nodes[i];
       var children = (depth + 1 >= maxDepth)
-        ? flattenChildren(node.children, depth + 1)
-        : renderThreadHtml(node.children, depth + 1);
-      out += "<blockquote>" + replyInnerHtml(node, depth) + children + "</blockquote>";
+        ? flattenChildren(node.children, depth + 1, opts)
+        : renderThreadHtml(node.children, depth + 1, opts);
+      out += "<blockquote>" + headFn(node, depth) + children + "</blockquote>";
     }
     return out;
+  }
+
+  // ---- StackOverflow Discussions: threaded replies ----------------------
+  // Replies live flat in #replies-container but nest VISUALLY: each level wraps the
+  // child block in a `.flex--item.fl-grow1` ancestor. Depth = count of those ancestors
+  // (structural, so it works in the test harness too — no layout/offsetLeft needed).
+  function soReplyDepth(reply, container) {
+    var d = 0, n = reply.parentElement;
+    while (n && n !== container) {
+      if (n.classList && n.classList.contains("flex--item") && n.classList.contains("fl-grow1")) d++;
+      n = n.parentElement;
+    }
+    return d;
+  }
+
+  // Header for a Discussions reply node (no floor / 感谢 / @-strip — V2EX-specific).
+  function soDiscReplyHtml(node) {
+    return "<p><strong>" + escapeHtml(node.author || "匿名") + "</strong></p>" + (node.bodyHtml || "");
+  }
+
+  // Build a tree from a flat list carrying explicit .depth (document/pre-order).
+  // A reply at depth d attaches under the most recent earlier reply at depth d-1.
+  function buildDepthTree(replies) {
+    var nodes = [], roots = [], stack = [];
+    for (var k = 0; k < replies.length; k++) {
+      var r0 = replies[k];
+      var nd = { author: r0.author, bodyHtml: r0.bodyHtml, depth: r0.depth || 0, children: [] };
+      nodes.push(nd);
+      var d = nd.depth;
+      if (d === 0 || !stack[d - 1]) roots.push(nd);
+      else stack[d - 1].children.push(nd);
+      stack[d] = nd;
+      stack.length = d + 1; // drop deeper levels so later shallower replies don't mis-attach
+    }
+    return roots;
   }
 
   function collapseName(s) { return String(s == null ? "" : s).replace(/\s+/g, "").toLowerCase(); }
@@ -603,6 +660,7 @@
   g.matchRule = matchRule;
   g.applySiteRule = applySiteRule;
   g.buildReplyTree = buildReplyTree;
+  g.buildDepthTree = buildDepthTree;
   g.renderThreadHtml = renderThreadHtml;
   g.soCommentsHtml = soCommentsHtml;
 })();

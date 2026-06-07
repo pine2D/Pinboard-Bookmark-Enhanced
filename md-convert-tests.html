@@ -582,7 +582,8 @@ section("site-rules: multi-item");
 })();
 
 (() => {
-  // Discussions: #replies-container [id^=reply-], no votes/accepted, author = .user-details a
+  // Discussions (flat, depth 0): #replies-container [id^=reply-], author = .s-user-card--link.
+  // Replies now render as THREADED blockquotes (not <h3>); both here are top-level (no wrappers).
   const html = `<!DOCTYPE html><html><head></head><body>
   <div id="question-header"><h1>Discussion topic?</h1></div>
   <div id="question"><div class="s-prose js-post-body"><p>discussion question</p></div></div>
@@ -594,8 +595,49 @@ section("site-rules: multi-item");
   const r = applySiteRule(doc, "https://stackoverflow.com/questions/79948695/discussion");
   const c = r ? norm(r.contentHtml) : "";
   check("so discussions → id+title", r && r.id === "stackoverflow" && r.title === "Discussion topic?", JSON.stringify(r && [r.id, r.title]));
-  check("so discussions → question + replies, author, no votes",
-    /discussion question/.test(c) && /first reply/.test(c) && /<h3>carol<\/h3>/.test(c) && /second reply/.test(c) && /<h3>dave<\/h3>/.test(c) && !/votes/.test(c), c);
+  check("so discussions → topic + replies as blockquotes, author, no votes/h3",
+    /discussion question/.test(c) && /<strong>carol<\/strong>/.test(c) && /first reply/.test(c) && /<strong>dave<\/strong>/.test(c) && /second reply/.test(c) && !/votes/.test(c) && !/<h3>/.test(c), c);
+})();
+
+(() => {
+  // Discussions THREADED: depth = count of .flex--item.fl-grow1 ancestors (real SO structure).
+  // alice(0) > bob(1) > carol(2); dave(0). author from data-author-username.
+  const html = `<!DOCTYPE html><html><head></head><body>
+  <div id="question-header"><h1>Nested disc?</h1></div>
+  <div id="question"><div class="s-prose js-post-body"><p>topic body</p></div></div>
+  <div id="answers"><div id="replies-container"><div class="mt16"><div>
+    <div class="post-layout" id="reply-1" data-author-username="alice"><div class="s-prose js-post-body"><p>A0</p></div></div>
+    <div class="d-flex"><div class="flex--item fl-grow1">
+      <div class="post-layout" id="reply-2" data-author-username="bob"><div class="s-prose js-post-body"><p>B1</p></div></div>
+      <div class="d-flex"><div class="flex--item fl-grow1">
+        <div class="post-layout" id="reply-3" data-author-username="carol"><div class="s-prose js-post-body"><p>C2</p></div></div>
+      </div></div>
+    </div></div>
+  </div></div>
+  <div class="mt16"><div>
+    <div class="post-layout" id="reply-4" data-author-username="dave"><div class="s-prose js-post-body"><p>D0</p></div></div>
+  </div></div>
+  </div></div></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://stackoverflow.com/questions/1/nested");
+  const c = r ? norm(r.contentHtml) : "";
+  check("so disc nested → alice>bob>carol 3 levels", /<strong>alice<\/strong>[\s\S]*<blockquote>[\s\S]*<strong>bob<\/strong>[\s\S]*<blockquote>[\s\S]*<strong>carol<\/strong>/.test(c), c);
+  check("so disc nested → carol body inside the deep blockquote", /C2/.test(c) && /B1/.test(c) && /A0/.test(c), c);
+  check("so disc nested → dave top-level (not under alice)", /<\/blockquote><blockquote><p><strong>dave<\/strong>/.test(c), c);
+})();
+
+section("site-rules: so buildDepthTree (pure)");
+check("buildDepthTree is a global function", typeof buildDepthTree === "function");
+(() => {
+  const roots = buildDepthTree([
+    { author: "a", bodyHtml: "", depth: 0 },
+    { author: "b", bodyHtml: "", depth: 1 },
+    { author: "c", bodyHtml: "", depth: 2 },
+    { author: "d", bodyHtml: "", depth: 1 },
+    { author: "e", bodyHtml: "", depth: 0 },
+  ]);
+  check("buildDepthTree → 2 roots (a, e)", roots.length === 2 && roots[0].author === "a" && roots[1].author === "e", JSON.stringify(roots.map(r => r.author)));
+  check("buildDepthTree → a>b>c chain + a>d sibling", roots[0].children.length === 2 && roots[0].children[0].author === "b" && roots[0].children[0].children[0].author === "c" && roots[0].children[1].author === "d", JSON.stringify(roots[0].children.map(x => x.author)));
 })();
 
 (() => {
