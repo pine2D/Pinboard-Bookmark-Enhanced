@@ -532,10 +532,10 @@
     "message": "На этой странице не найдено читаемого содержимого."
   },
   "bgTabSetSaved": {
-    "message": "Pinboard: Набор вкладок сохранён!"
+    "message": "Pinboard: остался один шаг"
   },
   "bgTabsSavedCount": {
-    "message": "$COUNT$ вкладок сохранено.",
+    "message": "Отправлено вкладок: $COUNT$ — нажмите «Save» на открывшейся странице Pinboard, чтобы завершить.",
     "placeholders": {
       "count": {
         "content": "$1"

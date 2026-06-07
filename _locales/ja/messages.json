@@ -532,10 +532,10 @@
     "message": "このページから読み取れるコンテンツが見つかりませんでした。"
   },
   "bgTabSetSaved": {
-    "message": "Pinboard：タブセットを保存しました！"
+    "message": "Pinboard：保存まであと一歩"
   },
   "bgTabsSavedCount": {
-    "message": "$COUNT$ 個のタブを保存しました。",
+    "message": "$COUNT$ 個のタブを送信しました — 開いた Pinboard ページで Save をクリックすると完了です。",
     "placeholders": {
       "count": {
         "content": "$1"

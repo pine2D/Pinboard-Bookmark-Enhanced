@@ -532,10 +532,10 @@
     "message": "未能從此頁面擷取到可讀內容。"
   },
   "bgTabSetSaved": {
-    "message": "Pinboard：標籤集已儲存！"
+    "message": "Pinboard：還差一步完成儲存"
   },
   "bgTabsSavedCount": {
-    "message": "已儲存 $COUNT$ 個分頁。",
+    "message": "已傳送 $COUNT$ 個分頁 — 在開啟的 Pinboard 頁面點擊 Save 才完成儲存。",
     "placeholders": {
       "count": {
         "content": "$1"

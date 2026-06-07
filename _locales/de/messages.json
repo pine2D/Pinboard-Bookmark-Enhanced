@@ -532,10 +532,10 @@
     "message": "Auf dieser Seite wurde kein lesbarer Inhalt gefunden."
   },
   "bgTabSetSaved": {
-    "message": "Pinboard: Tab-Set gespeichert!"
+    "message": "Pinboard: Noch ein Schritt zum Speichern"
   },
   "bgTabsSavedCount": {
-    "message": "$COUNT$ Tabs gespeichert.",
+    "message": "$COUNT$ Tabs gesendet – zum Abschluss auf der geöffneten Pinboard-Seite auf „Save“ klicken.",
     "placeholders": {
       "count": {
         "content": "$1"

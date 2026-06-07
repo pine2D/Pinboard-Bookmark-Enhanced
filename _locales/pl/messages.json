@@ -532,10 +532,10 @@
     "message": "Nie znaleziono czytelnej treści na tej stronie."
   },
   "bgTabSetSaved": {
-    "message": "Pinboard: Zestaw kart zapisany!"
+    "message": "Pinboard: jeszcze jeden krok"
   },
   "bgTabsSavedCount": {
-    "message": "Zapisano $COUNT$ kart.",
+    "message": "Wysłano $COUNT$ kart — kliknij „Save” na otwartej stronie Pinboard, aby zakończyć.",
     "placeholders": {
       "count": {
         "content": "$1"

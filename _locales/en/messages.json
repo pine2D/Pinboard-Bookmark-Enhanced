@@ -532,10 +532,10 @@
     "message": "No readable content was found on this page."
   },
   "bgTabSetSaved": {
-    "message": "Pinboard: Tab Set Saved!"
+    "message": "Pinboard: One more step to save"
   },
   "bgTabsSavedCount": {
-    "message": "$COUNT$ tabs saved.",
+    "message": "$COUNT$ tabs sent — click Save on the opened Pinboard page to finish.",
     "placeholders": {
       "count": {
         "content": "$1"

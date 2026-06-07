@@ -532,10 +532,10 @@
     "message": "Aucun contenu lisible n'a été trouvé sur cette page."
   },
   "bgTabSetSaved": {
-    "message": "Pinboard : Ensemble d'onglets enregistré !"
+    "message": "Pinboard : une dernière étape"
   },
   "bgTabsSavedCount": {
-    "message": "$COUNT$ onglets enregistrés.",
+    "message": "$COUNT$ onglets envoyés — cliquez sur « Save » sur la page Pinboard ouverte pour terminer.",
     "placeholders": {
       "count": {
         "content": "$1"

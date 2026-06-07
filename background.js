@@ -787,6 +787,9 @@ async function handleSaveTabSet(tabsData) {
     formData.append("data", JSON.stringify(result));
     const resp = await fetch("https://pinboard.in/tabs/save/", { method: "POST", body: formData, credentials: "include" });
     if (resp.ok) {
+      // /tabs/save/ only STAGES the tabs — Pinboard requires the user to click
+      // "Save" on /tabs/show/ to actually bookmark them. So we open that page and
+      // the notification says "one more step", not "saved" (keys kept for compat).
       chrome.tabs.create({ url: "https://pinboard.in/tabs/show/" });
       showNotification("tabset-saved", t("bgTabSetSaved"), t("bgTabsSavedCount", String(tabsData.length)), "tabSet");
     } else {

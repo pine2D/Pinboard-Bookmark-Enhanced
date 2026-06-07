@@ -532,10 +532,10 @@
     "message": "未能从该页面提取到可读内容。"
   },
   "bgTabSetSaved": {
-    "message": "Pinboard：标签集已保存！"
+    "message": "Pinboard：还需一步完成保存"
   },
   "bgTabsSavedCount": {
-    "message": "已保存 $COUNT$ 个标签页。",
+    "message": "已发送 $COUNT$ 个标签页 — 在打开的 Pinboard 页面点击 Save 才完成保存。",
     "placeholders": {
       "count": {
         "content": "$1"
