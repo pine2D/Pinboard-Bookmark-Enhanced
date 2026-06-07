@@ -311,14 +311,18 @@ main {
   margin: 0.4em 0;
   border-radius: 0;
 }
-#rendered-view blockquote blockquote::before {
+/* Elbow connector anchored to the author line so it sits on its vertical centre
+   (top:50% of the header <p>, not a fixed em — robust to font size / wrapping). */
+#rendered-view blockquote blockquote > p:first-child { position: relative; }
+#rendered-view blockquote blockquote > p:first-child::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: 0.9em;
-  width: 12px;
+  left: -16px;
+  top: 50%;
+  width: 14px;
   height: 2px;
   background: rgba(128, 128, 128, 0.4);
+  transform: translateY(-50%);
 }
 
 /* Images */

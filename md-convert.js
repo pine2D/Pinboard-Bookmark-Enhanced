@@ -388,7 +388,8 @@ html,body{margin:0;background:var(--x-bg)}
 .export-doc blockquote p{margin:.4em 0}
 .export-doc blockquote>p:first-child>strong:first-child{color:var(--x-bq-bd)}
 .export-doc blockquote blockquote{position:relative;background:transparent;border-left:2px solid rgba(128,128,128,.4);padding:4px 0 4px 16px;margin:.4em 0;border-radius:0}
-.export-doc blockquote blockquote::before{content:"";position:absolute;left:0;top:.9em;width:12px;height:2px;background:rgba(128,128,128,.4)}
+.export-doc blockquote blockquote>p:first-child{position:relative}
+.export-doc blockquote blockquote>p:first-child::before{content:"";position:absolute;left:-16px;top:50%;width:14px;height:2px;background:rgba(128,128,128,.4);transform:translateY(-50%)}
 .export-doc img{max-width:100%;height:auto;border-radius:8px;margin:1.5em 0;border:1px solid var(--x-bd)}
 .export-doc ul,.export-doc ol{margin:1em 0;padding-left:1.75em}
 .export-doc li{margin:.35em 0}
