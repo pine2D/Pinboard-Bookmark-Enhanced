@@ -643,6 +643,41 @@ section("site-rules: helpers");
   c.querySelectorAll("img").forEach(img => { const r = img.getAttribute("data-src"); if (r) img.setAttribute("src", r); });
   check("data-src promoted (helper parity)", /src="https:\/\/x\/i\.jpg"/.test(norm(c.innerHTML)) && !/class="ad"/.test(c.innerHTML), c.innerHTML);
 })();
+
+section("site-rules: v2ex buildReplyTree (pure)");
+check("buildReplyTree is a global function", typeof buildReplyTree === "function");
+(() => {
+  const R = (id, author, floor, mentions, refFloors) =>
+    ({ id, author, floor, mentions, refFloors, bodyHtml: author + floor, thanks: 0 });
+  const roots = buildReplyTree([
+    R("r1", "alice", "1", [], []),
+    R("r2", "bob", "2", ["alice"], []),
+    R("r3", "alice", "3", ["bob"], []),
+  ]);
+  check("v2ex tree → single root alice", roots.length === 1 && roots[0].author === "alice",
+    JSON.stringify(roots.map(r => r.author)));
+  check("v2ex tree → alice#1 → bob#2", roots[0].children.length === 1 && roots[0].children[0].author === "bob", "");
+  check("v2ex tree → bob#2 → alice#3", roots[0].children[0].children.length === 1 &&
+    roots[0].children[0].children[0].floor === "3", "");
+})();
+(() => {
+  const R = (author, floor, mentions, refFloors) =>
+    ({ id: author + floor, author, floor, mentions, refFloors, bodyHtml: "", thanks: 0 });
+  const parentOf = (roots, who) => {
+    let pf = null;
+    const walk = (n) => n.children.forEach(c => { if (c.author === who) pf = n.floor; walk(c); });
+    roots.forEach(walk); return pf;
+  };
+  const a = buildReplyTree([R("alice","1",[],[]), R("bob","2",[],[]), R("alice","3",[],[]), R("carol","5",["alice"],["1"])]);
+  check("v2ex tree → #floor branch (a) picks alice#1 (older)", parentOf(a, "carol") === "1", "parent=" + parentOf(a, "carol"));
+  const b = buildReplyTree([R("alice","1",[],[]), R("bob","2",[],[]), R("alice","3",[],[]), R("carol","5",["alice"],[])]);
+  check("v2ex tree → no-#floor branch (b) picks alice#3 (lastSeen)", parentOf(b, "carol") === "3", "parent=" + parentOf(b, "carol"));
+})();
+(() => {
+  const R = (author, floor, mentions) => ({ id: author + floor, author, floor, mentions, refFloors: [], bodyHtml: "", thanks: 0 });
+  const roots = buildReplyTree([R("op", "1", []), R("z", "2", ["nobody"])]);
+  check("v2ex tree → zero-@ and unseen-@ are roots", roots.length === 2, JSON.stringify(roots.map(r => r.author)));
+})();
 </script>
 
 <script>

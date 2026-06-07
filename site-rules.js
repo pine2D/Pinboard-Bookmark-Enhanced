@@ -14,6 +14,16 @@
 (function () {
   "use strict";
 
+  // Edit-time constants (no settings UI). Tests may override via window.__PBP_<NAME>
+  // hooks read at use-site by cfg().
+  var V2EX_MAX_DEPTH = 4;
+  var SO_COMMENTS_PER_POST = 5;
+  var SO_COMMENTS_GLOBAL = 60;
+  function cfg(name, def) {
+    var gg = (typeof window !== "undefined") ? window : (typeof self !== "undefined" ? self : null);
+    return (gg && gg["__PBP_" + name] != null) ? gg["__PBP_" + name] : def;
+  }
+
   // ---- shared helpers ----------------------------------------------------
 
   function readEntities(doc) {
@@ -333,6 +343,43 @@
     return { contentHtml: html, title: title, math: true };
   }
 
+  // Flat reply list -> conversation tree by @mention (V2EX). replies in floor order:
+  // { id, author, floor, mentions:[String], refFloors:[String], bodyHtml, thanks }.
+  // Parent = first resolvable @-target: exact author@floor that is EARLIER, else that
+  // member's most-recent earlier reply. Zero-@ / @unseen / @OP-no-earlier -> root.
+  // Maps update AFTER each reply, so parents always precede children (acyclic).
+  function buildReplyTree(replies) {
+    var floorMemberToIndex = {}, lastSeenByMember = {}, nodes = [], roots = [];
+    for (var k = 0; k < replies.length; k++) {
+      var r0 = replies[k];
+      nodes.push({
+        id: r0.id, author: r0.author, floor: r0.floor,
+        mentions: r0.mentions || [], refFloors: r0.refFloors || [],
+        bodyHtml: r0.bodyHtml, thanks: r0.thanks, children: []
+      });
+    }
+    for (var i = 0; i < replies.length; i++) {
+      var r = nodes[i], parentIdx = -1, mentions = r.mentions;
+      if (mentions.length) {
+        var multi = mentions.length > 1;
+        var names = multi ? mentions.slice().reverse() : mentions;
+        var floors = multi ? r.refFloors.slice().reverse() : r.refFloors;
+        var desiredFloor = floors[0];
+        for (var n = 0; n < names.length; n++) {
+          var name = names[n], j;
+          if (desiredFloor != null && (j = floorMemberToIndex[name + ":" + desiredFloor]) != null && j < i) { parentIdx = j; break; }
+          if ((j = lastSeenByMember[name]) != null) { parentIdx = j; break; }
+          // neither branch resolved for this name -> try the next name
+        }
+      }
+      if (parentIdx >= 0) nodes[parentIdx].children.push(r);
+      else roots.push(r);
+      lastSeenByMember[r.author] = i;
+      floorMemberToIndex[r.author + ":" + r.floor] = i;
+    }
+    return roots;
+  }
+
   // ---- framework ---------------------------------------------------------
 
   function hostMatches(pattern, hostname) {
@@ -388,4 +435,5 @@
   g.SITE_RULES = SITE_RULES;
   g.matchRule = matchRule;
   g.applySiteRule = applySiteRule;
+  g.buildReplyTree = buildReplyTree;
 })();
