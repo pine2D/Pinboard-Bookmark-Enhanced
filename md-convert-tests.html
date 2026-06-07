@@ -619,7 +619,7 @@ section("site-rules: multi-item");
   <meta name="citation_title" content="A Great Paper">
   <meta name="citation_author" content="Doe, Jane">
   <meta name="citation_author" content="Smith, John">
-  <meta name="citation_abstract" content="We prove $x \\geq 2$.">
+  <meta name="citation_abstract" content="Using Andr\\'e's lemma, ma\\~nana, fa\\c{c}ade, we prove $x \\geq 2$.">
   <meta name="citation_arxiv_id" content="2401.00001">
   <meta name="citation_date" content="2024/01/01">
   <meta name="citation_pdf_url" content="https://arxiv.org/pdf/2401.00001">
@@ -630,7 +630,8 @@ section("site-rules: multi-item");
   check("arxiv → id+title", r && r.id === "arxiv" && r.title === "A Great Paper", JSON.stringify(r && [r.id, r.title]));
   check("arxiv → authors as First Last", /Jane Doe, John Smith/.test(c) && !/Doe, Jane/.test(c), c);
   check("arxiv → labeled metadata list (id/subjects/submitted/comments/MSC)", /<ul>/.test(c) && /<strong>arXiv:<\/strong> 2401\.00001/.test(c) && /<strong>Subjects:<\/strong> Number Theory \(math\.NT\)/.test(c) && /<strong>Submitted:<\/strong> 2024\/01\/01/.test(c) && /<strong>Comments:<\/strong> 10 pages/.test(c) && /<strong>MSC:<\/strong> 11G30/.test(c), c);
-  check("arxiv → Abstract heading + $...$ kept + abs/pdf links", /<h2[^>]*>Abstract<\/h2>/.test(c) && /We prove \$x \\geq 2\$\./.test(c) && /arxiv\.org\/abs\/2401\.00001/.test(c) && /arxiv\.org\/pdf\/2401\.00001/.test(c), c);
+  check("arxiv → Abstract heading + abs/pdf links", /<h2[^>]*>Abstract<\/h2>/.test(c) && /arxiv\.org\/abs\/2401\.00001/.test(c) && /arxiv\.org\/pdf\/2401\.00001/.test(c), c);
+  check("arxiv → TeX accents decoded in prose, $...$ math left intact", /André's lemma/.test(c) && /mañana/.test(c) && /façade/.test(c) && /\$x \\geq 2\$/.test(c) && !/Andr\\'e/.test(c), c);
 })();
 
 section("site-rules: helpers");

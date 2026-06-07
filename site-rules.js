@@ -273,6 +273,29 @@
     return { contentHtml: note + parts.join("\n"), title: title };
   }
 
+  // Decode TeX text-mode accents/ligatures in PROSE (e.g. Andr\'e -> André). Punctuation
+  // accents allow \'e / \'{e}; letter-command accents (\c \v \u \H \r \k) require braces
+  // (\c{c}) to avoid eating \cite/\verb etc. Combining marks + NFC normalize.
+  var TEX_ACCENT = { "'": "́", "`": "̀", "^": "̂", '"': "̈", "~": "̃", "=": "̄", ".": "̇", "u": "̆", "v": "̌", "H": "̋", "r": "̊", "c": "̧", "k": "̨" };
+  var TEX_LETTER = { o: "ø", O: "Ø", l: "ł", L: "Ł", ss: "ß", ae: "æ", AE: "Æ", oe: "œ", OE: "Œ", aa: "å", AA: "Å", i: "i", j: "j" };
+  function texAcc(_, a, base) { var L = base === "\\i" ? "i" : base === "\\j" ? "j" : base; return L + TEX_ACCENT[a]; }
+  function decodeTexSeg(s) {
+    if (!s || s.indexOf("\\") === -1) return s;
+    s = s.replace(/\\([`'^"~=.])\s*\{?\s*(\\[ij]|[A-Za-z])\s*\}?/g, texAcc);   // \'e \'{e} \' e
+    s = s.replace(/\\([uvHrck])\{(\\[ij]|[A-Za-z])\}/g, texAcc);               // \c{c} \v{s} (braces only)
+    s = s.replace(/\\(ss|ae|AE|oe|OE|aa|AA|[oOlLij])(?:\{\})?(?![A-Za-z])/g, function (m, n) {
+      return Object.prototype.hasOwnProperty.call(TEX_LETTER, n) ? TEX_LETTER[n] : m;
+    });
+    return s.normalize ? s.normalize("NFC") : s;
+  }
+  // Decode accents only OUTSIDE $...$/$$...$$ math (decoding inside would corrupt \geq etc.).
+  function decodeTexText(s) {
+    if (!s || s.indexOf("\\") === -1) return s;
+    var parts = s.split(/(\$\$[\s\S]*?\$\$|\$[^$]*\$)/); // capture group -> math at odd indices
+    for (var i = 0; i < parts.length; i += 2) parts[i] = decodeTexSeg(parts[i]);
+    return parts.join("");
+  }
+
   // ---- arXiv (/abs/ citation_* meta card) -------------------------------
   function extractArxiv(doc) {
     function metas(name) { return Array.prototype.map.call(doc.querySelectorAll('meta[name="' + name + '"]'), function (m) { return m.getAttribute("content") || ""; }).filter(Boolean); }
@@ -282,7 +305,8 @@
     var authors = metas("citation_author").map(function (a) {
       var p = a.split(","); return p.length >= 2 ? (p[1].trim() + " " + p[0].trim()) : a.trim();
     });
-    var abs = metas("citation_abstract")[0] || domText("blockquote.abstract").replace(/^Abstract:?\s*/i, ""); // keep $...$ for KaTeX
+    var abs = metas("citation_abstract")[0] || domText("blockquote.abstract").replace(/^Abstract:?\s*/i, "");
+    abs = decodeTexText(abs); // \'e -> é etc. in prose; $...$ math left intact for KaTeX
     var id = metas("citation_arxiv_id")[0] || "";
     var date = metas("citation_date")[0] || domText(".dateline").replace(/[\[\]]/g, "").trim();
     var subjects = domText(".subjects");
