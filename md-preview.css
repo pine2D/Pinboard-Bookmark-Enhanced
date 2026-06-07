@@ -288,7 +288,7 @@ main {
   font-weight: 400;
 }
 
-/* Blockquotes */
+/* Blockquotes — top level keeps the accent bar + faint tint (nice for a single quote). */
 #rendered-view blockquote {
   border-left: 3px solid var(--bq-border);
   background: var(--bq-bg);
@@ -298,6 +298,16 @@ main {
   color: var(--bq-fg);
 }
 #rendered-view blockquote p { margin: 0.4em 0; }
+/* Nested levels (deep reply threads): thin neutral guide, no tint stacking, tighter.
+   Only the outermost quote shows the accent bar + tint; inner levels read as light
+   gray indent guides instead of several compounding blue bars. */
+#rendered-view blockquote blockquote {
+  background: transparent;
+  border-left: 2px solid rgba(128, 128, 128, 0.4);
+  padding: 4px 0 4px 14px;
+  margin: 0.6em 0;
+  border-radius: 0;
+}
 
 /* Images */
 #rendered-view img {
