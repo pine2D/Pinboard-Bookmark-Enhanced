@@ -534,7 +534,7 @@
 
     var showMore = 0, link = postEl.querySelector(".js-show-link");
     if (link) { var mm = (link.textContent || "").match(/(\d+)/); if (mm) showMore = parseInt(mm[1], 10); }
-    var more = showMore > 0 ? showMore : (items.length - perPostRendered);
+    var more = Math.max(showMore, items.length - perPostRendered);
     var moreLi = more > 0 ? "<li><em>" + escapeHtml("… and " + more + " more comments") + "</em></li>" : "";
     if (!lis && !moreLi) return "";
     return "<p><strong>Comments</strong></p><ul>" + lis + moreLi + "</ul>";
