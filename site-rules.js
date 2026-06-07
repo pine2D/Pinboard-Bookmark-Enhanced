@@ -263,18 +263,25 @@
     var topic = doc.querySelector(".topic_content");
     if (topic) parts.push(cleanBodyHtml(doc, topic.innerHTML));
     doc.querySelectorAll(".subtle .topic_content").forEach(function (ap) { parts.push(cleanBodyHtml(doc, ap.innerHTML)); });
-    var replies = doc.querySelectorAll('.cell[id^="r_"]');
-    if (replies.length) {
-      parts.push("<h2>" + escapeHtml("回复 (" + replies.length + ")") + "</h2>");
-      replies.forEach(function (cell) {
-        var author = pickText({ querySelector: function (s) { return cell.querySelector(s); } }, ["a[href^='/member/']", "strong a", "a.dark"]);
-        var floor = (cell.querySelector(".no") || {}).textContent || "";
-        var thanks = (cell.querySelector(".small.fade") || {}).textContent || "";
-        var body = cell.querySelector(".reply_content");
-        var head = "<p><strong>" + escapeHtml("#" + floor.trim() + " · " + (author || "匿名")) +
-          (thanks.trim() ? escapeHtml(" · 感谢 " + thanks.trim()) : "") + "</strong></p>";
-        if (body) parts.push(head + cleanBodyHtml(doc, body.innerHTML));
+    var cells = doc.querySelectorAll('.cell[id^="r_"]');
+    if (cells.length) {
+      var replies = [];
+      cells.forEach(function (cell) {
+        var aEl = cell.querySelector("a[href^='/member/']") || cell.querySelector("strong a") || cell.querySelector("a.dark");
+        var author = aEl ? aEl.textContent.trim() : "";
+        var floor = ((cell.querySelector(".no") || {}).textContent || "").trim();
+        var thanks = parseCount(((cell.querySelector(".small.fade") || {}).textContent || ""));
+        var bodyEl = cell.querySelector(".reply_content");
+        var text = bodyEl ? bodyEl.textContent : "";
+        var mentions = (text.match(/@([a-zA-Z0-9_]+)/g) || []).map(function (s) { return s.slice(1); });
+        var refFloors = (text.match(/#(\d+)/g) || []).map(function (s) { return s.slice(1); });
+        replies.push({
+          id: cell.id, author: author, floor: floor, mentions: mentions, refFloors: refFloors,
+          bodyHtml: bodyEl ? cleanBodyHtml(doc, bodyEl.innerHTML) : "", thanks: thanks
+        });
       });
+      parts.push("<h2>" + escapeHtml("回复 (" + replies.length + ")") + "</h2>");
+      parts.push(renderThreadHtml(buildReplyTree(replies), 0));
     }
     if (!parts.join("")) return null;
     var pages = doc.querySelectorAll("#Main .box .inner .page_normal, #Main .box .inner .page_current");

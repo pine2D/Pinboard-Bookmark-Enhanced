@@ -726,6 +726,52 @@ check("renderThreadHtml is a global function", typeof renderThreadHtml === "func
   const roots = buildReplyTree([R("op","1",[]), R("bob","2",["op"])]);
   check("v2ex tree → index-0 node can be a parent", roots.length === 1 && roots[0].children.length === 1, JSON.stringify(roots.map(r=>r.author)));
 })();
+
+section("site-rules: v2ex threaded extract");
+(() => {
+  const v = `<!DOCTYPE html><html><body>
+  <h1>线程主题</h1>
+  <div class="topic_content"><p>楼主正文</p></div>
+  <div class="cell" id="r_1"><strong><a href="/member/alice" class="dark">alice</a></strong><span class="no">1</span><div class="reply_content">第一层</div></div>
+  <div class="cell" id="r_2"><strong><a href="/member/bob" class="dark">bob</a></strong><span class="no">2</span><div class="reply_content"><a href="/member/alice">@alice</a> 回应A</div></div>
+  <div class="cell" id="r_3"><strong><a href="/member/carol" class="dark">carol</a></strong><span class="no">3</span><div class="reply_content">独立发言</div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(v, "text/html");
+  const r = applySiteRule(doc, "https://www.v2ex.com/t/1");
+  const c = r ? norm(r.contentHtml) : "";
+  check("v2ex thread → id+title", r && r.id === "v2ex" && r.title === "线程主题", JSON.stringify(r && [r.id, r.title]));
+  check("v2ex thread → bob nested under alice", /#1 · alice[\s\S]*<blockquote>[\s\S]*#2 · bob/.test(c), c);
+  check("v2ex thread → carol present (top-level)", /#3 · carol/.test(c) && /独立发言/.test(c), c);
+  check("v2ex thread → bob leading @alice stripped", !/@alice/.test(c), c);
+  const md = htmlToMarkdown(r.contentHtml);
+  check("v2ex thread → markdown nests reply one level", /> > /.test(md) && /回应A/.test(md), md);
+})();
+(() => {
+  const v = `<!DOCTYPE html><html><body>
+  <h1>富文本</h1>
+  <div class="topic_content"><p>正文</p></div>
+  <div class="cell" id="r_1"><strong><a href="/member/alice" class="dark">alice</a></strong><span class="no">1</span><div class="reply_content"><pre><code>x=1</code></pre><img data-src="https://v/i.png" src="data:image/gif,p"></div></div>
+  <div class="cell" id="r_2"><strong><a href="/member/bob" class="dark">bob</a></strong><span class="no">2</span><div class="reply_content"><a href="/member/alice">@alice</a> 看代码</div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(v, "text/html");
+  const r = applySiteRule(doc, "https://www.v2ex.com/t/2");
+  const c = r ? norm(r.contentHtml) : "";
+  check("v2ex rich → lazy img promoted in reply body", /src="https:\/\/v\/i\.png"/.test(c), c);
+  const md = htmlToMarkdown(r.contentHtml);
+  check("v2ex rich → code fence survives + x=1", /```/.test(md) && /x=1/.test(md), md);
+})();
+(() => {
+  const v = `<!DOCTYPE html><html><body>
+  <h1>多页</h1>
+  <div class="topic_content"><p>正文</p></div>
+  <div id="Main"><div class="box"><div class="inner"><a class="page_normal">1</a><a class="page_current">2</a></div></div></div>
+  <div class="cell" id="r_1"><strong><a href="/member/alice" class="dark">alice</a></strong><span class="no">101</span><div class="reply_content">第二页回复</div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(v, "text/html");
+  const r = applySiteRule(doc, "https://www.v2ex.com/t/3?p=2");
+  const c = r ? norm(r.contentHtml) : "";
+  check("v2ex pager → 共 2 页 note precedes the tree", /共 2 页/.test(c) && c.indexOf("共 2 页") < c.indexOf("第二页回复"), c);
+})();
 </script>
 
 <script>
