@@ -819,6 +819,17 @@ const SO_POST = (lis, extra) =>
   const out = norm(soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false }));
   check("so show-link → '… and 12 more comments' (link wins)", /and 12 more comments/.test(out), out);
 })();
+(() => {
+  // reply-to-a-reply: carol @bob, but bob is itself a nested child of alice.
+  // bob is not a top-level commenter, so carol resolves to top-level (one-level-max invariant).
+  const doc = new DOMParser().parseFromString(SO_POST(
+    SO_C("root", 1, "alice", null) +
+    SO_C('<a href="/users/1/alice">@alice</a> child-of-alice', 2, "bob", null) +
+    SO_C('<a href="/users/2/bob">@bob</a> reply-to-bob', 3, "carol", null)), "text/html");
+  const out = norm(soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false }));
+  check("so reply-to-reply → bob nested under alice", /<strong>alice<\/strong>[\s\S]*<ul>[\s\S]*<strong>bob<\/strong>[\s\S]*<\/ul>/.test(out), out);
+  check("so reply-to-reply → carol top-level (never 3rd level)", /<\/ul><\/li><li><strong>carol<\/strong>/.test(out) && !/<ul>[\s\S]*<ul>[\s\S]*<ul>/.test(out), out);
+})();
 
 section("site-rules: so comments (end-to-end)");
 (() => {
