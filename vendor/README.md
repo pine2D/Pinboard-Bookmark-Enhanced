@@ -10,6 +10,7 @@ For Chrome Web Store reviewers: every file in this directory is unmodified upstr
 |------|---------|----------|---------|---------|
 | `defuddle.js` | 0.18.1 | https://github.com/kepano/defuddle | MIT | Extracts main article content from arbitrary web pages so AI tag/summary requests can send clean text instead of full HTML. Injected via `chrome.scripting.executeScript` into the active tab on user action only. |
 | `turndown.js` | 7.2.4 | https://github.com/mixmark-io/turndown | MIT | Converts captured HTML to Markdown for the in-extension preview tab. Loaded only inside `md-preview.html`. |
+| `katex/` | 0.17.0 | https://github.com/KaTeX/KaTeX | MIT | Renders LaTeX math (`$...$` / `$$...$$`) in the Markdown preview. Lazy-loaded in `md-preview.html` only for content flagged math-bearing (e.g. arXiv abstracts) — never on other pages, so currency `$` is never touched. woff2 fonts only (Chrome supports woff2). |
 
 ## Reproduction (for source verification)
 
@@ -35,6 +36,14 @@ The file ships pre-built from npm. To verify:
 npm pack turndown@7.2.4
 tar -xzf turndown-7.2.4.tgz package/dist/turndown.js
 diff package/dist/turndown.js vendor/turndown.js
+```
+
+### `katex/`
+```bash
+npm pack katex@0.17.0
+tar -xzf katex-0.17.0.tgz
+# vendor/katex/ = package/dist/{katex.min.js, katex.min.css, contrib/auto-render.min.js, fonts/*.woff2}
+# (auto-render.min.js flattened out of contrib/; .woff/.ttf fonts dropped — Chrome uses woff2)
 ```
 
 ## Update Policy

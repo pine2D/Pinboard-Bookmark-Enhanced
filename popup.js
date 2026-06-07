@@ -340,7 +340,7 @@ async function extractLocalMarkdown(tabId) {
           if (typeof applySiteRule === "function") {
             const hit = applySiteRule(document, location.href);
             if (hit && hit.contentHtml) {
-              return { contentHtml: hit.contentHtml, title: hit.title || document.title, url: location.href };
+              return { contentHtml: hit.contentHtml, title: hit.title || document.title, url: location.href, math: !!hit.math };
             }
           }
         } catch (_) { /* fall through to Defuddle */ }
@@ -474,7 +474,8 @@ async function htmlToMarkdownAsync(html, opts) {
             tags: Array.isArray(currentTags) ? currentTags.slice() : [],
             tokens: result.tokens || 0,
             hasApiKey: !!result._hasApiKey,
-            source: settings.aiContentSource || "local"
+            source: settings.aiContentSource || "local",
+            math: !!result.math
           }
         });
         chrome.tabs.create({ url: "md-preview.html" });

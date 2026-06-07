@@ -304,7 +304,7 @@
     if (absUrl) links.push('<a href="' + escapeHtml(absUrl) + '">Abstract</a>');
     if (pdf) links.push('<a href="' + escapeHtml(pdf) + '">PDF</a>');
     if (links.length) html += "<p>" + links.join(" · ") + "</p>";
-    return { contentHtml: html, title: title };
+    return { contentHtml: html, title: title, math: true }; // abstract keeps $...$/$$...$$ → preview renders via KaTeX
   }
 
   // ---- framework ---------------------------------------------------------
@@ -350,7 +350,7 @@
       var out = null;
       try { out = rule.extract(doc, url); } catch (_) { out = null; }
       if (out && out.contentHtml) {
-        return { id: rule.id, contentHtml: out.contentHtml, title: out.title || doc.title || "", url: url };
+        return { id: rule.id, contentHtml: out.contentHtml, title: out.title || doc.title || "", url: url, math: !!out.math };
       }
       break; // matched site but produced nothing → fall back to Defuddle
     }

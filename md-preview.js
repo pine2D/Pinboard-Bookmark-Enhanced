@@ -68,6 +68,32 @@ function ensureHljs() {
   return _hljsPromise;
 }
 
+// Lazy-load KaTeX (JS + auto-render + CSS) only for math-bearing content (e.g. arXiv),
+// so non-math previews never pay the ~270KB cost and currency "$" on other pages is
+// never touched. CSS is injected here too so the lean first-paint isn't burdened.
+let _katexPromise = null;
+function ensureKatex() {
+  if (typeof renderMathInElement !== "undefined") return Promise.resolve();
+  if (_katexPromise) return _katexPromise;
+  _katexPromise = new Promise((resolve) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet"; css.href = "vendor/katex/katex.min.css";
+    document.head.appendChild(css);
+    const s = document.createElement("script");
+    s.src = "vendor/katex/katex.min.js";
+    s.onload = () => {
+      const a = document.createElement("script");
+      a.src = "vendor/katex/auto-render.min.js";
+      a.onload = () => resolve();
+      a.onerror = () => resolve();
+      document.head.appendChild(a);
+    };
+    s.onerror = () => resolve(); // degrade gracefully: math stays as $...$ source
+    document.head.appendChild(s);
+  });
+  return _katexPromise;
+}
+
 (async function () {
   initI18n();
   applyI18n();
@@ -190,6 +216,21 @@ function ensureHljs() {
   // synchronous whole-document highlight pass (the cold-load spinner).
   if (renderedView.querySelector("pre > code")) {
     requestAnimationFrame(() => { ensureHljs().then(() => highlightCodeBlocks(renderedView)); });
+  }
+  // Math rendering — ONLY for LaTeX-bearing content (info.math, e.g. arXiv). Gating on
+  // the flag (not just a "$") keeps KaTeX off every other page so currency like "$5"
+  // is never mangled. Off the first-paint path (rAF), degrades to $...$ source on error.
+  if (info.math && /\$/.test(renderedView.textContent)) {
+    requestAnimationFrame(() => ensureKatex().then(() => {
+      if (typeof renderMathInElement === "function") {
+        try {
+          renderMathInElement(renderedView, {
+            delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }],
+            throwOnError: false
+          });
+        } catch (_) { /* leave $...$ source visible on failure */ }
+      }
+    }));
   }
 
   // ---- Build TOC sidebar from the canonical markdown ----
