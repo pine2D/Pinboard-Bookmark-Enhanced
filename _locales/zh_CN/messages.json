@@ -14,6 +14,9 @@
   "cmdReadLater": {
     "message": "快速标记为稍后阅读（无弹窗）"
   },
+  "cmdMarkdownPreview": {
+    "message": "将页面转为 Markdown 预览（无弹窗）"
+  },
   "appName": {
     "message": "Pinboard 书签增强"
   },
@@ -521,6 +524,12 @@
   },
   "bgCannotBookmark": {
     "message": "此页面无法添加书签。"
+  },
+  "bgMdPreviewFailed": {
+    "message": "Pinboard：无法转换为 Markdown"
+  },
+  "bgMdPreviewNoContent": {
+    "message": "未能从该页面提取到可读内容。"
   },
   "bgTabSetSaved": {
     "message": "Pinboard：标签集已保存！"

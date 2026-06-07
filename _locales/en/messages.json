@@ -14,6 +14,9 @@
   "cmdReadLater": {
     "message": "Quick save as Read Later (no popup)"
   },
+  "cmdMarkdownPreview": {
+    "message": "Convert page to Markdown preview (no popup)"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -521,6 +524,12 @@
   },
   "bgCannotBookmark": {
     "message": "This page cannot be bookmarked."
+  },
+  "bgMdPreviewFailed": {
+    "message": "Pinboard: Couldn't convert to Markdown"
+  },
+  "bgMdPreviewNoContent": {
+    "message": "No readable content was found on this page."
   },
   "bgTabSetSaved": {
     "message": "Pinboard: Tab Set Saved!"

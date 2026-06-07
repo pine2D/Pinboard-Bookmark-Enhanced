@@ -14,6 +14,9 @@
   "cmdReadLater": {
     "message": "Быстрое сохранение как Напочитать (без окна)"
   },
+  "cmdMarkdownPreview": {
+    "message": "Преобразовать страницу в предпросмотр Markdown (без окна)"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -521,6 +524,12 @@
   },
   "bgCannotBookmark": {
     "message": "Эту страницу нельзя добавить в закладки."
+  },
+  "bgMdPreviewFailed": {
+    "message": "Pinboard: не удалось преобразовать в Markdown"
+  },
+  "bgMdPreviewNoContent": {
+    "message": "На этой странице не найдено читаемого содержимого."
   },
   "bgTabSetSaved": {
     "message": "Pinboard: Набор вкладок сохранён!"

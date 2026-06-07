@@ -14,6 +14,9 @@
   "cmdReadLater": {
     "message": "Szybki zapis jako Przeczytaj później (bez okna)"
   },
+  "cmdMarkdownPreview": {
+    "message": "Konwertuj stronę na podgląd Markdown (bez okna)"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -521,6 +524,12 @@
   },
   "bgCannotBookmark": {
     "message": "Tej strony nie można dodać do zakładek."
+  },
+  "bgMdPreviewFailed": {
+    "message": "Pinboard: nie udało się przekonwertować na Markdown"
+  },
+  "bgMdPreviewNoContent": {
+    "message": "Nie znaleziono czytelnej treści na tej stronie."
   },
   "bgTabSetSaved": {
     "message": "Pinboard: Zestaw kart zapisany!"

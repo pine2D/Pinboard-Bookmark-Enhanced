@@ -808,8 +808,99 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
+// ---- Markdown preview via keyboard shortcut (no popup) ----
+// Self-contained extractor injected into the active tab's ISOLATED world.
+// Mirrors popup.js extractLocalMarkdown's inner func: per-site rule first,
+// then Defuddle. Returns HTML only — md-preview.html runs Turndown itself.
+function extractPageForMarkdown() {
+  try {
+    if (typeof applySiteRule === "function") {
+      const hit = applySiteRule(document, location.href);
+      if (hit && hit.contentHtml) {
+        return { contentHtml: hit.contentHtml, title: hit.title || document.title, url: location.href, math: !!hit.math };
+      }
+    }
+  } catch (_) { /* fall through to Defuddle */ }
+  if (typeof Defuddle === "undefined") return { error: "Defuddle not available" };
+  const OriginalURL = window.URL;
+  if (!window.__pp_urlShimInstalled) {
+    const SafeURL = function (u, b) {
+      try { return b !== undefined ? new OriginalURL(u, b) : new OriginalURL(u); }
+      catch (_) { return new OriginalURL("about:blank"); }
+    };
+    SafeURL.prototype = OriginalURL.prototype;
+    try { SafeURL.createObjectURL = OriginalURL.createObjectURL.bind(OriginalURL); } catch (_) {}
+    try { SafeURL.revokeObjectURL = OriginalURL.revokeObjectURL.bind(OriginalURL); } catch (_) {}
+    try { SafeURL.canParse = OriginalURL.canParse && OriginalURL.canParse.bind(OriginalURL); } catch (_) {}
+    window.URL = SafeURL;
+    window.__pp_urlShimInstalled = true;
+  }
+  try {
+    const clone = document.cloneNode(true);
+    const _origCE = console.error;
+    console.error = (...a) => { if (!String(a[0]).startsWith("Defuddle:")) _origCE.apply(console, a); };
+    let result;
+    try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
+    if (!result?.content) return { error: "No content extracted" };
+    return { contentHtml: result.content, title: result.title || document.title, url: location.href };
+  } catch (e) { return { error: e.message }; }
+}
+
+async function openMarkdownPreviewFromShortcut() {
+  let tab;
+  try {
+    [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  } catch (_) { /* fall through to the guard below */ }
+  if (!tab?.id || !tab.url || !tab.url.startsWith("http")) {
+    showNotification("mdpv-error", t("bgMdPreviewFailed"), t("bgMdPreviewNoContent"), "error");
+    return;
+  }
+  try {
+    // Defuddle is required; bail if the page refuses injection (CSP-locked, store pages).
+    const injected = await chrome.scripting
+      .executeScript({ target: { tabId: tab.id }, files: ["vendor/defuddle.js"] })
+      .catch(() => null);
+    if (!injected) {
+      showNotification("mdpv-error", t("bgMdPreviewFailed"), t("bgMdPreviewNoContent"), "error");
+      return;
+    }
+    // site-rules.js is OPTIONAL — ignore failure so a broken rule can't mask Defuddle.
+    await chrome.scripting
+      .executeScript({ target: { tabId: tab.id }, files: ["site-rules.js"] })
+      .catch(() => {});
+    const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: extractPageForMarkdown });
+    const out = results?.[0]?.result;
+    if (!out || out.error || !out.contentHtml) {
+      showNotification("mdpv-error", t("bgMdPreviewFailed"), out?.error || t("bgMdPreviewNoContent"), "error");
+      return;
+    }
+    // HTML only (markdown:"") — md-preview.html converts via Turndown, same as the popup path.
+    await chrome.storage.local.set({
+      md_preview_data: {
+        markdown: "",
+        contentHtml: out.contentHtml || "",
+        title: out.title || tab.title || "",
+        url: out.url || tab.url,
+        baseUrl: out.url || tab.url,
+        tags: [],
+        tokens: 0,
+        hasApiKey: false,
+        source: "local",
+        math: !!out.math
+      }
+    });
+    await chrome.tabs.create({ url: "md-preview.html" });
+  } catch (e) {
+    showNotification("mdpv-error", t("bgMdPreviewFailed"), e.message, "error");
+  }
+}
+
 // ===================== Keyboard Shortcuts =====================
 chrome.commands.onCommand.addListener(async (command) => {
+  if (command === "markdown_preview") {
+    await openMarkdownPreviewFromShortcut();
+    return;
+  }
   const commandConfig = {
     read_later: { prefix: "rl", toread: true, notifyId: "rl", notifyTitle: () => t("bgReadLater"), notifyCategory: "readLater", errorTitle: () => t("bgReadLaterFailed") },
     quick_save: { prefix: "qs", toread: false, notifyId: "qs", notifyTitle: () => t("bgQuickSaved"), notifyCategory: "quickSave", errorTitle: () => t("bgQuickSaveFailed") },

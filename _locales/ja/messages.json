@@ -14,6 +14,9 @@
   "cmdReadLater": {
     "message": "あとで読むとしてクイック保存（ポップアップなし）"
   },
+  "cmdMarkdownPreview": {
+    "message": "ページを Markdown プレビューに変換（ポップアップなし）"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -521,6 +524,12 @@
   },
   "bgCannotBookmark": {
     "message": "このページはブックマークできません。"
+  },
+  "bgMdPreviewFailed": {
+    "message": "Pinboard：Markdown への変換に失敗しました"
+  },
+  "bgMdPreviewNoContent": {
+    "message": "このページから読み取れるコンテンツが見つかりませんでした。"
   },
   "bgTabSetSaved": {
     "message": "Pinboard：タブセットを保存しました！"

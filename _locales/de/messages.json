@@ -14,6 +14,9 @@
   "cmdReadLater": {
     "message": "Schnell als Später lesen speichern (ohne Popup)"
   },
+  "cmdMarkdownPreview": {
+    "message": "Seite als Markdown-Vorschau öffnen (ohne Popup)"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -521,6 +524,12 @@
   },
   "bgCannotBookmark": {
     "message": "Diese Seite kann nicht als Lesezeichen gespeichert werden."
+  },
+  "bgMdPreviewFailed": {
+    "message": "Pinboard: Markdown-Konvertierung fehlgeschlagen"
+  },
+  "bgMdPreviewNoContent": {
+    "message": "Auf dieser Seite wurde kein lesbarer Inhalt gefunden."
   },
   "bgTabSetSaved": {
     "message": "Pinboard: Tab-Set gespeichert!"

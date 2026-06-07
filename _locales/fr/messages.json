@@ -14,6 +14,9 @@
   "cmdReadLater": {
     "message": "Enregistrement rapide comme À lire (sans popup)"
   },
+  "cmdMarkdownPreview": {
+    "message": "Convertir la page en aperçu Markdown (sans popup)"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -521,6 +524,12 @@
   },
   "bgCannotBookmark": {
     "message": "Cette page ne peut pas être ajoutée aux signets."
+  },
+  "bgMdPreviewFailed": {
+    "message": "Pinboard : échec de la conversion en Markdown"
+  },
+  "bgMdPreviewNoContent": {
+    "message": "Aucun contenu lisible n'a été trouvé sur cette page."
   },
   "bgTabSetSaved": {
     "message": "Pinboard : Ensemble d'onglets enregistré !"

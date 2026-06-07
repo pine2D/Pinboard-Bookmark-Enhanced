@@ -14,6 +14,9 @@
   "cmdReadLater": {
     "message": "快速標記為稍後閱讀（無彈出式視窗）"
   },
+  "cmdMarkdownPreview": {
+    "message": "將頁面轉為 Markdown 預覽（無彈出式視窗）"
+  },
   "appName": {
     "message": "Pinboard 書籤強化"
   },
@@ -521,6 +524,12 @@
   },
   "bgCannotBookmark": {
     "message": "此頁面無法新增書籤。"
+  },
+  "bgMdPreviewFailed": {
+    "message": "Pinboard：無法轉換為 Markdown"
+  },
+  "bgMdPreviewNoContent": {
+    "message": "未能從此頁面擷取到可讀內容。"
   },
   "bgTabSetSaved": {
     "message": "Pinboard：標籤集已儲存！"

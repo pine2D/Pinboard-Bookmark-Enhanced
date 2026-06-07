@@ -89,6 +89,13 @@
         "mac": "MacCtrl+Shift+R"
       },
       "description": "__MSG_cmdReadLater__"
+    },
+    "markdown_preview": {
+      "suggested_key": {
+        "default": "Alt+Shift+M",
+        "mac": "MacCtrl+Shift+M"
+      },
+      "description": "__MSG_cmdMarkdownPreview__"
     }
   }
 }
