@@ -772,6 +772,53 @@ section("site-rules: v2ex threaded extract");
   const c = r ? norm(r.contentHtml) : "";
   check("v2ex pager → 共 2 页 note precedes the tree", /共 2 页/.test(c) && c.indexOf("共 2 页") < c.indexOf("第二页回复"), c);
 })();
+
+section("site-rules: so comments (unit)");
+check("soCommentsHtml is a global function", typeof soCommentsHtml === "function");
+const SO_C = (copyHtml, uid, name, score) =>
+  `<li class="comment">${score != null ? `<div class="comment-score">${score}</div>` : ""}<div class="comment-text"><div class="comment-body"><span class="comment-copy">${copyHtml}</span> <a class="comment-user" href="/users/${uid}/${name}">${name}</a></div></div></li>`;
+const SO_POST = (lis, extra) =>
+  `<!DOCTYPE html><html><body><div id="question"><div class="s-prose js-post-body"><p>q</p></div><div class="comments"><ul class="comments-list">${lis}</ul>${extra || ""}</div></div></body></html>`;
+(() => {
+  const doc = new DOMParser().parseFromString(SO_POST(
+    SO_C("first", 1, "alice", 3) +
+    SO_C('<a href="/users/1/alice">@alice</a> reply', 2, "bob", null) +
+    SO_C("standalone", 3, "carol", null)), "text/html");
+  const out = norm(soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false }));
+  check("so comments → list with authors", /<strong>alice<\/strong>/.test(out) && /<strong>carol<\/strong>/.test(out), out);
+  check("so comments → @reply nested one level under alice", /<li><strong>alice<\/strong>[\s\S]*<ul>[\s\S]*<strong>bob<\/strong>[\s\S]*<\/ul>/.test(out), out);
+  check("so comments → no 3rd ul level", !/<ul>[\s\S]*<ul>[\s\S]*<ul>/.test(out), out);
+  check("so comments → score only >=1", /· 3/.test(out) && !/· 0/.test(out), out);
+})();
+(() => {
+  const doc = new DOMParser().parseFromString(SO_POST(
+    SO_C("first", 1, "John Doe", null) +
+    SO_C('<a href="/users/1/John-Doe">@JohnDoe</a> r2', 2, "bob", null) +
+    SO_C('<a href="/users/1/John-Doe">@JohnDoe</a> r3', 3, "eve", null) +
+    SO_C('<a href="/users/9/nobody">@Nobody</a> r4', 4, "frank", null)), "text/html");
+  const out = norm(soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false }));
+  check("so comments → space-collapsed @JohnDoe matches 'John Doe'", /<strong>John Doe<\/strong>[\s\S]*<ul>[\s\S]*bob[\s\S]*eve[\s\S]*<\/ul>/.test(out), out);
+  check("so comments → @Nobody (unmatched) stays top-level", /<strong>John Doe<\/strong>[\s\S]*<ul>[\s\S]*bob[\s\S]*eve[\s\S]*<\/ul><\/li><li><strong>frank<\/strong>/.test(out), out);
+  check("so comments → still only one nesting level", !/<ul>[\s\S]*<ul>[\s\S]*<ul>/.test(out), out);
+})();
+(() => {
+  const doc = new DOMParser().parseFromString(SO_POST(SO_C('line A<br>line B', 1, "al", null)), "text/html");
+  const out = soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false });
+  check("so flatten → comment body on one line, no block tags", /<li><strong>al<\/strong>: line A line B<\/li>/.test(norm(out)) && !/<br/.test(out), out);
+})();
+(() => {
+  let lis = ""; for (let i = 1; i <= 7; i++) lis += SO_C("c" + i, i, "u" + i, null);
+  const doc = new DOMParser().parseFromString(SO_POST(lis), "text/html");
+  const out = norm(soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false }));
+  check("so cap → 5 rendered, c6 absent", /c1/.test(out) && /c5/.test(out) && !/>c6</.test(out) && !/: c6/.test(out), out);
+  check("so cap → '… and 2 more comments'", /and 2 more comments/.test(out), out);
+})();
+(() => {
+  let lis = ""; for (let i = 1; i <= 5; i++) lis += SO_C("c" + i, i, "u" + i, null);
+  const doc = new DOMParser().parseFromString(SO_POST(lis, '<a class="js-show-link comments-link">show 12 more comments</a>'), "text/html");
+  const out = norm(soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false }));
+  check("so show-link → '… and 12 more comments' (link wins)", /and 12 more comments/.test(out), out);
+})();
 </script>
 
 <script>

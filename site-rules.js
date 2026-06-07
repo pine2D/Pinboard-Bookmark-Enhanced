@@ -442,6 +442,101 @@
     return out;
   }
 
+  function collapseName(s) { return String(s == null ? "" : s).replace(/\s+/g, "").toLowerCase(); }
+
+  // SO comment body -> single line: block boundaries to spaces, drop block wrappers,
+  // keep inline tags (<a>/<code>/<em>/<strong>), collapse whitespace.
+  function soFlatten(html) {
+    if (!html) return "";
+    var s = html.replace(/<\/(p|div)>/gi, " ").replace(/<br\s*\/?>/gi, " ").replace(/<(p|div)\b[^>]*>/gi, "");
+    return s.replace(/\s+/g, " ").trim();
+  }
+
+  // Leading @target of a comment <li>, or null. Prefers the first-child anchor's
+  // /users/<id> (collision-free); falls back to a leading "@name" text token.
+  function soCommentTarget(li) {
+    var copy = li.querySelector(".comment-copy") || li.querySelector(".comment-body");
+    if (!copy) return null;
+    var a = copy.firstElementChild;
+    if (a && a.tagName === "A" && /^@/.test((a.textContent || "").trim())) {
+      var href = a.getAttribute("href") || "";
+      var m = href.match(/\/users\/(\d+)/);
+      return { uid: m ? m[1] : null, name: collapseName((a.textContent || "").replace(/^@/, "")) };
+    }
+    var tm = (copy.textContent || "").trim().match(/^@([^\s,.:;!?]+)/);
+    return tm ? { uid: null, name: collapseName(tm[1]) } : null;
+  }
+
+  // One post's comments -> indented <ul>. @-replies nest one level under the earlier
+  // TOP-LEVEL commenter they address. Caps: per-post + page-global (counts every comment
+  // in display order, parents + children). counters = { total, capped } threaded by caller.
+  function soCommentsHtml(postEl, doc, counters) {
+    if (!postEl) return "";
+    var container = postEl.querySelector(".comments");
+    if (!container) return "";
+    var rows = container.querySelectorAll(".comments-list > li.comment");
+    if (!rows.length) rows = container.querySelectorAll("li.comment");
+    if (!rows.length) return "";
+    var perPost = cfg("SO_COMMENTS_PER_POST", SO_COMMENTS_PER_POST);
+    var globalCap = cfg("SO_COMMENTS_GLOBAL", SO_COMMENTS_GLOBAL);
+
+    var items = [];
+    for (var i = 0; i < rows.length; i++) {
+      var li = rows[i];
+      var copy = li.querySelector(".comment-copy") || li.querySelector(".comment-body");
+      var userEl = li.querySelector(".comment-user");
+      var author = userEl ? (userEl.textContent || "").trim() : "";
+      var um = (userEl ? (userEl.getAttribute("href") || "") : "").match(/\/users\/(\d+)/);
+      var scoreEl = li.querySelector(".comment-score") || li.querySelector("span.cool");
+      var score = scoreEl ? parseInt((scoreEl.textContent || "").replace(/[^\d]/g, ""), 10) : 0;
+      items.push({
+        author: author, authorKey: collapseName(author), uid: um ? um[1] : null,
+        bodyHtml: soFlatten(copy ? copy.innerHTML : ""), score: score > 0 ? score : 0,
+        target: soCommentTarget(li), children: [], rendered: false
+      });
+    }
+
+    var topByName = {}, topByUid = {}, roots = [];
+    for (var k = 0; k < items.length; k++) {
+      var c = items[k], parent = -1;
+      if (c.target) {
+        var self = (c.target.uid && c.target.uid === c.uid) || (c.target.name && c.target.name === c.authorKey);
+        if (!self) {
+          if (c.target.uid != null && topByUid[c.target.uid] != null) parent = topByUid[c.target.uid];
+          else if (c.target.name != null && topByName[c.target.name] != null) parent = topByName[c.target.name];
+        }
+      }
+      if (parent >= 0) items[parent].children.push(c);
+      else { roots.push(c); topByName[c.authorKey] = k; if (c.uid != null) topByUid[c.uid] = k; }
+    }
+
+    var perPostRendered = 0;
+    for (var d = 0; d < items.length; d++) {
+      if (counters.total >= globalCap) { counters.capped = true; continue; }
+      if (perPostRendered >= perPost) continue;
+      items[d].rendered = true; perPostRendered++; counters.total++;
+    }
+    if (perPostRendered === 0) return "";
+
+    function liOf(c) {
+      var sc = c.score > 0 ? escapeHtml(" · " + c.score) : "";
+      var h = "<li><strong>" + escapeHtml(c.author || "匿名") + "</strong>: " + c.bodyHtml + sc;
+      var kids = "";
+      for (var x = 0; x < c.children.length; x++) if (c.children[x].rendered) kids += liOf(c.children[x]);
+      if (kids) h += "<ul>" + kids + "</ul>";
+      return h + "</li>";
+    }
+    var lis = "";
+    for (var r2 = 0; r2 < roots.length; r2++) if (roots[r2].rendered) lis += liOf(roots[r2]);
+
+    var showMore = 0, link = postEl.querySelector(".js-show-link");
+    if (link) { var mm = (link.textContent || "").match(/(\d+)/); if (mm) showMore = parseInt(mm[1], 10); }
+    var more = showMore > 0 ? showMore : (items.length - perPostRendered);
+    var moreLi = more > 0 ? "<li><em>" + escapeHtml("… and " + more + " more comments") + "</em></li>" : "";
+    if (!lis && !moreLi) return "";
+    return "<p><strong>Comments</strong></p><ul>" + lis + moreLi + "</ul>";
+  }
+
   // ---- framework ---------------------------------------------------------
 
   function hostMatches(pattern, hostname) {
@@ -499,4 +594,5 @@
   g.applySiteRule = applySiteRule;
   g.buildReplyTree = buildReplyTree;
   g.renderThreadHtml = renderThreadHtml;
+  g.soCommentsHtml = soCommentsHtml;
 })();
