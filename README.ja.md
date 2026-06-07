@@ -4,6 +4,8 @@
 
 [Pinboard](https://pinboard.in) ブックマークを AI タグ・要約と完全カスタマイズ可能なテーマで強化する Chrome 拡張機能。
 
+> **注意:** 本拡張機能は [Pinboard](https://pinboard.in)（**有料**のブックマークサービス）の独立したサードパーティ製クライアントです。利用にはご自身の Pinboard.in アカウントと API トークンが必要です。Pinboard とは提携しておらず、公式の承認も受けていません。
+
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)

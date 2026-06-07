@@ -4,6 +4,8 @@
 
 Rozszerzenie Chrome, które wzbogaca zakładki [Pinboard](https://pinboard.in) o tagi i streszczenia AI oraz w pełni konfigurowalny interfejs.
 
+> **Uwaga:** To niezależny klient innej firmy dla [Pinboard](https://pinboard.in) — **płatnej** usługi zakładek. Do korzystania potrzebujesz własnego konta Pinboard.in oraz tokena API. Niepowiązany z Pinboard ani przez niego nieautoryzowany.
+
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)

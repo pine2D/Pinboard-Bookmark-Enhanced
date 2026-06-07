@@ -4,6 +4,8 @@
 
 A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking with AI-powered tags, summaries, and a fully themeable interface.
 
+> **Note:** This is an independent, third-party client for [Pinboard](https://pinboard.in) — a **paid** bookmarking service. You need your own Pinboard.in account and API token to use it. Not affiliated with or endorsed by Pinboard.
+
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)

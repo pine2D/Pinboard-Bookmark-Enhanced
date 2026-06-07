@@ -4,6 +4,8 @@
 
 Une extension Chrome qui booste les signets [Pinboard](https://pinboard.in) avec tags et résumés par IA, et une interface entièrement personnalisable.
 
+> **Remarque :** Ceci est un client tiers indépendant pour [Pinboard](https://pinboard.in), un service de signets **payant**. Vous avez besoin de votre propre compte Pinboard.in et d'un jeton API pour l'utiliser. Non affilié à Pinboard ni approuvé par Pinboard.
+
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)

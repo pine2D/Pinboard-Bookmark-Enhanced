@@ -4,6 +4,8 @@
 
 全面增强 [Pinboard](https://pinboard.in) 书签体验的 Chrome 扩展：AI 智能标签、自动摘要，以及全套可定制主题界面。
 
+> **说明：** 本扩展是 [Pinboard](https://pinboard.in)（一项**付费**书签服务）的独立第三方客户端。使用前需要你自己的 Pinboard.in 账号及 API token。本项目与 Pinboard 官方无关。
+
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)

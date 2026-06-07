@@ -4,6 +4,8 @@
 
 Eine Chrome-Erweiterung, die [Pinboard](https://pinboard.in)-Lesezeichen mit KI-gestützten Tags, Zusammenfassungen und einer voll anpassbaren Oberfläche aufwertet.
 
+> **Hinweis:** Dies ist ein unabhängiger Drittanbieter-Client für [Pinboard](https://pinboard.in) – einen **kostenpflichtigen** Lesezeichendienst. Zur Nutzung benötigst du ein eigenes Pinboard.in-Konto und einen API-Token. Nicht mit Pinboard verbunden oder von Pinboard unterstützt.
+
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
