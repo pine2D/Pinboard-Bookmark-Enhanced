@@ -295,16 +295,18 @@
     if (!abs && !authors.length) return null;
     var html = "";
     if (authors.length) html += "<p><strong>" + escapeHtml(authors.join(", ")) + "</strong></p>";
-    var line1 = []; if (id) line1.push("arXiv:" + id); if (subjects) line1.push(subjects); if (date) line1.push(date); if (comments) line1.push(comments);
-    if (line1.length) html += "<p>" + escapeHtml(line1.join(" · ")) + "</p>";
-    var line2 = []; if (msc) line2.push("MSC: " + msc); if (jref) line2.push("Journal: " + jref); if (doi) line2.push("DOI: " + doi);
-    if (line2.length) html += "<p>" + escapeHtml(line2.join(" · ")) + "</p>";
-    if (abs) html += "<p>" + escapeHtml(abs) + "</p>";
+    // Labeled metadata list (one field per row, scannable) instead of a "·"-crammed run.
+    var rows = "";
+    function row(label, val) { if (val) rows += "<li><strong>" + escapeHtml(label) + ":</strong> " + escapeHtml(val) + "</li>"; }
+    row("arXiv", id); row("Subjects", subjects); row("Submitted", date); row("Comments", comments);
+    row("MSC", msc); row("Journal", jref); row("DOI", doi);
+    if (rows) html += "<ul>" + rows + "</ul>";
+    if (abs) html += "<h2>Abstract</h2><p>" + escapeHtml(abs) + "</p>"; // keeps $...$/$$...$$ → KaTeX
     var links = [];
     if (absUrl) links.push('<a href="' + escapeHtml(absUrl) + '">Abstract</a>');
     if (pdf) links.push('<a href="' + escapeHtml(pdf) + '">PDF</a>');
     if (links.length) html += "<p>" + links.join(" · ") + "</p>";
-    return { contentHtml: html, title: title, math: true }; // abstract keeps $...$/$$...$$ → preview renders via KaTeX
+    return { contentHtml: html, title: title, math: true };
   }
 
   // ---- framework ---------------------------------------------------------
