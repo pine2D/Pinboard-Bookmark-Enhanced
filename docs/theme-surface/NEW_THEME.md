@@ -15,18 +15,19 @@ cp docs/theme-surface/pilots/github-light.tokens.json \
 
 # 2. edit the palette / typo / patterns to taste
 
-# 3. regenerate shipped CSS into pinboard-themes.js
+# 3. regenerate pinboard-themes.js AND popup.css/options.css @generated regions
 node docs/theme-surface/tools/sync-all.mjs
 
-# 4. ensure all gates pass
+# 4. ensure all gates pass (sync-all already ran them; re-run to double-check)
 node docs/theme-surface/tools/diff-all.mjs --strict
 node docs/theme-surface/tools/cascade-lint.mjs
 node docs/theme-surface/tools/override-drift.mjs
 node docs/theme-surface/tools/token-coverage.mjs
 ```
 
-If all four exit 0 you're done. Reload the extension at
+If all gates exit 0 you're done. Reload the extension at
 `chrome://extensions/` and pick your theme from the options page.
+The popup and options pages will also show your new theme automatically.
 
 ---
 
@@ -190,7 +191,38 @@ probes in addition to the 9 light probes.
 
 ---
 
-## 6 · Verification loop
+## 6 · Extension popup + options themes (also regenerated)
+
+Adding a pilot tokens file regenerates **both** the pinboard.in site theme
+*and* the extension popup/options named-theme blocks. You do not need to
+touch `popup.css` or `options.css` manually.
+
+**How it works.** `composers/popup-chrome.mjs` and `composers/options-chrome.mjs`
+read the same pilot palette (via `composers/_ui-derive.mjs`) and write
+`--pp-*` / `--opt-*` custom properties into `@generated:ui-themes` regions
+inside `popup.css` and `options.css`. `sync-all` runs this step automatically.
+
+To regenerate popup + options themes on their own:
+
+```bash
+node docs/theme-surface/tools/apply-ui-themes.mjs --write
+```
+
+Three gates guard the generated output:
+
+| Gate | What it checks |
+|------|----------------|
+| `contrast-audit.mjs` | WCAG AA for every popup/options status + text pair |
+| `css-region-audit.mjs` | `@generated:ui-themes` regions have not been hand-edited |
+| `ui-token-coverage.mjs` | Every consumed `--pp-*` / `--opt-*` token is defined |
+
+All three run inside `sync-all` and inside the pre-commit hook. **Do not
+hand-edit the `@generated:ui-themes` regions** in `popup.css` or
+`options.css` — they will be overwritten on the next `sync-all`.
+
+---
+
+## 7 · Verification loop
 
 Run all four in this order. Each must exit 0.
 
@@ -202,8 +234,9 @@ node docs/theme-surface/tools/token-coverage.mjs     # missing token definitions
 ```
 
 `sync-all` is the orchestrator — it runs `render-all`, `apply-tokens` × N,
-`diff-all --strict`, `contrast-audit`, `layout-lint`, and `url-lint`. The
-other three are independent checks the pre-commit hook also runs.
+`diff-all --strict`, `contrast-audit`, `layout-lint`, and `url-lint`, plus
+the three UI gates from §6 above. The other three are independent checks the
+pre-commit hook also runs.
 
 The pre-commit hook runs all four automatically when any `composers/`,
 `pilots/*.tokens.json`, or `tools/*.mjs` file is staged. Do not bypass with
@@ -211,7 +244,7 @@ The pre-commit hook runs all four automatically when any `composers/`,
 
 ---
 
-## 7 · Common pitfalls
+## 8 · Common pitfalls
 
 1. **Forgetting `patterns.tag-style`.** The composer emits only the base
    `a.tag` rule; tag-style owns `:hover` and `.selected`. Without it, hovering
@@ -243,7 +276,7 @@ The pre-commit hook runs all four automatically when any `composers/`,
 
 ---
 
-## 8 · Visual smoke test
+## 9 · Visual smoke test
 
 1. Reload the extension at `chrome://extensions/` (toggle off/on or click the
    refresh icon on the unpacked extension card).
@@ -317,33 +350,46 @@ open in any browser. Use whichever fits the situation.
 
 ---
 
-## 9 · Submitting
+## 10 · Submitting
 
 This is a single-author project, so "submitting" means landing a commit on
 `main`. Two-file diff plus a sensible message:
 
 ```bash
-git add docs/theme-surface/pilots/<slug>.tokens.json pinboard-themes.js
+git add docs/theme-surface/pilots/<slug>.tokens.json \
+        pinboard-themes.js \
+        popup.css \
+        options.css
 git commit -m "feat(theme): add <slug> theme"
 ```
 
-`sync-all` regenerates `pinboard-themes.js` in place, so stage both files.
+`sync-all` regenerates `pinboard-themes.js` and the `@generated:ui-themes`
+regions in `popup.css` and `options.css` in place, so stage all four files.
 
 ---
 
-## Don't hand-edit pinboard-themes.js
+## Don't hand-edit generated files
 
-`pinboard-themes.js` is the runtime artifact. It is fully regenerated
-on every `sync-all` invocation from composer output + per-theme tokens.
-Any rule you add directly will be silently overwritten the next time
-sync-all runs.
+**`pinboard-themes.js`** is the runtime artifact for pinboard.in site themes.
+It is fully regenerated on every `sync-all` invocation from composer output +
+per-theme tokens. Any rule you add directly will be silently overwritten the
+next time sync-all runs.
+
+**`popup.css` / `options.css` `@generated:ui-themes` regions** are likewise
+factory output — written by `apply-ui-themes.mjs` from the pilot palettes.
+Do not edit between the `/* @generated:ui-themes */` and
+`/* @end:ui-themes */` markers; `css-region-audit` will catch the drift and
+block the commit.
 
 If you need a rule that doesn't fit the composer:
 
-- **Applies to all 13 themes** → add it to `composers/classic-list-v2.mjs`
+- **Pinboard site theme, all 13 themes** → add it to `composers/classic-list-v2.mjs`
   (or `_patterns.mjs` if it should be opt-in per theme).
-- **Applies to one theme only** → add it to that theme's
+- **Pinboard site theme, one theme only** → add it to that theme's
   `pilots/<slug>.tokens.json` `overrides.css` string.
+- **Popup/options UI chrome** → edit `composers/popup-chrome.mjs` or
+  `composers/options-chrome.mjs` (or `composers/_ui-derive.mjs` for shared
+  derivation logic), then re-run `sync-all`.
 
 The `handedit-audit` pre-commit hook detects any rule in
 `pinboard-themes.js` not derivable from the composer pipeline and
