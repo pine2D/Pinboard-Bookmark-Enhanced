@@ -475,7 +475,8 @@ async function htmlToMarkdownAsync(html, opts) {
             tokens: result.tokens || 0,
             hasApiKey: !!result._hasApiKey,
             source: settings.aiContentSource || "local",
-            math: !!result.math
+            math: !!result.math,
+            tabId: tab.id
           }
         });
         chrome.tabs.create({ url: "md-preview.html" });
