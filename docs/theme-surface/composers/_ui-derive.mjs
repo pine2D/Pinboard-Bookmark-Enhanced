@@ -52,30 +52,22 @@ export function hslToRgb([h, s, l]) {
 // Mix two rgb colors by ratio t (0 = a, 1 = b).
 export function mix(a, b, t) { return a.map((c, i) => c + (b[i] - c) * t); }
 
-// Produce a low-saturation background sharing fg's hue, sitting on the theme bg,
-// then adjust its LIGHTNESS until contrast(fg, bg) >= min. mode: "light"|"dark".
-export function tintToAA(fg, themeBg, mode, min = 4.5) {
-  const [h, s] = rgbToHsl(fg);
-  const baseBg = mix(themeBg, fg, mode === "dark" ? 0.18 : 0.12);
-  if (contrast(fg, baseBg) >= min) return baseBg;
-  const hueSat = [h, Math.min(s, mode === "dark" ? 0.5 : 0.7)];
-  // Sweep lightness in the mode's natural direction first (light -> lighter,
-  // dark -> darker). If the fg is too mid-tone to clear AA that way (e.g. its
-  // contrast ceiling against white is < min), fall back to the opposite
-  // direction so a status bg is still guaranteed to reach AA by construction.
-  const sweep = dir => {
-    let l = rgbToHsl(baseBg)[2];
-    let bg = baseBg;
-    for (let i = 0; i < 80; i++) {
-      l = dir > 0 ? Math.min(1, l + 0.015) : Math.max(0, l - 0.015);
-      bg = hslToRgb([hueSat[0], hueSat[1], l]);
-      if (contrast(fg, bg) >= min) return bg;
-      if (l <= 0 || l >= 1) break;
-    }
-    return null;
-  };
-  const primary = mode === "dark" ? -1 : 1;
-  return sweep(primary) || sweep(-primary) || baseBg;
+// Derive an AA-passing status (fg,bg) pair: subtle tinted background keeping the
+// theme's light/dark feel, with the foreground's LIGHTNESS adjusted (hue+sat kept)
+// until contrast >= min. mode: "light"|"dark". Returns { fg:[r,g,b], bg:[r,g,b] }.
+export function pairToAA(statusFg, themeBg, mode, min = 4.5) {
+  const bg = mix(themeBg, statusFg, mode === "dark" ? 0.18 : 0.12);
+  const bgIsLight = relLum(bg) > 0.18;
+  const [h, s] = rgbToHsl(statusFg);
+  let [, , l] = rgbToHsl(statusFg);
+  let fg = statusFg;
+  for (let i = 0; i < 80; i++) {
+    if (contrast(fg, bg) >= min) break;
+    l = bgIsLight ? Math.max(0, l - 0.02) : Math.min(1, l + 0.02);
+    fg = hslToRgb([h, s, l]);
+    if (l <= 0 || l >= 1) break;
+  }
+  return { fg, bg };
 }
 
 // Map an expanded pilot palette to the canonical UI semantic colors.
@@ -84,11 +76,11 @@ export function deriveUiColors(p, mode) {
   const hx = k => p[k];
   const rgb = k => hexToRgb(p[k]);
   const bg = rgb("bg");
-  const warnFg = rgb("destroy");
-  const okFg = rgb("success");
-  const bannerFg = rgb("accent");
-  const offFg = rgb("private-accent");
-  const t = (fgRgb) => rgbToHex(tintToAA(fgRgb, bg, mode));
+  const warn = pairToAA(rgb("destroy"), bg, mode);
+  const ok = pairToAA(rgb("success"), bg, mode);
+  const banner = pairToAA(rgb("accent"), bg, mode);
+  const offline = pairToAA(rgb("private-accent"), bg, mode);
+  const bd = (pr) => rgbToHex(mix(pr.bg, pr.fg, 0.5));
   const inputFocus = mode === "dark"
     ? rgbToHex(hslToRgb((() => { const [h, s, l] = rgbToHsl(rgb("input-bg")); return [h, s, Math.min(1, l + 0.06)]; })()))
     : hx("bg");
@@ -100,10 +92,10 @@ export function deriveUiColors(p, mode) {
     "tag-bg": hx("tag-bg"), "tag-fg": hx("tag-fg"), "tag-hover": hx("row-hover"),
     "drop-hover": hx("accent-soft"),
     "input-bg": hx("input-bg"), "input-focus-bg": inputFocus,
-    "warn-fg": hx("destroy"), "warn-bg": t(warnFg), "warn-bd": rgbToHex(mix(bg, warnFg, mode === "dark" ? 0.35 : 0.28)),
-    "ok-fg": hx("success"), "ok-bd": hx("success"), "ok-bg": t(okFg),
-    "banner-fg": hx("accent"), "banner-bg": t(bannerFg), "banner-bd": rgbToHex(mix(bg, bannerFg, mode === "dark" ? 0.35 : 0.28)),
-    "offline-fg": hx("private-accent"), "offline-bg": t(offFg), "offline-bd": rgbToHex(mix(bg, offFg, mode === "dark" ? 0.35 : 0.28)),
+    "warn-fg": rgbToHex(warn.fg), "warn-bg": rgbToHex(warn.bg), "warn-bd": bd(warn),
+    "ok-fg": rgbToHex(ok.fg), "ok-bg": rgbToHex(ok.bg), "ok-bd": bd(ok),
+    "banner-fg": rgbToHex(banner.fg), "banner-bg": rgbToHex(banner.bg), "banner-bd": bd(banner),
+    "offline-fg": rgbToHex(offline.fg), "offline-bg": rgbToHex(offline.bg), "offline-bd": bd(offline),
     danger: hx("destroy"),
     "spinner-bg": hx("border"), "spinner-fg": hx("accent"),
     "preset-bg": hx("accent-soft"), "preset-bd": hx("border"), "preset-fg": hx("accent"),
