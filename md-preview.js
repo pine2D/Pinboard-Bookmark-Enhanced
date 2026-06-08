@@ -109,6 +109,7 @@ function ensureKatex() {
   await chrome.storage.local.remove("md_preview_data");
 
   const { contentHtml, title, url, tokens, source } = info;
+  const srcTabId = info.tabId;
   const baseUrl = info.baseUrl || url || "";
   const tags = Array.isArray(info.tags) ? info.tags : [];
   const description = info.description || "";
@@ -186,8 +187,79 @@ function ensureKatex() {
     tokenEl.style.display = "none";
   }
   const sourceEl = document.getElementById("source-badge");
+  const engineStatusEl = document.getElementById("engine-status");
+  const curEngine = source === "jina" ? "jina" : "local";
+  let switching = false;
+
+  function setEngineStatus(text, isError) {
+    if (!engineStatusEl) return;
+    engineStatusEl.textContent = text || "";
+    engineStatusEl.classList.toggle("error", !!isError);
+  }
+  function engineLabel(e) { return e === "jina" ? "Jina Reader" : "Defuddle"; }
+  function engineUnavailable(e) {
+    if (e === "jina") return !/^https?:\/\//i.test(srcUrlForSwitch);
+    return !srcTabId; // local needs the source tab
+  }
+  function mapErr(r) {
+    const code = r && r.error;
+    if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
+    return code ? String(code) : "error";
+  }
+  function applyAvailability() {
+    if (!sourceEl) return;
+    sourceEl.querySelectorAll(".src-seg").forEach((seg) => {
+      const e = seg.getAttribute("data-engine");
+      const active = e === curEngine;
+      const unavail = engineUnavailable(e) && !active;
+      seg.classList.toggle("active", active);
+      seg.setAttribute("aria-pressed", active ? "true" : "false");
+      seg.disabled = unavail;
+      if (unavail) seg.setAttribute("aria-disabled", "true");
+      else seg.removeAttribute("aria-disabled");
+      if (!active && !unavail) seg.title = t("mdEngineSwitchTo", engineLabel(e));
+      else if (unavail && e === "local") seg.title = t("mdEngineTabGone");
+      else seg.removeAttribute("title");
+    });
+  }
+
+  const srcUrlForSwitch = url || "";
   if (sourceEl) {
-    sourceEl.textContent = source === "jina" ? "Jina Reader" : "Defuddle";
+    applyAvailability();
+    sourceEl.querySelectorAll(".src-seg").forEach((seg) => {
+      seg.addEventListener("click", async () => {
+        const e = seg.getAttribute("data-engine");
+        if (switching || e === curEngine || seg.disabled) return;
+        switching = true;
+        sourceEl.setAttribute("aria-busy", "true");
+        sourceEl.querySelectorAll(".src-seg").forEach((s) => { s.disabled = true; });
+        seg.classList.add("loading");
+        setEngineStatus(t("mdEngineSwitching"), false);
+        let r;
+        try {
+          r = await chrome.runtime.sendMessage({
+            type: "reextractMarkdown",
+            tabId: srcTabId, url: srcUrlForSwitch, engine: e,
+            tags, description
+          });
+        } catch (_) { r = { ok: false, error: "network" }; }
+        if (r && r.ok) { location.reload(); return; }
+        // failure: keep current content, restore the control
+        switching = false;
+        sourceEl.removeAttribute("aria-busy");
+        seg.classList.remove("loading");
+        applyAvailability();
+        setEngineStatus(t("mdEngineSwitchFailed", mapErr(r)), true);
+        if (e === "local" && r && (r.error === "tab_unavailable" || r.error === "tab_navigated")) {
+          const localSeg = sourceEl.querySelector('.src-seg[data-engine="local"]');
+          if (localSeg) {
+            localSeg.disabled = true;
+            localSeg.setAttribute("aria-disabled", "true");
+            localSeg.title = t("mdEngineTabGone");
+          }
+        }
+      });
+    });
   }
   document.title = `${title || "Markdown"} — Preview`;
 
