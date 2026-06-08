@@ -34,7 +34,7 @@ export function composeTheme(tokens, composer) {
   return out;
 }
 
-function mergeTokens(base, mode) {
+export function mergeTokens(base, mode) {
   return {
     ...base,
     palette: { ...base.palette, ...(mode.palette || {}) },
