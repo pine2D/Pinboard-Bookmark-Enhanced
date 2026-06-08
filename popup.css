@@ -1042,8 +1042,8 @@ html[data-theme="terminal"] {
   --pp-warn-bd: #9b2222;
   --pp-warn-fg: #ff3333;
   --pp-ok-bg: #081108;
-  --pp-ok-bd: #045504;
-  --pp-ok-fg: #009900;
+  --pp-ok-bd: #045004;
+  --pp-ok-fg: #008f00;
   --pp-offline-bg: #2d2d08;
   --pp-offline-bd: #7c7c04;
   --pp-offline-fg: #cccc00;
@@ -1387,8 +1387,8 @@ html[data-theme="gruvbox-dark"] {
   --pp-tag-hover: #3c3836;
   --pp-drop-hover: #3c3836;
   --pp-banner-bg: #383f3c;
-  --pp-banner-bd: #64766f;
-  --pp-banner-fg: #8faea2;
+  --pp-banner-bd: #677872;
+  --pp-banner-fg: #95b2a7;
   --pp-warn-bg: #4e2e2a;
   --pp-warn-bd: #a55248;
   --pp-warn-fg: #fc7666;

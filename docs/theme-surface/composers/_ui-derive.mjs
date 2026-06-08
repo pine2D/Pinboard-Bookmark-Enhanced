@@ -57,12 +57,13 @@ export function mix(a, b, t) { return a.map((c, i) => c + (b[i] - c) * t); }
 // until contrast >= min. mode: "light"|"dark". Returns { fg:[r,g,b], bg:[r,g,b] }.
 export function pairToAA(statusFg, themeBg, mode, min = 4.5) {
   const bg = mix(themeBg, statusFg, mode === "dark" ? 0.18 : 0.12);
-  const bgIsLight = relLum(bg) > 0.18;
+  const bgRound = hexToRgb(rgbToHex(bg));
+  const bgIsLight = relLum(bgRound) > 0.18;
   const [h, s] = rgbToHsl(statusFg);
   let [, , l] = rgbToHsl(statusFg);
   let fg = statusFg;
   for (let i = 0; i < 80; i++) {
-    if (contrast(fg, bg) >= min) break;
+    if (contrast(hexToRgb(rgbToHex(fg)), bgRound) >= min) break;
     l = bgIsLight ? Math.max(0, l - 0.02) : Math.min(1, l + 0.02);
     fg = hslToRgb([h, s, l]);
     if (l <= 0 || l >= 1) break;
