@@ -1,0 +1,111 @@
+// Shared UI-theme derivation: pilot palette -> popup/options semantic colors,
+// with contrast-aware tinting so status backgrounds clear WCAG AA by construction.
+// Pure functions only (unit-tested). No I/O.
+
+export function hexToRgb(h) {
+  let s = String(h).replace(/^#/, "").trim();
+  if (s.length === 3) s = s.split("").map(c => c + c).join("");
+  const n = parseInt(s, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+export function rgbToHex([r, g, b]) {
+  const h = x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, "0");
+  return "#" + h(r) + h(g) + h(b);
+}
+export function relLum(rgb) {
+  const s = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * s(rgb[0]) + 0.7152 * s(rgb[1]) + 0.0722 * s(rgb[2]);
+}
+export function contrast(a, b) {
+  const L = [relLum(a), relLum(b)].sort((x, y) => x - y);
+  return (L[1] + 0.05) / (L[0] + 0.05);
+}
+export function rgbToHsl([r, g, b]) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0; const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h /= 6;
+  }
+  return [h * 360, s, l];
+}
+export function hslToRgb([h, s, l]) {
+  h = ((h % 360) + 360) % 360 / 360;
+  if (s === 0) { const v = Math.round(l * 255); return [v, v, v]; }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hue = t => {
+    t = (t + 1) % 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  return [hue(h + 1 / 3), hue(h), hue(h - 1 / 3)].map(x => Math.round(x * 255));
+}
+
+// Mix two rgb colors by ratio t (0 = a, 1 = b).
+export function mix(a, b, t) { return a.map((c, i) => c + (b[i] - c) * t); }
+
+// Produce a low-saturation background sharing fg's hue, sitting on the theme bg,
+// then adjust its LIGHTNESS until contrast(fg, bg) >= min. mode: "light"|"dark".
+export function tintToAA(fg, themeBg, mode, min = 4.5) {
+  const [h, s] = rgbToHsl(fg);
+  const baseBg = mix(themeBg, fg, mode === "dark" ? 0.18 : 0.12);
+  if (contrast(fg, baseBg) >= min) return baseBg;
+  const hueSat = [h, Math.min(s, mode === "dark" ? 0.5 : 0.7)];
+  // Sweep lightness in the mode's natural direction first (light -> lighter,
+  // dark -> darker). If the fg is too mid-tone to clear AA that way (e.g. its
+  // contrast ceiling against white is < min), fall back to the opposite
+  // direction so a status bg is still guaranteed to reach AA by construction.
+  const sweep = dir => {
+    let l = rgbToHsl(baseBg)[2];
+    let bg = baseBg;
+    for (let i = 0; i < 80; i++) {
+      l = dir > 0 ? Math.min(1, l + 0.015) : Math.max(0, l - 0.015);
+      bg = hslToRgb([hueSat[0], hueSat[1], l]);
+      if (contrast(fg, bg) >= min) return bg;
+      if (l <= 0 || l >= 1) break;
+    }
+    return null;
+  };
+  const primary = mode === "dark" ? -1 : 1;
+  return sweep(primary) || sweep(-primary) || baseBg;
+}
+
+// Map an expanded pilot palette to the canonical UI semantic colors.
+// `mode` is the theme's light/dark intent. Palette values are hex strings.
+export function deriveUiColors(p, mode) {
+  const hx = k => p[k];
+  const rgb = k => hexToRgb(p[k]);
+  const bg = rgb("bg");
+  const warnFg = rgb("destroy");
+  const okFg = rgb("success");
+  const bannerFg = rgb("accent");
+  const offFg = rgb("private-accent");
+  const t = (fgRgb) => rgbToHex(tintToAA(fgRgb, bg, mode));
+  const inputFocus = mode === "dark"
+    ? rgbToHex(hslToRgb((() => { const [h, s, l] = rgbToHsl(rgb("input-bg")); return [h, s, Math.min(1, l + 0.06)]; })()))
+    : hx("bg");
+  return {
+    bg: hx("bg"), bg2: hx("bg-surface"), fg: hx("fg"),
+    "fg-muted": hx("muted"), "fg-hint": hx("muted-soft"),
+    border: hx("border"), divider: hx("border-soft"),
+    accent: hx("accent"), accent2: hx("link-visited"), link: hx("accent"),
+    "tag-bg": hx("tag-bg"), "tag-fg": hx("tag-fg"), "tag-hover": hx("row-hover"),
+    "drop-hover": hx("accent-soft"),
+    "input-bg": hx("input-bg"), "input-focus-bg": inputFocus,
+    "warn-fg": hx("destroy"), "warn-bg": t(warnFg), "warn-bd": rgbToHex(mix(bg, warnFg, mode === "dark" ? 0.35 : 0.28)),
+    "ok-fg": hx("success"), "ok-bd": hx("success"), "ok-bg": t(okFg),
+    "banner-fg": hx("accent"), "banner-bg": t(bannerFg), "banner-bd": rgbToHex(mix(bg, bannerFg, mode === "dark" ? 0.35 : 0.28)),
+    "offline-fg": hx("private-accent"), "offline-bg": t(offFg), "offline-bd": rgbToHex(mix(bg, offFg, mode === "dark" ? 0.35 : 0.28)),
+    danger: hx("destroy"),
+    "spinner-bg": hx("border"), "spinner-fg": hx("accent"),
+    "preset-bg": hx("accent-soft"), "preset-bd": hx("border"), "preset-fg": hx("accent"),
+  };
+}
