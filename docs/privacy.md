@@ -5,7 +5,7 @@ title: Privacy Policy
 
 # Privacy Policy — Pinboard Bookmark Enhanced
 
-**Last updated:** 2026-04-28
+**Last updated:** 2026-06-08
 
 ## Data Collection
 
@@ -13,15 +13,17 @@ Pinboard Bookmark Enhanced does **not** collect, transmit, or store any personal
 
 ## Data Storage
 
-All data is stored **locally** on your device using Chrome's built-in storage APIs:
+By **default**, all data is stored **locally** on your device (`chrome.storage.local`) and never leaves it. You can optionally enable **settings sync** (off by default); when enabled, only your settings — not your saved bookmarks or page content — are synced across your devices through Chrome's built-in account sync.
 
-| Data | Storage | Synced via Google Account |
-|------|---------|--------------------------|
-| Settings & preferences | `chrome.storage.sync` | Yes |
-| API keys (obfuscated) | `chrome.storage.sync` | Yes |
-| Custom CSS & themes | `chrome.storage.sync` (chunked) | Yes |
+| Data | Default storage | Synced via Google Account |
+|------|-----------------|--------------------------|
+| Settings & preferences | `chrome.storage.local` | Only if you enable settings sync |
+| API keys (obfuscated) | `chrome.storage.local` | Only if you enable settings sync |
+| Custom CSS & themes | `chrome.storage.local` (chunked) | Only if you enable settings sync |
 | AI result cache | `chrome.storage.local` | No |
 | Tag cache | `chrome.storage.local` | No |
+
+Settings sync is implemented with Chrome's `chrome.storage.sync`. The extension itself has no server and uploads nothing on its own.
 
 ## Network Requests
 
@@ -33,15 +35,15 @@ The extension only makes network requests to services **you explicitly configure
 
 3. **Pinboard website** (`pinboard.in`) — the content script injects custom CSS styles onto pinboard.in pages. No data is extracted or transmitted.
 
-4. **Jina Reader** (`r.jina.ai`, optional) — when enabled by the user, page URL is sent to Jina to fetch a cleaner reader-mode rendering for AI processing. Disabled by default.
+4. **Jina Reader** (`r.jina.ai`, optional) — when you choose the Jina content source, the page URL is sent to Jina to fetch a cleaner reader-mode rendering for AI processing or Markdown export. Disabled by default.
 
 ## Permissions
 
 | Permission | Purpose |
 |------------|---------|
-| `activeTab` | Read current page info (title, URL, selected text) for bookmarking |
+| `activeTab` | Read current page info (title, URL, selected text) for bookmarking and Markdown extraction |
 | `storage` | Store settings and caches locally |
-| `scripting` | Inject the Defuddle library into the active tab to extract clean article text, only when user triggers an AI feature |
+| `scripting` | Inject the Defuddle library into the active tab to extract clean article text, for AI features and the Markdown preview/export |
 | `tabs` | Access tab URLs for bookmark status detection and batch save |
 | `notifications` | Show save confirmations for quick save / read later |
 | `alarms` | Periodic cache cleanup and offline queue processing |
