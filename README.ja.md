@@ -23,7 +23,7 @@
 - **検索・再訪** — ブックマークを検索し、未読 / ネットワーク / メモ / 人気へジャンプ、最近の保存も閲覧可能。現在のページが既にブックマーク済みならツールバーアイコンが切り替わります
 - **オフラインキュー** — 下書きはローカル保存され、再接続時に自動同期
 - **`pinboard.in` 用テーマ** — 13 種のキュレートされたパレット（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …）+ デバイス間で同期するカスタム CSS オーバーレイ、ポップアップ幅も調整可能
-- **ページを Markdown に** — 現在のページをクリーンな Markdown に変換し、プレビューを内蔵（レンダリング/ソース表示の切り替え、目次、閲覧統計）。`.md` またはスタイル付き `.html` としてコピー・ダウンロードでき、front-matter・画像の扱い・目次の有無を調整したり、必要に応じて [Obsidian](https://obsidian.md) へ書き出すことも可能。バックエンドは [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（ローカル）または [Jina Reader](https://jina.ai/reader)（クラウド）から選択
+- **ページを Markdown に** — 現在のページをクリーンな Markdown に変換し、プレビューを内蔵（レンダリング/ソース表示の切り替え、目次、閲覧統計）。`.md` またはスタイル付き `.html` としてコピー・ダウンロードでき、frontmatter・画像の扱い・目次の有無を調整したり、必要に応じて [Obsidian](https://obsidian.md) へ書き出すことも可能。バックエンドは [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（ローカル）または [Jina Reader](https://jina.ai/reader)（クラウド）から選択
 - **9 言語対応** · カスタマイズ可能なショートカット · トラッキング一切なし
 
 ## インストール
@@ -39,7 +39,7 @@
 
 ## プライバシー
 
-トラッキング、解析、テレメトリは一切ありません。すべてのデータは `chrome.storage` でデバイス上にのみ保存されます。AI リクエストは「AI タグ」または「AI 要約」をクリックしたときに**だけ**発生し、設定したプロバイダーに直接送信されます。詳細ポリシー: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+トラッキング、解析、テレメトリは一切ありません。すべてのデータは既定で `chrome.storage` によりデバイス上に保存されます。設定の同期を有効にすると、設定（ブックマークの内容は除く）が Chrome アカウント経由でデバイス間で同期されます。AI リクエストは「AI タグ」または「AI 要約」をクリックしたときに**だけ**発生し、設定したプロバイダーに直接送信されます。詳細ポリシー: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## ライセンス
 

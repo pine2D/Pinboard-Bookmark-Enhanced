@@ -23,7 +23,7 @@ Eine Chrome-Erweiterung, die [Pinboard](https://pinboard.in)-Lesezeichen mit KI-
 - **Finden & wiederfinden** — durchsuche deine Lesezeichen, springe zu Ungelesen / Netzwerk / Notizen / Beliebt und durchstöbere zuletzt Gespeichertes; das Symbolleisten-Icon wechselt, wenn die aktuelle Seite bereits in deinen Lesezeichen ist
 - **Offline-Warteschlange** — Entwürfe bleiben lokal gespeichert und synchronisieren sich, sobald du wieder online bist
 - **Themes für `pinboard.in`** — 13 kuratierte Farbpaletten (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus eigenes CSS-Overlay, das geräteübergreifend synchronisiert wird, mit einstellbarer Popup-Breite
-- **Seite-zu-Markdown** — die aktuelle Seite in sauberes Markdown konvertieren, mit eingebauter Vorschau (gerenderte/Roh-Ansicht, Inhaltsverzeichnis, Lesestatistik); als `.md` oder gestyltes `.html` kopieren oder herunterladen, Front-Matter, Bildbehandlung und Inhaltsverzeichnis anpassen oder optional direkt an [Obsidian](https://obsidian.md) senden; wähle [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokal) oder [Jina Reader](https://jina.ai/reader) (Cloud)
+- **Seite-zu-Markdown** — die aktuelle Seite in sauberes Markdown konvertieren, mit eingebauter Vorschau (gerenderte/Roh-Ansicht, Inhaltsverzeichnis, Lesestatistik); als `.md` oder gestyltes `.html` kopieren oder herunterladen, frontmatter, Bildbehandlung und Inhaltsverzeichnis anpassen oder optional direkt an [Obsidian](https://obsidian.md) senden; wähle [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokal) oder [Jina Reader](https://jina.ai/reader) (Cloud)
 - **9 Sprachen** · anpassbare Tastenkürzel · kein Tracking
 
 ## Installation
@@ -39,7 +39,7 @@ Nach der Installation: Auf das Symbol in der Symbolleiste klicken → deinen [Pi
 
 ## Datenschutz
 
-Kein Tracking, keine Analytik, keine Telemetrie. Alle Daten bleiben über `chrome.storage` auf deinem Gerät. KI-Anfragen werden **nur** ausgelöst, wenn du auf „KI-Tags" oder „KI-Zusammenfassung" klickst, und gehen direkt an den von dir konfigurierten Anbieter. Vollständige Richtlinie: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+Kein Tracking, keine Analytik, keine Telemetrie. Alle Daten werden standardmäßig über `chrome.storage` auf deinem Gerät gespeichert; wenn du die Einstellungssynchronisierung aktivierst, werden deine Einstellungen (nicht deine gespeicherten Lesezeichen) über dein Chrome-Konto zwischen deinen Geräten synchronisiert. KI-Anfragen werden **nur** ausgelöst, wenn du auf „KI-Tags" oder „KI-Zusammenfassung" klickst, und gehen direkt an den von dir konfigurierten Anbieter. Vollständige Richtlinie: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## Lizenz
 

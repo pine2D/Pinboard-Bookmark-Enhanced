@@ -23,7 +23,7 @@ Une extension Chrome qui booste les signets [Pinboard](https://pinboard.in) avec
 - **Rechercher et retrouver** — cherchez dans vos signets, accédez aux Non lus / Réseau / Notes / Populaires et parcourez vos enregistrements récents ; l'icône de la barre d'outils change quand la page courante est déjà dans vos signets
 - **File d'attente hors-ligne** — les brouillons persistent localement et se synchronisent à la reconnexion
 - **Thèmes pour `pinboard.in`** — 13 palettes soignées (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus un calque CSS personnalisé synchronisé entre vos appareils, avec une largeur de popup ajustable
-- **Page vers Markdown** — convertir la page courante en Markdown propre, avec un aperçu intégré (vues rendu/source, table des matières, statistiques de lecture) ; copier ou télécharger en `.md` ou en `.html` mis en forme, ajuster le front-matter, la gestion des images et l'inclusion de la table des matières, ou exporter en option vers [Obsidian](https://obsidian.md) ; choisissez [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (local) ou [Jina Reader](https://jina.ai/reader) (cloud)
+- **Page vers Markdown** — convertir la page courante en Markdown propre, avec un aperçu intégré (vues rendu/source, table des matières, statistiques de lecture) ; copier ou télécharger en `.md` ou en `.html` mis en forme, ajuster le frontmatter, la gestion des images et l'inclusion de la table des matières, ou exporter en option vers [Obsidian](https://obsidian.md) ; choisissez [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (local) ou [Jina Reader](https://jina.ai/reader) (cloud)
 - **9 langues** · raccourcis clavier configurables · aucun tracking
 
 ## Installation
@@ -39,7 +39,7 @@ Après l'installation : cliquez sur l'icône de la barre d'outils → collez vot
 
 ## Confidentialité
 
-Aucun tracking, aucune analytique, aucune télémétrie. Toutes les données restent sur votre appareil via `chrome.storage`. Les requêtes IA se déclenchent **uniquement** quand vous cliquez sur « Tags IA » ou « Résumé IA » et vont directement au fournisseur configuré. Politique complète : <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+Aucun tracking, aucune analytique, aucune télémétrie. Toutes les données sont stockées sur votre appareil via `chrome.storage` ; si vous activez la synchronisation des paramètres, vos paramètres (pas vos signets enregistrés) se synchronisent entre vos appareils via votre compte Chrome. Les requêtes IA se déclenchent **uniquement** quand vous cliquez sur « Tags IA » ou « Résumé IA » et vont directement au fournisseur configuré. Politique complète : <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## Licence
 

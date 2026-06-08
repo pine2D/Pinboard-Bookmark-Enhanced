@@ -23,7 +23,7 @@
 - **搜尋同重溫** — 搜尋你嘅書籤，快速跳去未讀／Network／Notes／熱門，瀏覽最近儲存嘅項目；目前頁如果已經收藏咗，工具列圖示會自動切換狀態
 - **離線佇列** — 離線儲存嘅草稿留喺本機，重新連線時自動同步
 - **`pinboard.in` 佈景主題** — 13 套精心調校嘅配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），仲有自訂 CSS 覆蓋層，多裝置同步，彈出視窗寬度亦可調整
-- **當前頁轉 Markdown** — 將目前網頁轉為乾淨嘅 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可以複製或者下載做 `.md` 或者帶樣式嘅 `.html`，可以調整 front-matter、圖片處理同目錄，亦可按需匯出去 [Obsidian](https://obsidian.md)；後端可揀 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或者 [Jina Reader](https://jina.ai/reader)（雲端）
+- **當前頁轉 Markdown** — 將目前網頁轉為乾淨嘅 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可以複製或者下載做 `.md` 或者帶樣式嘅 `.html`，可以調整 frontmatter、圖片處理同目錄，亦可按需匯出去 [Obsidian](https://obsidian.md)；後端可揀 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或者 [Jina Reader](https://jina.ai/reader)（雲端）
 - **9 種語言**、可自訂快捷鍵、零追蹤
 
 ## 安裝
@@ -39,7 +39,7 @@
 
 ## 私隱
 
-零追蹤、零分析、零遙測。所有資料透過 `chrome.storage` 儲存喺你嘅本機。AI 請求**只**喺你撳「AI 標籤」或者「AI 摘要」嗰陣先觸發，並直接傳送去你設定嘅服務商。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+零追蹤、零分析、零遙測。所有資料預設透過 `chrome.storage` 儲存喺你嘅本機；若開咗設定同步，你嘅設定（唔包括書籤內容）會透過 Chrome 帳號喺你嘅裝置之間同步。AI 請求**只**喺你撳「AI 標籤」或者「AI 摘要」嗰陣先觸發，並直接傳送去你設定嘅服務商。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## 授權
 
