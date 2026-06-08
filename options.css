@@ -618,3 +618,12 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 /* ---- High-DPI Scaling ---- */
 @media (min-resolution: 144dpi) and (min-width: 1200px) { body { zoom: 1.12; } }
 @media (min-resolution: 192dpi) and (min-width: 1200px) { body { zoom: 1.22; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

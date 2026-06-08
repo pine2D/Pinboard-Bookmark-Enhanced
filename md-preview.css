@@ -612,3 +612,12 @@ body.md-empty main { margin-left: 0; }
 /* Send-to-Obsidian: full-width action below the Copy/Download grid */
 .obsidian-btn { width: 100%; justify-content: center; margin-top: 8px; }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
