@@ -532,8 +532,8 @@
     "message": "Aucun contenu lisible n'a été trouvé sur cette page."
   },
   "mdEngineSwitchTo": { "message": "Passer à $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineSwitching": { "message": "Changement de moteur d'extraction…" },
-  "mdEngineSwitchFailed": { "message": "Impossible de changer de moteur : $ERROR$", "placeholders": { "error": { "content": "$1" } } },
+  "mdEngineExtracting": { "message": "Extraction avec $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractFailed": { "message": "Impossible d'extraire cette page. Veuillez réessayer." },
   "mdEngineTabGone": { "message": "Onglet source indisponible — rouvrez la page pour utiliser Defuddle" },
   "bgTabSetSaved": {
     "message": "Pinboard : une dernière étape"

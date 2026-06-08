@@ -532,8 +532,8 @@
     "message": "このページから読み取れるコンテンツが見つかりませんでした。"
   },
   "mdEngineSwitchTo": { "message": "$ENGINE$ に切り替え", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineSwitching": { "message": "抽出エンジンを切り替えています…" },
-  "mdEngineSwitchFailed": { "message": "エンジンの切り替えに失敗しました：$ERROR$", "placeholders": { "error": { "content": "$1" } } },
+  "mdEngineExtracting": { "message": "$ENGINE$ で抽出しています…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractFailed": { "message": "このページを抽出できませんでした。もう一度お試しください。" },
   "mdEngineTabGone": { "message": "元のタブが利用できません — ページを開き直すと Defuddle を使えます" },
   "bgTabSetSaved": {
     "message": "Pinboard：保存まであと一歩"

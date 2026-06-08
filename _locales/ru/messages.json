@@ -532,8 +532,8 @@
     "message": "На этой странице не найдено читаемого содержимого."
   },
   "mdEngineSwitchTo": { "message": "Переключить на $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineSwitching": { "message": "Переключение движка извлечения…" },
-  "mdEngineSwitchFailed": { "message": "Не удалось переключить движок: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
+  "mdEngineExtracting": { "message": "Извлечение через $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractFailed": { "message": "Не удалось извлечь эту страницу. Попробуйте ещё раз." },
   "mdEngineTabGone": { "message": "Исходная вкладка недоступна — откройте страницу заново, чтобы использовать Defuddle" },
   "bgTabSetSaved": {
     "message": "Pinboard: остался один шаг"

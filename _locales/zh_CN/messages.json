@@ -532,8 +532,8 @@
     "message": "未能从该页面提取到可读内容。"
   },
   "mdEngineSwitchTo": { "message": "切换到 $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineSwitching": { "message": "正在切换抽取引擎…" },
-  "mdEngineSwitchFailed": { "message": "切换引擎失败：$ERROR$", "placeholders": { "error": { "content": "$1" } } },
+  "mdEngineExtracting": { "message": "正在用 $ENGINE$ 抽取…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractFailed": { "message": "无法抽取此页面，请重试。" },
   "mdEngineTabGone": { "message": "源标签页已不可用 — 重新打开该页面才能使用 Defuddle" },
   "bgTabSetSaved": {
     "message": "Pinboard：还需一步完成保存"

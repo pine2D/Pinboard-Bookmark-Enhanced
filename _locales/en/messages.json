@@ -532,8 +532,8 @@
     "message": "No readable content was found on this page."
   },
   "mdEngineSwitchTo": { "message": "Switch to $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineSwitching": { "message": "Switching extraction engine…" },
-  "mdEngineSwitchFailed": { "message": "Couldn't switch engine: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
+  "mdEngineExtracting": { "message": "Extracting with $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractFailed": { "message": "Couldn't extract this page. Please try again." },
   "mdEngineTabGone": { "message": "Source tab no longer available — reopen the page to use Defuddle" },
   "bgTabSetSaved": {
     "message": "Pinboard: One more step to save"
