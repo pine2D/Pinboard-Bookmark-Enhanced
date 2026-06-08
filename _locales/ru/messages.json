@@ -753,6 +753,12 @@
   "openShortcuts": {
     "message": "Открыть настройки горячих клавиш Chrome"
   },
+  "mdShortcutLabel": {
+    "message": "Горячая клавиша предпросмотра Markdown"
+  },
+  "mdShortcutUnset": {
+    "message": "Не задана — назначьте ниже"
+  },
   "shortcutsManual": {
     "message": "Или перейдите вручную:"
   },

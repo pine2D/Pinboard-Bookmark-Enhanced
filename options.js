@@ -1006,6 +1006,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     e.preventDefault();
     chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
   });
+  $id("open-shortcuts-link-md")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+  });
+  // Show the ACTUAL bound key for the Markdown preview command (not a hardcoded guess).
+  try {
+    const cmds = await chrome.commands.getAll();
+    const mdCmd = cmds.find((c) => c.name === "markdown_preview");
+    const cur = $id("md-shortcut-current");
+    if (cur) {
+      if (mdCmd && mdCmd.shortcut) {
+        cur.textContent = "";
+        const kbd = document.createElement("kbd");
+        kbd.textContent = mdCmd.shortcut;
+        cur.appendChild(kbd);
+      } else {
+        cur.textContent = t("mdShortcutUnset");
+      }
+    }
+  } catch (_) { /* commands API unavailable — leave the field blank */ }
 
 
   // B5: Write high-frequency UI fields mirror for next options open.

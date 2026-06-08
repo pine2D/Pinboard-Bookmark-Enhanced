@@ -753,6 +753,12 @@
   "openShortcuts": {
     "message": "Otwórz ustawienia skrótów Chrome"
   },
+  "mdShortcutLabel": {
+    "message": "Skrót podglądu Markdown"
+  },
+  "mdShortcutUnset": {
+    "message": "Nie ustawiono — przypisz poniżej"
+  },
   "shortcutsManual": {
     "message": "Lub przejdź ręcznie:"
   },

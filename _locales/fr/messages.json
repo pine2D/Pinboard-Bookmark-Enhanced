@@ -753,6 +753,12 @@
   "openShortcuts": {
     "message": "Ouvrir les paramètres de raccourcis Chrome"
   },
+  "mdShortcutLabel": {
+    "message": "Raccourci d'aperçu Markdown"
+  },
+  "mdShortcutUnset": {
+    "message": "Non défini — à configurer ci-dessous"
+  },
   "shortcutsManual": {
     "message": "Ou naviguez manuellement :"
   },

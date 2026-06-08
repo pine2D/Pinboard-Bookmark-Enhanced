@@ -753,6 +753,12 @@
   "openShortcuts": {
     "message": "Chrome Tastenkürzel-Einstellungen öffnen"
   },
+  "mdShortcutLabel": {
+    "message": "Tastenkürzel für Markdown-Vorschau"
+  },
+  "mdShortcutUnset": {
+    "message": "Nicht festgelegt — unten zuweisen"
+  },
   "shortcutsManual": {
     "message": "Oder manuell navigieren:"
   },

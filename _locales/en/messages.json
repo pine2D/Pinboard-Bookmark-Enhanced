@@ -753,6 +753,12 @@
   "openShortcuts": {
     "message": "Open Chrome Shortcut Settings"
   },
+  "mdShortcutLabel": {
+    "message": "Markdown preview shortcut"
+  },
+  "mdShortcutUnset": {
+    "message": "Not set — assign it below"
+  },
   "shortcutsManual": {
     "message": "Or navigate manually:"
   },

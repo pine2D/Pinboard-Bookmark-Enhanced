@@ -753,6 +753,12 @@
   "openShortcuts": {
     "message": "Chrome ショートカット設定を開く"
   },
+  "mdShortcutLabel": {
+    "message": "Markdown プレビューのショートカット"
+  },
+  "mdShortcutUnset": {
+    "message": "未設定 — 下のボタンから割り当て"
+  },
   "shortcutsManual": {
     "message": "または手動で移動："
   },

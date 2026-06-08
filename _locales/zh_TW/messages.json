@@ -753,6 +753,12 @@
   "openShortcuts": {
     "message": "開啟 Chrome 快捷鍵設定"
   },
+  "mdShortcutLabel": {
+    "message": "Markdown 預覽快捷鍵"
+  },
+  "mdShortcutUnset": {
+    "message": "未設定 — 點下方按鈕去綁定"
+  },
   "shortcutsManual": {
     "message": "或手動前往："
   },
