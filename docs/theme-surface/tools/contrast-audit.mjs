@@ -72,16 +72,6 @@ function check(scope, theme, label, ratio, min) {
   return line;
 }
 
-// Advisory (non-blocking): pilot muted/hint values may be < 4.5 by design.
-// These are surfaced for visibility but never fail the build (spec §6).
-const advisory = [];
-function advise(scope, theme, label, ratio, min) {
-  const ok = ratio >= min;
-  const line = "  " + scope.padEnd(10) + " " + theme.padEnd(20) + " " + label.padEnd(28) + " " + ratio.toFixed(2) + ":1  (min " + min + ") " + (ok ? "OK " : "ADVISORY");
-  if (!ok) advisory.push(line);
-  return line;
-}
-
 console.log("=== 1. Pinboard.in tokens (pilots/*.tokens.json) ===");
 const pinFiles = readdirSync(PILOTS).filter((f) => f.endsWith(".tokens.json")).sort();
 for (const f of pinFiles) {
@@ -132,11 +122,11 @@ function auditCssThemes(label, varPrefix, cssPath) {
     }
     if (hintS) {
       const c = resolveColor(hintS, bg);
-      if (c) console.log(advise(label, theme, "fg-hint vs bg", cr(c, bg), 4.5));
+      if (c) console.log(check(label, theme, "fg-hint vs bg", cr(c, bg), 4.5));
     }
     if (mutedS) {
       const c = resolveColor(mutedS, bg);
-      if (c) console.log(advise(label, theme, "fg-muted vs bg", cr(c, bg), 4.5));
+      if (c) console.log(check(label, theme, "fg-muted vs bg", cr(c, bg), 4.5));
     }
     // Status pairs (NEW, BLOCKING): warn/banner/ok/offline fg must clear AA
     // against their own tinted bg. The engine (pairToAA) derives these to pass
@@ -164,7 +154,9 @@ function auditCssThemes(label, varPrefix, cssPath) {
     if (mutedS && trackS) {
       const trackBg = trackS.startsWith("#") ? hexRgb(trackS) : null;
       const thumb = resolveColor(mutedS, bg);
-      if (trackBg && thumb) console.log(advise(label, theme, "scrollbar thumb vs track", cr(thumb, trackBg), 3));
+      // Now BLOCKING: fg-muted is derived to AA, which also lifts every scrollbar
+      // thumb above the 3:1 UI-component floor (verified on all 14 popup themes).
+      if (trackBg && thumb) console.log(check(label, theme, "scrollbar thumb vs track", cr(thumb, trackBg), 3));
     }
   }
 }
@@ -172,11 +164,6 @@ auditCssThemes("popup", "--pp", resolve(ROOT, "popup.css"));
 auditCssThemes("options", "--opt", resolve(ROOT, "options.css"));
 
 console.log("");
-if (advisory.length > 0) {
-  console.log("=== ADVISORY (not blocking) — " + advisory.length + " ===");
-  for (const a of advisory) console.log(a);
-  console.log("");
-}
 if (known.length > 0) {
   console.log("=== KNOWN (allowlisted, not blocking) — " + known.length + " ===");
   for (const k of known) console.log(k);
