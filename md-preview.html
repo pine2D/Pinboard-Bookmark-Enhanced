@@ -20,7 +20,11 @@
       <a id="preview-url" href="#" target="_blank"></a>
     </div>
     <div class="rail-badges">
-      <span id="source-badge" class="source-badge"></span>
+      <span id="source-badge" class="source-badge" role="group" aria-label="Extraction engine">
+        <button type="button" class="src-seg" data-engine="local">Defuddle</button>
+        <button type="button" class="src-seg" data-engine="jina">Jina Reader</button>
+      </span>
+      <span id="engine-status" class="engine-status" role="status" aria-live="polite"></span>
       <span id="reading-stats" class="stats-badge"></span>
       <span id="token-count" class="token-badge"></span>
     </div>

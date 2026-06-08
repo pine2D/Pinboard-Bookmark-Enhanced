@@ -29,6 +29,7 @@
   --table-stripe: #f8fafc;
   --selection: #bfdbfe;
   --surface: #ffffff;
+  --danger: #dc2626;
   /* Per-script font stacks — DRY building blocks for the :lang() rules below.
      Latin head first (handles en/de/fr/pl/ru + Latin in CJK articles), then the
      script-preferred Han/Kana/Hangul families, then a covering fallback. */
@@ -72,6 +73,7 @@
     --table-stripe: #1e293b;
     --selection: #1e3a5f;
     --surface: #1e293b;
+    --danger: #f87171;
   }
 }
 
@@ -147,15 +149,55 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .source-badge {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.src-seg {
+  font: inherit;
   font-size: 11px;
   font-weight: 500;
-  color: var(--fg-secondary);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 2px 8px;
-  border-radius: 100px;
   letter-spacing: 0.01em;
+  color: var(--fg-secondary);
+  background: transparent;
+  border: 0;
+  padding: 2px 10px;
+  cursor: pointer;
+  line-height: 1.6;
 }
+.src-seg + .src-seg { border-left: 1px solid var(--border); }
+.src-seg.active { color: var(--badge-fg); background: var(--badge-bg); cursor: default; }
+.src-seg:disabled,
+.src-seg[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+.src-seg.loading {
+  position: relative;
+  color: transparent;
+}
+.src-seg.loading::after {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 10px; height: 10px;
+  margin: -5px 0 0 -5px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  color: var(--fg-secondary);
+  animation: src-spin 0.6s linear infinite;
+}
+@keyframes src-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .src-seg.loading::after { animation: none; }
+}
+.engine-status {
+  font-size: 11px;
+  color: var(--fg-secondary);
+  margin-left: 8px;
+}
+.engine-status.error { color: var(--danger); }
 .token-badge {
   font-size: 12px;
   font-weight: 500;
