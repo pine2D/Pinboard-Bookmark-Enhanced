@@ -348,7 +348,7 @@ main {
 #rendered-view blockquote blockquote {
   position: relative;
   background: transparent;
-  border-left: 2px solid rgba(128, 128, 128, 0.4);
+  border-left: 1px solid rgba(128, 128, 128, 0.4);
   padding: 4px 0 4px 16px;
   margin: 0.4em 0;
   border-radius: 0;
@@ -362,7 +362,7 @@ main {
   left: -16px;
   top: 50%;
   width: 14px;
-  height: 2px;
+  height: 1px;
   background: rgba(128, 128, 128, 0.4);
   transform: translateY(-50%);
 }
