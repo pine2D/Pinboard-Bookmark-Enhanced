@@ -4,7 +4,7 @@
 
 全面強化 [Pinboard](https://pinboard.in) 書籤體驗嘅 Chrome 擴充功能：AI 智能標籤、自動摘要，加埋全套可自訂主題介面。
 
-> **說明：** 本擴充功能係 [Pinboard](https://pinboard.in)（一項**付費**書籤服務）嘅獨立第三方客戶端。使用前需要你自己嘅 Pinboard.in 帳號同 API token。本專案與 Pinboard 官方無關。
+> **說明：** 需要 Pinboard.in 帳號 —— [Pinboard](https://pinboard.in) 係一項獨立、**付費**嘅書籤服務。本擴充功能係第三方客戶端，會用你自己嘅 Pinboard API token 連接你現有嘅 Pinboard 帳號。本專案與 Pinboard 無任何隸屬、贊助或認可關係。你必須已經擁有（或註冊）一個付費 Pinboard.in 帳號先可以使用本擴充功能。
 
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)

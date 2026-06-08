@@ -4,7 +4,7 @@
 
 Расширение Chrome, которое улучшает закладки [Pinboard](https://pinboard.in) AI-метками, аннотациями и полностью настраиваемым интерфейсом.
 
-> **Примечание:** Это независимый сторонний клиент для [Pinboard](https://pinboard.in) — **платного** сервиса закладок. Для использования нужны собственный аккаунт Pinboard.in и API-токен. Не связан с Pinboard и не одобрен им.
+> **Примечание:** Требуется аккаунт [Pinboard](https://pinboard.in) — Pinboard (pinboard.in) — это независимый, **платный** сервис закладок. Это расширение является сторонним клиентом, который подключается к вашему существующему аккаунту Pinboard с помощью вашего собственного API-токена Pinboard. Оно не связано с Pinboard, не спонсируется и не одобряется им. Чтобы пользоваться этим расширением, у вас уже должен быть (или нужно оформить) платный аккаунт Pinboard.in.
 
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
