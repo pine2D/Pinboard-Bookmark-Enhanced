@@ -441,6 +441,18 @@ main {
 }
 .empty-state p { font-size: 15px; line-height: 1.6; }
 
+/* ---- Loading State (shortcut pending placeholder) ---- */
+.preview-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 80px 32px; }
+.preview-loading p { font-size: 15px; line-height: 1.6; color: var(--fg-secondary); margin: 0; }
+.preview-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--fg-secondary);
+  border-radius: 50%;
+  animation: src-spin 0.7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .preview-spinner { animation: none; } }
+
 
 /* ---- Content rendering optimization ---- */
 /* Skip layout/paint for off-screen content — massive scroll perf win on long pages */

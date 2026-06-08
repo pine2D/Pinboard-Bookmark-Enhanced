@@ -927,18 +927,17 @@ async function openMarkdownPreviewFromShortcut() {
     showNotification("mdpv-error", t("bgMdPreviewFailed"), t("bgMdPreviewNoContent"), "error");
     return;
   }
-  // Follow the aiContentSource setting (fresh read, not the cached loadSettings()).
+  // Open the preview INSTANTLY with a pending placeholder so the shortcut feels
+  // responsive; the preview page drives extraction via reextractMarkdown (the same
+  // path as the in-preview toggle). Follow the aiContentSource setting (fresh read).
   const raw = await (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource });
   const engine = raw.aiContentSource === "jina" ? "jina" : "local";
-  const out = await extractForPreview({ tabId: tab.id, url: tab.url, engine });
-  if (out.error) {
-    // Jina failures do NOT fall back (consistent with the popup Markdown button).
-    showNotification("mdpv-error", t("bgMdPreviewFailed"),
-      out.error === "empty" ? t("bgMdPreviewNoContent") : out.error, "error");
-    return;
-  }
   await chrome.storage.local.set({
-    md_preview_data: { ...out, baseUrl: out.url, tags: [], description: "", tabId: tab.id }
+    md_preview_data: {
+      pending: true, engine, source: engine,
+      tabId: tab.id, url: tab.url, baseUrl: tab.url, title: tab.title || "",
+      tags: [], description: ""
+    }
   });
   await chrome.tabs.create({ url: "md-preview.html" });
 }

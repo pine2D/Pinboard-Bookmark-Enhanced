@@ -17,6 +17,24 @@ function renderEmptyState(message) {
   document.body.classList.add("md-empty");
 }
 
+function renderLoadingState(message) {
+  const view = document.getElementById("rendered-view");
+  if (view) {
+    const wrap = document.createElement("div");
+    wrap.className = "preview-loading";
+    const sp = document.createElement("div");
+    sp.className = "preview-spinner";
+    sp.setAttribute("aria-hidden", "true");
+    const p = document.createElement("p");
+    p.textContent = message;
+    wrap.appendChild(sp);
+    wrap.appendChild(p);
+    view.replaceChildren(wrap);
+    view.setAttribute("aria-busy", "true");
+  }
+  document.body.classList.add("md-empty");
+}
+
 // Map the active UI locale (manual-override mirror, else the browser UI language) to a
 // BCP-47 tag for <html lang>, so the rail/UI chrome renders in the locale's font via :lang().
 function uiLangToBCP47() {
@@ -113,6 +131,25 @@ function ensureKatex() {
   const baseUrl = info.baseUrl || url || "";
   const tags = Array.isArray(info.tags) ? info.tags : [];
   const description = info.description || "";
+  // Shortcut opens the preview INSTANTLY with a pending placeholder, then the
+  // preview drives extraction via the reextract path (so the tab appears immediately
+  // even when Jina needs a network round-trip). On success the SW has written the
+  // full md_preview_data, so we reload into the normal render path.
+  if (info.pending) {
+    const titleEl0 = document.getElementById("preview-title");
+    if (titleEl0) { titleEl0.textContent = title || t("mdPreviewUntitled"); titleEl0.title = title || ""; }
+    document.title = (title || "Markdown") + " — Preview";
+    renderLoadingState(t("mdEngineExtracting", engineLabel(info.engine)));
+    let pr;
+    try {
+      pr = await chrome.runtime.sendMessage({
+        type: "reextractMarkdown", tabId: srcTabId, url, engine: info.engine, tags: [], description: ""
+      });
+    } catch (_) { pr = { ok: false, error: "network" }; }
+    if (pr && pr.ok) { location.reload(); return; }
+    renderEmptyState(friendlyEngineErr(pr));
+    return;
+  }
   // Canonical Markdown: Defuddle HTML -> Turndown; Jina already gives MD.
   // Single source of truth for Raw view, Copy MD, Download .md, and Rendered.
   const canonicalMarkdown = info.markdown || (contentHtml ? htmlToMarkdown(contentHtml, { baseUrl }) : "");
@@ -201,10 +238,11 @@ function ensureKatex() {
     if (e === "jina") return !/^https?:\/\//i.test(srcUrlForSwitch);
     return !srcTabId; // local needs the source tab
   }
-  function mapErr(r) {
+  function friendlyEngineErr(r) {
     const code = r && r.error;
     if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
-    return code ? String(code) : "error";
+    if (code === "empty") return t("mdPreviewNoContent");
+    return t("mdEngineExtractFailed");
   }
   function applyAvailability() {
     if (!sourceEl) return;
@@ -234,7 +272,7 @@ function ensureKatex() {
         sourceEl.setAttribute("aria-busy", "true");
         sourceEl.querySelectorAll(".src-seg").forEach((s) => { s.disabled = true; });
         seg.classList.add("loading");
-        setEngineStatus(t("mdEngineSwitching"), false);
+        setEngineStatus(t("mdEngineExtracting", engineLabel(e)), false);
         let r;
         try {
           r = await chrome.runtime.sendMessage({
@@ -249,7 +287,7 @@ function ensureKatex() {
         sourceEl.removeAttribute("aria-busy");
         seg.classList.remove("loading");
         applyAvailability();
-        setEngineStatus(t("mdEngineSwitchFailed", mapErr(r)), true);
+        setEngineStatus(friendlyEngineErr(r), true);
         if (e === "local" && r && (r.error === "tab_unavailable" || r.error === "tab_navigated")) {
           const localSeg = sourceEl.querySelector('.src-seg[data-engine="local"]');
           if (localSeg) {
