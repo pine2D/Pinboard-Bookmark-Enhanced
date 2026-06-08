@@ -55,8 +55,10 @@ const ALLOWLIST = new Set([
   "pinboard:nord-night:btn-bg vs btn-fg",
   "pinboard:catppuccin-latte:btn-bg vs btn-fg",
   // Solarized-light's body fg/bg is intentionally low-contrast (mirrors the
-  // pinboard:solarized-light:bg vs fg exemption); the popup inherits the same pilot palette.
+  // pinboard:solarized-light:bg vs fg exemption); the popup and options surfaces
+  // inherit the same pilot palette.
   "popup:solarized-light:fg vs bg",
+  "options:solarized-light:fg vs bg",
 ]);
 
 const violations = [];
