@@ -531,6 +531,10 @@
   "bgMdPreviewNoContent": {
     "message": "Nie znaleziono czytelnej treści na tej stronie."
   },
+  "mdEngineSwitchTo": { "message": "Przełącz na $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineSwitching": { "message": "Przełączanie silnika ekstrakcji…" },
+  "mdEngineSwitchFailed": { "message": "Nie udało się przełączyć silnika: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
+  "mdEngineTabGone": { "message": "Karta źródłowa niedostępna — otwórz stronę ponownie, aby użyć Defuddle" },
   "bgTabSetSaved": {
     "message": "Pinboard: jeszcze jeden krok"
   },

@@ -531,6 +531,10 @@
   "bgMdPreviewNoContent": {
     "message": "未能從此頁面擷取到可讀內容。"
   },
+  "mdEngineSwitchTo": { "message": "切換到 $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineSwitching": { "message": "正在切換擷取引擎…" },
+  "mdEngineSwitchFailed": { "message": "切換引擎失敗：$ERROR$", "placeholders": { "error": { "content": "$1" } } },
+  "mdEngineTabGone": { "message": "來源分頁已無法使用 — 重新開啟該頁面才能使用 Defuddle" },
   "bgTabSetSaved": {
     "message": "Pinboard：仲差一步完成儲存"
   },

@@ -531,6 +531,10 @@
   "bgMdPreviewNoContent": {
     "message": "На этой странице не найдено читаемого содержимого."
   },
+  "mdEngineSwitchTo": { "message": "Переключить на $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineSwitching": { "message": "Переключение движка извлечения…" },
+  "mdEngineSwitchFailed": { "message": "Не удалось переключить движок: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
+  "mdEngineTabGone": { "message": "Исходная вкладка недоступна — откройте страницу заново, чтобы использовать Defuddle" },
   "bgTabSetSaved": {
     "message": "Pinboard: остался один шаг"
   },
