@@ -52,23 +52,29 @@ export function hslToRgb([h, s, l]) {
 // Mix two rgb colors by ratio t (0 = a, 1 = b).
 export function mix(a, b, t) { return a.map((c, i) => c + (b[i] - c) * t); }
 
+// Adjust fg's LIGHTNESS (hue+sat preserved) against a FIXED bg until contrast >= min,
+// verifying on hex-rounded values so the written CSS clears AA. Returns rgb.
+export function fgToAA(fg, bg, min = 4.5) {
+  const bgRound = hexToRgb(rgbToHex(bg));
+  const bgIsLight = relLum(bgRound) > 0.18;
+  const [h, s] = rgbToHsl(fg);
+  let [, , l] = rgbToHsl(fg);
+  let out = fg;
+  for (let i = 0; i < 80; i++) {
+    if (contrast(hexToRgb(rgbToHex(out)), bgRound) >= min) break;
+    l = bgIsLight ? Math.max(0, l - 0.02) : Math.min(1, l + 0.02);
+    out = hslToRgb([h, s, l]);
+    if (l <= 0 || l >= 1) break;
+  }
+  return out;
+}
+
 // Derive an AA-passing status (fg,bg) pair: subtle tinted background keeping the
 // theme's light/dark feel, with the foreground's LIGHTNESS adjusted (hue+sat kept)
 // until contrast >= min. mode: "light"|"dark". Returns { fg:[r,g,b], bg:[r,g,b] }.
 export function pairToAA(statusFg, themeBg, mode, min = 4.5) {
   const bg = mix(themeBg, statusFg, mode === "dark" ? 0.18 : 0.12);
-  const bgRound = hexToRgb(rgbToHex(bg));
-  const bgIsLight = relLum(bgRound) > 0.18;
-  const [h, s] = rgbToHsl(statusFg);
-  let [, , l] = rgbToHsl(statusFg);
-  let fg = statusFg;
-  for (let i = 0; i < 80; i++) {
-    if (contrast(hexToRgb(rgbToHex(fg)), bgRound) >= min) break;
-    l = bgIsLight ? Math.max(0, l - 0.02) : Math.min(1, l + 0.02);
-    fg = hslToRgb([h, s, l]);
-    if (l <= 0 || l >= 1) break;
-  }
-  return { fg, bg };
+  return { fg: fgToAA(statusFg, bg, min), bg };
 }
 
 // Map an expanded pilot palette to the canonical UI semantic colors.
@@ -87,7 +93,8 @@ export function deriveUiColors(p, mode) {
     : hx("bg");
   return {
     bg: hx("bg"), bg2: hx("bg-surface"), fg: hx("fg"),
-    "fg-muted": hx("muted"), "fg-hint": hx("muted-soft"),
+    "fg-muted": rgbToHex(fgToAA(rgb("muted"), bg)),
+    "fg-hint": rgbToHex(fgToAA(rgb("muted-soft"), bg)),
     border: hx("border"), divider: hx("border-soft"),
     accent: hx("accent"), accent2: hx("link-visited"), link: hx("accent"),
     "tag-bg": hx("tag-bg"), "tag-fg": hx("tag-fg"), "tag-hover": hx("row-hover"),
