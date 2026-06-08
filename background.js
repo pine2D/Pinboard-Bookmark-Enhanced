@@ -2,7 +2,7 @@
 // Pinboard Bookmark Enhanced - Background Service Worker (v4.0)
 // ============================================================
 
-importScripts("i18n.js", "shared.js", "ai-cache.js", "ai.js");
+importScripts("i18n.js", "shared.js", "ai-cache.js", "ai.js", "jina.js");
 
 // Load manual language setting (async, t() falls back to browser locale until ready)
 initI18n();
@@ -776,6 +776,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(err => { clearTimeout(timer); sendResponse({ ok: false, error: err.name === "AbortError" ? "timeout" : "network" }); });
     return true; // keep channel open for async response
   }
+
+  if (message.type === "reextractMarkdown") {
+    const { tabId, url, engine, tags, description } = message;
+    if (!url || (engine !== "local" && engine !== "jina")) {
+      sendResponse({ ok: false, error: "bad_request" }); return true;
+    }
+    extractForPreview({ tabId, url, engine })
+      .then(out => {
+        if (out.error) { sendResponse({ ok: false, error: out.error }); return; }
+        return chrome.storage.local.set({
+          md_preview_data: {
+            ...out, baseUrl: out.url || url, tabId,
+            tags: Array.isArray(tags) ? tags : [],
+            description: typeof description === "string" ? description : ""
+          }
+        }).then(() => sendResponse({ ok: true }));
+      })
+      .catch(e => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
 });
 
 // ===================== Tab Set 保存 =====================
@@ -849,6 +869,55 @@ function extractPageForMarkdown() {
   } catch (e) { return { error: e.message }; }
 }
 
+// Unified extraction service for the preview. Shared by the keyboard-shortcut
+// opener and the in-preview engine toggle (reextractMarkdown). Returns the
+// md_preview_data payload fields (minus tags/description/tabId, added by caller)
+// or { error }. engine is "local" (Defuddle) or "jina".
+async function extractForPreview({ tabId, url, engine }) {
+  if (engine === "jina") {
+    // Fresh read — do NOT use loadSettings() (its _settingsCache can be stale
+    // when the user edits settings while the SW is warm). getSettingsStorage()
+    // returns RAW (obfuscated) settings, so deobfuscate the key exactly once.
+    const raw = await (await getSettingsStorage()).get({
+      jinaApiKey: SETTINGS_DEFAULTS.jinaApiKey,
+      aiCacheDuration: SETTINGS_DEFAULTS.aiCacheDuration
+    });
+    const key = raw.jinaApiKey ? deobfuscateKey(raw.jinaApiKey) : "";
+    const r = await fetchJinaMarkdown(url, { apiKey: key, cacheDuration: raw.aiCacheDuration });
+    if (r.error) return { error: r.error };
+    if (!r.markdown || !r.markdown.trim()) return { error: "empty" };
+    return {
+      source: "jina", markdown: r.markdown, contentHtml: "",
+      title: r.title || "", url: r.url || url,
+      tokens: r.tokens || 0, hasApiKey: !!key, math: false
+    };
+  }
+  // engine === "local" (Defuddle)
+  if (!tabId) return { error: "tab_unavailable" };
+  // Weak-handle guard: the stored tabId may now host a DIFFERENT page (user
+  // navigated, or the id was reused). activeTab can persist across same-origin
+  // navigation, so a successful inject could silently extract the wrong page.
+  try {
+    const live = await chrome.tabs.get(tabId);
+    if (!live || !live.url || live.url !== url) return { error: "tab_navigated" };
+  } catch (_) { return { error: "tab_unavailable" }; }
+  // Defuddle is required; injection failure (tab closed / CSP / no permission) → degrade.
+  const injected = await chrome.scripting
+    .executeScript({ target: { tabId }, files: ["vendor/defuddle.js"] }).catch(() => null);
+  if (!injected) return { error: "tab_unavailable" };
+  // site-rules.js is OPTIONAL — ignore failure so a broken rule can't mask Defuddle.
+  await chrome.scripting.executeScript({ target: { tabId }, files: ["site-rules.js"] }).catch(() => {});
+  const results = await chrome.scripting
+    .executeScript({ target: { tabId }, func: extractPageForMarkdown }).catch(() => null);
+  const out = results && results[0] && results[0].result;
+  if (!out || out.error || !out.contentHtml) return { error: (out && out.error) || "empty" };
+  return {
+    source: "local", markdown: "", contentHtml: out.contentHtml,
+    title: out.title || "", url: url, // prefer caller url over extractor's
+    tokens: 0, hasApiKey: false, math: !!out.math
+  };
+}
+
 async function openMarkdownPreviewFromShortcut() {
   let tab;
   try {
@@ -858,44 +927,20 @@ async function openMarkdownPreviewFromShortcut() {
     showNotification("mdpv-error", t("bgMdPreviewFailed"), t("bgMdPreviewNoContent"), "error");
     return;
   }
-  try {
-    // Defuddle is required; bail if the page refuses injection (CSP-locked, store pages).
-    const injected = await chrome.scripting
-      .executeScript({ target: { tabId: tab.id }, files: ["vendor/defuddle.js"] })
-      .catch(() => null);
-    if (!injected) {
-      showNotification("mdpv-error", t("bgMdPreviewFailed"), t("bgMdPreviewNoContent"), "error");
-      return;
-    }
-    // site-rules.js is OPTIONAL — ignore failure so a broken rule can't mask Defuddle.
-    await chrome.scripting
-      .executeScript({ target: { tabId: tab.id }, files: ["site-rules.js"] })
-      .catch(() => {});
-    const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: extractPageForMarkdown });
-    const out = results?.[0]?.result;
-    if (!out || out.error || !out.contentHtml) {
-      showNotification("mdpv-error", t("bgMdPreviewFailed"), out?.error || t("bgMdPreviewNoContent"), "error");
-      return;
-    }
-    // HTML only (markdown:"") — md-preview.html converts via Turndown, same as the popup path.
-    await chrome.storage.local.set({
-      md_preview_data: {
-        markdown: "",
-        contentHtml: out.contentHtml || "",
-        title: out.title || tab.title || "",
-        url: out.url || tab.url,
-        baseUrl: out.url || tab.url,
-        tags: [],
-        tokens: 0,
-        hasApiKey: false,
-        source: "local",
-        math: !!out.math
-      }
-    });
-    await chrome.tabs.create({ url: "md-preview.html" });
-  } catch (e) {
-    showNotification("mdpv-error", t("bgMdPreviewFailed"), e.message, "error");
+  // Follow the aiContentSource setting (fresh read, not the cached loadSettings()).
+  const raw = await (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource });
+  const engine = raw.aiContentSource === "jina" ? "jina" : "local";
+  const out = await extractForPreview({ tabId: tab.id, url: tab.url, engine });
+  if (out.error) {
+    // Jina failures do NOT fall back (consistent with the popup Markdown button).
+    showNotification("mdpv-error", t("bgMdPreviewFailed"),
+      out.error === "empty" ? t("bgMdPreviewNoContent") : out.error, "error");
+    return;
   }
+  await chrome.storage.local.set({
+    md_preview_data: { ...out, baseUrl: out.url, tags: [], description: "", tabId: tab.id }
+  });
+  await chrome.tabs.create({ url: "md-preview.html" });
 }
 
 // ===================== Keyboard Shortcuts =====================
