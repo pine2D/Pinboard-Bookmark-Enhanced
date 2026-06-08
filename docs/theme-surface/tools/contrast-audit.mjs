@@ -54,6 +54,9 @@ const ALLOWLIST = new Set([
   "pinboard:solarized-dark:muted vs bg-surface",
   "pinboard:nord-night:btn-bg vs btn-fg",
   "pinboard:catppuccin-latte:btn-bg vs btn-fg",
+  // Solarized-light's body fg/bg is intentionally low-contrast (mirrors the
+  // pinboard:solarized-light:bg vs fg exemption); the popup inherits the same pilot palette.
+  "popup:solarized-light:fg vs bg",
 ]);
 
 const violations = [];
@@ -66,6 +69,16 @@ function check(scope, theme, label, ratio, min) {
   const line = "  " + scope.padEnd(10) + " " + theme.padEnd(20) + " " + label.padEnd(28) + " " + ratio.toFixed(2) + ":1  (min " + min + ") " + flag;
   if (!ok && flag === "FAIL") violations.push(line);
   else if (!ok && flag === "KNOWN") known.push(line);
+  return line;
+}
+
+// Advisory (non-blocking): pilot muted/hint values may be < 4.5 by design.
+// These are surfaced for visibility but never fail the build (spec §6).
+const advisory = [];
+function advise(scope, theme, label, ratio, min) {
+  const ok = ratio >= min;
+  const line = "  " + scope.padEnd(10) + " " + theme.padEnd(20) + " " + label.padEnd(28) + " " + ratio.toFixed(2) + ":1  (min " + min + ") " + (ok ? "OK " : "ADVISORY");
+  if (!ok) advisory.push(line);
   return line;
 }
 
@@ -119,11 +132,27 @@ function auditCssThemes(label, varPrefix, cssPath) {
     }
     if (hintS) {
       const c = resolveColor(hintS, bg);
-      if (c) console.log(check(label, theme, "fg-hint vs bg", cr(c, bg), 4.5));
+      if (c) console.log(advise(label, theme, "fg-hint vs bg", cr(c, bg), 4.5));
     }
     if (mutedS) {
       const c = resolveColor(mutedS, bg);
-      if (c) console.log(check(label, theme, "fg-muted vs bg", cr(c, bg), 4.5));
+      if (c) console.log(advise(label, theme, "fg-muted vs bg", cr(c, bg), 4.5));
+    }
+    // Status pairs (NEW, BLOCKING): warn/banner/ok/offline fg must clear AA
+    // against their own tinted bg. The engine (pairToAA) derives these to pass
+    // by construction, so a FAIL here is a derivation bug — do NOT allowlist.
+    for (const [fgK, bgK, lbl] of [
+      ["warn-fg", "warn-bg", "warn fg vs bg"],
+      ["banner-fg", "banner-bg", "banner fg vs bg"],
+      ["ok-fg", "ok-bg", "ok fg vs bg"],
+      ["offline-fg", "offline-bg", "offline fg vs bg"],
+    ]) {
+      const fS = grab(fgK), bS = grab(bgK);
+      if (!fS || !bS) continue;
+      const bb = bS.startsWith("#") ? hexRgb(bS) : null;
+      if (!bb) continue;
+      const ff = resolveColor(fS, bb);
+      if (ff) console.log(check(label, theme, lbl, cr(ff, bb), 4.5));
     }
     // Scrollbar thumb (uses fg-muted) against scrollbar track (uses panel for options, bg2 for popup).
     // Threshold 3:1 — UI components, not text.
@@ -135,7 +164,7 @@ function auditCssThemes(label, varPrefix, cssPath) {
     if (mutedS && trackS) {
       const trackBg = trackS.startsWith("#") ? hexRgb(trackS) : null;
       const thumb = resolveColor(mutedS, bg);
-      if (trackBg && thumb) console.log(check(label, theme, "scrollbar thumb vs track", cr(thumb, trackBg), 3));
+      if (trackBg && thumb) console.log(advise(label, theme, "scrollbar thumb vs track", cr(thumb, trackBg), 3));
     }
   }
 }
@@ -143,6 +172,11 @@ auditCssThemes("popup", "--pp", resolve(ROOT, "popup.css"));
 auditCssThemes("options", "--opt", resolve(ROOT, "options.css"));
 
 console.log("");
+if (advisory.length > 0) {
+  console.log("=== ADVISORY (not blocking) — " + advisory.length + " ===");
+  for (const a of advisory) console.log(a);
+  console.log("");
+}
 if (known.length > 0) {
   console.log("=== KNOWN (allowlisted, not blocking) — " + known.length + " ===");
   for (const k of known) console.log(k);
