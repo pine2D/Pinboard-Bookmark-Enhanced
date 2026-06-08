@@ -123,8 +123,12 @@ function ensureKatex() {
     renderEmptyState(chrome.i18n.getMessage("mdPreviewEmpty") || "No preview data available. Please use the Markdown button in the popup first.");
     return;
   }
-  // Clear temporary data
-  await chrome.storage.local.remove("md_preview_data");
+  // Clear temporary data — but KEEP a pending placeholder so a manual reload during
+  // extraction re-drives it instead of hitting the empty state (the reextract success
+  // path overwrites md_preview_data with the full payload, which that load then clears).
+  if (!info.pending) {
+    await chrome.storage.local.remove("md_preview_data");
+  }
 
   const { contentHtml, title, url, tokens, source } = info;
   const srcTabId = info.tabId;
