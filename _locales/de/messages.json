@@ -533,6 +533,7 @@
   },
   "mdEngineSwitchTo": { "message": "Zu $ENGINE$ wechseln", "placeholders": { "engine": { "content": "$1" } } },
   "mdEngineExtracting": { "message": "Extraktion mit $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractingNoteJina": { "message": "Die erste Extraktion ruft die Jina-Cloud (r.jina.ai) ab. Die Wartezeit hängt davon ab, ob diese Seite lokal zwischengespeichert ist, von deiner Netzwerkgeschwindigkeit und der Seitengröße – meist ein paar Sekunden." },
   "mdEngineExtractFailed": { "message": "Diese Seite konnte nicht extrahiert werden. Bitte erneut versuchen." },
   "mdEngineTabGone": { "message": "Quell-Tab nicht mehr verfügbar — Seite erneut öffnen, um Defuddle zu nutzen" },
   "bgTabSetSaved": {

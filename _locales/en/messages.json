@@ -533,6 +533,7 @@
   },
   "mdEngineSwitchTo": { "message": "Switch to $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
   "mdEngineExtracting": { "message": "Extracting with $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractingNoteJina": { "message": "First-time extraction fetches from Jina's cloud (r.jina.ai). The wait depends on whether this page is cached locally, your network speed, and the page size — usually a few seconds." },
   "mdEngineExtractFailed": { "message": "Couldn't extract this page. Please try again." },
   "mdEngineTabGone": { "message": "Source tab no longer available — reopen the page to use Defuddle" },
   "bgTabSetSaved": {

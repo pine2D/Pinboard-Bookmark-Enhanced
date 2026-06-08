@@ -533,6 +533,7 @@
   },
   "mdEngineSwitchTo": { "message": "切換到 $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
   "mdEngineExtracting": { "message": "正在用 $ENGINE$ 擷取…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractingNoteJina": { "message": "首次擷取需連網請求 Jina 雲端（r.jina.ai）；耗時取決於本頁是否已在本機快取、你的網速與頁面大小，通常數秒。" },
   "mdEngineExtractFailed": { "message": "無法擷取此頁面，請重試。" },
   "mdEngineTabGone": { "message": "來源分頁已無法使用 — 重新開啟該頁面才能使用 Defuddle" },
   "bgTabSetSaved": {

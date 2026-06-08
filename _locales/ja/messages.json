@@ -533,6 +533,7 @@
   },
   "mdEngineSwitchTo": { "message": "$ENGINE$ に切り替え", "placeholders": { "engine": { "content": "$1" } } },
   "mdEngineExtracting": { "message": "$ENGINE$ で抽出しています…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractingNoteJina": { "message": "初回の抽出は Jina クラウド（r.jina.ai）への通信が必要です。待ち時間は、このページがローカルにキャッシュ済みか、通信速度、ページの大きさによって変わります（通常は数秒）。" },
   "mdEngineExtractFailed": { "message": "このページを抽出できませんでした。もう一度お試しください。" },
   "mdEngineTabGone": { "message": "元のタブが利用できません — ページを開き直すと Defuddle を使えます" },
   "bgTabSetSaved": {

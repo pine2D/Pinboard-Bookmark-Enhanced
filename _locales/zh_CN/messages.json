@@ -533,6 +533,7 @@
   },
   "mdEngineSwitchTo": { "message": "切换到 $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
   "mdEngineExtracting": { "message": "正在用 $ENGINE$ 抽取…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractingNoteJina": { "message": "首次抽取需联网请求 Jina 云端（r.jina.ai）；耗时取决于本页是否已在本地缓存、你的网速与页面大小，通常数秒。" },
   "mdEngineExtractFailed": { "message": "无法抽取此页面，请重试。" },
   "mdEngineTabGone": { "message": "源标签页已不可用 — 重新打开该页面才能使用 Defuddle" },
   "bgTabSetSaved": {

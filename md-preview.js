@@ -17,7 +17,7 @@ function renderEmptyState(message) {
   document.body.classList.add("md-empty");
 }
 
-function renderLoadingState(message) {
+function renderLoadingState(message, note) {
   const view = document.getElementById("rendered-view");
   if (view) {
     const wrap = document.createElement("div");
@@ -29,6 +29,12 @@ function renderLoadingState(message) {
     p.textContent = message;
     wrap.appendChild(sp);
     wrap.appendChild(p);
+    if (note) {
+      const n = document.createElement("p");
+      n.className = "note";
+      n.textContent = note;
+      wrap.appendChild(n);
+    }
     view.replaceChildren(wrap);
     view.setAttribute("aria-busy", "true");
   }
@@ -143,7 +149,10 @@ function ensureKatex() {
     const titleEl0 = document.getElementById("preview-title");
     if (titleEl0) { titleEl0.textContent = title || t("mdPreviewUntitled"); titleEl0.title = title || ""; }
     document.title = (title || "Markdown") + " — Preview";
-    renderLoadingState(t("mdEngineExtracting", engineLabel(info.engine)));
+    renderLoadingState(
+      t("mdEngineExtracting", engineLabel(info.engine)),
+      info.engine === "jina" ? t("mdEngineExtractingNoteJina") : ""
+    );
     let pr;
     try {
       pr = await chrome.runtime.sendMessage({

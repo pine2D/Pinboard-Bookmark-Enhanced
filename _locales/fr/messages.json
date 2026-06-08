@@ -533,6 +533,7 @@
   },
   "mdEngineSwitchTo": { "message": "Passer à $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
   "mdEngineExtracting": { "message": "Extraction avec $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractingNoteJina": { "message": "La première extraction interroge le cloud de Jina (r.jina.ai). Le délai dépend de la mise en cache locale de cette page, de votre vitesse réseau et de la taille de la page — généralement quelques secondes." },
   "mdEngineExtractFailed": { "message": "Impossible d'extraire cette page. Veuillez réessayer." },
   "mdEngineTabGone": { "message": "Onglet source indisponible — rouvrez la page pour utiliser Defuddle" },
   "bgTabSetSaved": {

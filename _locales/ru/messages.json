@@ -533,6 +533,7 @@
   },
   "mdEngineSwitchTo": { "message": "Переключить на $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
   "mdEngineExtracting": { "message": "Извлечение через $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
+  "mdEngineExtractingNoteJina": { "message": "Первое извлечение обращается к облаку Jina (r.jina.ai). Время ожидания зависит от того, кэширована ли эта страница локально, от скорости сети и размера страницы — обычно несколько секунд." },
   "mdEngineExtractFailed": { "message": "Не удалось извлечь эту страницу. Попробуйте ещё раз." },
   "mdEngineTabGone": { "message": "Исходная вкладка недоступна — откройте страницу заново, чтобы использовать Defuddle" },
   "bgTabSetSaved": {
