@@ -6,6 +6,10 @@ release/
 # Claude Code local state
 .claude/settings.local.json
 .claude/skills/
+.claude/scheduled_tasks.lock
+
+# CodeGraph local index (regenerable; machine-local socket/pid/db)
+.codegraph/
 
 # Internal planning/design drafts (superpowers skill output)
 docs/superpowers/
