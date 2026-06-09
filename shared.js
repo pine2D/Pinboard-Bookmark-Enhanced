@@ -128,7 +128,9 @@ const SETTINGS_DEFAULTS = {
   popupWidth: 550,
   mdExportFrontmatter: true, mdExportImagePolicy: "keep", mdExportIncludeToc: false,
   obsidianEnabled: false, obsidianVault: "", obsidianFolder: "",
-  urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] }
+  urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] },
+  // pinboard.in tag-page "sort by popularity" control (site enhancement, default on)
+  tagSortByPopEnabled: true
 };
 
 // ---- Tag case normalization helpers ----
