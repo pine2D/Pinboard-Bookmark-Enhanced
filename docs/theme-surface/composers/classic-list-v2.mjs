@@ -104,7 +104,7 @@ body { color-scheme: ${schemeFor(tokens)} !important; }
 /* Inner flex container: filters flow inline, .rss_linkbox pinned right via margin-left:auto.
    Only the selected filter gets a pill with negative margin to neutralize its padding (zero inline drift).
    flex:1 + min-width:0 lets nav shrink to fit available space after the leftward siblings. */
-#bmarks_page_nav { color: ${v("muted")} !important; flex: 1 !important; min-width: 0 !important; display: flex !important; flex-wrap: wrap !important; align-items: center !important; box-sizing: border-box !important; }
+#bmarks_page_nav { color: ${v("muted")} !important; flex: 1 !important; min-width: 0 !important; display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 0 0.3em !important; box-sizing: border-box !important; }
 #bmarks_page_nav .rss_linkbox { margin: 0 0 0 auto !important; padding-left: 12px !important; float: none !important; position: static !important; }
 #bmarks_page_nav a.filter { color: ${v("muted")} !important; transition: color 0.15s ease !important; }
 #bmarks_page_nav a.filter:hover { color: ${v("link-hover")} !important; }
