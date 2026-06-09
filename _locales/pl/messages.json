@@ -1452,5 +1452,6 @@
   "batchRevokeHint":   { "message": "Potrzebne tylko wtedy, gdy włączono masową ekstrakcję AI, ale nie chcesz już, aby rozszerzenie miało dostęp do wszystkich stron." },
   "batchRevokeSuccess": { "message": "Cofnięto" },
   "batchPermRevoked":  { "message": "cofnięto" },
+  "batchPermNone":     { "message": "Obecnie nie jest przyznany dostęp do wszystkich witryn" },
   "batchRevokeFailed": { "message": "Niepowodzenie" }
 }

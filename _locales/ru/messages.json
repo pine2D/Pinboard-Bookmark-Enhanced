@@ -1452,5 +1452,6 @@
   "batchRevokeHint":   { "message": "Нужно только если вы включили массовое AI-извлечение, но больше не хотите, чтобы расширение имело доступ ко всем страницам." },
   "batchRevokeSuccess": { "message": "Отозвано" },
   "batchPermRevoked":  { "message": "отозвано" },
+  "batchPermNone":     { "message": "Доступ ко всем сайтам в данный момент не предоставлен" },
   "batchRevokeFailed": { "message": "Ошибка" }
 }

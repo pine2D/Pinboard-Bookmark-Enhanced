@@ -1452,5 +1452,6 @@
   "batchRevokeHint":   { "message": "Nur erforderlich, wenn Sie die KI-Massenextraktion aktiviert haben, aber die Erweiterung nicht mehr auf alle Seiten zugreifen soll." },
   "batchRevokeSuccess": { "message": "Widerrufen" },
   "batchPermRevoked":  { "message": "widerrufen" },
+  "batchPermNone":     { "message": "Derzeit ist kein Zugriff auf alle Websites gewährt" },
   "batchRevokeFailed": { "message": "Fehlgeschlagen" }
 }

@@ -1452,5 +1452,6 @@
   "batchRevokeHint":   { "message": "Utile uniquement si vous avez activé l'extraction AI en masse mais ne souhaitez plus que l'extension accède à toutes les pages." },
   "batchRevokeSuccess": { "message": "Révoqué" },
   "batchPermRevoked":  { "message": "révoqué" },
+  "batchPermNone":     { "message": "Aucun accès à tous les sites n'est actuellement accordé" },
   "batchRevokeFailed": { "message": "Échec" }
 }

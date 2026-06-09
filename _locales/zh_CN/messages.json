@@ -1452,5 +1452,6 @@
   "batchRevokeHint":   { "message": "仅在您启用了批量 AI 内容提取但不再希望扩展访问所有页面时使用。" },
   "batchRevokeSuccess": { "message": "已撤销" },
   "batchPermRevoked":  { "message": "已撤销" },
+  "batchPermNone":     { "message": "当前未授予所有站点访问权限" },
   "batchRevokeFailed": { "message": "失败" }
 }

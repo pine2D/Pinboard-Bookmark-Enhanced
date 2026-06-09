@@ -1452,5 +1452,6 @@
   "batchRevokeHint":   { "message": "Only needed if you enabled batch AI extraction but no longer want the extension to access all pages for content." },
   "batchRevokeSuccess": { "message": "Revoked" },
   "batchPermRevoked":  { "message": "revoked" },
+  "batchPermNone":     { "message": "No all-sites access is currently granted" },
   "batchRevokeFailed": { "message": "Failed" }
 }

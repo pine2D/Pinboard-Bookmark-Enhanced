@@ -1452,5 +1452,6 @@
   "batchRevokeHint":   { "message": "一括 AI コンテンツ抽出を有効にしたが、拡張機能によるすべてのページへのアクセスが不要になった場合にのみ使用してください。" },
   "batchRevokeSuccess": { "message": "取り消しました" },
   "batchPermRevoked":  { "message": "取り消し済み" },
+  "batchPermNone":     { "message": "現在、全サイトへのアクセス権は付与されていません" },
   "batchRevokeFailed": { "message": "失敗" }
 }

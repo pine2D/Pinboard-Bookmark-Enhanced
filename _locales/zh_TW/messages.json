@@ -1452,5 +1452,6 @@
   "batchRevokeHint":   { "message": "僅在您啟用了批量 AI 內容擷取但不再希望擴充功能存取所有頁面時使用。" },
   "batchRevokeSuccess": { "message": "已撤銷" },
   "batchPermRevoked":  { "message": "已撤銷" },
+  "batchPermNone":     { "message": "目前未授予所有網站存取權限" },
   "batchRevokeFailed": { "message": "失敗" }
 }

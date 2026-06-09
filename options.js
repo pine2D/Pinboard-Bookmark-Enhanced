@@ -521,6 +521,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- Batch: revoke all-sites permission ----
+  // Reflect current grant state on load
+  (async () => {
+    try {
+      const has = await chrome.permissions.contains({ origins: ["*://*/*"] });
+      const statusEl = $id("batch-perm-status");
+      const btn = $id("batch-revoke-perm");
+      if (!has) {
+        if (statusEl) statusEl.textContent = t("batchPermNone");
+        if (btn) btn.disabled = true;
+      }
+    } catch (_) {}
+  })();
+
   $id("batch-revoke-perm")?.addEventListener("click", async (e) => {
     e.preventDefault();
     const btn = e.currentTarget;
@@ -529,8 +542,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       const revoked = await chrome.permissions.remove({ origins: ["*://*/*"] });
       if (revoked) {
         btn.textContent = t("batchRevokeSuccess");
-        const statusEl = $id("batch-perm-status");
-        if (statusEl) statusEl.textContent = t("batchPermRevoked");
+        if ($id("batch-perm-status")) $id("batch-perm-status").textContent = t("batchPermRevoked");
+        btn.disabled = true;
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      } else {
+        if ($id("batch-perm-status")) $id("batch-perm-status").textContent = t("batchPermNone");
+        btn.disabled = true;
         setTimeout(() => { btn.textContent = orig; }, 2000);
       }
     } catch (err) {
