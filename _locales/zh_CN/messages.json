@@ -290,6 +290,17 @@
   "aiUnknownError": {
     "message": "未知错误"
   },
+  "aiErrorModelNotFound": {
+    "message": "$PROVIDER$ 的默认模型可能已过期 — 请在设置中选择一个模型",
+    "placeholders": {
+      "provider": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiErrorModelNotFoundHint": {
+    "message": "前往设置 > AI，选择一个可用的模型"
+  },
   "addAll": {
     "message": "全部添加"
   },

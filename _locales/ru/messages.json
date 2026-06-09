@@ -290,6 +290,17 @@
   "aiUnknownError": {
     "message": "Неизвестная ошибка"
   },
+  "aiErrorModelNotFound": {
+    "message": "Модель по умолчанию для $PROVIDER$ может быть устаревшей — выберите модель в Настройках",
+    "placeholders": {
+      "provider": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiErrorModelNotFoundHint": {
+    "message": "Перейдите в Настройки > ИИ и выберите доступную модель"
+  },
   "addAll": {
     "message": "Добавить все"
   },

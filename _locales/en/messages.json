@@ -290,6 +290,17 @@
   "aiUnknownError": {
     "message": "Unknown error"
   },
+  "aiErrorModelNotFound": {
+    "message": "The default model for $PROVIDER$ may be outdated — pick a model in Settings",
+    "placeholders": {
+      "provider": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiErrorModelNotFoundHint": {
+    "message": "Visit Settings > AI to select an available model"
+  },
   "addAll": {
     "message": "Add all"
   },

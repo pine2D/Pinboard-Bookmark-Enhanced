@@ -290,6 +290,17 @@
   "aiUnknownError": {
     "message": "Nieznany błąd"
   },
+  "aiErrorModelNotFound": {
+    "message": "Domyślny model dla $PROVIDER$ może być przestarzały — wybierz model w Ustawieniach",
+    "placeholders": {
+      "provider": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiErrorModelNotFoundHint": {
+    "message": "Przejdź do Ustawienia > AI i wybierz dostępny model"
+  },
   "addAll": {
     "message": "Dodaj wszystkie"
   },

@@ -123,8 +123,22 @@ function showAIError(op, err) {
   const provLabel = AI_PROVIDER_LABEL[providerKey] || providerKey;
   $id("ai-error-title").textContent = t("aiErrorTitle", op === "tags" ? t("aiErrorOpTags") : t("aiErrorOpSummary"));
   const msgEl = $id("ai-error-message");
+
   const short = (err && err.message) ? err.message : String(err || t("aiUnknownError"));
-  msgEl.textContent = `[${provLabel}] ${short}`;
+
+  // Remove any previously inserted model-not-found hint element
+  msgEl.parentElement.querySelector(".model-not-found-hint")?.remove();
+
+  if (err?.code === "model_not_found") {
+    msgEl.textContent = t("aiErrorModelNotFound", provLabel);
+    const hintEl = document.createElement("div");
+    hintEl.className = "model-not-found-hint";
+    hintEl.textContent = t("aiErrorModelNotFoundHint");
+    msgEl.parentElement.insertBefore(hintEl, msgEl.nextSibling);
+  } else {
+    msgEl.textContent = `[${provLabel}] ${short}`;
+  }
+
   const detailsEl = $id("ai-error-details");
   detailsEl.textContent = (err && err.stack) ? err.stack : short;
   detailsEl.classList.add("hidden");

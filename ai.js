@@ -138,12 +138,20 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
 // ---- Unified AI error handler ----
 async function handleAIError(res, provider) {
   let msg = `${provider} failed (HTTP ${res.status})`;
+  let errorType = null;
   try {
     const body = await res.json();
     if (body.error?.message) msg = `${provider}: ${body.error.message}`;
     else if (body.error?.type) msg = `${provider}: ${body.error.type}`;
+    // Detect model-not-found errors: 404, or message/type contains model-related keywords
+    const combined = String(msg + (body.error?.type || "")).toLowerCase();
+    if (res.status === 404 || /model|not.*exist|not.*found|unknown.*model/i.test(combined)) {
+      errorType = "model_not_found";
+    }
   } catch (_) {}
-  throw new Error(msg);
+  const err = new Error(msg);
+  if (errorType) err.code = errorType;
+  throw err;
 }
 
 // ---- Check if AI key is configured ----

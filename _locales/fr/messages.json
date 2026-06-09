@@ -290,6 +290,17 @@
   "aiUnknownError": {
     "message": "Erreur inconnue"
   },
+  "aiErrorModelNotFound": {
+    "message": "Le modèle par défaut de $PROVIDER$ est peut-être obsolète — choisissez un modèle dans les Paramètres",
+    "placeholders": {
+      "provider": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiErrorModelNotFoundHint": {
+    "message": "Allez dans Paramètres > IA et choisissez un modèle disponible"
+  },
   "addAll": {
     "message": "Tout ajouter"
   },

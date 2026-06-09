@@ -290,6 +290,17 @@
   "aiUnknownError": {
     "message": "不明なエラー"
   },
+  "aiErrorModelNotFound": {
+    "message": "$PROVIDER$ のデフォルトモデルが古くなっている可能性があります — 設定でモデルを選択してください",
+    "placeholders": {
+      "provider": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiErrorModelNotFoundHint": {
+    "message": "設定 > AI を開いて、利用可能なモデルを選択してください"
+  },
   "addAll": {
     "message": "すべて追加"
   },

@@ -154,6 +154,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
    At 11px an underline alone is a weak cue, so bold (matching .fc-title) +
    underline-offset make "clickable" unambiguous without recolouring. */
 .fc-message a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.model-not-found-hint { margin-top: 3px; font-size: 0.9em; opacity: 0.8; }
 .fc-actions { display: flex; gap: 8px; margin-top: 4px; align-items: center; }
 .fc-btn {
   background: transparent; border: 1px solid currentColor;

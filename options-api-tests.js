@@ -41,7 +41,10 @@ function setupApiTests() {
       statusEl.style.color = "#080";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 4000);
     } catch (err) {
-      const msg = err.name === "AbortError" ? t("testTimeout") : err.message;
+      let msg = err.name === "AbortError" ? t("testTimeout") : err.message;
+      if (err?.code === "model_not_found") {
+        msg = t("aiErrorModelNotFound", cs.aiProvider) + " " + t("aiErrorModelNotFoundHint");
+      }
       setStatusIcon(statusEl, false, msg);
       statusEl.style.color = "#c00";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);

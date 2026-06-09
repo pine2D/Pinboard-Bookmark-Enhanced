@@ -290,6 +290,17 @@
   "aiUnknownError": {
     "message": "Unbekannter Fehler"
   },
+  "aiErrorModelNotFound": {
+    "message": "Das Standardmodell für $PROVIDER$ ist möglicherweise veraltet — wählen Sie ein Modell in den Einstellungen",
+    "placeholders": {
+      "provider": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiErrorModelNotFoundHint": {
+    "message": "Öffnen Sie Einstellungen > KI und wählen Sie ein verfügbares Modell"
+  },
   "addAll": {
     "message": "Alle hinzufügen"
   },
