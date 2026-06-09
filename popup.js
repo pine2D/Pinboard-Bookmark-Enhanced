@@ -724,7 +724,7 @@ function setupSubmit(token) {
         showStatus("status-msg", t("bookmarkSaved"), "success");
         setSubmitState("success");
         if (typeof saveLastUsedTags === "function") saveLastUsedTags(currentTags);
-        chrome.runtime.sendMessage({ type: "bookmark_saved", url: url });
+        chrome.runtime.sendMessage({ type: "bookmark_saved", url: url, toread: $id("readlater-check").checked });
         // Persist "just-saved" state: upgrade banner to reflect current bookmark
         existingBookmark = {
           href: url,
