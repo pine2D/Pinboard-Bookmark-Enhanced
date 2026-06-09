@@ -50,9 +50,18 @@
       .map((x) => x.el);
   }
 
+  // Fold rows that appeared after the snapshot (e.g. auto-pagination appended a later
+  // page) into the load-order snapshot. Returns the SAME array when nothing is new, so
+  // callers can cheaply detect "no change" by identity.
+  function mergeNewRows(snapshot, currentRows) {
+    const known = new Set(snapshot);
+    const added = currentRows.filter((r) => !known.has(r));
+    return added.length ? snapshot.concat(added) : snapshot;
+  }
+
   // Expose for the test harness (harmless in the isolated content world).
   if (typeof window !== "undefined") {
-    window.__PBP_POPSORT__ = { parsePopCount, extractPop, computeSortedOrder, getBookmarkRows };
+    window.__PBP_POPSORT__ = { parsePopCount, extractPop, computeSortedOrder, getBookmarkRows, mergeNewRows };
   }
 
   // ---------- everything below only runs on a real tag page ----------
@@ -119,6 +128,32 @@
     link.classList.toggle("pbp-pop-active", sorted);
   }
 
+  // Keep the feature working under auto-pagination (AutoPagerize / uAutoPagerize /
+  // userscripts that append later pages): fold newly-appended bookmark rows into the
+  // load-order snapshot, and if a sort is active, re-sort so they land in pop order.
+  // Debounced so a burst of appended nodes triggers one re-sort; the observer detaches
+  // around our own reorder() so the moves it makes don't re-trigger it.
+  function watchAutoPagination(mc) {
+    if (typeof MutationObserver === "undefined") return;
+    let timer = null;
+    const obs = new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          const next = mergeNewRows(originalOrder, getBookmarkRows(mc));
+          if (next === originalOrder) return; // nothing new appeared
+          originalOrder = next;
+          if (sorted) {
+            obs.disconnect();
+            reorder(mc, computeSortedOrder(originalOrder));
+            obs.observe(mc, { childList: true });
+          }
+        } catch (_) { /* never break the host page */ }
+      }, 120);
+    });
+    obs.observe(mc, { childList: true });
+  }
+
   function injectStyle() {
     if (document.getElementById("pbp-pop-style")) return;
     const st = document.createElement("style");
@@ -180,6 +215,7 @@
       e.preventDefault();
       try { onToggle(mc, link); } catch (_) { /* never break the host page */ }
     });
+    watchAutoPagination(mc);
   }
 
   async function main() {

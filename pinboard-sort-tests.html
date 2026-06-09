@@ -72,6 +72,16 @@ assertEq(F.extractPop(userRows[1]), 0, "extractPop wrapper without url_link -> 0
 const userSorted = F.computeSortedOrder(userRows);
 check("wrapped rows sort by pop (5 > 2 > 0)", userSorted[0] === userRows[2] && userSorted[1] === userRows[0] && userSorted[2] === userRows[1]);
 
+// --- mergeNewRows: auto-pagination fold-in (pure) ---
+const ra = {}, rb = {}, rc = {}, rd = {};
+const snap = [ra, rb];
+check("mergeNewRows: no new rows -> SAME array (identity)", F.mergeNewRows(snap, [ra, rb]) === snap);
+check("mergeNewRows: reordered current, nothing new -> SAME array", F.mergeNewRows(snap, [rb, ra]) === snap);
+const merged = F.mergeNewRows(snap, [ra, rb, rc, rd]);
+assertEq(merged.length, 4, "mergeNewRows: extends snapshot to 4");
+check("mergeNewRows: appends new rows in load order", merged[2] === rc && merged[3] === rd);
+assertEq(snap.length, 2, "mergeNewRows: input snapshot not mutated");
+
 console.log(`PASS ${pass} | FAIL ${fail}`);
 </script>
 </body></html>
