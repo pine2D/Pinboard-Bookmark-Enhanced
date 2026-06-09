@@ -84,6 +84,12 @@ function deobfuscateKey(val) {
   return val;
 }
 
+// Check if a cache entry {result, timestamp} has exceeded its TTL. Pure; testable without chrome.storage.
+function isStaleCacheEntry(entry, now, ttlMs) {
+  if (!entry || typeof entry !== "object") return true;
+  return (now - (entry.timestamp || 0)) > ttlMs;
+}
+
 const SETTINGS_DEFAULTS = {
   pinboardToken: "",
   aiProvider: "gemini",

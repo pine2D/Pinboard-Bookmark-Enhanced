@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Jina Cache Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 900px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; } .fail { color: #c00; font-weight: bold; } h2 { margin-top: 24px; }
+</style></head>
+<body>
+<h1>isStaleCacheEntry() tests</h1>
+<div id="results"></div>
+<script src="shared.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond) {
+  const ok = !!cond; ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "PASS" : "FAIL"}  ${name}`;
+  root.appendChild(div);
+}
+const ONE_HOUR = 60 * 60 * 1000, TWO_HOURS = 2 * ONE_HOUR, now = Date.now();
+check("null entry is stale", isStaleCacheEntry(null, now, ONE_HOUR));
+check("undefined entry is stale", isStaleCacheEntry(undefined, now, ONE_HOUR));
+check("non-object entry is stale", isStaleCacheEntry("string", now, ONE_HOUR));
+check("30min old / 1h TTL is fresh", !isStaleCacheEntry({ result: {}, timestamp: now - 30 * 60 * 1000 }, now, ONE_HOUR));
+check("2h old / 1h TTL is stale", isStaleCacheEntry({ result: {}, timestamp: now - TWO_HOURS }, now, ONE_HOUR));
+check("exactly 1h old is fresh (boundary, > not >=)", !isStaleCacheEntry({ result: {}, timestamp: now - ONE_HOUR }, now, ONE_HOUR));
+check("1h+1ms old is stale", isStaleCacheEntry({ result: {}, timestamp: now - ONE_HOUR - 1 }, now, ONE_HOUR));
+check("missing timestamp is stale", isStaleCacheEntry({ result: {} }, now, ONE_HOUR));
+const summary = document.createElement("h2");
+summary.textContent = `Results: ${pass} pass, ${fail} fail`;
+root.insertBefore(summary, root.firstChild);
+</script>
+</body></html>

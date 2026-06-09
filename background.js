@@ -672,19 +672,25 @@ async function gcLegacyAICache() {
 // ~once / 6h to bound the get(null) scan; drops entries older than 1h (past the TTL).
 const SUGGEST_SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const SUGGEST_STALE_MS = 60 * 60 * 1000;
+const JINA_STALE_MS = 60 * 60 * 1000; // 1 hour, same as suggest cache
+// Recurring sweep of per-URL cache (cached_suggest_* and jina_md_*). Both write
+// entries with a read-TTL but never evict them, so without this they accumulate
+// unbounded in storage.local and slow reads. Gated to ~once / 6h to bound the
+// get(null) scan; drops entries older than their 1h TTL.
 async function sweepSuggestCache() {
   try {
     const now = Date.now();
     const { _suggestSweepTs = 0 } = await chrome.storage.local.get({ _suggestSweepTs: 0 });
     if (now - _suggestSweepTs < SUGGEST_SWEEP_INTERVAL_MS) return;
     const all = await chrome.storage.local.get(null);
-    const stale = Object.keys(all).filter((k) =>
-      k.startsWith("cached_suggest_") &&
-      (!all[k] || typeof all[k] !== "object" || (now - (all[k].timestamp || 0)) > SUGGEST_STALE_MS)
-    );
+    const stale = Object.keys(all).filter((k) => {
+      if (k.startsWith("cached_suggest_")) return isStaleCacheEntry(all[k], now, SUGGEST_STALE_MS);
+      if (k.startsWith("jina_md_")) return isStaleCacheEntry(all[k], now, JINA_STALE_MS);
+      return false;
+    });
     if (stale.length) await chrome.storage.local.remove(stale);
     await chrome.storage.local.set({ _suggestSweepTs: now });
-    if (stale.length) console.log(`[suggest-cache] swept ${stale.length} stale entries`);
+    if (stale.length) console.log(`[cache-sweep] evicted ${stale.length} stale entries (suggest + jina_md)`);
   } catch (_) {}
 }
 
