@@ -1014,7 +1014,7 @@
     "message": "Steuerelement „Nach Beliebtheit sortieren“ auf Tag-Seiten hinzufügen"
   },
   "optTagSortByPopHint": {
-    "message": "Zeigt auf pinboard.in-Tag-Seiten neben date/title ein „pop“-Steuerelement, das die Lesezeichen der aktuellen Seite nach Anzahl der Speicherungen sortiert. Erneut klicken stellt die ursprüngliche Reihenfolge wieder her."
+    "message": "Fügt auf pinboard.in-Tag-Seiten ein „pop“-Steuerelement hinzu, das die Lesezeichen der aktuellen Seite nach Anzahl der Speicherungen sortiert (erneut klicken zum Zurücksetzen). Auf deinen eigenen Tag-Seiten reiht es sich in Pinboards native Sortierzeile (date · title) ein."
   },
   "secCustomStyle": {
     "message": "Pinboard.in Benutzerdefinierter Stil"

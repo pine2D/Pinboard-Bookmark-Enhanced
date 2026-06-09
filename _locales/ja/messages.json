@@ -1014,7 +1014,7 @@
     "message": "タグページに「人気順で並べ替え」コントロールを追加"
   },
   "optTagSortByPopHint": {
-    "message": "pinboard.in のタグページで date/title の隣に「pop」コントロールを表示し、各リンクの保存人数で現在のページのブックマークを並べ替えます。もう一度クリックすると元の順序に戻ります。"
+    "message": "pinboard.in のタグページに「pop」コントロールを追加し、各リンクの保存人数で現在のページのブックマークを並べ替えます（再クリックで元に戻ります）。自分のタグページでは Pinboard 標準の並べ替え行（date · title）に加わります。"
   },
   "secCustomStyle": {
     "message": "Pinboard.in カスタムスタイル"

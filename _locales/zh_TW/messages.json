@@ -1014,7 +1014,7 @@
     "message": "在標籤頁加入「依熱度排序」控制項"
   },
   "optTagSortByPopHint": {
-    "message": "在 pinboard.in 標籤頁的 date/title 旁顯示「pop」控制項，依收藏人數重新排序目前頁面的書籤；再次點擊可還原原始順序。"
+    "message": "在 pinboard.in 標籤頁加入「pop」控制項，依收藏人數排序目前頁面的書籤，再次點擊還原。在你自己的標籤頁上它會併入 Pinboard 原生排序列（date · title）。"
   },
   "secCustomStyle": {
     "message": "Pinboard.in 自訂樣式"

@@ -1014,7 +1014,7 @@
     "message": "Dodaj kontrolkę „sortuj według popularności” na stronach tagów"
   },
   "optTagSortByPopHint": {
-    "message": "Na stronach tagów pinboard.in pokazuje obok date/title kontrolkę „pop”, która porządkuje zakładki bieżącej strony według liczby osób, które je zapisały. Kliknij ponownie, aby przywrócić pierwotną kolejność."
+    "message": "Dodaje na stronach tagów pinboard.in kontrolkę „pop”, która sortuje zakładki bieżącej strony według liczby osób, które je zapisały (kliknij ponownie, aby przywrócić). Na Twoich własnych stronach tagów dołącza do natywnego wiersza sortowania Pinboard (date · title)."
   },
   "secCustomStyle": {
     "message": "Niestandardowy styl Pinboard.in"
