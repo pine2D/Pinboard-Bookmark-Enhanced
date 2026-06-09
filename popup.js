@@ -976,7 +976,19 @@ async function fetchRecentBookmarks(token) {
       row.appendChild(del);
       container.appendChild(row);
     });
-  } catch (e) { console.error("recent bookmarks error:", e); container.classList.remove("hidden"); container.innerHTML = `<div class="recent-bm-label">${esc(t("recentLabel"))}</div><span class="muted">${esc(t("recentFailed", e.message || String(e)))}</span>`; }
+  } catch (e) {
+    console.error("recent bookmarks error:", e);
+    container.classList.remove("hidden");
+    container.replaceChildren();
+    const label = document.createElement("div");
+    label.className = "recent-bm-label";
+    label.textContent = t("recentLabel");
+    const msg = document.createElement("span");
+    msg.className = "muted";
+    msg.textContent = t("recentFailed", e.message || String(e));
+    container.appendChild(label);
+    container.appendChild(msg);
+  }
 }
 
 // ===================== Offline Queue Status =====================
