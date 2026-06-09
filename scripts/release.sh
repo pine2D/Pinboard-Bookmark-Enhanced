@@ -153,6 +153,17 @@ else
   echo ""
 fi
 
+# ---- Step 1.6: Mirror runtime into the local unpacked-extension folder ----
+# Keeps the Windows-Chrome "Load unpacked" folder in sync with each release.
+# Non-fatal: a sync failure must never block the GitHub release.
+
+if [ -f "${REPO_ROOT}/scripts/sync-runtime.sh" ]; then
+  echo "  Syncing runtime to local extension folder..."
+  bash "${REPO_ROOT}/scripts/sync-runtime.sh" --zip "${ZIP_PATH}" \
+    || echo "  [release] WARN: runtime sync failed (continuing with release)"
+  echo ""
+fi
+
 # ---- Step 2: Check gh CLI ----
 
 if ! command -v gh &>/dev/null; then
