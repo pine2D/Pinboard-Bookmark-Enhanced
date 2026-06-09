@@ -1,0 +1,60 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pinboard-sort tests</title>
+<style>.case{font-family:monospace;white-space:pre}.pass{color:#176}.fail{color:#b00}</style>
+</head><body>
+<div id="results"></div>
+<!-- the content script under test; its DOM injection no-ops outside a tag page -->
+<script src="pinboard-sort.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond; ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+function assertEq(actual, expected, label) {
+  check(label, actual === expected, "expected " + JSON.stringify(expected) + " got " + JSON.stringify(actual));
+}
+
+const F = window.__PBP_POPSORT__;
+check("pure helpers exposed on window.__PBP_POPSORT__", !!F);
+
+// parsePopCount
+assertEq(F.parsePopCount("9 others"), 9, "parsePopCount '9 others' -> 9");
+assertEq(F.parsePopCount("1 other"), 1, "parsePopCount '1 other' -> 1");
+assertEq(F.parsePopCount("  3 others "), 3, "parsePopCount leading space -> 3");
+assertEq(F.parsePopCount(""), 0, "parsePopCount '' -> 0");
+assertEq(F.parsePopCount("copy to mine"), 0, "parsePopCount non-numeric -> 0");
+assertEq(F.parsePopCount(null), 0, "parsePopCount null -> 0");
+
+// extractPop + computeSortedOrder over a DOMParser fixture
+const html = `<div id="main_column">
+  <div class="bookmark"><div class="display"><a class="url_link">9 others</a></div></div>
+  <div class="bookmark"><div class="display"><a class="url_link">1 other</a></div></div>
+  <div class="bookmark"><div class="display"></div></div>
+  <div class="bookmark"><div class="display"><a class="url_link">9 others</a></div></div>
+</div>`;
+const doc = new DOMParser().parseFromString(html, "text/html");
+const bms = Array.from(doc.querySelectorAll("div.bookmark"));
+assertEq(F.extractPop(bms[0]), 9, "extractPop bms[0] -> 9");
+assertEq(F.extractPop(bms[2]), 0, "extractPop bms[2] (no url_link) -> 0");
+assertEq(F.extractPop(null), 0, "extractPop null -> 0");
+
+const order = F.computeSortedOrder(bms);
+assertEq(order.length, 4, "computeSortedOrder keeps all 4");
+check("sorted[0] = first pop-9 (stable)", order[0] === bms[0]);
+check("sorted[1] = second pop-9 (stable tie keeps input order)", order[1] === bms[3]);
+check("sorted[2] = pop-1", order[2] === bms[1]);
+check("sorted[3] = pop-0 sinks to bottom", order[3] === bms[2]);
+check("computeSortedOrder does not mutate input array", bms[1] === doc.querySelectorAll("div.bookmark")[1]);
+const originalFirst = bms[0], originalLast = bms[3];
+F.computeSortedOrder(bms);
+check("input array order is not reordered by sort", bms[0] === originalFirst && bms[3] === originalLast);
+assertEq(F.computeSortedOrder([]).length, 0, "computeSortedOrder([]) -> empty array");
+
+console.log(`PASS ${pass} | FAIL ${fail}`);
+</script>
+</body></html>
