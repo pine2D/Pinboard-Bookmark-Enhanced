@@ -160,7 +160,8 @@
     st.id = "pbp-pop-style";
     st.textContent =
       "#" + CONTROL_ID + "{cursor:pointer}" +
-      "#" + CONTROL_ID + ".pbp-pop-active{font-weight:700;text-decoration:underline}";
+      "#" + CONTROL_ID + ".pbp-pop-active{font-weight:700;text-decoration:underline}" +
+      "#pbp-pop-picker .sort_arrow{vertical-align:middle}";
     (document.head || document.documentElement).appendChild(st);
   }
 
