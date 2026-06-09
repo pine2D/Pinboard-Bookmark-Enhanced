@@ -9,7 +9,7 @@ const tokens = JSON.parse(readFileSync(new URL("./nord-night.tokens.json", impor
 const generated = composeTheme(tokens, compose);
 writeFileSync(new URL("./nord-night.generated.css", import.meta.url), generated);
 
-const src = readFileSync("/mnt/d/APP/Chrome-Extensions/Pinboard-Bookmark-Enhanced/pinboard-themes.js", "utf8");
+const src = readFileSync(new URL("../../../pinboard-themes.js", import.meta.url), "utf8");
 const m = src.match(/"nord-night":\s*\{[\s\S]*?css:\s*`([\s\S]*?)`\s*\}\s*,/);
 if (!m) { console.error("cannot locate nord-night shipped CSS"); process.exit(1); }
 const shipped = m[1];

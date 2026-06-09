@@ -7,7 +7,7 @@ import { compose } from "../composers/classic-list-v2.mjs";
 import { composeTheme } from "../composers/compose-theme.mjs";
 
 const here = new URL("./", import.meta.url);
-const src = readFileSync("/mnt/d/APP/Chrome-Extensions/Pinboard-Bookmark-Enhanced/pinboard-themes.js", "utf8");
+const src = readFileSync(new URL("../../../pinboard-themes.js", import.meta.url), "utf8");
 
 const extractShipped = slug => {
   // Regex: tolerate presence/absence of trailing comma after the closing "}"

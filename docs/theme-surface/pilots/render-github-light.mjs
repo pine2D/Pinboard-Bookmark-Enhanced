@@ -8,7 +8,7 @@ const generated = compose(tokens);
 writeFileSync(new URL("./github-light.generated.css", import.meta.url), generated);
 
 // Extract the shipped CSS from pinboard-themes.js
-const src = readFileSync("/mnt/d/APP/Chrome-Extensions/Pinboard-Bookmark-Enhanced/pinboard-themes.js", "utf8");
+const src = readFileSync(new URL("../../../pinboard-themes.js", import.meta.url), "utf8");
 const m = src.match(/"github-light"[\s\S]*?css:\s*`([\s\S]*?)`\s*\}\s*\n/);
 if (!m) { console.error("cannot locate github-light shipped CSS"); process.exit(1); }
 const shipped = m[1];
