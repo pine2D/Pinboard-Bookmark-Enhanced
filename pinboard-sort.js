@@ -50,18 +50,9 @@
       .map((x) => x.el);
   }
 
-  // Fold rows that appeared after the snapshot (e.g. auto-pagination appended a later
-  // page) into the load-order snapshot. Returns the SAME array when nothing is new, so
-  // callers can cheaply detect "no change" by identity.
-  function mergeNewRows(snapshot, currentRows) {
-    const known = new Set(snapshot);
-    const added = currentRows.filter((r) => !known.has(r));
-    return added.length ? snapshot.concat(added) : snapshot;
-  }
-
   // Expose for the test harness (harmless in the isolated content world).
   if (typeof window !== "undefined") {
-    window.__PBP_POPSORT__ = { parsePopCount, extractPop, computeSortedOrder, getBookmarkRows, mergeNewRows };
+    window.__PBP_POPSORT__ = { parsePopCount, extractPop, computeSortedOrder, getBookmarkRows };
   }
 
   // ---------- everything below only runs on a real tag page ----------
@@ -144,60 +135,18 @@
 
   function onToggle(mc, link) {
     sorted = !sorted;
-    // reorder() only reads `order` (it moves nodes, not array slots), so passing the
-    // originalOrder snapshot directly is safe — the snapshot array is never mutated.
-    reorder(mc, sorted ? computeSortedOrder(originalOrder) : originalOrder);
+    if (sorted) {
+      // Snapshot whatever is loaded right now — this includes any pages an infinite-scroll
+      // pager (AutoPagerize etc.) has already appended, so one click sorts the whole
+      // currently-loaded page. We deliberately do NOT watch for later pages: auto-re-sorting
+      // as new pages stream in feeds an unbreakable loop with the pager's load trigger
+      // (re-sort shifts layout -> pager loads -> re-sort -> …). Load more, click again.
+      originalOrder = getBookmarkRows(mc);
+      reorder(mc, computeSortedOrder(originalOrder));
+    } else {
+      reorder(mc, originalOrder); // restore the captured order
+    }
     link.classList.toggle("pbp-pop-active", sorted);
-  }
-
-  // Keep the feature working under auto-pagination (AutoPagerize / uAutoPagerize /
-  // userscripts that append later pages): fold newly-appended bookmark rows into the
-  // load-order snapshot, and if a sort is active, re-sort so they land in pop order.
-  // Debounced so a burst of appended nodes triggers one re-sort; the observer detaches
-  // around our own reorder() so the moves it makes don't re-trigger it.
-  function watchAutoPagination(mc) {
-    if (typeof MutationObserver === "undefined") return;
-    const SETTLE_MS = 400;       // coalesce a burst of appended nodes into one pass
-    const MIN_GAP_MS = 1500;     // throttle: at most one reorder per interval
-    const SCROLL_IDLE_MS = 600;  // never reorder while the user is actively scrolling
-    const OBS = { childList: true, subtree: true };
-    let settleTimer = null, gapTimer = null, lastSortAt = 0, lastScrollAt = 0, needsResort = false;
-
-    // While the user scrolls, an infinite-scroll pager loads pages on its own — we only
-    // FOLD those into the snapshot and defer the visual reorder until scrolling stops, so
-    // our reorder never lands in the middle of the pager's load/observe cycle and chains it.
-    window.addEventListener("scroll", () => { lastScrollAt = Date.now(); }, { passive: true });
-
-    function maybeResort() {
-      gapTimer = null;
-      if (!needsResort || !sorted) return;
-      const wait = Math.max(MIN_GAP_MS - (Date.now() - lastSortAt),
-                            SCROLL_IDLE_MS - (Date.now() - lastScrollAt));
-      if (wait > 0) { gapTimer = setTimeout(maybeResort, wait); return; }
-      needsResort = false;
-      lastSortAt = Date.now();
-      obs.disconnect();
-      try { reorder(mc, computeSortedOrder(originalOrder)); } catch (_) {}
-      obs.observe(mc, OBS);
-    }
-
-    function settle() {
-      settleTimer = null;
-      try {
-        const next = mergeNewRows(originalOrder, getBookmarkRows(mc));
-        if (next === originalOrder) return; // nothing new appeared
-        originalOrder = next;               // snapshot folds in every page immediately
-        if (!sorted) return;
-        needsResort = true;
-        if (!gapTimer) maybeResort();
-      } catch (_) { /* never break the host page */ }
-    }
-
-    const obs = new MutationObserver(() => {
-      clearTimeout(settleTimer);
-      settleTimer = setTimeout(settle, SETTLE_MS);
-    });
-    obs.observe(mc, OBS);
   }
 
   function injectStyle() {
@@ -257,12 +206,10 @@
       placeFallback(mc, span);
     }
     injectStyle();
-    originalOrder = getBookmarkRows(mc);
     link.addEventListener("click", (e) => {
       e.preventDefault();
       try { onToggle(mc, link); } catch (_) { /* never break the host page */ }
     });
-    watchAutoPagination(mc);
   }
 
   async function main() {
