@@ -145,23 +145,40 @@
   // around our own reorder() so the moves it makes don't re-trigger it.
   function watchAutoPagination(mc) {
     if (typeof MutationObserver === "undefined") return;
-    let timer = null;
+    const SETTLE_MS = 400;
+    const MIN_GAP_MS = 1500;
+    const OBS = { childList: true, subtree: true };
+    let settleTimer = null, gapTimer = null, lastSortAt = 0, needsResort = false;
+
+    function resort() {
+      gapTimer = null;
+      if (!needsResort || !sorted) return;
+      needsResort = false;
+      lastSortAt = Date.now();
+      obs.disconnect();
+      try { reorder(mc, computeSortedOrder(originalOrder)); } catch (_) {}
+      obs.observe(mc, OBS);
+    }
+
+    function settle() {
+      settleTimer = null;
+      try {
+        const next = mergeNewRows(originalOrder, getBookmarkRows(mc));
+        if (next === originalOrder) return; // nothing new appeared
+        originalOrder = next;               // snapshot folds in every page immediately
+        if (!sorted) return;
+        needsResort = true;
+        const since = Date.now() - lastSortAt;
+        if (since >= MIN_GAP_MS) resort();
+        else if (!gapTimer) gapTimer = setTimeout(resort, MIN_GAP_MS - since);
+      } catch (_) { /* never break the host page */ }
+    }
+
     const obs = new MutationObserver(() => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        try {
-          const next = mergeNewRows(originalOrder, getBookmarkRows(mc));
-          if (next === originalOrder) return; // nothing new appeared
-          originalOrder = next;
-          if (sorted) {
-            obs.disconnect();
-            reorder(mc, computeSortedOrder(originalOrder));
-            obs.observe(mc, { childList: true, subtree: true });
-          }
-        } catch (_) { /* never break the host page */ }
-      }, 120);
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(settle, SETTLE_MS);
     });
-    obs.observe(mc, { childList: true });
+    obs.observe(mc, OBS);
   }
 
   function injectStyle() {
