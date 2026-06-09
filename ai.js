@@ -288,6 +288,20 @@ function parseAITags(resp, separator) {
   return tags.map(t => t.toLowerCase().replace(/\s+/g, sep));
 }
 
+// ---- In-flight dedup registry ----
+// Prevents duplicate paid API calls when auto-click and manual click race
+// (e.g. popup boot auto-clicks ai-tags-btn while user clicks it too).
+// Mirrors the _pendingChecks pattern in background.js.
+const _inflightAI = new Map(); // key -> Promise
+
+function getOrCreateInflight(key, factory) {
+  if (_inflightAI.has(key)) return _inflightAI.get(key);
+  const promise = factory();
+  _inflightAI.set(key, promise);
+  promise.finally(() => _inflightAI.delete(key));
+  return promise;
+}
+
 // ---- AI cache helpers ----
 function getCacheKey(url, type, source) { return `ai_cache_${type}_${source || "local"}_${url}`; }
 const AI_CACHE_INDEX_KEY = "ai_cache_index";

@@ -283,7 +283,10 @@ async function doAISummary(forceRefresh) {
     await ensurePageText();
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "calling" });
-    const summary = await callAI(settings, buildSummaryPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value));
+    const infKey = `${settings.aiProvider}|summary|${pageInfo.url}`;
+    const summary = await getOrCreateInflight(infKey, () =>
+      callAI(settings, buildSummaryPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value))
+    );
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "parsing" });
     await setAICache(pageInfo.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
     upsertSummary(summary);
@@ -381,7 +384,10 @@ async function doAITags(forceRefresh) {
     await ensurePageText();
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "calling" });
-    const resp = await callAI(settings, buildTagPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
+    const infKey = `${settings.aiProvider}|tags|${pageInfo.url}`;
+    const resp = await getOrCreateInflight(infKey, () =>
+      callAI(settings, buildTagPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags))
+    );
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "parsing" });
     const rawTags = parseAITags(resp, settings.aiTagSeparator);
     const tags = settings.optRespectTagCase
