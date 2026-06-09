@@ -38,6 +38,19 @@ let allUserTagCounts = {};
 let tagCaseMap = {};
 let pageInfo = {};
 let existingBookmark = null;
+// P2: track which form fields the user has edited so the async existing-bookmark
+// lookup never clobbers in-progress input. Resets naturally on each popup open
+// (fresh document). Declared top-level so checkExistingBookmark() can read it.
+const fieldDirtyFlags = { "title-input": false, "description-input": false, "private-check": false, "readlater-check": false };
+
+function shouldUpdateField(fieldId) {
+  // Don't overwrite a field the user has already typed into / toggled.
+  // (Dirty flag is the precise signal; we deliberately do NOT also guard on
+  // activeElement — popup.js:906 auto-focuses title-input, and a focused-but-
+  // unedited field should still receive the saved value.)
+  return !fieldDirtyFlags[fieldId];
+}
+
 let acIndex = -1;
 let settings = {};
 
@@ -271,6 +284,13 @@ async function showMain(token) {
     updateCharCount();
   });
   $id("title-input").addEventListener("input", updateCharCount);
+  // P2: mark fields dirty on any user interaction so checkExistingBookmark()
+  // skips writing them after the user has started editing.
+  ["title-input", "description-input", "private-check", "readlater-check"].forEach((id) => {
+    const mark = () => { fieldDirtyFlags[id] = true; };
+    $id(id).addEventListener("input", mark);
+    $id(id).addEventListener("change", mark);
+  });
 
   $id("url-input").addEventListener("paste", async (e) => {
     const settings = await _loadUrlCleanSettings();
@@ -604,13 +624,17 @@ async function checkExistingBookmark(token, url, prefetch) {
     }
     if (data.posts?.length > 0) {
       existingBookmark = data.posts[0];
-      $id("title-input").value = existingBookmark.description;
-      $id("description-input").value = existingBookmark.extended;
-      $id("private-check").checked = existingBookmark.shared === "no";
-      $id("readlater-check").checked = existingBookmark.toread === "yes";
-      currentTags = [];
-      renderTags();
-      if (existingBookmark.tags?.trim()) existingBookmark.tags.split(" ").filter(Boolean).forEach((t) => { if (t.trim()) addTag(t.trim()); });
+      if (shouldUpdateField("title-input")) $id("title-input").value = existingBookmark.description;
+      if (shouldUpdateField("description-input")) $id("description-input").value = existingBookmark.extended;
+      if (shouldUpdateField("private-check")) $id("private-check").checked = existingBookmark.shared === "no";
+      if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
+      // Don't clobber tags the user already started entering (chips in currentTags
+      // or text mid-typed in #tags-input) — mirrors the per-field guard above.
+      if (currentTags.length === 0 && !$id("tags-input")?.value.trim()) {
+        currentTags = [];
+        renderTags();
+        if (existingBookmark.tags?.trim()) existingBookmark.tags.split(" ").filter(Boolean).forEach((t) => { if (t.trim()) addTag(t.trim()); });
+      }
       $id("submit-btn").textContent = t("update");
       $id("delete-btn").classList.remove("hidden");
       updateCharCount();
