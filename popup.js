@@ -539,6 +539,10 @@ async function htmlToMarkdownAsync(html, opts) {
           content: usedClipboard ? "" : out
         });
         window.open(uri, "_blank");
+        if (!sessionStorage.getItem("_obsidian_hint_shown")) {
+          sessionStorage.setItem("_obsidian_hint_shown", "1");
+          showStatus("status-msg", t("obsidianInstallHint"), "info");
+        }
       };
       const strip = $id("md-actions-strip");
       if (strip) {

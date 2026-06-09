@@ -1445,6 +1445,7 @@
   "optBgSaveNoClobberHint": {
     "message": "启用时，后台保存将读取您现有的 Pinboard 书签（如有），并将新标签与现有标签合并，而不是替换。这可防止在重复 URL 上意外丢失标签。注意：额外的 API 调用会增加约 3 秒的保存时间。前台弹出窗口编辑始终替换（让您完全控制）。"
   },
+  "obsidianInstallHint": { "message": "需要安装 Obsidian 才能打开笔记。笔记内容已复制到剪贴板作为备份。" },
   "batchPermLabel":    { "message": "主机权限：" },
   "batchRevokeBtn":    { "message": "撤销所有站点访问权限" },
   "batchRevokeHint":   { "message": "仅在您启用了批量 AI 内容提取但不再希望扩展访问所有页面时使用。" },

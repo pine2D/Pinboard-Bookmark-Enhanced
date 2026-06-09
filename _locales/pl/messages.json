@@ -1445,6 +1445,7 @@
   "optBgSaveNoClobberHint": {
     "message": "Gdy ta opcja jest włączona, zapis w tle odczytuje Twój istniejący zakładkę Pinboard (jeśli istnieje) i łączy nowe tagi z istniejącymi zamiast ich zastępować. Zapobiega to przypadkowemu utracie tagów w zduplikowanych adresach URL. Uwaga: dodatkowe wywołanie API dodaje około 3 sekundę do czasu zapisywania. Edycje wyskakującego okna na pierwszym planie zawsze zastępują (masz pełną kontrolę)."
   },
+  "obsidianInstallHint": { "message": "Aby otworzyć notatkę, musi być zainstalowany Obsidian. Treść została również skopiowana do schowka jako kopia zapasowa." },
   "batchPermLabel":    { "message": "Uprawnienia hosta:" },
   "batchRevokeBtn":    { "message": "Cofnij dostęp do wszystkich witryn" },
   "batchRevokeHint":   { "message": "Potrzebne tylko wtedy, gdy włączono masową ekstrakcję AI, ale nie chcesz już, aby rozszerzenie miało dostęp do wszystkich stron." },

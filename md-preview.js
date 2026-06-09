@@ -451,7 +451,12 @@ function ensureKatex() {
         content: usedClipboard ? "" : md
       });
       window.open(uri, "_blank");
-      flashButtonLabel(btn, t("mdSentObsidian"));
+      if (!sessionStorage.getItem("_obsidian_hint_shown")) {
+        sessionStorage.setItem("_obsidian_hint_shown", "1");
+        flashButtonLabel(btn, t("obsidianInstallHint"));
+      } else {
+        flashButtonLabel(btn, t("mdSentObsidian"));
+      }
     });
   } else if (obsBtn) {
     obsBtn.style.display = "none";
