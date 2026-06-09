@@ -4,7 +4,7 @@
 // Replaces chrome.storage.local-based ai_cache_* keys. Removes 5MB
 // quota limit and avoids read-modify-write storage write amplification
 // from the prior index-based LRU. Same call surface as ai.js's
-// getAICache/setAICache; ai.js wraps these and gates on a feature flag.
+// getAICache/setAICache; ai.js wraps these as the sole IDB-only AI-cache API.
 
 const _PBP_AI_DB_NAME = "pbp-ai-cache";
 const _PBP_AI_DB_VERSION = 1;

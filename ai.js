@@ -312,66 +312,22 @@ function getOrCreateInflight(key, factory) {
 
 // ---- AI cache helpers ----
 function getCacheKey(url, type, source) { return `ai_cache_${type}_${source || "local"}_${url}`; }
-const AI_CACHE_INDEX_KEY = "ai_cache_index";
-// LRU cap: prevents unbounded growth of one-shot URL cache entries (those that get
-// summarized once and never re-visited; per-read TTL doesn't help them).
-const AI_CACHE_MAX_ENTRIES = 200;
 
-async function _updateAICacheIndex(mutator) {
-  try {
-    const { [AI_CACHE_INDEX_KEY]: idx = {} } = await chrome.storage.local.get(AI_CACHE_INDEX_KEY);
-    const next = mutator(idx);
-    await chrome.storage.local.set({ [AI_CACHE_INDEX_KEY]: next });
-  } catch (_) { /* best-effort index — cleanup falls back to full scan when missing */ }
-}
-
-// ---- AI cache feature flag (Phase 4 D1) ----
-// _useIndexedDBCache=true: route via IDB (default)
-// _useIndexedDBCache=false: route via legacy chrome.storage.local (rollback path,
-// kept for 14-day observation window)
-let _pbpUseIDBCache = null;
-async function _pbpUseIDB() {
-  if (_pbpUseIDBCache !== null) return _pbpUseIDBCache;
-  try {
-    const { _useIndexedDBCache = true } = await chrome.storage.local.get({ _useIndexedDBCache: true });
-    _pbpUseIDBCache = !!_useIndexedDBCache;
-  } catch (_) { _pbpUseIDBCache = true; }
-  return _pbpUseIDBCache;
-}
-
-if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes._useIndexedDBCache) _pbpUseIDBCache = null;
-  });
-}
 
 async function getAICache(url, type, cacheDuration, source) {
   const key = getCacheKey(url, type, source);
   const dur = (cacheDuration || 60) * 60 * 1000;
   if (dur === 0) return null;
 
-  if (await _pbpUseIDB()) {
-    // IDB path (default after Phase 4)
-    if (typeof pbpAiCacheGet !== "function") return null;
-    const entry = await pbpAiCacheGet(key);
-    if (!entry) return null;
-    if (Date.now() - entry.ts > dur) {
-      pbpAiCacheDelete(key).catch(() => {});
-      return null;
-    }
-    return entry.result;
-  }
-
-  // Legacy chrome.storage.local path (rollback only)
-  const data = await chrome.storage.local.get(key);
-  if (!data[key]) return null;
-  const { result, timestamp } = data[key];
-  if (Date.now() - timestamp > dur) {
-    await chrome.storage.local.remove(key);
-    _updateAICacheIndex((idx) => { delete idx[key]; return idx; });
+  // IDB path (sole AI-cache backend)
+  if (typeof pbpAiCacheGet !== "function") return null;
+  const entry = await pbpAiCacheGet(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > dur) {
+    pbpAiCacheDelete(key).catch(() => {});
     return null;
   }
-  return result;
+  return entry.result;
 }
 
 async function setAICache(url, type, result, cacheDuration, source) {
@@ -379,27 +335,9 @@ async function setAICache(url, type, result, cacheDuration, source) {
   const key = getCacheKey(url, type, source);
   const timestamp = Date.now();
 
-  if (await _pbpUseIDB()) {
-    if (typeof pbpAiCacheSet !== "function") return;
-    await pbpAiCacheSet(key, result, timestamp);
-    return;
-  }
-
-  // Legacy chrome.storage.local path (rollback only)
-  await chrome.storage.local.set({ [key]: { result, timestamp } });
-  try {
-    const { [AI_CACHE_INDEX_KEY]: idx = {} } = await chrome.storage.local.get(AI_CACHE_INDEX_KEY);
-    idx[key] = timestamp;
-    const entries = Object.entries(idx);
-    if (entries.length > AI_CACHE_MAX_ENTRIES) {
-      entries.sort((a, b) => a[1] - b[1]);
-      const overflow = entries.length - AI_CACHE_MAX_ENTRIES;
-      const evictKeys = entries.slice(0, overflow).map(([k]) => k);
-      await chrome.storage.local.remove(evictKeys);
-      evictKeys.forEach(k => delete idx[k]);
-    }
-    await chrome.storage.local.set({ [AI_CACHE_INDEX_KEY]: idx });
-  } catch (_) {}
+  // IDB path (sole AI-cache backend)
+  if (typeof pbpAiCacheSet !== "function") return;
+  await pbpAiCacheSet(key, result, timestamp);
 }
 
 // ---- Build notes/description for a page ----

@@ -592,8 +592,6 @@ chrome.alarms.create("keepalive", { periodInMinutes: 4 });
 // uses (Chrome evicts storage backend after inactivity, causing slow first-open).
 chrome.alarms.create("storage-warm", { periodInMinutes: 5 });
 
-// D1 Phase 4: trigger one-time AI cache migration, then GC the legacy leftovers
-migrateAICacheToIDB().then(() => gcLegacyAICache()).catch(() => {});
 sweepAICacheMigrationBackup().catch(() => {});
 sweepSuggestCache().catch(() => {});
 
@@ -651,36 +649,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // Initial check
 syncPrewarmTagsAlarm().catch(() => {});
 
-// D1 Phase 4: one-time migration of legacy ai_cache_* from chrome.storage.local to IDB
-async function migrateAICacheToIDB() {
-  try {
-    const { _aiCacheMigrationV4 = false } = await chrome.storage.local.get({ _aiCacheMigrationV4: false });
-    if (_aiCacheMigrationV4) return; // already done
-    if (typeof pbpAiCacheSet !== "function") return; // ai-cache.js not loaded
-
-    const all = await chrome.storage.local.get(null);
-    const backup = {};
-    let migrated = 0;
-    for (const [k, v] of Object.entries(all)) {
-      if (!k.startsWith("ai_cache_") || k === "ai_cache_index") continue;
-      if (!v || typeof v !== "object" || !v.timestamp) continue;
-      backup[k] = v;
-      await pbpAiCacheSet(k, v.result, v.timestamp);
-      migrated++;
-    }
-    if (migrated > 0) {
-      // 7-day backup for rollback
-      await chrome.storage.local.set({
-        _aiCacheMigrationBackup: { entries: backup, ts: Date.now() }
-      });
-    }
-    await chrome.storage.local.set({ _aiCacheMigrationV4: true });
-    console.log(`[ai-cache] migrated ${migrated} entries to IndexedDB`);
-  } catch (e) {
-    console.warn("[ai-cache] migration failed:", e.message);
-  }
-}
-
 // Sweep expired migration backup (7 days)
 async function sweepAICacheMigrationBackup() {
   try {
@@ -694,30 +662,6 @@ async function sweepAICacheMigrationBackup() {
   } catch (_) {}
 }
 
-// One-time GC of legacy chrome.storage.local AI cache left behind by the IDB
-// migration: the original ai_cache_* keys (the migration copied them to IDB but
-// never deleted them) plus the full _aiCacheMigrationBackup copy. IndexedDB is now
-// the sole AI-cache source of truth; these are dead weight that bloated
-// storage.local and slowed reads for heavy users. Flag-guarded → runs once per
-// machine. TRANSITIONAL: safe to delete this function (together with
-// migrateAICacheToIDB + the legacy rollback path) in a later release once the
-// upgraded user base has run it.
-async function gcLegacyAICache() {
-  try {
-    const { _aiCacheMigrationV4 = false, _aiCacheLegacyGCDone = false } =
-      await chrome.storage.local.get({ _aiCacheMigrationV4: false, _aiCacheLegacyGCDone: false });
-    if (_aiCacheLegacyGCDone) return;  // already cleaned on this machine
-    if (!_aiCacheMigrationV4) return;  // wait until migration has copied data into IDB
-    const all = await chrome.storage.local.get(null);
-    const stale = Object.keys(all).filter((k) => k.startsWith("ai_cache_")); // incl. ai_cache_index
-    stale.push("_aiCacheMigrationBackup"); // the full backup copy — also dead weight
-    if (stale.length) await chrome.storage.local.remove(stale);
-    await chrome.storage.local.set({ _aiCacheLegacyGCDone: true });
-    console.log(`[ai-cache] GC removed ${stale.length} legacy storage.local keys`);
-  } catch (e) {
-    console.warn("[ai-cache] legacy GC failed:", e?.message || e);
-  }
-}
 
 // Recurring sweep of the per-URL suggest-tag cache (cached_suggest_*). The popup
 // writes one key per visited URL with a 10-min read-TTL but never evicts them, so
