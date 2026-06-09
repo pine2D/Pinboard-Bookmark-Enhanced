@@ -520,6 +520,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     saveAll();
   });
 
+  // ---- Batch: revoke all-sites permission ----
+  $id("batch-revoke-perm")?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    try {
+      const revoked = await chrome.permissions.remove({ origins: ["*://*/*"] });
+      if (revoked) {
+        btn.textContent = t("batchRevokeSuccess");
+        const statusEl = $id("batch-perm-status");
+        if (statusEl) statusEl.textContent = t("batchPermRevoked");
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      }
+    } catch (err) {
+      console.error("revoke permission failed:", err);
+      btn.textContent = t("batchRevokeFailed");
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    }
+  });
+
   // ===================== Auto-save =====================
   // Collect all settings from the form and save to chrome.storage.sync
   async function saveAll() {

@@ -208,6 +208,14 @@
           <div class="fg"><label><input type="checkbox" id="batch-ai-tags" /> <span data-i18n="batchAiTags">Auto-generate AI tags for each tab</span></label></div>
           <div class="fg"><label><input type="checkbox" id="batch-ai-summary" /> <span data-i18n="batchAiSummary">Auto-generate AI summary for each tab</span></label></div>
           <p class="hint hint-warn" style="margin-top:-4px" data-i18n="batchAiHint">AI features will be slow (separate AI call per tab + 3s rate limit). Requires "Access all websites" permission to read non-active tabs — prompted on first use.</p>
+          <div class="fg" style="margin-top:10px">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span data-i18n="batchPermLabel">Host permissions:</span>
+              <span id="batch-perm-status" style="font-size:11px;color:#666;"></span>
+            </div>
+            <button class="btn btn-sm" id="batch-revoke-perm" style="margin-top:6px;" data-i18n="batchRevokeBtn">Revoke all-sites access</button>
+            <p class="hint" style="margin-top:4px;" data-i18n="batchRevokeHint">Only needed if you enabled batch AI extraction but no longer want the extension to access all pages for content.</p>
+          </div>
         </div>
       </div>
     </div>
