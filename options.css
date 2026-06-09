@@ -43,17 +43,49 @@ body { font-family: "Helvetica Neue", Verdana, "PingFang SC", "Hiragino Sans GB"
    stack so their CJK uses the same fast named fonts. (.fg textarea keeps its monospace stack via
    higher specificity.) */
 button, input, select { font-family: inherit; }
-.container { max-width: 700px; margin: 0 auto; padding: 24px 16px; }
+.container {
+  max-width: 900px; margin: 0 auto; padding: 24px 16px;
+  display: grid;
+  grid-template-columns: minmax(160px, max-content) minmax(0, 1fr);
+  column-gap: 24px;
+  align-items: start;
+}
+/* LOAD-BEARING: h1 must span both columns. The floated .auto-save-hint relies on
+   the full width; without this it collapses into the ~160px sidebar column. */
+.container > h1 { grid-column: 1 / -1; }
 h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
 
 /* ---- Tabs ---- */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid #ccc; margin-bottom: 0; align-items: stretch; }
-.tab-btn { padding: 6px 16px; border: none; border-bottom: 2px solid transparent; background: none; cursor: pointer; font-size: 12px; color: #666; transition: color 0.15s, border-color 0.15s; }
-.tab-btn:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: -2px; }
-.tab-btn:hover:not(.active) { color: #333; border-bottom-color: #ccc; }
-.tab-btn.active { color: #333; font-weight: bold; border-bottom-color: #333; }
-.reset-tab-btn { margin-left: auto; padding: 3px 10px; font-size: 11px; color: #757575; background: none; border: 1px solid #ddd; cursor: pointer; border-radius: var(--opt-radius-sm); white-space: nowrap; transition: color 0.15s, border-color 0.15s; }
-.reset-tab-btn:hover { color: #c00; border-color: #c00; }
+.tabs {
+  grid-column: 1; grid-row: 2;
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 2px;
+  align-self: start;
+  position: sticky; top: 24px;
+}
+.tab-btn {
+  text-align: left;
+  border: none; border-left: 2px solid transparent;
+  border-radius: 0 var(--opt-radius-sm) var(--opt-radius-sm) 0;
+  background: none; cursor: pointer;
+  padding: 7px 14px 7px 12px;
+  font-size: 13px; color: #666;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+.tab-btn:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 2px; }
+.tab-btn:hover:not(.active) { color: #333; border-left-color: #bbb; background: rgba(0,0,0,0.03); }
+.tab-btn.active { color: #333; font-weight: bold; border-left-color: #333; background: rgba(0,0,0,0.05); }
+.reset-tab-btn {
+  margin: 14px 0 0 0; padding: 10px 12px 0;
+  border: none; border-top: 1px solid #e0e0e0;
+  background: none; cursor: pointer;
+  text-align: left; font-size: 11px; color: #757575;
+  align-self: stretch;
+  transition: color 0.15s;
+}
+.reset-tab-btn:hover { color: #c00; text-decoration: underline; }
+.reset-tab-btn:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 2px; }
 
 /* ---- Panels ---- */
 /* display:none (not visibility:hidden) so opening Settings only lays out the active
@@ -61,8 +93,8 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
    cost seconds at 4K). Inactive panels lay out lazily on first tab-switch; that switch
    used to be slow too, but the emoji→SVG fix removed the per-panel stall, so both
    open AND switch are now fast. */
-.panel { background: #fff; border: 1px solid #ccc; border-top: none; display: none; }
-.panel.active { display: block; padding: 16px; border-width: 0 1px 1px 1px; animation: panelFadeIn 0.18s ease; }
+.panel { background: #fff; border: 1px solid #ccc; display: none; }
+.panel.active { grid-column: 2; grid-row: 2; display: block; padding: 16px; border-width: 1px; border-radius: var(--opt-radius-md); animation: panelFadeIn 0.18s ease; }
 @keyframes panelFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ---- Form groups ---- */
@@ -542,12 +574,11 @@ html[data-theme="rose-pine"] { color-scheme: dark; }
 /* ---- Shared themed rules ---- */
 html[data-theme] body { background: var(--opt-bg); color: var(--opt-fg); }
 html[data-theme] h1 { color: var(--opt-fg); border-color: var(--opt-border); }
-html[data-theme] .tabs { border-color: var(--opt-border); }
 html[data-theme] .tab-btn { color: var(--opt-fg-muted); }
-html[data-theme] .tab-btn:hover:not(.active) { color: var(--opt-fg); border-bottom-color: var(--opt-border); }
-html[data-theme] .tab-btn.active { color: var(--opt-fg); border-bottom-color: var(--opt-accent, var(--opt-fg)); }
-html[data-theme] .reset-tab-btn { color: var(--opt-fg-muted); border-color: var(--opt-border); }
-html[data-theme] .reset-tab-btn:hover { color: #e55; border-color: #e55; }
+html[data-theme] .tab-btn:hover:not(.active) { color: var(--opt-fg); border-left-color: var(--opt-border); background: color-mix(in srgb, var(--opt-accent) 8%, transparent); }
+html[data-theme] .tab-btn.active { color: var(--opt-fg); border-left-color: var(--opt-accent, var(--opt-fg)); background: var(--opt-tab-active); }
+html[data-theme] .reset-tab-btn { color: var(--opt-fg-hint, var(--opt-fg-muted)); border-top-color: var(--opt-border-section, var(--opt-border)); }
+html[data-theme] .reset-tab-btn:hover { color: #e55; }
 html[data-theme] .panel { background: var(--opt-panel); border-color: var(--opt-border); }
 html[data-theme] .fg label { color: var(--opt-fg); }
 html[data-theme] .fg label.bl { color: var(--opt-fg-muted); }
@@ -630,7 +661,9 @@ html[data-theme] textarea {
 /* ---- Confirm popover (replaces native confirm()) ---- */
 .reset-tab-btn { position: relative; }
 .confirm-popover {
-  position: absolute; right: 0; top: calc(100% + 4px); z-index: 10;
+  position: absolute; left: 0; right: auto; top: auto; bottom: calc(100% + 4px); z-index: 10;
+  width: max-content;   /* the anchor (reset link) is a narrow sidebar column; without this the
+                           popover shrink-to-fits to that width and its row of buttons cramps */
   display: flex; align-items: center; gap: 6px;
   padding: 5px 10px; font-size: 11px; color: #c00; white-space: nowrap;
   background: #fff; border: 1px solid #ccc; border-radius: var(--opt-radius-sm);
