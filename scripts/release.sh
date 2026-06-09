@@ -63,7 +63,7 @@ INCLUDE_DIRS = ['vendor', 'icons', '_locales']
 EXCLUDE_FILES = {'url-strip-tests.html', 'md-convert-tests.html', 'pinboard-sort-tests.html'}
 
 # Top-level patterns to exclude
-EXCLUDE_PATTERNS = ['perf-baseline.json', 'perf-after-*.json', '.*', '*.md', 'LICENSE']
+EXCLUDE_PATTERNS = ['perf-baseline.json', 'perf-after-*.json', '.*', '*.md', 'LICENSE', '*-tests.html']
 
 def included_at_root(name: str) -> bool:
     if name in EXCLUDE_FILES:
