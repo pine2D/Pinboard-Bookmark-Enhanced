@@ -55,6 +55,13 @@ function setBtnIcon(btn, iconKey, label) {
   btn.lastElementChild.textContent = label != null ? String(label) : "";
 }
 
+// Escape HTML entities for safe embedding in <blockquote>. Pure string ops so it
+// works in BOTH the service worker (no document) and page contexts.
+function escapeForExtended(text) {
+  if (!text) return "";
+  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 const DEFAULT_TAG_PROMPT = `Suggest 5-10 bookmark tags for the following webpage. {{lang_instruction}} Tags should be lowercase, {{separator_instruction}}. Return ONLY a JSON array.
 
 Title: {{title}}

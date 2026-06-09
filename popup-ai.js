@@ -225,7 +225,7 @@ function setupAIFeatures() {
 function upsertSummary(summary) {
   const di = $id("description-input");
   const cur = di.value.trim();
-  const wrapped = `${AI_SUMMARY_TAG}\n<blockquote>${summary}</blockquote>`;
+  const wrapped = `${AI_SUMMARY_TAG}\n<blockquote>${escapeForExtended(summary)}</blockquote>`;
 
   if (AI_BQ_REGEX.test(cur)) {
     di.value = cur.replace(AI_BQ_REGEX, "\n\n" + wrapped).replace(/^\n\n/, "");

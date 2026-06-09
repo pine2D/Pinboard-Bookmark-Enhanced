@@ -344,7 +344,7 @@ async function setAICache(url, type, result, cacheDuration, source) {
 function buildAutoNotes(pageInfo, opts) {
   let desc = "";
   if (pageInfo.selectedText) {
-    desc = opts.blockquote ? `<blockquote>${pageInfo.selectedText}</blockquote>` : pageInfo.selectedText;
+    desc = opts.blockquote ? `<blockquote>${escapeForExtended(pageInfo.selectedText)}</blockquote>` : pageInfo.selectedText;
   } else if (opts.autoDescription && pageInfo.metaDescription) {
     desc = pageInfo.metaDescription;
   }

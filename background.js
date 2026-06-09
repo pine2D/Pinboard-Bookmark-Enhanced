@@ -404,7 +404,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     if (!r) continue;
     if (r.type === "tags") tags = [...tags, ...r.result];
     if (r.type === "summary") {
-      const wrapped = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
+      const wrapped = `[AI Summary]\n<blockquote>${escapeForExtended(r.result)}</blockquote>`;
       notes = notes ? notes + "\n\n" + wrapped : wrapped;
     }
   }
