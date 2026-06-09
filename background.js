@@ -224,7 +224,7 @@ async function updateBadge() {
     return;
   }
   try {
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${s.pinboardToken}&format=json&toread=yes&results=100`);
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${s.pinboardToken}&format=json&toread=yes&results=100&meta=no`);
     const data = await resp.json();
     const count = Array.isArray(data) ? data.length : 0;
     chrome.action.setBadgeText({ text: count > 0 ? String(count > 99 ? "99+" : count) : "" });
