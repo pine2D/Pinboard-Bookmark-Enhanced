@@ -1014,7 +1014,7 @@
     "message": "Add a “sort by popularity” control on tag pages"
   },
   "optTagSortByPopHint": {
-    "message": "On pinboard.in tag pages, adds a “pop” control that sorts the current page’s bookmarks by how many people saved each link; click again to restore. On your own tag pages it joins Pinboard’s native sort row (date · title)."
+    "message": "On pinboard.in tag pages, adds a “pop” control that sorts the current page’s bookmarks by how many people saved each link; click again to restore."
   },
   "secCustomStyle": {
     "message": "Pinboard.in Custom Style"

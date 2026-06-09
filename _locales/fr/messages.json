@@ -1014,7 +1014,7 @@
     "message": "Ajouter un contrôle « trier par popularité » sur les pages de tags"
   },
   "optTagSortByPopHint": {
-    "message": "Ajoute sur les pages de tags pinboard.in un contrôle « pop » qui trie les favoris de la page actuelle selon le nombre de personnes les ayant enregistrés (recliquez pour rétablir). Sur vos propres pages de tags, il rejoint la barre de tri native de Pinboard (date · title)."
+    "message": "Ajoute sur les pages de tags pinboard.in un contrôle « pop » qui trie les favoris de la page actuelle selon le nombre de personnes les ayant enregistrés (recliquez pour rétablir)."
   },
   "secCustomStyle": {
     "message": "Style personnalisé Pinboard.in"
