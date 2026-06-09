@@ -66,6 +66,16 @@
         "pinboard-style.js"
       ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://pinboard.in/*",
+        "https://*.pinboard.in/*"
+      ],
+      "js": [
+        "pinboard-sort.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "commands": {
