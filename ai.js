@@ -255,7 +255,7 @@ function buildTagPrompt(s, title, url, content, description, userTags) {
     .replace(/\{\{separator_instruction\}\}/g, sepMap[sep] || sepMap["-"])
     .replace(/\{\{title\}\}/g, title)
     .replace(/\{\{url\}\}/g, url)
-    .replace(/\{\{content\}\}/g, (content || "").substring(0, 3000))
+    .replace(/\{\{content\}\}/g, (content || "").substring(0, 4000))
     .replace(/\{\{description\}\}/g, description || "");
   if (userTags && userTags.length > 0) {
     prompt += `\n\nExisting tags (prefer reusing these if applicable): ${userTags.slice(0, 50).join(", ")}`;
@@ -277,7 +277,7 @@ function buildSummaryPrompt(s, title, url, content, description) {
   return tmpl
     .replace(/\{\{title\}\}/g, title)
     .replace(/\{\{url\}\}/g, url)
-    .replace(/\{\{content\}\}/g, (content || "").substring(0, 5000))
+    .replace(/\{\{content\}\}/g, (content || "").substring(0, 4000))
     .replace(/\{\{description\}\}/g, description || "")
     .replace(/\{\{lang_instruction\}\}/g, langInst);
 }
