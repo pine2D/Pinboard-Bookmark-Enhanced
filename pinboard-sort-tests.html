@@ -55,6 +55,23 @@ F.computeSortedOrder(bms);
 check("input array order is not reordered by sort", bms[0] === originalFirst && bms[3] === originalLast);
 assertEq(F.computeSortedOrder([]).length, 0, "computeSortedOrder([]) -> empty array");
 
+// --- getBookmarkRows: row resolution across the two real page structures ---
+// public /t: : bookmarks are DIRECT children of #main_column
+const pubMc = new DOMParser().parseFromString(html, "text/html").getElementById("main_column");
+const pubRows = F.getBookmarkRows(pubMc);
+assertEq(pubRows.length, 4, "getBookmarkRows public -> 4 rows");
+check("public rows ARE the bookmark divs", pubRows[0].classList.contains("bookmark"));
+// user /u:x/t: : each bookmark WRAPPED in an anonymous <div> under #main_column
+const wrapped = `<div id="main_column"><div id="bookmark_subbanner"></div><div><div class="bookmark"><div class="display"><a class="url_link">2 others</a></div></div></div><div><div class="bookmark"><div class="display"></div></div></div><div><div class="bookmark"><div class="display"><a class="url_link">5 others</a></div></div></div></div>`;
+const userMc = new DOMParser().parseFromString(wrapped, "text/html").getElementById("main_column");
+const userRows = F.getBookmarkRows(userMc);
+assertEq(userRows.length, 3, "getBookmarkRows user -> 3 rows (wrappers)");
+check("user rows are the WRAPPER divs, not the bookmark", !userRows[0].classList.contains("bookmark") && !!userRows[0].querySelector("div.bookmark"));
+assertEq(F.extractPop(userRows[0]), 2, "extractPop reads pop through the wrapper -> 2");
+assertEq(F.extractPop(userRows[1]), 0, "extractPop wrapper without url_link -> 0");
+const userSorted = F.computeSortedOrder(userRows);
+check("wrapped rows sort by pop (5 > 2 > 0)", userSorted[0] === userRows[2] && userSorted[1] === userRows[0] && userSorted[2] === userRows[1]);
+
 console.log(`PASS ${pass} | FAIL ${fail}`);
 </script>
 </body></html>

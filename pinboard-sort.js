@@ -52,7 +52,7 @@
 
   // Expose for the test harness (harmless in the isolated content world).
   if (typeof window !== "undefined") {
-    window.__PBP_POPSORT__ = { parsePopCount, extractPop, computeSortedOrder };
+    window.__PBP_POPSORT__ = { parsePopCount, extractPop, computeSortedOrder, getBookmarkRows };
   }
 
   // ---------- everything below only runs on a real tag page ----------
@@ -78,20 +78,30 @@
   }
 
   const CONTROL_ID = "pbp-pop-sort";
-  let originalOrder = null; // bookmark nodes in document order, snapshot at inject
+  let originalOrder = null; // bookmark ROWS in document order, snapshot at inject
   let sorted = false;
 
-  function getBookmarks(mc) {
-    return Array.from(mc.querySelectorAll(":scope > div.bookmark"));
+  // The reorderable unit is the direct child of #main_column that holds each bookmark.
+  // Public /t: pages put div.bookmark directly under #main_column; user /u:x/t: pages
+  // wrap every bookmark in an anonymous <div>. Climb from each bookmark to its
+  // #main_column-level ancestor so BOTH structures reorder correctly.
+  function getBookmarkRows(mc) {
+    const rows = [], seen = new Set();
+    mc.querySelectorAll("div.bookmark").forEach((bm) => {
+      let row = bm;
+      while (row.parentElement && row.parentElement !== mc) row = row.parentElement;
+      if (row.parentElement === mc && !seen.has(row)) { seen.add(row); rows.push(row); }
+    });
+    return rows;
   }
 
-  // Move the given ordered bookmark nodes to where the first bookmark sits,
-  // preserving any non-bookmark siblings (pager <p>, scripts) around the block.
+  // Move the given ordered bookmark rows to where the first row sits, preserving any
+  // non-row siblings (header, pager, scripts) around the block.
   function reorder(mc, order) {
-    // Anchor = the live first bookmark (re-queried, so it is always still attached
-    // even if the page mutated since inject). Removing all bookmarks collapses them
-    // to this one point, so the reordered block lands exactly where the list is.
-    const first = getBookmarks(mc)[0];
+    // Anchor = the live first bookmark row (re-queried, so it is always still attached
+    // even if the page mutated since inject). Removing all rows collapses them to this
+    // one point, so the reordered block lands exactly where the list is.
+    const first = getBookmarkRows(mc)[0];
     if (!first) return;
     const marker = document.createComment("pbp-pop");
     mc.insertBefore(marker, first);
@@ -136,7 +146,7 @@
     // No real header (or it resolved to a bookmark) → drop the control above the list,
     // never inside a bookmark.
     if (!header || header.classList.contains("bookmark")) {
-      mc.insertBefore(node, mc.querySelector(":scope > div.bookmark"));
+      mc.insertBefore(node, getBookmarkRows(mc)[0] || null);
       return;
     }
     const clear = header.querySelector(':scope > div[style*="clear"]');
@@ -165,7 +175,7 @@
       placeFallback(mc, span);
     }
     injectStyle();
-    originalOrder = getBookmarks(mc);
+    originalOrder = getBookmarkRows(mc);
     link.addEventListener("click", (e) => {
       e.preventDefault();
       try { onToggle(mc, link); } catch (_) { /* never break the host page */ }
