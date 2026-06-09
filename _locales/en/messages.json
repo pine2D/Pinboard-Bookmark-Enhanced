@@ -1446,6 +1446,7 @@
     "message": "When enabled, background saves read your existing Pinboard bookmark (if any) and merge new tags with existing tags instead of replacing them. This prevents accidental tag loss on duplicate URLs. Note: adds ~3s per save for the extra API call. Foreground popup edits always replace (give you full control)."
   },
   "obsidianInstallHint": { "message": "Obsidian must be installed for the note to open. Your note is also copied to the clipboard as a backup." },
+  "apiKeySecurityHint": { "message": "API keys are obfuscated (not encrypted) and sync via chrome.storage.sync. Do not share your settings export files." },
   "batchPermLabel":    { "message": "Host permissions:" },
   "batchRevokeBtn":    { "message": "Revoke all-sites access" },
   "batchRevokeHint":   { "message": "Only needed if you enabled batch AI extraction but no longer want the extension to access all pages for content." },

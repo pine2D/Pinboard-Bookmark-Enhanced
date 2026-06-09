@@ -1446,6 +1446,7 @@
     "message": "啟用時，背景保存將讀取您現有的 Pinboard 書籤（如有），並將新標籤與現有標籤合併，而不是替換。這可防止在重複 URL 上意外遺失標籤。注意：額外的 API 呼叫會增加約 3 秒的保存時間。前台彈出窗口編輯始終替換（讓您完全控制）。"
   },
   "obsidianInstallHint": { "message": "需要安裝 Obsidian 才能開啟筆記。筆記內容已複製到剪貼簿作為備份。" },
+  "apiKeySecurityHint": { "message": "API 金鑰已混淆（非加密），並透過 chrome.storage.sync 同步。請勿分享您的設定匯出檔案。" },
   "batchPermLabel":    { "message": "主機權限：" },
   "batchRevokeBtn":    { "message": "撤銷所有網站存取權限" },
   "batchRevokeHint":   { "message": "僅在您啟用了批量 AI 內容擷取但不再希望擴充功能存取所有頁面時使用。" },

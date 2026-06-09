@@ -1446,6 +1446,7 @@
     "message": "Wenn aktiviert, liest das Hintergrund-Speichern Ihr vorhandenes Pinboard-Lesezeichen (falls vorhanden) und führt neue Tags mit vorhandenen Tags zusammen, anstatt sie zu ersetzen. Dies verhindert versehentlichen Tagloss bei doppelten URLs. Hinweis: Der zusätzliche API-Aufruf verlängert die Speicherdauer um etwa 3 Sekunden. Vordergrund-Popup-Bearbeitungen ersetzen immer (Sie haben vollständige Kontrolle)."
   },
   "obsidianInstallHint": { "message": "Obsidian muss installiert sein, damit die Notiz geöffnet werden kann. Der Inhalt wurde zur Sicherheit auch in die Zwischenablage kopiert." },
+  "apiKeySecurityHint": { "message": "API-Schlüssel werden verschleiert (nicht verschlüsselt) und über chrome.storage.sync synchronisiert. Teilen Sie Ihre Einstellungs-Exportdateien nicht." },
   "batchPermLabel":    { "message": "Host-Berechtigungen:" },
   "batchRevokeBtn":    { "message": "Zugriff auf alle Websites widerrufen" },
   "batchRevokeHint":   { "message": "Nur erforderlich, wenn Sie die KI-Massenextraktion aktiviert haben, aber die Erweiterung nicht mehr auf alle Seiten zugreifen soll." },

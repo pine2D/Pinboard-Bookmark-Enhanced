@@ -1446,6 +1446,7 @@
     "message": "Lorsqu'elle est activée, la sauvegarde en arrière-plan lit votre signet Pinboard existant (le cas échéant) et fusionne les nouveaux tags avec les tags existants au lieu de les remplacer. Cela évite la perte accidentelle de tags sur les URL en double. Remarque : l'appel API supplémentaire ajoute environ 3 secondes au temps de sauvegarde. Les modifications du popup de premier plan remplacent toujours (vous avez le contrôle total)."
   },
   "obsidianInstallHint": { "message": "Obsidian doit être installé pour que la note s'ouvre. Le contenu a également été copié dans le presse-papiers en guise de sauvegarde." },
+  "apiKeySecurityHint": { "message": "Les clés API sont masquées (pas chiffrées) et synchronisées via chrome.storage.sync. Ne partagez pas vos fichiers d'export de paramètres." },
   "batchPermLabel":    { "message": "Permissions d'hôte :" },
   "batchRevokeBtn":    { "message": "Révoquer l'accès à tous les sites" },
   "batchRevokeHint":   { "message": "Utile uniquement si vous avez activé l'extraction AI en masse mais ne souhaitez plus que l'extension accède à toutes les pages." },
