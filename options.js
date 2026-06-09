@@ -356,6 +356,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "notify-tab-set": s.notifyTabSet, "notify-batch-save": s.notifyBatchSave,
     "notify-errors": s.notifyErrors,
     "opt-respect-tag-case": s.optRespectTagCase,
+    "opt-bg-save-noclobber": s.bgSaveNoClobber !== false,
     "offline-queue-enabled": s.offlineQueueEnabled,
     "opt-show-badge": s.optShowBadge,
     "opt-check-bookmark-status": s.optCheckBookmarkStatus,
@@ -532,6 +533,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       optBlockquote: $id("opt-blockquote").checked,
       optIncludeReferrer: $id("opt-include-referrer").checked,
       optRespectTagCase: $id("opt-respect-tag-case").checked,
+      bgSaveNoClobber: $id("opt-bg-save-noclobber").checked,
       offlineQueueEnabled: $id("offline-queue-enabled").checked,
       // Quick Actions
       qsAutoNotes: $id("qs-auto-notes").checked,

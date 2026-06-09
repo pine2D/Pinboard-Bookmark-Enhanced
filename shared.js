@@ -84,6 +84,37 @@ function deobfuscateKey(val) {
   return val;
 }
 
+// ---- Tag merge helper (pure function for union with dedup) ----
+// Merges two space-separated tag strings (existing, new), deduplicates case-insensitively,
+// preserves existing tag casing for duplicates, and appends unique new tags.
+// Returns a space-separated string of merged tags.
+function unionTags(existingStr, newStr) {
+  const existing = (existingStr || "").split(/\s+/).filter(Boolean);
+  const newTags = (newStr || "").split(/\s+/).filter(Boolean);
+
+  // Map of normalized tag → preferred (existing) casing
+  const seenNorm = {};
+  const result = [];
+
+  for (const tag of existing) {
+    const norm = tag.toLowerCase();
+    if (!seenNorm[norm]) {
+      seenNorm[norm] = tag;
+      result.push(tag);
+    }
+  }
+
+  for (const tag of newTags) {
+    const norm = tag.toLowerCase();
+    if (!seenNorm[norm]) {
+      seenNorm[norm] = tag;
+      result.push(tag);
+    }
+  }
+
+  return result.join(" ");
+}
+
 // Check if a cache entry {result, timestamp} has exceeded its TTL. Pure; testable without chrome.storage.
 function isStaleCacheEntry(entry, now, ttlMs) {
   if (!entry || typeof entry !== "object") return true;
@@ -136,7 +167,8 @@ const SETTINGS_DEFAULTS = {
   obsidianEnabled: false, obsidianVault: "", obsidianFolder: "",
   urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] },
   // pinboard.in tag-page "sort by popularity" control (site enhancement, default on)
-  tagSortByPopEnabled: true
+  tagSortByPopEnabled: true,
+  bgSaveNoClobber: true
 };
 
 // ---- Tag case normalization helpers ----

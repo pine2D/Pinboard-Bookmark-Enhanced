@@ -1427,5 +1427,11 @@
   "optPopupWidthCustom":  { "message": "カスタム：" },
   "optPopupWidthHelp":    { "message": "範囲: 420–720px (Chrome popup 制限)" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
+  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "optBgSaveNoClobber": {
+    "message": "バックグラウンド保存のタグをマージ（クイック保存/後で読む）"
+  },
+  "optBgSaveNoClobberHint": {
+    "message": "有効にすると、バックグラウンド保存は既存の Pinboard ブックマーク（存在する場合）を読み取り、新しいタグを既存のタグと置き換えるのではなくマージします。これにより、重複する URL での誤ったタグ損失を防ぎます。注意：追加の API 呼び出しにより、保存時間が約 3 秒増加します。フォアグラウンド ポップアップ編集は常に置き換えます（完全に制御できます）。"
+  }
 }

@@ -1427,5 +1427,11 @@
   "mdImagePolicyAlt": { "message": "Alt text only" },
   "mdImagePolicyStrip": { "message": "Strip images" },
   "mdExportImagePolicyHint": { "message": "Applied when copying or downloading Markdown from the preview page. Can be overridden per export." },
-  "mdExportIncludeToc": { "message": "Include table of contents" }
+  "mdExportIncludeToc": { "message": "Include table of contents" },
+  "optBgSaveNoClobber": {
+    "message": "Merge tags in background saves (Quick Save / Read Later)"
+  },
+  "optBgSaveNoClobberHint": {
+    "message": "When enabled, background saves read your existing Pinboard bookmark (if any) and merge new tags with existing tags instead of replacing them. This prevents accidental tag loss on duplicate URLs. Note: adds ~3s per save for the extra API call. Foreground popup edits always replace (give you full control)."
+  }
 }

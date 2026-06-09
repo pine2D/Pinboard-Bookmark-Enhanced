@@ -1427,5 +1427,11 @@
   "optPopupWidthCustom":  { "message": "Niestandardowe:" },
   "optPopupWidthHelp":    { "message": "Zakres: 420–720px (limit Chrome popup)" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
+  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "optBgSaveNoClobber": {
+    "message": "Łączenie tagów w zapisach w tle (Szybkie zapisanie/Przeczytaj później)"
+  },
+  "optBgSaveNoClobberHint": {
+    "message": "Gdy ta opcja jest włączona, zapis w tle odczytuje Twój istniejący zakładkę Pinboard (jeśli istnieje) i łączy nowe tagi z istniejącymi zamiast ich zastępować. Zapobiega to przypadkowemu utracie tagów w zduplikowanych adresach URL. Uwaga: dodatkowe wywołanie API dodaje około 3 sekundę do czasu zapisywania. Edycje wyskakującego okna na pierwszym planie zawsze zastępują (masz pełną kontrolę)."
+  }
 }

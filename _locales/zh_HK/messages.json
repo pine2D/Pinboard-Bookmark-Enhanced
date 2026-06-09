@@ -1427,5 +1427,11 @@
   "optPopupWidthCustom":  { "message": "自訂：" },
   "optPopupWidthHelp":    { "message": "範圍：420–720px（Chrome popup 限制）" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
+  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "optBgSaveNoClobber": {
+    "message": "合併背景保存中的標籤（快速保存/稍後閱讀）"
+  },
+  "optBgSaveNoClobberHint": {
+    "message": "啟用時，背景保存將讀取您現有的 Pinboard 書籤（如有），並將新標籤與現有標籤合併，而不是替換。這可防止在重複 URL 上意外遺失標籤。注意：額外的 API 呼叫會增加約 3 秒的保存時間。前台彈出窗口編輯始終替換（讓您完全控制）。"
+  }
 }

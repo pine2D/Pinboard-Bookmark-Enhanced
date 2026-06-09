@@ -1427,5 +1427,11 @@
   "optPopupWidthCustom":  { "message": "自定义：" },
   "optPopupWidthHelp":    { "message": "范围：420–720px（Chrome popup 限制）" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
+  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "optBgSaveNoClobber": {
+    "message": "合并后台保存中的标签（快速保存/稍后阅读）"
+  },
+  "optBgSaveNoClobberHint": {
+    "message": "启用时，后台保存将读取您现有的 Pinboard 书签（如有），并将新标签与现有标签合并，而不是替换。这可防止在重复 URL 上意外丢失标签。注意：额外的 API 调用会增加约 3 秒的保存时间。前台弹出窗口编辑始终替换（让您完全控制）。"
+  }
 }

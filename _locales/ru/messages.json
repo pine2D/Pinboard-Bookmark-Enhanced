@@ -1427,5 +1427,11 @@
   "optPopupWidthCustom":  { "message": "Произвольная:" },
   "optPopupWidthHelp":    { "message": "Диапазон: 420–720px (ограничение Chrome popup)" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
+  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "optBgSaveNoClobber": {
+    "message": "Объединить теги в фоновых сохранениях (Быстрое сохранение/Прочитать позже)"
+  },
+  "optBgSaveNoClobberHint": {
+    "message": "Если включено, фоновое сохранение считывает существующую закладку Pinboard (если она есть) и объединяет новые теги с существующими вместо их замены. Это предотвращает случайную потерю тегов при дублировании URL-адресов. Примечание: дополнительный вызов API добавляет к времени сохранения примерно 3 секунды. Редактирование во всплывающем окне переднего плана всегда заменяет (у вас есть полный контроль)."
+  }
 }

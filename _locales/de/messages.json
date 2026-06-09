@@ -1427,5 +1427,11 @@
   "optPopupWidthCustom":  { "message": "Benutzerdefiniert:" },
   "optPopupWidthHelp":    { "message": "Bereich: 420–720px (Chrome-Popup-Limit)" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
+  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "optBgSaveNoClobber": {
+    "message": "Tags in Hintergrund-Speichervorgängen zusammenführen (Schnellspeichern/Später lesen)"
+  },
+  "optBgSaveNoClobberHint": {
+    "message": "Wenn aktiviert, liest das Hintergrund-Speichern Ihr vorhandenes Pinboard-Lesezeichen (falls vorhanden) und führt neue Tags mit vorhandenen Tags zusammen, anstatt sie zu ersetzen. Dies verhindert versehentlichen Tagloss bei doppelten URLs. Hinweis: Der zusätzliche API-Aufruf verlängert die Speicherdauer um etwa 3 Sekunden. Vordergrund-Popup-Bearbeitungen ersetzen immer (Sie haben vollständige Kontrolle)."
+  }
 }

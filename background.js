@@ -235,6 +235,22 @@ async function updateBadge() {
 }
 
 // ---- F3: Offline queue ----
+
+// Read an existing bookmark's current tags + note for the merge-don't-clobber path.
+// Prefers a FRESH statusCache entry (same TTL as checkBookmarked); falls back to a
+// posts/get read when the cache is missing or stale. Returns "" fields on any failure.
+async function fetchExistingBookmark(url, token) {
+  const cached = statusCache.get(url);
+  if (cached?.posts?.length > 0 && !isStaleCacheEntry(cached, Date.now(), CACHE_TTL)) {
+    return { tags: cached.posts[0].tags || "", extended: cached.posts[0].extended || "" };
+  }
+  const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
+  if (!resp.ok) return { tags: "", extended: "" };
+  const data = await resp.json();
+  const post = data.posts?.[0];
+  return { tags: post?.tags || "", extended: post?.extended || "" };
+}
+
 async function enqueueOfflineSave(params) {
   const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
   const queueId = Date.now() + "-" + Math.random().toString(36).slice(2, 9);
@@ -242,14 +258,31 @@ async function enqueueOfflineSave(params) {
   await chrome.storage.local.set({ offlineQueue });
 }
 
-async function sendOfflineItem(item) {
+async function sendOfflineItem(item, settings) {
   const token = deobfuscateKey(item.token);
+  let finalTags = item.tags;
+  let existingExtended = "";
+
+  // If bgSaveNoClobber is enabled, merge tags (and preserve notes) from existing bookmark
+  if (settings?.bgSaveNoClobber) {
+    try {
+      const existing = await fetchExistingBookmark(item.url, token);
+      if (existing.tags) finalTags = unionTags(existing.tags, item.tags);
+      existingExtended = existing.extended;
+    } catch (_) {
+      // If merge fails, proceed with original tags
+    }
+  }
+
+  // buildPostsAddUri defaults replace=true (replace=yes)
   const apiUrl = buildPostsAddUri({
     token,
     url: item.url,
     title: item.title,
-    extended: item.notes,
-    tags: item.tags,
+    // item.notes / notes is system-filled (meta description or AI summary), never
+    // user-cleared, so falling back to the existing note can't erase an intentional blank.
+    extended: item.notes || existingExtended,
+    tags: finalTags,
     toread: item.toread ? "yes" : undefined,
   });
   const resp = await pinboardFetch(apiUrl);
@@ -260,10 +293,11 @@ async function sendOfflineItem(item) {
 async function processOfflineQueue() {
   const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
   if (!offlineQueue.length) return;
+  const s = await loadSettings();
   const remaining = [];
   for (const item of offlineQueue) {
     try {
-      if (await sendOfflineItem(item)) {
+      if (await sendOfflineItem(item, s)) {
         statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
       } else {
         remaining.push(item); // keep for retry
@@ -284,7 +318,8 @@ async function retryOfflineItem(queueId) {
   if (idx < 0) return false;
   const item = offlineQueue[idx];
   try {
-    const ok = await sendOfflineItem(item);
+    const s = await loadSettings();
+    const ok = await sendOfflineItem(item, s);
     if (!ok) return false;
     offlineQueue.splice(idx, 1);
     await chrome.storage.local.set({ offlineQueue });
@@ -375,12 +410,27 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   }
 
   // Save bookmark via pinboardFetch (rate-limited)
-  const tagsStr = tags.join(" ");
+  let tagsStr = tags.join(" ");
+  let existingExtended = "";
+
+  // If bgSaveNoClobber is enabled, merge tags (and preserve notes) from existing bookmark
+  if (s.bgSaveNoClobber) {
+    try {
+      const existing = await fetchExistingBookmark(url, s.pinboardToken);
+      if (existing.tags) tagsStr = unionTags(existing.tags, tagsStr);
+      existingExtended = existing.extended;
+    } catch (_) {
+      // Merge failure: proceed with new tags only
+    }
+  }
+
   const apiUrl = buildPostsAddUri({
     token: s.pinboardToken,
     url,
     title,
-    extended: notes,
+    // item.notes / notes is system-filled (meta description or AI summary), never
+    // user-cleared, so falling back to the existing note can't erase an intentional blank.
+    extended: notes || existingExtended,
     tags: tagsStr,
     toread: toread ? "yes" : undefined,
   });

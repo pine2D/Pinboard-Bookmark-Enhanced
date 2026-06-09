@@ -1427,5 +1427,11 @@
   "optPopupWidthCustom":  { "message": "Personnalisé :" },
   "optPopupWidthHelp":    { "message": "Plage : 420–720px (limite Chrome popup)" },
   "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" }
+  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "optBgSaveNoClobber": {
+    "message": "Fusionner les tags dans les enregistrements d'arrière-plan (Enregistrement rapide/Lire plus tard)"
+  },
+  "optBgSaveNoClobberHint": {
+    "message": "Lorsqu'elle est activée, la sauvegarde en arrière-plan lit votre signet Pinboard existant (le cas échéant) et fusionne les nouveaux tags avec les tags existants au lieu de les remplacer. Cela évite la perte accidentelle de tags sur les URL en double. Remarque : l'appel API supplémentaire ajoute environ 3 secondes au temps de sauvegarde. Les modifications du popup de premier plan remplacent toujours (vous avez le contrôle total)."
+  }
 }
