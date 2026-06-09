@@ -1007,6 +1007,15 @@
   "notifyErrors": {
     "message": "Error notifications"
   },
+  "secPinboardTagPages": {
+    "message": "Pinboard.in Tag Pages"
+  },
+  "optTagSortByPop": {
+    "message": "Add a “sort by popularity” control on tag pages"
+  },
+  "optTagSortByPopHint": {
+    "message": "On pinboard.in tag pages, shows a “pop” control next to date/title that reorders the current page’s bookmarks by how many people saved each link. Click again to restore the original order."
+  },
   "secCustomStyle": {
     "message": "Pinboard.in Custom Style"
   },

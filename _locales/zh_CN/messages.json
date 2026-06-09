@@ -1007,6 +1007,15 @@
   "notifyErrors": {
     "message": "错误通知"
   },
+  "secPinboardTagPages": {
+    "message": "Pinboard.in 标签页"
+  },
+  "optTagSortByPop": {
+    "message": "在标签页添加“按热度排序”控件"
+  },
+  "optTagSortByPopHint": {
+    "message": "在 pinboard.in 标签页的 date/title 旁显示“pop”控件，按收藏人数重排当前页书签；再次点击恢复原始顺序。"
+  },
   "secCustomStyle": {
     "message": "Pinboard.in 自定义样式"
   },

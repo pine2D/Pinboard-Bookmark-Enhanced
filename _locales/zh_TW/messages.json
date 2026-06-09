@@ -1007,6 +1007,15 @@
   "notifyErrors": {
     "message": "錯誤通知"
   },
+  "secPinboardTagPages": {
+    "message": "Pinboard.in 標籤頁"
+  },
+  "optTagSortByPop": {
+    "message": "在標籤頁加入「依熱度排序」控制項"
+  },
+  "optTagSortByPopHint": {
+    "message": "在 pinboard.in 標籤頁的 date/title 旁顯示「pop」控制項，依收藏人數重新排序目前頁面的書籤；再次點擊可還原原始順序。"
+  },
   "secCustomStyle": {
     "message": "Pinboard.in 自訂樣式"
   },

@@ -368,7 +368,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-popup-follow-theme": s.optPopupFollowTheme,
     "opt-md-frontmatter": s.mdExportFrontmatter,
     "opt-md-include-toc": s.mdExportIncludeToc,
-    "opt-obsidian-enabled": s.obsidianEnabled
+    "opt-obsidian-enabled": s.obsidianEnabled,
+    "opt-tag-sort-by-pop": s.tagSortByPopEnabled
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
@@ -624,6 +625,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       optShowQuickRow: $id("opt-show-quick-row").checked,
       optAutoCloseAfterSave: $id("opt-auto-close").checked,
       optPopupFollowTheme: $id("opt-popup-follow-theme").checked,
+      tagSortByPopEnabled: $id("opt-tag-sort-by-pop").checked,
       tagPresets: $id("opt-tag-presets").value,
       themePresetKey: currentPresetKey,
       urlClean: {

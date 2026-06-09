@@ -1007,6 +1007,15 @@
   "notifyErrors": {
     "message": "Уведомления об ошибках"
   },
+  "secPinboardTagPages": {
+    "message": "Страницы тегов Pinboard.in"
+  },
+  "optTagSortByPop": {
+    "message": "Добавить элемент «сортировать по популярности» на страницах тегов"
+  },
+  "optTagSortByPopHint": {
+    "message": "На страницах тегов pinboard.in рядом с date/title показывает элемент «pop», который упорядочивает закладки текущей страницы по числу сохранивших ссылку. Повторный клик возвращает исходный порядок."
+  },
   "secCustomStyle": {
     "message": "Пользовательский стиль Pinboard.in"
   },

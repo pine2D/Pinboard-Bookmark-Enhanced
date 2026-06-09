@@ -1007,6 +1007,15 @@
   "notifyErrors": {
     "message": "Fehlermeldungen"
   },
+  "secPinboardTagPages": {
+    "message": "Pinboard.in-Tag-Seiten"
+  },
+  "optTagSortByPop": {
+    "message": "Steuerelement „Nach Beliebtheit sortieren“ auf Tag-Seiten hinzufügen"
+  },
+  "optTagSortByPopHint": {
+    "message": "Zeigt auf pinboard.in-Tag-Seiten neben date/title ein „pop“-Steuerelement, das die Lesezeichen der aktuellen Seite nach Anzahl der Speicherungen sortiert. Erneut klicken stellt die ursprüngliche Reihenfolge wieder her."
+  },
   "secCustomStyle": {
     "message": "Pinboard.in Benutzerdefinierter Stil"
   },

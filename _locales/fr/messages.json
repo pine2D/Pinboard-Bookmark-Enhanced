@@ -1007,6 +1007,15 @@
   "notifyErrors": {
     "message": "Notifications d'erreur"
   },
+  "secPinboardTagPages": {
+    "message": "Pages de tags Pinboard.in"
+  },
+  "optTagSortByPop": {
+    "message": "Ajouter un contrôle « trier par popularité » sur les pages de tags"
+  },
+  "optTagSortByPopHint": {
+    "message": "Sur les pages de tags pinboard.in, affiche un contrôle « pop » à côté de date/title qui réordonne les favoris de la page actuelle selon le nombre de personnes les ayant enregistrés. Cliquez à nouveau pour rétablir l'ordre d'origine."
+  },
   "secCustomStyle": {
     "message": "Style personnalisé Pinboard.in"
   },

@@ -1007,6 +1007,15 @@
   "notifyErrors": {
     "message": "Powiadomienia o błędach"
   },
+  "secPinboardTagPages": {
+    "message": "Strony tagów Pinboard.in"
+  },
+  "optTagSortByPop": {
+    "message": "Dodaj kontrolkę „sortuj według popularności” na stronach tagów"
+  },
+  "optTagSortByPopHint": {
+    "message": "Na stronach tagów pinboard.in pokazuje obok date/title kontrolkę „pop”, która porządkuje zakładki bieżącej strony według liczby osób, które je zapisały. Kliknij ponownie, aby przywrócić pierwotną kolejność."
+  },
   "secCustomStyle": {
     "message": "Niestandardowy styl Pinboard.in"
   },
