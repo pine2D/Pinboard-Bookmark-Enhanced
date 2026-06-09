@@ -72,6 +72,20 @@ assertEq(F.extractPop(userRows[1]), 0, "extractPop wrapper without url_link -> 0
 const userSorted = F.computeSortedOrder(userRows);
 check("wrapped rows sort by pop (5 > 2 > 0)", userSorted[0] === userRows[2] && userSorted[1] === userRows[0] && userSorted[2] === userRows[1]);
 
+// auto-pagination page-container: an appended page nests wrappers inside a page block
+const contHtml = '<div id="main_column">' +
+  '<div class="bookmark"><div class="display"><a class="url_link">5 others</a></div></div>' +
+  '<div class="autopagerize_page_element">' +
+    '<div><div class="bookmark"><div class="display"><a class="url_link">9 others</a></div></div></div>' +
+    '<div><div class="bookmark"><div class="display"><a class="url_link">1 other</a></div></div></div>' +
+  '</div></div>';
+const contMc = new DOMParser().parseFromString(contHtml, "text/html").getElementById("main_column");
+const contRows = F.getBookmarkRows(contMc);
+assertEq(contRows.length, 3, "getBookmarkRows: page-container -> 3 per-bookmark rows");
+check("page-container rows are per-bookmark units, not the page block", !contRows.some(r => r.classList && r.classList.contains("autopagerize_page_element")));
+assertEq(F.extractPop(contRows[0]), 5, "page-container row[0] pop=5 (top-level bookmark)");
+assertEq(F.extractPop(contRows[1]), 9, "page-container row[1] pop=9 (nested wrapper)");
+
 // --- mergeNewRows: auto-pagination fold-in (pure) ---
 const ra = {}, rb = {}, rc = {}, rd = {};
 const snap = [ra, rb];

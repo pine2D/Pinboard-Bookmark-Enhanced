@@ -90,16 +90,26 @@
   let originalOrder = null; // bookmark ROWS in document order, snapshot at inject
   let sorted = false;
 
-  // The reorderable unit is the direct child of #main_column that holds each bookmark.
-  // Public /t: pages put div.bookmark directly under #main_column; user /u:x/t: pages
-  // wrap every bookmark in an anonymous <div>. Climb from each bookmark to its
-  // #main_column-level ancestor so BOTH structures reorder correctly.
+  // The reorderable unit is the TOPMOST ancestor (below #main_column) that still wraps
+  // exactly this one bookmark. Covers every structure seen in the wild:
+  //   • public /t:          → div.bookmark is a direct #main_column child (row = bookmark)
+  //   • user /u:x/t:         → each bookmark wrapped in an anonymous <div> (row = wrapper)
+  //   • auto-pagination      → an appended page may nest wrappers inside a page-container
+  //                            (e.g. .autopagerize_page_element); climb stops at the
+  //                            per-bookmark wrapper, never the multi-bookmark page block.
+  // The climb halts at the #main_column boundary, so it never scans the whole column.
   function getBookmarkRows(mc) {
     const rows = [], seen = new Set();
     mc.querySelectorAll("div.bookmark").forEach((bm) => {
       let row = bm;
-      while (row.parentElement && row.parentElement !== mc) row = row.parentElement;
-      if (row.parentElement === mc && !seen.has(row)) { seen.add(row); rows.push(row); }
+      while (
+        row.parentElement &&
+        row.parentElement !== mc &&
+        row.parentElement.querySelectorAll("div.bookmark").length === 1
+      ) {
+        row = row.parentElement;
+      }
+      if (!seen.has(row)) { seen.add(row); rows.push(row); }
     });
     return rows;
   }
@@ -146,7 +156,7 @@
           if (sorted) {
             obs.disconnect();
             reorder(mc, computeSortedOrder(originalOrder));
-            obs.observe(mc, { childList: true });
+            obs.observe(mc, { childList: true, subtree: true });
           }
         } catch (_) { /* never break the host page */ }
       }, 120);
