@@ -117,6 +117,16 @@
   // Move the given ordered bookmark rows to where the first row sits, preserving any
   // non-row siblings (header, pager, scripts) around the block.
   function reorder(mc, order) {
+    // Pin the scroll position across the move. Reordering rows lets the browser's scroll
+    // anchoring nudge scrollY to keep the visible content stable; an infinite-scroll pager
+    // (e.g. AutoPagerize) watching a bottom sentinel reads that nudge as "near the bottom"
+    // and loads another page — which we fold in and re-sort, which nudges again… a runaway
+    // that loads page after page and stutters the cursor. Restoring scrollTop afterward
+    // makes our reorder invisible to any scroll-driven pager. (Reading scrollTop first
+    // flushes layout so the anchoring adjustment is applied before we undo it.)
+    const se = document.scrollingElement || document.documentElement;
+    const keepTop = se ? se.scrollTop : 0;
+
     // Anchor = the live first bookmark row (re-queried, so it is always still attached
     // even if the page mutated since inject). Removing all rows collapses them to this
     // one point, so the reordered block lands exactly where the list is.
@@ -128,6 +138,8 @@
     for (const el of order) frag.appendChild(el); // moves el into frag, in order
     mc.insertBefore(frag, marker);
     marker.remove();
+
+    if (se && se.scrollTop !== keepTop) se.scrollTop = keepTop;
   }
 
   function onToggle(mc, link) {
@@ -145,14 +157,23 @@
   // around our own reorder() so the moves it makes don't re-trigger it.
   function watchAutoPagination(mc) {
     if (typeof MutationObserver === "undefined") return;
-    const SETTLE_MS = 400;
-    const MIN_GAP_MS = 1500;
+    const SETTLE_MS = 400;       // coalesce a burst of appended nodes into one pass
+    const MIN_GAP_MS = 1500;     // throttle: at most one reorder per interval
+    const SCROLL_IDLE_MS = 600;  // never reorder while the user is actively scrolling
     const OBS = { childList: true, subtree: true };
-    let settleTimer = null, gapTimer = null, lastSortAt = 0, needsResort = false;
+    let settleTimer = null, gapTimer = null, lastSortAt = 0, lastScrollAt = 0, needsResort = false;
 
-    function resort() {
+    // While the user scrolls, an infinite-scroll pager loads pages on its own — we only
+    // FOLD those into the snapshot and defer the visual reorder until scrolling stops, so
+    // our reorder never lands in the middle of the pager's load/observe cycle and chains it.
+    window.addEventListener("scroll", () => { lastScrollAt = Date.now(); }, { passive: true });
+
+    function maybeResort() {
       gapTimer = null;
       if (!needsResort || !sorted) return;
+      const wait = Math.max(MIN_GAP_MS - (Date.now() - lastSortAt),
+                            SCROLL_IDLE_MS - (Date.now() - lastScrollAt));
+      if (wait > 0) { gapTimer = setTimeout(maybeResort, wait); return; }
       needsResort = false;
       lastSortAt = Date.now();
       obs.disconnect();
@@ -168,9 +189,7 @@
         originalOrder = next;               // snapshot folds in every page immediately
         if (!sorted) return;
         needsResort = true;
-        const since = Date.now() - lastSortAt;
-        if (since >= MIN_GAP_MS) resort();
-        else if (!gapTimer) gapTimer = setTimeout(resort, MIN_GAP_MS - since);
+        if (!gapTimer) maybeResort();
       } catch (_) { /* never break the host page */ }
     }
 
