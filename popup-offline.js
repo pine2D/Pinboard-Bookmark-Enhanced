@@ -70,10 +70,10 @@
       list.appendChild(empty);
       return;
     }
-    queue.forEach((item, idx) => {
+    queue.forEach((item) => {
       const row = document.createElement("div");
       row.className = "offline-queue-item";
-      row.dataset.idx = String(idx);
+      row.dataset.queueId = item.queueId || "";
 
       const body = document.createElement("div");
       body.className = "offline-queue-body";
@@ -100,7 +100,7 @@
       retry.className = "offline-queue-retry";
       retry.innerHTML = PBP_ICONS.refresh;
       retry.title = t("offlineRetry");
-      retry.addEventListener("click", () => onRetry(idx, retry));
+      retry.addEventListener("click", () => onRetry(item.queueId, retry));
 
       const remove = document.createElement("button");
       remove.type = "button";
@@ -113,7 +113,7 @@
           msg: t("offlineRemoveConfirm"),
           yesText: t("delete"),
           noText: t("cancel"),
-          onConfirm: () => onRemove(idx),
+          onConfirm: () => onRemove(item.queueId),
         });
       });
 
@@ -126,12 +126,12 @@
     });
   }
 
-  async function onRetry(idx, btn) {
+  async function onRetry(queueId, btn) {
     btn.disabled = true;
     btn.textContent = "…";
     try {
       const ok = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: "retry_offline_item", index: idx }, (resp) => {
+        chrome.runtime.sendMessage({ type: "retry_offline_item", queueId }, (resp) => {
           resolve(!!(resp && resp.ok));
         });
       });
@@ -150,9 +150,10 @@
     }
   }
 
-  async function onRemove(idx) {
+  async function onRemove(queueId) {
     const q = await getQueue();
-    if (idx < 0 || idx >= q.length) return;
+    const idx = q.findIndex(item => item.queueId === queueId);
+    if (idx < 0) return;
     q.splice(idx, 1);
     await setQueue(q);
     await refreshBar();

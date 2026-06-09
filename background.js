@@ -237,7 +237,8 @@ async function updateBadge() {
 // ---- F3: Offline queue ----
 async function enqueueOfflineSave(params) {
   const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
-  offlineQueue.push({ ...params, queuedAt: Date.now() });
+  const queueId = Date.now() + "-" + Math.random().toString(36).slice(2, 9);
+  offlineQueue.push({ ...params, queuedAt: Date.now(), queueId });
   await chrome.storage.local.set({ offlineQueue });
 }
 
@@ -276,14 +277,16 @@ async function processOfflineQueue() {
   await chrome.storage.local.set({ offlineQueue: remaining });
 }
 
-async function retryOfflineItem(index) {
+async function retryOfflineItem(queueId) {
   const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
-  if (index < 0 || index >= offlineQueue.length) return false;
-  const item = offlineQueue[index];
+  if (!queueId || typeof queueId !== "string") return false;
+  const idx = offlineQueue.findIndex(item => item.queueId === queueId);
+  if (idx < 0) return false;
+  const item = offlineQueue[idx];
   try {
     const ok = await sendOfflineItem(item);
     if (!ok) return false;
-    offlineQueue.splice(index, 1);
+    offlineQueue.splice(idx, 1);
     await chrome.storage.local.set({ offlineQueue });
     statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
     return true;
@@ -767,8 +770,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "retry_offline_item" && typeof message.index === "number") {
-    retryOfflineItem(message.index)
+  if (message.type === "retry_offline_item" && typeof message.queueId === "string") {
+    retryOfflineItem(message.queueId)
       .then((ok) => sendResponse({ ok }))
       .catch(() => sendResponse({ ok: false }));
     return true;
