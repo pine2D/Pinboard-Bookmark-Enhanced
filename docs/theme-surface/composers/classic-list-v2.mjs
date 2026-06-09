@@ -167,9 +167,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: ${sizeXs} !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: ${sizeXs} !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: ${v("tag-bg")} !important; color: ${v("accent")} !important; }
 

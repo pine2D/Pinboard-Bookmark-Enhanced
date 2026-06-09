@@ -276,9 +276,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -1099,9 +1101,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -1883,9 +1887,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -2705,9 +2711,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -3538,9 +3546,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -4348,9 +4358,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -5059,9 +5071,11 @@ html.pbp-dark a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+html.pbp-dark .bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 html.pbp-dark a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -5901,9 +5915,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -6664,9 +6680,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -7439,9 +7457,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -8217,9 +8237,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -9008,9 +9030,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -9788,9 +9812,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
@@ -10577,9 +10603,11 @@ a.tag {
   background: transparent !important;
   padding: 0 4px !important;
   border-radius: 3px !important;
-  font-size: 11px !important;
   text-decoration: none !important;
 }
+/* font-size scoped to per-bookmark tags so the sidebar #tag_cloud keeps Pinboard's
+   inline frequency-based sizing (a bare a.tag font-size flattens the cloud). */
+.bookmark a.tag { font-size: 11px !important; }
 /* :hover and .selected: owned by tag-style pattern in _patterns.mjs */
 a.sort_order_selected { background: var(--pinboard-tag-bg) !important; color: var(--pinboard-accent) !important; }
 
