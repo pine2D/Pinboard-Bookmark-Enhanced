@@ -542,11 +542,31 @@
   "bgMdPreviewNoContent": {
     "message": "No readable content was found on this page."
   },
-  "mdEngineSwitchTo": { "message": "Switch to $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtracting": { "message": "Extracting with $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtractingNoteJina": { "message": "First-time extraction fetches from Jina's cloud (r.jina.ai). The wait depends on whether this page is cached locally, your network speed, and the page size — usually a few seconds." },
-  "mdEngineExtractFailed": { "message": "Couldn't extract this page. Please try again." },
-  "mdEngineTabGone": { "message": "Source tab no longer available — reopen the page to use Defuddle" },
+  "mdEngineSwitchTo": {
+    "message": "Switch to $ENGINE$",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtracting": {
+    "message": "Extracting with $ENGINE$…",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtractingNoteJina": {
+    "message": "First-time extraction fetches from Jina's cloud (r.jina.ai). The wait depends on whether this page is cached locally, your network speed, and the page size — usually a few seconds."
+  },
+  "mdEngineExtractFailed": {
+    "message": "Couldn't extract this page. Please try again."
+  },
+  "mdEngineTabGone": {
+    "message": "Source tab no longer available — reopen the page to use Defuddle"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard: One more step to save"
   },
@@ -619,8 +639,9 @@
   "tabBookmarks": {
     "message": "Bookmarks"
   },
-  
-  "tabPopup":           { "message": "Popup" },
+  "tabPopup": {
+    "message": "Popup"
+  },
   "tabAI": {
     "message": "AI"
   },
@@ -1238,38 +1259,102 @@
   "mdStripDownloadMd": {
     "message": "Download .md"
   },
-  "mdViewRaw": { "message": "Raw" },
-  "mdViewRendered": { "message": "Rendered" },
-  "mdExportSection": { "message": "Export" },
-  "mdOptFrontmatter": { "message": "Frontmatter" },
-  "mdOptImages": { "message": "Images" },
-  "mdImgKeep": { "message": "Keep" },
-  "mdImgAlt": { "message": "Alt text" },
-  "mdImgStrip": { "message": "Remove" },
-  "mdSendObsidian": { "message": "Send to Obsidian" },
-  "mdSentObsidian": { "message": "Sent" },
-  "mdObsidianVault": { "message": "Obsidian vault" },
-  "mdObsidianVaultHint": { "message": "Leave empty to use the current vault." },
-  "mdObsidianFolder": { "message": "Obsidian folder" },
-  "mdObsidianFolderHint": { "message": "Leave empty to save at the vault root." },
-  "tabMarkdown": { "message": "Markdown" },
-  "tabArchive": { "message": "Archive" },
-  "mdObsidianEnabled": { "message": "Enable export to Obsidian" },
-  "mdObsidianEnabledHint": { "message": "Shows the Send-to-Obsidian buttons in the preview page and the popup." },
-  "mdStripObsidian": { "message": "Obsidian" },
-  "mdOptIncludeToc": { "message": "Include TOC" },
-  "mdCopy": { "message": "Copy" },
-  "mdCopyMarkdown": { "message": "Copy Markdown" },
-  "mdCopyHtml": { "message": "Copy HTML" },
-  "mdDownloadMd": { "message": "Download .md" },
-  "mdDownloadMdTitle": { "message": "Download Markdown file" },
-  "mdDownloadHtml": { "message": "Download .html" },
-  "mdDownloadHtmlTitle": { "message": "Download HTML file" },
-  "mdTocContents": { "message": "Contents" },
-  "mdToggleControls": { "message": "Toggle controls" },
-  "mdPreviewUntitled": { "message": "Untitled" },
-  "mdPreviewFailed": { "message": "Failed" },
-  "mdPreviewNoContent": { "message": "No content was extracted from this page." },
+  "mdViewRaw": {
+    "message": "Raw"
+  },
+  "mdViewRendered": {
+    "message": "Rendered"
+  },
+  "mdExportSection": {
+    "message": "Export"
+  },
+  "mdOptFrontmatter": {
+    "message": "Frontmatter"
+  },
+  "mdOptImages": {
+    "message": "Images"
+  },
+  "mdImgKeep": {
+    "message": "Keep"
+  },
+  "mdImgAlt": {
+    "message": "Alt text"
+  },
+  "mdImgStrip": {
+    "message": "Remove"
+  },
+  "mdSendObsidian": {
+    "message": "Send to Obsidian"
+  },
+  "mdSentObsidian": {
+    "message": "Sent"
+  },
+  "mdObsidianVault": {
+    "message": "Obsidian vault"
+  },
+  "mdObsidianVaultHint": {
+    "message": "Leave empty to use the current vault."
+  },
+  "mdObsidianFolder": {
+    "message": "Obsidian folder"
+  },
+  "mdObsidianFolderHint": {
+    "message": "Leave empty to save at the vault root."
+  },
+  "tabMarkdown": {
+    "message": "Markdown"
+  },
+  "tabArchive": {
+    "message": "Archive"
+  },
+  "mdObsidianEnabled": {
+    "message": "Enable export to Obsidian"
+  },
+  "mdObsidianEnabledHint": {
+    "message": "Shows the Send-to-Obsidian buttons in the preview page and the popup."
+  },
+  "mdStripObsidian": {
+    "message": "Obsidian"
+  },
+  "mdOptIncludeToc": {
+    "message": "Include TOC"
+  },
+  "mdCopy": {
+    "message": "Copy"
+  },
+  "mdCopyMarkdown": {
+    "message": "Copy Markdown"
+  },
+  "mdCopyHtml": {
+    "message": "Copy HTML"
+  },
+  "mdDownloadMd": {
+    "message": "Download .md"
+  },
+  "mdDownloadMdTitle": {
+    "message": "Download Markdown file"
+  },
+  "mdDownloadHtml": {
+    "message": "Download .html"
+  },
+  "mdDownloadHtmlTitle": {
+    "message": "Download HTML file"
+  },
+  "mdTocContents": {
+    "message": "Contents"
+  },
+  "mdToggleControls": {
+    "message": "Toggle controls"
+  },
+  "mdPreviewUntitled": {
+    "message": "Untitled"
+  },
+  "mdPreviewFailed": {
+    "message": "Failed"
+  },
+  "mdPreviewNoContent": {
+    "message": "No content was extracted from this page."
+  },
   "secAiContentSource": {
     "message": "AI Content Source"
   },
@@ -1421,40 +1506,96 @@
   "optUrlCleanExclude": {
     "message": "Exclude parameters (one per line, never cleaned — e.g. keep affiliate tag=)"
   },
-  "emptyRecentBookmarks": { "message": "No recent bookmarks" },
-  "emptyTagSuggestions":  { "message": "No tag suggestions" },
-  "emptyAiTagsHint":      { "message": "Click to generate" },
-  "optPopupWidthTitle":   { "message": "Popup width" },
-  "optPopupWidth450":     { "message": "Compact (450px)" },
-  "optPopupWidth550":     { "message": "Standard (550px)" },
-  "optPopupWidth650":     { "message": "Wide (650px)" },
-  "optPopupWidthCustom":  { "message": "Custom:" },
-  "optPopupWidthHelp":    { "message": "Range: 420–720px (Chrome popup limit)" },
-  "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
-  "secMdExport": { "message": "Markdown Export Defaults" },
-  "mdExportFrontmatter": { "message": "Add YAML frontmatter to exported Markdown" },
-  "mdExportImagePolicy": { "message": "Image handling" },
-  "mdImagePolicyKeep": { "message": "Keep images (absolutize relative links)" },
-  "mdImagePolicyAlt": { "message": "Alt text only" },
-  "mdImagePolicyStrip": { "message": "Strip images" },
-  "mdExportImagePolicyHint": { "message": "Applied when copying or downloading Markdown from the preview page. Can be overridden per export." },
-  "mdExportIncludeToc": { "message": "Include table of contents" },
+  "emptyRecentBookmarks": {
+    "message": "No recent bookmarks"
+  },
+  "emptyTagSuggestions": {
+    "message": "No tag suggestions"
+  },
+  "emptyAiTagsHint": {
+    "message": "Click to generate"
+  },
+  "optPopupWidthTitle": {
+    "message": "Popup width"
+  },
+  "optPopupWidth450": {
+    "message": "Compact (450px)"
+  },
+  "optPopupWidth550": {
+    "message": "Standard (550px)"
+  },
+  "optPopupWidth650": {
+    "message": "Wide (650px)"
+  },
+  "optPopupWidthCustom": {
+    "message": "Custom:"
+  },
+  "optPopupWidthHelp": {
+    "message": "Range: 420–720px (Chrome popup limit)"
+  },
+  "optUrlCleanCustomPlaceholder": {
+    "message": "utm_other\ncustom_track_id\n_branch_referrer"
+  },
+  "optUrlCleanExcludePlaceholder": {
+    "message": "tag\nref\nsi"
+  },
+  "secMdExport": {
+    "message": "Markdown Export Defaults"
+  },
+  "mdExportFrontmatter": {
+    "message": "Add YAML frontmatter to exported Markdown"
+  },
+  "mdExportImagePolicy": {
+    "message": "Image handling"
+  },
+  "mdImagePolicyKeep": {
+    "message": "Keep images (absolutize relative links)"
+  },
+  "mdImagePolicyAlt": {
+    "message": "Alt text only"
+  },
+  "mdImagePolicyStrip": {
+    "message": "Strip images"
+  },
+  "mdExportImagePolicyHint": {
+    "message": "Applied when copying or downloading Markdown from the preview page. Can be overridden per export."
+  },
+  "mdExportIncludeToc": {
+    "message": "Include table of contents"
+  },
   "optBgSaveNoClobber": {
     "message": "Merge tags in background saves (Quick Save / Read Later)"
   },
   "optBgSaveNoClobberHint": {
     "message": "When enabled, background saves read your existing Pinboard bookmark (if any) and merge new tags with existing tags instead of replacing them. This prevents accidental tag loss on duplicate URLs. Note: adds ~3s per save for the extra API call. Foreground popup edits always replace (give you full control)."
   },
-  "obsidianInstallHint": { "message": "Obsidian must be installed for the note to open. Your note is also copied to the clipboard as a backup." },
-  "apiKeySecurityHint": { "message": "API keys are obfuscated (not encrypted) and sync via chrome.storage.sync. Do not share your settings export files." },
-  "batchPermLabel":    { "message": "Host permissions:" },
-  "batchRevokeBtn":    { "message": "Revoke all-sites access" },
-  "batchRevokeHint":   { "message": "Only needed if you enabled batch AI extraction but no longer want the extension to access all pages for content." },
-  "batchRevokeSuccess": { "message": "Revoked" },
-  "batchPermRevoked":  { "message": "revoked" },
-  "batchPermNone":     { "message": "No all-sites access is currently granted" },
-  "batchRevokeFailed": { "message": "Failed" },
+  "obsidianInstallHint": {
+    "message": "Obsidian must be installed for the note to open. Your note is also copied to the clipboard as a backup."
+  },
+  "apiKeySecurityHint": {
+    "message": "API keys are obfuscated (not encrypted) and sync via chrome.storage.sync. Do not share your settings export files."
+  },
+  "batchPermLabel": {
+    "message": "Host permissions:"
+  },
+  "batchRevokeBtn": {
+    "message": "Revoke all-sites access"
+  },
+  "batchRevokeHint": {
+    "message": "Only needed if you enabled batch AI extraction but no longer want the extension to access all pages for content."
+  },
+  "batchRevokeSuccess": {
+    "message": "Revoked"
+  },
+  "batchPermRevoked": {
+    "message": "revoked"
+  },
+  "batchPermNone": {
+    "message": "No all-sites access is currently granted"
+  },
+  "batchRevokeFailed": {
+    "message": "Failed"
+  },
   "optWayback": {
     "message": "Archive saved pages to the Wayback Machine"
   },
@@ -1475,9 +1616,6 @@
   },
   "optWaybackS3Hint": {
     "message": "With a free archive.org account key, archiving uses the authenticated API: higher quota, server-side dedup, reliable results."
-  },
-  "waybackGetKey": {
-    "message": "Get key"
   },
   "waybackPermDenied": {
     "message": "Permission for web.archive.org was declined - archiving stays off."

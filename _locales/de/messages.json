@@ -542,11 +542,31 @@
   "bgMdPreviewNoContent": {
     "message": "Auf dieser Seite wurde kein lesbarer Inhalt gefunden."
   },
-  "mdEngineSwitchTo": { "message": "Zu $ENGINE$ wechseln", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtracting": { "message": "Extraktion mit $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtractingNoteJina": { "message": "Die erste Extraktion ruft die Jina-Cloud (r.jina.ai) ab. Die Wartezeit hängt davon ab, ob diese Seite lokal zwischengespeichert ist, von deiner Netzwerkgeschwindigkeit und der Seitengröße – meist ein paar Sekunden." },
-  "mdEngineExtractFailed": { "message": "Diese Seite konnte nicht extrahiert werden. Bitte erneut versuchen." },
-  "mdEngineTabGone": { "message": "Quell-Tab nicht mehr verfügbar — Seite erneut öffnen, um Defuddle zu nutzen" },
+  "mdEngineSwitchTo": {
+    "message": "Zu $ENGINE$ wechseln",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtracting": {
+    "message": "Extraktion mit $ENGINE$…",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtractingNoteJina": {
+    "message": "Die erste Extraktion ruft die Jina-Cloud (r.jina.ai) ab. Die Wartezeit hängt davon ab, ob diese Seite lokal zwischengespeichert ist, von deiner Netzwerkgeschwindigkeit und der Seitengröße – meist ein paar Sekunden."
+  },
+  "mdEngineExtractFailed": {
+    "message": "Diese Seite konnte nicht extrahiert werden. Bitte erneut versuchen."
+  },
+  "mdEngineTabGone": {
+    "message": "Quell-Tab nicht mehr verfügbar — Seite erneut öffnen, um Defuddle zu nutzen"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard: Noch ein Schritt zum Speichern"
   },
@@ -619,8 +639,9 @@
   "tabBookmarks": {
     "message": "Lesezeichen"
   },
-  
-  "tabPopup":           { "message": "Popup" },
+  "tabPopup": {
+    "message": "Popup"
+  },
   "tabAI": {
     "message": "AI"
   },
@@ -1238,46 +1259,126 @@
   "mdStripDownloadMd": {
     "message": ".md laden"
   },
-  "mdViewRaw": { "message": "Quelltext" },
-  "mdViewRendered": { "message": "Vorschau" },
-  "mdExportSection": { "message": "Exportieren" },
-  "mdOptFrontmatter": { "message": "Frontmatter" },
-  "mdOptImages": { "message": "Bilder" },
-  "mdImgKeep": { "message": "Behalten" },
-  "mdImgAlt": { "message": "Alt-Text" },
-  "mdImgStrip": { "message": "Entfernen" },
-  "mdSendObsidian": { "message": "An Obsidian senden" },
-  "mdSentObsidian": { "message": "Gesendet" },
-  "mdObsidianVault": { "message": "Obsidian-Vault" },
-  "mdObsidianVaultHint": { "message": "Leer lassen, um den aktuellen Vault zu verwenden." },
-  "mdObsidianFolder": { "message": "Obsidian-Ordner" },
-  "mdObsidianFolderHint": { "message": "Leer lassen, um im Vault-Stammverzeichnis zu speichern." },
-  "tabMarkdown": { "message": "Markdown" },
-  "tabArchive": { "message": "Archiv" },
-  "mdObsidianEnabled": { "message": "Export nach Obsidian aktivieren" },
-  "mdObsidianEnabledHint": { "message": "Zeigt die „An Obsidian senden“-Schaltflächen in der Vorschauseite und im Popup an." },
-  "mdStripObsidian": { "message": "Obsidian" },
-  "secMdExport": { "message": "Markdown-Export – Standardwerte" },
-  "mdExportFrontmatter": { "message": "YAML-Frontmatter zum exportierten Markdown hinzufügen" },
-  "mdExportImagePolicy": { "message": "Bildbehandlung" },
-  "mdImagePolicyKeep": { "message": "Bilder beibehalten (relative Links absolut machen)" },
-  "mdImagePolicyAlt": { "message": "Nur Alternativtext" },
-  "mdImagePolicyStrip": { "message": "Bilder entfernen" },
-  "mdExportImagePolicyHint": { "message": "Wird beim Kopieren oder Herunterladen von Markdown auf der Vorschauseite angewendet. Kann pro Export überschrieben werden." },
-  "mdExportIncludeToc": { "message": "Inhaltsverzeichnis einfügen" },
-  "mdOptIncludeToc": { "message": "Inhaltsverzeichnis einfügen" },
-  "mdCopy": { "message": "Kopieren" },
-  "mdCopyMarkdown": { "message": "Markdown kopieren" },
-  "mdCopyHtml": { "message": "HTML kopieren" },
-  "mdDownloadMd": { "message": ".md laden" },
-  "mdDownloadMdTitle": { "message": "Markdown-Datei herunterladen" },
-  "mdDownloadHtml": { "message": ".html laden" },
-  "mdDownloadHtmlTitle": { "message": "HTML-Datei herunterladen" },
-  "mdTocContents": { "message": "Inhalt" },
-  "mdToggleControls": { "message": "Steuerleiste umschalten" },
-  "mdPreviewUntitled": { "message": "Ohne Titel" },
-  "mdPreviewFailed": { "message": "Fehlgeschlagen" },
-  "mdPreviewNoContent": { "message": "Aus dieser Seite konnte kein Inhalt extrahiert werden." },
+  "mdViewRaw": {
+    "message": "Quelltext"
+  },
+  "mdViewRendered": {
+    "message": "Vorschau"
+  },
+  "mdExportSection": {
+    "message": "Exportieren"
+  },
+  "mdOptFrontmatter": {
+    "message": "Frontmatter"
+  },
+  "mdOptImages": {
+    "message": "Bilder"
+  },
+  "mdImgKeep": {
+    "message": "Behalten"
+  },
+  "mdImgAlt": {
+    "message": "Alt-Text"
+  },
+  "mdImgStrip": {
+    "message": "Entfernen"
+  },
+  "mdSendObsidian": {
+    "message": "An Obsidian senden"
+  },
+  "mdSentObsidian": {
+    "message": "Gesendet"
+  },
+  "mdObsidianVault": {
+    "message": "Obsidian-Vault"
+  },
+  "mdObsidianVaultHint": {
+    "message": "Leer lassen, um den aktuellen Vault zu verwenden."
+  },
+  "mdObsidianFolder": {
+    "message": "Obsidian-Ordner"
+  },
+  "mdObsidianFolderHint": {
+    "message": "Leer lassen, um im Vault-Stammverzeichnis zu speichern."
+  },
+  "tabMarkdown": {
+    "message": "Markdown"
+  },
+  "tabArchive": {
+    "message": "Archiv"
+  },
+  "mdObsidianEnabled": {
+    "message": "Export nach Obsidian aktivieren"
+  },
+  "mdObsidianEnabledHint": {
+    "message": "Zeigt die „An Obsidian senden“-Schaltflächen in der Vorschauseite und im Popup an."
+  },
+  "mdStripObsidian": {
+    "message": "Obsidian"
+  },
+  "secMdExport": {
+    "message": "Markdown-Export – Standardwerte"
+  },
+  "mdExportFrontmatter": {
+    "message": "YAML-Frontmatter zum exportierten Markdown hinzufügen"
+  },
+  "mdExportImagePolicy": {
+    "message": "Bildbehandlung"
+  },
+  "mdImagePolicyKeep": {
+    "message": "Bilder beibehalten (relative Links absolut machen)"
+  },
+  "mdImagePolicyAlt": {
+    "message": "Nur Alternativtext"
+  },
+  "mdImagePolicyStrip": {
+    "message": "Bilder entfernen"
+  },
+  "mdExportImagePolicyHint": {
+    "message": "Wird beim Kopieren oder Herunterladen von Markdown auf der Vorschauseite angewendet. Kann pro Export überschrieben werden."
+  },
+  "mdExportIncludeToc": {
+    "message": "Inhaltsverzeichnis einfügen"
+  },
+  "mdOptIncludeToc": {
+    "message": "Inhaltsverzeichnis einfügen"
+  },
+  "mdCopy": {
+    "message": "Kopieren"
+  },
+  "mdCopyMarkdown": {
+    "message": "Markdown kopieren"
+  },
+  "mdCopyHtml": {
+    "message": "HTML kopieren"
+  },
+  "mdDownloadMd": {
+    "message": ".md laden"
+  },
+  "mdDownloadMdTitle": {
+    "message": "Markdown-Datei herunterladen"
+  },
+  "mdDownloadHtml": {
+    "message": ".html laden"
+  },
+  "mdDownloadHtmlTitle": {
+    "message": "HTML-Datei herunterladen"
+  },
+  "mdTocContents": {
+    "message": "Inhalt"
+  },
+  "mdToggleControls": {
+    "message": "Steuerleiste umschalten"
+  },
+  "mdPreviewUntitled": {
+    "message": "Ohne Titel"
+  },
+  "mdPreviewFailed": {
+    "message": "Fehlgeschlagen"
+  },
+  "mdPreviewNoContent": {
+    "message": "Aus dieser Seite konnte kein Inhalt extrahiert werden."
+  },
   "secAiContentSource": {
     "message": "AI Content Source"
   },
@@ -1429,32 +1530,72 @@
   "optUrlCleanExclude": {
     "message": "Auszuschließende Parameter (einer pro Zeile, niemals bereinigen – z. B. Affiliate-tag= behalten)"
   },
-  "emptyRecentBookmarks": { "message": "Keine aktuellen Lesezeichen" },
-  "emptyTagSuggestions":  { "message": "Keine Tag-Vorschläge" },
-  "emptyAiTagsHint":      { "message": "Zum Generieren klicken" },
-  "optPopupWidthTitle":   { "message": "Popup-Breite" },
-  "optPopupWidth450":     { "message": "Kompakt (450px)" },
-  "optPopupWidth550":     { "message": "Standard (550px)" },
-  "optPopupWidth650":     { "message": "Breit (650px)" },
-  "optPopupWidthCustom":  { "message": "Benutzerdefiniert:" },
-  "optPopupWidthHelp":    { "message": "Bereich: 420–720px (Chrome-Popup-Limit)" },
-  "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "emptyRecentBookmarks": {
+    "message": "Keine aktuellen Lesezeichen"
+  },
+  "emptyTagSuggestions": {
+    "message": "Keine Tag-Vorschläge"
+  },
+  "emptyAiTagsHint": {
+    "message": "Zum Generieren klicken"
+  },
+  "optPopupWidthTitle": {
+    "message": "Popup-Breite"
+  },
+  "optPopupWidth450": {
+    "message": "Kompakt (450px)"
+  },
+  "optPopupWidth550": {
+    "message": "Standard (550px)"
+  },
+  "optPopupWidth650": {
+    "message": "Breit (650px)"
+  },
+  "optPopupWidthCustom": {
+    "message": "Benutzerdefiniert:"
+  },
+  "optPopupWidthHelp": {
+    "message": "Bereich: 420–720px (Chrome-Popup-Limit)"
+  },
+  "optUrlCleanCustomPlaceholder": {
+    "message": "utm_other\ncustom_track_id\n_branch_referrer"
+  },
+  "optUrlCleanExcludePlaceholder": {
+    "message": "tag\nref\nsi"
+  },
   "optBgSaveNoClobber": {
     "message": "Tags in Hintergrund-Speichervorgängen zusammenführen (Schnellspeichern/Später lesen)"
   },
   "optBgSaveNoClobberHint": {
     "message": "Wenn aktiviert, liest das Hintergrund-Speichern Ihr vorhandenes Pinboard-Lesezeichen (falls vorhanden) und führt neue Tags mit vorhandenen Tags zusammen, anstatt sie zu ersetzen. Dies verhindert versehentlichen Tagloss bei doppelten URLs. Hinweis: Der zusätzliche API-Aufruf verlängert die Speicherdauer um etwa 3 Sekunden. Vordergrund-Popup-Bearbeitungen ersetzen immer (Sie haben vollständige Kontrolle)."
   },
-  "obsidianInstallHint": { "message": "Obsidian muss installiert sein, damit die Notiz geöffnet werden kann. Der Inhalt wurde zur Sicherheit auch in die Zwischenablage kopiert." },
-  "apiKeySecurityHint": { "message": "API-Schlüssel werden verschleiert (nicht verschlüsselt) und über chrome.storage.sync synchronisiert. Teilen Sie Ihre Einstellungs-Exportdateien nicht." },
-  "batchPermLabel":    { "message": "Host-Berechtigungen:" },
-  "batchRevokeBtn":    { "message": "Zugriff auf alle Websites widerrufen" },
-  "batchRevokeHint":   { "message": "Nur erforderlich, wenn Sie die KI-Massenextraktion aktiviert haben, aber die Erweiterung nicht mehr auf alle Seiten zugreifen soll." },
-  "batchRevokeSuccess": { "message": "Widerrufen" },
-  "batchPermRevoked":  { "message": "widerrufen" },
-  "batchPermNone":     { "message": "Derzeit ist kein Zugriff auf alle Websites gewährt" },
-  "batchRevokeFailed": { "message": "Fehlgeschlagen" },
+  "obsidianInstallHint": {
+    "message": "Obsidian muss installiert sein, damit die Notiz geöffnet werden kann. Der Inhalt wurde zur Sicherheit auch in die Zwischenablage kopiert."
+  },
+  "apiKeySecurityHint": {
+    "message": "API-Schlüssel werden verschleiert (nicht verschlüsselt) und über chrome.storage.sync synchronisiert. Teilen Sie Ihre Einstellungs-Exportdateien nicht."
+  },
+  "batchPermLabel": {
+    "message": "Host-Berechtigungen:"
+  },
+  "batchRevokeBtn": {
+    "message": "Zugriff auf alle Websites widerrufen"
+  },
+  "batchRevokeHint": {
+    "message": "Nur erforderlich, wenn Sie die KI-Massenextraktion aktiviert haben, aber die Erweiterung nicht mehr auf alle Seiten zugreifen soll."
+  },
+  "batchRevokeSuccess": {
+    "message": "Widerrufen"
+  },
+  "batchPermRevoked": {
+    "message": "widerrufen"
+  },
+  "batchPermNone": {
+    "message": "Derzeit ist kein Zugriff auf alle Websites gewährt"
+  },
+  "batchRevokeFailed": {
+    "message": "Fehlgeschlagen"
+  },
   "optWayback": {
     "message": "Gespeicherte Seiten im Wayback Machine archivieren"
   },
@@ -1476,9 +1617,6 @@
   "optWaybackS3Hint": {
     "message": "Mit einem kostenlosen archive.org-Kontoschlüssel verwendet das Archivieren die authentifizierte API: höheres Kontingent, serverseitige Deduplizierung, zuverlässige Ergebnisse."
   },
-  "waybackGetKey": {
-    "message": "Schlüssel holen"
-  },
   "waybackPermDenied": {
     "message": "Berechtigung für web.archive.org wurde abgelehnt - Archivierung bleibt deaktiviert."
   },
@@ -1493,7 +1631,11 @@
   },
   "archiveLogMore": {
     "message": "Ältere Einträge anzeigen ($COUNT$)",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "archiveOutcomeRequested": {
     "message": "angefordert"

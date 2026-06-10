@@ -542,11 +542,31 @@
   "bgMdPreviewNoContent": {
     "message": "Aucun contenu lisible n'a été trouvé sur cette page."
   },
-  "mdEngineSwitchTo": { "message": "Passer à $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtracting": { "message": "Extraction avec $ENGINE$…", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtractingNoteJina": { "message": "La première extraction interroge le cloud de Jina (r.jina.ai). Le délai dépend de la mise en cache locale de cette page, de votre vitesse réseau et de la taille de la page — généralement quelques secondes." },
-  "mdEngineExtractFailed": { "message": "Impossible d'extraire cette page. Veuillez réessayer." },
-  "mdEngineTabGone": { "message": "Onglet source indisponible — rouvrez la page pour utiliser Defuddle" },
+  "mdEngineSwitchTo": {
+    "message": "Passer à $ENGINE$",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtracting": {
+    "message": "Extraction avec $ENGINE$…",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtractingNoteJina": {
+    "message": "La première extraction interroge le cloud de Jina (r.jina.ai). Le délai dépend de la mise en cache locale de cette page, de votre vitesse réseau et de la taille de la page — généralement quelques secondes."
+  },
+  "mdEngineExtractFailed": {
+    "message": "Impossible d'extraire cette page. Veuillez réessayer."
+  },
+  "mdEngineTabGone": {
+    "message": "Onglet source indisponible — rouvrez la page pour utiliser Defuddle"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard : une dernière étape"
   },
@@ -619,8 +639,9 @@
   "tabBookmarks": {
     "message": "Signets"
   },
-  
-  "tabPopup":           { "message": "Popup" },
+  "tabPopup": {
+    "message": "Popup"
+  },
   "tabAI": {
     "message": "IA"
   },
@@ -1238,46 +1259,126 @@
   "mdStripDownloadMd": {
     "message": "Télécharger .md"
   },
-  "mdViewRaw": { "message": "Source" },
-  "mdViewRendered": { "message": "Aperçu" },
-  "mdExportSection": { "message": "Exporter" },
-  "mdOptFrontmatter": { "message": "Frontmatter" },
-  "mdOptImages": { "message": "Images" },
-  "mdImgKeep": { "message": "Conserver" },
-  "mdImgAlt": { "message": "Texte alt" },
-  "mdImgStrip": { "message": "Supprimer" },
-  "mdSendObsidian": { "message": "Envoyer vers Obsidian" },
-  "mdSentObsidian": { "message": "Envoyé" },
-  "mdObsidianVault": { "message": "Coffre Obsidian" },
-  "mdObsidianVaultHint": { "message": "Laisser vide pour utiliser le coffre actuel." },
-  "mdObsidianFolder": { "message": "Dossier Obsidian" },
-  "mdObsidianFolderHint": { "message": "Laisser vide pour enregistrer à la racine du coffre." },
-  "tabMarkdown": { "message": "Markdown" },
-  "tabArchive": { "message": "Archivage" },
-  "mdObsidianEnabled": { "message": "Activer l'export vers Obsidian" },
-  "mdObsidianEnabledHint": { "message": "Affiche les boutons « Envoyer vers Obsidian » dans la page d'aperçu et le popup." },
-  "mdStripObsidian": { "message": "Obsidian" },
-  "secMdExport": { "message": "Valeurs par défaut de l'export Markdown" },
-  "mdExportFrontmatter": { "message": "Ajouter un frontmatter YAML au Markdown exporté" },
-  "mdExportImagePolicy": { "message": "Gestion des images" },
-  "mdImagePolicyKeep": { "message": "Conserver les images (rendre les liens relatifs absolus)" },
-  "mdImagePolicyAlt": { "message": "Texte alternatif uniquement" },
-  "mdImagePolicyStrip": { "message": "Supprimer les images" },
-  "mdExportImagePolicyHint": { "message": "Appliqué lors de la copie ou du téléchargement du Markdown depuis la page d'aperçu. Peut être remplacé à chaque export." },
-  "mdExportIncludeToc": { "message": "Inclure la table des matières" },
-  "mdOptIncludeToc": { "message": "Inclure la TDM" },
-  "mdCopy": { "message": "Copier" },
-  "mdCopyMarkdown": { "message": "Copier le Markdown" },
-  "mdCopyHtml": { "message": "Copier le HTML" },
-  "mdDownloadMd": { "message": "Télécharger .md" },
-  "mdDownloadMdTitle": { "message": "Télécharger le fichier Markdown" },
-  "mdDownloadHtml": { "message": "Télécharger .html" },
-  "mdDownloadHtmlTitle": { "message": "Télécharger le fichier HTML" },
-  "mdTocContents": { "message": "Sommaire" },
-  "mdToggleControls": { "message": "Afficher/masquer les contrôles" },
-  "mdPreviewUntitled": { "message": "Sans titre" },
-  "mdPreviewFailed": { "message": "Échec" },
-  "mdPreviewNoContent": { "message": "Aucun contenu n'a pu être extrait de cette page." },
+  "mdViewRaw": {
+    "message": "Source"
+  },
+  "mdViewRendered": {
+    "message": "Aperçu"
+  },
+  "mdExportSection": {
+    "message": "Exporter"
+  },
+  "mdOptFrontmatter": {
+    "message": "Frontmatter"
+  },
+  "mdOptImages": {
+    "message": "Images"
+  },
+  "mdImgKeep": {
+    "message": "Conserver"
+  },
+  "mdImgAlt": {
+    "message": "Texte alt"
+  },
+  "mdImgStrip": {
+    "message": "Supprimer"
+  },
+  "mdSendObsidian": {
+    "message": "Envoyer vers Obsidian"
+  },
+  "mdSentObsidian": {
+    "message": "Envoyé"
+  },
+  "mdObsidianVault": {
+    "message": "Coffre Obsidian"
+  },
+  "mdObsidianVaultHint": {
+    "message": "Laisser vide pour utiliser le coffre actuel."
+  },
+  "mdObsidianFolder": {
+    "message": "Dossier Obsidian"
+  },
+  "mdObsidianFolderHint": {
+    "message": "Laisser vide pour enregistrer à la racine du coffre."
+  },
+  "tabMarkdown": {
+    "message": "Markdown"
+  },
+  "tabArchive": {
+    "message": "Archivage"
+  },
+  "mdObsidianEnabled": {
+    "message": "Activer l'export vers Obsidian"
+  },
+  "mdObsidianEnabledHint": {
+    "message": "Affiche les boutons « Envoyer vers Obsidian » dans la page d'aperçu et le popup."
+  },
+  "mdStripObsidian": {
+    "message": "Obsidian"
+  },
+  "secMdExport": {
+    "message": "Valeurs par défaut de l'export Markdown"
+  },
+  "mdExportFrontmatter": {
+    "message": "Ajouter un frontmatter YAML au Markdown exporté"
+  },
+  "mdExportImagePolicy": {
+    "message": "Gestion des images"
+  },
+  "mdImagePolicyKeep": {
+    "message": "Conserver les images (rendre les liens relatifs absolus)"
+  },
+  "mdImagePolicyAlt": {
+    "message": "Texte alternatif uniquement"
+  },
+  "mdImagePolicyStrip": {
+    "message": "Supprimer les images"
+  },
+  "mdExportImagePolicyHint": {
+    "message": "Appliqué lors de la copie ou du téléchargement du Markdown depuis la page d'aperçu. Peut être remplacé à chaque export."
+  },
+  "mdExportIncludeToc": {
+    "message": "Inclure la table des matières"
+  },
+  "mdOptIncludeToc": {
+    "message": "Inclure la TDM"
+  },
+  "mdCopy": {
+    "message": "Copier"
+  },
+  "mdCopyMarkdown": {
+    "message": "Copier le Markdown"
+  },
+  "mdCopyHtml": {
+    "message": "Copier le HTML"
+  },
+  "mdDownloadMd": {
+    "message": "Télécharger .md"
+  },
+  "mdDownloadMdTitle": {
+    "message": "Télécharger le fichier Markdown"
+  },
+  "mdDownloadHtml": {
+    "message": "Télécharger .html"
+  },
+  "mdDownloadHtmlTitle": {
+    "message": "Télécharger le fichier HTML"
+  },
+  "mdTocContents": {
+    "message": "Sommaire"
+  },
+  "mdToggleControls": {
+    "message": "Afficher/masquer les contrôles"
+  },
+  "mdPreviewUntitled": {
+    "message": "Sans titre"
+  },
+  "mdPreviewFailed": {
+    "message": "Échec"
+  },
+  "mdPreviewNoContent": {
+    "message": "Aucun contenu n'a pu être extrait de cette page."
+  },
   "secAiContentSource": {
     "message": "AI Content Source"
   },
@@ -1429,32 +1530,72 @@
   "optUrlCleanExclude": {
     "message": "Paramètres à exclure (un par ligne, jamais nettoyés — ex. garder affiliate tag=)"
   },
-  "emptyRecentBookmarks": { "message": "Aucun favori récent" },
-  "emptyTagSuggestions":  { "message": "Aucune suggestion de tag" },
- "emptyAiTagsHint":      { "message": "Cliquez pour générer" },
-  "optPopupWidthTitle":   { "message": "Largeur de la popup" },
-  "optPopupWidth450":     { "message": "Compact (450px)" },
-  "optPopupWidth550":     { "message": "Standard (550px)" },
-  "optPopupWidth650":     { "message": "Large (650px)" },
-  "optPopupWidthCustom":  { "message": "Personnalisé :" },
-  "optPopupWidthHelp":    { "message": "Plage : 420–720px (limite Chrome popup)" },
-  "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "emptyRecentBookmarks": {
+    "message": "Aucun favori récent"
+  },
+  "emptyTagSuggestions": {
+    "message": "Aucune suggestion de tag"
+  },
+  "emptyAiTagsHint": {
+    "message": "Cliquez pour générer"
+  },
+  "optPopupWidthTitle": {
+    "message": "Largeur de la popup"
+  },
+  "optPopupWidth450": {
+    "message": "Compact (450px)"
+  },
+  "optPopupWidth550": {
+    "message": "Standard (550px)"
+  },
+  "optPopupWidth650": {
+    "message": "Large (650px)"
+  },
+  "optPopupWidthCustom": {
+    "message": "Personnalisé :"
+  },
+  "optPopupWidthHelp": {
+    "message": "Plage : 420–720px (limite Chrome popup)"
+  },
+  "optUrlCleanCustomPlaceholder": {
+    "message": "utm_other\ncustom_track_id\n_branch_referrer"
+  },
+  "optUrlCleanExcludePlaceholder": {
+    "message": "tag\nref\nsi"
+  },
   "optBgSaveNoClobber": {
     "message": "Fusionner les tags dans les enregistrements d'arrière-plan (Enregistrement rapide/Lire plus tard)"
   },
   "optBgSaveNoClobberHint": {
     "message": "Lorsqu'elle est activée, la sauvegarde en arrière-plan lit votre signet Pinboard existant (le cas échéant) et fusionne les nouveaux tags avec les tags existants au lieu de les remplacer. Cela évite la perte accidentelle de tags sur les URL en double. Remarque : l'appel API supplémentaire ajoute environ 3 secondes au temps de sauvegarde. Les modifications du popup de premier plan remplacent toujours (vous avez le contrôle total)."
   },
-  "obsidianInstallHint": { "message": "Obsidian doit être installé pour que la note s'ouvre. Le contenu a également été copié dans le presse-papiers en guise de sauvegarde." },
-  "apiKeySecurityHint": { "message": "Les clés API sont masquées (pas chiffrées) et synchronisées via chrome.storage.sync. Ne partagez pas vos fichiers d'export de paramètres." },
-  "batchPermLabel":    { "message": "Permissions d'hôte :" },
-  "batchRevokeBtn":    { "message": "Révoquer l'accès à tous les sites" },
-  "batchRevokeHint":   { "message": "Utile uniquement si vous avez activé l'extraction AI en masse mais ne souhaitez plus que l'extension accède à toutes les pages." },
-  "batchRevokeSuccess": { "message": "Révoqué" },
-  "batchPermRevoked":  { "message": "révoqué" },
-  "batchPermNone":     { "message": "Aucun accès à tous les sites n'est actuellement accordé" },
-  "batchRevokeFailed": { "message": "Échec" },
+  "obsidianInstallHint": {
+    "message": "Obsidian doit être installé pour que la note s'ouvre. Le contenu a également été copié dans le presse-papiers en guise de sauvegarde."
+  },
+  "apiKeySecurityHint": {
+    "message": "Les clés API sont masquées (pas chiffrées) et synchronisées via chrome.storage.sync. Ne partagez pas vos fichiers d'export de paramètres."
+  },
+  "batchPermLabel": {
+    "message": "Permissions d'hôte :"
+  },
+  "batchRevokeBtn": {
+    "message": "Révoquer l'accès à tous les sites"
+  },
+  "batchRevokeHint": {
+    "message": "Utile uniquement si vous avez activé l'extraction AI en masse mais ne souhaitez plus que l'extension accède à toutes les pages."
+  },
+  "batchRevokeSuccess": {
+    "message": "Révoqué"
+  },
+  "batchPermRevoked": {
+    "message": "révoqué"
+  },
+  "batchPermNone": {
+    "message": "Aucun accès à tous les sites n'est actuellement accordé"
+  },
+  "batchRevokeFailed": {
+    "message": "Échec"
+  },
   "optWayback": {
     "message": "Archiver les pages enregistrées sur Internet Archive"
   },
@@ -1476,9 +1617,6 @@
   "optWaybackS3Hint": {
     "message": "Avec une clé de compte archive.org gratuite, l'archivage utilise l'API authentifiée : quota supérieur, dédupplication côté serveur, résultats fiables."
   },
-  "waybackGetKey": {
-    "message": "Obtenir la clé"
-  },
   "waybackPermDenied": {
     "message": "La permission pour web.archive.org a été refusée - l'archivage reste désactivé."
   },
@@ -1493,7 +1631,11 @@
   },
   "archiveLogMore": {
     "message": "Afficher les entrées plus anciennes ($COUNT$)",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "archiveOutcomeRequested": {
     "message": "demandé"

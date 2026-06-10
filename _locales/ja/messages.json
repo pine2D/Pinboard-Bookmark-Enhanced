@@ -542,11 +542,31 @@
   "bgMdPreviewNoContent": {
     "message": "このページから読み取れるコンテンツが見つかりませんでした。"
   },
-  "mdEngineSwitchTo": { "message": "$ENGINE$ に切り替え", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtracting": { "message": "$ENGINE$ で抽出しています…", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtractingNoteJina": { "message": "初回の抽出は Jina クラウド（r.jina.ai）への通信が必要です。待ち時間は、このページがローカルにキャッシュ済みか、通信速度、ページの大きさによって変わります（通常は数秒）。" },
-  "mdEngineExtractFailed": { "message": "このページを抽出できませんでした。もう一度お試しください。" },
-  "mdEngineTabGone": { "message": "元のタブが利用できません — ページを開き直すと Defuddle を使えます" },
+  "mdEngineSwitchTo": {
+    "message": "$ENGINE$ に切り替え",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtracting": {
+    "message": "$ENGINE$ で抽出しています…",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtractingNoteJina": {
+    "message": "初回の抽出は Jina クラウド（r.jina.ai）への通信が必要です。待ち時間は、このページがローカルにキャッシュ済みか、通信速度、ページの大きさによって変わります（通常は数秒）。"
+  },
+  "mdEngineExtractFailed": {
+    "message": "このページを抽出できませんでした。もう一度お試しください。"
+  },
+  "mdEngineTabGone": {
+    "message": "元のタブが利用できません — ページを開き直すと Defuddle を使えます"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard：保存まであと一歩"
   },
@@ -619,8 +639,9 @@
   "tabBookmarks": {
     "message": "ブックマーク"
   },
-  
-  "tabPopup":           { "message": "ポップアップ" },
+  "tabPopup": {
+    "message": "ポップアップ"
+  },
   "tabAI": {
     "message": "AI"
   },
@@ -1238,46 +1259,126 @@
   "mdStripDownloadMd": {
     "message": ".md をダウンロード"
   },
-  "mdViewRaw": { "message": "ソース" },
-  "mdViewRendered": { "message": "プレビュー" },
-  "mdExportSection": { "message": "エクスポート" },
-  "mdOptFrontmatter": { "message": "Frontmatter" },
-  "mdOptImages": { "message": "画像" },
-  "mdImgKeep": { "message": "保持" },
-  "mdImgAlt": { "message": "Alt テキスト" },
-  "mdImgStrip": { "message": "削除" },
-  "mdSendObsidian": { "message": "Obsidian に送る" },
-  "mdSentObsidian": { "message": "送信しました" },
-  "mdObsidianVault": { "message": "Obsidian Vault" },
-  "mdObsidianVaultHint": { "message": "空欄で現在の Vault を使用します。" },
-  "mdObsidianFolder": { "message": "Obsidian フォルダ" },
-  "mdObsidianFolderHint": { "message": "空欄で Vault のルートに保存します。" },
-  "tabMarkdown": { "message": "Markdown" },
-  "tabArchive": { "message": "アーカイブ" },
-  "mdObsidianEnabled": { "message": "Obsidian へのエクスポートを有効化" },
-  "mdObsidianEnabledHint": { "message": "プレビューページとポップアップに「Obsidian に送信」ボタンを表示します。" },
-  "mdStripObsidian": { "message": "Obsidian" },
-  "secMdExport": { "message": "Markdown エクスポートの既定値" },
-  "mdExportFrontmatter": { "message": "エクスポートする Markdown に YAML フロントマターを追加" },
-  "mdExportImagePolicy": { "message": "画像の扱い" },
-  "mdImagePolicyKeep": { "message": "画像を保持（相対リンクを絶対リンクに変換）" },
-  "mdImagePolicyAlt": { "message": "代替テキストのみ" },
-  "mdImagePolicyStrip": { "message": "画像を削除" },
-  "mdExportImagePolicyHint": { "message": "プレビューページから Markdown をコピーまたはダウンロードする際に適用されます。エクスポートごとに上書きできます。" },
-  "mdExportIncludeToc": { "message": "目次を含める" },
-  "mdOptIncludeToc": { "message": "目次を含める" },
-  "mdCopy": { "message": "コピー" },
-  "mdCopyMarkdown": { "message": "Markdown をコピー" },
-  "mdCopyHtml": { "message": "HTML をコピー" },
-  "mdDownloadMd": { "message": ".md をダウンロード" },
-  "mdDownloadMdTitle": { "message": "Markdown ファイルをダウンロード" },
-  "mdDownloadHtml": { "message": ".html をダウンロード" },
-  "mdDownloadHtmlTitle": { "message": "HTML ファイルをダウンロード" },
-  "mdTocContents": { "message": "目次" },
-  "mdToggleControls": { "message": "コントロールを切り替え" },
-  "mdPreviewUntitled": { "message": "無題" },
-  "mdPreviewFailed": { "message": "失敗" },
-  "mdPreviewNoContent": { "message": "このページからコンテンツを抽出できませんでした。" },
+  "mdViewRaw": {
+    "message": "ソース"
+  },
+  "mdViewRendered": {
+    "message": "プレビュー"
+  },
+  "mdExportSection": {
+    "message": "エクスポート"
+  },
+  "mdOptFrontmatter": {
+    "message": "Frontmatter"
+  },
+  "mdOptImages": {
+    "message": "画像"
+  },
+  "mdImgKeep": {
+    "message": "保持"
+  },
+  "mdImgAlt": {
+    "message": "Alt テキスト"
+  },
+  "mdImgStrip": {
+    "message": "削除"
+  },
+  "mdSendObsidian": {
+    "message": "Obsidian に送る"
+  },
+  "mdSentObsidian": {
+    "message": "送信しました"
+  },
+  "mdObsidianVault": {
+    "message": "Obsidian Vault"
+  },
+  "mdObsidianVaultHint": {
+    "message": "空欄で現在の Vault を使用します。"
+  },
+  "mdObsidianFolder": {
+    "message": "Obsidian フォルダ"
+  },
+  "mdObsidianFolderHint": {
+    "message": "空欄で Vault のルートに保存します。"
+  },
+  "tabMarkdown": {
+    "message": "Markdown"
+  },
+  "tabArchive": {
+    "message": "アーカイブ"
+  },
+  "mdObsidianEnabled": {
+    "message": "Obsidian へのエクスポートを有効化"
+  },
+  "mdObsidianEnabledHint": {
+    "message": "プレビューページとポップアップに「Obsidian に送信」ボタンを表示します。"
+  },
+  "mdStripObsidian": {
+    "message": "Obsidian"
+  },
+  "secMdExport": {
+    "message": "Markdown エクスポートの既定値"
+  },
+  "mdExportFrontmatter": {
+    "message": "エクスポートする Markdown に YAML フロントマターを追加"
+  },
+  "mdExportImagePolicy": {
+    "message": "画像の扱い"
+  },
+  "mdImagePolicyKeep": {
+    "message": "画像を保持（相対リンクを絶対リンクに変換）"
+  },
+  "mdImagePolicyAlt": {
+    "message": "代替テキストのみ"
+  },
+  "mdImagePolicyStrip": {
+    "message": "画像を削除"
+  },
+  "mdExportImagePolicyHint": {
+    "message": "プレビューページから Markdown をコピーまたはダウンロードする際に適用されます。エクスポートごとに上書きできます。"
+  },
+  "mdExportIncludeToc": {
+    "message": "目次を含める"
+  },
+  "mdOptIncludeToc": {
+    "message": "目次を含める"
+  },
+  "mdCopy": {
+    "message": "コピー"
+  },
+  "mdCopyMarkdown": {
+    "message": "Markdown をコピー"
+  },
+  "mdCopyHtml": {
+    "message": "HTML をコピー"
+  },
+  "mdDownloadMd": {
+    "message": ".md をダウンロード"
+  },
+  "mdDownloadMdTitle": {
+    "message": "Markdown ファイルをダウンロード"
+  },
+  "mdDownloadHtml": {
+    "message": ".html をダウンロード"
+  },
+  "mdDownloadHtmlTitle": {
+    "message": "HTML ファイルをダウンロード"
+  },
+  "mdTocContents": {
+    "message": "目次"
+  },
+  "mdToggleControls": {
+    "message": "コントロールを切り替え"
+  },
+  "mdPreviewUntitled": {
+    "message": "無題"
+  },
+  "mdPreviewFailed": {
+    "message": "失敗"
+  },
+  "mdPreviewNoContent": {
+    "message": "このページからコンテンツを抽出できませんでした。"
+  },
   "secAiContentSource": {
     "message": "AIコンテンツソース"
   },
@@ -1429,32 +1530,72 @@
   "optUrlCleanExclude": {
     "message": "除外パラメータ（1 行に 1 つ、クリーンアップしない — 例: アフィリエイト tag= を保持）"
   },
-  "emptyRecentBookmarks": { "message": "最近のブックマークはありません" },
-  "emptyTagSuggestions":  { "message": "タグの候補はありません" },
- "emptyAiTagsHint":      { "message": "クリックして生成" },
-  "optPopupWidthTitle":   { "message": "ポップアップの幅" },
-  "optPopupWidth450":     { "message": "コンパクト (450px)" },
-  "optPopupWidth550":     { "message": "標準 (550px)" },
-  "optPopupWidth650":     { "message": "広い (650px)" },
-  "optPopupWidthCustom":  { "message": "カスタム：" },
-  "optPopupWidthHelp":    { "message": "範囲: 420–720px (Chrome popup 制限)" },
-  "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "emptyRecentBookmarks": {
+    "message": "最近のブックマークはありません"
+  },
+  "emptyTagSuggestions": {
+    "message": "タグの候補はありません"
+  },
+  "emptyAiTagsHint": {
+    "message": "クリックして生成"
+  },
+  "optPopupWidthTitle": {
+    "message": "ポップアップの幅"
+  },
+  "optPopupWidth450": {
+    "message": "コンパクト (450px)"
+  },
+  "optPopupWidth550": {
+    "message": "標準 (550px)"
+  },
+  "optPopupWidth650": {
+    "message": "広い (650px)"
+  },
+  "optPopupWidthCustom": {
+    "message": "カスタム："
+  },
+  "optPopupWidthHelp": {
+    "message": "範囲: 420–720px (Chrome popup 制限)"
+  },
+  "optUrlCleanCustomPlaceholder": {
+    "message": "utm_other\ncustom_track_id\n_branch_referrer"
+  },
+  "optUrlCleanExcludePlaceholder": {
+    "message": "tag\nref\nsi"
+  },
   "optBgSaveNoClobber": {
     "message": "バックグラウンド保存のタグをマージ（クイック保存/後で読む）"
   },
   "optBgSaveNoClobberHint": {
     "message": "有効にすると、バックグラウンド保存は既存の Pinboard ブックマーク（存在する場合）を読み取り、新しいタグを既存のタグと置き換えるのではなくマージします。これにより、重複する URL での誤ったタグ損失を防ぎます。注意：追加の API 呼び出しにより、保存時間が約 3 秒増加します。フォアグラウンド ポップアップ編集は常に置き換えます（完全に制御できます）。"
   },
-  "obsidianInstallHint": { "message": "ノートを開くには Obsidian がインストールされている必要があります。ノートの内容はバックアップとしてクリップボードにもコピーされています。" },
-  "apiKeySecurityHint": { "message": "API キーは難読化（暗号化ではない）されており、chrome.storage.sync で同期されます。設定エクスポートファイルを共有しないでください。" },
-  "batchPermLabel":    { "message": "ホスト権限：" },
-  "batchRevokeBtn":    { "message": "全サイトアクセスを取り消す" },
-  "batchRevokeHint":   { "message": "一括 AI コンテンツ抽出を有効にしたが、拡張機能によるすべてのページへのアクセスが不要になった場合にのみ使用してください。" },
-  "batchRevokeSuccess": { "message": "取り消しました" },
-  "batchPermRevoked":  { "message": "取り消し済み" },
-  "batchPermNone":     { "message": "現在、全サイトへのアクセス権は付与されていません" },
-  "batchRevokeFailed": { "message": "失敗" },
+  "obsidianInstallHint": {
+    "message": "ノートを開くには Obsidian がインストールされている必要があります。ノートの内容はバックアップとしてクリップボードにもコピーされています。"
+  },
+  "apiKeySecurityHint": {
+    "message": "API キーは難読化（暗号化ではない）されており、chrome.storage.sync で同期されます。設定エクスポートファイルを共有しないでください。"
+  },
+  "batchPermLabel": {
+    "message": "ホスト権限："
+  },
+  "batchRevokeBtn": {
+    "message": "全サイトアクセスを取り消す"
+  },
+  "batchRevokeHint": {
+    "message": "一括 AI コンテンツ抽出を有効にしたが、拡張機能によるすべてのページへのアクセスが不要になった場合にのみ使用してください。"
+  },
+  "batchRevokeSuccess": {
+    "message": "取り消しました"
+  },
+  "batchPermRevoked": {
+    "message": "取り消し済み"
+  },
+  "batchPermNone": {
+    "message": "現在、全サイトへのアクセス権は付与されていません"
+  },
+  "batchRevokeFailed": {
+    "message": "失敗"
+  },
   "optWayback": {
     "message": "保存したページをインターネット アーカイブに保存する"
   },
@@ -1476,9 +1617,6 @@
   "optWaybackS3Hint": {
     "message": "無料の archive.org アカウントキーがあれば、認証済み API でアーカイブします：クォータ増加、サーバー側の重複排除、信頼性の高い結果。"
   },
-  "waybackGetKey": {
-    "message": "キーを取得"
-  },
   "waybackPermDenied": {
     "message": "web.archive.org の権限が拒否されました - アーカイブはオフのままです。"
   },
@@ -1493,7 +1631,11 @@
   },
   "archiveLogMore": {
     "message": "古いエントリを表示 ($COUNT$件)",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "archiveOutcomeRequested": {
     "message": "リクエスト済み"

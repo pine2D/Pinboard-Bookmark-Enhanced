@@ -542,11 +542,31 @@
   "bgMdPreviewNoContent": {
     "message": "未能從此頁面擷取到可讀內容。"
   },
-  "mdEngineSwitchTo": { "message": "切換到 $ENGINE$", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtracting": { "message": "正在用 $ENGINE$ 擷取…", "placeholders": { "engine": { "content": "$1" } } },
-  "mdEngineExtractingNoteJina": { "message": "首次擷取需連網請求 Jina 雲端（r.jina.ai）；耗時取決於本頁是否已在本機快取、你的網速與頁面大小，通常數秒。" },
-  "mdEngineExtractFailed": { "message": "無法擷取此頁面，請重試。" },
-  "mdEngineTabGone": { "message": "來源分頁已無法使用 — 重新開啟該頁面才能使用 Defuddle" },
+  "mdEngineSwitchTo": {
+    "message": "切換到 $ENGINE$",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtracting": {
+    "message": "正在用 $ENGINE$ 擷取…",
+    "placeholders": {
+      "engine": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdEngineExtractingNoteJina": {
+    "message": "首次擷取需連網請求 Jina 雲端（r.jina.ai）；耗時取決於本頁是否已在本機快取、你的網速與頁面大小，通常數秒。"
+  },
+  "mdEngineExtractFailed": {
+    "message": "無法擷取此頁面，請重試。"
+  },
+  "mdEngineTabGone": {
+    "message": "來源分頁已無法使用 — 重新開啟該頁面才能使用 Defuddle"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard：還差一步完成儲存"
   },
@@ -619,8 +639,9 @@
   "tabBookmarks": {
     "message": "書籤"
   },
-  
-  "tabPopup":           { "message": "彈窗" },
+  "tabPopup": {
+    "message": "彈窗"
+  },
   "tabAI": {
     "message": "AI"
   },
@@ -1238,46 +1259,126 @@
   "mdStripDownloadMd": {
     "message": "下載 .md"
   },
-  "mdViewRaw": { "message": "源碼" },
-  "mdViewRendered": { "message": "渲染" },
-  "mdExportSection": { "message": "匯出" },
-  "mdOptFrontmatter": { "message": "Frontmatter" },
-  "mdOptImages": { "message": "圖片" },
-  "mdImgKeep": { "message": "保留" },
-  "mdImgAlt": { "message": "Alt 文字" },
-  "mdImgStrip": { "message": "移除" },
-  "mdSendObsidian": { "message": "傳送到 Obsidian" },
-  "mdSentObsidian": { "message": "已傳送" },
-  "mdObsidianVault": { "message": "Obsidian 庫" },
-  "mdObsidianVaultHint": { "message": "留空則使用目前的庫。" },
-  "mdObsidianFolder": { "message": "Obsidian 資料夾" },
-  "mdObsidianFolderHint": { "message": "留空則儲存至庫根目錄。" },
-  "tabMarkdown": { "message": "Markdown" },
-  "tabArchive": { "message": "存檔" },
-  "mdObsidianEnabled": { "message": "啟用匯出到 Obsidian" },
-  "mdObsidianEnabledHint": { "message": "在預覽頁面和彈出式視窗中顯示「傳送到 Obsidian」按鈕。" },
-  "mdStripObsidian": { "message": "Obsidian" },
-  "secMdExport": { "message": "Markdown 匯出預設設定" },
-  "mdExportFrontmatter": { "message": "為匯出的 Markdown 加入 YAML frontmatter" },
-  "mdExportImagePolicy": { "message": "圖片處理" },
-  "mdImagePolicyKeep": { "message": "保留圖片（將相對連結轉為絕對連結）" },
-  "mdImagePolicyAlt": { "message": "僅保留替代文字" },
-  "mdImagePolicyStrip": { "message": "移除圖片" },
-  "mdExportImagePolicyHint": { "message": "在預覽頁面複製或下載 Markdown 時套用。可於每次匯出時個別覆寫。" },
-  "mdExportIncludeToc": { "message": "包含目錄" },
-  "mdOptIncludeToc": { "message": "含目錄" },
-  "mdCopy": { "message": "複製" },
-  "mdCopyMarkdown": { "message": "複製 Markdown" },
-  "mdCopyHtml": { "message": "複製 HTML" },
-  "mdDownloadMd": { "message": "下載 .md" },
-  "mdDownloadMdTitle": { "message": "下載 Markdown 檔案" },
-  "mdDownloadHtml": { "message": "下載 .html" },
-  "mdDownloadHtmlTitle": { "message": "下載 HTML 檔案" },
-  "mdTocContents": { "message": "目錄" },
-  "mdToggleControls": { "message": "切換控制列" },
-  "mdPreviewUntitled": { "message": "無標題" },
-  "mdPreviewFailed": { "message": "失敗" },
-  "mdPreviewNoContent": { "message": "未能從該頁面擷取到內容。" },
+  "mdViewRaw": {
+    "message": "源碼"
+  },
+  "mdViewRendered": {
+    "message": "渲染"
+  },
+  "mdExportSection": {
+    "message": "匯出"
+  },
+  "mdOptFrontmatter": {
+    "message": "Frontmatter"
+  },
+  "mdOptImages": {
+    "message": "圖片"
+  },
+  "mdImgKeep": {
+    "message": "保留"
+  },
+  "mdImgAlt": {
+    "message": "Alt 文字"
+  },
+  "mdImgStrip": {
+    "message": "移除"
+  },
+  "mdSendObsidian": {
+    "message": "傳送到 Obsidian"
+  },
+  "mdSentObsidian": {
+    "message": "已傳送"
+  },
+  "mdObsidianVault": {
+    "message": "Obsidian 庫"
+  },
+  "mdObsidianVaultHint": {
+    "message": "留空則使用目前的庫。"
+  },
+  "mdObsidianFolder": {
+    "message": "Obsidian 資料夾"
+  },
+  "mdObsidianFolderHint": {
+    "message": "留空則儲存至庫根目錄。"
+  },
+  "tabMarkdown": {
+    "message": "Markdown"
+  },
+  "tabArchive": {
+    "message": "存檔"
+  },
+  "mdObsidianEnabled": {
+    "message": "啟用匯出到 Obsidian"
+  },
+  "mdObsidianEnabledHint": {
+    "message": "在預覽頁面和彈出式視窗中顯示「傳送到 Obsidian」按鈕。"
+  },
+  "mdStripObsidian": {
+    "message": "Obsidian"
+  },
+  "secMdExport": {
+    "message": "Markdown 匯出預設設定"
+  },
+  "mdExportFrontmatter": {
+    "message": "為匯出的 Markdown 加入 YAML frontmatter"
+  },
+  "mdExportImagePolicy": {
+    "message": "圖片處理"
+  },
+  "mdImagePolicyKeep": {
+    "message": "保留圖片（將相對連結轉為絕對連結）"
+  },
+  "mdImagePolicyAlt": {
+    "message": "僅保留替代文字"
+  },
+  "mdImagePolicyStrip": {
+    "message": "移除圖片"
+  },
+  "mdExportImagePolicyHint": {
+    "message": "在預覽頁面複製或下載 Markdown 時套用。可於每次匯出時個別覆寫。"
+  },
+  "mdExportIncludeToc": {
+    "message": "包含目錄"
+  },
+  "mdOptIncludeToc": {
+    "message": "含目錄"
+  },
+  "mdCopy": {
+    "message": "複製"
+  },
+  "mdCopyMarkdown": {
+    "message": "複製 Markdown"
+  },
+  "mdCopyHtml": {
+    "message": "複製 HTML"
+  },
+  "mdDownloadMd": {
+    "message": "下載 .md"
+  },
+  "mdDownloadMdTitle": {
+    "message": "下載 Markdown 檔案"
+  },
+  "mdDownloadHtml": {
+    "message": "下載 .html"
+  },
+  "mdDownloadHtmlTitle": {
+    "message": "下載 HTML 檔案"
+  },
+  "mdTocContents": {
+    "message": "目錄"
+  },
+  "mdToggleControls": {
+    "message": "切換控制列"
+  },
+  "mdPreviewUntitled": {
+    "message": "無標題"
+  },
+  "mdPreviewFailed": {
+    "message": "失敗"
+  },
+  "mdPreviewNoContent": {
+    "message": "未能從該頁面擷取到內容。"
+  },
   "secAiContentSource": {
     "message": "AI 內容來源"
   },
@@ -1429,32 +1530,72 @@
   "optUrlCleanExclude": {
     "message": "排除參數（每行一個，永不清理 —— 例如保留 affiliate `tag=`）"
   },
-  "emptyRecentBookmarks": { "message": "暫無最近書籤" },
-  "emptyTagSuggestions":  { "message": "暫無標籤建議" },
- "emptyAiTagsHint":      { "message": "點擊生成" },
-  "optPopupWidthTitle":   { "message": "Popup 寬度" },
-  "optPopupWidth450":     { "message": "緊湊 (450px)" },
-  "optPopupWidth550":     { "message": "標準 (550px)" },
-  "optPopupWidth650":     { "message": "寬 (650px)" },
-  "optPopupWidthCustom":  { "message": "自訂：" },
-  "optPopupWidthHelp":    { "message": "範圍：420–720px（Chrome popup 限制）" },
-  "optUrlCleanCustomPlaceholder":  { "message": "utm_other\ncustom_track_id\n_branch_referrer" },
-  "optUrlCleanExcludePlaceholder": { "message": "tag\nref\nsi" },
+  "emptyRecentBookmarks": {
+    "message": "暫無最近書籤"
+  },
+  "emptyTagSuggestions": {
+    "message": "暫無標籤建議"
+  },
+  "emptyAiTagsHint": {
+    "message": "點擊生成"
+  },
+  "optPopupWidthTitle": {
+    "message": "Popup 寬度"
+  },
+  "optPopupWidth450": {
+    "message": "緊湊 (450px)"
+  },
+  "optPopupWidth550": {
+    "message": "標準 (550px)"
+  },
+  "optPopupWidth650": {
+    "message": "寬 (650px)"
+  },
+  "optPopupWidthCustom": {
+    "message": "自訂："
+  },
+  "optPopupWidthHelp": {
+    "message": "範圍：420–720px（Chrome popup 限制）"
+  },
+  "optUrlCleanCustomPlaceholder": {
+    "message": "utm_other\ncustom_track_id\n_branch_referrer"
+  },
+  "optUrlCleanExcludePlaceholder": {
+    "message": "tag\nref\nsi"
+  },
   "optBgSaveNoClobber": {
     "message": "合併背景保存中的標籤（快速保存/稍後閱讀）"
   },
   "optBgSaveNoClobberHint": {
     "message": "啟用時，背景保存將讀取您現有的 Pinboard 書籤（如有），並將新標籤與現有標籤合併，而不是替換。這可防止在重複 URL 上意外遺失標籤。注意：額外的 API 呼叫會增加約 3 秒的保存時間。前台彈出窗口編輯始終替換（讓您完全控制）。"
   },
-  "obsidianInstallHint": { "message": "需要安裝 Obsidian 才能開啟筆記。筆記內容已複製到剪貼簿作為備份。" },
-  "apiKeySecurityHint": { "message": "API 金鑰已混淆（非加密），並透過 chrome.storage.sync 同步。請勿分享您的設定匯出檔案。" },
-  "batchPermLabel":    { "message": "主機權限：" },
-  "batchRevokeBtn":    { "message": "撤銷所有網站存取權限" },
-  "batchRevokeHint":   { "message": "僅在您啟用了批量 AI 內容擷取但不再希望擴充功能存取所有頁面時使用。" },
-  "batchRevokeSuccess": { "message": "已撤銷" },
-  "batchPermRevoked":  { "message": "已撤銷" },
-  "batchPermNone":     { "message": "目前未授予所有網站存取權限" },
-  "batchRevokeFailed": { "message": "失敗" },
+  "obsidianInstallHint": {
+    "message": "需要安裝 Obsidian 才能開啟筆記。筆記內容已複製到剪貼簿作為備份。"
+  },
+  "apiKeySecurityHint": {
+    "message": "API 金鑰已混淆（非加密），並透過 chrome.storage.sync 同步。請勿分享您的設定匯出檔案。"
+  },
+  "batchPermLabel": {
+    "message": "主機權限："
+  },
+  "batchRevokeBtn": {
+    "message": "撤銷所有網站存取權限"
+  },
+  "batchRevokeHint": {
+    "message": "僅在您啟用了批量 AI 內容擷取但不再希望擴充功能存取所有頁面時使用。"
+  },
+  "batchRevokeSuccess": {
+    "message": "已撤銷"
+  },
+  "batchPermRevoked": {
+    "message": "已撤銷"
+  },
+  "batchPermNone": {
+    "message": "目前未授予所有網站存取權限"
+  },
+  "batchRevokeFailed": {
+    "message": "失敗"
+  },
   "optWayback": {
     "message": "保存頁面到網際網路檔案館"
   },
@@ -1476,9 +1617,6 @@
   "optWaybackS3Hint": {
     "message": "使用免費的 archive.org 帳戶金鑰，存檔將使用已認證的 API：更高的配額、伺服器端去重、可靠的結果。"
   },
-  "waybackGetKey": {
-    "message": "獲取金鑰"
-  },
   "waybackPermDenied": {
     "message": "拒絕了 web.archive.org 的權限 - 存檔保持關閉。"
   },
@@ -1493,7 +1631,11 @@
   },
   "archiveLogMore": {
     "message": "顯示更早的記錄（$COUNT$ 條）",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "archiveOutcomeRequested": {
     "message": "已請求"

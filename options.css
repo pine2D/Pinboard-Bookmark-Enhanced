@@ -829,11 +829,20 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 .wayback-log-url {
   flex: 1;
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+.wayback-log-url:hover { color: var(--opt-accent, #4477bb); text-decoration: underline; }
+.wayback-log-url-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--opt-fg, #333);
+  min-width: 0;
 }
+.wayback-log-url .ext-icon { width: 10px; height: 10px; flex: none; vertical-align: -1px; }
 .wayback-log-time {
   flex: 0 0 80px;
   color: var(--opt-fg-muted, #666);
@@ -845,8 +854,10 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   white-space: nowrap;
 }
 .wayback-perm-status {
+  display: block;
   font-size: 11px;
   color: var(--opt-fg-muted, #666);
+  margin: 2px 0 10px;
 }
 .wayback-log-more > summary {
   cursor: pointer;
