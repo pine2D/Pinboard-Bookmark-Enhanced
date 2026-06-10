@@ -110,7 +110,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .fg-stack > div:last-child { margin-bottom: 0; }
 .fg-stack > div > label { padding: 2px 0; margin-bottom: 0; }
 .fg-stack > label.bl { margin-bottom: 6px; }
-.fg-stack > .hint { margin-top: 6px; }
+.fg.fg-stack > .hint { margin-top: 6px; }
 .fg-stack > div:has(input[type="number"]),
 .fg-stack > div:has(input[type="text"]) { margin-top: 4px; margin-bottom: 6px; }
 .fg-stack input[type="number"] { padding: 1px 6px; font-size: 12px; height: auto; line-height: 1.4; }
