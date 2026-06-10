@@ -1352,7 +1352,7 @@ async function ensureTagSnapshot() {
   }
 }
 
-async function confirmMergeGroup(group, canonical) {
+async function confirmMergeGroup(group, canonical, anchorEl) {
   if (!group || !group.members || group.members.length === 0) return;
   const plan = pbpTagGovBuildPlan(group.members, canonical);
   if (plan.length === 0) return;
@@ -1360,7 +1360,7 @@ async function confirmMergeGroup(group, canonical) {
   const summary = renames.map(op => op.old + " -> " + canonical).join(" | ");
   const msg = t("tagGovConfirmMerge", String(renames.length), canonical)
     + (summary ? ": " + summary : "");
-  const anchor = $id("tag-gov-groups");
+  const anchor = anchorEl;
   if (!anchor) return;
   showConfirmPopover(anchor, {
     msg,
@@ -1567,7 +1567,7 @@ async function renderTagGov() {
     mergeBtn.addEventListener("click", () => {
       const selected = row.querySelector("input[type=\"radio\"]:checked");
       const canonical = selected ? selected.value : group.suggestedCanonical;
-      if (typeof confirmMergeGroup === "function") confirmMergeGroup(group, canonical);
+      if (typeof confirmMergeGroup === "function") confirmMergeGroup(group, canonical, mergeBtn);
     });
     btnGroup.appendChild(mergeBtn);
 
