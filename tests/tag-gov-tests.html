@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Tag Governance Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1200px; }
+h2 { margin-top: 24px; font-size: 16px; }
+.suite { margin: 12px 0; padding: 8px; border-left: 3px solid #ccc; }
+.case { padding: 4px 8px; margin: 4px 0; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<h1>tag-gov.js Tests</h1>
+<div id="results"></div>
+<script src="../tag-gov.js"></script>
+<script>
+
+function test(name, fn) {
+  try {
+    fn();
+    const div = document.createElement("div");
+    div.className = "case pass";
+    div.textContent = "✓ " + name;
+    document.getElementById("results").appendChild(div);
+  } catch (e) {
+    const div = document.createElement("div");
+    div.className = "case fail";
+    div.textContent = "✗ " + name + "\n  " + e.message;
+    document.getElementById("results").appendChild(div);
+  }
+}
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || "assertion failed");
+}
+
+function suite(name, fn) {
+  const div = document.createElement("div");
+  div.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = name;
+  div.appendChild(h);
+  const results = document.getElementById("results");
+  const savedAppend = results.appendChild;
+  results.appendChild = function(el) {
+    if (el.className?.includes("case")) div.appendChild(el);
+    else savedAppend.call(results, el);
+  };
+  fn();
+  results.appendChild = savedAppend;
+  results.appendChild(div);
+}
+
+// ============ pbpTagGovLevenshtein ============
+suite("pbpTagGovLevenshtein", () => {
+  test("equal strings return 0", () => {
+    assert(pbpTagGovLevenshtein("tag", "tag") === 0, "should return 0");
+  });
+
+  test("substitution returns 1", () => {
+    assert(pbpTagGovLevenshtein("tag", "taz") === 1, "one char substitution");
+  });
+
+  test("single insertion returns 1", () => {
+    assert(pbpTagGovLevenshtein("tag", "tags") === 1, "insert s");
+  });
+
+  test("single deletion returns 1", () => {
+    assert(pbpTagGovLevenshtein("tags", "tag") === 1, "delete s");
+  });
+
+  test("transposition ab/ba returns 2", () => {
+    assert(pbpTagGovLevenshtein("ab", "ba") === 2, "transposition is 2 edits");
+  });
+
+  test("length diff 2 returns 2", () => {
+    assert(pbpTagGovLevenshtein("tag", "t") === 2, "too many edits");
+  });
+
+  test("empty vs nonempty returns edit distance", () => {
+    assert(pbpTagGovLevenshtein("", "a") === 1, "one insertion");
+    assert(pbpTagGovLevenshtein("ab", "") === 2, "two deletions");
+  });
+});
+
+// ============ pbpTagGovFindGroups - plural ============
+suite("pbpTagGovFindGroups: plural", () => {
+  test("recipe/recipes s-plural pairs", () => {
+    const counts = { recipe: 10, recipes: 5 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 1, "one group");
+    assert(groups[0].kind === "plural", "kind is plural");
+    assert(groups[0].members.length === 2, "2 members");
+    assert(groups[0].suggestedCanonical === "recipe", "highest count wins");
+  });
+
+  test("box/boxes es-plural pairs", () => {
+    const counts = { box: 20, boxes: 8 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 1, "one group");
+    assert(groups[0].kind === "plural", "kind is plural");
+    assert(groups[0].members.some(m => m.tag === "box"), "has box");
+    assert(groups[0].members.some(m => m.tag === "boxes"), "has boxes");
+  });
+
+  test("study/studies ies-plural pairs", () => {
+    const counts = { study: 15, studies: 6 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 1, "one group");
+    assert(groups[0].kind === "plural", "kind is plural");
+    assert(groups[0].suggestedCanonical === "study", "singular form is canonical");
+  });
+
+  test("reverse direction found once: studies/study", () => {
+    const counts = { studies: 12, study: 5 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 1, "one group (no duplicate)");
+    assert(groups[0].suggestedCanonical === "studies", "highest count: studies");
+  });
+
+  test("les false-positive guard: le/les should not pair via ies rule", () => {
+    const counts = { le: 1, les: 3 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "should not pair: stem too short");
+  });
+
+  test("stem length guard: as/a should not pair", () => {
+    const counts = { a: 2, as: 5 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "should not pair: stem length < 2");
+  });
+
+  test("dot-tag exclusion: .recipe/recipes no group", () => {
+    const counts = { ".recipe": 10, recipes: 5 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "dot-tags excluded from all groups");
+  });
+
+  test("recipe/.recipes: only recipe kept", () => {
+    const counts = { recipe: 10, ".recipes": 5 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "recipe without recipes; dot-recipes excluded");
+  });
+});
+
+// ============ pbpTagGovFindGroups - separator ============
+suite("pbpTagGovFindGroups: separator", () => {
+  test("machine-learning/machine_learning/machinelearning = one 3-member group", () => {
+    const counts = { "machine-learning": 10, "machine_learning": 8, machinelearning: 5 };
+    const groups = pbpTagGovFindGroups(counts);
+    const sepGroups = groups.filter(g => g.kind === "separator");
+    assert(sepGroups.length === 1, "one separator group");
+    assert(sepGroups[0].members.length === 3, "3 members");
+    assert(sepGroups[0].suggestedCanonical === "machine-learning", "highest count");
+  });
+
+  test("a-b vs ab pairs", () => {
+    const counts = { "a-b": 12, ab: 7 };
+    const groups = pbpTagGovFindGroups(counts);
+    const sepGroups = groups.filter(g => g.kind === "separator");
+    assert(sepGroups.length === 1, "one separator group");
+    assert(sepGroups[0].members.length === 2, "2 members");
+  });
+
+  test("no group when only one form exists", () => {
+    const counts = { "machine-learning": 10 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "no group with single form");
+  });
+});
+
+// ============ pbpTagGovFindGroups - typo ============
+suite("pbpTagGovFindGroups: typo", () => {
+  test("javascript/javascrip: len ok, dist 1, counts 156 vs 1 -> group", () => {
+    const counts = { javascript: 156, javascrip: 1 };
+    const groups = pbpTagGovFindGroups(counts);
+    const typoGroups = groups.filter(g => g.kind === "typo");
+    assert(typoGroups.length === 1, "one typo group");
+    assert(typoGroups[0].suggestedCanonical === "javascript", "high count wins");
+  });
+
+  test("len<5 rejected: tag/tab (len 3)", () => {
+    const counts = { tag: 10, tab: 5 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "tags too short for typo");
+  });
+
+  test("ratio fail rejected: counts 3 vs 4", () => {
+    const counts = { python: 3, pyton: 4 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "ratio 4/3 = 1.33 < 5");
+  });
+
+  test("distance 2 rejected", () => {
+    const counts = { javascript: 100, javaserpt: 1 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "distance > 1");
+  });
+
+  test("both-low-counts rejected: min 3", () => {
+    const counts = { python: 3, pyton: 2 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "min count 2 <= 2");
+  });
+
+  test("min count 3 rejected (gate is min <= 2)", () => {
+    const counts = { python: 18, pyton: 3 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "min count 3 > 2: rejected by gate");
+  });
+});
+
+// ============ pbpTagGovFindGroups - priority ============
+suite("pbpTagGovFindGroups: priority", () => {
+  test("boxes/box-es matches as separator variant", () => {
+    const counts = { boxes: 100, "box-es": 50 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 1, "one group");
+    assert(groups[0].kind === "separator", "kind is separator");
+  });
+
+  test("plural-consumed pair does not re-emit as typo", () => {
+    const counts = { recipe: 10, recipes: 1 };  // dist 1, len>=5 — would qualify as typo if not consumed
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 1, "exactly one group");
+    assert(groups[0].kind === "plural", "plural wins");
+  });
+
+  test("tag consumed by plural does not appear in typo group", () => {
+    const counts = { study: 100, studies: 50, studt: 10 };
+    const groups = pbpTagGovFindGroups(counts);
+    const members = new Set();
+    groups.forEach(g => g.members.forEach(m => members.add(m.tag)));
+    assert(members.has("study"), "study in plural group");
+    assert(members.has("studies"), "studies in plural group");
+    assert(!members.has("studt"), "studt not used (study consumed)");
+  });
+});
+
+// ============ pbpTagGovFindGroups - canonical ============
+suite("pbpTagGovFindGroups: canonical", () => {
+  test("highest count wins", () => {
+    const counts = { javascript: 200, javascrip: 2 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups[0].suggestedCanonical === "javascript", "highest");
+  });
+
+  test("tie: lexicographically smallest", () => {
+    const counts = { zebra: 10, apple: 10 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 0, "no typo group: dist > 1");
+
+    const counts2 = { "a-b": 10, ab: 10 };
+    const groups2 = pbpTagGovFindGroups(counts2);
+    const sepGroups = groups2.filter(g => g.kind === "separator");
+    assert(sepGroups[0].suggestedCanonical === "a-b", "lexicographically smaller");
+  });
+
+  test("separator tie-break is lexicographic regardless of insertion order", () => {
+    const counts = { ab: 10, "a-b": 10 };
+    const groups = pbpTagGovFindGroups(counts);
+    assert(groups.length === 1, "one group");
+    assert(groups[0].suggestedCanonical === "a-b", "lexicographically smallest wins on tie");
+  });
+});
+
+// ============ pbpTagGovBuildPlan ============
+suite("pbpTagGovBuildPlan", () => {
+  test("happy path 2-member -> 1 op", () => {
+    const plan = pbpTagGovBuildPlan([{tag:"recipe",count:10},{tag:"recipes",count:5}], "recipe");
+    assert(plan.length === 1, "one operation");
+    assert(plan[0].op === "rename", "op is rename");
+    assert(plan[0].old === "recipes", "old is non-canonical");
+    assert(plan[0].new === "recipe", "new is canonical");
+  });
+
+  test("3-member -> 2 ops", () => {
+    const plan = pbpTagGovBuildPlan([{tag:"machine-learning",count:10},{tag:"machine_learning",count:8},{tag:"machinelearning",count:5}], "machine-learning");
+    assert(plan.length === 2, "two operations");
+    assert(plan[0].old === "machine_learning", "ordered by members");
+    assert(plan[1].old === "machinelearning", "ordered by members");
+    plan.forEach(op => assert(op.new === "machine-learning", "all rename to canonical"));
+  });
+
+  test("rejects empty canonical -> []", () => {
+    const plan = pbpTagGovBuildPlan([{tag:"recipe",count:10},{tag:"recipes",count:5}], "");
+    assert(plan.length === 0, "empty canonical rejected");
+  });
+
+  test("rejects canonical not in members -> []", () => {
+    const plan = pbpTagGovBuildPlan([{tag:"recipe",count:10},{tag:"recipes",count:5}], "dishes");
+    assert(plan.length === 0, "canonical not found");
+  });
+
+  test("rejects if any member is dot-tag -> []", () => {
+    const plan = pbpTagGovBuildPlan([{tag:"recipe",count:10},{tag:".recipes",count:5}], "recipe");
+    assert(plan.length === 0, "dot-tag in members");
+  });
+
+  test("rejects case-insensitive old==new -> []", () => {
+    const plan = pbpTagGovBuildPlan([{tag:"Recipe",count:10},{tag:"recipes",count:5}], "recipe");
+    assert(plan.length === 0, "Recipe and recipe are same case-insensitively");
+  });
+});
+
+// ============ pbpTagGovBuildAiPrompt ============
+suite("pbpTagGovBuildAiPrompt", () => {
+  test("contains all tags when under cap", () => {
+    const counts = { python: 10, javascript: 8, typescript: 5 };
+    const prompt = pbpTagGovBuildAiPrompt(counts, 100);
+    assert(prompt.includes("python"), "includes python");
+    assert(prompt.includes("javascript"), "includes javascript");
+    assert(prompt.includes("typescript"), "includes typescript");
+    assert(!prompt.includes("truncated"), "no truncation message");
+  });
+
+  test("over cap states truncation", () => {
+    const counts = {};
+    for (let i = 0; i < 2000; i++) counts[`tag${i}`] = i;
+    const prompt = pbpTagGovBuildAiPrompt(counts, 100);
+    assert(prompt.includes("truncated") || prompt.includes("top"), "states truncation");
+  });
+
+  test("demands strict JSON array", () => {
+    const counts = { python: 10, javascript: 8 };
+    const prompt = pbpTagGovBuildAiPrompt(counts, 100);
+    assert(prompt.includes("JSON"), "mentions JSON");
+    assert(prompt.includes("[]") || prompt.includes("array"), "shows array format");
+    assert(prompt.includes("members") && prompt.includes("canonical") && prompt.includes("reason"), "shows required fields");
+  });
+
+  test("forbids inventing tags", () => {
+    const counts = { python: 10, javascript: 8 };
+    const prompt = pbpTagGovBuildAiPrompt(counts, 100);
+    assert(prompt.toLowerCase().includes("not") || prompt.toLowerCase().includes("only"), "forbids invention");
+  });
+
+  test("capN default 1500", () => {
+    const counts = {};
+    for (let i = 0; i < 100; i++) counts[`tag${i}`] = i;
+    const prompt1 = pbpTagGovBuildAiPrompt(counts);
+    const prompt2 = pbpTagGovBuildAiPrompt(counts, 1500);
+    assert(prompt1.length === prompt2.length || prompt1.includes(counts), "default works");
+  });
+});
+
+// ============ pbpTagGovParseAiResponse ============
+suite("pbpTagGovParseAiResponse", () => {
+  test("fenced JSON parsed", () => {
+    const text = `\`\`\`json\n[{"members":["python","pyton"],"canonical":"python","reason":"typo"}]\n\`\`\``;
+    const counts = { python: 100, pyton: 5 };
+    const groups = pbpTagGovParseAiResponse(text, counts);
+    assert(groups.length === 1, "one group parsed");
+    assert(groups[0].kind === "ai", "kind is ai");
+  });
+
+  test("hallucinated member dropped", () => {
+    const text = `[{"members":["python","fakemember"],"canonical":"python","reason":"typo"}]`;
+    const counts = { python: 100 };
+    const groups = pbpTagGovParseAiResponse(text, counts);
+    assert(groups.length === 0, "hallucinated member drops group");
+  });
+
+  test("single-member dropped", () => {
+    const text = `[{"members":["python"],"canonical":"python","reason":"error"}]`;
+    const counts = { python: 100 };
+    const groups = pbpTagGovParseAiResponse(text, counts);
+    assert(groups.length === 0, "single member < 2");
+  });
+
+  test("canonical-outside dropped", () => {
+    const text = `[{"members":["python","pyton"],"canonical":"notinmembers","reason":"typo"}]`;
+    const counts = { python: 100, pyton: 5 };
+    const groups = pbpTagGovParseAiResponse(text, counts);
+    assert(groups.length === 0, "canonical not in members");
+  });
+
+  test("valid group -> kind ai with reason preserved", () => {
+    const text = `[{"members":["python","pyton"],"canonical":"python","reason":"missing n"}]`;
+    const counts = { python: 100, pyton: 5 };
+    const groups = pbpTagGovParseAiResponse(text, counts);
+    assert(groups.length === 1, "valid group");
+    assert(groups[0].kind === "ai", "kind ai");
+    assert(groups[0].reason === "missing n", "reason preserved");
+    assert(groups[0].suggestedCanonical === "python", "canonical set");
+  });
+
+  test("dot-tag member dropped", () => {
+    const text = `[{"members":["python",".pyton"],"canonical":"python","reason":"typo"}]`;
+    const counts = { python: 100, ".pyton": 5 };
+    const groups = pbpTagGovParseAiResponse(text, counts);
+    assert(groups.length === 0, "dot-tag member disqualifies");
+  });
+});
+
+// ============ pbpTagGovLowCountTags ============
+suite("pbpTagGovLowCountTags", () => {
+  test("threshold default 1; dot excluded; sorted", () => {
+    const counts = { alpha: 0, bravo: 1, charlie: 2, ".delta": 0 };
+    const low = pbpTagGovLowCountTags(counts);
+    assert(low.length === 2, "alpha and bravo (count 0-1)");
+    assert(!low.some(t => t.tag.startsWith(".")), "dot excluded");
+    assert(low[0].tag === "alpha", "sorted by tag");
+    assert(low[1].tag === "bravo", "sorted by tag");
+  });
+
+  test("threshold 3", () => {
+    const counts = { alpha: 1, bravo: 2, charlie: 3, delta: 4 };
+    const low = pbpTagGovLowCountTags(counts, 3);
+    assert(low.length === 3, "alpha, bravo, charlie");
+    assert(!low.some(t => t.tag === "delta"), "delta excluded (count 4 > 3)");
+  });
+
+  test("sorted ascending by tag", () => {
+    const counts = { zebra: 1, apple: 0, middle: 1 };
+    const low = pbpTagGovLowCountTags(counts, 2);
+    assert(low[0].tag === "apple", "a first");
+    assert(low[1].tag === "middle", "m second");
+    assert(low[2].tag === "zebra", "z last");
+  });
+});
+
+</script>
+</body></html>
