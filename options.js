@@ -1210,6 +1210,174 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // ---- Tag Governance helpers (top-level so they survive the DOMContentLoaded closure) ----
 
+const TAG_GOV_RETRY_WAIT_MS = 10000; // single backoff before retrying a 429 once (Pinboard rate limit)
+
+// Shared token reader for tag-governance operations.
+// Returns the deobfuscated Pinboard token, or "" if not set / on error.
+async function getTagGovToken() {
+  try {
+    const s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+    return deobfuscateKey(s.pinboardToken) || "";
+  } catch (e) {
+    console.error("[tag-gov] getTagGovToken failed:", e);
+    return "";
+  }
+}
+
+// Once per options-page session: download a tags/get snapshot before any destructive op.
+// Returns true if the snapshot was already downloaded this session or was just successfully
+// downloaded. Returns false (and shows an error in #tag-gov-progress-text) on any failure.
+let _tagGovSnapshotDownloaded = false;
+
+async function ensureTagSnapshot() {
+  if (_tagGovSnapshotDownloaded) return true;
+  const progressText = $id("tag-gov-progress-text");
+  const progress = $id("tag-gov-progress");
+  try {
+    const token = await getTagGovToken();
+    if (!token) {
+      if (progress) progress.classList.remove("hidden");
+      if (progressText) progressText.textContent = t("tagGovSnapshotFailed");
+      return false;
+    }
+    const resp = await pinboardFetch(
+      `https://api.pinboard.in/v1/tags/get?auth_token=${encodeURIComponent(token)}&format=json`
+    );
+    if (!resp || !resp.ok) {
+      if (progress) progress.classList.remove("hidden");
+      if (progressText) progressText.textContent = t("tagGovSnapshotFailed");
+      return false;
+    }
+    const counts = await resp.json();
+    const now = new Date();
+    const pad = (n, w = 2) => String(n).padStart(w, "0");
+    const yyyymmdd = pad(now.getFullYear(), 4) + pad(now.getMonth() + 1) + pad(now.getDate());
+    const hhmm = pad(now.getHours()) + pad(now.getMinutes());
+    const filename = `pinboard-tags-snapshot-${yyyymmdd}-${hhmm}.json`;
+    const blob = new Blob(
+      [JSON.stringify({ exportedAt: now.toISOString(), counts }, null, 2)],
+      { type: "application/json" }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    _tagGovSnapshotDownloaded = true;
+    if (progress) progress.classList.remove("hidden");
+    if (progressText) progressText.textContent = t("tagGovSnapshotSaved");
+    return true;
+  } catch (e) {
+    console.error("[tag-gov] ensureTagSnapshot failed:", e);
+    if (progress) progress.classList.remove("hidden");
+    if (progressText) progressText.textContent = t("tagGovSnapshotFailed");
+    return false;
+  }
+}
+
+async function confirmMergeGroup(group, canonical) {
+  if (!group || !group.members || group.members.length === 0) return;
+  const plan = pbpTagGovBuildPlan(group.members, canonical);
+  if (plan.length === 0) return;
+  const renames = plan.filter(op => op.op === "rename");
+  const summary = renames.map(op => op.old + " -> " + canonical).join(" | ");
+  const msg = t("tagGovConfirmMerge", String(renames.length), canonical)
+    + (summary ? ": " + summary : "");
+  const anchor = $id("tag-gov-groups");
+  if (!anchor) return;
+  showConfirmPopover(anchor, {
+    msg,
+    yesText: t("tagGovMerge"),
+    noText: t("cancel"),
+    onConfirm: async () => {
+      if (!(await ensureTagSnapshot())) return;
+      await runTagGovOps(plan);
+    }
+  });
+}
+
+async function runTagGovOps(ops) {
+  if (!ops || ops.length === 0) return { ok: 0, fail: 0, aborted: false };
+  const token = await getTagGovToken();
+  if (!token) {
+    const pt = $id("tag-gov-progress-text");
+    const pg = $id("tag-gov-progress");
+    if (pg) pg.classList.remove("hidden");
+    if (pt) pt.textContent = t("pinboardErrorAuth");
+    return { ok: 0, fail: ops.length, aborted: false };
+  }
+
+  const progress = $id("tag-gov-progress");
+  const fill = $id("tag-gov-progress-fill");
+  const ptext = $id("tag-gov-progress-text");
+  if (progress) progress.classList.remove("hidden");
+
+  let ok = 0, fail = 0, aborted = false;
+  const enc = encodeURIComponent;
+
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i];
+    const pct = Math.round(((i + 1) / ops.length) * 100);
+    if (fill) fill.style.width = pct + "%";
+    if (ptext) {
+      ptext.innerHTML =
+        (i + 1) + "/" + ops.length + " " +
+        "<span class=\"status-ic ok\">" + PBP_ICONS.check + "</span>" + ok + " " +
+        "<span class=\"status-ic bad\">" + PBP_ICONS.cross + "</span>" + fail;
+    }
+
+    let opUrl;
+    if (op.op === "rename") {
+      opUrl = `https://api.pinboard.in/v1/tags/rename?old=${enc(op.old)}&new=${enc(op.new)}&auth_token=${enc(token)}&format=json`;
+    } else if (op.op === "delete") {
+      opUrl = `https://api.pinboard.in/v1/tags/delete?tag=${enc(op.tag)}&auth_token=${enc(token)}&format=json`;
+    } else {
+      fail++;
+      continue;
+    }
+
+    try {
+      let resp = await pinboardFetch(opUrl);
+      if (resp.status === 429) {
+        await new Promise(r => setTimeout(r, TAG_GOV_RETRY_WAIT_MS));
+        resp = await pinboardFetch(opUrl);
+        if (resp.status === 429) {
+          aborted = true;
+          break;
+        }
+      }
+      if (!resp.ok) {
+        fail++;
+        continue;
+      }
+      const data = await resp.json();
+      if (data.result === "done") {
+        ok++;
+      } else {
+        fail++;
+      }
+    } catch (e) {
+      console.error("[tag-gov] op failed:", op, e);
+      fail++;
+    }
+  }
+
+  if (ptext) {
+    if (aborted) {
+      ptext.textContent = t("tagGovAborted429");
+    } else {
+      ptext.textContent = t("tagGovDoneSummary", String(ok), String(fail));
+    }
+  }
+
+  try { await chrome.storage.local.remove("cached_user_tags"); } catch (_) {}
+  await loadTagCounts(true);
+  await renderTagGov();
+
+  return { ok, fail, aborted };
+}
+
 async function loadTagCounts(forceFresh = false) {
   try {
     if (!forceFresh) {
@@ -1221,12 +1389,18 @@ async function loadTagCounts(forceFresh = false) {
         }
       }
     }
-    const result = await pinboardFetch("tags/get", { format: "json" });
-    if (!result || typeof result !== "object") return null;
+    const token = await getTagGovToken();
+    if (!token) return null;
+    const resp = await pinboardFetch(
+      `https://api.pinboard.in/v1/tags/get?auth_token=${encodeURIComponent(token)}&format=json`
+    );
+    if (!resp || !resp.ok) return null;
+    const counts = await resp.json();
+    if (!counts || typeof counts !== "object") return null;
     await chrome.storage.local.set({
-      cached_user_tags: { counts: result, timestamp: Date.now() }
+      cached_user_tags: { counts, timestamp: Date.now() }
     });
-    return result;
+    return counts;
   } catch (e) {
     console.error("[tag-gov] loadTagCounts failed:", e);
     return null;
