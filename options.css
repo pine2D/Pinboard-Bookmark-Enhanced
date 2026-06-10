@@ -159,7 +159,9 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
 html[data-theme] .panel-foot a:hover { color: var(--opt-accent); }
 
 /* ---- Common elements ---- */
-.hint { font-size: 11px; color: #757575; margin-top: 2px; }
+.hint { font-size: 11px; color: #757575; margin: 2px 0 10px; }
+.fg > .hint { margin: 2px 0 0; }   /* inside a form group: tight to its control; the group's own margin-bottom (10px) provides separation */
+.fg + .hint { margin-top: -6px; }  /* a hint owned by the preceding group: pull close (net ~4px gap above, 10px below) */
 .hint a { color: #4477bb; }
 .hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 .hint-warn::before {

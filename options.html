@@ -54,11 +54,11 @@
       <div class="divider"></div>
       <div class="section-title" data-i18n="secSync">Data Sync</div>
       <div class="fg"><label><input type="checkbox" id="opt-sync-enabled" /> <span data-i18n="optSyncEnabled">Sync settings across devices via Google account</span></label></div>
-      <p class="hint" style="margin-top:-4px;margin-bottom:8px" data-i18n="optSyncHint">When enabled, settings sync across Chrome installations signed into the same Google account.</p>
+      <p class="hint" data-i18n="optSyncHint">When enabled, settings sync across Chrome installations signed into the same Google account.</p>
       <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
       <div class="divider"></div>
       <div class="section-title" data-i18n="secBackupRestore">Backup &amp; Restore</div>
-      <p class="hint" style="margin-top:-4px;margin-bottom:8px" data-i18n="backupHint">Export/import your settings (API keys are excluded from export for security).</p>
+      <p class="hint" data-i18n="backupHint">Export/import your settings (API keys are excluded from export for security).</p>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="btn" id="export-settings" data-i18n="exportSettings">Export Settings</button>
         <label class="btn" style="cursor:pointer;" title="Import settings from JSON file">
@@ -161,9 +161,9 @@
           <span class="accordion-arrow"></span> <span data-i18n="secQuickSave">Quick Save</span>
         </div>
         <div class="accordion-body" id="acc-qs">
-          <p class="hint" style="margin-bottom:8px" data-i18n="qsHint">Save the current page instantly via keyboard shortcut (without opening popup).</p>
+          <p class="hint" data-i18n="qsHint">Save the current page instantly via keyboard shortcut (without opening popup).</p>
           <p style="margin-bottom:8px;"><a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" style="text-decoration:none;" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
-          <p class="hint" style="margin-bottom:8px"><span data-i18n="shortcutsManual">Or navigate manually:</span> <code>chrome://extensions/shortcuts</code></p>
+          <p class="hint"><span data-i18n="shortcutsManual">Or navigate manually:</span> <code>chrome://extensions/shortcuts</code></p>
           <div class="fg"><label><input type="checkbox" id="qs-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
           <div class="fg"><label><input type="checkbox" id="qs-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
           <div class="fg">
@@ -180,7 +180,7 @@
           <span class="accordion-arrow"></span> <span data-i18n="secReadLater">Read Later</span>
         </div>
         <div class="accordion-body" id="acc-rl">
-          <p class="hint" style="margin-bottom:8px" data-i18n="rlHint">Save current page as "Read Later" via keyboard shortcut. Automatically marks as unread.</p>
+          <p class="hint" data-i18n="rlHint">Save current page as "Read Later" via keyboard shortcut. Automatically marks as unread.</p>
           <p style="margin-bottom:8px;"><a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm" style="text-decoration:none;" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
           <div class="fg"><label><input type="checkbox" id="rl-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
           <div class="fg"><label><input type="checkbox" id="rl-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
@@ -198,7 +198,7 @@
           <span class="accordion-arrow"></span> <span data-i18n="secBatchSave">Batch Save</span>
         </div>
         <div class="accordion-body" id="acc-batch">
-          <p class="hint" style="margin-bottom:8px" data-i18n="batchHint">Save each open tab as an individual bookmark.</p>
+          <p class="hint" data-i18n="batchHint">Save each open tab as an individual bookmark.</p>
           <div class="fg"><label><input type="checkbox" id="opt-batch-tag-enabled" checked /> <span data-i18n="batchAutoAddTags">Auto-add tags</span></label></div>
           <div class="fg">
             <label class="bl" data-i18n="batchTagsLabel">Tags (comma-separated)</label>
@@ -208,14 +208,14 @@
           <div class="fg"><label><input type="checkbox" id="batch-skip-existing" /> <span data-i18n="batchSkipExisting">Skip already bookmarked URLs</span></label></div>
           <div class="fg"><label><input type="checkbox" id="batch-ai-tags" /> <span data-i18n="batchAiTags">Auto-generate AI tags for each tab</span></label></div>
           <div class="fg"><label><input type="checkbox" id="batch-ai-summary" /> <span data-i18n="batchAiSummary">Auto-generate AI summary for each tab</span></label></div>
-          <p class="hint hint-warn" style="margin-top:-4px" data-i18n="batchAiHint">AI features will be slow (separate AI call per tab + 3s rate limit). Requires "Access all websites" permission to read non-active tabs — prompted on first use.</p>
+          <p class="hint hint-warn" data-i18n="batchAiHint">AI features will be slow (separate AI call per tab + 3s rate limit). Requires "Access all websites" permission to read non-active tabs — prompted on first use.</p>
           <div class="fg" style="margin-top:10px">
             <div style="display:flex;gap:8px;align-items:center;">
               <span data-i18n="batchPermLabel">Host permissions:</span>
               <span id="batch-perm-status" style="font-size:11px;color:#666;"></span>
             </div>
             <button class="btn btn-sm" id="batch-revoke-perm" style="margin-top:6px;" data-i18n="batchRevokeBtn">Revoke all-sites access</button>
-            <p class="hint" style="margin-top:4px;" data-i18n="batchRevokeHint">Only needed if you enabled batch AI extraction but no longer want the extension to access all pages for content.</p>
+            <p class="hint" data-i18n="batchRevokeHint">Only needed if you enabled batch AI extraction but no longer want the extension to access all pages for content.</p>
           </div>
         </div>
       </div>
@@ -477,7 +477,7 @@
 
       <div class="divider"></div>
       <div class="section-title" data-i18n="secPrompts">Prompts</div>
-      <p class="hint" style="margin-top:-4px;margin-bottom:12px" data-i18n="promptsHint">Customize the prompts sent to the AI. Use placeholders: <code>{{title}}</code> <code>{{url}}</code> <code>{{content}}</code> <code>{{description}}</code> <code>{{lang_instruction}}</code> <code>{{separator_instruction}}</code>. Leave empty to use defaults.</p>
+      <p class="hint" data-i18n="promptsHint">Customize the prompts sent to the AI. Use placeholders: <code>{{title}}</code> <code>{{url}}</code> <code>{{content}}</code> <code>{{description}}</code> <code>{{lang_instruction}}</code> <code>{{separator_instruction}}</code>. Leave empty to use defaults.</p>
 
       <div class="fg">
         <label class="bl" data-i18n="labelTagPrompt">AI Tags Prompt</label>
@@ -499,7 +499,7 @@
     <div id="panel-markdown" class="panel">
       <div class="fg">
         <label class="bl" data-i18n="mdShortcutLabel">Markdown preview shortcut</label>
-        <p class="hint" style="margin-bottom:8px">
+        <p class="hint">
           <span id="md-shortcut-current"></span>
           <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-md" class="btn btn-sm" style="text-decoration:none;margin-left:8px;" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
         </p>
@@ -578,15 +578,15 @@
       </div>
 
       <div class="fg"><label><input type="checkbox" id="opt-popup-follow-theme" checked /> <span data-i18n="optPopupFollowTheme">Popup follows Pinboard theme preset</span></label></div>
-      <p class="hint" style="margin-top:-8px;margin-bottom:4px" data-i18n="popupFollowHint">When enabled, the popup appearance matches the selected Pinboard CSS theme.</p>
+      <p class="hint" data-i18n="popupFollowHint">When enabled, the popup appearance matches the selected Pinboard CSS theme.</p>
 
       <div class="divider"></div>
       <div class="section-title" data-i18n="secPinboardTagPages">Pinboard.in Tag Pages</div>
       <div class="fg"><label><input type="checkbox" id="opt-tag-sort-by-pop" checked /> <span data-i18n="optTagSortByPop">Add a "sort by popularity" control on tag pages</span></label></div>
-      <p class="hint" style="margin-top:-8px;margin-bottom:4px" data-i18n="optTagSortByPopHint">On pinboard.in tag pages, shows a "pop" control next to date/title that reorders the current page's bookmarks by how many people saved each link. Click again to restore the original order.</p>
+      <p class="hint" data-i18n="optTagSortByPopHint">On pinboard.in tag pages, shows a "pop" control next to date/title that reorders the current page's bookmarks by how many people saved each link. Click again to restore the original order.</p>
 
       <div class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</div>
-      <p class="hint" style="margin-top:-4px;margin-bottom:8px" data-i18n="customStyleHint">Inject custom CSS into pinboard.in pages. Useful for changing fonts, colors, layout etc.</p>
+      <p class="hint" data-i18n="customStyleHint">Inject custom CSS into pinboard.in pages. Useful for changing fonts, colors, layout etc.</p>
       <div class="fg">
         <label class="bl" data-i18n="labelCustomFont">Custom Font</label>
         <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans SC', 'Fira Code', sans-serif" data-i18n-placeholder="customFontPlaceholder" />
@@ -618,7 +618,7 @@
           <button class="btn btn-sm theme-preset-btn" data-theme="gruvbox-dark" aria-pressed="false">Gruvbox Dark</button>
           <button class="btn btn-sm theme-preset-btn" data-theme="rose-pine" aria-pressed="false">Rosé Pine</button>
         </div>
-        <p class="hint" style="margin-bottom:8px" data-i18n="themePresetsHint">Click a preset to load its CSS. Adaptive themes follow your Theme (light/dark) setting.</p>
+        <p class="hint" data-i18n="themePresetsHint">Click a preset to load its CSS. Adaptive themes follow your Theme (light/dark) setting.</p>
       </div>
       <div class="fg" id="saved-themes-section" style="display:none">
         <label class="bl" data-i18n="labelSavedThemes">Saved Themes</label>
