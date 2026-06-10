@@ -738,7 +738,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "archive_url" && typeof message.url === "string") {
-    loadSettings().then((s) => pbpWaybackArchive(message.url, s)).catch(() => {});
+    loadSettings().then((s) => pbpWaybackArchive(message.url, s, { force: message.force === true })).catch(() => {});
     return;
   }
 

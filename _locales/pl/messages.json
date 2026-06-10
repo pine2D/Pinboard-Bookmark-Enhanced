@@ -1651,5 +1651,8 @@
   },
   "archiveOutcomeError": {
     "message": "niepowodzenie"
+  },
+  "archiveRetry": {
+    "message": "Ponów archiwizację"
   }
 }

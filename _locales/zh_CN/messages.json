@@ -1651,5 +1651,8 @@
   },
   "archiveOutcomeError": {
     "message": "失败"
+  },
+  "archiveRetry": {
+    "message": "重新提交存档"
   }
 }

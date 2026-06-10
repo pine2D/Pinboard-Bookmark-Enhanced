@@ -1651,5 +1651,8 @@
   },
   "archiveOutcomeError": {
     "message": "fehlgeschlagen"
+  },
+  "archiveRetry": {
+    "message": "Archivierung erneut versuchen"
   }
 }

@@ -1651,5 +1651,8 @@
   },
   "archiveOutcomeError": {
     "message": "失敗"
+  },
+  "archiveRetry": {
+    "message": "アーカイブを再試行"
   }
 }

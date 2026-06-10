@@ -849,10 +849,27 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   white-space: nowrap;
 }
 .wayback-log-outcome {
-  flex: 0 0 90px;
+  flex: 0 1 auto;
+  max-width: 40%;
+  min-width: 70px;
   color: var(--opt-fg-muted, #666);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.wayback-log-retry {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--opt-fg-muted, #888);
+  flex: none;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+.wayback-log-retry:hover { color: var(--opt-accent, #4477bb); }
+.wayback-log-retry:disabled { opacity: .4; cursor: default; }
 .wayback-perm-status {
   display: block;
   font-size: 11px;

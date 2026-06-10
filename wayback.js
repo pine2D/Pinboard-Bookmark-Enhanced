@@ -86,7 +86,7 @@ async function _pbpWaybackLog(url, outcome) {
 
 // ---- Orchestrator (chrome.* usage allowed inside function body) ----
 
-async function pbpWaybackArchive(url, settings) {
+async function pbpWaybackArchive(url, settings, opts) {
   try {
     // Step 1: Check if feature is enabled
     if (!settings || settings.waybackArchiveEnabled !== true) {
@@ -105,10 +105,11 @@ async function pbpWaybackArchive(url, settings) {
     }
 
     // Step 3: Read dedup map and check if we should attempt
+    const force = !!(opts && opts.force);
     const stored = await chrome.storage.local.get({ _waybackAttempts: {} });
     const attempts = stored._waybackAttempts || {};
     const now = Date.now();
-    if (!pbpWaybackShouldAttempt(attempts, url, now)) {
+    if (!force && !pbpWaybackShouldAttempt(attempts, url, now)) {
       await _pbpWaybackLog(url, "skipped");
       return;
     }

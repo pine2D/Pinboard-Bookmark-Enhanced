@@ -1651,5 +1651,8 @@
   },
   "archiveOutcomeError": {
     "message": "failed"
+  },
+  "archiveRetry": {
+    "message": "Retry archive"
   }
 }

@@ -1651,5 +1651,8 @@
   },
   "archiveOutcomeError": {
     "message": "ошибка"
+  },
+  "archiveRetry": {
+    "message": "Повторить архивирование"
   }
 }

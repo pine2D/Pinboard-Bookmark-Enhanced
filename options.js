@@ -1212,6 +1212,7 @@ async function renderWaybackLog() {
     outcomeEl.className = "wayback-log-outcome";
     const outcome = (typeof entry.outcome === "string") ? entry.outcome : "";
     let outcomeText;
+    let showRetry = false;
     if (outcome === "requested") {
       outcomeText = t("archiveOutcomeRequested");
     } else if (outcome.startsWith("job:")) {
@@ -1221,12 +1222,18 @@ async function renderWaybackLog() {
       outcomeText = t("archiveOutcomeSkipped");
     } else if (outcome === "rate-limited") {
       outcomeText = t("archiveOutcomeRateLimited");
+      showRetry = true;
     } else if (outcome === "timeout") {
       outcomeText = t("archiveOutcomeTimeout");
+      showRetry = true;
     } else if (outcome.startsWith("error")) {
-      outcomeText = t("archiveOutcomeError");
       const detail = outcome.startsWith("error:") ? outcome.slice(6) : "";
-      if (detail) outcomeEl.title = detail;
+      const displayDetail = detail ? detail.slice(0, 48) : "";
+      outcomeText = displayDetail
+        ? t("archiveOutcomeError") + " · " + displayDetail
+        : t("archiveOutcomeError");
+      outcomeEl.title = outcome;
+      showRetry = true;
     } else {
       outcomeText = outcome;
     }
@@ -1235,6 +1242,21 @@ async function renderWaybackLog() {
     row.appendChild(urlEl);
     row.appendChild(timeEl);
     row.appendChild(outcomeEl);
+
+    if (showRetry && entry.url) {
+      const btn = document.createElement("button");
+      btn.className = "wayback-log-retry";
+      btn.title = t("archiveRetry");
+      btn.setAttribute("aria-label", t("archiveRetry"));
+      btn.innerHTML = PBP_ICONS.refresh;
+      btn.addEventListener("click", () => {
+        btn.disabled = true;
+        try { chrome.runtime.sendMessage({ type: "archive_url", url: entry.url, force: true }).catch(() => {}); } catch (_) {}
+        setTimeout(() => { renderWaybackLog(); }, 2500);
+      });
+      row.appendChild(btn);
+    }
+
     return row;
   }
 

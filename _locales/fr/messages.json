@@ -1651,5 +1651,8 @@
   },
   "archiveOutcomeError": {
     "message": "échoué"
+  },
+  "archiveRetry": {
+    "message": "Réessayer l'archivage"
   }
 }
