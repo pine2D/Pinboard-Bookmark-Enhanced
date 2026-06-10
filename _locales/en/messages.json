@@ -1654,5 +1654,35 @@
   },
   "archiveRetry": {
     "message": "Retry archive"
+  },
+  "archiveLogNote": {
+    "message": "A successful submission does not mean the snapshot is instantly visible - the Wayback Machine usually takes a few minutes (sometimes longer) to index new captures."
+  },
+  "archiveErrAuth": {
+    "message": "invalid credentials"
+  },
+  "archiveErrNetwork": {
+    "message": "could not reach archive.org"
+  },
+  "archiveErrBlocked": {
+    "message": "the site or URL is excluded from archiving"
+  },
+  "archiveErrNoAccess": {
+    "message": "page not accessible to the archiver (paywall or login)"
+  },
+  "archiveErrNotFound": {
+    "message": "page not found (404)"
+  },
+  "archiveErrDailyLimit": {
+    "message": "daily capture limit reached for this URL"
+  },
+  "archiveErrServer": {
+    "message": "archive.org server error - try again later"
+  },
+  "archiveErrRateLimited": {
+    "message": "anonymous requests are rate-limited per IP - try later or add an S3 key"
+  },
+  "archiveErrTimeoutHint": {
+    "message": "the request timed out - archive.org may be busy or the network slow"
   }
 }

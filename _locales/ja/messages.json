@@ -1654,5 +1654,35 @@
   },
   "archiveRetry": {
     "message": "アーカイブを再試行"
+  },
+  "archiveLogNote": {
+    "message": "送信成功はスナップショットの即時公開を意味しません — Wayback Machine が新しいキャプチャをインデックスするまで通常数分（場合によってはそれ以上）かかります。"
+  },
+  "archiveErrAuth": {
+    "message": "認証情報が無効です"
+  },
+  "archiveErrNetwork": {
+    "message": "archive.org に接続できません"
+  },
+  "archiveErrBlocked": {
+    "message": "このサイトまたは URL はアーカイブから除外されています"
+  },
+  "archiveErrNoAccess": {
+    "message": "アーカイバーがページにアクセスできません（ペイウォールまたはログインが必要）"
+  },
+  "archiveErrNotFound": {
+    "message": "ページが見つかりません（404）"
+  },
+  "archiveErrDailyLimit": {
+    "message": "この URL の本日のキャプチャ上限に達しました"
+  },
+  "archiveErrServer": {
+    "message": "archive.org のサーバーエラーです — しばらくしてから再試行してください"
+  },
+  "archiveErrRateLimited": {
+    "message": "匿名リクエストは IP ごとにレート制限されています — しばらく待つか S3 キーを追加してください"
+  },
+  "archiveErrTimeoutHint": {
+    "message": "リクエストがタイムアウトしました — archive.org が混雑しているかネットワークが遅い可能性があります"
   }
 }

@@ -1654,5 +1654,35 @@
   },
   "archiveRetry": {
     "message": "Archivierung erneut versuchen"
+  },
+  "archiveLogNote": {
+    "message": "Eine erfolgreiche Einreichung bedeutet nicht, dass der Schnappschuss sofort sichtbar ist - die Wayback Machine benötigt normalerweise einige Minuten (manchmal länger), um neue Aufnahmen zu indizieren."
+  },
+  "archiveErrAuth": {
+    "message": "ungültige Anmeldedaten"
+  },
+  "archiveErrNetwork": {
+    "message": "archive.org nicht erreichbar"
+  },
+  "archiveErrBlocked": {
+    "message": "Die Website oder URL ist von der Archivierung ausgeschlossen"
+  },
+  "archiveErrNoAccess": {
+    "message": "Seite für den Archivierer nicht zugänglich (Paywall oder Login erforderlich)"
+  },
+  "archiveErrNotFound": {
+    "message": "Seite nicht gefunden (404)"
+  },
+  "archiveErrDailyLimit": {
+    "message": "Tägliches Aufnahmelimit für diese URL erreicht"
+  },
+  "archiveErrServer": {
+    "message": "archive.org-Serverfehler - versuchen Sie es später erneut"
+  },
+  "archiveErrRateLimited": {
+    "message": "Anonyme Anfragen sind pro IP ratenbegrenzt - versuchen Sie es später oder fügen Sie einen S3-Schlüssel hinzu"
+  },
+  "archiveErrTimeoutHint": {
+    "message": "Die Anfrage hat das Zeitlimit überschritten - archive.org ist möglicherweise ausgelastet oder das Netzwerk ist langsam"
   }
 }

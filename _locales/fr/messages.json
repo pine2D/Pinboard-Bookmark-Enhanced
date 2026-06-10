@@ -1654,5 +1654,35 @@
   },
   "archiveRetry": {
     "message": "Réessayer l'archivage"
+  },
+  "archiveLogNote": {
+    "message": "Une soumission réussie ne signifie pas que la capture est immédiatement visible - la Wayback Machine prend généralement quelques minutes (parfois plus) pour indexer les nouvelles captures."
+  },
+  "archiveErrAuth": {
+    "message": "identifiants invalides"
+  },
+  "archiveErrNetwork": {
+    "message": "archive.org inaccessible"
+  },
+  "archiveErrBlocked": {
+    "message": "ce site ou cette URL est exclu de l'archivage"
+  },
+  "archiveErrNoAccess": {
+    "message": "page inaccessible à l'archiveur (payant ou connexion requise)"
+  },
+  "archiveErrNotFound": {
+    "message": "page introuvable (404)"
+  },
+  "archiveErrDailyLimit": {
+    "message": "limite quotidienne de captures atteinte pour cette URL"
+  },
+  "archiveErrServer": {
+    "message": "erreur serveur archive.org - réessayez plus tard"
+  },
+  "archiveErrRateLimited": {
+    "message": "les requêtes anonymes sont limitées par IP - réessayez plus tard ou ajoutez une clé S3"
+  },
+  "archiveErrTimeoutHint": {
+    "message": "la requête a expiré - archive.org est peut-être surchargé ou le réseau est lent"
   }
 }

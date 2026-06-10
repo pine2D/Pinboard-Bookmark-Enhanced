@@ -1146,6 +1146,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ---- Wayback Log Viewer ----
+// Map a raw wayback outcome detail to an i18n explanation key, or null for unknown.
+function waybackErrorKey(detail) {
+  const d = String(detail || "").toLowerCase();
+  if (!d) return null;
+  if (d.includes("401") || d.includes("unauthorized")) return "archiveErrAuth";
+  if (d.includes("failed to fetch") || d.includes("network")) return "archiveErrNetwork";
+  if (d.includes("too-many-daily-captures")) return "archiveErrDailyLimit";
+  if (d.includes("blocked")) return "archiveErrBlocked";
+  if (d.includes("no-access") || d.includes("403")) return "archiveErrNoAccess";
+  if (d.includes("not-found") || d.includes("404")) return "archiveErrNotFound";
+  if (/http-5\d\d/.test(d) || d.includes("internal-server-error") || d.includes("service-unavailable") || d.includes("gateway") || d.includes("celery") || d.includes("job-failed") || d.includes("no-browsers")) return "archiveErrServer";
+  return null;
+}
+
 async function renderWaybackLog() {
   const container = $id("wayback-log");
   if (!container) return;
@@ -1222,16 +1236,18 @@ async function renderWaybackLog() {
       outcomeText = t("archiveOutcomeSkipped");
     } else if (outcome === "rate-limited") {
       outcomeText = t("archiveOutcomeRateLimited");
+      outcomeEl.title = t("archiveErrRateLimited");
       showRetry = true;
     } else if (outcome === "timeout") {
       outcomeText = t("archiveOutcomeTimeout");
+      outcomeEl.title = t("archiveErrTimeoutHint");
       showRetry = true;
     } else if (outcome.startsWith("error")) {
       const detail = outcome.startsWith("error:") ? outcome.slice(6) : "";
-      const displayDetail = detail ? detail.slice(0, 48) : "";
-      outcomeText = displayDetail
-        ? t("archiveOutcomeError") + " · " + displayDetail
-        : t("archiveOutcomeError");
+      const errKey = waybackErrorKey(detail);
+      outcomeText = errKey
+        ? t("archiveOutcomeError") + " · " + t(errKey)
+        : (detail ? t("archiveOutcomeError") + " · " + detail.slice(0, 48) : t("archiveOutcomeError"));
       outcomeEl.title = outcome;
       showRetry = true;
     } else {

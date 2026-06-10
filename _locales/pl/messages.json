@@ -1654,5 +1654,35 @@
   },
   "archiveRetry": {
     "message": "Ponów archiwizację"
+  },
+  "archiveLogNote": {
+    "message": "Pomyślne przesłanie nie oznacza, że migawka jest natychmiast widoczna - Wayback Machine zazwyczaj potrzebuje kilku minut (czasem dłużej), aby zaindeksować nowe przechwycenia."
+  },
+  "archiveErrAuth": {
+    "message": "nieprawidłowe dane uwierzytelniające"
+  },
+  "archiveErrNetwork": {
+    "message": "nie można połączyć się z archive.org"
+  },
+  "archiveErrBlocked": {
+    "message": "ta witryna lub adres URL jest wykluczony z archiwizacji"
+  },
+  "archiveErrNoAccess": {
+    "message": "strona niedostępna dla archiwizatora (paywall lub wymagane logowanie)"
+  },
+  "archiveErrNotFound": {
+    "message": "strona nie została znaleziona (404)"
+  },
+  "archiveErrDailyLimit": {
+    "message": "dzienny limit przechwytywania osiągnięty dla tego adresu URL"
+  },
+  "archiveErrServer": {
+    "message": "błąd serwera archive.org - spróbuj ponownie później"
+  },
+  "archiveErrRateLimited": {
+    "message": "anonimowe żądania są ograniczane per IP - spróbuj później lub dodaj klucz S3"
+  },
+  "archiveErrTimeoutHint": {
+    "message": "żądanie przekroczyło limit czasu - archive.org może być przeciążony lub sieć jest wolna"
   }
 }

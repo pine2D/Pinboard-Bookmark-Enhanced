@@ -1654,5 +1654,35 @@
   },
   "archiveRetry": {
     "message": "重新提交存档"
+  },
+  "archiveLogNote": {
+    "message": "提交成功不代表立即可见 — Wayback Machine 通常需要几分钟（有时更久）才会将新快照编入索引。"
+  },
+  "archiveErrAuth": {
+    "message": "凭证无效"
+  },
+  "archiveErrNetwork": {
+    "message": "无法连接 archive.org"
+  },
+  "archiveErrBlocked": {
+    "message": "该站点或 URL 被排除在存档之外"
+  },
+  "archiveErrNoAccess": {
+    "message": "存档器无法访问该页（付费墙或需登录）"
+  },
+  "archiveErrNotFound": {
+    "message": "页面不存在（404）"
+  },
+  "archiveErrDailyLimit": {
+    "message": "该 URL 当日存档次数已达上限"
+  },
+  "archiveErrServer": {
+    "message": "archive.org 服务端故障，稍后重试"
+  },
+  "archiveErrRateLimited": {
+    "message": "匿名请求按 IP 限流 — 稍后再试或填入 S3 key"
+  },
+  "archiveErrTimeoutHint": {
+    "message": "请求超时 — archive.org 繁忙或网络缓慢"
   }
 }

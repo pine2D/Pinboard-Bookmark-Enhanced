@@ -1654,5 +1654,35 @@
   },
   "archiveRetry": {
     "message": "Повторить архивирование"
+  },
+  "archiveLogNote": {
+    "message": "Успешная отправка не означает, что снимок сразу виден - Wayback Machine обычно требует несколько минут (иногда дольше), чтобы проиндексировать новые захваты."
+  },
+  "archiveErrAuth": {
+    "message": "недействительные учётные данные"
+  },
+  "archiveErrNetwork": {
+    "message": "не удалось подключиться к archive.org"
+  },
+  "archiveErrBlocked": {
+    "message": "этот сайт или URL исключён из архивирования"
+  },
+  "archiveErrNoAccess": {
+    "message": "страница недоступна для архиватора (платный доступ или требуется вход)"
+  },
+  "archiveErrNotFound": {
+    "message": "страница не найдена (404)"
+  },
+  "archiveErrDailyLimit": {
+    "message": "достигнут дневной лимит захватов для этого URL"
+  },
+  "archiveErrServer": {
+    "message": "ошибка сервера archive.org - повторите попытку позже"
+  },
+  "archiveErrRateLimited": {
+    "message": "анонимные запросы ограничены по IP - попробуйте позже или добавьте ключ S3"
+  },
+  "archiveErrTimeoutHint": {
+    "message": "запрос превысил время ожидания - archive.org может быть перегружен или сеть работает медленно"
   }
 }
