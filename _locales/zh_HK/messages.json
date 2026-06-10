@@ -1609,10 +1609,10 @@
     "message": "批量保存可能會同時發送多個存檔請求；匿名配額有限。"
   },
   "optWaybackS3Key": {
-    "message": "archive.org S3 訪問密鑰（可選）"
+    "message": "archive.org S3 Access Key（可選）"
   },
   "optWaybackS3Secret": {
-    "message": "archive.org S3 密鑰（可選）"
+    "message": "archive.org S3 Secret（可選）"
   },
   "optWaybackS3Hint": {
     "message": "使用免費的 archive.org 帳戶密鑰，存檔將使用已認證的 API：更高的配額、伺服器端去重、可靠的結果。"

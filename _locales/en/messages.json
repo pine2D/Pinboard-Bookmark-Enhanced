@@ -1609,10 +1609,10 @@
     "message": "Batch saves can fire many archive requests at once; anonymous quota is limited."
   },
   "optWaybackS3Key": {
-    "message": "archive.org S3 access key (optional)"
+    "message": "archive.org S3 Access Key (optional)"
   },
   "optWaybackS3Secret": {
-    "message": "archive.org S3 secret (optional)"
+    "message": "archive.org S3 Secret (optional)"
   },
   "optWaybackS3Hint": {
     "message": "With a free archive.org account key, archiving uses the authenticated API: higher quota, server-side dedup, reliable results."

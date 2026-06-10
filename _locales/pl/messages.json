@@ -1609,10 +1609,10 @@
     "message": "Zapisywanie wsadowe może wysyłać wiele żądań archiwizacji jednocześnie; limit anonimowy jest ograniczony."
   },
   "optWaybackS3Key": {
-    "message": "klucz dostępu S3 archive.org (opcjonalnie)"
+    "message": "archive.org S3 Access Key (opcjonalnie)"
   },
   "optWaybackS3Secret": {
-    "message": "tajemnica S3 archive.org (opcjonalnie)"
+    "message": "archive.org S3 Secret (opcjonalnie)"
   },
   "optWaybackS3Hint": {
     "message": "Dzięki darmowemu kluczowi konta archive.org archiwizacja używa uwierzytelnionego interfejsu API: wyższy limit, deduplikacja po stronie serwera, niezawodne wyniki."

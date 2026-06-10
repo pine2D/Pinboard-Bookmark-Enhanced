@@ -1609,10 +1609,10 @@
     "message": "批量保存可能会同时发送多个存档请求；匿名配额有限。"
   },
   "optWaybackS3Key": {
-    "message": "archive.org S3 访问密钥（可选）"
+    "message": "archive.org S3 Access Key（可选）"
   },
   "optWaybackS3Secret": {
-    "message": "archive.org S3 密钥（可选）"
+    "message": "archive.org S3 Secret（可选）"
   },
   "optWaybackS3Hint": {
     "message": "使用免费的 archive.org 账户密钥，存档将使用已认证的 API：更高的配额、服务器端去重、可靠的结果。"

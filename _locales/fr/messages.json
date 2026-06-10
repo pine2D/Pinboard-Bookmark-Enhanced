@@ -1609,10 +1609,10 @@
     "message": "Les enregistrements par lot peuvent lancer plusieurs demandes d'archivage simultanément ; le quota anonyme est limité."
   },
   "optWaybackS3Key": {
-    "message": "clé d'accès S3 archive.org (optionnel)"
+    "message": "archive.org S3 Access Key (facultatif)"
   },
   "optWaybackS3Secret": {
-    "message": "secret S3 archive.org (optionnel)"
+    "message": "archive.org S3 Secret (facultatif)"
   },
   "optWaybackS3Hint": {
     "message": "Avec une clé de compte archive.org gratuite, l'archivage utilise l'API authentifiée : quota supérieur, dédupplication côté serveur, résultats fiables."

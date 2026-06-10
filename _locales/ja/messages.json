@@ -1609,10 +1609,10 @@
     "message": "一括保存は複数のアーカイブ リクエストを同時に送信できます。匿名クォータは限定されています。"
   },
   "optWaybackS3Key": {
-    "message": "archive.org S3 アクセスキー（オプション）"
+    "message": "archive.org S3 Access Key（オプション）"
   },
   "optWaybackS3Secret": {
-    "message": "archive.org S3 シークレット（オプション）"
+    "message": "archive.org S3 Secret（オプション）"
   },
   "optWaybackS3Hint": {
     "message": "無料の archive.org アカウントキーがあれば、認証済み API でアーカイブします：クォータ増加、サーバー側の重複排除、信頼性の高い結果。"

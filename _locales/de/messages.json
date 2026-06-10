@@ -1609,10 +1609,10 @@
     "message": "Batch-Speichern können viele Archivierungsanfragen gleichzeitig auslösen; anonymes Kontingent ist begrenzt."
   },
   "optWaybackS3Key": {
-    "message": "archive.org S3-Zugangsschlüssel (optional)"
+    "message": "archive.org S3 Access Key (optional)"
   },
   "optWaybackS3Secret": {
-    "message": "archive.org S3-Geheimnis (optional)"
+    "message": "archive.org S3 Secret (optional)"
   },
   "optWaybackS3Hint": {
     "message": "Mit einem kostenlosen archive.org-Kontoschlüssel verwendet das Archivieren die authentifizierte API: höheres Kontingent, serverseitige Deduplizierung, zuverlässige Ergebnisse."
