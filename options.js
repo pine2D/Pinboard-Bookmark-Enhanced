@@ -1203,7 +1203,54 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // #tag-gov-ai-btn: AI deep-analysis handler attached in Task 5 (on-demand clustering).
+  $id("tag-gov-ai-btn")?.addEventListener("click", async () => {
+    const btn = $id("tag-gov-ai-btn");
+    const statusEl = $id("tag-gov-ai-status");
+
+    if (!hasAIKey(s)) {
+      if (statusEl) {
+        setStatusIcon(statusEl, false, t("tagGovAiNoKey"));
+        statusEl.style.color = "#c00";
+        setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      }
+      return;
+    }
+
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = t("tagGovAiRunning");
+    if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
+
+    try {
+      const counts = await loadTagCounts(false);
+      if (!counts) throw new Error("Failed to load tag counts");
+
+      const prompt = pbpTagGovBuildAiPrompt(counts, 1500);
+      const raw = await getOrCreateInflight("taggov|" + s.aiProvider, () => callAI(s, prompt));
+
+      const aiGroups = pbpTagGovParseAiResponse(raw, counts);
+
+      await chrome.storage.local.set({ _tagGovAiGroups: { groups: aiGroups, ts: Date.now() } });
+      await renderTagGov();
+
+      if (statusEl && aiGroups.length === 0) {
+        statusEl.textContent = t("tagGovAiNone");
+      }
+    } catch (err) {
+      let msg = err.name === "AbortError" ? t("testTimeout") : err.message;
+      if (err?.code === "model_not_found") {
+        msg = t("aiErrorModelNotFound", s.aiProvider) + " " + t("aiErrorModelNotFoundHint");
+      }
+      if (statusEl) {
+        setStatusIcon(statusEl, false, msg);
+        statusEl.style.color = "#c00";
+        setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }
+  });
 
   await renderWaybackLog();
 });

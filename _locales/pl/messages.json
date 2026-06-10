@@ -1741,6 +1741,9 @@
   "tagGovAiNone":   {
     "message": "Nie znaleziono grup AI"
   },
+  "tagGovAiNoKey":   {
+    "message": "Brak skonfigurowanego dostawcy AI - przejdź do karty AI, aby skonfigurować"
+  },
   "tagGovLowCountTitle":   {
     "message": "Tagi o niskiej częstości (1 lub mniej)"
   },

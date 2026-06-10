@@ -1741,6 +1741,9 @@
   "tagGovAiNone":   {
     "message": "AI 未发现重复项"
   },
+  "tagGovAiNoKey":   {
+    "message": "未配置 AI 提供商——请前往 AI 标签页设置"
+  },
   "tagGovLowCountTitle":   {
     "message": "低频标签（1 次或更少）"
   },

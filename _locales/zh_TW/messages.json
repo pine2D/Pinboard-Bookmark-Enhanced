@@ -1741,6 +1741,9 @@
   "tagGovAiNone":   {
     "message": "AI 未發現重複項"
   },
+  "tagGovAiNoKey":   {
+    "message": "未設定 AI 提供商——請前往 AI 分頁設定"
+  },
   "tagGovLowCountTitle":   {
     "message": "低頻標籤（1 次或更少）"
   },

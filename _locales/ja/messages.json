@@ -1741,6 +1741,9 @@
   "tagGovAiNone":   {
     "message": "AI グループが見つかりません"
   },
+  "tagGovAiNoKey":   {
+    "message": "AI プロバイダーが未設定です。AI タブで設定してください"
+  },
   "tagGovLowCountTitle":   {
     "message": "低使用頻度タグ（1 回以下）"
   },

@@ -1741,6 +1741,9 @@
   "tagGovAiNone":   {
     "message": "Keine KI-Gruppen gefunden"
   },
+  "tagGovAiNoKey":   {
+    "message": "Kein KI-Anbieter konfiguriert - im KI-Tab einrichten"
+  },
   "tagGovLowCountTitle":   {
     "message": "Tags mit niedriger Häufigkeit (1 oder weniger)"
   },

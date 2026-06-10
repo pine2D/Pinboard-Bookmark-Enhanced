@@ -1741,6 +1741,9 @@
   "tagGovAiNone":   {
     "message": "No AI groups found"
   },
+  "tagGovAiNoKey":   {
+    "message": "No AI provider configured - set one up in the AI tab"
+  },
   "tagGovLowCountTitle":   {
     "message": "Low-count tags (1 use or fewer)"
   },

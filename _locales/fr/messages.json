@@ -1741,6 +1741,9 @@
   "tagGovAiNone":   {
     "message": "Aucun groupe d'IA trouvé"
   },
+  "tagGovAiNoKey":   {
+    "message": "Aucun fournisseur IA configuré - configurez-le dans l'onglet IA"
+  },
   "tagGovLowCountTitle":   {
     "message": "Étiquettes peu utilisées (1 utilisation ou moins)"
   },
