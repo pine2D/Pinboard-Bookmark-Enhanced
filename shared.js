@@ -175,7 +175,11 @@ const SETTINGS_DEFAULTS = {
   urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] },
   // pinboard.in tag-page "sort by popularity" control (site enhancement, default on)
   tagSortByPopEnabled: true,
-  bgSaveNoClobber: true
+  bgSaveNoClobber: true,
+  waybackArchiveEnabled: false,
+  waybackArchiveBatch: false,
+  waybackS3Key: "",
+  waybackS3Secret: ""
 };
 
 // ---- Tag case normalization helpers ----
@@ -433,7 +437,7 @@ async function syncGetLarge(key, defaultValue) {
   try { return JSON.parse(str); } catch (_) { return defaultValue; }
 }
 
-const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey"];
+const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret"];
 
 function deobfuscateSettings(s) {
   API_KEY_FIELDS.forEach(k => { if (s[k]) s[k] = deobfuscateKey(s[k]); });

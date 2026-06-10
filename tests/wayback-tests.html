@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Wayback Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+h2 { margin-top: 24px; font-size: 16px; }
+.suite { margin: 12px 0; padding: 8px; border-left: 3px solid #ccc; }
+.case { padding: 4px 8px; margin: 4px 0; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<h1>wayback.js Tests</h1>
+<div id="results"></div>
+<script src="../wayback.js"></script>
+<script>
+const T0 = 1750000000000; // fixed timestamp for deterministic tests
+
+function test(name, fn) {
+  try {
+    fn();
+    const div = document.createElement("div");
+    div.className = "case pass";
+    div.textContent = "✓ " + name;
+    document.getElementById("results").appendChild(div);
+  } catch (e) {
+    const div = document.createElement("div");
+    div.className = "case fail";
+    div.textContent = "✗ " + name + "\n  " + e.message;
+    document.getElementById("results").appendChild(div);
+  }
+}
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || "assertion failed");
+}
+
+function suite(name, fn) {
+  const div = document.createElement("div");
+  div.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = name;
+  div.appendChild(h);
+  const results = document.getElementById("results");
+  const savedAppend = results.appendChild;
+  results.appendChild = function(el) {
+    if (el.className?.includes("case")) div.appendChild(el);
+    else savedAppend.call(results, el);
+  };
+  fn();
+  results.appendChild = savedAppend;
+  results.appendChild(div);
+}
+
+// ============ pbpWaybackShouldAttempt ============
+suite("pbpWaybackShouldAttempt", () => {
+  test("never-attempted URL returns true", () => {
+    const map = {};
+    assert(pbpWaybackShouldAttempt(map, "https://example.com", T0) === true, "should return true for new URL");
+  });
+
+  test("attempted 1h ago returns false", () => {
+    const map = { "https://example.com": T0 - 60*60*1000 };
+    assert(pbpWaybackShouldAttempt(map, "https://example.com", T0) === false, "should return false within 24h window");
+  });
+
+  test("attempted 25h ago returns true", () => {
+    const map = { "https://example.com": T0 - 25*60*60*1000 };
+    assert(pbpWaybackShouldAttempt(map, "https://example.com", T0) === true, "should return true after 24h window");
+  });
+
+  test("empty map returns true", () => {
+    const map = {};
+    assert(pbpWaybackShouldAttempt(map, "https://new.com", T0) === true, "should return true for empty map");
+  });
+});
+
+// ============ pbpWaybackPruneAttempts ============
+suite("pbpWaybackPruneAttempts", () => {
+  test("mixed-age map keeps only <24h entries", () => {
+    const map = {
+      "https://old.com": T0 - 25*60*60*1000,
+      "https://recent.com": T0 - 12*60*60*1000,
+      "https://veryrecent.com": T0 - 1*60*60*1000
+    };
+    const pruned = pbpWaybackPruneAttempts(map, T0);
+    assert(!("https://old.com" in pruned), "should drop >24h entries");
+    assert(pruned["https://recent.com"] === map["https://recent.com"], "should keep recent entries");
+    assert(pruned["https://veryrecent.com"] === map["https://veryrecent.com"], "should keep very recent entries");
+  });
+
+  test("empty map is handled gracefully", () => {
+    const map = {};
+    const pruned = pbpWaybackPruneAttempts(map, T0);
+    assert(Object.keys(pruned).length === 0, "should return empty map");
+  });
+});
+
+// ============ pbpWaybackAppendLog ============
+suite("pbpWaybackAppendLog", () => {
+  test("append to empty array", () => {
+    const log = [];
+    const entry = { url: "https://example.com", ts: T0, outcome: "requested" };
+    const result = pbpWaybackAppendLog(log, entry);
+    assert(result.length === 1, "should have 1 entry");
+    assert(result[0].outcome === "requested", "entry should be appended");
+  });
+
+  test("append beyond cap 20 keeps newest 20, first dropped", () => {
+    const log = [];
+    for (let i = 0; i < 20; i++) {
+      log.push({ url: `https://url${i}.com`, ts: T0 + i*1000, outcome: `outcome${i}` });
+    }
+    const entry = { url: "https://url20.com", ts: T0 + 20*1000, outcome: "outcome20" };
+    const result = pbpWaybackAppendLog(log, entry, 20);
+    assert(result.length === 20, "should cap at 20");
+    assert(result[0].outcome === "outcome1", "first element (url0) should be dropped");
+    assert(result[19].outcome === "outcome20", "newest should be last");
+  });
+
+  test("custom cap is honored", () => {
+    const log = [];
+    for (let i = 0; i < 5; i++) {
+      log.push({ url: `https://url${i}.com`, ts: T0 + i*1000, outcome: `outcome${i}` });
+    }
+    const entry = { url: "https://url5.com", ts: T0 + 5*1000, outcome: "outcome5" };
+    const result = pbpWaybackAppendLog(log, entry, 3);
+    assert(result.length === 3, "should respect custom cap of 3");
+    assert(result[0].outcome === "outcome3", "should keep newest entries");
+    assert(result[2].outcome === "outcome5", "newest should be last");
+  });
+});
+
+// ============ pbpWaybackBuildRequest ============
+suite("pbpWaybackBuildRequest", () => {
+  test("anonymous request: GET to save/<encodeURI(url)>", () => {
+    const req = pbpWaybackBuildRequest("https://example.com/page?q=test", "", "");
+    assert(req.method === "GET", "method should be GET");
+    assert(req.url.startsWith("https://web.archive.org/save/"), "URL should start with save/");
+    assert(req.headers && typeof req.headers === "object", "headers should be object");
+    assert(Object.keys(req.headers).length === 0, "anonymous should have no headers");
+    assert(req.body === null, "body should be null");
+    assert(req.timeoutMs === 30000, "timeout should be 30000ms");
+  });
+
+  test("anonymous with spaces and CJK characters encoded", () => {
+    const req = pbpWaybackBuildRequest("https://example.com/page with spaces/中文", "", "");
+    assert(req.url === "https://web.archive.org/save/" + encodeURI("https://example.com/page with spaces/中文"), "URL should be encodeURI-encoded (preserves :// structure)");
+  });
+
+  test("authenticated request: POST with auth header", () => {
+    const req = pbpWaybackBuildRequest("https://example.com", "mykey", "mysecret");
+    assert(req.method === "POST", "method should be POST");
+    assert(req.url === "https://web.archive.org/save", "URL should be save endpoint");
+    assert(req.headers["Authorization"] === "LOW mykey:mysecret", "should have auth header");
+    assert(req.headers["Accept"] === "application/json", "should accept json");
+    assert(req.headers["Content-Type"] === "application/x-www-form-urlencoded", "should have content type");
+    assert(req.timeoutMs === 10000, "timeout should be 10000ms");
+  });
+
+  test("authenticated body has url, skip_first_archive=1, if_not_archived_within=1d", () => {
+    const req = pbpWaybackBuildRequest("https://example.com/test", "key", "secret");
+    assert(req.body.includes("url=" + encodeURIComponent("https://example.com/test")), "body should have URL");
+    assert(req.body.includes("skip_first_archive=1"), "body should skip first archive");
+    assert(req.body.includes("if_not_archived_within=1d"), "body should have if_not_archived_within");
+  });
+
+  test("key without secret falls back to anonymous", () => {
+    const req = pbpWaybackBuildRequest("https://example.com", "onlykey", "");
+    assert(req.method === "GET", "missing secret should fall back to GET");
+    assert(req.url.startsWith("https://web.archive.org/save/"), "should use anonymous URL");
+  });
+
+  test("secret without key falls back to anonymous", () => {
+    const req = pbpWaybackBuildRequest("https://example.com", "", "onlysecret");
+    assert(req.method === "GET", "missing key should fall back to GET");
+  });
+});
+</script>
+</body></html>
