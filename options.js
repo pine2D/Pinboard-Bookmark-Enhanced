@@ -310,7 +310,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-custom-font": s.customFont, "opt-custom-css": s.customOverlayCSS,
     "opt-ai-tag-separator": s.aiTagSeparator,
     "opt-jina-key": s.jinaApiKey,
-    "opt-tag-presets": s.tagPresets
+    "opt-tag-presets": s.tagPresets,
+    "opt-wayback-s3key": s.waybackS3Key,
+    "opt-wayback-s3secret": s.waybackS3Secret
   };
   for (const [id, val] of Object.entries(fieldMap)) {
     const el = $id(id);
@@ -370,7 +372,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-md-frontmatter": s.mdExportFrontmatter,
     "opt-md-include-toc": s.mdExportIncludeToc,
     "opt-obsidian-enabled": s.obsidianEnabled,
-    "opt-tag-sort-by-pop": s.tagSortByPopEnabled
+    "opt-tag-sort-by-pop": s.tagSortByPopEnabled,
+    "opt-wayback-enabled": s.waybackArchiveEnabled === true,
+    "opt-wayback-batch": s.waybackArchiveBatch === true
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
@@ -557,6 +561,46 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  // ---- Wayback: check permission on load ----
+  (async () => {
+    try {
+      const has = await chrome.permissions.contains({ origins: ["https://web.archive.org/*"] });
+      const statusEl = $id("wayback-perm-status");
+      if (!has && s.waybackArchiveEnabled) {
+        if (statusEl) statusEl.textContent = t("waybackPermDenied");
+      }
+    } catch (_) {}
+  })();
+
+  // ---- Wayback: toggle permission on opt-wayback-enabled change ----
+  $id("opt-wayback-enabled")?.addEventListener("change", async (e) => {
+    const enabled = e.target.checked;
+    const statusEl = $id("wayback-perm-status");
+    if (enabled) {
+      try {
+        const granted = await chrome.permissions.request({ origins: ["https://web.archive.org/*"] });
+        if (!granted) {
+          e.target.checked = false;
+          // Programmatic .checked changes fire no 'change' event; re-dispatch so the
+          // global auto-save persists the reverted (false) state via the normal path
+          // (which picks the correct storage area). Re-entering this listener is safe:
+          // it only acts when checked === true. Any transient true the debounced save
+          // may have written mid-dialog is overwritten by this final false save.
+          e.target.dispatchEvent(new Event("change", { bubbles: true }));
+          if (statusEl) statusEl.textContent = t("waybackPermDenied");
+          return;
+        }
+        if (statusEl) statusEl.textContent = "";
+      } catch (err) {
+        console.error("wayback permission request failed:", err);
+        e.target.checked = false;
+        // Same re-dispatch as the deny branch — ensures storage reflects false.
+        e.target.dispatchEvent(new Event("change", { bubbles: true }));
+        if (statusEl) statusEl.textContent = t("waybackPermDenied");
+      }
+    }
+  });
+
   // ===================== Auto-save =====================
   // Collect all settings from the form and save to chrome.storage.sync
   async function saveAll() {
@@ -666,6 +710,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       optPopupFollowTheme: $id("opt-popup-follow-theme").checked,
       tagSortByPopEnabled: $id("opt-tag-sort-by-pop").checked,
       tagPresets: $id("opt-tag-presets").value,
+      waybackArchiveEnabled: $id("opt-wayback-enabled").checked,
+      waybackArchiveBatch: $id("opt-wayback-batch").checked,
+      waybackS3Key: obfuscateKey($id("opt-wayback-s3key").value.trim()),
+      waybackS3Secret: obfuscateKey($id("opt-wayback-s3secret").value.trim()),
       themePresetKey: currentPresetKey,
       urlClean: {
         enabled: $id("opt-urlclean-enabled").checked,
