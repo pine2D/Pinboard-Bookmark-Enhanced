@@ -1684,5 +1684,133 @@
   },
   "archiveErrTimeoutHint": {
     "message": "la requête a expiré - archive.org est peut-être surchargé ou le réseau est lent"
+  },
+  "tabTags":   {
+    "message": "Étiquettes"
+  },
+  "tagGovOverview":   {
+    "message": "$TAGS$ étiquettes · $USES$ utilisations totales",
+    "placeholders": {
+      "tags": {
+        "content": "$1"
+      },
+      "uses": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovRefresh":   {
+    "message": "Actualiser"
+  },
+  "tagGovGroupsTitle":   {
+    "message": "Groupes d'étiquettes similaires"
+  },
+  "tagGovNoGroups":   {
+    "message": "Aucune étiquette en double trouvée"
+  },
+  "tagGovKindPlural":   {
+    "message": "singulier/pluriel"
+  },
+  "tagGovKindSeparator":   {
+    "message": "séparateur"
+  },
+  "tagGovKindTypo":   {
+    "message": "faute de frappe"
+  },
+  "tagGovKindAi":   {
+    "message": "IA"
+  },
+  "tagGovMerge":   {
+    "message": "Fusionner"
+  },
+  "tagGovIgnore":   {
+    "message": "Ignorer"
+  },
+  "tagGovResetIgnored":   {
+    "message": "Réinitialiser les ignorés"
+  },
+  "tagGovResetIgnoredConfirm":   {
+    "message": "Effacer les groupes ignorés et réafficher tous les doublons?"
+  },
+  "tagGovAiBtn":   {
+    "message": "Analyse approfondie par IA"
+  },
+  "tagGovAiRunning":   {
+    "message": "Analyse en cours…"
+  },
+  "tagGovAiNone":   {
+    "message": "Aucun groupe d'IA trouvé"
+  },
+  "tagGovLowCountTitle":   {
+    "message": "Étiquettes peu utilisées (1 utilisation ou moins)"
+  },
+  "tagGovSelectAll":   {
+    "message": "Tout sélectionner"
+  },
+  "tagGovDeleteSelected":   {
+    "message": "Supprimer la sélection"
+  },
+  "tagGovConfirmMerge":   {
+    "message": "Fusionner $N$ étiquettes dans $CANONICAL$?",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      },
+      "canonical": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovConfirmDelete":   {
+    "message": "Supprimer $N$ étiquettes sélectionnées? (permanent)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovDoneSummary":   {
+    "message": "$OK$ complété · $FAIL$ échoué",
+    "placeholders": {
+      "OK": {
+        "content": "$1"
+      },
+      "fail": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovAborted429":   {
+    "message": "Limite de débit atteinte — lot arrêté, éléments complétés sauvegardés"
+  },
+  "tagGovSnapshotSaved":   {
+    "message": "Snapshot d'étiquettes sauvegardé"
+  },
+  "tagGovSnapshotFailed":   {
+    "message": "Impossible de créer le snapshot — fusion/suppression bloquée"
+  },
+  "tagGovIrreversibleWarn":   {
+    "message": "Les fusions et suppressions ne peuvent pas être annulées. Un snapshot de votre liste d'étiquettes est téléchargé avant le premier changement."
+  },
+  "tagGovBundlesWarn":   {
+    "message": "Les bundles d'étiquettes sur pinboard.in ne sont pas mis à jour par les renommages — vérifiez-les manuellement après fusion."
+  },
+  "optBgSaveMode":   {
+    "message": "Mode de sauvegarde en arrière-plan"
+  },
+  "optBgSaveModeMerge":   {
+    "message": "Fusion (par défaut — combine les nouvelles étiquettes avec les existantes)"
+  },
+  "optBgSaveModeSkip":   {
+    "message": "Ignorer (si l'URL est déjà sauvegardée, rien faire)"
+  },
+  "optBgSaveModeOverwrite":   {
+    "message": "Remplacer (remplace toutes les étiquettes, sans fusion)"
+  },
+  "optBgSaveModeHint":   {
+    "message": "Fusion : lit les tags de signet existants et les combine avec les nouveaux tags. Ignorer : évite les doublons. Remplacer : remplace les tags entièrement (les édits au premier plan remplacent toujours)."
+  },
+  "bgSkippedExists":   {
+    "message": "Déjà en signet — sauvegarde ignorée"
   }
 }

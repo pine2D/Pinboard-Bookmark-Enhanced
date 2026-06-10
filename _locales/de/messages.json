@@ -1684,5 +1684,133 @@
   },
   "archiveErrTimeoutHint": {
     "message": "Die Anfrage hat das Zeitlimit überschritten - archive.org ist möglicherweise ausgelastet oder das Netzwerk ist langsam"
+  },
+  "tabTags":   {
+    "message": "Tags"
+  },
+  "tagGovOverview":   {
+    "message": "$TAGS$ Tags · $USES$ Gesamtverwendungen",
+    "placeholders": {
+      "tags": {
+        "content": "$1"
+      },
+      "uses": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovRefresh":   {
+    "message": "Aktualisieren"
+  },
+  "tagGovGroupsTitle":   {
+    "message": "Ähnliche Tag-Gruppen"
+  },
+  "tagGovNoGroups":   {
+    "message": "Keine doppelten Tags gefunden"
+  },
+  "tagGovKindPlural":   {
+    "message": "Singular/Plural"
+  },
+  "tagGovKindSeparator":   {
+    "message": "Trennzeichen"
+  },
+  "tagGovKindTypo":   {
+    "message": "Tippfehler"
+  },
+  "tagGovKindAi":   {
+    "message": "KI"
+  },
+  "tagGovMerge":   {
+    "message": "Zusammenführen"
+  },
+  "tagGovIgnore":   {
+    "message": "Ignorieren"
+  },
+  "tagGovResetIgnored":   {
+    "message": "Ignorierte zurücksetzen"
+  },
+  "tagGovResetIgnoredConfirm":   {
+    "message": "Ignorierte Gruppen löschen und alle Duplikate erneut anzeigen?"
+  },
+  "tagGovAiBtn":   {
+    "message": "KI-Tiefenanalyse"
+  },
+  "tagGovAiRunning":   {
+    "message": "Analysiere…"
+  },
+  "tagGovAiNone":   {
+    "message": "Keine KI-Gruppen gefunden"
+  },
+  "tagGovLowCountTitle":   {
+    "message": "Tags mit niedriger Häufigkeit (1 oder weniger)"
+  },
+  "tagGovSelectAll":   {
+    "message": "Alle auswählen"
+  },
+  "tagGovDeleteSelected":   {
+    "message": "Ausgewählte löschen"
+  },
+  "tagGovConfirmMerge":   {
+    "message": "$N$ Tags in $CANONICAL$ zusammenführen?",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      },
+      "canonical": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovConfirmDelete":   {
+    "message": "$N$ ausgewählte Tags löschen? (permanent)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovDoneSummary":   {
+    "message": "$OK$ abgeschlossen · $FAIL$ fehlgeschlagen",
+    "placeholders": {
+      "OK": {
+        "content": "$1"
+      },
+      "fail": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovAborted429":   {
+    "message": "Ratenlimit erreicht — Batch gestoppt, abgeschlossene Änderungen gespeichert"
+  },
+  "tagGovSnapshotSaved":   {
+    "message": "Tag-Snapshot gespeichert"
+  },
+  "tagGovSnapshotFailed":   {
+    "message": "Snapshot konnte nicht erstellt werden — Zusammenführen/Löschen blockiert"
+  },
+  "tagGovIrreversibleWarn":   {
+    "message": "Zusammenführungen und Löschungen können nicht rückgängig gemacht werden. Vor der ersten Änderung wird eine Sicherung Ihrer Tag-Liste heruntergeladen."
+  },
+  "tagGovBundlesWarn":   {
+    "message": "Tag-Bundles auf pinboard.in werden bei Umbenennungen nicht automatisch aktualisiert — überprüfen Sie sie nach dem Zusammenführen manuell."
+  },
+  "optBgSaveMode":   {
+    "message": "Modus für Hintergrund-Speichern"
+  },
+  "optBgSaveModeMerge":   {
+    "message": "Zusammenführen (Standard — neue Tags mit vorhandenen kombinieren)"
+  },
+  "optBgSaveModeSkip":   {
+    "message": "Überspringen (wenn URL bereits gespeichert, nichts tun)"
+  },
+  "optBgSaveModeOverwrite":   {
+    "message": "Überschreiben (alle Tags ersetzen, nicht zusammenführen)"
+  },
+  "optBgSaveModeHint":   {
+    "message": "Zusammenführen: liest vorhandene Lesezeichen-Tags und kombiniert mit neuen Tags. Überspringen: vermeidet Speichern doppelter URLs. Überschreiben: ersetzt Tags vollständig (Vordergrund-Bearbeitung ersetzt immer)."
+  },
+  "bgSkippedExists":   {
+    "message": "Bereits als Lesezeichen — Speichern übersprungen"
   }
 }

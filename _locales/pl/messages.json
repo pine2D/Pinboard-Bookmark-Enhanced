@@ -1684,5 +1684,133 @@
   },
   "archiveErrTimeoutHint": {
     "message": "żądanie przekroczyło limit czasu - archive.org może być przeciążony lub sieć jest wolna"
+  },
+  "tabTags":   {
+    "message": "Tagi"
+  },
+  "tagGovOverview":   {
+    "message": "$TAGS$ tagów · $USES$ wszystkich użyć",
+    "placeholders": {
+      "tags": {
+        "content": "$1"
+      },
+      "uses": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovRefresh":   {
+    "message": "Odśwież"
+  },
+  "tagGovGroupsTitle":   {
+    "message": "Grupy podobnych tagów"
+  },
+  "tagGovNoGroups":   {
+    "message": "Nie znaleziono zduplikowanych tagów"
+  },
+  "tagGovKindPlural":   {
+    "message": "liczba pojedyncza/mnoga"
+  },
+  "tagGovKindSeparator":   {
+    "message": "separator"
+  },
+  "tagGovKindTypo":   {
+    "message": "błąd pisowni"
+  },
+  "tagGovKindAi":   {
+    "message": "AI"
+  },
+  "tagGovMerge":   {
+    "message": "Połącz"
+  },
+  "tagGovIgnore":   {
+    "message": "Ignoruj"
+  },
+  "tagGovResetIgnored":   {
+    "message": "Resetuj ignorowane"
+  },
+  "tagGovResetIgnoredConfirm":   {
+    "message": "Wyczyścić ignorowane grupy i wyświetlić ponownie wszystkie duplikaty?"
+  },
+  "tagGovAiBtn":   {
+    "message": "Głęboka analiza AI"
+  },
+  "tagGovAiRunning":   {
+    "message": "Analiza w toku…"
+  },
+  "tagGovAiNone":   {
+    "message": "Nie znaleziono grup AI"
+  },
+  "tagGovLowCountTitle":   {
+    "message": "Tagi o niskiej częstości (1 lub mniej)"
+  },
+  "tagGovSelectAll":   {
+    "message": "Zaznacz wszystko"
+  },
+  "tagGovDeleteSelected":   {
+    "message": "Usuń zaznaczone"
+  },
+  "tagGovConfirmMerge":   {
+    "message": "Połączyć $N$ tagów z $CANONICAL$?",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      },
+      "canonical": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovConfirmDelete":   {
+    "message": "Usunąć $N$ zaznaczonych tagów? (trwale)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovDoneSummary":   {
+    "message": "$OK$ ukończeń · $FAIL$ niepowodzeń",
+    "placeholders": {
+      "OK": {
+        "content": "$1"
+      },
+      "fail": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovAborted429":   {
+    "message": "Osiągnięto limit szybkości — partia zatrzymana, ukończone elementy zapisane"
+  },
+  "tagGovSnapshotSaved":   {
+    "message": "Migawka tagów zapisana"
+  },
+  "tagGovSnapshotFailed":   {
+    "message": "Nie można utworzyć migawki — łączenie/usuwanie zablokowane"
+  },
+  "tagGovIrreversibleWarn":   {
+    "message": "Połączenia i usunięcia nie mogą być cofnięte. Migawka listy tagów jest pobierana przed pierwszą zmianą."
+  },
+  "tagGovBundlesWarn":   {
+    "message": "Pakiety tagów na pinboard.in nie są automatycznie aktualizowane przez zmianę nazwy — sprawdź je ręcznie po połączeniu."
+  },
+  "optBgSaveMode":   {
+    "message": "Tryb zapisywania w tle"
+  },
+  "optBgSaveModeMerge":   {
+    "message": "Połącz (domyślnie — połącz nowe tagi z istniejącymi)"
+  },
+  "optBgSaveModeSkip":   {
+    "message": "Pomiń (jeśli adres URL jest już zapisany, nic nie rób)"
+  },
+  "optBgSaveModeOverwrite":   {
+    "message": "Zastąp (zastąp wszystkie tagi, bez łączenia)"
+  },
+  "optBgSaveModeHint":   {
+    "message": "Połącz: odczytuje istniejące tagi zakładki i łączy z nowymi tagami. Pomiń: unika zapisywania zduplikowanych adresów URL. Zastąp: całkowicie zastępuje tagi (edycje na pierwszym planie zawsze zastępują)."
+  },
+  "bgSkippedExists":   {
+    "message": "Już w zakładkach — zapisywanie pominięte"
   }
 }

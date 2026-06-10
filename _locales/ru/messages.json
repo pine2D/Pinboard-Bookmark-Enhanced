@@ -1684,5 +1684,133 @@
   },
   "archiveErrTimeoutHint": {
     "message": "запрос превысил время ожидания - archive.org может быть перегружен или сеть работает медленно"
+  },
+  "tabTags":   {
+    "message": "Теги"
+  },
+  "tagGovOverview":   {
+    "message": "$TAGS$ тегов · всего $USES$ использований",
+    "placeholders": {
+      "tags": {
+        "content": "$1"
+      },
+      "uses": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovRefresh":   {
+    "message": "Обновить"
+  },
+  "tagGovGroupsTitle":   {
+    "message": "Группы похожих тегов"
+  },
+  "tagGovNoGroups":   {
+    "message": "Дублирующихся тегов не найдено"
+  },
+  "tagGovKindPlural":   {
+    "message": "единственное/множественное число"
+  },
+  "tagGovKindSeparator":   {
+    "message": "разделитель"
+  },
+  "tagGovKindTypo":   {
+    "message": "опечатка"
+  },
+  "tagGovKindAi":   {
+    "message": "AI"
+  },
+  "tagGovMerge":   {
+    "message": "Объединить"
+  },
+  "tagGovIgnore":   {
+    "message": "Игнорировать"
+  },
+  "tagGovResetIgnored":   {
+    "message": "Сбросить игнорируемые"
+  },
+  "tagGovResetIgnoredConfirm":   {
+    "message": "Очистить игнорируемые группы и повторно показать все дубликаты?"
+  },
+  "tagGovAiBtn":   {
+    "message": "Глубокий анализ AI"
+  },
+  "tagGovAiRunning":   {
+    "message": "Анализирование…"
+  },
+  "tagGovAiNone":   {
+    "message": "Группы AI не найдены"
+  },
+  "tagGovLowCountTitle":   {
+    "message": "Теги с малым количеством использований (1 или менее)"
+  },
+  "tagGovSelectAll":   {
+    "message": "Выбрать все"
+  },
+  "tagGovDeleteSelected":   {
+    "message": "Удалить выбранные"
+  },
+  "tagGovConfirmMerge":   {
+    "message": "Объединить $N$ тегов в $CANONICAL$?",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      },
+      "canonical": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovConfirmDelete":   {
+    "message": "Удалить $N$ выбранных тегов? (безвозвратно)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovDoneSummary":   {
+    "message": "$OK$ завершено · $FAIL$ ошибок",
+    "placeholders": {
+      "OK": {
+        "content": "$1"
+      },
+      "fail": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovAborted429":   {
+    "message": "Достигнут лимит запросов — пакет остановлен, завершённые элементы сохранены"
+  },
+  "tagGovSnapshotSaved":   {
+    "message": "Снимок тегов сохранён"
+  },
+  "tagGovSnapshotFailed":   {
+    "message": "Не удалось создать снимок — объединение/удаление заблокировано"
+  },
+  "tagGovIrreversibleWarn":   {
+    "message": "Объединение и удаление нельзя отменить. Перед первым изменением автоматически скачивается снимок вашего списка тегов."
+  },
+  "tagGovBundlesWarn":   {
+    "message": "Пакеты тегов на pinboard.in не обновляются автоматически при переименовании — проверьте их вручную после объединения."
+  },
+  "optBgSaveMode":   {
+    "message": "Режим фонового сохранения"
+  },
+  "optBgSaveModeMerge":   {
+    "message": "Объединение (по умолчанию — новые теги объединяются с существующими)"
+  },
+  "optBgSaveModeSkip":   {
+    "message": "Пропуск (если URL уже сохранён, ничего не делать)"
+  },
+  "optBgSaveModeOverwrite":   {
+    "message": "Перезапись (замещение всех тегов, без объединения)"
+  },
+  "optBgSaveModeHint":   {
+    "message": "Объединение: читает существующие теги закладки и объединяет с новыми. Пропуск: избегает сохранения дублирующихся URL. Перезапись: полностью замещает теги (переднеплановое редактирование всегда замещает)."
+  },
+  "bgSkippedExists":   {
+    "message": "Уже в закладках — сохранение пропущено"
   }
 }

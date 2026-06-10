@@ -1684,5 +1684,133 @@
   },
   "archiveErrTimeoutHint": {
     "message": "请求超时 — archive.org 繁忙或网络缓慢"
+  },
+  "tabTags":   {
+    "message": "标签"
+  },
+  "tagGovOverview":   {
+    "message": "$TAGS$ 个标签 · 共 $USES$ 次使用",
+    "placeholders": {
+      "tags": {
+        "content": "$1"
+      },
+      "uses": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovRefresh":   {
+    "message": "刷新"
+  },
+  "tagGovGroupsTitle":   {
+    "message": "近似标签组"
+  },
+  "tagGovNoGroups":   {
+    "message": "未检测到重复标签"
+  },
+  "tagGovKindPlural":   {
+    "message": "单复数"
+  },
+  "tagGovKindSeparator":   {
+    "message": "分隔符"
+  },
+  "tagGovKindTypo":   {
+    "message": "笔误"
+  },
+  "tagGovKindAi":   {
+    "message": "AI"
+  },
+  "tagGovMerge":   {
+    "message": "合并"
+  },
+  "tagGovIgnore":   {
+    "message": "忽略"
+  },
+  "tagGovResetIgnored":   {
+    "message": "重置忽略列表"
+  },
+  "tagGovResetIgnoredConfirm":   {
+    "message": "清除被忽略的组，重新显示所有重复项？"
+  },
+  "tagGovAiBtn":   {
+    "message": "AI 深度分析"
+  },
+  "tagGovAiRunning":   {
+    "message": "分析中…"
+  },
+  "tagGovAiNone":   {
+    "message": "AI 未发现重复项"
+  },
+  "tagGovLowCountTitle":   {
+    "message": "低频标签（1 次或更少）"
+  },
+  "tagGovSelectAll":   {
+    "message": "全选"
+  },
+  "tagGovDeleteSelected":   {
+    "message": "删除所选"
+  },
+  "tagGovConfirmMerge":   {
+    "message": "合并 $N$ 个标签到 $CANONICAL$？",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      },
+      "canonical": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovConfirmDelete":   {
+    "message": "删除 $N$ 个标签？（永久操作）",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovDoneSummary":   {
+    "message": "$OK$ 个完成 · $FAIL$ 个失败",
+    "placeholders": {
+      "OK": {
+        "content": "$1"
+      },
+      "fail": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovAborted429":   {
+    "message": "触发限流 — 批次停止，已完成的改动已保存"
+  },
+  "tagGovSnapshotSaved":   {
+    "message": "标签快照已保存"
+  },
+  "tagGovSnapshotFailed":   {
+    "message": "无法生成快照 — 合并/删除已阻止"
+  },
+  "tagGovIrreversibleWarn":   {
+    "message": "合并和删除操作不可撤销。第一次修改前会自动下载你的标签列表快照。"
+  },
+  "tagGovBundlesWarn":   {
+    "message": "Pinboard.in 上的标签束不会跟随重命名自动更新 — 合并后请手动检查。"
+  },
+  "optBgSaveMode":   {
+    "message": "后台保存模式"
+  },
+  "optBgSaveModeMerge":   {
+    "message": "合并（默认 — 新标签与现有标签合并）"
+  },
+  "optBgSaveModeSkip":   {
+    "message": "跳过（如果网址已保存则不操作）"
+  },
+  "optBgSaveModeOverwrite":   {
+    "message": "覆盖（完全替换标签，不合并）"
+  },
+  "optBgSaveModeHint":   {
+    "message": "合并：读取已有书签标签并与新标签合并。跳过：避免保存重复网址。覆盖：完全替换标签（前台编辑始终替换）。"
+  },
+  "bgSkippedExists":   {
+    "message": "已收藏过 — 保存已跳过"
   }
 }

@@ -1684,5 +1684,133 @@
   },
   "archiveErrTimeoutHint": {
     "message": "the request timed out - archive.org may be busy or the network slow"
+  },
+  "tabTags":   {
+    "message": "Tags"
+  },
+  "tagGovOverview":   {
+    "message": "$TAGS$ tags · $USES$ total uses",
+    "placeholders": {
+      "tags": {
+        "content": "$1"
+      },
+      "uses": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovRefresh":   {
+    "message": "Refresh"
+  },
+  "tagGovGroupsTitle":   {
+    "message": "Similar Tag Groups"
+  },
+  "tagGovNoGroups":   {
+    "message": "No duplicate tags found"
+  },
+  "tagGovKindPlural":   {
+    "message": "plural"
+  },
+  "tagGovKindSeparator":   {
+    "message": "separator"
+  },
+  "tagGovKindTypo":   {
+    "message": "typo"
+  },
+  "tagGovKindAi":   {
+    "message": "AI"
+  },
+  "tagGovMerge":   {
+    "message": "Merge"
+  },
+  "tagGovIgnore":   {
+    "message": "Ignore"
+  },
+  "tagGovResetIgnored":   {
+    "message": "Reset ignored list"
+  },
+  "tagGovResetIgnoredConfirm":   {
+    "message": "Clear ignored groups and re-show all duplicates?"
+  },
+  "tagGovAiBtn":   {
+    "message": "AI deep analysis"
+  },
+  "tagGovAiRunning":   {
+    "message": "Analyzing..."
+  },
+  "tagGovAiNone":   {
+    "message": "No AI groups found"
+  },
+  "tagGovLowCountTitle":   {
+    "message": "Low-count tags (1 use or fewer)"
+  },
+  "tagGovSelectAll":   {
+    "message": "Select all"
+  },
+  "tagGovDeleteSelected":   {
+    "message": "Delete selected"
+  },
+  "tagGovConfirmMerge":   {
+    "message": "Merge $N$ tags into $CANONICAL$?",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      },
+      "canonical": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovConfirmDelete":   {
+    "message": "Delete $N$ selected tags? (permanent)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovDoneSummary":   {
+    "message": "$OK$ completed · $FAIL$ failed",
+    "placeholders": {
+      "OK": {
+        "content": "$1"
+      },
+      "fail": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovAborted429":   {
+    "message": "Rate-limited — batch stopped, completed items saved"
+  },
+  "tagGovSnapshotSaved":   {
+    "message": "Tag snapshot saved"
+  },
+  "tagGovSnapshotFailed":   {
+    "message": "Could not create snapshot — merge/delete blocked"
+  },
+  "tagGovIrreversibleWarn":   {
+    "message": "Merges and deletions cannot be undone. A snapshot of your tag list is downloaded before the first change."
+  },
+  "tagGovBundlesWarn":   {
+    "message": "Tag bundles on pinboard.in are not updated by renames — review them manually after merging."
+  },
+  "optBgSaveMode":   {
+    "message": "Background save mode"
+  },
+  "optBgSaveModeMerge":   {
+    "message": "Merge (default — combine new tags with existing)"
+  },
+  "optBgSaveModeSkip":   {
+    "message": "Skip (if URL already saved, do nothing)"
+  },
+  "optBgSaveModeOverwrite":   {
+    "message": "Overwrite (replace all tags, no merge)"
+  },
+  "optBgSaveModeHint":   {
+    "message": "Merge: reads existing bookmark tags and combines with new tags. Skip: avoids duplicate-URL saves. Overwrite: replaces tags entirely (foreground edits always replace)."
+  },
+  "bgSkippedExists":   {
+    "message": "Already bookmarked — save skipped"
   }
 }

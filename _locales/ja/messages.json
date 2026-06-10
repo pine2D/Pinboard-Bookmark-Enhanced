@@ -1684,5 +1684,133 @@
   },
   "archiveErrTimeoutHint": {
     "message": "リクエストがタイムアウトしました — archive.org が混雑しているかネットワークが遅い可能性があります"
+  },
+  "tabTags":   {
+    "message": "タグ"
+  },
+  "tagGovOverview":   {
+    "message": "$TAGS$ 個のタグ · 合計 $USES$ 回の使用",
+    "placeholders": {
+      "tags": {
+        "content": "$1"
+      },
+      "uses": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovRefresh":   {
+    "message": "更新"
+  },
+  "tagGovGroupsTitle":   {
+    "message": "類似タググループ"
+  },
+  "tagGovNoGroups":   {
+    "message": "重複したタグは見つかりません"
+  },
+  "tagGovKindPlural":   {
+    "message": "単複数"
+  },
+  "tagGovKindSeparator":   {
+    "message": "区切り文字"
+  },
+  "tagGovKindTypo":   {
+    "message": "タイプミス"
+  },
+  "tagGovKindAi":   {
+    "message": "AI"
+  },
+  "tagGovMerge":   {
+    "message": "マージ"
+  },
+  "tagGovIgnore":   {
+    "message": "無視"
+  },
+  "tagGovResetIgnored":   {
+    "message": "無視をリセット"
+  },
+  "tagGovResetIgnoredConfirm":   {
+    "message": "無視されたグループをクリアしてすべての重複を再表示しますか？"
+  },
+  "tagGovAiBtn":   {
+    "message": "AI ディープ分析"
+  },
+  "tagGovAiRunning":   {
+    "message": "分析中…"
+  },
+  "tagGovAiNone":   {
+    "message": "AI グループが見つかりません"
+  },
+  "tagGovLowCountTitle":   {
+    "message": "低使用頻度タグ（1 回以下）"
+  },
+  "tagGovSelectAll":   {
+    "message": "すべて選択"
+  },
+  "tagGovDeleteSelected":   {
+    "message": "選択したものを削除"
+  },
+  "tagGovConfirmMerge":   {
+    "message": "$N$ 個のタグを $CANONICAL$ にマージしますか？",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      },
+      "canonical": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovConfirmDelete":   {
+    "message": "選択した $N$ 個のタグを削除しますか？（永続的）",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovDoneSummary":   {
+    "message": "$OK$ 個完了 · $FAIL$ 個失敗",
+    "placeholders": {
+      "OK": {
+        "content": "$1"
+      },
+      "fail": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovAborted429":   {
+    "message": "レート制限に達しました — バッチが停止され、完了した項目は保存されています"
+  },
+  "tagGovSnapshotSaved":   {
+    "message": "タグスナップショットが保存されました"
+  },
+  "tagGovSnapshotFailed":   {
+    "message": "スナップショットを作成できません — マージ/削除がブロックされています"
+  },
+  "tagGovIrreversibleWarn":   {
+    "message": "マージと削除は元に戻せません。最初の変更の前に、タグリストのスナップショットが自動的にダウンロードされます。"
+  },
+  "tagGovBundlesWarn":   {
+    "message": "pinboard.in のタグバンドルは、名前変更によって自動更新されません — マージ後に手動で確認してください。"
+  },
+  "optBgSaveMode":   {
+    "message": "バックグラウンド保存モード"
+  },
+  "optBgSaveModeMerge":   {
+    "message": "マージ（デフォルト — 新しいタグと既存タグを結合）"
+  },
+  "optBgSaveModeSkip":   {
+    "message": "スキップ（URL が既に保存されている場合は何もしない）"
+  },
+  "optBgSaveModeOverwrite":   {
+    "message": "上書き（すべてのタグを置換、マージしない）"
+  },
+  "optBgSaveModeHint":   {
+    "message": "マージ：既存のブックマークタグを読み込み、新しいタグと結合します。スキップ：重複 URL の保存を避けます。上書き：タグを完全に置換します（フォアグラウンド編集は常に置換）。"
+  },
+  "bgSkippedExists":   {
+    "message": "既にブックマークされています — 保存がスキップされました"
   }
 }

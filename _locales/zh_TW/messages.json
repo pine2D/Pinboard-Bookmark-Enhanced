@@ -1684,5 +1684,133 @@
   },
   "archiveErrTimeoutHint": {
     "message": "請求逾時 — archive.org 繁忙或網路緩慢"
+  },
+  "tabTags":   {
+    "message": "標籤"
+  },
+  "tagGovOverview":   {
+    "message": "$TAGS$ 個標籤 · 共 $USES$ 次使用",
+    "placeholders": {
+      "tags": {
+        "content": "$1"
+      },
+      "uses": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovRefresh":   {
+    "message": "重新整理"
+  },
+  "tagGovGroupsTitle":   {
+    "message": "近似標籤組"
+  },
+  "tagGovNoGroups":   {
+    "message": "未偵測到重複標籤"
+  },
+  "tagGovKindPlural":   {
+    "message": "單複數"
+  },
+  "tagGovKindSeparator":   {
+    "message": "分隔符"
+  },
+  "tagGovKindTypo":   {
+    "message": "筆誤"
+  },
+  "tagGovKindAi":   {
+    "message": "AI"
+  },
+  "tagGovMerge":   {
+    "message": "合併"
+  },
+  "tagGovIgnore":   {
+    "message": "忽略"
+  },
+  "tagGovResetIgnored":   {
+    "message": "重設忽略清單"
+  },
+  "tagGovResetIgnoredConfirm":   {
+    "message": "清除被忽略的組，重新顯示所有重複項？"
+  },
+  "tagGovAiBtn":   {
+    "message": "AI 深度分析"
+  },
+  "tagGovAiRunning":   {
+    "message": "分析中…"
+  },
+  "tagGovAiNone":   {
+    "message": "AI 未發現重複項"
+  },
+  "tagGovLowCountTitle":   {
+    "message": "低頻標籤（1 次或更少）"
+  },
+  "tagGovSelectAll":   {
+    "message": "全選"
+  },
+  "tagGovDeleteSelected":   {
+    "message": "刪除所選"
+  },
+  "tagGovConfirmMerge":   {
+    "message": "合併 $N$ 個標籤到 $CANONICAL$？",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      },
+      "canonical": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovConfirmDelete":   {
+    "message": "刪除 $N$ 個標籤？（永久操作）",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovDoneSummary":   {
+    "message": "$OK$ 個完成 · $FAIL$ 個失敗",
+    "placeholders": {
+      "OK": {
+        "content": "$1"
+      },
+      "fail": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovAborted429":   {
+    "message": "觸發限流 — 批次停止，已完成的改動已保存"
+  },
+  "tagGovSnapshotSaved":   {
+    "message": "標籤快照已保存"
+  },
+  "tagGovSnapshotFailed":   {
+    "message": "無法生成快照 — 合併/刪除已阻止"
+  },
+  "tagGovIrreversibleWarn":   {
+    "message": "合併和刪除操作不可撤銷。第一次修改前會自動下載你的標籤列表快照。"
+  },
+  "tagGovBundlesWarn":   {
+    "message": "Pinboard.in 上的標籤束不會跟隨重命名自動更新 — 合併後請手動檢查。"
+  },
+  "optBgSaveMode":   {
+    "message": "背景保存模式"
+  },
+  "optBgSaveModeMerge":   {
+    "message": "合併（預設 — 新標籤與既有標籤合併）"
+  },
+  "optBgSaveModeSkip":   {
+    "message": "跳過（若網址已保存則不操作）"
+  },
+  "optBgSaveModeOverwrite":   {
+    "message": "覆蓋（完全取代標籤，不合併）"
+  },
+  "optBgSaveModeHint":   {
+    "message": "合併：讀取既有書籤標籤並與新標籤合併。跳過：避免保存重複網址。覆蓋：完全取代標籤（前台編輯始終取代）。"
+  },
+  "bgSkippedExists":   {
+    "message": "已收藏過 — 保存已跳過"
   }
 }
