@@ -9,7 +9,7 @@
 // Self-contained: no imports, DOM-only. Exposes globals SITE_RULES / matchRule /
 // applySiteRule so the injected inline func (page context) can call them.
 // Adding a site = push one { id, match, extract }. Keep selectors here so markup
-// drift is localized; per-rule smoke tests live in md-convert-tests.html.
+// drift is localized; per-rule smoke tests live in tests/md-convert-tests.html.
 
 (function () {
   "use strict";

@@ -121,7 +121,7 @@ bash scripts/release.sh
 - **自动包含**（root 下匹配 glob）：`*.html` / `*.js` / `*.css` / `manifest.json`
 - **递归包含目录**：`vendor/` / `icons/` / `_locales/`
 - **显式排除**：
-  - `url-strip-tests.html`（dev 测试页）
+  - `tests/`（dev 测试页整目录——不在 INCLUDE_DIRS，自动 skip）
   - `perf-baseline.json` / `perf-after-*.json`（measurement 数据）
   - `*.md` / `LICENSE`（文档）
   - 隐藏文件/目录（`.git/` / `.claude/` / `.qa-scan/` 等）
