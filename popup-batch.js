@@ -197,6 +197,9 @@ function setupTabSet() {
           const data = await (await pinboardFetch(apiUrl)).json();
           if (data.result_code === "done") {
             saved++;
+            if (settings.waybackArchiveEnabled && settings.waybackArchiveBatch) {
+              chrome.runtime.sendMessage({ type: "archive_url", url: tab.url }).catch(() => {});
+            }
           } else failed++;
         } catch (_) { failed++; }
       }

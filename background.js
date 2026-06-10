@@ -2,7 +2,7 @@
 // Pinboard Bookmark Enhanced - Background Service Worker (v4.0)
 // ============================================================
 
-importScripts("i18n.js", "shared.js", "ai-cache.js", "ai.js", "jina.js");
+importScripts("i18n.js", "shared.js", "ai-cache.js", "ai.js", "jina.js", "wayback.js");
 
 // Load manual language setting (async, t() falls back to browser locale until ready)
 initI18n();
@@ -299,6 +299,7 @@ async function processOfflineQueue() {
     try {
       if (await sendOfflineItem(item, s)) {
         statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
+        pbpWaybackArchive(item.url, s).catch(() => {});
       } else {
         remaining.push(item); // keep for retry
       }
@@ -324,6 +325,7 @@ async function retryOfflineItem(queueId) {
     offlineQueue.splice(idx, 1);
     await chrome.storage.local.set({ offlineQueue });
     statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
+    pbpWaybackArchive(item.url, s).catch(() => {});
     return true;
   } catch (_) {
     // Single-item retry failure: caller treats `false` as "still queued"
@@ -460,6 +462,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       showNotification(notifyId + "-saved", notifyTitle, t("bgTitleSaved", title.substring(0, 60)), notifyCategory, { url, token: s.pinboardToken });
       processOfflineQueue().catch(() => {});
       if (toread) updateBadge().catch(() => {});
+      pbpWaybackArchive(url, s).catch(() => {});
     } else {
       showNotification(notifyId + "-error", t("bgSaveFailed"), data.result_code || "Unknown error", "error");
     }
@@ -728,8 +731,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }).catch(() => {});
     // Update badge if toread bookmark was saved
     if (message.toread) updateBadge().catch(() => {});
+    // Archive to Wayback Machine
+    loadSettings().then((s) => pbpWaybackArchive(message.url, s)).catch(() => {});
     sendResponse({ ok: true });
     return true;
+  }
+
+  if (message.type === "archive_url" && typeof message.url === "string") {
+    loadSettings().then((s) => pbpWaybackArchive(message.url, s)).catch(() => {});
+    return;
   }
 
   if (message.type === "bookmark_deleted" && message.url) {
