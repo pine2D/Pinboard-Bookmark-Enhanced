@@ -41,6 +41,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderPresetPreview();
   }
 
+  // ---- Tags panel lazy-init ----
+  let _tagGovInited = false;
+  function updateTagGovOverview(counts) {
+    const overview = $id("tag-gov-overview");
+    if (!counts || !overview) return;
+    const tagCount = Object.keys(counts).length;
+    const totalUses = Object.values(counts).reduce((a, b) => a + b, 0);
+    overview.replaceChildren();
+    const span = document.createElement("span");
+    span.textContent = t("tagGovOverview", String(tagCount), String(totalUses));
+    overview.appendChild(span);
+  }
+  async function _initTagGovPanel() {
+    if (_tagGovInited) return;
+    _tagGovInited = true;
+    const counts = await loadTagCounts();
+    const overview = $id("tag-gov-overview");
+    if (counts && overview) {
+      updateTagGovOverview(counts);
+      const refreshBtn = document.createElement("button");
+      refreshBtn.className = "btn btn-sm";
+      refreshBtn.id = "tag-gov-refresh";
+      refreshBtn.textContent = t("tagGovRefresh");
+      refreshBtn.addEventListener("click", async () => {
+        refreshBtn.disabled = true;
+        await chrome.storage.local.remove("_tagGovAiGroups");
+        const fresh = await loadTagCounts(true);
+        if (fresh) {
+          updateTagGovOverview(fresh);
+          const btn = $id("tag-gov-refresh");
+          if (btn && btn.parentNode) btn.parentNode.appendChild(btn);
+        }
+        await renderTagGov();
+        await renderLowCountTags();
+        refreshBtn.disabled = false;
+      });
+      overview.appendChild(refreshBtn);
+    }
+    await renderTagGov();
+    await renderLowCountTags();
+  }
+
   // ---- Tab switching ----
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -50,6 +92,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       $id(`panel-${btn.dataset.panel}`).classList.add("active");
       // W3: lazy-init expensive per-panel rendering on first view.
       if (btn.dataset.panel === "appearance") _initAppearancePanel();
+      if (btn.dataset.panel === "tags") _initTagGovPanel();
     });
   });
 
@@ -130,6 +173,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       fields: {
         "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": ""
       }
+    },
+    tags: {
+      fields: {},
+      skip: []
     }
   };
 
@@ -1142,8 +1189,199 @@ document.addEventListener("DOMContentLoaded", async () => {
     localStorage.setItem("pp-options-fields", JSON.stringify(mirror));
   } catch (_) {}
 
+  // ---- Tag governance event listeners ----
+  $id("tag-gov-reset-ignored")?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    showConfirmPopover($id("tag-gov-reset-ignored"), {
+      msg: t("tagGovResetIgnoredConfirm"),
+      yesText: t("reset"),
+      noText: t("cancel"),
+      onConfirm: async () => {
+        await chrome.storage.local.remove("_tagGovIgnored");
+        await renderTagGov();
+      }
+    });
+  });
+
+  // #tag-gov-ai-btn: AI deep-analysis handler attached in Task 5 (on-demand clustering).
+
   await renderWaybackLog();
 });
+
+// ---- Tag Governance helpers (top-level so they survive the DOMContentLoaded closure) ----
+
+async function loadTagCounts(forceFresh = false) {
+  try {
+    if (!forceFresh) {
+      const cached = await chrome.storage.local.get({ cached_user_tags: null });
+      if (cached.cached_user_tags) {
+        const { counts, timestamp } = cached.cached_user_tags;
+        if (Date.now() - timestamp < TAG_CACHE_TTL) {
+          return counts || null;
+        }
+      }
+    }
+    const result = await pinboardFetch("tags/get", { format: "json" });
+    if (!result || typeof result !== "object") return null;
+    await chrome.storage.local.set({
+      cached_user_tags: { counts: result, timestamp: Date.now() }
+    });
+    return result;
+  } catch (e) {
+    console.error("[tag-gov] loadTagCounts failed:", e);
+    return null;
+  }
+}
+
+async function renderTagGov() {
+  const container = $id("tag-gov-groups");
+  if (!container) return;
+
+  container.replaceChildren();
+
+  const stored = await chrome.storage.local.get({
+    cached_user_tags: null,
+    _tagGovIgnored: [],
+    _tagGovAiGroups: { groups: [] }
+  });
+  const tagCounts = stored.cached_user_tags && stored.cached_user_tags.counts;
+
+  if (!tagCounts) {
+    const empty = document.createElement("div");
+    empty.className = "fg";
+    empty.textContent = t("tagGovNoGroups");
+    container.appendChild(empty);
+    return;
+  }
+
+  const ignoredList = stored._tagGovIgnored || [];
+  const aiGroups = (stored._tagGovAiGroups && stored._tagGovAiGroups.groups) || [];
+
+  let allGroups = pbpTagGovFindGroups(tagCounts);
+  allGroups = allGroups.concat(aiGroups);
+  allGroups = allGroups.filter(g => !ignoredList.includes(g.id));
+
+  if (!allGroups.length) {
+    const empty = document.createElement("div");
+    empty.className = "fg";
+    empty.textContent = t("tagGovNoGroups");
+    container.appendChild(empty);
+    return;
+  }
+
+  for (const group of allGroups) {
+    const row = document.createElement("div");
+    row.className = "tag-gov-group-row";
+
+    const badge = document.createElement("span");
+    badge.className = "tag-gov-kind-badge";
+    const kindKey = group.kind === "plural" ? "tagGovKindPlural"
+      : group.kind === "separator" ? "tagGovKindSeparator"
+      : group.kind === "typo" ? "tagGovKindTypo"
+      : "tagGovKindAi";
+    badge.textContent = t(kindKey);
+    row.appendChild(badge);
+
+    const membersList = document.createElement("div");
+    membersList.className = "tag-gov-members";
+    for (const member of group.members) {
+      const label = document.createElement("label");
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "group-" + group.id;
+      radio.value = member.tag;
+      radio.defaultChecked = (member.tag === group.suggestedCanonical);
+      label.appendChild(radio);
+      const text = document.createElement("span");
+      text.textContent = " " + member.tag + " (" + member.count + ")";
+      label.appendChild(text);
+      membersList.appendChild(label);
+    }
+    row.appendChild(membersList);
+
+    if (group.kind === "ai" && group.reason) {
+      const reason = document.createElement("small");
+      reason.className = "tag-gov-reason";
+      reason.textContent = group.reason;
+      row.appendChild(reason);
+    }
+
+    const btnGroup = document.createElement("div");
+    btnGroup.className = "tag-gov-actions";
+
+    const mergeBtn = document.createElement("button");
+    mergeBtn.className = "btn btn-sm";
+    mergeBtn.textContent = t("tagGovMerge");
+    mergeBtn.addEventListener("click", () => {
+      const selected = row.querySelector("input[type=\"radio\"]:checked");
+      const canonical = selected ? selected.value : group.suggestedCanonical;
+      if (typeof confirmMergeGroup === "function") confirmMergeGroup(group, canonical);
+    });
+    btnGroup.appendChild(mergeBtn);
+
+    const ignoreBtn = document.createElement("button");
+    ignoreBtn.className = "btn btn-sm";
+    ignoreBtn.textContent = t("tagGovIgnore");
+    ignoreBtn.addEventListener("click", async () => {
+      const result2 = await chrome.storage.local.get({ _tagGovIgnored: [] });
+      const list = result2._tagGovIgnored || [];
+      if (!list.includes(group.id)) {
+        list.push(group.id);
+        await chrome.storage.local.set({ _tagGovIgnored: list });
+        await renderTagGov();
+      }
+    });
+    btnGroup.appendChild(ignoreBtn);
+
+    row.appendChild(btnGroup);
+    container.appendChild(row);
+  }
+}
+
+async function renderLowCountTags() {
+  const listContainer = $id("tag-gov-lowcount-list");
+  if (!listContainer) return;
+  listContainer.replaceChildren();
+
+  const cached = await chrome.storage.local.get({ cached_user_tags: null });
+  const counts = cached.cached_user_tags && cached.cached_user_tags.counts;
+  if (!counts) return;
+
+  const lowCount = pbpTagGovLowCountTags(counts, 1);
+  if (!lowCount.length) {
+    const empty = document.createElement("div");
+    empty.textContent = t("tagGovNoLowCount");
+    listContainer.appendChild(empty);
+    return;
+  }
+
+  const table = document.createElement("div");
+  table.className = "tag-gov-lowcount-table";
+  for (const item of lowCount) {
+    const row = document.createElement("div");
+    row.className = "tag-gov-lowcount-row";
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "tag-gov-lowcount-checkbox";
+    checkbox.value = item.tag;
+    label.appendChild(checkbox);
+    const text = document.createElement("span");
+    text.textContent = " " + item.tag + " (" + item.count + ")";
+    label.appendChild(text);
+    row.appendChild(label);
+    table.appendChild(row);
+  }
+  listContainer.appendChild(table);
+
+  const selectAll = $id("tag-gov-select-all");
+  if (selectAll) {
+    selectAll.onchange = () => {
+      listContainer.querySelectorAll(".tag-gov-lowcount-checkbox")
+        .forEach(cb => { cb.checked = selectAll.checked; });
+    };
+  }
+}
 
 // ---- Wayback Log Viewer ----
 // Map a raw wayback outcome detail to an i18n explanation key, or null for unknown.

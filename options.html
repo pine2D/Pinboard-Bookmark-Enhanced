@@ -17,6 +17,7 @@
       <button class="tab-btn" data-panel="ai" data-i18n="tabAI">AI</button>
       <button class="tab-btn" data-panel="quick" data-i18n="tabQuickActions">Quick Actions</button>
       <button class="tab-btn" data-panel="markdown" data-i18n="tabMarkdown">Markdown</button>
+      <button class="tab-btn" data-panel="tags" data-i18n="tabTags">Tags</button>
       <button class="tab-btn" data-panel="archive" data-i18n="tabArchive">Archive</button>
       <button class="tab-btn" data-panel="appearance" data-i18n="tabAppearance">Appearance</button>
       <button class="reset-tab-btn" id="reset-panel-btn" title="Reset current tab settings to defaults" data-i18n="resetTabBtn" data-i18n-title="resetTabTitle">Reset This Tab</button>
@@ -532,6 +533,38 @@
       </div>
     </div>
 
+    <!-- Tab: Tags -->
+    <div id="panel-tags" class="panel">
+      <div class="section-title" data-i18n="tagGovGroupsTitle">Tag Groups</div>
+      <div class="fg" id="tag-gov-overview">
+        <span data-i18n="tagGovOverview">$TAGS$ tags</span>
+        <button class="btn btn-sm" id="tag-gov-refresh" data-i18n="tagGovRefresh">Refresh</button>
+      </div>
+      <div id="tag-gov-groups"></div>
+      <div class="fg" style="margin-top:10px">
+        <button class="btn btn-sm" id="tag-gov-ai-btn" data-i18n="tagGovAiBtn">Deep Analysis (AI)</button>
+        <small class="tag-gov-reset-link"><a href="#" id="tag-gov-reset-ignored" data-i18n="tagGovResetIgnored">Reset ignored groups</a></small>
+      </div>
+      <div class="divider"></div>
+      <div class="section-title" data-i18n="tagGovLowCountTitle">Low-Count Tags</div>
+      <details id="tag-gov-lowcount">
+        <summary data-i18n="tagGovLowCountTitle">Show tags with 1 use or fewer</summary>
+        <div id="tag-gov-lowcount-list"></div>
+        <div style="margin-top:8px;display:flex;gap:8px;">
+          <label><input type="checkbox" id="tag-gov-select-all" /> <span data-i18n="tagGovSelectAll">Select all</span></label>
+        </div>
+        <button class="btn btn-sm tag-gov-delete-btn" id="tag-gov-delete-selected" data-i18n="tagGovDeleteSelected">Delete Selected</button>
+      </details>
+      <div id="tag-gov-progress" class="hidden" style="margin-top:10px;">
+        <div class="progress-bar">
+          <div id="tag-gov-progress-fill" class="progress-fill"></div>
+        </div>
+        <div id="tag-gov-progress-text"></div>
+      </div>
+      <p class="hint hint-warn tag-gov-warns" data-i18n="tagGovIrreversibleWarn">Merging and deletion are permanent. Create a backup before proceeding.</p>
+      <p class="hint" data-i18n="tagGovBundlesWarn">Note: Pinboard bundles are not visible via API and will not be updated when tags are merged.</p>
+    </div>
+
     <!-- Tab: Archive -->
     <div id="panel-archive" class="panel">
       <div class="section-title" data-i18n="optWayback">Wayback Archive on Save</div>
@@ -649,6 +682,7 @@
   <script defer src="ai.js"></script>
   <script defer src="options-connectivity.js"></script>
   <script defer src="options-backup.js"></script>
+  <script defer src="tag-gov.js"></script>
   <script defer src="options.js"></script>
 </body>
 </html>

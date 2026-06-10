@@ -904,3 +904,93 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   margin-right: 5px;
   vertical-align: middle;
 }
+
+/* ---- Tag Governance UI (T3) ---- */
+.tag-gov-group-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--opt-panel, #fafafa);
+  border: 1px solid var(--opt-border, #ccc);
+  border-radius: var(--opt-radius-sm, 3px);
+  margin-bottom: 8px;
+}
+.tag-gov-kind-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  background: var(--opt-border, #e0e0e0);
+  border-radius: var(--opt-radius-full, 9999px);
+  width: fit-content;
+  color: var(--opt-muted, #555);
+}
+.tag-gov-members {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-left: 8px;
+}
+.tag-gov-members label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.tag-gov-members input[type="radio"] {
+  margin: 0;
+}
+.tag-gov-reason {
+  font-size: 10px;
+  color: var(--opt-muted, #999);
+  display: block;
+  margin-left: 8px;
+  font-style: italic;
+}
+.tag-gov-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: 8px;
+}
+.tag-gov-lowcount-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.tag-gov-lowcount-row {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+.tag-gov-lowcount-checkbox {
+  margin-right: 6px;
+}
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--opt-border, #e0e0e0);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--opt-accent, #4477bb);
+  width: 0%;
+  transition: width 0.2s ease;
+}
+#tag-gov-progress-text {
+  font-size: 11px;
+  color: var(--opt-fg-muted, #666);
+  margin-top: 4px;
+}
+.tag-gov-warns {
+  margin-top: 12px;
+}
+.tag-gov-delete-btn {
+  margin-top: 8px;
+}
+.tag-gov-reset-link {
+  margin-left: 8px;
+}
