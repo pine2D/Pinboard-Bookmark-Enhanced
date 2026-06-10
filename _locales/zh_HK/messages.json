@@ -1816,6 +1816,9 @@
   "optBgSaveModeHint":   {
     "message": "合併：讀取已有書籤標籤並與新標籤合併。跳過：避免保存重複網址。覆蓋：完全取代標籤（前台編輯始終取代）。"
   },
+  "bgSkippedTitle":   {
+    "message": "已收藏"
+  },
   "bgSkippedExists":   {
     "message": "已收藏過 — 保存已跳過"
   }

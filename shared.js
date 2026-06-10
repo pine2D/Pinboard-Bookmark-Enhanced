@@ -176,6 +176,7 @@ const SETTINGS_DEFAULTS = {
   // pinboard.in tag-page "sort by popularity" control (site enhancement, default on)
   tagSortByPopEnabled: true,
   bgSaveNoClobber: true,
+  bgSaveMode: "merge", // "merge" | "skip" | "overwrite"
   waybackArchiveEnabled: false,
   waybackArchiveBatch: false,
   waybackS3Key: "",

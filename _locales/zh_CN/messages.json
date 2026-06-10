@@ -1816,6 +1816,9 @@
   "optBgSaveModeHint":   {
     "message": "合并：读取已有书签标签并与新标签合并。跳过：避免保存重复网址。覆盖：完全替换标签（前台编辑始终替换）。"
   },
+  "bgSkippedTitle":   {
+    "message": "已收藏"
+  },
   "bgSkippedExists":   {
     "message": "已收藏过 — 保存已跳过"
   }

@@ -1816,6 +1816,9 @@
   "optBgSaveModeHint":   {
     "message": "Fusion : lit les tags de signet existants et les combine avec les nouveaux tags. Ignorer : évite les doublons. Remplacer : remplace les tags entièrement (les édits au premier plan remplacent toujours)."
   },
+  "bgSkippedTitle":   {
+    "message": "Déjà en signet"
+  },
   "bgSkippedExists":   {
     "message": "Déjà en signet — sauvegarde ignorée"
   }

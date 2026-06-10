@@ -1816,6 +1816,9 @@
   "optBgSaveModeHint":   {
     "message": "Połącz: odczytuje istniejące tagi zakładki i łączy z nowymi tagami. Pomiń: unika zapisywania zduplikowanych adresów URL. Zastąp: całkowicie zastępuje tagi (edycje na pierwszym planie zawsze zastępują)."
   },
+  "bgSkippedTitle":   {
+    "message": "Już w zakładkach"
+  },
   "bgSkippedExists":   {
     "message": "Już w zakładkach — zapisywanie pominięte"
   }

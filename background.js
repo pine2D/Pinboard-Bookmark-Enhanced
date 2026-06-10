@@ -242,13 +242,19 @@ async function updateBadge() {
 async function fetchExistingBookmark(url, token) {
   const cached = statusCache.get(url);
   if (cached?.posts?.length > 0 && !isStaleCacheEntry(cached, Date.now(), CACHE_TTL)) {
-    return { tags: cached.posts[0].tags || "", extended: cached.posts[0].extended || "" };
+    return { exists: true, tags: cached.posts[0].tags || "", extended: cached.posts[0].extended || "" };
   }
-  const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
-  if (!resp.ok) return { tags: "", extended: "" };
-  const data = await resp.json();
-  const post = data.posts?.[0];
-  return { tags: post?.tags || "", extended: post?.extended || "" };
+  try {
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
+    if (!resp.ok) return { exists: false, lookupFailed: true, tags: "", extended: "" };
+    const data = await resp.json();
+    const posts = data.posts || [];
+    const exists = posts.length > 0;
+    const post = posts[0];
+    return { exists, tags: post?.tags || "", extended: post?.extended || "" };
+  } catch (_) {
+    return { exists: false, lookupFailed: true, tags: "", extended: "" };
+  }
 }
 
 async function enqueueOfflineSave(params) {
@@ -263,16 +269,27 @@ async function sendOfflineItem(item, settings) {
   let finalTags = item.tags;
   let existingExtended = "";
 
-  // If bgSaveNoClobber is enabled, merge tags (and preserve notes) from existing bookmark
-  if (settings?.bgSaveNoClobber) {
+  // bgSaveMode tri-state: merge | skip | overwrite
+  if (settings?.bgSaveMode === "skip" || settings?.bgSaveMode === "merge") {
     try {
       const existing = await fetchExistingBookmark(item.url, token);
-      if (existing.tags) finalTags = unionTags(existing.tags, item.tags);
-      existingExtended = existing.extended;
+      if (existing.lookupFailed) {
+        // Network/API failure: degrade to merge (never lose a save)
+        if (existing.tags) finalTags = unionTags(existing.tags, item.tags);
+        existingExtended = existing.extended;
+      } else if (settings.bgSaveMode === "skip" && existing.exists) {
+        // Skip mode: bookmark exists, dequeue without saving
+        return true;
+      } else {
+        // Merge mode or skip with non-existent: proceed with merge
+        if (existing.tags) finalTags = unionTags(existing.tags, item.tags);
+        existingExtended = existing.extended;
+      }
     } catch (_) {
-      // If merge fails, proceed with original tags
+      // Fetch error: proceed with original tags
     }
   }
+  // overwrite mode: no read, use tags as-is
 
   // buildPostsAddUri defaults replace=true (replace=yes)
   const apiUrl = buildPostsAddUri({
@@ -415,16 +432,29 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   let tagsStr = tags.join(" ");
   let existingExtended = "";
 
-  // If bgSaveNoClobber is enabled, merge tags (and preserve notes) from existing bookmark
-  if (s.bgSaveNoClobber) {
+  // bgSaveMode tri-state: merge | skip | overwrite
+  if (s.bgSaveMode === "skip" || s.bgSaveMode === "merge") {
     try {
       const existing = await fetchExistingBookmark(url, s.pinboardToken);
-      if (existing.tags) tagsStr = unionTags(existing.tags, tagsStr);
-      existingExtended = existing.extended;
+      if (existing.lookupFailed) {
+        // Network/API failure: degrade to merge (never lose a save)
+        if (existing.tags) tagsStr = unionTags(existing.tags, tagsStr);
+        existingExtended = existing.extended;
+      } else if (s.bgSaveMode === "skip" && existing.exists) {
+        // Skip mode: bookmark exists, do not save
+        showNotification(notifyId + "-skipped", t("bgSkippedTitle"), t("bgSkippedExists"), notifyCategory);
+        statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
+        return;
+      } else {
+        // Merge mode or skip with non-existent: proceed with merge
+        if (existing.tags) tagsStr = unionTags(existing.tags, tagsStr);
+        existingExtended = existing.extended;
+      }
     } catch (_) {
-      // Merge failure: proceed with new tags only
+      // Fetch error: proceed with original tags
     }
   }
+  // overwrite mode: no read, use tags/extended as-is
 
   const apiUrl = buildPostsAddUri({
     token: s.pinboardToken,
@@ -597,6 +627,19 @@ chrome.alarms.create("storage-warm", { periodInMinutes: 5 });
 
 sweepAICacheMigrationBackup().catch(() => {});
 sweepSuggestCache().catch(() => {});
+
+// One-time migration: bgSaveNoClobber (boolean) -> bgSaveMode (tri-state).
+// Raw array-key read (no defaults) so a genuinely-absent bgSaveMode is detectable.
+async function migrateBgSaveMode() {
+  try {
+    const store = await getSettingsStorage();
+    const raw = await store.get(["bgSaveMode", "bgSaveNoClobber"]);
+    if (raw.bgSaveMode !== undefined) return; // already migrated or user-set
+    const mode = (raw.bgSaveNoClobber === false) ? "overwrite" : "merge";
+    await store.set({ bgSaveMode: mode });
+  } catch (_) {}
+}
+migrateBgSaveMode();
 
 async function syncPrewarmTagsAlarm() {
   const s = await loadSettings();

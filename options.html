@@ -131,8 +131,13 @@
       <div class="fg"><label><input type="checkbox" id="opt-private-default" /> <span data-i18n="optPrivateDefault">Private by default</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-private-incognito" /> <span data-i18n="optPrivateIncognito">Private in Incognito</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-readlater-default" /> <span data-i18n="optReadlaterDefault">Read Later by default</span></label></div>
-      <div class="fg"><label><input type="checkbox" id="opt-bg-save-noclobber" checked /> <span data-i18n="optBgSaveNoClobber">Merge tags in background saves (Quick Save / Read Later)</span></label></div>
-      <p class="hint" data-i18n="optBgSaveNoClobberHint">When enabled, background saves read your existing Pinboard bookmark (if any) and merge new tags with existing tags instead of replacing them. This prevents accidental tag loss on duplicate URLs. Note: adds ~3s per save for the extra API call. Foreground popup edits always replace (give you full control).</p>
+      <div class="fg fg-stack">
+        <label class="bl" data-i18n="optBgSaveMode">Background save mode</label>
+        <div><label><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" /> <span data-i18n="optBgSaveModeMerge">Merge (default — combine new tags with existing)</span></label></div>
+        <div><label><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" /> <span data-i18n="optBgSaveModeSkip">Skip (if URL already saved, do nothing)</span></label></div>
+        <div><label><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" /> <span data-i18n="optBgSaveModeOverwrite">Overwrite (replace all tags, no merge)</span></label></div>
+        <p class="hint" data-i18n="optBgSaveModeHint">Merge: reads existing bookmark tags and combines with new tags. Skip: avoids duplicate-URL saves. Overwrite: replaces tags entirely (foreground edits always replace).</p>
+      </div>
       <div class="divider"></div>
       <div class="section-title" data-i18n="secNotesBehavior">Notes Behavior</div>
       <div class="fg"><label><input type="checkbox" id="opt-auto-description" checked /> <span data-i18n="optAutoDescription">Auto-fill meta description into notes</span></label></div>

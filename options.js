@@ -127,7 +127,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       fields: {
         "opt-private-default": false, "opt-private-incognito": true, "opt-readlater-default": false,
         "opt-auto-description": true, "opt-blockquote": true, "opt-include-referrer": false,
-        "opt-respect-tag-case": true, "opt-tag-presets": ""
+        "opt-respect-tag-case": true, "opt-tag-presets": "",
+        "opt-bgsave-merge": true, "opt-bgsave-skip": false, "opt-bgsave-overwrite": false
       }
     },
     ai: {
@@ -385,6 +386,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tsRadio = document.querySelector(`input[name="tag-sync-mode"][value="${s.tagSyncMode || 'cached'}"]`);
   if (tsRadio) tsRadio.checked = true;
 
+  // Background Save Mode radio
+  const bsRadio = document.querySelector(`input[name="bgsave-mode"][value="${s.bgSaveMode || 'merge'}"]`);
+  if (bsRadio) bsRadio.checked = true;
+
   // Markdown export image policy select
   const mdImgSel = $id("opt-md-image-policy");
   if (mdImgSel) mdImgSel.value = s.mdExportImagePolicy || "keep";
@@ -412,7 +417,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     "notify-tab-set": s.notifyTabSet, "notify-batch-save": s.notifyBatchSave,
     "notify-errors": s.notifyErrors,
     "opt-respect-tag-case": s.optRespectTagCase,
-    "opt-bg-save-noclobber": s.bgSaveNoClobber !== false,
     "offline-queue-enabled": s.offlineQueueEnabled,
     "opt-show-badge": s.optShowBadge,
     "opt-check-bookmark-status": s.optCheckBookmarkStatus,
@@ -668,7 +672,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       optBlockquote: $id("opt-blockquote").checked,
       optIncludeReferrer: $id("opt-include-referrer").checked,
       optRespectTagCase: $id("opt-respect-tag-case").checked,
-      bgSaveNoClobber: $id("opt-bg-save-noclobber").checked,
+      bgSaveMode: document.querySelector('input[name="bgsave-mode"]:checked')?.value || "merge",
       offlineQueueEnabled: $id("offline-queue-enabled").checked,
       // Quick Actions
       qsAutoNotes: $id("qs-auto-notes").checked,

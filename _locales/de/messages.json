@@ -1816,6 +1816,9 @@
   "optBgSaveModeHint":   {
     "message": "Zusammenführen: liest vorhandene Lesezeichen-Tags und kombiniert mit neuen Tags. Überspringen: vermeidet Speichern doppelter URLs. Überschreiben: ersetzt Tags vollständig (Vordergrund-Bearbeitung ersetzt immer)."
   },
+  "bgSkippedTitle":   {
+    "message": "Bereits als Lesezeichen gespeichert"
+  },
   "bgSkippedExists":   {
     "message": "Bereits als Lesezeichen — Speichern übersprungen"
   }

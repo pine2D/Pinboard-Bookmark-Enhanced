@@ -1816,6 +1816,9 @@
   "optBgSaveModeHint":   {
     "message": "Merge: reads existing bookmark tags and combines with new tags. Skip: avoids duplicate-URL saves. Overwrite: replaces tags entirely (foreground edits always replace)."
   },
+  "bgSkippedTitle":   {
+    "message": "Already bookmarked"
+  },
   "bgSkippedExists":   {
     "message": "Already bookmarked — save skipped"
   }
