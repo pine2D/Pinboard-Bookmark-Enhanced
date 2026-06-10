@@ -442,6 +442,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .status-msg { padding: 3px 12px 4px 72px; font-size: 11px; }
 .status-msg.success { color: #080; }
 .status-msg.error { color: #c00; }
+.wayback-indicator { font-size: 0.9em; opacity: 0.85; }
 
 /* Search Bar */
 .search-row { padding: 0 8px 6px; }

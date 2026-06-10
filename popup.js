@@ -752,7 +752,23 @@ function setupSubmit(token) {
         showStatus("status-msg", t("bookmarkSaved"), "success");
         setSubmitState("success");
         if (typeof saveLastUsedTags === "function") saveLastUsedTags(currentTags);
+        // Read _waybackAttempts BEFORE sending bookmark_saved (SW will stamp it after)
+        let _waybackAttemptsSnap = {};
+        try { _waybackAttemptsSnap = (await chrome.storage.local.get("_waybackAttempts"))._waybackAttempts || {}; } catch (_) {}
         chrome.runtime.sendMessage({ type: "bookmark_saved", url: url, toread: $id("readlater-check").checked });
+        // Optimistic archive indicator (cosmetic only, never blocks save or auto-close)
+        try {
+          if (settings.waybackArchiveEnabled === true && typeof pbpWaybackShouldAttempt === "function" && pbpWaybackShouldAttempt(_waybackAttemptsSnap, url, Date.now())) {
+            const statusEl = $id("status-msg");
+            if (statusEl) {
+              const indicator = document.createElement("span");
+              indicator.className = "wayback-indicator";
+              indicator.textContent = t("archiveRequested");
+              statusEl.appendChild(document.createTextNode(" · "));
+              statusEl.appendChild(indicator);
+            }
+          }
+        } catch (_) {}
         // Persist "just-saved" state: upgrade banner to reflect current bookmark
         existingBookmark = {
           href: url,
