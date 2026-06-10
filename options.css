@@ -801,3 +801,42 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
     scroll-behavior: auto !important;
   }
 }
+
+/* ---- Wayback Log Viewer ---- */
+#wayback-log {
+  margin-top: 6px;
+  border: 1px solid var(--opt-border, #ccc);
+  border-radius: var(--opt-radius-sm, 3px);
+  background: var(--opt-panel, #fafafa);
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.wayback-log-empty {
+  padding: 8px;
+  color: var(--opt-fg-muted, #666);
+}
+.wayback-log-row {
+  display: flex;
+  gap: 10px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--opt-border, #ccc);
+  align-items: baseline;
+}
+.wayback-log-row:last-child { border-bottom: none; }
+.wayback-log-domain {
+  flex: 0 0 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--opt-fg, #333);
+}
+.wayback-log-time {
+  flex: 0 0 80px;
+  color: var(--opt-fg-muted, #666);
+  white-space: nowrap;
+}
+.wayback-log-outcome {
+  flex: 1;
+  color: var(--opt-fg-muted, #666);
+}

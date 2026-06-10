@@ -1134,4 +1134,92 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
     localStorage.setItem("pp-options-fields", JSON.stringify(mirror));
   } catch (_) {}
+
+  await renderWaybackLog();
 });
+
+// ---- Wayback Log Viewer ----
+async function renderWaybackLog() {
+  const container = $id("wayback-log");
+  if (!container) return;
+
+  container.replaceChildren();
+
+  let log = [];
+  try {
+    const data = await chrome.storage.local.get({ _waybackLog: [] });
+    log = Array.isArray(data._waybackLog) ? data._waybackLog : [];
+  } catch (_) {
+    log = [];
+  }
+
+  if (!log.length) {
+    const empty = document.createElement("div");
+    empty.className = "wayback-log-empty";
+    empty.textContent = t("archiveLogEmpty");
+    container.appendChild(empty);
+    return;
+  }
+
+  const reversed = [...log].reverse();
+  for (const entry of reversed) {
+    const row = document.createElement("div");
+    row.className = "wayback-log-row";
+
+    const domainEl = document.createElement("span");
+    domainEl.className = "wayback-log-domain";
+    let domain = "";
+    try {
+      domain = new URL(entry.url).hostname.replace(/^www\./, "");
+    } catch (_) {
+      domain = entry.url || "";
+    }
+    domainEl.textContent = domain;
+
+    const timeEl = document.createElement("span");
+    timeEl.className = "wayback-log-time";
+    timeEl.textContent = _waybackRelTime(entry.ts);
+
+    const outcomeEl = document.createElement("span");
+    outcomeEl.className = "wayback-log-outcome";
+    const outcome = (typeof entry.outcome === "string") ? entry.outcome : "";
+    let outcomeText;
+    if (outcome === "requested") {
+      outcomeText = t("archiveOutcomeRequested");
+    } else if (outcome.startsWith("job:")) {
+      outcomeText = t("archiveOutcomeRequested");
+      outcomeEl.title = outcome;
+    } else if (outcome === "skipped") {
+      outcomeText = t("archiveOutcomeSkipped");
+    } else if (outcome === "rate-limited") {
+      outcomeText = t("archiveOutcomeRateLimited");
+    } else if (outcome === "timeout") {
+      outcomeText = t("archiveOutcomeTimeout");
+    } else if (outcome.startsWith("error")) {
+      outcomeText = t("archiveOutcomeError");
+      const detail = outcome.startsWith("error:") ? outcome.slice(6) : "";
+      if (detail) outcomeEl.title = detail;
+    } else {
+      outcomeText = outcome;
+    }
+    outcomeEl.textContent = outcomeText;
+
+    row.appendChild(domainEl);
+    row.appendChild(timeEl);
+    row.appendChild(outcomeEl);
+    container.appendChild(row);
+  }
+}
+
+function _waybackRelTime(ts) {
+  if (!ts) return "";
+  const diff = Math.max(0, Date.now() - ts);
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return t("offlineJustNow");
+  const m = Math.floor(s / 60);
+  if (m < 60) return t("offlineMinAgo", String(m));
+  const h = Math.floor(m / 60);
+  if (h < 24) return t("offlineHourAgo", String(h));
+  const d = Math.floor(h / 24);
+  return t("offlineDayAgo", String(d));
+}
