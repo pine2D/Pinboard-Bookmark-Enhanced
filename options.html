@@ -17,6 +17,7 @@
       <button class="tab-btn" data-panel="ai" data-i18n="tabAI">AI</button>
       <button class="tab-btn" data-panel="quick" data-i18n="tabQuickActions">Quick Actions</button>
       <button class="tab-btn" data-panel="markdown" data-i18n="tabMarkdown">Markdown</button>
+      <button class="tab-btn" data-panel="archive" data-i18n="tabArchive">Archive</button>
       <button class="tab-btn" data-panel="appearance" data-i18n="tabAppearance">Appearance</button>
       <button class="reset-tab-btn" id="reset-panel-btn" title="Reset current tab settings to defaults" data-i18n="resetTabBtn" data-i18n-title="resetTabTitle">Reset This Tab</button>
     </div>
@@ -131,35 +132,6 @@
       <div class="fg"><label><input type="checkbox" id="opt-readlater-default" /> <span data-i18n="optReadlaterDefault">Read Later by default</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-bg-save-noclobber" checked /> <span data-i18n="optBgSaveNoClobber">Merge tags in background saves (Quick Save / Read Later)</span></label></div>
       <p class="hint" data-i18n="optBgSaveNoClobberHint">When enabled, background saves read your existing Pinboard bookmark (if any) and merge new tags with existing tags instead of replacing them. This prevents accidental tag loss on duplicate URLs. Note: adds ~3s per save for the extra API call. Foreground popup edits always replace (give you full control).</p>
-      <div class="divider"></div>
-      <div class="section-title" data-i18n="optWayback">Wayback Archive on Save</div>
-      <div class="fg"><label><input type="checkbox" id="opt-wayback-enabled" /> <span data-i18n="optWayback">Enable Wayback archive on save</span></label></div>
-      <p class="hint" data-i18n="optWaybackHint">Automatically submit saved URLs to archive.org when you save a bookmark. Works with both Quick Save and Read Later.</p>
-      <div class="fg" style="margin-left:20px">
-        <label><input type="checkbox" id="opt-wayback-batch" /> <span data-i18n="optWaybackBatch">Also archive in Batch Save</span></label>
-        <p class="hint" style="margin-top:4px" data-i18n="optWaybackBatchHint">When checked, Batch Save will also submit each tab to archive.org. May slow down batch operations due to archiving delays.</p>
-      </div>
-      <div class="fg" style="margin-top:10px">
-        <label class="bl" data-i18n="optWaybackS3Key">Wayback S3 API Key (optional)</label>
-        <input type="password" id="opt-wayback-s3key" data-i18n-placeholder="placeholderOptional" autocomplete="off" spellcheck="false" />
-        <button type="button" class="key-toggle" data-target="opt-wayback-s3key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
-      </div>
-      <div class="fg">
-        <label class="bl" data-i18n="optWaybackS3Secret">Wayback S3 API Secret (optional)</label>
-        <input type="password" id="opt-wayback-s3secret" data-i18n-placeholder="placeholderOptional" autocomplete="off" spellcheck="false" />
-        <button type="button" class="key-toggle" data-target="opt-wayback-s3secret" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
-      </div>
-      <p class="hint" data-i18n="optWaybackS3Hint">Get your S3 credentials from archive.org/account/s3.php. With credentials, saves get priority and job tracking; anonymous saves are free but slower.</p>
-      <div class="fg" style="margin-top:4px">
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span data-i18n="batchPermLabel">Permission status:</span>
-          <span id="wayback-perm-status" style="font-size:11px;color:#666;"></span>
-        </div>
-      </div>
-      <div class="fg" style="margin-top:12px">
-        <div class="bl" data-i18n="archiveLogTitle">Archive Log</div>
-        <div id="wayback-log"></div>
-      </div>
       <div class="divider"></div>
       <div class="section-title" data-i18n="secNotesBehavior">Notes Behavior</div>
       <div class="fg"><label><input type="checkbox" id="opt-auto-description" checked /> <span data-i18n="optAutoDescription">Auto-fill meta description into notes</span></label></div>
@@ -557,6 +529,40 @@
         <label class="bl" for="opt-obsidian-folder" data-i18n="mdObsidianFolder">Obsidian folder</label>
         <input type="text" id="opt-obsidian-folder" autocomplete="off" />
         <p class="hint" data-i18n="mdObsidianFolderHint">Leave empty to save at the vault root.</p>
+      </div>
+    </div>
+
+    <!-- Tab: Archive -->
+    <div id="panel-archive" class="panel">
+      <div class="section-title" data-i18n="optWayback">Wayback Archive on Save</div>
+      <div class="fg"><label><input type="checkbox" id="opt-wayback-enabled" /> <span data-i18n="optWayback">Enable Wayback archive on save</span></label></div>
+      <p class="hint" data-i18n="optWaybackHint">Automatically submit saved URLs to archive.org when you save a bookmark. Works with both Quick Save and Read Later.</p>
+      <div class="fg" style="margin-left:20px">
+        <label><input type="checkbox" id="opt-wayback-batch" /> <span data-i18n="optWaybackBatch">Also archive in Batch Save</span></label>
+        <p class="hint" data-i18n="optWaybackBatchHint">Batch saves can fire many archive requests at once; anonymous quota is limited.</p>
+      </div>
+      <div class="divider"></div>
+      <div class="fg" style="margin-top:10px">
+        <label class="bl" data-i18n="optWaybackS3Key">Wayback S3 API Key (optional)</label>
+        <input type="password" id="opt-wayback-s3key" data-i18n-placeholder="placeholderOptional" autocomplete="off" spellcheck="false" />
+        <button type="button" class="key-toggle" data-target="opt-wayback-s3key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
+      </div>
+      <div class="fg">
+        <label class="bl" data-i18n="optWaybackS3Secret">Wayback S3 API Secret (optional)</label>
+        <input type="password" id="opt-wayback-s3secret" data-i18n-placeholder="placeholderOptional" autocomplete="off" spellcheck="false" />
+        <button type="button" class="key-toggle" data-target="opt-wayback-s3secret" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
+      </div>
+      <p class="hint"><span data-i18n="optWaybackS3Hint">With a free archive.org account key, archiving uses the authenticated API: higher quota, reliable results.</span> <a href="https://archive.org/account/s3.php" target="_blank" rel="noopener" data-i18n="waybackGetKey">Get key</a></p>
+      <div class="fg">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span data-i18n="batchPermLabel">Permission status:</span>
+          <span id="wayback-perm-status" class="wayback-perm-status"></span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="fg">
+        <div class="bl" data-i18n="archiveLogTitle">Archive Log</div>
+        <div id="wayback-log"></div>
       </div>
     </div>
 

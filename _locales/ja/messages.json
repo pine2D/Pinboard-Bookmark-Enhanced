@@ -1253,6 +1253,7 @@
   "mdObsidianFolder": { "message": "Obsidian フォルダ" },
   "mdObsidianFolderHint": { "message": "空欄で Vault のルートに保存します。" },
   "tabMarkdown": { "message": "Markdown" },
+  "tabArchive": { "message": "アーカイブ" },
   "mdObsidianEnabled": { "message": "Obsidian へのエクスポートを有効化" },
   "mdObsidianEnabledHint": { "message": "プレビューページとポップアップに「Obsidian に送信」ボタンを表示します。" },
   "mdStripObsidian": { "message": "Obsidian" },
@@ -1473,7 +1474,10 @@
     "message": "archive.org S3 シークレット（オプション）"
   },
   "optWaybackS3Hint": {
-    "message": "無料の archive.org アカウントキー（archive.org/account/s3.php）があれば、認証済み API でアーカイブします：クォータ増加、サーバー側の重複排除、信頼性の高い結果。"
+    "message": "無料の archive.org アカウントキーがあれば、認証済み API でアーカイブします：クォータ増加、サーバー側の重複排除、信頼性の高い結果。"
+  },
+  "waybackGetKey": {
+    "message": "キーを取得"
   },
   "waybackPermDenied": {
     "message": "web.archive.org の権限が拒否されました - アーカイブはオフのままです。"
@@ -1486,6 +1490,10 @@
   },
   "archiveLogEmpty": {
     "message": "アーカイブリクエストはまだありません"
+  },
+  "archiveLogMore": {
+    "message": "古いエントリを表示 ($COUNT$件)",
+    "placeholders": { "count": { "content": "$1" } }
   },
   "archiveOutcomeRequested": {
     "message": "リクエスト済み"

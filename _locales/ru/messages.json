@@ -1253,6 +1253,7 @@
   "mdObsidianFolder": { "message": "Папка Obsidian" },
   "mdObsidianFolderHint": { "message": "Оставьте пустым, чтобы сохранить в корне хранилища." },
   "tabMarkdown": { "message": "Markdown" },
+  "tabArchive": { "message": "Архив" },
   "mdObsidianEnabled": { "message": "Включить экспорт в Obsidian" },
   "mdObsidianEnabledHint": { "message": "Показывает кнопки «Отправить в Obsidian» на странице предпросмотра и во всплывающем окне." },
   "mdStripObsidian": { "message": "Obsidian" },
@@ -1473,7 +1474,10 @@
     "message": "секрет S3 archive.org (необязательно)"
   },
   "optWaybackS3Hint": {
-    "message": "С бесплатным ключом учетной записи archive.org (archive.org/account/s3.php) архивирование использует аутентифицированный API: более высокая квота, дедупликация на стороне сервера, надежные результаты."
+    "message": "С бесплатным ключом учётной записи archive.org архивирование использует аутентифицированный API: более высокая квота, дедупликация на стороне сервера, надёжные результаты."
+  },
+  "waybackGetKey": {
+    "message": "Получить ключ"
   },
   "waybackPermDenied": {
     "message": "Разрешение для web.archive.org было отклонено - архивирование остается отключенным."
@@ -1486,6 +1490,10 @@
   },
   "archiveLogEmpty": {
     "message": "Запросы архивирования отсутствуют"
+  },
+  "archiveLogMore": {
+    "message": "Показать более ранние записи ($COUNT$)",
+    "placeholders": { "count": { "content": "$1" } }
   },
   "archiveOutcomeRequested": {
     "message": "запрошено"

@@ -1253,6 +1253,7 @@
   "mdObsidianFolder": { "message": "Dossier Obsidian" },
   "mdObsidianFolderHint": { "message": "Laisser vide pour enregistrer à la racine du coffre." },
   "tabMarkdown": { "message": "Markdown" },
+  "tabArchive": { "message": "Archivage" },
   "mdObsidianEnabled": { "message": "Activer l'export vers Obsidian" },
   "mdObsidianEnabledHint": { "message": "Affiche les boutons « Envoyer vers Obsidian » dans la page d'aperçu et le popup." },
   "mdStripObsidian": { "message": "Obsidian" },
@@ -1473,7 +1474,10 @@
     "message": "secret S3 archive.org (optionnel)"
   },
   "optWaybackS3Hint": {
-    "message": "Avec une clé de compte archive.org gratuite (archive.org/account/s3.php), l'archivage utilise l'API authentifiée : quota supérieur, dédupplication côté serveur, résultats fiables."
+    "message": "Avec une clé de compte archive.org gratuite, l'archivage utilise l'API authentifiée : quota supérieur, dédupplication côté serveur, résultats fiables."
+  },
+  "waybackGetKey": {
+    "message": "Obtenir la clé"
   },
   "waybackPermDenied": {
     "message": "La permission pour web.archive.org a été refusée - l'archivage reste désactivé."
@@ -1486,6 +1490,10 @@
   },
   "archiveLogEmpty": {
     "message": "Aucune demande d'archivage pour le moment"
+  },
+  "archiveLogMore": {
+    "message": "Afficher les entrées plus anciennes ($COUNT$)",
+    "placeholders": { "count": { "content": "$1" } }
   },
   "archiveOutcomeRequested": {
     "message": "demandé"

@@ -1253,6 +1253,7 @@
   "mdObsidianFolder": { "message": "Obsidian 資料夾" },
   "mdObsidianFolderHint": { "message": "留空則儲存至庫根目錄。" },
   "tabMarkdown": { "message": "Markdown" },
+  "tabArchive": { "message": "存檔" },
   "mdObsidianEnabled": { "message": "啟用匯出到 Obsidian" },
   "mdObsidianEnabledHint": { "message": "在預覽頁面和彈出窗口中顯示「傳送到 Obsidian」按鈕。" },
   "mdStripObsidian": { "message": "Obsidian" },
@@ -1473,7 +1474,10 @@
     "message": "archive.org S3 密鑰（可選）"
   },
   "optWaybackS3Hint": {
-    "message": "使用免費的 archive.org 帳戶密鑰（archive.org/account/s3.php），存檔使用已認證的 API：更高的配額、伺服器端去重、可靠的結果。"
+    "message": "使用免費的 archive.org 帳戶密鑰，存檔將使用已認證的 API：更高的配額、伺服器端去重、可靠的結果。"
+  },
+  "waybackGetKey": {
+    "message": "獲取密鑰"
   },
   "waybackPermDenied": {
     "message": "拒絕了 web.archive.org 的權限 - 存檔保持關閉。"
@@ -1486,6 +1490,10 @@
   },
   "archiveLogEmpty": {
     "message": "還沒有存檔請求"
+  },
+  "archiveLogMore": {
+    "message": "顯示更早的記錄（$COUNT$ 條）",
+    "placeholders": { "count": { "content": "$1" } }
   },
   "archiveOutcomeRequested": {
     "message": "已請求"

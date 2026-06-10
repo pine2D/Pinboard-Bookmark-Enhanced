@@ -119,6 +119,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-obsidian-vault": "", "opt-obsidian-folder": ""
       }
     },
+    archive: {
+      fields: {
+        "opt-wayback-enabled": false, "opt-wayback-batch": false,
+        "opt-wayback-s3key": "", "opt-wayback-s3secret": ""
+      },
+      skip: ["opt-wayback-s3key", "opt-wayback-s3secret"]
+    },
     appearance: {
       fields: {
         "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": ""
@@ -1162,19 +1169,17 @@ async function renderWaybackLog() {
   }
 
   const reversed = [...log].reverse();
-  for (const entry of reversed) {
+
+  function buildRow(entry) {
     const row = document.createElement("div");
     row.className = "wayback-log-row";
 
-    const domainEl = document.createElement("span");
-    domainEl.className = "wayback-log-domain";
-    let domain = "";
-    try {
-      domain = new URL(entry.url).hostname.replace(/^www\./, "");
-    } catch (_) {
-      domain = entry.url || "";
-    }
-    domainEl.textContent = domain;
+    const urlEl = document.createElement("span");
+    urlEl.className = "wayback-log-url";
+    let urlText = "";
+    try { urlText = entry.url || ""; } catch (_) { urlText = ""; }
+    urlEl.textContent = urlText;
+    urlEl.title = urlText;
 
     const timeEl = document.createElement("span");
     timeEl.className = "wayback-log-time";
@@ -1204,10 +1209,29 @@ async function renderWaybackLog() {
     }
     outcomeEl.textContent = outcomeText;
 
-    row.appendChild(domainEl);
+    row.appendChild(urlEl);
     row.appendChild(timeEl);
     row.appendChild(outcomeEl);
-    container.appendChild(row);
+    return row;
+  }
+
+  const visible = reversed.slice(0, 10);
+  const rest = reversed.slice(10);
+
+  for (const entry of visible) {
+    container.appendChild(buildRow(entry));
+  }
+
+  if (rest.length > 0) {
+    const details = document.createElement("details");
+    details.className = "wayback-log-more";
+    const summary = document.createElement("summary");
+    summary.textContent = t("archiveLogMore", String(rest.length));
+    details.appendChild(summary);
+    for (const entry of rest) {
+      details.appendChild(buildRow(entry));
+    }
+    container.appendChild(details);
   }
 }
 

@@ -1253,6 +1253,7 @@
   "mdObsidianFolder": { "message": "Obsidian-Ordner" },
   "mdObsidianFolderHint": { "message": "Leer lassen, um im Vault-Stammverzeichnis zu speichern." },
   "tabMarkdown": { "message": "Markdown" },
+  "tabArchive": { "message": "Archiv" },
   "mdObsidianEnabled": { "message": "Export nach Obsidian aktivieren" },
   "mdObsidianEnabledHint": { "message": "Zeigt die „An Obsidian senden“-Schaltflächen in der Vorschauseite und im Popup an." },
   "mdStripObsidian": { "message": "Obsidian" },
@@ -1473,7 +1474,10 @@
     "message": "archive.org S3-Geheimnis (optional)"
   },
   "optWaybackS3Hint": {
-    "message": "Mit einem kostenlosen archive.org-Kontoschlüssel (archive.org/account/s3.php) verwendet das Archivieren die authentifizierte API: höheres Kontingent, serverseitige Deduplication, zuverlässige Ergebnisse."
+    "message": "Mit einem kostenlosen archive.org-Kontoschlüssel verwendet das Archivieren die authentifizierte API: höheres Kontingent, serverseitige Deduplizierung, zuverlässige Ergebnisse."
+  },
+  "waybackGetKey": {
+    "message": "Schlüssel holen"
   },
   "waybackPermDenied": {
     "message": "Berechtigung für web.archive.org wurde abgelehnt - Archivierung bleibt deaktiviert."
@@ -1486,6 +1490,10 @@
   },
   "archiveLogEmpty": {
     "message": "Noch keine Archivierungsanfragen"
+  },
+  "archiveLogMore": {
+    "message": "Ältere Einträge anzeigen ($COUNT$)",
+    "placeholders": { "count": { "content": "$1" } }
   },
   "archiveOutcomeRequested": {
     "message": "angefordert"

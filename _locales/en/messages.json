@@ -1253,6 +1253,7 @@
   "mdObsidianFolder": { "message": "Obsidian folder" },
   "mdObsidianFolderHint": { "message": "Leave empty to save at the vault root." },
   "tabMarkdown": { "message": "Markdown" },
+  "tabArchive": { "message": "Archive" },
   "mdObsidianEnabled": { "message": "Enable export to Obsidian" },
   "mdObsidianEnabledHint": { "message": "Shows the Send-to-Obsidian buttons in the preview page and the popup." },
   "mdStripObsidian": { "message": "Obsidian" },
@@ -1473,7 +1474,10 @@
     "message": "archive.org S3 secret (optional)"
   },
   "optWaybackS3Hint": {
-    "message": "With a free archive.org account key (archive.org/account/s3.php), archiving uses the authenticated API: higher quota, server-side dedup, reliable results."
+    "message": "With a free archive.org account key, archiving uses the authenticated API: higher quota, server-side dedup, reliable results."
+  },
+  "waybackGetKey": {
+    "message": "Get key"
   },
   "waybackPermDenied": {
     "message": "Permission for web.archive.org was declined - archiving stays off."
@@ -1486,6 +1490,14 @@
   },
   "archiveLogEmpty": {
     "message": "No archive requests yet"
+  },
+  "archiveLogMore": {
+    "message": "Show older requests ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "archiveOutcomeRequested": {
     "message": "requested"

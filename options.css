@@ -824,8 +824,9 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   align-items: baseline;
 }
 .wayback-log-row:last-child { border-bottom: none; }
-.wayback-log-domain {
-  flex: 0 0 120px;
+.wayback-log-url {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -837,6 +838,41 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   white-space: nowrap;
 }
 .wayback-log-outcome {
-  flex: 1;
+  flex: 0 0 90px;
   color: var(--opt-fg-muted, #666);
+  white-space: nowrap;
+}
+.wayback-perm-status {
+  font-size: 11px;
+  color: var(--opt-fg-muted, #666);
+}
+.wayback-log-more > summary {
+  cursor: pointer;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: var(--opt-fg-muted, #666);
+  list-style: none;
+}
+.wayback-log-more > summary::-webkit-details-marker { display: none; }
+.wayback-log-more > summary::before {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.wayback-log-more[open] > summary::before {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  border-bottom: none;
+  border-left: 4px solid transparent;
+  margin-right: 5px;
+  vertical-align: middle;
 }
