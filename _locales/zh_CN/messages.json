@@ -1453,5 +1453,53 @@
   "batchRevokeSuccess": { "message": "已撤销" },
   "batchPermRevoked":  { "message": "已撤销" },
   "batchPermNone":     { "message": "当前未授予所有站点访问权限" },
-  "batchRevokeFailed": { "message": "失败" }
+  "batchRevokeFailed": { "message": "失败" },
+  "optWayback": {
+    "message": "保存页面到互联网档案馆"
+  },
+  "optWaybackHint": {
+    "message": "每次保存后，请求互联网档案馆为该页面拍摄快照（尽力而为，不会阻挡保存）。将保存的 URL 发送至 archive.org - 默认关闭。"
+  },
+  "optWaybackBatch": {
+    "message": "批量保存时也要存档"
+  },
+  "optWaybackBatchHint": {
+    "message": "批量保存可能会同时发送多个存档请求；匿名配额有限。"
+  },
+  "optWaybackS3Key": {
+    "message": "archive.org S3 访问密钥（可选）"
+  },
+  "optWaybackS3Secret": {
+    "message": "archive.org S3 密钥（可选）"
+  },
+  "optWaybackS3Hint": {
+    "message": "使用免费的 archive.org 账户密钥（archive.org/account/s3.php），存档使用已认证的 API：更高的配额、服务器端去重、可靠的结果。"
+  },
+  "waybackPermDenied": {
+    "message": "拒绝了 web.archive.org 的权限 - 存档保持关闭。"
+  },
+  "archiveRequested": {
+    "message": "已请求存档"
+  },
+  "archiveLogTitle": {
+    "message": "最近的存档请求"
+  },
+  "archiveLogEmpty": {
+    "message": "还没有存档请求"
+  },
+  "archiveOutcomeRequested": {
+    "message": "已请求"
+  },
+  "archiveOutcomeSkipped": {
+    "message": "已跳过（最近已存档）"
+  },
+  "archiveOutcomeRateLimited": {
+    "message": "频率限制"
+  },
+  "archiveOutcomeTimeout": {
+    "message": "超时"
+  },
+  "archiveOutcomeError": {
+    "message": "失败"
+  }
 }

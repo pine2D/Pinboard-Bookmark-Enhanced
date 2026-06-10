@@ -1453,5 +1453,53 @@
   "batchRevokeSuccess": { "message": "Widerrufen" },
   "batchPermRevoked":  { "message": "widerrufen" },
   "batchPermNone":     { "message": "Derzeit ist kein Zugriff auf alle Websites gewährt" },
-  "batchRevokeFailed": { "message": "Fehlgeschlagen" }
+  "batchRevokeFailed": { "message": "Fehlgeschlagen" },
+  "optWayback": {
+    "message": "Gespeicherte Seiten im Wayback Machine archivieren"
+  },
+  "optWaybackHint": {
+    "message": "Nach jedem Speichern das Internet Archive bitten, einen Schnappschuss der Seite zu erstellen (Best-Effort, blockiert das Speichern nicht). Sendet die gespeicherte URL an archive.org - standardmäßig deaktiviert."
+  },
+  "optWaybackBatch": {
+    "message": "Auch während Batch-Speichern archivieren"
+  },
+  "optWaybackBatchHint": {
+    "message": "Batch-Speichern können viele Archivierungsanfragen gleichzeitig auslösen; anonymes Kontingent ist begrenzt."
+  },
+  "optWaybackS3Key": {
+    "message": "archive.org S3-Zugangsschlüssel (optional)"
+  },
+  "optWaybackS3Secret": {
+    "message": "archive.org S3-Geheimnis (optional)"
+  },
+  "optWaybackS3Hint": {
+    "message": "Mit einem kostenlosen archive.org-Kontoschlüssel (archive.org/account/s3.php) verwendet das Archivieren die authentifizierte API: höheres Kontingent, serverseitige Deduplication, zuverlässige Ergebnisse."
+  },
+  "waybackPermDenied": {
+    "message": "Berechtigung für web.archive.org wurde abgelehnt - Archivierung bleibt deaktiviert."
+  },
+  "archiveRequested": {
+    "message": "Archivierung angefordert"
+  },
+  "archiveLogTitle": {
+    "message": "Kürzliche Archivierungsanfragen"
+  },
+  "archiveLogEmpty": {
+    "message": "Noch keine Archivierungsanfragen"
+  },
+  "archiveOutcomeRequested": {
+    "message": "angefordert"
+  },
+  "archiveOutcomeSkipped": {
+    "message": "übersprungen (kürzlich archiviert)"
+  },
+  "archiveOutcomeRateLimited": {
+    "message": "Rate-begrenzt"
+  },
+  "archiveOutcomeTimeout": {
+    "message": "Zeitüberschreitung"
+  },
+  "archiveOutcomeError": {
+    "message": "fehlgeschlagen"
+  }
 }

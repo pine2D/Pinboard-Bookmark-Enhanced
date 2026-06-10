@@ -1453,5 +1453,53 @@
   "batchRevokeSuccess": { "message": "取り消しました" },
   "batchPermRevoked":  { "message": "取り消し済み" },
   "batchPermNone":     { "message": "現在、全サイトへのアクセス権は付与されていません" },
-  "batchRevokeFailed": { "message": "失敗" }
+  "batchRevokeFailed": { "message": "失敗" },
+  "optWayback": {
+    "message": "保存したページをインターネット アーカイブに保存する"
+  },
+  "optWaybackHint": {
+    "message": "保存するたびに、インターネット アーカイブにページのスナップショットを撮影するよう要求します（ベストエフォート、保存をブロックしません）。保存した URL を archive.org に送信 - デフォルトでオフです。"
+  },
+  "optWaybackBatch": {
+    "message": "一括保存中もアーカイブする"
+  },
+  "optWaybackBatchHint": {
+    "message": "一括保存は複数のアーカイブ リクエストを同時に送信できます。匿名クォータは限定されています。"
+  },
+  "optWaybackS3Key": {
+    "message": "archive.org S3 アクセスキー（オプション）"
+  },
+  "optWaybackS3Secret": {
+    "message": "archive.org S3 シークレット（オプション）"
+  },
+  "optWaybackS3Hint": {
+    "message": "無料の archive.org アカウントキー（archive.org/account/s3.php）があれば、認証済み API でアーカイブします：クォータ増加、サーバー側の重複排除、信頼性の高い結果。"
+  },
+  "waybackPermDenied": {
+    "message": "web.archive.org の権限が拒否されました - アーカイブはオフのままです。"
+  },
+  "archiveRequested": {
+    "message": "アーカイブをリクエストしました"
+  },
+  "archiveLogTitle": {
+    "message": "最近のアーカイブリクエスト"
+  },
+  "archiveLogEmpty": {
+    "message": "アーカイブリクエストはまだありません"
+  },
+  "archiveOutcomeRequested": {
+    "message": "リクエスト済み"
+  },
+  "archiveOutcomeSkipped": {
+    "message": "スキップ（最近アーカイブ済み）"
+  },
+  "archiveOutcomeRateLimited": {
+    "message": "レート制限"
+  },
+  "archiveOutcomeTimeout": {
+    "message": "タイムアウト"
+  },
+  "archiveOutcomeError": {
+    "message": "失敗"
+  }
 }

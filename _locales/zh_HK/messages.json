@@ -1453,5 +1453,53 @@
   "batchRevokeSuccess": { "message": "已撤銷" },
   "batchPermRevoked":  { "message": "已撤銷" },
   "batchPermNone":     { "message": "目前未授予所有網站存取權限" },
-  "batchRevokeFailed": { "message": "失敗" }
+  "batchRevokeFailed": { "message": "失敗" },
+  "optWayback": {
+    "message": "保存頁面到互聯網檔案館"
+  },
+  "optWaybackHint": {
+    "message": "每次保存後，請求互聯網檔案館為該頁面拍攝快照（盡力而為，不會阻擋保存）。將保存的 URL 發送至 archive.org - 預設關閉。"
+  },
+  "optWaybackBatch": {
+    "message": "批量保存時也要存檔"
+  },
+  "optWaybackBatchHint": {
+    "message": "批量保存可能會同時發送多個存檔請求；匿名配額有限。"
+  },
+  "optWaybackS3Key": {
+    "message": "archive.org S3 訪問密鑰（可選）"
+  },
+  "optWaybackS3Secret": {
+    "message": "archive.org S3 密鑰（可選）"
+  },
+  "optWaybackS3Hint": {
+    "message": "使用免費的 archive.org 帳戶密鑰（archive.org/account/s3.php），存檔使用已認證的 API：更高的配額、伺服器端去重、可靠的結果。"
+  },
+  "waybackPermDenied": {
+    "message": "拒絕了 web.archive.org 的權限 - 存檔保持關閉。"
+  },
+  "archiveRequested": {
+    "message": "已請求存檔"
+  },
+  "archiveLogTitle": {
+    "message": "最近的存檔請求"
+  },
+  "archiveLogEmpty": {
+    "message": "還沒有存檔請求"
+  },
+  "archiveOutcomeRequested": {
+    "message": "已請求"
+  },
+  "archiveOutcomeSkipped": {
+    "message": "已跳過（最近已存檔）"
+  },
+  "archiveOutcomeRateLimited": {
+    "message": "頻率限制"
+  },
+  "archiveOutcomeTimeout": {
+    "message": "逾時"
+  },
+  "archiveOutcomeError": {
+    "message": "失敗"
+  }
 }

@@ -1453,5 +1453,53 @@
   "batchRevokeSuccess": { "message": "Révoqué" },
   "batchPermRevoked":  { "message": "révoqué" },
   "batchPermNone":     { "message": "Aucun accès à tous les sites n'est actuellement accordé" },
-  "batchRevokeFailed": { "message": "Échec" }
+  "batchRevokeFailed": { "message": "Échec" },
+  "optWayback": {
+    "message": "Archiver les pages enregistrées sur Internet Archive"
+  },
+  "optWaybackHint": {
+    "message": "Après chaque enregistrement, demandez à Internet Archive de prendre un instantané de la page (meilleur effort, ne bloque jamais l'enregistrement). Envoie l'URL enregistrée à archive.org - désactivé par défaut."
+  },
+  "optWaybackBatch": {
+    "message": "Archiver également lors de l'enregistrement par lot"
+  },
+  "optWaybackBatchHint": {
+    "message": "Les enregistrements par lot peuvent lancer plusieurs demandes d'archivage simultanément ; le quota anonyme est limité."
+  },
+  "optWaybackS3Key": {
+    "message": "clé d'accès S3 archive.org (optionnel)"
+  },
+  "optWaybackS3Secret": {
+    "message": "secret S3 archive.org (optionnel)"
+  },
+  "optWaybackS3Hint": {
+    "message": "Avec une clé de compte archive.org gratuite (archive.org/account/s3.php), l'archivage utilise l'API authentifiée : quota supérieur, dédupplication côté serveur, résultats fiables."
+  },
+  "waybackPermDenied": {
+    "message": "La permission pour web.archive.org a été refusée - l'archivage reste désactivé."
+  },
+  "archiveRequested": {
+    "message": "Archivage demandé"
+  },
+  "archiveLogTitle": {
+    "message": "Demandes d'archivage récentes"
+  },
+  "archiveLogEmpty": {
+    "message": "Aucune demande d'archivage pour le moment"
+  },
+  "archiveOutcomeRequested": {
+    "message": "demandé"
+  },
+  "archiveOutcomeSkipped": {
+    "message": "ignoré (archivé récemment)"
+  },
+  "archiveOutcomeRateLimited": {
+    "message": "limite de débit"
+  },
+  "archiveOutcomeTimeout": {
+    "message": "délai dépassé"
+  },
+  "archiveOutcomeError": {
+    "message": "échoué"
+  }
 }

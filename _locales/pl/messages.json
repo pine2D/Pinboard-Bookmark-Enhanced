@@ -1453,5 +1453,53 @@
   "batchRevokeSuccess": { "message": "Cofnięto" },
   "batchPermRevoked":  { "message": "cofnięto" },
   "batchPermNone":     { "message": "Obecnie nie jest przyznany dostęp do wszystkich witryn" },
-  "batchRevokeFailed": { "message": "Niepowodzenie" }
+  "batchRevokeFailed": { "message": "Niepowodzenie" },
+  "optWayback": {
+    "message": "Archiwizuj zapisane strony w Internet Archive"
+  },
+  "optWaybackHint": {
+    "message": "Po każdym zapisaniu poproś Internet Archive o zrobienie migawki strony (najlepszy wysiłek, nigdy nie blokuje zapisywania). Wysyła zapisany adres URL do archive.org - domyślnie wyłączone."
+  },
+  "optWaybackBatch": {
+    "message": "Archiwizuj również podczas zapisywania wsadowego"
+  },
+  "optWaybackBatchHint": {
+    "message": "Zapisywanie wsadowe może wysyłać wiele żądań archiwizacji jednocześnie; limit anonimowy jest ograniczony."
+  },
+  "optWaybackS3Key": {
+    "message": "klucz dostępu S3 archive.org (opcjonalnie)"
+  },
+  "optWaybackS3Secret": {
+    "message": "tajemnica S3 archive.org (opcjonalnie)"
+  },
+  "optWaybackS3Hint": {
+    "message": "Dzięki darmowemu kluczowi konta archive.org (archive.org/account/s3.php) archiwizacja używa uwierzytelnionego interfejsu API: wyższy limit, deduplikacja po stronie serwera, niezawodne wyniki."
+  },
+  "waybackPermDenied": {
+    "message": "Uprawnienie dla web.archive.org zostało odrzucone - archiwizacja pozostaje wyłączona."
+  },
+  "archiveRequested": {
+    "message": "Archiwizacja żądana"
+  },
+  "archiveLogTitle": {
+    "message": "Ostatnie żądania archiwizacji"
+  },
+  "archiveLogEmpty": {
+    "message": "Brak żądań archiwizacji"
+  },
+  "archiveOutcomeRequested": {
+    "message": "żądane"
+  },
+  "archiveOutcomeSkipped": {
+    "message": "pominięte (niedawno zarchiwizowane)"
+  },
+  "archiveOutcomeRateLimited": {
+    "message": "ograniczone szybkością"
+  },
+  "archiveOutcomeTimeout": {
+    "message": "limit czasu"
+  },
+  "archiveOutcomeError": {
+    "message": "niepowodzenie"
+  }
 }

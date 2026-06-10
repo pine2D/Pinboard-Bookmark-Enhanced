@@ -1453,5 +1453,53 @@
   "batchRevokeSuccess": { "message": "Отозвано" },
   "batchPermRevoked":  { "message": "отозвано" },
   "batchPermNone":     { "message": "Доступ ко всем сайтам в данный момент не предоставлен" },
-  "batchRevokeFailed": { "message": "Ошибка" }
+  "batchRevokeFailed": { "message": "Ошибка" },
+  "optWayback": {
+    "message": "Архивировать сохраненные страницы в Wayback Machine"
+  },
+  "optWaybackHint": {
+    "message": "После каждого сохранения попросите Internet Archive сделать снимок страницы (по возможности, никогда не блокирует сохранение). Отправляет сохраненный URL на archive.org - отключено по умолчанию."
+  },
+  "optWaybackBatch": {
+    "message": "Также архивировать при массовом сохранении"
+  },
+  "optWaybackBatchHint": {
+    "message": "Массовое сохранение может отправить множество запросов архивирования одновременно; анонимная квота ограничена."
+  },
+  "optWaybackS3Key": {
+    "message": "ключ доступа S3 archive.org (необязательно)"
+  },
+  "optWaybackS3Secret": {
+    "message": "секрет S3 archive.org (необязательно)"
+  },
+  "optWaybackS3Hint": {
+    "message": "С бесплатным ключом учетной записи archive.org (archive.org/account/s3.php) архивирование использует аутентифицированный API: более высокая квота, дедупликация на стороне сервера, надежные результаты."
+  },
+  "waybackPermDenied": {
+    "message": "Разрешение для web.archive.org было отклонено - архивирование остается отключенным."
+  },
+  "archiveRequested": {
+    "message": "Запрошена архивация"
+  },
+  "archiveLogTitle": {
+    "message": "Последние запросы архивирования"
+  },
+  "archiveLogEmpty": {
+    "message": "Запросы архивирования отсутствуют"
+  },
+  "archiveOutcomeRequested": {
+    "message": "запрошено"
+  },
+  "archiveOutcomeSkipped": {
+    "message": "пропущено (недавно заархивировано)"
+  },
+  "archiveOutcomeRateLimited": {
+    "message": "ограничено по скорости"
+  },
+  "archiveOutcomeTimeout": {
+    "message": "истекло время ожидания"
+  },
+  "archiveOutcomeError": {
+    "message": "ошибка"
+  }
 }

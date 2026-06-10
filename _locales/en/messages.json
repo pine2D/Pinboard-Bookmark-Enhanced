@@ -1453,5 +1453,53 @@
   "batchRevokeSuccess": { "message": "Revoked" },
   "batchPermRevoked":  { "message": "revoked" },
   "batchPermNone":     { "message": "No all-sites access is currently granted" },
-  "batchRevokeFailed": { "message": "Failed" }
+  "batchRevokeFailed": { "message": "Failed" },
+  "optWayback": {
+    "message": "Archive saved pages to the Wayback Machine"
+  },
+  "optWaybackHint": {
+    "message": "After each save, ask the Internet Archive to snapshot the page (best effort, never blocks saving). Sends the saved URL to archive.org - off by default."
+  },
+  "optWaybackBatch": {
+    "message": "Also archive during batch save"
+  },
+  "optWaybackBatchHint": {
+    "message": "Batch saves can fire many archive requests at once; anonymous quota is limited."
+  },
+  "optWaybackS3Key": {
+    "message": "archive.org S3 access key (optional)"
+  },
+  "optWaybackS3Secret": {
+    "message": "archive.org S3 secret (optional)"
+  },
+  "optWaybackS3Hint": {
+    "message": "With a free archive.org account key (archive.org/account/s3.php), archiving uses the authenticated API: higher quota, server-side dedup, reliable results."
+  },
+  "waybackPermDenied": {
+    "message": "Permission for web.archive.org was declined - archiving stays off."
+  },
+  "archiveRequested": {
+    "message": "Archive requested"
+  },
+  "archiveLogTitle": {
+    "message": "Recent archive requests"
+  },
+  "archiveLogEmpty": {
+    "message": "No archive requests yet"
+  },
+  "archiveOutcomeRequested": {
+    "message": "requested"
+  },
+  "archiveOutcomeSkipped": {
+    "message": "skipped (recently archived)"
+  },
+  "archiveOutcomeRateLimited": {
+    "message": "rate-limited"
+  },
+  "archiveOutcomeTimeout": {
+    "message": "timed out"
+  },
+  "archiveOutcomeError": {
+    "message": "failed"
+  }
 }
