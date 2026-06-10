@@ -1753,6 +1753,9 @@
   "tagGovDeleteSelected":   {
     "message": "刪除所選"
   },
+  "tagGovNoLowCount":   {
+    "message": "沒有使用次數為 1 或更少的標籤。"
+  },
   "tagGovConfirmMerge":   {
     "message": "合併 $N$ 個標籤到 $CANONICAL$？",
     "placeholders": {

@@ -1753,6 +1753,9 @@
   "tagGovDeleteSelected":   {
     "message": "Ausgewählte löschen"
   },
+  "tagGovNoLowCount":   {
+    "message": "Keine Tags mit 1 Verwendung oder weniger."
+  },
   "tagGovConfirmMerge":   {
     "message": "$N$ Tags in $CANONICAL$ zusammenführen?",
     "placeholders": {

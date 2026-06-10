@@ -1753,6 +1753,9 @@
   "tagGovDeleteSelected":   {
     "message": "Supprimer la sélection"
   },
+  "tagGovNoLowCount":   {
+    "message": "Aucune étiquette avec 1 utilisation ou moins."
+  },
   "tagGovConfirmMerge":   {
     "message": "Fusionner $N$ étiquettes dans $CANONICAL$?",
     "placeholders": {

@@ -1753,6 +1753,9 @@
   "tagGovDeleteSelected":   {
     "message": "選択したものを削除"
   },
+  "tagGovNoLowCount":   {
+    "message": "使用回数が1回以下のタグはありません。"
+  },
   "tagGovConfirmMerge":   {
     "message": "$N$ 個のタグを $CANONICAL$ にマージしますか？",
     "placeholders": {

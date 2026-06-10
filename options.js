@@ -1203,6 +1203,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
+  $id("tag-gov-delete-selected")?.addEventListener("click", async () => {
+    const selected = Array.from(
+      document.querySelectorAll(".tag-gov-lowcount-checkbox:checked")
+    ).map(el => el.value);
+    if (!selected.length) return;
+    const btn = $id("tag-gov-delete-selected");
+    const shown = selected.slice(0, 10).join(", ") + (selected.length > 10 ? ", +" + (selected.length - 10) + " more" : "");
+    const msg = t("tagGovConfirmDelete", String(selected.length))
+      + "\n" + shown;
+    showConfirmPopover(btn, {
+      msg,
+      yesText: t("tagGovDeleteSelected"),
+      noText: t("cancel"),
+      onConfirm: async () => {
+        if (btn) btn.disabled = true;
+        if (!(await ensureTagSnapshot())) {
+          if (btn) btn.disabled = false;
+          return;
+        }
+        await runTagGovOps(selected.map(tag => ({ op: "delete", tag })));
+        if (btn) btn.disabled = false;
+      }
+    });
+  });
+
   $id("tag-gov-ai-btn")?.addEventListener("click", async () => {
     const btn = $id("tag-gov-ai-btn");
     const statusEl = $id("tag-gov-ai-status");
@@ -1419,8 +1444,10 @@ async function runTagGovOps(ops) {
   }
 
   try { await chrome.storage.local.remove("cached_user_tags"); } catch (_) {}
-  await loadTagCounts(true);
+  const fresh = await loadTagCounts(true);
+  if (fresh) updateTagGovOverview(fresh);
   await renderTagGov();
+  await renderLowCountTags();
 
   return { ok, fail, aborted };
 }
@@ -1595,8 +1622,12 @@ async function renderLowCountTags() {
   }
   listContainer.appendChild(table);
 
+  const summary = $id("tag-gov-lowcount")?.querySelector("summary");
+  if (summary) summary.textContent = t("tagGovLowCountTitle") + " (" + lowCount.length + ")";
+
   const selectAll = $id("tag-gov-select-all");
   if (selectAll) {
+    selectAll.checked = false;
     selectAll.onchange = () => {
       listContainer.querySelectorAll(".tag-gov-lowcount-checkbox")
         .forEach(cb => { cb.checked = selectAll.checked; });
