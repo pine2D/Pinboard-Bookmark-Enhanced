@@ -46,22 +46,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function _initTagGovPanel() {
     if (_tagGovInited) return;
     _tagGovInited = true;
-    const counts = await loadTagCounts();
     const overview = $id("tag-gov-overview");
+    // Bind Refresh UNCONDITIONALLY before the first load: when the initial
+    // loadTagCounts failed (no token yet, offline), the gated binding left a dead
+    // Refresh button and no recovery short of a full page reload (_tagGovInited
+    // never resets). Static #tag-gov-refresh from options.html (data-i18n
+    // localized); updateTagGovOverview preserves it across re-renders.
+    const refreshBtn = overview ? overview.querySelector("#tag-gov-refresh") : null;
+    if (refreshBtn) refreshBtn.addEventListener("click", async () => {
+      refreshBtn.disabled = true;
+      await chrome.storage.local.remove("_tagGovAiGroups");
+      const fresh = await loadTagCounts(true);
+      if (fresh) updateTagGovOverview(fresh);
+      else _tagGovShowLoadFailed();
+      await renderTagGov();
+      await renderLowCountTags();
+      refreshBtn.disabled = false;
+    });
+    const counts = await loadTagCounts();
     if (counts && overview) {
       updateTagGovOverview(counts);
-      // Static #tag-gov-refresh button from options.html (data-i18n localized);
-      // updateTagGovOverview preserves it across re-renders.
-      const refreshBtn = overview.querySelector("#tag-gov-refresh");
-      if (refreshBtn) refreshBtn.addEventListener("click", async () => {
-        refreshBtn.disabled = true;
-        await chrome.storage.local.remove("_tagGovAiGroups");
-        const fresh = await loadTagCounts(true);
-        if (fresh) updateTagGovOverview(fresh);
-        await renderTagGov();
-        await renderLowCountTags();
-        refreshBtn.disabled = false;
-      });
+    } else if (overview) {
+      _tagGovShowLoadFailed();
     }
     // Restore the last run's outcome if it left anything needing attention —
     // all-ok runs are not resurrected (no nagging).
@@ -1347,6 +1353,20 @@ function updateTagGovOverview(counts) {
 // Pinboard username (token prefix), stashed by getTagGovToken for building
 // pinboard.in/u:<user>/... links without an extra async hop at render time.
 let _tagGovUser = "";
+
+// Loading tag counts failed (no token / offline / API error): say so in the
+// overview line instead of leaving the unfilled "$TAGS$ tags" template visible.
+// Preserves the Refresh button the same way updateTagGovOverview does.
+function _tagGovShowLoadFailed() {
+  const overview = $id("tag-gov-overview");
+  if (!overview) return;
+  const refreshBtn = overview.querySelector("#tag-gov-refresh");
+  overview.replaceChildren();
+  const span = document.createElement("span");
+  span.textContent = t("tagGovLoadFailed");
+  overview.appendChild(span);
+  if (refreshBtn) overview.appendChild(refreshBtn);
+}
 
 // Shared token reader for tag-governance operations.
 // Returns the deobfuscated Pinboard token, or "" if not set / on error.

@@ -1886,6 +1886,9 @@
       }
     }
   },
+  "tagGovLoadFailed":   {
+    "message": "无法加载标签——请检查 Pinboard token 或网络后点刷新"
+  },
   "tagGovSnapshotSaved":   {
     "message": "已下载标签清单快照（仅含标签名和数量，供手工修复参考，不能自动还原）"
   },

@@ -1886,6 +1886,9 @@
       }
     }
   },
+  "tagGovLoadFailed":   {
+    "message": "Impossible de charger les tags — vérifiez votre jeton Pinboard ou le réseau, puis actualisez"
+  },
   "tagGovSnapshotSaved":   {
     "message": "Instantané de la liste des tags téléchargé (noms et compteurs uniquement — référence pour réparation manuelle, pas de restauration automatique)"
   },
