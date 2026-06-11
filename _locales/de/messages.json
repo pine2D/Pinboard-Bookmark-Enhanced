@@ -1789,6 +1789,33 @@
   "tagGovAborted429":   {
     "message": "Ratenlimit erreicht — Batch gestoppt, abgeschlossene Änderungen gespeichert"
   },
+  "tagGovMergeEstimate":   {
+    "message": "Geschätzte Dauer: ca. $T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovRetagProgress":   {
+    "message": "$DONE$/$TOTAL$ Lesezeichen neu getaggt",
+    "placeholders": {
+      "DONE": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovSkippedSummary":   {
+    "message": "$N$ übersprungen (Notiz zu lang zum erneuten Speichern)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag-Snapshot gespeichert"
   },

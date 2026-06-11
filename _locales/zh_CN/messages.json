@@ -1789,6 +1789,33 @@
   "tagGovAborted429":   {
     "message": "触发限流 — 批次停止，已完成的改动已保存"
   },
+  "tagGovMergeEstimate":   {
+    "message": "预计耗时：约 $T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovRetagProgress":   {
+    "message": "已重打标签 $DONE$/$TOTAL$ 个书签",
+    "placeholders": {
+      "DONE": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovSkippedSummary":   {
+    "message": "跳过 $N$ 条（备注过长，无法重新保存）",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "标签快照已保存"
   },

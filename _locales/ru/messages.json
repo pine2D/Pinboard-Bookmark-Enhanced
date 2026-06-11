@@ -1789,6 +1789,33 @@
   "tagGovAborted429":   {
     "message": "Достигнут лимит запросов — пакет остановлен, завершённые элементы сохранены"
   },
+  "tagGovMergeEstimate":   {
+    "message": "Примерное время: ~$T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovRetagProgress":   {
+    "message": "Обработано $DONE$/$TOTAL$ закладок",
+    "placeholders": {
+      "DONE": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovSkippedSummary":   {
+    "message": "Пропущено: $N$ (заметка слишком длинная для повторного сохранения)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Снимок тегов сохранён"
   },

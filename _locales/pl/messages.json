@@ -1789,6 +1789,33 @@
   "tagGovAborted429":   {
     "message": "Osiągnięto limit szybkości — partia zatrzymana, ukończone elementy zapisane"
   },
+  "tagGovMergeEstimate":   {
+    "message": "Szacowany czas: ok. $T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovRetagProgress":   {
+    "message": "Przetworzono $DONE$/$TOTAL$ zakładek",
+    "placeholders": {
+      "DONE": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovSkippedSummary":   {
+    "message": "Pominięto $N$ (notatka zbyt długa, aby zapisać ponownie)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Migawka tagów zapisana"
   },

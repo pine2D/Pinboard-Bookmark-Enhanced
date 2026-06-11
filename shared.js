@@ -283,7 +283,7 @@ function _executePinboardFetch(url, options, resolve, reject) {
 // the URI-bound API). Every save path (popup, batch, background) and the live char counter use
 // buildPostsAddUri below, so the measured length equals what is actually sent.
 const POSTS_ADD_URI_BUDGET = 3900;
-function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", shared, toread, replace = true }) {
+function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", shared, toread, dt, replace = true }) {
   const enc = encodeURIComponent;
   let uri = `https://api.pinboard.in/v1/posts/add?auth_token=${token}&format=json`;
   uri += `&url=${enc(url || "")}`;
@@ -292,6 +292,7 @@ function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", sh
   uri += `&tags=${enc(tags)}`;
   if (shared !== undefined) uri += `&shared=${shared}`;
   if (toread !== undefined) uri += `&toread=${toread}`;
+  if (dt) uri += `&dt=${enc(dt)}`; // preserve original timestamp when re-saving an existing bookmark
   if (replace) uri += `&replace=yes`;
   return uri;
 }

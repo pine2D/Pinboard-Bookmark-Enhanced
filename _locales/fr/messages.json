@@ -1789,6 +1789,33 @@
   "tagGovAborted429":   {
     "message": "Limite de débit atteinte — lot arrêté, éléments complétés sauvegardés"
   },
+  "tagGovMergeEstimate":   {
+    "message": "Durée estimée : env. $T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovRetagProgress":   {
+    "message": "$DONE$/$TOTAL$ signets mis à jour",
+    "placeholders": {
+      "DONE": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovSkippedSummary":   {
+    "message": "$N$ ignorés (note trop longue pour être réenregistrée)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Snapshot d'étiquettes sauvegardé"
   },

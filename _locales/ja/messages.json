@@ -1789,6 +1789,33 @@
   "tagGovAborted429":   {
     "message": "レート制限に達しました — バッチが停止され、完了した項目は保存されています"
   },
+  "tagGovMergeEstimate":   {
+    "message": "推定所要時間：約 $T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovRetagProgress":   {
+    "message": "$DONE$/$TOTAL$ 件のブックマークを再タグ付け",
+    "placeholders": {
+      "DONE": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovSkippedSummary":   {
+    "message": "$N$ 件をスキップ（メモが長すぎて再保存できません）",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "タグスナップショットが保存されました"
   },

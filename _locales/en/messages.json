@@ -1789,6 +1789,33 @@
   "tagGovAborted429":   {
     "message": "Rate-limited — batch stopped, completed items saved"
   },
+  "tagGovMergeEstimate":   {
+    "message": "Estimated time: ~$T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
+  "tagGovRetagProgress":   {
+    "message": "$DONE$/$TOTAL$ bookmarks retagged",
+    "placeholders": {
+      "DONE": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovSkippedSummary":   {
+    "message": "$N$ skipped (note too long to re-save)",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag snapshot saved"
   },

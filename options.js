@@ -1358,8 +1358,17 @@ async function confirmMergeGroup(group, canonical, anchorEl) {
   if (plan.length === 0) return;
   const renames = plan.filter(op => op.op === "rename");
   const summary = renames.map(op => op.old + " -> " + canonical).join(" | ");
+  // Renames run as per-bookmark re-saves (tags/rename is broken server-side), so the
+  // duration scales with bookmark count: one posts/all fetch per rename + one posts/add
+  // per bookmark, each spaced 3.1s by the rate-limit queue.
+  const canonLower = canonical.toLowerCase();
+  const bookmarkCount = group.members.reduce((sum, m) =>
+    (m && m.tag && m.tag.toLowerCase() !== canonLower) ? sum + (m.count || 0) : sum, 0);
+  const estSec = Math.ceil((renames.length + bookmarkCount) * 3.2);
+  const estStr = estSec < 90 ? estSec + "s" : Math.ceil(estSec / 60) + " min";
   const msg = t("tagGovConfirmMerge", String(renames.length), canonical)
-    + (summary ? ": " + summary : "");
+    + (summary ? ": " + summary : "")
+    + "\n" + t("tagGovMergeEstimate", estStr);
   const anchor = anchorEl;
   if (!anchor) return;
   showConfirmPopover(anchor, {
@@ -1371,6 +1380,75 @@ async function confirmMergeGroup(group, canonical, anchorEl) {
       await runTagGovOps(plan);
     }
   });
+}
+
+// Pinboard's v1 tags/rename endpoint is broken server-side (verified 2026-06-11: HTTP 500
+// with empty body for EVERY input, including two nonexistent tag names — it crashes before
+// input validation; the documented v2 API is not deployed, all /v2/* paths return an
+// Apache-level 403). tags/delete and posts/add still work, so renames are implemented as
+// per-bookmark re-tagging: fetch every post carrying the old tag, then re-save each via
+// posts/add replace=yes with the old tag substituted. The old tag disappears on its own
+// once its use count reaches zero. Deliberately NO tags/delete afterwards: if any re-save
+// was skipped or failed, deleting would strip the old tag with no new tag present (data loss).
+// Each network call flows through the shared 3.1s pinboardFetch queue.
+async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
+  const enc = encodeURIComponent;
+  const listUrl = `https://api.pinboard.in/v1/posts/all?tag=${enc(oldTag)}&meta=no&format=json&auth_token=${enc(token)}`;
+  let resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
+  if (resp.status === 429) {
+    await new Promise(r => setTimeout(r, TAG_GOV_RETRY_WAIT_MS));
+    resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
+    if (resp.status === 429) return { total: 0, saved: 0, failed: 0, skipped: 0, aborted: true };
+  }
+  if (!resp.ok) return { total: 0, saved: 0, failed: 1, skipped: 0, aborted: false };
+  const posts = await resp.json();
+  if (!Array.isArray(posts)) return { total: 0, saved: 0, failed: 1, skipped: 0, aborted: false };
+
+  const oldLower = oldTag.toLowerCase();
+  let saved = 0, failed = 0, skipped = 0;
+  for (let i = 0; i < posts.length; i++) {
+    if (onProgress) onProgress(i, posts.length);
+    const post = posts[i];
+    if (!post || !post.href) { failed++; continue; }
+    const tags = (post.tags || "").split(/\s+/).filter(Boolean);
+    // Pinboard tags are case-insensitive: match accordingly. Already clean -> count as done without a write.
+    if (!tags.some(tg => tg.toLowerCase() === oldLower)) { saved++; continue; }
+    const seen = new Set();
+    const next = [];
+    for (const tg of tags) {
+      const replaced = tg.toLowerCase() === oldLower ? newTag : tg;
+      const key = replaced.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); next.push(replaced); }
+    }
+    const uri = buildPostsAddUri({
+      token,
+      url: post.href,
+      title: post.description || post.href,
+      extended: post.extended || "",
+      tags: next.join(" "),
+      shared: post.shared,
+      toread: post.toread,
+      dt: post.time
+    });
+    // Never truncate a bookmark to fit the URI cap — skip it and surface the count instead.
+    if (uri.length > POSTS_ADD_URI_BUDGET) { skipped++; continue; }
+    try {
+      let r = await pinboardFetch(uri);
+      if (r.status === 429) {
+        await new Promise(rs => setTimeout(rs, TAG_GOV_RETRY_WAIT_MS));
+        r = await pinboardFetch(uri);
+        if (r.status === 429) return { total: posts.length, saved, failed, skipped, aborted: true };
+      }
+      if (!r.ok) { failed++; continue; }
+      const data = await r.json();
+      if (data.result_code === "done") { saved++; } else { failed++; }
+    } catch (e) {
+      console.error("[tag-gov] retag re-save failed:", post.href, e);
+      failed++;
+    }
+  }
+  if (onProgress) onProgress(posts.length, posts.length);
+  return { total: posts.length, saved, failed, skipped, aborted: false };
 }
 
 async function runTagGovOps(ops) {
@@ -1389,29 +1467,49 @@ async function runTagGovOps(ops) {
   const ptext = $id("tag-gov-progress-text");
   if (progress) progress.classList.remove("hidden");
 
-  let ok = 0, fail = 0, aborted = false;
+  let ok = 0, fail = 0, aborted = false, skippedTotal = 0;
   const enc = encodeURIComponent;
 
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i];
     const pct = Math.round(((i + 1) / ops.length) * 100);
     if (fill) fill.style.width = pct + "%";
-    if (ptext) {
-      ptext.innerHTML =
-        (i + 1) + "/" + ops.length + " " +
-        "<span class=\"status-ic ok\">" + PBP_ICONS.check + "</span>" + ok + " " +
-        "<span class=\"status-ic bad\">" + PBP_ICONS.cross + "</span>" + fail;
+    const opLine =
+      (i + 1) + "/" + ops.length + " " +
+      "<span class=\"status-ic ok\">" + PBP_ICONS.check + "</span>" + ok + " " +
+      "<span class=\"status-ic bad\">" + PBP_ICONS.cross + "</span>" + fail;
+    if (ptext) ptext.innerHTML = opLine;
+
+    if (op.op === "rename") {
+      // tags/rename is broken server-side -- re-tag each bookmark instead (see helper above).
+      try {
+        const res = await retagBookmarksViaResave(token, op.old, op.new, (done, total) => {
+          if (ptext && total > 0) {
+            ptext.innerHTML = opLine + " " + t("tagGovRetagProgress", String(done), String(total));
+          }
+        });
+        if (res.aborted) {
+          aborted = true;
+          break;
+        }
+        skippedTotal += res.skipped;
+        if (res.failed === 0 && res.skipped === 0) {
+          ok++;
+        } else {
+          fail++;
+        }
+      } catch (e) {
+        console.error("[tag-gov] op failed:", op, e);
+        fail++;
+      }
+      continue;
     }
 
-    let opUrl;
-    if (op.op === "rename") {
-      opUrl = `https://api.pinboard.in/v1/tags/rename?old=${enc(op.old)}&new=${enc(op.new)}&auth_token=${enc(token)}&format=json`;
-    } else if (op.op === "delete") {
-      opUrl = `https://api.pinboard.in/v1/tags/delete?tag=${enc(op.tag)}&auth_token=${enc(token)}&format=json`;
-    } else {
+    if (op.op !== "delete") {
       fail++;
       continue;
     }
+    const opUrl = `https://api.pinboard.in/v1/tags/delete?tag=${enc(op.tag)}&auth_token=${enc(token)}&format=json`;
 
     try {
       let resp = await pinboardFetch(opUrl);
@@ -1443,7 +1541,8 @@ async function runTagGovOps(ops) {
     if (aborted) {
       ptext.textContent = t("tagGovAborted429");
     } else {
-      ptext.textContent = t("tagGovDoneSummary", String(ok), String(fail));
+      ptext.textContent = t("tagGovDoneSummary", String(ok), String(fail))
+        + (skippedTotal > 0 ? " · " + t("tagGovSkippedSummary", String(skippedTotal)) : "");
     }
   }
 
