@@ -2032,9 +2032,17 @@ async function loadTagCounts(forceFresh = false) {
     }
     const token = await getTagGovToken();
     if (!token) return null;
-    const resp = await pinboardFetch(
-      `https://api.pinboard.in/v1/tags/get?auth_token=${encodeURIComponent(token)}&format=json`
-    );
+    const url = `https://api.pinboard.in/v1/tags/get?auth_token=${encodeURIComponent(token)}&format=json`;
+    // tags/get on a slow pinboard day exceeds the default 15s timeout (seen in the
+    // field: AbortError and Failed-to-fetch back-to-back) — allow 30s and retry once
+    // through the queue before declaring failure to the panel.
+    let resp;
+    try {
+      resp = await pinboardFetch(url, { timeoutMs: 30000 });
+    } catch (e) {
+      console.warn("[tag-gov] tags/get failed, retrying once:", e?.name || e);
+      resp = await pinboardFetch(url, { timeoutMs: 30000 });
+    }
     if (!resp || !resp.ok) return null;
     const counts = await resp.json();
     if (!counts || typeof counts !== "object") return null;
@@ -2043,7 +2051,10 @@ async function loadTagCounts(forceFresh = false) {
     });
     return counts;
   } catch (e) {
-    console.error("[tag-gov] loadTagCounts failed:", e);
+    // Expected failure mode (slow/unreachable API) and already surfaced in the UI —
+    // warn, not error: unpacked extensions list console.error on chrome://extensions,
+    // which should stay reserved for real defects.
+    console.warn("[tag-gov] loadTagCounts failed:", e);
     return null;
   }
 }
