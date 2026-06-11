@@ -1579,8 +1579,11 @@ async function _runTagGovBatch(ops) {
 
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i];
-    const pct = Math.round(((i + 1) / ops.length) * 100);
-    if (fill) fill.style.width = pct + "%";
+    // Bar = completed ops + fractional progress inside the current op. The old
+    // (i + 1) / ops.length formula filled the bar at the START of each op — a
+    // single-op batch showed 100% from the first second while 30 bookmarks were
+    // still being re-saved.
+    if (fill) fill.style.width = Math.round((i / ops.length) * 100) + "%";
     const opLine =
       t("tagGovOpLabel", String(i + 1), String(ops.length)) + " " +
       "<span class=\"status-ic ok\">" + PBP_ICONS.check + "</span>" + ok + " " +
@@ -1595,7 +1598,11 @@ async function _runTagGovBatch(ops) {
       // tags/rename is broken server-side -- re-tag each bookmark instead (see helper above).
       try {
         const res = await retagBookmarksViaResave(token, op.old, op.new, (done, total) => {
-          if (ptext && total > 0) {
+          if (total <= 0) return;
+          if (fill) {
+            fill.style.width = Math.round(((i + done / total) / ops.length) * 100) + "%";
+          }
+          if (ptext) {
             ptext.innerHTML = opLine + " " + t("tagGovRetagProgress", String(done), String(total)) + queueSuffix();
           }
         });
@@ -1651,6 +1658,8 @@ async function _runTagGovBatch(ops) {
       fail++;
     }
   }
+
+  if (fill && !aborted) fill.style.width = "100%";
 
   if (ptext) {
     if (aborted) {
