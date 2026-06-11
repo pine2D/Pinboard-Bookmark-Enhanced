@@ -1407,6 +1407,7 @@ async function ensureTagSnapshot() {
     if (!token) {
       if (progress) progress.classList.remove("hidden");
       if (progressText) progressText.textContent = t("tagGovSnapshotFailed");
+      _tagGovSetProgressBtn("dismiss"); // failure card must be closable on a fresh page
       return false;
     }
     const resp = await pinboardFetch(
@@ -1415,6 +1416,7 @@ async function ensureTagSnapshot() {
     if (!resp || !resp.ok) {
       if (progress) progress.classList.remove("hidden");
       if (progressText) progressText.textContent = t("tagGovSnapshotFailed");
+      _tagGovSetProgressBtn("dismiss"); // failure card must be closable on a fresh page
       return false;
     }
     const counts = await resp.json();
@@ -1444,6 +1446,7 @@ async function ensureTagSnapshot() {
     console.error("[tag-gov] ensureTagSnapshot failed:", e);
     if (progress) progress.classList.remove("hidden");
     if (progressText) progressText.textContent = t("tagGovSnapshotFailed");
+    _tagGovSetProgressBtn("dismiss"); // failure card must be closable on a fresh page
     return false;
   }
 }
