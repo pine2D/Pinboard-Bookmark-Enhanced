@@ -1817,7 +1817,7 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "Migawka tagów zapisana"
+    "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"
   },
   "tagGovSnapshotFailed":   {
     "message": "Nie można utworzyć migawki — łączenie/usuwanie zablokowane"

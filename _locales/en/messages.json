@@ -1817,7 +1817,7 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "Tag snapshot saved"
+    "message": "Tag snapshot downloaded (backup — merges and deletions cannot be undone)"
   },
   "tagGovSnapshotFailed":   {
     "message": "Could not create snapshot — merge/delete blocked"

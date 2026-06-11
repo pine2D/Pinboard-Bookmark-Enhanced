@@ -1817,7 +1817,7 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "Snapshot d'étiquettes sauvegardé"
+    "message": "Instantané des tags téléchargé (sauvegarde — les fusions et suppressions sont irréversibles)"
   },
   "tagGovSnapshotFailed":   {
     "message": "Impossible de créer le snapshot — fusion/suppression bloquée"

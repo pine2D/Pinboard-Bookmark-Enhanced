@@ -1817,7 +1817,7 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "标签快照已保存"
+    "message": "已下载标签快照（合并/删除不可撤销，此文件留作恢复备份）"
   },
   "tagGovSnapshotFailed":   {
     "message": "无法生成快照 — 合并/删除已阻止"

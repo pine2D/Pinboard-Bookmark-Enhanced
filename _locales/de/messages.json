@@ -1817,7 +1817,7 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "Tag-Snapshot gespeichert"
+    "message": "Tag-Snapshot heruntergeladen (Sicherung — Zusammenführungen und Löschungen können nicht rückgängig gemacht werden)"
   },
   "tagGovSnapshotFailed":   {
     "message": "Snapshot konnte nicht erstellt werden — Zusammenführen/Löschen blockiert"
