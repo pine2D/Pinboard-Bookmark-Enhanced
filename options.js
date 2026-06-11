@@ -63,6 +63,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         refreshBtn.disabled = false;
       });
     }
+    // Link the bundles note to the user's bundles page on pinboard.in
+    // (username = the part of the API token before the colon).
+    const bundlesWarn = $id("tag-gov-bundles-warn");
+    if (bundlesWarn && !bundlesWarn.querySelector("a")) {
+      const user = (await getTagGovToken()).split(":")[0];
+      if (user) {
+        const a = document.createElement("a");
+        a.href = "https://pinboard.in/u:" + encodeURIComponent(user) + "/bundles/";
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = "pinboard.in/u:" + user + "/bundles/";
+        bundlesWarn.appendChild(document.createTextNode(" "));
+        bundlesWarn.appendChild(a);
+      }
+    }
     await renderTagGov();
     await renderLowCountTags();
   }
