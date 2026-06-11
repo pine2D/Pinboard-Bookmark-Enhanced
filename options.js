@@ -1973,8 +1973,9 @@ async function renderTagGov() {
   const container = $id("tag-gov-groups");
   if (!container) return;
 
-  container.replaceChildren();
-
+  // Do NOT empty the container before the awaits below: a paint during the async gap
+  // collapses the panel height, Chrome clamps the scroll offset, and the page visibly
+  // jumps to the top. Build the new content first, then swap atomically at the end.
   const stored = await chrome.storage.local.get({
     cached_user_tags: null,
     _tagGovIgnored: [],
@@ -1986,7 +1987,7 @@ async function renderTagGov() {
     const empty = document.createElement("div");
     empty.className = "fg";
     empty.textContent = t("tagGovNoGroups");
-    container.appendChild(empty);
+    container.replaceChildren(empty);
     return;
   }
 
@@ -2014,10 +2015,11 @@ async function renderTagGov() {
     const empty = document.createElement("div");
     empty.className = "fg";
     empty.textContent = t("tagGovNoGroups");
-    container.appendChild(empty);
+    container.replaceChildren(empty);
     return;
   }
 
+  const frag = document.createDocumentFragment();
   for (const group of allGroups) {
     const row = document.createElement("div");
     row.className = "tag-gov-group-row";
@@ -2083,7 +2085,7 @@ async function renderTagGov() {
     btnGroup.appendChild(ignoreBtn);
 
     row.appendChild(btnGroup);
-    container.appendChild(row);
+    frag.appendChild(row);
 
     // Re-freeze only while batches are actually QUEUED (counter > 1). At the
     // drain-time re-render the counter is 1 and the active tags are released a few
@@ -2093,22 +2095,27 @@ async function renderTagGov() {
       _tagGovMarkRowQueued(row);
     }
   }
+  container.replaceChildren(frag);
 }
 
 async function renderLowCountTags() {
   const listContainer = $id("tag-gov-lowcount-list");
   if (!listContainer) return;
-  listContainer.replaceChildren();
 
+  // Same scroll-jump guard as renderTagGov: never leave the container empty across
+  // an await — build first, swap atomically.
   const cached = await chrome.storage.local.get({ cached_user_tags: null });
   const counts = cached.cached_user_tags && cached.cached_user_tags.counts;
-  if (!counts) return;
+  if (!counts) {
+    listContainer.replaceChildren();
+    return;
+  }
 
   const lowCount = pbpTagGovLowCountTags(counts, 1);
   if (!lowCount.length) {
     const empty = document.createElement("div");
     empty.textContent = t("tagGovNoLowCount");
-    listContainer.appendChild(empty);
+    listContainer.replaceChildren(empty);
     return;
   }
 
@@ -2129,7 +2136,7 @@ async function renderLowCountTags() {
     row.appendChild(label);
     table.appendChild(row);
   }
-  listContainer.appendChild(table);
+  listContainer.replaceChildren(table);
 
   const summary = $id("tag-gov-lowcount")?.querySelector("summary");
   if (summary) summary.textContent = t("tagGovLowCountTitle") + " (" + lowCount.length + ")";
