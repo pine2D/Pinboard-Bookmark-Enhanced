@@ -1816,6 +1816,25 @@
       }
     }
   },
+  "tagGovOpLabel":   {
+    "message": "タスク $I$/$N$",
+    "placeholders": {
+      "I": {
+        "content": "$1"
+      },
+      "N": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovQueuedBatches":   {
+    "message": "残り $N$ 件待機中",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "タグのスナップショットをダウンロードしました（統合・削除は元に戻せないため、復元用のバックアップです）"
   },

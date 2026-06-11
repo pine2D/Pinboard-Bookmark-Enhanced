@@ -1816,6 +1816,25 @@
       }
     }
   },
+  "tagGovOpLabel":   {
+    "message": "Task $I$/$N$",
+    "placeholders": {
+      "I": {
+        "content": "$1"
+      },
+      "N": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovQueuedBatches":   {
+    "message": "$N$ more queued",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag snapshot downloaded (backup — merges and deletions cannot be undone)"
   },

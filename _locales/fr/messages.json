@@ -1816,6 +1816,25 @@
       }
     }
   },
+  "tagGovOpLabel":   {
+    "message": "Tâche $I$/$N$",
+    "placeholders": {
+      "I": {
+        "content": "$1"
+      },
+      "N": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovQueuedBatches":   {
+    "message": "$N$ en attente",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Instantané des tags téléchargé (sauvegarde — les fusions et suppressions sont irréversibles)"
   },

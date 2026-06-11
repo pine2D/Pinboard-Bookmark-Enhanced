@@ -1816,6 +1816,25 @@
       }
     }
   },
+  "tagGovOpLabel":   {
+    "message": "Задача $I$/$N$",
+    "placeholders": {
+      "I": {
+        "content": "$1"
+      },
+      "N": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovQueuedBatches":   {
+    "message": "В очереди: $N$",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Снимок меток скачан (резервная копия — слияния и удаления необратимы)"
   },

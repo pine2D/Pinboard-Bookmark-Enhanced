@@ -1472,7 +1472,24 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
   return { total: posts.length, saved, failed, skipped, aborted: false };
 }
 
-async function runTagGovOps(ops) {
+// Batches queue up instead of running concurrently: several confirmed merges would
+// otherwise interleave their writes into the single shared progress line (observed in
+// the field as alternating "1/2 ... 24/92" / "1/2 ... 36/42" from different batches).
+// Network calls were already serialized by the pinboardFetch queue; this serializes
+// the UI and the ok/fail bookkeeping too.
+let _tagGovBatchChain = Promise.resolve();
+let _tagGovUnfinishedBatches = 0;
+
+function runTagGovOps(ops) {
+  _tagGovUnfinishedBatches++;
+  const run = _tagGovBatchChain.then(() =>
+    _runTagGovBatch(ops).finally(() => { _tagGovUnfinishedBatches--; })
+  );
+  _tagGovBatchChain = run.catch(() => {});
+  return run;
+}
+
+async function _runTagGovBatch(ops) {
   if (!ops || ops.length === 0) return { ok: 0, fail: 0, aborted: false };
   const token = await getTagGovToken();
   if (!token) {
@@ -1498,17 +1515,21 @@ async function runTagGovOps(ops) {
     const pct = Math.round(((i + 1) / ops.length) * 100);
     if (fill) fill.style.width = pct + "%";
     const opLine =
-      (i + 1) + "/" + ops.length + " " +
+      t("tagGovOpLabel", String(i + 1), String(ops.length)) + " " +
       "<span class=\"status-ic ok\">" + PBP_ICONS.check + "</span>" + ok + " " +
       "<span class=\"status-ic bad\">" + PBP_ICONS.cross + "</span>" + fail;
-    if (ptext) ptext.innerHTML = opLine;
+    const queueSuffix = () => {
+      const waiting = _tagGovUnfinishedBatches - 1; // batches queued behind this one
+      return waiting > 0 ? " · " + t("tagGovQueuedBatches", String(waiting)) : "";
+    };
+    if (ptext) ptext.innerHTML = opLine + queueSuffix();
 
     if (op.op === "rename") {
       // tags/rename is broken server-side -- re-tag each bookmark instead (see helper above).
       try {
         const res = await retagBookmarksViaResave(token, op.old, op.new, (done, total) => {
           if (ptext && total > 0) {
-            ptext.innerHTML = opLine + " " + t("tagGovRetagProgress", String(done), String(total));
+            ptext.innerHTML = opLine + " " + t("tagGovRetagProgress", String(done), String(total)) + queueSuffix();
           }
         });
         if (res.aborted) {

@@ -1816,6 +1816,25 @@
       }
     }
   },
+  "tagGovOpLabel":   {
+    "message": "Zadanie $I$/$N$",
+    "placeholders": {
+      "I": {
+        "content": "$1"
+      },
+      "N": {
+        "content": "$2"
+      }
+    }
+  },
+  "tagGovQueuedBatches":   {
+    "message": "W kolejce: $N$",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"
   },
