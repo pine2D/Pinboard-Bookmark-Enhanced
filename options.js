@@ -1310,12 +1310,18 @@ function updateTagGovOverview(counts) {
   if (refreshBtn) overview.appendChild(refreshBtn);
 }
 
+// Pinboard username (token prefix), stashed by getTagGovToken for building
+// pinboard.in/u:<user>/... links without an extra async hop at render time.
+let _tagGovUser = "";
+
 // Shared token reader for tag-governance operations.
 // Returns the deobfuscated Pinboard token, or "" if not set / on error.
 async function getTagGovToken() {
   try {
     const s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
-    return deobfuscateKey(s.pinboardToken) || "";
+    const token = deobfuscateKey(s.pinboardToken) || "";
+    if (token) _tagGovUser = token.split(":")[0] || _tagGovUser;
+    return token;
   } catch (e) {
     console.error("[tag-gov] getTagGovToken failed:", e);
     return "";
@@ -1552,15 +1558,31 @@ function renderTagGovProblems() {
     kind.className = "tag-gov-problem-kind" + (pr.kind === "failed" ? " bad" : "");
     kind.textContent = t(pr.kind === "failed" ? "tagGovProblemFailed" : "tagGovProblemSkipped");
     row.appendChild(kind);
-    row.appendChild(document.createTextNode(" " + pr.old + " -> " + pr.new));
-    if (pr.url) {
-      row.appendChild(document.createTextNode(" · "));
-      const a = document.createElement("a");
-      a.href = "https://pinboard.in/add?url=" + encodeURIComponent(pr.url);
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.textContent = pr.title || pr.url;
-      row.appendChild(a);
+    if (pr.tag) {
+      // delete-path row: the tag name, linked to its page so the user can inspect
+      // what still carries it before retrying.
+      row.appendChild(document.createTextNode(" "));
+      if (_tagGovUser) {
+        const a = document.createElement("a");
+        a.href = "https://pinboard.in/u:" + encodeURIComponent(_tagGovUser) + "/t:" + encodeURIComponent(pr.tag) + "/";
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = pr.tag;
+        row.appendChild(a);
+      } else {
+        row.appendChild(document.createTextNode(pr.tag));
+      }
+    } else {
+      row.appendChild(document.createTextNode(" " + pr.old + " -> " + pr.new));
+      if (pr.url) {
+        row.appendChild(document.createTextNode(" · "));
+        const a = document.createElement("a");
+        a.href = "https://pinboard.in/add?url=" + encodeURIComponent(pr.url);
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = pr.title || pr.url;
+        row.appendChild(a);
+      }
     }
     if (pr.reason) row.appendChild(document.createTextNode(" · " + pr.reason));
     box.appendChild(row);
@@ -1705,6 +1727,7 @@ async function _runTagGovBatch(ops) {
       }
       if (!resp.ok) {
         fail++;
+        _tagGovProblems.push({ kind: "failed", tag: op.tag, reason: "HTTP " + resp.status });
         continue;
       }
       const data = await resp.json();
@@ -1712,10 +1735,12 @@ async function _runTagGovBatch(ops) {
         ok++;
       } else {
         fail++;
+        _tagGovProblems.push({ kind: "failed", tag: op.tag, reason: String(data.result || "unknown") });
       }
     } catch (e) {
       console.error("[tag-gov] op failed:", op, e);
       fail++;
+      _tagGovProblems.push({ kind: "failed", tag: op.tag, reason: e?.name || "network error" });
     }
   }
 
