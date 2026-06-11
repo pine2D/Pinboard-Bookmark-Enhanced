@@ -1471,12 +1471,9 @@ async function runTagGovOps(ops) {
   const progress = $id("tag-gov-progress");
   const fill = $id("tag-gov-progress-fill");
   const ptext = $id("tag-gov-progress-text");
-  if (progress) {
-    progress.classList.remove("hidden");
-    // The progress row sits at the bottom of the Tags panel, below the groups list —
-    // bring it into view so short batches (a few seconds) are not missed entirely.
-    progress.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }
+  // Visibility from any scroll position is handled by CSS — #tag-gov-progress is
+  // position:sticky at the viewport bottom, so no scroll jump is needed here.
+  if (progress) progress.classList.remove("hidden");
 
   let ok = 0, fail = 0, aborted = false, skippedTotal = 0;
   const enc = encodeURIComponent;
