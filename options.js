@@ -1811,7 +1811,20 @@ async function renderTagGov() {
   }
 
   const ignoredList = stored._tagGovIgnored || [];
-  const aiGroups = (stored._tagGovAiGroups && stored._tagGovAiGroups.groups) || [];
+  // AI groups are a stored snapshot and never expire on their own. After a merge the
+  // heuristic groups self-heal (rebuilt from fresh counts) but stale AI groups would
+  // keep showing vanished members — worse, an AI group whose canonical was itself
+  // just merged away would re-create that tag if merged. Filter members against the
+  // live counts, refresh their counts, and drop groups left with fewer than 2 members.
+  const aiGroups = ((stored._tagGovAiGroups && stored._tagGovAiGroups.groups) || [])
+    .map(g => ({
+      ...g,
+      members: (g.members || [])
+        .filter(m => m && Object.prototype.hasOwnProperty.call(tagCounts, m.tag))
+        .map(m => ({ ...m, count: tagCounts[m.tag] }))
+    }))
+    .filter(g => g.members.length >= 2
+      && g.members.some(m => m.tag === g.suggestedCanonical));
 
   let allGroups = pbpTagGovFindGroups(tagCounts);
   allGroups = allGroups.concat(aiGroups);
