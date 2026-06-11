@@ -231,7 +231,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         for (const [id, val] of Object.entries(def.fields)) {
           const el = $id(id);
           if (!el) continue;
-          if (el.type === "checkbox") el.checked = val;
+          // Radios reset via .checked like checkboxes (boolean = whether selected).
+          // The old else-branch overwrote a radio's VALUE attribute with "true"/
+          // "false" -- saveAll() then persisted bgSaveMode as "true", which the
+          // background treats as overwrite (merge protection silently lost).
+          if (el.type === "checkbox" || el.type === "radio") el.checked = val;
           else el.value = val;
         }
         saveAll();
