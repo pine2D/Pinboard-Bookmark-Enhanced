@@ -1889,6 +1889,9 @@
   "tagGovLoadFailed":   {
     "message": "無法載入標籤——請檢查 Pinboard token 或網路後按重新整理"
   },
+  "placeholderOptional":   {
+    "message": "可選"
+  },
   "tagGovSnapshotSaved":   {
     "message": "已下載標籤清單快照（僅含標籤名稱和數量，供手工修復參考，不能自動還原）"
   },

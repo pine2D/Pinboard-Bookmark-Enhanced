@@ -1555,7 +1555,11 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
     }
     if (onProgress) onProgress(i, posts.length);
     const post = posts[i];
-    if (!post || !post.href) { failed++; continue; }
+    if (!post || !post.href) {
+      failed++;
+      problems.push({ url: "", title: (post && post.description) || "", kind: "failed", reason: "missing href" });
+      continue;
+    }
     const tags = (post.tags || "").split(/\s+/).filter(Boolean);
     // Pinboard tags are case-insensitive: match accordingly. Already clean -> count as done without a write.
     if (!tags.some(tg => tg.toLowerCase() === oldLower)) { saved++; continue; }
@@ -1842,6 +1846,11 @@ async function _runTagGovBatch(ops) {
     const pg = $id("tag-gov-progress");
     if (pg) pg.classList.remove("hidden");
     if (pt) pt.textContent = t("pinboardErrorAuth");
+    _tagGovSetProgressBtn("dismiss");
+    // Keep the run bookkeeping consistent with the normal path: count the failures
+    // and still run the drain-time tail (persist + refresh) when last in the queue.
+    _tagGovRunTotals.fail += ops.length;
+    if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh();
     return { ok: 0, fail: ops.length, aborted: false };
   }
 

@@ -1889,6 +1889,9 @@
   "tagGovLoadFailed":   {
     "message": "Could not load tags — check your Pinboard token or network, then Refresh"
   },
+  "placeholderOptional":   {
+    "message": "optional"
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag list snapshot downloaded (names and counts — reference for manual repair, not an automatic restore)"
   },

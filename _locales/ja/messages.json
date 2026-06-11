@@ -1889,6 +1889,9 @@
   "tagGovLoadFailed":   {
     "message": "タグを読み込めませんでした — Pinboard トークンまたはネットワークを確認して更新してください"
   },
+  "placeholderOptional":   {
+    "message": "任意"
+  },
   "tagGovSnapshotSaved":   {
     "message": "タグ一覧のスナップショットをダウンロードしました（名前と件数のみ。手動修復の参考用で、自動復元はできません）"
   },

@@ -1889,6 +1889,9 @@
   "tagGovLoadFailed":   {
     "message": "Nie udało się wczytać tagów — sprawdź token Pinboard lub sieć, potem odśwież"
   },
+  "placeholderOptional":   {
+    "message": "opcjonalnie"
+  },
   "tagGovSnapshotSaved":   {
     "message": "Pobrano migawkę listy tagów (tylko nazwy i liczby — pomoc przy ręcznej naprawie, bez automatycznego przywracania)"
   },

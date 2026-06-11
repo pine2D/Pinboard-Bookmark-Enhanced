@@ -310,6 +310,11 @@ html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--
    Segoe UI Emoji and stall on first paint at Windows hi-DPI). Inherits the status colour. */
 .status-ic { display: inline-flex; vertical-align: -2px; margin-right: 1px; }
 .status-ic svg { display: block; }
+/* Same green/red contract as popup.css — the tag-gov progress counters use these
+   classes and rendered uncolored without them (the rules lived only in popup.css). */
+.status-ic.ok { color: #2a8a2a; }
+.status-ic.bad { color: #c0392b; }
+html[data-theme] .status-ic.bad { color: var(--opt-danger, #c0392b); }
 .key-toggle:hover { color: #555; }
 .key-toggle:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 1px; }
 
