@@ -1887,13 +1887,13 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "Instantané des tags téléchargé (sauvegarde — les fusions et suppressions sont irréversibles)"
+    "message": "Instantané de la liste des tags téléchargé (noms et compteurs uniquement — référence pour réparation manuelle, pas de restauration automatique)"
   },
   "tagGovSnapshotFailed":   {
     "message": "Impossible de créer le snapshot — fusion/suppression bloquée"
   },
   "tagGovIrreversibleWarn":   {
-    "message": "Les fusions et suppressions ne peuvent pas être annulées. Un snapshot de votre liste d'étiquettes est téléchargé avant le premier changement."
+    "message": "Les fusions et suppressions sont irréversibles. Avant la première modification, un instantané de la liste des tags (noms et compteurs) est téléchargé — à titre de référence uniquement."
   },
   "tagGovBundlesWarn":   {
     "message": "Les bundles d'étiquettes sur pinboard.in ne sont pas mis à jour par les renommages — vérifiez-les manuellement après fusion."

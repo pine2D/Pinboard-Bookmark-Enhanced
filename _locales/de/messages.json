@@ -1887,13 +1887,13 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "Tag-Snapshot heruntergeladen (Sicherung — Zusammenführungen und Löschungen können nicht rückgängig gemacht werden)"
+    "message": "Tag-Listen-Snapshot heruntergeladen (nur Namen und Anzahl — Referenz für manuelle Reparatur, keine automatische Wiederherstellung)"
   },
   "tagGovSnapshotFailed":   {
     "message": "Snapshot konnte nicht erstellt werden — Zusammenführen/Löschen blockiert"
   },
   "tagGovIrreversibleWarn":   {
-    "message": "Zusammenführungen und Löschungen können nicht rückgängig gemacht werden. Vor der ersten Änderung wird eine Sicherung Ihrer Tag-Liste heruntergeladen."
+    "message": "Zusammenführungen und Löschungen können nicht rückgängig gemacht werden. Vor der ersten Änderung wird ein Snapshot der Tag-Liste (Namen und Anzahl) heruntergeladen — nur als Referenz."
   },
   "tagGovBundlesWarn":   {
     "message": "Tag-Bundles auf pinboard.in werden bei Umbenennungen nicht automatisch aktualisiert — überprüfen Sie sie nach dem Zusammenführen manuell."

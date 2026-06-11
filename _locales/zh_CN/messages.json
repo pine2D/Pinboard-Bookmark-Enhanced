@@ -1887,13 +1887,13 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "已下载标签快照（合并/删除不可撤销，此文件留作恢复备份）"
+    "message": "已下载标签清单快照（仅含标签名和数量，供手工修复参考，不能自动还原）"
   },
   "tagGovSnapshotFailed":   {
     "message": "无法生成快照 — 合并/删除已阻止"
   },
   "tagGovIrreversibleWarn":   {
-    "message": "合并和删除操作不可撤销。第一次修改前会自动下载你的标签列表快照。"
+    "message": "合并和删除操作不可撤销。第一次修改前会自动下载你的标签清单快照（仅含标签名和数量，供手工修复参考）。"
   },
   "tagGovBundlesWarn":   {
     "message": "Pinboard.in 上的标签束不会跟随重命名自动更新 — 合并后请手动检查。"

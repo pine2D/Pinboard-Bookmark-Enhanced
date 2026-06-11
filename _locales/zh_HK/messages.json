@@ -1887,13 +1887,13 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "已下載標籤快照（合併/刪除無法復原，此檔案留作還原備份）"
+    "message": "已下載標籤清單快照（僅含標籤名稱和數量，供手工修復參考，不能自動還原）"
   },
   "tagGovSnapshotFailed":   {
     "message": "無法生成快照 — 合併/刪除已阻止"
   },
   "tagGovIrreversibleWarn":   {
-    "message": "合併和刪除操作不可撤銷。第一次修改前會自動下載你的標籤列表快照。"
+    "message": "合併和刪除操作無法復原。第一次修改前會自動下載你的標籤清單快照（僅含標籤名稱和數量，供手工修復參考）。"
   },
   "tagGovBundlesWarn":   {
     "message": "Pinboard.in 上的標籤束不會跟隨重命名自動更新 — 合併後請手動檢查。"

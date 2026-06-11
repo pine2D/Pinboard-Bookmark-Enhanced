@@ -1887,13 +1887,13 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"
+    "message": "Pobrano migawkę listy tagów (tylko nazwy i liczby — pomoc przy ręcznej naprawie, bez automatycznego przywracania)"
   },
   "tagGovSnapshotFailed":   {
     "message": "Nie można utworzyć migawki — łączenie/usuwanie zablokowane"
   },
   "tagGovIrreversibleWarn":   {
-    "message": "Połączenia i usunięcia nie mogą być cofnięte. Migawka listy tagów jest pobierana przed pierwszą zmianą."
+    "message": "Scalenia i usunięcia są nieodwracalne. Przed pierwszą zmianą pobierana jest migawka listy tagów (nazwy i liczby) — wyłącznie jako odniesienie."
   },
   "tagGovBundlesWarn":   {
     "message": "Pakiety tagów na pinboard.in nie są automatycznie aktualizowane przez zmianę nazwy — sprawdź je ręcznie po połączeniu."

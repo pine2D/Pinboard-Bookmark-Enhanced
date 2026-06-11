@@ -1887,13 +1887,13 @@
     }
   },
   "tagGovSnapshotSaved":   {
-    "message": "Tag snapshot downloaded (backup — merges and deletions cannot be undone)"
+    "message": "Tag list snapshot downloaded (names and counts — reference for manual repair, not an automatic restore)"
   },
   "tagGovSnapshotFailed":   {
     "message": "Could not create snapshot — merge/delete blocked"
   },
   "tagGovIrreversibleWarn":   {
-    "message": "Merges and deletions cannot be undone. A snapshot of your tag list is downloaded before the first change."
+    "message": "Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change — for manual reference only."
   },
   "tagGovBundlesWarn":   {
     "message": "Tag bundles on pinboard.in are not updated by renames — review them manually after merging."
