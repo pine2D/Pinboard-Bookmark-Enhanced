@@ -1867,6 +1867,9 @@
   "tagGovStopped":   {
     "message": "Gestoppt — abgeschlossene Änderungen bleiben erhalten."
   },
+  "tagGovQueuedBadge":   {
+    "message": "In Warteschlange…"
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag-Snapshot heruntergeladen (Sicherung — Zusammenführungen und Löschungen können nicht rückgängig gemacht werden)"
   },

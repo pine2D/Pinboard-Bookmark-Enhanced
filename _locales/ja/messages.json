@@ -1867,6 +1867,9 @@
   "tagGovStopped":   {
     "message": "手動で停止しました。完了済みの変更は保存されています。"
   },
+  "tagGovQueuedBadge":   {
+    "message": "待機中…"
+  },
   "tagGovSnapshotSaved":   {
     "message": "タグのスナップショットをダウンロードしました（統合・削除は元に戻せないため、復元用のバックアップです）"
   },

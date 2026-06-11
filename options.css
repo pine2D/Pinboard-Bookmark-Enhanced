@@ -1013,6 +1013,14 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   margin-top: 8px;
   font-size: 11px;
 }
+.tag-gov-row-queued {
+  opacity: 0.65;
+}
+.tag-gov-queued-note {
+  font-size: 11px;
+  color: var(--opt-fg-muted, #666);
+  margin-left: 6px;
+}
 .tag-gov-problems-title {
   color: var(--opt-fg-muted, #666);
   margin-bottom: 2px;

@@ -1220,13 +1220,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       yesText: t("tagGovDeleteSelected"),
       noText: t("cancel"),
       onConfirm: async () => {
+        const delTags = selected.map(tg => tg.toLowerCase());
+        if (delTags.some(tg => _tagGovActiveTags.has(tg))) return;
         if (btn) btn.disabled = true;
         if (!(await ensureTagSnapshot())) {
           if (btn) btn.disabled = false;
           return;
         }
-        await runTagGovOps(selected.map(tag => ({ op: "delete", tag })));
-        if (btn) btn.disabled = false;
+        delTags.forEach(tg => _tagGovActiveTags.add(tg));
+        try {
+          await runTagGovOps(selected.map(tag => ({ op: "delete", tag })));
+        } finally {
+          delTags.forEach(tg => _tagGovActiveTags.delete(tg));
+          if (btn) btn.disabled = false;
+        }
       }
     });
   });
@@ -1407,8 +1414,19 @@ async function confirmMergeGroup(group, canonical, anchorEl) {
     yesText: t("tagGovMerge"),
     noText: t("cancel"),
     onConfirm: async () => {
+      // Refuse overlapping plans (same group clicked twice, or a sibling group
+      // sharing a tag) instead of burning another rate-limited posts/all slot.
+      const planTags = [];
+      for (const pop of plan) planTags.push(pop.old.toLowerCase(), pop.new.toLowerCase());
+      if (planTags.some(tg => _tagGovActiveTags.has(tg))) return;
       if (!(await ensureTagSnapshot())) return;
-      await runTagGovOps(plan);
+      planTags.forEach(tg => _tagGovActiveTags.add(tg));
+      _tagGovMarkRowQueued(anchor.closest(".tag-gov-group-row"));
+      try {
+        await runTagGovOps(plan);
+      } finally {
+        planTags.forEach(tg => _tagGovActiveTags.delete(tg));
+      }
     }
   });
 }
@@ -1563,6 +1581,24 @@ document.addEventListener("click", (ev) => {
 // run and reset when a fresh run starts (counter at zero).
 const _tagGovProblems = [];
 const TAG_GOV_PROBLEMS_CAP = 20;
+// Every tag involved in a queued/running op (lowercased): used to refuse
+// double-queueing the same group (or a sibling group sharing a tag) and to keep
+// rebuilt rows visually frozen if the user refreshes mid-run.
+const _tagGovActiveTags = new Set();
+
+// Visually freeze a group row whose merge is queued/running: disable its controls
+// and append a "Queued" note. Rows rebuilt by renderTagGov re-apply this state from
+// _tagGovActiveTags; the drain-time re-render naturally clears it.
+function _tagGovMarkRowQueued(row) {
+  if (!row || row.classList.contains("tag-gov-row-queued")) return;
+  row.classList.add("tag-gov-row-queued");
+  row.querySelectorAll("button, input").forEach(el => { el.disabled = true; });
+  const note = document.createElement("span");
+  note.className = "tag-gov-queued-note";
+  note.textContent = t("tagGovQueuedBadge");
+  row.appendChild(note);
+}
+
 // Run-level totals shown in the done summary, accumulated across the queued batches
 // of one run: per-batch numbers alone hid earlier batches' failures — only the last
 // batch's summary survived on screen while the problems list was cross-batch.
@@ -1973,6 +2009,10 @@ async function renderTagGov() {
 
     row.appendChild(btnGroup);
     container.appendChild(row);
+
+    if (group.members.some(m => m && m.tag && _tagGovActiveTags.has(m.tag.toLowerCase()))) {
+      _tagGovMarkRowQueued(row);
+    }
   }
 }
 

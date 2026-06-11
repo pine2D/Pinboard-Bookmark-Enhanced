@@ -1867,6 +1867,9 @@
   "tagGovStopped":   {
     "message": "Zatrzymano — ukończone zmiany zostały zachowane."
   },
+  "tagGovQueuedBadge":   {
+    "message": "W kolejce…"
+  },
   "tagGovSnapshotSaved":   {
     "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"
   },
