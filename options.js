@@ -1484,6 +1484,11 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
     if (resp.status === 429) {
       setWaitNote();
       await new Promise(r => setTimeout(r, TAG_GOV_LIST_RETRY_WAIT_MS));
+      // Stop clicked during the 60s wait: don't burn the budgeted retry on a result
+      // that would be discarded anyway.
+      if (_tagGovCancelRequested) {
+        return { total: 0, saved: 0, failed: 0, skipped: 0, problems: [], cancelled: true };
+      }
       resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
       if (resp.status === 429) return { total: 0, saved: 0, failed: 0, skipped: 0, problems: [], aborted: true };
     }
@@ -1544,6 +1549,9 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
       if (r.status === 429) {
         setWaitNote();
         await new Promise(rs => setTimeout(rs, TAG_GOV_RETRY_WAIT_MS));
+        if (_tagGovCancelRequested) {
+          return { total: posts.length, saved, failed, skipped, problems, cancelled: true };
+        }
         r = await pinboardFetch(uri);
         if (r.status === 429) {
           // A persistent 429 on one bookmark is likely a transient cross-context
@@ -1772,6 +1780,10 @@ async function _runTagGovBatch(ops) {
     // Queued behind an aborted/stopped batch: drop without touching the progress
     // line (it shows the abort explanation), but still refresh the panel at drain.
     _tagGovDrainCount--;
+    // The stopped run is fully drained — a new batch confirmed during the drain
+    // window must NOT inherit the stale cancel flag (it would die at its first
+    // checkpoint with zero ops executed, shown as "Stopped" the user never asked for).
+    if (_tagGovDrainCount === 0) _tagGovCancelRequested = false;
     if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh();
     return { ok: 0, fail: 0, aborted: true };
   }
@@ -1870,7 +1882,12 @@ async function _runTagGovBatch(ops) {
     try {
       let resp = await pinboardFetch(opUrl);
       if (resp.status === 429) {
+        if (ptext) ptext.textContent = t("tagGovRateLimitWait");
         await new Promise(r => setTimeout(r, TAG_GOV_RETRY_WAIT_MS));
+        if (_tagGovCancelRequested) {
+          cancelled = true;
+          break;
+        }
         resp = await pinboardFetch(opUrl);
         if (resp.status === 429) {
           aborted = true;
@@ -1898,7 +1915,12 @@ async function _runTagGovBatch(ops) {
 
   if (fill && !aborted && !cancelled) fill.style.width = "100%";
   const cancelledBehind = (aborted || cancelled) ? _tagGovUnfinishedBatches - 1 : 0;
-  if (aborted || cancelled) _tagGovDrainCount = cancelledBehind;
+  if (aborted || cancelled) {
+    _tagGovDrainCount = cancelledBehind;
+    // Solo stop (nothing queued behind): release the cancel flag right away so a
+    // batch confirmed during this batch's tail refresh runs normally.
+    if (cancelledBehind === 0) _tagGovCancelRequested = false;
+  }
 
   _tagGovRunTotals.ok += ok;
   _tagGovRunTotals.fail += fail;
