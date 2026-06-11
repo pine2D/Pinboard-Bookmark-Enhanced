@@ -1665,8 +1665,16 @@ function renderTagGovProblems() {
   }
 }
 
+// Busy dot on the Tags tab button: inactive panels are display:none, so a running
+// batch is otherwise invisible from every other settings tab.
+function _tagGovSetTabBusy(busy) {
+  const btn = document.querySelector('.tab-btn[data-panel="tags"]');
+  if (btn) btn.classList.toggle("tab-busy", busy);
+}
+
 function runTagGovOps(ops) {
   if (_tagGovUnfinishedBatches === 0) {
+    _tagGovSetTabBusy(true);
     // fresh run: reset the cross-batch accumulators
     _tagGovProblems.length = 0;
     _tagGovRunTotals.ok = 0;
@@ -1677,7 +1685,10 @@ function runTagGovOps(ops) {
   }
   _tagGovUnfinishedBatches++;
   const run = _tagGovBatchChain.then(() =>
-    _runTagGovBatch(ops).finally(() => { _tagGovUnfinishedBatches--; })
+    _runTagGovBatch(ops).finally(() => {
+      _tagGovUnfinishedBatches--;
+      if (_tagGovUnfinishedBatches === 0) _tagGovSetTabBusy(false);
+    })
   );
   _tagGovBatchChain = run.catch(() => {});
   return run;

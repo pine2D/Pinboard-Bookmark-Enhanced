@@ -87,6 +87,24 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .reset-tab-btn:hover { color: #c00; text-decoration: underline; }
 .reset-tab-btn:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 2px; }
 
+/* Pulsing activity dot on a tab button while its panel has background work running
+   (pure CSS — no glyph fonts involved). */
+.tab-btn.tab-busy::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--opt-accent, #4477bb);
+  animation: tabBusyPulse 1.2s ease-in-out infinite;
+  vertical-align: middle;
+}
+@keyframes tabBusyPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
 /* ---- Panels ---- */
 /* display:none (not visibility:hidden) so opening Settings only lays out the active
    panel, not all 6 (the AI panel alone is ~350 nodes — laying out all panels at once
