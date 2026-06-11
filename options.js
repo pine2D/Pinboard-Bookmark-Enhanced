@@ -43,16 +43,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- Tags panel lazy-init ----
   let _tagGovInited = false;
-  function updateTagGovOverview(counts) {
-    const overview = $id("tag-gov-overview");
-    if (!counts || !overview) return;
-    const tagCount = Object.keys(counts).length;
-    const totalUses = Object.values(counts).reduce((a, b) => a + b, 0);
-    overview.replaceChildren();
-    const span = document.createElement("span");
-    span.textContent = t("tagGovOverview", String(tagCount), String(totalUses));
-    overview.appendChild(span);
-  }
   async function _initTagGovPanel() {
     if (_tagGovInited) return;
     _tagGovInited = true;
@@ -60,24 +50,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     const overview = $id("tag-gov-overview");
     if (counts && overview) {
       updateTagGovOverview(counts);
-      const refreshBtn = document.createElement("button");
-      refreshBtn.className = "btn btn-sm";
-      refreshBtn.id = "tag-gov-refresh";
-      refreshBtn.textContent = t("tagGovRefresh");
-      refreshBtn.addEventListener("click", async () => {
+      // Static #tag-gov-refresh button from options.html (data-i18n localized);
+      // updateTagGovOverview preserves it across re-renders.
+      const refreshBtn = overview.querySelector("#tag-gov-refresh");
+      if (refreshBtn) refreshBtn.addEventListener("click", async () => {
         refreshBtn.disabled = true;
         await chrome.storage.local.remove("_tagGovAiGroups");
         const fresh = await loadTagCounts(true);
-        if (fresh) {
-          updateTagGovOverview(fresh);
-          const btn = $id("tag-gov-refresh");
-          if (btn && btn.parentNode) btn.parentNode.appendChild(btn);
-        }
+        if (fresh) updateTagGovOverview(fresh);
         await renderTagGov();
         await renderLowCountTags();
         refreshBtn.disabled = false;
       });
-      overview.appendChild(refreshBtn);
     }
     await renderTagGov();
     await renderLowCountTags();
@@ -1287,6 +1271,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ---- Tag Governance helpers (top-level so they survive the DOMContentLoaded closure) ----
 
 const TAG_GOV_RETRY_WAIT_MS = 10000; // single backoff before retrying a 429 once (Pinboard rate limit)
+
+// Rebuild the tag-overview line (tag count + total uses). Top level, NOT inside the
+// DOMContentLoaded closure: runTagGovOps calls it after every batch (a closure-scoped
+// version threw "updateTagGovOverview is not defined" there, killing the post-batch
+// re-render). Preserves the #tag-gov-refresh button across replaceChildren — query it
+// live from the container instead of $id, whose memoized cache could hold a stale node.
+function updateTagGovOverview(counts) {
+  const overview = $id("tag-gov-overview");
+  if (!counts || !overview) return;
+  const tagCount = Object.keys(counts).length;
+  const totalUses = Object.values(counts).reduce((a, b) => a + b, 0);
+  const refreshBtn = overview.querySelector("#tag-gov-refresh");
+  overview.replaceChildren();
+  const span = document.createElement("span");
+  span.textContent = t("tagGovOverview", String(tagCount), String(totalUses));
+  overview.appendChild(span);
+  if (refreshBtn) overview.appendChild(refreshBtn);
+}
 
 // Shared token reader for tag-governance operations.
 // Returns the deobfuscated Pinboard token, or "" if not set / on error.
