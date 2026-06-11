@@ -1878,6 +1878,14 @@
       }
     }
   },
+  "tagGovLastRun":   {
+    "message": "Dernière exécution ($D$) :",
+    "placeholders": {
+      "D": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Instantané des tags téléchargé (sauvegarde — les fusions et suppressions sont irréversibles)"
   },

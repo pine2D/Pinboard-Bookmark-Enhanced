@@ -63,6 +63,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         refreshBtn.disabled = false;
       });
     }
+    // Restore the last run's outcome if it left anything needing attention —
+    // all-ok runs are not resurrected (no nagging).
+    if (_tagGovUnfinishedBatches === 0) {
+      const lr = (await chrome.storage.local.get({ _tagGovLastRun: null }))._tagGovLastRun;
+      if (lr && (lr.fail > 0 || lr.skipped > 0 || (lr.problems && lr.problems.length))) {
+        _tagGovProblems.length = 0;
+        _tagGovProblems.push(...(lr.problems || []));
+        const card = $id("tag-gov-progress");
+        const fillEl = $id("tag-gov-progress-fill");
+        const pt = $id("tag-gov-progress-text");
+        if (card) card.classList.remove("hidden");
+        if (fillEl) fillEl.style.width = "100%";
+        if (pt) {
+          pt.textContent = t("tagGovLastRun", new Date(lr.ts).toLocaleString()) + " "
+            + t("tagGovDoneSummary", String(lr.ok), String(lr.fail))
+            + (lr.skipped > 0 ? " · " + t("tagGovSkippedSummary", String(lr.skipped)) : "");
+        }
+        _tagGovSetProgressBtn("dismiss");
+        renderTagGovProblems();
+      }
+    }
+
     // Link the bundles note to the user's bundles page on pinboard.in
     // (username = the part of the API token before the colon).
     const bundlesWarn = $id("tag-gov-bundles-warn");
@@ -1580,6 +1602,8 @@ document.addEventListener("click", (ev) => {
   } else {
     const card = $id("tag-gov-progress");
     if (card) card.classList.add("hidden");
+    // Dismiss = acknowledged: drop the persisted record so it stops reappearing.
+    try { chrome.storage.local.remove("_tagGovLastRun"); } catch (_) {}
   }
 });
 // Bookmarks that need manual attention, accumulated across the queued batches of one
@@ -1707,6 +1731,17 @@ window.addEventListener("beforeunload", (e) => {
 
 async function _tagGovTailRefresh() {
   _tagGovSetProgressBtn("dismiss");
+  // Persist the run outcome: the summary and attention list were DOM-only and
+  // vanished if the page closed before the user came back to look at them.
+  try {
+    await chrome.storage.local.set({ _tagGovLastRun: {
+      ts: Date.now(),
+      ok: _tagGovRunTotals.ok,
+      fail: _tagGovRunTotals.fail,
+      skipped: _tagGovRunTotals.skipped,
+      problems: _tagGovProblems.slice(0, TAG_GOV_PROBLEMS_CAP)
+    } });
+  } catch (_) {}
   const fresh = await loadTagCounts(true);
   if (fresh) updateTagGovOverview(fresh);
   await renderTagGov();

@@ -1878,6 +1878,14 @@
       }
     }
   },
+  "tagGovLastRun":   {
+    "message": "上次运行（$D$）：",
+    "placeholders": {
+      "D": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "已下载标签快照（合并/删除不可撤销，此文件留作恢复备份）"
   },

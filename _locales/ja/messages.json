@@ -1878,6 +1878,14 @@
       }
     }
   },
+  "tagGovLastRun":   {
+    "message": "前回の実行（$D$）:",
+    "placeholders": {
+      "D": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "タグのスナップショットをダウンロードしました（統合・削除は元に戻せないため、復元用のバックアップです）"
   },

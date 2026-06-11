@@ -1878,6 +1878,14 @@
       }
     }
   },
+  "tagGovLastRun":   {
+    "message": "Last run ($D$):",
+    "placeholders": {
+      "D": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag snapshot downloaded (backup — merges and deletions cannot be undone)"
   },

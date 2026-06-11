@@ -1878,6 +1878,14 @@
       }
     }
   },
+  "tagGovLastRun":   {
+    "message": "Ostatnie uruchomienie ($D$):",
+    "placeholders": {
+      "D": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"
   },
