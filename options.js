@@ -1453,6 +1453,9 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
   let saved = 0, failed = 0, skipped = 0;
   const problems = []; // { url, title, kind: "failed" | "skipped" } per bookmark
   for (let i = 0; i < posts.length; i++) {
+    if (_tagGovCancelRequested) {
+      return { total: posts.length, saved, failed, skipped, problems, cancelled: true };
+    }
     if (onProgress) onProgress(i, posts.length);
     const post = posts[i];
     if (!post || !post.href) { failed++; continue; }
@@ -1530,6 +1533,32 @@ let _tagGovUnfinishedBatches = 0;
 // (they would keep hammering an API that just told us to stop, and their op lines
 // would overwrite the abort explanation within seconds).
 let _tagGovRunAborted = false;
+// Set by the Stop button; checked at every per-bookmark/per-op checkpoint. A stopped
+// run drains its queue like an aborted one — completed re-saves persist server-side.
+let _tagGovCancelRequested = false;
+
+// The single button on the progress card: "Stop" while a run is active, "Dismiss"
+// once the queue drains (the sticky card otherwise pins to the viewport forever).
+function _tagGovSetProgressBtn(mode) {
+  const btn = $id("tag-gov-progress-btn");
+  if (!btn) return;
+  btn.dataset.mode = mode;
+  btn.disabled = false;
+  btn.hidden = false;
+  btn.textContent = mode === "stop" ? t("tagGovStop") : t("tagGovDismiss");
+}
+
+document.addEventListener("click", (ev) => {
+  const btn = ev.target instanceof Element && ev.target.closest("#tag-gov-progress-btn");
+  if (!btn) return;
+  if (btn.dataset.mode === "stop") {
+    _tagGovCancelRequested = true;
+    btn.disabled = true; // takes effect at the next per-bookmark checkpoint
+  } else {
+    const card = $id("tag-gov-progress");
+    if (card) card.classList.add("hidden");
+  }
+});
 // Bookmarks that need manual attention, accumulated across the queued batches of one
 // run and reset when a fresh run starts (counter at zero).
 const _tagGovProblems = [];
@@ -1603,6 +1632,7 @@ function runTagGovOps(ops) {
     _tagGovRunTotals.fail = 0;
     _tagGovRunTotals.skipped = 0;
     _tagGovRunAborted = false;
+    _tagGovCancelRequested = false;
   }
   _tagGovUnfinishedBatches++;
   const run = _tagGovBatchChain.then(() =>
@@ -1624,6 +1654,7 @@ window.addEventListener("beforeunload", (e) => {
 });
 
 async function _tagGovTailRefresh() {
+  _tagGovSetProgressBtn("dismiss");
   const fresh = await loadTagCounts(true);
   if (fresh) updateTagGovOverview(fresh);
   await renderTagGov();
@@ -1654,10 +1685,16 @@ async function _runTagGovBatch(ops) {
   // position:sticky at the viewport bottom, so no scroll jump is needed here.
   if (progress) progress.classList.remove("hidden");
 
-  let ok = 0, fail = 0, aborted = false, skippedTotal = 0;
+  _tagGovSetProgressBtn("stop");
+
+  let ok = 0, fail = 0, aborted = false, cancelled = false, skippedTotal = 0;
   const enc = encodeURIComponent;
 
   for (let i = 0; i < ops.length; i++) {
+    if (_tagGovCancelRequested) {
+      cancelled = true;
+      break;
+    }
     const op = ops[i];
     // Bar = completed ops + fractional progress inside the current op. The old
     // (i + 1) / ops.length formula filled the bar at the START of each op — a
@@ -1691,6 +1728,10 @@ async function _runTagGovBatch(ops) {
         skippedTotal += res.skipped;
         for (const pr of (res.problems || [])) {
           _tagGovProblems.push({ ...pr, old: op.old, new: op.new });
+        }
+        if (res.cancelled) {
+          cancelled = true;
+          break;
         }
         if (res.aborted) {
           aborted = true;
@@ -1744,19 +1785,22 @@ async function _runTagGovBatch(ops) {
     }
   }
 
-  if (fill && !aborted) fill.style.width = "100%";
-  if (aborted) _tagGovRunAborted = true;
-  const cancelledBehind = aborted ? _tagGovUnfinishedBatches - 1 : 0;
+  if (fill && !aborted && !cancelled) fill.style.width = "100%";
+  if (aborted || cancelled) _tagGovRunAborted = true;
+  const cancelledBehind = (aborted || cancelled) ? _tagGovUnfinishedBatches - 1 : 0;
 
   _tagGovRunTotals.ok += ok;
   _tagGovRunTotals.fail += fail;
   _tagGovRunTotals.skipped += skippedTotal;
 
   if (ptext) {
-    ptext.textContent = aborted
-      ? t("tagGovAborted429") + (cancelledBehind > 0 ? " · " + t("tagGovQueuedCancelled", String(cancelledBehind)) : "")
-      : t("tagGovDoneSummary", String(_tagGovRunTotals.ok), String(_tagGovRunTotals.fail))
-        + (_tagGovRunTotals.skipped > 0 ? " · " + t("tagGovSkippedSummary", String(_tagGovRunTotals.skipped)) : "");
+    const behindNote = cancelledBehind > 0 ? " · " + t("tagGovQueuedCancelled", String(cancelledBehind)) : "";
+    ptext.textContent = cancelled
+      ? t("tagGovStopped") + behindNote
+      : aborted
+        ? t("tagGovAborted429") + behindNote
+        : t("tagGovDoneSummary", String(_tagGovRunTotals.ok), String(_tagGovRunTotals.fail))
+          + (_tagGovRunTotals.skipped > 0 ? " · " + t("tagGovSkippedSummary", String(_tagGovRunTotals.skipped)) : "");
     // The manual-attention list renders below the (viewport-pinned) progress row, at
     // the bottom of the panel — out of sight when scrolled up. Link to it explicitly.
     if (_tagGovProblems.length > 0) {
@@ -1782,7 +1826,7 @@ async function _runTagGovBatch(ops) {
   // autocomplete's cache whenever the refetch failed.
   if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh();
 
-  return { ok, fail, aborted };
+  return { ok, fail, aborted, cancelled };
 }
 
 async function loadTagCounts(forceFresh = false) {

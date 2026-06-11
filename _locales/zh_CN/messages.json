@@ -1858,6 +1858,15 @@
       }
     }
   },
+  "tagGovStop":   {
+    "message": "停止"
+  },
+  "tagGovDismiss":   {
+    "message": "关闭"
+  },
+  "tagGovStopped":   {
+    "message": "已手动停止，已完成的更改保留。"
+  },
   "tagGovSnapshotSaved":   {
     "message": "已下载标签快照（合并/删除不可撤销，此文件留作恢复备份）"
   },

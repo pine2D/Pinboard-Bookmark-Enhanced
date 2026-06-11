@@ -1858,6 +1858,15 @@
       }
     }
   },
+  "tagGovStop":   {
+    "message": "停止"
+  },
+  "tagGovDismiss":   {
+    "message": "閉じる"
+  },
+  "tagGovStopped":   {
+    "message": "手動で停止しました。完了済みの変更は保存されています。"
+  },
   "tagGovSnapshotSaved":   {
     "message": "タグのスナップショットをダウンロードしました（統合・削除は元に戻せないため、復元用のバックアップです）"
   },

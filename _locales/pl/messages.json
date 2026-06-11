@@ -1858,6 +1858,15 @@
       }
     }
   },
+  "tagGovStop":   {
+    "message": "Zatrzymaj"
+  },
+  "tagGovDismiss":   {
+    "message": "Zamknij"
+  },
+  "tagGovStopped":   {
+    "message": "Zatrzymano — ukończone zmiany zostały zachowane."
+  },
   "tagGovSnapshotSaved":   {
     "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"
   },

@@ -1858,6 +1858,15 @@
       }
     }
   },
+  "tagGovStop":   {
+    "message": "Stopp"
+  },
+  "tagGovDismiss":   {
+    "message": "Schließen"
+  },
+  "tagGovStopped":   {
+    "message": "Gestoppt — abgeschlossene Änderungen bleiben erhalten."
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag-Snapshot heruntergeladen (Sicherung — Zusammenführungen und Löschungen können nicht rückgängig gemacht werden)"
   },

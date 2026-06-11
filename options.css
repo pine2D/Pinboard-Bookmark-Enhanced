@@ -995,6 +995,15 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   width: 0%;
   transition: width 0.2s ease;
 }
+.tag-gov-progress-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.tag-gov-progress-foot button {
+  flex-shrink: 0;
+}
 #tag-gov-progress-text {
   font-size: 11px;
   color: var(--opt-fg-muted, #666);
