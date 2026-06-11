@@ -1844,6 +1844,9 @@
   "tagGovProblemSkipped":   {
     "message": "pominięto (notatka zbyt długa)"
   },
+  "tagGovProblemsSeeBelow":   {
+    "message": "zobacz szczegóły poniżej"
+  },
   "tagGovSnapshotSaved":   {
     "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"
   },

@@ -1844,6 +1844,9 @@
   "tagGovProblemSkipped":   {
     "message": "ignoré (note trop longue)"
   },
+  "tagGovProblemsSeeBelow":   {
+    "message": "voir les détails en bas de page"
+  },
   "tagGovSnapshotSaved":   {
     "message": "Instantané des tags téléchargé (sauvegarde — les fusions et suppressions sont irréversibles)"
   },

@@ -1662,11 +1662,23 @@ async function _runTagGovBatch(ops) {
   if (fill && !aborted) fill.style.width = "100%";
 
   if (ptext) {
-    if (aborted) {
-      ptext.textContent = t("tagGovAborted429");
-    } else {
-      ptext.textContent = t("tagGovDoneSummary", String(ok), String(fail))
+    ptext.textContent = aborted
+      ? t("tagGovAborted429")
+      : t("tagGovDoneSummary", String(ok), String(fail))
         + (skippedTotal > 0 ? " · " + t("tagGovSkippedSummary", String(skippedTotal)) : "");
+    // The manual-attention list renders below the (viewport-pinned) progress row, at
+    // the bottom of the panel — out of sight when scrolled up. Link to it explicitly.
+    if (_tagGovProblems.length > 0) {
+      ptext.appendChild(document.createTextNode(" · "));
+      const seeBelow = document.createElement("a");
+      seeBelow.href = "#";
+      seeBelow.textContent = t("tagGovProblemsSeeBelow");
+      seeBelow.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        // block:"center" keeps the list clear of the sticky progress card at the bottom
+        $id("tag-gov-problems")?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+      ptext.appendChild(seeBelow);
     }
   }
   renderTagGovProblems();

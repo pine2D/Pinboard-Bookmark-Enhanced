@@ -1844,6 +1844,9 @@
   "tagGovProblemSkipped":   {
     "message": "スキップ（メモが長すぎます）"
   },
+  "tagGovProblemsSeeBelow":   {
+    "message": "ページ下部で詳細を表示"
+  },
   "tagGovSnapshotSaved":   {
     "message": "タグのスナップショットをダウンロードしました（統合・削除は元に戻せないため、復元用のバックアップです）"
   },

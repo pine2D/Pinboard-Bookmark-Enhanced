@@ -1844,6 +1844,9 @@
   "tagGovProblemSkipped":   {
     "message": "跳过（备注过长）"
   },
+  "tagGovProblemsSeeBelow":   {
+    "message": "查看页面底部详情"
+  },
   "tagGovSnapshotSaved":   {
     "message": "已下载标签快照（合并/删除不可撤销，此文件留作恢复备份）"
   },

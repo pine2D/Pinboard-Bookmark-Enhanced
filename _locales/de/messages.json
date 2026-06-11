@@ -1844,6 +1844,9 @@
   "tagGovProblemSkipped":   {
     "message": "übersprungen (Notiz zu lang)"
   },
+  "tagGovProblemsSeeBelow":   {
+    "message": "Details unten anzeigen"
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag-Snapshot heruntergeladen (Sicherung — Zusammenführungen und Löschungen können nicht rückgängig gemacht werden)"
   },
