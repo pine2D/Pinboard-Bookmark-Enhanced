@@ -300,6 +300,13 @@ suite("pbpTagGovBuildPlan", () => {
     const plan = pbpTagGovBuildPlan([{tag:"Recipe",count:10},{tag:"recipes",count:5}], "recipe");
     assert(plan.length === 0, "Recipe and recipe are same case-insensitively");
   });
+
+  test("skips case-only member, keeps sibling renames", () => {
+    const plan = pbpTagGovBuildPlan(
+      [{tag:"my-tag",count:10},{tag:"my_tag",count:8},{tag:"My-Tag",count:3}], "my-tag");
+    assert(plan.length === 1, "one rename survives");
+    assert(plan[0].old === "my_tag" && plan[0].new === "my-tag", "sibling rename kept, case-variant skipped");
+  });
 });
 
 // ============ pbpTagGovBuildAiPrompt ============

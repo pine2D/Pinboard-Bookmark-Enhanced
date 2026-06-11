@@ -230,8 +230,14 @@ function pbpTagGovBuildPlan(members, canonical) {
   const plan = [];
   for (const tag of tags) {
     if (tag === canonical) continue;
-    // Pinboard is case-insensitive: a case-only "rename" is a server no-op — reject the whole plan.
-    if (tag.toLowerCase() === canonical.toLowerCase()) { console.debug("[tag-gov] BuildPlan: case-only pair"); return []; }
+    // Pinboard tags are case-insensitive server-side: a case-only "rename" is a
+    // no-op there. Skip just this member — rejecting the WHOLE plan also dropped
+    // legitimate sibling renames (e.g. {my-tag, my_tag, My-Tag} lost my_tag too)
+    // and left a Merge button that silently did nothing.
+    if (tag.toLowerCase() === canonical.toLowerCase()) {
+      console.debug("[tag-gov] BuildPlan: skipping case-only member:", tag);
+      continue;
+    }
     plan.push({ op: "rename", old: tag, new: canonical });
   }
   return plan;
