@@ -163,34 +163,35 @@ function hasAIKey(s) {
 }
 
 // ---- AI dispatcher ----
-async function callAI(s, prompt) {
+async function callAI(s, prompt, opts = {}) {
   const p = s.aiProvider || "gemini";
   switch (p) {
-    case "gemini": return callGemini(s, prompt);
-    case "claude": return callClaude(s, prompt);
-    case "openai": return callOpenAICompat(s.openaiBaseUrl || "https://api.openai.com/v1", s.openaiApiKey, s.openaiModel || "gpt-5.4-nano", prompt);
-    case "deepseek": return callOpenAICompat("https://api.deepseek.com/v1", s.deepseekApiKey, s.deepseekModel || "deepseek-v4-flash", prompt);
-    case "qwen": return callOpenAICompat("https://dashscope.aliyuncs.com/compatible-mode/v1", s.qwenApiKey, s.qwenModel || "qwen-flash", prompt);
-    case "minimax": return callOpenAICompat("https://api.minimax.chat/v1", s.minimaxApiKey, s.minimaxModel || "MiniMax-M2", prompt);
-    case "openrouter": return callOpenAICompat("https://openrouter.ai/api/v1", s.openrouterApiKey, s.openrouterModel || "meta-llama/llama-4-scout:free", prompt);
-    case "groq": return callOpenAICompat("https://api.groq.com/openai/v1", s.groqApiKey, s.groqModel || "meta-llama/llama-4-scout-17b-16e-instruct", prompt);
-    case "mistral": return callOpenAICompat("https://api.mistral.ai/v1", s.mistralApiKey, s.mistralModel || "mistral-small-latest", prompt);
-    case "cohere": return callOpenAICompat("https://api.cohere.com/v2", s.cohereApiKey, s.cohereModel || "command-r-08-2024", prompt);
-    case "siliconflow": return callOpenAICompat("https://api.siliconflow.cn/v1", s.siliconflowApiKey, s.siliconflowModel || "Qwen/Qwen3-8B", prompt);
-    case "zhipu": return callOpenAICompat("https://open.bigmodel.cn/api/paas/v4", s.zhipuApiKey, s.zhipuModel || "glm-4.7-flash", prompt);
-    case "kimi": return callOpenAICompat("https://api.moonshot.cn/v1", s.kimiApiKey, s.kimiModel || "kimi-k2.6", prompt);
-    case "ollama": return callOllama(s, prompt);
-    case "custom": return callOpenAICompat(s.customBaseUrl, s.customApiKey, s.customModel, prompt);
+    case "gemini": return callGemini(s, prompt, opts);
+    case "claude": return callClaude(s, prompt, opts);
+    case "openai": return callOpenAICompat(s.openaiBaseUrl || "https://api.openai.com/v1", s.openaiApiKey, s.openaiModel || "gpt-5.4-nano", prompt, opts);
+    case "deepseek": return callOpenAICompat("https://api.deepseek.com/v1", s.deepseekApiKey, s.deepseekModel || "deepseek-v4-flash", prompt, opts);
+    case "qwen": return callOpenAICompat("https://dashscope.aliyuncs.com/compatible-mode/v1", s.qwenApiKey, s.qwenModel || "qwen-flash", prompt, opts);
+    case "minimax": return callOpenAICompat("https://api.minimax.chat/v1", s.minimaxApiKey, s.minimaxModel || "MiniMax-M2", prompt, opts);
+    case "openrouter": return callOpenAICompat("https://openrouter.ai/api/v1", s.openrouterApiKey, s.openrouterModel || "meta-llama/llama-4-scout:free", prompt, opts);
+    case "groq": return callOpenAICompat("https://api.groq.com/openai/v1", s.groqApiKey, s.groqModel || "meta-llama/llama-4-scout-17b-16e-instruct", prompt, opts);
+    case "mistral": return callOpenAICompat("https://api.mistral.ai/v1", s.mistralApiKey, s.mistralModel || "mistral-small-latest", prompt, opts);
+    case "cohere": return callOpenAICompat("https://api.cohere.com/v2", s.cohereApiKey, s.cohereModel || "command-r-08-2024", prompt, opts);
+    case "siliconflow": return callOpenAICompat("https://api.siliconflow.cn/v1", s.siliconflowApiKey, s.siliconflowModel || "Qwen/Qwen3-8B", prompt, opts);
+    case "zhipu": return callOpenAICompat("https://open.bigmodel.cn/api/paas/v4", s.zhipuApiKey, s.zhipuModel || "glm-4.7-flash", prompt, opts);
+    case "kimi": return callOpenAICompat("https://api.moonshot.cn/v1", s.kimiApiKey, s.kimiModel || "kimi-k2.6", prompt, opts);
+    case "ollama": return callOllama(s, prompt, opts);
+    case "custom": return callOpenAICompat(s.customBaseUrl, s.customApiKey, s.customModel, prompt, opts);
     default: throw new Error("Unknown provider: " + p);
   }
 }
 
-async function callGemini(s, prompt) {
+async function callGemini(s, prompt, opts = {}) {
   const model = s.geminiModel || "gemini-2.5-flash-lite";
+  const maxTokens = opts.maxTokens || 1024;
   // Gemini API requires key as URL param (no Authorization header support) — API design limitation
   const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${s.geminiApiKey}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 1024 } })
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens } })
   });
   if (!res.ok) await handleAIError(res, "Gemini");
   const text = (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim();
@@ -198,11 +199,12 @@ async function callGemini(s, prompt) {
   return text;
 }
 
-async function callClaude(s, prompt) {
+async function callClaude(s, prompt, opts = {}) {
+  const maxTokens = opts.maxTokens || 1024;
   const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": s.claudeApiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: s.claudeModel || "claude-haiku-4-5-20251001", max_tokens: 1024, messages: [{ role: "user", content: prompt }] })
+    body: JSON.stringify({ model: s.claudeModel || "claude-haiku-4-5-20251001", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] })
   });
   if (!res.ok) await handleAIError(res, "Claude");
   const text = (await res.json()).content?.[0]?.text?.trim();
@@ -210,12 +212,13 @@ async function callClaude(s, prompt) {
   return text;
 }
 
-async function callOpenAICompat(baseUrl, apiKey, model, prompt) {
+async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
+  const maxTokens = opts.maxTokens || 1024;
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
   const res = await fetchWithTimeout(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
     method: "POST", headers,
-    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0.3, max_tokens: 1024 })
+    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0.3, max_tokens: maxTokens })
   });
   if (!res.ok) await handleAIError(res, "API");
   const text = (await res.json()).choices?.[0]?.message?.content?.trim();
@@ -223,7 +226,7 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt) {
   return text;
 }
 
-async function callOllama(s, prompt) {
+async function callOllama(s, prompt, opts = {}) {
   const base = (s.ollamaBaseUrl || "http://localhost:11434").replace(/\/+$/, "");
   const res = await fetchWithTimeout(`${base}/api/chat`, {
     method: "POST", headers: { "Content-Type": "application/json" },

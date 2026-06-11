@@ -1239,7 +1239,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!counts) throw new Error("Failed to load tag counts");
 
       const prompt = pbpTagGovBuildAiPrompt(counts, 1500);
-      const raw = await getOrCreateInflight("taggov|" + s.aiProvider, () => callAI(s, prompt));
+      // Clustering output is a large JSON array, and thinking models (Gemini 2.5,
+      // DeepSeek reasoner) burn output budget on reasoning first — the default
+      // 1024-token cap came back as an empty response from both. 4096 is accepted
+      // by every supported provider.
+      const raw = await getOrCreateInflight("taggov|" + s.aiProvider, () => callAI(s, prompt, { maxTokens: 4096 }));
 
       const aiGroups = pbpTagGovParseAiResponse(raw, counts);
 
