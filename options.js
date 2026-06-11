@@ -1794,6 +1794,11 @@ window.addEventListener("beforeunload", (e) => {
   }
 });
 
+// True only while the drain-time tail re-render runs: renderTagGov must not re-freeze
+// rows from _tagGovActiveTags then (the tags are released a few microtasks later), but
+// MUST re-freeze them on user-triggered re-renders (ignore/refresh/AI) mid-run.
+let _tagGovIsTailRender = false;
+
 async function _tagGovTailRefresh() {
   _tagGovSetProgressBtn("dismiss");
   // Persist the run outcome: the summary and attention list were DOM-only and
@@ -1809,8 +1814,13 @@ async function _tagGovTailRefresh() {
   } catch (_) {}
   const fresh = await loadTagCounts(true);
   if (fresh) updateTagGovOverview(fresh);
-  await renderTagGov();
-  await renderLowCountTags();
+  _tagGovIsTailRender = true;
+  try {
+    await renderTagGov();
+    await renderLowCountTags();
+  } finally {
+    _tagGovIsTailRender = false;
+  }
 }
 
 async function _runTagGovBatch(ops) {
@@ -2147,10 +2157,14 @@ async function renderTagGov() {
     row.appendChild(btnGroup);
     frag.appendChild(row);
 
-    // Re-freeze only while batches are actually QUEUED (counter > 1). At the
-    // drain-time re-render the counter is 1 and the active tags are released a few
-    // microtasks later — marking then would freeze the just-finished group's row.
-    if (_tagGovUnfinishedBatches > 1
+    // Re-freeze rows whose tags belong to a queued/RUNNING op — a user-triggered
+    // re-render (ignore/refresh/AI) mid-run must restore the frozen state even with
+    // a single batch running (the old counter>1 test dropped it, leaving a clickable
+    // row whose confirm then no-oped silently on the active-tags guard). The one
+    // exception is the drain-time tail render, where the active tags are released a
+    // few microtasks later and marking would freeze the just-finished group's row.
+    if (!_tagGovIsTailRender
+        && _tagGovUnfinishedBatches > 0
         && group.members.some(m => m && m.tag && _tagGovActiveTags.has(m.tag.toLowerCase()))) {
       _tagGovMarkRowQueued(row);
     }
