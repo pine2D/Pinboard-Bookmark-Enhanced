@@ -1787,7 +1787,7 @@
     }
   },
   "tagGovAborted429":   {
-    "message": "Ratenlimit erreicht — Batch gestoppt, abgeschlossene Änderungen gespeichert"
+    "message": "Rate-Limit — Stapel gestoppt, abgeschlossene Änderungen bleiben erhalten. Ein erneuter Lauf derselben Zusammenführung setzt sicher fort (bereits aktualisierte Lesezeichen werden übersprungen)."
   },
   "tagGovMergeEstimate":   {
     "message": "Geschätzte Dauer: ca. $T$",
@@ -1846,6 +1846,17 @@
   },
   "tagGovProblemsSeeBelow":   {
     "message": "Details unten anzeigen"
+  },
+  "tagGovRateLimitWait":   {
+    "message": "Rate-Limit erreicht — erneuter Versuch folgt…"
+  },
+  "tagGovQueuedCancelled":   {
+    "message": "$N$ wartende Aufgaben abgebrochen",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
   },
   "tagGovSnapshotSaved":   {
     "message": "Tag-Snapshot heruntergeladen (Sicherung — Zusammenführungen und Löschungen können nicht rückgängig gemacht werden)"

@@ -1787,7 +1787,7 @@
     }
   },
   "tagGovAborted429":   {
-    "message": "Rate-limited — batch stopped, completed items saved"
+    "message": "Rate-limited — batch stopped, completed items saved. Re-running the same merge resumes safely (already-updated bookmarks are skipped)."
   },
   "tagGovMergeEstimate":   {
     "message": "Estimated time: ~$T$",
@@ -1846,6 +1846,17 @@
   },
   "tagGovProblemsSeeBelow":   {
     "message": "view details below"
+  },
+  "tagGovRateLimitWait":   {
+    "message": "Rate-limited — waiting to retry…"
+  },
+  "tagGovQueuedCancelled":   {
+    "message": "$N$ queued tasks cancelled",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
   },
   "tagGovSnapshotSaved":   {
     "message": "Tag snapshot downloaded (backup — merges and deletions cannot be undone)"

@@ -1787,7 +1787,7 @@
     }
   },
   "tagGovAborted429":   {
-    "message": "触发限流 — 批次停止，已完成的改动已保存"
+    "message": "已限流，批次停止，已完成的更改保留。重新运行同一合并可安全续传（已改完的书签会自动跳过）。"
   },
   "tagGovMergeEstimate":   {
     "message": "预计耗时：约 $T$",
@@ -1846,6 +1846,17 @@
   },
   "tagGovProblemsSeeBelow":   {
     "message": "查看页面底部详情"
+  },
+  "tagGovRateLimitWait":   {
+    "message": "已限流，稍候自动重试…"
+  },
+  "tagGovQueuedCancelled":   {
+    "message": "已取消 $N$ 个排队批次",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
   },
   "tagGovSnapshotSaved":   {
     "message": "已下载标签快照（合并/删除不可撤销，此文件留作恢复备份）"

@@ -1787,7 +1787,7 @@
     }
   },
   "tagGovAborted429":   {
-    "message": "Osiągnięto limit szybkości — partia zatrzymana, ukończone elementy zapisane"
+    "message": "Limit zapytań — partia zatrzymana, ukończone zmiany zachowane. Ponowne uruchomienie tego samego scalania bezpiecznie wznawia pracę (zaktualizowane zakładki są pomijane)."
   },
   "tagGovMergeEstimate":   {
     "message": "Szacowany czas: ok. $T$",
@@ -1846,6 +1846,17 @@
   },
   "tagGovProblemsSeeBelow":   {
     "message": "zobacz szczegóły poniżej"
+  },
+  "tagGovRateLimitWait":   {
+    "message": "Limit zapytań — ponowna próba wkrótce…"
+  },
+  "tagGovQueuedCancelled":   {
+    "message": "Anulowano zadania w kolejce: $N$",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
   },
   "tagGovSnapshotSaved":   {
     "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"

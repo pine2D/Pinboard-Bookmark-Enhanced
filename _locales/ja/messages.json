@@ -1787,7 +1787,7 @@
     }
   },
   "tagGovAborted429":   {
-    "message": "レート制限に達しました — バッチが停止され、完了した項目は保存されています"
+    "message": "レート制限によりバッチを停止しました。完了済みの変更は保存されています。同じ統合を再実行すると安全に再開できます（更新済みのブックマークは自動でスキップされます）。"
   },
   "tagGovMergeEstimate":   {
     "message": "推定所要時間：約 $T$",
@@ -1846,6 +1846,17 @@
   },
   "tagGovProblemsSeeBelow":   {
     "message": "ページ下部で詳細を表示"
+  },
+  "tagGovRateLimitWait":   {
+    "message": "レート制限中 — まもなく再試行します…"
+  },
+  "tagGovQueuedCancelled":   {
+    "message": "待機中の $N$ 件をキャンセルしました",
+    "placeholders": {
+      "N": {
+        "content": "$1"
+      }
+    }
   },
   "tagGovSnapshotSaved":   {
     "message": "タグのスナップショットをダウンロードしました（統合・削除は元に戻せないため、復元用のバックアップです）"

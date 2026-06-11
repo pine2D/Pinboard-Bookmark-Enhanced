@@ -1290,6 +1290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ---- Tag Governance helpers (top-level so they survive the DOMContentLoaded closure) ----
 
 const TAG_GOV_RETRY_WAIT_MS = 10000; // single backoff before retrying a 429 once (Pinboard rate limit)
+const TAG_GOV_LIST_RETRY_WAIT_MS = 60000; // posts/all has its own documented once-per-5-min budget — back off much longer
 
 // Rebuild the tag-overview line (tag count + total uses). Top level, NOT inside the
 // DOMContentLoaded closure: runTagGovOps calls it after every batch (a closure-scoped
@@ -1362,8 +1363,11 @@ async function ensureTagSnapshot() {
     a.click();
     URL.revokeObjectURL(url);
     _tagGovSnapshotDownloaded = true;
-    if (progress) progress.classList.remove("hidden");
-    if (progressText) progressText.textContent = t("tagGovSnapshotSaved");
+    // Don't stomp a running batch's progress line with the snapshot note.
+    if (_tagGovUnfinishedBatches === 0) {
+      if (progress) progress.classList.remove("hidden");
+      if (progressText) progressText.textContent = t("tagGovSnapshotSaved");
+    }
     return true;
   } catch (e) {
     console.error("[tag-gov] ensureTagSnapshot failed:", e);
@@ -1414,16 +1418,30 @@ async function confirmMergeGroup(group, canonical, anchorEl) {
 // Each network call flows through the shared 3.1s pinboardFetch queue.
 async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
   const enc = encodeURIComponent;
+  // The 10s retry sleeps used to be a frozen screen — tell the user what is happening.
+  const setWaitNote = () => {
+    const pt = $id("tag-gov-progress-text");
+    if (pt) pt.textContent = t("tagGovRateLimitWait");
+  };
   const listUrl = `https://api.pinboard.in/v1/posts/all?tag=${enc(oldTag)}&meta=no&format=json&auth_token=${enc(token)}`;
   let resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
   if (resp.status === 429) {
-    await new Promise(r => setTimeout(r, TAG_GOV_RETRY_WAIT_MS));
+    setWaitNote();
+    await new Promise(r => setTimeout(r, TAG_GOV_LIST_RETRY_WAIT_MS));
     resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
     if (resp.status === 429) return { total: 0, saved: 0, failed: 0, skipped: 0, problems: [], aborted: true };
   }
-  if (!resp.ok) return { total: 0, saved: 0, failed: 1, skipped: 0, problems: [], aborted: false };
+  // A failed list fetch means NO bookmark was touched — say which pair and why, so the
+  // summary's "1 failed" is not an anonymous dead end (re-running is fully safe).
+  if (!resp.ok) {
+    return { total: 0, saved: 0, failed: 1, skipped: 0,
+      problems: [{ url: "", title: "", kind: "failed", reason: "posts/all HTTP " + resp.status }], aborted: false };
+  }
   const posts = await resp.json();
-  if (!Array.isArray(posts)) return { total: 0, saved: 0, failed: 1, skipped: 0, problems: [], aborted: false };
+  if (!Array.isArray(posts)) {
+    return { total: 0, saved: 0, failed: 1, skipped: 0,
+      problems: [{ url: "", title: "", kind: "failed", reason: "posts/all: unexpected response" }], aborted: false };
+  }
 
   const oldLower = oldTag.toLowerCase();
   let saved = 0, failed = 0, skipped = 0;
@@ -1461,13 +1479,21 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
     try {
       let r = await pinboardFetch(uri);
       if (r.status === 429) {
+        setWaitNote();
         await new Promise(rs => setTimeout(rs, TAG_GOV_RETRY_WAIT_MS));
         r = await pinboardFetch(uri);
-        if (r.status === 429) return { total: posts.length, saved, failed, skipped, problems, aborted: true };
+        if (r.status === 429) {
+          // A persistent 429 on one bookmark is likely a transient cross-context
+          // collision (popup/background share the rate budget) — record it and move
+          // on instead of killing the whole run over a single bookmark.
+          failed++;
+          problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: "HTTP 429" });
+          continue;
+        }
       }
       if (!r.ok) {
         failed++;
-        problems.push({ url: post.href, title: post.description || post.href, kind: "failed" });
+        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: "HTTP " + r.status });
         continue;
       }
       const data = await r.json();
@@ -1475,12 +1501,12 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
         saved++;
       } else {
         failed++;
-        problems.push({ url: post.href, title: post.description || post.href, kind: "failed" });
+        problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: String(data.result_code || "unknown") });
       }
     } catch (e) {
       console.error("[tag-gov] retag re-save failed:", post.href, e);
       failed++;
-      problems.push({ url: post.href, title: post.description || post.href, kind: "failed" });
+      problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: e?.name || "network error" });
     }
   }
   if (onProgress) onProgress(posts.length, posts.length);
@@ -1494,6 +1520,10 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
 // the UI and the ok/fail bookkeeping too.
 let _tagGovBatchChain = Promise.resolve();
 let _tagGovUnfinishedBatches = 0;
+// Set when a batch hits the rate-limit abort: queued batches drain without running
+// (they would keep hammering an API that just told us to stop, and their op lines
+// would overwrite the abort explanation within seconds).
+let _tagGovRunAborted = false;
 // Bookmarks that need manual attention, accumulated across the queued batches of one
 // run and reset when a fresh run starts (counter at zero).
 const _tagGovProblems = [];
@@ -1522,13 +1552,17 @@ function renderTagGovProblems() {
     kind.className = "tag-gov-problem-kind" + (pr.kind === "failed" ? " bad" : "");
     kind.textContent = t(pr.kind === "failed" ? "tagGovProblemFailed" : "tagGovProblemSkipped");
     row.appendChild(kind);
-    row.appendChild(document.createTextNode(" " + pr.old + " -> " + pr.new + " · "));
-    const a = document.createElement("a");
-    a.href = "https://pinboard.in/add?url=" + encodeURIComponent(pr.url);
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.textContent = pr.title || pr.url;
-    row.appendChild(a);
+    row.appendChild(document.createTextNode(" " + pr.old + " -> " + pr.new));
+    if (pr.url) {
+      row.appendChild(document.createTextNode(" · "));
+      const a = document.createElement("a");
+      a.href = "https://pinboard.in/add?url=" + encodeURIComponent(pr.url);
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = pr.title || pr.url;
+      row.appendChild(a);
+    }
+    if (pr.reason) row.appendChild(document.createTextNode(" · " + pr.reason));
     box.appendChild(row);
   }
   if (_tagGovProblems.length > TAG_GOV_PROBLEMS_CAP) {
@@ -1546,6 +1580,7 @@ function runTagGovOps(ops) {
     _tagGovRunTotals.ok = 0;
     _tagGovRunTotals.fail = 0;
     _tagGovRunTotals.skipped = 0;
+    _tagGovRunAborted = false;
   }
   _tagGovUnfinishedBatches++;
   const run = _tagGovBatchChain.then(() =>
@@ -1566,7 +1601,20 @@ window.addEventListener("beforeunload", (e) => {
   }
 });
 
+async function _tagGovTailRefresh() {
+  const fresh = await loadTagCounts(true);
+  if (fresh) updateTagGovOverview(fresh);
+  await renderTagGov();
+  await renderLowCountTags();
+}
+
 async function _runTagGovBatch(ops) {
+  if (_tagGovRunAborted) {
+    // Queued behind an aborted batch: drop without touching the progress line (it
+    // shows the abort explanation), but still refresh the panel once at drain.
+    if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh();
+    return { ok: 0, fail: 0, aborted: true };
+  }
   if (!ops || ops.length === 0) return { ok: 0, fail: 0, aborted: false };
   const token = await getTagGovToken();
   if (!token) {
@@ -1616,13 +1664,15 @@ async function _runTagGovBatch(ops) {
             ptext.innerHTML = opLine + " " + t("tagGovRetagProgress", String(done), String(total)) + queueSuffix();
           }
         });
-        if (res.aborted) {
-          aborted = true;
-          break;
-        }
+        // Collect partial results BEFORE the abort check — an aborted op returns the
+        // failed/skipped rows it accumulated, exactly what the user needs to see then.
         skippedTotal += res.skipped;
         for (const pr of (res.problems || [])) {
           _tagGovProblems.push({ ...pr, old: op.old, new: op.new });
+        }
+        if (res.aborted) {
+          aborted = true;
+          break;
         }
         // Skipped bookmarks don't fail the task — they are listed for manual editing.
         if (res.failed === 0) {
@@ -1670,6 +1720,8 @@ async function _runTagGovBatch(ops) {
   }
 
   if (fill && !aborted) fill.style.width = "100%";
+  if (aborted) _tagGovRunAborted = true;
+  const cancelledBehind = aborted ? _tagGovUnfinishedBatches - 1 : 0;
 
   _tagGovRunTotals.ok += ok;
   _tagGovRunTotals.fail += fail;
@@ -1677,7 +1729,7 @@ async function _runTagGovBatch(ops) {
 
   if (ptext) {
     ptext.textContent = aborted
-      ? t("tagGovAborted429")
+      ? t("tagGovAborted429") + (cancelledBehind > 0 ? " · " + t("tagGovQueuedCancelled", String(cancelledBehind)) : "")
       : t("tagGovDoneSummary", String(_tagGovRunTotals.ok), String(_tagGovRunTotals.fail))
         + (_tagGovRunTotals.skipped > 0 ? " · " + t("tagGovSkippedSummary", String(_tagGovRunTotals.skipped)) : "");
     // The manual-attention list renders below the (viewport-pinned) progress row, at
@@ -1703,12 +1755,7 @@ async function _runTagGovBatch(ops) {
   // forced tags/get per batch. The old pre-purge of cached_user_tags was redundant —
   // loadTagCounts(true) bypasses and rewrites the cache itself — and cleared popup
   // autocomplete's cache whenever the refetch failed.
-  if (_tagGovUnfinishedBatches === 1) {
-    const fresh = await loadTagCounts(true);
-    if (fresh) updateTagGovOverview(fresh);
-    await renderTagGov();
-    await renderLowCountTags();
-  }
+  if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh();
 
   return { ok, fail, aborted };
 }
