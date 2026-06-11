@@ -1000,6 +1000,23 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   color: var(--opt-fg-muted, #666);
   margin-top: 4px;
 }
+#tag-gov-problems {
+  margin-top: 8px;
+  font-size: 11px;
+}
+.tag-gov-problems-title {
+  color: var(--opt-fg-muted, #666);
+  margin-bottom: 2px;
+}
+.tag-gov-problem-row {
+  color: var(--opt-fg-muted, #666);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tag-gov-problem-kind.bad {
+  color: #c00;
+}
 .tag-gov-warns {
   margin-top: 12px;
 }

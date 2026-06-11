@@ -1776,7 +1776,7 @@
     }
   },
   "tagGovDoneSummary":   {
-    "message": "$OK$ completed · $FAIL$ failed",
+    "message": "$OK$ tasks completed · $FAIL$ failed",
     "placeholders": {
       "OK": {
         "content": "$1"
@@ -1834,6 +1834,15 @@
         "content": "$1"
       }
     }
+  },
+  "tagGovProblemsTitle":   {
+    "message": "Bookmarks needing manual editing:"
+  },
+  "tagGovProblemFailed":   {
+    "message": "failed"
+  },
+  "tagGovProblemSkipped":   {
+    "message": "skipped (note too long)"
   },
   "tagGovSnapshotSaved":   {
     "message": "Tag snapshot downloaded (backup — merges and deletions cannot be undone)"

@@ -1776,7 +1776,7 @@
     }
   },
   "tagGovDoneSummary":   {
-    "message": "$OK$ 个完成 · $FAIL$ 个失败",
+    "message": "$OK$ 个任务完成 · $FAIL$ 个任务失败",
     "placeholders": {
       "OK": {
         "content": "$1"
@@ -1834,6 +1834,15 @@
         "content": "$1"
       }
     }
+  },
+  "tagGovProblemsTitle":   {
+    "message": "需手动处理的书签："
+  },
+  "tagGovProblemFailed":   {
+    "message": "失败"
+  },
+  "tagGovProblemSkipped":   {
+    "message": "跳过（备注过长）"
   },
   "tagGovSnapshotSaved":   {
     "message": "已下载标签快照（合并/删除不可撤销，此文件留作恢复备份）"

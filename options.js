@@ -1419,14 +1419,15 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
   if (resp.status === 429) {
     await new Promise(r => setTimeout(r, TAG_GOV_RETRY_WAIT_MS));
     resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
-    if (resp.status === 429) return { total: 0, saved: 0, failed: 0, skipped: 0, aborted: true };
+    if (resp.status === 429) return { total: 0, saved: 0, failed: 0, skipped: 0, problems: [], aborted: true };
   }
-  if (!resp.ok) return { total: 0, saved: 0, failed: 1, skipped: 0, aborted: false };
+  if (!resp.ok) return { total: 0, saved: 0, failed: 1, skipped: 0, problems: [], aborted: false };
   const posts = await resp.json();
-  if (!Array.isArray(posts)) return { total: 0, saved: 0, failed: 1, skipped: 0, aborted: false };
+  if (!Array.isArray(posts)) return { total: 0, saved: 0, failed: 1, skipped: 0, problems: [], aborted: false };
 
   const oldLower = oldTag.toLowerCase();
   let saved = 0, failed = 0, skipped = 0;
+  const problems = []; // { url, title, kind: "failed" | "skipped" } per bookmark
   for (let i = 0; i < posts.length; i++) {
     if (onProgress) onProgress(i, posts.length);
     const post = posts[i];
@@ -1452,24 +1453,38 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
       dt: post.time
     });
     // Never truncate a bookmark to fit the URI cap — skip it and surface the count instead.
-    if (uri.length > POSTS_ADD_URI_BUDGET) { skipped++; continue; }
+    if (uri.length > POSTS_ADD_URI_BUDGET) {
+      skipped++;
+      problems.push({ url: post.href, title: post.description || post.href, kind: "skipped" });
+      continue;
+    }
     try {
       let r = await pinboardFetch(uri);
       if (r.status === 429) {
         await new Promise(rs => setTimeout(rs, TAG_GOV_RETRY_WAIT_MS));
         r = await pinboardFetch(uri);
-        if (r.status === 429) return { total: posts.length, saved, failed, skipped, aborted: true };
+        if (r.status === 429) return { total: posts.length, saved, failed, skipped, problems, aborted: true };
       }
-      if (!r.ok) { failed++; continue; }
+      if (!r.ok) {
+        failed++;
+        problems.push({ url: post.href, title: post.description || post.href, kind: "failed" });
+        continue;
+      }
       const data = await r.json();
-      if (data.result_code === "done") { saved++; } else { failed++; }
+      if (data.result_code === "done") {
+        saved++;
+      } else {
+        failed++;
+        problems.push({ url: post.href, title: post.description || post.href, kind: "failed" });
+      }
     } catch (e) {
       console.error("[tag-gov] retag re-save failed:", post.href, e);
       failed++;
+      problems.push({ url: post.href, title: post.description || post.href, kind: "failed" });
     }
   }
   if (onProgress) onProgress(posts.length, posts.length);
-  return { total: posts.length, saved, failed, skipped, aborted: false };
+  return { total: posts.length, saved, failed, skipped, problems, aborted: false };
 }
 
 // Batches queue up instead of running concurrently: several confirmed merges would
@@ -1479,8 +1494,49 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
 // the UI and the ok/fail bookkeeping too.
 let _tagGovBatchChain = Promise.resolve();
 let _tagGovUnfinishedBatches = 0;
+// Bookmarks that need manual attention, accumulated across the queued batches of one
+// run and reset when a fresh run starts (counter at zero).
+const _tagGovProblems = [];
+const TAG_GOV_PROBLEMS_CAP = 20;
+
+// Render the manual-attention list under the progress row: failed re-saves and
+// skipped over-budget bookmarks, each linking to pinboard's edit form for that URL.
+function renderTagGovProblems() {
+  const box = $id("tag-gov-problems");
+  if (!box) return;
+  box.replaceChildren();
+  if (_tagGovProblems.length === 0) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  const title = document.createElement("div");
+  title.className = "tag-gov-problems-title";
+  title.textContent = t("tagGovProblemsTitle");
+  box.appendChild(title);
+  for (const pr of _tagGovProblems.slice(0, TAG_GOV_PROBLEMS_CAP)) {
+    const row = document.createElement("div");
+    row.className = "tag-gov-problem-row";
+    const kind = document.createElement("span");
+    kind.className = "tag-gov-problem-kind" + (pr.kind === "failed" ? " bad" : "");
+    kind.textContent = t(pr.kind === "failed" ? "tagGovProblemFailed" : "tagGovProblemSkipped");
+    row.appendChild(kind);
+    row.appendChild(document.createTextNode(" " + pr.old + " -> " + pr.new + " · "));
+    const a = document.createElement("a");
+    a.href = "https://pinboard.in/add?url=" + encodeURIComponent(pr.url);
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = pr.title || pr.url;
+    row.appendChild(a);
+    box.appendChild(row);
+  }
+  if (_tagGovProblems.length > TAG_GOV_PROBLEMS_CAP) {
+    const more = document.createElement("div");
+    more.className = "tag-gov-problem-row";
+    more.textContent = "+" + (_tagGovProblems.length - TAG_GOV_PROBLEMS_CAP);
+    box.appendChild(more);
+  }
+}
 
 function runTagGovOps(ops) {
+  if (_tagGovUnfinishedBatches === 0) _tagGovProblems.length = 0; // fresh run: reset the list
   _tagGovUnfinishedBatches++;
   const run = _tagGovBatchChain.then(() =>
     _runTagGovBatch(ops).finally(() => { _tagGovUnfinishedBatches--; })
@@ -1537,7 +1593,11 @@ async function _runTagGovBatch(ops) {
           break;
         }
         skippedTotal += res.skipped;
-        if (res.failed === 0 && res.skipped === 0) {
+        for (const pr of (res.problems || [])) {
+          _tagGovProblems.push({ ...pr, old: op.old, new: op.new });
+        }
+        // Skipped bookmarks don't fail the task — they are listed for manual editing.
+        if (res.failed === 0) {
           ok++;
         } else {
           fail++;
@@ -1589,6 +1649,7 @@ async function _runTagGovBatch(ops) {
         + (skippedTotal > 0 ? " · " + t("tagGovSkippedSummary", String(skippedTotal)) : "");
     }
   }
+  renderTagGovProblems();
 
   try { await chrome.storage.local.remove("cached_user_tags"); } catch (_) {}
   const fresh = await loadTagCounts(true);

@@ -1776,7 +1776,7 @@
     }
   },
   "tagGovDoneSummary":   {
-    "message": "$OK$ abgeschlossen · $FAIL$ fehlgeschlagen",
+    "message": "$OK$ Aufgaben abgeschlossen · $FAIL$ fehlgeschlagen",
     "placeholders": {
       "OK": {
         "content": "$1"
@@ -1834,6 +1834,15 @@
         "content": "$1"
       }
     }
+  },
+  "tagGovProblemsTitle":   {
+    "message": "Lesezeichen, die manuelle Bearbeitung benötigen:"
+  },
+  "tagGovProblemFailed":   {
+    "message": "fehlgeschlagen"
+  },
+  "tagGovProblemSkipped":   {
+    "message": "übersprungen (Notiz zu lang)"
   },
   "tagGovSnapshotSaved":   {
     "message": "Tag-Snapshot heruntergeladen (Sicherung — Zusammenführungen und Löschungen können nicht rückgängig gemacht werden)"

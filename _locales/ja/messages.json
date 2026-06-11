@@ -1776,7 +1776,7 @@
     }
   },
   "tagGovDoneSummary":   {
-    "message": "$OK$ 個完了 · $FAIL$ 個失敗",
+    "message": "タスク $OK$ 件完了 · $FAIL$ 件失敗",
     "placeholders": {
       "OK": {
         "content": "$1"
@@ -1834,6 +1834,15 @@
         "content": "$1"
       }
     }
+  },
+  "tagGovProblemsTitle":   {
+    "message": "手動での対応が必要なブックマーク:"
+  },
+  "tagGovProblemFailed":   {
+    "message": "失敗"
+  },
+  "tagGovProblemSkipped":   {
+    "message": "スキップ（メモが長すぎます）"
   },
   "tagGovSnapshotSaved":   {
     "message": "タグのスナップショットをダウンロードしました（統合・削除は元に戻せないため、復元用のバックアップです）"

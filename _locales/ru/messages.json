@@ -1776,7 +1776,7 @@
     }
   },
   "tagGovDoneSummary":   {
-    "message": "$OK$ завершено · $FAIL$ ошибок",
+    "message": "Задач завершено: $OK$ · с ошибкой: $FAIL$",
     "placeholders": {
       "OK": {
         "content": "$1"
@@ -1834,6 +1834,15 @@
         "content": "$1"
       }
     }
+  },
+  "tagGovProblemsTitle":   {
+    "message": "Закладки, требующие ручного редактирования:"
+  },
+  "tagGovProblemFailed":   {
+    "message": "ошибка"
+  },
+  "tagGovProblemSkipped":   {
+    "message": "пропущено (заметка слишком длинная)"
   },
   "tagGovSnapshotSaved":   {
     "message": "Снимок меток скачан (резервная копия — слияния и удаления необратимы)"

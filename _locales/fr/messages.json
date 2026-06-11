@@ -1776,7 +1776,7 @@
     }
   },
   "tagGovDoneSummary":   {
-    "message": "$OK$ complété · $FAIL$ échoué",
+    "message": "$OK$ tâches terminées · $FAIL$ en échec",
     "placeholders": {
       "OK": {
         "content": "$1"
@@ -1834,6 +1834,15 @@
         "content": "$1"
       }
     }
+  },
+  "tagGovProblemsTitle":   {
+    "message": "Signets à modifier manuellement :"
+  },
+  "tagGovProblemFailed":   {
+    "message": "échec"
+  },
+  "tagGovProblemSkipped":   {
+    "message": "ignoré (note trop longue)"
   },
   "tagGovSnapshotSaved":   {
     "message": "Instantané des tags téléchargé (sauvegarde — les fusions et suppressions sont irréversibles)"

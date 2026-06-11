@@ -1776,7 +1776,7 @@
     }
   },
   "tagGovDoneSummary":   {
-    "message": "$OK$ ukończeń · $FAIL$ niepowodzeń",
+    "message": "Ukończono zadań: $OK$ · nieudanych: $FAIL$",
     "placeholders": {
       "OK": {
         "content": "$1"
@@ -1834,6 +1834,15 @@
         "content": "$1"
       }
     }
+  },
+  "tagGovProblemsTitle":   {
+    "message": "Zakładki wymagające ręcznej edycji:"
+  },
+  "tagGovProblemFailed":   {
+    "message": "błąd"
+  },
+  "tagGovProblemSkipped":   {
+    "message": "pominięto (notatka zbyt długa)"
   },
   "tagGovSnapshotSaved":   {
     "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"
