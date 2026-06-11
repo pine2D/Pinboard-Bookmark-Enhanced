@@ -1275,7 +1275,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const btn = $id("tag-gov-ai-btn");
     const statusEl = $id("tag-gov-ai-status");
 
-    if (!hasAIKey(s)) {
+    // Re-read settings fresh (like getTagGovToken does): the page-load snapshot `s`
+    // is never written back by saveAll(), so a key/provider configured THIS session
+    // (paste key on the AI tab, come back here) was invisible until a full reload —
+    // and a provider switch would fire the request at the OLD provider/key/model.
+    const sNow = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+    deobfuscateSettings(sNow);
+
+    if (!hasAIKey(sNow)) {
       if (statusEl) {
         setStatusIcon(statusEl, false, t("tagGovAiNoKey"));
         statusEl.style.color = "#c00";
@@ -1298,7 +1305,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // DeepSeek reasoner) burn output budget on reasoning first — the default
       // 1024-token cap came back as an empty response from both. 4096 is accepted
       // by every supported provider.
-      const raw = await getOrCreateInflight("taggov|" + s.aiProvider, () => callAI(s, prompt, { maxTokens: 4096 }));
+      const raw = await getOrCreateInflight("taggov|" + sNow.aiProvider, () => callAI(sNow, prompt, { maxTokens: 4096 }));
 
       const aiGroups = pbpTagGovParseAiResponse(raw, counts);
 
@@ -1311,7 +1318,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
       let msg = err.name === "AbortError" ? t("testTimeout") : err.message;
       if (err?.code === "model_not_found") {
-        msg = t("aiErrorModelNotFound", s.aiProvider) + " " + t("aiErrorModelNotFoundHint");
+        msg = t("aiErrorModelNotFound", sNow.aiProvider) + " " + t("aiErrorModelNotFoundHint");
       }
       if (statusEl) {
         setStatusIcon(statusEl, false, msg);
