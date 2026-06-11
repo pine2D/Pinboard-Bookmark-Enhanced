@@ -2079,6 +2079,13 @@ async function renderTagGov() {
 
   let allGroups = pbpTagGovFindGroups(tagCounts);
   allGroups = allGroups.concat(aiGroups);
+  // Heuristic and AI detection share the same id scheme (sorted members joined) and
+  // the AI prompt is steered toward the same plural/separator/typo shapes — without
+  // dedupe a duplicated group rendered twice with IDENTICAL radio name="group-<id>",
+  // so the two rows fought over one radio group and a canonical chosen in one row
+  // silently uncheck-ed the other. Keep the first occurrence (heuristic wins).
+  const seenGroupIds = new Set();
+  allGroups = allGroups.filter(g => !seenGroupIds.has(g.id) && seenGroupIds.add(g.id));
   allGroups = allGroups.filter(g => !ignoredList.includes(g.id));
 
   if (!allGroups.length) {
