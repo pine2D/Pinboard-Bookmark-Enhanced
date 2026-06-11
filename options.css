@@ -204,6 +204,11 @@ html[data-theme] .free-tier-list strong { color: var(--opt-text, #ddd); }
 html[data-theme] .free-tier-help summary { color: var(--opt-accent, #4477bb); }
 .opt-error { font-size: 12px; color: #c00; margin: 4px 0 8px; padding: 6px 10px; background: #fff0f0; border: 1px solid #f5c6c6; border-radius: var(--opt-radius-sm); }
 .opt-error.hidden { display: none; }
+/* Generic utility (same convention as popup.css). options.css historically only had
+   the two scoped variants above/below — bare class="hidden" elements (the tag-gov
+   progress card and attention list) were never actually hidden, so the Dismiss
+   button appeared to do nothing. */
+.hidden { display: none !important; }
 html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--opt-danger-bg, rgba(220,80,80,0.08)); border-color: var(--opt-danger, #e55); }
 .divider { border-top: 1px solid #ddd; margin: 14px 0; }
 .btn { padding: 4px 16px; font-size: 12px; cursor: pointer; border: 1px solid #999; background: #f5f5f0; transition: background 0.15s, border-color 0.15s, transform 0.15s; }
