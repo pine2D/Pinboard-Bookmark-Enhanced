@@ -1018,6 +1018,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  margin-top: 4px;
 }
 .tag-gov-progress-foot button {
   flex-shrink: 0;
@@ -1025,7 +1026,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 #tag-gov-progress-text {
   font-size: 11px;
   color: var(--opt-fg-muted, #666);
-  margin-top: 4px;
+  min-width: 0; /* allow flex shrink so a long token wraps instead of overflowing */
 }
 #tag-gov-problems {
   margin-top: 8px;

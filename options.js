@@ -68,6 +68,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (_tagGovUnfinishedBatches === 0) {
       const lr = (await chrome.storage.local.get({ _tagGovLastRun: null }))._tagGovLastRun;
       if (lr && (lr.fail > 0 || lr.skipped > 0 || (lr.problems && lr.problems.length))) {
+        await getTagGovToken(); // seed _tagGovUser so restored delete rows render t:-page links
         _tagGovProblems.length = 0;
         _tagGovProblems.push(...(lr.problems || []));
         const card = $id("tag-gov-progress");
@@ -1475,12 +1476,20 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
     if (pt) pt.textContent = t("tagGovRateLimitWait");
   };
   const listUrl = `https://api.pinboard.in/v1/posts/all?tag=${enc(oldTag)}&meta=no&format=json&auth_token=${enc(token)}`;
-  let resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
-  if (resp.status === 429) {
-    setWaitNote();
-    await new Promise(r => setTimeout(r, TAG_GOV_LIST_RETRY_WAIT_MS));
+  // pinboardFetch REJECTS on network failure or its 30s timeout — without this catch
+  // the rejection escaped to the op-level handler as an anonymous fail with no row.
+  let resp;
+  try {
     resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
-    if (resp.status === 429) return { total: 0, saved: 0, failed: 0, skipped: 0, problems: [], aborted: true };
+    if (resp.status === 429) {
+      setWaitNote();
+      await new Promise(r => setTimeout(r, TAG_GOV_LIST_RETRY_WAIT_MS));
+      resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
+      if (resp.status === 429) return { total: 0, saved: 0, failed: 0, skipped: 0, problems: [], aborted: true };
+    }
+  } catch (e) {
+    return { total: 0, saved: 0, failed: 1, skipped: 0,
+      problems: [{ url: "", title: "", kind: "failed", reason: "posts/all: " + (e?.name || "network error") }], aborted: false };
   }
   // A failed list fetch means NO bookmark was touched — say which pair and why, so the
   // summary's "1 failed" is not an anonymous dead end (re-running is fully safe).
@@ -1574,10 +1583,11 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
 // the UI and the ok/fail bookkeeping too.
 let _tagGovBatchChain = Promise.resolve();
 let _tagGovUnfinishedBatches = 0;
-// Set when a batch hits the rate-limit abort: queued batches drain without running
-// (they would keep hammering an API that just told us to stop, and their op lines
-// would overwrite the abort explanation within seconds).
-let _tagGovRunAborted = false;
+// Number of queued batches to drop after an abort/stop: exactly the batches that
+// were waiting at that moment (they would keep hammering an API that just told us
+// to stop, and their op lines would overwrite the abort explanation). A NEW batch
+// the user confirms during the drain window lands after these and still runs.
+let _tagGovDrainCount = 0;
 // Set by the Stop button; checked at every per-bookmark/per-op checkpoint. A stopped
 // run drains its queue like an aborted one — completed re-saves persist server-side.
 let _tagGovCancelRequested = false;
@@ -1602,6 +1612,10 @@ document.addEventListener("click", (ev) => {
   } else {
     const card = $id("tag-gov-progress");
     if (card) card.classList.add("hidden");
+    // The attention list is a sibling of the card — dismiss both, or it stays
+    // orphaned on screen with no way to clear it.
+    _tagGovProblems.length = 0;
+    renderTagGovProblems();
     // Dismiss = acknowledged: drop the persisted record so it stops reappearing.
     try { chrome.storage.local.remove("_tagGovLastRun"); } catch (_) {}
   }
@@ -1704,14 +1718,19 @@ function runTagGovOps(ops) {
     _tagGovRunTotals.ok = 0;
     _tagGovRunTotals.fail = 0;
     _tagGovRunTotals.skipped = 0;
-    _tagGovRunAborted = false;
+    _tagGovDrainCount = 0;
     _tagGovCancelRequested = false;
   }
   _tagGovUnfinishedBatches++;
   const run = _tagGovBatchChain.then(() =>
     _runTagGovBatch(ops).finally(() => {
       _tagGovUnfinishedBatches--;
-      if (_tagGovUnfinishedBatches === 0) _tagGovSetTabBusy(false);
+      if (_tagGovUnfinishedBatches === 0) {
+        _tagGovSetTabBusy(false);
+        // Backstop for a batch that threw before reaching the tail: never leave
+        // the card stuck on a dead "Stop" button.
+        _tagGovSetProgressBtn("dismiss");
+      }
     })
   );
   _tagGovBatchChain = run.catch(() => {});
@@ -1749,9 +1768,10 @@ async function _tagGovTailRefresh() {
 }
 
 async function _runTagGovBatch(ops) {
-  if (_tagGovRunAborted) {
-    // Queued behind an aborted batch: drop without touching the progress line (it
-    // shows the abort explanation), but still refresh the panel once at drain.
+  if (_tagGovDrainCount > 0) {
+    // Queued behind an aborted/stopped batch: drop without touching the progress
+    // line (it shows the abort explanation), but still refresh the panel at drain.
+    _tagGovDrainCount--;
     if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh();
     return { ok: 0, fail: 0, aborted: true };
   }
@@ -1877,8 +1897,8 @@ async function _runTagGovBatch(ops) {
   }
 
   if (fill && !aborted && !cancelled) fill.style.width = "100%";
-  if (aborted || cancelled) _tagGovRunAborted = true;
   const cancelledBehind = (aborted || cancelled) ? _tagGovUnfinishedBatches - 1 : 0;
+  if (aborted || cancelled) _tagGovDrainCount = cancelledBehind;
 
   _tagGovRunTotals.ok += ok;
   _tagGovRunTotals.fail += fail;
@@ -2065,7 +2085,11 @@ async function renderTagGov() {
     row.appendChild(btnGroup);
     container.appendChild(row);
 
-    if (group.members.some(m => m && m.tag && _tagGovActiveTags.has(m.tag.toLowerCase()))) {
+    // Re-freeze only while batches are actually QUEUED (counter > 1). At the
+    // drain-time re-render the counter is 1 and the active tags are released a few
+    // microtasks later — marking then would freeze the just-finished group's row.
+    if (_tagGovUnfinishedBatches > 1
+        && group.members.some(m => m && m.tag && _tagGovActiveTags.has(m.tag.toLowerCase()))) {
       _tagGovMarkRowQueued(row);
     }
   }
