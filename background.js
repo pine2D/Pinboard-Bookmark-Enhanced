@@ -639,7 +639,12 @@ async function migrateBgSaveMode() {
     await store.set({ bgSaveMode: mode });
   } catch (_) {}
 }
-migrateBgSaveMode();
+// Keep the migration's promise: primeSettings callers await it first. Both are
+// read-then-write over bgSaveMode, and onInstalled fires primeSettings almost
+// immediately on update — if both reads completed before either write, prime's
+// stale snapshot re-inserted the default "merge", permanently clobbering a legacy
+// bgSaveNoClobber=false user's "overwrite" preference.
+const _bgSaveModeMigration = migrateBgSaveMode();
 
 async function syncPrewarmTagsAlarm() {
   const s = await loadSettings();
@@ -681,7 +686,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     prewarmTagsNow().catch(() => {});
   }
   if (alarm.name === "storage-warm") {
-    primeSettings().catch(() => {});
+    _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
   }
 });
 
@@ -739,7 +744,7 @@ async function sweepSuggestCache() {
 
 // Startup: process offline queue + update badge + prime settings (cheap no-op when already primed)
 chrome.runtime.onStartup.addListener(() => {
-  primeSettings().catch(() => {});
+  _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
   processOfflineQueue().catch(() => {});
   updateBadge().catch(() => {});
 });
@@ -748,7 +753,7 @@ chrome.runtime.onStartup.addListener(() => {
 // storage doesn't have every key yet (storage.get(missing-key) is measurably slower).
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === "install" || reason === "update") {
-    primeSettings().catch(() => {});
+    _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
   }
 });
 
