@@ -1228,7 +1228,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Tag governance event listeners ----
   $id("tag-gov-reset-ignored")?.addEventListener("click", async (e) => {
     e.preventDefault();
-    showConfirmPopover($id("tag-gov-reset-ignored"), {
+    // Anchor to the positioned <small> wrapper, NOT inside the <a href="#"> itself:
+    // a popover nested in the anchor makes its buttons activate the link (the
+    // popover only stopPropagation()s, it can't cancel the anchor's default), so
+    // confirming OR cancelling navigated to "#" and scroll-jumped the page to top.
+    showConfirmPopover($id("tag-gov-reset-ignored")?.closest(".tag-gov-reset-link"), {
       msg: t("tagGovResetIgnoredConfirm"),
       yesText: t("reset"),
       noText: t("cancel"),

@@ -690,12 +690,17 @@ html[data-theme] textarea {
   width: max-content;   /* the anchor (reset link) is a narrow sidebar column; without this the
                            popover shrink-to-fits to that width and its row of buttons cramps */
   display: flex; align-items: center; gap: 6px;
-  padding: 5px 10px; font-size: 11px; color: #c00; white-space: nowrap;
+  flex-wrap: wrap;       /* long tag lists: buttons drop to their own row */
+  max-width: min(60ch, 78vw);
+  padding: 5px 10px; font-size: 11px; color: #c00;
   background: #fff; border: 1px solid #ccc; border-radius: var(--opt-radius-sm);
   box-shadow: var(--opt-shadow-md);
   animation: confirmFadeIn 0.12s ease;
 }
-.confirm-popover .confirm-msg { font-weight: bold; color: inherit; }
+/* pre-line: the tag-gov messages embed a real newline (summary line + time estimate);
+   under the old nowrap it collapsed to one ever-wider unwrappable line that could
+   run far past the viewport with a long member list. */
+.confirm-popover .confirm-msg { font-weight: bold; color: inherit; white-space: pre-line; }
 .confirm-popover button {
   padding: 2px 10px; font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm); border: 1px solid;
 }
