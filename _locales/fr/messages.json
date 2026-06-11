@@ -1870,6 +1870,14 @@
   "tagGovQueuedBadge":   {
     "message": "En attente…"
   },
+  "tagGovTimeLeft":   {
+    "message": "encore ~$T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Instantané des tags téléchargé (sauvegarde — les fusions et suppressions sont irréversibles)"
   },

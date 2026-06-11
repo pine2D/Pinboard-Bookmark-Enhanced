@@ -1870,6 +1870,14 @@
   "tagGovQueuedBadge":   {
     "message": "Queued…"
   },
+  "tagGovTimeLeft":   {
+    "message": "about $T$ left",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag snapshot downloaded (backup — merges and deletions cannot be undone)"
   },

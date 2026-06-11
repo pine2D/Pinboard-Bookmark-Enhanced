@@ -1870,6 +1870,14 @@
   "tagGovQueuedBadge":   {
     "message": "排隊中…"
   },
+  "tagGovTimeLeft":   {
+    "message": "約剩 $T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "已下載標籤快照（合併/刪除無法復原，此檔案留作還原備份）"
   },

@@ -1870,6 +1870,14 @@
   "tagGovQueuedBadge":   {
     "message": "W kolejce…"
   },
+  "tagGovTimeLeft":   {
+    "message": "pozostało ok. $T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Pobrano migawkę tagów (kopia zapasowa — scalenia i usunięcia są nieodwracalne)"
   },

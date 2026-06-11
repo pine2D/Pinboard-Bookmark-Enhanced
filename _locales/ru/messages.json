@@ -1870,6 +1870,14 @@
   "tagGovQueuedBadge":   {
     "message": "В очереди…"
   },
+  "tagGovTimeLeft":   {
+    "message": "осталось ~$T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Снимок меток скачан (резервная копия — слияния и удаления необратимы)"
   },

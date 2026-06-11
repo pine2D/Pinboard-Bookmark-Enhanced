@@ -1870,6 +1870,14 @@
   "tagGovQueuedBadge":   {
     "message": "待機中…"
   },
+  "tagGovTimeLeft":   {
+    "message": "残り約 $T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "タグのスナップショットをダウンロードしました（統合・削除は元に戻せないため、復元用のバックアップです）"
   },

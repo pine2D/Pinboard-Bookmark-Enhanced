@@ -1390,6 +1390,11 @@ async function ensureTagSnapshot() {
   }
 }
 
+// Format a seconds estimate: "45s" under 90s, whole minutes above.
+function formatTagGovEst(seconds) {
+  return seconds < 90 ? Math.ceil(seconds) + "s" : Math.ceil(seconds / 60) + " min";
+}
+
 async function confirmMergeGroup(group, canonical, anchorEl) {
   if (!group || !group.members || group.members.length === 0) return;
   const plan = pbpTagGovBuildPlan(group.members, canonical);
@@ -1403,7 +1408,7 @@ async function confirmMergeGroup(group, canonical, anchorEl) {
   const bookmarkCount = group.members.reduce((sum, m) =>
     (m && m.tag && m.tag.toLowerCase() !== canonLower) ? sum + (m.count || 0) : sum, 0);
   const estSec = Math.ceil((renames.length + bookmarkCount) * 3.2);
-  const estStr = estSec < 90 ? estSec + "s" : Math.ceil(estSec / 60) + " min";
+  const estStr = formatTagGovEst(estSec);
   const msg = t("tagGovConfirmMerge", String(renames.length), canonical)
     + (summary ? ": " + summary : "")
     + "\n" + t("tagGovMergeEstimate", estStr);
@@ -1756,7 +1761,11 @@ async function _runTagGovBatch(ops) {
             fill.style.width = Math.round(((i + done / total) / ops.length) * 100) + "%";
           }
           if (ptext) {
-            ptext.innerHTML = opLine + " " + t("tagGovRetagProgress", String(done), String(total)) + queueSuffix();
+            // Live ETA from the REAL bookmark total — the confirm-time estimate came
+            // from possibly-stale cached counts. Upcoming ops add one posts/all each.
+            const remainSec = (total - done) * 3.2 + (ops.length - i - 1) * 3.2;
+            const eta = remainSec >= 3 ? " · " + t("tagGovTimeLeft", formatTagGovEst(remainSec)) : "";
+            ptext.innerHTML = opLine + " " + t("tagGovRetagProgress", String(done), String(total)) + eta + queueSuffix();
           }
         });
         // Collect partial results BEFORE the abort check — an aborted op returns the

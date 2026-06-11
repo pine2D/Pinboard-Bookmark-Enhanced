@@ -1870,6 +1870,14 @@
   "tagGovQueuedBadge":   {
     "message": "In Warteschlange…"
   },
+  "tagGovTimeLeft":   {
+    "message": "noch ca. $T$",
+    "placeholders": {
+      "T": {
+        "content": "$1"
+      }
+    }
+  },
   "tagGovSnapshotSaved":   {
     "message": "Tag-Snapshot heruntergeladen (Sicherung — Zusammenführungen und Löschungen können nicht rückgängig gemacht werden)"
   },
