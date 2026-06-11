@@ -1498,6 +1498,10 @@ let _tagGovUnfinishedBatches = 0;
 // run and reset when a fresh run starts (counter at zero).
 const _tagGovProblems = [];
 const TAG_GOV_PROBLEMS_CAP = 20;
+// Run-level totals shown in the done summary, accumulated across the queued batches
+// of one run: per-batch numbers alone hid earlier batches' failures — only the last
+// batch's summary survived on screen while the problems list was cross-batch.
+const _tagGovRunTotals = { ok: 0, fail: 0, skipped: 0 };
 
 // Render the manual-attention list under the progress row: failed re-saves and
 // skipped over-budget bookmarks, each linking to pinboard's edit form for that URL.
@@ -1536,7 +1540,13 @@ function renderTagGovProblems() {
 }
 
 function runTagGovOps(ops) {
-  if (_tagGovUnfinishedBatches === 0) _tagGovProblems.length = 0; // fresh run: reset the list
+  if (_tagGovUnfinishedBatches === 0) {
+    // fresh run: reset the cross-batch accumulators
+    _tagGovProblems.length = 0;
+    _tagGovRunTotals.ok = 0;
+    _tagGovRunTotals.fail = 0;
+    _tagGovRunTotals.skipped = 0;
+  }
   _tagGovUnfinishedBatches++;
   const run = _tagGovBatchChain.then(() =>
     _runTagGovBatch(ops).finally(() => { _tagGovUnfinishedBatches--; })
@@ -1661,11 +1671,15 @@ async function _runTagGovBatch(ops) {
 
   if (fill && !aborted) fill.style.width = "100%";
 
+  _tagGovRunTotals.ok += ok;
+  _tagGovRunTotals.fail += fail;
+  _tagGovRunTotals.skipped += skippedTotal;
+
   if (ptext) {
     ptext.textContent = aborted
       ? t("tagGovAborted429")
-      : t("tagGovDoneSummary", String(ok), String(fail))
-        + (skippedTotal > 0 ? " · " + t("tagGovSkippedSummary", String(skippedTotal)) : "");
+      : t("tagGovDoneSummary", String(_tagGovRunTotals.ok), String(_tagGovRunTotals.fail))
+        + (_tagGovRunTotals.skipped > 0 ? " · " + t("tagGovSkippedSummary", String(_tagGovRunTotals.skipped)) : "");
     // The manual-attention list renders below the (viewport-pinned) progress row, at
     // the bottom of the panel — out of sight when scrolled up. Link to it explicitly.
     if (_tagGovProblems.length > 0) {
@@ -1683,11 +1697,18 @@ async function _runTagGovBatch(ops) {
   }
   renderTagGovProblems();
 
-  try { await chrome.storage.local.remove("cached_user_tags"); } catch (_) {}
-  const fresh = await loadTagCounts(true);
-  if (fresh) updateTagGovOverview(fresh);
-  await renderTagGov();
-  await renderLowCountTags();
+  // Refresh detection/UI only when this is the last batch in the queue: a mid-queue
+  // renderTagGov() rebuilt the group rows under the user (resetting a canonical radio
+  // they had just changed — risking a merge in the wrong direction) and burned one
+  // forced tags/get per batch. The old pre-purge of cached_user_tags was redundant —
+  // loadTagCounts(true) bypasses and rewrites the cache itself — and cleared popup
+  // autocomplete's cache whenever the refetch failed.
+  if (_tagGovUnfinishedBatches === 1) {
+    const fresh = await loadTagCounts(true);
+    if (fresh) updateTagGovOverview(fresh);
+    await renderTagGov();
+    await renderLowCountTags();
+  }
 
   return { ok, fail, aborted };
 }
