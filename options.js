@@ -1545,6 +1545,17 @@ function runTagGovOps(ops) {
   return run;
 }
 
+// Warn before leaving while batches are running/queued. Completed re-saves persist
+// server-side; re-running the same merge after a reload resumes safely (posts/all
+// only returns still-untagged bookmarks) — but the rest of the running batch and
+// every queued batch would be silently dropped.
+window.addEventListener("beforeunload", (e) => {
+  if (_tagGovUnfinishedBatches > 0) {
+    e.preventDefault();
+    e.returnValue = ""; // required by Chrome to show the native confirmation
+  }
+});
+
 async function _runTagGovBatch(ops) {
   if (!ops || ops.length === 0) return { ok: 0, fail: 0, aborted: false };
   const token = await getTagGovToken();
