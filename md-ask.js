@@ -1236,9 +1236,18 @@ function _pbpExplainEnsurePop() {
       lab.appendChild(document.createTextNode(" " + label));
       menu.appendChild(lab);
     });
-  gear.addEventListener("click", () => {
+  gear.addEventListener("click", (e) => {
+    e.stopPropagation(); // don't let this same click trigger the outside-close below
     menu.hidden = !menu.hidden;
     gear.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+  // Click anywhere outside the gear (but still inside the popover) closes the
+  // menu; a click outside the popover light-dismisses the whole popover.
+  pop.addEventListener("click", (e) => {
+    if (!menu.hidden && !gearWrap.contains(e.target)) {
+      menu.hidden = true;
+      gear.setAttribute("aria-expanded", "false");
+    }
   });
   gearWrap.appendChild(gear);
   gearWrap.appendChild(menu);
@@ -1248,9 +1257,14 @@ function _pbpExplainEnsurePop() {
   pop.appendChild(head);
   pop.appendChild(body);
   pop.appendChild(foot);
-  // Light dismiss / Esc: abort any in-flight stream when the popover closes.
+  // Light dismiss / Esc: abort any in-flight stream when the popover closes,
+  // and reset the gear menu so it reopens closed (the popover element is reused).
   pop.addEventListener("toggle", (e) => {
-    if (e.newState === "closed" && _pbpExplainAbort) _pbpExplainAbort.abort();
+    if (e.newState === "closed") {
+      if (_pbpExplainAbort) _pbpExplainAbort.abort();
+      menu.hidden = true;
+      gear.setAttribute("aria-expanded", "false");
+    }
   });
   document.body.appendChild(pop);
   _pbpExplainPopEl = pop;

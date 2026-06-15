@@ -409,6 +409,13 @@ async function _pbpTrStart(st) {
   st.ctrl = new AbortController();
   pbpAiBumpCounter("translate");
   _pbpTrSetStatus(st, "translating");
+  // Progressive display: reveal the view toggle and switch to bilingual NOW so
+  // each .pb-tr appears the moment its block fills, instead of the user staring
+  // at the original until the whole article finishes. Not persisted mid-run;
+  // the final mode is persisted on completion below. (User may click Original
+  // mid-run to opt out, or Translated-only.)
+  _pbpTrShowViewToggle(st);
+  if (st.mode === "original") _pbpTrSetMode(st, "bilingual", false);
 
   // Context enrichment: reuse the ALREADY-CACHED AI summary if present
   // (never generates one — strict user-invoked rule). Source mirrors the
@@ -474,13 +481,12 @@ async function _pbpTrStart(st) {
     try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, newly); } catch (_) {}
   }
   const doneAll = st.work.every((w) => (w.n in st.trMd));
-  if (doneAll) {
-    _pbpTrSetStatus(st, "done");
-    _pbpTrShowViewToggle(st);
-    if (st.mode === "original") _pbpTrSetMode(st, "bilingual", true);
-  } else {
-    _pbpTrSetStatus(st, "partial");                 // Stop / failures: Continue
-    if (Object.keys(st.trMd).length) _pbpTrShowViewToggle(st);
+  _pbpTrSetStatus(st, doneAll ? "done" : "partial"); // partial = Stop / failures: Continue
+  // Toggle is already shown and the mode already switched to bilingual at the
+  // start of the run; persist the FINAL mode (unless the user switched back to
+  // Original mid-run, in which case there is nothing translated to remember).
+  if (st.mode !== "original") {
+    pbpTrViewSet(st.url, { mode: st.mode, lang: st.target.code }).catch(() => {});
   }
 }
 
