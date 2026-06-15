@@ -230,6 +230,7 @@ async function _pbpAskClearThread() {
   const chips = document.getElementById("ask-chips");
   if (chips) chips.hidden = false;
   if (_pbpAskState) await pbpAskHistSet(_pbpAskState.url, []);
+  _pbpAskHistRestored = false;
 }
 
 // Send-flow seam: _pbpAskSend lands in the next task (same file, function
@@ -806,7 +807,7 @@ function _pbpAskEnsureClear() {
     btn.type = "button";
     btn.id = "ask-clear";
     btn.className = "ask-clear-btn";
-    btn.textContent = t("askClearYes");
+    btn.textContent = t("askClear");
     thread.parentNode.insertBefore(btn, thread);
   }
   btn.hidden = false;
@@ -846,7 +847,10 @@ function _pbpAskShowClearConfirm() {
   strip.appendChild(yes);
   strip.appendChild(no);
   thread.parentNode.insertBefore(strip, thread);
+  let cleared = false;
   yes.addEventListener("click", async () => {
+    if (cleared) return;
+    cleared = true;
     strip.remove();
     const clearBtn = document.getElementById("ask-clear");
     if (clearBtn) clearBtn.hidden = true;
@@ -919,4 +923,4 @@ document.addEventListener("pbp:rendered", (e) => {
     });
     mo.observe(document.body, { childList: true, subtree: true });
   }).catch(() => {});
-});
+}, { once: true });
