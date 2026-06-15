@@ -554,5 +554,48 @@ suite("pbpAiFuzzyFind", () => {
     assert(pbpAiFuzzyFind("a", "") === null, "empty haystack");
   });
 });
+
+// ============ Task 6: gating + model override ============
+suite("pbpAiAvailable / pbpAiResolveModelOverride", () => {
+  test("enabled + key present -> true", () => {
+    assert(pbpAiAvailable({ previewAiEnabled: true, aiProvider: "gemini", geminiApiKey: "k" }) === true, "on+key");
+  });
+  test("key missing -> false even when enabled", () => {
+    assert(pbpAiAvailable({ previewAiEnabled: true, aiProvider: "gemini", geminiApiKey: "" }) === false, "no key");
+  });
+  test("master switch off -> false even with ollama", () => {
+    assert(pbpAiAvailable({ previewAiEnabled: false, aiProvider: "ollama" }) === false, "off");
+  });
+  test("previewAiEnabled undefined treated as enabled (default true)", () => {
+    assert(pbpAiAvailable({ aiProvider: "ollama" }) === true, "undefined !== false");
+  });
+  test("model override trims; empty/whitespace -> undefined", () => {
+    assert(pbpAiResolveModelOverride({ previewAiModel: " gpt-x " }) === "gpt-x", "trimmed");
+    assert(pbpAiResolveModelOverride({ previewAiModel: "   " }) === undefined, "whitespace");
+    assert(pbpAiResolveModelOverride({}) === undefined, "absent");
+  });
+});
+
+// ============ Task 6: IDB key conventions + ask-history cap ============
+suite("md-ai IDB key conventions", () => {
+  test("tr_ key = tr_<lang>_<model>_<urlHash>", () => {
+    const k = _pbpTrCacheKey("https://a.test/x", "zh-CN", "gemini-2.5-flash-lite");
+    assert(k === "tr_zh-CN_gemini-2.5-flash-lite_" + pbpAiHash("https://a.test/x"), "got: " + k);
+  });
+  test("ask_/trview_ keys hash the url", () => {
+    assert(_pbpAskHistKey("https://a.test/x") === "ask_" + pbpAiHash("https://a.test/x"), "ask key");
+    assert(_pbpTrViewKey("https://a.test/x") === "trview_" + pbpAiHash("https://a.test/x"), "trview key");
+  });
+  test("ask history trimmed to last 20, oldest dropped", () => {
+    const arr = [];
+    for (let i = 1; i <= 25; i++) arr.push({ q: "q" + i });
+    const t = _pbpAskHistTrim(arr);
+    assert(t.length === 20, "cap 20, got " + t.length);
+    assert(t[0].q === "q6" && t[19].q === "q25", "oldest dropped");
+  });
+  test("ask history trim tolerates non-array", () => {
+    assert(Array.isArray(_pbpAskHistTrim(null)) && _pbpAskHistTrim(null).length === 0, "null -> []");
+  });
+});
 </script>
 </body></html>

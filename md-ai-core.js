@@ -300,3 +300,108 @@ function pbpAiFuzzyFind(needle, haystack) {
   if (bestStart === -1 || bestDist > budget) return null;
   return mapBack(bestStart, Math.min(bestStart + win, hay.text.length));
 }
+
+// ---- Settings (md-preview page) ----
+// Same area-resolution pattern as md-preview.js: optSyncEnabled lives in
+// storage.local and decides whether settings are in sync or local. Reading
+// chrome.storage.sync directly would miss every sync-off (default) user.
+// Memoized: md-preview is a short-lived single-render page.
+let _pbpAiAreaPromise = null;
+let _pbpAiSettingsPromise = null;
+
+function pbpAiSettingsArea() {
+  if (!_pbpAiAreaPromise) {
+    _pbpAiAreaPromise = chrome.storage.local.get({ optSyncEnabled: false })
+      .then(({ optSyncEnabled }) => (optSyncEnabled ? chrome.storage.sync : chrome.storage.local));
+  }
+  return _pbpAiAreaPromise;
+}
+
+function pbpAiGetSettings() {
+  if (!_pbpAiSettingsPromise) {
+    _pbpAiSettingsPromise = pbpAiSettingsArea()
+      .then((area) => area.get(SETTINGS_DEFAULTS))
+      .then((s) => deobfuscateSettings(s));
+  }
+  return _pbpAiSettingsPromise;
+}
+
+// Gate: master switch on AND a usable AI key (hasAIKey from ai.js; ollama
+// counts as keyed). False -> no md-ai entry point renders at all.
+function pbpAiAvailable(s) {
+  return s.previewAiEnabled !== false && hasAIKey(s);
+}
+
+function pbpAiResolveModelOverride(s) {
+  const m = (s && typeof s.previewAiModel === "string") ? s.previewAiModel.trim() : "";
+  return m || undefined;
+}
+
+// ---- IDB persistence: thin wrappers over ai-cache.js (pbpAiCacheGet/Set).
+// ONE aggregated entry per article per (lang, model) so the 200-entry LRU
+// is not flooded by per-block writes. Entry shape: {key, result, ts}.
+const PBP_ASK_HIST_MAX = 20;
+
+function _pbpTrCacheKey(url, lang, model) {
+  return "tr_" + lang + "_" + model + "_" + pbpAiHash(String(url || ""));
+}
+function _pbpAskHistKey(url) { return "ask_" + pbpAiHash(String(url || "")); }
+function _pbpTrViewKey(url) { return "trview_" + pbpAiHash(String(url || "")); }
+function _pbpAskHistTrim(arr) {
+  return Array.isArray(arr) ? arr.slice(-PBP_ASK_HIST_MAX) : [];
+}
+
+async function pbpTrCacheGet(url, lang, model) {
+  const entry = await pbpAiCacheGet(_pbpTrCacheKey(url, lang, model));
+  const r = entry && entry.result;
+  if (!r || typeof r !== "object" || !r.blocks || typeof r.blocks !== "object") return null;
+  return { blocks: r.blocks };
+}
+
+async function pbpTrCacheSet(url, lang, model, blocksMap) {
+  const key = _pbpTrCacheKey(url, lang, model);
+  const prev = await pbpAiCacheGet(key);
+  const prevBlocks = (prev && prev.result && prev.result.blocks
+    && typeof prev.result.blocks === "object") ? prev.result.blocks : {};
+  const merged = Object.assign({}, prevBlocks, blocksMap || {});
+  await pbpAiCacheSet(key, { blocks: merged }, Date.now());
+}
+
+async function pbpAskHistGet(url) {
+  const entry = await pbpAiCacheGet(_pbpAskHistKey(url));
+  return (entry && Array.isArray(entry.result)) ? entry.result : [];
+}
+
+async function pbpAskHistSet(url, arr) {
+  await pbpAiCacheSet(_pbpAskHistKey(url), _pbpAskHistTrim(arr), Date.now());
+}
+
+async function pbpTrViewGet(url) {
+  const entry = await pbpAiCacheGet(_pbpTrViewKey(url));
+  const r = entry && entry.result;
+  if (!r || typeof r !== "object" || typeof r.mode !== "string") return null;
+  return { mode: r.mode, lang: String(r.lang || "") };
+}
+
+async function pbpTrViewSet(url, state) {
+  await pbpAiCacheSet(_pbpTrViewKey(url), {
+    mode: String((state && state.mode) || "original"),
+    lang: String((state && state.lang) || "")
+  }, Date.now());
+}
+
+// ---- Local usage counters (storage.local only, NO telemetry; spec sec 11:
+// keep/deepen/kill decision after three months). Fire-and-forget.
+function pbpAiBumpCounter(name) {
+  try {
+    if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
+    chrome.storage.local.get({ pbp_ai_usage: { explain: 0, ask: 0, translate: 0 } })
+      .then((d) => {
+        const u = (d && d.pbp_ai_usage && typeof d.pbp_ai_usage === "object")
+          ? d.pbp_ai_usage : { explain: 0, ask: 0, translate: 0 };
+        u[name] = (u[name] || 0) + 1;
+        return chrome.storage.local.set({ pbp_ai_usage: u });
+      })
+      .catch(() => {});
+  } catch (_) {}
+}

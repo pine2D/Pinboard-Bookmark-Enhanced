@@ -220,7 +220,11 @@ function ensureKatex() {
     };
   }
   function buildExportMarkdown() {
-    return composeExport(getMarkdown(), buildMeta(), buildExportOpts());
+    // Export follows the translation view: md-translate.js sets
+    // window.pbpViewMarkdown when the view is bilingual/translated-only;
+    // it returns null (or is undefined) for the original view.
+    const viewMd = (typeof window.pbpViewMarkdown === "function") ? window.pbpViewMarkdown() : null;
+    return composeExport(viewMd || getMarkdown(), buildMeta(), buildExportOpts());
   }
 
   // Fill header
@@ -383,6 +387,13 @@ function ensureKatex() {
     setupScrollSpy(renderedView, tocList);
   }
   setupDrawer();
+
+  // Notify the md-ai layer (md-ai-core / md-translate / md-ask) that the
+  // article DOM is final. Fires even when the TOC is absent. detail.url is
+  // the cache-key source for tr_/ask_/trview_ entries (md_preview_data is
+  // already removed from storage at this point; the page holds the markdown
+  // in closure and md-ai reads text via the DOM blocks).
+  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title } }));
 
   // Raw view populated lazily on first switch
 

@@ -180,7 +180,13 @@ const SETTINGS_DEFAULTS = {
   waybackArchiveEnabled: false,
   waybackArchiveBatch: false,
   waybackS3Key: "",
-  waybackS3Secret: ""
+  waybackS3Secret: "",
+  // md-preview in-page AI (explain / ask / translate)
+  previewAiEnabled: true,
+  previewAiModel: "",
+  translateTargetLang: "auto",
+  translateGlossary: "",
+  selectionTrigger: "icon"
 };
 
 // ---- Tag case normalization helpers ----
