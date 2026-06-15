@@ -1068,3 +1068,346 @@ function pbpExplainInit(detail) {
 }
 
 document.addEventListener("pbp:rendered", (e) => pbpExplainInit((e && e.detail) || {}), { once: true });
+
+// ===========================================================================
+// Task 17: explain popover — length routing / sentence scan / context pack /
+// streamed answer into an HTML Popover. Appended after Task 16's pill/hotkey.
+// ===========================================================================
+
+// ---- Explain: length routing (spec 5.3) ----
+// <=4 whitespace-separated words -> define-in-context; CJK selections carry
+// no spaces, so a spaceless run containing CJK counts as a term up to 8
+// chars; a spaceless non-CJK run is one word, hence always a term.
+function pbpExplainIsTerm(text) {
+  const s = String(text == null ? "" : text).trim();
+  if (!s) return false;
+  if (/\s/.test(s)) return s.split(/\s+/).length <= 4;
+  // Han + Kana (inside U+2E80-U+9FFF) / Hangul / CJK Compatibility Ideographs
+  if (/[\u2E80-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/.test(s)) return s.length <= 8;
+  return true;
+}
+
+// ---- Explain: sentence-boundary scan around [start, end) ----
+// Backward from start to the previous boundary (exclusive), forward from end
+// through the next boundary (inclusive). Boundaries: . ! ? ; newline and
+// their CJK forms. No boundary found -> text edge. Result is trimmed.
+function pbpExplainSentenceAround(text, start, end) {
+  const s = String(text == null ? "" : text);
+  const n = s.length;
+  const a = Math.max(0, Math.min(Number(start) || 0, n));
+  const b = Math.max(a, Math.min(Number(end) || 0, n));
+  const isBoundary = (c) => ".!?;\n".indexOf(c) !== -1 || "。！？；".indexOf(c) !== -1;
+  let from = 0;
+  for (let i = a - 1; i >= 0; i--) {
+    if (isBoundary(s[i])) { from = i + 1; break; }
+  }
+  let to = n;
+  for (let i = b; i < n; i++) {
+    if (isBoundary(s[i])) { to = i + 1; break; }
+  }
+  return s.slice(from, to).trim();
+}
+
+// ---- Explain: answer language = the READER's UI language ----
+// Maps uiLangToBCP47() (md-preview.js) output to a human language name for
+// the prompt. The 9 supported UI locales; anything else answers in English.
+const PBP_EXPLAIN_LANG_NAMES = {
+  "zh-Hans": "Simplified Chinese",
+  "zh-Hant": "Traditional Chinese",
+  "ja": "Japanese",
+  "ko": "Korean",
+  "en": "English",
+  "de": "German",
+  "fr": "French",
+  "pl": "Polish",
+  "ru": "Russian"
+};
+function pbpExplainLangName(bcp47) {
+  return PBP_EXPLAIN_LANG_NAMES[bcp47] || "English";
+}
+
+// ---- Explain: prompt builder (pure) ----
+function pbpExplainBuildPrompt(p) {
+  const isTerm = !!p.isTerm;
+  const system = "You are a precise reading assistant embedded in an article viewer. " +
+    "Answer in " + p.answerLang + ". Use the article context to disambiguate meaning. " +
+    "Output plain markdown prose only: no headings, no preamble, no restating the question. " +
+    (isTerm
+      ? "Define the selected term as it is used in THIS article in 2-4 sentences, then add one sentence on why it matters here."
+      : "Explain the selected passage in 3-6 sentences: what it says and what it implies in this article's argument.");
+  const parts = [];
+  parts.push("Article title: " + (p.title || "(untitled)"));
+  if (p.prevText) parts.push("Previous paragraph:\n" + p.prevText);
+  parts.push("Paragraph containing the selection:\n" + p.blockText);
+  if (p.nextText) parts.push("Next paragraph:\n" + p.nextText);
+  parts.push("Full sentence containing the selection:\n" + p.sentence);
+  parts.push((isTerm ? "Selected term: " : "Selected passage: ") + '"' + p.selection + '"');
+  return { system, prompt: parts.join("\n\n") };
+}
+
+// ---- Explain: popover shell (lazy-mounted on first invoke) ----
+let _pbpExplainPopEl = null;
+let _pbpExplainAbort = null;
+
+// Static inline SVG (Feather settings gear). Constant string, never model text.
+const PBP_EXPLAIN_GEAR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+
+// Footer transparency label: "<provider> · <model>" — override wins, else the
+// provider's configured model key (e.g. s.geminiModel), else provider alone.
+function _pbpExplainModelLabel(s) {
+  const p = s.aiProvider || "gemini";
+  const m = pbpAiResolveModelOverride(s) || (typeof s[p + "Model"] === "string" ? s[p + "Model"] : "");
+  return m ? p + " · " + m : p;
+}
+
+// Bridge into the ask panel: close the popover, open the panel, prefill the
+// question box with the quoted selection, focus it. Prefers the ask
+// section's opener when exposed; otherwise drives the contract-fixed shell
+// (#ask-panel + body.ask-open) directly.
+function _pbpExplainOpenAsk(selText) {
+  const prefill = '"' + selText + '" ';
+  if (typeof window.pbpAskOpenPanel === "function") {
+    window.pbpAskOpenPanel(prefill);
+    return;
+  }
+  const panel = document.getElementById("ask-panel");
+  if (!panel) return;
+  document.body.classList.add("ask-open");
+  const input = panel.querySelector("textarea");
+  if (input) {
+    input.value = prefill;
+    input.focus();
+  }
+}
+
+function _pbpExplainEnsurePop() {
+  if (_pbpExplainPopEl) return _pbpExplainPopEl;
+  const pop = document.createElement("div");
+  pop.id = "explain-pop";
+  pop.setAttribute("popover", "auto"); // top-layer + Esc + light-dismiss for free
+  const head = document.createElement("div");
+  head.className = "xp-head";
+  const term = document.createElement("span");
+  term.className = "xp-term";
+  head.appendChild(term);
+  const body = document.createElement("div");
+  body.className = "xp-body";
+  const foot = document.createElement("div");
+  foot.className = "xp-foot";
+  const model = document.createElement("span");
+  model.className = "xp-model";
+  const ask = document.createElement("button");
+  ask.type = "button";
+  ask.className = "xp-ask";
+  ask.textContent = t("explainAskMore");
+  ask.addEventListener("click", () => {
+    const selText = pop.querySelector(".xp-term").textContent;
+    try { pop.hidePopover(); } catch (_) {}
+    _pbpExplainOpenAsk(selText);
+  });
+  const gearWrap = document.createElement("span");
+  gearWrap.className = "xp-gear-wrap";
+  const gear = document.createElement("button");
+  gear.type = "button";
+  gear.className = "xp-gear";
+  gear.title = t("explainSettings");
+  gear.setAttribute("aria-label", t("explainSettings"));
+  gear.setAttribute("aria-expanded", "false");
+  gear.innerHTML = PBP_EXPLAIN_GEAR_SVG; // static constant, see above
+  const menu = document.createElement("div");
+  menu.className = "xp-gear-menu";
+  menu.hidden = true;
+  [["icon", t("explainTriggerIcon")], ["hotkey", t("explainTriggerHotkey")], ["off", t("explainTriggerOff")]]
+    .forEach(([value, label]) => {
+      const lab = document.createElement("label");
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "xp-trigger";
+      radio.value = value;
+      radio.addEventListener("change", async () => {
+        // On-the-spot trigger-ladder switch (spec 5.3), persisted to the
+        // SAME storage area options.js writes (sync when optSyncEnabled,
+        // else local). Takes effect immediately via the live module var.
+        _pbpExplainTrigger = value;
+        if (value !== "icon") _pbpExplainHidePill();
+        await (await pbpAiSettingsArea()).set({ selectionTrigger: value });
+      });
+      lab.appendChild(radio);
+      lab.appendChild(document.createTextNode(" " + label));
+      menu.appendChild(lab);
+    });
+  gear.addEventListener("click", () => {
+    menu.hidden = !menu.hidden;
+    gear.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+  gearWrap.appendChild(gear);
+  gearWrap.appendChild(menu);
+  foot.appendChild(model);
+  foot.appendChild(ask);
+  foot.appendChild(gearWrap);
+  pop.appendChild(head);
+  pop.appendChild(body);
+  pop.appendChild(foot);
+  // Light dismiss / Esc: abort any in-flight stream when the popover closes.
+  pop.addEventListener("toggle", (e) => {
+    if (e.newState === "closed" && _pbpExplainAbort) _pbpExplainAbort.abort();
+  });
+  document.body.appendChild(pop);
+  _pbpExplainPopEl = pop;
+  return pop;
+}
+
+// ---- Explain: context pack ----
+// Selection + full sentence + host block + one neighbor each side + title.
+// Caps keep the request bounded (output is the budget at 1024 tokens; input
+// stays comfortably small). Works on translated sibling blocks too (.pb-tr
+// is inserted by md-translate as the original block's nextSibling): the
+// original block text is sent alongside, labeled, per spec 5.3.
+const PBP_EXPLAIN_BLOCK_CAP = 4000;
+const PBP_EXPLAIN_NEIGHBOR_CAP = 1200;
+
+function _pbpExplainPackContext(cap) {
+  const view = document.getElementById("rendered-view");
+  // Ask/translate init owns the canonical pbpAiIndexBlocks call on
+  // pbp:rendered; this is only a lazy backfill (re-indexing resets caches).
+  if (view && !pbpAiBlocks().length) pbpAiIndexBlocks(view);
+  let node = cap.range.startContainer;
+  if (node && node.nodeType !== 1) node = node.parentElement;
+  const blockEl = node ? node.closest("#rendered-view > *") : null;
+  let n = 0;
+  let trText = "";
+  if (blockEl && blockEl.dataset.pb) {
+    n = Number(blockEl.dataset.pb);
+  } else if (blockEl && blockEl.classList.contains("pb-tr")
+      && blockEl.previousElementSibling && blockEl.previousElementSibling.dataset.pb) {
+    n = Number(blockEl.previousElementSibling.dataset.pb);
+    trText = blockEl.textContent || "";
+  }
+  const origText = n ? pbpAiTextOf(n) : ((blockEl && blockEl.textContent) || cap.text);
+  // The sentence is scanned in the text the selection actually lives in
+  // (the translated block when selecting inside .pb-tr).
+  const hostText = trText || origText;
+  const idx = hostText.indexOf(cap.text);
+  const sentence = idx === -1
+    ? cap.text
+    : pbpExplainSentenceAround(hostText, idx, idx + cap.text.length);
+  let blockText = origText.slice(0, PBP_EXPLAIN_BLOCK_CAP);
+  if (trText) {
+    blockText += "\n\nTranslated rendering of the same paragraph (the selection comes from this translation):\n"
+      + trText.slice(0, PBP_EXPLAIN_BLOCK_CAP);
+  }
+  const prevText = n > 1 ? pbpAiTextOf(n - 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
+  const nextText = (n && pbpAiBlockEl(n + 1)) ? pbpAiTextOf(n + 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
+  return { sentence, blockText, prevText, nextText };
+}
+
+// ---- Explain: streamed request into the popover body ----
+async function _pbpExplainRun(cap, ctx, pop) {
+  const s = _pbpExplainSettings || await pbpAiGetSettings();
+  const body = pop.querySelector(".xp-body");
+  // Skeleton: 3 shimmer lines + an SR-only loading announcement.
+  body.setAttribute("aria-busy", "true");
+  body.replaceChildren();
+  for (let i = 0; i < 3; i++) {
+    const sk = document.createElement("div");
+    sk.className = "xp-skel";
+    body.appendChild(sk);
+  }
+  const sr = document.createElement("span");
+  sr.className = "sr-only";
+  sr.textContent = t("explainLoading");
+  body.appendChild(sr);
+  // A new invocation aborts the previous in-flight request — this is also
+  // the double-click guard (no inflight dedup needed: the old stream dies).
+  if (_pbpExplainAbort) _pbpExplainAbort.abort();
+  const ctrl = new AbortController();
+  _pbpExplainAbort = ctrl;
+  const { system, prompt } = pbpExplainBuildPrompt({
+    selection: cap.text,
+    sentence: ctx.sentence,
+    blockText: ctx.blockText,
+    prevText: ctx.prevText,
+    nextText: ctx.nextText,
+    title: _pbpExplainPage.title || document.title,
+    answerLang: pbpExplainLangName(uiLangToBCP47()),
+    isTerm: pbpExplainIsTerm(cap.text)
+  });
+  pbpAiBumpCounter("explain"); // local usage counter, storage.local only
+  const stream = document.createElement("div");
+  stream.className = "xp-stream";
+  let started = false;
+  let pending = "";
+  let rafId = 0;
+  const flush = () => { rafId = 0; stream.textContent = pending; };
+  try {
+    // temperature intentionally omitted: callAIStream defaults to 0.3 (the
+    // existing ask/explain default). maxTokens 1024 per spec 5.3.
+    const full = await callAIStream(s, prompt, {
+      maxTokens: 1024,
+      model: pbpAiResolveModelOverride(s),
+      system,
+      signal: ctrl.signal
+    }, (delta, acc) => {
+      if (!started) { started = true; body.replaceChildren(stream); }
+      pending = acc; // markers can split across chunks: always render the accumulated text
+      if (!rafId) rafId = requestAnimationFrame(flush); // rAF-throttled DOM writes
+    });
+    if (rafId) cancelAnimationFrame(rafId);
+    // Final pass through the single sanitize point (renderMarkdown =
+    // marked + DOMPurify, md-convert.js). Never innerHTML raw model text.
+    const md = document.createElement("div");
+    md.className = "xp-md";
+    md.innerHTML = renderMarkdown(full);
+    body.replaceChildren(md);
+  } catch (e) {
+    if (rafId) cancelAnimationFrame(rafId);
+    if (e && e.name === "AbortError") return; // closed or re-invoked: silent
+    const wrap = document.createElement("div");
+    wrap.className = "xp-error";
+    const msg = document.createElement("p");
+    msg.textContent = (e && e.message) || "Request failed"; // handleAIError text, plain
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "xp-retry";
+    retry.textContent = t("explainErrRetry");
+    retry.addEventListener("click", () => _pbpExplainRun(cap, ctx, pop));
+    wrap.appendChild(msg);
+    wrap.appendChild(retry);
+    body.replaceChildren(wrap);
+  } finally {
+    body.removeAttribute("aria-busy");
+  }
+}
+
+// ---- Explain: open (called by pbpExplainInvoke, Task 16) ----
+// Everything needed is captured at invoke time: cap.rect is a FROZEN DOMRect
+// snapshot taken by pbpExplainInvoke before this runs, so positioning never
+// touches the live range. The block lookup below reads cap.range.startContainer
+// synchronously (before any await) — light dismiss only collapses the range
+// after this turn, so the DOM node is still valid here (spec 5.3).
+function _pbpExplainOpenPop(cap) {
+  const pop = _pbpExplainEnsurePop();
+  pop.querySelector(".xp-term").textContent = cap.text; // ellipsized via CSS
+  pop.querySelector(".xp-model").textContent = _pbpExplainModelLabel(_pbpExplainSettings || {});
+  // Gear radios mirror the live trigger value; menu starts closed.
+  const menu = pop.querySelector(".xp-gear-menu");
+  menu.hidden = true;
+  pop.querySelector(".xp-gear").setAttribute("aria-expanded", "false");
+  menu.querySelectorAll('input[type="radio"]').forEach((r) => {
+    r.checked = (r.value === _pbpExplainTrigger);
+  });
+  // Pack context first (reads the live DOM node synchronously), then show.
+  const ctx = _pbpExplainPackContext(cap);
+  const rect = cap.rect || cap.range.getBoundingClientRect(); // frozen snapshot
+  try { pop.hidePopover(); } catch (_) {} // re-invoke while open: reset first
+  pop.showPopover();
+  // Anchor near the selection: measure after showPopover, clamp to viewport,
+  // flip above when the bottom is too close.
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  const x = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - pw - 8));
+  let y = rect.bottom + 8;
+  if (y + ph > window.innerHeight - 8) y = Math.max(8, rect.top - ph - 8);
+  pop.style.left = x + "px";
+  pop.style.top = y + "px";
+  _pbpExplainRun(cap, ctx, pop);
+}

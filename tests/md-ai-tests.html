@@ -1302,4 +1302,100 @@ suiteIf("pbpExplainSelectionValid", "pbpAskInit", () => {
   });
 });
 </script>
+
+<script>
+// ============ Task 17: explain routing / sentence scan / prompt ============
+suiteIf("pbpExplainIsTerm", "pbpAskInit", () => {
+  test("up to 4 words is a term", () => {
+    assertEq(pbpExplainIsTerm("gradient descent"), true, "2 words");
+    assertEq(pbpExplainIsTerm("large language model alignment"), true, "4 words");
+  });
+  test("5+ words is a passage", () => {
+    assertEq(pbpExplainIsTerm("the quick brown fox jumps"), false, "5 words");
+  });
+  test("spaceless CJK: term up to 8 chars", () => {
+    assertEq(pbpExplainIsTerm("反向传播"), true, "4 chars");
+    assertEq(pbpExplainIsTerm("大语言模型对齐"), true, "7 chars");
+    assertEq(pbpExplainIsTerm("梯度消失与梯度爆炸"), false, "9 chars");
+  });
+  test("single latin token is a term regardless of length", () => {
+    assertEq(pbpExplainIsTerm("backpropagation"), true, "long single word");
+  });
+  test("blank is not a term", () => {
+    assertEq(pbpExplainIsTerm("   "), false, "blank");
+  });
+});
+
+suiteIf("pbpExplainSentenceAround", "pbpAskInit", () => {
+  test("expands to surrounding sentence boundaries", () => {
+    const txt = "First sentence here. The TARGET word sits in this one! Third sentence.";
+    const i = txt.indexOf("TARGET");
+    assertEq(pbpExplainSentenceAround(txt, i, i + 6), "The TARGET word sits in this one!", "middle sentence");
+  });
+  test("CJK punctuation boundaries", () => {
+    const txt = "第一句话。目标词在第二句话里！第三句。";
+    const i = txt.indexOf("目标词");
+    assertEq(pbpExplainSentenceAround(txt, i, i + 3), "目标词在第二句话里！", "CJK sentence");
+  });
+  test("no boundary anywhere -> whole text", () => {
+    assertEq(pbpExplainSentenceAround("no punctuation at all", 3, 5), "no punctuation at all", "whole");
+  });
+  test("selection at text start / end", () => {
+    const txt = "Alpha beta. Gamma delta";
+    assertEq(pbpExplainSentenceAround(txt, 0, 5), "Alpha beta.", "head");
+    assertEq(pbpExplainSentenceAround(txt, txt.indexOf("Gamma"), txt.length), "Gamma delta", "tail");
+  });
+});
+
+suiteIf("pbpExplainLangName", "pbpAskInit", () => {
+  test("maps known UI tags", () => {
+    assertEq(pbpExplainLangName("zh-Hans"), "Simplified Chinese", "hans");
+    assertEq(pbpExplainLangName("zh-Hant"), "Traditional Chinese", "hant");
+    assertEq(pbpExplainLangName("ja"), "Japanese", "ja");
+    assertEq(pbpExplainLangName("pl"), "Polish", "pl");
+  });
+  test("unknown tag falls back to English", () => {
+    assertEq(pbpExplainLangName("xx"), "English", "fallback");
+    assertEq(pbpExplainLangName(""), "English", "empty");
+  });
+});
+
+suiteIf("pbpExplainBuildPrompt", "pbpAskInit", () => {
+  const base = {
+    selection: "gradient descent",
+    sentence: "We use gradient descent to fit it.",
+    blockText: "Block text here. We use gradient descent to fit it.",
+    prevText: "Previous block.",
+    nextText: "Next block.",
+    title: "Intro to ML",
+    answerLang: "Simplified Chinese"
+  };
+  test("term mode: define-in-context instructions", () => {
+    const r = pbpExplainBuildPrompt(Object.assign({}, base, { isTerm: true }));
+    assert(r.system.indexOf("Simplified Chinese") !== -1, "answer language in system");
+    assert(r.system.indexOf("Define the selected term") !== -1, "term branch");
+    assert(r.prompt.indexOf('Selected term: "gradient descent"') !== -1, "term labeled");
+  });
+  test("passage mode: explain instructions", () => {
+    const r = pbpExplainBuildPrompt(Object.assign({}, base, { isTerm: false }));
+    assert(r.system.indexOf("Explain the selected passage") !== -1, "passage branch");
+    assert(r.prompt.indexOf('Selected passage: "gradient descent"') !== -1, "passage labeled");
+  });
+  test("prompt carries title, neighbors, block and sentence in order", () => {
+    const r = pbpExplainBuildPrompt(Object.assign({}, base, { isTerm: true }));
+    const iTitle = r.prompt.indexOf("Article title: Intro to ML");
+    const iPrev = r.prompt.indexOf("Previous paragraph:\nPrevious block.");
+    const iBlock = r.prompt.indexOf("Paragraph containing the selection:");
+    const iNext = r.prompt.indexOf("Next paragraph:\nNext block.");
+    const iSent = r.prompt.indexOf("Full sentence containing the selection:");
+    assert(iTitle !== -1 && iPrev !== -1 && iBlock !== -1 && iNext !== -1 && iSent !== -1, "all parts present");
+    assert(iTitle < iPrev && iPrev < iBlock && iBlock < iNext && iNext < iSent, "document order");
+  });
+  test("empty neighbors omitted", () => {
+    const r = pbpExplainBuildPrompt(Object.assign({}, base, { prevText: "", nextText: "", isTerm: true }));
+    assert(r.prompt.indexOf("Previous paragraph") === -1, "no prev");
+    assert(r.prompt.indexOf("Next paragraph") === -1, "no next");
+  });
+});
+</script>
 </body></html>
