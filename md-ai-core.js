@@ -196,7 +196,7 @@ function pbpAiMakeStreamJsonParser(onItem) {
           }
         } catch (_) {}
       }
-      return { seenIds: seen };
+      return { seenIds: new Set(seen) };
     }
   };
 }
@@ -217,7 +217,8 @@ function pbpAiParseCites(fullText) {
   if (!last) return { body: text.trim(), cites: [] };
   const body = text.slice(0, last.index).trim();
   const cites = [];
-  for (const line of text.slice(last.index + last[0].length).split("\n")) {
+  for (let line of text.slice(last.index + last[0].length).split("\n")) {
+    line = line.replace(/\r$/, "");
     const lm = line.match(/^[ \t]*[-*]?[ \t]*P(\d+)[ \t]*:[ \t]*(.+)$/);
     if (!lm) continue;
     const quote = lm[2].trim()
@@ -234,6 +235,10 @@ function pbpAiParseCites(fullText) {
 // the Range/highlight, or null. Exact indexOf first; else sliding fixed-size
 // window with capped (banded) Levenshtein, budget = floor(needleLen/5)
 // (spec: ~1 error per 5 chars).
+// Note: the match window is fixed at the needle's normalized length, so when
+// the needle is shorter than the true match (a deletion), the returned end
+// offset can be up to budget chars short on the trailing edge -- acceptable
+// for approximate citation highlighting.
 function _pbpAiNormWithMap(s) {
   const chars = [];
   const map = [];
@@ -283,7 +288,7 @@ function pbpAiFuzzyFind(needle, haystack) {
   let bestDist = budget + 1;
   let bestStart = -1;
   for (let i = 0; i < hay.text.length; i++) {
-    const slice = hay.text.substr(i, win);
+    const slice = hay.text.slice(i, i + win);
     if (slice.length < win - budget) break;
     const d = _pbpAiEditDistanceCapped(nd.text, slice, Math.min(budget, bestDist - 1));
     if (d < bestDist) {

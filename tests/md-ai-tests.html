@@ -512,6 +512,12 @@ suite("pbpAiParseCites", () => {
     const r = pbpAiParseCites('Body text\nCITES:\nP4: "cut off mid quo');
     assert(r.cites.length === 1 && r.cites[0].p === 4, "partial line still parsed");
   });
+  test("CRLF line endings in CITES block: both citations parsed", () => {
+    const r = pbpAiParseCites('Body\nCITES:\nP1: "quote"\r\nP2: "second"');
+    assert(r.cites.length === 2, "2 cites, got " + r.cites.length);
+    assert(r.cites[0].p === 1 && r.cites[0].quote === "quote", "P1 parsed");
+    assert(r.cites[1].p === 2 && r.cites[1].quote === "second", "P2 parsed");
+  });
 });
 
 // ============ Task 5: pbpAiFuzzyFind ============
