@@ -977,5 +977,28 @@ suiteIf("pbpTrComposeView", "pbpTrComposeView", () => {
     assertEq(pbpTrComposeView("translated", null), "", "null");
   });
 });
+
+// ============ Task 12: md-ask.js panel shell ============
+suiteIf("pbpAskIsTypingTarget", "pbpAskIsTypingTarget", () => {
+  test("input/textarea/select are typing targets", () => {
+    assert(pbpAskIsTypingTarget(document.createElement("input")) === true, "input");
+    assert(pbpAskIsTypingTarget(document.createElement("textarea")) === true, "textarea");
+    assert(pbpAskIsTypingTarget(document.createElement("select")) === true, "select");
+  });
+  test("contenteditable element is a typing target", () => {
+    const d = document.createElement("div");
+    d.contentEditable = "true";
+    document.body.appendChild(d); // isContentEditable is only computed in-document
+    const r = pbpAskIsTypingTarget(d);
+    d.remove();
+    assert(r === true, "contenteditable");
+  });
+  test("plain elements and null are not typing targets", () => {
+    assert(pbpAskIsTypingTarget(document.createElement("p")) === false, "p");
+    assert(pbpAskIsTypingTarget(document.createElement("button")) === false, "button");
+    assert(pbpAskIsTypingTarget(document.body) === false, "body");
+    assert(pbpAskIsTypingTarget(null) === false, "null");
+  });
+});
 </script>
 </body></html>

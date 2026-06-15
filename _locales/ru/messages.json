@@ -2019,5 +2019,17 @@
   },
   "trShowOriginal": {
     "message": "Нажмите, чтобы временно показать оригинал"
+  },
+  "askOpen": {
+    "message": "Вопросы"
+  },
+  "askTitle": {
+    "message": "Спросить страницу"
+  },
+  "askClear": {
+    "message": "Очистить беседу"
+  },
+  "askClose": {
+    "message": "Закрыть"
   }
 }

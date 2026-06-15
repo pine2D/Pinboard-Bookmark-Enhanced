@@ -2019,5 +2019,17 @@
   },
   "trShowOriginal": {
     "message": "點擊暫時顯示原文"
+  },
+  "askOpen": {
+    "message": "問答"
+  },
+  "askTitle": {
+    "message": "向本頁提問"
+  },
+  "askClear": {
+    "message": "清空對話"
+  },
+  "askClose": {
+    "message": "關閉"
   }
 }

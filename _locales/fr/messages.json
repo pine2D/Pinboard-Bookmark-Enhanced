@@ -2019,5 +2019,17 @@
   },
   "trShowOriginal": {
     "message": "Cliquer pour afficher temporairement l'original"
+  },
+  "askOpen": {
+    "message": "Questions"
+  },
+  "askTitle": {
+    "message": "Interroger la page"
+  },
+  "askClear": {
+    "message": "Effacer la conversation"
+  },
+  "askClose": {
+    "message": "Fermer"
   }
 }

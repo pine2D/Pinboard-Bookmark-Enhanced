@@ -671,3 +671,118 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #tr-section .tr-meta[hidden] { display: none; }
 #tr-section .view-toggle { margin-top: 8px; }
 
+/* ---- Ask panel (md-ask.js): fixed right column on wide viewports ---- */
+#ask-panel {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+  z-index: 18; /* deliberately below .rail-scrim (19) and .rail (20) */
+}
+/* The flex rule above outspecifies the UA "[hidden]" rule - restate it. */
+#ask-panel[hidden] { display: none; }
+
+/* Third column: push the centered doc body away from the open panel. */
+body.ask-open main { margin-right: 396px; }
+
+.ask-head { display: flex; align-items: center; gap: 6px; }
+.ask-head h2 { flex: 1; font-size: 15px; font-weight: 600; margin: 0; }
+.ask-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  border: 1px solid transparent; border-radius: 6px;
+  background: none; color: var(--fg-muted); cursor: pointer;
+}
+.ask-ic:hover { background: var(--btn-hover); color: var(--fg); }
+.ask-ic:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.ask-ic svg { width: 15px; height: 15px; }
+#ask-section .ask-open-btn { width: 100%; justify-content: center; }
+.ask-open-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+#ask-thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+.ask-empty { font-size: 13px; color: var(--fg-muted); margin: 0; }
+.ask-q { font-weight: 600; font-size: 14px; color: var(--fg); margin-top: 8px; }
+.ask-q:first-child { margin-top: 0; }
+.ask-a { font-size: 14px; line-height: 1.65; color: var(--fg); overflow-wrap: break-word; }
+.ask-a > :first-child { margin-top: 0; }
+.ask-a > :last-child { margin-bottom: 0; }
+
+/* Starter chips. Every visual property is set here on purpose: the
+   citation-pipeline task later appends a bare .ask-chip rule for the tiny
+   superscript chips inside answers; this ID+class selector wins for the
+   starter chips regardless of source order. */
+#ask-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#ask-chips .ask-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  height: auto;
+  margin: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--btn-border);
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--fg-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+#ask-chips .ask-chip:hover { background: var(--btn-hover); border-color: var(--link); color: var(--fg); }
+
+#ask-form { display: flex; flex-direction: column; gap: 8px; }
+#ask-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 44px;
+  max-height: 160px;
+  padding: 8px 10px;
+  border: 1px solid var(--btn-border);
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#ask-input:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.ask-actions { display: flex; justify-content: flex-end; gap: 8px; }
+#ask-send svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+#ask-meta { min-height: 16px; font-size: 11px; line-height: 1.5; color: var(--fg-muted); }
+
+/* Narrow viewports: bottom sheet (same 1000px breakpoint as the rail drawer). */
+@media (max-width: 1000px) {
+  body.ask-open main { margin-right: 0; }
+  #ask-panel {
+    top: auto;
+    left: 0; right: 0; bottom: 0;
+    width: auto;
+    max-height: 70vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.18);
+  }
+}
+
+@media print {
+  #ask-panel, #ask-section { display: none; }
+  body.ask-open main { margin-right: 0; }
+}
+

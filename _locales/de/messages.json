@@ -2019,5 +2019,17 @@
   },
   "trShowOriginal": {
     "message": "Klicken, um Original vorübergehend anzuzeigen"
+  },
+  "askOpen": {
+    "message": "Fragen"
+  },
+  "askTitle": {
+    "message": "Seite befragen"
+  },
+  "askClear": {
+    "message": "Unterhaltung löschen"
+  },
+  "askClose": {
+    "message": "Schließen"
   }
 }

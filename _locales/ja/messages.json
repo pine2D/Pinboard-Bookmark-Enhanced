@@ -2019,5 +2019,17 @@
   },
   "trShowOriginal": {
     "message": "クリックして一時的に原文を表示"
+  },
+  "askOpen": {
+    "message": "質問"
+  },
+  "askTitle": {
+    "message": "ページに質問"
+  },
+  "askClear": {
+    "message": "会話を消去"
+  },
+  "askClose": {
+    "message": "閉じる"
   }
 }

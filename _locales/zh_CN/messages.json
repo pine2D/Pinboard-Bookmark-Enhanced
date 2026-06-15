@@ -2019,5 +2019,17 @@
   },
   "trShowOriginal": {
     "message": "点击临时显示原文"
+  },
+  "askOpen": {
+    "message": "问答"
+  },
+  "askTitle": {
+    "message": "向本页提问"
+  },
+  "askClear": {
+    "message": "清空对话"
+  },
+  "askClose": {
+    "message": "关闭"
   }
 }
