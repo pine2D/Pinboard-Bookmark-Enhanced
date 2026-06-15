@@ -329,16 +329,22 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => { timedOut = true; ctrl.abort(); }, PBP_STREAM_IDLE_MS);
   };
+  let reader = null;
   try {
     resetIdle();
     const res = await fetch(url, { ...init, signal: ctrl.signal });
+    // Headers received: start a fresh idle window for time-to-first-byte.
+    resetIdle();
     if (!res.ok) {
       clearTimeout(idleTimer);
       // always throws (same semantics as the non-streaming callers)
       await handleAIError(res, providerName);
     }
-    if (!res.body) throw new Error(providerName + " response has no stream body");
-    const reader = res.body.getReader();
+    if (!res.body) {
+      clearTimeout(idleTimer);
+      throw new Error(providerName + " response has no stream body");
+    }
+    reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
     while (true) {
@@ -351,12 +357,16 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     buf += decoder.decode();
     consume(buf, true);
   } catch (e) {
+    // Caller abort takes precedence over an idle timeout that fired in the
+    // same tick, so the rejection surfaces as the caller's AbortError, not
+    // "AI stream timeout".
     if (timedOut && !(opts.signal && opts.signal.aborted)) {
       throw new Error("AI stream timeout");
     }
     throw e;
   } finally {
     clearTimeout(idleTimer);
+    if (reader) { try { reader.cancel(); } catch (_) {} }
   }
 }
 
