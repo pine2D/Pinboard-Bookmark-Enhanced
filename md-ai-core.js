@@ -143,7 +143,12 @@ function pbpAiShield(md) {
 }
 
 function pbpAiRestore(text, slots) {
-  let out = String(text == null ? "" : text);
-  for (const s of (slots || [])) out = out.split(s.ph).join(s.orig);
-  return out;
+  const s = String(text == null ? "" : text);
+  if (!slots || !slots.length) return s;
+  const map = Object.create(null);
+  for (const slot of slots) map[slot.ph] = slot.orig;
+  // One pass: each placeholder maps to its original; an unknown/hallucinated
+  // placeholder (not in the map) is left untouched. Replacement is via a
+  // function callback, so no $-escaping pitfalls.
+  return s.replace(/⟦[CLIM]\d+⟧/g, (m) => (m in map ? map[m] : m));
 }

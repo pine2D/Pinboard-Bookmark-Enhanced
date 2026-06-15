@@ -428,6 +428,11 @@ suite("pbpAiRestore", () => {
   test("null slots tolerated", () => {
     assert(pbpAiRestore("abc", null) === "abc", "null slots");
   });
+  test("restore is non-cascading when a slot original contains a placeholder-like sequence", () => {
+    const md = "`⟦C2⟧ literal` and `second`";
+    const sh = pbpAiShield(md);
+    assertEq(pbpAiRestore(sh.text, sh.slots), md, "no cascade");
+  });
 });
 </script>
 </body></html>
