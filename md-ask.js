@@ -629,6 +629,7 @@ function _pbpAskRangeFromOffsets(blockEl, start, end) {
 }
 
 let _pbpAskFlashTimer = null;
+let _pbpAskFlashEl = null;
 
 // Flash the jump target. Primary: CSS Custom Highlight API (zero DOM
 // mutation). Fallback (no CSS.highlights): keyframed background class on
@@ -640,10 +641,11 @@ function _pbpAskFlash(range, targetEl) {
     CSS.highlights.set("pbp-flash", new Highlight(range));
     _pbpAskFlashTimer = setTimeout(() => { CSS.highlights.delete("pbp-flash"); }, 1600);
   } else {
-    targetEl.classList.remove("pb-flash-fallback");
+    if (_pbpAskFlashEl) _pbpAskFlashEl.classList.remove("pb-flash-fallback");
+    _pbpAskFlashEl = targetEl;
     void targetEl.offsetWidth; // restart the CSS animation
     targetEl.classList.add("pb-flash-fallback");
-    _pbpAskFlashTimer = setTimeout(() => { targetEl.classList.remove("pb-flash-fallback"); }, 1600);
+    _pbpAskFlashTimer = setTimeout(() => { targetEl.classList.remove("pb-flash-fallback"); _pbpAskFlashEl = null; }, 1600);
   }
 }
 
