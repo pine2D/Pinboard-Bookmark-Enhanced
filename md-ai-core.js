@@ -104,3 +104,46 @@ function pbpAiHash(str) {
 function pbpAiEstimateTokens(chars) {
   return Math.ceil((Number(chars) || 0) / 4);
 }
+
+// ---- Markdown placeholder shield (translation format fidelity) ----
+// Replaces untranslatable spans with unique placeholders the prompt orders
+// the model to keep verbatim; pbpAiRestore puts the originals back.
+// Placeholder chars U+27E6/U+27E7 are outside the banned glyph range and
+// never appear in real markdown. Order matters:
+//   C inline code first (may contain $, urls, brackets)
+//   M display then inline math (raw $...$ in non-rendered articles; the
+//     KaTeX pre-pass in pbpAiMdOf also lands here as $tex$)
+//   I whole images BEFORE links (image syntax embeds link syntax)
+//   L link URLs only ([text]( stays visible so the text gets translated),
+//     then remaining bare/autolink URLs
+function pbpAiShield(md) {
+  const slots = [];
+  const counters = { C: 0, L: 0, I: 0, M: 0 };
+  function take(kind, orig) {
+    counters[kind] += 1;
+    const ph = "⟦" + kind + counters[kind] + "⟧";
+    slots.push({ ph, orig });
+    return ph;
+  }
+  let text = String(md == null ? "" : md);
+  text = text.replace(/``[^`]+``|`[^`\n]+`/g, (m) => take("C", m));
+  text = text.replace(/\$\$[^$]+\$\$/g, (m) => take("M", m));
+  // Inline math vs currency heuristic: "$5 and $6" (whitespace inside, no
+  // TeX-ish chars) is prose and must stay translatable; anything with
+  // \ ^ _ { } = or no internal whitespace is treated as math.
+  text = text.replace(/\$([^$\n]+)\$/g, (m, inner) => {
+    if (/\s/.test(inner) && !/[\\^_{}=]/.test(inner)) return m;
+    return take("M", m);
+  });
+  text = text.replace(/!\[[^\]\n]*\]\([^)\n]*\)/g, (m) => take("I", m));
+  text = text.replace(/(\[[^\]\n]*\]\()([^)\n]+)(\))/g,
+    (m, pre, url, post) => pre + take("L", url) + post);
+  text = text.replace(/https?:\/\/[^\s<>()⟦⟧]+/g, (m) => take("L", m));
+  return { text, slots };
+}
+
+function pbpAiRestore(text, slots) {
+  let out = String(text == null ? "" : text);
+  for (const s of (slots || [])) out = out.split(s.ph).join(s.orig);
+  return out;
+}

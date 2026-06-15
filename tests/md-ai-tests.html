@@ -358,5 +358,76 @@ suite("pbpAiIndexBlocks family", () => {
     assert(pbpAiTextOf(1) === "second", "cache reset");
   });
 });
+
+// ============ Task 4: pbpAiShield / pbpAiRestore ============
+suite("pbpAiShield", () => {
+  test("inline code becomes C placeholder", () => {
+    const r = pbpAiShield("run `npm install` now");
+    assert(r.text === "run ⟦C1⟧ now", "got: " + r.text);
+    assert(r.slots.length === 1 && r.slots[0].orig === "`npm install`", "slot orig");
+    assert(r.slots[0].ph === "⟦C1⟧", "slot ph");
+  });
+  test("link URL shielded but link text stays translatable", () => {
+    const r = pbpAiShield("see [Example Site](https://e.test/a?b=1) here");
+    assert(r.text === "see [Example Site](⟦L1⟧) here", "got: " + r.text);
+    assert(r.slots[0].orig === "https://e.test/a?b=1", "url in slot");
+  });
+  test("image shielded whole", () => {
+    const r = pbpAiShield("pic ![alt text](https://i.test/p.png) end");
+    assert(r.text === "pic ⟦I1⟧ end", "got: " + r.text);
+    assert(r.slots[0].orig === "![alt text](https://i.test/p.png)", "image whole");
+  });
+  test("bare URL shielded", () => {
+    const r = pbpAiShield("visit https://x.test/page now");
+    assert(r.text === "visit ⟦L1⟧ now", "got: " + r.text);
+  });
+  test("display and inline math shielded as M", () => {
+    const r = pbpAiShield("eq $$x+y$$ and $E=mc^2$ done");
+    assert(r.text === "eq ⟦M1⟧ and ⟦M2⟧ done", "got: " + r.text);
+    assert(r.slots[0].orig === "$$x+y$$" && r.slots[1].orig === "$E=mc^2$", "math origs");
+  });
+  test("currency-like dollars left alone", () => {
+    const r = pbpAiShield("it costs $5 and later $6 total");
+    assert(r.text === "it costs $5 and later $6 total", "got: " + r.text);
+    assert(r.slots.length === 0, "no slots");
+  });
+  test("math with TeX chars and spaces still shielded", () => {
+    const r = pbpAiShield("so $a = b$ holds");
+    assert(r.text === "so ⟦M1⟧ holds", "= marks TeX: " + r.text);
+  });
+  test("dollar inside inline code stays C, not M", () => {
+    const r = pbpAiShield("price `$5` here");
+    assert(r.slots.length === 1 && r.slots[0].ph === "⟦C1⟧", "code wins");
+  });
+  test("numbering increases per kind independently", () => {
+    const r = pbpAiShield("`a` then `b` and https://u1.test/ plus https://u2.test/");
+    const phs = r.slots.map((s) => s.ph).join(",");
+    assert(phs === "⟦C1⟧,⟦C2⟧,⟦L1⟧,⟦L2⟧", "got: " + phs);
+  });
+  test("empty input", () => {
+    const r = pbpAiShield("");
+    assert(r.text === "" && r.slots.length === 0, "empty ok");
+  });
+});
+
+suite("pbpAiRestore", () => {
+  test("round trip is identity on composite markdown", () => {
+    const md = "Intro `code $x$` with [link](https://e.test/p) and ![img](https://i.test/i.png), math $$x+y$$ plus $E=mc^2$ and bare https://b.test/ end";
+    const r = pbpAiShield(md);
+    assert(r.slots.length === 6, "6 slots, got " + r.slots.length);
+    assert(pbpAiRestore(r.text, r.slots) === md, "round trip");
+  });
+  test("duplicated placeholder restored at every occurrence", () => {
+    const slots = [{ ph: "⟦C1⟧", orig: "`x`" }];
+    assert(pbpAiRestore("⟦C1⟧ and ⟦C1⟧", slots) === "`x` and `x`", "both replaced");
+  });
+  test("missing placeholder tolerated (no throw, text unchanged)", () => {
+    const slots = [{ ph: "⟦C1⟧", orig: "`x`" }];
+    assert(pbpAiRestore("no placeholders here", slots) === "no placeholders here", "unchanged");
+  });
+  test("null slots tolerated", () => {
+    assert(pbpAiRestore("abc", null) === "abc", "null slots");
+  });
+});
 </script>
 </body></html>
