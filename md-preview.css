@@ -689,6 +689,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #ask-panel[hidden] { display: none; }
 
 /* Third column: push the centered doc body away from the open panel. */
+/* panel width (380) + panel padding (16) = 396 */
 body.ask-open main { margin-right: 396px; }
 
 .ask-head { display: flex; align-items: center; gap: 6px; }

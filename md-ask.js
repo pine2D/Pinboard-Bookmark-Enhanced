@@ -125,6 +125,7 @@ function _pbpAskBuildRailEntry() {
 // this innerHTML (questions use textContent; answers stream as textContent
 // and finalize through renderMarkdown(), the single sanitize point).
 function _pbpAskBuildPanel() {
+  if (!_pbpAskState) return null;
   if (_pbpAskState.panel) return _pbpAskState.panel;
   const panel = document.createElement("aside");
   panel.id = "ask-panel";
@@ -202,6 +203,7 @@ function _pbpAskIsOpen() {
 // overlays the page). Esc and the close button dismiss it.
 function _pbpAskSetOpen(open) {
   const panel = _pbpAskBuildPanel();
+  if (!panel) return;
   document.body.classList.toggle("ask-open", open);
   panel.hidden = !open;
   const btn = document.getElementById("ask-open");
