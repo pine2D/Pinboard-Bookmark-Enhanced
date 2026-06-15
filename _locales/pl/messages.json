@@ -1924,5 +1924,56 @@
   },
   "bgSkippedExists":   {
     "message": "Już w zakładkach — zapisywanie pominięte"
+  },
+  "secPreviewAi": {
+    "message": "AI strony podglądu"
+  },
+  "previewAiSectionHint": {
+    "message": "Wyjaśnianie zaznaczenia, pytania do strony i pełne tłumaczenie na stronie podglądu Markdown. Używa dostawcy AI i klucza skonfigurowanego powyżej; każde żądanie jest wywoływane przez użytkownika, nic nie działa w tle."
+  },
+  "previewAiEnabled": {
+    "message": "Włącz funkcje AI na stronie podglądu"
+  },
+  "previewAiEnabledHint": {
+    "message": "Wyłączenie usuwa wszystkie punkty wejścia AI ze strony podglądu. Punkty wejścia są również ukrywane automatycznie, gdy nie skonfigurowano klucza API."
+  },
+  "previewAiModelLabel": {
+    "message": "Zastąpienie modelu (opcjonalne)"
+  },
+  "previewAiModelHint": {
+    "message": "Nazwa modelu używana tylko przez funkcje AI strony podglądu, u tego samego dostawcy co powyżej. Pozostaw puste, aby użyć domyślnego modelu dostawcy."
+  },
+  "translateTargetLangLabel": {
+    "message": "Język docelowy tłumaczenia"
+  },
+  "translateLangAuto": {
+    "message": "Automatyczny (zgodnie z językiem interfejsu)"
+  },
+  "translateLangCustom": {
+    "message": "Niestandardowy…"
+  },
+  "translateLangCustomPlaceholder": {
+    "message": "Dowolna nazwa języka, np. Łacina, Greka klasyczna"
+  },
+  "translateGlossaryLabel": {
+    "message": "Słownik tłumaczeń"
+  },
+  "translateGlossaryPlaceholder": {
+    "message": "LLM=Duży model językowy\nPinboard="
+  },
+  "translateGlossaryHint": {
+    "message": "Jedna reguła na wiersz w postaci termin=tłumaczenie. Pozostaw prawą stronę pustą, aby zachować termin bez tłumaczenia. Wysyłane z każdym żądaniem tłumaczenia."
+  },
+  "selectionTriggerLabel": {
+    "message": "Wyzwalacz wyjaśniania zaznaczenia"
+  },
+  "selectionTriggerIcon": {
+    "message": "Mały przycisk obok zaznaczenia"
+  },
+  "selectionTriggerHotkey": {
+    "message": "Tylko skrót E (bez przycisku)"
+  },
+  "selectionTriggerOff": {
+    "message": "Wyłączone"
   }
 }

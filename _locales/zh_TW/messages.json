@@ -1924,5 +1924,56 @@
   },
   "bgSkippedExists":   {
     "message": "已收藏過 — 保存已跳過"
+  },
+  "secPreviewAi": {
+    "message": "預覽頁 AI"
+  },
+  "previewAiSectionHint": {
+    "message": "在 Markdown 預覽頁提供劃詞解釋、全文問答與全文翻譯。使用上方設定的 AI 提供商與 Key；所有請求均由你主動觸發，不會在背景執行。"
+  },
+  "previewAiEnabled": {
+    "message": "在預覽頁啟用 AI 功能"
+  },
+  "previewAiEnabledHint": {
+    "message": "關閉後預覽頁不再出現任何 AI 入口。未設定 API Key 時入口也會自動隱藏。"
+  },
+  "previewAiModelLabel": {
+    "message": "模型覆寫（選填）"
+  },
+  "previewAiModelHint": {
+    "message": "僅供預覽頁 AI 功能使用的模型名稱（與上方同一提供商）。留空則使用上方設定的預設模型。"
+  },
+  "translateTargetLangLabel": {
+    "message": "翻譯目標語言"
+  },
+  "translateLangAuto": {
+    "message": "自動（跟隨介面語言）"
+  },
+  "translateLangCustom": {
+    "message": "自訂…"
+  },
+  "translateLangCustomPlaceholder": {
+    "message": "任意語言名稱，如：文言文、世界語"
+  },
+  "translateGlossaryLabel": {
+    "message": "翻譯詞彙表"
+  },
+  "translateGlossaryPlaceholder": {
+    "message": "LLM=大型語言模型\nPinboard="
+  },
+  "translateGlossaryHint": {
+    "message": "每行一條，格式為 術語=譯法。等號右側留空表示該術語保持原文。隨每次翻譯請求一起傳送。"
+  },
+  "selectionTriggerLabel": {
+    "message": "劃詞解釋觸發方式"
+  },
+  "selectionTriggerIcon": {
+    "message": "選取文字旁顯示小按鈕"
+  },
+  "selectionTriggerHotkey": {
+    "message": "僅快速鍵 E（不顯示按鈕）"
+  },
+  "selectionTriggerOff": {
+    "message": "關閉"
   }
 }

@@ -1924,5 +1924,56 @@
   },
   "bgSkippedExists":   {
     "message": "Bereits als Lesezeichen — Speichern übersprungen"
+  },
+  "secPreviewAi": {
+    "message": "Vorschauseite KI"
+  },
+  "previewAiSectionHint": {
+    "message": "Erklärung von Auswahlen, Seitenbefragung und Volltext-Übersetzung auf der Markdown-Vorschauseite. Verwendet den oben konfigurierten KI-Anbieter und -Schlüssel; jede Anfrage wird vom Benutzer ausgelöst, nichts läuft im Hintergrund."
+  },
+  "previewAiEnabled": {
+    "message": "KI-Funktionen auf der Vorschauseite aktivieren"
+  },
+  "previewAiEnabledHint": {
+    "message": "Wenn deaktiviert, werden alle KI-Einstiegspunkte von der Vorschauseite entfernt. Einstiegspunkte werden auch automatisch ausgeblendet, wenn kein API-Schlüssel konfiguriert ist."
+  },
+  "previewAiModelLabel": {
+    "message": "Modell-Überschreibung (optional)"
+  },
+  "previewAiModelHint": {
+    "message": "Modellname, der nur von KI-Funktionen der Vorschauseite verwendet wird, beim gleichen Anbieter wie oben. Leer lassen, um das Standard-Modell des Anbieters zu verwenden."
+  },
+  "translateTargetLangLabel": {
+    "message": "Übersetzungszielsprache"
+  },
+  "translateLangAuto": {
+    "message": "Automatisch (Oberflächensprache folgen)"
+  },
+  "translateLangCustom": {
+    "message": "Benutzerdefiniert…"
+  },
+  "translateLangCustomPlaceholder": {
+    "message": "Beliebiger Sprachname, z. B. Latein, Altgriechisch"
+  },
+  "translateGlossaryLabel": {
+    "message": "Übersetzungsglossars"
+  },
+  "translateGlossaryPlaceholder": {
+    "message": "LLM=Großes Sprachmodell\nPinboard="
+  },
+  "translateGlossaryHint": {
+    "message": "Eine Regel pro Zeile im Format Begriff=Übersetzung. Rechte Seite leer lassen, um den Begriff unübersetzt zu behalten. Wird mit jeder Übersetzungsanfrage gesendet."
+  },
+  "selectionTriggerLabel": {
+    "message": "Auswahl-Erklärung Auslöser"
+  },
+  "selectionTriggerIcon": {
+    "message": "Kleiner Button neben der Auswahl"
+  },
+  "selectionTriggerHotkey": {
+    "message": "Nur Hotkey E (kein Button)"
+  },
+  "selectionTriggerOff": {
+    "message": "Aus"
   }
 }

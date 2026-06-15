@@ -1924,5 +1924,56 @@
   },
   "bgSkippedExists":   {
     "message": "Already bookmarked — save skipped"
+  },
+  "secPreviewAi": {
+    "message": "Preview Page AI"
+  },
+  "previewAiSectionHint": {
+    "message": "Explain selection, ask the page, and full-text translation on the Markdown preview page. Uses the AI provider and key configured above; every request is user-invoked, nothing runs in the background."
+  },
+  "previewAiEnabled": {
+    "message": "Enable AI features on the preview page"
+  },
+  "previewAiEnabledHint": {
+    "message": "Turning this off removes every AI entry point from the preview page. Entry points are also hidden automatically when no API key is configured."
+  },
+  "previewAiModelLabel": {
+    "message": "Model override (optional)"
+  },
+  "previewAiModelHint": {
+    "message": "Model name used only by preview-page AI features, on the same provider as above. Leave empty to use the provider's default model."
+  },
+  "translateTargetLangLabel": {
+    "message": "Translation target language"
+  },
+  "translateLangAuto": {
+    "message": "Auto (follow interface language)"
+  },
+  "translateLangCustom": {
+    "message": "Custom…"
+  },
+  "translateLangCustomPlaceholder": {
+    "message": "Any language name, e.g. Latin, Classical Chinese"
+  },
+  "translateGlossaryLabel": {
+    "message": "Translation glossary"
+  },
+  "translateGlossaryPlaceholder": {
+    "message": "LLM=Large Language Model\nPinboard="
+  },
+  "translateGlossaryHint": {
+    "message": "One rule per line, in the form term=translation. Leave the right side empty to keep the term untranslated. Sent with every translation request."
+  },
+  "selectionTriggerLabel": {
+    "message": "Explain-selection trigger"
+  },
+  "selectionTriggerIcon": {
+    "message": "Small button next to the selection"
+  },
+  "selectionTriggerHotkey": {
+    "message": "Hotkey E only (no button)"
+  },
+  "selectionTriggerOff": {
+    "message": "Off"
   }
 }

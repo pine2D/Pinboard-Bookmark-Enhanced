@@ -1924,5 +1924,56 @@
   },
   "bgSkippedExists":   {
     "message": "既にブックマークされています — 保存がスキップされました"
+  },
+  "secPreviewAi": {
+    "message": "プレビューページ AI"
+  },
+  "previewAiSectionHint": {
+    "message": "Markdown プレビューページで選択テキストの説明、ページへの質問、全文翻訳を提供します。上記で設定した AI プロバイダーとキーを使用し、すべてのリクエストはユーザーが明示的に実行します。バックグラウンドでは何も実行されません。"
+  },
+  "previewAiEnabled": {
+    "message": "プレビューページで AI 機能を有効にする"
+  },
+  "previewAiEnabledHint": {
+    "message": "オフにするとプレビューページから AI の入口がすべて消えます。API キーが設定されていない場合も入口は自動的に非表示になります。"
+  },
+  "previewAiModelLabel": {
+    "message": "モデルの上書き（任意）"
+  },
+  "previewAiModelHint": {
+    "message": "プレビューページの AI 機能専用のモデル名（上記と同じプロバイダー）。空欄にすると上記設定のデフォルトモデルを使用します。"
+  },
+  "translateTargetLangLabel": {
+    "message": "翻訳先の言語"
+  },
+  "translateLangAuto": {
+    "message": "自動（インターフェース言語に従う）"
+  },
+  "translateLangCustom": {
+    "message": "カスタム…"
+  },
+  "translateLangCustomPlaceholder": {
+    "message": "任意の言語名（例：Latin、Classical Chinese）"
+  },
+  "translateGlossaryLabel": {
+    "message": "翻訳用語集"
+  },
+  "translateGlossaryPlaceholder": {
+    "message": "LLM=大規模言語モデル\nPinboard="
+  },
+  "translateGlossaryHint": {
+    "message": "1 行に 1 ルール、形式は 用語=訳語。右側を空欄にするとその用語は翻訳されません。毎回の翻訳リクエストと一緒に送信されます。"
+  },
+  "selectionTriggerLabel": {
+    "message": "選択説明のトリガー"
+  },
+  "selectionTriggerIcon": {
+    "message": "選択範囲の横に小さなボタンを表示"
+  },
+  "selectionTriggerHotkey": {
+    "message": "ホットキー E のみ（ボタンなし）"
+  },
+  "selectionTriggerOff": {
+    "message": "オフ"
   }
 }
