@@ -311,8 +311,10 @@ let _pbpAiSettingsPromise = null;
 
 function pbpAiSettingsArea() {
   if (!_pbpAiAreaPromise) {
-    _pbpAiAreaPromise = chrome.storage.local.get({ optSyncEnabled: false })
-      .then(({ optSyncEnabled }) => (optSyncEnabled ? chrome.storage.sync : chrome.storage.local));
+    _pbpAiAreaPromise = (typeof window !== "undefined" && window.pbpSettingsArea)
+      ? Promise.resolve(window.pbpSettingsArea)
+      : chrome.storage.local.get({ optSyncEnabled: false })
+          .then(function (r) { return r.optSyncEnabled ? chrome.storage.sync : chrome.storage.local; });
   }
   return _pbpAiAreaPromise;
 }
@@ -393,6 +395,7 @@ async function pbpTrViewSet(url, state) {
 // ---- Local usage counters (storage.local only, NO telemetry; spec sec 11:
 // keep/deepen/kill decision after three months). Fire-and-forget.
 function pbpAiBumpCounter(name) {
+  if (name !== "explain" && name !== "ask" && name !== "translate") return;
   try {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
     chrome.storage.local.get({ pbp_ai_usage: { explain: 0, ask: 0, translate: 0 } })

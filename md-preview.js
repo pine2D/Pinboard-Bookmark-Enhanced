@@ -180,6 +180,7 @@ function ensureKatex() {
   // obsidianEnabled gate, the vault/folder, and the frontmatter/image/TOC defaults.
   const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
   const settingsArea = optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+  window.pbpSettingsArea = settingsArea;
   const exportSettings = await settingsArea.get({
     mdExportFrontmatter: true,
     mdExportImagePolicy: "keep",
