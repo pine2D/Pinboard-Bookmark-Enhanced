@@ -238,6 +238,58 @@ async function callOllama(s, prompt, opts = {}) {
   return text;
 }
 
+// ============================================================
+// Streaming helpers (md-preview ask / translate / explain)
+// ============================================================
+// Pure SSE/NDJSON parsing. No fetch, no chrome.*, no DOM — unit-tested
+// in tests/md-ai-tests.html.
+
+// Split complete SSE events out of an accumulating text buffer.
+// Returns { events, rest }: `events` = the "data:" payload of every
+// COMPLETE event (blank-line terminated; multiple data lines joined with
+// \n per SSE spec; comment/event:/id: lines dropped); `rest` = trailing
+// incomplete fragment the caller must keep and prepend to the next chunk.
+function _pbpSseChunks(buffered) {
+  const blocks = String(buffered).split(/\r?\n\r?\n/);
+  const rest = blocks.pop();
+  const events = [];
+  for (const block of blocks) {
+    const dataLines = [];
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+    }
+    if (dataLines.length) events.push(dataLines.join("\n"));
+  }
+  return { events, rest };
+}
+
+// Per-provider delta extractors: parsed JSON chunk -> visible text or null.
+// null = chunk carries no user-visible text (role headers, pings, usage,
+// thinking deltas, final stats) — the caller simply skips it.
+function _pbpOpenAIDelta(obj) {
+  const t = obj?.choices?.[0]?.delta?.content;
+  return (typeof t === "string" && t.length) ? t : null;
+}
+
+function _pbpGeminiDelta(obj) {
+  const parts = obj?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return null;
+  let out = "";
+  for (const p of parts) { if (typeof p?.text === "string") out += p.text; }
+  return out.length ? out : null;
+}
+
+function _pbpClaudeDelta(obj) {
+  if (obj?.type !== "content_block_delta") return null;
+  const t = obj.delta?.text;
+  return (typeof t === "string" && t.length) ? t : null;
+}
+
+function _pbpOllamaDelta(obj) {
+  const t = obj?.message?.content;
+  return (typeof t === "string" && t.length) ? t : null;
+}
+
 // ---- Prompt builders (no DOM dependency) ----
 function buildTagPrompt(s, title, url, content, description, userTags) {
   const sep = s.aiTagSeparator || "-";

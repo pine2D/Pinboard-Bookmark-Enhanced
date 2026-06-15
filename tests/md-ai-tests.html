@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>md-preview AI Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1200px; }
+h2 { margin-top: 24px; font-size: 16px; }
+.suite { margin: 12px 0; padding: 8px; border-left: 3px solid #ccc; }
+.case { padding: 4px 8px; margin: 4px 0; white-space: pre-wrap; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+.skip { color: #888; background: #f6f6f6; }
+#summary { font-weight: bold; margin: 8px 0; }
+</style></head>
+<body>
+<h1>md-preview AI tests (ai.js stream helpers + md-ai-core + md-translate + md-ask)</h1>
+<div id="summary"></div>
+<div id="results"></div>
+
+<!-- Scripts under test. md-ai-core.js / md-translate.js / md-ask.js may not
+     exist yet in early plan tasks: a 404 here only logs to the console and
+     does not break the page; their suites use suiteIf() and show as SKIP. -->
+<script src="../vendor/turndown.js"></script>
+<script src="../ai.js"></script>
+<script src="../md-ai-core.js"></script>
+<script src="../md-translate.js"></script>
+<script src="../md-ask.js"></script>
+
+<script>
+let PASS = 0, FAIL = 0, SKIP = 0;
+
+function test(name, fn) {
+  const div = document.createElement("div");
+  try {
+    fn();
+    PASS++;
+    div.className = "case pass";
+    div.textContent = "PASS " + name;
+  } catch (e) {
+    FAIL++;
+    div.className = "case fail";
+    div.textContent = "FAIL " + name + "\n  " + e.message;
+  }
+  document.getElementById("results").appendChild(div);
+}
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || "assertion failed");
+}
+
+function assertEq(actual, expected, label) {
+  if (actual !== expected) {
+    throw new Error((label || "assertEq") + ": expected " +
+      JSON.stringify(expected) + " got " + JSON.stringify(actual));
+  }
+}
+
+function suite(name, fn) {
+  const div = document.createElement("div");
+  div.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = name;
+  div.appendChild(h);
+  const results = document.getElementById("results");
+  const savedAppend = results.appendChild;
+  results.appendChild = function(el) {
+    if (el.className?.includes("case")) div.appendChild(el);
+    else savedAppend.call(results, el);
+  };
+  fn();
+  results.appendChild = savedAppend;
+  results.appendChild(div);
+}
+
+// Skip (not fail) a whole suite while its file/global does not exist yet.
+// Later plan tasks register md-ai-core / md-translate / md-ask suites via
+// this guard so the page only reports REAL pass/fail.
+function suiteIf(name, globalName, fn) {
+  if (typeof window[globalName] !== "function") {
+    SKIP++;
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP suite " + name + " (" + globalName + " not loaded)";
+    document.getElementById("results").appendChild(div);
+    return;
+  }
+  suite(name, fn);
+}
+
+window.addEventListener("load", () => {
+  const el = document.getElementById("summary");
+  el.textContent = "SUMMARY: " + PASS + " passed, " + FAIL + " failed, " + SKIP + " suites skipped";
+  el.style.color = FAIL ? "#c00" : "#0a0";
+  document.title = (FAIL ? "FAIL " : "PASS ") + document.title;
+});
+</script>
+
+<script>
+// ============ ai.js: _pbpSseChunks ============
+suite("_pbpSseChunks", () => {
+  test("empty buffer -> no events, empty rest", () => {
+    const r = _pbpSseChunks("");
+    assertEq(r.events.length, 0, "events");
+    assertEq(r.rest, "", "rest");
+  });
+
+  test("single complete event", () => {
+    const r = _pbpSseChunks('data: {"a":1}\n\n');
+    assertEq(r.events.length, 1, "one event");
+    assertEq(r.events[0], '{"a":1}', "payload");
+    assertEq(r.rest, "", "rest empty");
+  });
+
+  test("data without space after colon", () => {
+    const r = _pbpSseChunks('data:{"a":1}\n\n');
+    assertEq(r.events[0], '{"a":1}', "payload");
+  });
+
+  test("incomplete trailing event stays in rest", () => {
+    const r = _pbpSseChunks('data: {"a":1}\n\ndata: {"b"');
+    assertEq(r.events.length, 1, "one complete");
+    assertEq(r.rest, 'data: {"b"', "partial kept");
+  });
+
+  test("rest + next chunk completes the event", () => {
+    const first = _pbpSseChunks('data: {"a":1}\n\ndata: {"b"');
+    const second = _pbpSseChunks(first.rest + ':2}\n\n');
+    assertEq(second.events[0], '{"b":2}', "joined across reads");
+  });
+
+  test("multiple events in one buffer", () => {
+    const r = _pbpSseChunks("data: one\n\ndata: two\n\ndata: three\n\n");
+    assertEq(r.events.join("|"), "one|two|three", "all three");
+  });
+
+  test("CRLF separators", () => {
+    const r = _pbpSseChunks("data: x\r\n\r\ndata: y\r\n\r\n");
+    assertEq(r.events.join("|"), "x|y", "both events");
+    assertEq(r.rest, "", "rest empty");
+  });
+
+  test("[DONE] terminator passes through as event", () => {
+    const r = _pbpSseChunks("data: [DONE]\n\n");
+    assertEq(r.events[0], "[DONE]", "passthrough");
+  });
+
+  test("multi data lines join with newline (SSE spec)", () => {
+    const r = _pbpSseChunks("data: line1\ndata: line2\n\n");
+    assertEq(r.events[0], "line1\nline2", "joined");
+  });
+
+  test("event:/id: lines ignored, data extracted (Claude shape)", () => {
+    const r = _pbpSseChunks('event: content_block_delta\ndata: {"t":1}\n\n');
+    assertEq(r.events.length, 1, "one event");
+    assertEq(r.events[0], '{"t":1}', "data only");
+  });
+
+  test("keep-alive comment block yields no event", () => {
+    const r = _pbpSseChunks(": keep-alive\n\n");
+    assertEq(r.events.length, 0, "ignored");
+  });
+});
+
+// ============ ai.js: provider delta extractors ============
+suite("_pbpOpenAIDelta", () => {
+  test("content delta extracted", () => {
+    assertEq(_pbpOpenAIDelta({ choices: [{ delta: { content: "Hi" } }] }), "Hi", "content");
+  });
+  test("role-only first chunk -> null", () => {
+    assertEq(_pbpOpenAIDelta({ choices: [{ delta: { role: "assistant" } }] }), null, "role chunk");
+  });
+  test("finish chunk with empty delta -> null", () => {
+    assertEq(_pbpOpenAIDelta({ choices: [{ delta: {}, finish_reason: "stop" }] }), null, "finish chunk");
+  });
+  test("usage-only chunk with empty choices -> null", () => {
+    assertEq(_pbpOpenAIDelta({ choices: [], usage: { total_tokens: 5 } }), null, "usage chunk");
+  });
+  test("empty content string -> null", () => {
+    assertEq(_pbpOpenAIDelta({ choices: [{ delta: { content: "" } }] }), null, "empty string");
+  });
+  test("garbage object -> null, no throw", () => {
+    assertEq(_pbpOpenAIDelta({}), null, "empty obj");
+    assertEq(_pbpOpenAIDelta(null), null, "null");
+  });
+});
+
+suite("_pbpGeminiDelta", () => {
+  test("single part text", () => {
+    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ text: "Hel" }] } }] }), "Hel", "text");
+  });
+  test("multiple parts concatenated", () => {
+    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ text: "a" }, { text: "b" }] } }] }), "ab", "concat");
+  });
+  test("non-text part skipped -> null when nothing remains", () => {
+    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ functionCall: {} }] } }] }), null, "no text part");
+  });
+  test("no candidates (promptFeedback chunk) -> null", () => {
+    assertEq(_pbpGeminiDelta({ promptFeedback: {} }), null, "feedback chunk");
+    assertEq(_pbpGeminiDelta(null), null, "null");
+  });
+});
+
+suite("_pbpClaudeDelta", () => {
+  test("content_block_delta text extracted", () => {
+    assertEq(_pbpClaudeDelta({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hi" } }), "Hi", "text_delta");
+  });
+  test("message_start -> null", () => {
+    assertEq(_pbpClaudeDelta({ type: "message_start", message: {} }), null, "message_start");
+  });
+  test("thinking_delta -> null (not user-visible text)", () => {
+    assertEq(_pbpClaudeDelta({ type: "content_block_delta", delta: { type: "thinking_delta", thinking: "x" } }), null, "thinking");
+  });
+  test("message_stop / ping -> null", () => {
+    assertEq(_pbpClaudeDelta({ type: "message_stop" }), null, "stop");
+    assertEq(_pbpClaudeDelta({ type: "ping" }), null, "ping");
+  });
+});
+
+suite("_pbpOllamaDelta", () => {
+  test("message content extracted", () => {
+    assertEq(_pbpOllamaDelta({ message: { role: "assistant", content: "Hi" }, done: false }), "Hi", "content");
+  });
+  test("final done chunk with empty content -> null", () => {
+    assertEq(_pbpOllamaDelta({ message: { role: "assistant", content: "" }, done: true }), null, "final chunk");
+  });
+  test("stats-only chunk -> null, no throw", () => {
+    assertEq(_pbpOllamaDelta({ done: true, total_duration: 1 }), null, "stats");
+    assertEq(_pbpOllamaDelta(null), null, "null");
+  });
+});
+</script>
+</body></html>
