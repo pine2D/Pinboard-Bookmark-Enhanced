@@ -172,7 +172,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-cohere-model": "command-r-08-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B",
         "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6",
         "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
-        "opt-custom-name": "Custom", "opt-custom-baseurl": "", "opt-custom-model": ""
+        "opt-custom-name": "Custom", "opt-custom-baseurl": "", "opt-custom-model": "",
+        "opt-preview-ai-enabled": true, "opt-preview-ai-model": "",
+        "translate-target-lang": "auto", "translate-target-lang-custom": "",
+        "opt-translate-glossary": "", "opt-selection-trigger": "icon"
       },
       skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-custom-key"]
     },
@@ -222,6 +225,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (f) f.disabled = off;
   }
 
+  // Show the free-text language input only while the select sits on "custom".
+  // Safe to call on any page/panel (guards on element existence); programmatic
+  // .value changes (load, reset) don't fire 'change', so call it explicitly.
+  function syncTranslateLangCustomState() {
+    const sel = $id("translate-target-lang");
+    const customEl = $id("translate-target-lang-custom");
+    if (!sel || !customEl) return;
+    customEl.classList.toggle("hidden", sel.value !== "custom");
+  }
+
+  // Resolution contract for the persisted translateTargetLang (read by
+  // md-translate.js as a plain string -- it never sees this select):
+  //   select on a non-custom option -> that option's code ("auto", "ja", ...)
+  //   select on "custom"            -> trimmed free text from the custom input
+  //   custom input empty            -> "auto"
+  // The literal sentinel "custom" is therefore never persisted.
+  function resolveTranslateTargetLang() {
+    const sel = $id("translate-target-lang");
+    if (!sel) return "auto";
+    if (sel.value !== "custom") return sel.value;
+    const customEl = $id("translate-target-lang-custom");
+    return (customEl && customEl.value.trim()) || "auto";
+  }
+
   $id("reset-panel-btn").addEventListener("click", function () {
     const resetBtn = this;
     const activeBtn = document.querySelector(".tab-btn.active");
@@ -246,6 +273,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         saveAll();
         syncObsidianEnabledState();
+        syncTranslateLangCustomState();
       },
     });
   });
@@ -399,7 +427,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-jina-key": s.jinaApiKey,
     "opt-tag-presets": s.tagPresets,
     "opt-wayback-s3key": s.waybackS3Key,
-    "opt-wayback-s3secret": s.waybackS3Secret
+    "opt-wayback-s3secret": s.waybackS3Secret,
+    "opt-preview-ai-model": s.previewAiModel,
+    "opt-translate-glossary": s.translateGlossary,
+    "opt-selection-trigger": s.selectionTrigger
   };
   for (const [id, val] of Object.entries(fieldMap)) {
     const el = $id(id);
@@ -464,13 +495,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-obsidian-enabled": s.obsidianEnabled,
     "opt-tag-sort-by-pop": s.tagSortByPopEnabled,
     "opt-wayback-enabled": s.waybackArchiveEnabled === true,
-    "opt-wayback-batch": s.waybackArchiveBatch === true
+    "opt-wayback-batch": s.waybackArchiveBatch === true,
+    "opt-preview-ai-enabled": s.previewAiEnabled !== false
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
     if (el) el.checked = val;
   }
   syncObsidianEnabledState();
+
+  // ---- Preview AI: translation target language (select + custom free-text) ----
+  // Stored value is either an option code or a free-text language name; map it
+  // back onto the two controls. Guard against a hand-edited backup that smuggled
+  // in the "custom" sentinel (resolveTranslateTargetLang never persists it).
+  {
+    const sel = $id("translate-target-lang");
+    const customEl = $id("translate-target-lang-custom");
+    const stored = s.translateTargetLang || "auto";
+    const codes = Array.from(sel.options).map(o => o.value);
+    if (stored !== "custom" && codes.includes(stored)) {
+      sel.value = stored;
+    } else if (stored === "custom") {
+      sel.value = "auto";
+    } else {
+      sel.value = "custom";
+      customEl.value = stored;
+    }
+    syncTranslateLangCustomState();
+    sel.addEventListener("change", syncTranslateLangCustomState);
+  }
 
   // ---- Popup width (B9) ----
   const popupWidth = Number(s.popupWidth) || 550;
@@ -775,6 +828,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       obsidianEnabled: $id("opt-obsidian-enabled").checked,
       obsidianVault: $id("opt-obsidian-vault").value.trim(),
       obsidianFolder: $id("opt-obsidian-folder").value.trim(),
+      // Preview-page AI (md-preview explain / ask / translate)
+      previewAiEnabled: $id("opt-preview-ai-enabled").checked,
+      previewAiModel: $id("opt-preview-ai-model").value.trim(),
+      translateTargetLang: resolveTranslateTargetLang(),
+      translateGlossary: $id("opt-translate-glossary").value,
+      selectionTrigger: $id("opt-selection-trigger").value,
       // Appearance
       optLang: $id("opt-lang").value,
       optTheme: $id("opt-theme").value,
