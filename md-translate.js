@@ -451,7 +451,7 @@ async function _pbpTrStart(st) {
 
   const byId = new Map(st.work.map((w) => [w.n, w]));
   const newly = {};                                 // blockHash -> shielded translation
-  const result = await pbpTrRunQueue({
+  await pbpTrRunQueue({
     batches: pbpTrPackBatches(pending.map((w) => ({ id: w.n, text: w.shielded.text }))),
     requestBatch, requestSingle, signal: st.ctrl.signal,
     onFill: (id, text) => {

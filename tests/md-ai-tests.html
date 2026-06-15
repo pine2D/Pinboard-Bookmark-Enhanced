@@ -928,4 +928,54 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
   host.appendChild(sum);
 })();
 </script>
+<script>
+// ============ Task 11: view composition + lang resolution ============
+suiteIf("pbpTrResolveTargetLang / entry visibility", "pbpTrResolveTargetLang", () => {
+  test("auto follows the passed UI language", () => {
+    const r = pbpTrResolveTargetLang({ translateTargetLang: "auto" }, "zh-Hans");
+    assertEq(r.code, "zh-Hans", "code");
+    assertEq(r.name, "Simplified Chinese", "human name for prompt");
+  });
+  test("stored code maps to human name", () => {
+    assertEq(pbpTrResolveTargetLang({ translateTargetLang: "ja" }, "en").name, "Japanese", "ja");
+    assertEq(pbpTrResolveTargetLang({ translateTargetLang: "pl" }, "en").name, "Polish", "pl");
+  });
+  test("custom free text passes through as both code and name", () => {
+    const r = pbpTrResolveTargetLang({ translateTargetLang: "Classical Chinese" }, "en");
+    assertEq(r.code, "Classical Chinese", "code passthrough");
+    assertEq(r.name, "Classical Chinese", "name passthrough");
+  });
+  test("missing setting falls back to auto", () => {
+    assertEq(pbpTrResolveTargetLang({}, "de").code, "de", "default auto");
+  });
+  test("entry hidden ONLY when both langs non-empty and equal", () => {
+    assert(_pbpTrShouldHideEntry("zh-Hans", "zh-Hans") === true, "same -> hide");
+    assert(_pbpTrShouldHideEntry("", "zh-Hans") === false, "unknown article -> show");
+    assert(_pbpTrShouldHideEntry("zh-Hans", "") === false, "unknown ui -> show");
+    assert(_pbpTrShouldHideEntry("ja", "zh-Hans") === false, "different -> show");
+    assert(_pbpTrShouldHideEntry("", "") === false, "both empty -> show");
+  });
+});
+
+suiteIf("pbpTrComposeView", "pbpTrComposeView", () => {
+  const items = [
+    { orig: "# Title", tr: "# 标题" },
+    { orig: "Paragraph one.", tr: "第一段。" },
+    { orig: "```\ncode\n```", tr: null },
+    { orig: "Untranslated yet.", tr: null }
+  ];
+  test("bilingual interleaves orig + tr, skips tr when absent", () => {
+    const md = pbpTrComposeView("bilingual", items);
+    assertEq(md, "# Title\n\n# 标题\n\nParagraph one.\n\n第一段。\n\n```\ncode\n```\n\nUntranslated yet.", "interleave");
+  });
+  test("translated-only uses tr with orig fallback (pre + missing keep orig)", () => {
+    const md = pbpTrComposeView("translated", items);
+    assertEq(md, "# 标题\n\n第一段。\n\n```\ncode\n```\n\nUntranslated yet.", "tr-only");
+  });
+  test("empty items tolerated", () => {
+    assertEq(pbpTrComposeView("bilingual", []), "", "empty");
+    assertEq(pbpTrComposeView("translated", null), "", "null");
+  });
+});
+</script>
 </body></html>
