@@ -2103,5 +2103,29 @@
         "content": "$1"
       }
     }
+  },
+  "explainSelection": {
+    "message": "Expliquer la sélection"
+  },
+  "explainAskMore": {
+    "message": "Poser une question de suivi"
+  },
+  "explainLoading": {
+    "message": "Génération de l'explication…"
+  },
+  "explainErrRetry": {
+    "message": "Réessayer"
+  },
+  "explainSettings": {
+    "message": "Réglages de l'explication de sélection"
+  },
+  "explainTriggerIcon": {
+    "message": "Bouton à côté de la sélection"
+  },
+  "explainTriggerHotkey": {
+    "message": "Raccourci E uniquement"
+  },
+  "explainTriggerOff": {
+    "message": "Désactivé"
   }
 }

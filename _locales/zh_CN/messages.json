@@ -2103,5 +2103,29 @@
         "content": "$1"
       }
     }
+  },
+  "explainSelection": {
+    "message": "解释所选内容"
+  },
+  "explainAskMore": {
+    "message": "在问答中追问"
+  },
+  "explainLoading": {
+    "message": "正在生成解释…"
+  },
+  "explainErrRetry": {
+    "message": "重试"
+  },
+  "explainSettings": {
+    "message": "划词解释设置"
+  },
+  "explainTriggerIcon": {
+    "message": "选中文字旁显示按钮"
+  },
+  "explainTriggerHotkey": {
+    "message": "仅快捷键 E"
+  },
+  "explainTriggerOff": {
+    "message": "关闭"
   }
 }

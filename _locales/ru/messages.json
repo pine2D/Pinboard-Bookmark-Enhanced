@@ -2103,5 +2103,29 @@
         "content": "$1"
       }
     }
+  },
+  "explainSelection": {
+    "message": "Объяснить выделенное"
+  },
+  "explainAskMore": {
+    "message": "Задать уточняющий вопрос"
+  },
+  "explainLoading": {
+    "message": "Создание объяснения…"
+  },
+  "explainErrRetry": {
+    "message": "Повторить"
+  },
+  "explainSettings": {
+    "message": "Настройки объяснения выделенного"
+  },
+  "explainTriggerIcon": {
+    "message": "Кнопка рядом с выделением"
+  },
+  "explainTriggerHotkey": {
+    "message": "Только горячая клавиша E"
+  },
+  "explainTriggerOff": {
+    "message": "Выключено"
   }
 }

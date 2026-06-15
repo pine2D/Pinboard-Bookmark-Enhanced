@@ -2103,5 +2103,29 @@
         "content": "$1"
       }
     }
+  },
+  "explainSelection": {
+    "message": "Explain selection"
+  },
+  "explainAskMore": {
+    "message": "Ask a follow-up"
+  },
+  "explainLoading": {
+    "message": "Generating explanation…"
+  },
+  "explainErrRetry": {
+    "message": "Retry"
+  },
+  "explainSettings": {
+    "message": "Explain-selection settings"
+  },
+  "explainTriggerIcon": {
+    "message": "Button next to selection"
+  },
+  "explainTriggerHotkey": {
+    "message": "Hotkey E only"
+  },
+  "explainTriggerOff": {
+    "message": "Off"
   }
 }

@@ -2103,5 +2103,29 @@
         "content": "$1"
       }
     }
+  },
+  "explainSelection": {
+    "message": "選択範囲を解説"
+  },
+  "explainAskMore": {
+    "message": "続けて質問する"
+  },
+  "explainLoading": {
+    "message": "解説を生成中…"
+  },
+  "explainErrRetry": {
+    "message": "再試行"
+  },
+  "explainSettings": {
+    "message": "選択解説の設定"
+  },
+  "explainTriggerIcon": {
+    "message": "選択テキストの横にボタンを表示"
+  },
+  "explainTriggerHotkey": {
+    "message": "ショートカット E のみ"
+  },
+  "explainTriggerOff": {
+    "message": "オフ"
   }
 }

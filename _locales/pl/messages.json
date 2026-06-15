@@ -2103,5 +2103,29 @@
         "content": "$1"
       }
     }
+  },
+  "explainSelection": {
+    "message": "Wyjaśnij zaznaczenie"
+  },
+  "explainAskMore": {
+    "message": "Zadaj pytanie uzupełniające"
+  },
+  "explainLoading": {
+    "message": "Generowanie wyjaśnienia…"
+  },
+  "explainErrRetry": {
+    "message": "Spróbuj ponownie"
+  },
+  "explainSettings": {
+    "message": "Ustawienia wyjaśniania zaznaczenia"
+  },
+  "explainTriggerIcon": {
+    "message": "Przycisk obok zaznaczenia"
+  },
+  "explainTriggerHotkey": {
+    "message": "Tylko skrót klawiszowy E"
+  },
+  "explainTriggerOff": {
+    "message": "Wyłączone"
   }
 }

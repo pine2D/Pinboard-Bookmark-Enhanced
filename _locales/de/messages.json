@@ -2103,5 +2103,29 @@
         "content": "$1"
       }
     }
+  },
+  "explainSelection": {
+    "message": "Auswahl erklären"
+  },
+  "explainAskMore": {
+    "message": "Rückfrage stellen"
+  },
+  "explainLoading": {
+    "message": "Erklärung wird erstellt…"
+  },
+  "explainErrRetry": {
+    "message": "Erneut versuchen"
+  },
+  "explainSettings": {
+    "message": "Einstellungen der Auswahl-Erklärung"
+  },
+  "explainTriggerIcon": {
+    "message": "Schaltfläche neben der Auswahl"
+  },
+  "explainTriggerHotkey": {
+    "message": "Nur Tastenkürzel E"
+  },
+  "explainTriggerOff": {
+    "message": "Aus"
   }
 }
