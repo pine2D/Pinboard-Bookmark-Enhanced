@@ -19,6 +19,7 @@ h2 { margin-top: 24px; font-size: 16px; }
      exist yet in early plan tasks: a 404 here only logs to the console and
      does not break the page; their suites use suiteIf() and show as SKIP. -->
 <script src="../vendor/turndown.js"></script>
+<script src="../md-convert.js"></script>
 <script src="../ai.js"></script>
 <script src="../md-ai-core.js"></script>
 <script src="../md-translate.js"></script>
@@ -259,6 +260,102 @@ suite("_pbpChainAbort", () => {
     const c = _pbpChainAbort(parent.signal);
     c.abort();
     assertEq(parent.signal.aborted, false, "parent untouched");
+  });
+});
+</script>
+
+<script>
+// ============ Task 3: pbpAiHash (FNV-1a 32-bit hex) ============
+suite("pbpAiHash", () => {
+  test("empty string is FNV offset basis", () => {
+    assert(pbpAiHash("") === "811c9dc5", "got " + pbpAiHash(""));
+  });
+  test("known vector 'a'", () => {
+    assert(pbpAiHash("a") === "e40c292c", "got " + pbpAiHash("a"));
+  });
+  test("known vector 'foobar'", () => {
+    assert(pbpAiHash("foobar") === "bf9cf968", "got " + pbpAiHash("foobar"));
+  });
+  test("always 8 lowercase hex chars", () => {
+    assert(/^[0-9a-f]{8}$/.test(pbpAiHash("x")), "shape");
+    assert(/^[0-9a-f]{8}$/.test(pbpAiHash("longer input string here")), "shape long");
+  });
+  test("CJK input deterministic and distinct", () => {
+    assert(pbpAiHash("你好") === pbpAiHash("你好"), "deterministic");
+    assert(pbpAiHash("你好") !== pbpAiHash("你坏"), "distinct");
+  });
+});
+
+// ============ Task 3: pbpAiEstimateTokens ============
+suite("pbpAiEstimateTokens", () => {
+  test("ceil(chars/4)", () => {
+    assert(pbpAiEstimateTokens(0) === 0, "0 chars");
+    assert(pbpAiEstimateTokens(1) === 1, "1 char");
+    assert(pbpAiEstimateTokens(4) === 1, "4 chars");
+    assert(pbpAiEstimateTokens(5) === 2, "5 chars");
+    assert(pbpAiEstimateTokens(8000) === 2000, "8000 chars");
+  });
+});
+
+// ============ Task 3: block indexer + textOf/mdOf ============
+suite("pbpAiIndexBlocks family", () => {
+  function makeRoot(html) {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    return d;
+  }
+  test("indexes only block tags, 1-based, sets data-pb", () => {
+    const root = makeRoot("<h2>T</h2><p>one</p><div>skip</div><ul><li>a</li></ul><pre><code>x</code></pre>");
+    const blocks = pbpAiIndexBlocks(root);
+    assert(blocks.length === 4, "4 blocks, got " + blocks.length);
+    assert(blocks[0].n === 1 && blocks[0].tag === "h2", "first is h2 n=1");
+    assert(blocks[1].el.dataset.pb === "2", "data-pb assigned");
+    assert(blocks[3].tag === "pre", "pre indexed");
+    assert(root.querySelector("div").dataset.pb === undefined, "div skipped");
+  });
+  test("pbpAiBlocks returns stored index; pbpAiBlockEl resolves", () => {
+    const root = makeRoot("<p>a</p><p>b</p>");
+    pbpAiIndexBlocks(root);
+    assert(pbpAiBlocks().length === 2, "2 blocks");
+    assert(pbpAiBlockEl(2).textContent === "b", "blockEl(2)");
+    assert(pbpAiBlockEl(99) === null, "out of range null");
+    assert(pbpAiBlockEl(0) === null, "0 null");
+  });
+  test("pbpAiTextOf returns textContent and caches", () => {
+    const root = makeRoot("<p>hello <strong>world</strong></p>");
+    pbpAiIndexBlocks(root);
+    assert(pbpAiTextOf(1) === "hello world", "textContent");
+    root.querySelector("p").textContent = "changed";
+    assert(pbpAiTextOf(1) === "hello world", "cached after DOM change");
+  });
+  test("pbpAiMdOf converts block markdown and caches", () => {
+    const root = makeRoot('<p>see <strong>bold</strong> and <a href="https://x.test/">link</a></p>');
+    pbpAiIndexBlocks(root);
+    const md = pbpAiMdOf(1);
+    assert(md.indexOf("**bold**") !== -1, "bold survives: " + md);
+    assert(md.indexOf("](https://x.test/)") !== -1, "link survives: " + md);
+    root.querySelector("p").textContent = "changed";
+    assert(pbpAiMdOf(1) === md, "cached");
+  });
+  test("pbpAiMdOf KaTeX pre-pass: inline .katex becomes $tex$", () => {
+    const root = makeRoot('<p>mass <span class="katex"><span class="katex-mathml"><math><semantics><mrow></mrow><annotation encoding="application/x-tex">E=mc^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">Emc2glyphs</span></span> end</p>');
+    pbpAiIndexBlocks(root);
+    const md = pbpAiMdOf(1);
+    assert(md.indexOf("$E=mc^2$") !== -1, "tex source restored: " + md);
+    assert(md.indexOf("Emc2glyphs") === -1, "rendered glyphs dropped: " + md);
+  });
+  test("pbpAiMdOf KaTeX pre-pass: .katex-display becomes $$tex$$", () => {
+    const root = makeRoot('<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow></mrow><annotation encoding="application/x-tex">x+y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">xyglyphs</span></span></span></p>');
+    pbpAiIndexBlocks(root);
+    const md = pbpAiMdOf(1);
+    assert(md.indexOf("$$x+y$$") !== -1, "display tex wrapped: " + md);
+    assert(md.indexOf("xyglyphs") === -1, "glyphs dropped: " + md);
+  });
+  test("re-index resets caches", () => {
+    pbpAiIndexBlocks(makeRoot("<p>first</p>"));
+    assert(pbpAiTextOf(1) === "first", "first root");
+    pbpAiIndexBlocks(makeRoot("<p>second</p>"));
+    assert(pbpAiTextOf(1) === "second", "cache reset");
   });
 });
 </script>
