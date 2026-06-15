@@ -232,4 +232,34 @@ suite("_pbpOllamaDelta", () => {
   });
 });
 </script>
+
+<script>
+// ============ ai.js: _pbpChainAbort ============
+suite("_pbpChainAbort", () => {
+  test("no parent -> fresh non-aborted controller", () => {
+    const c = _pbpChainAbort(undefined);
+    assert(c instanceof AbortController, "is AbortController");
+    assertEq(c.signal.aborted, false, "not aborted");
+  });
+  test("pre-aborted parent -> chained aborted immediately", () => {
+    const parent = new AbortController();
+    parent.abort();
+    const c = _pbpChainAbort(parent.signal);
+    assertEq(c.signal.aborted, true, "aborted at creation");
+  });
+  test("parent abort propagates to chained", () => {
+    const parent = new AbortController();
+    const c = _pbpChainAbort(parent.signal);
+    assertEq(c.signal.aborted, false, "starts live");
+    parent.abort();
+    assertEq(c.signal.aborted, true, "propagated");
+  });
+  test("chained abort does NOT abort parent (idle timeout must not cancel caller signal)", () => {
+    const parent = new AbortController();
+    const c = _pbpChainAbort(parent.signal);
+    c.abort();
+    assertEq(parent.signal.aborted, false, "parent untouched");
+  });
+});
+</script>
 </body></html>

@@ -293,6 +293,240 @@ function _pbpOllamaDelta(obj) {
   return (typeof t === "string" && t.length) ? t : null;
 }
 
+// ---- Stream plumbing ----
+
+const PBP_STREAM_IDLE_MS = 30000;
+
+// Child AbortController that follows the caller's optional signal.
+// The 30s idle timeout aborts the CHILD only — never the caller's
+// controller (callers reuse one controller across parallel requests,
+// e.g. the translate queue's Stop button).
+function _pbpChainAbort(signal) {
+  const ctrl = new AbortController();
+  if (signal) {
+    if (signal.aborted) ctrl.abort();
+    else signal.addEventListener("abort", () => ctrl.abort(), { once: true });
+  }
+  return ctrl;
+}
+
+// Shared streaming driver. POSTs `url` and pipes the response body
+// through `consume(buf, isFinal) -> rest`: consume extracts complete
+// payloads from the accumulated text and returns the unconsumed tail
+// (must return "" when isFinal).
+// Idle timeout: one resettable 30s timer, armed before fetch and re-armed
+// on every received network chunk — covers time-to-first-byte AND
+// mid-stream stalls. (Byte-level, not delta-level: an SSE keep-alive
+// comment also resets it, which is the desired liveness semantics.)
+// Rejections: handleAIError(res, providerName) on non-ok; DOMException
+// AbortError when the CALLER aborts; Error("AI stream timeout") when the
+// idle timer fires.
+async function _pbpStreamRead(url, init, opts, providerName, consume) {
+  const ctrl = _pbpChainAbort(opts.signal);
+  let timedOut = false;
+  let idleTimer = null;
+  const resetIdle = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { timedOut = true; ctrl.abort(); }, PBP_STREAM_IDLE_MS);
+  };
+  try {
+    resetIdle();
+    const res = await fetch(url, { ...init, signal: ctrl.signal });
+    if (!res.ok) {
+      clearTimeout(idleTimer);
+      // always throws (same semantics as the non-streaming callers)
+      await handleAIError(res, providerName);
+    }
+    if (!res.body) throw new Error(providerName + " response has no stream body");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      resetIdle();
+      buf += decoder.decode(value, { stream: true });
+      buf = consume(buf, false);
+    }
+    buf += decoder.decode();
+    consume(buf, true);
+  } catch (e) {
+    if (timedOut && !(opts.signal && opts.signal.aborted)) {
+      throw new Error("AI stream timeout");
+    }
+    throw e;
+  } finally {
+    clearTimeout(idleTimer);
+  }
+}
+
+// Build a consume() for SSE bodies: split complete events, JSON-parse each,
+// run the provider delta extractor, forward text via onText(delta).
+// "[DONE]" (OpenAI terminator) and unparseable keep-alives are skipped;
+// stream end is signaled by the reader, not by the terminator.
+function _pbpSseConsumer(extractDelta, onText) {
+  return (buf, isFinal) => {
+    const { events, rest } = _pbpSseChunks(isFinal ? buf + "\n\n" : buf);
+    for (const ev of events) {
+      if (ev === "[DONE]") continue;
+      let obj;
+      try { obj = JSON.parse(ev); } catch (_) { continue; }
+      const d = extractDelta(obj);
+      if (d) onText(d);
+    }
+    return isFinal ? "" : rest;
+  };
+}
+
+async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta) {
+  const headers = { "Content-Type": "application/json" };
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  const messages = [];
+  if (opts.system) messages.push({ role: "system", content: opts.system });
+  messages.push({ role: "user", content: prompt });
+  let full = "";
+  await _pbpStreamRead(
+    `${baseUrl.replace(/\/+$/, "")}/chat/completions`,
+    {
+      method: "POST", headers,
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
+        max_tokens: opts.maxTokens || 1024,
+        stream: true
+      })
+    },
+    opts, "API",
+    _pbpSseConsumer(_pbpOpenAIDelta, (d) => { full += d; onDelta(d, full); })
+  );
+  if (!full.trim()) throw new Error("API returned empty response");
+  return full;
+}
+
+async function _streamGemini(s, prompt, opts, onDelta) {
+  const model = opts.model || s.geminiModel || "gemini-2.5-flash-lite";
+  const generationConfig = {
+    temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
+    maxOutputTokens: opts.maxTokens || 1024
+  };
+  // Translate path: hard-disable thinking so the output budget is all payload.
+  if (opts.noThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig };
+  if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
+  let full = "";
+  // Gemini requires the key as a URL param (same limitation as callGemini)
+  await _pbpStreamRead(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${s.geminiApiKey}`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    opts, "Gemini",
+    _pbpSseConsumer(_pbpGeminiDelta, (d) => { full += d; onDelta(d, full); })
+  );
+  if (!full.trim()) throw new Error("Gemini returned empty response");
+  return full;
+}
+
+async function _streamClaude(s, prompt, opts, onDelta) {
+  const body = {
+    model: opts.model || s.claudeModel || "claude-haiku-4-5-20251001",
+    max_tokens: opts.maxTokens || 1024,
+    temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
+    messages: [{ role: "user", content: prompt }],
+    stream: true
+  };
+  if (opts.system) body.system = opts.system;
+  let full = "";
+  await _pbpStreamRead(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": s.claudeApiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify(body)
+    },
+    opts, "Claude",
+    _pbpSseConsumer(_pbpClaudeDelta, (d) => { full += d; onDelta(d, full); })
+  );
+  if (!full.trim()) throw new Error("Claude returned empty response");
+  return full;
+}
+
+async function _streamOllama(s, prompt, opts, onDelta) {
+  const base = (s.ollamaBaseUrl || "http://localhost:11434").replace(/\/+$/, "");
+  const messages = [];
+  if (opts.system) messages.push({ role: "system", content: opts.system });
+  messages.push({ role: "user", content: prompt });
+  const body = {
+    model: opts.model || s.ollamaModel || "llama3.2",
+    messages,
+    stream: true,
+    options: {
+      temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
+      num_predict: opts.maxTokens || 1024
+    }
+  };
+  let full = "";
+  // Ollama streams NDJSON (one JSON object per line), not SSE.
+  const consume = (buf, isFinal) => {
+    const lines = buf.split("\n");
+    const rest = isFinal ? "" : lines.pop();
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let obj;
+      try { obj = JSON.parse(trimmed); } catch (_) { continue; }
+      const d = _pbpOllamaDelta(obj);
+      if (d) { full += d; onDelta(d, full); }
+    }
+    return rest;
+  };
+  await _pbpStreamRead(
+    `${base}/api/chat`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    opts, "Ollama", consume
+  );
+  if (!full.trim()) throw new Error("Ollama returned empty response");
+  return full;
+}
+
+// ---- Streaming AI dispatcher ----
+// callAIStream(s, prompt, opts, onDelta) -> Promise<string fullText>
+//   opts: { maxTokens?, model? (override provider default), system?,
+//           signal? (AbortSignal), temperature? (default 0.3),
+//           noThinking? (Gemini only) }
+//   onDelta(deltaText, accumulatedText) fires once per text chunk.
+//   Resolves with the full accumulated text (identical to the last
+//   accumulatedText passed to onDelta). Rejects with handleAIError
+//   semantics on non-ok / AbortError on caller abort /
+//   Error("AI stream timeout") on 30s idle.
+async function callAIStream(s, prompt, opts = {}, onDelta) {
+  const cb = (typeof onDelta === "function") ? onDelta : () => {};
+  const p = s.aiProvider || "gemini";
+  const m = opts.model;
+  switch (p) {
+    case "gemini": return _streamGemini(s, prompt, opts, cb);
+    case "claude": return _streamClaude(s, prompt, opts, cb);
+    case "openai": return _streamOpenAICompat(s.openaiBaseUrl || "https://api.openai.com/v1", s.openaiApiKey, m || s.openaiModel || "gpt-5.4-nano", prompt, opts, cb);
+    case "deepseek": return _streamOpenAICompat("https://api.deepseek.com/v1", s.deepseekApiKey, m || s.deepseekModel || "deepseek-v4-flash", prompt, opts, cb);
+    case "qwen": return _streamOpenAICompat("https://dashscope.aliyuncs.com/compatible-mode/v1", s.qwenApiKey, m || s.qwenModel || "qwen-flash", prompt, opts, cb);
+    case "minimax": return _streamOpenAICompat("https://api.minimax.chat/v1", s.minimaxApiKey, m || s.minimaxModel || "MiniMax-M2", prompt, opts, cb);
+    case "openrouter": return _streamOpenAICompat("https://openrouter.ai/api/v1", s.openrouterApiKey, m || s.openrouterModel || "meta-llama/llama-4-scout:free", prompt, opts, cb);
+    case "groq": return _streamOpenAICompat("https://api.groq.com/openai/v1", s.groqApiKey, m || s.groqModel || "meta-llama/llama-4-scout-17b-16e-instruct", prompt, opts, cb);
+    case "mistral": return _streamOpenAICompat("https://api.mistral.ai/v1", s.mistralApiKey, m || s.mistralModel || "mistral-small-latest", prompt, opts, cb);
+    case "cohere": return _streamOpenAICompat("https://api.cohere.com/v2", s.cohereApiKey, m || s.cohereModel || "command-r-08-2024", prompt, opts, cb);
+    case "siliconflow": return _streamOpenAICompat("https://api.siliconflow.cn/v1", s.siliconflowApiKey, m || s.siliconflowModel || "Qwen/Qwen3-8B", prompt, opts, cb);
+    case "zhipu": return _streamOpenAICompat("https://open.bigmodel.cn/api/paas/v4", s.zhipuApiKey, m || s.zhipuModel || "glm-4.7-flash", prompt, opts, cb);
+    case "kimi": return _streamOpenAICompat("https://api.moonshot.cn/v1", s.kimiApiKey, m || s.kimiModel || "kimi-k2.6", prompt, opts, cb);
+    case "ollama": return _streamOllama(s, prompt, opts, cb);
+    case "custom": return _streamOpenAICompat(s.customBaseUrl, s.customApiKey, m || s.customModel, prompt, opts, cb);
+    default: throw new Error("Unknown provider: " + p);
+  }
+}
+
 // ---- Prompt builders (no DOM dependency) ----
 function buildTagPrompt(s, title, url, content, description, userTags) {
   const sep = s.aiTagSeparator || "-";
