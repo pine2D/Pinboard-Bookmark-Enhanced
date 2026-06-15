@@ -906,3 +906,25 @@ body.ask-open main { margin-right: 396px; }
 }
 .ask-copy-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
 
+/* ---- Explain-selection pill (md-ask.js) ---- */
+#explain-pill {
+  position: fixed;
+  z-index: 40;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 1px solid var(--btn-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.16);
+  cursor: pointer;
+}
+#explain-pill:hover { background: var(--btn-hover); border-color: var(--border); }
+#explain-pill:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+#explain-pill svg { width: 15px; height: 15px; }
+#explain-pill[hidden] { display: none; }
+

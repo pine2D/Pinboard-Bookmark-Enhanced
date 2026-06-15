@@ -924,3 +924,145 @@ document.addEventListener("pbp:rendered", (e) => {
     mo.observe(document.body, { childList: true, subtree: true });
   }).catch(() => {});
 }, { once: true });
+
+// ============================================================
+// Explain-selection (spec 5.3): selection observer + pill + popover.
+// Trigger ladder lives in settings key selectionTrigger:
+//   "icon" (default) -> pill next to the selection end + hotkey "e"
+//   "hotkey"         -> no pill, hotkey "e" only
+//   "off"            -> nothing registers at all
+// ============================================================
+
+// Pill geometry: 28px square, 6px gap from the selection rect, 8px viewport
+// margin. Placed below-right of the selection end so it NEVER covers the
+// selected line; flips above when the viewport bottom is too close.
+function pbpExplainPillPos(rect, vw, vh) {
+  const S = 28, GAP = 6, M = 8;
+  let x = rect.right + GAP;
+  if (x + S > vw - M) x = vw - M - S;
+  if (x < M) x = M;
+  let y = rect.bottom + GAP;
+  let above = false;
+  if (y + S > vh - M) { above = true; y = rect.top - GAP - S; }
+  if (y < M) y = M;
+  return { x, y, above };
+}
+
+// Minimum meaningful selection: >= 2 chars after trimming (spec 5.3).
+function pbpExplainSelectionValid(text) {
+  return typeof text === "string" && text.trim().length >= 2;
+}
+
+// ---- Explain: module state ----
+let _pbpExplainPage = { url: "", title: "" };
+let _pbpExplainSettings = null;
+let _pbpExplainTrigger = "icon"; // live value; the in-popover gear updates it
+let _pbpExplainMouseDown = false;
+let _pbpExplainSelTimer = null;
+let _pbpExplainPillEl = null;
+
+// Static inline SVG (Feather help-circle). Constant string, never model text.
+const PBP_EXPLAIN_PILL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+// Current selection if (and only if) it is explainable: non-collapsed, both
+// endpoints inside #rendered-view, >= 2 chars. Returns { range, text } | null.
+function _pbpExplainGetSelection() {
+  const view = document.getElementById("rendered-view");
+  if (!view) return null;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  const range = sel.getRangeAt(0);
+  if (!view.contains(range.startContainer) || !view.contains(range.endContainer)) return null;
+  const text = sel.toString();
+  if (!pbpExplainSelectionValid(text)) return null;
+  return { range, text: text.trim() };
+}
+
+function _pbpExplainEnsurePill() {
+  if (_pbpExplainPillEl) return _pbpExplainPillEl;
+  const pill = document.createElement("button");
+  pill.id = "explain-pill";
+  pill.type = "button";
+  pill.hidden = true;
+  pill.title = t("explainSelection");
+  pill.setAttribute("aria-label", t("explainSelection"));
+  pill.innerHTML = PBP_EXPLAIN_PILL_SVG; // static constant, see above
+  // Keep the selection alive through the click (mousedown would clear it).
+  pill.addEventListener("mousedown", (e) => e.preventDefault());
+  pill.addEventListener("click", () => pbpExplainInvoke());
+  document.body.appendChild(pill);
+  _pbpExplainPillEl = pill;
+  return pill;
+}
+
+function _pbpExplainHidePill() {
+  if (_pbpExplainPillEl) _pbpExplainPillEl.hidden = true;
+}
+
+function _pbpExplainShowPill() {
+  if (_pbpExplainTrigger !== "icon") { _pbpExplainHidePill(); return; }
+  const cap = _pbpExplainGetSelection();
+  if (!cap) { _pbpExplainHidePill(); return; }
+  const rect = cap.range.getBoundingClientRect();
+  if (!rect || (rect.width === 0 && rect.height === 0)) { _pbpExplainHidePill(); return; }
+  const pos = pbpExplainPillPos(rect, window.innerWidth, window.innerHeight);
+  const pill = _pbpExplainEnsurePill();
+  pill.style.left = pos.x + "px";
+  pill.style.top = pos.y + "px";
+  pill.hidden = false;
+}
+
+// Entry point for BOTH the pill click and the "e" hotkey. Captures the
+// selection NOW (the popover's light-dismiss may clear it later) and hands
+// off to the popover (Task 17). The typeof guard keeps this commit shippable
+// before the popover lands: invoke is then a silent no-op.
+function pbpExplainInvoke() {
+  const cap = _pbpExplainGetSelection();
+  if (!cap) return;
+  _pbpExplainHidePill();
+  if (typeof _pbpExplainOpenPop === "function") _pbpExplainOpenPop(cap);
+}
+
+function pbpExplainInit(detail) {
+  _pbpExplainPage = { url: (detail && detail.url) || "", title: (detail && detail.title) || "" };
+  pbpAiGetSettings().then((s) => {
+    if (!pbpAiAvailable(s)) return; // gate: master switch + key (spec rule 1/2)
+    _pbpExplainSettings = s;
+    _pbpExplainTrigger = s.selectionTrigger || "icon";
+    if (_pbpExplainTrigger === "off") return; // "off": zero listeners, zero DOM
+
+    // Mouse selection: suppress UI while dragging; read the selection 10ms
+    // after mouseup (the browser settles the final range after the event).
+    document.addEventListener("mousedown", (e) => {
+      if (_pbpExplainPillEl && _pbpExplainPillEl.contains(e.target)) return;
+      _pbpExplainMouseDown = true;
+      _pbpExplainHidePill();
+    });
+    document.addEventListener("mouseup", () => {
+      setTimeout(() => { _pbpExplainMouseDown = false; _pbpExplainShowPill(); }, 10);
+    });
+    // Keyboard selection (Shift+arrows): 100ms debounce; skipped while the
+    // mouse is down (mouseup owns that path).
+    document.addEventListener("selectionchange", () => {
+      if (_pbpExplainMouseDown) return;
+      clearTimeout(_pbpExplainSelTimer);
+      _pbpExplainSelTimer = setTimeout(_pbpExplainShowPill, 100);
+    });
+    // Fixed-position pill drifts on scroll: just hide it (re-select or "e").
+    window.addEventListener("scroll", _pbpExplainHidePill, { passive: true });
+    // Hotkey "e": works in both "icon" and "hotkey" modes. Guarded like the
+    // ask panel's "a": no modifiers, not in editable targets. Coexists with
+    // the "a"/Esc keydown handler above — different keys entirely.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "e" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (_pbpExplainTrigger === "off") return;
+      if (!_pbpExplainGetSelection()) return;
+      e.preventDefault();
+      pbpExplainInvoke();
+    });
+  });
+}
+
+document.addEventListener("pbp:rendered", (e) => pbpExplainInit((e && e.detail) || {}));

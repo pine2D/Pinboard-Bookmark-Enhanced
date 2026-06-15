@@ -1258,4 +1258,48 @@ suiteIf("ask copy text builder", "pbpAskBuildContext", () => {
   });
 });
 </script>
+<script>
+// ============ Task 16: explain pill positioning + selection validity ============
+suiteIf("pbpExplainPillPos", "pbpAskInit", () => {
+  function rect(l, t, r, b) { return { left: l, top: t, right: r, bottom: b }; }
+  test("default: below-right of the selection end", () => {
+    const p = pbpExplainPillPos(rect(100, 100, 300, 120), 1280, 800);
+    assertEq(p.x, 306, "x = rect.right + 6");
+    assertEq(p.y, 126, "y = rect.bottom + 6");
+    assertEq(p.above, false, "below");
+  });
+  test("clamps x to right viewport edge", () => {
+    const p = pbpExplainPillPos(rect(1000, 100, 1270, 120), 1280, 800);
+    assertEq(p.x, 1280 - 8 - 28, "clamped to vw - margin - size");
+  });
+  test("clamps x to left margin", () => {
+    const p = pbpExplainPillPos(rect(0, 100, 1, 120), 1280, 800);
+    assertEq(p.x, 8, "left margin");
+  });
+  test("flips above when no room below", () => {
+    const p = pbpExplainPillPos(rect(100, 700, 300, 780), 1280, 800);
+    assertEq(p.above, true, "flipped");
+    assertEq(p.y, 700 - 6 - 28, "above the rect");
+  });
+  test("flipped position still clamped to top margin", () => {
+    const p = pbpExplainPillPos(rect(100, 4, 300, 796), 1280, 800);
+    assertEq(p.above, true, "flipped");
+    assertEq(p.y, 8, "top margin");
+  });
+});
+
+suiteIf("pbpExplainSelectionValid", "pbpAskInit", () => {
+  test("two or more non-space chars valid", () => {
+    assertEq(pbpExplainSelectionValid("ab"), true, "ab");
+    assertEq(pbpExplainSelectionValid("  中文  "), true, "CJK trimmed");
+  });
+  test("short or blank invalid", () => {
+    assertEq(pbpExplainSelectionValid("a"), false, "1 char");
+    assertEq(pbpExplainSelectionValid("  a  "), false, "1 char padded");
+    assertEq(pbpExplainSelectionValid("   "), false, "spaces only");
+    assertEq(pbpExplainSelectionValid(""), false, "empty");
+    assertEq(pbpExplainSelectionValid(null), false, "null");
+  });
+});
+</script>
 </body></html>
