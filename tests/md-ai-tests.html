@@ -601,4 +601,138 @@ suite("md-ai IDB key conventions", () => {
   });
 });
 </script>
+
+<script>
+// ============ Task 9: md-translate pure core ============
+suiteIf("pbpTrPackBatches", "pbpTrPackBatches", () => {
+  function segs(n, len) {
+    const out = [];
+    for (let i = 1; i <= n; i++) out.push({ id: i, text: "x".repeat(len) });
+    return out;
+  }
+  test("empty input -> no batches", () => {
+    assertEq(pbpTrPackBatches([]).length, 0, "empty");
+    assertEq(pbpTrPackBatches(null).length, 0, "null tolerated");
+  });
+  test("small blocks pack into one batch, order kept", () => {
+    const b = pbpTrPackBatches([{ id: 1, text: "a" }, { id: 2, text: "b" }, { id: 5, text: "c" }]);
+    assertEq(b.length, 1, "one batch");
+    assertEq(b[0].map((s) => s.id).join(","), "1,2,5", "doc order");
+    assertEq(b[0][2].text, "c", "text carried");
+  });
+  test("default maxBlocks=15: 16 tiny blocks -> [15,1]", () => {
+    const b = pbpTrPackBatches(segs(16, 2));
+    assertEq(b.length, 2, "two batches");
+    assertEq(b[0].length, 15, "first 15");
+    assertEq(b[1].length, 1, "last 1");
+    assertEq(b[1][0].id, 16, "id 16 in second");
+  });
+  test("default maxChars=8000: 3000-char blocks pack two per batch", () => {
+    const b = pbpTrPackBatches(segs(5, 3000));
+    assertEq(b.map((x) => x.length).join(","), "2,2,1", "char-bounded");
+  });
+  test("single oversize block still gets its own batch (never dropped)", () => {
+    const b = pbpTrPackBatches([{ id: 1, text: "x".repeat(9000) }, { id: 2, text: "y" }]);
+    assertEq(b.length, 2, "split");
+    assertEq(b[0][0].id, 1, "oversize alone");
+    assertEq(b[1][0].id, 2, "next starts fresh");
+  });
+  test("custom limits honored", () => {
+    const b = pbpTrPackBatches(segs(5, 10), 2, 1000);
+    assertEq(b.map((x) => x.length).join(","), "2,2,1", "maxBlocks=2");
+    const c = pbpTrPackBatches(segs(4, 60), 15, 100);
+    assertEq(c.map((x) => x.length).join(","), "1,1,1,1", "maxChars=100");
+  });
+});
+
+suiteIf("pbpTrBuildPrompt", "pbpTrBuildPrompt", () => {
+  test("prompt is JSON with required keys, segments verbatim", () => {
+    const r = pbpTrBuildPrompt({
+      targetLanguage: "Simplified Chinese", title: "T",
+      segments: [{ id: 3, text: "hello ⟦C1⟧" }]
+    });
+    const p = JSON.parse(r.prompt);
+    assertEq(p.targetLanguage, "Simplified Chinese", "lang");
+    assertEq(p.title, "T", "title");
+    assertEq(p.segments.length, 1, "one seg");
+    assertEq(p.segments[0].id, 3, "id");
+    assertEq(p.segments[0].text, "hello ⟦C1⟧", "placeholder survives JSON");
+    assert(!("summary" in p), "summary omitted when absent");
+    assert(!("glossary" in p), "glossary omitted when absent");
+  });
+  test("summary and glossary included when provided", () => {
+    const r = pbpTrBuildPrompt({
+      targetLanguage: "Japanese", title: "T", summary: "article summary",
+      glossary: { LLM: "大規模言語モデル", Pinboard: "" },
+      segments: [{ id: 1, text: "a" }]
+    });
+    const p = JSON.parse(r.prompt);
+    assertEq(p.summary, "article summary", "summary in");
+    assertEq(p.glossary.LLM, "大規模言語モデル", "glossary term");
+    assertEq(p.glossary.Pinboard, "", "empty value kept (keep-source rule)");
+  });
+  test("empty glossary object omitted", () => {
+    const p = JSON.parse(pbpTrBuildPrompt({ targetLanguage: "x", title: "", segments: [], glossary: {} }).prompt);
+    assert(!("glossary" in p), "empty {} omitted");
+  });
+  test("system prompt states the JSON-only protocol", () => {
+    const sys = pbpTrBuildPrompt({ targetLanguage: "x", title: "", segments: [] }).system;
+    assert(sys.indexOf('{"translations":[{"id":N,"text":"..."}]}') !== -1, "exact output shape");
+    assert(sys.indexOf("⟦") !== -1, "placeholder rule present");
+    assert(/verbatim/i.test(sys), "verbatim ordered");
+    assert(/ids must match/i.test(sys), "id contract");
+    assert(/empty value/i.test(sys), "glossary keep-source rule");
+    assert(/proper nouns/i.test(sys), "proper-noun rule");
+  });
+});
+
+suiteIf("pbpTrParseGlossary", "pbpTrParseGlossary", () => {
+  test("basic term=translation", () => {
+    const g = pbpTrParseGlossary("LLM=Large Language Model");
+    assertEq(g.LLM, "Large Language Model", "parsed");
+  });
+  test("empty value = keep source", () => {
+    const g = pbpTrParseGlossary("Pinboard=");
+    assertEq(g.Pinboard, "", "empty string value");
+    assert("Pinboard" in g, "key present");
+  });
+  test("multiple lines, CRLF and blanks tolerated, whitespace trimmed", () => {
+    const g = pbpTrParseGlossary("  LLM = Large Language Model \r\n\r\n Pinboard=\n");
+    assertEq(g.LLM, "Large Language Model", "trimmed");
+    assertEq(g.Pinboard, "", "second rule");
+    assertEq(Object.keys(g).length, 2, "blank lines skipped");
+  });
+  test("lines without = and empty terms skipped", () => {
+    const g = pbpTrParseGlossary("not a rule\n=orphan value\nA=1");
+    assertEq(Object.keys(g).join(","), "A", "only valid rule");
+  });
+  test("value containing = kept whole (split on first =)", () => {
+    const g = pbpTrParseGlossary("E=mc^2=energy formula");
+    assertEq(g.E, "mc^2=energy formula", "first = splits");
+  });
+  test("null/empty input -> empty object", () => {
+    assertEq(Object.keys(pbpTrParseGlossary("")).length, 0, "empty");
+    assertEq(Object.keys(pbpTrParseGlossary(null)).length, 0, "null");
+  });
+});
+
+suiteIf("pbpTrLengthRatioOk", "pbpTrLengthRatioOk", () => {
+  test("similar lengths pass", () => {
+    assert(pbpTrLengthRatioOk("hello world here", "你好世界在此处") === true, "CJK shrink ok");
+  });
+  test("inclusive bounds 0.3 and 4", () => {
+    assert(pbpTrLengthRatioOk("x".repeat(10), "y".repeat(3)) === true, "exactly 0.3");
+    assert(pbpTrLengthRatioOk("x".repeat(10), "y".repeat(40)) === true, "exactly 4");
+    assert(pbpTrLengthRatioOk("x".repeat(10), "y".repeat(2)) === false, "0.2 fails");
+    assert(pbpTrLengthRatioOk("x".repeat(10), "y".repeat(41)) === false, "4.1 fails");
+  });
+  test("empty or whitespace translation invalid", () => {
+    assert(pbpTrLengthRatioOk("source text", "") === false, "empty");
+    assert(pbpTrLengthRatioOk("source text", "   ") === false, "whitespace");
+  });
+  test("empty original invalid (nothing to translate)", () => {
+    assert(pbpTrLengthRatioOk("", "anything") === false, "empty orig");
+  });
+});
+</script>
 </body></html>
