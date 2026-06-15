@@ -2031,5 +2031,54 @@
   },
   "askClose": {
     "message": "Schließen"
+  },
+  "askSend": {
+    "message": "Senden"
+  },
+  "askStop": {
+    "message": "Stopp"
+  },
+  "askPlaceholder": {
+    "message": "Frage zu diesem Artikel stellen... (Enter senden, Shift+Enter neue Zeile)"
+  },
+  "askWillSend": {
+    "message": "Sendet etwa $TOKENS$ Tokens an $MODEL$",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "askSentPartial": {
+    "message": "(langer Artikel: $SENT$ von $TOTAL$ Blöcken werden gesendet)",
+    "placeholders": {
+      "sent": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "askChipSummarize": {
+    "message": "Diesen Artikel zusammenfassen"
+  },
+  "askChipArgument": {
+    "message": "Was ist das Hauptargument?"
+  },
+  "askChipData": {
+    "message": "Welche Daten werden zitiert?"
+  },
+  "askErrRetry": {
+    "message": "Erneut versuchen"
+  },
+  "askStopped": {
+    "message": "Gestoppt (Teilantwort beibehalten)"
+  },
+  "askEmptyHint": {
+    "message": "Antworten zitieren die Absätze des Artikels, sodass jede Aussage überprüfbar ist."
   }
 }

@@ -2031,5 +2031,54 @@
   },
   "askClose": {
     "message": "關閉"
+  },
+  "askSend": {
+    "message": "發送"
+  },
+  "askStop": {
+    "message": "停止"
+  },
+  "askPlaceholder": {
+    "message": "針對本文提問…（Enter 發送，Shift+Enter 換行）"
+  },
+  "askWillSend": {
+    "message": "將向 $MODEL$ 發送約 $TOKENS$ tokens",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "askSentPartial": {
+    "message": "（文章較長：發送 $SENT$/$TOTAL$ 段）",
+    "placeholders": {
+      "sent": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "askChipSummarize": {
+    "message": "總結這篇文章"
+  },
+  "askChipArgument": {
+    "message": "核心論點是什麼？"
+  },
+  "askChipData": {
+    "message": "文中引用了哪些資料？"
+  },
+  "askErrRetry": {
+    "message": "重試"
+  },
+  "askStopped": {
+    "message": "已停止（已保留部分回答）"
+  },
+  "askEmptyHint": {
+    "message": "回答會標註原文段落出處，每個論斷都可點擊核對。"
   }
 }

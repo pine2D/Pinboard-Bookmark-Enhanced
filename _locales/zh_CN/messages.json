@@ -2031,5 +2031,54 @@
   },
   "askClose": {
     "message": "关闭"
+  },
+  "askSend": {
+    "message": "发送"
+  },
+  "askStop": {
+    "message": "停止"
+  },
+  "askPlaceholder": {
+    "message": "针对本文提问…（Enter 发送，Shift+Enter 换行）"
+  },
+  "askWillSend": {
+    "message": "将向 $MODEL$ 发送约 $TOKENS$ tokens",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "askSentPartial": {
+    "message": "（文章较长：发送 $SENT$/$TOTAL$ 段）",
+    "placeholders": {
+      "sent": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "askChipSummarize": {
+    "message": "总结这篇文章"
+  },
+  "askChipArgument": {
+    "message": "核心论点是什么？"
+  },
+  "askChipData": {
+    "message": "文中引用了哪些数据？"
+  },
+  "askErrRetry": {
+    "message": "重试"
+  },
+  "askStopped": {
+    "message": "已停止（已保留部分回答）"
+  },
+  "askEmptyHint": {
+    "message": "回答会标注原文段落出处，每个论断都可点击核对。"
   }
 }

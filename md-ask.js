@@ -246,3 +246,256 @@ if (typeof document !== "undefined") {
     pbpAskInit((e && e.detail) || {}).catch(() => {});
   }, { once: true });
 }
+
+// ============================================================
+// Ask send pipeline (Task 13), part 1: pure functions.
+// ============================================================
+
+// Context budget in estimated tokens (chars/4; spec 5.1: ~24k, tunable).
+const PBP_ASK_CTX_BUDGET = 24000;
+
+// Layered context builder. blocks = pbpAiBlocks() entries ({n, el, tag}).
+// Always keeps every heading block (h2/h3/h4) plus the first 3 and last 2
+// blocks; the remaining budget is filled by sampling the leftover middle
+// blocks at uniform document-order intervals (largest count that fits).
+// Returns { text: "[Pn] <text>" lines joined by \n, sentBlocks, totalBlocks }.
+function pbpAskBuildContext(blocks, budgetTokens) {
+  const budget = (budgetTokens === undefined || budgetTokens === null)
+    ? PBP_ASK_CTX_BUDGET : Number(budgetTokens);
+  const list = Array.isArray(blocks) ? blocks : [];
+  const totalBlocks = list.length;
+  if (!totalBlocks) return { text: "", sentBlocks: 0, totalBlocks: 0 };
+  const lineOf = (b) => "[P" + b.n + "] " +
+    String((b.el && b.el.textContent) || "").replace(/\s+/g, " ").trim();
+  const mandatory = [];
+  const middle = [];
+  list.forEach((b, i) => {
+    const must = b.tag === "h2" || b.tag === "h3" || b.tag === "h4"
+      || i < 3 || i >= totalBlocks - 2;
+    (must ? mandatory : middle).push(b);
+  });
+  let baseChars = 0;
+  for (const b of mandatory) baseChars += lineOf(b).length + 1;
+  const midLens = middle.map((b) => lineOf(b).length + 1);
+  // Largest k whose evenly-spaced sample fits the budget. O(middle^2)
+  // worst case but middle is at most a few hundred blocks - negligible.
+  let chosen = [];
+  for (let k = middle.length; k >= 1; k--) {
+    let chars = baseChars;
+    for (let j = 0; j < k; j++) chars += midLens[Math.floor(j * middle.length / k)];
+    if (pbpAiEstimateTokens(chars) <= budget) {
+      for (let j = 0; j < k; j++) chosen.push(Math.floor(j * middle.length / k));
+      break;
+    }
+  }
+  const picked = new Set(mandatory.map((b) => b.n));
+  for (const ix of chosen) picked.add(middle[ix].n);
+  const lines = [];
+  for (const b of list) if (picked.has(b.n)) lines.push(lineOf(b));
+  return { text: lines.join("\n"), sentBlocks: lines.length, totalBlocks };
+}
+
+// Prompt builder. history = [{q, a}] (caller passes the in-memory rounds);
+// only the last 4 are serialized. The CITES contract here is what
+// pbpAiParseCites (md-ai-core, Task 5) parses on the way back.
+function pbpAskBuildPrompt(args) {
+  const a = args || {};
+  const context = String(a.context == null ? "" : a.context);
+  const question = String(a.question == null ? "" : a.question);
+  const history = Array.isArray(a.history) ? a.history.slice(-4) : [];
+  const system = [
+    "You answer questions about ONE article supplied below.",
+    "Rules:",
+    "1. Answer in the same language as the question.",
+    "2. Use ONLY the article. Do not use outside knowledge.",
+    "3. After every claim the article supports, add an inline citation token [P<n>] where <n> is the paragraph number from the article.",
+    "4. End the answer with a CITES: block - one line per cited paragraph, formatted exactly as:",
+    "   P<n>: \"verbatim quote of 15 words or fewer, in the article's original language\"",
+    "5. If the article does not contain the answer, say so plainly. Never invent citations."
+  ].join("\n");
+  const parts = ["ARTICLE:", context, ""];
+  if (history.length) {
+    parts.push("PREVIOUS Q&A (context for follow-ups only):");
+    for (const h of history) {
+      parts.push("Q: " + String((h && h.q) || ""));
+      parts.push("A: " + String((h && h.a) || ""));
+    }
+    parts.push("");
+  }
+  parts.push("QUESTION: " + question);
+  return { system, prompt: parts.join("\n") };
+}
+
+// ============================================================
+// Ask send pipeline (Task 13), part 2: streaming send flow.
+// Wires the Task 12 seams: _pbpAskOnSubmit -> _pbpAskSend and
+// _pbpAskSetOpen -> _pbpAskUpdateMeta.
+// ============================================================
+
+// "provider" or "provider/override" - shown in the transparency line and
+// persisted as the history record's model field.
+function _pbpAskProviderLabel(s) {
+  const provider = (s && s.aiProvider) || "gemini";
+  const override = pbpAiResolveModelOverride(s);
+  return override ? provider + "/" + override : provider;
+}
+
+// Transparency line (Task 12's _pbpAskSetOpen calls this seam on every
+// open; the send path refreshes it again right before the request fires).
+// Builds and caches the trimmed context on first need.
+function _pbpAskUpdateMeta() {
+  const st = _pbpAskState;
+  const meta = document.getElementById("ask-meta");
+  if (!st || !meta) return;
+  if (!st.ctx) st.ctx = pbpAskBuildContext(pbpAiBlocks(), PBP_ASK_CTX_BUDGET);
+  const tokens = pbpAiEstimateTokens(st.ctx.text.length);
+  let line = t("askWillSend", String(tokens), _pbpAskProviderLabel(st.s));
+  if (st.ctx.sentBlocks < st.ctx.totalBlocks) {
+    line += " " + t("askSentPartial", String(st.ctx.sentBlocks), String(st.ctx.totalBlocks));
+  }
+  meta.textContent = line;
+}
+
+// One-time Stop wiring (the panel markup belongs to Task 12; same
+// _pbpWired expando pattern the history task uses for #ask-clear).
+function _pbpAskWireStop() {
+  const btn = document.getElementById("ask-stop");
+  if (!btn || btn._pbpWired) return;
+  btn._pbpWired = true;
+  btn.addEventListener("click", () => {
+    if (_pbpAskState && _pbpAskState.ctrl) _pbpAskState.ctrl.abort();
+  });
+}
+
+// Append one Q/A round. Question is USER text -> textContent only. The
+// .ask-q/.ask-a structure is a cross-task contract (the history restore
+// task replicates it verbatim).
+function _pbpAskAppendRound(question) {
+  const thread = document.getElementById("ask-thread");
+  if (!thread) return null;
+  const empty = document.getElementById("ask-empty");
+  if (empty) empty.remove();
+  const chips = document.getElementById("ask-chips");
+  if (chips) chips.hidden = true;
+  const qEl = document.createElement("div");
+  qEl.className = "ask-q";
+  qEl.textContent = question;
+  const aEl = document.createElement("div");
+  aEl.className = "ask-a streaming";
+  thread.appendChild(qEl);
+  thread.appendChild(aEl);
+  thread.scrollTop = thread.scrollHeight;
+  return aEl;
+}
+
+// PLACEHOLDER implementation (assembly constraint 11): strip the CITES
+// block and show plain text. The citation-pipeline task (Task 14) replaces
+// this WHOLE function, this comment included, with renderMarkdown (single
+// sanitize point) + the chip pass. Return shape {body, cites} is already
+// the final contract - callers persist parsed.cites with the record.
+function _pbpAskFinalize(el, fullText) {
+  const parsed = pbpAiParseCites(String(fullText == null ? "" : fullText));
+  el.textContent = parsed.body;
+  return parsed;
+}
+
+// Error UI: human message (callAIStream rejects with handleAIError text)
+// plus a retry button that re-runs the SAME question into the same .ask-a.
+function _pbpAskErrorUi(aEl, message, question) {
+  const err = document.createElement("p");
+  err.className = "ask-err";
+  err.textContent = message;
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "action-btn ask-retry";
+  retry.textContent = t("askErrRetry");
+  retry.addEventListener("click", () => {
+    aEl.replaceChildren();
+    aEl.classList.add("streaming");
+    _pbpAskRun(question, aEl).catch(() => {});
+  });
+  aEl.appendChild(err);
+  aEl.appendChild(retry);
+}
+
+// Core runner: stream into aEl, finalize, persist, count.
+async function _pbpAskRun(question, aEl) {
+  const st = _pbpAskState;
+  if (!st || st.running) return;
+  st.rounds = st.rounds || []; // lazy: Task 12's state object predates this field
+  st.running = true;
+  st.ctrl = new AbortController();
+  _pbpAskWireStop();
+  const stopBtn = document.getElementById("ask-stop");
+  const sendBtn = document.getElementById("ask-send");
+  if (stopBtn) stopBtn.hidden = false;
+  if (sendBtn) sendBtn.disabled = true;
+  let raf = 0;
+  let acc = "";
+  const paint = () => { raf = 0; aEl.textContent = acc; };
+  try {
+    if (!st.ctx) st.ctx = pbpAskBuildContext(pbpAiBlocks(), PBP_ASK_CTX_BUDGET);
+    const built = pbpAskBuildPrompt({ context: st.ctx.text, history: st.rounds, question });
+    const full = await getOrCreateInflight("ask_" + st.url + "_" + question, () =>
+      callAIStream(st.s, built.prompt, {
+        maxTokens: 4096,
+        model: pbpAiResolveModelOverride(st.s),
+        system: built.system,
+        signal: st.ctrl.signal
+      }, (d, accText) => {
+        // rAF throttle: deltas land as plain textContent at most once per
+        // frame; markdown renders exactly once, at finalize.
+        acc = accText;
+        if (!raf) raf = requestAnimationFrame(paint);
+      })
+    );
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    aEl.classList.remove("streaming");
+    const parsed = _pbpAskFinalize(aEl, full);
+    st.rounds.push({ q: question, a: parsed.body });
+    const hist = await pbpAskHistGet(st.url);
+    hist.push({
+      q: question,
+      a: full,
+      cites: parsed.cites,
+      ts: Date.now(),
+      model: _pbpAskProviderLabel(st.s)
+    });
+    await pbpAskHistSet(st.url, hist); // pbpAskHistSet caps at the last 20
+    pbpAiBumpCounter("ask");
+  } catch (e) {
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    aEl.classList.remove("streaming");
+    aEl.textContent = acc; // keep whatever already streamed in
+    if (e && e.name === "AbortError") {
+      const note = document.createElement("p");
+      note.className = "ask-stopped";
+      note.textContent = t("askStopped");
+      aEl.appendChild(note);
+    } else {
+      _pbpAskErrorUi(aEl, (e && e.message) ? e.message : String(e), question);
+    }
+  } finally {
+    st.running = false;
+    st.ctrl = null;
+    if (stopBtn) stopBtn.hidden = true;
+    if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
+// Submit seam target (Task 12's _pbpAskOnSubmit typeof-checks this name).
+// Validation: non-empty question + gate; starter chips need nothing extra
+// here (Task 12 already routes chip clicks through _pbpAskOnSubmit).
+async function _pbpAskSend() {
+  const st = _pbpAskState;
+  if (!st || st.running) return;
+  const ta = document.getElementById("ask-input");
+  const question = ta ? ta.value.trim() : "";
+  if (!question) { if (ta) ta.focus(); return; }
+  if (!pbpAiAvailable(st.s)) return;
+  _pbpAskUpdateMeta(); // refresh the transparency line BEFORE the request
+  const aEl = _pbpAskAppendRound(question);
+  if (!aEl) return;
+  ta.value = "";
+  await _pbpAskRun(question, aEl);
+}

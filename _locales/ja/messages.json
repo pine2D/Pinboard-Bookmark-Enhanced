@@ -2031,5 +2031,54 @@
   },
   "askClose": {
     "message": "閉じる"
+  },
+  "askSend": {
+    "message": "送信"
+  },
+  "askStop": {
+    "message": "停止"
+  },
+  "askPlaceholder": {
+    "message": "この記事について質問…（Enter で送信、Shift+Enter で改行）"
+  },
+  "askWillSend": {
+    "message": "$MODEL$ に約 $TOKENS$ トークンを送信します",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "askSentPartial": {
+    "message": "（記事が長いため $TOTAL$ 段落中 $SENT$ 段落を送信）",
+    "placeholders": {
+      "sent": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "askChipSummarize": {
+    "message": "この記事を要約して"
+  },
+  "askChipArgument": {
+    "message": "主な論点は何？"
+  },
+  "askChipData": {
+    "message": "どんなデータが引用されている？"
+  },
+  "askErrRetry": {
+    "message": "再試行"
+  },
+  "askStopped": {
+    "message": "停止しました（途中までの回答を保持）"
+  },
+  "askEmptyHint": {
+    "message": "回答には原文の段落への出典が付くので、各主張を確認できます。"
   }
 }

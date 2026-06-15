@@ -1001,4 +1001,101 @@ suiteIf("pbpAskIsTypingTarget", "pbpAskIsTypingTarget", () => {
   });
 });
 </script>
+
+<script>
+// ============ Task 13: pbpAskBuildContext ============
+suiteIf("pbpAskBuildContext", "pbpAskBuildContext", () => {
+  function ctxBlocks(html) {
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    return pbpAiIndexBlocks(root);
+  }
+  test("small set fits whole: every [Pn] line, order kept, default budget", () => {
+    const r = pbpAskBuildContext(ctxBlocks("<p>one</p><p>two</p><p>three</p><p>four</p>"));
+    assertEq(r.totalBlocks, 4, "total");
+    assertEq(r.sentBlocks, 4, "all sent");
+    assertEq(r.text, "[P1] one\n[P2] two\n[P3] three\n[P4] four", "exact lines");
+  });
+  test("block text is whitespace-collapsed in its line", () => {
+    const r = pbpAskBuildContext(ctxBlocks("<p>a   b\n c</p>"), 1000);
+    assertEq(r.text, "[P1] a b c", "collapsed");
+  });
+  test("headings always kept even when middles are dropped", () => {
+    // P1-P3 first three, P5 heading, P7/P8 last two = mandatory (6 blocks).
+    // P4/P6 are 200-char middles; budget 30 tokens fits neither.
+    const html = "<p>a</p><p>b</p><p>c</p>"
+      + "<p>" + "x".repeat(200) + "</p>"
+      + "<h2>Head</h2>"
+      + "<p>" + "y".repeat(200) + "</p>"
+      + "<p>d</p><p>e</p>";
+    const r = pbpAskBuildContext(ctxBlocks(html), 30);
+    assertEq(r.totalBlocks, 8, "total");
+    assertEq(r.sentBlocks, 6, "mandatory only");
+    assertEq(r.text, "[P1] a\n[P2] b\n[P3] c\n[P5] Head\n[P7] d\n[P8] e", "heading kept, middles cut");
+  });
+  test("remaining budget filled by uniform sampling of middle blocks", () => {
+    // 15 blocks: P1-P3 "aa".."cc", P4-P13 middles of 94 chars, P14/P15 "yy"/"zz".
+    // base chars 42; middle lines cost 100 (P4-P9) / 101 (P10-P13) chars.
+    // Budget 140 tokens = 560 chars: k=6 -> 644 chars (over), k=5 -> 544 (fits).
+    // Sampled middle indexes floor(j*10/5) = 0,2,4,6,8 -> P4,P6,P8,P10,P12.
+    let html = "<p>aa</p><p>bb</p><p>cc</p>";
+    for (let i = 0; i < 10; i++) html += "<p>" + "m".repeat(94) + "</p>";
+    html += "<p>yy</p><p>zz</p>";
+    const r = pbpAskBuildContext(ctxBlocks(html), 140);
+    assertEq(r.totalBlocks, 15, "total");
+    assertEq(r.sentBlocks, 10, "5 mandatory + 5 sampled");
+    ["[P4]", "[P6]", "[P8]", "[P10]", "[P12]"].forEach((tok) => {
+      assert(r.text.indexOf(tok) !== -1, tok + " sampled in");
+    });
+    ["[P5]", "[P7]", "[P9]", "[P11]", "[P13]"].forEach((tok) => {
+      assert(r.text.indexOf(tok) === -1, tok + " sampled out");
+    });
+    assertEq(r.text.split("\n").length, r.sentBlocks, "one line per sent block");
+  });
+  test("empty/non-array input tolerated", () => {
+    const r = pbpAskBuildContext([], 100);
+    assertEq(r.text, "", "empty text");
+    assertEq(r.sentBlocks, 0, "0 sent");
+    assertEq(r.totalBlocks, 0, "0 total");
+    assertEq(pbpAskBuildContext(null, 100).totalBlocks, 0, "null tolerated");
+  });
+});
+
+// ============ Task 13: pbpAskBuildPrompt ============
+suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
+  test("system pins question language, article-only and CITES protocol", () => {
+    const r = pbpAskBuildPrompt({ context: "[P1] alpha", history: [], question: "alpha?" });
+    assert(r.system.indexOf("same language as the question") !== -1, "language rule");
+    assert(r.system.indexOf("ONLY") !== -1, "article-only rule");
+    assert(r.system.indexOf("[P<n>]") !== -1, "inline cite token");
+    assert(r.system.indexOf("CITES:") !== -1, "cites block marker");
+    assert(r.system.indexOf("15 words or fewer") !== -1, "quote length cap");
+    assert(r.system.indexOf("article's original language") !== -1, "quote language rule");
+    assert(r.system.indexOf("does not contain") !== -1, "honesty rule");
+  });
+  test("prompt carries article context and question; no history section when empty", () => {
+    const r = pbpAskBuildPrompt({ context: "[P1] alpha\n[P2] beta", history: [], question: "What is beta?" });
+    assert(r.prompt.indexOf("ARTICLE:\n[P1] alpha\n[P2] beta") !== -1, "context embedded");
+    assert(r.prompt.indexOf("QUESTION: What is beta?") !== -1, "question line");
+    assert(r.prompt.indexOf("PREVIOUS") === -1, "no history header");
+  });
+  test("history serialized as Q/A lines, last 4 only, order kept", () => {
+    const hist = [];
+    for (let i = 1; i <= 5; i++) hist.push({ q: "q" + i, a: "a" + i });
+    const r = pbpAskBuildPrompt({ context: "[P1] x", history: hist, question: "next" });
+    assert(r.prompt.indexOf("Q: q1") === -1, "oldest dropped");
+    assert(r.prompt.indexOf("Q: q2") !== -1, "4th-from-last kept");
+    assert(r.prompt.indexOf("A: a5") !== -1, "newest kept");
+    assert(r.prompt.indexOf("Q: q2") < r.prompt.indexOf("Q: q5"), "chronological order");
+    assert(r.prompt.indexOf("PREVIOUS Q&A") !== -1, "history header present");
+  });
+  test("missing/null fields tolerated", () => {
+    const r = pbpAskBuildPrompt({});
+    assert(typeof r.system === "string" && typeof r.prompt === "string", "shapes");
+    assert(r.prompt.indexOf("QUESTION: ") !== -1, "question line present");
+    const r2 = pbpAskBuildPrompt({ context: "c", history: [{ q: null, a: null }], question: "q" });
+    assert(r2.prompt.indexOf("Q: \nA: ") !== -1, "null history fields become empty strings");
+  });
+});
+</script>
 </body></html>

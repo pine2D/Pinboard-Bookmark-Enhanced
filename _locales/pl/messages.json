@@ -2031,5 +2031,54 @@
   },
   "askClose": {
     "message": "Zamknij"
+  },
+  "askSend": {
+    "message": "Wyślij"
+  },
+  "askStop": {
+    "message": "Zatrzymaj"
+  },
+  "askPlaceholder": {
+    "message": "Zadaj pytanie o ten artykuł... (Enter wysyła, Shift+Enter nowa linia)"
+  },
+  "askWillSend": {
+    "message": "Wyśle około $TOKENS$ tokenów do $MODEL$",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "askSentPartial": {
+    "message": "(długi artykuł: wysyłane $SENT$ z $TOTAL$ bloków)",
+    "placeholders": {
+      "sent": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "askChipSummarize": {
+    "message": "Podsumuj ten artykuł"
+  },
+  "askChipArgument": {
+    "message": "Jaki jest główny argument?"
+  },
+  "askChipData": {
+    "message": "Jakie dane są cytowane?"
+  },
+  "askErrRetry": {
+    "message": "Ponów próbę"
+  },
+  "askStopped": {
+    "message": "Zatrzymano (zachowano częściową odpowiedź)"
+  },
+  "askEmptyHint": {
+    "message": "Odpowiedzi cytują akapity artykułu, więc każde twierdzenie można sprawdzić."
   }
 }

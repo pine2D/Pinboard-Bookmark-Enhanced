@@ -2031,5 +2031,54 @@
   },
   "askClose": {
     "message": "Fermer"
+  },
+  "askSend": {
+    "message": "Envoyer"
+  },
+  "askStop": {
+    "message": "Arrêter"
+  },
+  "askPlaceholder": {
+    "message": "Posez une question sur cet article... (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne)"
+  },
+  "askWillSend": {
+    "message": "Enverra environ $TOKENS$ tokens à $MODEL$",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "askSentPartial": {
+    "message": "(article long : envoi de $SENT$ blocs sur $TOTAL$)",
+    "placeholders": {
+      "sent": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "askChipSummarize": {
+    "message": "Résumer cet article"
+  },
+  "askChipArgument": {
+    "message": "Quel est l’argument principal ?"
+  },
+  "askChipData": {
+    "message": "Quelles données sont citées ?"
+  },
+  "askErrRetry": {
+    "message": "Réessayer"
+  },
+  "askStopped": {
+    "message": "Arrêté (réponse partielle conservée)"
+  },
+  "askEmptyHint": {
+    "message": "Les réponses citent les paragraphes de l’article, chaque affirmation est vérifiable."
   }
 }

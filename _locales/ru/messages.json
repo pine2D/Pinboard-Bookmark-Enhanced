@@ -2031,5 +2031,54 @@
   },
   "askClose": {
     "message": "Закрыть"
+  },
+  "askSend": {
+    "message": "Отправить"
+  },
+  "askStop": {
+    "message": "Остановить"
+  },
+  "askPlaceholder": {
+    "message": "Задайте вопрос об этой статье... (Enter отправить, Shift+Enter новая строка)"
+  },
+  "askWillSend": {
+    "message": "Будет отправлено около $TOKENS$ токенов в $MODEL$",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "askSentPartial": {
+    "message": "(длинная статья: отправляется $SENT$ из $TOTAL$ блоков)",
+    "placeholders": {
+      "sent": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "askChipSummarize": {
+    "message": "Кратко изложите эту статью"
+  },
+  "askChipArgument": {
+    "message": "Каков главный аргумент?"
+  },
+  "askChipData": {
+    "message": "Какие данные приводятся?"
+  },
+  "askErrRetry": {
+    "message": "Повторить"
+  },
+  "askStopped": {
+    "message": "Остановлено (частичный ответ сохранён)"
+  },
+  "askEmptyHint": {
+    "message": "Ответы ссылаются на абзацы статьи, поэтому каждое утверждение можно проверить."
   }
 }

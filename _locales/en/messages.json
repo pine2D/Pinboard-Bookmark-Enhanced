@@ -2031,5 +2031,54 @@
   },
   "askClose": {
     "message": "Close"
+  },
+  "askSend": {
+    "message": "Send"
+  },
+  "askStop": {
+    "message": "Stop"
+  },
+  "askPlaceholder": {
+    "message": "Ask about this article... (Enter to send, Shift+Enter for a new line)"
+  },
+  "askWillSend": {
+    "message": "Will send about $TOKENS$ tokens to $MODEL$",
+    "placeholders": {
+      "tokens": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "askSentPartial": {
+    "message": "(long article: sending $SENT$ of $TOTAL$ blocks)",
+    "placeholders": {
+      "sent": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "askChipSummarize": {
+    "message": "Summarize this article"
+  },
+  "askChipArgument": {
+    "message": "What is the main argument?"
+  },
+  "askChipData": {
+    "message": "What data does it cite?"
+  },
+  "askErrRetry": {
+    "message": "Retry"
+  },
+  "askStopped": {
+    "message": "Stopped (partial answer kept)"
+  },
+  "askEmptyHint": {
+    "message": "Answers cite the article paragraphs, so every claim can be checked."
   }
 }
