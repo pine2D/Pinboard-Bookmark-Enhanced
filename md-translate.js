@@ -18,7 +18,8 @@ function pbpTrPackBatches(blocks, maxBlocks = 15, maxChars = 8000) {
   let cur = [];
   let curChars = 0;
   for (const b of (blocks || [])) {
-    const len = (b && typeof b.text === "string") ? b.text.length : 0;
+    if (!b || typeof b.text !== "string") continue;
+    const len = b.text.length;
     if (cur.length && (cur.length >= maxBlocks || curChars + len > maxChars)) {
       batches.push(cur);
       cur = [];
@@ -57,7 +58,9 @@ function pbpTrBuildPrompt(args) {
   if (a.glossary && typeof a.glossary === "object" && Object.keys(a.glossary).length) {
     payload.glossary = a.glossary;
   }
-  payload.segments = Array.isArray(a.segments) ? a.segments : [];
+  payload.segments = Array.isArray(a.segments)
+    ? a.segments.map(function (s) { return { id: s.id, text: s.text }; })
+    : [];
   return { system: PBP_TR_SYSTEM, prompt: JSON.stringify(payload) };
 }
 

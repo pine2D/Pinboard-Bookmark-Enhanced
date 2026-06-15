@@ -643,6 +643,17 @@ suiteIf("pbpTrPackBatches", "pbpTrPackBatches", () => {
     const c = pbpTrPackBatches(segs(4, 60), 15, 100);
     assertEq(c.map((x) => x.length).join(","), "1,1,1,1", "maxChars=100");
   });
+  test("oversize block in middle flushes preceding batch first", () => {
+    const b = pbpTrPackBatches([
+      { id: 1, text: "x".repeat(100) },
+      { id: 2, text: "x".repeat(9000) },
+      { id: 3, text: "x".repeat(100) }
+    ]);
+    assertEq(b.length, 3, "three batches");
+    assertEq(b[0][0].id, 1, "small alone");
+    assertEq(b[1][0].id, 2, "oversize alone");
+    assertEq(b[2][0].id, 3, "tail starts fresh");
+  });
 });
 
 suiteIf("pbpTrBuildPrompt", "pbpTrBuildPrompt", () => {
