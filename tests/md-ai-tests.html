@@ -767,6 +767,10 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
     assert(_pbpTrIs429(new Error("AI stream timeout")) === false, "timeout");
     assert(_pbpTrIs429(null) === false, "null");
   });
+  test("incidental 429 substring in a hard error is not a rate limit", () => {
+    assert(_pbpTrIs429({ message: "context length 429 exceeded" }) === false, "not 429");
+    assert(_pbpTrIs429({ message: "API failed (HTTP 429)" }) === true, "real 429");
+  });
   test("_pbpTrMissingIds diffs batch ids against filled set", () => {
     const batch = [{ id: 1, text: "a" }, { id: 4, text: "b" }, { id: 9, text: "c" }];
     assertEq(_pbpTrMissingIds(batch, new Set([1, 9])).join(","), "4", "one missing");

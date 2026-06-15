@@ -101,7 +101,7 @@ function pbpTrLengthRatioOk(orig, translated) {
 function _pbpTrIs429(err) {
   if (!err) return false;
   if (err.status === 429) return true;
-  return /HTTP 429|\b429\b|rate.?limit|too many requests|resource.*exhausted/i.test(String(err.message || ""));
+  return /HTTP 429|rate.?limit|too many requests|resource.*exhausted/i.test(String(err.message || ""));
 }
 
 function _pbpTrMissingIds(batch, filledSet) {
@@ -197,7 +197,7 @@ async function pbpTrRunQueue(plan) {
   }
 
   const workers = [];
-  for (let w = 0; w < Math.min(conc, Math.max(batches.length, 1)); w++) workers.push(worker(w));
+  for (let w = 0; w < Math.min(conc, Math.max(batches.length, 1)); w++) workers.push(Promise.resolve(worker(w)).catch(function (e) { void e; }));
   await Promise.all(workers);
 
   // Downgrade phase: sequential single-block re-request, ONE attempt each
