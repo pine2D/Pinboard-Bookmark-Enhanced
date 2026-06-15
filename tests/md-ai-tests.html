@@ -434,5 +434,119 @@ suite("pbpAiRestore", () => {
     assertEq(pbpAiRestore(sh.text, sh.slots), md, "no cascade");
   });
 });
+
+// ============ Task 5: pbpAiMakeStreamJsonParser ============
+suite("pbpAiMakeStreamJsonParser", () => {
+  test("no item fired on incomplete object; fires once when closed", () => {
+    const got = [];
+    const p = pbpAiMakeStreamJsonParser((it) => got.push(it));
+    p.push('{"translations":[{"id":1,"text":"hel');
+    assert(got.length === 0, "incomplete: none fired");
+    p.push('{"translations":[{"id":1,"text":"hello"}');
+    assert(got.length === 1 && got[0].id === 1 && got[0].text === "hello", "fired on close");
+    p.push('{"translations":[{"id":1,"text":"hello"},');
+    assert(got.length === 1, "same id never re-fired");
+  });
+  test("multiple items across accumulated pushes, in order", () => {
+    const got = [];
+    const p = pbpAiMakeStreamJsonParser((it) => got.push(it.id));
+    const full = '{"translations":[{"id":3,"text":"a"},{"id":7,"text":"b"}]}';
+    p.push(full.slice(0, 30));
+    p.push(full);
+    assert(got.join(",") === "3,7", "got: " + got.join(","));
+  });
+  test("escaped quotes and braces inside text decoded", () => {
+    const got = [];
+    const p = pbpAiMakeStreamJsonParser((it) => got.push(it));
+    p.push('{"translations":[{"id":2,"text":"say \\"hi\\" {ok}"}]}');
+    assert(got[0].text === 'say "hi" {ok}', "got: " + got[0].text);
+  });
+  test("finish tolerant sweep catches text-first key order", () => {
+    const got = [];
+    const p = pbpAiMakeStreamJsonParser((it) => got.push(it.id));
+    const full = '{"translations":[{"text":"x","id":4},{"id":5,"text":"y"}]}';
+    p.push(full);
+    assert(got.indexOf(5) !== -1 && got.indexOf(4) === -1, "incremental got id-first only");
+    const fin = p.finish(full);
+    assert(got.indexOf(4) !== -1, "finish swept text-first item");
+    assert(fin.seenIds instanceof Set && fin.seenIds.has(4) && fin.seenIds.has(5), "seenIds");
+  });
+  test("finish strips markdown fences", () => {
+    const got = [];
+    const p = pbpAiMakeStreamJsonParser((it) => got.push(it.id));
+    const fin = p.finish('```json\n{"translations":[{"id":9,"text":"z"}]}\n```');
+    assert(got.join(",") === "9" && fin.seenIds.has(9), "fenced JSON parsed");
+  });
+  test("finish on garbage returns empty seenIds without throwing", () => {
+    const p = pbpAiMakeStreamJsonParser(() => {});
+    const fin = p.finish("sorry, I cannot do that");
+    assert(fin.seenIds instanceof Set && fin.seenIds.size === 0, "empty set");
+  });
+});
+
+// ============ Task 5: pbpAiParseCites ============
+suite("pbpAiParseCites", () => {
+  test("strips trailing CITES block and parses quotes", () => {
+    const r = pbpAiParseCites('The answer [P7] is clear.\n\nCITES:\nP7: "exact words from text"\nP2: "another quote"');
+    assert(r.body === "The answer [P7] is clear.", "body: " + r.body);
+    assert(r.cites.length === 2, "2 cites");
+    assert(r.cites[0].p === 7 && r.cites[0].quote === "exact words from text", "cite 1");
+    assert(r.cites[1].p === 2 && r.cites[1].quote === "another quote", "cite 2");
+  });
+  test("absence tolerated", () => {
+    const r = pbpAiParseCites("Just an answer with no cites.");
+    assert(r.body === "Just an answer with no cites." && r.cites.length === 0, "no cites");
+  });
+  test("curly quotes and list dashes tolerated, junk lines skipped", () => {
+    const r = pbpAiParseCites('Body.\nCITES:\n- P3: "curly quoted"\nnot a cite line\nP1: unquoted text');
+    assert(r.cites.length === 2, "2 parsed, got " + r.cites.length);
+    assert(r.cites[0].p === 3 && r.cites[0].quote === "curly quoted", "curly");
+    assert(r.cites[1].p === 1 && r.cites[1].quote === "unquoted text", "unquoted");
+  });
+  test("uses LAST CITES: marker (body may mention the word)", () => {
+    const r = pbpAiParseCites('See the CITES: format below.\nCITES:\nP1: "q"');
+    assert(r.cites.length === 1 && r.cites[0].p === 1, "last marker wins");
+    assert(r.body === "See the CITES: format below.", "body kept: " + r.body);
+  });
+  test("streaming truncation mid-block does not throw", () => {
+    const r = pbpAiParseCites('Body text\nCITES:\nP4: "cut off mid quo');
+    assert(r.cites.length === 1 && r.cites[0].p === 4, "partial line still parsed");
+  });
+});
+
+// ============ Task 5: pbpAiFuzzyFind ============
+suite("pbpAiFuzzyFind", () => {
+  test("exact match returns original indices", () => {
+    const r = pbpAiFuzzyFind("world", "hello world");
+    assert(r !== null && r.start === 6 && r.end === 11, "got: " + JSON.stringify(r));
+  });
+  test("whitespace-normalized match maps back to original span", () => {
+    const hay = "say hello\n   world now";
+    const r = pbpAiFuzzyFind("hello world", hay);
+    assert(r !== null, "found");
+    assert(hay.slice(r.start, r.end).replace(/\s+/g, " ") === "hello world",
+      "span: " + JSON.stringify(hay.slice(r.start, r.end)));
+    assert(r.start === 4 && r.end === 18, "indices: " + JSON.stringify(r));
+  });
+  test("typo within budget (floor(len/5)) is found", () => {
+    const hay = "the translation quality is high";
+    const r = pbpAiFuzzyFind("translaton quality", hay);
+    assert(r !== null, "fuzzy hit");
+    assert(hay.slice(r.start).indexOf("translation") === 0, "anchored at translation");
+  });
+  test("over budget returns null", () => {
+    assert(pbpAiFuzzyFind("completely different words", "nothing in common here at all") === null, "null");
+  });
+  test("short needle has zero budget: near-miss is null, exact still works", () => {
+    assert(pbpAiFuzzyFind("abc", "xxabdxx") === null, "1 edit but budget 0");
+    const r = pbpAiFuzzyFind("abc", "xxabcxx");
+    assert(r !== null && r.start === 2 && r.end === 5, "exact short");
+  });
+  test("empty needle or haystack returns null", () => {
+    assert(pbpAiFuzzyFind("", "abc") === null, "empty needle");
+    assert(pbpAiFuzzyFind("   ", "abc") === null, "whitespace needle");
+    assert(pbpAiFuzzyFind("a", "") === null, "empty haystack");
+  });
+});
 </script>
 </body></html>
