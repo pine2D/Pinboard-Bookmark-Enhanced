@@ -595,6 +595,7 @@ function _pbpTrSetStatus(st, status) {
     btn.hidden = false;
     stop.hidden = true;
   } else if (status === "done") {
+    btn.disabled = false;
     btn.hidden = true;
     stop.hidden = true;
     prog.hidden = true;
@@ -655,6 +656,9 @@ function _pbpTrSyncToc(st, mode) {
     if (mode === "translated") {
       const headEl = document.getElementById(a.dataset.slug);
       if (!headEl || !headEl.dataset.pb) return;
+      // Relies on _pbpTrFill keeping .pb-tr as the heading's immediate next sibling
+      // (it removes any .pb-tr-err pill before inserting). Missing/failed translations
+      // fall through here and leave the original TOC text in place -- intended.
       const sib = headEl.nextElementSibling;
       if (!sib || !sib.classList.contains("pb-tr")) return;
       const txt = sib.textContent.trim();
