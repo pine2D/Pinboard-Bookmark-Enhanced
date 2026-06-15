@@ -1929,7 +1929,7 @@
     "message": "IA page de prévisualisation"
   },
   "previewAiSectionHint": {
-    "message": "Expliquer une sélection, interroger la page et traduction complète sur la page de prévisualisation Markdown. Utilise le fournisseur IA et la clé configurés ci-dessus ; chaque requête est déclenchée par l'utilisateur, rien ne s'exécute en arrière-plan."
+    "message": "Expliquer une sélection, interroger la page et traduire le texte intégral sur la page de prévisualisation Markdown. Utilise le fournisseur IA et la clé configurés ci-dessus ; chaque requête est déclenchée par l'utilisateur, rien ne s'exécute en arrière-plan."
   },
   "previewAiEnabled": {
     "message": "Activer les fonctionnalités IA sur la page de prévisualisation"
@@ -1959,7 +1959,7 @@
     "message": "Glossaire de traduction"
   },
   "translateGlossaryPlaceholder": {
-    "message": "LLM=Grand modèle de langage\nPinboard="
+    "message": "LLM=Grand modèle de langue\nPinboard="
   },
   "translateGlossaryHint": {
     "message": "Une règle par ligne, sous la forme terme=traduction. Laisser la partie droite vide pour garder le terme non traduit. Envoyé avec chaque requête de traduction."

@@ -1929,13 +1929,13 @@
     "message": "預覽頁 AI"
   },
   "previewAiSectionHint": {
-    "message": "在 Markdown 預覽頁提供劃詞解釋、全文問答與全文翻譯。使用上方配置的 AI 提供商與 Key；所有請求均由你主動觸發，不會在後台運行。"
+    "message": "在 Markdown 預覽頁提供劃詞解釋、全文問答與全文翻譯。使用上方配置的 AI 提供商與 Key；所有請求均由你主動觸發，不會在背景執行。"
   },
   "previewAiEnabled": {
     "message": "在預覽頁啟用 AI 功能"
   },
   "previewAiEnabledHint": {
-    "message": "關閉後預覽頁不再出現任何 AI 入口。未配置 API Key 時入口也會自動隱藏。"
+    "message": "關閉後預覽頁不再出現任何 AI 入口。未設定 API Key 時入口也會自動隱藏。"
   },
   "previewAiModelLabel": {
     "message": "模型覆蓋（可選）"
@@ -1968,7 +1968,7 @@
     "message": "劃詞解釋觸發方式"
   },
   "selectionTriggerIcon": {
-    "message": "選中文字旁顯示小按鈕"
+    "message": "選取文字旁顯示小按鈕"
   },
   "selectionTriggerHotkey": {
     "message": "僅快捷鍵 E（不顯示按鈕）"
