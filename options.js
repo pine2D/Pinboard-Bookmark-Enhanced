@@ -511,18 +511,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   {
     const sel = $id("translate-target-lang");
     const customEl = $id("translate-target-lang-custom");
-    const stored = s.translateTargetLang || "auto";
-    const codes = Array.from(sel.options).map(o => o.value);
-    if (stored !== "custom" && codes.includes(stored)) {
-      sel.value = stored;
-    } else if (stored === "custom") {
-      sel.value = "auto";
-    } else {
-      sel.value = "custom";
-      customEl.value = stored;
+    if (sel && customEl) {
+      const stored = s.translateTargetLang || "auto";
+      const codes = Array.from(sel.options).map(o => o.value);
+      if (stored !== "custom" && codes.includes(stored)) {
+        sel.value = stored;
+      } else if (stored === "custom") {
+        sel.value = "auto";
+      } else {
+        sel.value = "custom";
+        customEl.value = stored;
+      }
+      syncTranslateLangCustomState();
+      sel.addEventListener("change", syncTranslateLangCustomState);
     }
-    syncTranslateLangCustomState();
-    sel.addEventListener("change", syncTranslateLangCustomState);
   }
 
   // ---- Popup width (B9) ----
