@@ -157,6 +157,11 @@ suite("_pbpSseChunks", () => {
     const r = _pbpSseChunks(": keep-alive\n\n");
     assertEq(r.events.length, 0, "ignored");
   });
+
+  test("data: field with no value yields no event", () => {
+    const r = _pbpSseChunks("data:\n\n");
+    assertEq(r.events.length, 0, "empty data field skipped");
+  });
 });
 
 // ============ ai.js: provider delta extractors ============

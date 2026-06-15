@@ -258,7 +258,10 @@ function _pbpSseChunks(buffered) {
     for (const line of block.split(/\r?\n/)) {
       if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
     }
-    if (dataLines.length) events.push(dataLines.join("\n"));
+    if (dataLines.length) {
+      const payload = dataLines.join("\n");
+      if (payload) events.push(payload);
+    }
   }
   return { events, rest };
 }
