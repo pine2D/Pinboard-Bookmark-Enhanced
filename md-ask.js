@@ -996,6 +996,8 @@ function _pbpExplainEnsurePill() {
 }
 
 function _pbpExplainHidePill() {
+  clearTimeout(_pbpExplainSelTimer);
+  _pbpExplainSelTimer = null;
   if (_pbpExplainPillEl) _pbpExplainPillEl.hidden = true;
 }
 
@@ -1019,6 +1021,7 @@ function _pbpExplainShowPill() {
 function pbpExplainInvoke() {
   const cap = _pbpExplainGetSelection();
   if (!cap) return;
+  if (cap.range) cap.rect = cap.range.getBoundingClientRect();
   _pbpExplainHidePill();
   if (typeof _pbpExplainOpenPop === "function") _pbpExplainOpenPop(cap);
 }
@@ -1057,12 +1060,11 @@ function pbpExplainInit(detail) {
       if (e.key !== "e" || e.ctrlKey || e.metaKey || e.altKey) return;
       const el = e.target;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
-      if (_pbpExplainTrigger === "off") return;
       if (!_pbpExplainGetSelection()) return;
       e.preventDefault();
       pbpExplainInvoke();
     });
-  });
+  }).catch(() => {});
 }
 
-document.addEventListener("pbp:rendered", (e) => pbpExplainInit((e && e.detail) || {}));
+document.addEventListener("pbp:rendered", (e) => pbpExplainInit((e && e.detail) || {}), { once: true });
