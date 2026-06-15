@@ -347,8 +347,18 @@ function _pbpAskUpdateMeta() {
   const st = _pbpAskState;
   const meta = document.getElementById("ask-meta");
   if (!st || !meta) return;
+  // Context is built once from the ORIGINAL article and intentionally never
+  // refreshes across translation/three-state changes -- the model stays
+  // grounded on the original text so [Pn] citations resolve against original
+  // paragraphs.
   if (!st.ctx) st.ctx = pbpAskBuildContext(pbpAiBlocks(), PBP_ASK_CTX_BUDGET);
-  const tokens = pbpAiEstimateTokens(st.ctx.text.length);
+  const _askQuestion = document.getElementById("ask-input");
+  const _askQ = _askQuestion ? _askQuestion.value : "";
+  const _askRounds = (st.rounds || []);
+  const _askBuilt = st.ctx
+    ? pbpAskBuildPrompt({ context: st.ctx.text, history: _askRounds, question: _askQ })
+    : { system: "", prompt: "" };
+  const tokens = pbpAiEstimateTokens((_askBuilt.system + _askBuilt.prompt).length);
   let line = t("askWillSend", String(tokens), _pbpAskProviderLabel(st.s));
   if (st.ctx.sentBlocks < st.ctx.totalBlocks) {
     line += " " + t("askSentPartial", String(st.ctx.sentBlocks), String(st.ctx.totalBlocks));
@@ -453,6 +463,8 @@ async function _pbpAskRun(question, aEl) {
     aEl.classList.remove("streaming");
     const parsed = _pbpAskFinalize(aEl, full);
     st.rounds.push({ q: question, a: parsed.body });
+    // History read-modify-write is safe: st.running serializes sends so only
+    // one answer finalizes at a time, making this sequence race-free.
     const hist = await pbpAskHistGet(st.url);
     hist.push({
       q: question,
