@@ -398,17 +398,6 @@ function _pbpAskAppendRound(question) {
   return aEl;
 }
 
-// PLACEHOLDER implementation (assembly constraint 11): strip the CITES
-// block and show plain text. The citation-pipeline task (Task 14) replaces
-// this WHOLE function, this comment included, with renderMarkdown (single
-// sanitize point) + the chip pass. Return shape {body, cites} is already
-// the final contract - callers persist parsed.cites with the record.
-function _pbpAskFinalize(el, fullText) {
-  const parsed = pbpAiParseCites(String(fullText == null ? "" : fullText));
-  el.textContent = parsed.body;
-  return parsed;
-}
-
 // Error UI: human message (callAIStream rejects with handleAIError text)
 // plus a retry button that re-runs the SAME question into the same .ask-a.
 function _pbpAskErrorUi(aEl, message, question) {
@@ -510,4 +499,243 @@ async function _pbpAskSend() {
   if (!aEl) return;
   ta.value = "";
   await _pbpAskRun(question, aEl);
+}
+
+// ============================================================
+// Citation pipeline (Task 14): parse -> render -> chips -> verify
+// -> tooltip -> jump + flash. Replaces the Task 13 placeholder.
+// ============================================================
+
+// Pure tokenizer: split answer text into segments around [Pn] tokens.
+// -> [{kind:"text", text}, {kind:"cite", p, token}, ...]; "" -> [].
+// Drives the chip pass below (splits each text node at token boundaries,
+// i.e. the splitText semantics, but unit-testable without a DOM).
+function _pbpAskSplitCiteTokens(text) {
+  const s = String(text == null ? "" : text);
+  const re = /\[P(\d+)\]/g;
+  const segs = [];
+  let last = 0;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    if (m.index > last) segs.push({ kind: "text", text: s.slice(last, m.index) });
+    segs.push({ kind: "cite", p: Number(m[1]), token: m[0] });
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) segs.push({ kind: "text", text: s.slice(last) });
+  return segs;
+}
+
+// Chip pass: walk el's text nodes, replace every in-range [Pn] token with a
+// superscript chip button; out-of-range tokens stay literal text (spec 5.2:
+// failed verification must never render as a link). Verification (fuzzy
+// quote locate) runs once per unique paragraph; chips are numbered
+// sequentially per answer (data-seq) in reading order.
+function _pbpAskChipPass(el, cites) {
+  const maxP = pbpAiBlocks().length;
+  // First quote wins when the model emits several CITES lines for one Pn.
+  const quoteByP = new Map();
+  for (const c of (Array.isArray(cites) ? cites : [])) {
+    if (!quoteByP.has(c.p)) quoteByP.set(c.p, c.quote);
+  }
+  // pbpAiFuzzyFind already maps normalized hits back to RAW textContent
+  // offsets (core.md Task 5: _pbpAiNormWithMap builds the index map and
+  // mapBack applies it before returning), so {start,end} feed straight
+  // into _pbpAskRangeFromOffsets at click time.
+  const verifyByP = new Map();
+  const verify = (p) => {
+    if (!verifyByP.has(p)) {
+      const quote = quoteByP.get(p);
+      verifyByP.set(p, quote ? pbpAiFuzzyFind(quote, pbpAiTextOf(p)) : null);
+    }
+    return verifyByP.get(p);
+  };
+  // Collect first, mutate after: replacing nodes while the TreeWalker is
+  // live skips siblings.
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (!/\[P\d+\]/.test(node.nodeValue)) continue;
+    // [Pn] inside code/pre is answer content (e.g. a code sample), not a cite.
+    if (node.parentElement && node.parentElement.closest("pre, code")) continue;
+    nodes.push(node);
+  }
+  let seq = 0;
+  for (const textNode of nodes) {
+    const segs = _pbpAskSplitCiteTokens(textNode.nodeValue);
+    const parent = textNode.parentNode;
+    for (const seg of segs) {
+      if (seg.kind === "text") {
+        parent.insertBefore(document.createTextNode(seg.text), textNode);
+        continue;
+      }
+      if (!(seg.p >= 1 && seg.p <= maxP)) {
+        parent.insertBefore(document.createTextNode(seg.token), textNode);
+        continue;
+      }
+      seq += 1;
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "ask-chip";
+      chip.dataset.p = String(seg.p);
+      chip.dataset.seq = String(seq);
+      chip.textContent = String(seq);
+      chip.setAttribute("aria-label", "P" + seg.p);
+      const quote = quoteByP.get(seg.p);
+      if (quote) chip.dataset.quote = quote;
+      const hit = verify(seg.p);
+      if (hit) {
+        chip.dataset.qs = String(hit.start);
+        chip.dataset.qe = String(hit.end);
+        chip.classList.add("verified");
+      }
+      chip.addEventListener("click", () => _pbpAskJump(chip));
+      chip.addEventListener("mouseenter", () => _pbpAskTipShow(chip));
+      chip.addEventListener("mouseleave", _pbpAskTipHide);
+      chip.addEventListener("focus", () => _pbpAskTipShow(chip));
+      chip.addEventListener("blur", _pbpAskTipHide);
+      parent.insertBefore(chip, textNode);
+    }
+    parent.removeChild(textNode);
+  }
+}
+
+// Map raw textContent offsets [start, end) to a DOM Range by accumulating
+// text-node lengths under blockEl (TreeWalker offset accumulation).
+function _pbpAskRangeFromOffsets(blockEl, start, end) {
+  if (!blockEl || !Number.isFinite(start) || !Number.isFinite(end)
+    || start < 0 || end <= start) return null;
+  const walker = document.createTreeWalker(blockEl, NodeFilter.SHOW_TEXT);
+  let pos = 0;
+  let startNode = null;
+  let startOffset = 0;
+  let node;
+  while ((node = walker.nextNode())) {
+    const len = node.nodeValue.length;
+    if (!startNode && start < pos + len) {
+      startNode = node;
+      startOffset = start - pos;
+    }
+    if (end <= pos + len) {
+      if (!startNode) return null;
+      const range = document.createRange();
+      range.setStart(startNode, startOffset);
+      range.setEnd(node, end - pos);
+      return range;
+    }
+    pos += len;
+  }
+  return null; // offsets beyond the block's current text
+}
+
+let _pbpAskFlashTimer = null;
+
+// Flash the jump target. Primary: CSS Custom Highlight API (zero DOM
+// mutation). Fallback (no CSS.highlights): keyframed background class on
+// the whole target element. Removal is clearTimeout-guarded so rapid
+// consecutive clicks restart the 1600ms window instead of racing it.
+function _pbpAskFlash(range, targetEl) {
+  clearTimeout(_pbpAskFlashTimer);
+  if (typeof Highlight === "function" && typeof CSS !== "undefined" && "highlights" in CSS) {
+    CSS.highlights.set("pbp-flash", new Highlight(range));
+    _pbpAskFlashTimer = setTimeout(() => { CSS.highlights.delete("pbp-flash"); }, 1600);
+  } else {
+    targetEl.classList.remove("pb-flash-fallback");
+    void targetEl.offsetWidth; // restart the CSS animation
+    targetEl.classList.add("pb-flash-fallback");
+    _pbpAskFlashTimer = setTimeout(() => { targetEl.classList.remove("pb-flash-fallback"); }, 1600);
+  }
+}
+
+// Chip click: scroll to the cited block (or its translation in
+// translated-only view) and flash the verified quote span / whole block.
+function _pbpAskJump(chip) {
+  const p = Number(chip.dataset.p);
+  const orig = pbpAiBlockEl(p);
+  if (!orig) return;
+  _pbpAskTipHide();
+  let target = orig;
+  // Three-view interplay: in translated-only view a filled original is
+  // hidden (body.tr-only + [data-pb-tr-done]) -> jump to its .pb-tr
+  // nextElementSibling instead. Bilingual view keeps originals visible,
+  // so the precise quote span still applies there.
+  if (document.body.classList.contains("tr-only") && orig.hasAttribute("data-pb-tr-done")) {
+    const sib = orig.nextElementSibling;
+    if (sib && sib.classList && sib.classList.contains("pb-tr")) target = sib;
+  }
+  target.scrollIntoView({ block: "center", behavior: "smooth" });
+  let range = null;
+  // Verified offsets index the ORIGINAL block's textContent (translation
+  // inserts siblings, never mutates the original's text nodes), so they
+  // only apply when the original itself is the visible target.
+  if (target === orig && chip.classList.contains("verified")) {
+    range = _pbpAskRangeFromOffsets(orig, Number(chip.dataset.qs), Number(chip.dataset.qe));
+  }
+  if (!range) {
+    range = document.createRange();
+    range.selectNode(target);
+  }
+  _pbpAskFlash(range, target);
+}
+
+// ---- Single shared tooltip for all chips (lazy-created) ----
+let _pbpAskTipEl = null;
+
+function _pbpAskTipShow(chip) {
+  if (!_pbpAskTipEl) {
+    _pbpAskTipEl = document.createElement("div");
+    _pbpAskTipEl.id = "ask-tip";
+    _pbpAskTipEl.setAttribute("role", "tooltip");
+    document.body.appendChild(_pbpAskTipEl);
+    // Fixed positioning drifts on scroll; just hide (re-hover re-places it).
+    window.addEventListener("scroll", _pbpAskTipHide, { capture: true, passive: true });
+  }
+  const tip = _pbpAskTipEl;
+  tip.replaceChildren();
+  const p = Number(chip.dataset.p);
+  if (chip.dataset.quote) {
+    const q = document.createElement("div");
+    q.className = "ask-tip-quote";
+    q.textContent = '"' + chip.dataset.quote + '"';
+    tip.appendChild(q);
+  }
+  const blockText = pbpAiTextOf(p).replace(/\s+/g, " ").trim();
+  const b = document.createElement("div");
+  b.className = "ask-tip-block";
+  b.textContent = "P" + p + " · " + blockText.slice(0, 80) + (blockText.length > 80 ? "…" : "");
+  tip.appendChild(b);
+  // Measure, then place above the chip; flip below when viewport space
+  // above is too small. Clamp horizontally to the viewport.
+  tip.style.visibility = "hidden";
+  tip.style.display = "block";
+  const cr = chip.getBoundingClientRect();
+  const tr = tip.getBoundingClientRect();
+  let top = cr.top - tr.height - 6;
+  if (top < 8) top = cr.bottom + 6;
+  let left = cr.left + cr.width / 2 - tr.width / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tr.width - 8));
+  tip.style.top = top + "px";
+  tip.style.left = left + "px";
+  tip.style.visibility = "visible";
+}
+
+function _pbpAskTipHide() {
+  if (_pbpAskTipEl) _pbpAskTipEl.style.display = "none";
+}
+
+// Stream-end finalizer, called by the Task 13 send path and the Task 15
+// history restore. el = the .ask-a element that held streamed plain text.
+// Returns {body, cites} so the caller can persist them with the record.
+function _pbpAskFinalize(el, fullText) {
+  const parsed = pbpAiParseCites(String(fullText == null ? "" : fullText));
+  // renderMarkdown (md-convert.js) is the SINGLE sanitize point (marked +
+  // DOMPurify); assigning its return via innerHTML is the established
+  // md-preview.js pattern (renderedView.innerHTML = renderMarkdown(...),
+  // md-preview.js ~line 330-333). NEVER assign raw model text to innerHTML.
+  el.innerHTML = renderMarkdown(parsed.body);
+  _pbpAskChipPass(el, parsed.cites);
+  // Task 15 hook (copy button + history chrome). typeof-guarded so this
+  // Task 14 commit stands alone before Task 15 lands.
+  if (typeof _pbpAskDecorate === "function") _pbpAskDecorate(el, parsed);
+  return parsed;
 }

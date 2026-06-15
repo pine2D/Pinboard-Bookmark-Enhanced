@@ -1097,5 +1097,144 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
     assert(r2.prompt.indexOf("Q: \nA: ") !== -1, "null history fields become empty strings");
   });
 });
+
+// ============ Task 14: ask citation tokenizer ============
+suiteIf("ask citation tokenizer", "pbpAskBuildContext", () => {
+  test("plain text -> single text segment", () => {
+    const segs = _pbpAskSplitCiteTokens("no cites here");
+    assertEq(segs.length, 1, "one seg");
+    assertEq(segs[0].kind, "text", "kind");
+    assertEq(segs[0].text, "no cites here", "text");
+  });
+  test("token in the middle splits into three segments", () => {
+    const segs = _pbpAskSplitCiteTokens("A [P7] b");
+    assertEq(segs.length, 3, "three segs");
+    assertEq(segs[0].text, "A ", "head");
+    assertEq(segs[1].kind, "cite", "cite kind");
+    assertEq(segs[1].p, 7, "p");
+    assertEq(segs[1].token, "[P7]", "token");
+    assertEq(segs[2].text, " b", "tail");
+  });
+  test("adjacent tokens, token at start and end", () => {
+    const segs = _pbpAskSplitCiteTokens("[P1][P2]");
+    assertEq(segs.length, 2, "two segs");
+    assertEq(segs[0].p, 1, "p1");
+    assertEq(segs[1].p, 2, "p2");
+  });
+  test("multi-digit paragraph number", () => {
+    const segs = _pbpAskSplitCiteTokens("x [P12] y");
+    assertEq(segs[1].p, 12, "p 12");
+  });
+  test("malformed tokens stay text", () => {
+    const segs = _pbpAskSplitCiteTokens("[P] [Px] [p3]");
+    assertEq(segs.length, 1, "single text seg");
+    assertEq(segs[0].kind, "text", "text kind");
+  });
+  test("empty input -> empty array", () => {
+    assertEq(_pbpAskSplitCiteTokens("").length, 0, "empty");
+  });
+});
+
+// ============ Task 14: raw offsets -> DOM Range ============
+suiteIf("ask range from offsets", "pbpAskBuildContext", () => {
+  function holder(html) {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    return d;
+  }
+  test("single text node", () => {
+    const r = _pbpAskRangeFromOffsets(holder("<p>hello world</p>"), 6, 11);
+    assertEq(r.toString(), "world", "range text");
+  });
+  test("span across nested inline elements", () => {
+    const r = _pbpAskRangeFromOffsets(holder("<p>hello <strong>brave</strong> world</p>"), 6, 17);
+    assertEq(r.toString(), "brave world", "across nodes");
+  });
+  test("full-length range", () => {
+    const r = _pbpAskRangeFromOffsets(holder("<p>abc</p>"), 0, 3);
+    assertEq(r.toString(), "abc", "full");
+  });
+  test("offsets beyond text -> null", () => {
+    assertEq(_pbpAskRangeFromOffsets(holder("<p>abc</p>"), 1, 99), null, "end out");
+    assertEq(_pbpAskRangeFromOffsets(holder("<p>abc</p>"), 99, 100), null, "start out");
+  });
+  test("degenerate offsets -> null", () => {
+    assertEq(_pbpAskRangeFromOffsets(holder("<p>abc</p>"), 2, 2), null, "empty span");
+    assertEq(_pbpAskRangeFromOffsets(holder("<p>abc</p>"), -1, 2), null, "negative");
+    assertEq(_pbpAskRangeFromOffsets(null, 0, 1), null, "null el");
+  });
+});
+
+// ============ Task 14: chip pass (verify + replace) ============
+suiteIf("ask chip pass", "pbpAskBuildContext", () => {
+  function makeBlocks(html) {
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    pbpAiIndexBlocks(root);
+    return root;
+  }
+  test("chips replace in-range tokens; out-of-range stays plain text", () => {
+    makeBlocks("<p>alpha beta gamma</p><p>second block text</p>");
+    const a = document.createElement("div");
+    a.innerHTML = "<p>Claim [P1] and [P2] but bogus [P9] end.</p>";
+    _pbpAskChipPass(a, [{ p: 1, quote: "alpha beta" }]);
+    const chips = a.querySelectorAll("button.ask-chip");
+    assertEq(chips.length, 2, "two chips");
+    assertEq(chips[0].dataset.p, "1", "p1");
+    assertEq(chips[0].dataset.seq, "1", "seq1");
+    assertEq(chips[0].textContent, "1", "label = seq");
+    assertEq(chips[1].dataset.p, "2", "p2");
+    assertEq(chips[1].dataset.seq, "2", "seq2");
+    assert(a.textContent.indexOf("[P9]") !== -1, "bogus token left as text");
+    assert(a.textContent.indexOf("[P1]") === -1, "valid token replaced");
+  });
+  test("verified chip carries raw quote offsets", () => {
+    makeBlocks("<p>alpha beta gamma</p>");
+    const a = document.createElement("div");
+    a.innerHTML = "<p>See [P1].</p>";
+    _pbpAskChipPass(a, [{ p: 1, quote: "beta gamma" }]);
+    const chip = a.querySelector(".ask-chip");
+    assert(chip.classList.contains("verified"), "verified class");
+    assertEq(chip.dataset.qs, "6", "raw start");
+    assertEq(chip.dataset.qe, "16", "raw end");
+    assertEq(chip.dataset.quote, "beta gamma", "quote stored");
+  });
+  test("no CITES quote for p -> chip unverified", () => {
+    makeBlocks("<p>alpha beta gamma</p>");
+    const a = document.createElement("div");
+    a.innerHTML = "<p>See [P1].</p>";
+    _pbpAskChipPass(a, []);
+    const chip = a.querySelector(".ask-chip");
+    assert(chip && !chip.classList.contains("verified"), "unverified");
+    assertEq(chip.dataset.qs, undefined, "no offsets");
+  });
+  test("quote not found in block -> chip unverified", () => {
+    makeBlocks("<p>alpha beta gamma</p>");
+    const a = document.createElement("div");
+    a.innerHTML = "<p>See [P1].</p>";
+    _pbpAskChipPass(a, [{ p: 1, quote: "totally different words here" }]);
+    const chip = a.querySelector(".ask-chip");
+    assert(chip && !chip.classList.contains("verified"), "fuzzy miss");
+  });
+  test("repeated cite of same paragraph gets fresh seq numbers", () => {
+    makeBlocks("<p>alpha beta gamma</p>");
+    const a = document.createElement("div");
+    a.innerHTML = "<p>One [P1] two [P1].</p>";
+    _pbpAskChipPass(a, [{ p: 1, quote: "alpha" }]);
+    const chips = a.querySelectorAll(".ask-chip");
+    assertEq(chips.length, 2, "two chips");
+    assertEq(chips[0].dataset.seq, "1", "seq 1");
+    assertEq(chips[1].dataset.seq, "2", "seq 2");
+    assert(chips[0].classList.contains("verified") && chips[1].classList.contains("verified"), "both verified");
+  });
+  test("tokens inside code/pre are content, not cites", () => {
+    makeBlocks("<p>alpha</p>");
+    const a = document.createElement("div");
+    a.innerHTML = "<pre><code>[P1]</code></pre><p>real [P1]</p>";
+    _pbpAskChipPass(a, []);
+    assertEq(a.querySelectorAll(".ask-chip").length, 1, "only prose token chipped");
+    assertEq(a.querySelector("code").textContent, "[P1]", "code untouched");
+  });
+});
 </script>
 </body></html>
