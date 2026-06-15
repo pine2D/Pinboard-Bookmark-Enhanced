@@ -1975,5 +1975,49 @@
   },
   "selectionTriggerOff": {
     "message": "Désactivé"
+  },
+  "trTranslate": {
+    "message": "Traduire"
+  },
+  "trTranslating": {
+    "message": "Traduction en cours…"
+  },
+  "trProgress": {
+    "message": "$DONE$ / $TOTAL$ segments",
+    "placeholders": {
+      "done": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "trStop": {
+    "message": "Arrêter"
+  },
+  "trContinue": {
+    "message": "Continuer la traduction"
+  },
+  "trViewOriginal": {
+    "message": "Original"
+  },
+  "trViewBilingual": {
+    "message": "Bilingue"
+  },
+  "trViewTranslated": {
+    "message": "Traduction"
+  },
+  "trEstCost": {
+    "message": "Environ ~$COUNT$ tokens · $MODEL$",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trBlockFailed": {
+    "message": "Échec de la traduction de ce paragraphe"
+  },
+  "trRetryBlock": {
+    "message": "Réessayer ce paragraphe"
+  },
+  "trShowOriginal": {
+    "message": "Cliquer pour afficher temporairement l'original"
   }
 }

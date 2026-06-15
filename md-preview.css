@@ -621,3 +621,53 @@ body.md-empty main { margin-left: 0; }
   }
 }
 
+/* ============================================================
+   Full-text translation (md-translate.js)
+   ============================================================ */
+/* Translated sibling block: de-emphasized — one text shade down + 0.95em
+   (user-picked option A). Hidden in the original view; direct child of
+   #rendered-view, so it inherits the content-visibility scroll perf rule. */
+#rendered-view .pb-tr {
+  display: none;
+  color: var(--fg-secondary);
+  font-size: 0.95em;
+  margin: 0.35em 0 1em;
+}
+body.tr-bilingual #rendered-view .pb-tr,
+body.tr-only #rendered-view .pb-tr { display: block; }
+#rendered-view .pb-tr > :first-child { margin-top: 0; }
+#rendered-view .pb-tr > :last-child { margin-bottom: 0; }
+
+/* Translated-only view: hide originals that HAVE a translation. pre blocks
+   and not-yet-translated blocks never carry data-pb-tr-done, so they stay
+   visible by construction. .pb-show-orig is the per-block escape hatch
+   (click the translated block to peek at its original, click again to hide). */
+body.tr-only #rendered-view > [data-pb-tr-done]:not(.pb-show-orig) { display: none; }
+body.tr-only #rendered-view .pb-tr { cursor: pointer; }
+
+/* Per-block failure pill: inline SVG + retry label; title carries the error. */
+.pb-tr-err {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0.25em 0 1em;
+  padding: 3px 10px;
+  border: 1px solid var(--danger);
+  border-radius: 100px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 12px;
+  cursor: pointer;
+}
+.pb-tr-err svg { width: 13px; height: 13px; flex-shrink: 0; }
+.pb-tr-err:hover { background: var(--btn-hover); }
+.pb-tr-err:disabled { opacity: 0.5; cursor: wait; }
+
+/* Rail translate section */
+#tr-section .tr-row { display: flex; gap: 6px; }
+#tr-section .tr-row .action-btn { flex: 1; justify-content: center; }
+#tr-section .tr-row .action-btn svg { width: 14px; height: 14px; }
+#tr-section .tr-meta { margin-top: 6px; font-size: 12px; color: var(--fg-secondary); }
+#tr-section .tr-meta[hidden] { display: none; }
+#tr-section .view-toggle { margin-top: 8px; }
+

@@ -1975,5 +1975,49 @@
   },
   "selectionTriggerOff": {
     "message": "オフ"
+  },
+  "trTranslate": {
+    "message": "翻訳"
+  },
+  "trTranslating": {
+    "message": "翻訳中…"
+  },
+  "trProgress": {
+    "message": "$DONE$ / $TOTAL$ セグメント",
+    "placeholders": {
+      "done": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "trStop": {
+    "message": "停止"
+  },
+  "trContinue": {
+    "message": "翻訳を続ける"
+  },
+  "trViewOriginal": {
+    "message": "原文"
+  },
+  "trViewBilingual": {
+    "message": "対訳"
+  },
+  "trViewTranslated": {
+    "message": "訳文のみ"
+  },
+  "trEstCost": {
+    "message": "約 ~$COUNT$ tokens · $MODEL$",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trBlockFailed": {
+    "message": "この段落の翻訳に失敗しました"
+  },
+  "trRetryBlock": {
+    "message": "この段落を再試行"
+  },
+  "trShowOriginal": {
+    "message": "クリックして一時的に原文を表示"
   }
 }

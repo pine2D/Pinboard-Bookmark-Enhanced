@@ -1975,5 +1975,49 @@
   },
   "selectionTriggerOff": {
     "message": "Wyłączone"
+  },
+  "trTranslate": {
+    "message": "Tłumacz"
+  },
+  "trTranslating": {
+    "message": "Tłumaczenie…"
+  },
+  "trProgress": {
+    "message": "$DONE$ / $TOTAL$ segmentów",
+    "placeholders": {
+      "done": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "trStop": {
+    "message": "Zatrzymaj"
+  },
+  "trContinue": {
+    "message": "Kontynuuj tłumaczenie"
+  },
+  "trViewOriginal": {
+    "message": "Oryginał"
+  },
+  "trViewBilingual": {
+    "message": "Dwujęzycznie"
+  },
+  "trViewTranslated": {
+    "message": "Tłumaczenie"
+  },
+  "trEstCost": {
+    "message": "Około ~$COUNT$ tokens · $MODEL$",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trBlockFailed": {
+    "message": "Tłumaczenie tego akapitu nie powiodło się"
+  },
+  "trRetryBlock": {
+    "message": "Ponów ten akapit"
+  },
+  "trShowOriginal": {
+    "message": "Kliknij, aby tymczasowo wyświetlić oryginał"
   }
 }

@@ -1975,5 +1975,49 @@
   },
   "selectionTriggerOff": {
     "message": "Aus"
+  },
+  "trTranslate": {
+    "message": "Übersetzen"
+  },
+  "trTranslating": {
+    "message": "Übersetze…"
+  },
+  "trProgress": {
+    "message": "$DONE$ / $TOTAL$ Abschnitte",
+    "placeholders": {
+      "done": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "trStop": {
+    "message": "Stoppen"
+  },
+  "trContinue": {
+    "message": "Übersetzung fortsetzen"
+  },
+  "trViewOriginal": {
+    "message": "Original"
+  },
+  "trViewBilingual": {
+    "message": "Zweisprachig"
+  },
+  "trViewTranslated": {
+    "message": "Übersetzung"
+  },
+  "trEstCost": {
+    "message": "Ca. ~$COUNT$ tokens · $MODEL$",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trBlockFailed": {
+    "message": "Übersetzung dieses Absatzes fehlgeschlagen"
+  },
+  "trRetryBlock": {
+    "message": "Diesen Absatz erneut versuchen"
+  },
+  "trShowOriginal": {
+    "message": "Klicken, um Original vorübergehend anzuzeigen"
   }
 }

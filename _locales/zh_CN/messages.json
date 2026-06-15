@@ -1975,5 +1975,49 @@
   },
   "selectionTriggerOff": {
     "message": "关闭"
+  },
+  "trTranslate": {
+    "message": "翻译"
+  },
+  "trTranslating": {
+    "message": "翻译中…"
+  },
+  "trProgress": {
+    "message": "$DONE$ / $TOTAL$ 段",
+    "placeholders": {
+      "done": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "trStop": {
+    "message": "停止"
+  },
+  "trContinue": {
+    "message": "继续翻译"
+  },
+  "trViewOriginal": {
+    "message": "原文"
+  },
+  "trViewBilingual": {
+    "message": "双语"
+  },
+  "trViewTranslated": {
+    "message": "仅译文"
+  },
+  "trEstCost": {
+    "message": "约 ~$COUNT$ tokens · $MODEL$",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trBlockFailed": {
+    "message": "此段翻译失败"
+  },
+  "trRetryBlock": {
+    "message": "重试此段"
+  },
+  "trShowOriginal": {
+    "message": "点击临时显示原文"
   }
 }

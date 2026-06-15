@@ -1975,5 +1975,49 @@
   },
   "selectionTriggerOff": {
     "message": "Выключено"
+  },
+  "trTranslate": {
+    "message": "Перевести"
+  },
+  "trTranslating": {
+    "message": "Перевод…"
+  },
+  "trProgress": {
+    "message": "$DONE$ / $TOTAL$ сегментов",
+    "placeholders": {
+      "done": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "trStop": {
+    "message": "Остановить"
+  },
+  "trContinue": {
+    "message": "Продолжить перевод"
+  },
+  "trViewOriginal": {
+    "message": "Оригинал"
+  },
+  "trViewBilingual": {
+    "message": "Двуязычный"
+  },
+  "trViewTranslated": {
+    "message": "Перевод"
+  },
+  "trEstCost": {
+    "message": "Около ~$COUNT$ tokens · $MODEL$",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trBlockFailed": {
+    "message": "Перевод этого абзаца не удался"
+  },
+  "trRetryBlock": {
+    "message": "Повторить этот абзац"
+  },
+  "trShowOriginal": {
+    "message": "Нажмите, чтобы временно показать оригинал"
   }
 }

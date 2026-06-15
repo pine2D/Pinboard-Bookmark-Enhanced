@@ -1975,5 +1975,49 @@
   },
   "selectionTriggerOff": {
     "message": "Off"
+  },
+  "trTranslate": {
+    "message": "Translate"
+  },
+  "trTranslating": {
+    "message": "Translating…"
+  },
+  "trProgress": {
+    "message": "$DONE$ / $TOTAL$ segments",
+    "placeholders": {
+      "done": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "trStop": {
+    "message": "Stop"
+  },
+  "trContinue": {
+    "message": "Continue translation"
+  },
+  "trViewOriginal": {
+    "message": "Original"
+  },
+  "trViewBilingual": {
+    "message": "Bilingual"
+  },
+  "trViewTranslated": {
+    "message": "Translation"
+  },
+  "trEstCost": {
+    "message": "About ~$COUNT$ tokens · $MODEL$",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "model": { "content": "$2" }
+    }
+  },
+  "trBlockFailed": {
+    "message": "Translation failed for this paragraph"
+  },
+  "trRetryBlock": {
+    "message": "Retry this paragraph"
+  },
+  "trShowOriginal": {
+    "message": "Click to temporarily show the original"
   }
 }
