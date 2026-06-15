@@ -2080,5 +2080,28 @@
   },
   "askEmptyHint": {
     "message": "回答会标注原文段落出处，每个论断都可点击核对。"
+  },
+  "askCopyAnswer": {
+    "message": "复制回答"
+  },
+  "askCopied": {
+    "message": "已复制!"
+  },
+  "askClearConfirm": {
+    "message": "清空本页全部问答？"
+  },
+  "askClearYes": {
+    "message": "清空"
+  },
+  "askClearNo": {
+    "message": "取消"
+  },
+  "askRestoredNote": {
+    "message": "已恢复 $COUNT$ 条历史问答",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

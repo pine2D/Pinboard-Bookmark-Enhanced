@@ -2080,5 +2080,28 @@
   },
   "askEmptyHint": {
     "message": "Ответы ссылаются на абзацы статьи, поэтому каждое утверждение можно проверить."
+  },
+  "askCopyAnswer": {
+    "message": "Копировать ответ"
+  },
+  "askCopied": {
+    "message": "Скопировано!"
+  },
+  "askClearConfirm": {
+    "message": "Очистить все вопросы и ответы для этой страницы?"
+  },
+  "askClearYes": {
+    "message": "Очистить"
+  },
+  "askClearNo": {
+    "message": "Отмена"
+  },
+  "askRestoredNote": {
+    "message": "Восстановлено $COUNT$ ранее заданных вопросов",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

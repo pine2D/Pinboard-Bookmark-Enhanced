@@ -2080,5 +2080,28 @@
   },
   "askEmptyHint": {
     "message": "Antworten zitieren die Absätze des Artikels, sodass jede Aussage überprüfbar ist."
+  },
+  "askCopyAnswer": {
+    "message": "Antwort kopieren"
+  },
+  "askCopied": {
+    "message": "Kopiert!"
+  },
+  "askClearConfirm": {
+    "message": "Alle Fragen und Antworten für diese Seite löschen?"
+  },
+  "askClearYes": {
+    "message": "Löschen"
+  },
+  "askClearNo": {
+    "message": "Abbrechen"
+  },
+  "askRestoredNote": {
+    "message": "$COUNT$ frühere Frage(n) wiederhergestellt",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

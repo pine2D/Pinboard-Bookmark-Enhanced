@@ -2080,5 +2080,28 @@
   },
   "askEmptyHint": {
     "message": "Odpowiedzi cytują akapity artykułu, więc każde twierdzenie można sprawdzić."
+  },
+  "askCopyAnswer": {
+    "message": "Kopiuj odpowiedź"
+  },
+  "askCopied": {
+    "message": "Skopiowano!"
+  },
+  "askClearConfirm": {
+    "message": "Wyczyścić wszystkie pytania i odpowiedzi dla tej strony?"
+  },
+  "askClearYes": {
+    "message": "Wyczyść"
+  },
+  "askClearNo": {
+    "message": "Anuluj"
+  },
+  "askRestoredNote": {
+    "message": "Przywrócono $COUNT$ wcześniejszych pytań",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

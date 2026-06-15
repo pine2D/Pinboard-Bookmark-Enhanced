@@ -741,3 +741,182 @@ function _pbpAskFinalize(el, fullText) {
   if (typeof _pbpAskDecorate === "function") _pbpAskDecorate(el, parsed);
   return parsed;
 }
+
+// ============================================================
+// Ask history: restore + clear + per-answer copy (Task 15)
+// ============================================================
+// DOM contract (Task 12/13): panel #ask-panel, conversation container
+// #ask-thread, question/answer elements .ask-q/.ask-a. Records persisted
+// by the Task 13 send path as {q, a: full raw model text, cites, ts, model}
+// via pbpAskHistSet (cap 20, md-ai-core).
+
+// Static inline SVG (clipboard, same path set as the rail Copy buttons in
+// md-preview.html). Constant string, never model text.
+const PBP_ASK_COPY_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+// Pure: compose the copied markdown = answer body + footnote block from
+// the parsed cites. [^k] indexes follow cite order; quotes stay verbatim.
+function _pbpAskBuildCopyText(body, cites) {
+  const b = String(body == null ? "" : body).trim();
+  const list = Array.isArray(cites) ? cites : [];
+  if (!list.length) return b;
+  const foot = list
+    .map((c, i) => '[^' + (i + 1) + ']: "' + c.quote + '" — P' + c.p)
+    .join("\n");
+  return b + "\n\n" + foot;
+}
+
+function _pbpAskHistThread() {
+  return document.getElementById("ask-thread");
+}
+
+// Hook called by _pbpAskFinalize (Task 14) for EVERY finalized answer --
+// live-streamed and restored alike. Adds the per-answer copy button and
+// makes sure the clear control exists once the thread has content.
+function _pbpAskDecorate(el, parsed) {
+  _pbpAskEnsureClear();
+  if (el.querySelector(".ask-copy-btn")) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "action-btn ask-copy-btn";
+  btn.innerHTML = PBP_ASK_COPY_SVG; // static inline SVG constant above
+  const label = document.createElement("span");
+  label.className = "btn-label";
+  label.textContent = t("askCopyAnswer");
+  btn.appendChild(label);
+  const text = _pbpAskBuildCopyText(parsed.body, parsed.cites);
+  btn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      flashButtonLabel(btn, t("askCopied"));
+    } catch (_) {
+      flashButtonLabel(btn, t("mdPreviewFailed"));
+    }
+  });
+  el.appendChild(btn);
+}
+
+// ---- Clear: inline two-button confirm strip (never window.confirm) ----
+function _pbpAskEnsureClear() {
+  let btn = document.getElementById("ask-clear");
+  const thread = _pbpAskHistThread();
+  if (!btn) {
+    if (!thread || !thread.parentNode) return;
+    btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "ask-clear";
+    btn.className = "ask-clear-btn";
+    btn.textContent = t("askClearYes");
+    thread.parentNode.insertBefore(btn, thread);
+  }
+  btn.hidden = false;
+  if (!btn._pbpWired) {
+    btn._pbpWired = true;
+    btn.addEventListener("click", _pbpAskShowClearConfirm);
+  }
+}
+
+function _pbpAskShowClearConfirm() {
+  const thread = _pbpAskHistThread();
+  if (!thread || document.getElementById("ask-clear-confirm")) return;
+  // Markup produced here:
+  // <div id="ask-clear-confirm" class="ask-clear-confirm" role="alertdialog"
+  //      aria-label="{askClearConfirm}">
+  //   <span class="ask-clear-msg">{askClearConfirm}</span>
+  //   <button type="button" class="action-btn ask-clear-yes">{askClearYes}</button>
+  //   <button type="button" class="action-btn ask-clear-no">{askClearNo}</button>
+  // </div>
+  const strip = document.createElement("div");
+  strip.id = "ask-clear-confirm";
+  strip.className = "ask-clear-confirm";
+  strip.setAttribute("role", "alertdialog");
+  strip.setAttribute("aria-label", t("askClearConfirm"));
+  const msg = document.createElement("span");
+  msg.className = "ask-clear-msg";
+  msg.textContent = t("askClearConfirm");
+  const yes = document.createElement("button");
+  yes.type = "button";
+  yes.className = "action-btn ask-clear-yes";
+  yes.textContent = t("askClearYes");
+  const no = document.createElement("button");
+  no.type = "button";
+  no.className = "action-btn ask-clear-no";
+  no.textContent = t("askClearNo");
+  strip.appendChild(msg);
+  strip.appendChild(yes);
+  strip.appendChild(no);
+  thread.parentNode.insertBefore(strip, thread);
+  yes.addEventListener("click", async () => {
+    strip.remove();
+    const clearBtn = document.getElementById("ask-clear");
+    if (clearBtn) clearBtn.hidden = true;
+    // Route through Task 12's clear path: it restores the empty-state hint
+    // + starter chips AND erases ask_<url> — keeping ONE owner for the
+    // post-clear panel state. Bare wipe only if the shell is absent.
+    if (typeof _pbpAskClearThread === "function") {
+      try { await _pbpAskClearThread(); } catch (_) {}
+    } else {
+      thread.replaceChildren();
+      try { await pbpAskHistSet(_pbpAskHistUrl, []); } catch (_) {}
+    }
+  });
+  no.addEventListener("click", () => strip.remove());
+  no.focus(); // safe default: initial focus away from the destructive action
+}
+
+// ---- Restore persisted rounds when the (lazily mounted) thread appears ----
+let _pbpAskHistUrl = "";
+let _pbpAskHistRestored = false;
+
+async function _pbpAskHistRestore() {
+  const thread = _pbpAskHistThread();
+  if (_pbpAskHistRestored || !thread || !_pbpAskHistUrl) return;
+  _pbpAskHistRestored = true;
+  let hist = [];
+  try { hist = await pbpAskHistGet(_pbpAskHistUrl); } catch (_) {}
+  if (!hist.length) return;
+  // Restored rounds replace the empty-state hint; the starter chips
+  // collapse (thread is no longer empty) — mirrors the live send path.
+  const empty = document.getElementById("ask-empty");
+  if (empty) empty.remove();
+  const chips = document.getElementById("ask-chips");
+  if (chips) chips.hidden = true;
+  const frag = document.createDocumentFragment();
+  const note = document.createElement("div");
+  note.className = "ask-restored";
+  note.textContent = t("askRestoredNote", String(hist.length));
+  frag.appendChild(note);
+  for (const rec of hist) {
+    if (!rec || typeof rec.a !== "string") continue;
+    const qEl = document.createElement("div");
+    qEl.className = "ask-q";
+    qEl.textContent = String(rec.q || "");
+    const aEl = document.createElement("div");
+    aEl.className = "ask-a";
+    frag.appendChild(qEl);
+    frag.appendChild(aEl);
+    // SAME pipeline as live answers: pbpAiParseCites -> renderMarkdown
+    // (single sanitize point) -> chip pass -> verification runs AGAIN
+    // against the current block index -> decorate (copy button).
+    _pbpAskFinalize(aEl, rec.a);
+  }
+  // Prepend: if a live round raced in before the async read finished,
+  // restored history still reads in chronological order above it.
+  thread.insertBefore(frag, thread.firstChild);
+}
+
+document.addEventListener("pbp:rendered", (e) => {
+  _pbpAskHistUrl = (e.detail && e.detail.url) || "";
+  pbpAiGetSettings().then((s) => {
+    if (!pbpAiAvailable(s)) return; // master gate: zero residue when off
+    if (_pbpAskHistThread()) { _pbpAskHistRestore(); return; }
+    // The panel mounts lazily on first open (rail button, hotkey "a", or
+    // the explain bridge). Watch for #ask-thread, restore once, disconnect.
+    const mo = new MutationObserver(() => {
+      if (!_pbpAskHistThread()) return;
+      mo.disconnect();
+      _pbpAskHistRestore();
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+  }).catch(() => {});
+});

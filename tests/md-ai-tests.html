@@ -1237,4 +1237,25 @@ suiteIf("ask chip pass", "pbpAskBuildContext", () => {
   });
 });
 </script>
+<script>
+// ============ Task 15: ask copy text builder ============
+suiteIf("ask copy text builder", "pbpAskBuildContext", () => {
+  test("no cites -> trimmed body only", () => {
+    assertEq(_pbpAskBuildCopyText("  Answer body.  ", []), "Answer body.", "body only");
+  });
+  test("cites appended as footnote block", () => {
+    const out = _pbpAskBuildCopyText("Body [P7].", [
+      { p: 7, quote: "exact words" },
+      { p: 2, quote: "another quote" }
+    ]);
+    assertEq(out, 'Body [P7].\n\n[^1]: "exact words" — P7\n[^2]: "another quote" — P2', "footnotes");
+  });
+  test("non-array cites tolerated", () => {
+    assertEq(_pbpAskBuildCopyText("x", null), "x", "null cites");
+  });
+  test("empty body with cites still emits footnotes", () => {
+    assertEq(_pbpAskBuildCopyText("", [{ p: 1, quote: "q" }]), '\n\n[^1]: "q" — P1', "empty body");
+  });
+});
+</script>
 </body></html>

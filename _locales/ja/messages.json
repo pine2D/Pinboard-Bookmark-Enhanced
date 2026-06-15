@@ -2080,5 +2080,28 @@
   },
   "askEmptyHint": {
     "message": "回答には原文の段落への出典が付くので、各主張を確認できます。"
+  },
+  "askCopyAnswer": {
+    "message": "回答をコピー"
+  },
+  "askCopied": {
+    "message": "コピーしました!"
+  },
+  "askClearConfirm": {
+    "message": "このページの質問と回答をすべて消去しますか？"
+  },
+  "askClearYes": {
+    "message": "消去"
+  },
+  "askClearNo": {
+    "message": "キャンセル"
+  },
+  "askRestoredNote": {
+    "message": "過去の質問 $COUNT$ 件を復元しました",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

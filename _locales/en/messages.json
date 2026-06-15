@@ -2080,5 +2080,28 @@
   },
   "askEmptyHint": {
     "message": "Answers cite the article paragraphs, so every claim can be checked."
+  },
+  "askCopyAnswer": {
+    "message": "Copy answer"
+  },
+  "askCopied": {
+    "message": "Copied!"
+  },
+  "askClearConfirm": {
+    "message": "Clear all questions and answers for this page?"
+  },
+  "askClearYes": {
+    "message": "Clear"
+  },
+  "askClearNo": {
+    "message": "Cancel"
+  },
+  "askRestoredNote": {
+    "message": "Restored $COUNT$ earlier question(s)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

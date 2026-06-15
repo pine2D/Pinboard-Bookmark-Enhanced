@@ -2080,5 +2080,28 @@
   },
   "askEmptyHint": {
     "message": "Les réponses citent les paragraphes de l’article, chaque affirmation est vérifiable."
+  },
+  "askCopyAnswer": {
+    "message": "Copier la réponse"
+  },
+  "askCopied": {
+    "message": "Copié !"
+  },
+  "askClearConfirm": {
+    "message": "Effacer toutes les questions et réponses de cette page ?"
+  },
+  "askClearYes": {
+    "message": "Effacer"
+  },
+  "askClearNo": {
+    "message": "Annuler"
+  },
+  "askRestoredNote": {
+    "message": "$COUNT$ question(s) précédente(s) restaurée(s)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

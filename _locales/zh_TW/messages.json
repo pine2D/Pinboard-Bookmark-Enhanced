@@ -2080,5 +2080,28 @@
   },
   "askEmptyHint": {
     "message": "回答會標註原文段落出處，每個論斷都可點擊核對。"
+  },
+  "askCopyAnswer": {
+    "message": "複製回答"
+  },
+  "askCopied": {
+    "message": "已複製!"
+  },
+  "askClearConfirm": {
+    "message": "清空本頁全部問答？"
+  },
+  "askClearYes": {
+    "message": "清空"
+  },
+  "askClearNo": {
+    "message": "取消"
+  },
+  "askRestoredNote": {
+    "message": "已恢復 $COUNT$ 條歷史問答",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }
