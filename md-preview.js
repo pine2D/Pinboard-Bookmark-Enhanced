@@ -449,7 +449,9 @@ function ensureKatex() {
   document.getElementById("btn-dl-html").addEventListener("click", async () => {
     if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights the export
     const hljsCss = await loadHljsCss();
-    const doc = composeStyledHtml(getMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
+    // Follow the original/bilingual/translation-only view like the Markdown export
+    // does (buildExportMarkdown = pbpViewMarkdown() || getMarkdown()).
+    const doc = composeStyledHtml(buildExportMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
   });
 
