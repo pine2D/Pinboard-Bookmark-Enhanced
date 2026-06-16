@@ -848,6 +848,10 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #tr-section .tr-row .action-btn svg { width: 14px; height: 14px; }
 #tr-section .tr-meta { margin-top: 6px; font-size: 12px; color: var(--fg-secondary); }
 #tr-section .tr-meta[hidden] { display: none; }
+/* .action-btn sets display:inline-flex, which outspecifies the UA [hidden] rule —
+   restate it so btn.hidden / stop.hidden actually hide the translate & stop buttons
+   (otherwise they stay visible reading "翻译中" after the run finishes). */
+#tr-section .tr-row .action-btn[hidden] { display: none; }
 #tr-section .tr-target { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 #tr-section .tr-link {
   border: 0; background: none; padding: 0; cursor: pointer;
