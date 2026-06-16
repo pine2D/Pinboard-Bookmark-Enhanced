@@ -433,12 +433,14 @@ function ensureKatex() {
     await copyToClipboard(buildExportMarkdown(), e.currentTarget);
   });
   document.getElementById("btn-copy-html").addEventListener("click", async (e) => {
-    // Ensure code is highlighted before copying the HTML (highlight is deferred/lazy on load).
-    if (renderedView.querySelector("pre > code:not(.hljs)")) {
-      await ensureHljs();
-      highlightCodeBlocks(renderedView);
-    }
-    await copyToClipboard(renderedView.innerHTML, e.currentTarget); // nosec: reading back own generated HTML
+    // Same content as the HTML download: a complete styled doc that follows the
+    // original/bilingual/translation-only view (buildExportMarkdown), copied as
+    // text — symmetric with Copy MD == Download MD. (Was renderedView.innerHTML,
+    // which always carried every .pb-tr block regardless of the selected view.)
+    if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights
+    const hljsCss = await loadHljsCss();
+    const doc = composeStyledHtml(buildExportMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
+    await copyToClipboard(doc, e.currentTarget);
   });
 
   // Download buttons
