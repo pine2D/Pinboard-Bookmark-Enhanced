@@ -595,6 +595,7 @@ section("site-rules: multi-item");
   const r = applySiteRule(doc, "https://stackoverflow.com/questions/79948695/discussion");
   const c = r ? norm(r.contentHtml) : "";
   check("so discussions → id+title", r && r.id === "stackoverflow" && r.title === "Discussion topic?", JSON.stringify(r && [r.id, r.title]));
+  check("so → forum flag true", r && r.forum === true, JSON.stringify(r && r.forum));
   check("so discussions → topic + replies as blockquotes, author, no votes/h3",
     /discussion question/.test(c) && /<strong>carol<\/strong>/.test(c) && /first reply/.test(c) && /<strong>dave<\/strong>/.test(c) && /second reply/.test(c) && !/votes/.test(c) && !/<h3>/.test(c), c);
 })();
@@ -651,6 +652,7 @@ check("buildDepthTree is a global function", typeof buildDepthTree === "function
   const r = applySiteRule(doc, "https://www.v2ex.com/t/123456");
   const c = r ? norm(r.contentHtml) : "";
   check("v2ex → id+title", r && r.id === "v2ex" && r.title === "测试主题", JSON.stringify(r && [r.id, r.title]));
+  check("v2ex → forum flag true", r && r.forum === true, JSON.stringify(r && r.forum));
   check("v2ex → topic body + 回复 heading", /主题正文/.test(c) && /<h2>回复/.test(c), c);
   check("v2ex → reply blocks, no per-reply h2", /#1 · alice/.test(c) && /回复一/.test(c) && /#2 · bob/.test(c) && !/<h2>alice<\/h2>/.test(c), c);
   check("v2ex → lazy img promoted", /src="https:\/\/v\/i\.png"/.test(c), c);

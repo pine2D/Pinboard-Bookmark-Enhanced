@@ -630,11 +630,11 @@
       match: { host: "zhihu.com", url: /\/question\/\d+\/?(?:[?#].*)?$/ }, extract: extractZhihuQuestion },
     { id: "zhihu-zhuanlan", source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
       match: { host: "zhuanlan.zhihu.com", url: /\/p\/\d+/ }, extract: extractZhihuArticle }
-    ,{ id: "stackoverflow", source: "json-ld+self", lastVerified: "2026-06-06", driftCheck: "auto",
+    ,{ id: "stackoverflow", source: "json-ld+self", forum: true, lastVerified: "2026-06-06", driftCheck: "auto",
        sampleUrl: "", match: { host: "stackoverflow.com", url: /\/questions\/\d+/ }, extract: function (d) { return extractStackOverflow(d); } }
-    ,{ id: "stackexchange", source: "json-ld+self", lastVerified: "2026-06-06", driftCheck: "auto",
+    ,{ id: "stackexchange", source: "json-ld+self", forum: true, lastVerified: "2026-06-06", driftCheck: "auto",
        sampleUrl: "", match: { host: "stackexchange.com", url: /\/questions\/\d+/ }, extract: function (d) { return extractStackOverflow(d); } }
-    ,{ id: "v2ex",  source: "self", lastVerified: "2026-06-06", driftCheck: "auto",
+    ,{ id: "v2ex",  source: "self", forum: true, lastVerified: "2026-06-06", driftCheck: "auto",
        sampleUrl: "", match: { host: "v2ex.com", url: /\/t\/\d+/ }, extract: function (d) { return extractV2ex(d); } }
     ,{ id: "arxiv", source: "self", lastVerified: "2026-06-06", driftCheck: "auto",
        sampleUrl: "", match: { host: "arxiv.org", url: /\/abs\// }, extract: function (d) { return extractArxiv(d); } }
@@ -647,7 +647,7 @@
       var out = null;
       try { out = rule.extract(doc, url); } catch (_) { out = null; }
       if (out && out.contentHtml) {
-        return { id: rule.id, contentHtml: out.contentHtml, title: out.title || doc.title || "", url: url, math: !!out.math };
+        return { id: rule.id, contentHtml: out.contentHtml, title: out.title || doc.title || "", url: url, math: !!out.math, forum: !!rule.forum };
       }
       break; // matched site but produced nothing → fall back to Defuddle
     }
