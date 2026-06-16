@@ -49,6 +49,41 @@ function pbpAiTextOf(n) {
   return text;
 }
 
+// ---- Forum thread flatten (per-comment blocks) ----
+// Forum site rules (HN/V2EX/SO-discussions) emit nested <blockquote> threads;
+// after marked, one top-level thread = one block, so translate/ask/explain treat
+// the whole thread as a unit. md-preview runs this (only when info.forum) right
+// after innerHTML, before pbpAiIndexBlocks: it rewrites each top-level <blockquote>
+// into a flat PRE-ORDER sequence of top-level sibling blockquotes — one per comment
+// — tagged with data-pb-depth for CSS indentation. The block indexer then sees each
+// comment as its own block; the rest of the AI layer is unchanged. Deterministic
+// (depth = nesting level); a non-nested quote is just re-wrapped at depth 0 (visually
+// identical). Moves already-sanitized element nodes — never builds new markup. Relies
+// on marked wrapping blockquote text in <p> (so element children carry all content).
+function _pbpFlattenBlockquote(bq, depth, out) {
+  const own = document.createElement("blockquote");
+  own.className = "pb-forum-comment";
+  own.dataset.pbDepth = String(depth);
+  const childBqs = [];
+  for (const c of Array.from(bq.children)) {   // snapshot, then move (live collection)
+    if (c.tagName === "BLOCKQUOTE") childBqs.push(c);
+    else own.appendChild(c);                    // this comment's own header + body
+  }
+  if (own.childNodes.length) out.push(own);      // skip shells with no own content
+  for (const c of childBqs) _pbpFlattenBlockquote(c, depth + 1, out);
+}
+
+function pbpForumFlatten(rootEl) {
+  if (!rootEl) return;
+  for (const el of Array.from(rootEl.children)) {
+    if (el.tagName !== "BLOCKQUOTE") continue;
+    const out = [];
+    _pbpFlattenBlockquote(el, 0, out);
+    for (const node of out) rootEl.insertBefore(node, el);
+    rootEl.removeChild(el);
+  }
+}
+
 // KaTeX pre-pass (translation fidelity): on a CLONE of the block, swap each
 // rendered KaTeX tree for its TeX source pulled from the MathML annotation,
 // wrapped back in $/$$ delimiters. Display math first (its wrapper contains

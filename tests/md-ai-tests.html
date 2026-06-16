@@ -362,6 +362,65 @@ suite("pbpAiIndexBlocks family", () => {
   });
 });
 
+suiteIf("pbpForumFlatten", "pbpForumFlatten", () => {
+  function root(html) { const d = document.createElement("div"); d.innerHTML = html; return d; }
+  const tops = (r) => Array.from(r.querySelectorAll(":scope > blockquote"));
+
+  test("non-nested blockquote -> one depth-0 comment, content preserved", () => {
+    const r = root("<blockquote><p><strong>#1 · alice</strong></p><p>body one</p></blockquote>");
+    pbpForumFlatten(r);
+    const bqs = tops(r);
+    assertEq(bqs.length, 1, "one block");
+    assertEq(bqs[0].className, "pb-forum-comment", "class");
+    assertEq(bqs[0].dataset.pbDepth, "0", "depth 0");
+    assert(/#1 · alice/.test(bqs[0].textContent) && /body one/.test(bqs[0].textContent), "content");
+    assert(!bqs[0].querySelector("blockquote"), "no residual nesting");
+  });
+
+  test("2-level nest -> two top-level comments, depths [0,1] pre-order", () => {
+    const r = root("<blockquote><p>A</p><blockquote><p>B</p></blockquote></blockquote>");
+    pbpForumFlatten(r);
+    const bqs = tops(r);
+    assertEq(bqs.map((b) => b.dataset.pbDepth).join(","), "0,1", "depth seq");
+    assertEq(bqs.map((b) => b.textContent.trim()).join("|"), "A|B", "pre-order");
+  });
+
+  test("3-level with sibling -> depths [0,1,2,1] pre-order (n1,n2,n4,n3)", () => {
+    const r = root(
+      "<blockquote><p>n1</p>" +
+        "<blockquote><p>n2</p><blockquote><p>n4</p></blockquote></blockquote>" +
+        "<blockquote><p>n3</p></blockquote>" +
+      "</blockquote>");
+    pbpForumFlatten(r);
+    const bqs = tops(r);
+    assertEq(bqs.map((b) => b.dataset.pbDepth).join(","), "0,1,2,1", "depth seq");
+    assertEq(bqs.map((b) => b.textContent.trim()).join(","), "n1,n2,n4,n3", "pre-order");
+  });
+
+  test("empty shell (only child blockquotes) skipped; child kept at depth 1", () => {
+    const r = root("<blockquote><blockquote><p>only child</p></blockquote></blockquote>");
+    pbpForumFlatten(r);
+    const bqs = tops(r);
+    assertEq(bqs.length, 1, "shell dropped");
+    assertEq(bqs[0].dataset.pbDepth, "1", "child depth 1");
+    assertEq(bqs[0].textContent.trim(), "only child", "child content");
+  });
+
+  test("non-blockquote top-level elements untouched, order preserved", () => {
+    const r = root("<h2>Replies</h2><blockquote><p>c1</p><blockquote><p>c2</p></blockquote></blockquote><p>after</p>");
+    pbpForumFlatten(r);
+    const kids = Array.from(r.children).map((e) => e.tagName + (e.dataset.pbDepth != null ? ":" + e.dataset.pbDepth : ""));
+    assertEq(kids.join(","), "H2,BLOCKQUOTE:0,BLOCKQUOTE:1,P", "order");
+    assertEq(r.querySelector("h2").textContent, "Replies", "h2 intact");
+    assertEq(r.querySelector(":scope > p").textContent, "after", "trailing p intact");
+  });
+
+  test("null root is a no-op (no throw)", () => {
+    pbpForumFlatten(null);
+    assert(true, "no throw");
+  });
+});
+
 // ============ Task 4: pbpAiShield / pbpAiRestore ============
 suite("pbpAiShield", () => {
   test("inline code becomes C placeholder", () => {
