@@ -957,7 +957,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   background: var(--opt-border, #e0e0e0);
   border-radius: var(--opt-radius-full, 9999px);
   width: fit-content;
-  color: var(--opt-muted, #555);
+  color: var(--opt-fg-muted, #555);
 }
 .tag-gov-members {
   display: flex;
@@ -976,7 +976,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 }
 .tag-gov-reason {
   font-size: 10px;
-  color: var(--opt-muted, #999);
+  color: var(--opt-fg-muted, #999);
   display: block;
   margin-left: 8px;
   font-style: italic;
