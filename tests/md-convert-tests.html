@@ -951,6 +951,36 @@ section("site-rules: v2ex author robustness (avatar link)");
 </script>
 
 <script>
+section("site-rules: hacker news");
+{
+  const HN = '<html><body>' +
+    '<table class="fatitem"><tr class="athing" id="1"><td><span class="titleline">' +
+      '<a href="https://x.com">The Story Title</a></span></td></tr>' +
+      '<tr><td class="subtext"></td></tr></table>' +
+    '<table class="comment-tree">' +
+      '<tr class="athing comtr" id="c1"><td><table><tr>' +
+        '<td class="ind" indent="0"><img src="s.gif" width="0"></td>' +
+        '<td class="default"><div class="comhead"><a class="hnuser" href="user?id=alice">alice</a></div>' +
+        '<div class="comment"><div class="commtext c00">root comment here</div></div></td>' +
+      '</tr></table></td></tr>' +
+      '<tr class="athing comtr" id="c2"><td><table><tr>' +
+        '<td class="ind" indent="1"><img src="s.gif" width="40"></td>' +
+        '<td class="default"><div class="comhead"><a class="hnuser" href="user?id=bob">bob</a></div>' +
+        '<div class="comment"><div class="commtext c00">child reply here</div></div></td>' +
+      '</tr></table></td></tr>' +
+    '</table></body></html>';
+  const doc = new DOMParser().parseFromString(HN, "text/html");
+  const r = applySiteRule(doc, "https://news.ycombinator.com/item?id=123");
+  check("hn → id + forum flag", r && r.id === "hackernews" && r.forum === true, JSON.stringify(r && [r.id, r.forum]));
+  check("hn → title", r && r.title === "The Story Title", r && r.title);
+  const c = (r && r.contentHtml) || "";
+  check("hn → Comments heading (2)", /<h2>Comments \(2\)<\/h2>/.test(c), c);
+  check("hn → authors + bodies present", /alice/.test(c) && /bob/.test(c) && /root comment here/.test(c) && /child reply here/.test(c), c);
+  check("hn → bob nested under alice", /<blockquote>[\s\S]*alice[\s\S]*<blockquote>[\s\S]*bob[\s\S]*<\/blockquote>[\s\S]*<\/blockquote>/.test(c), c);
+}
+</script>
+
+<script>
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>

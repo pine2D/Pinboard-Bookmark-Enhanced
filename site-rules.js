@@ -20,6 +20,8 @@
   var SO_DISC_MAX_DEPTH = 6;   // StackOverflow Discussions threads (deeper than V2EX)
   var SO_COMMENTS_PER_POST = 5;
   var SO_COMMENTS_GLOBAL = 60;
+  var HN_MAX_DEPTH = 8;          // Hacker News threads nest deep; flatten beyond this level
+  var HN_COMMENTS_GLOBAL = 200;  // cap total comments extracted from one HN item page
   function cfg(name, def) {
     var gg = (typeof window !== "undefined") ? window : (typeof self !== "undefined" ? self : null);
     return (gg && gg["__PBP_" + name] != null) ? gg["__PBP_" + name] : def;
@@ -313,6 +315,52 @@
     var note = "";
     if (pages.length > 1) note = "<blockquote><p>" + escapeHtml("注：仅提取当前页回复（共 " + pages.length + " 页）。") + "</p></blockquote>";
     return { contentHtml: note + parts.join("\n"), title: title };
+  }
+
+  // ---- Hacker News (item page: story title + threaded comments) ----------
+  // No floor/thanks/@-strip (HN-specific). Header = author; body = .commtext.
+  function hnReplyHtml(node) {
+    return "<p><strong>" + escapeHtml(node.author || "匿名") + "</strong></p>" + (node.bodyHtml || "");
+  }
+
+  function extractHackerNews(doc) {
+    var title = pickText(doc, [".fatitem .titleline > a", ".titleline > a", ".athing .titleline a"]) || doc.title;
+    var parts = [];
+    // Optional Ask-HN / self-post body (the toptext under the title).
+    var top = doc.querySelector(".fatitem .toptext") || doc.querySelector("td.cell .toptext");
+    if (top && top.textContent.trim()) parts.push(cleanBodyHtml(doc, top.innerHTML));
+
+    var rows = doc.querySelectorAll("table.comment-tree tr.athing.comtr");
+    if (!rows.length) rows = doc.querySelectorAll("tr.athing.comtr");
+    var globalCap = cfg("HN_COMMENTS_GLOBAL", HN_COMMENTS_GLOBAL);
+    var maxDepth = cfg("HN_MAX_DEPTH", HN_MAX_DEPTH);
+    var replies = [], capped = false;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (row.classList.contains("noshow") || row.querySelector(".comment .dead")) continue; // collapsed/dead
+      if (replies.length >= globalCap) { capped = true; break; }
+      var userEl = row.querySelector(".hnuser");
+      var author = userEl ? userEl.textContent.trim() : "";
+      var bodyEl = row.querySelector(".commtext");
+      var bodyHtml = bodyEl ? cleanBodyHtml(doc, bodyEl.innerHTML) : "";
+      if (!author && !bodyHtml) continue;
+      // depth: td.ind[indent] (modern HN) or its spacer img width / 40 (legacy)
+      var ind = row.querySelector("td.ind");
+      var depth = 0;
+      if (ind) {
+        var ia = ind.getAttribute("indent");
+        if (ia != null && ia !== "") depth = parseInt(ia, 10) || 0;
+        else { var im = ind.querySelector("img"); if (im) depth = Math.round((parseInt(im.getAttribute("width"), 10) || 0) / 40); }
+      }
+      replies.push({ author: author, bodyHtml: bodyHtml, depth: depth });
+    }
+    if (replies.length) {
+      parts.push("<h2>" + escapeHtml("Comments (" + replies.length + (capped ? "+" : "") + ")") + "</h2>");
+      parts.push(renderThreadHtml(buildDepthTree(replies), 0, { headFn: hnReplyHtml, maxDepth: maxDepth }));
+    }
+    if (capped) parts.push("<blockquote><p>" + escapeHtml("Note: only the first " + globalCap + " comments were extracted.") + "</p></blockquote>");
+    if (!parts.join("")) return null;
+    return { contentHtml: parts.join("\n"), title: title };
   }
 
   // Decode TeX text-mode accents/ligatures in PROSE (e.g. Andr\'e -> André). Punctuation
@@ -638,6 +686,8 @@
        sampleUrl: "", match: { host: "v2ex.com", url: /\/t\/\d+/ }, extract: function (d) { return extractV2ex(d); } }
     ,{ id: "arxiv", source: "self", lastVerified: "2026-06-06", driftCheck: "auto",
        sampleUrl: "", match: { host: "arxiv.org", url: /\/abs\// }, extract: function (d) { return extractArxiv(d); } }
+    ,{ id: "hackernews", source: "self", forum: true, lastVerified: "2026-06-16", driftCheck: "manual",
+       sampleUrl: "", match: { host: "news.ycombinator.com", url: /\/item\?id=\d+/ }, extract: function (d) { return extractHackerNews(d); } }
   ];
 
   function applySiteRule(doc, url) {
