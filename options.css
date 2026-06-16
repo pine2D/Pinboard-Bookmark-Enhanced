@@ -939,6 +939,12 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 }
 
 /* ---- Tag Governance UI (T3) ---- */
+#tag-gov-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  align-items: start;        /* each card hugs its own height; no stretch to row max */
+}
 .tag-gov-group-row {
   display: flex;
   flex-direction: column;
@@ -947,7 +953,10 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   background: var(--opt-panel, #fafafa);
   border: 1px solid var(--opt-border, #ccc);
   border-radius: var(--opt-radius-sm, 3px);
-  margin-bottom: 8px;
+  margin-bottom: 0;          /* grid gap now owns vertical spacing */
+}
+#tag-gov-groups > :not(.tag-gov-group-row) {
+  grid-column: 1 / -1;       /* empty-state / non-card messages span the full grid width */
 }
 .tag-gov-kind-badge {
   display: inline-block;
