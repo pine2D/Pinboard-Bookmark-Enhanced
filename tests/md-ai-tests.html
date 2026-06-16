@@ -927,7 +927,7 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
       batches: [segs([1, 2])],
       requestBatch: async (segments, onItem) => {
         onItem({ id: 1, text: "T:" + segments[0].text });
-        onItem({ id: 2, text: "xx" }); // ratio far below 0.3 -> rejected fill
+        onItem({ id: 2, text: "x".repeat(160) }); // runaway expansion (t > o*4+20) -> rejected fill
         return { seenIds: new Set([1, 2]) };
       },
       requestSingle: async () => null, // downgrade also unusable
