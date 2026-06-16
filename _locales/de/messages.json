@@ -2004,6 +2004,12 @@
   "trChangeLang": {
     "message": "Ändern"
   },
+  "trDone": {
+    "message": "Fertig · $COUNT$ Segmente",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
   "trStop": {
     "message": "Stoppen"
   },

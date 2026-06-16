@@ -2004,6 +2004,12 @@
   "trChangeLang": {
     "message": "修改"
   },
+  "trDone": {
+    "message": "翻譯完成 · $COUNT$ 段",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
   "trStop": {
     "message": "停止"
   },

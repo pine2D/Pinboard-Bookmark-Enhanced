@@ -506,7 +506,15 @@ function _pbpTrBuildSection(st) {
   sec.appendChild(prog);
 
   anchor.insertAdjacentElement("afterend", sec);
-  btn.addEventListener("click", () => { _pbpTrStart(st).catch(() => {}); });
+  btn.addEventListener("click", () => {
+    _pbpTrStart(st).catch(() => {
+      // Unexpected rejection (setup error etc.): never leave the UI stuck on
+      // "翻译中". Reset run flag and settle to a terminal status the user can act on.
+      st.running = false;
+      const doneAll = st.work.every((w) => (w.n in st.trMd));
+      _pbpTrSetStatus(st, doneAll ? "done" : "partial");
+    });
+  });
   stop.addEventListener("click", () => { if (st.ctrl) st.ctrl.abort(); });
 }
 
@@ -764,8 +772,13 @@ function _pbpTrSetStatus(st, status) {
     btn.disabled = false;
     btn.hidden = true;
     stop.hidden = true;
-    prog.hidden = true;
     est.hidden = true;
+    // Explicit completion indicator (the button hides, and the view toggle is
+    // already shown from the progressive-display start, so without this the run
+    // has no visible "finished" signal). Show the translated-block count.
+    const n = st.work.filter((w) => w.n in st.trMd).length;
+    prog.hidden = false;
+    prog.textContent = t("trDone", String(n));
   }
 }
 

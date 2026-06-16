@@ -2004,6 +2004,12 @@
   "trChangeLang": {
     "message": "Изменить"
   },
+  "trDone": {
+    "message": "Готово · $COUNT$ сегментов",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
   "trStop": {
     "message": "Остановить"
   },
