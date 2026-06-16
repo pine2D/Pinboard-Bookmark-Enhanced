@@ -1045,3 +1045,18 @@ body.ask-open main { margin-right: 396px; }
 #explain-pill svg { width: 15px; height: 15px; }
 #explain-pill[hidden] { display: none; }
 
+/* ---- Forum per-comment blocks (pbpForumFlatten) ---- */
+/* Each comment is a top-level blockquote tagged with its thread depth; the adjacent
+   .pb-tr (translation sibling, when bilingual/translated) inherits the same indent so
+   the translation engine needs no forum awareness. Depth 0 = normal blockquote look.
+   Indent is capped (deep chains clamp to the depth-6 step). */
+.pb-forum-comment[data-pb-depth="1"], .pb-forum-comment[data-pb-depth="1"] + .pb-tr { margin-left: 1.6em; }
+.pb-forum-comment[data-pb-depth="2"], .pb-forum-comment[data-pb-depth="2"] + .pb-tr { margin-left: 3.2em; }
+.pb-forum-comment[data-pb-depth="3"], .pb-forum-comment[data-pb-depth="3"] + .pb-tr { margin-left: 4.8em; }
+.pb-forum-comment[data-pb-depth="4"], .pb-forum-comment[data-pb-depth="4"] + .pb-tr { margin-left: 6.4em; }
+.pb-forum-comment[data-pb-depth="5"], .pb-forum-comment[data-pb-depth="5"] + .pb-tr { margin-left: 8em; }
+.pb-forum-comment[data-pb-depth="6"], .pb-forum-comment[data-pb-depth="6"] + .pb-tr { margin-left: 9.6em; }
+/* depth >= 7 clamps to the depth-6 step (attribute selectors can't do arithmetic) */
+.pb-forum-comment[data-pb-depth="7"], .pb-forum-comment[data-pb-depth="7"] + .pb-tr,
+.pb-forum-comment[data-pb-depth="8"], .pb-forum-comment[data-pb-depth="8"] + .pb-tr { margin-left: 9.6em; }
+
