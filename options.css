@@ -988,15 +988,20 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 }
 .tag-gov-actions button { position: relative; }
 .tag-gov-lowcount-table {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 4px 12px;
   margin-bottom: 8px;
 }
 .tag-gov-lowcount-row {
   display: flex;
   align-items: center;
   font-size: 12px;
+  min-width: 0;            /* allow the grid item to shrink to the track width */
+}
+.tag-gov-lowcount-row label {
+  user-select: none;       /* prevent text selection while shift-clicking a range */
+  overflow-wrap: anywhere; /* wrap very long tag names instead of overflowing the cell */
 }
 .tag-gov-lowcount-checkbox {
   margin-right: 6px;

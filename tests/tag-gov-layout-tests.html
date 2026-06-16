@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Tag Gov Layout Tests</title>
+<link rel="stylesheet" href="../options.css">
+<style>
+  .case.pass { color: #0a0; }
+  .case.fail { color: #c00; font-weight: bold; }
+</style>
+</head>
+<body>
+<div id="results"></div>
+<!-- Pin to the real ~650px panel width so multi-column is a genuine proof. -->
+<div id="fixture" style="width: 650px;">
+  <div id="tag-gov-lowcount-list"></div>
+</div>
+<script>
+function pass(name){const d=document.createElement("div");d.className="case pass";d.textContent="OK "+name;document.getElementById("results").appendChild(d);}
+function fail(name,msg){const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
+function test(name,fn){try{fn();pass(name);}catch(e){fail(name,e.message);}}
+function trackCount(el){const c=getComputedStyle(el).gridTemplateColumns;return c==="none"?1:c.split(/\s+/).filter(Boolean).length;}
+
+// Build the low-count list exactly like renderLowCountTags does.
+const list=document.getElementById("tag-gov-lowcount-list");
+const table=document.createElement("div");
+table.className="tag-gov-lowcount-table";
+for(let i=0;i<12;i++){
+  const r=document.createElement("div");r.className="tag-gov-lowcount-row";
+  const l=document.createElement("label");
+  const cb=document.createElement("input");cb.type="checkbox";cb.className="tag-gov-lowcount-checkbox";
+  l.appendChild(cb);
+  const s=document.createElement("span");s.textContent=" tag"+i+" (1)";l.appendChild(s);
+  r.appendChild(l);table.appendChild(r);
+}
+list.appendChild(table);
+
+test("low-count table is a multi-column grid", () => {
+  const n = trackCount(table);
+  // 650px fixture, minmax(160px,1fr) + 12px col-gap => exactly 3 tracks
+  // (3*160+2*12=504<=650; 4*160+3*12=676>650). >1 is too weak to catch regressions.
+  if (n < 3) throw new Error("expected >=3 grid tracks at 650px, got " + n);
+});
+test("low-count label disables text selection", () => {
+  const lbl = table.querySelector("label");
+  const cs = getComputedStyle(lbl);
+  const us = cs.userSelect || cs.webkitUserSelect;
+  if (us !== "none") throw new Error("expected user-select:none, got " + us);
+});
+</script>
+</body></html>
