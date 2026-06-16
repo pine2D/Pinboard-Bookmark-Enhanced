@@ -512,7 +512,9 @@ async function _pbpTrStart(st) {
   const segMap = new Map();                          // segId -> {n, idx, parts}
   const partBuf = new Map();                         // n -> {chunks:Array, seps:[]}
   const segs = [];
-  let nextSegId = pending.reduce((m, w) => Math.max(m, w.n), 0) + 1;
+  // Base fresh part ids past EVERY block id (st.work, not just pending) so a
+  // part id can never collide with an already-cached block's id in byId.
+  let nextSegId = st.work.reduce((m, w) => Math.max(m, w.n), 0) + 1;
   for (const w of pending) {
     if (w.shielded.text.length <= PBP_TR_PART_LIMIT) {
       segs.push({ id: w.n, text: w.shielded.text });
