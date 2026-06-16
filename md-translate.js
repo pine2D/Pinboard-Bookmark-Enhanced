@@ -290,10 +290,12 @@ async function pbpTrRunQueue(plan) {
 // ============================================================
 
 // Entry visibility (spec 4.1): hide the translate control ONLY when the
-// detected article language AND the UI language are both non-empty and
-// equal. Uncertain detection ("" for Latin scripts) always shows it.
-function _pbpTrShouldHideEntry(articleLang, uiLang) {
-  return !!(articleLang && uiLang && articleLang === uiLang);
+// detected article language AND the resolved TARGET language are both non-empty
+// and equal (translating a language into itself is a no-op). Gate on the target,
+// NOT the UI language — a zh UI with an explicit en target must still offer to
+// translate a zh article. Uncertain detection ("" for Latin scripts) always shows it.
+function _pbpTrShouldHideEntry(articleLang, targetLang) {
+  return !!(articleLang && targetLang && articleLang === targetLang);
 }
 
 // Target-language resolution: "auto" -> the UI language (BCP-47 from
@@ -351,14 +353,15 @@ async function pbpTrInit(detail) {
   const s = await pbpAiGetSettings();
   if (!pbpAiAvailable(s)) return; // master switch off or no key: zero UI
   const uiLang = uiLangToBCP47();
-  if (_pbpTrShouldHideEntry(view.lang || "", uiLang)) return;
+  const target = pbpTrResolveTargetLang(s, uiLang);
+  if (_pbpTrShouldHideEntry(view.lang || "", target.code)) return;
   if (!pbpAiBlocks().length) pbpAiIndexBlocks(view);
 
   const st = _pbpTrState = {
     s,
     url: String((detail && detail.url) || ""),
     title: String((detail && detail.title) || ""),
-    target: pbpTrResolveTargetLang(s, uiLang),
+    target,
     modelKey: (s.aiProvider || "gemini") + ":" + (pbpAiResolveModelOverride(s) || "default"),
     work: [],                      // non-pre blocks: {n, md, hash, shielded:{text,slots}}
     trMd: Object.create(null),     // n -> RESTORED translated markdown (export + TOC)

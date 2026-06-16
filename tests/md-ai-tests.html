@@ -1078,12 +1078,20 @@ suiteIf("pbpTrResolveTargetLang / entry visibility", "pbpTrResolveTargetLang", (
   test("missing setting falls back to auto", () => {
     assertEq(pbpTrResolveTargetLang({}, "de").code, "de", "default auto");
   });
-  test("entry hidden ONLY when both langs non-empty and equal", () => {
-    assert(_pbpTrShouldHideEntry("zh-Hans", "zh-Hans") === true, "same -> hide");
+  test("entry hidden ONLY when article lang == target lang (both non-empty)", () => {
+    assert(_pbpTrShouldHideEntry("zh-Hans", "zh-Hans") === true, "same as target -> hide");
     assert(_pbpTrShouldHideEntry("", "zh-Hans") === false, "unknown article -> show");
-    assert(_pbpTrShouldHideEntry("zh-Hans", "") === false, "unknown ui -> show");
-    assert(_pbpTrShouldHideEntry("ja", "zh-Hans") === false, "different -> show");
+    assert(_pbpTrShouldHideEntry("zh-Hans", "") === false, "unknown target -> show");
+    assert(_pbpTrShouldHideEntry("ja", "zh-Hans") === false, "different from target -> show");
     assert(_pbpTrShouldHideEntry("", "") === false, "both empty -> show");
+  });
+  test("gate uses resolved TARGET lang, not UI lang", () => {
+    // zh UI, explicit en target, zh article -> must SHOW (zh->en is useful)
+    const tEn = pbpTrResolveTargetLang({ translateTargetLang: "en" }, "zh-Hans");
+    assert(_pbpTrShouldHideEntry("zh-Hans", tEn.code) === false, "zh article + en target -> show");
+    // zh UI, auto target (=zh), zh article -> HIDE (zh->zh is a no-op)
+    const tAuto = pbpTrResolveTargetLang({ translateTargetLang: "auto" }, "zh-Hans");
+    assert(_pbpTrShouldHideEntry("zh-Hans", tAuto.code) === true, "zh article + auto(zh) target -> hide");
   });
 });
 
