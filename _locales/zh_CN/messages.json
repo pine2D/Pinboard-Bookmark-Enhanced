@@ -782,6 +782,12 @@
   "qsHint": {
     "message": "通过键盘快捷键即时保存当前页面（无需打开弹窗）。"
   },
+  "labelShortcut": {
+    "message": "快捷键"
+  },
+  "labelOpenPopupShortcut": {
+    "message": "打开弹窗快捷键"
+  },
   "openShortcuts": {
     "message": "打开 Chrome 快捷键设置"
   },

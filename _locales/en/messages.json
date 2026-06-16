@@ -782,6 +782,12 @@
   "qsHint": {
     "message": "Save the current page instantly via keyboard shortcut (without opening popup)."
   },
+  "labelShortcut": {
+    "message": "Shortcut"
+  },
+  "labelOpenPopupShortcut": {
+    "message": "Open popup shortcut"
+  },
   "openShortcuts": {
     "message": "Open Chrome Shortcut Settings"
   },

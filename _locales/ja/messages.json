@@ -782,6 +782,12 @@
   "qsHint": {
     "message": "キーボードショートカットで現在のページを即座に保存（ポップアップを開かずに）。"
   },
+  "labelShortcut": {
+    "message": "ショートカット"
+  },
+  "labelOpenPopupShortcut": {
+    "message": "ポップアップを開くショートカット"
+  },
   "openShortcuts": {
     "message": "Chrome ショートカット設定を開く"
   },

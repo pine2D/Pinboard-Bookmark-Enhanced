@@ -782,6 +782,12 @@
   "qsHint": {
     "message": "Zapisz bieżącą stronę natychmiast skrótem klawiszowym (bez otwierania okienka)."
   },
+  "labelShortcut": {
+    "message": "Skrót"
+  },
+  "labelOpenPopupShortcut": {
+    "message": "Skrót otwierania wyskakującego okna"
+  },
   "openShortcuts": {
     "message": "Otwórz ustawienia skrótów Chrome"
   },

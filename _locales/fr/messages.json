@@ -782,6 +782,12 @@
   "qsHint": {
     "message": "Enregistrer la page actuelle instantanément via un raccourci clavier (sans ouvrir le popup)."
   },
+  "labelShortcut": {
+    "message": "Raccourci"
+  },
+  "labelOpenPopupShortcut": {
+    "message": "Raccourci d’ouverture du popup"
+  },
   "openShortcuts": {
     "message": "Ouvrir les paramètres de raccourcis Chrome"
   },

@@ -782,6 +782,12 @@
   "qsHint": {
     "message": "Aktuelle Seite sofort per Tastenkürzel speichern (ohne Popup zu öffnen)."
   },
+  "labelShortcut": {
+    "message": "Tastenkürzel"
+  },
+  "labelOpenPopupShortcut": {
+    "message": "Tastenkürzel zum Öffnen des Popups"
+  },
   "openShortcuts": {
     "message": "Chrome Tastenkürzel-Einstellungen öffnen"
   },

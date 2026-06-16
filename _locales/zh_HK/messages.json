@@ -782,6 +782,12 @@
   "qsHint": {
     "message": "透過鍵盤快捷鍵即時儲存當前頁面（無需開啟彈出窗口）。"
   },
+  "labelShortcut": {
+    "message": "快捷鍵"
+  },
+  "labelOpenPopupShortcut": {
+    "message": "開啟彈窗快捷鍵"
+  },
   "openShortcuts": {
     "message": "開啟 Chrome 快捷鍵設定"
   },

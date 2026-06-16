@@ -1237,35 +1237,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadSavedThemes();
   updateSaveThemeBtnState();
 
-  // ---- Chrome shortcuts link ----
-  $id("open-shortcuts-link")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+  // ---- Chrome shortcuts: open chrome://extensions/shortcuts ----
+  // A plain <a href="chrome://..."> can't navigate from an extension page, so
+  // intercept every shortcut link (any tab) and open it via the tabs API.
+  document.querySelectorAll('a[href="chrome://extensions/shortcuts"]').forEach((a) => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+    });
   });
-  $id("open-shortcuts-link-rl")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
-  });
-  $id("open-shortcuts-link-md")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
-  });
-  // Show the ACTUAL bound key for the Markdown preview command (not a hardcoded guess).
+  // Show the ACTUAL bound key for every command that has a display slot in the
+  // page ([data-command="<command name>"]) — not a hardcoded guess. Unbound
+  // commands show the "unset" hint. One loop covers all current + future slots.
   try {
     const cmds = await chrome.commands.getAll();
-    const mdCmd = cmds.find((c) => c.name === "markdown_preview");
-    const cur = $id("md-shortcut-current");
-    if (cur) {
-      if (mdCmd && mdCmd.shortcut) {
-        cur.textContent = "";
+    const byName = new Map(cmds.map((c) => [c.name, c.shortcut]));
+    document.querySelectorAll("[data-command]").forEach((slot) => {
+      const sc = byName.get(slot.dataset.command);
+      slot.textContent = "";
+      if (sc) {
         const kbd = document.createElement("kbd");
-        kbd.textContent = mdCmd.shortcut;
-        cur.appendChild(kbd);
+        kbd.textContent = sc;
+        slot.appendChild(kbd);
       } else {
-        cur.textContent = t("mdShortcutUnset");
+        slot.textContent = t("mdShortcutUnset");
       }
-    }
-  } catch (_) { /* commands API unavailable — leave the field blank */ }
+    });
+  } catch (_) { /* commands API unavailable — leave fields blank */ }
 
 
   // B5: Write high-frequency UI fields mirror for next options open.

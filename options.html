@@ -84,6 +84,13 @@
     <!-- Tab 2: Popup -->
     <div id="panel-popup" class="panel">
       <div class="section-title" data-i18n="secPopupBehavior">Popup Behavior</div>
+      <div class="fg">
+        <label class="bl" data-i18n="labelOpenPopupShortcut">Open popup shortcut</label>
+        <p class="hint">
+          <span class="shortcut-current" data-command="_execute_action"></span>
+          <a href="chrome://extensions/shortcuts" class="btn btn-sm" style="text-decoration:none;margin-left:8px;" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
+        </p>
+      </div>
       <div class="fg"><label><input type="checkbox" id="opt-check-bookmark-status" checked /> <span data-i18n="optCheckBookmarkStatus">Show bookmark status via icon (check if current page is saved)</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-auto-close" checked /> <span data-i18n="optAutoClose">Auto-close popup after save</span></label></div>
       <div class="fg"><label><input type="checkbox" id="offline-queue-enabled" /> <span data-i18n="optOfflineQueue">Enable offline save queue</span></label></div>
@@ -168,7 +175,7 @@
         </div>
         <div class="accordion-body" id="acc-qs">
           <p class="hint" data-i18n="qsHint">Save the current page instantly via keyboard shortcut (without opening popup).</p>
-          <p style="margin-bottom:8px;"><a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" style="text-decoration:none;" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
+          <p style="margin-bottom:8px;"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="quick_save"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link" class="btn btn-sm" style="text-decoration:none;margin-left:8px;" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
           <p class="hint"><span data-i18n="shortcutsManual">Or navigate manually:</span> <code>chrome://extensions/shortcuts</code></p>
           <div class="fg"><label><input type="checkbox" id="qs-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
           <div class="fg"><label><input type="checkbox" id="qs-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
@@ -187,7 +194,7 @@
         </div>
         <div class="accordion-body" id="acc-rl">
           <p class="hint" data-i18n="rlHint">Save current page as "Read Later" via keyboard shortcut. Automatically marks as unread.</p>
-          <p style="margin-bottom:8px;"><a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm" style="text-decoration:none;" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
+          <p style="margin-bottom:8px;"><span data-i18n="labelShortcut">Shortcut</span>: <span class="shortcut-current" data-command="read_later"></span> <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-rl" class="btn btn-sm" style="text-decoration:none;margin-left:8px;" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a></p>
           <div class="fg"><label><input type="checkbox" id="rl-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
           <div class="fg"><label><input type="checkbox" id="rl-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
           <div class="fg">
@@ -564,7 +571,7 @@
       <div class="fg">
         <label class="bl" data-i18n="mdShortcutLabel">Markdown preview shortcut</label>
         <p class="hint">
-          <span id="md-shortcut-current"></span>
+          <span id="md-shortcut-current" class="shortcut-current" data-command="markdown_preview"></span>
           <a href="chrome://extensions/shortcuts" id="open-shortcuts-link-md" class="btn btn-sm" style="text-decoration:none;margin-left:8px;" data-i18n="openShortcuts">Open Chrome Shortcut Settings</a>
         </p>
       </div>
