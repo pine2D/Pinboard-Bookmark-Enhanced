@@ -745,6 +745,47 @@ suiteIf("pbpTrLengthRatioOk", "pbpTrLengthRatioOk", () => {
     assert(pbpTrLengthRatioOk("", "anything") === false, "empty orig");
   });
 });
+
+suiteIf("_pbpTrSplitText", "_pbpTrSplitText", () => {
+  function rebuilds(s, lim) {
+    const r = _pbpTrSplitText(s, lim);
+    return r.seps.map((sp, i) => sp + r.chunks[i]).join("") === s;
+  }
+  function maxLen(s, lim) {
+    const r = _pbpTrSplitText(s, lim);
+    return Math.max.apply(null, r.chunks.map((c) => c.length));
+  }
+  function phBalanced(s, lim) {
+    const r = _pbpTrSplitText(s, lim);
+    return r.chunks.every((c) => (c.match(/⟦/g) || []).length === (c.match(/⟧/g) || []).length);
+  }
+  test("short text -> single chunk, empty sep, exact round-trip", () => {
+    const r = _pbpTrSplitText("hello world", 6000);
+    assertEq(r.chunks.length, 1, "one chunk");
+    assertEq(r.seps[0], "", "lead sep empty");
+    assertEq(r.chunks[0], "hello world", "chunk is the text");
+  });
+  test("paragraph split: round-trip exact, chunks within limit", () => {
+    const s = Array.from({ length: 20 }, (_, i) => "Para " + i + " " + "x".repeat(500)).join("\n\n");
+    assert(rebuilds(s, 6000), "round trip");
+    assert(maxLen(s, 6000) <= 6000, "within limit");
+  });
+  test("line split when no paragraph breaks (markdown table rows)", () => {
+    const s = Array.from({ length: 300 }, (_, i) => "| row " + i + " | " + "y".repeat(30) + " |").join("\n");
+    assert(rebuilds(s, 6000), "round trip");
+    assert(maxLen(s, 6000) <= 6000, "within limit");
+  });
+  test("hard split of a boundary-free run never cuts inside a placeholder", () => {
+    const s = "z".repeat(3000) + "⟦C1⟧" + "z".repeat(3000) + "⟦L1⟧" + "z".repeat(3000);
+    assert(rebuilds(s, 6000), "round trip");
+    assert(maxLen(s, 6000) <= 6000, "within limit");
+    assert(phBalanced(s, 6000), "placeholders balanced in every chunk");
+  });
+  test("null/empty tolerated", () => {
+    assertEq(_pbpTrSplitText("", 6000).chunks[0], "", "empty");
+    assertEq(_pbpTrSplitText(null, 6000).chunks[0], "", "null");
+  });
+});
 </script>
 
 <script>

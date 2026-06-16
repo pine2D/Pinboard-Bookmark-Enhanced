@@ -91,6 +91,53 @@ function pbpTrLengthRatioOk(orig, translated) {
   return r >= 0.3 && r <= 4;
 }
 
+// A block this long, translated, can exceed a model's output-token cap and
+// truncate -- losing the whole block (the "longest 2 blocks always fail"
+// symptom). Such blocks are sub-split into parts <= this many chars; each part
+// translates within the cap and the parts reassemble into the block's text.
+const PBP_TR_PART_LIMIT = 6000;
+
+// Split `text` into chunks <= limit chars at the coarsest boundary available
+// (paragraph "\n\n", then line "\n", then sentence end, then a hard cut that
+// never lands inside a ⟦...⟧ placeholder). Returns { chunks, seps } such that
+// seps.map((s,i)=>s+chunks[i]).join("") === text exactly (seps[0]===""), so the
+// translated chunks reassemble with their original separators. A boundary-free
+// run longer than limit is kept whole (rare; better whole than corrupted).
+function _pbpTrSplitText(text, limit) {
+  const s = String(text == null ? "" : text);
+  const lim = limit || PBP_TR_PART_LIMIT;
+  if (s.length <= lim) return { chunks: [s], seps: [""] };
+  const chunks = [];
+  const seps = [];
+  let pos = 0;
+  let prevSep = "";
+  while (pos < s.length) {
+    if (s.length - pos <= lim) { chunks.push(s.slice(pos)); seps.push(prevSep); break; }
+    const win = s.slice(pos, pos + lim);
+    let cut = -1, sepLen = 0;
+    for (const [delim, dl] of [["\n\n", 2], ["\n", 1]]) {
+      const idx = win.lastIndexOf(delim);
+      if (idx > 0) { cut = pos + idx; sepLen = dl; break; }
+    }
+    if (cut === -1) {
+      const sIdx = win.search(/[.。!?！？](?=[\s]?[^.。!?！？]*$)/);
+      if (sIdx > 0) { cut = pos + sIdx + 1; sepLen = (s[pos + sIdx + 1] === " ") ? 1 : 0; }
+      else {
+        let end = pos + lim;
+        const open = s.lastIndexOf("⟦", end - 1);
+        const close = s.lastIndexOf("⟧", end - 1);
+        if (open > close && open > pos) end = open;   // don't cut inside a placeholder
+        cut = end; sepLen = 0;
+      }
+    }
+    chunks.push(s.slice(pos, cut));
+    seps.push(prevSep);
+    prevSep = s.slice(cut, cut + sepLen);
+    pos = cut + sepLen;
+  }
+  return { chunks, seps };
+}
+
 // ============================================================
 // Batch queue engine (DOM-free; all I/O injected for testability)
 // ============================================================
@@ -458,18 +505,50 @@ async function _pbpTrStart(st) {
 
   const byId = new Map(st.work.map((w) => [w.n, w]));
   const newly = {};                                 // blockHash -> shielded translation
+  // Sub-split oversize blocks into parts so no single request truncates at the
+  // output cap. Each part is its own queued segment (part 0 reuses the block id
+  // n; later parts get fresh ids past max(n)); parts reassemble in order with
+  // their original separators into the block's full translation.
+  const segMap = new Map();                          // segId -> {n, idx, parts}
+  const partBuf = new Map();                         // n -> {chunks:Array, seps:[]}
+  const segs = [];
+  let nextSegId = pending.reduce((m, w) => Math.max(m, w.n), 0) + 1;
+  for (const w of pending) {
+    if (w.shielded.text.length <= PBP_TR_PART_LIMIT) {
+      segs.push({ id: w.n, text: w.shielded.text });
+      segMap.set(w.n, { n: w.n, idx: 0, parts: 1 });
+    } else {
+      const split = _pbpTrSplitText(w.shielded.text, PBP_TR_PART_LIMIT);
+      partBuf.set(w.n, { chunks: new Array(split.chunks.length), seps: split.seps });
+      split.chunks.forEach((chunk, idx) => {
+        const id = idx === 0 ? w.n : nextSegId++;
+        segs.push({ id, text: chunk });
+        segMap.set(id, { n: w.n, idx, parts: split.chunks.length });
+      });
+    }
+  }
   await pbpTrRunQueue({
-    batches: pbpTrPackBatches(pending.map((w) => ({ id: w.n, text: w.shielded.text }))),
+    batches: pbpTrPackBatches(segs),
     requestBatch, requestSingle, signal: st.ctrl.signal,
     onFill: (id, text) => {
-      const w = byId.get(id);
+      const m = segMap.get(id);
+      if (!m) return;
+      const w = byId.get(m.n);
       if (!w) return;
-      _pbpTrFill(st, w, text);
-      newly[w.hash] = text;
+      if (m.parts === 1) { _pbpTrFill(st, w, text); newly[w.hash] = text; return; }
+      const pb = partBuf.get(m.n);
+      if (!pb) return;
+      pb.chunks[m.idx] = text;
+      if (pb.chunks.every((c) => typeof c === "string")) {
+        const joined = pb.chunks.map((c, i) => (pb.seps[i] || "") + c).join("");
+        _pbpTrFill(st, w, joined);
+        newly[w.hash] = joined;
+      }
     },
     onBlockFail: (id, message) => {
-      const w = byId.get(id);
-      if (w) _pbpTrMarkFailed(st, w, message);
+      const m = segMap.get(id);
+      const w = m && byId.get(m.n);
+      if (w) _pbpTrMarkFailed(st, w, message);       // any failed part fails its block
     },
     onProgress: (done, total) => {
       const prog = document.getElementById("tr-progress");
@@ -550,25 +629,42 @@ function _pbpTrMarkFailed(st, w, message) {
   btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
 }
 
-async function _pbpTrRetryBlock(st, w, btn) {
-  if (btn.disabled) return;
-  btn.disabled = true;
+// Translate one whole block, sub-splitting if it exceeds the part limit so its
+// translation never truncates at the output cap. Returns the (still-shielded)
+// translation; throws on an invalid/failed part. Parts reassemble in order with
+// their original separators.
+async function _pbpTrTranslateBlock(st, w) {
   const glossary = pbpTrParseGlossary(st.s.translateGlossary);
-  const { system, prompt } = pbpTrBuildPrompt({
-    targetLanguage: st.target.name, title: st.title, glossary,
-    segments: [{ id: w.n, text: w.shielded.text }]
-  });
-  try {
+  const split = w.shielded.text.length <= PBP_TR_PART_LIMIT
+    ? { chunks: [w.shielded.text], seps: [""] }
+    : _pbpTrSplitText(w.shielded.text, PBP_TR_PART_LIMIT);
+  const out = [];
+  for (let i = 0; i < split.chunks.length; i++) {
+    const { system, prompt } = pbpTrBuildPrompt({
+      targetLanguage: st.target.name, title: st.title, glossary,
+      segments: [{ id: w.n, text: split.chunks[i] }]
+    });
     let got = null;
     const parser = pbpAiMakeStreamJsonParser((it) => { if (it.id === w.n) got = it.text; });
     const full = await callAIStream(st.s, prompt, {
       system, model: pbpAiResolveModelOverride(st.s),
-      temperature: 0.1, noThinking: true, maxTokens: 4096
+      temperature: 0.1, noThinking: true,
+      maxTokens: Math.min(8192, Math.max(1024, pbpAiEstimateTokens(split.chunks[i].length) * 3))
     }, (d, acc) => parser.push(acc));
     parser.finish(full);
-    if (typeof got !== "string" || !pbpTrLengthRatioOk(w.shielded.text, got)) {
+    if (typeof got !== "string" || !pbpTrLengthRatioOk(split.chunks[i], got)) {
       throw new Error("invalid single-block translation");
     }
+    out.push(got);
+  }
+  return split.chunks.length === 1 ? out[0] : out.map((c, i) => (split.seps[i] || "") + c).join("");
+}
+
+async function _pbpTrRetryBlock(st, w, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const got = await _pbpTrTranslateBlock(st, w);
     btn.remove();
     _pbpTrFill(st, w, got);
     const one = {};
