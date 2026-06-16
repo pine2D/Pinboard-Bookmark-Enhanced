@@ -310,10 +310,26 @@ const PBP_TR_LANG_NAMES = {
   th: "Thai", id: "Indonesian"
 };
 
+// Localized language name for UI display (e.g. zh UI shows "简体中文", not the
+// English "Simplified Chinese"). Uses the built-in Intl.DisplayNames (zero-dep);
+// falls back to the English name for custom/free-text targets Intl can't resolve
+// (of() returns the code unchanged for unknown-but-valid codes, throws for malformed).
+// NOTE: display only — the prompt still sends the English `name`.
+function _pbpTrLocalizedLangName(code, fallbackName, uiLang) {
+  try {
+    if (typeof Intl !== "undefined" && Intl.DisplayNames) {
+      const out = new Intl.DisplayNames([uiLang || "en"], { type: "language" }).of(code);
+      if (out && out !== code) return out;
+    }
+  } catch (_) { /* invalid code / unsupported API: fall through to fallback */ }
+  return fallbackName || code;
+}
+
 function pbpTrResolveTargetLang(s, uiLang) {
   const v = String((s && s.translateTargetLang) || "auto").trim() || "auto";
   const code = v === "auto" ? String(uiLang || "en") : v;
-  return { code, name: PBP_TR_LANG_NAMES[code] || code };
+  const name = PBP_TR_LANG_NAMES[code] || code;
+  return { code, name, display: _pbpTrLocalizedLangName(code, name, uiLang) };
 }
 
 // Export composition (window.pbpViewMarkdown): items = [{orig, tr|null}]
@@ -456,7 +472,7 @@ function _pbpTrBuildSection(st) {
   const tgt = document.createElement("div");
   tgt.className = "tr-meta tr-target";
   const tgtText = document.createElement("span");
-  tgtText.textContent = t("trTargetLang", st.target.name);
+  tgtText.textContent = t("trTargetLang", st.target.display || st.target.name);
   tgt.appendChild(tgtText);
   const tgtLink = document.createElement("button");
   tgtLink.type = "button";

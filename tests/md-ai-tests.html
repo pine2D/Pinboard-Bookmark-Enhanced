@@ -1061,19 +1061,31 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
 <script>
 // ============ Task 11: view composition + lang resolution ============
 suiteIf("pbpTrResolveTargetLang / entry visibility", "pbpTrResolveTargetLang", () => {
-  test("auto follows the passed UI language", () => {
+  test("auto follows the passed UI language; display localized, prompt name English", () => {
     const r = pbpTrResolveTargetLang({ translateTargetLang: "auto" }, "zh-Hans");
     assertEq(r.code, "zh-Hans", "code");
-    assertEq(r.name, "Simplified Chinese", "human name for prompt");
+    assertEq(r.name, "Simplified Chinese", "human name for prompt (English)");
+    assert(r.display.indexOf("简") >= 0, "display localized for zh UI: " + r.display);
   });
-  test("stored code maps to human name", () => {
+  test("stored code maps to human name; display localizes to UI lang", () => {
     assertEq(pbpTrResolveTargetLang({ translateTargetLang: "ja" }, "en").name, "Japanese", "ja");
     assertEq(pbpTrResolveTargetLang({ translateTargetLang: "pl" }, "en").name, "Polish", "pl");
+    // en target in a zh UI -> prompt stays "English", display becomes 英语-ish
+    const r = pbpTrResolveTargetLang({ translateTargetLang: "en" }, "zh-Hans");
+    assertEq(r.name, "English", "prompt name stays English");
+    assert(r.display.indexOf("英") >= 0, "display localized: " + r.display);
+    // en UI: display equals the English name (no regression)
+    assertEq(pbpTrResolveTargetLang({ translateTargetLang: "ja" }, "en").display, "Japanese", "en UI display");
   });
-  test("custom free text passes through as both code and name", () => {
+  test("custom free text: code+name verbatim (prompt), display shown verbatim too", () => {
     const r = pbpTrResolveTargetLang({ translateTargetLang: "Classical Chinese" }, "en");
     assertEq(r.code, "Classical Chinese", "code passthrough");
-    assertEq(r.name, "Classical Chinese", "name passthrough");
+    assertEq(r.name, "Classical Chinese", "name passthrough (prompt)");
+    assertEq(r.display, "Classical Chinese", "display verbatim (Intl can't resolve)");
+    // CJK custom (e.g. 文言文): Intl throws -> user sees exactly what they typed
+    const r2 = pbpTrResolveTargetLang({ translateTargetLang: "文言文" }, "zh-Hans");
+    assertEq(r2.name, "文言文", "CJK custom name for prompt");
+    assertEq(r2.display, "文言文", "CJK custom shown verbatim");
   });
   test("missing setting falls back to auto", () => {
     assertEq(pbpTrResolveTargetLang({}, "de").code, "de", "default auto");
@@ -1092,6 +1104,26 @@ suiteIf("pbpTrResolveTargetLang / entry visibility", "pbpTrResolveTargetLang", (
     // zh UI, auto target (=zh), zh article -> HIDE (zh->zh is a no-op)
     const tAuto = pbpTrResolveTargetLang({ translateTargetLang: "auto" }, "zh-Hans");
     assert(_pbpTrShouldHideEntry("zh-Hans", tAuto.code) === true, "zh article + auto(zh) target -> hide");
+  });
+});
+
+suiteIf("_pbpTrLocalizedLangName", "_pbpTrLocalizedLangName", () => {
+  test("preset code localized to the UI language", () => {
+    assert(_pbpTrLocalizedLangName("zh-Hans", "Simplified Chinese", "zh-Hans").indexOf("简") >= 0, "zh-Hans -> 简*");
+    assert(_pbpTrLocalizedLangName("en", "English", "zh-Hans").indexOf("英") >= 0, "en -> 英*");
+  });
+  test("English UI returns the English names (no regression)", () => {
+    assertEq(_pbpTrLocalizedLangName("zh-Hans", "Simplified Chinese", "en"), "Simplified Chinese", "en UI");
+    assertEq(_pbpTrLocalizedLangName("ja", "Japanese", "en"), "Japanese", "en UI ja");
+  });
+  test("unknown-but-structurally-valid code falls back to the provided name", () => {
+    // Intl.of('zz') returns 'zz' (the code) -> helper rejects (out===code) -> fallback
+    assertEq(_pbpTrLocalizedLangName("zz", "My Fallback", "zh-Hans"), "My Fallback", "zz -> fallback");
+  });
+  test("malformed/custom targets (CJK, spaces) shown verbatim", () => {
+    // Intl.of throws RangeError for these -> fallback to the user's own text
+    assertEq(_pbpTrLocalizedLangName("文言文", "文言文", "zh-Hans"), "文言文", "CJK custom");
+    assertEq(_pbpTrLocalizedLangName("Pirate English", "Pirate English", "zh-Hans"), "Pirate English", "spaced custom");
   });
 });
 
