@@ -926,7 +926,7 @@ function extractPageForMarkdown() {
     let result;
     try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
     if (!result?.content) return { error: "No content extracted" };
-    return { contentHtml: result.content, title: result.title || document.title, url: location.href };
+    return { contentHtml: result.content, title: result.title || document.title, url: location.href, math: !!document.querySelector("math") };
   } catch (e) { return { error: e.message }; }
 }
 

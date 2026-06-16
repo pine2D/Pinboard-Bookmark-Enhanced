@@ -12,6 +12,24 @@
 function htmlToMarkdown(html, opts) {
   if (typeof TurndownService === "undefined") return html;
   const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced", bulletListMarker: "-" });
+  // MathML (LaTeXML/arxiv-html, KaTeX): a <math> carries BOTH presentation MathML
+  // and the TeX source (alttext attr, or <annotation encoding="application/x-tex">).
+  // Default conversion concatenates textContent = presentation + annotation ->
+  // duplicated output ("47.21 % 47.21\%"). Emit ONLY the TeX, wrapped in $/$$, so it
+  // round-trips clean and renders via KaTeX (md-preview gates on info.math, which the
+  // extractor sets when the page has <math>). No TeX source -> fall back to default.
+  td.addRule("mathml", {
+    filter: "math",
+    replacement: (content, node) => {
+      let tex = (node.getAttribute("alttext") || "").trim();
+      if (!tex && node.querySelector) {
+        const ann = node.querySelector('annotation[encoding="application/x-tex"]');
+        tex = ann ? (ann.textContent || "").trim() : "";
+      }
+      if (!tex) return content;
+      return node.getAttribute("display") === "block" ? ("$$" + tex + "$$") : ("$" + tex + "$");
+    }
+  });
   td.addRule("preformattedCode", {
     filter: (n) => n.nodeName === "PRE",
     replacement: (content, node) => {
