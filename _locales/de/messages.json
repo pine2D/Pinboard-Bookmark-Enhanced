@@ -795,7 +795,7 @@
     "message": "Tastenkürzel für Markdown-Vorschau"
   },
   "mdShortcutUnset": {
-    "message": "Nicht festgelegt — unten zuweisen"
+    "message": "Nicht festgelegt"
   },
   "shortcutsManual": {
     "message": "Oder manuell navigieren:"

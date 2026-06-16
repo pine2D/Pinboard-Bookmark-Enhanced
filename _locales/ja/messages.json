@@ -795,7 +795,7 @@
     "message": "Markdown プレビューのショートカット"
   },
   "mdShortcutUnset": {
-    "message": "未設定 — 下のボタンから割り当て"
+    "message": "未設定"
   },
   "shortcutsManual": {
     "message": "または手動で移動："

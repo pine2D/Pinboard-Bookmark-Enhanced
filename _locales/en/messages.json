@@ -795,7 +795,7 @@
     "message": "Markdown preview shortcut"
   },
   "mdShortcutUnset": {
-    "message": "Not set — assign it below"
+    "message": "Not set"
   },
   "shortcutsManual": {
     "message": "Or navigate manually:"

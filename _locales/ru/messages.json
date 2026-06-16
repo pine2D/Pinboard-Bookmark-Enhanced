@@ -795,7 +795,7 @@
     "message": "Горячая клавиша предпросмотра Markdown"
   },
   "mdShortcutUnset": {
-    "message": "Не задана — назначьте ниже"
+    "message": "Не задана"
   },
   "shortcutsManual": {
     "message": "Или перейдите вручную:"
