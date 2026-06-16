@@ -336,6 +336,11 @@ function ensureKatex() {
   // Lazy-load images / async decode (sanitizer keeps these attributes).
   renderedHtml = renderedHtml.replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');
   renderedView.innerHTML = renderedHtml;
+  // Forum pages: split nested-blockquote threads into per-comment top-level blocks
+  // BEFORE the AI layer indexes (pbp:rendered). Gated on info.forum so non-forum
+  // pages with a nested quote are untouched. canonicalMarkdown (export/Copy/Raw) is
+  // unaffected — this only mutates the rendered DOM.
+  if (info.forum && typeof pbpForumFlatten === "function") pbpForumFlatten(renderedView);
   const _articleLang = detectArticleLang(canonicalMarkdown);
   if (_articleLang) renderedView.lang = _articleLang; // article-script font for the reading content
   // Syntax highlighting is OFF the critical first-paint path: the article paints
