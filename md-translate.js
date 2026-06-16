@@ -91,6 +91,18 @@ function pbpTrLengthRatioOk(orig, translated) {
   return r >= 0.3 && r <= 4;
 }
 
+// True if the shielded block text has anything worth translating (any letter,
+// including CJK). A block that is only ⟦...⟧ placeholders + whitespace/
+// punctuation -- an image wall, a badge row, an avatar/logo grid -- has no text
+// to translate; sending it just yields an empty/omitted model reply that fails
+// the ratio check ("invalid single-block translation"), and retry re-fails the
+// same way. Skip such blocks: keep the original (images still render), no
+// .pb-tr line, no error pill.
+function _pbpTrHasText(shielded) {
+  const bare = String(shielded == null ? "" : shielded).replace(/⟦[CLIM]\d+⟧/g, "");
+  return /\p{L}/u.test(bare);
+}
+
 // A block this long, translated, can exceed a model's output-token cap and
 // truncate -- losing the whole block (the "longest 2 blocks always fail"
 // symptom). Such blocks are sub-split into parts <= this many chars; each part
@@ -351,7 +363,9 @@ async function pbpTrInit(detail) {
     if (b.tag === "pre") continue;                 // code blocks never travel (spec 4.4)
     const md = pbpAiMdOf(b.n);
     if (!md.trim()) continue;
-    st.work.push({ n: b.n, md, hash: pbpAiHash(md), shielded: pbpAiShield(md) });
+    const shielded = pbpAiShield(md);
+    if (!_pbpTrHasText(shielded.text)) continue;   // image/badge/logo wall: nothing to translate
+    st.work.push({ n: b.n, md, hash: pbpAiHash(md), shielded });
   }
   if (!st.work.length) return;
   _pbpTrBuildSection(st);

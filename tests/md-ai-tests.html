@@ -786,6 +786,28 @@ suiteIf("_pbpTrSplitText", "_pbpTrSplitText", () => {
     assertEq(_pbpTrSplitText(null, 6000).chunks[0], "", "null");
   });
 });
+
+suiteIf("_pbpTrHasText", "_pbpTrHasText", () => {
+  test("prose and link-text have translatable text", () => {
+    assert(_pbpTrHasText("Meshery is a manager.") === true, "prose");
+    assert(_pbpTrHasText("[Docs](⟦L1⟧) and [Blog](⟦L2⟧)") === true, "link text kept");
+    assert(_pbpTrHasText("## ⟦I1⟧ Meshery Adopters") === true, "heading with logo");
+  });
+  test("placeholder-only blocks have nothing to translate", () => {
+    assert(_pbpTrHasText("⟦I1⟧ ⟦I2⟧ ⟦I3⟧") === false, "image wall");
+    assert(_pbpTrHasText("[⟦I1⟧](⟦L1⟧) [⟦I2⟧](⟦L2⟧)") === false, "badge row");
+    assert(_pbpTrHasText("[⟦I1⟧](⟦L1⟧)[⟦I2⟧](⟦L2⟧)[⟦I3⟧](⟦L3⟧)") === false, "avatar grid");
+  });
+  test("whitespace / punctuation only is not translatable", () => {
+    assert(_pbpTrHasText("   ") === false, "spaces");
+    assert(_pbpTrHasText("--- | ---") === false, "table rule");
+    assert(_pbpTrHasText("") === false, "empty");
+    assert(_pbpTrHasText(null) === false, "null");
+  });
+  test("CJK counts as translatable", () => {
+    assert(_pbpTrHasText("已有内容 ⟦L1⟧") === true, "cjk letters");
+  });
+});
 </script>
 
 <script>
