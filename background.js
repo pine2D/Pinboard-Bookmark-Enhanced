@@ -901,7 +901,7 @@ function extractPageForMarkdown() {
     if (typeof applySiteRule === "function") {
       const hit = applySiteRule(document, location.href);
       if (hit && hit.contentHtml) {
-        return { contentHtml: hit.contentHtml, title: hit.title || document.title, url: location.href, math: !!hit.math };
+        return { contentHtml: hit.contentHtml, title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum };
       }
     }
   } catch (_) { /* fall through to Defuddle */ }
@@ -975,7 +975,7 @@ async function extractForPreview({ tabId, url, engine }) {
   return {
     source: "local", markdown: "", contentHtml: out.contentHtml,
     title: out.title || "", url: url, // prefer caller url over extractor's
-    tokens: 0, hasApiKey: false, math: !!out.math
+    tokens: 0, hasApiKey: false, math: !!out.math, forum: !!out.forum
   };
 }
 

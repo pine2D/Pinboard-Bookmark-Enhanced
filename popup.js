@@ -360,7 +360,7 @@ async function extractLocalMarkdown(tabId) {
           if (typeof applySiteRule === "function") {
             const hit = applySiteRule(document, location.href);
             if (hit && hit.contentHtml) {
-              return { contentHtml: hit.contentHtml, title: hit.title || document.title, url: location.href, math: !!hit.math };
+              return { contentHtml: hit.contentHtml, title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum };
             }
           }
         } catch (_) { /* fall through to Defuddle */ }
@@ -496,6 +496,7 @@ async function htmlToMarkdownAsync(html, opts) {
             hasApiKey: !!result._hasApiKey,
             source: settings.aiContentSource || "local",
             math: !!result.math,
+            forum: !!result.forum,
             tabId: tab.id
           }
         });
