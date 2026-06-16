@@ -1989,6 +1989,15 @@
       "total": { "content": "$2" }
     }
   },
+  "trTargetLang": {
+    "message": "Język docelowy: $LANG$",
+    "placeholders": {
+      "lang": { "content": "$1" }
+    }
+  },
+  "trChangeLang": {
+    "message": "Zmień"
+  },
   "trStop": {
     "message": "Zatrzymaj"
   },

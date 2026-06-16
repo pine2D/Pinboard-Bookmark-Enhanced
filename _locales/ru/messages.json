@@ -1989,6 +1989,15 @@
       "total": { "content": "$2" }
     }
   },
+  "trTargetLang": {
+    "message": "Язык перевода: $LANG$",
+    "placeholders": {
+      "lang": { "content": "$1" }
+    }
+  },
+  "trChangeLang": {
+    "message": "Изменить"
+  },
   "trStop": {
     "message": "Остановить"
   },

@@ -1989,6 +1989,15 @@
       "total": { "content": "$2" }
     }
   },
+  "trTargetLang": {
+    "message": "翻訳先: $LANG$",
+    "placeholders": {
+      "lang": { "content": "$1" }
+    }
+  },
+  "trChangeLang": {
+    "message": "変更"
+  },
   "trStop": {
     "message": "停止"
   },

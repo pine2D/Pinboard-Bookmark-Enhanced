@@ -450,6 +450,28 @@ function _pbpTrBuildSection(st) {
   row.appendChild(stop);
   sec.appendChild(row);
 
+  // Target-language hint + jump-to-settings. Translation always uses the language
+  // configured in options (translateTargetLang); surface it BEFORE the first request
+  // so the user knows what they'll get, and let them change it without hunting.
+  const tgt = document.createElement("div");
+  tgt.className = "tr-meta tr-target";
+  const tgtText = document.createElement("span");
+  tgtText.textContent = t("trTargetLang", st.target.name);
+  tgt.appendChild(tgtText);
+  const tgtLink = document.createElement("button");
+  tgtLink.type = "button";
+  tgtLink.className = "tr-link";
+  tgtLink.textContent = t("trChangeLang");
+  tgtLink.addEventListener("click", () => {
+    try {
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.openOptionsPage) {
+        chrome.runtime.openOptionsPage();
+      }
+    } catch (_) { /* options page unavailable: no-op */ }
+  });
+  tgt.appendChild(tgtLink);
+  sec.appendChild(tgt);
+
   // Cost transparency BEFORE the first request (spec 4.1): chars/4 x 2.
   const est = document.createElement("div");
   est.id = "tr-estimate";

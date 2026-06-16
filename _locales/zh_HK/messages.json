@@ -1989,6 +1989,15 @@
       "total": { "content": "$2" }
     }
   },
+  "trTargetLang": {
+    "message": "目標語言：$LANG$",
+    "placeholders": {
+      "lang": { "content": "$1" }
+    }
+  },
+  "trChangeLang": {
+    "message": "修改"
+  },
   "trStop": {
     "message": "停止"
   },
