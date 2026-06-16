@@ -2281,7 +2281,9 @@ async function renderLowCountTags() {
 
   const table = document.createElement("div");
   table.className = "tag-gov-lowcount-table";
-  for (const item of lowCount) {
+  const boxes = [];
+  let lastIdx = null;            // anchor = last individually-clicked box; resets each render
+  lowCount.forEach((item, i) => {
     const row = document.createElement("div");
     row.className = "tag-gov-lowcount-row";
     const label = document.createElement("label");
@@ -2289,13 +2291,25 @@ async function renderLowCountTags() {
     checkbox.type = "checkbox";
     checkbox.className = "tag-gov-lowcount-checkbox";
     checkbox.value = item.tag;
+    checkbox.addEventListener("click", (e) => {
+      // The browser already toggled this checkbox before the click handler runs,
+      // so checkbox.checked is the new state and the range follows it. The anchor
+      // moves only on a plain click; shift-clicks extend from the same anchor
+      // (native checkbox-list range semantics).
+      if (e.shiftKey && lastIdx !== null) {
+        pbpTagGovApplyShiftRange(boxes, lastIdx, i);
+      } else {
+        lastIdx = i;
+      }
+    });
+    boxes.push(checkbox);
     label.appendChild(checkbox);
     const text = document.createElement("span");
     text.textContent = " " + item.tag + " (" + item.count + ")";
     label.appendChild(text);
     row.appendChild(label);
     table.appendChild(row);
-  }
+  });
   listContainer.replaceChildren(table);
 
   const summary = $id("tag-gov-lowcount")?.querySelector("summary");

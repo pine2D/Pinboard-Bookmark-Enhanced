@@ -327,3 +327,15 @@ function pbpTagGovLowCountTags(counts, threshold = 1) {
   low.sort((a, b) => a.tag.localeCompare(b.tag));
   return low;
 }
+
+// Native shift-click range semantics for a checkbox list: set every box in the
+// inclusive index range [anchorIdx..clickIdx] to the CLICKED box's current checked
+// state. `boxes` is any array of objects exposing a boolean `checked` (real <input>
+// elements at runtime, plain stubs in tests). The caller tracks `anchorIdx` = the
+// index of the last individually-clicked box.
+function pbpTagGovApplyShiftRange(boxes, anchorIdx, clickIdx) {
+  const lo = Math.min(anchorIdx, clickIdx);
+  const hi = Math.max(anchorIdx, clickIdx);
+  const state = boxes[clickIdx].checked;
+  for (let i = lo; i <= hi; i++) boxes[i].checked = state;
+}
