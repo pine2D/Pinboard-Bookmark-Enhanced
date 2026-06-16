@@ -87,8 +87,15 @@ function pbpTrLengthRatioOk(orig, translated) {
   const o = String(orig == null ? "" : orig).trim().length;
   const t = String(translated == null ? "" : translated).trim().length;
   if (o === 0 || t === 0) return false;
-  const r = t / o;
-  return r >= 0.3 && r <= 4;
+  // Always reject runaway expansion (the model adding/hallucinating content).
+  if (t > o * 4 + 20) return false;
+  // Short blocks -- a heading or a few words -- legitimately compress hard into
+  // a dense target language ("The shape of the curriculum" -> "课程的形态", ratio
+  // ~0.18), so the 0.3 lower bound is a false positive there. Only enforce a
+  // lower bound on longer blocks, where a very low ratio really means dropped
+  // content (and even then 0.2 leaves room for English->CJK compression).
+  if (o < 80) return true;
+  return t / o >= 0.2;
 }
 
 // True if the shielded block text has anything worth translating (any letter,

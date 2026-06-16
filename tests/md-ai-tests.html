@@ -731,11 +731,19 @@ suiteIf("pbpTrLengthRatioOk", "pbpTrLengthRatioOk", () => {
   test("similar lengths pass", () => {
     assert(pbpTrLengthRatioOk("hello world here", "你好世界在此处") === true, "CJK shrink ok");
   });
-  test("inclusive bounds 0.3 and 4", () => {
-    assert(pbpTrLengthRatioOk("x".repeat(10), "y".repeat(3)) === true, "exactly 0.3");
-    assert(pbpTrLengthRatioOk("x".repeat(10), "y".repeat(40)) === true, "exactly 4");
-    assert(pbpTrLengthRatioOk("x".repeat(10), "y".repeat(2)) === false, "0.2 fails");
-    assert(pbpTrLengthRatioOk("x".repeat(10), "y".repeat(41)) === false, "4.1 fails");
+  test("short blocks tolerate heavy compression (dense target language)", () => {
+    // English heading/phrase -> far shorter CJK is correct, not a hallucination.
+    assert(pbpTrLengthRatioOk("The shape of the curriculum", "课程的形态") === true, "EN heading -> short CJK");
+    assert(pbpTrLengthRatioOk("Overview", "概览") === true, "single word compress");
+  });
+  test("runaway expansion rejected on every block", () => {
+    assert(pbpTrLengthRatioOk("Overview", "x".repeat(300)) === false, "short block exploded");
+    assert(pbpTrLengthRatioOk("x".repeat(10), "y".repeat(70)) === false, "10 -> 70");
+    assert(pbpTrLengthRatioOk("x".repeat(100), "y".repeat(500)) === false, "100 -> 500");
+  });
+  test("long-block lower bound ~0.2 catches dropped content", () => {
+    assert(pbpTrLengthRatioOk("x".repeat(100), "y".repeat(20)) === true, "0.2 ok");
+    assert(pbpTrLengthRatioOk("x".repeat(100), "y".repeat(15)) === false, "0.15 dropped");
   });
   test("empty or whitespace translation invalid", () => {
     assert(pbpTrLengthRatioOk("source text", "") === false, "empty");
