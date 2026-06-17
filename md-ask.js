@@ -204,6 +204,13 @@ function _pbpAskIsOpen() {
 function _pbpAskSetOpen(open) {
   const panel = _pbpAskBuildPanel();
   if (!panel) return;
+  if (open) {
+    // Remember who opened us so we can hand focus back on close (non-modal,
+    // so this is focus-RETURN only, not a trap). Skip if focus is already
+    // inside the panel (e.g. re-open while open).
+    const ae = document.activeElement;
+    if (ae && ae !== document.body && !panel.contains(ae)) _pbpAskState.opener = ae;
+  }
   document.body.classList.toggle("ask-open", open);
   panel.hidden = !open;
   const btn = document.getElementById("ask-open");
@@ -213,6 +220,10 @@ function _pbpAskSetOpen(open) {
     if (typeof _pbpAskUpdateMeta === "function") _pbpAskUpdateMeta();
     const ta = document.getElementById("ask-input");
     if (ta) ta.focus();
+  } else {
+    const op = _pbpAskState.opener;
+    if (op && typeof op.focus === "function" && document.contains(op)) op.focus();
+    _pbpAskState.opener = null;
   }
 }
 

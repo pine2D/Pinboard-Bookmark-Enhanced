@@ -93,4 +93,31 @@ function buildRecentControl(kind){
   test("G2: ArrowDown moves selection to next tab",()=>{btns[0].dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true}));if(btns[1].getAttribute("aria-selected")!=="true")throw new Error("ArrowDown did not select next tab");});
   test("G2: ArrowUp wraps selection back to first tab",()=>{btns[1].dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowUp",bubbles:true}));if(btns[0].getAttribute("aria-selected")!=="true")throw new Error("ArrowUp did not wrap back");});
 })();
-</script></body></html>
+
+// G3: Ask-the-page panel focus return on close (non-modal, no trap).
+// Mirrors the opener-capture / restore logic shipped in _pbpAskSetOpen.
+(function(){
+  // Build the fixture dynamically so it exists before the test functions run.
+  const fix=document.createElement("div");
+  fix.id="g3-fixture";fix.style.cssText="position:fixed;left:-9999px;top:-9999px";
+  fix.innerHTML='<button id="g3-opener">Ask</button><div id="g3-panel" hidden><textarea id="g3-input"></textarea></div>';
+  document.body.appendChild(fix);
+
+  let opener=null;
+  const panel=document.getElementById("g3-panel");
+  const input=document.getElementById("g3-input");
+  function setOpen(open){
+    if(open){ opener=document.activeElement; panel.hidden=false; input.focus(); }
+    else { panel.hidden=true; if(opener&&typeof opener.focus==="function")opener.focus(); }
+  }
+  test("G3: open focuses panel input",()=>{
+    const btn=document.getElementById("g3-opener");btn.focus();setOpen(true);
+    if(document.activeElement!==input)throw new Error("input not focused on open");
+  });
+  test("G3: close restores focus to opener",()=>{
+    setOpen(false);
+    if(document.activeElement!==document.getElementById("g3-opener"))throw new Error("opener not refocused on close, active="+(document.activeElement&&document.activeElement.id));
+  });
+})();
+</script>
+</body></html>
