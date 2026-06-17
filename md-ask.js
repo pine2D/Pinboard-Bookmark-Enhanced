@@ -968,6 +968,17 @@ function pbpExplainSelectionValid(text) {
 let _pbpExplainPage = { url: "", title: "" };
 let _pbpExplainSettings = null;
 let _pbpExplainTrigger = "icon"; // live value; the in-popover gear updates it
+
+// Persist the explain trigger to the same area options.js writes (sync when
+// optSyncEnabled, else local). A sync-area write can reject on quota/throttle;
+// the in-memory _pbpExplainTrigger already took effect, so swallow it rather
+// than surface an unhandled rejection from the radio change handler.
+async function _pbpExplainPersistTrigger(value) {
+  try {
+    await (await pbpAiSettingsArea()).set({ selectionTrigger: value });
+  } catch (_) { /* quota/throttle: in-memory switch already applied */ }
+}
+
 let _pbpExplainMouseDown = false;
 let _pbpExplainSelTimer = null;
 let _pbpExplainPillEl = null;
@@ -1235,13 +1246,13 @@ function _pbpExplainEnsurePop() {
       radio.type = "radio";
       radio.name = "xp-trigger";
       radio.value = value;
-      radio.addEventListener("change", async () => {
+      radio.addEventListener("change", () => {
         // On-the-spot trigger-ladder switch (spec 5.3), persisted to the
         // SAME storage area options.js writes (sync when optSyncEnabled,
         // else local). Takes effect immediately via the live module var.
         _pbpExplainTrigger = value;
         if (value !== "icon") _pbpExplainHidePill();
-        await (await pbpAiSettingsArea()).set({ selectionTrigger: value });
+        _pbpExplainPersistTrigger(value);   // fire-and-forget; never rejects
       });
       lab.appendChild(radio);
       lab.appendChild(document.createTextNode(" " + label));

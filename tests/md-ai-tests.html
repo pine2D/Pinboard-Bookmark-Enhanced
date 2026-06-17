@@ -662,6 +662,50 @@ suite("md-ai IDB key conventions", () => {
 </script>
 
 <script>
+// ============ Group K1: gear-trigger persistence (async) ============
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "_pbpExplainPersistTrigger (async)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  if (typeof _pbpExplainPersistTrigger !== "function") {
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP _pbpExplainPersistTrigger (not loaded)";
+    host.appendChild(div); SKIP++; return;
+  }
+  await atest("resolves even when storage .set rejects (sync quota)", async () => {
+    const prev = window.pbpSettingsArea;
+    let calledWith = null;
+    window.pbpSettingsArea = { set(o) { calledWith = o; return Promise.reject(new Error("quota exceeded")); } };
+    // Reset memo so pbpAiSettingsArea() picks up our stub (plain <script>, no module boundary)
+    if (typeof _pbpAiAreaPromise !== "undefined") _pbpAiAreaPromise = null;
+    try { await _pbpExplainPersistTrigger("hotkey"); }
+    finally { window.pbpSettingsArea = prev; _pbpAiAreaPromise = null; }
+    assert(calledWith && calledWith.selectionTrigger === "hotkey", "wrote selectionTrigger");
+  });
+  await atest("resolves and writes value on healthy area", async () => {
+    const prev = window.pbpSettingsArea;
+    let calledWith = null;
+    window.pbpSettingsArea = { set(o) { calledWith = o; return Promise.resolve(); } };
+    if (typeof _pbpAiAreaPromise !== "undefined") _pbpAiAreaPromise = null;
+    try { await _pbpExplainPersistTrigger("off"); }
+    finally { window.pbpSettingsArea = prev; _pbpAiAreaPromise = null; }
+    assert(calledWith.selectionTrigger === "off", "value persisted");
+  });
+})();
+</script>
+
+<script>
 // ============ Task 9: md-translate pure core ============
 suiteIf("pbpTrPackBatches", "pbpTrPackBatches", () => {
   function segs(n, len) {
