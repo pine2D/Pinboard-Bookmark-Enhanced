@@ -313,6 +313,15 @@ function computeSavedUrlSet(existingUrls, savedUrls) {
   return out;
 }
 
+// ---- Batch dedup: on a failed existing-URL fetch, return null (the SAME signal
+// the >1000-bookmark branch uses) so the caller falls back to per-tab posts/get.
+// Returning an empty Set would be indistinguishable from a zero-bookmark account,
+// and with batchSkipExisting on every tab would be re-saved with replace=yes,
+// clobbering existing bookmarks' tags/title. NEVER treat fetch failure as empty.
+function batchExistingResultOnError() {
+  return null;
+}
+
 // ---- Pinboard error classifier ----
 // Returns an i18n key describing a Pinboard API failure.
 // Input: HTTP Response, Error, or status number. Caller handles 401 (pinboardFetch redirects)

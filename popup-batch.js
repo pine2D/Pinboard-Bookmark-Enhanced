@@ -293,6 +293,9 @@ async function fetchExistingUrlSet(token) {
     await chrome.storage.local.set({ [cacheKey]: { urls, timestamp: Date.now() } });
     return new Set(urls);
   } catch (_) {
-    return new Set();
+    // Fetch / .json() failed transiently. Do NOT return an empty Set — that is
+    // indistinguishable from a zero-bookmark account and would re-save every tab
+    // with replace=yes, clobbering existing bookmarks. Signal per-tab fallback.
+    return batchExistingResultOnError();
   }
 }

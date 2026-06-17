@@ -57,5 +57,30 @@ run("results-a1", [
     expected: '["https://pre.example/"]'
   }
 ]);
+
+// A2: a thrown/failed existing-URL fetch must NOT collapse to empty-set
+// (which, with batchSkipExisting on, re-saves every tab with replace=yes and
+// clobbers existing bookmarks). It must yield the null/per-tab fallback signal.
+const a2root = document.createElement("div");
+a2root.innerHTML = '<h2>A2: fetch failure -> per-tab fallback, never empty set</h2><div id="results-a2"></div>';
+document.body.insertBefore(a2root, document.querySelector("script"));
+run("results-a2", [
+  {
+    name: "transient fetch failure -> null (per-tab fallback), NOT empty Set",
+    fn: () => batchExistingResultOnError(),
+    check: (got) => got === null,
+    expected: "null"
+  },
+  {
+    name: "null is distinguishable from an empty result set",
+    fn: () => {
+      const r = batchExistingResultOnError();
+      // caller does `if (result === null) fallback; else existingUrls = result`
+      return r === null ? "fallback" : ("set:" + (r instanceof Set ? r.size : "?"));
+    },
+    check: (got) => got === "fallback",
+    expected: '"fallback"'
+  }
+]);
 </script>
 </body></html>
