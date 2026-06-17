@@ -858,7 +858,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       optAiAutoTags: $id("opt-ai-auto-tags").checked,
       aiTagLang: $id("opt-ai-tag-lang").value,
       aiSummaryLang: $id("opt-ai-summary-lang").value,
-      aiCacheDuration: Math.min(10080, Math.max(0, parseInt($id("opt-ai-cache-duration").value) || 60)),
+      aiCacheDuration: (() => {
+        const raw = $id("opt-ai-cache-duration").value;
+        const n = (raw === "" || raw == null) ? 60 : parseInt(raw, 10);
+        return Math.min(10080, Math.max(0, Number.isNaN(n) ? 60 : n));
+      })(),
       aiTagSeparator: $id("opt-ai-tag-separator").value,
       aiContentSource: document.querySelector('input[name="ai-content-source"]:checked')?.value || "local",
       tagSyncMode: document.querySelector('input[name="tag-sync-mode"]:checked')?.value || "cached",

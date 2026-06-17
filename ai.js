@@ -618,8 +618,8 @@ function getCacheKey(url, type, source) { return `ai_cache_${type}_${source || "
 
 async function getAICache(url, type, cacheDuration, source) {
   const key = getCacheKey(url, type, source);
-  const dur = (cacheDuration || 60) * 60 * 1000;
-  if (dur === 0) return null;
+  const dur = resolveCacheMs(cacheDuration);
+  if (dur === 0) return null;   // 0 now reachable: cache disabled, never read
 
   // IDB path (sole AI-cache backend)
   if (typeof pbpAiCacheGet !== "function") return null;
@@ -633,7 +633,7 @@ async function getAICache(url, type, cacheDuration, source) {
 }
 
 async function setAICache(url, type, result, cacheDuration, source) {
-  if ((cacheDuration || 60) === 0) return;
+  if (resolveCacheMs(cacheDuration) === 0) return;   // disabled: never write
   const key = getCacheKey(url, type, source);
   const timestamp = Date.now();
 

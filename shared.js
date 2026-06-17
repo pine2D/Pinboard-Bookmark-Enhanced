@@ -122,6 +122,17 @@ function unionTags(existingStr, newStr) {
   return result.join(" ");
 }
 
+// Resolve a per-URL cache duration (minutes from settings) to milliseconds.
+// CRITICAL: a deliberate 0 means "cache disabled" (options.html "Set 0 to disable.")
+// — DO NOT use `|| 60` anywhere, it eats the 0. Only null/undefined/NaN/"" → default.
+function resolveCacheMs(cacheDuration) {
+  const n = (cacheDuration === null || cacheDuration === undefined || cacheDuration === "")
+    ? NaN : Number(cacheDuration);
+  if (Number.isNaN(n)) return 60 * 60 * 1000;   // default 60 min
+  if (n <= 0) return 0;                          // 0 (or negative) = disabled
+  return n * 60 * 1000;
+}
+
 // Check if a cache entry {result, timestamp} has exceeded its TTL. Pure; testable without chrome.storage.
 function isStaleCacheEntry(entry, now, ttlMs) {
   if (!entry || typeof entry !== "object") return true;

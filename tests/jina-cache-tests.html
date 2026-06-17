@@ -28,6 +28,23 @@ check("2h old / 1h TTL is stale", isStaleCacheEntry({ result: {}, timestamp: now
 check("exactly 1h old is fresh (boundary, > not >=)", !isStaleCacheEntry({ result: {}, timestamp: now - ONE_HOUR }, now, ONE_HOUR));
 check("1h+1ms old is stale", isStaleCacheEntry({ result: {}, timestamp: now - ONE_HOUR - 1 }, now, ONE_HOUR));
 check("missing timestamp is stale", isStaleCacheEntry({ result: {} }, now, ONE_HOUR));
+
+// ---- resolveCacheMs: 0 must mean "disabled", null/undefined must mean default ----
+const HOUR_MS = 60 * 60 * 1000;
+check("resolveCacheMs(0) returns 0 (disabled)", resolveCacheMs(0) === 0);
+check("resolveCacheMs('0') returns 0 (numeric-string disabled)", resolveCacheMs("0") === 0);
+check("resolveCacheMs(null) returns default 60m", resolveCacheMs(null) === HOUR_MS);
+check("resolveCacheMs(undefined) returns default 60m", resolveCacheMs(undefined) === HOUR_MS);
+check("resolveCacheMs('') returns default 60m", resolveCacheMs("") === HOUR_MS);
+check("resolveCacheMs(NaN) returns default 60m", resolveCacheMs(NaN) === HOUR_MS);
+check("resolveCacheMs(30) returns 30m in ms", resolveCacheMs(30) === 30 * 60 * 1000);
+check("resolveCacheMs(120) returns 120m in ms", resolveCacheMs(120) === 120 * 60 * 1000);
+// save-coercion contract (mirrors options.js:861 Math.min/Math.max clamp): 0 must survive
+const coerce = (v) => Math.min(10080, Math.max(0, (v === "" || v == null || isNaN(parseInt(v))) ? 60 : parseInt(v)));
+check("save coercion keeps 0 as 0 (not 60)", coerce("0") === 0);
+check("save coercion keeps blank as 60", coerce("") === 60);
+check("save coercion clamps 99999 to 10080", coerce("99999") === 10080);
+
 const summary = document.createElement("h2");
 summary.textContent = `Results: ${pass} pass, ${fail} fail`;
 root.insertBefore(summary, root.firstChild);

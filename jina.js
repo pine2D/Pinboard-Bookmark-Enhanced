@@ -13,7 +13,7 @@ async function fetchJinaMarkdown(url, options = {}) {
       const data = await chrome.storage.local.get(cacheKey);
       if (data[cacheKey]) {
         const { result, timestamp } = data[cacheKey];
-        const dur = (cacheDuration || 60) * 60 * 1000;
+        const dur = resolveCacheMs(cacheDuration);
         if (dur > 0 && Date.now() - timestamp <= dur) {
           return { ...result, fromCache: true };
         }
@@ -45,7 +45,7 @@ async function fetchJinaMarkdown(url, options = {}) {
     };
 
     // Cache result
-    if ((cacheDuration || 60) > 0) {
+    if (resolveCacheMs(cacheDuration) > 0) {
       try {
         await chrome.storage.local.set({ [cacheKey]: { result, timestamp: Date.now() } });
       } catch (_) {}
