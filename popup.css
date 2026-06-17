@@ -701,6 +701,8 @@ html.dark .batch-progress-text { color: #e0e0e0; mix-blend-mode: normal; filter:
 .offline-queue-actions button:disabled { opacity: 0.5; cursor: default; }
 .offline-queue-actions .offline-queue-remove:hover:not(:disabled) { color: #c00; }
 .offline-queue-actions .offline-queue-failed { color: #c00; border-color: #c00; }
+.offline-queue-retry.loading svg { animation: spin 0.6s linear infinite; }
+.offline-queue-retry.loading { opacity: 0.7; cursor: default; }
 
 /* Recent Bookmarks */
 .recent-bm-area {

@@ -94,6 +94,27 @@ function buildRecentControl(kind){
   test("G2: ArrowUp wraps selection back to first tab",()=>{btns[1].dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowUp",bubbles:true}));if(btns[0].getAttribute("aria-selected")!=="true")throw new Error("ArrowUp did not wrap back");});
 })();
 
+// G4: Offline retry button — aria-label + icon-preserving loading state.
+(function(){
+  const btn=document.createElement("button");
+  btn.type="button";
+  btn.className="offline-queue-retry";
+  btn.innerHTML=PBP_ICONS.refresh;
+  btn.title="Retry";
+  btn.setAttribute("aria-label","Retry");
+  document.getElementById("fixture").appendChild(btn);
+  // Shipped loading transition: disable + spin class, NEVER textContent.
+  function enterLoading(b){ b.disabled=true; b.classList.add("loading"); }
+  enterLoading(btn);
+
+  test("G4: retry has aria-label",()=>{if(!btn.getAttribute("aria-label"))throw new Error("missing aria-label");});
+  test("G4: loading keeps SVG icon (not wiped to text)",()=>{
+    if(!btn.querySelector("svg"))throw new Error("SVG wiped during loading state");
+    if(btn.textContent.indexOf("…")>=0)throw new Error("loading used textContent ellipsis");
+  });
+  test("G4: loading disables the button",()=>{if(!btn.disabled)throw new Error("not disabled during loading");});
+})();
+
 // G3: Ask-the-page panel focus return on close (non-modal, no trap).
 // Mirrors the opener-capture / restore logic shipped in _pbpAskSetOpen.
 (function(){

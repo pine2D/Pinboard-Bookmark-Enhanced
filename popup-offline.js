@@ -100,6 +100,7 @@
       retry.className = "offline-queue-retry";
       retry.innerHTML = PBP_ICONS.refresh;
       retry.title = t("offlineRetry");
+      retry.setAttribute("aria-label", t("offlineRetry"));
       retry.addEventListener("click", () => onRetry(item.queueId, retry));
 
       const remove = document.createElement("button");
@@ -128,7 +129,7 @@
 
   async function onRetry(queueId, btn) {
     btn.disabled = true;
-    btn.textContent = "…";
+    btn.classList.add("loading");
     try {
       const ok = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: "retry_offline_item", queueId }, (resp) => {
@@ -137,6 +138,7 @@
       });
       if (!ok) {
         btn.disabled = false;
+        btn.classList.remove("loading");
         btn.innerHTML = PBP_ICONS.refresh;
         btn.classList.add("offline-queue-failed");
         setTimeout(() => btn.classList.remove("offline-queue-failed"), 1200);
@@ -146,6 +148,7 @@
       await refreshBar();
     } catch (_) {
       btn.disabled = false;
+      btn.classList.remove("loading");
       btn.innerHTML = PBP_ICONS.refresh;
     }
   }
