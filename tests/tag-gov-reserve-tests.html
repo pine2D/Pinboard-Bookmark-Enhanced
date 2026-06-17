@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Tag Gov Reserve Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+h2 { margin-top: 24px; font-size: 16px; }
+.suite { margin: 12px 0; padding: 8px; border-left: 3px solid #ccc; }
+.case { padding: 4px 8px; margin: 4px 0; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<h1>Tag Gov Reserve-Before-Await Tests</h1>
+<div id="results"></div>
+<script>
+// Async-capable test harness (brief requirement: make test() await-aware)
+async function test(name, fn) {
+  try {
+    await fn();
+    const div = document.createElement("div"); div.className = "case pass";
+    div.textContent = "PASS " + name; document.getElementById("results").appendChild(div);
+  } catch (e) {
+    const div = document.createElement("div"); div.className = "case fail";
+    div.textContent = "FAIL " + name + "\n  " + e.message; document.getElementById("results").appendChild(div);
+  }
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+async function suite(name, fn) {
+  const div = document.createElement("div"); div.className = "suite";
+  const h = document.createElement("h2"); h.textContent = name; div.appendChild(h);
+  const results = document.getElementById("results"); const savedAppend = results.appendChild.bind(results);
+  results.appendChild = function(el) { if (el.className?.includes("case")) div.appendChild(el); else savedAppend(el); };
+  await fn();
+  results.appendChild = savedAppend; results.appendChild(div);
+}
+
+// Mirror of the production reserve-before-await ordering shipped in options.js.
+// The FIXED implementation: reserve synchronously before the async snapshot await.
+const activeTags = new Set();
+let snapshotCalls = 0;
+function fakeEnsureSnapshot(ok) {
+  snapshotCalls++;
+  return new Promise((res) => setTimeout(() => res(ok), 5)); // async, like a network fetch
+}
+
+// FIXED implementation matching the shipped options.js onConfirm shape.
+async function reserveAndRun(planTags, snapshotOk, ran) {
+  if (planTags.some((tg) => activeTags.has(tg))) return "overlap-rejected";
+  planTags.forEach((tg) => activeTags.add(tg));        // reserve BEFORE await
+  let ok = false;
+  try {
+    ok = await fakeEnsureSnapshot(snapshotOk);
+    if (!ok) { planTags.forEach((tg) => activeTags.delete(tg)); return "snapshot-failed"; }
+    ran.push(planTags.slice());                         // stand-in for runTagGovOps
+    return "ran";
+  } finally {
+    if (ok) planTags.forEach((tg) => activeTags.delete(tg));
+  }
+}
+
+(async () => {
+  await suite("tag-gov reserve-before-await", async () => {
+    await test("two overlapping plans: second is rejected, snapshot not double-fetched", async () => {
+      activeTags.clear(); snapshotCalls = 0;
+      const ran = [];
+      const p1 = reserveAndRun(["foo", "bar"], true, ran);
+      const p2 = reserveAndRun(["bar", "baz"], true, ran); // shares "bar"
+      const [r1, r2] = await Promise.all([p1, p2]);
+      assert(r1 === "ran", "first plan runs");
+      assert(r2 === "overlap-rejected", "second (sharing bar) is rejected synchronously");
+      assert(snapshotCalls === 1, "snapshot fetched only once, not twice");
+      assert(ran.length === 1, "only one plan executed");
+    });
+
+    await test("snapshot failure releases the reservation so a retry can proceed", async () => {
+      activeTags.clear();
+      const ran = [];
+      const r1 = await reserveAndRun(["x"], false, ran); // snapshot fails
+      assert(r1 === "snapshot-failed", "fails on bad snapshot");
+      assert(!activeTags.has("x"), "reservation released after failure");
+      const r2 = await reserveAndRun(["x"], true, ran);  // retry now allowed
+      assert(r2 === "ran", "retry proceeds after release");
+    });
+  });
+})();
+</script>
+</body></html>

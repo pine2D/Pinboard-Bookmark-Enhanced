@@ -1359,12 +1359,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       onConfirm: async () => {
         const delTags = selected.map(tg => tg.toLowerCase());
         if (delTags.some(tg => _tagGovActiveTags.has(tg))) return;
+        delTags.forEach(tg => _tagGovActiveTags.add(tg)); // reserve BEFORE await (atomic check+reserve)
         if (btn) btn.disabled = true;
         if (!(await ensureTagSnapshot())) {
+          delTags.forEach(tg => _tagGovActiveTags.delete(tg)); // roll back reservation on snapshot failure
           if (btn) btn.disabled = false;
           return;
         }
-        delTags.forEach(tg => _tagGovActiveTags.add(tg));
         try {
           await runTagGovOps(selected.map(tag => ({ op: "delete", tag })));
         } finally {
@@ -1585,8 +1586,11 @@ async function confirmMergeGroup(group, canonical, anchorEl) {
       const planTags = [];
       for (const pop of plan) planTags.push(pop.old.toLowerCase(), pop.new.toLowerCase());
       if (planTags.some(tg => _tagGovActiveTags.has(tg))) return;
-      if (!(await ensureTagSnapshot())) return;
-      planTags.forEach(tg => _tagGovActiveTags.add(tg));
+      planTags.forEach(tg => _tagGovActiveTags.add(tg)); // reserve BEFORE await (atomic check+reserve)
+      if (!(await ensureTagSnapshot())) {
+        planTags.forEach(tg => _tagGovActiveTags.delete(tg)); // roll back reservation on snapshot failure
+        return;
+      }
       _tagGovMarkRowQueued(anchor.closest(".tag-gov-group-row"));
       try {
         await runTagGovOps(plan);
