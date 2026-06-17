@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Settings Cache Invalidate Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 900px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; }
+.fail { color: #c00; font-weight: bold; }
+</style></head>
+<body>
+<h1>pbpSettingsKeysChanged() tests</h1>
+<div id="results"></div>
+<script src="../shared.js"></script>
+<script>
+// ---- minimal harness ----
+let _suiteName = "";
+let _passed = 0, _failed = 0;
+function suite(name, fn) { _suiteName = name; fn(); }
+function test(name, fn) {
+  const d = document.createElement("div");
+  try {
+    fn();
+    d.className = "case pass";
+    d.textContent = "PASS  " + _suiteName + " > " + name;
+    _passed++;
+  } catch (e) {
+    d.className = "case fail";
+    d.textContent = "FAIL  " + _suiteName + " > " + name + "\n  " + e.message;
+    _failed++;
+  }
+  document.getElementById("results").appendChild(d);
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+
+suite("pbpSettingsKeysChanged", () => {
+  test("transient _pbRateLimitTs does NOT count as a settings change", () => {
+    assert(pbpSettingsKeysChanged({ _pbRateLimitTs: { newValue: 1 } }) === false, "rate-limit ts is transient");
+  });
+  test("offlineQueue does NOT count", () => {
+    assert(pbpSettingsKeysChanged({ offlineQueue: { newValue: [] } }) === false, "offlineQueue is transient");
+  });
+  test("_waybackAttempts / _waybackLog do NOT count", () => {
+    assert(pbpSettingsKeysChanged({ _waybackAttempts: {} }) === false, "wayback dedup is transient");
+    assert(pbpSettingsKeysChanged({ _waybackLog: {} }) === false, "wayback log is transient");
+  });
+  test("cached_user_tags / _aiCacheMigrationBackup do NOT count", () => {
+    assert(pbpSettingsKeysChanged({ cached_user_tags: {} }) === false, "tag cache is transient");
+    assert(pbpSettingsKeysChanged({ _aiCacheMigrationBackup: {} }) === false, "migration backup is transient");
+  });
+  test("a real setting (tagSyncMode) DOES count", () => {
+    assert(pbpSettingsKeysChanged({ tagSyncMode: { newValue: "fresh" } }) === true, "tagSyncMode is a real setting");
+  });
+  test("a mixed batch with one real key counts", () => {
+    assert(pbpSettingsKeysChanged({ _pbRateLimitTs: {}, waybackArchiveEnabled: { newValue: true } }) === true, "any real key triggers");
+  });
+  test("empty / null changes is false", () => {
+    assert(pbpSettingsKeysChanged({}) === false, "empty -> false");
+    assert(pbpSettingsKeysChanged(null) === false, "null -> false");
+  });
+});
+
+// summary
+const sum = document.createElement("div");
+sum.style.cssText = "margin-top:12px;font-weight:bold;";
+sum.textContent = `Total: ${_passed + _failed}  Passed: ${_passed}  Failed: ${_failed}`;
+sum.style.color = _failed > 0 ? "#c00" : "#0a0";
+document.getElementById("results").appendChild(sum);
+</script>
+</body></html>

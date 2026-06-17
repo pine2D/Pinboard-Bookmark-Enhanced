@@ -189,6 +189,18 @@ const SETTINGS_DEFAULTS = {
   selectionTrigger: "icon"
 };
 
+// True iff a storage.onChanged `changes` object touched at least one real
+// setting key. Transient keys (_pbRateLimitTs, offlineQueue, caches, _wayback*,
+// _suggestSweepTs, migration backups) are NOT in SETTINGS_DEFAULTS, so they
+// return false — letting the SW keep its warm _settingsCache.
+function pbpSettingsKeysChanged(changes) {
+  if (!changes || typeof changes !== "object") return false;
+  for (const k of Object.keys(changes)) {
+    if (Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, k)) return true;
+  }
+  return false;
+}
+
 // ---- Tag case normalization helpers ----
 // Build a map: normalized_tag → preferred_casing (by highest count)
 function buildTagCaseMap(tagCounts) {

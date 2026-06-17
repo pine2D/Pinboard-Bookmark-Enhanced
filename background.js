@@ -702,7 +702,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // React to settings change: toggle the prewarm alarm on/off (settings live in sync or local based on optSyncEnabled)
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "sync" || area === "local") invalidateSettingsCache();
+  if ((area === "sync" || area === "local") && pbpSettingsKeysChanged(changes)) invalidateSettingsCache();
   if ((area === "sync" || area === "local") && (changes.tagSyncMode || changes.pinboardToken)) {
     syncPrewarmTagsAlarm().catch(() => {});
   }
