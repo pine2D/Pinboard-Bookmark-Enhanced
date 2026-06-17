@@ -35,6 +35,26 @@ async function loadLocale(loc) {
             `${loc}.${k} still == en: ${JSON.stringify(tr)}`);
     }
   }
+  // H2: new keys exist in all locales
+  for (const k of ["importSettingsTitle","jinaMdNonWebHint","popSortTitle"]) {
+    for (const loc of LOCALES)
+      check(`H2 ${loc}.${k} present`, !!msgs[loc][k]?.message, `${loc} missing ${k}`);
+  }
+  // H2: hardcoded literals removed from source
+  const optHtml = await (await fetch("../options.html")).text();
+  check('H2 options.html has no literal "Import settings from JSON file"',
+        !optHtml.includes('title="Import settings from JSON file"'));
+  check('H2 options.html Import label wired to data-i18n-title',
+        optHtml.includes('data-i18n-title="importSettingsTitle"'));
+  const popupJs = await (await fetch("../popup.js")).text();
+  check('H2 popup.js has no literal "Only works on web pages"',
+        !popupJs.includes('"Only works on web pages"'));
+  const sortJs = await (await fetch("../pinboard-sort.js")).text();
+  check('H2 pinboard-sort.js has no literal "Sort this page by popularity"',
+        !sortJs.includes('"Sort this page by popularity"'));
+  const sharedJs = await (await fetch("../shared.js")).text();
+  check('H2 shared.js Dismiss aria-label wired to i18n',
+        !sharedJs.includes('.setAttribute("aria-label", "Dismiss")'));
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>

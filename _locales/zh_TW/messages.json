@@ -776,6 +776,15 @@
   "importInvalid": {
     "message": "檔案格式無效"
   },
+  "importSettingsTitle": {
+    "message": "從 JSON 檔案匯入設定"
+  },
+  "jinaMdNonWebHint": {
+    "message": "僅適用於網頁"
+  },
+  "popSortTitle": {
+    "message": "按熱門程度排序此頁面"
+  },
   "importPartial": {
     "message": "已匯入 — 主題已儲存至本機（同步配額已滿）；重新整理後生效"
   },

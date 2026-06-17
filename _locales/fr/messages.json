@@ -776,6 +776,15 @@
   "importInvalid": {
     "message": "Fichier invalide"
   },
+  "importSettingsTitle": {
+    "message": "Importer les paramètres depuis un fichier JSON"
+  },
+  "jinaMdNonWebHint": {
+    "message": "Fonctionne uniquement sur les pages web"
+  },
+  "popSortTitle": {
+    "message": "Trier cette page par popularité"
+  },
   "importPartial": {
     "message": "Importé — thèmes sauvegardés localement (quota sync plein); rechargez"
   },

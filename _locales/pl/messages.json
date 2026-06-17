@@ -776,6 +776,15 @@
   "importInvalid": {
     "message": "Nieprawidłowy plik"
   },
+  "importSettingsTitle": {
+    "message": "Importuj ustawienia z pliku JSON"
+  },
+  "jinaMdNonWebHint": {
+    "message": "Działa tylko na stronach internetowych"
+  },
+  "popSortTitle": {
+    "message": "Sortuj tę stronę według popularności"
+  },
   "importPartial": {
     "message": "Zaimportowano — motywy zapisane lokalnie (limit sync pełny); odśwież"
   },

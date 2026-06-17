@@ -655,7 +655,7 @@ function showFeedback({ variant = "info", title = "", message = "", messageNode 
   const dismiss = document.createElement("button");
   dismiss.type = "button";
   dismiss.className = "fc-dismiss";
-  dismiss.setAttribute("aria-label", "Dismiss");
+  dismiss.setAttribute("aria-label", typeof t === "function" ? t("aiErrorDismiss") : "Dismiss");
   dismiss.textContent = "×";
   let dismissed = false;
   const remove = () => {

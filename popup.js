@@ -431,7 +431,7 @@ async function htmlToMarkdownAsync(html, opts) {
     const currentUrl = $id("url-input")?.value || "";
     if (!currentUrl.startsWith("http://") && !currentUrl.startsWith("https://")) {
       jinaMdBtn.disabled = true;
-      jinaMdBtn.title = "Only works on web pages";
+      jinaMdBtn.title = t("jinaMdNonWebHint");
     }
     jinaMdBtn.addEventListener("click", async () => {
       if (jinaMdBtn.disabled) return;

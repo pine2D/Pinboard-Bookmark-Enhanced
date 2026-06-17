@@ -776,6 +776,15 @@
   "importInvalid": {
     "message": "Недопустимый файл"
   },
+  "importSettingsTitle": {
+    "message": "Импортировать настройки из JSON-файла"
+  },
+  "jinaMdNonWebHint": {
+    "message": "Работает только на веб-страницах"
+  },
+  "popSortTitle": {
+    "message": "Сортировать эту страницу по популярности"
+  },
   "importPartial": {
     "message": "Импортировано — темы сохранены локально (лимит sync исчерпан); перезагрузите"
   },

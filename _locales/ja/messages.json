@@ -776,6 +776,15 @@
   "importInvalid": {
     "message": "無効なファイル"
   },
+  "importSettingsTitle": {
+    "message": "JSONファイルから設定をインポート"
+  },
+  "jinaMdNonWebHint": {
+    "message": "ウェブページでのみ動作します"
+  },
+  "popSortTitle": {
+    "message": "このページを人気順に並び替える"
+  },
   "importPartial": {
     "message": "インポート完了 — テーマはローカルに保存されました（同期容量超過）；リロードで反映"
   },

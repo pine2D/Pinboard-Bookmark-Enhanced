@@ -165,7 +165,12 @@
     a.id = CONTROL_ID;
     a.href = "#";
     a.textContent = "pop";
-    a.title = "Sort this page by popularity";
+    let popTitle = "Sort this page by popularity";
+    try {
+      const m = chrome.i18n && chrome.i18n.getMessage("popSortTitle");
+      if (m) popTitle = m;
+    } catch (_) {}
+    a.title = popTitle;
     return a;
   }
 
