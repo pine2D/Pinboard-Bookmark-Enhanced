@@ -52,7 +52,7 @@
 
   // Expose for the test harness (harmless in the isolated content world).
   if (typeof window !== "undefined") {
-    window.__PBP_POPSORT__ = { parsePopCount, extractPop, computeSortedOrder, getBookmarkRows };
+    window.__PBP_POPSORT__ = { parsePopCount, extractPop, computeSortedOrder, getBookmarkRows, makeFallbackArrow };
   }
 
   // ---------- everything below only runs on a real tag page ----------
@@ -174,6 +174,21 @@
     return a;
   }
 
+  // Inline SVG up/down arrow for the fallback picker. Avoids the literal ⇳
+  // (U+21F3) dingbat, which can fall back to Segoe UI Emoji and stall first
+  // paint on Windows hi-DPI Chrome (see CLAUDE.md font-fallback notes).
+  // currentColor → inherits the native picker text color across all 13 themes.
+  function makeFallbackArrow() {
+    const arrow = document.createElement("span");
+    arrow.className = "sort_arrow";
+    arrow.innerHTML =
+      '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true" ' +
+      'fill="none" stroke="currentColor" stroke-width="1.6" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M5 6 8 3l3 3M5 10l3 3 3-3"/></svg>';
+    return arrow;
+  }
+
   // Public/other pages: place the fallback picker in the tag header,
   // left of the float:right RSS, above the bookmark/pager block.
   function placeFallback(mc, node) {
@@ -201,9 +216,7 @@
       const span = document.createElement("span");
       span.className = "pagination_select";
       span.id = "pbp-pop-picker";
-      const arrow = document.createElement("span");
-      arrow.className = "sort_arrow";
-      arrow.textContent = "⇳";
+      const arrow = makeFallbackArrow();
       span.appendChild(document.createTextNode("\u00A0")); // nbsp before arrow (matches native picker)
       span.appendChild(arrow);
       span.appendChild(document.createTextNode(" "));

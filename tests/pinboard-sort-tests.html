@@ -86,6 +86,14 @@ check("page-container rows are per-bookmark units, not the page block", !contRow
 assertEq(F.extractPop(contRows[0]), 5, "page-container row[0] pop=5 (top-level bookmark)");
 assertEq(F.extractPop(contRows[1]), 9, "page-container row[1] pop=9 (nested wrapper)");
 
+// --- J1: fallback arrow is inline SVG, no U+21F3 glyph ---
+check("makeFallbackArrow exposed", typeof F.makeFallbackArrow === "function");
+const arr = F.makeFallbackArrow();
+check("arrow is span.sort_arrow", arr.tagName === "SPAN" && arr.classList.contains("sort_arrow"));
+check("arrow contains an inline <svg>", !!arr.querySelector("svg"));
+check("arrow has NO literal U+21F3 glyph", arr.textContent.indexOf("⇳") === -1);
+check("arrow svg uses currentColor (theme-inherits)", arr.innerHTML.indexOf("currentColor") !== -1);
+
 console.log(`PASS ${pass} | FAIL ${fail}`);
 </script>
 </body></html>
