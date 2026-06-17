@@ -15,6 +15,41 @@ input { width: 100%; padding: 4px; margin-top: 8px; box-sizing: border-box; }
 <pre id="manual-out"></pre>
 <script src="../shared.js"></script>
 <script>
+// ============ Group B2: one cleaned target drives check + save ============
+// Mirror the boot-time selection used in popup.js showMain().
+function pickTargetUrl(ucs, rawUrl) {
+  if (ucs.enabled && ucs.onPopupOpen && rawUrl) {
+    return stripTrackingParams(rawUrl, ucs).cleaned;
+  }
+  return rawUrl;
+}
+function b2case(name, cond) {
+  const d = document.createElement("div");
+  d.className = "case " + (cond ? "pass" : "fail");
+  d.textContent = (cond ? "✓ " : "✗ ") + name;
+  document.getElementById("results").appendChild(d);
+}
+{
+  const ucs = { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
+  const raw = "https://example.com/?utm_source=x&id=42";
+  const target = pickTargetUrl(ucs, raw);
+  b2case("B2: target is the cleaned url", target === "https://example.com/?id=42");
+  b2case("B2: check url === save url (single source)", target === pickTargetUrl(ucs, raw));
+}
+{
+  const ucsOff = { enabled: false, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
+  const raw = "https://example.com/?utm_source=x&id=42";
+  b2case("B2: cleaning disabled -> raw url passes through unchanged",
+    pickTargetUrl(ucsOff, raw) === raw);
+}
+{
+  const ucsNoOpen = { enabled: true, onPopupOpen: false, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
+  const raw = "https://example.com/?utm_source=x&id=42";
+  b2case("B2: onPopupOpen off -> raw url (matches input box behavior)",
+    pickTargetUrl(ucsNoOpen, raw) === raw);
+}
+</script>
+<script>
 const cases = [
   { in: "https://example.com/?utm_source=x&utm_medium=y&id=42", out: "https://example.com/?id=42", removed: 2 },
   { in: "https://example.com/?fbclid=abc&q=hello", out: "https://example.com/?q=hello", removed: 1 },

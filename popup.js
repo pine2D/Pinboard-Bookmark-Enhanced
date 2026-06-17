@@ -251,8 +251,10 @@ async function showMain(token) {
   }
 
   const _ucs = await _loadUrlCleanSettings();
+  let targetUrl = pageInfo.url;
   if (_ucs.enabled && _ucs.onPopupOpen && pageInfo.url) {
     const { cleaned, removedCount, original } = stripTrackingParams(pageInfo.url, _ucs);
+    targetUrl = cleaned;
     $id("url-input").value = cleaned;
     _renderCleanHint({ removedCount, original });
   } else {
@@ -579,12 +581,12 @@ async function htmlToMarkdownAsync(html, opts) {
   // Suggest tags — enqueue after user tags so tagCaseMap is ready
   if (settings.optShowSuggestTags) {
     $id("suggest-row").classList.remove("hidden");
-    fetchPinboardSuggestTags(token, pageInfo.url);
+    fetchPinboardSuggestTags(token, targetUrl);
   }
   // Bookmark check — non-blocking, updates UI when ready.
   // Pass the prefetched cache promise (started right after popup-form-ready) so the
   // service-worker round-trip overlaps with getPageInfoFromTab instead of running after it.
-  checkExistingBookmark(token, pageInfo.url, {
+  checkExistingBookmark(token, targetUrl, {
     prefetchUrl: _bookmarkPrefetchUrl,
     prefetchPromise: _bookmarkPrefetchPromise,
   });
