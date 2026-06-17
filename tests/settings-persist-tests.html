@@ -60,6 +60,28 @@ async function run() {
   check("E2 non-quota error rethrows (returns null sentinel)",
         importThemesResult(new SyntaxError("bad json")) === null);
 
+  // ---------- E3: v1 themePresetKey routes through getSettingsStorage ----------
+  // Stub both areas; record which one themePresetKey lands in.
+  // (chrome is not defined in headless non-extension Chromium; we install a full stub)
+  const synced = {}, localed = {};
+  const prevChrome = globalThis.chrome;
+  globalThis.chrome = {
+    storage: {
+      sync: { set: (d) => { Object.assign(synced, d); return Promise.resolve(); },
+              get: () => Promise.resolve({}) },
+      local: { get: () => Promise.resolve({ optSyncEnabled: false }),
+               set: (d) => { Object.assign(localed, d); return Promise.resolve(); } },
+      onChanged: { addListener() {} },
+    },
+  };
+  // Clear the module-level cache so getSettingsStorage re-evaluates against the stub
+  if (typeof _settingsStorageCache !== "undefined") _settingsStorageCache = null;
+  const target = await getSettingsStorage();
+  await target.set({ themePresetKey: "nord" });
+  check("E3 themePresetKey lands in LOCAL when sync off", localed.themePresetKey === "nord");
+  check("E3 themePresetKey NOT forced into sync", synced.themePresetKey === undefined);
+  globalThis.chrome = prevChrome;
+
   const summary = document.createElement("h2");
   summary.textContent = `Results: ${pass} pass, ${fail} fail`;
   root.insertBefore(summary, root.firstChild);

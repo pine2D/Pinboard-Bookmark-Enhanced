@@ -77,7 +77,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
           const allowed = [presetCSS, ...variants.map(k => PINBOARD_THEMES[k]?.css || "")];
           newOverlay = allowed.some(c => c && c.trim() === customCSS.trim()) ? "" : customCSS;
         }
-        await chrome.storage.sync.set({ themePresetKey: resolvedKey || "" });
+        await (await getSettingsStorage()).set({ themePresetKey: resolvedKey || "" });
         await saveOverlayWithFallback(newOverlay);
       }
 
