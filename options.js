@@ -112,15 +112,29 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---- Tab switching ----
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      $id(`panel-${btn.dataset.panel}`).classList.add("active");
-      // W3: lazy-init expensive per-panel rendering on first view.
-      if (btn.dataset.panel === "appearance") _initAppearancePanel();
-      if (btn.dataset.panel === "tags") _initTagGovPanel();
+  const _tabBtns = [...document.querySelectorAll(".tab-btn")];
+  function activateTab(btn) {
+    _tabBtns.forEach((b) => { b.classList.remove("active"); b.setAttribute("aria-selected", "false"); b.tabIndex = -1; });
+    document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+    btn.classList.add("active");
+    btn.setAttribute("aria-selected", "true");
+    btn.tabIndex = 0;
+    $id(`panel-${btn.dataset.panel}`).classList.add("active");
+    // W3: lazy-init expensive per-panel rendering on first view.
+    if (btn.dataset.panel === "appearance") _initAppearancePanel();
+    if (btn.dataset.panel === "tags") _initTagGovPanel();
+  }
+  _tabBtns.forEach((btn, i) => {
+    btn.tabIndex = btn.classList.contains("active") ? 0 : -1;
+    btn.addEventListener("click", () => activateTab(btn));
+    btn.addEventListener("keydown", (e) => {
+      let n = -1;
+      if (e.key === "ArrowDown") n = (i + 1) % _tabBtns.length;
+      else if (e.key === "ArrowUp") n = (i - 1 + _tabBtns.length) % _tabBtns.length;
+      else return;
+      e.preventDefault();
+      activateTab(_tabBtns[n]);
+      _tabBtns[n].focus();
     });
   });
 

@@ -10,21 +10,21 @@
   <div class="container">
     <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced — Settings</span> <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span></h1>
 
-    <div class="tabs">
-      <button class="tab-btn active" data-panel="general" data-i18n="tabGeneral">General</button>
-      <button class="tab-btn" data-panel="popup" data-i18n="tabPopup">Popup</button>
-      <button class="tab-btn" data-panel="bookmarks" data-i18n="tabBookmarks">Bookmarks</button>
-      <button class="tab-btn" data-panel="ai" data-i18n="tabAI">AI</button>
-      <button class="tab-btn" data-panel="quick" data-i18n="tabQuickActions">Quick Actions</button>
-      <button class="tab-btn" data-panel="markdown" data-i18n="tabMarkdown">Markdown</button>
-      <button class="tab-btn" data-panel="tags" data-i18n="tabTags">Tags</button>
-      <button class="tab-btn" data-panel="archive" data-i18n="tabArchive">Archive</button>
-      <button class="tab-btn" data-panel="appearance" data-i18n="tabAppearance">Appearance</button>
+    <div class="tabs" role="tablist" aria-orientation="vertical">
+      <button class="tab-btn active" id="tab-general" data-panel="general" role="tab" aria-selected="true" aria-controls="panel-general" data-i18n="tabGeneral">General</button>
+      <button class="tab-btn" id="tab-popup" data-panel="popup" role="tab" aria-selected="false" aria-controls="panel-popup" data-i18n="tabPopup">Popup</button>
+      <button class="tab-btn" id="tab-bookmarks" data-panel="bookmarks" role="tab" aria-selected="false" aria-controls="panel-bookmarks" data-i18n="tabBookmarks">Bookmarks</button>
+      <button class="tab-btn" id="tab-ai" data-panel="ai" role="tab" aria-selected="false" aria-controls="panel-ai" data-i18n="tabAI">AI</button>
+      <button class="tab-btn" id="tab-quick" data-panel="quick" role="tab" aria-selected="false" aria-controls="panel-quick" data-i18n="tabQuickActions">Quick Actions</button>
+      <button class="tab-btn" id="tab-markdown" data-panel="markdown" role="tab" aria-selected="false" aria-controls="panel-markdown" data-i18n="tabMarkdown">Markdown</button>
+      <button class="tab-btn" id="tab-tags" data-panel="tags" role="tab" aria-selected="false" aria-controls="panel-tags" data-i18n="tabTags">Tags</button>
+      <button class="tab-btn" id="tab-archive" data-panel="archive" role="tab" aria-selected="false" aria-controls="panel-archive" data-i18n="tabArchive">Archive</button>
+      <button class="tab-btn" id="tab-appearance" data-panel="appearance" role="tab" aria-selected="false" aria-controls="panel-appearance" data-i18n="tabAppearance">Appearance</button>
       <button class="reset-tab-btn" id="reset-panel-btn" title="Reset current tab settings to defaults" data-i18n="resetTabBtn" data-i18n-title="resetTabTitle">Reset This Tab</button>
     </div>
 
     <!-- Tab 1: General -->
-    <div id="panel-general" class="panel active">
+    <div id="panel-general" class="panel active" role="tabpanel" aria-labelledby="tab-general">
       <div class="section-title" data-i18n="secPinboardAccount">Pinboard Account</div>
       <div class="fg">
         <label class="bl" for="opt-pinboard-token" data-i18n="labelApiToken">API Token</label>
@@ -82,7 +82,7 @@
     </div>
 
     <!-- Tab 2: Popup -->
-    <div id="panel-popup" class="panel">
+    <div id="panel-popup" class="panel" role="tabpanel" aria-labelledby="tab-popup">
       <div class="section-title" data-i18n="secPopupBehavior">Popup Behavior</div>
       <div class="fg">
         <label class="bl" data-i18n="labelOpenPopupShortcut">Open popup shortcut</label>
@@ -133,7 +133,7 @@
     </div>
 
     <!-- Tab 3: Bookmarks -->
-    <div id="panel-bookmarks" class="panel">
+    <div id="panel-bookmarks" class="panel" role="tabpanel" aria-labelledby="tab-bookmarks">
       <div class="section-title" data-i18n="secSaveDefaults">Save Defaults</div>
       <div class="fg"><label><input type="checkbox" id="opt-private-default" /> <span data-i18n="optPrivateDefault">Private by default</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-private-incognito" /> <span data-i18n="optPrivateIncognito">Private in Incognito</span></label></div>
@@ -168,7 +168,7 @@
     </div>
 
     <!-- Tab 4: Quick Actions -->
-    <div id="panel-quick" class="panel">
+    <div id="panel-quick" class="panel" role="tabpanel" aria-labelledby="tab-quick">
       <div class="accordion-section open">
         <div class="accordion-header" data-target="acc-qs">
           <span class="accordion-arrow"></span> <span data-i18n="secQuickSave">Quick Save</span>
@@ -235,7 +235,7 @@
     </div>
 
     <!-- Tab 5: AI -->
-    <div id="panel-ai" class="panel">
+    <div id="panel-ai" class="panel" role="tabpanel" aria-labelledby="tab-ai">
       <div class="section-title" data-i18n="secAiProvider">AI Provider</div>
       <div class="fg">
         <select id="opt-ai-provider">
@@ -567,7 +567,7 @@
     </div>
 
     <!-- Tab: Markdown -->
-    <div id="panel-markdown" class="panel">
+    <div id="panel-markdown" class="panel" role="tabpanel" aria-labelledby="tab-markdown">
       <div class="fg">
         <label class="bl" data-i18n="mdShortcutLabel">Markdown preview shortcut</label>
         <p class="hint">
@@ -604,7 +604,7 @@
     </div>
 
     <!-- Tab: Tags -->
-    <div id="panel-tags" class="panel">
+    <div id="panel-tags" class="panel" role="tabpanel" aria-labelledby="tab-tags">
       <div class="section-title" data-i18n="tagGovGroupsTitle">Tag Groups</div>
       <div class="fg" id="tag-gov-overview">
         <span>…</span>
@@ -641,7 +641,7 @@
     </div>
 
     <!-- Tab: Archive -->
-    <div id="panel-archive" class="panel">
+    <div id="panel-archive" class="panel" role="tabpanel" aria-labelledby="tab-archive">
       <div class="section-title" data-i18n="optWayback">Wayback Archive on Save</div>
       <div class="fg"><label><input type="checkbox" id="opt-wayback-enabled" /> <span data-i18n="optWayback">Enable Wayback archive on save</span></label></div>
       <p class="hint" data-i18n="optWaybackHint">Automatically submit saved URLs to archive.org when you save a bookmark. Works with both Quick Save and Read Later.</p>
@@ -671,7 +671,7 @@
     </div>
 
     <!-- Tab 6: Appearance -->
-    <div id="panel-appearance" class="panel">
+    <div id="panel-appearance" class="panel" role="tabpanel" aria-labelledby="tab-appearance">
       <div class="section-title" data-i18n="secTheme">Theme</div>
       <div class="fg">
         <select id="opt-theme">

@@ -45,4 +45,52 @@ function buildRecentControl(kind){
     if(el._firedCount()<2)throw new Error("Space did not fire handler");
   });
 });
+
+// G2: ARIA tablist/tab/tabpanel + roving focus for options tabs (vertical sidebar).
+// Fixture mirrors the shipped options.html markup; wiring mirrors options.js activateTab + keydown.
+// Deviation from brief: ArrowDown/ArrowUp used (not ArrowRight/ArrowLeft) because .tabs is
+// a vertical sidebar (flex-direction:column) and aria-orientation="vertical" requires vertical arrows.
+(function(){
+  const wrap=document.createElement("div");
+  wrap.id="g2-fixture";
+  wrap.style.display="none";
+  wrap.innerHTML=`
+    <div class="tabs" role="tablist" aria-orientation="vertical">
+      <button class="tab-btn active" id="tab-general" data-panel="general" role="tab" aria-selected="true"  aria-controls="panel-general">General</button>
+      <button class="tab-btn"        id="tab-popup"   data-panel="popup"   role="tab" aria-selected="false" aria-controls="panel-popup">Popup</button>
+    </div>
+    <div id="panel-general" class="panel active" role="tabpanel" aria-labelledby="tab-general"></div>
+    <div id="panel-popup"   class="panel"        role="tabpanel" aria-labelledby="tab-popup"></div>
+  `;
+  document.getElementById("fixture").appendChild(wrap);
+
+  const bar=wrap.querySelector(".tabs");
+  const btns=[...bar.querySelectorAll(".tab-btn")];
+  function selectTab(btn){
+    btns.forEach(b=>{b.classList.remove("active");b.setAttribute("aria-selected","false");b.tabIndex=-1;});
+    wrap.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");btn.setAttribute("aria-selected","true");btn.tabIndex=0;
+    wrap.querySelector("#panel-"+btn.dataset.panel).classList.add("active");
+  }
+  btns.forEach((btn,i)=>{
+    btn.tabIndex=btn.classList.contains("active")?0:-1;
+    btn.addEventListener("click",()=>selectTab(btn));
+    btn.addEventListener("keydown",(e)=>{
+      let n=-1;
+      if(e.key==="ArrowDown")n=(i+1)%btns.length;
+      else if(e.key==="ArrowUp")n=(i-1+btns.length)%btns.length;
+      else return;
+      e.preventDefault();selectTab(btns[n]);btns[n].focus();
+    });
+  });
+
+  test("G2: tablist role on .tabs",()=>{if(bar.getAttribute("role")!=="tablist")throw new Error("role="+bar.getAttribute("role"));});
+  test("G2: tablist aria-orientation=vertical",()=>{if(bar.getAttribute("aria-orientation")!=="vertical")throw new Error("aria-orientation="+bar.getAttribute("aria-orientation"));});
+  test("G2: each tab has role=tab + aria-controls",()=>{btns.forEach(b=>{if(b.getAttribute("role")!=="tab")throw new Error("missing role=tab on "+b.id);const ctrl=b.getAttribute("aria-controls");if(!wrap.querySelector("#"+ctrl))throw new Error("aria-controls dangling: "+ctrl);});});
+  test("G2: active tab aria-selected=true, others false",()=>{const sel=btns.filter(b=>b.getAttribute("aria-selected")==="true");if(sel.length!==1)throw new Error("expected exactly 1 selected, got "+sel.length);});
+  test("G2: tabpanel labelled by its tab",()=>{wrap.querySelectorAll(".panel").forEach(p=>{if(p.getAttribute("role")!=="tabpanel")throw new Error("missing role=tabpanel on #"+p.id);const lab=p.getAttribute("aria-labelledby");if(!wrap.querySelector("#"+lab))throw new Error("aria-labelledby dangling: "+lab);});});
+  test("G2: roving tabindex — only active tab is 0",()=>{const zero=btns.filter(b=>b.tabIndex===0);if(zero.length!==1||!zero[0].classList.contains("active"))throw new Error("roving tabindex broken");});
+  test("G2: ArrowDown moves selection to next tab",()=>{btns[0].dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true}));if(btns[1].getAttribute("aria-selected")!=="true")throw new Error("ArrowDown did not select next tab");});
+  test("G2: ArrowUp wraps selection back to first tab",()=>{btns[1].dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowUp",bubbles:true}));if(btns[0].getAttribute("aria-selected")!=="true")throw new Error("ArrowUp did not wrap back");});
+})();
 </script></body></html>
