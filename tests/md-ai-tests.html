@@ -1601,5 +1601,22 @@ suite("buildTagPrompt / buildSummaryPrompt $-literal substitution", () => {
     assert(p.indexOf("title $$ $1") !== -1, "title corrupted: " + p);
   });
 });
+
+// ============ Group B4: skip cached-summary restore for existing bookmarks ====
+suiteIf("pbpShouldRestoreCachedSummary", "pbpShouldRestoreCachedSummary", () => {
+  const BQ = "[AI Summary]\n<blockquote>x</blockquote>";
+  test("fresh page (no existing bookmark), empty desc -> restore", () => {
+    assertEq(pbpShouldRestoreCachedSummary(null, ""), true, "fresh empty");
+  });
+  test("fresh page but desc already has a summary block -> skip", () => {
+    assertEq(pbpShouldRestoreCachedSummary(null, BQ), false, "already present");
+  });
+  test("already bookmarked -> skip even if desc empty (extended owns it)", () => {
+    assertEq(pbpShouldRestoreCachedSummary({ extended: "" }, ""), false, "existing wins");
+  });
+  test("already bookmarked with notes -> skip (don't append on top)", () => {
+    assertEq(pbpShouldRestoreCachedSummary({ extended: "my notes" }, "my notes"), false, "no double write");
+  });
+});
 </script>
 </body></html>

@@ -757,3 +757,15 @@ function injectEmptyState(container, svgKey, messageText) {
   wrap.appendChild(msg);
   container.appendChild(wrap);
 }
+
+// ===================== AI summary restore guard (B4) =====================
+// Decide whether to auto-restore a cached AI summary into the description.
+// Skip when (a) the page is already a bookmark — checkExistingBookmark restores
+// the user's saved `extended`, which already owns any summary they kept — or
+// (b) the description already contains an [AI Summary] block.
+// Pure function; extracted here for testability (popup-ai.js uses it at runtime).
+const _AI_BQ_REGEX_SHARED = /(\n\n)?\[AI Summary\]\n<blockquote>[\s\S]*?<\/blockquote>\s*$/;
+function pbpShouldRestoreCachedSummary(existing, descValue) {
+  if (existing) return false;
+  return !_AI_BQ_REGEX_SHARED.test(descValue || "");
+}

@@ -87,6 +87,7 @@ async function enrichPageTextIfJina() {
 
 const AI_SUMMARY_TAG = "[AI Summary]";
 const AI_BQ_REGEX = /(\n\n)?\[AI Summary\]\n<blockquote>[\s\S]*?<\/blockquote>\s*$/;
+// pbpShouldRestoreCachedSummary is defined in shared.js (pure helper, B4).
 
 // ---- Setup AI feature listeners ----
 // ---- AI Error Card ----
@@ -205,15 +206,16 @@ function setupAIFeatures() {
     await doAISummary(false);
   });
 
-  // Auto-restore cached summary if description doesn't already contain one
-  if (!AI_BQ_REGEX.test($id("description-input").value)) {
-    getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource).then(cached => {
-      if (cached && !AI_BQ_REGEX.test($id("description-input").value)) {
-        upsertSummary(cached);
-        showSummaryActions(true);
-      }
-    });
-  }
+  // Auto-restore cached summary only for fresh (non-bookmarked) pages whose
+  // description doesn't already contain a summary. For existing bookmarks,
+  // checkExistingBookmark (popup.js) restores the user's saved `extended` — we
+  // must not race it (lost summary) or append on top (duplicate summary).
+  getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource).then(cached => {
+    if (cached && pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
+      upsertSummary(cached);
+      showSummaryActions(true);
+    }
+  });
 
   $id("ai-tags-btn").addEventListener("click", async (e) => {
     e.preventDefault();
