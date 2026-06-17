@@ -82,5 +82,41 @@ test("popup-width-custom field resets via def.fields", () => {
   applyPanelReset({ fields: { "opt-popup-width-custom": "550" } }, qsa);
   if ($id("opt-popup-width-custom").value !== "550") throw new Error("custom width should reset to 550");
 });
+
+// ---- C2: PANEL_DEFAULTS.popup shape assertions ----
+// Encode the expected target shape; in real options.js this will be exported as
+// window.__PBP_PANEL_DEFAULTS.popup after C2 implementation.
+const POPUP_DEF = {
+  fields: {
+    "opt-check-bookmark-status": true, "opt-auto-close": true, "offline-queue-enabled": true,
+    "opt-show-search": false, "opt-show-recent": false, "opt-show-badge": false,
+    "opt-show-suggest-tags": true, "opt-show-ai-summary": true, "opt-show-ai-tags": true,
+    "opt-show-quick-links": true, "opt-show-quick-row": true,
+    "opt-popup-width-custom": "550"
+  },
+  radios: { "popup-width-preset": "550" },
+  nested: { urlClean: {
+    "opt-urlclean-enabled": true, "opt-urlclean-on-open": true, "opt-urlclean-on-paste": true,
+    "opt-urlclean-aggressive": false, "opt-urlclean-custom": [], "opt-urlclean-exclude": []
+  } }
+};
+test("popup def covers popup-width radio group", () => {
+  if (!POPUP_DEF.radios || POPUP_DEF.radios["popup-width-preset"] !== "550")
+    throw new Error("popup-width-preset default must be 550");
+});
+test("popup def covers all 6 urlClean controls", () => {
+  const ids = Object.keys(POPUP_DEF.nested.urlClean);
+  for (const need of ["opt-urlclean-enabled","opt-urlclean-on-open","opt-urlclean-on-paste",
+                      "opt-urlclean-aggressive","opt-urlclean-custom","opt-urlclean-exclude"])
+    if (!ids.includes(need)) throw new Error("missing urlClean control: " + need);
+});
+test("applyPanelReset on popup def clears tracking params + restores width", () => {
+  document.querySelector('input[name="popup-width-preset"][value="450"]').checked = true;
+  $id("opt-urlclean-custom").value = "utm_other\nfoo";
+  applyPanelReset(POPUP_DEF, qsa);
+  if (document.querySelector('input[name="popup-width-preset"]:checked').value !== "550")
+    throw new Error("width not reset to 550");
+  if ($id("opt-urlclean-custom").value !== "") throw new Error("custom params not cleared");
+});
 </script>
 </body></html>

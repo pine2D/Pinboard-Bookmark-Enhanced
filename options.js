@@ -148,7 +148,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-show-search": false, "opt-show-recent": false, "opt-show-badge": false,
         "opt-show-suggest-tags": true,
         "opt-show-ai-summary": true, "opt-show-ai-tags": true,
-        "opt-show-quick-links": true, "opt-show-quick-row": true
+        "opt-show-quick-links": true, "opt-show-quick-row": true,
+        "opt-popup-width-custom": "550"
+      },
+      radios: { "popup-width-preset": "550" },
+      nested: {
+        urlClean: {
+          "opt-urlclean-enabled": true, "opt-urlclean-on-open": true, "opt-urlclean-on-paste": true,
+          "opt-urlclean-aggressive": false, "opt-urlclean-custom": [], "opt-urlclean-exclude": []
+        }
       }
     },
     bookmarks: {
@@ -211,6 +219,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       skip: []
     }
   };
+  if (typeof window !== "undefined") window.__PBP_PANEL_DEFAULTS = PANEL_DEFAULTS;
 
   // Gray out the Obsidian vault/folder inputs when the master toggle is off.
   // Safe to call on any page/panel (guards on element existence); programmatic
