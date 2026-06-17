@@ -775,10 +775,10 @@
   },
   "importInvalid": {
     "message": "檔案格式無效"
-  },,
+  },
   "importPartial": {
     "message": "已匯入 — 主題已儲存至本機（同步配額已滿）；重新整理後生效"
-  }
+  },
   "secQuickSave": {
     "message": "快速儲存"
   },

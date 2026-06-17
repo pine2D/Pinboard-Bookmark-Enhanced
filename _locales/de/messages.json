@@ -775,10 +775,10 @@
   },
   "importInvalid": {
     "message": "Ungültige Datei"
-  },,
+  },
   "importPartial": {
     "message": "Importiert — Themes lokal gespeichert (Sync-Kontingent voll); Seite neu laden"
-  }
+  },
   "secQuickSave": {
     "message": "Schnellspeicherung"
   },
