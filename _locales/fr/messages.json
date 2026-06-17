@@ -1617,6 +1617,9 @@
   "batchRevokeFailed": {
     "message": "Échec"
   },
+  "secWayback": {
+    "message": "Archivage Wayback Machine"
+  },
   "optWayback": {
     "message": "Archiver les pages enregistrées sur Internet Archive"
   },

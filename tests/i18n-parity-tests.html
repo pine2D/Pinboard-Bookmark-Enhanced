@@ -63,6 +63,15 @@ async function loadLocale(loc) {
   const sharedJs = await (await fetch("../shared.js")).text();
   check('H2 shared.js Dismiss aria-label wired to aiErrorDismiss key',
         sharedJs.includes('aiErrorDismiss'));
+  // H3: Wayback section title is its own key, distinct from the checkbox label
+  for (const loc of LOCALES)
+    check(`H3 ${loc}.secWayback present`, !!msgs[loc].secWayback?.message, `${loc} missing secWayback`);
+  const optHtml3 = await (await fetch("../options.html")).text();
+  // the section-title line must NOT still point at optWayback
+  check('H3 options.html section-title uses secWayback',
+        /class="section-title"[^>]*data-i18n="secWayback"/.test(optHtml3));
+  check('H3 options.html no longer has section-title data-i18n="optWayback"',
+        !/class="section-title"[^>]*data-i18n="optWayback"/.test(optHtml3));
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>

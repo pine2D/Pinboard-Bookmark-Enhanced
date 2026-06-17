@@ -1617,6 +1617,9 @@
   "batchRevokeFailed": {
     "message": "Failed"
   },
+  "secWayback": {
+    "message": "Wayback Machine Archiving"
+  },
   "optWayback": {
     "message": "Archive saved pages to the Wayback Machine"
   },

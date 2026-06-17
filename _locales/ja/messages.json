@@ -1617,6 +1617,9 @@
   "batchRevokeFailed": {
     "message": "失敗"
   },
+  "secWayback": {
+    "message": "Wayback Machine アーカイブ"
+  },
   "optWayback": {
     "message": "保存したページをインターネット アーカイブに保存する"
   },

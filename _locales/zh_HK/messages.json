@@ -1617,6 +1617,9 @@
   "batchRevokeFailed": {
     "message": "失敗"
   },
+  "secWayback": {
+    "message": "Wayback 封存"
+  },
   "optWayback": {
     "message": "保存頁面到互聯網檔案館"
   },
