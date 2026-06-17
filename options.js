@@ -249,6 +249,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     return (customEl && customEl.value.trim()) || "auto";
   }
 
+  // Reset a panel's controls to defaults. Handles three address modes that the
+  // old id-only loop missed: (a) radio GROUPS addressed by name (popup-width,
+  // tag-sync-mode, ai-content-source), (b) the nested urlClean object, (c)
+  // array-valued textareas (custom/exclude params join with newline → "").
+  // Custom-overlay CSS is NOT here — it persists via saveOverlayWithFallback,
+  // re-run through each panel's def.after (see appearance).
+  function applyPanelReset(def, root) {
+    for (const [id, val] of Object.entries(def.fields || {})) {
+      const el = $id(id);
+      if (!el) continue;
+      // Radios reset via .checked like checkboxes (boolean = whether selected).
+      // The old else-branch overwrote a radio's VALUE attribute with "true"/
+      // "false" -- saveAll() then persisted bgSaveMode as "true", which the
+      // background treats as overwrite (merge protection silently lost).
+      if (el.type === "checkbox" || el.type === "radio") el.checked = val;
+      else el.value = val;
+    }
+    // Radio groups by name → check the input whose value === the default.
+    for (const [name, val] of Object.entries(def.radios || {})) {
+      const r = root.querySelector(`input[name="${name}"][value="${val}"]`);
+      if (r) r.checked = true;
+    }
+    // Nested objects (urlClean): map each member id → its default. Array
+    // defaults (customParams/excludeParams) reduce to an empty textarea.
+    for (const group of Object.values(def.nested || {})) {
+      for (const [id, dflt] of Object.entries(group)) {
+        const el = $id(id);
+        if (!el) continue;
+        if (el.type === "checkbox") el.checked = !!dflt;
+        else el.value = Array.isArray(dflt) ? dflt.join("\n") : dflt;
+      }
+    }
+  }
+  // Test hook (browser test harness; no-op in normal page).
+  if (typeof window !== "undefined") window.__PBP_applyPanelReset = applyPanelReset;
+
   $id("reset-panel-btn").addEventListener("click", function () {
     const resetBtn = this;
     const activeBtn = document.querySelector(".tab-btn.active");
@@ -261,17 +297,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       yesText: t("reset"),
       noText: t("cancel"),
       onConfirm: () => {
-        for (const [id, val] of Object.entries(def.fields)) {
-          const el = $id(id);
-          if (!el) continue;
-          // Radios reset via .checked like checkboxes (boolean = whether selected).
-          // The old else-branch overwrote a radio's VALUE attribute with "true"/
-          // "false" -- saveAll() then persisted bgSaveMode as "true", which the
-          // background treats as overwrite (merge protection silently lost).
-          if (el.type === "checkbox" || el.type === "radio") el.checked = val;
-          else el.value = val;
-        }
+        applyPanelReset(def, document);
         saveAll();
+        if (typeof def.after === "function") def.after();
         syncObsidianEnabledState();
         syncTranslateLangCustomState();
       },

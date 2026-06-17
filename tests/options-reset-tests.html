@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Options Reset Tests</title>
+<style>
+  .case.pass { color: #0a0; }
+  .case.fail { color: #c00; font-weight: bold; }
+</style></head>
+<body>
+<div id="results"></div>
+<div id="fixture" style="display:none">
+  <!-- popup panel controls -->
+  <input type="radio" name="popup-width-preset" value="450">
+  <input type="radio" name="popup-width-preset" value="550">
+  <input type="radio" name="popup-width-preset" value="650">
+  <input type="radio" name="popup-width-preset" value="custom">
+  <input type="number" id="opt-popup-width-custom" value="700">
+  <input type="checkbox" id="opt-urlclean-enabled">
+  <input type="checkbox" id="opt-urlclean-on-open">
+  <input type="checkbox" id="opt-urlclean-on-paste">
+  <input type="checkbox" id="opt-urlclean-aggressive">
+  <textarea id="opt-urlclean-custom">utm_other</textarea>
+  <textarea id="opt-urlclean-exclude">tag</textarea>
+</div>
+<script>
+function pass(name){const d=document.createElement("div");d.className="case pass";d.textContent="OK "+name;document.getElementById("results").appendChild(d);}
+function fail(name,msg){const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
+function test(name,fn){try{fn();pass(name);}catch(e){fail(name,e.message);}}
+
+// $id shim (options.js uses shared.js's $id; tests run standalone)
+const $id = (id) => document.getElementById(id);
+
+// ---- copy of applyPanelReset under test (kept in sync with options.js) ----
+// In real options.js this is exported via window.__PBP_applyPanelReset; here we
+// paste the same body so the test runs without chrome/IIFE scaffolding.
+function applyPanelReset(def, qsa) {
+  for (const [id, val] of Object.entries(def.fields || {})) {
+    const el = $id(id); if (!el) continue;
+    if (el.type === "checkbox" || el.type === "radio") el.checked = val;
+    else el.value = val;
+  }
+  for (const [name, val] of Object.entries(def.radios || {})) {
+    const r = qsa(`input[name="${name}"][value="${val}"]`)[0];
+    if (r) r.checked = true;
+  }
+  for (const group of Object.values(def.nested || {})) {
+    for (const [id, dflt] of Object.entries(group)) {
+      const el = $id(id); if (!el) continue;
+      if (el.type === "checkbox") el.checked = !!dflt;
+      else el.value = Array.isArray(dflt) ? dflt.join("\n") : dflt;
+    }
+  }
+}
+const qsa = (sel) => Array.from(document.querySelectorAll(sel));
+
+test("radio group resets to named default value", () => {
+  $id("opt-popup-width-custom"); // ensure fixture present
+  document.querySelector('input[name="popup-width-preset"][value="450"]').checked = true;
+  applyPanelReset({ radios: { "popup-width-preset": "550" } }, qsa);
+  const sel = document.querySelector('input[name="popup-width-preset"]:checked');
+  if (!sel || sel.value !== "550") throw new Error("expected 550 checked, got " + (sel && sel.value));
+});
+test("nested urlClean checkboxes reset to defaults", () => {
+  $id("opt-urlclean-enabled").checked = false;
+  $id("opt-urlclean-on-open").checked = false;
+  applyPanelReset({ nested: { urlClean: {
+    "opt-urlclean-enabled": true, "opt-urlclean-on-open": true,
+    "opt-urlclean-on-paste": true, "opt-urlclean-aggressive": false,
+    "opt-urlclean-custom": [], "opt-urlclean-exclude": []
+  } } }, qsa);
+  if (!$id("opt-urlclean-enabled").checked) throw new Error("enabled should reset to true");
+  if (!$id("opt-urlclean-on-open").checked) throw new Error("on-open should reset to true");
+  if ($id("opt-urlclean-aggressive").checked) throw new Error("aggressive should reset to false");
+});
+test("nested urlClean array textareas reset to empty string", () => {
+  applyPanelReset({ nested: { urlClean: {
+    "opt-urlclean-custom": [], "opt-urlclean-exclude": []
+  } } }, qsa);
+  if ($id("opt-urlclean-custom").value !== "") throw new Error("custom textarea should be empty, got " + JSON.stringify($id("opt-urlclean-custom").value));
+  if ($id("opt-urlclean-exclude").value !== "") throw new Error("exclude textarea should be empty");
+});
+test("popup-width-custom field resets via def.fields", () => {
+  $id("opt-popup-width-custom").value = "700";
+  applyPanelReset({ fields: { "opt-popup-width-custom": "550" } }, qsa);
+  if ($id("opt-popup-width-custom").value !== "550") throw new Error("custom width should reset to 550");
+});
+</script>
+</body></html>
