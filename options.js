@@ -265,8 +265,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // old id-only loop missed: (a) radio GROUPS addressed by name (popup-width,
   // tag-sync-mode, ai-content-source), (b) the nested urlClean object, (c)
   // array-valued textareas (custom/exclude params join with newline → "").
-  // Custom-overlay CSS is NOT here — it persists via saveOverlayWithFallback,
-  // re-run through each panel's def.after (see appearance).
+  // Custom-overlay CSS clears via its normal opt-custom-css field reset above;
+  // it then persists because the reset handler runs saveAll() right after this
+  // (saveAll unconditionally calls saveOverlayWithFallback with the cleared value).
   function applyPanelReset(def, root) {
     for (const [id, val] of Object.entries(def.fields || {})) {
       const el = $id(id);

@@ -175,11 +175,8 @@ test("appearance def resets tag-sort-by-pop to on", () => {
   applyPanelReset(APPEARANCE_DEF, qsa);
   if (!$id("opt-tag-sort-by-pop").checked) throw new Error("tag-sort toggle not reset to on");
 });
-test("appearance def is in shipped PANEL_DEFAULTS", () => {
-  const live = window.__PBP_PANEL_DEFAULTS && window.__PBP_PANEL_DEFAULTS.appearance;
-  if (!live) throw new Error("no live appearance def (run inside options.js context)");
-  if (!("opt-custom-css" in live.fields)) throw new Error("shipped appearance.fields missing opt-custom-css");
-  if (!("opt-tag-sort-by-pop" in live.fields)) throw new Error("shipped appearance.fields missing opt-tag-sort-by-pop");
-});
+// NOTE: the "shipped PANEL_DEFAULTS coverage" assertion (reading
+// window.__PBP_PANEL_DEFAULTS) belongs to Task C6, which loads the real
+// shipped defaults; it cannot run in this bare page (no options.js context).
 </script>
 </body></html>
