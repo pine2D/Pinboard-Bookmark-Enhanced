@@ -72,6 +72,11 @@ async function loadLocale(loc) {
         /class="section-title"[^>]*data-i18n="secWayback"/.test(optHtml3));
   check('H3 options.html no longer has section-title data-i18n="optWayback"',
         !/class="section-title"[^>]*data-i18n="optWayback"/.test(optHtml3));
+  // H4: no literal U+2192 arrow in jinaAuthFailed (font-fallback risk)
+  for (const loc of LOCALES)
+    check(`H4 ${loc}.jinaAuthFailed has no U+2192`,
+          !(msgs[loc].jinaAuthFailed?.message || "").includes("→"),
+          `${loc}.jinaAuthFailed: ${JSON.stringify(msgs[loc].jinaAuthFailed?.message)}`);
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>

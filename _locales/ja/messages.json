@@ -1255,7 +1255,7 @@
     "message": "Jina Reader API で整形済み Markdown を取得します（ネットワーク必須、API キーは任意・より高いクォータに）。"
   },
   "jinaAuthFailed": {
-    "message": "Jina API キーが無効または期限切れです。設定 → Jina Reader で更新してください。"
+    "message": "Jina API キーが無効または期限切れです。設定 > Jina Reader で更新してください。"
   },
   "jinaFailedDetail": {
     "message": "Markdown の取得に失敗しました：$ERROR$",
@@ -1709,10 +1709,10 @@
   "archiveErrTimeoutHint": {
     "message": "リクエストがタイムアウトしました — archive.org が混雑しているかネットワークが遅い可能性があります"
   },
-  "tabTags":   {
+  "tabTags": {
     "message": "タグ"
   },
-  "tagGovOverview":   {
+  "tagGovOverview": {
     "message": "$TAGS$ 個のタグ · 合計 $USES$ 回の使用",
     "placeholders": {
       "tags": {
@@ -1723,64 +1723,64 @@
       }
     }
   },
-  "tagGovRefresh":   {
+  "tagGovRefresh": {
     "message": "更新"
   },
-  "tagGovGroupsTitle":   {
+  "tagGovGroupsTitle": {
     "message": "類似タググループ"
   },
-  "tagGovNoGroups":   {
+  "tagGovNoGroups": {
     "message": "重複したタグは見つかりません"
   },
-  "tagGovKindPlural":   {
+  "tagGovKindPlural": {
     "message": "単複数"
   },
-  "tagGovKindSeparator":   {
+  "tagGovKindSeparator": {
     "message": "区切り文字"
   },
-  "tagGovKindTypo":   {
+  "tagGovKindTypo": {
     "message": "タイプミス"
   },
-  "tagGovKindAi":   {
+  "tagGovKindAi": {
     "message": "AI"
   },
-  "tagGovMerge":   {
+  "tagGovMerge": {
     "message": "マージ"
   },
-  "tagGovIgnore":   {
+  "tagGovIgnore": {
     "message": "無視"
   },
-  "tagGovResetIgnored":   {
+  "tagGovResetIgnored": {
     "message": "無視をリセット"
   },
-  "tagGovResetIgnoredConfirm":   {
+  "tagGovResetIgnoredConfirm": {
     "message": "無視されたグループをクリアしてすべての重複を再表示しますか？"
   },
-  "tagGovAiBtn":   {
+  "tagGovAiBtn": {
     "message": "AI ディープ分析"
   },
-  "tagGovAiRunning":   {
+  "tagGovAiRunning": {
     "message": "分析中…"
   },
-  "tagGovAiNone":   {
+  "tagGovAiNone": {
     "message": "AI グループが見つかりません"
   },
-  "tagGovAiNoKey":   {
+  "tagGovAiNoKey": {
     "message": "AI プロバイダーが未設定です。AI タブで設定してください"
   },
-  "tagGovLowCountTitle":   {
+  "tagGovLowCountTitle": {
     "message": "低使用頻度タグ（1 回以下）"
   },
-  "tagGovSelectAll":   {
+  "tagGovSelectAll": {
     "message": "すべて選択"
   },
-  "tagGovDeleteSelected":   {
+  "tagGovDeleteSelected": {
     "message": "選択したものを削除"
   },
-  "tagGovNoLowCount":   {
+  "tagGovNoLowCount": {
     "message": "使用回数が1回以下のタグはありません。"
   },
-  "tagGovConfirmMerge":   {
+  "tagGovConfirmMerge": {
     "message": "$N$ 個のタグを $CANONICAL$ にマージしますか？",
     "placeholders": {
       "N": {
@@ -1791,7 +1791,7 @@
       }
     }
   },
-  "tagGovConfirmDelete":   {
+  "tagGovConfirmDelete": {
     "message": "選択した $N$ 個のタグを削除しますか？（永続的）",
     "placeholders": {
       "N": {
@@ -1799,7 +1799,7 @@
       }
     }
   },
-  "tagGovDoneSummary":   {
+  "tagGovDoneSummary": {
     "message": "タスク $OK$ 件完了 · $FAIL$ 件失敗",
     "placeholders": {
       "OK": {
@@ -1810,10 +1810,10 @@
       }
     }
   },
-  "tagGovAborted429":   {
+  "tagGovAborted429": {
     "message": "レート制限によりバッチを停止しました。完了済みの変更は保存されています。同じ統合を再実行すると安全に再開できます（更新済みのブックマークは自動でスキップされます）。"
   },
-  "tagGovMergeEstimate":   {
+  "tagGovMergeEstimate": {
     "message": "推定所要時間：約 $T$",
     "placeholders": {
       "T": {
@@ -1821,7 +1821,7 @@
       }
     }
   },
-  "tagGovRetagProgress":   {
+  "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ 件のブックマークを再タグ付け",
     "placeholders": {
       "DONE": {
@@ -1832,7 +1832,7 @@
       }
     }
   },
-  "tagGovSkippedSummary":   {
+  "tagGovSkippedSummary": {
     "message": "$N$ 件をスキップ（メモが長すぎて再保存できません）",
     "placeholders": {
       "N": {
@@ -1840,7 +1840,7 @@
       }
     }
   },
-  "tagGovOpLabel":   {
+  "tagGovOpLabel": {
     "message": "タスク $I$/$N$",
     "placeholders": {
       "I": {
@@ -1851,7 +1851,7 @@
       }
     }
   },
-  "tagGovQueuedBatches":   {
+  "tagGovQueuedBatches": {
     "message": "残り $N$ 件待機中",
     "placeholders": {
       "N": {
@@ -1859,22 +1859,22 @@
       }
     }
   },
-  "tagGovProblemsTitle":   {
+  "tagGovProblemsTitle": {
     "message": "手動での対応が必要なブックマーク:"
   },
-  "tagGovProblemFailed":   {
+  "tagGovProblemFailed": {
     "message": "失敗"
   },
-  "tagGovProblemSkipped":   {
+  "tagGovProblemSkipped": {
     "message": "スキップ（メモが長すぎます）"
   },
-  "tagGovProblemsSeeBelow":   {
+  "tagGovProblemsSeeBelow": {
     "message": "ページ下部で詳細を表示"
   },
-  "tagGovRateLimitWait":   {
+  "tagGovRateLimitWait": {
     "message": "レート制限中 — まもなく再試行します…"
   },
-  "tagGovQueuedCancelled":   {
+  "tagGovQueuedCancelled": {
     "message": "待機中の $N$ 件をキャンセルしました",
     "placeholders": {
       "N": {
@@ -1882,19 +1882,19 @@
       }
     }
   },
-  "tagGovStop":   {
+  "tagGovStop": {
     "message": "停止"
   },
-  "tagGovDismiss":   {
+  "tagGovDismiss": {
     "message": "閉じる"
   },
-  "tagGovStopped":   {
+  "tagGovStopped": {
     "message": "手動で停止しました。完了済みの変更は保存されています。"
   },
-  "tagGovQueuedBadge":   {
+  "tagGovQueuedBadge": {
     "message": "待機中…"
   },
-  "tagGovTimeLeft":   {
+  "tagGovTimeLeft": {
     "message": "残り約 $T$",
     "placeholders": {
       "T": {
@@ -1902,7 +1902,7 @@
       }
     }
   },
-  "tagGovLastRun":   {
+  "tagGovLastRun": {
     "message": "前回の実行（$D$）:",
     "placeholders": {
       "D": {
@@ -1910,43 +1910,43 @@
       }
     }
   },
-  "tagGovLoadFailed":   {
+  "tagGovLoadFailed": {
     "message": "タグを読み込めませんでした — Pinboard トークンまたはネットワークを確認して更新してください"
   },
-  "placeholderOptional":   {
+  "placeholderOptional": {
     "message": "任意"
   },
-  "tagGovSnapshotSaved":   {
+  "tagGovSnapshotSaved": {
     "message": "タグ一覧のスナップショットをダウンロードしました（名前と件数のみ。手動修復の参考用で、自動復元はできません）"
   },
-  "tagGovSnapshotFailed":   {
+  "tagGovSnapshotFailed": {
     "message": "スナップショットを作成できません — マージ/削除がブロックされています"
   },
-  "tagGovIrreversibleWarn":   {
+  "tagGovIrreversibleWarn": {
     "message": "統合と削除は元に戻せません。最初の変更前にタグ一覧のスナップショット（名前と件数のみ、手動修復の参考用）を自動ダウンロードします。"
   },
-  "tagGovBundlesWarn":   {
+  "tagGovBundlesWarn": {
     "message": "pinboard.in のタグバンドルは、名前変更によって自動更新されません — マージ後に手動で確認してください。"
   },
-  "optBgSaveMode":   {
+  "optBgSaveMode": {
     "message": "バックグラウンド保存モード"
   },
-  "optBgSaveModeMerge":   {
+  "optBgSaveModeMerge": {
     "message": "マージ（デフォルト — 新しいタグと既存タグを結合）"
   },
-  "optBgSaveModeSkip":   {
+  "optBgSaveModeSkip": {
     "message": "スキップ（URL が既に保存されている場合は何もしない）"
   },
-  "optBgSaveModeOverwrite":   {
+  "optBgSaveModeOverwrite": {
     "message": "上書き（すべてのタグを置換、マージしない）"
   },
-  "optBgSaveModeHint":   {
+  "optBgSaveModeHint": {
     "message": "マージ：既存のブックマークタグを読み込み、新しいタグと結合します。スキップ：重複 URL の保存を避けます。上書き：タグを完全に置換します（フォアグラウンド編集は常に置換）。"
   },
-  "bgSkippedTitle":   {
+  "bgSkippedTitle": {
     "message": "既にブックマーク済み"
   },
-  "bgSkippedExists":   {
+  "bgSkippedExists": {
     "message": "既にブックマークされています — 保存がスキップされました"
   },
   "secPreviewAi": {
@@ -2009,14 +2009,20 @@
   "trProgress": {
     "message": "$DONE$ / $TOTAL$ セグメント",
     "placeholders": {
-      "done": { "content": "$1" },
-      "total": { "content": "$2" }
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
     }
   },
   "trTargetLang": {
     "message": "翻訳先: $LANG$",
     "placeholders": {
-      "lang": { "content": "$1" }
+      "lang": {
+        "content": "$1"
+      }
     }
   },
   "trChangeLang": {
@@ -2025,7 +2031,9 @@
   "trDone": {
     "message": "翻訳完了 · $COUNT$ 件",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "trStop": {
@@ -2046,8 +2054,12 @@
   "trEstCost": {
     "message": "約 ~$COUNT$ tokens · $MODEL$",
     "placeholders": {
-      "count": { "content": "$1" },
-      "model": { "content": "$2" }
+      "count": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
     }
   },
   "trBlockFailed": {

@@ -1255,7 +1255,7 @@
     "message": "透過 Jina Reader API 取得清洗過的 Markdown（需網絡；可選填 API Key 以獲得更高配額）。"
   },
   "jinaAuthFailed": {
-    "message": "Jina API Key 無效或已過期，請到 設定 → Jina Reader 中更新。"
+    "message": "Jina API Key 無效或已過期，請到 設定 > Jina Reader 中更新。"
   },
   "jinaFailedDetail": {
     "message": "Markdown 抓取失敗：$ERROR$",

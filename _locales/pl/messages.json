@@ -1255,7 +1255,7 @@
     "message": "Pobiera oczyszczony Markdown przez Jina Reader API (wymaga sieci; klucz API opcjonalny dla wyższego limitu)."
   },
   "jinaAuthFailed": {
-    "message": "Klucz API Jina jest nieprawidłowy lub wygasł. Otwórz Ustawienia → Jina Reader, aby go zaktualizować."
+    "message": "Klucz API Jina jest nieprawidłowy lub wygasł. Otwórz Ustawienia > Jina Reader, aby go zaktualizować."
   },
   "jinaFailedDetail": {
     "message": "Pobieranie Markdown nie powiodło się: $ERROR$",

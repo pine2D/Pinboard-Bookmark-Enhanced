@@ -1255,7 +1255,7 @@
     "message": "通过 Jina Reader API 获取清洗过的 Markdown（需联网；可选填 API Key 以获得更高配额）。"
   },
   "jinaAuthFailed": {
-    "message": "Jina API Key 无效或已过期，请到 设置 → Jina Reader 中更新。"
+    "message": "Jina API Key 无效或已过期，请到 设置 > Jina Reader 中更新。"
   },
   "jinaFailedDetail": {
     "message": "Markdown 抓取失败：$ERROR$",
@@ -1709,10 +1709,10 @@
   "archiveErrTimeoutHint": {
     "message": "请求超时 — archive.org 繁忙或网络缓慢"
   },
-  "tabTags":   {
+  "tabTags": {
     "message": "标签"
   },
-  "tagGovOverview":   {
+  "tagGovOverview": {
     "message": "$TAGS$ 个标签 · 共 $USES$ 次使用",
     "placeholders": {
       "tags": {
@@ -1723,64 +1723,64 @@
       }
     }
   },
-  "tagGovRefresh":   {
+  "tagGovRefresh": {
     "message": "刷新"
   },
-  "tagGovGroupsTitle":   {
+  "tagGovGroupsTitle": {
     "message": "近似标签组"
   },
-  "tagGovNoGroups":   {
+  "tagGovNoGroups": {
     "message": "未检测到重复标签"
   },
-  "tagGovKindPlural":   {
+  "tagGovKindPlural": {
     "message": "单复数"
   },
-  "tagGovKindSeparator":   {
+  "tagGovKindSeparator": {
     "message": "分隔符"
   },
-  "tagGovKindTypo":   {
+  "tagGovKindTypo": {
     "message": "笔误"
   },
-  "tagGovKindAi":   {
+  "tagGovKindAi": {
     "message": "AI"
   },
-  "tagGovMerge":   {
+  "tagGovMerge": {
     "message": "合并"
   },
-  "tagGovIgnore":   {
+  "tagGovIgnore": {
     "message": "忽略"
   },
-  "tagGovResetIgnored":   {
+  "tagGovResetIgnored": {
     "message": "重置忽略列表"
   },
-  "tagGovResetIgnoredConfirm":   {
+  "tagGovResetIgnoredConfirm": {
     "message": "清除被忽略的组，重新显示所有重复项？"
   },
-  "tagGovAiBtn":   {
+  "tagGovAiBtn": {
     "message": "AI 深度分析"
   },
-  "tagGovAiRunning":   {
+  "tagGovAiRunning": {
     "message": "分析中…"
   },
-  "tagGovAiNone":   {
+  "tagGovAiNone": {
     "message": "AI 未发现重复项"
   },
-  "tagGovAiNoKey":   {
+  "tagGovAiNoKey": {
     "message": "未配置 AI 提供商——请前往 AI 标签页设置"
   },
-  "tagGovLowCountTitle":   {
+  "tagGovLowCountTitle": {
     "message": "低频标签（1 次或更少）"
   },
-  "tagGovSelectAll":   {
+  "tagGovSelectAll": {
     "message": "全选"
   },
-  "tagGovDeleteSelected":   {
+  "tagGovDeleteSelected": {
     "message": "删除所选"
   },
-  "tagGovNoLowCount":   {
+  "tagGovNoLowCount": {
     "message": "没有使用次数为 1 或更少的标签。"
   },
-  "tagGovConfirmMerge":   {
+  "tagGovConfirmMerge": {
     "message": "合并 $N$ 个标签到 $CANONICAL$？",
     "placeholders": {
       "N": {
@@ -1791,7 +1791,7 @@
       }
     }
   },
-  "tagGovConfirmDelete":   {
+  "tagGovConfirmDelete": {
     "message": "删除 $N$ 个标签？（永久操作）",
     "placeholders": {
       "N": {
@@ -1799,7 +1799,7 @@
       }
     }
   },
-  "tagGovDoneSummary":   {
+  "tagGovDoneSummary": {
     "message": "$OK$ 个任务完成 · $FAIL$ 个任务失败",
     "placeholders": {
       "OK": {
@@ -1810,10 +1810,10 @@
       }
     }
   },
-  "tagGovAborted429":   {
+  "tagGovAborted429": {
     "message": "已限流，批次停止，已完成的更改保留。重新运行同一合并可安全续传（已改完的书签会自动跳过）。"
   },
-  "tagGovMergeEstimate":   {
+  "tagGovMergeEstimate": {
     "message": "预计耗时：约 $T$",
     "placeholders": {
       "T": {
@@ -1821,7 +1821,7 @@
       }
     }
   },
-  "tagGovRetagProgress":   {
+  "tagGovRetagProgress": {
     "message": "已重打标签 $DONE$/$TOTAL$ 个书签",
     "placeholders": {
       "DONE": {
@@ -1832,7 +1832,7 @@
       }
     }
   },
-  "tagGovSkippedSummary":   {
+  "tagGovSkippedSummary": {
     "message": "跳过 $N$ 条（备注过长，无法重新保存）",
     "placeholders": {
       "N": {
@@ -1840,7 +1840,7 @@
       }
     }
   },
-  "tagGovOpLabel":   {
+  "tagGovOpLabel": {
     "message": "任务 $I$/$N$",
     "placeholders": {
       "I": {
@@ -1851,7 +1851,7 @@
       }
     }
   },
-  "tagGovQueuedBatches":   {
+  "tagGovQueuedBatches": {
     "message": "还有 $N$ 批排队",
     "placeholders": {
       "N": {
@@ -1859,22 +1859,22 @@
       }
     }
   },
-  "tagGovProblemsTitle":   {
+  "tagGovProblemsTitle": {
     "message": "需手动处理的书签："
   },
-  "tagGovProblemFailed":   {
+  "tagGovProblemFailed": {
     "message": "失败"
   },
-  "tagGovProblemSkipped":   {
+  "tagGovProblemSkipped": {
     "message": "跳过（备注过长）"
   },
-  "tagGovProblemsSeeBelow":   {
+  "tagGovProblemsSeeBelow": {
     "message": "查看页面底部详情"
   },
-  "tagGovRateLimitWait":   {
+  "tagGovRateLimitWait": {
     "message": "已限流，稍候自动重试…"
   },
-  "tagGovQueuedCancelled":   {
+  "tagGovQueuedCancelled": {
     "message": "已取消 $N$ 个排队批次",
     "placeholders": {
       "N": {
@@ -1882,19 +1882,19 @@
       }
     }
   },
-  "tagGovStop":   {
+  "tagGovStop": {
     "message": "停止"
   },
-  "tagGovDismiss":   {
+  "tagGovDismiss": {
     "message": "关闭"
   },
-  "tagGovStopped":   {
+  "tagGovStopped": {
     "message": "已手动停止，已完成的更改保留。"
   },
-  "tagGovQueuedBadge":   {
+  "tagGovQueuedBadge": {
     "message": "排队中…"
   },
-  "tagGovTimeLeft":   {
+  "tagGovTimeLeft": {
     "message": "约剩 $T$",
     "placeholders": {
       "T": {
@@ -1902,7 +1902,7 @@
       }
     }
   },
-  "tagGovLastRun":   {
+  "tagGovLastRun": {
     "message": "上次运行（$D$）：",
     "placeholders": {
       "D": {
@@ -1910,43 +1910,43 @@
       }
     }
   },
-  "tagGovLoadFailed":   {
+  "tagGovLoadFailed": {
     "message": "无法加载标签——请检查 Pinboard token 或网络后点刷新"
   },
-  "placeholderOptional":   {
+  "placeholderOptional": {
     "message": "可选"
   },
-  "tagGovSnapshotSaved":   {
+  "tagGovSnapshotSaved": {
     "message": "已下载标签清单快照（仅含标签名和数量，供手工修复参考，不能自动还原）"
   },
-  "tagGovSnapshotFailed":   {
+  "tagGovSnapshotFailed": {
     "message": "无法生成快照 — 合并/删除已阻止"
   },
-  "tagGovIrreversibleWarn":   {
+  "tagGovIrreversibleWarn": {
     "message": "合并和删除操作不可撤销。第一次修改前会自动下载你的标签清单快照（仅含标签名和数量，供手工修复参考）。"
   },
-  "tagGovBundlesWarn":   {
+  "tagGovBundlesWarn": {
     "message": "Pinboard.in 上的标签束不会跟随重命名自动更新 — 合并后请手动检查。"
   },
-  "optBgSaveMode":   {
+  "optBgSaveMode": {
     "message": "后台保存模式"
   },
-  "optBgSaveModeMerge":   {
+  "optBgSaveModeMerge": {
     "message": "合并（默认 — 新标签与现有标签合并）"
   },
-  "optBgSaveModeSkip":   {
+  "optBgSaveModeSkip": {
     "message": "跳过（如果网址已保存则不操作）"
   },
-  "optBgSaveModeOverwrite":   {
+  "optBgSaveModeOverwrite": {
     "message": "覆盖（完全替换标签，不合并）"
   },
-  "optBgSaveModeHint":   {
+  "optBgSaveModeHint": {
     "message": "合并：读取已有书签标签并与新标签合并。跳过：避免保存重复网址。覆盖：完全替换标签（前台编辑始终替换）。"
   },
-  "bgSkippedTitle":   {
+  "bgSkippedTitle": {
     "message": "已收藏"
   },
-  "bgSkippedExists":   {
+  "bgSkippedExists": {
     "message": "已收藏过 — 保存已跳过"
   },
   "secPreviewAi": {
@@ -2009,14 +2009,20 @@
   "trProgress": {
     "message": "$DONE$ / $TOTAL$ 段",
     "placeholders": {
-      "done": { "content": "$1" },
-      "total": { "content": "$2" }
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
     }
   },
   "trTargetLang": {
     "message": "目标语言：$LANG$",
     "placeholders": {
-      "lang": { "content": "$1" }
+      "lang": {
+        "content": "$1"
+      }
     }
   },
   "trChangeLang": {
@@ -2025,7 +2031,9 @@
   "trDone": {
     "message": "翻译完成 · $COUNT$ 段",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "trStop": {
@@ -2046,8 +2054,12 @@
   "trEstCost": {
     "message": "约 ~$COUNT$ tokens · $MODEL$",
     "placeholders": {
-      "count": { "content": "$1" },
-      "model": { "content": "$2" }
+      "count": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
     }
   },
   "trBlockFailed": {

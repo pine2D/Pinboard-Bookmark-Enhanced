@@ -1255,7 +1255,7 @@
     "message": "Получение очищенного Markdown через API Jina Reader (требуется сеть; API-ключ опционален для большего лимита)."
   },
   "jinaAuthFailed": {
-    "message": "API-ключ Jina недействителен или просрочен. Откройте Настройки → Jina Reader, чтобы обновить его."
+    "message": "API-ключ Jina недействителен или просрочен. Откройте Настройки > Jina Reader, чтобы обновить его."
   },
   "jinaFailedDetail": {
     "message": "Не удалось получить Markdown: $ERROR$",

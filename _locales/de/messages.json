@@ -1255,7 +1255,7 @@
     "message": "Bereinigtes Markdown über die Jina Reader API abrufen (Netzwerk erforderlich; API-Schlüssel optional für höheres Kontingent)."
   },
   "jinaAuthFailed": {
-    "message": "Jina API-Schlüssel ist ungültig oder abgelaufen. Öffne Einstellungen → Jina Reader, um ihn zu aktualisieren."
+    "message": "Jina API-Schlüssel ist ungültig oder abgelaufen. Öffne Einstellungen > Jina Reader, um ihn zu aktualisieren."
   },
   "jinaFailedDetail": {
     "message": "Markdown-Abruf fehlgeschlagen: $ERROR$",

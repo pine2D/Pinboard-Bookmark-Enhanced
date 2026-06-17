@@ -1255,7 +1255,7 @@
     "message": "Fetch cleaned Markdown via Jina Reader API (requires network; API key optional for higher quota)."
   },
   "jinaAuthFailed": {
-    "message": "Jina API key is invalid or expired. Open Settings → Jina Reader to update it."
+    "message": "Jina API key is invalid or expired. Open Settings > Jina Reader to update it."
   },
   "jinaFailedDetail": {
     "message": "Markdown fetch failed: $ERROR$",
@@ -1709,10 +1709,10 @@
   "archiveErrTimeoutHint": {
     "message": "the request timed out - archive.org may be busy or the network slow"
   },
-  "tabTags":   {
+  "tabTags": {
     "message": "Tags"
   },
-  "tagGovOverview":   {
+  "tagGovOverview": {
     "message": "$TAGS$ tags · $USES$ total uses",
     "placeholders": {
       "tags": {
@@ -1723,64 +1723,64 @@
       }
     }
   },
-  "tagGovRefresh":   {
+  "tagGovRefresh": {
     "message": "Refresh"
   },
-  "tagGovGroupsTitle":   {
+  "tagGovGroupsTitle": {
     "message": "Similar Tag Groups"
   },
-  "tagGovNoGroups":   {
+  "tagGovNoGroups": {
     "message": "No duplicate tags found"
   },
-  "tagGovKindPlural":   {
+  "tagGovKindPlural": {
     "message": "plural"
   },
-  "tagGovKindSeparator":   {
+  "tagGovKindSeparator": {
     "message": "separator"
   },
-  "tagGovKindTypo":   {
+  "tagGovKindTypo": {
     "message": "typo"
   },
-  "tagGovKindAi":   {
+  "tagGovKindAi": {
     "message": "AI"
   },
-  "tagGovMerge":   {
+  "tagGovMerge": {
     "message": "Merge"
   },
-  "tagGovIgnore":   {
+  "tagGovIgnore": {
     "message": "Ignore"
   },
-  "tagGovResetIgnored":   {
+  "tagGovResetIgnored": {
     "message": "Reset ignored list"
   },
-  "tagGovResetIgnoredConfirm":   {
+  "tagGovResetIgnoredConfirm": {
     "message": "Clear ignored groups and re-show all duplicates?"
   },
-  "tagGovAiBtn":   {
+  "tagGovAiBtn": {
     "message": "AI deep analysis"
   },
-  "tagGovAiRunning":   {
+  "tagGovAiRunning": {
     "message": "Analyzing..."
   },
-  "tagGovAiNone":   {
+  "tagGovAiNone": {
     "message": "No AI groups found"
   },
-  "tagGovAiNoKey":   {
+  "tagGovAiNoKey": {
     "message": "No AI provider configured - set one up in the AI tab"
   },
-  "tagGovLowCountTitle":   {
+  "tagGovLowCountTitle": {
     "message": "Low-count tags (1 use or fewer)"
   },
-  "tagGovSelectAll":   {
+  "tagGovSelectAll": {
     "message": "Select all"
   },
-  "tagGovDeleteSelected":   {
+  "tagGovDeleteSelected": {
     "message": "Delete selected"
   },
-  "tagGovNoLowCount":   {
+  "tagGovNoLowCount": {
     "message": "No tags with 1 use or fewer."
   },
-  "tagGovConfirmMerge":   {
+  "tagGovConfirmMerge": {
     "message": "Merge $N$ tags into $CANONICAL$?",
     "placeholders": {
       "N": {
@@ -1791,7 +1791,7 @@
       }
     }
   },
-  "tagGovConfirmDelete":   {
+  "tagGovConfirmDelete": {
     "message": "Delete $N$ selected tags? (permanent)",
     "placeholders": {
       "N": {
@@ -1799,7 +1799,7 @@
       }
     }
   },
-  "tagGovDoneSummary":   {
+  "tagGovDoneSummary": {
     "message": "$OK$ tasks completed · $FAIL$ failed",
     "placeholders": {
       "OK": {
@@ -1810,10 +1810,10 @@
       }
     }
   },
-  "tagGovAborted429":   {
+  "tagGovAborted429": {
     "message": "Rate-limited — batch stopped, completed items saved. Re-running the same merge resumes safely (already-updated bookmarks are skipped)."
   },
-  "tagGovMergeEstimate":   {
+  "tagGovMergeEstimate": {
     "message": "Estimated time: ~$T$",
     "placeholders": {
       "T": {
@@ -1821,7 +1821,7 @@
       }
     }
   },
-  "tagGovRetagProgress":   {
+  "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ bookmarks retagged",
     "placeholders": {
       "DONE": {
@@ -1832,7 +1832,7 @@
       }
     }
   },
-  "tagGovSkippedSummary":   {
+  "tagGovSkippedSummary": {
     "message": "$N$ skipped (note too long to re-save)",
     "placeholders": {
       "N": {
@@ -1840,7 +1840,7 @@
       }
     }
   },
-  "tagGovOpLabel":   {
+  "tagGovOpLabel": {
     "message": "Task $I$/$N$",
     "placeholders": {
       "I": {
@@ -1851,7 +1851,7 @@
       }
     }
   },
-  "tagGovQueuedBatches":   {
+  "tagGovQueuedBatches": {
     "message": "$N$ more queued",
     "placeholders": {
       "N": {
@@ -1859,22 +1859,22 @@
       }
     }
   },
-  "tagGovProblemsTitle":   {
+  "tagGovProblemsTitle": {
     "message": "Bookmarks needing manual editing:"
   },
-  "tagGovProblemFailed":   {
+  "tagGovProblemFailed": {
     "message": "failed"
   },
-  "tagGovProblemSkipped":   {
+  "tagGovProblemSkipped": {
     "message": "skipped (note too long)"
   },
-  "tagGovProblemsSeeBelow":   {
+  "tagGovProblemsSeeBelow": {
     "message": "view details below"
   },
-  "tagGovRateLimitWait":   {
+  "tagGovRateLimitWait": {
     "message": "Rate-limited — waiting to retry…"
   },
-  "tagGovQueuedCancelled":   {
+  "tagGovQueuedCancelled": {
     "message": "$N$ queued tasks cancelled",
     "placeholders": {
       "N": {
@@ -1882,19 +1882,19 @@
       }
     }
   },
-  "tagGovStop":   {
+  "tagGovStop": {
     "message": "Stop"
   },
-  "tagGovDismiss":   {
+  "tagGovDismiss": {
     "message": "Dismiss"
   },
-  "tagGovStopped":   {
+  "tagGovStopped": {
     "message": "Stopped — completed changes are saved."
   },
-  "tagGovQueuedBadge":   {
+  "tagGovQueuedBadge": {
     "message": "Queued…"
   },
-  "tagGovTimeLeft":   {
+  "tagGovTimeLeft": {
     "message": "about $T$ left",
     "placeholders": {
       "T": {
@@ -1902,7 +1902,7 @@
       }
     }
   },
-  "tagGovLastRun":   {
+  "tagGovLastRun": {
     "message": "Last run ($D$):",
     "placeholders": {
       "D": {
@@ -1910,43 +1910,43 @@
       }
     }
   },
-  "tagGovLoadFailed":   {
+  "tagGovLoadFailed": {
     "message": "Could not load tags — check your Pinboard token or network, then Refresh"
   },
-  "placeholderOptional":   {
+  "placeholderOptional": {
     "message": "optional"
   },
-  "tagGovSnapshotSaved":   {
+  "tagGovSnapshotSaved": {
     "message": "Tag list snapshot downloaded (names and counts — reference for manual repair, not an automatic restore)"
   },
-  "tagGovSnapshotFailed":   {
+  "tagGovSnapshotFailed": {
     "message": "Could not create snapshot — merge/delete blocked"
   },
-  "tagGovIrreversibleWarn":   {
+  "tagGovIrreversibleWarn": {
     "message": "Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change — for manual reference only."
   },
-  "tagGovBundlesWarn":   {
+  "tagGovBundlesWarn": {
     "message": "Tag bundles on pinboard.in are not updated by renames — review them manually after merging."
   },
-  "optBgSaveMode":   {
+  "optBgSaveMode": {
     "message": "Background save mode"
   },
-  "optBgSaveModeMerge":   {
+  "optBgSaveModeMerge": {
     "message": "Merge (default — combine new tags with existing)"
   },
-  "optBgSaveModeSkip":   {
+  "optBgSaveModeSkip": {
     "message": "Skip (if URL already saved, do nothing)"
   },
-  "optBgSaveModeOverwrite":   {
+  "optBgSaveModeOverwrite": {
     "message": "Overwrite (replace all tags, no merge)"
   },
-  "optBgSaveModeHint":   {
+  "optBgSaveModeHint": {
     "message": "Merge: reads existing bookmark tags and combines with new tags. Skip: avoids duplicate-URL saves. Overwrite: replaces tags entirely (foreground edits always replace)."
   },
-  "bgSkippedTitle":   {
+  "bgSkippedTitle": {
     "message": "Already bookmarked"
   },
-  "bgSkippedExists":   {
+  "bgSkippedExists": {
     "message": "Already bookmarked — save skipped"
   },
   "secPreviewAi": {
@@ -2009,14 +2009,20 @@
   "trProgress": {
     "message": "$DONE$ / $TOTAL$ segments",
     "placeholders": {
-      "done": { "content": "$1" },
-      "total": { "content": "$2" }
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
     }
   },
   "trTargetLang": {
     "message": "Target: $LANG$",
     "placeholders": {
-      "lang": { "content": "$1" }
+      "lang": {
+        "content": "$1"
+      }
     }
   },
   "trChangeLang": {
@@ -2025,7 +2031,9 @@
   "trDone": {
     "message": "Done · $COUNT$ segments",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "trStop": {
@@ -2046,8 +2054,12 @@
   "trEstCost": {
     "message": "About ~$COUNT$ tokens · $MODEL$",
     "placeholders": {
-      "count": { "content": "$1" },
-      "model": { "content": "$2" }
+      "count": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
     }
   },
   "trBlockFailed": {

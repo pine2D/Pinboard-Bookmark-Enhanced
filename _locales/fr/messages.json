@@ -1255,7 +1255,7 @@
     "message": "Récupérer le Markdown nettoyé via l'API Jina Reader (réseau requis ; clé API optionnelle pour un quota plus élevé)."
   },
   "jinaAuthFailed": {
-    "message": "La clé API Jina est invalide ou expirée. Ouvrez Paramètres → Jina Reader pour la mettre à jour."
+    "message": "La clé API Jina est invalide ou expirée. Ouvrez Paramètres > Jina Reader pour la mettre à jour."
   },
   "jinaFailedDetail": {
     "message": "Échec de récupération Markdown : $ERROR$",
