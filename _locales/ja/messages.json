@@ -775,7 +775,10 @@
   },
   "importInvalid": {
     "message": "無効なファイル"
-  },
+  },,
+  "importPartial": {
+    "message": "インポート完了 — テーマはローカルに保存されました（同期容量超過）；リロードで反映"
+  }
   "secQuickSave": {
     "message": "クイック保存"
   },

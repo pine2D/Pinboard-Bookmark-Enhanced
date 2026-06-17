@@ -4,6 +4,16 @@
 // Schema-version aware: v2 backups use customOverlayCSS, v1 uses customCSS.
 // ============================================================
 
+// Classify a syncSetLarge("savedThemes") failure during import.
+// Quota errors mean the data WAS preserved to local (syncSetLarge's fallback),
+// so report partial success — not the misleading generic "Invalid file".
+// Returns a t() key, or null to signal "rethrow as a genuine import failure".
+function importThemesResult(err) {
+  if (!err) return "importedReload";
+  if (/QUOTA|quota/i.test(err.message || "")) return "importPartial";
+  return null;
+}
+
 function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
   $id("export-settings").addEventListener("click", async () => {
     const raw = await (await getSettingsStorage()).get(exportableKeys);
@@ -71,9 +81,19 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
         await saveOverlayWithFallback(newOverlay);
       }
 
-      if (importedThemes !== undefined) await syncSetLarge("savedThemes", importedThemes);
+      let themesStatusKey = "importedReload";
+      if (importedThemes !== undefined) {
+        try {
+          await syncSetLarge("savedThemes", importedThemes);
+        } catch (e) {
+          const key = importThemesResult(e);
+          // null sentinel = non-quota failure → let the outer catch handle it.
+          if (key === null) throw e;
+          themesStatusKey = key; // "importPartial": data preserved to local by syncSetLarge fallback
+        }
+      }
       const status = $id("import-status");
-      setStatusIcon(status, true, t("importedReload"));
+      setStatusIcon(status, themesStatusKey === "importPartial" ? false : true, t(themesStatusKey));
       setTimeout(() => { status.textContent = ""; }, 3000);
     } catch (err) {
       console.error("[import] failed", err);

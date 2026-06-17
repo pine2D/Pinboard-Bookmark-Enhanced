@@ -775,7 +775,10 @@
   },
   "importInvalid": {
     "message": "Invalid file"
-  },
+  },,
+  "importPartial": {
+    "message": "Imported — themes saved locally (sync quota full); reload to see changes"
+  }
   "secQuickSave": {
     "message": "Quick Save"
   },

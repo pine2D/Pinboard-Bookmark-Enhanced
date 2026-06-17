@@ -9,6 +9,7 @@ body { font-family: monospace; padding: 16px; max-width: 900px; }
 <h1>Settings persistence robustness tests</h1>
 <div id="results"></div>
 <script src="../shared.js"></script>
+<script src="../options-backup.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -50,6 +51,14 @@ async function run() {
   catch (_) { threw = true; }
   check("E1 quota reject does NOT throw out of persistSettings", threw === false);
   check("E1 quota reject reported as not-ok", r2 && r2.ok === false && /quota/i.test(r2.error.message));
+
+  // ---------- E2: savedThemes import quota classification ----------
+  // importThemesResult(err|null) maps the syncSetLarge outcome to a status key.
+  check("E2 no error → importedReload", importThemesResult(null) === "importedReload");
+  check("E2 quota error → importPartial (not importInvalid)",
+        importThemesResult(new Error("QUOTA_BYTES_PER_ITEM quota exceeded")) === "importPartial");
+  check("E2 non-quota error rethrows (returns null sentinel)",
+        importThemesResult(new SyntaxError("bad json")) === null);
 
   const summary = document.createElement("h2");
   summary.textContent = `Results: ${pass} pass, ${fail} fail`;

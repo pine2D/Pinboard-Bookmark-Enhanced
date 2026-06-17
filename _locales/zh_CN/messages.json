@@ -775,7 +775,10 @@
   },
   "importInvalid": {
     "message": "文件格式无效"
-  },
+  },,
+  "importPartial": {
+    "message": "已导入 — 主题已保存到本地（同步配额已满）；刷新页面后生效"
+  }
   "secQuickSave": {
     "message": "快速保存"
   },

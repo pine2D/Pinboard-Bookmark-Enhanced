@@ -775,7 +775,10 @@
   },
   "importInvalid": {
     "message": "Fichier invalide"
-  },
+  },,
+  "importPartial": {
+    "message": "Importé — thèmes sauvegardés localement (quota sync plein); rechargez"
+  }
   "secQuickSave": {
     "message": "Enregistrement rapide"
   },

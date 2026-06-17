@@ -775,7 +775,10 @@
   },
   "importInvalid": {
     "message": "Nieprawidłowy plik"
-  },
+  },,
+  "importPartial": {
+    "message": "Zaimportowano — motywy zapisane lokalnie (limit sync pełny); odśwież"
+  }
   "secQuickSave": {
     "message": "Szybki zapis"
   },
