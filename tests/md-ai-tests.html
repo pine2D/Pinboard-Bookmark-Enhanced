@@ -1103,6 +1103,84 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
 })();
 </script>
 <script>
+// ============ Group K2: per-block retry passes a fresh, abortable signal ============
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "_pbpTrTranslateBlock / _pbpTrRetryBlock signal (async)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  if (typeof _pbpTrTranslateBlock !== "function" || typeof _pbpTrRetryBlock !== "function") {
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP _pbpTrRetryBlock suite (not loaded)";
+    host.appendChild(div); SKIP++; return;
+  }
+
+  // Minimal st: _pbpTrTranslateBlock reads s, target.name, title, translateGlossary.
+  function makeSt() {
+    return {
+      s: { aiProvider: "gemini", geminiApiKey: "k", translateGlossary: "" },
+      target: { name: "Simplified Chinese", code: "zh-CN" },
+      title: "T", url: "https://a.test/x", modelKey: "m",
+      work: [], trMd: {}
+    };
+  }
+  const w = { n: 1, hash: "h1", shielded: { text: "hello world" } };
+
+  await atest("_pbpTrTranslateBlock forwards the signal to callAIStream opts", async () => {
+    const realStream = window.callAIStream;
+    let seenSignal = "ABSENT";
+    window.callAIStream = async (s, prompt, opts) => {
+      seenSignal = ("signal" in opts) ? opts.signal : "ABSENT";
+      // emit a valid translation for id 1 via the parser the caller wires
+      return '{"translations":[{"id":1,"text":"你好世界你好"}]}';
+    };
+    try {
+      const ctrl = new AbortController();
+      await _pbpTrTranslateBlock(makeSt(), w, ctrl.signal);
+      if (seenSignal === "ABSENT") throw new Error("opts.signal not passed to callAIStream");
+      if (seenSignal !== ctrl.signal) throw new Error("a DIFFERENT signal was passed");
+    } finally { window.callAIStream = realStream; }
+  });
+
+  await atest("_pbpTrRetryBlock uses a fresh signal, not the (possibly aborted) st.ctrl", async () => {
+    const realStream = window.callAIStream;
+    const prevChrome = window.chrome;
+    let seenSignal = "ABSENT", abortedAtCall = "n/a";
+    window.callAIStream = async (s, prompt, opts) => {
+      seenSignal = ("signal" in opts) ? opts.signal : "ABSENT";
+      abortedAtCall = seenSignal && typeof seenSignal === "object" ? seenSignal.aborted : "no-signal";
+      return '{"translations":[{"id":1,"text":"你好世界你好"}]}';
+    };
+    // _pbpTrRetryBlock success path calls _pbpTrShowViewToggle → t() → chrome.i18n.getMessage.
+    // Stub chrome.i18n so the test harness (no extension context) doesn't throw.
+    window.chrome = { i18n: { getMessage: () => "" } };
+    const st = makeSt();
+    st.ctrl = new AbortController();
+    st.ctrl.abort();                       // simulate a finished/stopped main run
+    const btn = document.createElement("button");
+    try {
+      await _pbpTrRetryBlock(st, w, btn);
+      if (seenSignal === "ABSENT") throw new Error("retry passed no signal");
+      if (seenSignal === st.ctrl.signal) throw new Error("retry reused the aborted st.ctrl");
+      if (abortedAtCall !== false) throw new Error("retry's signal was already aborted at call time");
+    } finally {
+      window.callAIStream = realStream;
+      window.chrome = prevChrome;
+    }
+  });
+})();
+</script>
+<script>
 // ============ Task 11: view composition + lang resolution ============
 suiteIf("pbpTrResolveTargetLang / entry visibility", "pbpTrResolveTargetLang", () => {
   test("auto follows the passed UI language; display localized, prompt name English", () => {

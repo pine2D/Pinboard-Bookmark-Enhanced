@@ -705,7 +705,7 @@ function _pbpTrMarkFailed(st, w, message) {
 // translation never truncates at the output cap. Returns the (still-shielded)
 // translation; throws on an invalid/failed part. Parts reassemble in order with
 // their original separators.
-async function _pbpTrTranslateBlock(st, w) {
+async function _pbpTrTranslateBlock(st, w, signal) {
   const glossary = pbpTrParseGlossary(st.s.translateGlossary);
   const split = w.shielded.text.length <= PBP_TR_PART_LIMIT
     ? { chunks: [w.shielded.text], seps: [""] }
@@ -720,7 +720,7 @@ async function _pbpTrTranslateBlock(st, w) {
     const parser = pbpAiMakeStreamJsonParser((it) => { if (it.id === w.n) got = it.text; });
     const full = await callAIStream(st.s, prompt, {
       system, model: pbpAiResolveModelOverride(st.s),
-      temperature: 0.1, noThinking: true,
+      temperature: 0.1, noThinking: true, signal,
       maxTokens: Math.min(8192, Math.max(1024, pbpAiEstimateTokens(split.chunks[i].length) * 3))
     }, (d, acc) => parser.push(acc));
     parser.finish(full);
@@ -735,8 +735,14 @@ async function _pbpTrTranslateBlock(st, w) {
 async function _pbpTrRetryBlock(st, w, btn) {
   if (btn.disabled) return;
   btn.disabled = true;
+  // Fresh controller: the run-level st.ctrl may already be aborted (Stop /
+  // pagehide on the main run), and reusing it would abort this retry instantly.
+  // Wire pagehide so a retry started after the run still cancels on unload.
+  const ctrl = new AbortController();
+  const onHide = () => ctrl.abort();
+  window.addEventListener("pagehide", onHide, { once: true });
   try {
-    const got = await _pbpTrTranslateBlock(st, w);
+    const got = await _pbpTrTranslateBlock(st, w, ctrl.signal);
     btn.remove();
     _pbpTrFill(st, w, got);
     const one = {};
@@ -747,6 +753,8 @@ async function _pbpTrRetryBlock(st, w, btn) {
   } catch (e) {
     btn.disabled = false;
     btn.title = t("trBlockFailed") + " - " + String((e && e.message) || "");
+  } finally {
+    window.removeEventListener("pagehide", onHide);
   }
 }
 
