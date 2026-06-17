@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Tag Gov Layout Tests</title>
 <link rel="stylesheet" href="../options.css">
+<link rel="stylesheet" href="../popup.css">
 <style>
   .case.pass { color: #0a0; }
   .case.fail { color: #c00; font-weight: bold; }
@@ -67,6 +68,20 @@ test("non-card child spans the full grid width", () => {
   // A single 280px-min column is ~321px at 650px; a full-span child must be much wider.
   const w = groupsEmptyProbe.offsetWidth;
   if (w < 500) throw new Error("expected full-width (~650px) span, got " + w);
+});
+
+// --- J2: tag drag-handle uses CSS grip dots, no U+22EE glyph ---
+test("tag-drag-handle carries no U+22EE glyph and paints via CSS", function () {
+  const handle = document.createElement("span");
+  handle.className = "tag-drag-handle";
+  handle.setAttribute("aria-hidden", "true");
+  // NOTE: no textContent assignment — matches the post-fix renderTags.
+  document.getElementById("fixture").appendChild(handle);
+  if (handle.textContent.indexOf("⋮") !== -1) throw new Error("handle still contains U+22EE");
+  if (handle.textContent.trim() !== "") throw new Error("handle must have empty text (CSS-drawn), got " + JSON.stringify(handle.textContent));
+  if (handle.getAttribute("aria-hidden") !== "true") throw new Error("handle must stay aria-hidden");
+  const bg = getComputedStyle(handle).backgroundImage;
+  if (!bg || bg === "none") throw new Error("expected CSS background grip dots, got " + bg);
 });
 </script>
 </body></html>

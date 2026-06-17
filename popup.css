@@ -331,8 +331,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tag-drag-handle {
   color: var(--pp-fg-hint); opacity: 0;
   transition: opacity 0.1s; cursor: grab;
-  font-size: 9px; margin-right: 2px; user-select: none;
-  letter-spacing: -1px;
+  width: 6px; height: 12px; margin-right: 2px; user-select: none;
+  display: inline-block; vertical-align: middle; flex-shrink: 0;
+  background-image: radial-gradient(currentColor 40%, transparent 45%);
+  background-size: 3px 4px; background-repeat: repeat;
+  background-position: 0 1px;
 }
 .tags-display:hover .tag-drag-handle { opacity: 0.5; }
 .tag-item.dragging .tag-drag-handle { opacity: 0.8; cursor: grabbing; }

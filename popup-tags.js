@@ -394,7 +394,8 @@ function renderTags() {
     el.dataset.idx = idx;
     const handle = document.createElement("span");
     handle.className = "tag-drag-handle";
-    handle.textContent = "⋮⋮";
+    // Grip dots are CSS-drawn (radial-gradient), not a ⋮⋮ (U+22EE) glyph,
+    // which can fall back to a slow emoji font on Windows hi-DPI Chrome.
     handle.setAttribute("aria-hidden", "true");
     el.appendChild(handle);
     const text = document.createTextNode(tag);
