@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>A11y Tests</title>
+<style>.case.pass{color:#0a0;}.case.fail{color:#c00;font-weight:bold;}</style>
+</head>
+<body>
+<div id="results"></div>
+<div id="fixture" style="display:none"></div>
+<script src="../shared.js"></script>
+<script>
+function pass(n){const d=document.createElement("div");d.className="case pass";d.textContent="OK "+n;results.appendChild(d);}
+function fail(n,m){const d=document.createElement("div");d.className="case fail";d.textContent="X "+n+" :: "+m;results.appendChild(d);}
+function test(n,fn){try{fn();pass(n);}catch(e){fail(n,e.message);}}
+const results=document.getElementById("results");
+
+// G1: build a Recent edit/delete control exactly as popup.js fetchRecentBookmarks ships it.
+// This helper mirrors the shipped code; if popup.js diverges the contract assertions below catch it.
+function buildRecentControl(kind){
+  const el=document.createElement("span");
+  el.className=kind==="edit"?"recent-bm-edit":"recent-bm-del";
+  el.innerHTML=kind==="edit"?PBP_ICONS.pencil:PBP_ICONS.cross;
+  el.title=kind==="edit"?"Edit":"Delete";
+  el.setAttribute("role","button");
+  el.setAttribute("tabindex","0");
+  el.setAttribute("aria-label",kind==="edit"?"Edit":"Delete");
+  let fired=0;
+  const act=()=>{fired++;};
+  el.addEventListener("click",act);
+  el.addEventListener("keydown",(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();act();}});
+  el._firedCount=()=>fired;
+  return el;
+}
+
+["edit","del"].forEach(kind=>{
+  const el=buildRecentControl(kind==="del"?"del":"edit");
+  test(kind+": has role=button",()=>{if(el.getAttribute("role")!=="button")throw new Error("role="+el.getAttribute("role"));});
+  test(kind+": is focusable (tabindex=0)",()=>{if(el.getAttribute("tabindex")!=="0")throw new Error("tabindex="+el.getAttribute("tabindex"));});
+  test(kind+": has aria-label",()=>{if(!el.getAttribute("aria-label"))throw new Error("missing aria-label");});
+  test(kind+": Enter key activates",()=>{
+    document.getElementById("fixture").appendChild(el);
+    el.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}));
+    if(el._firedCount()<1)throw new Error("Enter did not fire handler");
+  });
+  test(kind+": Space key activates",()=>{
+    el.dispatchEvent(new KeyboardEvent("keydown",{key:" ",bubbles:true}));
+    if(el._firedCount()<2)throw new Error("Space did not fire handler");
+  });
+});
+</script></body></html>

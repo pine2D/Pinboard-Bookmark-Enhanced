@@ -977,16 +977,24 @@ async function fetchRecentBookmarks(token) {
       edit.className = "recent-bm-edit";
       edit.innerHTML = PBP_ICONS.pencil;
       edit.title = t("recentEditTitle");
-      edit.addEventListener("click", async (e) => {
-        e.preventDefault();
+      edit.setAttribute("role", "button");
+      edit.setAttribute("tabindex", "0");
+      edit.setAttribute("aria-label", t("recentEditTitle"));
+      const doEdit = async (e) => {
+        if (e) e.preventDefault();
         await loadBookmarkForEdit(p.href, token);
-      });
+      };
+      edit.addEventListener("click", doEdit);
+      edit.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); doEdit(); } });
       row.appendChild(edit);
       const del = document.createElement("span");
       del.className = "recent-bm-del";
       del.innerHTML = PBP_ICONS.cross;
       del.title = t("recentDeleteTitle");
-      del.addEventListener("click", async () => {
+      del.setAttribute("role", "button");
+      del.setAttribute("tabindex", "0");
+      del.setAttribute("aria-label", t("recentDeleteTitle"));
+      const doDelete = async () => {
         if (!confirm(t("confirmDelete"))) return;
         try {
           const data = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(p.href)}&auth_token=${token}&format=json`)).json();
@@ -995,7 +1003,9 @@ async function fetchRecentBookmarks(token) {
             chrome.runtime.sendMessage({ type: "bookmark_deleted", url: p.href });
           }
         } catch (_) {}
-      });
+      };
+      del.addEventListener("click", doDelete);
+      del.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); doDelete(); } });
       row.appendChild(del);
       container.appendChild(row);
     });
