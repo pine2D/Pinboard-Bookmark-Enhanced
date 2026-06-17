@@ -213,7 +213,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     appearance: {
       fields: {
-        "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": ""
+        "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": "",
+        "opt-custom-css": "", "opt-tag-sort-by-pop": true
       }
     },
     tags: {

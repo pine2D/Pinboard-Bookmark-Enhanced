@@ -152,5 +152,34 @@ test("ai def resets opt-ai-tag-lang to en", () => {
   applyPanelReset({ fields: { "opt-ai-tag-lang": "en" } }, qsa);
   if ($id("opt-ai-tag-lang").value !== "en") throw new Error("tag-lang not reset to en, got " + $id("opt-ai-tag-lang").value);
 });
+// ---- C5: appearance panel clears custom-overlay CSS and resets tag-sort toggle ----
+</script>
+<div id="fixture-appearance" style="display:none">
+  <textarea id="opt-custom-css">body { display:none }</textarea>
+  <input type="checkbox" id="opt-tag-sort-by-pop">
+</div>
+<script>
+const APPEARANCE_DEF = {
+  fields: {
+    "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": "",
+    "opt-custom-css": "", "opt-tag-sort-by-pop": true
+  }
+};
+test("appearance def clears custom-overlay CSS", () => {
+  $id("opt-custom-css").value = "body { display:none }";
+  applyPanelReset(APPEARANCE_DEF, qsa);
+  if ($id("opt-custom-css").value !== "") throw new Error("custom CSS not cleared, got " + JSON.stringify($id("opt-custom-css").value));
+});
+test("appearance def resets tag-sort-by-pop to on", () => {
+  $id("opt-tag-sort-by-pop").checked = false;
+  applyPanelReset(APPEARANCE_DEF, qsa);
+  if (!$id("opt-tag-sort-by-pop").checked) throw new Error("tag-sort toggle not reset to on");
+});
+test("appearance def is in shipped PANEL_DEFAULTS", () => {
+  const live = window.__PBP_PANEL_DEFAULTS && window.__PBP_PANEL_DEFAULTS.appearance;
+  if (!live) throw new Error("no live appearance def (run inside options.js context)");
+  if (!("opt-custom-css" in live.fields)) throw new Error("shipped appearance.fields missing opt-custom-css");
+  if (!("opt-tag-sort-by-pop" in live.fields)) throw new Error("shipped appearance.fields missing opt-tag-sort-by-pop");
+});
 </script>
 </body></html>
