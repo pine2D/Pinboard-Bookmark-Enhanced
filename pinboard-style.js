@@ -15,11 +15,19 @@ const PBP_ADAPTIVE_THEME_MAP = {
   catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
 };
 
-// Immediately hide page to prevent FOUC while loading custom theme
-const _pbpCloak = document.createElement("style");
-_pbpCloak.id = "pbp-cloak";
-_pbpCloak.textContent = "html { opacity: 0 !important; }";
-(document.head || document.documentElement).appendChild(_pbpCloak);
+// Only cloak when prior evidence (origin-scoped, synchronous) says a theme is
+// configured. Default/un-themed users get NO blank flash — there is nothing to
+// fade in. localStorage is readable here (content script runs in pinboard.in
+// origin); shared.js's chrome.storage mirror is async and unavailable that early.
+let _pbpHasTheme = false;
+try { _pbpHasTheme = localStorage.getItem("pbp_has_theme") === "1"; } catch (_) {}
+let _pbpCloak = null;
+if (_pbpHasTheme) {
+  _pbpCloak = document.createElement("style");
+  _pbpCloak.id = "pbp-cloak";
+  _pbpCloak.textContent = "html { opacity: 0 !important; }";
+  (document.head || document.documentElement).appendChild(_pbpCloak);
+}
 
 (async () => {
   // Inline storage selector (shared.js not available in content scripts)
@@ -49,8 +57,9 @@ _pbpCloak.textContent = "html { opacity: 0 !important; }";
     if (el) el.remove();
   }
 
-  // Safety: always uncloak after 800ms even if something fails
-  setTimeout(uncloak, 800);
+  // Safety: always uncloak after 400ms even if something fails (was 800ms;
+  // themed storage reads resolve well under this on warm SW)
+  setTimeout(uncloak, 400);
 
   try {
     const storage = await getStorage();
@@ -101,6 +110,10 @@ _pbpCloak.textContent = "html { opacity: 0 !important; }";
     if (overlay) {
       combined += `/* === user overlay === */\n${overlay}\n`;
     }
+
+    // Persist cheap synchronous evidence for NEXT cold load's cloak gate.
+    const _pbpThemed = !!(data.themePresetKey || data.customFont || overlay);
+    try { localStorage.setItem("pbp_has_theme", _pbpThemed ? "1" : "0"); } catch (_) {}
 
     if (combined) {
       const style = document.createElement("style");
