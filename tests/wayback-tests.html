@@ -175,5 +175,30 @@ suite("pbpWaybackBuildRequest", () => {
     assert(req.method === "GET", "missing key should fall back to GET");
   });
 });
+
+// ============ pbpWaybackOutcomeRetainsDedup ============
+suite("pbpWaybackOutcomeRetainsDedup", () => {
+  test("'requested' retains the dedup timestamp", () => {
+    assert(pbpWaybackOutcomeRetainsDedup("requested") === true, "ok outcome keeps suppression");
+  });
+  test("'job:12345' retains the dedup timestamp", () => {
+    assert(pbpWaybackOutcomeRetainsDedup("job:12345") === true, "job id keeps suppression");
+  });
+  test("'rate-limited' retains the dedup timestamp", () => {
+    assert(pbpWaybackOutcomeRetainsDedup("rate-limited") === true, "429 keeps suppression (don't hammer)");
+  });
+  test("'timeout' rolls back (re-attempt allowed)", () => {
+    assert(pbpWaybackOutcomeRetainsDedup("timeout") === false, "timeout must NOT suppress 24h");
+  });
+  test("'error:500' rolls back", () => {
+    assert(pbpWaybackOutcomeRetainsDedup("error:500") === false, "5xx must roll back");
+  });
+  test("'error:Failed to fetch' rolls back", () => {
+    assert(pbpWaybackOutcomeRetainsDedup("error:Failed to fetch") === false, "network error must roll back");
+  });
+  test("'permDenied' / 'skipped' are not retain-decisions but default to rollback-safe", () => {
+    assert(pbpWaybackOutcomeRetainsDedup("permDenied") === false, "non-attempt outcomes don't retain");
+  });
+});
 </script>
 </body></html>

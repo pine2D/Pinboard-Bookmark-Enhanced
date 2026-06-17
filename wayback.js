@@ -28,6 +28,14 @@ function pbpWaybackPruneAttempts(attemptsMap, now) {
   return pruned;
 }
 
+// Whether an attempt outcome should KEEP the 24h dedup timestamp. ok (requested
+// / job:*) and rate-limited keep it (don't re-hammer); transient timeout/error
+// roll back so auto re-archive isn't suppressed for 24h after a failed attempt.
+function pbpWaybackOutcomeRetainsDedup(outcome) {
+  if (typeof outcome !== "string") return false;
+  return outcome === "requested" || outcome.startsWith("job:") || outcome === "rate-limited";
+}
+
 function pbpWaybackAppendLog(logArr, entry, cap) {
   const actualCap = cap !== undefined ? cap : WAYBACK_LOG_CAP;
   if (!logArr) logArr = [];
@@ -69,6 +77,21 @@ function pbpWaybackBuildRequest(url, s3Key, s3Secret) {
 }
 
 // ---- Internal logging helper (chrome.* inside function body) ----
+
+// Remove a single url's dedup timestamp (re-read so we don't clobber a
+// concurrent prune/write). Best-effort — swallow storage errors.
+async function _pbpWaybackRollbackAttempt(url) {
+  try {
+    const stored = await chrome.storage.local.get({ _waybackAttempts: {} });
+    const attempts = stored._waybackAttempts || {};
+    if (url in attempts) {
+      delete attempts[url];
+      await chrome.storage.local.set({ _waybackAttempts: attempts });
+    }
+  } catch (e) {
+    console.debug("[wayback] rollback failed:", e?.message || e);
+  }
+}
 
 // Best-effort, non-atomic read-modify-write: concurrent callers may drop one entry. Acceptable for an advisory log.
 async function _pbpWaybackLog(url, outcome) {
@@ -154,10 +177,18 @@ async function pbpWaybackArchive(url, settings, opts) {
       outcome = "error:" + response.status;
     }
 
-    // Step 7: Log the result
+    // Step 7: On a transient (non-retaining) outcome, roll back the pre-fetch
+    // dedup write so auto re-archive isn't suppressed 24h after a failed attempt.
+    if (!pbpWaybackOutcomeRetainsDedup(outcome)) {
+      await _pbpWaybackRollbackAttempt(url);
+    }
+
+    // Step 8: Log the result
     await _pbpWaybackLog(url, outcome);
   } catch (e) {
-    // Catch AbortError and other exceptions — never throw
+    // Catch AbortError and other exceptions — never throw. These are always
+    // transient, so roll back the dedup timestamp written in Step 4.
+    await _pbpWaybackRollbackAttempt(url);
     if (e && (e.name === "AbortError" || e.name === "TimeoutError")) {
       await _pbpWaybackLog(url, "timeout");
     } else {
