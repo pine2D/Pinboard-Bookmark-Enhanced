@@ -388,6 +388,29 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
   });
 }
 
+// ---- Single-writer reducer for offlineQueue ----
+// Pure function — returns a NEW array, never mutates input.
+// background.js is the only writer; popup sends messages instead of touching storage.
+// Centralises the 5 previously-unsynchronised read-modify-writes into one testable reducer.
+function pbpOfflineQueueReduce(queue, action) {
+  const q = Array.isArray(queue) ? queue : [];
+  if (!action || typeof action !== "object") return q.slice();
+  switch (action.kind) {
+    case "clear":
+      return [];
+    case "remove":
+      return q.filter((it) => it && it.queueId !== action.queueId);
+    case "enqueue":
+      if (!action.item) return q.slice();
+      if (q.some((it) => it && it.queueId === action.item.queueId)) return q.slice();
+      return [...q, action.item];
+    case "replace":
+      return Array.isArray(action.remaining) ? action.remaining.slice() : q.slice();
+    default:
+      return q.slice();
+  }
+}
+
 // ---- Prime SETTINGS_DEFAULTS into storage (one-time fix for popup boot lag) ----
 // chrome.storage.{local,sync}.get({ k: default }) is measurably slower when k is missing
 // vs when k exists explicitly. For users who never customized most settings, this slows

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Offline Queue Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+h2 { margin-top: 24px; font-size: 16px; }
+.suite { margin: 12px 0; padding: 8px; border-left: 3px solid #ccc; }
+.case { padding: 4px 8px; margin: 4px 0; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<h1>offlineQueue reducer Tests</h1>
+<div id="results"></div>
+<script src="../shared.js"></script>
+<script>
+function test(name, fn) {
+  try { fn();
+    const div = document.createElement("div"); div.className = "case pass";
+    div.textContent = "PASS " + name; document.getElementById("results").appendChild(div);
+  } catch (e) {
+    const div = document.createElement("div"); div.className = "case fail";
+    div.textContent = "FAIL " + name + "\n  " + e.message; document.getElementById("results").appendChild(div);
+  }
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+function suite(name, fn) {
+  const div = document.createElement("div"); div.className = "suite";
+  const h = document.createElement("h2"); h.textContent = name; div.appendChild(h);
+  const results = document.getElementById("results"); const savedAppend = results.appendChild;
+  results.appendChild = function(el) { if (el.className?.includes("case")) div.appendChild(el); else savedAppend.call(results, el); };
+  fn(); results.appendChild = savedAppend; results.appendChild(div);
+}
+
+const Q = () => ([
+  { queueId: "a", url: "https://a.com" },
+  { queueId: "b", url: "https://b.com" },
+  { queueId: "c", url: "https://c.com" },
+]);
+
+suite("pbpOfflineQueueReduce", () => {
+  test("remove drops only the matching queueId", () => {
+    const out = pbpOfflineQueueReduce(Q(), { kind: "remove", queueId: "b" });
+    assert(out.length === 2, "should drop one");
+    assert(!out.some(i => i.queueId === "b"), "b removed");
+    assert(out[0].queueId === "a" && out[1].queueId === "c", "order preserved");
+  });
+  test("remove of unknown id is a no-op (new array, same contents)", () => {
+    const input = Q();
+    const out = pbpOfflineQueueReduce(input, { kind: "remove", queueId: "zzz" });
+    assert(out.length === 3, "nothing dropped");
+    assert(out !== input, "returns a NEW array, never mutates input");
+  });
+  test("clear returns empty array", () => {
+    assert(pbpOfflineQueueReduce(Q(), { kind: "clear" }).length === 0, "cleared");
+  });
+  test("enqueue appends item", () => {
+    const out = pbpOfflineQueueReduce(Q(), { kind: "enqueue", item: { queueId: "d", url: "https://d.com" } });
+    assert(out.length === 4 && out[3].queueId === "d", "appended at tail");
+  });
+  test("enqueue does not duplicate an existing queueId", () => {
+    const out = pbpOfflineQueueReduce(Q(), { kind: "enqueue", item: { queueId: "a", url: "https://a.com" } });
+    assert(out.length === 3, "no duplicate for same queueId");
+  });
+  test("replace swaps the whole array (processOfflineQueue remaining set)", () => {
+    const out = pbpOfflineQueueReduce(Q(), { kind: "replace", remaining: [{ queueId: "c", url: "https://c.com" }] });
+    assert(out.length === 1 && out[0].queueId === "c", "replaced with remaining");
+  });
+  test("does not mutate its input (clear)", () => {
+    const input = Q();
+    pbpOfflineQueueReduce(input, { kind: "clear" });
+    assert(input.length === 3, "input untouched");
+  });
+  test("null/garbage queue treated as empty", () => {
+    assert(pbpOfflineQueueReduce(null, { kind: "clear" }).length === 0, "null -> []");
+    assert(pbpOfflineQueueReduce(undefined, { kind: "enqueue", item: { queueId: "x" } }).length === 1, "undefined -> [item]");
+  });
+});
+</script>
+</body></html>

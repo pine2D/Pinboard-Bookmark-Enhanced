@@ -151,11 +151,9 @@
   }
 
   async function onRemove(queueId) {
-    const q = await getQueue();
-    const idx = q.findIndex(item => item.queueId === queueId);
-    if (idx < 0) return;
-    q.splice(idx, 1);
-    await setQueue(q);
+    await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: "remove_offline_item", queueId }, () => resolve());
+    });
     await refreshBar();
   }
 

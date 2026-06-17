@@ -257,11 +257,22 @@ async function fetchExistingBookmark(url, token) {
   }
 }
 
+// Serialize ALL offlineQueue writes through one promise chain so concurrent handlers
+// (enqueue / process / retry / popup remove+clear messages) never lose updates.
+let _offlineQueueWrite = Promise.resolve();
+function mutateOfflineQueue(action) {
+  _offlineQueueWrite = _offlineQueueWrite.then(async () => {
+    const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
+    const next = pbpOfflineQueueReduce(offlineQueue, action);
+    await chrome.storage.local.set({ offlineQueue: next });
+    return next;
+  }).catch(() => {});
+  return _offlineQueueWrite;
+}
+
 async function enqueueOfflineSave(params) {
-  const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
   const queueId = Date.now() + "-" + Math.random().toString(36).slice(2, 9);
-  offlineQueue.push({ ...params, queuedAt: Date.now(), queueId });
-  await chrome.storage.local.set({ offlineQueue });
+  await mutateOfflineQueue({ kind: "enqueue", item: { ...params, queuedAt: Date.now(), queueId } });
 }
 
 async function sendOfflineItem(item, settings) {
@@ -326,7 +337,7 @@ async function processOfflineQueue() {
       remaining.push(item);
     }
   }
-  await chrome.storage.local.set({ offlineQueue: remaining });
+  await mutateOfflineQueue({ kind: "replace", remaining });
 }
 
 async function retryOfflineItem(queueId) {
@@ -339,8 +350,7 @@ async function retryOfflineItem(queueId) {
     const s = await loadSettings();
     const ok = await sendOfflineItem(item, s);
     if (!ok) return false;
-    offlineQueue.splice(idx, 1);
-    await chrome.storage.local.set({ offlineQueue });
+    await mutateOfflineQueue({ kind: "remove", queueId });
     statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
     pbpWaybackArchive(item.url, s).catch(() => {});
     return true;
@@ -825,6 +835,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "retry_offline_item" && typeof message.queueId === "string") {
     retryOfflineItem(message.queueId)
       .then((ok) => sendResponse({ ok }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
+  if (message.type === "remove_offline_item" && typeof message.queueId === "string") {
+    mutateOfflineQueue({ kind: "remove", queueId: message.queueId })
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
+  if (message.type === "clear_offline_queue") {
+    mutateOfflineQueue({ kind: "clear" })
+      .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
   }

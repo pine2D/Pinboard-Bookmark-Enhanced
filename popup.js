@@ -1031,7 +1031,9 @@ async function showOfflineQueueStatus() {
       yesText: t("clear"),
       noText: t("cancel"),
       onConfirm: async () => {
-        await chrome.storage.local.set({ offlineQueue: [] });
+        await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: "clear_offline_queue" }, () => resolve());
+        });
         bar.classList.add("hidden");
       },
     });
