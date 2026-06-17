@@ -1397,6 +1397,9 @@
   "overlayQuotaFallback": {
     "message": "CSS saved locally (sync quota full)"
   },
+  "optSaveFailed": {
+    "message": "Save failed — settings too large to sync"
+  },
   "confirm": {
     "message": "Confirm"
   },

@@ -1421,6 +1421,9 @@
   "overlayQuotaFallback": {
     "message": "CSS をローカルに保存しました（同期容量が満杯）"
   },
+  "optSaveFailed": {
+    "message": "保存に失敗しました — 設定が同期できるサイズを超えています"
+  },
   "confirm": {
     "message": "確認"
   },

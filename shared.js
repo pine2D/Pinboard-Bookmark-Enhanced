@@ -499,6 +499,37 @@ async function syncGetLarge(key, defaultValue) {
   try { return JSON.parse(str); } catch (_) { return defaultValue; }
 }
 
+// Persist the settings batch, routing the four large free-text keys through
+// syncSetLarge (chunked, local-fallback on quota) so a single >8KB key can't
+// reject the whole sync batch. The remaining keys go in one guarded set().
+// Returns {ok, fellBackToLocal, error?} — never throws on quota.
+async function persistSettings(data) {
+  const LARGE_KEYS = ["customTagPrompt", "customSummaryPrompt", "translateGlossary", "tagPresets"];
+  const batch = { ...data };
+  let fellBackToLocal = false;
+  // Test seam: allow stubbing storage + syncSetLarge from the harness.
+  const storage = (typeof globalThis !== "undefined" && globalThis.__pbpTestStorage)
+    ? globalThis.__pbpTestStorage : await getSettingsStorage();
+  const ssl = (typeof globalThis !== "undefined" && globalThis.__pbpTestSyncSetLarge)
+    ? globalThis.__pbpTestSyncSetLarge : syncSetLarge;
+  try {
+    for (const k of LARGE_KEYS) {
+      if (k in batch) {
+        try { await ssl(k, batch[k]); }
+        catch (e) { if (/QUOTA|quota/i.test(e && e.message || "")) fellBackToLocal = true; else throw e; }
+        delete batch[k];
+      }
+    }
+    await storage.set(batch);
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.lastError) {
+      return { ok: false, fellBackToLocal, error: new Error(chrome.runtime.lastError.message) };
+    }
+    return { ok: true, fellBackToLocal };
+  } catch (e) {
+    return { ok: false, fellBackToLocal, error: e instanceof Error ? e : new Error(String(e)) };
+  }
+}
+
 const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret"];
 
 function deobfuscateSettings(s) {

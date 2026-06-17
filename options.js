@@ -932,10 +932,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         return { popupWidth: popupWidthToSave };
       })()
     };
-    await (await getSettingsStorage()).set(data);
+    const res = await persistSettings(data);
     // Save customOverlayCSS with quota-aware fallback (sync → local on QUOTA_BYTES)
     await saveOverlayWithFallback($id("opt-custom-css").value);
-    flashAutoSave();
+    if (res.ok) {
+      flashAutoSave();
+    } else {
+      const status = $id("auto-save-status");
+      if (status) {
+        setStatusIcon(status, false, t("optSaveFailed") || "Save failed — settings too large to sync");
+        status.classList.remove("saved");
+        clearTimeout(status._timer);
+        status._timer = setTimeout(() => {
+          status.textContent = t("optAutoSave"); status.classList.remove("saved");
+        }, 4000);
+      }
+    }
   }
 
   // Quota-aware overlay save. On sync QUOTA_BYTES, write to local + flag,

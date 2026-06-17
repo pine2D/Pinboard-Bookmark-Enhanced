@@ -1421,6 +1421,9 @@
   "overlayQuotaFallback": {
     "message": "CSS enregistré localement (quota de synchronisation plein)"
   },
+  "optSaveFailed": {
+    "message": "Échec de l'enregistrement — paramètres trop volumineux pour la synchronisation"
+  },
   "confirm": {
     "message": "Confirmer"
   },

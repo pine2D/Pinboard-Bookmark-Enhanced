@@ -1421,6 +1421,9 @@
   "overlayQuotaFallback": {
     "message": "CSS lokal gespeichert (Sync-Kontingent voll)"
   },
+  "optSaveFailed": {
+    "message": "Speichern fehlgeschlagen – Einstellungen zu groß für die Synchronisierung"
+  },
   "confirm": {
     "message": "Bestätigen"
   },
