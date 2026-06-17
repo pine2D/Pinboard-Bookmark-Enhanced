@@ -165,7 +165,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-auto-description": true, "opt-blockquote": true, "opt-include-referrer": false,
         "opt-respect-tag-case": true, "opt-tag-presets": "",
         "opt-bgsave-merge": true, "opt-bgsave-skip": false, "opt-bgsave-overwrite": false
-      }
+      },
+      radios: { "tag-sync-mode": "cached" }
     },
     ai: {
       fields: {

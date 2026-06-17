@@ -118,5 +118,20 @@ test("applyPanelReset on popup def clears tracking params + restores width", () 
     throw new Error("width not reset to 550");
   if ($id("opt-urlclean-custom").value !== "") throw new Error("custom params not cleared");
 });
+
+// ---- C3: bookmarks panel resets tag-sync-mode radio ----
+</script>
+<div id="fixture-bookmarks" style="display:none">
+  <input type="radio" name="tag-sync-mode" value="cached">
+  <input type="radio" name="tag-sync-mode" value="fresh">
+  <input type="radio" name="tag-sync-mode" value="prewarmed">
+</div>
+<script>
+test("bookmarks def resets tag-sync-mode to cached", () => {
+  document.querySelector('input[name="tag-sync-mode"][value="prewarmed"]').checked = true;
+  applyPanelReset({ radios: { "tag-sync-mode": "cached" } }, qsa);
+  const sel = document.querySelector('input[name="tag-sync-mode"]:checked');
+  if (!sel || sel.value !== "cached") throw new Error("tag-sync-mode not reset to cached, got " + (sel && sel.value));
+});
 </script>
 </body></html>
