@@ -230,7 +230,10 @@ function upsertSummary(summary) {
   const wrapped = `${AI_SUMMARY_TAG}\n<blockquote>${escapeForExtended(summary)}</blockquote>`;
 
   if (AI_BQ_REGEX.test(cur)) {
-    di.value = cur.replace(AI_BQ_REGEX, "\n\n" + wrapped).replace(/^\n\n/, "");
+    // Function replacer: `wrapped` carries AI-summary text that may contain
+    // $&, $1, $$ etc., which String.replace would interpret as special patterns
+    // and corrupt. A replacer fn inserts it literally (same fix as ai.js builders).
+    di.value = cur.replace(AI_BQ_REGEX, () => "\n\n" + wrapped).replace(/^\n\n/, "");
   } else {
     di.value = cur ? cur + "\n\n" + wrapped : wrapped;
   }
