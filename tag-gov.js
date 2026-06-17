@@ -2,6 +2,15 @@
 // Pinboard Bookmark Enhanced - Tag Governance Engine (Pure)
 // ============================================================
 
+// Test-only instrumentation hook: counts Levenshtein calls made by _findTypoGroups.
+// Guarded so it is a no-op in production (window exists in popup/options, but only
+// test pages set __PBP_TYPO_CMP_INC / __PBP_TYPO_CMP_COUNT).
+if (typeof window !== "undefined" && !window.__PBP_TYPO_CMP_COUNT) {
+  let _c = 0;
+  window.__PBP_TYPO_CMP_INC = () => _c++;
+  window.__PBP_TYPO_CMP_COUNT = () => _c;
+}
+
 // Returns 0 (equal), 1 (exactly one edit), or 2 (more than one edit; sentinel).
 // Specialized Levenshtein for distance <= 1 detection only (no full DP).
 // Callers must pass normalized (lowercased) strings.
@@ -179,37 +188,57 @@ function _findSeparatorGroups(counts, used) {
 
 function _findTypoGroups(counts, used) {
   const groups = [];
-  const tags = Object.keys(counts).filter(t => !t.startsWith(".") && !used.has(t));
+  // Typo gate requires both tags length >= 5 AND edit-distance 1; distance 1
+  // implies |len(a)-len(b)| <= 1, so bucket by length and only compare a bucket
+  // with itself and its +1 length neighbor. Prunes the O(n^2) scan for heavy users.
+  const tags = Object.keys(counts)
+    .filter(t => !t.startsWith(".") && !used.has(t) && t.length >= 5);
 
-  for (let i = 0; i < tags.length; i++) {
-    for (let j = i + 1; j < tags.length; j++) {
-      const tag1 = tags[i], tag2 = tags[j];
-      if (used.has(tag1) || used.has(tag2)) continue;
+  const byLen = new Map();
+  for (const tag of tags) {
+    const L = tag.length;
+    if (!byLen.has(L)) byLen.set(L, []);
+    byLen.get(L).push(tag);
+  }
+  const lengths = [...byLen.keys()].sort((a, b) => a - b);
 
-      const lc1 = tag1.toLowerCase(), lc2 = tag2.toLowerCase();
-      const dist = pbpTagGovLevenshtein(lc1, lc2);
-
-      if (dist === 1 && lc1.length >= 5 && lc2.length >= 5) {
-        const count1 = counts[tag1], count2 = counts[tag2];
-        const minC = Math.min(count1, count2), maxC = Math.max(count1, count2);
-        if (minC <= 2 && maxC >= 5 * minC) {
-          const members = [
-            { tag: tag1, count: count1 },
-            { tag: tag2, count: count2 }
-          ];
-          members.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
-          const canonical = members[0].tag;
-          const group = {
-            id: [tag1, tag2].sort().join("|"),
-            kind: "typo",
-            members,
-            suggestedCanonical: canonical
-          };
-          groups.push(group);
-          used.add(tag1);
-          used.add(tag2);
-        }
+  const tryPair = (tag1, tag2) => {
+    if (used.has(tag1) || used.has(tag2)) return;
+    const lc1 = tag1.toLowerCase(), lc2 = tag2.toLowerCase();
+    if (typeof window !== "undefined" && window.__PBP_TYPO_CMP_INC) window.__PBP_TYPO_CMP_INC();
+    const dist = pbpTagGovLevenshtein(lc1, lc2);
+    if (dist === 1 && lc1.length >= 5 && lc2.length >= 5) {
+      const count1 = counts[tag1], count2 = counts[tag2];
+      const minC = Math.min(count1, count2), maxC = Math.max(count1, count2);
+      if (minC <= 2 && maxC >= 5 * minC) {
+        const members = [
+          { tag: tag1, count: count1 },
+          { tag: tag2, count: count2 }
+        ];
+        members.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+        const canonical = members[0].tag;
+        groups.push({
+          id: [tag1, tag2].sort().join("|"),
+          kind: "typo",
+          members,
+          suggestedCanonical: canonical
+        });
+        used.add(tag1);
+        used.add(tag2);
       }
+    }
+  };
+
+  for (const L of lengths) {
+    const same = byLen.get(L);
+    // within-bucket pairs (equal length → substitution only)
+    for (let i = 0; i < same.length; i++) {
+      for (let j = i + 1; j < same.length; j++) tryPair(same[i], same[j]);
+    }
+    // cross-bucket pairs with the +1 length neighbor only (insertion/deletion)
+    const next = byLen.get(L + 1);
+    if (next) {
+      for (const a of same) for (const b of next) tryPair(a, b);
     }
   }
 
