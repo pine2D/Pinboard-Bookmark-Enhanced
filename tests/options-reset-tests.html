@@ -133,5 +133,24 @@ test("bookmarks def resets tag-sync-mode to cached", () => {
   const sel = document.querySelector('input[name="tag-sync-mode"]:checked');
   if (!sel || sel.value !== "cached") throw new Error("tag-sync-mode not reset to cached, got " + (sel && sel.value));
 });
+// ---- C4: AI panel resets ai-content-source radio + opt-ai-tag-lang select ----
+</script>
+<div id="fixture-ai" style="display:none">
+  <input type="radio" name="ai-content-source" value="local">
+  <input type="radio" name="ai-content-source" value="jina">
+  <select id="opt-ai-tag-lang"><option value="auto"></option><option value="en"></option><option value="ja"></option></select>
+</div>
+<script>
+test("ai def resets ai-content-source to local", () => {
+  document.querySelector('input[name="ai-content-source"][value="jina"]').checked = true;
+  applyPanelReset({ radios: { "ai-content-source": "local" } }, qsa);
+  const sel = document.querySelector('input[name="ai-content-source"]:checked');
+  if (!sel || sel.value !== "local") throw new Error("content-source not reset to local, got " + (sel && sel.value));
+});
+test("ai def resets opt-ai-tag-lang to en", () => {
+  $id("opt-ai-tag-lang").value = "ja";
+  applyPanelReset({ fields: { "opt-ai-tag-lang": "en" } }, qsa);
+  if ($id("opt-ai-tag-lang").value !== "en") throw new Error("tag-lang not reset to en, got " + $id("opt-ai-tag-lang").value);
+});
 </script>
 </body></html>

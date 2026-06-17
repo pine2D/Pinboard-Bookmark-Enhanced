@@ -170,7 +170,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     ai: {
       fields: {
-        "opt-ai-provider": "gemini", "opt-ai-summary-lang": "auto", "opt-ai-cache-duration": "60",
+        "opt-ai-provider": "gemini", "opt-ai-tag-lang": "en", "opt-ai-summary-lang": "auto", "opt-ai-cache-duration": "60",
         "opt-ai-auto-tags": false, "opt-ai-tag-separator": "-",
         "opt-custom-tag-prompt": "", "opt-custom-summary-prompt": "",
         "opt-gemini-model": "gemini-2.5-flash-lite", "opt-openai-model": "gpt-5.4-nano",
@@ -186,6 +186,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "translate-target-lang": "auto", "translate-target-lang-custom": "",
         "opt-translate-glossary": "", "opt-selection-trigger": "icon"
       },
+      radios: { "ai-content-source": "local" },
       skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-custom-key"]
     },
     quick: {
