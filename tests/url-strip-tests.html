@@ -78,4 +78,25 @@ m.addEventListener("input", () => {
   document.getElementById("manual-out").textContent = `cleaned: ${r.cleaned}\nremoved: ${r.removedCount}`;
 });
 </script>
+<script>
+// ============ Group B3: setIcon only when URL matches active tab ============
+// Mirror the guard used in background.js bookmark_saved / bookmark_deleted.
+function pbpSameBookmark(aUrl, bUrl) {
+  if (!aUrl || !bUrl) return false;
+  if (aUrl === bUrl) return true;
+  try {
+    return stripTrackingParams(aUrl, {}).cleaned === stripTrackingParams(bUrl, {}).cleaned;
+  } catch (_) { return false; }
+}
+{
+  b2case("B3: identical urls match",
+    pbpSameBookmark("https://x.test/p", "https://x.test/p") === true);
+  b2case("B3: tracking-param difference still matches (active tab has utm_*)",
+    pbpSameBookmark("https://x.test/p?utm_source=a", "https://x.test/p") === true);
+  b2case("B3: unrelated url from Recent list does NOT match active tab",
+    pbpSameBookmark("https://other.test/q", "https://x.test/p") === false);
+  b2case("B3: missing url -> no match (don't flip icon)",
+    pbpSameBookmark("", "https://x.test/p") === false);
+}
+</script>
 </body></html>

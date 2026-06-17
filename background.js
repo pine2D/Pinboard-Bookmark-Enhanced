@@ -775,7 +775,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "bookmark_saved" && message.url) {
     statusCache.set(message.url, { bookmarked: true, timestamp: Date.now() });
     chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-      if (tab?.id) setIcon(tab.id, true);
+      if (tab?.id && pbpSameBookmark(tab.url, message.url)) setIcon(tab.id, true);
     }).catch(() => {});
     // Update badge if toread bookmark was saved
     if (message.toread) updateBadge().catch(() => {});
@@ -793,7 +793,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "bookmark_deleted" && message.url) {
     statusCache.set(message.url, { bookmarked: false, timestamp: Date.now() });
     chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-      if (tab?.id) setIcon(tab.id, false);
+      if (tab?.id && pbpSameBookmark(tab.url, message.url)) setIcon(tab.id, false);
     }).catch(() => {});
     sendResponse({ ok: true });
     return true;
