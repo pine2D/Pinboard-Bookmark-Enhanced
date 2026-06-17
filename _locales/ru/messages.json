@@ -1225,19 +1225,19 @@
     "message": "Markdown"
   },
   "jinaMarkdownTitle": {
-    "message": "Convert page to Markdown (Local)"
+    "message": "Преобразовать страницу в Markdown (локально)"
   },
   "jinaMarkdownTitleJina": {
-    "message": "Convert page to Markdown (Jina Reader)"
+    "message": "Преобразовать страницу в Markdown (Jina Reader)"
   },
   "jinaConverting": {
-    "message": "Converting..."
+    "message": "Преобразование…"
   },
   "jinaCopied": {
-    "message": "Copied!"
+    "message": "Скопировано!"
   },
   "jinaFailed": {
-    "message": "Failed"
+    "message": "Ошибка"
   },
   "aiContentSourceLocalHint": {
     "message": "Извлечение основного содержимого страницы локально (офлайн, быстро)."
@@ -1257,7 +1257,7 @@
     }
   },
   "jinaViewBtn": {
-    "message": "View"
+    "message": "Открыть"
   },
   "mdStripCopied": {
     "message": "Markdown скопирован"
@@ -1389,10 +1389,10 @@
     "message": "Не удалось извлечь содержимое со страницы."
   },
   "secAiContentSource": {
-    "message": "AI Content Source"
+    "message": "Источник контента для ИИ"
   },
   "aiContentSourceLocal": {
-    "message": "Local (Defuddle)"
+    "message": "Локально (Defuddle)"
   },
   "aiContentSourceJina": {
     "message": "Jina Reader"
@@ -1401,10 +1401,10 @@
     "message": "Jina Reader"
   },
   "jinaApiKeyLabel": {
-    "message": "API Key (optional)"
+    "message": "API-ключ (необязательно)"
   },
   "jinaApiKeyPlaceholder": {
-    "message": "jina_xxxx (leave empty for free tier)"
+    "message": "jina_xxxx (оставьте пустым для бесплатного тарифа)"
   },
   "submitUriTooLong": {
     "message": "Запрос слишком большой — сократите заметки, заголовок или теги"
@@ -1697,10 +1697,10 @@
   "archiveErrTimeoutHint": {
     "message": "запрос превысил время ожидания - archive.org может быть перегружен или сеть работает медленно"
   },
-  "tabTags":   {
+  "tabTags": {
     "message": "Теги"
   },
-  "tagGovOverview":   {
+  "tagGovOverview": {
     "message": "$TAGS$ тегов · всего $USES$ использований",
     "placeholders": {
       "tags": {
@@ -1711,64 +1711,64 @@
       }
     }
   },
-  "tagGovRefresh":   {
+  "tagGovRefresh": {
     "message": "Обновить"
   },
-  "tagGovGroupsTitle":   {
+  "tagGovGroupsTitle": {
     "message": "Группы похожих тегов"
   },
-  "tagGovNoGroups":   {
+  "tagGovNoGroups": {
     "message": "Дублирующихся тегов не найдено"
   },
-  "tagGovKindPlural":   {
+  "tagGovKindPlural": {
     "message": "единственное/множественное число"
   },
-  "tagGovKindSeparator":   {
+  "tagGovKindSeparator": {
     "message": "разделитель"
   },
-  "tagGovKindTypo":   {
+  "tagGovKindTypo": {
     "message": "опечатка"
   },
-  "tagGovKindAi":   {
+  "tagGovKindAi": {
     "message": "AI"
   },
-  "tagGovMerge":   {
+  "tagGovMerge": {
     "message": "Объединить"
   },
-  "tagGovIgnore":   {
+  "tagGovIgnore": {
     "message": "Игнорировать"
   },
-  "tagGovResetIgnored":   {
+  "tagGovResetIgnored": {
     "message": "Сбросить игнорируемые"
   },
-  "tagGovResetIgnoredConfirm":   {
+  "tagGovResetIgnoredConfirm": {
     "message": "Очистить игнорируемые группы и повторно показать все дубликаты?"
   },
-  "tagGovAiBtn":   {
+  "tagGovAiBtn": {
     "message": "Глубокий анализ AI"
   },
-  "tagGovAiRunning":   {
+  "tagGovAiRunning": {
     "message": "Анализирование…"
   },
-  "tagGovAiNone":   {
+  "tagGovAiNone": {
     "message": "Группы AI не найдены"
   },
-  "tagGovAiNoKey":   {
+  "tagGovAiNoKey": {
     "message": "Провайдер ИИ не настроен - настройте его на вкладке ИИ"
   },
-  "tagGovLowCountTitle":   {
+  "tagGovLowCountTitle": {
     "message": "Теги с малым количеством использований (1 или менее)"
   },
-  "tagGovSelectAll":   {
+  "tagGovSelectAll": {
     "message": "Выбрать все"
   },
-  "tagGovDeleteSelected":   {
+  "tagGovDeleteSelected": {
     "message": "Удалить выбранные"
   },
-  "tagGovNoLowCount":   {
+  "tagGovNoLowCount": {
     "message": "Нет тегов с 1 использованием или меньше."
   },
-  "tagGovConfirmMerge":   {
+  "tagGovConfirmMerge": {
     "message": "Объединить $N$ тегов в $CANONICAL$?",
     "placeholders": {
       "N": {
@@ -1779,7 +1779,7 @@
       }
     }
   },
-  "tagGovConfirmDelete":   {
+  "tagGovConfirmDelete": {
     "message": "Удалить $N$ выбранных тегов? (безвозвратно)",
     "placeholders": {
       "N": {
@@ -1787,7 +1787,7 @@
       }
     }
   },
-  "tagGovDoneSummary":   {
+  "tagGovDoneSummary": {
     "message": "Задач завершено: $OK$ · с ошибкой: $FAIL$",
     "placeholders": {
       "OK": {
@@ -1798,10 +1798,10 @@
       }
     }
   },
-  "tagGovAborted429":   {
+  "tagGovAborted429": {
     "message": "Превышен лимит — пакет остановлен, завершённые изменения сохранены. Повторный запуск того же слияния безопасно продолжит работу (уже обновлённые закладки пропускаются)."
   },
-  "tagGovMergeEstimate":   {
+  "tagGovMergeEstimate": {
     "message": "Примерное время: ~$T$",
     "placeholders": {
       "T": {
@@ -1809,7 +1809,7 @@
       }
     }
   },
-  "tagGovRetagProgress":   {
+  "tagGovRetagProgress": {
     "message": "Обработано $DONE$/$TOTAL$ закладок",
     "placeholders": {
       "DONE": {
@@ -1820,7 +1820,7 @@
       }
     }
   },
-  "tagGovSkippedSummary":   {
+  "tagGovSkippedSummary": {
     "message": "Пропущено: $N$ (заметка слишком длинная для повторного сохранения)",
     "placeholders": {
       "N": {
@@ -1828,7 +1828,7 @@
       }
     }
   },
-  "tagGovOpLabel":   {
+  "tagGovOpLabel": {
     "message": "Задача $I$/$N$",
     "placeholders": {
       "I": {
@@ -1839,7 +1839,7 @@
       }
     }
   },
-  "tagGovQueuedBatches":   {
+  "tagGovQueuedBatches": {
     "message": "В очереди: $N$",
     "placeholders": {
       "N": {
@@ -1847,22 +1847,22 @@
       }
     }
   },
-  "tagGovProblemsTitle":   {
+  "tagGovProblemsTitle": {
     "message": "Закладки, требующие ручного редактирования:"
   },
-  "tagGovProblemFailed":   {
+  "tagGovProblemFailed": {
     "message": "ошибка"
   },
-  "tagGovProblemSkipped":   {
+  "tagGovProblemSkipped": {
     "message": "пропущено (заметка слишком длинная)"
   },
-  "tagGovProblemsSeeBelow":   {
+  "tagGovProblemsSeeBelow": {
     "message": "подробности внизу страницы"
   },
-  "tagGovRateLimitWait":   {
+  "tagGovRateLimitWait": {
     "message": "Превышен лимит запросов — повтор через несколько секунд…"
   },
-  "tagGovQueuedCancelled":   {
+  "tagGovQueuedCancelled": {
     "message": "Отменено задач в очереди: $N$",
     "placeholders": {
       "N": {
@@ -1870,19 +1870,19 @@
       }
     }
   },
-  "tagGovStop":   {
+  "tagGovStop": {
     "message": "Стоп"
   },
-  "tagGovDismiss":   {
+  "tagGovDismiss": {
     "message": "Закрыть"
   },
-  "tagGovStopped":   {
+  "tagGovStopped": {
     "message": "Остановлено — завершённые изменения сохранены."
   },
-  "tagGovQueuedBadge":   {
+  "tagGovQueuedBadge": {
     "message": "В очереди…"
   },
-  "tagGovTimeLeft":   {
+  "tagGovTimeLeft": {
     "message": "осталось ~$T$",
     "placeholders": {
       "T": {
@@ -1890,7 +1890,7 @@
       }
     }
   },
-  "tagGovLastRun":   {
+  "tagGovLastRun": {
     "message": "Последний запуск ($D$):",
     "placeholders": {
       "D": {
@@ -1898,43 +1898,43 @@
       }
     }
   },
-  "tagGovLoadFailed":   {
+  "tagGovLoadFailed": {
     "message": "Не удалось загрузить метки — проверьте токен Pinboard или сеть, затем обновите"
   },
-  "placeholderOptional":   {
+  "placeholderOptional": {
     "message": "необязательно"
   },
-  "tagGovSnapshotSaved":   {
+  "tagGovSnapshotSaved": {
     "message": "Снимок списка меток скачан (только имена и количество — справка для ручного восстановления, не автоматический бэкап)"
   },
-  "tagGovSnapshotFailed":   {
+  "tagGovSnapshotFailed": {
     "message": "Не удалось создать снимок — объединение/удаление заблокировано"
   },
-  "tagGovIrreversibleWarn":   {
+  "tagGovIrreversibleWarn": {
     "message": "Слияния и удаления необратимы. Перед первым изменением скачивается снимок списка меток (имена и количество) — только для справки."
   },
-  "tagGovBundlesWarn":   {
+  "tagGovBundlesWarn": {
     "message": "Пакеты тегов на pinboard.in не обновляются автоматически при переименовании — проверьте их вручную после объединения."
   },
-  "optBgSaveMode":   {
+  "optBgSaveMode": {
     "message": "Режим фонового сохранения"
   },
-  "optBgSaveModeMerge":   {
+  "optBgSaveModeMerge": {
     "message": "Объединение (по умолчанию — новые теги объединяются с существующими)"
   },
-  "optBgSaveModeSkip":   {
+  "optBgSaveModeSkip": {
     "message": "Пропуск (если URL уже сохранён, ничего не делать)"
   },
-  "optBgSaveModeOverwrite":   {
+  "optBgSaveModeOverwrite": {
     "message": "Перезапись (замещение всех тегов, без объединения)"
   },
-  "optBgSaveModeHint":   {
+  "optBgSaveModeHint": {
     "message": "Объединение: читает существующие теги закладки и объединяет с новыми. Пропуск: избегает сохранения дублирующихся URL. Перезапись: полностью замещает теги (переднеплановое редактирование всегда замещает)."
   },
-  "bgSkippedTitle":   {
+  "bgSkippedTitle": {
     "message": "Уже в закладках"
   },
-  "bgSkippedExists":   {
+  "bgSkippedExists": {
     "message": "Уже в закладках — сохранение пропущено"
   },
   "secPreviewAi": {
@@ -1997,14 +1997,20 @@
   "trProgress": {
     "message": "$DONE$ / $TOTAL$ сегментов",
     "placeholders": {
-      "done": { "content": "$1" },
-      "total": { "content": "$2" }
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
     }
   },
   "trTargetLang": {
     "message": "Язык перевода: $LANG$",
     "placeholders": {
-      "lang": { "content": "$1" }
+      "lang": {
+        "content": "$1"
+      }
     }
   },
   "trChangeLang": {
@@ -2013,7 +2019,9 @@
   "trDone": {
     "message": "Готово · $COUNT$ сегментов",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "trStop": {
@@ -2034,8 +2042,12 @@
   "trEstCost": {
     "message": "Около ~$COUNT$ tokens · $MODEL$",
     "placeholders": {
-      "count": { "content": "$1" },
-      "model": { "content": "$2" }
+      "count": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
     }
   },
   "trBlockFailed": {

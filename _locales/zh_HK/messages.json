@@ -1231,13 +1231,13 @@
     "message": "將頁面轉換為 Markdown（Jina Reader）"
   },
   "jinaConverting": {
-    "message": "Converting..."
+    "message": "轉換中…"
   },
   "jinaCopied": {
-    "message": "Copied!"
+    "message": "已複製！"
   },
   "jinaFailed": {
-    "message": "Failed"
+    "message": "失敗"
   },
   "aiContentSourceLocalHint": {
     "message": "在本機抓取頁面主要內容（離線、速度快）。"
@@ -1257,7 +1257,7 @@
     }
   },
   "jinaViewBtn": {
-    "message": "View"
+    "message": "檢視"
   },
   "mdStripCopied": {
     "message": "Markdown 已複製"
@@ -1389,10 +1389,10 @@
     "message": "未能從該頁面擷取到內容。"
   },
   "secAiContentSource": {
-    "message": "AI Content Source"
+    "message": "AI 內容來源"
   },
   "aiContentSourceLocal": {
-    "message": "Local (Defuddle)"
+    "message": "本地（Defuddle）"
   },
   "aiContentSourceJina": {
     "message": "Jina Reader"
@@ -1401,10 +1401,10 @@
     "message": "Jina Reader"
   },
   "jinaApiKeyLabel": {
-    "message": "API Key (optional)"
+    "message": "API Key（選填）"
   },
   "jinaApiKeyPlaceholder": {
-    "message": "jina_xxxx (leave empty for free tier)"
+    "message": "jina_xxxx（留空使用免費額度）"
   },
   "submitUriTooLong": {
     "message": "請求過長 — 請精簡筆記、標題或標籤"
@@ -1697,10 +1697,10 @@
   "archiveErrTimeoutHint": {
     "message": "請求逾時 — archive.org 繁忙或網路緩慢"
   },
-  "tabTags":   {
+  "tabTags": {
     "message": "標籤"
   },
-  "tagGovOverview":   {
+  "tagGovOverview": {
     "message": "$TAGS$ 個標籤 · 共 $USES$ 次使用",
     "placeholders": {
       "tags": {
@@ -1711,64 +1711,64 @@
       }
     }
   },
-  "tagGovRefresh":   {
+  "tagGovRefresh": {
     "message": "重新整理"
   },
-  "tagGovGroupsTitle":   {
+  "tagGovGroupsTitle": {
     "message": "近似標籤組"
   },
-  "tagGovNoGroups":   {
+  "tagGovNoGroups": {
     "message": "未偵測到重複標籤"
   },
-  "tagGovKindPlural":   {
+  "tagGovKindPlural": {
     "message": "單複數"
   },
-  "tagGovKindSeparator":   {
+  "tagGovKindSeparator": {
     "message": "分隔符"
   },
-  "tagGovKindTypo":   {
+  "tagGovKindTypo": {
     "message": "筆誤"
   },
-  "tagGovKindAi":   {
+  "tagGovKindAi": {
     "message": "AI"
   },
-  "tagGovMerge":   {
+  "tagGovMerge": {
     "message": "合併"
   },
-  "tagGovIgnore":   {
+  "tagGovIgnore": {
     "message": "忽略"
   },
-  "tagGovResetIgnored":   {
+  "tagGovResetIgnored": {
     "message": "重設忽略列表"
   },
-  "tagGovResetIgnoredConfirm":   {
+  "tagGovResetIgnoredConfirm": {
     "message": "清除被忽略的組，重新顯示所有重複項？"
   },
-  "tagGovAiBtn":   {
+  "tagGovAiBtn": {
     "message": "AI 深度分析"
   },
-  "tagGovAiRunning":   {
+  "tagGovAiRunning": {
     "message": "分析中…"
   },
-  "tagGovAiNone":   {
+  "tagGovAiNone": {
     "message": "AI 未發現重複項"
   },
-  "tagGovAiNoKey":   {
+  "tagGovAiNoKey": {
     "message": "未設定 AI 提供商——請前往 AI 分頁設定"
   },
-  "tagGovLowCountTitle":   {
+  "tagGovLowCountTitle": {
     "message": "低頻標籤（1 次或更少）"
   },
-  "tagGovSelectAll":   {
+  "tagGovSelectAll": {
     "message": "全選"
   },
-  "tagGovDeleteSelected":   {
+  "tagGovDeleteSelected": {
     "message": "刪除所選"
   },
-  "tagGovNoLowCount":   {
+  "tagGovNoLowCount": {
     "message": "沒有使用次數為 1 或更少的標籤。"
   },
-  "tagGovConfirmMerge":   {
+  "tagGovConfirmMerge": {
     "message": "合併 $N$ 個標籤到 $CANONICAL$？",
     "placeholders": {
       "N": {
@@ -1779,7 +1779,7 @@
       }
     }
   },
-  "tagGovConfirmDelete":   {
+  "tagGovConfirmDelete": {
     "message": "刪除 $N$ 個標籤？（永久操作）",
     "placeholders": {
       "N": {
@@ -1787,7 +1787,7 @@
       }
     }
   },
-  "tagGovDoneSummary":   {
+  "tagGovDoneSummary": {
     "message": "$OK$ 個任務完成 · $FAIL$ 個任務失敗",
     "placeholders": {
       "OK": {
@@ -1798,10 +1798,10 @@
       }
     }
   },
-  "tagGovAborted429":   {
+  "tagGovAborted429": {
     "message": "已限流，批次停止，已完成的更改保留。重新執行同一合併可安全續傳（已改完的書籤會自動跳過）。"
   },
-  "tagGovMergeEstimate":   {
+  "tagGovMergeEstimate": {
     "message": "預計耗時：約 $T$",
     "placeholders": {
       "T": {
@@ -1809,7 +1809,7 @@
       }
     }
   },
-  "tagGovRetagProgress":   {
+  "tagGovRetagProgress": {
     "message": "已重新標記 $DONE$/$TOTAL$ 個書籤",
     "placeholders": {
       "DONE": {
@@ -1820,7 +1820,7 @@
       }
     }
   },
-  "tagGovSkippedSummary":   {
+  "tagGovSkippedSummary": {
     "message": "略過 $N$ 條（備註過長，無法重新儲存）",
     "placeholders": {
       "N": {
@@ -1828,7 +1828,7 @@
       }
     }
   },
-  "tagGovOpLabel":   {
+  "tagGovOpLabel": {
     "message": "任務 $I$/$N$",
     "placeholders": {
       "I": {
@@ -1839,7 +1839,7 @@
       }
     }
   },
-  "tagGovQueuedBatches":   {
+  "tagGovQueuedBatches": {
     "message": "尚有 $N$ 批排隊",
     "placeholders": {
       "N": {
@@ -1847,22 +1847,22 @@
       }
     }
   },
-  "tagGovProblemsTitle":   {
+  "tagGovProblemsTitle": {
     "message": "需手動處理的書籤："
   },
-  "tagGovProblemFailed":   {
+  "tagGovProblemFailed": {
     "message": "失敗"
   },
-  "tagGovProblemSkipped":   {
+  "tagGovProblemSkipped": {
     "message": "略過（備註過長）"
   },
-  "tagGovProblemsSeeBelow":   {
+  "tagGovProblemsSeeBelow": {
     "message": "查看頁面底部詳情"
   },
-  "tagGovRateLimitWait":   {
+  "tagGovRateLimitWait": {
     "message": "已限流，稍候自動重試…"
   },
-  "tagGovQueuedCancelled":   {
+  "tagGovQueuedCancelled": {
     "message": "已取消 $N$ 個排隊批次",
     "placeholders": {
       "N": {
@@ -1870,19 +1870,19 @@
       }
     }
   },
-  "tagGovStop":   {
+  "tagGovStop": {
     "message": "停止"
   },
-  "tagGovDismiss":   {
+  "tagGovDismiss": {
     "message": "關閉"
   },
-  "tagGovStopped":   {
+  "tagGovStopped": {
     "message": "已手動停止，已完成的更改保留。"
   },
-  "tagGovQueuedBadge":   {
+  "tagGovQueuedBadge": {
     "message": "排隊中…"
   },
-  "tagGovTimeLeft":   {
+  "tagGovTimeLeft": {
     "message": "約剩 $T$",
     "placeholders": {
       "T": {
@@ -1890,7 +1890,7 @@
       }
     }
   },
-  "tagGovLastRun":   {
+  "tagGovLastRun": {
     "message": "上次執行（$D$）：",
     "placeholders": {
       "D": {
@@ -1898,43 +1898,43 @@
       }
     }
   },
-  "tagGovLoadFailed":   {
+  "tagGovLoadFailed": {
     "message": "無法載入標籤——請檢查 Pinboard token 或網路後按重新整理"
   },
-  "placeholderOptional":   {
+  "placeholderOptional": {
     "message": "可選"
   },
-  "tagGovSnapshotSaved":   {
+  "tagGovSnapshotSaved": {
     "message": "已下載標籤清單快照（僅含標籤名稱和數量，供手工修復參考，不能自動還原）"
   },
-  "tagGovSnapshotFailed":   {
+  "tagGovSnapshotFailed": {
     "message": "無法生成快照 — 合併/刪除已阻止"
   },
-  "tagGovIrreversibleWarn":   {
+  "tagGovIrreversibleWarn": {
     "message": "合併和刪除操作無法復原。第一次修改前會自動下載你的標籤清單快照（僅含標籤名稱和數量，供手工修復參考）。"
   },
-  "tagGovBundlesWarn":   {
+  "tagGovBundlesWarn": {
     "message": "Pinboard.in 上的標籤束不會跟隨重命名自動更新 — 合併後請手動檢查。"
   },
-  "optBgSaveMode":   {
+  "optBgSaveMode": {
     "message": "後台保存模式"
   },
-  "optBgSaveModeMerge":   {
+  "optBgSaveModeMerge": {
     "message": "合併（預設 — 新標籤與現有標籤合併）"
   },
-  "optBgSaveModeSkip":   {
+  "optBgSaveModeSkip": {
     "message": "跳過（如果網址已保存則不操作）"
   },
-  "optBgSaveModeOverwrite":   {
+  "optBgSaveModeOverwrite": {
     "message": "覆蓋（完全取代標籤，不合併）"
   },
-  "optBgSaveModeHint":   {
+  "optBgSaveModeHint": {
     "message": "合併：讀取已有書籤標籤並與新標籤合併。跳過：避免保存重複網址。覆蓋：完全取代標籤（前台編輯始終取代）。"
   },
-  "bgSkippedTitle":   {
+  "bgSkippedTitle": {
     "message": "已收藏"
   },
-  "bgSkippedExists":   {
+  "bgSkippedExists": {
     "message": "已收藏過 — 保存已跳過"
   },
   "secPreviewAi": {
@@ -1997,14 +1997,20 @@
   "trProgress": {
     "message": "$DONE$ / $TOTAL$ 段",
     "placeholders": {
-      "done": { "content": "$1" },
-      "total": { "content": "$2" }
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
     }
   },
   "trTargetLang": {
     "message": "目標語言：$LANG$",
     "placeholders": {
-      "lang": { "content": "$1" }
+      "lang": {
+        "content": "$1"
+      }
     }
   },
   "trChangeLang": {
@@ -2013,7 +2019,9 @@
   "trDone": {
     "message": "翻譯完成 · $COUNT$ 段",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "trStop": {
@@ -2034,8 +2042,12 @@
   "trEstCost": {
     "message": "約 ~$COUNT$ tokens · $MODEL$",
     "placeholders": {
-      "count": { "content": "$1" },
-      "model": { "content": "$2" }
+      "count": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
     }
   },
   "trBlockFailed": {

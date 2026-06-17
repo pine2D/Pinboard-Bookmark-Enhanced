@@ -1225,19 +1225,19 @@
     "message": "Markdown"
   },
   "jinaMarkdownTitle": {
-    "message": "Convert page to Markdown (Local)"
+    "message": "Konwertuj stronę do Markdown (lokalnie)"
   },
   "jinaMarkdownTitleJina": {
-    "message": "Convert page to Markdown (Jina Reader)"
+    "message": "Konwertuj stronę do Markdown (Jina Reader)"
   },
   "jinaConverting": {
-    "message": "Converting..."
+    "message": "Konwertowanie…"
   },
   "jinaCopied": {
-    "message": "Copied!"
+    "message": "Skopiowano!"
   },
   "jinaFailed": {
-    "message": "Failed"
+    "message": "Niepowodzenie"
   },
   "aiContentSourceLocalHint": {
     "message": "Wyodrębnia główną treść strony lokalnie (offline, szybko)."
@@ -1257,7 +1257,7 @@
     }
   },
   "jinaViewBtn": {
-    "message": "View"
+    "message": "Pokaż"
   },
   "mdStripCopied": {
     "message": "Skopiowano Markdown"
@@ -1389,10 +1389,10 @@
     "message": "Nie udało się wyodrębnić treści z tej strony."
   },
   "secAiContentSource": {
-    "message": "AI Content Source"
+    "message": "Źródło treści AI"
   },
   "aiContentSourceLocal": {
-    "message": "Local (Defuddle)"
+    "message": "Lokalnie (Defuddle)"
   },
   "aiContentSourceJina": {
     "message": "Jina Reader"
@@ -1401,10 +1401,10 @@
     "message": "Jina Reader"
   },
   "jinaApiKeyLabel": {
-    "message": "API Key (optional)"
+    "message": "Klucz API (opcjonalnie)"
   },
   "jinaApiKeyPlaceholder": {
-    "message": "jina_xxxx (leave empty for free tier)"
+    "message": "jina_xxxx (puste = darmowy plan)"
   },
   "submitUriTooLong": {
     "message": "Żądanie zbyt duże — skróć notatki, tytuł lub tagi"
@@ -1697,10 +1697,10 @@
   "archiveErrTimeoutHint": {
     "message": "żądanie przekroczyło limit czasu - archive.org może być przeciążony lub sieć jest wolna"
   },
-  "tabTags":   {
+  "tabTags": {
     "message": "Tagi"
   },
-  "tagGovOverview":   {
+  "tagGovOverview": {
     "message": "$TAGS$ tagów · $USES$ wszystkich użyć",
     "placeholders": {
       "tags": {
@@ -1711,64 +1711,64 @@
       }
     }
   },
-  "tagGovRefresh":   {
+  "tagGovRefresh": {
     "message": "Odśwież"
   },
-  "tagGovGroupsTitle":   {
+  "tagGovGroupsTitle": {
     "message": "Grupy podobnych tagów"
   },
-  "tagGovNoGroups":   {
+  "tagGovNoGroups": {
     "message": "Nie znaleziono zduplikowanych tagów"
   },
-  "tagGovKindPlural":   {
+  "tagGovKindPlural": {
     "message": "liczba pojedyncza/mnoga"
   },
-  "tagGovKindSeparator":   {
+  "tagGovKindSeparator": {
     "message": "separator"
   },
-  "tagGovKindTypo":   {
+  "tagGovKindTypo": {
     "message": "błąd pisowni"
   },
-  "tagGovKindAi":   {
+  "tagGovKindAi": {
     "message": "AI"
   },
-  "tagGovMerge":   {
+  "tagGovMerge": {
     "message": "Połącz"
   },
-  "tagGovIgnore":   {
+  "tagGovIgnore": {
     "message": "Ignoruj"
   },
-  "tagGovResetIgnored":   {
+  "tagGovResetIgnored": {
     "message": "Resetuj ignorowane"
   },
-  "tagGovResetIgnoredConfirm":   {
+  "tagGovResetIgnoredConfirm": {
     "message": "Wyczyścić ignorowane grupy i wyświetlić ponownie wszystkie duplikaty?"
   },
-  "tagGovAiBtn":   {
+  "tagGovAiBtn": {
     "message": "Głęboka analiza AI"
   },
-  "tagGovAiRunning":   {
+  "tagGovAiRunning": {
     "message": "Analiza w toku…"
   },
-  "tagGovAiNone":   {
+  "tagGovAiNone": {
     "message": "Nie znaleziono grup AI"
   },
-  "tagGovAiNoKey":   {
+  "tagGovAiNoKey": {
     "message": "Brak skonfigurowanego dostawcy AI - przejdź do karty AI, aby skonfigurować"
   },
-  "tagGovLowCountTitle":   {
+  "tagGovLowCountTitle": {
     "message": "Tagi o niskiej częstości (1 lub mniej)"
   },
-  "tagGovSelectAll":   {
+  "tagGovSelectAll": {
     "message": "Zaznacz wszystko"
   },
-  "tagGovDeleteSelected":   {
+  "tagGovDeleteSelected": {
     "message": "Usuń zaznaczone"
   },
-  "tagGovNoLowCount":   {
+  "tagGovNoLowCount": {
     "message": "Brak tagów z 1 użyciem lub mniej."
   },
-  "tagGovConfirmMerge":   {
+  "tagGovConfirmMerge": {
     "message": "Połączyć $N$ tagów z $CANONICAL$?",
     "placeholders": {
       "N": {
@@ -1779,7 +1779,7 @@
       }
     }
   },
-  "tagGovConfirmDelete":   {
+  "tagGovConfirmDelete": {
     "message": "Usunąć $N$ zaznaczonych tagów? (trwale)",
     "placeholders": {
       "N": {
@@ -1787,7 +1787,7 @@
       }
     }
   },
-  "tagGovDoneSummary":   {
+  "tagGovDoneSummary": {
     "message": "Ukończono zadań: $OK$ · nieudanych: $FAIL$",
     "placeholders": {
       "OK": {
@@ -1798,10 +1798,10 @@
       }
     }
   },
-  "tagGovAborted429":   {
+  "tagGovAborted429": {
     "message": "Limit zapytań — partia zatrzymana, ukończone zmiany zachowane. Ponowne uruchomienie tego samego scalania bezpiecznie wznawia pracę (zaktualizowane zakładki są pomijane)."
   },
-  "tagGovMergeEstimate":   {
+  "tagGovMergeEstimate": {
     "message": "Szacowany czas: ok. $T$",
     "placeholders": {
       "T": {
@@ -1809,7 +1809,7 @@
       }
     }
   },
-  "tagGovRetagProgress":   {
+  "tagGovRetagProgress": {
     "message": "Przetworzono $DONE$/$TOTAL$ zakładek",
     "placeholders": {
       "DONE": {
@@ -1820,7 +1820,7 @@
       }
     }
   },
-  "tagGovSkippedSummary":   {
+  "tagGovSkippedSummary": {
     "message": "Pominięto $N$ (notatka zbyt długa, aby zapisać ponownie)",
     "placeholders": {
       "N": {
@@ -1828,7 +1828,7 @@
       }
     }
   },
-  "tagGovOpLabel":   {
+  "tagGovOpLabel": {
     "message": "Zadanie $I$/$N$",
     "placeholders": {
       "I": {
@@ -1839,7 +1839,7 @@
       }
     }
   },
-  "tagGovQueuedBatches":   {
+  "tagGovQueuedBatches": {
     "message": "W kolejce: $N$",
     "placeholders": {
       "N": {
@@ -1847,22 +1847,22 @@
       }
     }
   },
-  "tagGovProblemsTitle":   {
+  "tagGovProblemsTitle": {
     "message": "Zakładki wymagające ręcznej edycji:"
   },
-  "tagGovProblemFailed":   {
+  "tagGovProblemFailed": {
     "message": "błąd"
   },
-  "tagGovProblemSkipped":   {
+  "tagGovProblemSkipped": {
     "message": "pominięto (notatka zbyt długa)"
   },
-  "tagGovProblemsSeeBelow":   {
+  "tagGovProblemsSeeBelow": {
     "message": "zobacz szczegóły poniżej"
   },
-  "tagGovRateLimitWait":   {
+  "tagGovRateLimitWait": {
     "message": "Limit zapytań — ponowna próba wkrótce…"
   },
-  "tagGovQueuedCancelled":   {
+  "tagGovQueuedCancelled": {
     "message": "Anulowano zadania w kolejce: $N$",
     "placeholders": {
       "N": {
@@ -1870,19 +1870,19 @@
       }
     }
   },
-  "tagGovStop":   {
+  "tagGovStop": {
     "message": "Zatrzymaj"
   },
-  "tagGovDismiss":   {
+  "tagGovDismiss": {
     "message": "Zamknij"
   },
-  "tagGovStopped":   {
+  "tagGovStopped": {
     "message": "Zatrzymano — ukończone zmiany zostały zachowane."
   },
-  "tagGovQueuedBadge":   {
+  "tagGovQueuedBadge": {
     "message": "W kolejce…"
   },
-  "tagGovTimeLeft":   {
+  "tagGovTimeLeft": {
     "message": "pozostało ok. $T$",
     "placeholders": {
       "T": {
@@ -1890,7 +1890,7 @@
       }
     }
   },
-  "tagGovLastRun":   {
+  "tagGovLastRun": {
     "message": "Ostatnie uruchomienie ($D$):",
     "placeholders": {
       "D": {
@@ -1898,43 +1898,43 @@
       }
     }
   },
-  "tagGovLoadFailed":   {
+  "tagGovLoadFailed": {
     "message": "Nie udało się wczytać tagów — sprawdź token Pinboard lub sieć, potem odśwież"
   },
-  "placeholderOptional":   {
+  "placeholderOptional": {
     "message": "opcjonalnie"
   },
-  "tagGovSnapshotSaved":   {
+  "tagGovSnapshotSaved": {
     "message": "Pobrano migawkę listy tagów (tylko nazwy i liczby — pomoc przy ręcznej naprawie, bez automatycznego przywracania)"
   },
-  "tagGovSnapshotFailed":   {
+  "tagGovSnapshotFailed": {
     "message": "Nie można utworzyć migawki — łączenie/usuwanie zablokowane"
   },
-  "tagGovIrreversibleWarn":   {
+  "tagGovIrreversibleWarn": {
     "message": "Scalenia i usunięcia są nieodwracalne. Przed pierwszą zmianą pobierana jest migawka listy tagów (nazwy i liczby) — wyłącznie jako odniesienie."
   },
-  "tagGovBundlesWarn":   {
+  "tagGovBundlesWarn": {
     "message": "Pakiety tagów na pinboard.in nie są automatycznie aktualizowane przez zmianę nazwy — sprawdź je ręcznie po połączeniu."
   },
-  "optBgSaveMode":   {
+  "optBgSaveMode": {
     "message": "Tryb zapisywania w tle"
   },
-  "optBgSaveModeMerge":   {
+  "optBgSaveModeMerge": {
     "message": "Połącz (domyślnie — połącz nowe tagi z istniejącymi)"
   },
-  "optBgSaveModeSkip":   {
+  "optBgSaveModeSkip": {
     "message": "Pomiń (jeśli adres URL jest już zapisany, nic nie rób)"
   },
-  "optBgSaveModeOverwrite":   {
+  "optBgSaveModeOverwrite": {
     "message": "Zastąp (zastąp wszystkie tagi, bez łączenia)"
   },
-  "optBgSaveModeHint":   {
+  "optBgSaveModeHint": {
     "message": "Połącz: odczytuje istniejące tagi zakładki i łączy z nowymi tagami. Pomiń: unika zapisywania zduplikowanych adresów URL. Zastąp: całkowicie zastępuje tagi (edycje na pierwszym planie zawsze zastępują)."
   },
-  "bgSkippedTitle":   {
+  "bgSkippedTitle": {
     "message": "Już w zakładkach"
   },
-  "bgSkippedExists":   {
+  "bgSkippedExists": {
     "message": "Już w zakładkach — zapisywanie pominięte"
   },
   "secPreviewAi": {
@@ -1997,14 +1997,20 @@
   "trProgress": {
     "message": "$DONE$ / $TOTAL$ segmentów",
     "placeholders": {
-      "done": { "content": "$1" },
-      "total": { "content": "$2" }
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
     }
   },
   "trTargetLang": {
     "message": "Język docelowy: $LANG$",
     "placeholders": {
-      "lang": { "content": "$1" }
+      "lang": {
+        "content": "$1"
+      }
     }
   },
   "trChangeLang": {
@@ -2013,7 +2019,9 @@
   "trDone": {
     "message": "Gotowe · $COUNT$ segmentów",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "trStop": {
@@ -2034,8 +2042,12 @@
   "trEstCost": {
     "message": "Około ~$COUNT$ tokens · $MODEL$",
     "placeholders": {
-      "count": { "content": "$1" },
-      "model": { "content": "$2" }
+      "count": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
     }
   },
   "trBlockFailed": {

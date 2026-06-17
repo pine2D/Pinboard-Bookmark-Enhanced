@@ -1225,19 +1225,19 @@
     "message": "Markdown"
   },
   "jinaMarkdownTitle": {
-    "message": "Convert page to Markdown (Local)"
+    "message": "Convertir la page en Markdown (local)"
   },
   "jinaMarkdownTitleJina": {
-    "message": "Convert page to Markdown (Jina Reader)"
+    "message": "Convertir la page en Markdown (Jina Reader)"
   },
   "jinaConverting": {
-    "message": "Converting..."
+    "message": "Conversion…"
   },
   "jinaCopied": {
-    "message": "Copied!"
+    "message": "Copié !"
   },
   "jinaFailed": {
-    "message": "Failed"
+    "message": "Échec"
   },
   "aiContentSourceLocalHint": {
     "message": "Extraire le contenu principal de la page en local (hors ligne, rapide)."
@@ -1257,7 +1257,7 @@
     }
   },
   "jinaViewBtn": {
-    "message": "View"
+    "message": "Voir"
   },
   "mdStripCopied": {
     "message": "Markdown copié"
@@ -1389,7 +1389,7 @@
     "message": "Aucun contenu n'a pu être extrait de cette page."
   },
   "secAiContentSource": {
-    "message": "AI Content Source"
+    "message": "Source de contenu IA"
   },
   "aiContentSourceLocal": {
     "message": "Local (Defuddle)"
@@ -1401,10 +1401,10 @@
     "message": "Jina Reader"
   },
   "jinaApiKeyLabel": {
-    "message": "API Key (optional)"
+    "message": "Clé API (facultatif)"
   },
   "jinaApiKeyPlaceholder": {
-    "message": "jina_xxxx (leave empty for free tier)"
+    "message": "jina_xxxx (laisser vide pour l'offre gratuite)"
   },
   "submitUriTooLong": {
     "message": "Requête trop longue — raccourcissez les notes, le titre ou les tags"
@@ -1697,10 +1697,10 @@
   "archiveErrTimeoutHint": {
     "message": "la requête a expiré - archive.org est peut-être surchargé ou le réseau est lent"
   },
-  "tabTags":   {
+  "tabTags": {
     "message": "Étiquettes"
   },
-  "tagGovOverview":   {
+  "tagGovOverview": {
     "message": "$TAGS$ étiquettes · $USES$ utilisations totales",
     "placeholders": {
       "tags": {
@@ -1711,64 +1711,64 @@
       }
     }
   },
-  "tagGovRefresh":   {
+  "tagGovRefresh": {
     "message": "Actualiser"
   },
-  "tagGovGroupsTitle":   {
+  "tagGovGroupsTitle": {
     "message": "Groupes d'étiquettes similaires"
   },
-  "tagGovNoGroups":   {
+  "tagGovNoGroups": {
     "message": "Aucune étiquette en double trouvée"
   },
-  "tagGovKindPlural":   {
+  "tagGovKindPlural": {
     "message": "singulier/pluriel"
   },
-  "tagGovKindSeparator":   {
+  "tagGovKindSeparator": {
     "message": "séparateur"
   },
-  "tagGovKindTypo":   {
+  "tagGovKindTypo": {
     "message": "faute de frappe"
   },
-  "tagGovKindAi":   {
+  "tagGovKindAi": {
     "message": "IA"
   },
-  "tagGovMerge":   {
+  "tagGovMerge": {
     "message": "Fusionner"
   },
-  "tagGovIgnore":   {
+  "tagGovIgnore": {
     "message": "Ignorer"
   },
-  "tagGovResetIgnored":   {
+  "tagGovResetIgnored": {
     "message": "Réinitialiser les ignorés"
   },
-  "tagGovResetIgnoredConfirm":   {
+  "tagGovResetIgnoredConfirm": {
     "message": "Effacer les groupes ignorés et réafficher tous les doublons?"
   },
-  "tagGovAiBtn":   {
+  "tagGovAiBtn": {
     "message": "Analyse approfondie par IA"
   },
-  "tagGovAiRunning":   {
+  "tagGovAiRunning": {
     "message": "Analyse en cours…"
   },
-  "tagGovAiNone":   {
+  "tagGovAiNone": {
     "message": "Aucun groupe d'IA trouvé"
   },
-  "tagGovAiNoKey":   {
+  "tagGovAiNoKey": {
     "message": "Aucun fournisseur IA configuré - configurez-le dans l'onglet IA"
   },
-  "tagGovLowCountTitle":   {
+  "tagGovLowCountTitle": {
     "message": "Étiquettes peu utilisées (1 utilisation ou moins)"
   },
-  "tagGovSelectAll":   {
+  "tagGovSelectAll": {
     "message": "Tout sélectionner"
   },
-  "tagGovDeleteSelected":   {
+  "tagGovDeleteSelected": {
     "message": "Supprimer la sélection"
   },
-  "tagGovNoLowCount":   {
+  "tagGovNoLowCount": {
     "message": "Aucune étiquette avec 1 utilisation ou moins."
   },
-  "tagGovConfirmMerge":   {
+  "tagGovConfirmMerge": {
     "message": "Fusionner $N$ étiquettes dans $CANONICAL$?",
     "placeholders": {
       "N": {
@@ -1779,7 +1779,7 @@
       }
     }
   },
-  "tagGovConfirmDelete":   {
+  "tagGovConfirmDelete": {
     "message": "Supprimer $N$ étiquettes sélectionnées? (permanent)",
     "placeholders": {
       "N": {
@@ -1787,7 +1787,7 @@
       }
     }
   },
-  "tagGovDoneSummary":   {
+  "tagGovDoneSummary": {
     "message": "$OK$ tâches terminées · $FAIL$ en échec",
     "placeholders": {
       "OK": {
@@ -1798,10 +1798,10 @@
       }
     }
   },
-  "tagGovAborted429":   {
+  "tagGovAborted429": {
     "message": "Limite de débit — lot arrêté, les modifications terminées sont conservées. Relancer la même fusion reprend en toute sécurité (les signets déjà mis à jour sont ignorés)."
   },
-  "tagGovMergeEstimate":   {
+  "tagGovMergeEstimate": {
     "message": "Durée estimée : env. $T$",
     "placeholders": {
       "T": {
@@ -1809,7 +1809,7 @@
       }
     }
   },
-  "tagGovRetagProgress":   {
+  "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ signets mis à jour",
     "placeholders": {
       "DONE": {
@@ -1820,7 +1820,7 @@
       }
     }
   },
-  "tagGovSkippedSummary":   {
+  "tagGovSkippedSummary": {
     "message": "$N$ ignorés (note trop longue pour être réenregistrée)",
     "placeholders": {
       "N": {
@@ -1828,7 +1828,7 @@
       }
     }
   },
-  "tagGovOpLabel":   {
+  "tagGovOpLabel": {
     "message": "Tâche $I$/$N$",
     "placeholders": {
       "I": {
@@ -1839,7 +1839,7 @@
       }
     }
   },
-  "tagGovQueuedBatches":   {
+  "tagGovQueuedBatches": {
     "message": "$N$ en attente",
     "placeholders": {
       "N": {
@@ -1847,22 +1847,22 @@
       }
     }
   },
-  "tagGovProblemsTitle":   {
+  "tagGovProblemsTitle": {
     "message": "Signets à modifier manuellement :"
   },
-  "tagGovProblemFailed":   {
+  "tagGovProblemFailed": {
     "message": "échec"
   },
-  "tagGovProblemSkipped":   {
+  "tagGovProblemSkipped": {
     "message": "ignoré (note trop longue)"
   },
-  "tagGovProblemsSeeBelow":   {
+  "tagGovProblemsSeeBelow": {
     "message": "voir les détails en bas de page"
   },
-  "tagGovRateLimitWait":   {
+  "tagGovRateLimitWait": {
     "message": "Limite de débit atteinte — nouvelle tentative sous peu…"
   },
-  "tagGovQueuedCancelled":   {
+  "tagGovQueuedCancelled": {
     "message": "$N$ tâches en attente annulées",
     "placeholders": {
       "N": {
@@ -1870,19 +1870,19 @@
       }
     }
   },
-  "tagGovStop":   {
+  "tagGovStop": {
     "message": "Arrêter"
   },
-  "tagGovDismiss":   {
+  "tagGovDismiss": {
     "message": "Fermer"
   },
-  "tagGovStopped":   {
+  "tagGovStopped": {
     "message": "Arrêté — les modifications terminées sont conservées."
   },
-  "tagGovQueuedBadge":   {
+  "tagGovQueuedBadge": {
     "message": "En attente…"
   },
-  "tagGovTimeLeft":   {
+  "tagGovTimeLeft": {
     "message": "encore ~$T$",
     "placeholders": {
       "T": {
@@ -1890,7 +1890,7 @@
       }
     }
   },
-  "tagGovLastRun":   {
+  "tagGovLastRun": {
     "message": "Dernière exécution ($D$) :",
     "placeholders": {
       "D": {
@@ -1898,43 +1898,43 @@
       }
     }
   },
-  "tagGovLoadFailed":   {
+  "tagGovLoadFailed": {
     "message": "Impossible de charger les tags — vérifiez votre jeton Pinboard ou le réseau, puis actualisez"
   },
-  "placeholderOptional":   {
+  "placeholderOptional": {
     "message": "facultatif"
   },
-  "tagGovSnapshotSaved":   {
+  "tagGovSnapshotSaved": {
     "message": "Instantané de la liste des tags téléchargé (noms et compteurs uniquement — référence pour réparation manuelle, pas de restauration automatique)"
   },
-  "tagGovSnapshotFailed":   {
+  "tagGovSnapshotFailed": {
     "message": "Impossible de créer le snapshot — fusion/suppression bloquée"
   },
-  "tagGovIrreversibleWarn":   {
+  "tagGovIrreversibleWarn": {
     "message": "Les fusions et suppressions sont irréversibles. Avant la première modification, un instantané de la liste des tags (noms et compteurs) est téléchargé — à titre de référence uniquement."
   },
-  "tagGovBundlesWarn":   {
+  "tagGovBundlesWarn": {
     "message": "Les bundles d'étiquettes sur pinboard.in ne sont pas mis à jour par les renommages — vérifiez-les manuellement après fusion."
   },
-  "optBgSaveMode":   {
+  "optBgSaveMode": {
     "message": "Mode de sauvegarde en arrière-plan"
   },
-  "optBgSaveModeMerge":   {
+  "optBgSaveModeMerge": {
     "message": "Fusion (par défaut — combine les nouvelles étiquettes avec les existantes)"
   },
-  "optBgSaveModeSkip":   {
+  "optBgSaveModeSkip": {
     "message": "Ignorer (si l'URL est déjà sauvegardée, rien faire)"
   },
-  "optBgSaveModeOverwrite":   {
+  "optBgSaveModeOverwrite": {
     "message": "Remplacer (remplace toutes les étiquettes, sans fusion)"
   },
-  "optBgSaveModeHint":   {
+  "optBgSaveModeHint": {
     "message": "Fusion : lit les tags de signet existants et les combine avec les nouveaux tags. Ignorer : évite les doublons. Remplacer : remplace les tags entièrement (les édits au premier plan remplacent toujours)."
   },
-  "bgSkippedTitle":   {
+  "bgSkippedTitle": {
     "message": "Déjà en signet"
   },
-  "bgSkippedExists":   {
+  "bgSkippedExists": {
     "message": "Déjà en signet — sauvegarde ignorée"
   },
   "secPreviewAi": {
@@ -1997,14 +1997,20 @@
   "trProgress": {
     "message": "$DONE$ / $TOTAL$ segments",
     "placeholders": {
-      "done": { "content": "$1" },
-      "total": { "content": "$2" }
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
     }
   },
   "trTargetLang": {
     "message": "Cible : $LANG$",
     "placeholders": {
-      "lang": { "content": "$1" }
+      "lang": {
+        "content": "$1"
+      }
     }
   },
   "trChangeLang": {
@@ -2013,7 +2019,9 @@
   "trDone": {
     "message": "Terminé · $COUNT$ segments",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "trStop": {
@@ -2034,8 +2042,12 @@
   "trEstCost": {
     "message": "Environ ~$COUNT$ tokens · $MODEL$",
     "placeholders": {
-      "count": { "content": "$1" },
-      "model": { "content": "$2" }
+      "count": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
     }
   },
   "trBlockFailed": {

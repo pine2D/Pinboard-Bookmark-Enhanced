@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>i18n parity tests</title>
+<style>.case{font-family:monospace;white-space:pre}.pass{color:#176}.fail{color:#b00}</style>
+</head><body>
+<div id="results"></div>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond; ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+// load via fetch (open this file over http://, e.g. `npx serve` or VS Code Live Server,
+// because file:// blocks fetch of sibling JSON in Chrome)
+async function loadLocale(loc) {
+  const r = await fetch(`../_locales/${loc}/messages.json`);
+  return r.json();
+}
+(async () => {
+  const LOCALES = ["en","de","fr","pl","ru","zh_HK","zh_CN","zh_TW","ja"];
+  const msgs = {};
+  for (const l of LOCALES) msgs[l] = await loadLocale(l);
+
+  // H1: AI/Jina cluster must be translated (≠ English) in these locales
+  const CLUSTER = ["secAiContentSource","aiContentSourceLocal","jinaConverting",
+    "jinaCopied","jinaFailed","jinaApiKeyLabel","jinaApiKeyPlaceholder","jinaViewBtn",
+    "jinaMarkdownTitle","jinaMarkdownTitleJina"];
+  for (const loc of ["de","fr","pl","ru","zh_HK"]) {
+    for (const k of CLUSTER) {
+      const en = msgs.en[k]?.message, tr = msgs[loc][k]?.message;
+      check(`H1 ${loc}.${k} translated`, tr && tr !== en,
+            `${loc}.${k} still == en: ${JSON.stringify(tr)}`);
+    }
+  }
+  console.log(`PASS ${pass} | FAIL ${fail}`);
+})();
+</script></body></html>

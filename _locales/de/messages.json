@@ -1225,19 +1225,19 @@
     "message": "Markdown"
   },
   "jinaMarkdownTitle": {
-    "message": "Convert page to Markdown (Local)"
+    "message": "Seite in Markdown umwandeln (lokal)"
   },
   "jinaMarkdownTitleJina": {
-    "message": "Convert page to Markdown (Jina Reader)"
+    "message": "Seite in Markdown umwandeln (Jina Reader)"
   },
   "jinaConverting": {
-    "message": "Converting..."
+    "message": "Wird konvertiert…"
   },
   "jinaCopied": {
-    "message": "Copied!"
+    "message": "Kopiert!"
   },
   "jinaFailed": {
-    "message": "Failed"
+    "message": "Fehlgeschlagen"
   },
   "aiContentSourceLocalHint": {
     "message": "Hauptinhalt der Seite lokal extrahieren (offline, schnell)."
@@ -1257,7 +1257,7 @@
     }
   },
   "jinaViewBtn": {
-    "message": "View"
+    "message": "Ansehen"
   },
   "mdStripCopied": {
     "message": "Markdown kopiert"
@@ -1389,10 +1389,10 @@
     "message": "Aus dieser Seite konnte kein Inhalt extrahiert werden."
   },
   "secAiContentSource": {
-    "message": "AI Content Source"
+    "message": "KI-Inhaltsquelle"
   },
   "aiContentSourceLocal": {
-    "message": "Local (Defuddle)"
+    "message": "Lokal (Defuddle)"
   },
   "aiContentSourceJina": {
     "message": "Jina Reader"
@@ -1404,7 +1404,7 @@
     "message": "API Key (optional)"
   },
   "jinaApiKeyPlaceholder": {
-    "message": "jina_xxxx (leave empty for free tier)"
+    "message": "jina_xxxx (für kostenloses Kontingent leer lassen)"
   },
   "submitUriTooLong": {
     "message": "Anfrage zu groß — Notizen, Titel oder Tags kürzen"
@@ -1697,10 +1697,10 @@
   "archiveErrTimeoutHint": {
     "message": "Die Anfrage hat das Zeitlimit überschritten - archive.org ist möglicherweise ausgelastet oder das Netzwerk ist langsam"
   },
-  "tabTags":   {
+  "tabTags": {
     "message": "Tags"
   },
-  "tagGovOverview":   {
+  "tagGovOverview": {
     "message": "$TAGS$ Tags · $USES$ Gesamtverwendungen",
     "placeholders": {
       "tags": {
@@ -1711,64 +1711,64 @@
       }
     }
   },
-  "tagGovRefresh":   {
+  "tagGovRefresh": {
     "message": "Aktualisieren"
   },
-  "tagGovGroupsTitle":   {
+  "tagGovGroupsTitle": {
     "message": "Ähnliche Tag-Gruppen"
   },
-  "tagGovNoGroups":   {
+  "tagGovNoGroups": {
     "message": "Keine doppelten Tags gefunden"
   },
-  "tagGovKindPlural":   {
+  "tagGovKindPlural": {
     "message": "Singular/Plural"
   },
-  "tagGovKindSeparator":   {
+  "tagGovKindSeparator": {
     "message": "Trennzeichen"
   },
-  "tagGovKindTypo":   {
+  "tagGovKindTypo": {
     "message": "Tippfehler"
   },
-  "tagGovKindAi":   {
+  "tagGovKindAi": {
     "message": "KI"
   },
-  "tagGovMerge":   {
+  "tagGovMerge": {
     "message": "Zusammenführen"
   },
-  "tagGovIgnore":   {
+  "tagGovIgnore": {
     "message": "Ignorieren"
   },
-  "tagGovResetIgnored":   {
+  "tagGovResetIgnored": {
     "message": "Ignorierte zurücksetzen"
   },
-  "tagGovResetIgnoredConfirm":   {
+  "tagGovResetIgnoredConfirm": {
     "message": "Ignorierte Gruppen löschen und alle Duplikate erneut anzeigen?"
   },
-  "tagGovAiBtn":   {
+  "tagGovAiBtn": {
     "message": "KI-Tiefenanalyse"
   },
-  "tagGovAiRunning":   {
+  "tagGovAiRunning": {
     "message": "Analysiere…"
   },
-  "tagGovAiNone":   {
+  "tagGovAiNone": {
     "message": "Keine KI-Gruppen gefunden"
   },
-  "tagGovAiNoKey":   {
+  "tagGovAiNoKey": {
     "message": "Kein KI-Anbieter konfiguriert - im KI-Tab einrichten"
   },
-  "tagGovLowCountTitle":   {
+  "tagGovLowCountTitle": {
     "message": "Tags mit niedriger Häufigkeit (1 oder weniger)"
   },
-  "tagGovSelectAll":   {
+  "tagGovSelectAll": {
     "message": "Alle auswählen"
   },
-  "tagGovDeleteSelected":   {
+  "tagGovDeleteSelected": {
     "message": "Ausgewählte löschen"
   },
-  "tagGovNoLowCount":   {
+  "tagGovNoLowCount": {
     "message": "Keine Tags mit 1 Verwendung oder weniger."
   },
-  "tagGovConfirmMerge":   {
+  "tagGovConfirmMerge": {
     "message": "$N$ Tags in $CANONICAL$ zusammenführen?",
     "placeholders": {
       "N": {
@@ -1779,7 +1779,7 @@
       }
     }
   },
-  "tagGovConfirmDelete":   {
+  "tagGovConfirmDelete": {
     "message": "$N$ ausgewählte Tags löschen? (permanent)",
     "placeholders": {
       "N": {
@@ -1787,7 +1787,7 @@
       }
     }
   },
-  "tagGovDoneSummary":   {
+  "tagGovDoneSummary": {
     "message": "$OK$ Aufgaben abgeschlossen · $FAIL$ fehlgeschlagen",
     "placeholders": {
       "OK": {
@@ -1798,10 +1798,10 @@
       }
     }
   },
-  "tagGovAborted429":   {
+  "tagGovAborted429": {
     "message": "Rate-Limit — Stapel gestoppt, abgeschlossene Änderungen bleiben erhalten. Ein erneuter Lauf derselben Zusammenführung setzt sicher fort (bereits aktualisierte Lesezeichen werden übersprungen)."
   },
-  "tagGovMergeEstimate":   {
+  "tagGovMergeEstimate": {
     "message": "Geschätzte Dauer: ca. $T$",
     "placeholders": {
       "T": {
@@ -1809,7 +1809,7 @@
       }
     }
   },
-  "tagGovRetagProgress":   {
+  "tagGovRetagProgress": {
     "message": "$DONE$/$TOTAL$ Lesezeichen neu getaggt",
     "placeholders": {
       "DONE": {
@@ -1820,7 +1820,7 @@
       }
     }
   },
-  "tagGovSkippedSummary":   {
+  "tagGovSkippedSummary": {
     "message": "$N$ übersprungen (Notiz zu lang zum erneuten Speichern)",
     "placeholders": {
       "N": {
@@ -1828,7 +1828,7 @@
       }
     }
   },
-  "tagGovOpLabel":   {
+  "tagGovOpLabel": {
     "message": "Aufgabe $I$/$N$",
     "placeholders": {
       "I": {
@@ -1839,7 +1839,7 @@
       }
     }
   },
-  "tagGovQueuedBatches":   {
+  "tagGovQueuedBatches": {
     "message": "$N$ weitere in Warteschlange",
     "placeholders": {
       "N": {
@@ -1847,22 +1847,22 @@
       }
     }
   },
-  "tagGovProblemsTitle":   {
+  "tagGovProblemsTitle": {
     "message": "Lesezeichen, die manuelle Bearbeitung benötigen:"
   },
-  "tagGovProblemFailed":   {
+  "tagGovProblemFailed": {
     "message": "fehlgeschlagen"
   },
-  "tagGovProblemSkipped":   {
+  "tagGovProblemSkipped": {
     "message": "übersprungen (Notiz zu lang)"
   },
-  "tagGovProblemsSeeBelow":   {
+  "tagGovProblemsSeeBelow": {
     "message": "Details unten anzeigen"
   },
-  "tagGovRateLimitWait":   {
+  "tagGovRateLimitWait": {
     "message": "Rate-Limit erreicht — erneuter Versuch folgt…"
   },
-  "tagGovQueuedCancelled":   {
+  "tagGovQueuedCancelled": {
     "message": "$N$ wartende Aufgaben abgebrochen",
     "placeholders": {
       "N": {
@@ -1870,19 +1870,19 @@
       }
     }
   },
-  "tagGovStop":   {
+  "tagGovStop": {
     "message": "Stopp"
   },
-  "tagGovDismiss":   {
+  "tagGovDismiss": {
     "message": "Schließen"
   },
-  "tagGovStopped":   {
+  "tagGovStopped": {
     "message": "Gestoppt — abgeschlossene Änderungen bleiben erhalten."
   },
-  "tagGovQueuedBadge":   {
+  "tagGovQueuedBadge": {
     "message": "In Warteschlange…"
   },
-  "tagGovTimeLeft":   {
+  "tagGovTimeLeft": {
     "message": "noch ca. $T$",
     "placeholders": {
       "T": {
@@ -1890,7 +1890,7 @@
       }
     }
   },
-  "tagGovLastRun":   {
+  "tagGovLastRun": {
     "message": "Letzter Lauf ($D$):",
     "placeholders": {
       "D": {
@@ -1898,43 +1898,43 @@
       }
     }
   },
-  "tagGovLoadFailed":   {
+  "tagGovLoadFailed": {
     "message": "Tags konnten nicht geladen werden — Pinboard-Token oder Netzwerk prüfen, dann Aktualisieren"
   },
-  "placeholderOptional":   {
+  "placeholderOptional": {
     "message": "optional"
   },
-  "tagGovSnapshotSaved":   {
+  "tagGovSnapshotSaved": {
     "message": "Tag-Listen-Snapshot heruntergeladen (nur Namen und Anzahl — Referenz für manuelle Reparatur, keine automatische Wiederherstellung)"
   },
-  "tagGovSnapshotFailed":   {
+  "tagGovSnapshotFailed": {
     "message": "Snapshot konnte nicht erstellt werden — Zusammenführen/Löschen blockiert"
   },
-  "tagGovIrreversibleWarn":   {
+  "tagGovIrreversibleWarn": {
     "message": "Zusammenführungen und Löschungen können nicht rückgängig gemacht werden. Vor der ersten Änderung wird ein Snapshot der Tag-Liste (Namen und Anzahl) heruntergeladen — nur als Referenz."
   },
-  "tagGovBundlesWarn":   {
+  "tagGovBundlesWarn": {
     "message": "Tag-Bundles auf pinboard.in werden bei Umbenennungen nicht automatisch aktualisiert — überprüfen Sie sie nach dem Zusammenführen manuell."
   },
-  "optBgSaveMode":   {
+  "optBgSaveMode": {
     "message": "Modus für Hintergrund-Speichern"
   },
-  "optBgSaveModeMerge":   {
+  "optBgSaveModeMerge": {
     "message": "Zusammenführen (Standard — neue Tags mit vorhandenen kombinieren)"
   },
-  "optBgSaveModeSkip":   {
+  "optBgSaveModeSkip": {
     "message": "Überspringen (wenn URL bereits gespeichert, nichts tun)"
   },
-  "optBgSaveModeOverwrite":   {
+  "optBgSaveModeOverwrite": {
     "message": "Überschreiben (alle Tags ersetzen, nicht zusammenführen)"
   },
-  "optBgSaveModeHint":   {
+  "optBgSaveModeHint": {
     "message": "Zusammenführen: liest vorhandene Lesezeichen-Tags und kombiniert mit neuen Tags. Überspringen: vermeidet Speichern doppelter URLs. Überschreiben: ersetzt Tags vollständig (Vordergrund-Bearbeitung ersetzt immer)."
   },
-  "bgSkippedTitle":   {
+  "bgSkippedTitle": {
     "message": "Bereits als Lesezeichen gespeichert"
   },
-  "bgSkippedExists":   {
+  "bgSkippedExists": {
     "message": "Bereits als Lesezeichen — Speichern übersprungen"
   },
   "secPreviewAi": {
@@ -1997,14 +1997,20 @@
   "trProgress": {
     "message": "$DONE$ / $TOTAL$ Abschnitte",
     "placeholders": {
-      "done": { "content": "$1" },
-      "total": { "content": "$2" }
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
     }
   },
   "trTargetLang": {
     "message": "Zielsprache: $LANG$",
     "placeholders": {
-      "lang": { "content": "$1" }
+      "lang": {
+        "content": "$1"
+      }
     }
   },
   "trChangeLang": {
@@ -2013,7 +2019,9 @@
   "trDone": {
     "message": "Fertig · $COUNT$ Segmente",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "trStop": {
@@ -2034,8 +2042,12 @@
   "trEstCost": {
     "message": "Ca. ~$COUNT$ tokens · $MODEL$",
     "placeholders": {
-      "count": { "content": "$1" },
-      "model": { "content": "$2" }
+      "count": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
     }
   },
   "trBlockFailed": {
