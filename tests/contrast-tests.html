@@ -11,6 +11,10 @@
 <!-- Render each probe inside its real container so getComputedStyle resolves
      the shipped color + the inherited/declared background. -->
 <div class="offline-queue-list"><div class="offline-queue-empty" id="oqe">empty</div></div>
+<div class="autocomplete-dropdown">
+  <div class="ac-item"><span>tag</span><span class="ac-count" id="acc">12</span></div>
+  <div class="ac-hint-footer" id="ach">hint</div>
+</div>
 <script>
 function pass(name){const d=document.createElement("div");d.className="case pass";d.textContent="OK "+name;document.getElementById("results").appendChild(d);}
 function fail(name,msg){const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
@@ -42,6 +46,16 @@ function effectiveBg(el){
 
 test("I1 .offline-queue-empty >= AA 4.5:1", () => {
   const el = document.getElementById("oqe");
+  const r = ratio(getComputedStyle(el).color, effectiveBg(el));
+  if (r < 4.5) throw new Error("contrast " + r.toFixed(2) + ":1 < 4.5:1");
+});
+test("I2 .ac-count >= AA 4.5:1", () => {
+  const el = document.getElementById("acc");
+  const r = ratio(getComputedStyle(el).color, effectiveBg(el));
+  if (r < 4.5) throw new Error("contrast " + r.toFixed(2) + ":1 < 4.5:1");
+});
+test("I2 .ac-hint-footer >= AA 4.5:1", () => {
+  const el = document.getElementById("ach");
   const r = ratio(getComputedStyle(el).color, effectiveBg(el));
   if (r < 4.5) throw new Error("contrast " + r.toFixed(2) + ":1 < 4.5:1");
 });

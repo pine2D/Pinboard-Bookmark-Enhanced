@@ -353,13 +353,13 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .ac-scroll { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .ac-item { padding: 3px 6px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: space-between; }
 .ac-item:hover, .ac-item.selected { background: #d5e5f5; }
-.ac-count { color: #888; font-size: 10px; margin-left: 4px; flex-shrink: 0; }
+.ac-count { color: #717171; font-size: 10px; margin-left: 4px; flex-shrink: 0; }
 .ac-new-hint { color: #888; font-style: italic; cursor: pointer; }
 .ac-new-hint:hover { background: #d5e5f5; color: #333; font-style: normal; }
 .ac-new-icon { color: #4477bb; font-style: normal; font-weight: bold; margin-right: 3px; }
 .ac-hint-footer {
   flex: 0 0 auto;
-  padding: 3px 6px; font-size: 10px; color: #888; border-top: 1px solid #eee;
+  padding: 3px 6px; font-size: 10px; color: #717171; border-top: 1px solid #eee;
   background: #fafafa; user-select: none; cursor: default; line-height: 1.4;
 }
 .ac-hint-footer kbd {
