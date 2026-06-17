@@ -59,5 +59,29 @@ test("I2 .ac-hint-footer >= AA 4.5:1", () => {
   const r = ratio(getComputedStyle(el).color, effectiveBg(el));
   if (r < 4.5) throw new Error("contrast " + r.toFixed(2) + ":1 < 4.5:1");
 });
+test("I3 solarized-light --pp-fg meets AA on --pp-bg", () => {
+  document.documentElement.setAttribute("data-theme", "solarized-light");
+  try {
+    const s = getComputedStyle(document.documentElement);
+    const fg = s.getPropertyValue("--pp-fg").trim();
+    const bg = s.getPropertyValue("--pp-bg").trim();
+    if (!fg || !bg) throw new Error("CSS vars not resolved (fg=" + fg + " bg=" + bg + ")");
+    // Create a probe element so the browser resolves the vars to rgb()
+    const probe = document.createElement("div");
+    probe.style.color = "var(--pp-fg)";
+    probe.style.backgroundColor = "var(--pp-bg)";
+    probe.style.position = "fixed";
+    probe.style.visibility = "hidden";
+    document.body.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    const fgRgb = cs.color;
+    const bgRgb = cs.backgroundColor;
+    document.body.removeChild(probe);
+    const r = ratio(fgRgb, bgRgb);
+    if (r < 4.5) throw new Error("contrast " + r.toFixed(3) + ":1 < 4.5:1 (fg=" + fg + " bg=" + bg + ")");
+  } finally {
+    document.documentElement.removeAttribute("data-theme");
+  }
+});
 </script>
 </body></html>
