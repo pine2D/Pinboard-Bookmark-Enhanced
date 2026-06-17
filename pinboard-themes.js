@@ -5650,7 +5650,7 @@ html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 
     css: `:root {
   --pinboard-bg: #fdf6e3;
   --pinboard-bg-surface: #eee8d5;
-  --pinboard-fg: #657b83;
+  --pinboard-fg: #586e75;
   --pinboard-fg-strong: #586e75;
   --pinboard-muted: #586e75;
   --pinboard-muted-soft: #93a1a1;

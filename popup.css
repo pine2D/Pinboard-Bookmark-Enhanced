@@ -1224,7 +1224,7 @@ html[data-theme="flexoki-dark"] {
 html[data-theme="solarized-light"] {
   --pp-bg: #fdf6e3;
   --pp-bg2: #eee8d5;
-  --pp-fg: #657b83;
+  --pp-fg: #586e75;
   --pp-fg-muted: #586e75;
   --pp-fg-hint: #657474;
   --pp-link: #268bd2;

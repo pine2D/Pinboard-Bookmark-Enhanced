@@ -14,7 +14,7 @@
   "palette": {
     "bg": "#fdf6e3",
     "bg-surface": "#eee8d5",
-    "fg": "#657b83",
+    "fg": "#586e75",
     "fg-strong": "#586e75",
     "muted": "#586e75",
     "muted-soft": "#93a1a1",

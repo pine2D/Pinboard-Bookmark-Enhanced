@@ -48,17 +48,11 @@ const resolveColor = (s, bg) => {
 // pairs would still fail the audit — only the listed (theme, pair) combinations
 // are exempt.
 const ALLOWLIST = new Set([
-  "pinboard:solarized-light:bg vs fg",
   "pinboard:solarized-light:btn-bg vs btn-fg",
   "pinboard:solarized-dark:btn-bg vs btn-fg",
   "pinboard:solarized-dark:muted vs bg-surface",
   "pinboard:nord-night:btn-bg vs btn-fg",
   "pinboard:catppuccin-latte:btn-bg vs btn-fg",
-  // Solarized-light's body fg/bg is intentionally low-contrast (mirrors the
-  // pinboard:solarized-light:bg vs fg exemption); the popup and options surfaces
-  // inherit the same pilot palette.
-  "popup:solarized-light:fg vs bg",
-  "options:solarized-light:fg vs bg",
 ]);
 
 const violations = [];
