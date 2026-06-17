@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Batch Dedup Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 900px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; }
+.fail { color: #c00; font-weight: bold; }
+h2 { margin-top: 24px; }
+</style></head>
+<body>
+<h1>Batch dedup data-integrity tests</h1>
+<h2>A1: computeSavedUrlSet — cache only done URLs</h2>
+<div id="results-a1"></div>
+<script src="../shared.js"></script>
+<script>
+function run(rootId, cases) {
+  const root = document.getElementById(rootId);
+  for (const c of cases) {
+    let ok, got;
+    try { got = c.fn(); ok = c.check(got); }
+    catch (e) { got = "THREW: " + e.message; ok = false; }
+    const div = document.createElement("div");
+    div.className = "case " + (ok ? "pass" : "fail");
+    div.textContent = `${ok ? "PASS" : "FAIL"}  ${c.name}\n   got: ${JSON.stringify(got)}${ok ? "" : `\n   expected: ${c.expected}`}`;
+    root.appendChild(div);
+  }
+}
+
+// A1: only URLs that actually returned result_code==="done" enter the cache.
+run("results-a1", [
+  {
+    name: "saved subset unions into existing; failed/tooLong excluded",
+    fn: () => {
+      const existing = new Set(["https://pre.example/"]);
+      // simulate loop: a=done, b=failed, c=tooLong(never attempted), d=done
+      const savedUrls = ["https://a.example/", "https://d.example/"];
+      return [...computeSavedUrlSet(existing, savedUrls)].sort();
+    },
+    check: (got) => JSON.stringify(got) === JSON.stringify(
+      ["https://a.example/", "https://d.example/", "https://pre.example/"]),
+    expected: '["https://a.example/","https://d.example/","https://pre.example/"]'
+  },
+  {
+    name: "no saved URLs -> existing unchanged",
+    fn: () => [...computeSavedUrlSet(new Set(["https://pre.example/"]), [])].sort(),
+    check: (got) => JSON.stringify(got) === JSON.stringify(["https://pre.example/"]),
+    expected: '["https://pre.example/"]'
+  },
+  {
+    name: "does not mutate the input set",
+    fn: () => {
+      const existing = new Set(["https://pre.example/"]);
+      computeSavedUrlSet(existing, ["https://a.example/"]);
+      return [...existing];
+    },
+    check: (got) => JSON.stringify(got) === JSON.stringify(["https://pre.example/"]),
+    expected: '["https://pre.example/"]'
+  }
+]);
+</script>
+</body></html>

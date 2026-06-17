@@ -97,6 +97,7 @@ function setupTabSet() {
 
       let saved = 0, failed = 0, skipped = 0, tooLong = 0;
       let existingUrls = new Set();
+      const savedUrls = [];
       let existingPerTabFallback = false;
       if (settings.batchSkipExisting) {
         const result = await fetchExistingUrlSet(pinboardToken);
@@ -197,6 +198,7 @@ function setupTabSet() {
           const data = await (await pinboardFetch(apiUrl)).json();
           if (data.result_code === "done") {
             saved++;
+            savedUrls.push(tab.url);
             if (settings.waybackArchiveEnabled && settings.waybackArchiveBatch) {
               chrome.runtime.sendMessage({ type: "archive_url", url: tab.url }).catch(() => {});
             }
@@ -204,8 +206,10 @@ function setupTabSet() {
         } catch (_) { failed++; }
       }
       if (saved > 0) {
-        const newUrls = validTabs.filter(tab => !existingUrls.has(tab.url)).map(tab => tab.url);
-        newUrls.forEach(u => existingUrls.add(u));
+        // Cache only URLs that actually returned result_code==="done" (savedUrls),
+        // NOT every non-pre-existing tab — failed/tooLong/thrown tabs must stay
+        // re-savable on the next run, not get masked by the 30-min dedup cache.
+        existingUrls = computeSavedUrlSet(existingUrls, savedUrls);
         try {
           await chrome.storage.local.set({
             cached_existing_urls: { urls: [...existingUrls], timestamp: Date.now() }

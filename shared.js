@@ -303,6 +303,16 @@ function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", sh
   return uri;
 }
 
+// ---- Batch dedup: union ONLY the URLs that actually saved (result_code==="done")
+// into the existing-URL set before caching. Caching tabs that FAILED / were tooLong /
+// threw would mark them "already saved" and silently skip them on re-run for the
+// 30-min cache TTL. Returns a NEW set (does not mutate `existingUrls`).
+function computeSavedUrlSet(existingUrls, savedUrls) {
+  const out = new Set(existingUrls);
+  for (const u of (savedUrls || [])) out.add(u);
+  return out;
+}
+
 // ---- Pinboard error classifier ----
 // Returns an i18n key describing a Pinboard API failure.
 // Input: HTTP Response, Error, or status number. Caller handles 401 (pinboardFetch redirects)
