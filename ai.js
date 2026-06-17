@@ -553,12 +553,12 @@ function buildTagPrompt(s, title, url, content, description, userTags) {
   else langInst = `Tags must be in ${lang}.`;
   const tmpl = s.customTagPrompt?.trim() || DEFAULT_TAG_PROMPT;
   let prompt = tmpl
-    .replace(/\{\{lang_instruction\}\}/g, langInst)
-    .replace(/\{\{separator_instruction\}\}/g, sepMap[sep] || sepMap["-"])
-    .replace(/\{\{title\}\}/g, title)
-    .replace(/\{\{url\}\}/g, url)
-    .replace(/\{\{content\}\}/g, (content || "").substring(0, 4000))
-    .replace(/\{\{description\}\}/g, description || "");
+    .replace(/\{\{lang_instruction\}\}/g, () => langInst)
+    .replace(/\{\{separator_instruction\}\}/g, () => sepMap[sep] || sepMap["-"])
+    .replace(/\{\{title\}\}/g, () => title || "")
+    .replace(/\{\{url\}\}/g, () => url || "")
+    .replace(/\{\{content\}\}/g, () => (content || "").substring(0, 4000))
+    .replace(/\{\{description\}\}/g, () => description || "");
   if (userTags && userTags.length > 0) {
     prompt += `\n\nExisting tags (prefer reusing these if applicable): ${userTags.slice(0, 50).join(", ")}`;
   }
@@ -577,11 +577,11 @@ function buildSummaryPrompt(s, title, url, content, description) {
   else if (lang === "ko") langInst = "Write in Korean.";
   else if (lang !== "auto") langInst = `Write in ${lang}.`;
   return tmpl
-    .replace(/\{\{title\}\}/g, title)
-    .replace(/\{\{url\}\}/g, url)
-    .replace(/\{\{content\}\}/g, (content || "").substring(0, 4000))
-    .replace(/\{\{description\}\}/g, description || "")
-    .replace(/\{\{lang_instruction\}\}/g, langInst);
+    .replace(/\{\{title\}\}/g, () => title || "")
+    .replace(/\{\{url\}\}/g, () => url || "")
+    .replace(/\{\{content\}\}/g, () => (content || "").substring(0, 4000))
+    .replace(/\{\{description\}\}/g, () => description || "")
+    .replace(/\{\{lang_instruction\}\}/g, () => langInst);
 }
 
 // ---- Parse AI tag response ----

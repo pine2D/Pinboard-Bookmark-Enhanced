@@ -1568,4 +1568,38 @@ suiteIf("pbpExplainBuildPrompt", "pbpAskInit", () => {
   });
 });
 </script>
+
+<script>
+// ============ Group B1: prompt builders must substitute LITERALLY ============
+suite("buildTagPrompt / buildSummaryPrompt $-literal substitution", () => {
+  // Minimal settings: force the DEFAULT templates (no custom prompt) so {{...}}
+  // placeholders are present and the only variable is our injected value.
+  const S = { aiTagSeparator: "-", aiTagLang: "en", aiSummaryLang: "en" };
+
+  test("tag prompt: content with $$ / $& / $1 is inserted verbatim", () => {
+    const evil = "math $$E=mc^2$$ and $& and group $1 and shell $HOME";
+    const p = buildTagPrompt(S, "T", "https://x.test/", evil, "", []);
+    assert(p.indexOf(evil) !== -1, "content corrupted: " + p);
+  });
+
+  test("tag prompt: title/url $-sequences verbatim", () => {
+    // DEFAULT_TAG_PROMPT has {{title}} and {{url}} but not {{description}}
+    const p = buildTagPrompt(S, "price $5 $$", "https://x.test/?a=$1", "body", "desc", []);
+    assert(p.indexOf("price $5 $$") !== -1, "title corrupted: " + p);
+    assert(p.indexOf("https://x.test/?a=$1") !== -1, "url corrupted: " + p);
+  });
+
+  test("summary prompt: content with $$ / $& / $1 inserted verbatim", () => {
+    const evil = "math $$x+y$$ and $& and $1 and $HOME";
+    const p = buildSummaryPrompt(S, "T", "https://x.test/", evil, "");
+    assert(p.indexOf(evil) !== -1, "content corrupted: " + p);
+  });
+
+  test("summary prompt: title $-sequences verbatim", () => {
+    // DEFAULT_SUMMARY_PROMPT has {{title}} and {{content}} but not {{url}}/{{description}}
+    const p = buildSummaryPrompt(S, "title $$ $1", "https://x.test/", "body", "desc");
+    assert(p.indexOf("title $$ $1") !== -1, "title corrupted: " + p);
+  });
+});
+</script>
 </body></html>
