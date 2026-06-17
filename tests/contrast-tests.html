@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Popup Contrast Tests</title>
+<link rel="stylesheet" href="../popup.css">
+<style>
+  .case.pass { color: #0a0; }
+  .case.fail { color: #c00; font-weight: bold; }
+</style>
+</head>
+<body>
+<div id="results"></div>
+<!-- Render each probe inside its real container so getComputedStyle resolves
+     the shipped color + the inherited/declared background. -->
+<div class="offline-queue-list"><div class="offline-queue-empty" id="oqe">empty</div></div>
+<script>
+function pass(name){const d=document.createElement("div");d.className="case pass";d.textContent="OK "+name;document.getElementById("results").appendChild(d);}
+function fail(name,msg){const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
+function test(name,fn){try{fn();pass(name);}catch(e){fail(name,e.message);}}
+
+// WCAG relative-luminance contrast (same formula as tools/contrast-audit.mjs).
+function _rgb(s){
+  const m = s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) throw new Error("not an rgb() color: " + s);
+  return [+m[1], +m[2], +m[3]];
+}
+function _lum(c){
+  const f = v => { v/=255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); };
+  return 0.2126*f(c[0]) + 0.7152*f(c[1]) + 0.0722*f(c[2]);
+}
+function ratio(fg, bg){
+  const a=_lum(_rgb(fg)), b=_lum(_rgb(bg));
+  const hi=Math.max(a,b), lo=Math.min(a,b);
+  return (hi+0.05)/(lo+0.05);
+}
+// Walk up to the first element with a non-transparent background-color.
+function effectiveBg(el){
+  for (let n=el; n; n=n.parentElement){
+    const bg = getComputedStyle(n).backgroundColor;
+    if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") return bg;
+  }
+  return "rgb(255, 255, 255)";
+}
+
+test("I1 .offline-queue-empty >= AA 4.5:1", () => {
+  const el = document.getElementById("oqe");
+  const r = ratio(getComputedStyle(el).color, effectiveBg(el));
+  if (r < 4.5) throw new Error("contrast " + r.toFixed(2) + ":1 < 4.5:1");
+});
+</script>
+</body></html>

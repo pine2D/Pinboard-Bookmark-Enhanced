@@ -653,7 +653,7 @@ html.dark .batch-progress-text { color: #e0e0e0; mix-blend-mode: normal; filter:
 .offline-queue-empty {
   padding: 8px;
   text-align: center;
-  color: #999;
+  color: #6b6b6b;
 }
 .offline-queue-item {
   display: flex;
