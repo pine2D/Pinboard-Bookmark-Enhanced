@@ -77,6 +77,40 @@ async function loadLocale(loc) {
     check(`H4 ${loc}.jinaAuthFailed has no U+2192`,
           !(msgs[loc].jinaAuthFailed?.message || "").includes("→"),
           `${loc}.jinaAuthFailed: ${JSON.stringify(msgs[loc].jinaAuthFailed?.message)}`);
+  // H5: enumerate English-identical keys per locale, excluding brand/technical tokens
+  const BRAND_OK = new Set([
+    "extName","appName","labelUrl","labelApiKey","labelApiToken","labelBaseUrl",
+    "langZh","langZhTW","langZhHK","langEn","langJa","langKo","langFr","langDe","langEs","langRu",
+    "provGemini","provOpenai","provClaude","provDeepseek","provQwen","provMinimax",
+    "provOpenrouter","provGroq","provMistral","provCohere","provSiliconflow","provZhipu",
+    "provKimi","provOllama","provCustom","provHuggingface",
+    "jinaMarkdownBtn","aiContentSourceJina","secJinaReader","mdStripObsidian","tabMarkdown",
+    "hintClaudeModel","hintZhipuModel","hintKimiModel","labelAiTags","placeholderTags",
+    "optUrlCleanCustomPlaceholder","optUrlCleanExcludePlaceholder","customCSSPlaceholder",
+    "tagPresetsPlaceholder","translateGlossaryPlaceholder","aiCancel",
+    // keyboard shortcuts — same in all locales (platform keys)
+    "hintCtrlEnter","aiSummaryBtnTitle",
+    // pure placeholder-format strings — no translatable text
+    "batchProgress",
+    // loanwords / same-word in target language
+    "tabPopup","tabAI","tagGovKindAi","mdOptFrontmatter","secPrompts","labelTagPrompt",
+    "aiErrorDetails","qlSets","labelTags","aiErrorOpTags","secTags","tabTags",
+    "placeholderOptional","optPopupWidth550","jinaApiKeyLabel",
+    "optWaybackS3Key","optWaybackS3Secret","trViewOriginal",
+    "labelNotes","tagCount","tagCountPlural","qlNotes","sepUnderscore",
+    "secNotifications","qlNotesTitle","mdOptImages","aiContentSourceLocal",
+    "optPopupWidth450","trProgress","labelModel","tagGovKindSeparator"
+  ]);
+  for (const loc of ["de","fr","pl","ru","zh_HK"]) {
+    const offenders = Object.keys(msgs.en).filter(k =>
+      !BRAND_OK.has(k) &&
+      msgs[loc][k]?.message != null &&
+      msgs[loc][k].message === msgs.en[k].message);
+    // log the worklist so the implementer sees exactly what to translate
+    console.log(`H5 ${loc} untranslated (${offenders.length}):`, offenders.join(", "));
+    check(`H5 ${loc} has no non-brand English-identical keys`, offenders.length === 0,
+          `${offenders.length} left: ${offenders.slice(0,12).join(", ")}…`);
+  }
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>

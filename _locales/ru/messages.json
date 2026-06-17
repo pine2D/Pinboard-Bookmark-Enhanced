@@ -109,7 +109,7 @@
     "message": "Ошибка аутентификации."
   },
   "settingsPassword": {
-    "message": "settings/password"
+    "message": "настройки/пароль"
   },
   "labelUrl": {
     "message": "Ссылка"
@@ -334,7 +334,7 @@
     "message": "Превышено время ожидания, повторите позже"
   },
   "qlSets": {
-    "message": "Sets"
+    "message": "Наборы"
   },
   "qlNetwork": {
     "message": "связи"

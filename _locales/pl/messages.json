@@ -109,7 +109,7 @@
     "message": "Uwierzytelnianie nie powiodło się."
   },
   "settingsPassword": {
-    "message": "settings/password"
+    "message": "ustawienia/hasło"
   },
   "labelUrl": {
     "message": "URL"
