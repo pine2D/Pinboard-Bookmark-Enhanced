@@ -1433,6 +1433,9 @@
   "overlayQuotaFallback": {
     "message": "CSS zapisany lokalnie (limit synchronizacji pełny)"
   },
+  "optSavedLocally": {
+    "message": "Zapisano lokalnie (limit synchronizacji pełny)"
+  },
   "optSaveFailed": {
     "message": "Zapis nie powiódł się — ustawienia zbyt duże do synchronizacji"
   },

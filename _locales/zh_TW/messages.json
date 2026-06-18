@@ -1433,6 +1433,9 @@
   "overlayQuotaFallback": {
     "message": "CSS 僅儲存到本機（同步配額已滿）"
   },
+  "optSavedLocally": {
+    "message": "僅儲存到本機（同步配額已滿）"
+  },
   "optSaveFailed": {
     "message": "儲存失敗 — 設定內容過大，無法同步"
   },

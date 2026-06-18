@@ -953,7 +953,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     const res = await persistSettings(data);
     // Save customOverlayCSS with quota-aware fallback (sync → local on QUOTA_BYTES)
     await saveOverlayWithFallback($id("opt-custom-css").value);
-    if (res.ok) {
+    if (res.ok && res.fellBackToLocal) {
+      // A large prompt key (>8KB) exceeded the sync quota and fell back to local
+      // storage — it won't sync to other devices. Surface it the same way
+      // saveOverlayWithFallback does for the overlay, instead of a silent "saved"
+      // flash that hides the degraded sync (F4).
+      const status = $id("auto-save-status");
+      if (status) {
+        status.textContent = t("optSavedLocally") || "Saved locally (sync quota full)";
+        status.classList.add("saved");
+        clearTimeout(status._timer);
+        status._timer = setTimeout(() => {
+          status.textContent = t("optAutoSave"); status.classList.remove("saved");
+        }, 4000);
+      }
+    } else if (res.ok) {
       flashAutoSave();
     } else {
       const status = $id("auto-save-status");

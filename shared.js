@@ -532,9 +532,9 @@ async function persistSettings(data) {
       }
     }
     await storage.set(batch);
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.lastError) {
-      return { ok: false, fellBackToLocal, error: new Error(chrome.runtime.lastError.message) };
-    }
+    // MV3 promise-based storage.set() rejects on failure (handled by catch below);
+    // it never sets chrome.runtime.lastError (a callback-API artifact). Mirrors the
+    // try/catch-only convention in options.js saveOverlayWithFallback (F4).
     return { ok: true, fellBackToLocal };
   } catch (e) {
     return { ok: false, fellBackToLocal, error: e instanceof Error ? e : new Error(String(e)) };
