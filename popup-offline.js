@@ -23,10 +23,9 @@
     const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
     return offlineQueue;
   }
-
-  async function setQueue(q) {
-    await chrome.storage.local.set({ offlineQueue: q });
-  }
+  // NOTE: no setQueue() here — the offline queue is mutated ONLY by the SW
+  // (background.js mutateOfflineQueue, single-writer mutex, D1). The popup reads
+  // via getQueue() and sends messages for retry/remove; it never writes directly.
 
   async function refreshBar() {
     const q = await getQueue();
