@@ -785,11 +785,11 @@ html.dark .batch-progress-text { color: #e0e0e0; mix-blend-mode: normal; filter:
 
 /* ===================== Dark Mode ===================== */
 /* JS adds .dark to <html> based on theme setting (auto/dark/light) */
-html.dark body { background: #1a1a1a; color: #e0e0e0; }
+html.dark body { background: var(--pp-bg); color: var(--pp-fg); }
 html.dark a { color: #6699ff; }
-html.dark .header-bar { background: #252525; border-color: #444; color: #aaa; }
-html.dark .header-bar a { color: #aaa; }
-html.dark .header-bar .header-link { color: #aaa; }
+html.dark .header-bar { background: var(--pp-bg2); border-color: #444; color: var(--pp-fg-muted); }
+html.dark .header-bar a { color: var(--pp-fg-muted); }
+html.dark .header-bar .header-link { color: var(--pp-fg-muted); }
 html.dark .header-bar .header-link:hover { color: #ddd; }
 html.dark .login-body p { color: #bbb; }
 html.dark .login-body input { background: #2a2a2a; border-color: #555; color: #e0e0e0; }
@@ -801,12 +801,12 @@ html.dark .tags-input-wrap:focus-within { border-color: #4477bb; background: #1e
 html.dark .tags-input-wrap input { background: transparent; color: #e0e0e0; }
 html.dark .tag-item { background: #3a3a3a; color: #ddd; }
 html.dark .tag-item:hover { background: #4a4a4a; }
-html.dark .autocomplete-dropdown { background: #252525; border-color: #555; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+html.dark .autocomplete-dropdown { background: var(--pp-bg2); border-color: #555; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 html.dark .ac-item { color: #ddd; }
 html.dark .ac-item:hover, html.dark .ac-item.selected { background: #2a3f5f; }
-html.dark .ac-count { color: #777; }
-html.dark .submit-hint { color: #666; }
-html.dark .kb-hint { color: #777; }
+html.dark .ac-count { color: var(--pp-fg-hint); }
+html.dark .submit-hint { color: var(--pp-fg-hint); }
+html.dark .kb-hint { color: var(--pp-fg-hint); }
 html.dark .submit-bar button { background: #2a2a2a; border-color: #666; color: #ddd; }
 html.dark .submit-bar button:hover { background: #333; }
 html.dark #submit-btn { background: #4477bb; color: #fff; border-color: #4477bb; }
@@ -816,12 +816,22 @@ html.dark .del-confirm-popover { background: #252525; border-color: #555; box-sh
 html.dark .del-confirm-popover button { background: #2a2a2a; border-color: #555; color: #ddd; }
 html.dark .del-confirm-yes { color: #ff6666 !important; border-color: #ff6666 !important; }
 html.dark .bottom-bar label { color: #ddd; }
-html.dark .ac-new-hint { color: #777; }
+html.dark .ac-new-hint { color: var(--pp-fg-hint); }
 html.dark .ac-new-hint:hover { background: #2a3f5f; color: #ddd; }
-html.dark .ac-hint-footer { color: #888; border-top-color: #3a3a3a; background: #1f1f1f; }
+html.dark .ac-hint-footer { color: var(--pp-fg-hint); border-top-color: #3a3a3a; background: #1f1f1f; }
 html.dark .ac-hint-footer kbd { color: #ccc; background: #2a2a2a; border-color: #555; box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
 html.dark .ac-new-icon { color: #6699ff; }
 html.dark {
+  /* Default-dark text/surface tiers — token-driven for parity with the generated
+     html[data-theme] layer, and AA-gated by contrast-audit.mjs's html.dark probe.
+     Values clear WCAG AA (4.5:1) on the lightest surface each tier lands on:
+     fg-hint on bg2 (#252525) = 4.56, fg-muted on bg2 = 6.60. Decorative/disabled
+     greys (.stag.used / .preset-btn.used / .ql-sep) stay hardcoded and are exempt. */
+  --pp-bg: #1a1a1a;
+  --pp-bg2: #252525;
+  --pp-fg: #e0e0e0;
+  --pp-fg-muted: #aaaaaa;
+  --pp-fg-hint: #8c8c8c;
   --pp-hover-shadow: 0 1px 2px rgba(120,150,255,0.15), 0 2px 8px rgba(120,150,255,0.18);
   /* Variant tokens (used by .feedback-card[data-variant=...]) */
   --pp-warn-bg: #3a1a1a;
@@ -839,31 +849,31 @@ html.dark {
 }
 html.dark .quick-actions { background: #222; }
 html.dark .quick-actions .divider { border-color: #444; }
-html.dark .qbtn { background: #252525; border-color: #444; color: #aaa; }
+html.dark .qbtn { background: var(--pp-bg2); border-color: #444; color: var(--pp-fg-muted); }
 html.dark .qbtn:hover { background: #2a2a2a; color: #88aaff; box-shadow: var(--pp-hover-shadow); transform: translateY(-1px); }
 html.dark .preset-btn:hover { background: #2a3f5f; box-shadow: var(--pp-hover-shadow); }
 html.dark .qbtn.saving { background: #2a2510; border-color: #4a4020; color: #d4a800; }
 html.dark .qbtn.saved { background: #1a3a1a; border-color: #2a6a2a; color: #88cc88; }
-html.dark .label { color: #999; }
-html.dark .muted { color: #666; }
-html.dark .group-label { color: #666; }
+html.dark .label { color: var(--pp-fg-muted); }
+html.dark .muted { color: var(--pp-fg-hint); }
+html.dark .group-label { color: var(--pp-fg-hint); }
 .stag { transition: color 0.15s; }
 html.dark .stag { color: #6699ff; }
 html.dark .stag.used { color: #444; }
 html.dark .stag.ai { color: #aa77dd; }
-html.dark .cache-hint { color: #666; }
+html.dark .cache-hint { color: var(--pp-fg-hint); }
 html.dark .regen-link { color: #aa77dd; }
 html.dark .action-link { color: #aa77dd; }
-html.dark #desc-char-count { color: #666; }
+html.dark #desc-char-count { color: var(--pp-fg-hint); }
 html.dark #desc-char-count.over-limit { color: #ff6b6b; }
 /* html.dark doesn't override --pp-divider, so set an explicit dark solid color. */
 html.dark .tag-skel { background: #2e2e2e; }
-html.dark .recent-bm-label { color: #777; }
+html.dark .recent-bm-label { color: var(--pp-fg-hint); }
 html.dark .recent-bm-item { color: #6699ff; }
-html.dark .recent-bm-domain { color: #555; }
-html.dark .recent-bm-del { color: #555; }
+html.dark .recent-bm-domain { color: var(--pp-fg-hint); }
+html.dark .recent-bm-del { color: var(--pp-fg-hint); }
 html.dark .recent-bm-del:hover { color: #ff6666; }
-html.dark .recent-bm-edit { color: #777; }
+html.dark .recent-bm-edit { color: var(--pp-fg-hint); }
 html.dark .recent-bm-edit:hover { color: #6699ff; }
 html.dark .edit-cancel { background: rgba(255,255,255,0.12); color: #ddd; }
 html.dark .edit-cancel:hover { background: rgba(255,255,255,0.22); color: #ff6666; }
@@ -871,10 +881,10 @@ html.dark .edit-cancel:focus-visible { outline-color: #6699ff; }
 html.dark .search-field { background: #2a2a2a; border-color: #555; color: #e0e0e0; }
 html.dark .search-field:focus { border-color: #4477bb; background: #1e2a3a; }
 html.dark .search-field:focus-visible { box-shadow: 0 0 0 2px rgba(68,119,187,0.25); }
-html.dark .clear-all-link { color: #666; }
+html.dark .clear-all-link { color: var(--pp-fg-hint); }
 html.dark .clear-all-link:hover { color: #ff6666; }
 html.dark #tags-copy-all:hover { color: #6699ff; }
-html.dark .last-used-hint { color: #666; }
+html.dark .last-used-hint { color: var(--pp-fg-hint); }
 html.dark .last-used-hint:hover { color: #6699ff; }
 html.dark .existing-banner { background: #1a2a3a; border-color: #2a4a6a; color: #6699ff; }
 html.dark .existing-banner.just-saved { background: #1a3a20; border-color: #2d5a34; color: #66ff99; }
@@ -888,17 +898,17 @@ html.dark .offline-clear { color: #ff6666; }
 html.dark .offline-queue-list { background: #1f1c0e; border-top-color: #4a4020; }
 html.dark .offline-queue-item { border-bottom-color: rgba(255,255,255,0.06); }
 html.dark .offline-queue-title { color: #d4c890; }
-html.dark .offline-queue-meta { color: #7a6f4a; }
+html.dark .offline-queue-meta { color: #9d8f5e; }
 html.dark .offline-queue-actions button { border-color: #4a4020; color: #aaa; }
 html.dark .offline-queue-actions button:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: #88aaff; }
 html.dark .offline-queue-actions .offline-queue-remove:hover:not(:disabled) { color: #ff6666; }
-html.dark .offline-queue-empty { color: #6a6a6a; }
+html.dark .offline-queue-empty { color: var(--pp-fg-hint); }
 html.dark .submit-bar button.saved-success { background: #1a3a1a; border-color: #2a6a2a; color: #88cc88; }
 html.dark .submit-bar button.save-error { background: #3a1a1a; border-color: #6a2a2a; color: #ff8888; }
 
-html.dark .add-all-link { color: #666; }
+html.dark .add-all-link { color: var(--pp-fg-hint); }
 html.dark .add-all-link:hover { color: #999; }
-html.dark .submit-bar button.loading { color: #666; }
+html.dark .submit-bar button.loading { color: var(--pp-fg-hint); }
 html.dark .submit-bar button.loading::before, html.dark .action-link.loading::before { border-color: #555; border-top-color: #aaa; }
 
 /* ===================== URL Cleaned Hint (B4) ===================== */

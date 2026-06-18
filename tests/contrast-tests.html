@@ -83,5 +83,55 @@ test("I3 solarized-light --pp-fg meets AA on --pp-bg", () => {
     document.documentElement.removeAttribute("data-theme");
   }
 });
+
+// ---- F1: default-dark layer (html.dark) AA — the hand-maintained layer the
+// factory does NOT generate. Mirrors tools/contrast-audit.mjs's html.dark probe.
+// Run each probe with html.dark set so the shipped dark rules + token palette apply.
+function withDark(fn){
+  document.documentElement.classList.add("dark");
+  try { return fn(); } finally { document.documentElement.classList.remove("dark"); }
+}
+// Resolve a (color-var, bg-var) pair to its shipped rgb() under the current root.
+function varPairRatio(fgVar, bgVar){
+  const probe = document.createElement("div");
+  probe.style.color = "var(" + fgVar + ")";
+  probe.style.backgroundColor = "var(" + bgVar + ")";
+  probe.style.position = "fixed";
+  probe.style.visibility = "hidden";
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const fgRgb = cs.color, bgRgb = cs.backgroundColor;
+  document.body.removeChild(probe);
+  if (!/^rgb/.test(bgRgb) || bgRgb === "rgba(0, 0, 0, 0)") throw new Error(bgVar + " did not resolve (" + bgRgb + ")");
+  return ratio(fgRgb, bgRgb);
+}
+test("F1 dark .ac-count >= AA 4.5:1", () => withDark(() => {
+  const el = document.getElementById("acc");
+  const r = ratio(getComputedStyle(el).color, effectiveBg(el));
+  if (r < 4.5) throw new Error("dark contrast " + r.toFixed(2) + ":1 < 4.5:1");
+}));
+test("F1 dark .ac-hint-footer >= AA 4.5:1", () => withDark(() => {
+  const el = document.getElementById("ach");
+  const r = ratio(getComputedStyle(el).color, effectiveBg(el));
+  if (r < 4.5) throw new Error("dark contrast " + r.toFixed(2) + ":1 < 4.5:1");
+}));
+test("F1 dark .offline-queue-empty >= AA 4.5:1", () => withDark(() => {
+  const el = document.getElementById("oqe");
+  const r = ratio(getComputedStyle(el).color, effectiveBg(el));
+  if (r < 4.5) throw new Error("dark contrast " + r.toFixed(2) + ":1 < 4.5:1");
+}));
+// Token-tier probes against the strictest surface each tier lands on (bg2=#252525).
+test("F1 dark --pp-fg-hint meets AA on --pp-bg2", () => withDark(() => {
+  const r = varPairRatio("--pp-fg-hint", "--pp-bg2");
+  if (r < 4.5) throw new Error("fg-hint on bg2 " + r.toFixed(2) + ":1 < 4.5:1");
+}));
+test("F1 dark --pp-fg-muted meets AA on --pp-bg2", () => withDark(() => {
+  const r = varPairRatio("--pp-fg-muted", "--pp-bg2");
+  if (r < 4.5) throw new Error("fg-muted on bg2 " + r.toFixed(2) + ":1 < 4.5:1");
+}));
+test("F1 dark --pp-fg meets AA on --pp-bg", () => withDark(() => {
+  const r = varPairRatio("--pp-fg", "--pp-bg");
+  if (r < 4.5) throw new Error("fg on bg " + r.toFixed(2) + ":1 < 4.5:1");
+}));
 </script>
 </body></html>
