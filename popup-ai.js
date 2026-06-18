@@ -86,7 +86,10 @@ async function enrichPageTextIfJina() {
 }
 
 const AI_SUMMARY_TAG = "[AI Summary]";
-const AI_BQ_REGEX = /(\n\n)?\[AI Summary\]\n<blockquote>[\s\S]*?<\/blockquote>\s*$/;
+// Single source of truth: the regex literal lives in shared.js (_AI_BQ_REGEX_SHARED),
+// which popup.html loads before popup-ai.js. Alias it here so the [AI Summary]
+// blockquote pattern can never drift between the two files (F3).
+const AI_BQ_REGEX = _AI_BQ_REGEX_SHARED;
 // pbpShouldRestoreCachedSummary is defined in shared.js (pure helper, B4).
 
 // ---- Setup AI feature listeners ----
