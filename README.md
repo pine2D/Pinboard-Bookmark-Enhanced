@@ -17,14 +17,15 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 ## Features
 
 - **Smart capture** — auto-fills the title, URL, meta description, referrer, and any selected text, and strips tracking parameters (`utm_*`, `gclid`, `fbclid`, …) from the saved URL on capture or paste, with an aggressive mode and custom keep/remove lists
-- **AI tags & summaries** — bring your own key for 13 popular LLM providers, or any OpenAI-compatible endpoint; the AI reads the cleaned article body with ads, menus, and sidebars stripped out
-- **Tag assistant** — autocomplete from your own tags, Pinboard's suggested tags, and one-tap tag presets
-- **Quick save** — save the page (or as *read later*) straight from a keyboard shortcut, no popup needed; or batch-save every open tab with per-tab AI tagging and live progress, and bundle them into a Tab Set
-- **Find & revisit** — search your bookmarks, jump to Unread / Network / Notes / Popular, and browse recent saves; the toolbar icon flips when the current page is already bookmarked
-- **Offline queue** — drafts persist locally and sync when you reconnect
-- **Themeable `pinboard.in`** — 13 curated palettes (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus a custom-CSS overlay that syncs across devices, with an adjustable popup width
-- **Page-to-Markdown** — turn the current page into clean Markdown with a built-in preview (rendered/raw views, table of contents, and reading stats); copy or download as `.md` or styled `.html`, tune frontmatter, image handling, and TOC inclusion, or optionally send it straight to [Obsidian](https://obsidian.md); pick [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (local) or [Jina Reader](https://jina.ai/reader) (cloud)
-- **9 languages** · configurable shortcuts · zero tracking
+- **Quick & batch save** — save the page (or as *read later*) from a keyboard shortcut without opening the popup, or batch-save every open tab with per-tab AI tagging, live progress, and a Tab Set bundle; drafts queue offline and sync when you reconnect
+- **AI tags & summaries** — bring your own key for 13 LLM providers or any OpenAI-compatible endpoint; the AI reads the cleaned article body with ads, menus, and sidebars stripped out
+- **Tag tools** — autocomplete from your own tags, Pinboard's suggested tags, and one-tap presets, plus a governance panel that surfaces duplicate and low-count tags (heuristic + on-demand AI clustering) and merges them in throttled batches with live progress
+- **Quick links & status** — one-tap to your Unread, Network, Notes, and Popular pages; the toolbar icon flips when the current page is already bookmarked
+- **Page-to-Markdown** — turn the current page into clean Markdown with a built-in preview (rendered/raw views, table of contents, reading stats); copy or download as `.md` or styled `.html`, tune frontmatter, image handling, and TOC, or send it straight to [Obsidian](https://obsidian.md). Site-aware extraction keeps Q&A and forum threads readable (Zhihu, Hacker News, Stack Overflow, …); pick [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (local) or [Jina Reader](https://jina.ai/reader) (cloud)
+- **Ask & translate the page** — from that Markdown preview, ask questions and get streamed answers with verified citations that jump to the source, explain any selected passage inline, or translate the whole page with a custom glossary and original / bilingual / translation views
+- **Auto-archive** — optionally push every save to the Internet Archive's [Wayback Machine](https://web.archive.org), with an archive log and retry, so your links outlive link-rot
+- **Themeable `pinboard.in`** — 13 curated palettes (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus a custom-CSS overlay that syncs across devices, an adjustable popup width, and sort-by-popularity on tag pages
+- **9 languages** · configurable shortcuts · local-first storage · zero tracking
 
 ## Install
 

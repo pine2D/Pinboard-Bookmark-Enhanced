@@ -16,15 +16,16 @@ Rozszerzenie Chrome, które wzbogaca zakładki [Pinboard](https://pinboard.in) o
 
 ## Funkcje
 
-- **Inteligentne przechwytywanie** — automatyczne wypełnianie tytułu, URL, meta-opisu, referrera i zaznaczonego tekstu, a także usuwanie parametrów śledzących (`utm_*`, `gclid`, `fbclid`, …) z zapisywanego URL przy przechwytywaniu lub wklejaniu, z trybem agresywnym oraz własnymi listami zachowywania/usuwania
-- **Tagi i streszczenia AI** — własny klucz dla 13 popularnych dostawców LLM lub dowolnego endpointu zgodnego z OpenAI; do AI trafia oczyszczona treść artykułu — bez reklam, menu i pasków bocznych
-- **Asystent tagów** — autouzupełnianie z Twoich własnych tagów, tagów sugerowanych przez Pinboard oraz gotowych zestawów tagów dodawanych jednym dotknięciem
-- **Szybki zapis** — zapisz stronę (lub jako *do przeczytania później*) bezpośrednio skrótem klawiszowym, bez otwierania okna; albo zapisz hurtowo wszystkie otwarte karty z tagowaniem AI dla każdej karty i postępem na żywo, łącząc je w Zestaw kart
-- **Wyszukiwanie i powroty** — przeszukuj swoje zakładki, przejdź do Nieprzeczytanych / Sieci / Notatek / Popularnych i przeglądaj ostatnie zapisy; ikona na pasku zmienia się, gdy bieżąca strona jest już w Twoich zakładkach
-- **Kolejka offline** — wersje robocze są zapisywane lokalnie i synchronizowane po ponownym połączeniu
-- **Motywy dla `pinboard.in`** — 13 dopracowanych palet (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus własna nakładka CSS synchronizowana między urządzeniami, z regulowaną szerokością okna
-- **Strona do Markdown** — przekonwertuj bieżącą stronę na czysty Markdown z wbudowanym podglądem (widoki renderowany/źródłowy, spis treści, statystyki czytania); kopiuj lub pobieraj jako `.md` lub stylizowany `.html`, dostosuj frontmatter, obsługę obrazów i dołączanie spisu treści albo opcjonalnie wyeksportuj do [Obsidian](https://obsidian.md); wybierz [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokalnie) lub [Jina Reader](https://jina.ai/reader) (w chmurze)
-- **9 języków** · konfigurowalne skróty · zero śledzenia
+- **Inteligentne przechwytywanie** — automatycznie wypełnia tytuł, URL, meta-opis, referrer i zaznaczony tekst, a przy przechwytywaniu lub wklejaniu usuwa z zapisywanego adresu parametry śledzące (`utm_*`, `gclid`, `fbclid`, …) — z trybem agresywnym i własnymi listami parametrów do zachowania lub usunięcia
+- **Zapis pojedynczy i zbiorczy** — zapisz stronę (lub odłóż ją *na później*) skrótem klawiszowym, bez otwierania okna; albo zapisz naraz wszystkie otwarte karty — z osobnym tagowaniem AI każdej z nich, postępem na żywo i spięciem ich w Zestaw kart; wersje robocze czekają w kolejce offline i synchronizują się po ponownym połączeniu
+- **Tagi i streszczenia AI** — podłącz własny klucz do 13 dostawców LLM lub dowolnego endpointu zgodnego z OpenAI; do AI trafia oczyszczona treść artykułu — bez reklam, menu i pasków bocznych
+- **Narzędzia do tagów** — autouzupełnianie z Twoich własnych tagów, tagów sugerowanych przez Pinboard oraz gotowych zestawów dodawanych jednym dotknięciem, a do tego panel porządkowania, który wychwytuje zduplikowane i rzadko używane tagi (heurystyka + grupowanie AI na żądanie) i scala je partiami w kontrolowanym tempie, z postępem na żywo
+- **Szybkie odnośniki i status** — jednym dotknięciem do stron Nieprzeczytane, Sieć, Notatki i Popularne; ikona na pasku zmienia się, gdy bieżąca strona jest już w zakładkach
+- **Strona do Markdown** — zamień bieżącą stronę w czysty Markdown z wbudowanym podglądem (widok renderowany/źródłowy, spis treści, statystyki czytania); skopiuj lub pobierz jako `.md` albo stylizowany `.html`, dopasuj frontmatter, sposób obsługi obrazów i spis treści lub wyślij stronę prosto do [Obsidian](https://obsidian.md). Ekstrakcja dopasowana do witryny zachowuje czytelność pytań i odpowiedzi oraz wątków na forach (Zhihu, Hacker News, Stack Overflow, …); wybierz [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (lokalnie) lub [Jina Reader](https://jina.ai/reader) (w chmurze)
+- **Pytaj o stronę i tłumacz ją** — prosto z podglądu Markdown zadawaj pytania i otrzymuj odpowiedzi na bieżąco, ze zweryfikowanymi cytatami, które przenoszą cię do źródła; wyjaśnij na miejscu dowolny zaznaczony fragment albo przetłumacz całą stronę z własnym glosariuszem i widokami: oryginał / dwujęzyczny / tłumaczenie
+- **Automatyczna archiwizacja** — jeśli zechcesz, każdy zapis trafi też do [Wayback Machine](https://web.archive.org) Internet Archive — z dziennikiem archiwizacji i ponawianiem prób, dzięki czemu Twoje linki przetrwają, nawet gdy oryginalna strona zniknie
+- **Motywy dla `pinboard.in`** — 13 dopracowanych palet (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus własna nakładka CSS synchronizowana między urządzeniami, regulowana szerokość okna oraz sortowanie według popularności na stronach tagów
+- **9 języków** · konfigurowalne skróty · pamięć lokalna w pierwszej kolejności · zero śledzenia
 
 ## Instalacja
 

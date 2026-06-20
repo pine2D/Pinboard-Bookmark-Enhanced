@@ -17,14 +17,15 @@
 ## 功能特色
 
 - **智慧填表** — 自動填入標題、URL、頁面描述、來源連結和選取的文字，並在擷取或貼上時從儲存的 URL 移除追蹤參數（`utm_*`、`gclid`、`fbclid`、…），另有積極模式與自訂保留／移除清單
+- **快速與批次儲存** — 直接用鍵盤快捷鍵儲存頁面（或標為*稍後閱讀*），無需開啟彈出視窗；或批次儲存所有開啟的分頁，每個分頁獨立 AI 標籤化、即時顯示進度，還能打包成 Tab Set；離線時草稿會排入佇列，重新連線時自動同步
 - **AI 標籤與摘要** — 自備 API key 接入 13 家主流 LLM 服務商，或任何 OpenAI 相容端點；送往 AI 的是去除廣告、選單、側欄後的乾淨正文
-- **標籤助手** — 從你自己的標籤、Pinboard 建議標籤，以及一鍵標籤預設中自動補全
-- **快速儲存** — 直接用鍵盤快捷鍵儲存頁面（或標為*稍後閱讀*），無需開啟彈出視窗；或批次儲存所有開啟的分頁，每個分頁獨立 AI 標籤化並即時顯示進度，還能打包成 Tab Set
-- **搜尋與回顧** — 搜尋你的書籤，快速前往 Unread／Network／Notes／Popular，並瀏覽最近儲存的項目；目前頁若已收藏，工具列圖示會自動切換狀態
-- **離線佇列** — 離線儲存的草稿留在本機，重新連線時自動同步
-- **`pinboard.in` 佈景主題** — 13 套精心調校的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），加上多裝置同步的自訂 CSS 覆蓋層，以及可調整的彈出視窗寬度
-- **當前頁轉 Markdown** — 將目前網頁轉為乾淨的 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可複製或下載為 `.md` 或帶樣式的 `.html`，可調整 frontmatter、圖片處理與目錄，也可視需要匯出到 [Obsidian](https://obsidian.md)；後端可選 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或 [Jina Reader](https://jina.ai/reader)（雲端）
-- **9 種語言**、可自訂快捷鍵、零追蹤
+- **標籤工具** — 從你自己的標籤、Pinboard 建議標籤，以及一鍵標籤預設中自動補全；另有標籤治理面板，能找出重複與低使用次數的標籤（啟發式 + 隨選 AI 分群），並以限流批次合併，同時即時顯示進度
+- **快速連結與狀態** — 一鍵前往你的 Unread、Network、Notes 與 Popular 頁面；目前頁若已收藏，工具列圖示會自動切換狀態
+- **當前頁轉 Markdown** — 將目前網頁轉為乾淨的 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可複製或下載為 `.md` 或帶樣式的 `.html`，可調整 frontmatter、圖片處理與目錄，也可直接送往 [Obsidian](https://obsidian.md)。站台感知擷取讓問答與論壇討論串保持易讀（知乎、Hacker News、Stack Overflow、…）；後端可選 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或 [Jina Reader](https://jina.ai/reader)（雲端）
+- **向頁面提問與翻譯** — 在該 Markdown 預覽中，你可以提問並取得串流回答，附帶可跳至原文的查證引用，也能就地解說任何選取段落，或以自訂詞彙表翻譯整頁，並提供原文／雙語／譯文三種檢視
+- **自動封存** — 可選擇在每次儲存時將網頁一併存入網際網路檔案館的 [Wayback Machine](https://web.archive.org)（附封存記錄與重試），原網頁日後失效也找得回
+- **`pinboard.in` 佈景主題** — 13 套精心調校的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），加上多裝置同步的自訂 CSS 覆蓋層、可調整的彈出視窗寬度，以及標籤頁的人氣排序
+- **9 種語言**、可自訂快捷鍵、本機優先儲存、零追蹤
 
 ## 安裝
 

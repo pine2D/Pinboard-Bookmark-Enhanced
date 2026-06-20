@@ -17,14 +17,15 @@
 ## 功能特色
 
 - **智能填表** — 自動填入標題、URL、頁面描述、來源連結同選取嘅文字；儲存或者貼上嗰陣，仲會由 URL 移除追蹤參數（`utm_*`、`gclid`、`fbclid`、…），另設進取模式同自訂保留／移除清單
+- **快速同批次儲存** — 唔使開彈出視窗，撳一下快捷鍵就直接儲存頁面（或者標記為*稍後閱讀*）；又或者批次儲存所有開咗嘅分頁，每個分頁獨立 AI 加標籤、即時顯示進度，仲可以打包成一個分頁集；離線儲存嘅草稿會排隊留喺本機，重新連線時自動同步
 - **AI 標籤同摘要** — 自備 API key 接入 13 家主流 LLM 服務商，或者任何 OpenAI 相容端點；送畀 AI 嘅係去除咗廣告、選單、側欄之後嘅乾淨正文
-- **標籤助手** — 由你自己嘅標籤、Pinboard 建議標籤同一撳即用嘅標籤預設提供自動完成
-- **快速儲存** — 唔使開彈出視窗，撳一下快捷鍵就直接儲存頁面（或者標記為*稍後閱讀*）；又或者批次儲存所有開咗嘅分頁，每個分頁獨立 AI 加標籤兼即時顯示進度，仲可以打包成一個分頁集
-- **搜尋同重溫** — 搜尋你嘅書籤，快速跳去未讀／Network／Notes／熱門，瀏覽最近儲存嘅項目；目前頁如果已經收藏咗，工具列圖示會自動切換狀態
-- **離線佇列** — 離線儲存嘅草稿留喺本機，重新連線時自動同步
-- **`pinboard.in` 佈景主題** — 13 套精心調校嘅配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），仲有自訂 CSS 覆蓋層，多裝置同步，彈出視窗寬度亦可調整
-- **當前頁轉 Markdown** — 將目前網頁轉為乾淨嘅 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可以複製或者下載做 `.md` 或者帶樣式嘅 `.html`，可以調整 frontmatter、圖片處理同目錄，亦可按需匯出去 [Obsidian](https://obsidian.md)；後端可揀 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或者 [Jina Reader](https://jina.ai/reader)（雲端）
-- **9 種語言**、可自訂快捷鍵、零追蹤
+- **標籤工具** — 由你自己嘅標籤、Pinboard 建議標籤同一撳即用嘅標籤預設提供自動完成；仲有一個治理面板，可以揪出重複同低使用次數嘅標籤（啟發式判斷 + 按需 AI 聚類），再分批限速合併，過程即時顯示進度
+- **快速連結同狀態** — 一撳即去你嘅未讀、Network、Notes 同熱門頁面；目前頁如果已經收藏咗，工具列圖示會自動切換狀態
+- **當前頁轉 Markdown** — 將目前網頁轉為乾淨嘅 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可以複製或者下載做 `.md` 或者帶樣式嘅 `.html`，可以調整 frontmatter、圖片處理同目錄，亦可直接匯出去 [Obsidian](https://obsidian.md)。網站感知抽取會令問答同論壇串保持易讀（知乎、Hacker News、Stack Overflow、…）；後端可揀 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或者 [Jina Reader](https://jina.ai/reader)（雲端）
+- **向頁面提問同翻譯** — 喺嗰個 Markdown 預覽入面，你可以直接提問並串流取得答案，附帶可核實嘅引註、撳一下即跳去原文；亦可以就任何選取段落做行內解釋，或者用自訂詞彙表將成版翻譯，並提供原文／雙語／譯文三種檢視
+- **自動存檔** — 可選擇將每次儲存一併存入 Internet Archive 嘅 [Wayback Machine](https://web.archive.org)（附存檔記錄同重試），就算原網頁日後失效都仲搵得返
+- **`pinboard.in` 佈景主題** — 13 套精心調校嘅配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），仲有自訂 CSS 覆蓋層，多裝置同步，彈出視窗寬度亦可調整，標籤頁仲可以按熱門度排序
+- **9 種語言**、可自訂快捷鍵、本機優先儲存、零追蹤
 
 ## 安裝
 
