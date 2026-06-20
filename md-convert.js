@@ -172,9 +172,12 @@ function _configureMarked() {
   if (_markedConfigured || typeof marked === "undefined") return;
   const renderer = new marked.Renderer();
   // GitHub-style slug id on headings so the TOC anchors (P2/P3) resolve.
-  renderer.heading = function (text, level, raw) {
-    const id = slugify(typeof raw === "string" ? raw : text);
-    return `<h${level} id="${id}">${text}</h${level}>\n`;
+  // marked v13+ passes the heading TOKEN (not positional text/level/raw); render
+  // the inline content via this.parser.parseInline and slug the raw token.text.
+  renderer.heading = function (token) {
+    const text = this.parser.parseInline(token.tokens);
+    const id = slugify(token.text);
+    return `<h${token.depth} id="${id}">${text}</h${token.depth}>\n`;
   };
   marked.use({ gfm: true, breaks: false, renderer });
   _markedConfigured = true;
