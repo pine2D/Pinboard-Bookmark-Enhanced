@@ -8,10 +8,10 @@ For Chrome Web Store reviewers: every file in this directory is unmodified upstr
 
 | File | Version | Upstream | License | Purpose |
 |------|---------|----------|---------|---------|
-| `defuddle.js` | 0.18.1 | https://github.com/kepano/defuddle | MIT | Extracts main article content from arbitrary web pages so AI tag/summary requests can send clean text instead of full HTML. Injected via `chrome.scripting.executeScript` into the active tab on user action only. |
+| `defuddle.js` | 0.19.0 | https://github.com/kepano/defuddle | MIT | Extracts main article content from arbitrary web pages so AI tag/summary requests can send clean text instead of full HTML. Injected via `chrome.scripting.executeScript` into the active tab on user action only. |
 | `turndown.js` | 7.2.4 | https://github.com/mixmark-io/turndown | MIT | Converts captured HTML to Markdown for the in-extension preview tab. Loaded only inside `md-preview.html`. |
 | `marked.min.js` | 18.0.5 | https://github.com/markedjs/marked | MIT | Converts canonical Markdown to HTML for the preview render (then sanitized by DOMPurify). Loaded only inside `md-preview.html`. Vendored from the npm UMD build (`lib/marked.umd.js`) under the historical `.min.js` name. |
-| `purify.min.js` | 3.4.10 | https://github.com/cure53/DOMPurify | Apache-2.0 / MPL-2.0 | The single sanitize point: cleans all HTML before it enters the preview DOM (both `marked` output and arbitrary web-page Markdown). Loaded only inside `md-preview.html`. |
+| `purify.min.js` | 3.4.11 | https://github.com/cure53/DOMPurify | Apache-2.0 / MPL-2.0 | The single sanitize point: cleans all HTML before it enters the preview DOM (both `marked` output and arbitrary web-page Markdown). Loaded only inside `md-preview.html`. |
 | `highlight.min.js`, `hljs-github*.min.css` | 11.11.1 | https://github.com/highlightjs/highlight.js | BSD-3-Clause | Syntax-highlights fenced/auto-detected code blocks in the Markdown preview. Loaded only inside `md-preview.html`. |
 | `katex/` | 0.17.0 | https://github.com/KaTeX/KaTeX | MIT | Renders LaTeX math (`$...$` / `$$...$$`) in the Markdown preview. Lazy-loaded in `md-preview.html` only for content flagged math-bearing (e.g. arXiv abstracts) — never on other pages, so currency `$` is never touched. woff2 fonts only (Chrome supports woff2). |
 
@@ -19,15 +19,15 @@ For Chrome Web Store reviewers: every file in this directory is unmodified upstr
 
 ### `defuddle.js`
 ```bash
-npm pack defuddle@0.18.1
-tar -xzf defuddle-0.18.1.tgz package/dist/index.js
+npm pack defuddle@0.19.0
+tar -xzf defuddle-0.19.0.tgz package/dist/index.js
 diff package/dist/index.js vendor/defuddle.js
 ```
 Or build from source:
 ```bash
 git clone https://github.com/kepano/defuddle.git
 cd defuddle
-git checkout 0.18.1
+git checkout 0.19.0
 npm install
 npm run build
 # Output: dist/index.js (matches vendor/defuddle.js byte-for-byte)
@@ -50,8 +50,8 @@ diff package/lib/marked.umd.js vendor/marked.min.js   # UMD build, vendored unde
 
 ### `purify.min.js`
 ```bash
-npm pack dompurify@3.4.10
-tar -xzf dompurify-3.4.10.tgz package/dist/purify.min.js
+npm pack dompurify@3.4.11
+tar -xzf dompurify-3.4.11.tgz package/dist/purify.min.js
 diff package/dist/purify.min.js vendor/purify.min.js
 ```
 
@@ -73,7 +73,7 @@ tar -xzf katex-0.17.0.tgz
 
 ## Update Policy
 
-Vendor files are pinned to specific versions and updated only when needed (security fix, breaking compatibility). `scripts/update-vendor.sh` refreshes **`defuddle.js` and `turndown.js`** (it pulls npm `latest` for both — unpinned — and re-stamps the version banner). The remaining libraries (`marked.min.js`, `purify.min.js`, `highlight.min.js`, `katex/`) are refreshed manually per the Reproduction steps above. Note: a `marked` upgrade requires adapting the custom `renderer.heading` in `md-convert.js` — v13+ passes a token object instead of positional `(text, level, raw)`.
+Vendor files are pinned and updated only when needed (security fix, breaking compatibility). `scripts/update-vendor.sh` refreshes **`defuddle.js`, `turndown.js`, `marked.min.js`, `purify.min.js`, and `highlight.min.js` (+ its github theme CSS)** to the true npm-registry `latest`. It fetches release tarballs straight from `registry.npmjs.org` (and cdnjs for the highlight.js browser bundle) and verifies the SHA-1 the registry publishes — which deliberately **bypasses any local npm cooldown** (e.g. Aikido safe-chain's rolling ~7-day `before` window, which otherwise resolves `@latest` to an older version and hides freshly-published releases; safe-chain wraps `npm`/`npx`, not `curl`). `katex/` is refreshed manually (multi-file dist + woff2 fonts) per the Reproduction steps above. Note: a `marked` major bump requires adapting the custom `renderer.heading` in `md-convert.js` — v13+ passes a token object instead of positional `(text, level, raw)`.
 
 ## Why Bundled Instead of npm-installed
 
