@@ -11,6 +11,7 @@ h2 { margin-top: 24px; font-size: 16px; }
 <body>
 <h1>wayback.js Tests</h1>
 <div id="results"></div>
+<script src="../shared.js"></script>
 <script src="../wayback.js"></script>
 <script>
 const T0 = 1750000000000; // fixed timestamp for deterministic tests
@@ -216,6 +217,25 @@ suite("pbpEffectivePrivate", () => {
   });
   test("null-safe", () => {
     assert(pbpEffectivePrivate(null, null) === false, "null settings/ctx");
+  });
+});
+
+suite("buildPostsAddUri shared/toread contract", () => {
+  test("emits &shared=no when private", () => {
+    const uri = buildPostsAddUri({ token: "t", url: "https://x.com", shared: "no" });
+    assert(uri.includes("&shared=no"), "shared=no present");
+  });
+  test("emits &shared=yes when public", () => {
+    const uri = buildPostsAddUri({ token: "t", url: "https://x.com", shared: "yes" });
+    assert(uri.includes("&shared=yes"), "shared=yes present");
+  });
+  test("emits &toread=yes when read-later", () => {
+    const uri = buildPostsAddUri({ token: "t", url: "https://x.com", toread: "yes" });
+    assert(uri.includes("&toread=yes"), "toread=yes present");
+  });
+  test("omits shared/toread when undefined", () => {
+    const uri = buildPostsAddUri({ token: "t", url: "https://x.com" });
+    assert(!uri.includes("&shared=") && !uri.includes("&toread="), "omitted when undefined");
   });
 });
 

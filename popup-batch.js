@@ -183,12 +183,15 @@ function setupTabSet() {
           }
 
           const dedupedTags = [...new Set(tags.map(tag => tag.toLowerCase()))].map(lower => tags.find(tag => tag.toLowerCase() === lower));
+          const isPrivate = pbpEffectivePrivate(settings, { incognito: tab.incognito });
           const apiUrl = buildPostsAddUri({
             token: pinboardToken,
             url: tab.url,
             title: tab.title || tab.url,
             extended: notes,
             tags: dedupedTags.join(" "),
+            shared: isPrivate ? "no" : "yes",
+            toread: settings.optReadlaterDefault ? "yes" : undefined,
           });
           if (apiUrl.length > POSTS_ADD_URI_BUDGET) {
             console.warn(`[batch] skipping oversize URI (${apiUrl.length}/${POSTS_ADD_URI_BUDGET}):`, tab.url);
@@ -200,7 +203,7 @@ function setupTabSet() {
             saved++;
             savedUrls.push(tab.url);
             if (settings.waybackArchiveEnabled && settings.waybackArchiveBatch) {
-              chrome.runtime.sendMessage({ type: "archive_url", url: tab.url }).catch(() => {});
+              chrome.runtime.sendMessage({ type: "archive_url", url: tab.url, private: isPrivate }).catch(() => {});
             }
           } else failed++;
         } catch (_) { failed++; }
