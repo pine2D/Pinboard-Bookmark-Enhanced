@@ -312,6 +312,7 @@ async function sendOfflineItem(item, settings) {
     extended: item.notes || existingExtended,
     tags: finalTags,
     toread: item.toread ? "yes" : undefined,
+    shared: item.private ? "no" : "yes",
   });
   const resp = await pinboardFetch(apiUrl);
   const data = await resp.json();
@@ -327,7 +328,7 @@ async function processOfflineQueue() {
     try {
       if (await sendOfflineItem(item, s)) {
         statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
-        pbpWaybackArchive(item.url, s).catch(() => {});
+        pbpWaybackArchive(item.url, s, { isPrivate: !!item.private }).catch(() => {});
       } else {
         remaining.push(item); // keep for retry
       }
@@ -352,7 +353,7 @@ async function retryOfflineItem(queueId) {
     if (!ok) return false;
     await mutateOfflineQueue({ kind: "remove", queueId });
     statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
-    pbpWaybackArchive(item.url, s).catch(() => {});
+    pbpWaybackArchive(item.url, s, { isPrivate: !!item.private }).catch(() => {});
     return true;
   } catch (_) {
     // Single-item retry failure: caller treats `false` as "still queued"
@@ -466,6 +467,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   }
   // overwrite mode: no read, use tags/extended as-is
 
+  const isPrivate = pbpEffectivePrivate(s, { incognito: tab?.incognito });
   const apiUrl = buildPostsAddUri({
     token: s.pinboardToken,
     url,
@@ -475,6 +477,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     extended: notes || existingExtended,
     tags: tagsStr,
     toread: toread ? "yes" : undefined,
+    shared: isPrivate ? "no" : "yes",
   });
 
   // Quick-save has no UI to trim the note, so gate on the URI budget before sending.
@@ -502,14 +505,14 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       showNotification(notifyId + "-saved", notifyTitle, t("bgTitleSaved", title.substring(0, 60)), notifyCategory, { url, token: s.pinboardToken });
       processOfflineQueue().catch(() => {});
       if (toread) updateBadge().catch(() => {});
-      pbpWaybackArchive(url, s).catch(() => {});
+      pbpWaybackArchive(url, s, { isPrivate }).catch(() => {});
     } else {
       showNotification(notifyId + "-error", t("bgSaveFailed"), data.result_code || "Unknown error", "error");
     }
   } catch (e) {
     // Network/timeout error — queue for offline retry if enabled
     if (s.offlineQueueEnabled) {
-      await enqueueOfflineSave({ url, title, notes, tags: tagsStr, toread: !!toread, token: obfuscateKey(s.pinboardToken) });
+      await enqueueOfflineSave({ url, title, notes, tags: tagsStr, toread: !!toread, private: isPrivate, token: obfuscateKey(s.pinboardToken) });
       showNotification(notifyId + "-queued", t("bgQueuedOffline"), t("bgTitleQueued", title.substring(0, 60)), notifyCategory);
     } else {
       showNotification(notifyId + "-error", t("bgNetworkError"), e.message, "error");
@@ -790,13 +793,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Update badge if toread bookmark was saved
     if (message.toread) updateBadge().catch(() => {});
     // Archive to Wayback Machine
-    loadSettings().then((s) => pbpWaybackArchive(message.url, s)).catch(() => {});
+    loadSettings().then((s) => pbpWaybackArchive(message.url, s, { isPrivate: message.private === true, override: message.archive })).catch(() => {});
     sendResponse({ ok: true });
     return true;
   }
 
   if (message.type === "archive_url" && typeof message.url === "string") {
-    loadSettings().then((s) => pbpWaybackArchive(message.url, s, { force: message.force === true })).catch(() => {});
+    loadSettings().then((s) => pbpWaybackArchive(message.url, s, { isPrivate: message.private === true, force: message.force === true })).catch(() => {});
     return;
   }
 
