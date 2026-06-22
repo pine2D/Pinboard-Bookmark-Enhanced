@@ -1655,6 +1655,9 @@
   "optWaybackS3Hint": {
     "message": "With a free archive.org account key, archiving uses the authenticated API: higher quota, server-side dedup, reliable results."
   },
+  "waybackSkipPrivate": {
+    "message": "Never archive bookmarks you save as private"
+  },
   "waybackPermDenied": {
     "message": "Permission for web.archive.org was declined - archiving stays off."
   },

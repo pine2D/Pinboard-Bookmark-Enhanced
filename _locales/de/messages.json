@@ -1655,6 +1655,9 @@
   "optWaybackS3Hint": {
     "message": "Mit einem kostenlosen archive.org-Kontoschlüssel verwendet das Archivieren die authentifizierte API: höheres Kontingent, serverseitige Deduplizierung, zuverlässige Ergebnisse."
   },
+  "waybackSkipPrivate": {
+    "message": "Als privat gespeicherte Lesezeichen nie bei archive.org archivieren"
+  },
   "waybackPermDenied": {
     "message": "Berechtigung für web.archive.org wurde abgelehnt - Archivierung bleibt deaktiviert."
   },

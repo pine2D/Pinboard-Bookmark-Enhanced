@@ -1655,6 +1655,9 @@
   "optWaybackS3Hint": {
     "message": "無料の archive.org アカウントキーがあれば、認証済み API でアーカイブします：クォータ増加、サーバー側の重複排除、信頼性の高い結果。"
   },
+  "waybackSkipPrivate": {
+    "message": "非公開で保存したブックマークは archive.org に送信しない"
+  },
   "waybackPermDenied": {
     "message": "web.archive.org の権限が拒否されました - アーカイブはオフのままです。"
   },

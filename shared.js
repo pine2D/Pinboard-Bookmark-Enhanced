@@ -190,6 +190,7 @@ const SETTINGS_DEFAULTS = {
   bgSaveMode: "merge", // "merge" | "skip" | "overwrite"
   waybackArchiveEnabled: false,
   waybackArchiveBatch: false,
+  waybackSkipPrivate: true,
   waybackS3Key: "",
   waybackS3Secret: "",
   // md-preview in-page AI (explain / ask / translate)

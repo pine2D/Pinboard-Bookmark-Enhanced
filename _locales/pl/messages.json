@@ -1655,6 +1655,9 @@
   "optWaybackS3Hint": {
     "message": "Dzięki darmowemu kluczowi konta archive.org archiwizacja używa uwierzytelnionego interfejsu API: wyższy limit, deduplikacja po stronie serwera, niezawodne wyniki."
   },
+  "waybackSkipPrivate": {
+    "message": "Nigdy nie archiwizuj w archive.org zakładek zapisanych jako prywatne"
+  },
   "waybackPermDenied": {
     "message": "Uprawnienie dla web.archive.org zostało odrzucone - archiwizacja pozostaje wyłączona."
   },

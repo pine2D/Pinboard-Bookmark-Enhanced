@@ -1655,6 +1655,9 @@
   "optWaybackS3Hint": {
     "message": "使用免費的 archive.org 帳戶金鑰，存檔將使用已認證的 API：更高的配額、伺服器端去重、可靠的結果。"
   },
+  "waybackSkipPrivate": {
+    "message": "儲存為私密的書籤一律不提交到 archive.org"
+  },
   "waybackPermDenied": {
     "message": "拒絕了 web.archive.org 的權限 - 存檔保持關閉。"
   },

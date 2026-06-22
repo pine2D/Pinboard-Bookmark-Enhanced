@@ -1655,6 +1655,9 @@
   "optWaybackS3Hint": {
     "message": "Avec une clé de compte archive.org gratuite, l'archivage utilise l'API authentifiée : quota supérieur, dédupplication côté serveur, résultats fiables."
   },
+  "waybackSkipPrivate": {
+    "message": "Ne jamais archiver sur archive.org les favoris enregistrés comme privés"
+  },
   "waybackPermDenied": {
     "message": "La permission pour web.archive.org a été refusée - l'archivage reste désactivé."
   },

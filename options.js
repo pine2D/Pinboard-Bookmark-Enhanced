@@ -551,6 +551,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-tag-sort-by-pop": s.tagSortByPopEnabled,
     "opt-wayback-enabled": s.waybackArchiveEnabled === true,
     "opt-wayback-batch": s.waybackArchiveBatch === true,
+    "opt-wayback-skip-private": s.waybackSkipPrivate !== false,
     "opt-preview-ai-enabled": s.previewAiEnabled !== false
   };
   for (const [id, val] of Object.entries(checkMap)) {
@@ -922,6 +923,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       tagPresets: $id("opt-tag-presets").value,
       waybackArchiveEnabled: $id("opt-wayback-enabled").checked,
       waybackArchiveBatch: $id("opt-wayback-batch").checked,
+      waybackSkipPrivate: $id("opt-wayback-skip-private").checked,
       waybackS3Key: obfuscateKey($id("opt-wayback-s3key").value.trim()),
       waybackS3Secret: obfuscateKey($id("opt-wayback-s3secret").value.trim()),
       themePresetKey: currentPresetKey,
