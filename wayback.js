@@ -107,6 +107,25 @@ async function _pbpWaybackLog(url, outcome) {
   }
 }
 
+// ---- Pure decision helpers (no chrome.*, no DOM — unit-tested in wayback-tests.html) ----
+
+// Effective private status for save paths that have no explicit checkbox
+// (quick-save / read-later / batch / offline). The popup uses #private-check instead.
+function pbpEffectivePrivate(settings, ctx) {
+  const s = settings || {};
+  const incognito = !!(ctx && ctx.incognito);
+  return !!(s.optPrivateDefault || (s.optPrivateIncognito && incognito));
+}
+
+// Single archive decision. `override` is the explicit popup per-save checkbox state:
+// true = ticked, false = unticked, undefined = no explicit choice / non-popup path.
+function pbpWaybackShouldArchive({ enabled, skipPrivate, isPrivate, force, override }) {
+  if (override === true) return true;    // explicit per-save tick: bypass enabled + skipPrivate
+  if (override === false) return false;  // explicit per-save untick
+  if (force) return true;                // manual archive-log retry: explicit, skip-private-exempt
+  return !!enabled && !(skipPrivate && isPrivate);
+}
+
 // ---- Orchestrator (chrome.* usage allowed inside function body) ----
 
 async function pbpWaybackArchive(url, settings, opts) {

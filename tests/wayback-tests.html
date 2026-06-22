@@ -200,5 +200,47 @@ suite("pbpWaybackOutcomeRetainsDedup", () => {
     assert(pbpWaybackOutcomeRetainsDedup("permDenied") === false, "non-attempt outcomes don't retain");
   });
 });
+
+suite("pbpEffectivePrivate", () => {
+  test("false when neither default nor incognito", () => {
+    assert(pbpEffectivePrivate({ optPrivateDefault: false, optPrivateIncognito: true }, { incognito: false }) === false, "public");
+  });
+  test("true when optPrivateDefault", () => {
+    assert(pbpEffectivePrivate({ optPrivateDefault: true }, { incognito: false }) === true, "default private");
+  });
+  test("true when incognito + optPrivateIncognito", () => {
+    assert(pbpEffectivePrivate({ optPrivateDefault: false, optPrivateIncognito: true }, { incognito: true }) === true, "incognito private");
+  });
+  test("false when incognito but optPrivateIncognito off", () => {
+    assert(pbpEffectivePrivate({ optPrivateDefault: false, optPrivateIncognito: false }, { incognito: true }) === false, "incognito not private");
+  });
+  test("null-safe", () => {
+    assert(pbpEffectivePrivate(null, null) === false, "null settings/ctx");
+  });
+});
+
+suite("pbpWaybackShouldArchive", () => {
+  test("override=true bypasses everything", () => {
+    assert(pbpWaybackShouldArchive({ enabled: false, skipPrivate: true, isPrivate: true, force: false, override: true }) === true, "tick wins");
+  });
+  test("override=false blocks everything", () => {
+    assert(pbpWaybackShouldArchive({ enabled: true, skipPrivate: false, isPrivate: false, force: true, override: false }) === false, "untick wins");
+  });
+  test("force archives regardless of skipPrivate", () => {
+    assert(pbpWaybackShouldArchive({ enabled: true, skipPrivate: true, isPrivate: true, force: true, override: undefined }) === true, "manual retry exempt");
+  });
+  test("auto: enabled + public => archive", () => {
+    assert(pbpWaybackShouldArchive({ enabled: true, skipPrivate: true, isPrivate: false, force: false, override: undefined }) === true, "public archives");
+  });
+  test("auto: enabled + private + skipPrivate => skip", () => {
+    assert(pbpWaybackShouldArchive({ enabled: true, skipPrivate: true, isPrivate: true, force: false, override: undefined }) === false, "private skipped");
+  });
+  test("auto: enabled + private + skipPrivate OFF => archive", () => {
+    assert(pbpWaybackShouldArchive({ enabled: true, skipPrivate: false, isPrivate: true, force: false, override: undefined }) === true, "skipPrivate off");
+  });
+  test("auto: disabled => skip", () => {
+    assert(pbpWaybackShouldArchive({ enabled: false, skipPrivate: false, isPrivate: false, force: false, override: undefined }) === false, "disabled skips");
+  });
+});
 </script>
 </body></html>
