@@ -281,6 +281,69 @@ function showSetKeyError() {
   window._lastStatusFeedback = showFeedback({ variant: "error", messageNode: msg });
 }
 
+// Apply optional case-resolution to AI tags (mirrors the prior inline doAITags logic).
+function finalizeAITags(rawTags) {
+  return settings.optRespectTagCase ? rawTags.map(t => resolveTagCase(t, tagCaseMap)) : rawTags;
+}
+
+// Fetch one AI artifact ("summary" | "tags") for the current page (cache-miss path only).
+// If the OTHER artifact is also missing, issue ONE combined call and cache the other
+// half so its later click is an instant, zero-extra-body-token cache hit. forceRefresh
+// (regenerate) always does a single dedicated call. Combined failure -> single fallback.
+async function fetchAIArtifacts(kind, forceRefresh) {
+  const url = pageInfo.url;
+  const provider = settings.aiProvider;
+  const otherKind = kind === "summary" ? "tags" : "summary";
+  const combinedKey = `${provider}|combined|${url}`;
+
+  const callSingle = () => {
+    if (kind === "summary") {
+      return getOrCreateInflight(`${provider}|summary|${url}`, () =>
+        callAI(settings, buildSummaryPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value)));
+    }
+    return getOrCreateInflight(`${provider}|tags|${url}`, async () => {
+      const resp = await callAI(settings, buildTagPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
+      return finalizeAITags(refineTags(parseAITags(resp, settings.aiTagSeparator), { cap: AI_TAG_CAP, separator: settings.aiTagSeparator }));
+    });
+  };
+
+  if (forceRefresh) return callSingle();
+
+  // Custom-prompt users keep their own templates -> never use the combined prompt
+  // (it uses TAG_GUIDANCE, not customTagPrompt/customSummaryPrompt). Global Constraint.
+  if (settings.customTagPrompt?.trim() || settings.customSummaryPrompt?.trim()) return callSingle();
+
+  // Ride an in-flight combined call if one is already running.
+  if (_inflightAI.has(combinedKey)) {
+    const both = await _inflightAI.get(combinedKey);
+    if (both) return kind === "tags" ? finalizeAITags(both.tags) : both.summary;
+  }
+
+  // If the other half is already cached, only the requested half is missing.
+  const otherCached = await getAICache(url, otherKind, settings.aiCacheDuration, settings.aiContentSource);
+  if (otherCached != null) return callSingle();
+
+  // Opportunistic combined call.
+  let both = null;
+  try {
+    both = await getOrCreateInflight(combinedKey, async () => {
+      const resp = await callAI(settings, buildCombinedPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
+      return parseAICombined(resp, settings.aiTagSeparator);
+    });
+  } catch (e) {
+    both = null;
+  }
+  if (!both) return callSingle();
+
+  // Cache the OTHER half so its later click is instant + free.
+  if (otherKind === "tags") {
+    await setAICache(url, "tags", finalizeAITags(both.tags), settings.aiCacheDuration, settings.aiContentSource);
+  } else {
+    await setAICache(url, "summary", both.summary, settings.aiCacheDuration, settings.aiContentSource);
+  }
+  return kind === "tags" ? finalizeAITags(both.tags) : both.summary;
+}
+
 // ---- AI Summary core logic ----
 async function doAISummary(forceRefresh) {
   const btn = $id("ai-summary-btn");
@@ -305,10 +368,7 @@ async function doAISummary(forceRefresh) {
     await ensurePageText();
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "calling" });
-    const infKey = `${settings.aiProvider}|summary|${pageInfo.url}`;
-    const summary = await getOrCreateInflight(infKey, () =>
-      callAI(settings, buildSummaryPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value))
-    );
+    const summary = await fetchAIArtifacts("summary", forceRefresh);
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "parsing" });
     await setAICache(pageInfo.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
     upsertSummary(summary);
@@ -406,15 +466,8 @@ async function doAITags(forceRefresh) {
     await ensurePageText();
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "calling" });
-    const infKey = `${settings.aiProvider}|tags|${pageInfo.url}`;
-    const resp = await getOrCreateInflight(infKey, () =>
-      callAI(settings, buildTagPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags))
-    );
+    const tags = await fetchAIArtifacts("tags", forceRefresh);
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "parsing" });
-    const rawTags = parseAITags(resp, settings.aiTagSeparator);
-    const tags = settings.optRespectTagCase
-      ? rawTags.map(t => resolveTagCase(t, tagCaseMap))
-      : rawTags;
     await setAICache(pageInfo.url, "tags", tags, settings.aiCacheDuration, settings.aiContentSource);
     renderAITags(tags, false);
     if (forceRefresh) {
@@ -442,14 +495,9 @@ function renderAITags(tags, fromCache) {
     return;
   }
 
-  // Sort: matched tags (by count desc) first, unmatched keep original order
-  const sorted = [...tags].sort((a, b) => {
-    const ca = allUserTagCounts[a] || 0, cb = allUserTagCounts[b] || 0;
-    if (ca && !cb) return -1;
-    if (!ca && cb) return 1;
-    return 0;
-  });
-  sorted.forEach((tag) => {
+  // Render in the model's specificity order (most defining first); do NOT reorder
+  // owned tags to the front — that would bury a new defining tag like "ai_token_relay".
+  tags.forEach((tag) => {
     const el = document.createElement("span");
     el.className = "stag ai";
     el.dataset.tag = tag;
