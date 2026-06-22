@@ -1661,6 +1661,9 @@
   "waybackPermDenied": {
     "message": "Permission for web.archive.org was declined - archiving stays off."
   },
+  "archiveThisSave": {
+    "message": "archive"
+  },
   "archiveRequested": {
     "message": "Archive requested"
   },

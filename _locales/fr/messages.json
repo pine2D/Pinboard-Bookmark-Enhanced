@@ -1661,6 +1661,9 @@
   "waybackPermDenied": {
     "message": "La permission pour web.archive.org a été refusée - l'archivage reste désactivé."
   },
+  "archiveThisSave": {
+    "message": "archiver"
+  },
   "archiveRequested": {
     "message": "Archivage demandé"
   },

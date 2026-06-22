@@ -1661,6 +1661,9 @@
   "waybackPermDenied": {
     "message": "Uprawnienie dla web.archive.org zostało odrzucone - archiwizacja pozostaje wyłączona."
   },
+  "archiveThisSave": {
+    "message": "archiwizuj"
+  },
   "archiveRequested": {
     "message": "Archiwizacja żądana"
   },

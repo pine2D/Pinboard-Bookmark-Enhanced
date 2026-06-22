@@ -1661,6 +1661,9 @@
   "waybackPermDenied": {
     "message": "拒绝了 web.archive.org 的权限 - 存档保持关闭。"
   },
+  "archiveThisSave": {
+    "message": "存档"
+  },
   "archiveRequested": {
     "message": "已请求存档"
   },

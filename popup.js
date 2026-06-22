@@ -43,6 +43,22 @@ let existingBookmark = null;
 // (fresh document). Declared top-level so checkExistingBookmark() can read it.
 const fieldDirtyFlags = { "title-input": false, "description-input": false, "private-check": false, "readlater-check": false };
 
+// Wayback per-save toggle: defaults to the auto-decision and tracks the private
+// checkbox until the user manually overrides it (then it sticks).
+let _archiveUserTouched = false;
+function recomputeArchiveCheck() {
+  if (_archiveUserTouched) return;
+  const el = $id("archive-check");
+  if (!el) return;
+  el.checked = pbpWaybackShouldArchive({
+    enabled: settings.waybackArchiveEnabled === true,
+    skipPrivate: settings.waybackSkipPrivate !== false,
+    isPrivate: $id("private-check").checked,
+    force: false,
+    override: undefined,
+  });
+}
+
 function shouldUpdateField(fieldId) {
   // Don't overwrite a field the user has already typed into / toggled.
   // (Dirty flag is the precise signal; we deliberately do NOT also guard on
@@ -334,6 +350,23 @@ async function showMain(token) {
   if (settings.optPrivateDefault) $id("private-check").checked = true;
   if (settings.optPrivateIncognito && tab.incognito) $id("private-check").checked = true;
   if (settings.optReadlaterDefault) $id("readlater-check").checked = true;
+  recomputeArchiveCheck();
+  $id("private-check").addEventListener("change", recomputeArchiveCheck);
+  $id("archive-check").addEventListener("change", async (e) => {
+    _archiveUserTouched = true;
+    if (e.target.checked) {
+      try {
+        const has = await chrome.permissions.contains({ origins: ["https://web.archive.org/*"] });
+        if (!has) {
+          const granted = await chrome.permissions.request({ origins: ["https://web.archive.org/*"] });
+          if (!granted) {
+            e.target.checked = false;
+            showStatus("status-msg", t("waybackPermDenied"), "error");
+          }
+        }
+      } catch (_) {}
+    }
+  });
 
   // Setup UI features immediately — don't block on network requests
   setupTagsInput();
@@ -634,6 +667,7 @@ async function checkExistingBookmark(token, url, prefetch) {
       if (shouldUpdateField("title-input")) $id("title-input").value = existingBookmark.description;
       if (shouldUpdateField("description-input")) $id("description-input").value = existingBookmark.extended;
       if (shouldUpdateField("private-check")) $id("private-check").checked = existingBookmark.shared === "no";
+      recomputeArchiveCheck();
       if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
       // Don't clobber tags the user already started entering (chips in currentTags
       // or text mid-typed in #tags-input) — mirrors the per-field guard above.
@@ -758,10 +792,10 @@ function setupSubmit(token) {
         // Read _waybackAttempts BEFORE sending bookmark_saved (SW will stamp it after)
         let _waybackAttemptsSnap = {};
         try { _waybackAttemptsSnap = (await chrome.storage.local.get("_waybackAttempts"))._waybackAttempts || {}; } catch (_) {}
-        chrome.runtime.sendMessage({ type: "bookmark_saved", url: url, toread: $id("readlater-check").checked });
+        chrome.runtime.sendMessage({ type: "bookmark_saved", url: url, toread: $id("readlater-check").checked, private: $id("private-check").checked, archive: $id("archive-check").checked });
         // Optimistic archive indicator (cosmetic only, never blocks save or auto-close)
         try {
-          if (settings.waybackArchiveEnabled === true && typeof pbpWaybackShouldAttempt === "function" && pbpWaybackShouldAttempt(_waybackAttemptsSnap, url, Date.now())) {
+          if ($id("archive-check").checked && typeof pbpWaybackShouldAttempt === "function" && pbpWaybackShouldAttempt(_waybackAttemptsSnap, url, Date.now())) {
             const statusEl = $id("status-msg");
             if (statusEl) {
               const indicator = document.createElement("span");

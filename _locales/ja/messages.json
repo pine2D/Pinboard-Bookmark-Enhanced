@@ -1661,6 +1661,9 @@
   "waybackPermDenied": {
     "message": "web.archive.org の権限が拒否されました - アーカイブはオフのままです。"
   },
+  "archiveThisSave": {
+    "message": "アーカイブ"
+  },
   "archiveRequested": {
     "message": "アーカイブをリクエストしました"
   },

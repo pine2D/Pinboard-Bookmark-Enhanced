@@ -1661,6 +1661,9 @@
   "waybackPermDenied": {
     "message": "Разрешение для web.archive.org было отклонено - архивирование остается отключенным."
   },
+  "archiveThisSave": {
+    "message": "архив"
+  },
   "archiveRequested": {
     "message": "Запрошена архивация"
   },
