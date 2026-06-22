@@ -65,7 +65,19 @@ function escapeForExtended(text) {
 // Max AI tags to keep (enforced in refineTags; also stated in DEFAULT_TAG_PROMPT).
 const AI_TAG_CAP = 8;
 
-const DEFAULT_TAG_PROMPT = `Suggest 5-10 bookmark tags for the following webpage. {{lang_instruction}} Tags should be lowercase, {{separator_instruction}}. Return ONLY a JSON array.
+// Shared tag-quality guidance, reused by DEFAULT_TAG_PROMPT and buildCombinedPrompt.
+// Pushes the model toward the page's specific defining identity; deliberately does
+// NOT mention rating/ranking/comparison — "what it DOES" covers those generically.
+const TAG_GUIDANCE = `Choose tags that capture this page's specific identity, not just its broad category:
+- Include the single most specific term that identifies what this page or site IS and what it DOES — the term someone in its niche would actually use to find it — even if it is uncommon or you have to coin it (a broad category like "ai" is the genus; also give the differentia, e.g. "llm_proxy" instead of stopping at "ai").
+- Avoid over-generic catch-all tags (ai, api, tools, web, service, software, app, productivity, online) unless no more specific term fits.
+- Order tags from most specific/defining to most general.`;
+
+const DEFAULT_TAG_PROMPT = `Suggest up to ${AI_TAG_CAP} bookmark tags for the following webpage. {{lang_instruction}} Tags should be lowercase, {{separator_instruction}}.
+
+${TAG_GUIDANCE}
+
+Return ONLY a JSON array.
 
 Title: {{title}}
 URL: {{url}}

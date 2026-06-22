@@ -86,4 +86,36 @@ suite("refineTags", () => {
   });
 });
 </script>
+
+<script>
+// ============ Task 2: DEFAULT_TAG_PROMPT + TAG_GUIDANCE ============
+suite("default tag prompt", () => {
+  test("TAG_GUIDANCE pushes specificity and bans no evaluation facet", () => {
+    assert(/most specific/i.test(TAG_GUIDANCE), "asks for most specific term");
+    assert(/differentia/i.test(TAG_GUIDANCE), "genus/differentia framing");
+    assert(/Avoid over-generic/i.test(TAG_GUIDANCE), "anti-generic guidance");
+    assert(!/rating|ranking|comparison|evaluat/i.test(TAG_GUIDANCE), "no evaluation-facet wording");
+  });
+  test("DEFAULT_TAG_PROMPT embeds guidance, cap, and keeps placeholders", () => {
+    assert(DEFAULT_TAG_PROMPT.indexOf(TAG_GUIDANCE) !== -1, "guidance embedded");
+    assert(DEFAULT_TAG_PROMPT.indexOf("up to 8") !== -1, "cap 8 stated");
+    ["{{lang_instruction}}", "{{separator_instruction}}", "{{title}}", "{{url}}", "{{content}}"].forEach(ph =>
+      assert(DEFAULT_TAG_PROMPT.indexOf(ph) !== -1, "placeholder kept: " + ph));
+  });
+  test("buildTagPrompt substitutes placeholders and injects guidance", () => {
+    const p = buildTagPrompt({ aiTagLang: "en", aiTagSeparator: "_" }, "My$Title", "https://x.test/", "Body & <stuff>", "", []);
+    assert(p.indexOf("My$Title") !== -1, "title verbatim incl $");
+    assert(p.indexOf("{{title}}") === -1, "title placeholder gone");
+    assert(p.indexOf("Tags must be in English.") !== -1, "lang instruction");
+    assert(p.indexOf("underscores") !== -1, "separator instruction");
+    assert(p.indexOf("most specific") !== -1, "guidance present");
+  });
+  test("buildTagPrompt appends existing-tags line only when userTags present", () => {
+    const withTags = buildTagPrompt({ aiTagLang: "en" }, "t", "u", "c", "", ["alpha", "beta"]);
+    assert(/Existing tags \(prefer reusing/.test(withTags), "reuse line present");
+    const none = buildTagPrompt({ aiTagLang: "en" }, "t", "u", "c", "", []);
+    assert(!/Existing tags/.test(none), "no reuse line when empty");
+  });
+});
+</script>
 </body></html>
