@@ -403,6 +403,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .stag.used { color: #bbb; text-decoration: line-through; pointer-events: none; }
 .stag.ai { color: #7733aa; }
 .stag.ai:hover { color: #5511aa; }
+/* Count badge inside a suggest chip: spacing via padding (not margin) so the
+   :hover underline runs continuously under "tag (N)" instead of being broken by
+   the margin gap. Scoped to .stag so the autocomplete dropdown's .ac-count
+   (a flex item that relies on margin-left) is unaffected. */
+.stag .ac-count { margin-left: 0; padding-left: 4px; }
 .add-all-link { color: #757575; font-size: 11px; cursor: pointer; }
 .add-all-link:hover { text-decoration: underline; color: #666; }
 .muted { color: #767676; font-size: 11px; font-style: italic; }
