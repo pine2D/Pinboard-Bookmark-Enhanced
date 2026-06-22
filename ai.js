@@ -648,6 +648,30 @@ function parseAITags(resp, separator) {
   return tags.map(t => t.toLowerCase().replace(/\s+/g, sep));
 }
 
+// ---- Refine AI tags: dedup, conservative plural fold, preserve order, cap ----
+// Input is the already-normalized output of parseAITags (lowercased, separator-applied),
+// but the helper is defensive so it can also be fed raw model strings.
+function refineTags(tags, opts) {
+  const cap = (opts && opts.cap) || AI_TAG_CAP;
+  if (!Array.isArray(tags)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const raw of tags) {
+    if (typeof raw !== "string") continue;
+    const tag = raw.trim();
+    if (!tag) continue;
+    // Canonical key: lowercase, strip separators/spaces so "token-relay" == "token_relay" == "tokenrelay".
+    const key = tag.toLowerCase().replace(/[\s_-]+/g, "");
+    if (!key || seen.has(key)) continue;
+    // Conservative English plural fold: an ASCII word ending in "s" whose singular was already kept.
+    if (/^[a-z0-9][a-z0-9_\- ]*s$/.test(tag.toLowerCase()) && seen.has(key.slice(0, -1))) continue;
+    seen.add(key);
+    out.push(tag);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
 // ---- In-flight dedup registry ----
 // Prevents duplicate paid API calls when auto-click and manual click race
 // (e.g. popup boot auto-clicks ai-tags-btn while user clicks it too).

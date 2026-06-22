@@ -62,6 +62,9 @@ function escapeForExtended(text) {
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// Max AI tags to keep (enforced in refineTags; also stated in DEFAULT_TAG_PROMPT).
+const AI_TAG_CAP = 8;
+
 const DEFAULT_TAG_PROMPT = `Suggest 5-10 bookmark tags for the following webpage. {{lang_instruction}} Tags should be lowercase, {{separator_instruction}}. Return ONLY a JSON array.
 
 Title: {{title}}

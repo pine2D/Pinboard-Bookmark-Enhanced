@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>AI Tags Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1200px; }
+h2 { margin-top: 24px; font-size: 16px; }
+.suite { margin: 12px 0; padding: 8px; border-left: 3px solid #ccc; }
+.case { padding: 4px 8px; margin: 4px 0; white-space: pre-wrap; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+#summary { font-weight: bold; margin: 8px 0; }
+</style></head>
+<body>
+<h1>AI tag-quality + combined-prompt tests (ai.js + shared.js)</h1>
+<div id="summary"></div>
+<div id="results"></div>
+
+<script src="../i18n.js"></script>
+<script src="../shared.js"></script>
+<script src="../ai.js"></script>
+
+<script>
+let PASS = 0, FAIL = 0;
+function test(name, fn) {
+  const div = document.createElement("div");
+  try { fn(); PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+  catch (e) { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + e.message; }
+  document.getElementById("results").appendChild(div);
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+function assertEq(actual, expected, label) {
+  if (actual !== expected) throw new Error((label || "assertEq") + ": expected " + JSON.stringify(expected) + " got " + JSON.stringify(actual));
+}
+function suite(name, fn) {
+  const div = document.createElement("div"); div.className = "suite";
+  const h = document.createElement("h2"); h.textContent = name; div.appendChild(h);
+  const results = document.getElementById("results");
+  const savedAppend = results.appendChild;
+  results.appendChild = function(el) { if (el.className?.includes("case")) div.appendChild(el); else savedAppend.call(results, el); };
+  fn();
+  results.appendChild = savedAppend; results.appendChild(div);
+}
+window.addEventListener("load", () => {
+  const el = document.getElementById("summary");
+  el.textContent = "SUMMARY: " + PASS + " passed, " + FAIL + " failed";
+  el.style.color = FAIL ? "#c00" : "#0a0";
+  document.title = (FAIL ? "FAIL " : "PASS ") + document.title;
+});
+</script>
+
+<script>
+// ============ Task 1: refineTags ============
+suite("refineTags", () => {
+  test("AI_TAG_CAP is 8", () => {
+    assertEq(AI_TAG_CAP, 8, "cap const");
+  });
+  test("passes short lists through unchanged, order preserved", () => {
+    assertEq(refineTags(["ai_token_relay", "rating", "proxy"], { cap: 8, separator: "_" }).join(","),
+      "ai_token_relay,rating,proxy", "order kept");
+  });
+  test("caps to opts.cap, keeping the first N (most specific first)", () => {
+    const out = refineTags(["a", "b", "c", "d", "e"], { cap: 3, separator: "-" });
+    assertEq(out.join(","), "a,b,c", "first 3");
+  });
+  test("defaults cap to AI_TAG_CAP when not given", () => {
+    const many = Array.from({ length: 12 }, (_, i) => "t" + i);
+    assertEq(refineTags(many, { separator: "-" }).length, 8, "default cap 8");
+  });
+  test("dedups case/separator-insensitively, keeps first casing", () => {
+    assertEq(refineTags(["Token-Relay", "token_relay", "tokenrelay"], { cap: 8, separator: "_" }).join(","),
+      "Token-Relay", "separator+case variants collapse");
+  });
+  test("folds ASCII plural when singular already kept (rating before ratings)", () => {
+    assertEq(refineTags(["rating", "ratings", "proxy"], { cap: 8, separator: "-" }).join(","),
+      "rating,proxy", "ratings dropped");
+  });
+  test("CJK tags are never plural-folded and survive", () => {
+    assertEq(refineTags(["评分", "代理"], { cap: 8, separator: "-" }).join(","), "评分,代理", "cjk kept");
+  });
+  test("drops empties and trims; tolerates non-strings", () => {
+    assertEq(refineTags(["  spaced  ", "", null, 5, "real"], { cap: 8, separator: "-" }).join(","),
+      "spaced,real", "cleaned");
+  });
+  test("non-array input -> empty array", () => {
+    assertEq(refineTags(null, { cap: 8 }).length, 0, "null");
+    assertEq(refineTags(undefined).length, 0, "undefined");
+  });
+});
+</script>
+</body></html>
