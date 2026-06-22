@@ -148,36 +148,64 @@ function setupTabSet() {
             let tabPageInfo = null;
             try { tabPageInfo = await getPageInfoFromTab(tab.id, { withDefuddle: true }); } catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
             if (tabPageInfo?.pageText) {
-              const aiJobs = [];
-              if (useAiTags) aiJobs.push((async () => {
+              let combinedHandled = false;
+
+              // Both requested -> one combined call per tab (sends the body once).
+              // Gated OFF for custom-prompt users so their templates are honored (Global Constraint).
+              if (useAiTags && useAiSummary
+                  && !settings.customTagPrompt?.trim() && !settings.customSummaryPrompt?.trim()) {
                 try {
-                  const cached = await getAICache(tab.url, "tags", settings.aiCacheDuration, settings.aiContentSource);
-                  if (cached) return { type: "tags", result: cached };
-                  const prompt = buildTagPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "", []);
-                  const resp = await callAI(settings, prompt);
-                  const rawTags = parseAITags(resp, settings.aiTagSeparator);
-                  const aiTags = settings.optRespectTagCase
-                    ? rawTags.map(tag => resolveTagCase(tag, tagCaseMap))
-                    : rawTags;
-                  await setAICache(tab.url, "tags", aiTags, settings.aiCacheDuration, settings.aiContentSource);
-                  return { type: "tags", result: aiTags };
-                } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
-              })());
-              if (useAiSummary) aiJobs.push((async () => {
-                try {
-                  const cached = await getAICache(tab.url, "summary", settings.aiCacheDuration, settings.aiContentSource);
-                  if (cached) return { type: "summary", result: cached };
-                  const prompt = buildSummaryPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "");
-                  const summary = await callAI(settings, prompt);
-                  await setAICache(tab.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
-                  return { type: "summary", result: summary };
-                } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
-              })());
-              const results = await Promise.all(aiJobs);
-              for (const r of results) {
-                if (!r) continue;
-                if (r.type === "tags") tags = [...tags, ...r.result];
-                if (r.type === "summary") notes = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
+                  const tCached = await getAICache(tab.url, "tags", settings.aiCacheDuration, settings.aiContentSource);
+                  const sCached = await getAICache(tab.url, "summary", settings.aiCacheDuration, settings.aiContentSource);
+                  let aiTags, summary;
+                  if (tCached && sCached) {
+                    aiTags = tCached; summary = sCached;
+                  } else {
+                    const resp = await callAI(settings, buildCombinedPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "", []));
+                    const parsed = parseAICombined(resp, settings.aiTagSeparator);
+                    aiTags = settings.optRespectTagCase ? parsed.tags.map(tag => resolveTagCase(tag, tagCaseMap)) : parsed.tags;
+                    summary = parsed.summary;
+                    await setAICache(tab.url, "tags", aiTags, settings.aiCacheDuration, settings.aiContentSource);
+                    await setAICache(tab.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
+                  }
+                  tags = [...tags, ...aiTags];
+                  if (summary) notes = `[AI Summary]\n<blockquote>${summary}</blockquote>`;
+                  combinedHandled = true;
+                } catch (e) { console.warn("batch AI combined failed, falling back:", tab.url, e.message); }
+              }
+
+              if (!combinedHandled) {
+                const aiJobs = [];
+                if (useAiTags) aiJobs.push((async () => {
+                  try {
+                    const cached = await getAICache(tab.url, "tags", settings.aiCacheDuration, settings.aiContentSource);
+                    if (cached) return { type: "tags", result: cached };
+                    const prompt = buildTagPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "", []);
+                    const resp = await callAI(settings, prompt);
+                    const rawTags = refineTags(parseAITags(resp, settings.aiTagSeparator), { cap: AI_TAG_CAP, separator: settings.aiTagSeparator });
+                    const aiTags = settings.optRespectTagCase
+                      ? rawTags.map(tag => resolveTagCase(tag, tagCaseMap))
+                      : rawTags;
+                    await setAICache(tab.url, "tags", aiTags, settings.aiCacheDuration, settings.aiContentSource);
+                    return { type: "tags", result: aiTags };
+                  } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
+                })());
+                if (useAiSummary) aiJobs.push((async () => {
+                  try {
+                    const cached = await getAICache(tab.url, "summary", settings.aiCacheDuration, settings.aiContentSource);
+                    if (cached) return { type: "summary", result: cached };
+                    const prompt = buildSummaryPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "");
+                    const summary = await callAI(settings, prompt);
+                    await setAICache(tab.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
+                    return { type: "summary", result: summary };
+                  } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
+                })());
+                const results = await Promise.all(aiJobs);
+                for (const r of results) {
+                  if (!r) continue;
+                  if (r.type === "tags") tags = [...tags, ...r.result];
+                  if (r.type === "summary") notes = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
+                }
               }
             }
           }
