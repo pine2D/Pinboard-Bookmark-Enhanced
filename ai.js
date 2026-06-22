@@ -587,24 +587,44 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
   }
 }
 
+// ---- Shared prompt fragments (used by tag, summary, and combined builders) ----
+const TAG_SEP_MAP = {
+  "-": "use hyphens for multi-word (e.g. machine-learning)",
+  "_": "use underscores for multi-word (e.g. machine_learning)",
+  " ": "use spaces for multi-word tags",
+};
+
+function aiTagLangInstruction(s) {
+  const lang = (s && s.aiTagLang) || "en";
+  if (lang === "auto") return "Use the same language as the content for tags.";
+  if (lang === "zh") return "Tags must be in Chinese (简体中文).";
+  if (lang === "zh-TW") return "Tags must be in Traditional Chinese (繁體中文/台灣).";
+  if (lang === "zh-HK") return "Tags must be in Traditional Chinese (繁體中文/香港).";
+  if (lang === "en") return "Tags must be in English.";
+  if (lang === "ja") return "Tags must be in Japanese (日本語).";
+  if (lang === "ko") return "Tags must be in Korean (한국어).";
+  return `Tags must be in ${lang}.`;
+}
+
+function aiSummaryLangInstruction(s) {
+  const lang = (s && s.aiSummaryLang) || "auto";
+  if (lang === "zh") return "Write in Chinese (简体中文).";
+  if (lang === "zh-TW") return "Write in Traditional Chinese (繁體中文/台灣).";
+  if (lang === "zh-HK") return "Write in Traditional Chinese (繁體中文/香港).";
+  if (lang === "en") return "Write in English.";
+  if (lang === "ja") return "Write in Japanese.";
+  if (lang === "ko") return "Write in Korean.";
+  if (lang !== "auto") return `Write in ${lang}.`;
+  return "Write in the same language as the content.";
+}
+
 // ---- Prompt builders (no DOM dependency) ----
 function buildTagPrompt(s, title, url, content, description, userTags) {
   const sep = s.aiTagSeparator || "-";
-  const sepMap = { "-": "use hyphens for multi-word (e.g. machine-learning)", "_": "use underscores for multi-word (e.g. machine_learning)", " ": "use spaces for multi-word tags" };
-  let langInst = "Tags must be in English.";
-  const lang = s.aiTagLang || "en";
-  if (lang === "auto") langInst = "Use the same language as the content for tags.";
-  else if (lang === "zh") langInst = "Tags must be in Chinese (简体中文).";
-  else if (lang === "zh-TW") langInst = "Tags must be in Traditional Chinese (繁體中文/台灣).";
-  else if (lang === "zh-HK") langInst = "Tags must be in Traditional Chinese (繁體中文/香港).";
-  else if (lang === "en") langInst = "Tags must be in English.";
-  else if (lang === "ja") langInst = "Tags must be in Japanese (日本語).";
-  else if (lang === "ko") langInst = "Tags must be in Korean (한국어).";
-  else langInst = `Tags must be in ${lang}.`;
   const tmpl = s.customTagPrompt?.trim() || DEFAULT_TAG_PROMPT;
   let prompt = tmpl
-    .replace(/\{\{lang_instruction\}\}/g, () => langInst)
-    .replace(/\{\{separator_instruction\}\}/g, () => sepMap[sep] || sepMap["-"])
+    .replace(/\{\{lang_instruction\}\}/g, () => aiTagLangInstruction(s))
+    .replace(/\{\{separator_instruction\}\}/g, () => TAG_SEP_MAP[sep] || TAG_SEP_MAP["-"])
     .replace(/\{\{title\}\}/g, () => title || "")
     .replace(/\{\{url\}\}/g, () => url || "")
     .replace(/\{\{content\}\}/g, () => (content || "").substring(0, 4000))
@@ -617,21 +637,52 @@ function buildTagPrompt(s, title, url, content, description, userTags) {
 
 function buildSummaryPrompt(s, title, url, content, description) {
   const tmpl = s.customSummaryPrompt?.trim() || DEFAULT_SUMMARY_PROMPT;
-  let langInst = "Write in the same language as the content.";
-  const lang = s.aiSummaryLang || "auto";
-  if (lang === "zh") langInst = "Write in Chinese (简体中文).";
-  else if (lang === "zh-TW") langInst = "Write in Traditional Chinese (繁體中文/台灣).";
-  else if (lang === "zh-HK") langInst = "Write in Traditional Chinese (繁體中文/香港).";
-  else if (lang === "en") langInst = "Write in English.";
-  else if (lang === "ja") langInst = "Write in Japanese.";
-  else if (lang === "ko") langInst = "Write in Korean.";
-  else if (lang !== "auto") langInst = `Write in ${lang}.`;
   return tmpl
     .replace(/\{\{title\}\}/g, () => title || "")
     .replace(/\{\{url\}\}/g, () => url || "")
     .replace(/\{\{content\}\}/g, () => (content || "").substring(0, 4000))
     .replace(/\{\{description\}\}/g, () => description || "")
-    .replace(/\{\{lang_instruction\}\}/g, () => langInst);
+    .replace(/\{\{lang_instruction\}\}/g, () => aiSummaryLangInstruction(s));
+}
+
+function buildCombinedPrompt(s, title, url, content, description, userTags) {
+  const sep = s.aiTagSeparator || "-";
+  let prompt = `Analyze the following webpage and return ONLY a JSON object with exactly two keys: "summary" and "tags".
+
+"summary": ${aiSummaryLangInstruction(s)} Summarize concisely in 2-4 sentences, focusing on key points.
+
+"tags": an array of up to ${AI_TAG_CAP} bookmark tags. ${aiTagLangInstruction(s)} Tags should be lowercase, ${TAG_SEP_MAP[sep] || TAG_SEP_MAP["-"]}.
+${TAG_GUIDANCE}
+
+Title: {{title}}
+URL: {{url}}
+Content: {{content}}
+
+Format: {"summary":"...","tags":["tag1","tag2"]}`;
+  prompt = prompt
+    .replace(/\{\{title\}\}/g, () => title || "")
+    .replace(/\{\{url\}\}/g, () => url || "")
+    .replace(/\{\{content\}\}/g, () => (content || "").substring(0, 4000));
+  if (userTags && userTags.length > 0) {
+    prompt += `\n\nExisting tags (prefer reusing these if applicable): ${userTags.slice(0, 50).join(", ")}`;
+  }
+  return prompt;
+}
+
+// Parse a combined {"summary","tags"} reply. Throws on no-object / bad-JSON /
+// empty result so callers can fall back to two separate calls.
+function parseAICombined(resp, separator) {
+  const sep = separator || "-";
+  if (typeof resp !== "string") throw new Error("combined: empty response");
+  const m = resp.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("combined: no JSON object");
+  const obj = JSON.parse(m[0]); // throws on bad JSON -> caller falls back
+  const summary = typeof obj.summary === "string" ? obj.summary.trim() : "";
+  let tags = Array.isArray(obj.tags) ? obj.tags : [];
+  tags = tags.filter(t => typeof t === "string").map(t => t.toLowerCase().replace(/\s+/g, sep));
+  tags = refineTags(tags, { cap: AI_TAG_CAP, separator: sep });
+  if (!summary && tags.length === 0) throw new Error("combined: empty result");
+  return { summary, tags };
 }
 
 // ---- Parse AI tag response ----

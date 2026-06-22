@@ -118,4 +118,79 @@ suite("default tag prompt", () => {
   });
 });
 </script>
+
+<script>
+// ============ Task 3: lang helpers + combined prompt/parse ============
+suite("lang instruction helpers", () => {
+  test("tag lang: explicit, auto, fallback", () => {
+    assertEq(aiTagLangInstruction({ aiTagLang: "en" }), "Tags must be in English.", "en");
+    assertEq(aiTagLangInstruction({ aiTagLang: "zh" }), "Tags must be in Chinese (简体中文).", "zh");
+    assertEq(aiTagLangInstruction({ aiTagLang: "auto" }), "Use the same language as the content for tags.", "auto");
+    assertEq(aiTagLangInstruction({ aiTagLang: "fr" }), "Tags must be in fr.", "fallback");
+    assertEq(aiTagLangInstruction({}), "Tags must be in English.", "default en");
+  });
+  test("summary lang: explicit, auto default, fallback", () => {
+    assertEq(aiSummaryLangInstruction({ aiSummaryLang: "ja" }), "Write in Japanese.", "ja");
+    assertEq(aiSummaryLangInstruction({ aiSummaryLang: "auto" }), "Write in the same language as the content.", "auto");
+    assertEq(aiSummaryLangInstruction({}), "Write in the same language as the content.", "default auto");
+    assertEq(aiSummaryLangInstruction({ aiSummaryLang: "fr" }), "Write in fr.", "fallback");
+  });
+});
+
+suite("buildCombinedPrompt", () => {
+  test("requests one JSON object with summary + tags, embeds guidance & cap", () => {
+    const p = buildCombinedPrompt({ aiTagLang: "en", aiSummaryLang: "auto", aiTagSeparator: "_" }, "T", "https://x.test/", "Body", "", []);
+    assert(/"summary"/.test(p) && /"tags"/.test(p), "two keys named");
+    assert(p.indexOf("up to 8") !== -1, "cap 8");
+    assert(p.indexOf(TAG_GUIDANCE) !== -1, "guidance embedded");
+    assert(p.indexOf("Write in the same language") !== -1, "summary lang");
+    assert(p.indexOf("Tags must be in English.") !== -1, "tag lang");
+    assert(p.indexOf("underscores") !== -1, "separator wording");
+    assert(/\{"summary":"\.\.\.","tags":\[/.test(p), "output shape shown");
+  });
+  test("content capped to 4000 and title is $-safe", () => {
+    const p = buildCombinedPrompt({ aiTagLang: "en" }, "A$1B", "u", "x".repeat(5000), "", []);
+    assert(p.indexOf("A$1B") !== -1, "title verbatim incl $1");
+    assert(p.indexOf("x".repeat(4000)) !== -1, "4000 present");
+    assert(p.indexOf("x".repeat(4001)) === -1, "not 4001");
+  });
+  test("appends existing-tags line only when userTags present", () => {
+    assert(/Existing tags \(prefer reusing/.test(buildCombinedPrompt({}, "t", "u", "c", "", ["a"])), "present");
+    assert(!/Existing tags/.test(buildCombinedPrompt({}, "t", "u", "c", "", [])), "absent");
+  });
+});
+
+suite("parseAICombined", () => {
+  test("clean object parsed; tags normalized + refined", () => {
+    const r = parseAICombined('{"summary":"  A short summary. ","tags":["AI Token Relay","rating","ratings"]}', "_");
+    assertEq(r.summary, "A short summary.", "summary trimmed");
+    assertEq(r.tags.join(","), "ai_token_relay,rating", "tags normalized, ratings folded");
+  });
+  test("object embedded in prose / fences is extracted", () => {
+    const r = parseAICombined('Sure!\n```json\n{"summary":"S","tags":["proxy"]}\n```\nDone', "-");
+    assertEq(r.summary, "S", "summary");
+    assertEq(r.tags.join(","), "proxy", "tags");
+  });
+  test("missing tags array tolerated (summary still returned)", () => {
+    const r = parseAICombined('{"summary":"only summary"}', "-");
+    assertEq(r.summary, "only summary", "summary");
+    assertEq(r.tags.length, 0, "no tags");
+  });
+  test("bad JSON throws (caller falls back)", () => {
+    let threw = false;
+    try { parseAICombined('{"summary": not json', "-"); } catch (e) { threw = true; }
+    assert(threw, "throws on bad json");
+  });
+  test("no object at all throws", () => {
+    let threw = false;
+    try { parseAICombined("sorry, I cannot help", "-"); } catch (e) { threw = true; }
+    assert(threw, "throws when no object");
+  });
+  test("empty object (no summary, no tags) throws", () => {
+    let threw = false;
+    try { parseAICombined('{"foo":1}', "-"); } catch (e) { threw = true; }
+    assert(threw, "throws on empty result");
+  });
+});
+</script>
 </body></html>
