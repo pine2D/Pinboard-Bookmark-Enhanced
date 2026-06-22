@@ -1667,6 +1667,9 @@
   "archiveRequested": {
     "message": "Archivierung angefordert"
   },
+  "archiveLogClear": {
+    "message": "Leeren"
+  },
   "archiveLogTitle": {
     "message": "Kürzliche Archivierungsanfragen"
   },

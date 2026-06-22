@@ -1667,6 +1667,9 @@
   "archiveRequested": {
     "message": "Archiwizacja żądana"
   },
+  "archiveLogClear": {
+    "message": "Wyczyść"
+  },
   "archiveLogTitle": {
     "message": "Ostatnie żądania archiwizacji"
   },

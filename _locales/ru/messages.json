@@ -1667,6 +1667,9 @@
   "archiveRequested": {
     "message": "Запрошена архивация"
   },
+  "archiveLogClear": {
+    "message": "Очистить"
+  },
   "archiveLogTitle": {
     "message": "Последние запросы архивирования"
   },

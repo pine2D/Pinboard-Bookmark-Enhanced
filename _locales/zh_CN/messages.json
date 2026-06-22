@@ -1667,6 +1667,9 @@
   "archiveRequested": {
     "message": "已请求存档"
   },
+  "archiveLogClear": {
+    "message": "清空"
+  },
   "archiveLogTitle": {
     "message": "最近的存档请求"
   },

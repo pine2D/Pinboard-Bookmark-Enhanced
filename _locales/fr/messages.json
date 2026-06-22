@@ -1667,6 +1667,9 @@
   "archiveRequested": {
     "message": "Archivage demandé"
   },
+  "archiveLogClear": {
+    "message": "Effacer"
+  },
   "archiveLogTitle": {
     "message": "Demandes d'archivage récentes"
   },

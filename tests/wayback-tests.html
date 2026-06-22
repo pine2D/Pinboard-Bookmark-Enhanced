@@ -129,6 +129,18 @@ suite("pbpWaybackAppendLog", () => {
     assert(result[0].outcome === "outcome3", "should keep newest entries");
     assert(result[2].outcome === "outcome5", "newest should be last");
   });
+
+  test("default cap is WAYBACK_LOG_CAP (50)", () => {
+    assert(WAYBACK_LOG_CAP === 50, "WAYBACK_LOG_CAP should be 50");
+    const log = [];
+    for (let i = 0; i < 60; i++) {
+      log.push({ url: `https://u${i}.com`, ts: T0 + i*1000, outcome: `o${i}` });
+    }
+    const entry = { url: "https://u60.com", ts: T0 + 60*1000, outcome: "o60" };
+    const result = pbpWaybackAppendLog(log, entry); // no explicit cap → default WAYBACK_LOG_CAP
+    assert(result.length === WAYBACK_LOG_CAP, "should cap at the default");
+    assert(result[result.length - 1].outcome === "o60", "newest kept at end");
+  });
 });
 
 // ============ pbpWaybackBuildRequest ============

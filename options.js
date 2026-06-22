@@ -802,6 +802,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  // ---- Wayback: clear the archive log (display only; keeps the _waybackAttempts
+  // dedup map so just-saved URLs are not immediately re-archivable) ----
+  $id("wayback-log-clear")?.addEventListener("click", async () => {
+    try { await chrome.storage.local.remove("_waybackLog"); } catch (_) {}
+    await renderWaybackLog();
+  });
+
   // ===================== Auto-save =====================
   // Collect all settings from the form and save to chrome.storage.sync
   async function saveAll() {
@@ -2444,6 +2451,10 @@ async function renderWaybackLog() {
   } catch (_) {
     log = [];
   }
+
+  // Show the Clear button only when there's something to clear
+  const clearBtn = $id("wayback-log-clear");
+  if (clearBtn) clearBtn.style.display = log.length ? "" : "none";
 
   if (!log.length) {
     const empty = document.createElement("div");

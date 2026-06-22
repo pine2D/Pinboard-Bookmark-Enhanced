@@ -1667,6 +1667,9 @@
   "archiveRequested": {
     "message": "アーカイブをリクエストしました"
   },
+  "archiveLogClear": {
+    "message": "クリア"
+  },
   "archiveLogTitle": {
     "message": "最近のアーカイブリクエスト"
   },
