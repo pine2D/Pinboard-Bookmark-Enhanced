@@ -394,9 +394,41 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     tags = s._defaultTags.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
   }
 
-  // AI features (parallel)
+  // AI features
   const aiPromises = [];
-  if (pageInfo?.pageText && hasAIKey(s)) {
+  let combinedHandled = false;
+
+  // Both tags AND summary requested -> one combined call (sends the body once).
+  // Gated OFF when the user set a custom tag/summary prompt: the combined prompt uses
+  // TAG_GUIDANCE (not their template), so customizers fall through to the separate calls
+  // below, which honor customTagPrompt/customSummaryPrompt (Global Constraint).
+  if (pageInfo?.pageText && hasAIKey(s) && s._aiTags && s._aiSummary
+      && !s.customTagPrompt?.trim() && !s.customSummaryPrompt?.trim()) {
+    try {
+      const tCached = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource);
+      const sCached = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource);
+      let aiTags, summary;
+      if (tCached && sCached) {
+        aiTags = tCached; summary = sCached;
+      } else {
+        const resp = await callAI(s, buildCombinedPrompt(s, title, url, pageInfo.pageText, notes, []));
+        const parsed = parseAICombined(resp, s.aiTagSeparator);
+        aiTags = parsed.tags; summary = parsed.summary;
+        await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
+        await setAICache(url, "summary", summary, s.aiCacheDuration, s.aiContentSource);
+      }
+      tags = [...tags, ...aiTags];
+      if (summary) {
+        const wrapped = `[AI Summary]\n<blockquote>${escapeForExtended(summary)}</blockquote>`;
+        notes = notes ? notes + "\n\n" + wrapped : wrapped;
+      }
+      combinedHandled = true;
+    } catch (e) {
+      console.warn(`${notifyCategory} AI combined failed, falling back to separate calls:`, e.message);
+    }
+  }
+
+  if (!combinedHandled && pageInfo?.pageText && hasAIKey(s)) {
     if (s._aiTags) {
       aiPromises.push(
         (async () => {
@@ -405,7 +437,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
             if (cached) return { type: "tags", result: cached };
             const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
             const resp = await callAI(s, prompt);
-            const aiTags = parseAITags(resp, s.aiTagSeparator);
+            const aiTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
             await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
             return { type: "tags", result: aiTags };
           } catch (e) { console.warn(`${notifyCategory} AI tags failed:`, e.message); return null; }
@@ -428,7 +460,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     }
   }
 
-  // Wait for AI results
+  // Wait for AI results (empty when combinedHandled)
   const aiResults = await Promise.all(aiPromises);
   for (const r of aiResults) {
     if (!r) continue;
