@@ -374,6 +374,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .submit-hint { color: #767676; font-size: 10px; margin-left: auto; align-self: center; }
 .kb-hint { color: #999; font-size: 10px; align-self: center; }
 #ai-summary-hint { margin-left: auto; margin-right: 6px; }
+#ai-tags-hint { margin-right: 6px; }
 
 .clear-all-link {
   font-size: 10px; color: #757575; cursor: pointer;

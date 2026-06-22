@@ -868,15 +868,13 @@ function setupSubmit(token) {
     } else if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === "Enter") {
       const mainSection = $id("main-section");
       if (mainSection.classList.contains("hidden")) return;
-      const aiBtn = $id("ai-summary-btn");
-      const regen = document.querySelector('.regen-link[data-action="regenerate"]');
-      if (aiBtn && !aiBtn.classList.contains("hidden") && !aiBtn.classList.contains("disabled-link")) {
-        e.preventDefault();
-        aiBtn.click();
-      } else if (regen && !regen.classList.contains("loading")) {
-        e.preventDefault();
-        regen.click();
-      }
+      e.preventDefault();
+      // Shift+Enter fires AI summary AND tags together. They share one combined
+      // API call: whichever runs first issues the combined request and caches the
+      // other half, so the second is an instant cache hit (one call fills both).
+      // Already-present halves re-render from cache; re-roll uses the regenerate links.
+      if (typeof doAISummary === "function") doAISummary(false);
+      if (typeof doAITags === "function") doAITags(false);
     } else if (e.key === "Escape") {
       const delPop = document.querySelector(".del-confirm-popover");
       if (delPop) { delPop.remove(); return; }
