@@ -1684,6 +1684,9 @@
   "archiveOutcomeSkipped": {
     "message": "пропущено (недавно заархивировано)"
   },
+  "archiveOutcomeSkippedPrivate": {
+    "message": "пропущено (приватная)"
+  },
   "archiveOutcomeRateLimited": {
     "message": "ограничено по скорости"
   },

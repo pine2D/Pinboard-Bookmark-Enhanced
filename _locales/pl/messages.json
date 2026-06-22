@@ -1684,6 +1684,9 @@
   "archiveOutcomeSkipped": {
     "message": "pominięte (niedawno zarchiwizowane)"
   },
+  "archiveOutcomeSkippedPrivate": {
+    "message": "pominięto (prywatna)"
+  },
   "archiveOutcomeRateLimited": {
     "message": "ograniczone szybkością"
   },

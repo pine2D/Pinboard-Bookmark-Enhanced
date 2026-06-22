@@ -1684,6 +1684,9 @@
   "archiveOutcomeSkipped": {
     "message": "ignoré (archivé récemment)"
   },
+  "archiveOutcomeSkippedPrivate": {
+    "message": "ignoré (privé)"
+  },
   "archiveOutcomeRateLimited": {
     "message": "limite de débit"
   },

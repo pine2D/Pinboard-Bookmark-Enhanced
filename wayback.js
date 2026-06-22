@@ -130,8 +130,20 @@ function pbpWaybackShouldArchive({ enabled, skipPrivate, isPrivate, force, overr
 
 async function pbpWaybackArchive(url, settings, opts) {
   try {
-    // Step 1: Check if feature is enabled
-    if (!settings || settings.waybackArchiveEnabled !== true) {
+    // Step 1: Centralized archive decision (enabled + skip-private + per-save override)
+    if (!settings) return;
+    const enabled = settings.waybackArchiveEnabled === true;
+    const skipPrivate = settings.waybackSkipPrivate !== false; // default ON
+    const isPrivate = !!(opts && opts.isPrivate);
+    const force = !!(opts && opts.force);
+    const override = opts ? opts.override : undefined;
+    if (!pbpWaybackShouldArchive({ enabled, skipPrivate, isPrivate, force, override })) {
+      // Log the privacy skip only when archiving would otherwise have happened
+      // (enabled + auto path). Plain disabled / explicit untick stay silent —
+      // preserving the prior "disabled = no log" behavior.
+      if (override === undefined && !force && enabled && skipPrivate && isPrivate) {
+        await _pbpWaybackLog(url, "skippedPrivate");
+      }
       return;
     }
 
@@ -147,7 +159,6 @@ async function pbpWaybackArchive(url, settings, opts) {
     }
 
     // Step 3: Read dedup map and check if we should attempt
-    const force = !!(opts && opts.force);
     const stored = await chrome.storage.local.get({ _waybackAttempts: {} });
     const attempts = stored._waybackAttempts || {};
     const now = Date.now();

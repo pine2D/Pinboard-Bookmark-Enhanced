@@ -1684,6 +1684,9 @@
   "archiveOutcomeSkipped": {
     "message": "übersprungen (kürzlich archiviert)"
   },
+  "archiveOutcomeSkippedPrivate": {
+    "message": "übersprungen (privat)"
+  },
   "archiveOutcomeRateLimited": {
     "message": "Rate-begrenzt"
   },

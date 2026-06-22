@@ -1684,6 +1684,9 @@
   "archiveOutcomeSkipped": {
     "message": "已跳過（最近已存檔）"
   },
+  "archiveOutcomeSkippedPrivate": {
+    "message": "已略過（私密）"
+  },
   "archiveOutcomeRateLimited": {
     "message": "頻率限制"
   },

@@ -2505,6 +2505,8 @@ async function renderWaybackLog() {
       outcomeEl.title = outcome;
     } else if (outcome === "skipped") {
       outcomeText = t("archiveOutcomeSkipped");
+    } else if (outcome === "skippedPrivate") {
+      outcomeText = t("archiveOutcomeSkippedPrivate");
     } else if (outcome === "rate-limited") {
       outcomeText = t("archiveOutcomeRateLimited");
       outcomeEl.title = t("archiveErrRateLimited");

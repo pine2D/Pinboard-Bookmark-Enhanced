@@ -1684,6 +1684,9 @@
   "archiveOutcomeSkipped": {
     "message": "スキップ（最近アーカイブ済み）"
   },
+  "archiveOutcomeSkippedPrivate": {
+    "message": "スキップ（非公開）"
+  },
   "archiveOutcomeRateLimited": {
     "message": "レート制限"
   },
