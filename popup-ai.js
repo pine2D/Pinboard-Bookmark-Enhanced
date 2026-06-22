@@ -313,10 +313,14 @@ async function fetchAIArtifacts(kind, forceRefresh) {
   // (it uses TAG_GUIDANCE, not customTagPrompt/customSummaryPrompt). Global Constraint.
   if (settings.customTagPrompt?.trim() || settings.customSummaryPrompt?.trim()) return callSingle();
 
-  // Ride an in-flight combined call if one is already running.
+  // Ride an in-flight combined call if one is already running. If that call
+  // rejects (combined parse failure), fall through to this call's own
+  // cache/single path instead of surfacing the other click's error.
   if (_inflightAI.has(combinedKey)) {
-    const both = await _inflightAI.get(combinedKey);
-    if (both) return kind === "tags" ? finalizeAITags(both.tags) : both.summary;
+    try {
+      const both = await _inflightAI.get(combinedKey);
+      if (both) return kind === "tags" ? finalizeAITags(both.tags) : both.summary;
+    } catch (_) { /* combined in-flight failed; fall through */ }
   }
 
   // If the other half is already cached, only the requested half is missing.
