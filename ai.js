@@ -162,8 +162,57 @@ function hasAIKey(s) {
   return !!s[keyMap[p]];
 }
 
+// ---- Host-permission gate for user-configured endpoints ----
+// Three providers can target an origin that is NOT in the static host_permissions:
+// "custom" (any base URL), "openai" (a base-URL override, e.g. Azure/a proxy), and
+// "ollama" (a non-loopback/remote URL). Fetching such an origin without a host grant
+// is subject to CORS and usually fails — and the background quick-save path runs in a
+// Service Worker, which has no user gesture to request the permission itself. Resolve
+// the origin a call will hit so we can verify the grant up front and fail with an
+// actionable message instead of a cryptic CORS error. Returns an origin match pattern
+// ("https://host/*"), or null when no runtime grant is needed (the built-in static
+// hosts, or loopback Ollama which is reached via its own permissive CORS).
+function _aiTargetOriginPattern(s) {
+  const p = (s && s.aiProvider) || "gemini";
+  let base;
+  if (p === "custom") base = s.customBaseUrl;
+  else if (p === "openai") base = s.openaiBaseUrl || "https://api.openai.com/v1";
+  else if (p === "ollama") base = s.ollamaBaseUrl || "http://localhost:11434";
+  else return null;
+  try {
+    const u = new URL(base);
+    if (u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "[::1]") return null;
+    return u.origin + "/*";
+  } catch (_) {
+    return null; // malformed/empty URL — let the request fail with its own error
+  }
+}
+
+// Throw an actionable error when the configured endpoint's origin is not granted.
+// Read-only: chrome.permissions.contains needs no user gesture and works in the SW.
+// No-op outside an extension context (e.g. unit-test pages) and for static providers.
+// The narrow origin is a subset of the declared optional *://*/* permission, which is
+// how the options-page Test button requests it on a real gesture.
+async function _ensureAIHostPermission(s) {
+  const pattern = _aiTargetOriginPattern(s);
+  if (!pattern) return;
+  if (typeof chrome === "undefined" || !chrome.permissions || !chrome.permissions.contains) return;
+  let has = true;
+  try {
+    has = await chrome.permissions.contains({ origins: [pattern] });
+  } catch (_) {
+    return; // contains itself failed — don't block; let the fetch attempt run
+  }
+  if (!has) {
+    const err = new Error(t("aiErrorHostPermission", pattern.replace(/\/\*$/, "")));
+    err.code = "host_permission";
+    throw err;
+  }
+}
+
 // ---- AI dispatcher ----
 async function callAI(s, prompt, opts = {}) {
+  await _ensureAIHostPermission(s);
   const p = s.aiProvider || "gemini";
   switch (p) {
     case "gemini": return callGemini(s, prompt, opts);
@@ -515,6 +564,7 @@ async function _streamOllama(s, prompt, opts, onDelta) {
 //   Error("AI stream timeout") on 30s idle.
 async function callAIStream(s, prompt, opts = {}, onDelta) {
   const cb = (typeof onDelta === "function") ? onDelta : () => {};
+  await _ensureAIHostPermission(s);
   const p = s.aiProvider || "gemini";
   const m = opts.model;
   switch (p) {

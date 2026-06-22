@@ -298,6 +298,14 @@
       }
     }
   },
+  "aiErrorHostPermission": {
+    "message": "Нет доступа к $HOST$ — откройте Настройки > ИИ и нажмите «Тест», чтобы предоставить доступ",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
   "aiErrorModelNotFoundHint": {
     "message": "Перейдите в Настройки > ИИ и выберите доступную модель"
   },

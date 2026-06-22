@@ -298,6 +298,14 @@
       }
     }
   },
+  "aiErrorHostPermission": {
+    "message": "$HOST$ にアクセスできません — 設定 > AI で「テスト」をクリックして許可してください",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
   "aiErrorModelNotFoundHint": {
     "message": "設定 > AI を開いて、利用可能なモデルを選択してください"
   },

@@ -298,6 +298,14 @@
       }
     }
   },
+  "aiErrorHostPermission": {
+    "message": "Brak dostępu do $HOST$ — otwórz Ustawienia > AI i kliknij Testuj, aby przyznać dostęp",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
   "aiErrorModelNotFoundHint": {
     "message": "Przejdź do Ustawienia > AI i wybierz dostępny model"
   },

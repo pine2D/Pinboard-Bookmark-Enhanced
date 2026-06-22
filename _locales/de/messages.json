@@ -298,6 +298,14 @@
       }
     }
   },
+  "aiErrorHostPermission": {
+    "message": "Kein Zugriff auf $HOST$ — in Einstellungen > KI auf die Schaltfläche „Test“ klicken, um den Zugriff zu erlauben",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
   "aiErrorModelNotFoundHint": {
     "message": "Öffnen Sie Einstellungen > KI und wählen Sie ein verfügbares Modell"
   },

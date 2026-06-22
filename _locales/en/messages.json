@@ -298,6 +298,14 @@
       }
     }
   },
+  "aiErrorHostPermission": {
+    "message": "No access to $HOST$ — open Settings > AI and click Test to grant it",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
   "aiErrorModelNotFoundHint": {
     "message": "Visit Settings > AI to select an available model"
   },

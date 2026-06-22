@@ -33,6 +33,23 @@ function setupApiTests() {
       customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
     };
 
+    // Endpoints outside the built-in host list (custom, an openai/ollama base-URL
+    // override, a remote Ollama) need a host grant. This click is a user gesture, so
+    // request the narrow origin now — a subset of the declared optional *://*/*
+    // permission. request() resolves true with no prompt if already granted, so it is
+    // safe to call on every Test. The background quick-save path can't prompt itself.
+    const originPattern = (typeof _aiTargetOriginPattern === "function") ? _aiTargetOriginPattern(cs) : null;
+    if (originPattern && chrome.permissions && chrome.permissions.request) {
+      let granted = false;
+      try { granted = await chrome.permissions.request({ origins: [originPattern] }); } catch (_) {}
+      if (!granted) {
+        setStatusIcon(statusEl, false, t("aiErrorHostPermission", originPattern.replace(/\/\*$/, "")));
+        statusEl.style.color = "#c00";
+        setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+        return;
+      }
+    }
+
     try {
       if (!hasAIKey(cs)) throw new Error(t("testNoApiKey"));
       const result = await callAI(cs, "Reply with just the word: OK");

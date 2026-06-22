@@ -298,6 +298,14 @@
       }
     }
   },
+  "aiErrorHostPermission": {
+    "message": "无法访问 $HOST$ — 请在 设置 > AI 中点击「测试」以授予访问权限",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
   "aiErrorModelNotFoundHint": {
     "message": "前往设置 > AI，选择一个可用的模型"
   },

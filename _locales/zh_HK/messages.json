@@ -298,6 +298,14 @@
       }
     }
   },
+  "aiErrorHostPermission": {
+    "message": "無法存取 $HOST$ — 請喺 設定 > AI 度撳「測試」嚟授予存取權限",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
   "aiErrorModelNotFoundHint": {
     "message": "前往設定 > AI，選擇一個可用嘅模型"
   },

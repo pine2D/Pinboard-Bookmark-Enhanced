@@ -298,6 +298,14 @@
       }
     }
   },
+  "aiErrorHostPermission": {
+    "message": "Pas d'accès à $HOST$ — ouvrez Paramètres > IA et cliquez sur Tester pour l'autoriser",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
   "aiErrorModelNotFoundHint": {
     "message": "Allez dans Paramètres > IA et choisissez un modèle disponible"
   },
