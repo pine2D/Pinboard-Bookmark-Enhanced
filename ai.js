@@ -173,7 +173,7 @@ async function handleAIError(res, provider) {
 //   defaultModel fallback when the model setting is blank
 const OPENAI_COMPAT_PROVIDERS = {
   openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano" },
-  deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash" },
+  deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash", extraBody: { thinking: { type: "disabled" } } },  // v4-flash defaults thinking ON; off — summarize/tag/explain/translate never need reasoning (saves tokens+latency)
   qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen-flash" },
   minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimaxi.com/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2" },
   openrouter:  { keyField: "openrouterApiKey",  base: "https://openrouter.ai/api/v1",                                           modelField: "openrouterModel",  defaultModel: "meta-llama/llama-4-scout:free" },
@@ -258,7 +258,7 @@ async function callAI(s, prompt, opts = {}) {
   if (p === "ollama") return callOllama(s, prompt, opts);
   const cfg = OPENAI_COMPAT_PROVIDERS[p];
   if (!cfg) throw new Error("Unknown provider: " + p);
-  return callOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], s[cfg.modelField] || cfg.defaultModel, prompt, opts);
+  return callOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], s[cfg.modelField] || cfg.defaultModel, prompt, { ...opts, extraBody: cfg.extraBody });
 }
 
 async function callGemini(s, prompt, opts = {}) {
@@ -294,7 +294,7 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
   const res = await fetchWithTimeout(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
     method: "POST", headers,
-    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0.3, max_tokens: maxTokens })
+    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0.3, max_tokens: maxTokens, ...(opts.extraBody || {}) })
   });
   if (!res.ok) await handleAIError(res, "API");
   const text = (await res.json()).choices?.[0]?.message?.content?.trim();
@@ -480,7 +480,8 @@ async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta
         messages,
         temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
         max_tokens: opts.maxTokens || 1024,
-        stream: true
+        stream: true,
+        ...(opts.extraBody || {})
       })
     },
     opts, "API",
@@ -599,7 +600,7 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
   const cfg = OPENAI_COMPAT_PROVIDERS[p];
   if (!cfg) throw new Error("Unknown provider: " + p);
   const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
-  return _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, opts, cb);
+  return _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody: cfg.extraBody }, cb);
 }
 
 // ---- Shared prompt fragments (used by tag, summary, and combined builders) ----
