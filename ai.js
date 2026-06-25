@@ -154,12 +154,43 @@ async function handleAIError(res, provider) {
   throw err;
 }
 
+// ---- OpenAI-compatible provider registry ----
+// Single source of truth for every provider reached via callOpenAICompat /
+// _streamOpenAICompat. gemini / claude / ollama use bespoke callers (different
+// request/response shapes) and are dispatched ahead of this table.
+//   keyField     settings key holding the API key (also drives hasAIKey)
+//   base         default endpoint (overridable per-provider via baseField)
+//   baseField    optional settings key whose value overrides `base` (openai/custom)
+//   modelField   settings key holding the model id
+//   defaultModel fallback when the model setting is blank
+const OPENAI_COMPAT_PROVIDERS = {
+  openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano" },
+  deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash" },
+  qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen-flash" },
+  minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimax.chat/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2" },
+  openrouter:  { keyField: "openrouterApiKey",  base: "https://openrouter.ai/api/v1",                                           modelField: "openrouterModel",  defaultModel: "meta-llama/llama-4-scout:free" },
+  groq:        { keyField: "groqApiKey",        base: "https://api.groq.com/openai/v1",                                         modelField: "groqModel",        defaultModel: "meta-llama/llama-4-scout-17b-16e-instruct" },
+  mistral:     { keyField: "mistralApiKey",     base: "https://api.mistral.ai/v1",                                              modelField: "mistralModel",     defaultModel: "mistral-small-latest" },
+  cohere:      { keyField: "cohereApiKey",      base: "https://api.cohere.com/v2",                                              modelField: "cohereModel",      defaultModel: "command-r-08-2024" },
+  siliconflow: { keyField: "siliconflowApiKey", base: "https://api.siliconflow.cn/v1",                                          modelField: "siliconflowModel", defaultModel: "Qwen/Qwen3-8B" },
+  zhipu:       { keyField: "zhipuApiKey",       base: "https://open.bigmodel.cn/api/paas/v4",                                   modelField: "zhipuModel",       defaultModel: "glm-4.7-flash" },
+  kimi:        { keyField: "kimiApiKey",        base: "https://api.moonshot.cn/v1",                                             modelField: "kimiModel",        defaultModel: "kimi-k2.6" },
+  custom:      { keyField: "customApiKey",      base: "",                                                  baseField: "customBaseUrl", modelField: "customModel",      defaultModel: "" },
+};
+
+// Resolve an OpenAI-compatible provider's base URL (per-provider baseField override wins).
+function _openaiCompatBase(cfg, s) {
+  return (cfg.baseField && s[cfg.baseField]) || cfg.base;
+}
+
 // ---- Check if AI key is configured ----
 function hasAIKey(s) {
   const p = s.aiProvider || "gemini";
   if (p === "ollama") return true;
-  const keyMap = { gemini: "geminiApiKey", openai: "openaiApiKey", claude: "claudeApiKey", deepseek: "deepseekApiKey", qwen: "qwenApiKey", minimax: "minimaxApiKey", openrouter: "openrouterApiKey", groq: "groqApiKey", mistral: "mistralApiKey", cohere: "cohereApiKey", siliconflow: "siliconflowApiKey", zhipu: "zhipuApiKey", kimi: "kimiApiKey", custom: "customApiKey" };
-  return !!s[keyMap[p]];
+  const keyField = p === "gemini" ? "geminiApiKey"
+    : p === "claude" ? "claudeApiKey"
+    : OPENAI_COMPAT_PROVIDERS[p] && OPENAI_COMPAT_PROVIDERS[p].keyField;
+  return !!(keyField && s[keyField]);
 }
 
 // ---- Host-permission gate for user-configured endpoints ----
@@ -214,24 +245,12 @@ async function _ensureAIHostPermission(s) {
 async function callAI(s, prompt, opts = {}) {
   await _ensureAIHostPermission(s);
   const p = s.aiProvider || "gemini";
-  switch (p) {
-    case "gemini": return callGemini(s, prompt, opts);
-    case "claude": return callClaude(s, prompt, opts);
-    case "openai": return callOpenAICompat(s.openaiBaseUrl || "https://api.openai.com/v1", s.openaiApiKey, s.openaiModel || "gpt-5.4-nano", prompt, opts);
-    case "deepseek": return callOpenAICompat("https://api.deepseek.com/v1", s.deepseekApiKey, s.deepseekModel || "deepseek-v4-flash", prompt, opts);
-    case "qwen": return callOpenAICompat("https://dashscope.aliyuncs.com/compatible-mode/v1", s.qwenApiKey, s.qwenModel || "qwen-flash", prompt, opts);
-    case "minimax": return callOpenAICompat("https://api.minimax.chat/v1", s.minimaxApiKey, s.minimaxModel || "MiniMax-M2", prompt, opts);
-    case "openrouter": return callOpenAICompat("https://openrouter.ai/api/v1", s.openrouterApiKey, s.openrouterModel || "meta-llama/llama-4-scout:free", prompt, opts);
-    case "groq": return callOpenAICompat("https://api.groq.com/openai/v1", s.groqApiKey, s.groqModel || "meta-llama/llama-4-scout-17b-16e-instruct", prompt, opts);
-    case "mistral": return callOpenAICompat("https://api.mistral.ai/v1", s.mistralApiKey, s.mistralModel || "mistral-small-latest", prompt, opts);
-    case "cohere": return callOpenAICompat("https://api.cohere.com/v2", s.cohereApiKey, s.cohereModel || "command-r-08-2024", prompt, opts);
-    case "siliconflow": return callOpenAICompat("https://api.siliconflow.cn/v1", s.siliconflowApiKey, s.siliconflowModel || "Qwen/Qwen3-8B", prompt, opts);
-    case "zhipu": return callOpenAICompat("https://open.bigmodel.cn/api/paas/v4", s.zhipuApiKey, s.zhipuModel || "glm-4.7-flash", prompt, opts);
-    case "kimi": return callOpenAICompat("https://api.moonshot.cn/v1", s.kimiApiKey, s.kimiModel || "kimi-k2.6", prompt, opts);
-    case "ollama": return callOllama(s, prompt, opts);
-    case "custom": return callOpenAICompat(s.customBaseUrl, s.customApiKey, s.customModel, prompt, opts);
-    default: throw new Error("Unknown provider: " + p);
-  }
+  if (p === "gemini") return callGemini(s, prompt, opts);
+  if (p === "claude") return callClaude(s, prompt, opts);
+  if (p === "ollama") return callOllama(s, prompt, opts);
+  const cfg = OPENAI_COMPAT_PROVIDERS[p];
+  if (!cfg) throw new Error("Unknown provider: " + p);
+  return callOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], s[cfg.modelField] || cfg.defaultModel, prompt, opts);
 }
 
 async function callGemini(s, prompt, opts = {}) {
@@ -566,25 +585,13 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
   const cb = (typeof onDelta === "function") ? onDelta : () => {};
   await _ensureAIHostPermission(s);
   const p = s.aiProvider || "gemini";
-  const m = opts.model;
-  switch (p) {
-    case "gemini": return _streamGemini(s, prompt, opts, cb);
-    case "claude": return _streamClaude(s, prompt, opts, cb);
-    case "openai": return _streamOpenAICompat(s.openaiBaseUrl || "https://api.openai.com/v1", s.openaiApiKey, m || s.openaiModel || "gpt-5.4-nano", prompt, opts, cb);
-    case "deepseek": return _streamOpenAICompat("https://api.deepseek.com/v1", s.deepseekApiKey, m || s.deepseekModel || "deepseek-v4-flash", prompt, opts, cb);
-    case "qwen": return _streamOpenAICompat("https://dashscope.aliyuncs.com/compatible-mode/v1", s.qwenApiKey, m || s.qwenModel || "qwen-flash", prompt, opts, cb);
-    case "minimax": return _streamOpenAICompat("https://api.minimax.chat/v1", s.minimaxApiKey, m || s.minimaxModel || "MiniMax-M2", prompt, opts, cb);
-    case "openrouter": return _streamOpenAICompat("https://openrouter.ai/api/v1", s.openrouterApiKey, m || s.openrouterModel || "meta-llama/llama-4-scout:free", prompt, opts, cb);
-    case "groq": return _streamOpenAICompat("https://api.groq.com/openai/v1", s.groqApiKey, m || s.groqModel || "meta-llama/llama-4-scout-17b-16e-instruct", prompt, opts, cb);
-    case "mistral": return _streamOpenAICompat("https://api.mistral.ai/v1", s.mistralApiKey, m || s.mistralModel || "mistral-small-latest", prompt, opts, cb);
-    case "cohere": return _streamOpenAICompat("https://api.cohere.com/v2", s.cohereApiKey, m || s.cohereModel || "command-r-08-2024", prompt, opts, cb);
-    case "siliconflow": return _streamOpenAICompat("https://api.siliconflow.cn/v1", s.siliconflowApiKey, m || s.siliconflowModel || "Qwen/Qwen3-8B", prompt, opts, cb);
-    case "zhipu": return _streamOpenAICompat("https://open.bigmodel.cn/api/paas/v4", s.zhipuApiKey, m || s.zhipuModel || "glm-4.7-flash", prompt, opts, cb);
-    case "kimi": return _streamOpenAICompat("https://api.moonshot.cn/v1", s.kimiApiKey, m || s.kimiModel || "kimi-k2.6", prompt, opts, cb);
-    case "ollama": return _streamOllama(s, prompt, opts, cb);
-    case "custom": return _streamOpenAICompat(s.customBaseUrl, s.customApiKey, m || s.customModel, prompt, opts, cb);
-    default: throw new Error("Unknown provider: " + p);
-  }
+  if (p === "gemini") return _streamGemini(s, prompt, opts, cb);
+  if (p === "claude") return _streamClaude(s, prompt, opts, cb);
+  if (p === "ollama") return _streamOllama(s, prompt, opts, cb);
+  const cfg = OPENAI_COMPAT_PROVIDERS[p];
+  if (!cfg) throw new Error("Unknown provider: " + p);
+  const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
+  return _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, opts, cb);
 }
 
 // ---- Shared prompt fragments (used by tag, summary, and combined builders) ----
