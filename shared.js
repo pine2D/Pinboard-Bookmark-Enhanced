@@ -201,7 +201,6 @@ const SETTINGS_DEFAULTS = {
   urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] },
   // pinboard.in tag-page "sort by popularity" control (site enhancement, default on)
   tagSortByPopEnabled: true,
-  bgSaveNoClobber: true,
   bgSaveMode: "merge", // "merge" | "skip" | "overwrite"
   waybackArchiveEnabled: false,
   waybackArchiveBatch: false,
@@ -350,15 +349,6 @@ function computeSavedUrlSet(existingUrls, savedUrls) {
   const out = new Set(existingUrls);
   for (const u of (savedUrls || [])) out.add(u);
   return out;
-}
-
-// ---- Batch dedup: on a failed existing-URL fetch, return null (the SAME signal
-// the >1000-bookmark branch uses) so the caller falls back to per-tab posts/get.
-// Returning an empty Set would be indistinguishable from a zero-bookmark account,
-// and with batchSkipExisting on every tab would be re-saved with replace=yes,
-// clobbering existing bookmarks' tags/title. NEVER treat fetch failure as empty.
-function batchExistingResultOnError() {
-  return null;
 }
 
 // ---- Pinboard error classifier ----

@@ -327,6 +327,6 @@ async function fetchExistingUrlSet(token) {
     // Fetch / .json() failed transiently. Do NOT return an empty Set — that is
     // indistinguishable from a zero-bookmark account and would re-save every tab
     // with replace=yes, clobbering existing bookmarks. Signal per-tab fallback.
-    return batchExistingResultOnError();
+    return null;
   }
 }
