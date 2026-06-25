@@ -670,7 +670,7 @@ async function _pbpTrStart(st) {
   if (prog0) prog0.textContent = t("trExtracting");
   await _pbpTrEnsureGlossary(st);
   const model = pbpAiResolveModelOverride(st.s);
-  const baseArgs = { targetLanguage: st.target.name, title: st.title, summary, glossary: st.glossary };
+  const baseArgs = { targetLanguage: st.target.name, title: st.title, summary };
   const streamOpts = (charLen) => ({
     system: "", model, signal: st.ctrl.signal,
     temperature: 0.1, noThinking: true,
@@ -678,7 +678,7 @@ async function _pbpTrStart(st) {
   });
 
   const requestBatch = (segments, onItem) => {
-    const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, segments });
+    const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, glossary: pbpTrMatchGlossary(st.glossary, segments), segments });
     const parser = pbpAiMakeStreamJsonParser(onItem);
     const opts = streamOpts(segments.reduce((a, x) => a + x.text.length, 0));
     opts.system = system;
@@ -688,7 +688,7 @@ async function _pbpTrStart(st) {
     ).then((full) => parser.finish(full));
   };
   const requestSingle = async (seg) => {
-    const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, segments: [seg] });
+    const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, glossary: pbpTrMatchGlossary(st.glossary, [seg]), segments: [seg] });
     let got = null;
     const parser = pbpAiMakeStreamJsonParser((it) => { if (it.id === seg.id) got = it.text; });
     const opts = streamOpts(seg.text.length);
@@ -837,9 +837,10 @@ async function _pbpTrTranslateBlock(st, w, signal) {
     : _pbpTrSplitText(w.shielded.text, PBP_TR_PART_LIMIT);
   const out = [];
   for (let i = 0; i < split.chunks.length; i++) {
+    const seg = { id: w.n, text: split.chunks[i] };
     const { system, prompt } = pbpTrBuildPrompt({
-      targetLanguage: st.target.name, title: st.title, glossary,
-      segments: [{ id: w.n, text: split.chunks[i] }]
+      targetLanguage: st.target.name, title: st.title,
+      glossary: pbpTrMatchGlossary(glossary, [seg]), segments: [seg]
     });
     let got = null;
     const parser = pbpAiMakeStreamJsonParser((it) => { if (it.id === w.n) got = it.text; });
