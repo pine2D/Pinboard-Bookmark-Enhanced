@@ -166,12 +166,12 @@ async function handleAIError(res, provider) {
 const OPENAI_COMPAT_PROVIDERS = {
   openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano" },
   deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash" },
-  qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen-flash" },
-  minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimax.chat/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2" },
+  qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen3.5-flash" },
+  minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimaxi.com/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2.7" },
   openrouter:  { keyField: "openrouterApiKey",  base: "https://openrouter.ai/api/v1",                                           modelField: "openrouterModel",  defaultModel: "meta-llama/llama-4-scout:free" },
-  groq:        { keyField: "groqApiKey",        base: "https://api.groq.com/openai/v1",                                         modelField: "groqModel",        defaultModel: "meta-llama/llama-4-scout-17b-16e-instruct" },
+  groq:        { keyField: "groqApiKey",        base: "https://api.groq.com/openai/v1",                                         modelField: "groqModel",        defaultModel: "llama-3.1-8b-instant" },
   mistral:     { keyField: "mistralApiKey",     base: "https://api.mistral.ai/v1",                                              modelField: "mistralModel",     defaultModel: "mistral-small-latest" },
-  cohere:      { keyField: "cohereApiKey",      base: "https://api.cohere.com/v2",                                              modelField: "cohereModel",      defaultModel: "command-r-08-2024" },
+  cohere:      { keyField: "cohereApiKey",      base: "https://api.cohere.ai/compatibility/v1",                                              modelField: "cohereModel",      defaultModel: "command-r7b-12-2024" },
   siliconflow: { keyField: "siliconflowApiKey", base: "https://api.siliconflow.cn/v1",                                          modelField: "siliconflowModel", defaultModel: "Qwen/Qwen3-8B" },
   zhipu:       { keyField: "zhipuApiKey",       base: "https://open.bigmodel.cn/api/paas/v4",                                   modelField: "zhipuModel",       defaultModel: "glm-4.7-flash" },
   kimi:        { keyField: "kimiApiKey",        base: "https://api.moonshot.cn/v1",                                             modelField: "kimiModel",        defaultModel: "kimi-k2.6" },
@@ -272,7 +272,7 @@ async function callClaude(s, prompt, opts = {}) {
   const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": s.claudeApiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: s.claudeModel || "claude-haiku-4-5-20251001", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] })
+    body: JSON.stringify({ model: s.claudeModel || "claude-haiku-4-5", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] })
   });
   if (!res.ok) await handleAIError(res, "Claude");
   const text = (await res.json()).content?.[0]?.text?.trim();
@@ -506,7 +506,7 @@ async function _streamGemini(s, prompt, opts, onDelta) {
 
 async function _streamClaude(s, prompt, opts, onDelta) {
   const body = {
-    model: opts.model || s.claudeModel || "claude-haiku-4-5-20251001",
+    model: opts.model || s.claudeModel || "claude-haiku-4-5",
     max_tokens: opts.maxTokens || 1024,
     temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
     messages: [{ role: "user", content: prompt }],
