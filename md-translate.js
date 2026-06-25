@@ -105,6 +105,28 @@ function pbpTrMergeGlossary(auto, user) {
   return Object.assign(Object.create(null), auto || {}, user || {});
 }
 
+// Single-call terminology extraction over the whole article; >limit chars -> chunk
+// and union. Output is small (a term list), so cost is ~1x article INPUT once.
+const PBP_TR_GLOSSARY_LIMIT = 24000;
+const PBP_TR_GLOSSARY_SYSTEM = [
+  "You are a terminology extractor for a document translator.",
+  "Read the whole source text and extract the key terms that must be translated CONSISTENTLY:",
+  "proper nouns, person names, product/brand names, and recurring domain-specific technical terms.",
+  'Output ONLY a JSON object {"terms":[{"term":"...","translation":"..."}]} - no fences, no commentary.',
+  "Rules:",
+  "1. \"translation\" is the term rendered in targetLanguage.",
+  "2. If a term should stay in its source language (code identifiers, brand names, well-known acronyms), set \"translation\" to \"\" (empty string).",
+  "3. Prefer terms appearing more than once or clearly significant; keep it focused (<= ~40 entries).",
+  "4. Ignore placeholders like ⟦C1⟧ ⟦L2⟧ - they are not terms.",
+  "5. Do not include ordinary words; only translation-sensitive terms."
+].join("\n");
+function pbpTrBuildGlossaryPrompt(text, targetLanguage) {
+  return {
+    system: PBP_TR_GLOSSARY_SYSTEM,
+    prompt: JSON.stringify({ targetLanguage: String(targetLanguage || ""), text: String(text == null ? "" : text) })
+  };
+}
+
 // Per-batch trimming (spec T0-a): keep only terms that actually appear in this
 // batch's segment text, so we inject a focused subset instead of the whole table.
 // Latin terms match case-insensitively; CJK (no a-z) match as exact substring.
@@ -555,7 +577,7 @@ function _pbpTrBuildSection(st) {
   est.id = "tr-estimate";
   est.className = "tr-meta";
   const chars = st.work.reduce((a, w) => a + w.shielded.text.length, 0);
-  est.textContent = t("trEstCost", String(pbpAiEstimateTokens(chars) * 2),
+  est.textContent = t("trEstCost", String(pbpAiEstimateTokens(chars) * 3),
     (st.s.aiProvider || "gemini") + "/" + (pbpAiResolveModelOverride(st.s) || "default"));
   sec.appendChild(est);
 
@@ -578,6 +600,45 @@ function _pbpTrBuildSection(st) {
     });
   });
   stop.addEventListener("click", () => { if (st.ctrl) st.ctrl.abort(); });
+}
+
+// Run the extraction pass over the full shielded article text. Returns a term map
+// (possibly empty) on success, or null on failure (caller then uses user glossary only).
+async function _pbpTrExtractGlossary(st) {
+  const full = st.work.map((w) => w.shielded.text).join("\n\n");
+  if (!full.trim()) return Object.create(null);
+  const chunks = full.length <= PBP_TR_GLOSSARY_LIMIT
+    ? [full]
+    : _pbpTrSplitText(full, PBP_TR_GLOSSARY_LIMIT).chunks;
+  const model = pbpAiResolveModelOverride(st.s);
+  const merged = Object.create(null);
+  for (const chunk of chunks) {
+    if (st.ctrl && st.ctrl.signal && st.ctrl.signal.aborted) break;
+    const { system, prompt } = pbpTrBuildGlossaryPrompt(chunk, st.target.name);
+    const out = await callAIStream(st.s, prompt, {
+      system, model, temperature: 0.1, noThinking: true,
+      signal: st.ctrl && st.ctrl.signal, maxTokens: 2048
+    }, () => {});
+    Object.assign(merged, pbpTrParseGlossaryJson(out));
+  }
+  return merged;
+}
+
+// Build st.glossary = merge(auto, user), once. auto = cached or freshly extracted;
+// any failure degrades to user-only (never blocks translation).
+async function _pbpTrEnsureGlossary(st) {
+  if (st.glossary) return st.glossary;
+  const user = pbpTrParseGlossary(st.s.translateGlossary);
+  let auto = null;
+  try {
+    auto = await pbpTrGlossaryCacheGet(st.url, st.target.code, st.modelKey);
+    if (!auto) {
+      auto = await _pbpTrExtractGlossary(st);
+      if (auto) { try { await pbpTrGlossaryCacheSet(st.url, st.target.code, st.modelKey, auto); } catch (_) {} }
+    }
+  } catch (_) { auto = null; }
+  st.glossary = pbpTrMergeGlossary(auto || Object.create(null), user);
+  return st.glossary;
 }
 
 async function _pbpTrStart(st) {
@@ -605,9 +666,11 @@ async function _pbpTrStart(st) {
     const source = (activeSeg && activeSeg.getAttribute("data-engine") === "jina") ? "jina" : "local";
     summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source)) || "";
   } catch (_) {}
-  const glossary = pbpTrParseGlossary(st.s.translateGlossary);
+  const prog0 = document.getElementById("tr-progress");
+  if (prog0) prog0.textContent = t("trExtracting");
+  await _pbpTrEnsureGlossary(st);
   const model = pbpAiResolveModelOverride(st.s);
-  const baseArgs = { targetLanguage: st.target.name, title: st.title, summary, glossary };
+  const baseArgs = { targetLanguage: st.target.name, title: st.title, summary, glossary: st.glossary };
   const streamOpts = (charLen) => ({
     system: "", model, signal: st.ctrl.signal,
     temperature: 0.1, noThinking: true,
@@ -768,7 +831,7 @@ function _pbpTrMarkFailed(st, w, message) {
 // translation; throws on an invalid/failed part. Parts reassemble in order with
 // their original separators.
 async function _pbpTrTranslateBlock(st, w, signal) {
-  const glossary = pbpTrParseGlossary(st.s.translateGlossary);
+  const glossary = st.glossary || pbpTrParseGlossary(st.s.translateGlossary);
   const split = w.shielded.text.length <= PBP_TR_PART_LIMIT
     ? { chunks: [w.shielded.text], seps: [""] }
     : _pbpTrSplitText(w.shielded.text, PBP_TR_PART_LIMIT);

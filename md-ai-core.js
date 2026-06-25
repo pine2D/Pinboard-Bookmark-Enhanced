@@ -404,6 +404,21 @@ async function pbpTrCacheSet(url, lang, model, blocksMap) {
   await pbpAiCacheSet(key, { blocks: merged }, Date.now());
 }
 
+// Auto-extracted terminology cache (spec T1): one entry per article per (lang, model),
+// parallel to the translation cache. Entry shape: {key, result:{terms:{...}}, ts}.
+function _pbpTrGlossaryCacheKey(url, lang, model) {
+  return "gloss_" + lang + "_" + model + "_" + pbpAiHash(String(url || ""));
+}
+async function pbpTrGlossaryCacheGet(url, lang, model) {
+  const entry = await pbpAiCacheGet(_pbpTrGlossaryCacheKey(url, lang, model));
+  const r = entry && entry.result;
+  if (!r || typeof r !== "object" || !r.terms || typeof r.terms !== "object") return null;
+  return r.terms;
+}
+async function pbpTrGlossaryCacheSet(url, lang, model, terms) {
+  await pbpAiCacheSet(_pbpTrGlossaryCacheKey(url, lang, model), { terms: terms || {} }, Date.now());
+}
+
 async function pbpAskHistGet(url) {
   const entry = await pbpAiCacheGet(_pbpAskHistKey(url));
   return (entry && Array.isArray(entry.result)) ? entry.result : [];

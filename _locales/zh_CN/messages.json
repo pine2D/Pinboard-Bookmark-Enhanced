@@ -2088,6 +2088,7 @@
       }
     }
   },
+  "trExtracting": { "message": "抽取术语中…" },
   "trBlockFailed": {
     "message": "此段翻译失败"
   },

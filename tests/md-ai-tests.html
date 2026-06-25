@@ -1797,5 +1797,15 @@ suiteIf("pbpTrParseGlossaryJson / pbpTrMergeGlossary / pbpTrMatchGlossary", "pbp
     assertEq(Object.keys(pbpTrMatchGlossary({ X: "x" }, [{ id: 1, text: "nothing here" }])).length, 0, "empty");
   });
 });
+
+suiteIf("pbpTrBuildGlossaryPrompt", "pbpTrBuildGlossaryPrompt", () => {
+  test("buildGlossaryPrompt: shape", () => {
+    const { system, prompt } = pbpTrBuildGlossaryPrompt("the Transformer architecture", "Simplified Chinese");
+    assert(/terminology/i.test(system), "system mentions terminology");
+    const p = JSON.parse(prompt);
+    assertEq(p.targetLanguage, "Simplified Chinese", "target carried");
+    assert(p.text.indexOf("Transformer") >= 0, "text carried");
+  });
+});
 </script>
 </body></html>
