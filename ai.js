@@ -159,6 +159,7 @@ async function handleAIError(res, provider) {
   } catch (_) {}
   const err = new Error(msg);
   if (errorType) err.code = errorType;
+  err.status = res.status;
   throw err;
 }
 
@@ -172,23 +173,71 @@ async function handleAIError(res, provider) {
 //   modelField   settings key holding the model id
 //   defaultModel fallback when the model setting is blank
 const OPENAI_COMPAT_PROVIDERS = {
-  openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano" },
-  deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash", extraBody: { thinking: { type: "disabled" } } },  // v4-flash defaults thinking ON; off — summarize/tag/explain/translate never need reasoning (saves tokens+latency)
-  qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen-flash" },
-  minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimaxi.com/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2" },
-  openrouter:  { keyField: "openrouterApiKey",  base: "https://openrouter.ai/api/v1",                                           modelField: "openrouterModel",  defaultModel: "meta-llama/llama-4-scout:free" },
-  groq:        { keyField: "groqApiKey",        base: "https://api.groq.com/openai/v1",                                         modelField: "groqModel",        defaultModel: "llama-3.1-8b-instant" },
-  mistral:     { keyField: "mistralApiKey",     base: "https://api.mistral.ai/v1",                                              modelField: "mistralModel",     defaultModel: "mistral-small-latest" },
-  cohere:      { keyField: "cohereApiKey",      base: "https://api.cohere.ai/compatibility/v1",                                              modelField: "cohereModel",      defaultModel: "command-r7b-12-2024" },
-  siliconflow: { keyField: "siliconflowApiKey", base: "https://api.siliconflow.cn/v1",                                          modelField: "siliconflowModel", defaultModel: "Qwen/Qwen3-8B" },
-  zhipu:       { keyField: "zhipuApiKey",       base: "https://open.bigmodel.cn/api/paas/v4",                                   modelField: "zhipuModel",       defaultModel: "glm-4.7-flash" },
-  kimi:        { keyField: "kimiApiKey",        base: "https://api.moonshot.cn/v1",                                             modelField: "kimiModel",        defaultModel: "kimi-k2.6" },
-  custom:      { keyField: "customApiKey",      base: "",                                                  baseField: "customBaseUrl", modelField: "customModel",      defaultModel: "" },
+  openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano",                thinkingOff: { reasoning_effort: "none" } },
+  deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash",               thinkingOff: { thinking: { type: "disabled" } } },  // v4-flash defaults thinking ON; 4xx self-heal (deepseek-reasoner rejects it)
+  qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen-flash",                      thinkingOff: { enable_thinking: false } },
+  minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimaxi.com/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2",                      thinkingOff: { thinking: { type: "disabled" } } },  // M2 no-op but harmless; M3-ready
+  openrouter:  { keyField: "openrouterApiKey",  base: "https://openrouter.ai/api/v1",                                           modelField: "openrouterModel",  defaultModel: "meta-llama/llama-4-scout:free",   thinkingOff: { reasoning: { enabled: false } } },
+  groq:        { keyField: "groqApiKey",        base: "https://api.groq.com/openai/v1",                                         modelField: "groqModel",        defaultModel: "llama-3.1-8b-instant" },          // no thinkingOff: no safe universal field; groq doesn't think by default
+  mistral:     { keyField: "mistralApiKey",     base: "https://api.mistral.ai/v1",                                              modelField: "mistralModel",     defaultModel: "mistral-small-latest",            thinkingOff: { reasoning_effort: "none" } },
+  cohere:      { keyField: "cohereApiKey",      base: "https://api.cohere.ai/compatibility/v1",                                 modelField: "cohereModel",      defaultModel: "command-r7b-12-2024",             thinkingOff: { reasoning_effort: "none" } },
+  siliconflow: { keyField: "siliconflowApiKey", base: "https://api.siliconflow.cn/v1",                                          modelField: "siliconflowModel", defaultModel: "Qwen/Qwen3-8B",                   thinkingOff: { enable_thinking: false } },
+  zhipu:       { keyField: "zhipuApiKey",       base: "https://open.bigmodel.cn/api/paas/v4",                                   modelField: "zhipuModel",       defaultModel: "glm-4.7-flash",                   thinkingOff: { thinking: { type: "disabled" } } },
+  kimi:        { keyField: "kimiApiKey",        base: "https://api.moonshot.cn/v1",                                             modelField: "kimiModel",        defaultModel: "kimi-k2.6",                       thinkingOff: { thinking: { type: "disabled" } } },
+  custom:      { keyField: "customApiKey",      base: "",                                                  baseField: "customBaseUrl", modelField: "customModel",      defaultModel: "" },                          // no thinkingOff: dialect unknown
 };
 
 // Resolve an OpenAI-compatible provider's base URL (per-provider baseField override wins).
 function _openaiCompatBase(cfg, s) {
   return (cfg.baseField && s[cfg.baseField]) || cfg.base;
+}
+
+// ---- Thinking-disable: dialect param + 4xx self-healing fallback + memo (spec T0-c) ----
+// thinkingOff is the per-provider "turn reasoning off" body field. It is sent on every
+// request EXCEPT when memoized as rejected for this (provider, model). On a 400/422 we
+// strip it, retry once, and remember the rejection (open model space: free-text model
+// fields + custom providers mean a static allowlist can't be trusted).
+function _aiEffectiveExtraBody(cfg, thinkRejected) {
+  const base = (cfg && cfg.extraBody) || {};
+  const off = (cfg && cfg.thinkingOff && !thinkRejected) ? cfg.thinkingOff : {};
+  return { ...base, ...off };
+}
+function _aiShouldRetryNoThink(cfg, thinkRejected, errStatus) {
+  return !!(cfg && cfg.thinkingOff) && !thinkRejected && (errStatus === 400 || errStatus === 422);
+}
+
+const _PBP_THINK_REJECT_KEY = "pbpThinkReject";
+async function _aiThinkRejected(memoKey) {
+  try {
+    if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return false;
+    const o = await chrome.storage.local.get(_PBP_THINK_REJECT_KEY);
+    const m = o && o[_PBP_THINK_REJECT_KEY];
+    return !!(m && m[memoKey]);
+  } catch (_) { return false; }
+}
+async function _aiThinkReject(memoKey) {
+  try {
+    if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
+    const o = await chrome.storage.local.get(_PBP_THINK_REJECT_KEY);
+    const m = (o && o[_PBP_THINK_REJECT_KEY]) || {};
+    m[memoKey] = true;
+    await chrome.storage.local.set({ [_PBP_THINK_REJECT_KEY]: m });
+  } catch (_) { /* storage unavailable: skip memo, fallback still works per-call */ }
+}
+
+async function _aiWithThinkingFallback(provider, model, cfg, makeCall) {
+  const memoKey = provider + ":" + (model || "");
+  const rejected = await _aiThinkRejected(memoKey);
+  try {
+    return await makeCall(_aiEffectiveExtraBody(cfg, rejected));
+  } catch (e) {
+    if (_aiShouldRetryNoThink(cfg, rejected, e && e.status)) {
+      const out = await makeCall(_aiEffectiveExtraBody(cfg, true)); // retry without thinkingOff
+      await _aiThinkReject(memoKey);                                // memo only on retry success
+      return out;
+    }
+    throw e;
+  }
 }
 
 // ---- Check if AI key is configured ----
@@ -258,7 +307,9 @@ async function callAI(s, prompt, opts = {}) {
   if (p === "ollama") return callOllama(s, prompt, opts);
   const cfg = OPENAI_COMPAT_PROVIDERS[p];
   if (!cfg) throw new Error("Unknown provider: " + p);
-  return callOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], s[cfg.modelField] || cfg.defaultModel, prompt, { ...opts, extraBody: cfg.extraBody });
+  const model = s[cfg.modelField] || cfg.defaultModel;
+  return _aiWithThinkingFallback(p, model, cfg, (extraBody) =>
+    callOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody }));
 }
 
 async function callGemini(s, prompt, opts = {}) {
@@ -600,7 +651,8 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
   const cfg = OPENAI_COMPAT_PROVIDERS[p];
   if (!cfg) throw new Error("Unknown provider: " + p);
   const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
-  return _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody: cfg.extraBody }, cb);
+  return _aiWithThinkingFallback(p, model, cfg, (extraBody) =>
+    _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody }, cb));
 }
 
 // ---- Shared prompt fragments (used by tag, summary, and combined builders) ----

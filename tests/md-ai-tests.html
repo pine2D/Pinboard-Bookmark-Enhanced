@@ -1807,5 +1807,49 @@ suiteIf("pbpTrBuildGlossaryPrompt", "pbpTrBuildGlossaryPrompt", () => {
     assert(p.text.indexOf("Transformer") >= 0, "text carried");
   });
 });
+
+// ============ Task 5 (T0-c): thinkingOff dialect + 4xx self-healing ============
+suite("effectiveExtraBody: provider dialect when not rejected", () => {
+  test("zhipu gets thinking disabled", () => {
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.zhipu, false)), '{"thinking":{"type":"disabled"}}', "zhipu");
+  });
+  test("siliconflow gets enable_thinking false", () => {
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.siliconflow, false)), '{"enable_thinking":false}', "siliconflow");
+  });
+  test("openrouter gets reasoning disabled", () => {
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.openrouter, false)), '{"reasoning":{"enabled":false}}', "openrouter");
+  });
+  test("deepseek migrated to thinkingOff", () => {
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.deepseek, false)), '{"thinking":{"type":"disabled"}}', "deepseek migrated to thinkingOff");
+  });
+});
+suite("effectiveExtraBody: empty when rejected or no thinkingOff", () => {
+  test("rejected zhipu -> stripped", () => {
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.zhipu, true)), "{}", "rejected -> stripped");
+  });
+  test("groq has no thinkingOff", () => {
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.groq, false)), "{}", "groq has none");
+  });
+  test("custom has no thinkingOff", () => {
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.custom, false)), "{}", "custom untouched");
+  });
+});
+suite("shouldRetryNoThink: only 400/422 with thinkingOff and not rejected", () => {
+  test("zhipu 400 -> retry", () => {
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, false, 400), true, "400");
+  });
+  test("zhipu 422 -> retry", () => {
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, false, 422), true, "422");
+  });
+  test("zhipu 429 -> no retry", () => {
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, false, 429), false, "429 no");
+  });
+  test("already rejected -> no retry", () => {
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, true, 400), false, "already rejected");
+  });
+  test("groq no thinkingOff -> no retry", () => {
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.groq, false, 400), false, "no thinkingOff");
+  });
+});
 </script>
 </body></html>
