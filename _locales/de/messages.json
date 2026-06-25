@@ -2088,6 +2088,7 @@
       }
     }
   },
+  "trExtracting": { "message": "Terminologie wird extrahiert…" },
   "trBlockFailed": {
     "message": "Übersetzung dieses Absatzes fehlgeschlagen"
   },

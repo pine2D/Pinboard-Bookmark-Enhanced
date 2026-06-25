@@ -2088,6 +2088,7 @@
       }
     }
   },
+  "trExtracting": { "message": "Extraction de la terminologie…" },
   "trBlockFailed": {
     "message": "Échec de la traduction de ce paragraphe"
   },

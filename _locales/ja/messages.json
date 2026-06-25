@@ -2088,6 +2088,7 @@
       }
     }
   },
+  "trExtracting": { "message": "用語を抽出中…" },
   "trBlockFailed": {
     "message": "この段落の翻訳に失敗しました"
   },

@@ -2088,6 +2088,7 @@
       }
     }
   },
+  "trExtracting": { "message": "Wyodrębnianie terminologii…" },
   "trBlockFailed": {
     "message": "Tłumaczenie tego akapitu nie powiodło się"
   },
