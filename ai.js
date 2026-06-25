@@ -143,9 +143,17 @@ async function handleAIError(res, provider) {
     const body = await res.json();
     if (body.error?.message) msg = `${provider}: ${body.error.message}`;
     else if (body.error?.type) msg = `${provider}: ${body.error.type}`;
-    // Detect model-not-found errors: 404, or message/type contains model-related keywords
-    const combined = String(msg + (body.error?.type || "")).toLowerCase();
-    if (res.status === 404 || /model|not.*exist|not.*found|unknown.*model/i.test(combined)) {
+    // Detect model-not-found errors. Match ONLY explicit model-error phrasing, never a
+    // bare "model" substring: provider auth errors often embed a help-link URL containing
+    // the word "model" (e.g. DashScope's invalid-key message links to
+    // ".../model-studio/error-code"), which previously flagged every bad-KEY error as
+    // "model expired" and misdirected the user to change the model instead of the key.
+    const detail = String((body.error?.message || "") + " " + (body.error?.code || "") + " " + (body.error?.type || "")).toLowerCase();
+    const modelErr =
+      /model[_\s-]?not[_\s-]?(?:found|exist)/.test(detail) ||
+      /\b(?:model|deployment)\b[^.]{0,40}\b(?:not\s+found|not\s+exist|does\s*not\s+exist|is\s+invalid|unavailable|unsupported|deprecated|decommissioned|no\s+longer\s+(?:available|supported))\b/.test(detail) ||
+      /\b(?:unknown|invalid|unsupported|no\s+such|non[\s-]?existent)\s+model\b/.test(detail);
+    if (res.status === 404 || modelErr) {
       errorType = "model_not_found";
     }
   } catch (_) {}
