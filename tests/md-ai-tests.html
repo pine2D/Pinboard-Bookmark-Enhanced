@@ -857,6 +857,27 @@ suiteIf("pbpTrLengthRatioOk", "pbpTrLengthRatioOk", () => {
   });
 });
 
+suiteIf("pbpTrPlaceholdersConserved", "pbpTrPlaceholdersConserved", () => {
+  test("placeholders conserved: equal sets pass", () => {
+    assertEq(pbpTrPlaceholdersConserved("a ⟦C1⟧ b ⟦L2⟧", "x ⟦L2⟧ y ⟦C1⟧"), true, "reordered ok");
+  });
+  test("placeholders conserved: missing fails", () => {
+    assertEq(pbpTrPlaceholdersConserved("a ⟦C1⟧ ⟦L2⟧", "a ⟦C1⟧"), false, "dropped L2");
+  });
+  test("placeholders conserved: extra fails", () => {
+    assertEq(pbpTrPlaceholdersConserved("a ⟦C1⟧", "a ⟦C1⟧ ⟦C2⟧"), false, "added C2");
+  });
+  test("placeholders conserved: duplicate fails", () => {
+    assertEq(pbpTrPlaceholdersConserved("⟦C1⟧", "⟦C1⟧ ⟦C1⟧"), false, "dup C1");
+  });
+  test("placeholders conserved: hallucinated unknown fails", () => {
+    assertEq(pbpTrPlaceholdersConserved("⟦C1⟧", "⟦C9⟧"), false, "C9 not in orig");
+  });
+  test("placeholders conserved: both none passes", () => {
+    assertEq(pbpTrPlaceholdersConserved("plain text", "纯文本"), true, "no placeholders");
+  });
+});
+
 suiteIf("_pbpTrSplitText", "_pbpTrSplitText", () => {
   function rebuilds(s, lim) {
     const r = _pbpTrSplitText(s, lim);

@@ -98,6 +98,23 @@ function pbpTrLengthRatioOk(orig, translated) {
   return t / o >= 0.2;
 }
 
+// Placeholder conservation gate (spec T0-b): a faithful translation keeps every
+// ⟦C/L/I/M n⟧ placeholder exactly once and adds no new/unknown ones. Compares the
+// MULTISET of placeholders in the shielded original vs the shielded translation
+// (run BEFORE pbpAiRestore). The cheapest, most reliable omission/corruption signal.
+function pbpTrPlaceholdersConserved(orig, translated) {
+  const rx = /⟦[CLIM]\d+⟧/g;
+  const count = (s) => {
+    const m = new Map();
+    for (const ph of (String(s == null ? "" : s).match(rx) || [])) m.set(ph, (m.get(ph) || 0) + 1);
+    return m;
+  };
+  const a = count(orig), b = count(translated);
+  if (a.size !== b.size) return false;
+  for (const [ph, n] of a) if (b.get(ph) !== n) return false;
+  return true;
+}
+
 // True if the shielded block text has anything worth translating (any letter,
 // including CJK). A block that is only ⟦...⟧ placeholders + whitespace/
 // punctuation -- an image wall, a badge row, an avatar/logo grid -- has no text
@@ -228,7 +245,7 @@ async function pbpTrRunQueue(plan) {
     const onItem = (item) => {
       const seg = byId.get(item.id);
       if (!seg || filled.has(item.id)) return;            // out-of-batch / dup id: skip
-      if (pbpTrLengthRatioOk(seg.text, item.text)) fill(item.id, item.text);
+      if (pbpTrPlaceholdersConserved(seg.text, item.text) && pbpTrLengthRatioOk(seg.text, item.text)) fill(item.id, item.text);
       // ratio-failed items stay unfilled -> picked up by the missing diff below
     };
     for (let attempt = 0; ; attempt++) {
@@ -274,7 +291,7 @@ async function pbpTrRunQueue(plan) {
     if (!seg || filled.has(seg.id)) continue;
     try {
       const text = await plan.requestSingle(seg);
-      if (typeof text === "string" && pbpTrLengthRatioOk(seg.text, text)) fill(seg.id, text);
+      if (typeof text === "string" && pbpTrPlaceholdersConserved(seg.text, text) && pbpTrLengthRatioOk(seg.text, text)) fill(seg.id, text);
       else fail(seg.id, "invalid single-block translation");
     } catch (e) {
       if (aborted()) break;
@@ -724,7 +741,7 @@ async function _pbpTrTranslateBlock(st, w, signal) {
       maxTokens: Math.min(8192, Math.max(1024, pbpAiEstimateTokens(split.chunks[i].length) * 3))
     }, (d, acc) => parser.push(acc));
     parser.finish(full);
-    if (typeof got !== "string" || !pbpTrLengthRatioOk(split.chunks[i], got)) {
+    if (typeof got !== "string" || !pbpTrPlaceholdersConserved(split.chunks[i], got) || !pbpTrLengthRatioOk(split.chunks[i], got)) {
       throw new Error("invalid single-block translation");
     }
     out.push(got);
