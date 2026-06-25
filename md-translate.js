@@ -78,6 +78,51 @@ function pbpTrParseGlossary(str) {
   return out;
 }
 
+// Parse the terminology-extraction model reply (spec T1). Tolerant: strips ```fences,
+// takes the first {...} block, bad JSON -> {}. Empty translation ("") = keep source
+// untranslated (same semantics as the user glossary).
+function pbpTrParseGlossaryJson(full) {
+  const out = Object.create(null);
+  let s = String(full == null ? "" : full).trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  const i = s.indexOf("{"), j = s.lastIndexOf("}");
+  if (i < 0 || j <= i) return out;
+  let obj;
+  try { obj = JSON.parse(s.slice(i, j + 1)); } catch (_) { return out; }
+  const terms = (obj && Array.isArray(obj.terms)) ? obj.terms : [];
+  for (const t of terms) {
+    if (!t || typeof t.term !== "string") continue;
+    const term = t.term.trim();
+    if (!term) continue;
+    out[term] = (typeof t.translation === "string") ? t.translation.trim() : "";
+  }
+  return out;
+}
+
+// Merge auto-extracted + user glossary; the USER entry always wins (spec decision).
+function pbpTrMergeGlossary(auto, user) {
+  return Object.assign(Object.create(null), auto || {}, user || {});
+}
+
+// Per-batch trimming (spec T0-a): keep only terms that actually appear in this
+// batch's segment text, so we inject a focused subset instead of the whole table.
+// Latin terms match case-insensitively; CJK (no a-z) match as exact substring.
+function pbpTrMatchGlossary(glossary, segments) {
+  const g = glossary || {};
+  const terms = Object.keys(g);
+  const out = Object.create(null);
+  if (!terms.length) return out;
+  const hay = (segments || []).map((s) => String((s && s.text) || "")).join("\n");
+  const hayLc = hay.toLowerCase();
+  for (const term of terms) {
+    if (!term) continue;
+    const hit = /[a-z]/i.test(term) ? hayLc.includes(term.toLowerCase()) : hay.includes(term);
+    if (hit) out[term] = g[term];
+  }
+  return out;
+}
+
 // ---- Hallucination probe (spec 4.3 ladder step 3) ----
 // A translated block whose char-length ratio vs the original falls outside
 // [0.3, 4] (inclusive) is judged invalid and re-queued for single-block

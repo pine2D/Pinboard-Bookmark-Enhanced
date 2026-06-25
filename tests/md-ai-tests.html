@@ -1762,4 +1762,40 @@ suiteIf("pbpShouldRestoreCachedSummary", "pbpShouldRestoreCachedSummary", () => 
   });
 });
 </script>
+
+<script>
+// ============ Task 2: glossary parse/merge/match trio ============
+suiteIf("pbpTrParseGlossaryJson / pbpTrMergeGlossary / pbpTrMatchGlossary", "pbpTrParseGlossaryJson", () => {
+  test("parseGlossaryJson: normal object", () => {
+    const g = pbpTrParseGlossaryJson('{"terms":[{"term":"Transformer","translation":"变换器"},{"term":"Token","translation":""}]}');
+    assertEq(g.Transformer, "变换器", "term");
+    assertEq(g.Token, "", "empty keep-source preserved");
+  });
+  test("parseGlossaryJson: fenced json", () => {
+    const g = pbpTrParseGlossaryJson('```json\n{"terms":[{"term":"GPU","translation":"GPU"}]}\n```');
+    assertEq(g.GPU, "GPU", "fence stripped");
+  });
+  test("parseGlossaryJson: garbage -> empty", () => {
+    assertEq(Object.keys(pbpTrParseGlossaryJson("sorry, no json here")).length, 0, "no throw, empty");
+  });
+  test("mergeGlossary: user wins", () => {
+    const g = pbpTrMergeGlossary({ Token: "标记", Model: "模型" }, { Token: "令牌" });
+    assertEq(g.Token, "令牌", "user overrides auto");
+    assertEq(g.Model, "模型", "auto kept where user silent");
+  });
+  test("matchGlossary: only hits in batch", () => {
+    const g = pbpTrMatchGlossary({ Transformer: "变换器", Llama: "羊驼" }, [{ id: 1, text: "the Transformer block" }]);
+    assertEq(g.Transformer, "变换器", "hit kept");
+    assertEq("Llama" in g, false, "miss dropped");
+  });
+  test("matchGlossary: latin case-insensitive, CJK exact", () => {
+    const g = pbpTrMatchGlossary({ GPU: "GPU", 大模型: "大模型" }, [{ id: 1, text: "running on a gpu with 大模型" }]);
+    assertEq("GPU" in g, true, "latin case-insensitive");
+    assertEq("大模型" in g, true, "cjk substring");
+  });
+  test("matchGlossary: zero hit -> empty", () => {
+    assertEq(Object.keys(pbpTrMatchGlossary({ X: "x" }, [{ id: 1, text: "nothing here" }])).length, 0, "empty");
+  });
+});
+</script>
 </body></html>
