@@ -531,7 +531,9 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 /* Batch progress bar — visible while batch save iterates over tabs */
 .batch-progress {
   position: relative;
-  margin: 6px 12px 0;
+  /* symmetric 6px top/bottom so the bar isn't flush against the popup's bottom edge
+     (.quick-actions has no bottom padding; this is the last visible element) */
+  margin: 6px 12px;
   height: 14px;
   background: #eef2f7;
   border: 1px solid #d4dae3;
@@ -559,7 +561,25 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 }
 html[data-theme] .batch-progress { background: var(--pp-input-bg, var(--pp-bg-soft, #2a2a2a)); border-color: var(--pp-border); }
 html[data-theme] .batch-progress-fill { background: var(--pp-accent, #4477bb); }
-html[data-theme] .batch-progress-text { color: var(--pp-fg); mix-blend-mode: normal; filter: none; }
+/* Themed accents (--pp-accent) are often bright/mid (cyan/green/blue) and --pp-fg is
+   tuned for body text, so plain --pp-fg over the accent fill fails contrast on all 13
+   themes (terminal is fg==accent → invisible). The count text sits over TWO backdrops
+   (accent fill on the left, input-bg track on the right), so no single static colour
+   works. Solution: keep the theme fg, but give every glyph a crisp 1px outline in the
+   theme's input-bg — fg-over-input-bg is the theme's own body pairing (CR ≥ 4.1 on all
+   13), so the outline guarantees a readable backing no matter what colour is behind the
+   glyph. (mix-blend-mode/ filter reset cancels the base light-mode difference trick,
+   which fails on mid-luminance themed accents like Solarized.) */
+html[data-theme] .batch-progress-text {
+  color: var(--pp-fg);
+  mix-blend-mode: normal;
+  filter: none;
+  text-shadow:
+    1px 0 0 var(--pp-input-bg), -1px 0 0 var(--pp-input-bg),
+    0 1px 0 var(--pp-input-bg), 0 -1px 0 var(--pp-input-bg),
+    1px 1px 0 var(--pp-input-bg), -1px -1px 0 var(--pp-input-bg),
+    1px -1px 0 var(--pp-input-bg), -1px 1px 0 var(--pp-input-bg);
+}
 html.dark .batch-progress { background: #252525; border-color: #444; }
 html.dark .batch-progress-fill { background: linear-gradient(90deg, #5599dd, #4477bb); }
 html.dark .batch-progress-text { color: #e0e0e0; mix-blend-mode: normal; filter: none; }
