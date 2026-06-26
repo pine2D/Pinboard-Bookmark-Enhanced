@@ -59,6 +59,16 @@ function setupTabSet() {
   const batchBtn = $id("batch-bookmark-btn");
   if (!batchBtn) return;
   batchBtn.addEventListener("click", async () => {
+    // Re-entry guard: a batch may already be running in the background (popup closed/reopened).
+    try {
+      const { batch_progress: bp } = await chrome.storage.local.get("batch_progress");
+      if (batchIsRunning(bp, Date.now(), BATCH_STALE_TTL)) {
+        showStatus("status-msg", t("batchRunningBg"), "success");
+        renderBatchProgress(bp);
+        return;
+      }
+    } catch (_) {}
+
     batchBtn.disabled = true;
     setBtnIcon(batchBtn, "pin", t("batchSaving"));
     try {
@@ -76,13 +86,11 @@ function setupTabSet() {
         setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
         return;
       }
-      const baseTags = settings.optBatchTagEnabled && settings.optBatchTag
-        ? settings.optBatchTag.split(/[,，]+/).map(s => s.trim().replace(/\s+/g, "-")).filter(Boolean)
-        : [];
+
       const useAiTags = settings.batchAiTags && hasAIKey(settings);
       const useAiSummary = settings.batchAiSummary && hasAIKey(settings);
-
-      // Request host permission for content extraction (needed for non-active tabs)
+      // Host permission for non-active-tab extraction MUST be requested here (user gesture);
+      // once granted it persists and the SW can use it for background-tab scripting.
       if (useAiTags || useAiSummary) {
         const hasPermission = await chrome.permissions.contains({ origins: ["*://*/*"] });
         if (!hasPermission) {
@@ -95,175 +103,16 @@ function setupTabSet() {
         }
       }
 
-      let saved = 0, failed = 0, skipped = 0, tooLong = 0;
-      let existingUrls = new Set();
-      const savedUrls = [];
-      let existingPerTabFallback = false;
-      if (settings.batchSkipExisting) {
-        const result = await fetchExistingUrlSet(pinboardToken);
-        if (result === null) {
-          existingPerTabFallback = true; // > 5000 bookmarks; query per-tab inside loop
-        } else {
-          existingUrls = result;
-        }
-      }
-      let aiFailed = 0;
+      // Snapshot tabs and hand off to the SW; the loop now runs in the background.
+      const snapshot = validTabs.map(tab => ({ id: tab.id, title: tab.title || tab.url, url: tab.url, incognito: !!tab.incognito }));
       const progress = $id("batch-progress");
-      const fill = $id("batch-progress-fill");
-      const ptext = $id("batch-progress-text");
       if (progress) progress.classList.remove("hidden");
-      const updateProgress = (i) => {
-        const total = validTabs.length;
-        const pct = Math.round((i / total) * 100);
-        if (fill) fill.style.width = pct + "%";
-        // saved/failed/aiFailed are integer counters → safe to interpolate into innerHTML.
-        // Inline check/cross SVGs replace literal ✓/✗ (which pull Segoe UI Emoji on Windows).
-        if (ptext) ptext.innerHTML = `${i}/${total}  <span class="status-ic ok">${PBP_ICONS.check}</span>${saved}  <span class="status-ic bad">${PBP_ICONS.cross}</span>${failed}${aiFailed ? `  AI<span class="status-ic bad">${PBP_ICONS.cross}</span>${aiFailed}` : ""}`;
-        if (progress) progress.setAttribute("aria-valuenow", String(pct));
-      };
-      updateProgress(0);
-      for (let i = 0; i < validTabs.length; i++) {
-        const tab = validTabs[i];
-        setBtnIcon(batchBtn, "pin", t("batchProgress", String(i + 1), String(validTabs.length), String(saved), String(failed)));
-        updateProgress(i);
-        if (settings.batchSkipExisting) {
-          let isExisting = existingUrls.has(tab.url);
-          if (existingPerTabFallback) {
-            // Per-tab posts/get via SW message (uses statusCache in SW; 5-min TTL)
-            try {
-              const r = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url: tab.url });
-              if (r?.posts?.length > 0) isExisting = true;
-            } catch (_) {}
-          }
-          if (isExisting) {
-            skipped++;
-            continue;
-          }
-        }
-        try {
-          let tags = [...baseTags];
-          let notes = "";
-
-          if (useAiTags || useAiSummary) {
-            let tabPageInfo = null;
-            try { tabPageInfo = await getPageInfoFromTab(tab.id, { withDefuddle: true }); } catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
-            if (tabPageInfo?.pageText) {
-              let combinedHandled = false;
-
-              // Both requested -> one combined call per tab (sends the body once).
-              // Gated OFF for custom-prompt users so their templates are honored (Global Constraint).
-              if (useAiTags && useAiSummary
-                  && !settings.customTagPrompt?.trim() && !settings.customSummaryPrompt?.trim()) {
-                try {
-                  const tCached = await getAICache(tab.url, "tags", settings.aiCacheDuration, settings.aiContentSource);
-                  const sCached = await getAICache(tab.url, "summary", settings.aiCacheDuration, settings.aiContentSource);
-                  let aiTags, summary;
-                  if (tCached && sCached) {
-                    aiTags = tCached; summary = sCached;
-                  } else {
-                    const resp = await callAI(settings, buildCombinedPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "", []));
-                    const parsed = parseAICombined(resp, settings.aiTagSeparator);
-                    aiTags = settings.optRespectTagCase ? parsed.tags.map(tag => resolveTagCase(tag, tagCaseMap)) : parsed.tags;
-                    summary = parsed.summary;
-                    await setAICache(tab.url, "tags", aiTags, settings.aiCacheDuration, settings.aiContentSource);
-                    await setAICache(tab.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
-                  }
-                  tags = [...tags, ...aiTags];
-                  if (summary) notes = `[AI Summary]\n<blockquote>${summary}</blockquote>`;
-                  combinedHandled = true;
-                } catch (e) { console.warn("batch AI combined failed, falling back:", tab.url, e.message); }
-              }
-
-              if (!combinedHandled) {
-                const aiJobs = [];
-                if (useAiTags) aiJobs.push((async () => {
-                  try {
-                    const cached = await getAICache(tab.url, "tags", settings.aiCacheDuration, settings.aiContentSource);
-                    if (cached) return { type: "tags", result: cached };
-                    const prompt = buildTagPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "", []);
-                    const resp = await callAI(settings, prompt);
-                    const rawTags = refineTags(parseAITags(resp, settings.aiTagSeparator), { cap: AI_TAG_CAP, separator: settings.aiTagSeparator });
-                    const aiTags = settings.optRespectTagCase
-                      ? rawTags.map(tag => resolveTagCase(tag, tagCaseMap))
-                      : rawTags;
-                    await setAICache(tab.url, "tags", aiTags, settings.aiCacheDuration, settings.aiContentSource);
-                    return { type: "tags", result: aiTags };
-                  } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
-                })());
-                if (useAiSummary) aiJobs.push((async () => {
-                  try {
-                    const cached = await getAICache(tab.url, "summary", settings.aiCacheDuration, settings.aiContentSource);
-                    if (cached) return { type: "summary", result: cached };
-                    const prompt = buildSummaryPrompt(settings, tab.title || tab.url, tab.url, tabPageInfo.pageText, "");
-                    const summary = await callAI(settings, prompt);
-                    await setAICache(tab.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
-                    return { type: "summary", result: summary };
-                  } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
-                })());
-                const results = await Promise.all(aiJobs);
-                for (const r of results) {
-                  if (!r) continue;
-                  if (r.type === "tags") tags = [...tags, ...r.result];
-                  if (r.type === "summary") notes = `[AI Summary]\n<blockquote>${r.result}</blockquote>`;
-                }
-              }
-            }
-          }
-
-          const dedupedTags = [...new Set(tags.map(tag => tag.toLowerCase()))].map(lower => tags.find(tag => tag.toLowerCase() === lower));
-          const isPrivate = pbpEffectivePrivate(settings, { incognito: tab.incognito });
-          const apiUrl = buildPostsAddUri({
-            token: pinboardToken,
-            url: tab.url,
-            title: tab.title || tab.url,
-            extended: notes,
-            tags: dedupedTags.join(" "),
-            shared: isPrivate ? "no" : "yes",
-            toread: settings.optReadlaterDefault ? "yes" : undefined,
-          });
-          if (apiUrl.length > POSTS_ADD_URI_BUDGET) {
-            console.warn(`[batch] skipping oversize URI (${apiUrl.length}/${POSTS_ADD_URI_BUDGET}):`, tab.url);
-            tooLong++;
-            continue;
-          }
-          const data = await (await pinboardFetch(apiUrl)).json();
-          if (data.result_code === "done") {
-            saved++;
-            savedUrls.push(tab.url);
-            if (settings.waybackArchiveEnabled && settings.waybackArchiveBatch) {
-              chrome.runtime.sendMessage({ type: "archive_url", url: tab.url, private: isPrivate }).catch(() => {});
-            }
-          } else failed++;
-        } catch (_) { failed++; }
+      setBtnIcon(batchBtn, "pin", t("batchProgress", "0", String(snapshot.length), "0", "0"));
+      const resp = await chrome.runtime.sendMessage({ action: "startBatchSave", tabs: snapshot }).catch(() => null);
+      if (resp && resp.status === "busy") {
+        showStatus("status-msg", t("batchRunningBg"), "success");
       }
-      if (saved > 0) {
-        // Cache only URLs that actually returned result_code==="done" (savedUrls),
-        // NOT every non-pre-existing tab — failed/tooLong/thrown tabs must stay
-        // re-savable on the next run, not get masked by the 30-min dedup cache.
-        existingUrls = computeSavedUrlSet(existingUrls, savedUrls);
-        try {
-          await chrome.storage.local.set({
-            cached_existing_urls: { urls: [...existingUrls], timestamp: Date.now() }
-          });
-        } catch (_) {}
-        if (baseTags.length && typeof saveLastUsedTags === "function") saveLastUsedTags(baseTags);
-      }
-      const tagStr = baseTags.join(", ");
-      const skipMsg = skipped > 0 ? t("batchSkipped", String(skipped)) : "";
-      const tooLongMsg = tooLong > 0 ? t("batchTooLong", String(tooLong)) : "";
-      const aiWarnMsg = aiFailed > 0 ? ` (AI failed: ${aiFailed})` : "";
-      showStatus("status-msg", t("batchDone", String(saved), String(failed)) + skipMsg + tooLongMsg + aiWarnMsg, saved > 0 ? "success" : "error");
-      if (saved > 0) {
-        const tagsSuffix = tagStr ? t("batchTaggedSuffix", tagStr) : "";
-        chrome.runtime.sendMessage({ type: "show_notification", id: "batch-saved-" + Date.now(), title: t("bgBatchSaved"), message: t("batchSavedNotify", String(saved), tagsSuffix), category: "batchSave" });
-      }
-      setBtnIcon(batchBtn, "pin", t("batchSavedCount", String(saved)));
-      // Snap progress bar to 100% then fade out after 1.5s
-      updateProgress(validTabs.length);
-      setTimeout(() => {
-        if (progress) progress.classList.add("hidden");
-        setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
-      }, 1500);
+      // From here, renderBatchProgress (wired via storage.onChanged) drives the UI.
     } catch (e) {
       showStatus("status-msg", t("batchFailed", e.message), "error");
       const progress = $id("batch-progress");
@@ -271,6 +120,52 @@ function setupTabSet() {
       setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
     }
   });
+
+  wireBatchProgress();
+}
+
+// ---- Background batch progress (driven by storage.local.batch_progress) ----
+function renderBatchProgress(p) {
+  if (!p) return;
+  const batchBtn = $id("batch-bookmark-btn");
+  const progress = $id("batch-progress");
+  const fill = $id("batch-progress-fill");
+  const ptext = $id("batch-progress-text");
+  const total = p.total || 0;
+  const cur = p.done ? total : (p.i || 0);
+  const pct = total ? Math.round((cur / total) * 100) : 0;
+  if (progress) { progress.classList.remove("hidden"); progress.setAttribute("aria-valuenow", String(pct)); }
+  if (fill) fill.style.width = pct + "%";
+  // saved/failed/aiFailed are integers -> safe to interpolate; SVG icons avoid emoji font fallback.
+  if (ptext) ptext.innerHTML = `${cur}/${total}  <span class="status-ic ok">${PBP_ICONS.check}</span>${p.saved || 0}  <span class="status-ic bad">${PBP_ICONS.cross}</span>${p.failed || 0}${p.aiFailed ? `  AI<span class="status-ic bad">${PBP_ICONS.cross}</span>${p.aiFailed}` : ""}`;
+  if (!batchBtn) return;
+  if (p.done) {
+    const skipMsg = p.skipped > 0 ? t("batchSkipped", String(p.skipped)) : "";
+    const tooLongMsg = p.tooLong > 0 ? t("batchTooLong", String(p.tooLong)) : "";
+    const aiWarnMsg = p.aiFailed > 0 ? ` (AI failed: ${p.aiFailed})` : "";
+    if (p.error === "not_logged_in") showStatus("status-msg", t("batchNotLoggedIn"), "error");
+    else if (p.error) showStatus("status-msg", t("batchFailed", p.error), "error");
+    else showStatus("status-msg", t("batchDone", String(p.saved || 0), String(p.failed || 0)) + skipMsg + tooLongMsg + aiWarnMsg, (p.saved || 0) > 0 ? "success" : "error");
+    setBtnIcon(batchBtn, "pin", t("batchSavedCount", String(p.saved || 0)));
+    setTimeout(() => {
+      if (progress) progress.classList.add("hidden");
+      setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
+      batchBtn.disabled = false;
+    }, 1500);
+  } else {
+    batchBtn.disabled = true;
+    setBtnIcon(batchBtn, "pin", t("batchProgress", String(cur), String(total), String(p.saved || 0), String(p.failed || 0)));
+  }
+}
+
+function wireBatchProgress() {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.batch_progress) renderBatchProgress(changes.batch_progress.newValue);
+  });
+  // Reopen restore: if a batch is mid-flight, show it immediately.
+  chrome.storage.local.get("batch_progress").then(({ batch_progress: bp }) => {
+    if (batchIsRunning(bp, Date.now(), BATCH_STALE_TTL)) renderBatchProgress(bp);
+  }).catch(() => {});
 }
 
 // ---- Tag Presets ----
