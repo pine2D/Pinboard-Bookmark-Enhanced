@@ -844,12 +844,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "show_notification") {
-    showNotification(message.id || "popup-notify", message.title || "Pinboard", message.message || "", message.category || "");
-    sendResponse({ ok: true });
-    return true;
-  }
-
   if (message.action === "saveTabSet" && message.tabsData) {
     handleSaveTabSet(message.tabsData);
     sendResponse({ status: "started" });
@@ -1086,7 +1080,9 @@ async function handleBatchSave(tabs) {
 
     await _writeBatchProgress({ running: false, done: true, error: null, total, i: total, saved, failed, aiFailed, skipped, tooLong });
     const tagsSuffix = baseTags.length ? t("batchTaggedSuffix", baseTags.join(", ")) : "";
-    showNotification("batch-saved", t("bgBatchSaved"), t("batchSavedNotify", String(saved), tagsSuffix), "batchSave");
+    // Only notify when something actually saved (matches the old popup gate); an
+    // all-skipped/all-failed run should not toast "Saved 0 bookmarks".
+    if (saved > 0) showNotification("batch-saved", t("bgBatchSaved"), t("batchSavedNotify", String(saved), tagsSuffix), "batchSave");
   } catch (e) {
     await _writeBatchProgress({ running: false, done: true, error: e.message, total, i: total, saved, failed, aiFailed, skipped, tooLong });
     showNotification("batch-error", t("bgBatchSaved"), e.message, "error");

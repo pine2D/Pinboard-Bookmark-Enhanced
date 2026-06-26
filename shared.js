@@ -362,7 +362,8 @@ function batchIsRunning(progress, now, ttl) {
 }
 
 // ---- Existing URL Set Cache (for batch dedup) ----
-// Lives in shared.js so BOTH the popup and the SW (handleBatchSave) can call it.
+// Lives in shared.js so it resolves in either context; currently called only from
+// the SW (handleBatchSave), but kept context-agnostic for the popup too.
 // In the popup, pinboardFetch is popup.js's proxy override (routes through the SW);
 // in the SW it is shared.js's real fetch wrapper. Both return a .json()-capable
 // Response-like object, so this function resolves correctly in either context.
