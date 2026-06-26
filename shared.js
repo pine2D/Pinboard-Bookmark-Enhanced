@@ -380,6 +380,8 @@ async function fetchExistingUrlSet(token) {
   try {
     const recentData = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${token}&format=json&results=1000&meta=no`)).json();
     if (Array.isArray(recentData) && recentData.length >= 1000) {
+      // D2 Phase 4: likely > 5000 bookmarks; skip-existing falls back to per-tab
+      // posts/get inside the batch loop to avoid false-not-existing for older bookmarks.
       console.log("[batch] account likely > 5000 bookmarks, skip-existing falls back to per-tab posts/get");
       return null;
     }
@@ -387,6 +389,9 @@ async function fetchExistingUrlSet(token) {
     await chrome.storage.local.set({ [cacheKey]: { urls, timestamp: Date.now() } });
     return new Set(urls);
   } catch (_) {
+    // Fetch / .json() failed transiently. Do NOT return an empty Set — that is
+    // indistinguishable from a zero-bookmark account and would re-save every tab
+    // with replace=yes, clobbering existing bookmarks. Signal per-tab fallback.
     return null;
   }
 }
