@@ -856,6 +856,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === "startBatchSave" && Array.isArray(message.tabs)) {
+    if (_batchRunning) { sendResponse({ status: "busy" }); return true; }
+    handleBatchSave(message.tabs);   // fire-and-forget; keeps SW alive via in-flight fetches
+    sendResponse({ status: "started" });
+    return true;
+  }
+
   if (message.type === "pinboard_api_call" && message.url) {
     // Proxy Pinboard fetch through service worker to avoid Chrome's native auth dialog on 401
     pinboardFetch(message.url, message.options || undefined)
@@ -917,6 +924,176 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+// ===================== Batch Bookmark 保存（后台） =====================
+// The batch loop moved out of popup-batch.js so it survives popup close.
+// Progress is mirrored to storage.local.batch_progress for the popup to render;
+// the completion notification fires here regardless of popup state.
+let _batchRunning = false;
+
+async function _writeBatchProgress(p) {
+  try { await chrome.storage.local.set({ batch_progress: { ...p, ts: Date.now() } }); }
+  catch (_) { /* storage transient failure — progress UI degrades, batch continues */ }
+}
+
+async function handleBatchSave(tabs) {
+  if (_batchRunning) return;            // one batch per SW lifetime (popup also guards)
+  _batchRunning = true;
+  const total = tabs.length;
+  let saved = 0, failed = 0, aiFailed = 0, skipped = 0, tooLong = 0;
+  const base = () => ({ total, i: 0, saved, failed, aiFailed, skipped, tooLong });
+  await _writeBatchProgress({ running: true, done: false, error: null, ...base() });
+
+  try {
+    const s = await loadSettings();
+    if (!s.pinboardToken) {
+      await _writeBatchProgress({ running: false, done: true, error: "not_logged_in", ...base() });
+      showNotification("batch-error", t("bgBatchSaved"), t("bgNotLoggedIn"), "error");
+      return;
+    }
+
+    const baseTags = s.optBatchTagEnabled && s.optBatchTag
+      ? s.optBatchTag.split(/[,，]+/).map(x => x.trim().replace(/\s+/g, "-")).filter(Boolean)
+      : [];
+    const useAiTags = s.batchAiTags && hasAIKey(s);
+    const useAiSummary = s.batchAiSummary && hasAIKey(s);
+
+    // popup's global tagCaseMap is unreachable in the SW; rebuild from the cached
+    // user-tag counts (popup-tags.js persists them under "cached_user_tags").
+    let tagCaseMap = {};
+    if (s.optRespectTagCase) {
+      try {
+        const cached = await chrome.storage.local.get("cached_user_tags");
+        const counts = cached?.cached_user_tags?.counts;
+        if (counts) tagCaseMap = buildTagCaseMap(counts);
+      } catch (_) { /* no cache -> map stays empty, resolveTagCase returns tag as-is */ }
+    }
+
+    // Dedup set
+    let existingUrls = new Set();
+    let existingPerTabFallback = false;
+    const savedUrls = [];
+    if (s.batchSkipExisting) {
+      const result = await fetchExistingUrlSet(s.pinboardToken);
+      if (result === null) existingPerTabFallback = true;
+      else existingUrls = result;
+    }
+
+    for (let i = 0; i < tabs.length; i++) {
+      const tab = tabs[i];
+      await _writeBatchProgress({ running: true, done: false, error: null, total, i, saved, failed, aiFailed, skipped, tooLong });
+
+      if (s.batchSkipExisting) {
+        let isExisting = existingUrls.has(tab.url);
+        if (existingPerTabFallback) {
+          try { const ex = await fetchExistingBookmark(tab.url, s.pinboardToken); if (ex.exists) isExisting = true; }
+          catch (_) {}
+        }
+        if (isExisting) { skipped++; continue; }
+      }
+
+      try {
+        let tags = [...baseTags];
+        let notes = "";
+
+        if (useAiTags || useAiSummary) {
+          let pageInfo = null;
+          try { pageInfo = await getPageInfoFromTab(tab.id, { withDefuddle: true }); }
+          catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
+          if (pageInfo?.pageText) {
+            let combinedHandled = false;
+            if (useAiTags && useAiSummary && !s.customTagPrompt?.trim() && !s.customSummaryPrompt?.trim()) {
+              try {
+                const tCached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource);
+                const sCached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource);
+                let aiTags, summary;
+                if (tCached && sCached) { aiTags = tCached; summary = sCached; }
+                else {
+                  const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", []));
+                  const parsed = parseAICombined(resp, s.aiTagSeparator);
+                  aiTags = s.optRespectTagCase ? parsed.tags.map(tg => resolveTagCase(tg, tagCaseMap)) : parsed.tags;
+                  summary = parsed.summary;
+                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
+                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, s.aiContentSource);
+                }
+                tags = [...tags, ...aiTags];
+                if (summary) notes = `[AI Summary]\n<blockquote>${escapeForExtended(summary)}</blockquote>`;
+                combinedHandled = true;
+              } catch (e) { console.warn("batch AI combined failed, falling back:", tab.url, e.message); }
+            }
+            if (!combinedHandled) {
+              const aiJobs = [];
+              if (useAiTags) aiJobs.push((async () => {
+                try {
+                  const cached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource);
+                  if (cached) return { type: "tags", result: cached };
+                  const prompt = buildTagPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", []);
+                  const resp = await callAI(s, prompt);
+                  const rawTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
+                  const aiTags = s.optRespectTagCase ? rawTags.map(tg => resolveTagCase(tg, tagCaseMap)) : rawTags;
+                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
+                  return { type: "tags", result: aiTags };
+                } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
+              })());
+              if (useAiSummary) aiJobs.push((async () => {
+                try {
+                  const cached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource);
+                  if (cached) return { type: "summary", result: cached };
+                  const prompt = buildSummaryPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "");
+                  const summary = await callAI(s, prompt);
+                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, s.aiContentSource);
+                  return { type: "summary", result: summary };
+                } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
+              })());
+              const results = await Promise.all(aiJobs);
+              for (const r of results) {
+                if (!r) continue;
+                if (r.type === "tags") tags = [...tags, ...r.result];
+                if (r.type === "summary") notes = `[AI Summary]\n<blockquote>${escapeForExtended(r.result)}</blockquote>`;
+              }
+            }
+          }
+        }
+
+        const dedupedTags = [...new Set(tags.map(tg => tg.toLowerCase()))].map(lower => tags.find(tg => tg.toLowerCase() === lower));
+        const isPrivate = pbpEffectivePrivate(s, { incognito: tab.incognito });
+        const apiUrl = buildPostsAddUri({
+          token: s.pinboardToken,
+          url: tab.url,
+          title: tab.title || tab.url,
+          extended: notes,
+          tags: dedupedTags.join(" "),
+          shared: isPrivate ? "no" : "yes",
+          toread: s.optReadlaterDefault ? "yes" : undefined,
+        });
+        if (apiUrl.length > POSTS_ADD_URI_BUDGET) { console.warn(`[batch] skipping oversize URI (${apiUrl.length}/${POSTS_ADD_URI_BUDGET}):`, tab.url); tooLong++; continue; }
+        const data = await (await pinboardFetch(apiUrl)).json();
+        if (data.result_code === "done") {
+          saved++;
+          savedUrls.push(tab.url);
+          statusCache.set(tab.url, { bookmarked: true, timestamp: Date.now() }); // icon reflects batch save
+          if (s.waybackArchiveEnabled && s.waybackArchiveBatch) {
+            pbpWaybackArchive(tab.url, s, { isPrivate }).catch(() => {}); // direct call; gating internal
+          }
+        } else failed++;
+      } catch (_) { failed++; }
+    }
+
+    if (saved > 0) {
+      existingUrls = computeSavedUrlSet(existingUrls, savedUrls);
+      try { await chrome.storage.local.set({ cached_existing_urls: { urls: [...existingUrls], timestamp: Date.now() } }); } catch (_) {}
+    }
+
+    await _writeBatchProgress({ running: false, done: true, error: null, total, i: total, saved, failed, aiFailed, skipped, tooLong });
+    const tagsSuffix = baseTags.length ? t("batchTaggedSuffix", baseTags.join(", ")) : "";
+    showNotification("batch-saved", t("bgBatchSaved"), t("batchSavedNotify", String(saved), tagsSuffix), "batchSave");
+  } catch (e) {
+    await _writeBatchProgress({ running: false, done: true, error: e.message, total, i: total, saved, failed, aiFailed, skipped, tooLong });
+    showNotification("batch-error", t("bgBatchSaved"), e.message, "error");
+  } finally {
+    _batchRunning = false;
+  }
+}
 
 // ===================== Tab Set 保存 =====================
 async function handleSaveTabSet(tabsData) {
