@@ -299,34 +299,3 @@ function setupTagPresets() {
     container.appendChild(btn);
   });
 }
-
-// ---- Existing URL Set Cache (for batch dedup) ----
-async function fetchExistingUrlSet(token) {
-  const cacheKey = "cached_existing_urls";
-  try {
-    const cached = await chrome.storage.local.get(cacheKey);
-    if (cached[cacheKey]) {
-      const { urls, timestamp } = cached[cacheKey];
-      if (Date.now() - timestamp < 30 * 60 * 1000) {
-        return new Set(urls);
-      }
-    }
-  } catch (_) {}
-  try {
-    const recentData = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${token}&format=json&results=1000&meta=no`)).json();
-    if (Array.isArray(recentData) && recentData.length >= 1000) {
-      // D2 Phase 4: likely > 5000 bookmarks; skip-existing falls back to per-tab
-      // posts/get inside the batch loop to avoid false-not-existing for older bookmarks.
-      console.log("[batch] account likely > 5000 bookmarks, skip-existing falls back to per-tab posts/get");
-      return null;
-    }
-    const urls = recentData.map(p => p.href);
-    await chrome.storage.local.set({ [cacheKey]: { urls, timestamp: Date.now() } });
-    return new Set(urls);
-  } catch (_) {
-    // Fetch / .json() failed transiently. Do NOT return an empty Set — that is
-    // indistinguishable from a zero-bookmark account and would re-save every tab
-    // with replace=yes, clobbering existing bookmarks. Signal per-tab fallback.
-    return null;
-  }
-}

@@ -83,4 +83,41 @@ run("results-a2", [
   }
 ]);
 </script>
+
+<h2>A3: batchIsRunning — liveness with stale heartbeat</h2>
+<div id="results-a3"></div>
+<script>
+run("results-a3", [
+  {
+    name: "running + fresh ts -> true",
+    fn: () => batchIsRunning({ running: true, done: false, ts: 1000 }, 1500, 120000),
+    check: (got) => got === true,
+    expected: "true"
+  },
+  {
+    name: "running but stale ts (> ttl) -> false",
+    fn: () => batchIsRunning({ running: true, done: false, ts: 1000 }, 200000, 120000),
+    check: (got) => got === false,
+    expected: "false"
+  },
+  {
+    name: "done -> false even if ts fresh",
+    fn: () => batchIsRunning({ running: true, done: true, ts: 1000 }, 1500, 120000),
+    check: (got) => got === false,
+    expected: "false"
+  },
+  {
+    name: "null/undefined progress -> false",
+    fn: () => batchIsRunning(undefined, 1500, 120000),
+    check: (got) => got === false,
+    expected: "false"
+  },
+  {
+    name: "missing ttl falls back to BATCH_STALE_TTL (fresh) -> true",
+    fn: () => batchIsRunning({ running: true, done: false, ts: 1000 }, 1000 + 119000),
+    check: (got) => got === true,
+    expected: "true"
+  }
+]);
+</script>
 </body></html>

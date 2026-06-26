@@ -351,6 +351,46 @@ function computeSavedUrlSet(existingUrls, savedUrls) {
   return out;
 }
 
+// ---- Batch background-run liveness ----
+// True iff a batch is mid-flight AND its heartbeat (ts) is fresh. A stale ts
+// (the SW was terminated mid-batch) reads as not-running so the popup's Batch
+// button isn't locked forever. Pure — unit-tested in tests/batch-dedup-tests.html.
+const BATCH_STALE_TTL = 120000; // 120s, ~ one slow single-tab AI call
+function batchIsRunning(progress, now, ttl) {
+  if (!progress || !progress.running || progress.done) return false;
+  return (now - (progress.ts || 0)) < (ttl || BATCH_STALE_TTL);
+}
+
+// ---- Existing URL Set Cache (for batch dedup) ----
+// Lives in shared.js so BOTH the popup and the SW (handleBatchSave) can call it.
+// In the popup, pinboardFetch is popup.js's proxy override (routes through the SW);
+// in the SW it is shared.js's real fetch wrapper. Both return a .json()-capable
+// Response-like object, so this function resolves correctly in either context.
+async function fetchExistingUrlSet(token) {
+  const cacheKey = "cached_existing_urls";
+  try {
+    const cached = await chrome.storage.local.get(cacheKey);
+    if (cached[cacheKey]) {
+      const { urls, timestamp } = cached[cacheKey];
+      if (Date.now() - timestamp < 30 * 60 * 1000) {
+        return new Set(urls);
+      }
+    }
+  } catch (_) {}
+  try {
+    const recentData = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${token}&format=json&results=1000&meta=no`)).json();
+    if (Array.isArray(recentData) && recentData.length >= 1000) {
+      console.log("[batch] account likely > 5000 bookmarks, skip-existing falls back to per-tab posts/get");
+      return null;
+    }
+    const urls = recentData.map(p => p.href);
+    await chrome.storage.local.set({ [cacheKey]: { urls, timestamp: Date.now() } });
+    return new Set(urls);
+  } catch (_) {
+    return null;
+  }
+}
+
 // ---- Pinboard error classifier ----
 // Returns an i18n key describing a Pinboard API failure.
 // Input: HTTP Response, Error, or status number. Caller handles 401 (pinboardFetch redirects)
