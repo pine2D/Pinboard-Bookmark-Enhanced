@@ -105,13 +105,22 @@ function setupTabSet() {
 
       // Snapshot tabs and hand off to the SW; the loop now runs in the background.
       const snapshot = validTabs.map(tab => ({ id: tab.id, title: tab.title || tab.url, url: tab.url, incognito: !!tab.incognito }));
+      // No .catch here: a sendMessage rejection (dead SW channel) must propagate to
+      // the outer catch so the button is re-enabled and the progress bar hidden —
+      // swallowing it to null would leave the UI stuck disabled until popup close.
+      const resp = await chrome.runtime.sendMessage({ action: "startBatchSave", tabs: snapshot });
+      if (resp && resp.status === "busy") {
+        // A batch started between our re-entry check and this dispatch; don't start a
+        // second one. Re-enable our button — the running batch's heartbeat will drive
+        // the progress UI via wireBatchProgress.
+        showStatus("status-msg", t("batchRunningBg"), "success");
+        setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
+        batchBtn.disabled = false;
+        return;
+      }
       const progress = $id("batch-progress");
       if (progress) progress.classList.remove("hidden");
       setBtnIcon(batchBtn, "pin", t("batchProgress", "0", String(snapshot.length), "0", "0"));
-      const resp = await chrome.runtime.sendMessage({ action: "startBatchSave", tabs: snapshot }).catch(() => null);
-      if (resp && resp.status === "busy") {
-        showStatus("status-msg", t("batchRunningBg"), "success");
-      }
       // From here, renderBatchProgress (wired via storage.onChanged) drives the UI.
     } catch (e) {
       showStatus("status-msg", t("batchFailed", e.message), "error");
