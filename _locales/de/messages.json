@@ -365,6 +365,9 @@
   "batchSaving": {
     "message": "Speichern..."
   },
+  "batchRunningBg": {
+    "message": "Wird im Hintergrund gespeichert…"
+  },
   "batchNoValidTabs": {
     "message": "Keine gültigen Tabs zum Speichern"
   },

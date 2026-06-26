@@ -365,6 +365,9 @@
   "batchSaving": {
     "message": "Zapisywanie..."
   },
+  "batchRunningBg": {
+    "message": "Zapisywanie w tle…"
+  },
   "batchNoValidTabs": {
     "message": "Brak prawidłowych kart do zapisania"
   },

@@ -365,6 +365,9 @@
   "batchSaving": {
     "message": "Saving..."
   },
+  "batchRunningBg": {
+    "message": "Saving in background…"
+  },
   "batchNoValidTabs": {
     "message": "No valid tabs to save"
   },

@@ -365,6 +365,9 @@
   "batchSaving": {
     "message": "Сохранение..."
   },
+  "batchRunningBg": {
+    "message": "Сохранение в фоне…"
+  },
   "batchNoValidTabs": {
     "message": "Нет подходящих вкладок для сохранения"
   },

@@ -365,6 +365,9 @@
   "batchSaving": {
     "message": "保存中..."
   },
+  "batchRunningBg": {
+    "message": "バックグラウンドで保存中…"
+  },
   "batchNoValidTabs": {
     "message": "保存できるタブがありません"
   },

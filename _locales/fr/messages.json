@@ -365,6 +365,9 @@
   "batchSaving": {
     "message": "Enregistrement..."
   },
+  "batchRunningBg": {
+    "message": "Enregistrement en arrière-plan…"
+  },
   "batchNoValidTabs": {
     "message": "Aucun onglet valide à enregistrer"
   },

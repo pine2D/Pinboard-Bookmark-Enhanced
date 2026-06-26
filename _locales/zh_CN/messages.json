@@ -365,6 +365,9 @@
   "batchSaving": {
     "message": "保存中..."
   },
+  "batchRunningBg": {
+    "message": "正在后台保存…"
+  },
   "batchNoValidTabs": {
     "message": "没有可保存的标签页"
   },

@@ -365,6 +365,9 @@
   "batchSaving": {
     "message": "儲存中..."
   },
+  "batchRunningBg": {
+    "message": "正在背景儲存…"
+  },
   "batchNoValidTabs": {
     "message": "沒有可儲存的標籤頁"
   },
