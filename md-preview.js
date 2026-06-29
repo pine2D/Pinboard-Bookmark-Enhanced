@@ -220,12 +220,16 @@ function ensureKatex() {
       includeToc: expIncludeToc ? expIncludeToc.checked : !!exportSettings.mdExportIncludeToc
     };
   }
-  function buildExportMarkdown() {
-    // Export follows the translation view: md-translate.js sets
-    // window.pbpViewMarkdown when the view is bilingual/translated-only;
-    // it returns null (or is undefined) for the original view.
+  // Raw view markdown, following the translation view: md-translate.js sets
+  // window.pbpViewMarkdown when the view is bilingual/translated-only; it
+  // returns null (or is undefined) for the original view. No frontmatter/
+  // imagePolicy/TOC applied yet — composeExport/composeStyledHtml do that.
+  function getViewMarkdown() {
     const viewMd = (typeof window.pbpViewMarkdown === "function") ? window.pbpViewMarkdown() : null;
-    return composeExport(viewMd || getMarkdown(), buildMeta(), buildExportOpts());
+    return viewMd || getMarkdown();
+  }
+  function buildExportMarkdown() {
+    return composeExport(getViewMarkdown(), buildMeta(), buildExportOpts());
   }
 
   // Fill header
@@ -434,12 +438,15 @@ function ensureKatex() {
   });
   document.getElementById("btn-copy-html").addEventListener("click", async (e) => {
     // Same content as the HTML download: a complete styled doc that follows the
-    // original/bilingual/translation-only view (buildExportMarkdown), copied as
+    // original/bilingual/translation-only view (getViewMarkdown), copied as
     // text — symmetric with Copy MD == Download MD. (Was renderedView.innerHTML,
     // which always carried every .pb-tr block regardless of the selected view.)
+    // Pass RAW view markdown (no YAML frontmatter) — composeStyledHtml renders
+    // the frontmatter as a styled <header>, so feeding it the YAML-prefixed
+    // buildExportMarkdown() would double it into the body as plain text.
     if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights
     const hljsCss = await loadHljsCss();
-    const doc = composeStyledHtml(buildExportMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
+    const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
     await copyToClipboard(doc, e.currentTarget);
   });
 
@@ -452,8 +459,10 @@ function ensureKatex() {
     if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights the export
     const hljsCss = await loadHljsCss();
     // Follow the original/bilingual/translation-only view like the Markdown export
-    // does (buildExportMarkdown = pbpViewMarkdown() || getMarkdown()).
-    const doc = composeStyledHtml(buildExportMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
+    // does, but pass RAW view markdown (getViewMarkdown, no YAML frontmatter):
+    // composeStyledHtml turns frontmatter into a styled <header>. Passing the
+    // YAML-prefixed buildExportMarkdown() rendered the YAML into the body as text.
+    const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
   });
 
