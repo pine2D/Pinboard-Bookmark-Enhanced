@@ -801,7 +801,12 @@ function getOrCreateInflight(key, factory) {
   if (_inflightAI.has(key)) return _inflightAI.get(key);
   const promise = factory();
   _inflightAI.set(key, promise);
-  promise.finally(() => _inflightAI.delete(key));
+  // Cleanup runs on a SEPARATE chain from the returned `promise`. If `promise`
+  // rejects (fetch timeout/abort, network fail), the caller's await/try-catch
+  // handles the returned chain — but this cleanup chain would surface its own
+  // "Uncaught (in promise)" rejection. .catch swallows it here; the caller still
+  // sees (and handles) the rejection via the returned `promise`.
+  promise.finally(() => _inflightAI.delete(key)).catch(() => {});
   return promise;
 }
 
