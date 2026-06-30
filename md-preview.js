@@ -489,6 +489,19 @@ function ensureKatex() {
     const primaryLabel = document.getElementById("send-primary-label");
     const caret = document.getElementById("send-caret");
     const menu = document.getElementById("send-menu");
+    const sendStatus = document.getElementById("send-status");
+    let sendStatusTimer;
+    function showSendStatus(msg, isError) {
+      if (!sendStatus) return;
+      clearTimeout(sendStatusTimer);
+      sendStatus.classList.toggle("error", !!isError);
+      sendStatus.hidden = false;          // unhide before setting text so aria-live announces it
+      sendStatus.textContent = msg;
+      sendStatusTimer = setTimeout(() => { sendStatus.hidden = true; sendStatus.textContent = ""; }, 6000);
+    }
+    if (sendStatus) sendStatus.addEventListener("click", () => {
+      clearTimeout(sendStatusTimer); sendStatus.hidden = true; sendStatus.textContent = "";
+    });
 
     if (!enabledIds.length) {
       split.classList.add("send-empty");
@@ -527,14 +540,14 @@ function ensureKatex() {
       }
       primary.classList.remove("sending");
       setPrimary(id);
-      if (res.ok) {
-        flashButtonLabel(primary, res.fellBack
-          ? t("mdSendTooLongFellBack")
-          : t("mdSentTo").replace("{name}", row.label));
+      if (res.ok && !res.fellBack) {
+        flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label));        // short -> button
+      } else if (res.ok) {
+        showSendStatus(t("mdSendTooLongFellBack").replace("{name}", row.label), false); // long -> roomy block
       } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {
-        flashButtonLabel(primary, t("mdSendNeedsSetup"));
+        showSendStatus(t("mdSendNeedsSetup"), false);
       } else {
-        flashButtonLabel(primary, t("mdSendFailed"));
+        showSendStatus(t("mdSendFailed"), true);
       }
     }
 

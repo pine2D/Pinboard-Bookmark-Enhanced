@@ -5,9 +5,15 @@
 // safeFilename), which load before this file everywhere it is used.
 // ============================================================
 
-// Safe ceiling for a custom-scheme URI. The OS/Chromium external-protocol
-// length limit is undocumented; ~2000 is the practical cap, 1800 leaves slack.
-const PBP_URI_BUDGET = 1800;
+// Safe ceiling for a custom-scheme URI handed to the OS protocol launcher.
+// HARD WALL = Windows: ShellExecute caps ~2048, and Chromium's external-protocol
+// prompt SILENTLY no-ops its "Open" button above ~2046 chars (crbug 727909).
+// macOS/Linux allow far more, but this single cross-platform constant stays
+// Windows-safe. DO NOT raise above ~2000 — past the wall content is silently
+// LOST (worse than the clipboard fallback). Long bodies go via clipboard /
+// the HTTP token API, never a longer URL. encodeURIComponent inflates markdown
+// ~1.6x (ASCII) / ~9x (CJK), so even 2000 holds only ~1200 ASCII / ~220 CJK raw chars.
+const PBP_URI_BUDGET = 2000;
 
 // Remove a single leading YAML frontmatter block ("---\n...\n---"). Idempotent;
 // no-op when absent. (rawBody from getViewMarkdown() is already YAML-free; this

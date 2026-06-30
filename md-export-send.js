@@ -46,9 +46,13 @@ async function pbpSendToTarget(id, ctx) {
       // Inline-content scheme: build the URI, fall back if it's too long.
       const uri = row.buildUri(meta, rawBody, cfg);
       if (pbpUriTooLong(uri)) {
+        // A+ : article too long for the URL channel (Windows external-protocol wall).
+        // Copy the full body to the clipboard and open the app with EMPTY content
+        // (a short, valid URI) so the user lands paste-ready and finishes with one Ctrl+V.
         const fileBody = pbpBuildFileBody(id, meta, rawBody);
-        downloadFile(safeFilename(meta.title || "untitled") + ".md", fileBody, "text/markdown;charset=utf-8");
         try { await navigator.clipboard.writeText(fileBody); } catch (_) {}
+        const openUri = row.buildUri(meta, "", cfg); // empty content -> short URI -> opens app
+        window.open(openUri, "_blank");
         return { ok: true, fellBack: true, error: null };
       }
       window.open(uri, "_blank");

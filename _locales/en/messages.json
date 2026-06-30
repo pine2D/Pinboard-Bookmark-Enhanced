@@ -2240,7 +2240,7 @@
     "message": "last used"
   },
   "mdSendTooLongFellBack": {
-    "message": "Too long for a link — downloaded .md + copied to clipboard"
+    "message": "Too long for a direct link — full text copied. Paste into {name} (Ctrl+V) to finish."
   },
   "mdSendNeedsSetup": {
     "message": "Finish setup in Settings"

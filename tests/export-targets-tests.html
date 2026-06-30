@@ -48,7 +48,7 @@ section("registry shape");
 assertEq(pbpExportTargetIds().join(","), "obsidian,logseq,capacities", "id order");
 assert(PBP_EXPORT_TARGETS.obsidian.mechanism === "url-scheme", "obsidian is url-scheme");
 assert(PBP_EXPORT_TARGETS.obsidian.viaClipboard === true, "obsidian uses clipboard");
-assert(PBP_URI_BUDGET === 1800, "budget constant");
+assert(PBP_URI_BUDGET === 2000, "budget constant");
 
 section("logseq.buildUri");
 {
@@ -89,7 +89,7 @@ assertEq(pbpBuildFileBody("capacities", { title: "T" }, "already-clean body"),
   "already-clean body", "strip policy returns the raw body unchanged");
 
 section("pbpUriTooLong");
-assert(pbpUriTooLong("x".repeat(1801)) === true, "over budget");
+assert(pbpUriTooLong("x".repeat(2001)) === true, "over budget");
 assert(pbpUriTooLong("x".repeat(10)) === false, "under budget");
 
 section("pbpBuildFileBody — inline (obsidian)");

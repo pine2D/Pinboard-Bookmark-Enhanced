@@ -639,6 +639,15 @@ body.md-empty main { margin-left: 0; }
 .send-mi-tag { margin-left: auto; font-size: 10px; opacity: .6; }
 .send-mi-foot { border-top: 1px solid var(--border, #d8dee4); margin-top: 4px;
   border-radius: 0; opacity: .8; font-size: 12px; }
+.send-status {
+  margin-top: 8px; padding: 8px 10px;
+  font-size: 12px; line-height: 1.45; word-break: break-word;
+  color: var(--fg-secondary); background: var(--btn-bg);
+  border: 1px solid var(--border); border-left: 3px solid var(--success);
+  border-radius: 6px; cursor: pointer;
+}
+.send-status.error { color: var(--danger); border-left-color: var(--danger); }
+.send-status[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
