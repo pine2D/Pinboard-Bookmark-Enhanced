@@ -76,7 +76,7 @@ assert(PBP_EXPORT_TARGETS.logseq.pageTitle({ title: "My Article" }) === "My Arti
 assert(PBP_EXPORT_TARGETS.logseq.pageTitle({ title: "a/b#c" }) === "a-b-c", "sanitizes / and #");
 assert(PBP_EXPORT_TARGETS.logseq.pageTitle({}) === "Untitled", "untitled fallback");
 
-section("logseq.buildRequest (clean title + notebook tag)");
+section("logseq.buildRequest (body block — NO tags:: text)");
 {
   const req = PBP_EXPORT_TARGETS.logseq.buildRequest({ title: "T", url: "U", date: "D", tags: ["news"] }, "the body", { notebook: "Clippings", port: "9999" }, "tok123");
   assert(req.url === "http://127.0.0.1:9999/api", "configured port");
@@ -84,21 +84,25 @@ section("logseq.buildRequest (clean title + notebook tag)");
   const parsed = JSON.parse(req.body);
   assert(parsed.method === "logseq.Editor.appendBlockInPage", "appendBlockInPage");
   assert(parsed.args[0] === "T", "page = article title only (no namespace prefix)");
-  assert(parsed.args[1].startsWith("tags:: Clippings, news"), "notebook + article tags as page property");
+  assert(!parsed.args[1].includes("tags::"), "no tags:: TEXT in body (API does not parse it -> page property instead)");
   assert(parsed.args[1].includes("Source: U") && parsed.args[1].includes("the body"), "source line + body present");
 }
-{
-  const req2 = PBP_EXPORT_TARGETS.logseq.buildRequest({ title: "T" }, "b", {}, "x");  // no notebook, no tags
-  assert(!JSON.parse(req2.body).args[1].startsWith("tags::"), "no tags:: line when nothing to tag");
-}
 
-section("logseq.preRequest (createPage article title + redirect)");
+section("logseq.preRequest (createPage sets tags as a structured page property)");
 {
-  const pr = PBP_EXPORT_TARGETS.logseq.preRequest({ title: "T" }, { notebook: "Clippings" }, "x");
+  const pr = PBP_EXPORT_TARGETS.logseq.preRequest({ title: "T", tags: ["news"] }, { notebook: "Clippings" }, "x");
   const p = JSON.parse(pr.body);
   assert(p.method === "logseq.Editor.createPage", "createPage");
   assert(p.args[0] === "T", "createPage uses the article title (not namespaced)");
+  assert(Array.isArray(p.args[1].tags), "tags passed as a structured array, not key:: text");
+  assert(p.args[1].tags[0] === "Clippings" && p.args[1].tags[1] === "news", "notebook first, then article tags");
   assert(p.args[2] && p.args[2].redirect === true, "redirect:true");
+  assert(p.args[2].createFirstBlock === false, "createFirstBlock:false");
+}
+{
+  const pr2 = PBP_EXPORT_TARGETS.logseq.preRequest({ title: "T" }, {}, "x");  // no notebook, no tags
+  const p2 = JSON.parse(pr2.body);
+  assert(!("tags" in p2.args[1]), "no tags property when nothing to tag");
 }
 
 section("pbpUriTooLong");

@@ -104,28 +104,39 @@ const PBP_EXPORT_TARGETS = {
       let title = String(meta.title || "Untitled").replace(/[\/\\#%\[\]]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 100);
       return title || "Untitled";
     },
+    // Logseq has no folders; group via a page `tags` property (notebook + article
+    // tags). The HTTP API does NOT parse `key:: value` TEXT into properties — they
+    // MUST ride createPage's structured 2nd arg (verified against the shipping
+    // "Send To Logseq" extension: it extracts leading property lines client-side
+    // and passes them as createPage(name, {tags:[...]}, ...)). A `tags::` text line
+    // in an appended block is a no-op page-tag-wise — that was the Smoke7 bug.
+    _logseqTags(meta, cfg) {
+      const tags = [];
+      if (cfg && cfg.notebook && String(cfg.notebook).trim()) tags.push(String(cfg.notebook).trim());
+      if (meta && Array.isArray(meta.tags)) meta.tags.forEach((t) => { const s = String(t).trim(); if (s) tags.push(s); });
+      return tags;
+    },
     preRequest(meta, cfg, token) {
       const port = String((cfg && cfg.port) || "12315");
+      const tags = this._logseqTags(meta, cfg);
+      const props = tags.length ? { tags: tags } : {};   // structured page property
       return {
         url: "http://127.0.0.1:" + port + "/api",
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
         body: JSON.stringify({
           method: "logseq.Editor.createPage",
-          args: [this.pageTitle(meta), {}, { createFirstBlock: false, journal: false, redirect: true }]
+          args: [this.pageTitle(meta), props, { createFirstBlock: false, journal: false, redirect: true }]
         })
       };
     },
     buildRequest(meta, body, cfg, token) {
       cfg = cfg || {}; meta = meta || {};
       const port = String(cfg.port || "12315");
-      // Logseq has no folders; group via a page tag (tags:: on the page's first block).
-      const tags = [];
-      if (cfg.notebook && String(cfg.notebook).trim()) tags.push(String(cfg.notebook).trim());
-      if (Array.isArray(meta.tags)) meta.tags.forEach((t) => { const s = String(t).trim(); if (s) tags.push(s); });
-      const propLine = tags.length ? "tags:: " + tags.join(", ") + "\n\n" : "";
+      // Tags are set as page properties in preRequest's createPage; the body block
+      // carries only a human-readable Source/date line + the article.
       const metaLine = [meta.url ? "Source: " + meta.url : "", meta.date || ""].filter(Boolean).join("  ·  ");
-      const content = propLine + (metaLine ? metaLine + "\n\n" : "") + String(body || "");
+      const content = (metaLine ? metaLine + "\n\n" : "") + String(body || "");
       return {
         url: "http://127.0.0.1:" + port + "/api",
         method: "POST",
