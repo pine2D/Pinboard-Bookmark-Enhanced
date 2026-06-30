@@ -577,10 +577,6 @@
         </p>
       </div>
       <div class="section-title" data-i18n="secMdExport">Markdown Export Defaults</div>
-      <div class="fg">
-        <label><input type="checkbox" id="opt-obsidian-enabled" /> <span data-i18n="mdObsidianEnabled">Enable export to Obsidian</span></label>
-        <p class="hint" data-i18n="mdObsidianEnabledHint">Shows the Send-to-Obsidian buttons in the preview page and the popup.</p>
-      </div>
       <div class="fg"><label><input type="checkbox" id="opt-md-frontmatter" checked /> <span data-i18n="mdExportFrontmatter">Add YAML frontmatter to exported Markdown</span></label></div>
       <div class="fg">
         <label class="bl" data-i18n="mdExportImagePolicy">Image handling</label>
@@ -592,16 +588,9 @@
         <p class="hint" data-i18n="mdExportImagePolicyHint">Applied when copying or downloading Markdown from the preview page. Can be overridden per export.</p>
       </div>
       <div class="fg"><label><input type="checkbox" id="opt-md-include-toc" /> <span data-i18n="mdExportIncludeToc">Include table of contents</span></label></div>
-      <div class="fg">
-        <label class="bl" for="opt-obsidian-vault" data-i18n="mdObsidianVault">Obsidian vault</label>
-        <input type="text" id="opt-obsidian-vault" autocomplete="off" />
-        <p class="hint" data-i18n="mdObsidianVaultHint">Leave empty to use the current vault.</p>
-      </div>
-      <div class="fg">
-        <label class="bl" for="opt-obsidian-folder" data-i18n="mdObsidianFolder">Obsidian folder</label>
-        <input type="text" id="opt-obsidian-folder" autocomplete="off" />
-        <p class="hint" data-i18n="mdObsidianFolderHint">Leave empty to save at the vault root.</p>
-      </div>
+      <div class="section-title" data-i18n="secSendDestinations">Send-to Destinations</div>
+      <p class="hint" data-i18n="secSendDestinationsHint">Each enabled destination appears in the preview page's "Send to" menu.</p>
+      <div id="export-targets"></div>
     </div>
 
     <!-- Tab: Tags -->
@@ -761,6 +750,7 @@
   <script defer src="options-connectivity.js"></script>
   <script defer src="options-backup.js"></script>
   <script defer src="tag-gov.js"></script>
+  <script defer src="export-targets.js"></script>
   <script defer src="options.js"></script>
 </body>
 </html>

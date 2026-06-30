@@ -213,9 +213,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     markdown: {
       fields: {
-        "opt-obsidian-enabled": false,
-        "opt-md-frontmatter": true, "opt-md-image-policy": "keep", "opt-md-include-toc": false,
-        "opt-obsidian-vault": "", "opt-obsidian-folder": ""
+        "opt-md-frontmatter": true, "opt-md-image-policy": "keep", "opt-md-include-toc": false
       }
     },
     archive: {
@@ -249,6 +247,72 @@ document.addEventListener("DOMContentLoaded", async () => {
     const f = $id("opt-obsidian-folder");
     if (v) v.disabled = off;
     if (f) f.disabled = off;
+  }
+
+  // Render one settings card per export target from the registry. Inputs use
+  // data-et="<id>.<key>" so saveSettings can collect them generically.
+  function renderExportTargets(exportTargets) {
+    const host = $id("export-targets");
+    if (!host || typeof PBP_EXPORT_TARGETS === "undefined") return;
+    host.innerHTML = "";
+    exportTargets = exportTargets || {};
+    pbpExportTargetIds().forEach((id) => {
+      const row = PBP_EXPORT_TARGETS[id];
+      const cfg = exportTargets[id] || {};
+      const card = document.createElement("div");
+      card.className = "fg export-target-card";
+
+      const enableLabel = document.createElement("label");
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.dataset.et = id + ".enabled";
+      cb.checked = !!cfg.enabled;
+      const sp = document.createElement("span");
+      sp.textContent = t("mdSendEnableTo").replace("{name}", row.label);
+      enableLabel.appendChild(cb); enableLabel.appendChild(document.createTextNode(" ")); enableLabel.appendChild(sp);
+      card.appendChild(enableLabel);
+
+      (row.settings || []).forEach((s) => {
+        if (s.type !== "text") return; // P1 has only text fields
+        const wrap = document.createElement("div");
+        wrap.className = "et-field";
+        const lab = document.createElement("label");
+        lab.className = "bl";
+        lab.textContent = t(s.label);
+        const inp = document.createElement("input");
+        inp.type = "text"; inp.autocomplete = "off";
+        inp.dataset.et = id + "." + s.key;
+        inp.value = cfg[s.key] || "";
+        if (s.placeholder) inp.placeholder = s.placeholder;
+        wrap.appendChild(lab); wrap.appendChild(inp);
+        card.appendChild(wrap);
+      });
+
+      if (row.onboarding) {
+        const det = document.createElement("details");
+        det.className = "et-onboarding";
+        const sum = document.createElement("summary");
+        sum.textContent = t("mdSendHowToSetUp");
+        const p = document.createElement("p");
+        p.className = "hint";
+        p.textContent = t(row.onboarding);
+        det.appendChild(sum); det.appendChild(p);
+        card.appendChild(det);
+      }
+      host.appendChild(card);
+    });
+  }
+
+  // Collect the rendered target cards back into an exportTargets object.
+  function collectExportTargets() {
+    const out = {};
+    pbpExportTargetIds().forEach((id) => { out[id] = {}; });
+    document.querySelectorAll("#export-targets [data-et]").forEach((el) => {
+      const [id, key] = el.dataset.et.split(".");
+      if (!out[id]) out[id] = {};
+      out[id][key] = el.type === "checkbox" ? el.checked : el.value.trim();
+    });
+    return out;
   }
 
   // Show the free-text language input only while the select sits on "custom".
@@ -327,6 +391,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         applyPanelReset(def, document);
         saveAll();
         if (typeof def.after === "function") def.after();
+        // export-targets has no static fields; reset = re-render with defaults (all disabled).
+        if (panel === "markdown") renderExportTargets({});
         syncObsidianEnabledState();
         syncTranslateLangCustomState();
       },
@@ -511,10 +577,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Markdown export image policy select
   const mdImgSel = $id("opt-md-image-policy");
   if (mdImgSel) mdImgSel.value = s.mdExportImagePolicy || "keep";
-  const obsVault = $id("opt-obsidian-vault");
-  if (obsVault) obsVault.value = s.obsidianVault || "";
-  const obsFolder = $id("opt-obsidian-folder");
-  if (obsFolder) obsFolder.value = s.obsidianFolder || "";
+  // Migrate the legacy obsidian* keys into exportTargets.obsidian (one-time,
+  // non-destructive — old keys stay readable as a fallback).
+  const _et = s.exportTargets || {};
+  if (!_et.obsidian && (s.obsidianEnabled || s.obsidianVault || s.obsidianFolder)) {
+    _et.obsidian = { enabled: !!s.obsidianEnabled, vault: s.obsidianVault || "", folder: s.obsidianFolder || "" };
+  }
+  renderExportTargets(_et);
 
   // ---- Fill checkbox fields ----
   const checkMap = {
@@ -547,7 +616,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-popup-follow-theme": s.optPopupFollowTheme,
     "opt-md-frontmatter": s.mdExportFrontmatter,
     "opt-md-include-toc": s.mdExportIncludeToc,
-    "opt-obsidian-enabled": s.obsidianEnabled,
     "opt-tag-sort-by-pop": s.tagSortByPopEnabled,
     "opt-wayback-enabled": s.waybackArchiveEnabled === true,
     "opt-wayback-batch": s.waybackArchiveBatch === true,
@@ -894,9 +962,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       mdExportFrontmatter: $id("opt-md-frontmatter").checked,
       mdExportImagePolicy: $id("opt-md-image-policy").value,
       mdExportIncludeToc: $id("opt-md-include-toc").checked,
-      obsidianEnabled: $id("opt-obsidian-enabled").checked,
-      obsidianVault: $id("opt-obsidian-vault").value.trim(),
-      obsidianFolder: $id("opt-obsidian-folder").value.trim(),
+      exportTargets: collectExportTargets(),
       // Preview-page AI (md-preview explain / ask / translate)
       previewAiEnabled: $id("opt-preview-ai-enabled").checked,
       previewAiModel: $id("opt-preview-ai-model").value.trim(),
