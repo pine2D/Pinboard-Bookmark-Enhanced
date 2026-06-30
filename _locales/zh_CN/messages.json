@@ -2264,5 +2264,11 @@
   "mdSendTestDown": { "message": "无法连接到服务器——应用是否正在运行？" },
   "mdSendTestBadToken": { "message": "令牌被拒绝——请从应用中重新复制。" },
   "mdSendTestNoToken": { "message": "请先输入令牌。" },
-  "mdSendTestPerm": { "message": "本地访问权限被拒绝。" }
+  "mdSendTestPerm": { "message": "本地访问权限被拒绝。" },
+  "mdTargetGithubToken": {
+    "message": "GitHub 令牌（classic 类型，gist 权限）"
+  },
+  "mdTargetGithubOnboarding": {
+    "message": "在 GitHub → Settings → Developer settings → Tokens (classic) 创建一个经典个人访问令牌，勾选「gist」权限，粘贴到下方。每条剪藏会保存为一个私有 gist。注意：细粒度（fine-grained）令牌暂不支持创建 gist，请使用 classic 令牌。"
+  }
 }

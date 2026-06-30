@@ -38,6 +38,8 @@ function pbpUriTooLong(uri) { return String(uri || "").length > PBP_URI_BUDGET; 
 // Inline SVG icons (no emoji — font-fallback rule). 16px line icons.
 const _PBP_ICON_OBSIDIAN =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>';
+const _PBP_ICON_GITHUB =
+  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1C5.9 1 1 5.9 1 12c0 4.9 3.2 9 7.6 10.4.6.1.8-.2.8-.5v-1.8c-3.1.7-3.8-1.5-3.8-1.5-.5-1.3-1.2-1.6-1.2-1.6-1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 1.7 2.6 1.2 3.2.9.1-.7.4-1.2.7-1.5-2.5-.3-5.1-1.2-5.1-5.5 0-1.2.4-2.2 1.1-3-.1-.3-.5-1.4.1-2.9 0 0 .9-.3 3 1.1.9-.2 1.8-.4 2.7-.4.9 0 1.8.1 2.7.4 2.1-1.4 3-1.1 3-1.1.6 1.5.2 2.6.1 2.9.7.8 1.1 1.8 1.1 3 0 4.3-2.6 5.2-5.1 5.5.4.3.8 1 .8 2.1v3.1c0 .3.2.6.8.5C19.8 21 23 16.9 23 12c0-6.1-4.9-11-11-11z"/></svg>';
 
 const PBP_EXPORT_TARGETS = {
   obsidian: {
@@ -60,8 +62,50 @@ const PBP_EXPORT_TARGETS = {
       { key: "folder", type: "text", label: "mdObsidianFolder" }
     ],
     onboarding: ""
+  },
+
+  // GitHub Gist — token-api. A gist file IS raw markdown (GitHub renders the
+  // YAML frontmatter natively), so no block conversion. Each clip = one new
+  // private gist. NOTE: gists require a CLASSIC PAT with the `gist` scope —
+  // fine-grained tokens cannot create gists (GitHub docs, verified 2026-06).
+  github: {
+    id: "github",
+    label: "GitHub Gist",
+    icon: _PBP_ICON_GITHUB,
+    mechanism: "token-api",
+    frontmatter: "inline",          // gist file = one raw markdown string incl. YAML
+    origin: "https://api.github.com/*",
+    // Gist filename: sanitized title + ".md" (no path/reserved chars; non-empty).
+    _slug(meta) {
+      const t = String((meta && meta.title) || "clip")
+        .replace(/[\/\\?%*:|"<>#]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 80);
+      return (t || "clip") + ".md";
+    },
+    precheckRequest(cfg, token) {
+      return {
+        url: "https://api.github.com/user",
+        method: "GET",
+        headers: { "Accept": "application/vnd.github+json", "Authorization": "Bearer " + token, "X-GitHub-Api-Version": "2022-11-28" }
+      };
+    },
+    buildRequest(meta, body, cfg, token) {
+      meta = meta || {};
+      const files = {};
+      // gist rejects empty content (422) — guard with the title or a placeholder.
+      files[this._slug(meta)] = { content: String(body || "") || String(meta.title || "(empty)") };
+      return {
+        url: "https://api.github.com/gists",
+        method: "POST",
+        headers: { "Accept": "application/vnd.github+json", "Authorization": "Bearer " + token, "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json" },
+        body: JSON.stringify({ description: String(meta.title || "Clipped from web"), public: false, files: files })
+      };
+    },
+    settings: [
+      { key: "token", type: "secret", required: true, label: "mdTargetGithubToken" }
+    ],
+    onboarding: "mdTargetGithubOnboarding"
   }
 };
 
 // Display order for the menu + settings rendering.
-function pbpExportTargetIds() { return ["obsidian"]; }
+function pbpExportTargetIds() { return ["obsidian", "github"]; }

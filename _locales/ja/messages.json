@@ -2270,5 +2270,11 @@
   },
   "mdSendTestPerm": {
     "message": "Local-access permission was denied."
+  },
+  "mdTargetGithubToken": {
+    "message": "GitHub token (classic, gist scope)"
+  },
+  "mdTargetGithubOnboarding": {
+    "message": "Create a Personal Access Token (classic) at GitHub → Settings → Developer settings → Tokens (classic) with the \"gist\" scope, then paste it below. Each clip is saved as a private gist. Note: fine-grained tokens can't create gists yet — use a classic token."
   }
 }

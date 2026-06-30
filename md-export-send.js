@@ -71,9 +71,11 @@ async function pbpSendToTarget(id, ctx) {
           await fetch(prq.url, { method: prq.method, headers: prq.headers, body: prq.body });
         } catch (_) {}
       }
-      // Send.
+      // Send. buildRequest gets the body with the row's frontmatter policy
+      // applied (inline keeps YAML, strip drops it) — same shaping as the
+      // clipboard/fallback paths, so each target controls its own body.
       try {
-        const req = row.buildRequest(meta, rawBody, cfg, token);
+        const req = row.buildRequest(meta, pbpBuildFileBody(id, meta, rawBody), cfg, token);
         const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body });
         if (resp.status === 401) return apiFail("api-token");
         if (!resp.ok) return apiFail("api-failed");
