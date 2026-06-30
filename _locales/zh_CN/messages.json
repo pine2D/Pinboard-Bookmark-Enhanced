@@ -2263,6 +2263,13 @@
   "mdSendLogseqBadToken": { "message": "Logseq 拒绝了令牌。请从 HTTP APIs server 面板重新复制。已复制全文到剪贴板。" },
   "mdSendLogseqApiFailed": { "message": "Logseq 未能保存。已复制全文到剪贴板——粘贴即可完成。" },
   "mdTargetLogseqOnboarding": {
-    "message": "可选一键直送：在 Logseq 桌面版中，设置 → 功能 → 启用「HTTP APIs server」，创建令牌并保持应用运行，然后将令牌粘贴到此处。未配置令牌时，剪藏会通过 logseq:// 链接打开（短内容直接写入；长内容复制到剪贴板）。"
-  }
+    "message": "自动发送全文：在 Logseq 桌面端，设置 → 功能 → 启用「HTTP APIs server」，点击工具栏的插头图标 → 启动服务器，创建一个授权令牌并粘贴到下方。不配置令牌时，较长的剪藏会复制到剪贴板，需手动粘贴到 Logseq。"
+  },
+  "mdSendTest": { "message": "测试连接" },
+  "mdSendTestOk": { "message": "已连接到 Logseq" },
+  "mdSendTestDown": { "message": "无法连接 Logseq——桌面应用是否已打开并启动了 HTTP APIs server？" },
+  "mdSendTestBadToken": { "message": "令牌被拒绝——请从 Logseq 的 HTTP APIs server 面板重新复制。" },
+  "mdSendTestNoToken": { "message": "请先输入令牌。" },
+  "mdSendTestPerm": { "message": "本地访问权限被拒绝。" },
+  "mdSendSetupGuide": { "message": "官方配置指南 →" }
 }

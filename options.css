@@ -679,6 +679,15 @@ html[data-theme] .pf { background: var(--opt-pf-bg); border-color: var(--opt-bor
 html[data-theme] .pf h3 { color: var(--opt-fg-muted); }
 html[data-theme] .et-onboarding { color: var(--opt-fg-muted); }
 html[data-theme] .et-onboarding summary { color: var(--opt-accent); }
+.et-test { display: flex; align-items: center; gap: 10px; }
+.et-test-status { font-size: 12px; }
+.et-test-status.ok { color: #1a7f37; }
+.et-test-status.err { color: #cf222e; }
+.et-test-status.warn { color: #9a6700; }
+.et-doc-link { display: inline-block; margin-top: 6px; }
+html[data-theme] .et-test-status.ok { color: var(--opt-save, #1a7f37); }
+html[data-theme] .et-test-status.err { color: var(--opt-danger, #cf222e); }
+html[data-theme] .et-test-status.warn { color: var(--opt-warn, #9a6700); }
 html[data-theme] .section-title { color: var(--opt-fg-muted); }
 html[data-theme] .save-status { color: var(--opt-save); }
 html[data-theme] .auto-save-hint { color: var(--opt-fg-hint); }

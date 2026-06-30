@@ -318,7 +318,46 @@ document.addEventListener("DOMContentLoaded", async () => {
         p.className = "hint";
         p.textContent = t(row.onboarding);
         det.appendChild(sum); det.appendChild(p);
+        if (row.docUrl) {
+          const a = document.createElement("a");
+          a.href = row.docUrl; a.target = "_blank"; a.rel = "noopener noreferrer";
+          a.className = "hint et-doc-link";
+          a.textContent = t("mdSendSetupGuide");
+          det.appendChild(a);
+        }
         card.appendChild(det);
+      }
+      if (row.precheckRequest) {
+        const testWrap = document.createElement("div");
+        testWrap.className = "et-field et-test";
+        const testBtn = document.createElement("button");
+        testBtn.type = "button";
+        testBtn.className = "btn btn-sm";
+        testBtn.textContent = t("mdSendTest");
+        const testStatus = document.createElement("span");
+        testStatus.className = "et-test-status";
+        testBtn.addEventListener("click", async () => {
+          const tokenInp = card.querySelector('[data-et="' + id + '.token"]');
+          const portInp = card.querySelector('[data-et="' + id + '.port"]');
+          const token = (tokenInp && tokenInp.value.trim()) || "";
+          const port = (portInp && portInp.value.trim()) || "";
+          testStatus.className = "et-test-status";
+          if (!token) { testStatus.classList.add("warn"); testStatus.textContent = t("mdSendTestNoToken"); return; }
+          testStatus.textContent = t("mdSending");
+          try {
+            const granted = await chrome.permissions.request({ origins: [row.origin] });
+            if (!granted) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestPerm"); return; }
+          } catch (_) {}
+          try {
+            const pr = row.precheckRequest({ port }, token);
+            const resp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body });
+            if (resp.status === 401) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestBadToken"); }
+            else if (!resp.ok) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestDown"); }
+            else { testStatus.classList.add("ok"); testStatus.textContent = t("mdSendTestOk"); }
+          } catch (_) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestDown"); }
+        });
+        testWrap.appendChild(testBtn); testWrap.appendChild(testStatus);
+        card.appendChild(testWrap);
       }
       sec.appendChild(head); sec.appendChild(card);
       host.appendChild(sec);
