@@ -59,6 +59,14 @@ async function pbpSendToTarget(id, ctx) {
           if (!presp.ok) return apiFail("logseq-down");
         } catch (_) { return apiFail("logseq-down"); }
       }
+      // Best-effort: create the per-article page and navigate Logseq to it.
+      // If this fails, appendBlockInPage below still auto-creates the page (no navigation).
+      if (row.preRequest) {
+        try {
+          const prq = row.preRequest(meta, cfg, token);
+          await fetch(prq.url, { method: prq.method, headers: prq.headers, body: prq.body });
+        } catch (_) {}
+      }
       // Send.
       try {
         const req = row.buildRequest(meta, rawBody, cfg, token);

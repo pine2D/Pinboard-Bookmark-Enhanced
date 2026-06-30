@@ -99,21 +99,39 @@ const PBP_EXPORT_TARGETS = {
     },
     // --- Logseq local HTTP API (used when cfg.token is set) ---
     origin: "http://127.0.0.1/*",
-    buildRequest(meta, body, cfg, token) {
-      cfg = cfg || {}; meta = meta || {};
-      const port = String(cfg.port || "12315");
-      const page = cfg.page || "Clipped from Web";
-      const tagLine = (Array.isArray(meta.tags) && meta.tags.length)
-        ? meta.tags.map((t) => "#" + String(t).replace(/\s+/g, "-")).join(" ") : "";
-      const content = "## " + (meta.title || "") + "\n" +
-        (meta.url ? "Source: " + meta.url + "\n" : "") +
-        (meta.date ? "Date: " + meta.date + "\n" : "") +
-        (tagLine ? tagLine + "\n" : "") + "\n" + String(body || "");
+    pageTitle(meta, cfg) {
+      meta = meta || {}; cfg = cfg || {};
+      const ns = String(cfg.notebook || "").trim().replace(/^\/+|\/+$/g, "");
+      // sanitize the article title for a Logseq page name: strip chars that
+      // would create unintended namespaces / break the filename, collapse ws, cap length.
+      let title = String(meta.title || "Untitled").replace(/[\/\\#%\[\]]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 100);
+      if (!title) title = "Untitled";
+      return ns ? ns + "/" + title : title;
+    },
+    preRequest(meta, cfg, token) {
+      const port = String((cfg && cfg.port) || "12315");
       return {
         url: "http://127.0.0.1:" + port + "/api",
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-        body: JSON.stringify({ method: "logseq.Editor.appendBlockInPage", args: [page, content] })
+        body: JSON.stringify({
+          method: "logseq.Editor.createPage",
+          args: [this.pageTitle(meta, cfg), {}, { createFirstBlock: false, journal: false, redirect: true }]
+        })
+      };
+    },
+    buildRequest(meta, body, cfg, token) {
+      cfg = cfg || {}; meta = meta || {};
+      const port = String(cfg.port || "12315");
+      const tagLine = (Array.isArray(meta.tags) && meta.tags.length)
+        ? meta.tags.map((t) => "#" + String(t).replace(/\s+/g, "-")).join(" ") : "";
+      const metaLine = [meta.url ? "Source: " + meta.url : "", meta.date || "", tagLine].filter(Boolean).join("  ·  ");
+      const content = (metaLine ? metaLine + "\n\n" : "") + String(body || "");
+      return {
+        url: "http://127.0.0.1:" + port + "/api",
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify({ method: "logseq.Editor.appendBlockInPage", args: [this.pageTitle(meta, cfg), content] })
       };
     },
     precheckRequest(cfg, token) {
@@ -127,7 +145,7 @@ const PBP_EXPORT_TARGETS = {
     },
     settings: [
       { key: "token", type: "secret", label: "mdTargetLogseqToken" },
-      { key: "page", type: "text", label: "mdTargetLogseqPage", placeholder: "Clipped from Web" },
+      { key: "notebook", type: "text", label: "mdTargetLogseqNotebook", placeholder: "Clippings" },
       { key: "port", type: "text", label: "mdTargetLogseqPort", placeholder: "12315" }
     ],
     onboarding: "mdTargetLogseqOnboarding"
