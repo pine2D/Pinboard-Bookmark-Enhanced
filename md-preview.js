@@ -187,7 +187,8 @@ function ensureKatex() {
     mdExportIncludeToc: false,
     obsidianEnabled: false,
     obsidianVault: "",
-    obsidianFolder: ""
+    obsidianFolder: "",
+    exportTargets: {}
   });
   const expFrontmatter = document.getElementById("exp-frontmatter");
   const expImagePolicy = document.getElementById("exp-image-policy");
@@ -466,31 +467,120 @@ function ensureKatex() {
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
   });
 
-  const obsBtn = document.getElementById("btn-obsidian");
-  if (exportSettings.obsidianEnabled) {
-    obsBtn.addEventListener("click", async (e) => {
-      const btn = e.currentTarget;
-      const md = buildExportMarkdown();
-      let usedClipboard = false;
-      try { await navigator.clipboard.writeText(md); usedClipboard = true; } catch (_) {}
-      const uri = buildObsidianUri({
-        vault: exportSettings.obsidianVault,
-        folder: exportSettings.obsidianFolder,
-        name: safeTitle,
-        clipboard: usedClipboard,
-        content: usedClipboard ? "" : md
-      });
-      window.open(uri, "_blank");
-      if (!sessionStorage.getItem("_obsidian_hint_shown")) {
-        sessionStorage.setItem("_obsidian_hint_shown", "1");
-        flashButtonLabel(btn, t("obsidianInstallHint"));
+  async function setupSendMenu() {
+    const split = document.getElementById("send-split");
+    if (!split || typeof PBP_EXPORT_TARGETS === "undefined") return;
+
+    // Resolve enabled targets. Back-compat: if exportTargets is empty but the
+    // legacy obsidian* settings exist, synthesize the obsidian row so existing
+    // users keep one-click Obsidian before they re-open the options page.
+    const et = Object.assign({}, exportSettings.exportTargets || {});
+    if (!et.obsidian && (exportSettings.obsidianEnabled || exportSettings.obsidianVault || exportSettings.obsidianFolder)) {
+      et.obsidian = {
+        enabled: !!exportSettings.obsidianEnabled,
+        vault: exportSettings.obsidianVault || "",
+        folder: exportSettings.obsidianFolder || ""
+      };
+    }
+    const enabledIds = pbpExportTargetIds().filter((id) => et[id] && et[id].enabled);
+
+    const primary = document.getElementById("send-primary");
+    const primaryIc = document.getElementById("send-primary-ic");
+    const primaryLabel = document.getElementById("send-primary-label");
+    const caret = document.getElementById("send-caret");
+    const menu = document.getElementById("send-menu");
+
+    if (!enabledIds.length) {
+      split.classList.add("send-empty");
+      primaryIc.innerHTML = "";
+      primaryLabel.textContent = t("mdSendToEllipsis");
+      caret.setAttribute("hidden", "");
+      primary.title = t("mdSendNoneConfigured");
+      primary.addEventListener("click", () => chrome.runtime.openOptionsPage());
+      return;
+    }
+
+    let lastId = await pbpGetLastTarget();
+    if (!enabledIds.includes(lastId)) lastId = enabledIds[0];
+
+    function setPrimary(id) {
+      const row = PBP_EXPORT_TARGETS[id];
+      primary.dataset.targetId = id;
+      primaryIc.innerHTML = row.icon;
+      primaryLabel.textContent = t("mdSendTo").replace("{name}", row.label);
+    }
+    setPrimary(lastId);
+
+    async function doSend(id) {
+      const row = PBP_EXPORT_TARGETS[id];
+      setPrimary(id);
+      await pbpSetLastTarget(id);
+      primary.classList.add("sending");
+      primaryLabel.textContent = t("mdSending");
+      const res = await pbpSendToTarget(id, { meta: buildMeta(), rawBody: getViewMarkdown(), cfg: et[id] });
+      primary.classList.remove("sending");
+      setPrimary(id);
+      if (res.ok) {
+        flashButtonLabel(primary, res.fellBack
+          ? t("mdSendTooLongFellBack")
+          : t("mdSentTo").replace("{name}", row.label));
+      } else if (res.error && res.error.indexOf("missing:") === 0) {
+        flashButtonLabel(primary, t("mdSendNeedsSetup"));
       } else {
-        flashButtonLabel(btn, t("mdSentObsidian"));
+        flashButtonLabel(primary, t("mdSendFailed"));
       }
+    }
+
+    primary.addEventListener("click", () => { if (primary.dataset.targetId) doSend(primary.dataset.targetId); });
+
+    function closeMenu() { menu.setAttribute("hidden", ""); caret.setAttribute("aria-expanded", "false"); }
+    function openMenu() {
+      menu.removeAttribute("hidden");
+      caret.setAttribute("aria-expanded", "true");
+      const f = menu.querySelector(".send-mi");
+      if (f) f.focus();
+    }
+    caret.addEventListener("click", (e) => { e.stopPropagation(); menu.hasAttribute("hidden") ? openMenu() : closeMenu(); });
+    document.addEventListener("click", (e) => { if (!split.contains(e.target)) closeMenu(); });
+    menu.addEventListener("keydown", (e) => {
+      const items = [...menu.querySelectorAll(".send-mi")];
+      const i = items.indexOf(document.activeElement);
+      if (e.key === "Escape") { closeMenu(); caret.focus(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); (items[i + 1] || items[0]).focus(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); (items[i - 1] || items[items.length - 1]).focus(); }
     });
-  } else if (obsBtn) {
-    obsBtn.style.display = "none";
+
+    menu.innerHTML = "";
+    const ordered = [lastId].concat(enabledIds.filter((id) => id !== lastId)); // last-used pinned on top
+    ordered.forEach((id) => {
+      const row = PBP_EXPORT_TARGETS[id];
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "send-mi";
+      item.setAttribute("role", "menuitem");
+      item.dataset.targetId = id;
+      const ic = document.createElement("span");
+      ic.className = "send-mi-ic"; ic.setAttribute("aria-hidden", "true"); ic.innerHTML = row.icon;
+      const lb = document.createElement("span");
+      lb.textContent = row.label;
+      item.appendChild(ic); item.appendChild(lb);
+      if (id === lastId) {
+        const tag = document.createElement("span");
+        tag.className = "send-mi-tag"; tag.textContent = t("mdSendLastUsed");
+        item.appendChild(tag);
+      }
+      item.addEventListener("click", () => { closeMenu(); doSend(id); });
+      menu.appendChild(item);
+    });
+
+    const foot = document.createElement("button");
+    foot.type = "button"; foot.className = "send-mi send-mi-foot"; foot.setAttribute("role", "menuitem");
+    foot.textContent = t("mdManageDestinations");
+    foot.addEventListener("click", () => { closeMenu(); chrome.runtime.openOptionsPage(); });
+    menu.appendChild(foot);
   }
+
+  await setupSendMenu();
 })();
 
 // ---- Copy to clipboard with visual feedback ----
