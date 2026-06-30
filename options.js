@@ -883,6 +883,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ===================== Auto-save =====================
   // Collect all settings from the form and save to chrome.storage.sync
   async function saveAll() {
+    const _ets = collectExportTargets();
     const data = {
       // Bookmarks
       pinboardToken: obfuscateKey($id("opt-pinboard-token").value.trim()),
@@ -965,7 +966,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       mdExportFrontmatter: $id("opt-md-frontmatter").checked,
       mdExportImagePolicy: $id("opt-md-image-policy").value,
       mdExportIncludeToc: $id("opt-md-include-toc").checked,
-      exportTargets: collectExportTargets(),
+      exportTargets: _ets,
+      // Mirror obsidian into legacy keys so popup.js "Send to Obsidian" strip (which still
+      // reads obsidianEnabled/Vault/Folder) stays in sync. P2 migrates popup to read exportTargets.
+      obsidianEnabled: !!(_ets.obsidian && _ets.obsidian.enabled),
+      obsidianVault: (_ets.obsidian && _ets.obsidian.vault) || "",
+      obsidianFolder: (_ets.obsidian && _ets.obsidian.folder) || "",
       // Preview-page AI (md-preview explain / ask / translate)
       previewAiEnabled: $id("opt-preview-ai-enabled").checked,
       previewAiModel: $id("opt-preview-ai-model").value.trim(),

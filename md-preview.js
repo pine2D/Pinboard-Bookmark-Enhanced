@@ -515,11 +515,13 @@ function ensureKatex() {
       const row = PBP_EXPORT_TARGETS[id];
       setPrimary(id);
       await pbpSetLastTarget(id);
+      const _exp = buildExportOpts();
+      const _sendBody = composeExport(getViewMarkdown(), buildMeta(), { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc });
       primary.classList.add("sending");
       primaryLabel.textContent = t("mdSending");
       let res;
       try {
-        res = await pbpSendToTarget(id, { meta: buildMeta(), rawBody: getViewMarkdown(), cfg: et[id] });
+        res = await pbpSendToTarget(id, { meta: buildMeta(), rawBody: _sendBody, cfg: et[id] });
       } catch (_) {
         res = { ok: false, fellBack: false, error: "" };
       }
