@@ -37,6 +37,7 @@ section("pbpStripFrontmatter");
 assertEq(pbpStripFrontmatter("---\ntitle: X\n---\n\nbody"), "body", "strips a leading YAML block");
 assertEq(pbpStripFrontmatter("no frontmatter"), "no frontmatter", "no-op when absent");
 assertEq(pbpStripFrontmatter(pbpStripFrontmatter("---\na: b\n---\nx")), "x", "idempotent");
+assertEq(pbpStripFrontmatter("---\ntitle: X\n---"), "", "strips a closing --- with no trailing newline");
 
 section("pbpToLogseqProps");
 assertEq(pbpToLogseqProps({ title: "T", url: "U", date: "D", tags: ["a","b"] }),

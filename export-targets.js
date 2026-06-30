@@ -13,7 +13,7 @@ const PBP_URI_BUDGET = 1800;
 // no-op when absent. (rawBody from getViewMarkdown() is already YAML-free; this
 // guards callers that pass a frontmattered string.)
 function pbpStripFrontmatter(md) {
-  return String(md == null ? "" : md).replace(/^﻿?---\r?\n[\s\S]*?\r?\n---\r?\n\r?\n?/, "");
+  return String(md == null ? "" : md).replace(/^﻿?---\r?\n[\s\S]*?\r?\n---(?:\r?\n\r?\n?)?/, "");
 }
 
 // meta {title,url,date,tags[]} -> Logseq first-block page properties (no YAML).
