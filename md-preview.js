@@ -517,14 +517,19 @@ function ensureKatex() {
       await pbpSetLastTarget(id);
       primary.classList.add("sending");
       primaryLabel.textContent = t("mdSending");
-      const res = await pbpSendToTarget(id, { meta: buildMeta(), rawBody: getViewMarkdown(), cfg: et[id] });
+      let res;
+      try {
+        res = await pbpSendToTarget(id, { meta: buildMeta(), rawBody: getViewMarkdown(), cfg: et[id] });
+      } catch (_) {
+        res = { ok: false, fellBack: false, error: "" };
+      }
       primary.classList.remove("sending");
       setPrimary(id);
       if (res.ok) {
         flashButtonLabel(primary, res.fellBack
           ? t("mdSendTooLongFellBack")
           : t("mdSentTo").replace("{name}", row.label));
-      } else if (res.error && res.error.indexOf("missing:") === 0) {
+      } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {
         flashButtonLabel(primary, t("mdSendNeedsSetup"));
       } else {
         flashButtonLabel(primary, t("mdSendFailed"));
