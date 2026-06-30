@@ -50,6 +50,48 @@ assert(PBP_EXPORT_TARGETS.obsidian.mechanism === "url-scheme", "obsidian is url-
 assert(PBP_EXPORT_TARGETS.obsidian.viaClipboard === true, "obsidian uses clipboard");
 assert(PBP_URI_BUDGET === 1800, "budget constant");
 
+section("logseq.buildUri");
+{
+  const uri = PBP_EXPORT_TARGETS.logseq.buildUri(
+    { title: "Hello World", url: "https://e.com/a b", tags: ["dev","read later"] },
+    "the body", {});
+  assert(uri.startsWith("logseq://x-callback-url/quickCapture?"), "logseq scheme + action");
+  assert(uri.includes("title=Hello%20World"), "encodes title");
+  assert(uri.includes("page=TODAY&append=true"), "deterministic landing + append");
+  assert(decodeURIComponent(uri.split("content=")[1].split("&")[0]).includes("#read-later"),
+    "spaces in tags become hyphenated #tags");
+}
+
+section("logseq file body — map policy");
+{
+  const body = pbpBuildFileBody("logseq", { title: "T", url: "U", tags: ["a"] }, "para");
+  assert(body.startsWith("title:: T\nurl:: U\ntags:: a"), "map emits key:: props, no YAML");
+  assert(body.includes("para"), "keeps the body");
+  assert(!body.includes("---"), "no YAML fences in map policy");
+}
+
+section("capacities.buildUri");
+{
+  const uri = PBP_EXPORT_TARGETS.capacities.buildUri(
+    { title: "Clip" }, "body", { spaceId: "sp-123", type: "Weblink" });
+  assert(uri.startsWith("capacities://x-callback-url/createNewObject?"), "capacities scheme");
+  assert(uri.includes("name=Clip") && uri.includes("title=Clip"), "sends BOTH name and title");
+  assert(uri.includes("type=Weblink") && uri.includes("spaceId=sp-123"), "type + spaceId");
+  assert(uri.includes("x-source=Pinboard"), "x-source attribution");
+}
+{
+  const uri = PBP_EXPORT_TARGETS.capacities.buildUri({ title: "T" }, "b", {});
+  assert(!uri.includes("spaceId="), "omits spaceId when not configured");
+}
+
+section("capacities file body — strip policy");
+assertEq(pbpBuildFileBody("capacities", { title: "T" }, "already-clean body"),
+  "already-clean body", "strip policy returns the raw body unchanged");
+
+section("pbpUriTooLong");
+assert(pbpUriTooLong("x".repeat(1801)) === true, "over budget");
+assert(pbpUriTooLong("x".repeat(10)) === false, "under budget");
+
 section("pbpBuildFileBody — inline (obsidian)");
 {
   const out = pbpBuildFileBody("obsidian", { title: "T", url: "U", date: "D", tags: ["x"] }, "body text");
