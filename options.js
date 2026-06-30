@@ -286,18 +286,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       card.appendChild(enableLabel);
 
       (row.settings || []).forEach((s) => {
-        if (s.type !== "text") return; // P1 has only text fields
+        if (s.type !== "text" && s.type !== "secret") return;
         const wrap = document.createElement("div");
         wrap.className = "et-field";
         const lab = document.createElement("label");
         lab.className = "bl";
         lab.textContent = t(s.label);
         const inp = document.createElement("input");
-        inp.type = "text"; inp.autocomplete = "off";
+        inp.type = s.type === "secret" ? "password" : "text";
+        inp.autocomplete = "off";
         inp.id = id + "-" + s.key;
         lab.htmlFor = inp.id;
         inp.dataset.et = id + "." + s.key;
-        inp.value = cfg[s.key] || "";
+        if (s.type === "secret") {
+          inp.dataset.secret = "1";
+          inp.value = (typeof deobfuscateKey === "function") ? deobfuscateKey(cfg[s.key] || "") : (cfg[s.key] || "");
+        } else {
+          inp.value = cfg[s.key] || "";
+        }
         if (s.placeholder) inp.placeholder = s.placeholder;
         wrap.appendChild(lab); wrap.appendChild(inp);
         card.appendChild(wrap);
@@ -327,7 +333,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.querySelectorAll("#export-targets [data-et]").forEach((el) => {
       const [id, key] = el.dataset.et.split(".", 2);
       if (!out[id]) out[id] = {};
-      out[id][key] = el.type === "checkbox" ? el.checked : el.value.trim();
+      if (el.dataset.secret) out[id][key] = (typeof obfuscateKey === "function") ? obfuscateKey(el.value.trim()) : el.value.trim();
+      else out[id][key] = el.type === "checkbox" ? el.checked : el.value.trim();
     });
     return out;
   }

@@ -71,6 +71,21 @@ section("logseq file body — map policy");
 }
 
 
+section("logseq.buildRequest (HTTP API)");
+{
+  const req = PBP_EXPORT_TARGETS.logseq.buildRequest({ title: "T", url: "U", date: "D", tags: ["a b"] }, "the body", { page: "P", port: "9999" }, "tok123");
+  assert(req.url === "http://127.0.0.1:9999/api", "uses configured port");
+  assert(req.headers.Authorization === "Bearer tok123", "bearer token header");
+  const parsed = JSON.parse(req.body);
+  assert(parsed.method === "logseq.Editor.appendBlockInPage", "appendBlockInPage method");
+  assert(parsed.args[0] === "P", "configured page name");
+  assert(parsed.args[1].includes("the body") && parsed.args[1].includes("#a-b"), "content has body + hyphenated tag");
+}
+{
+  const req = PBP_EXPORT_TARGETS.logseq.buildRequest({ title: "T" }, "b", {}, "x");
+  assert(req.url === "http://127.0.0.1:12315/api", "default port 12315");
+}
+
 section("pbpUriTooLong");
 assert(pbpUriTooLong("x".repeat(2001)) === true, "over budget");
 assert(pbpUriTooLong("x".repeat(10)) === false, "under budget");

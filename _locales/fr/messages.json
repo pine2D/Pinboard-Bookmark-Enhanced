@@ -2256,7 +2256,13 @@
   "mdManageDestinations": {
     "message": "Gérer les destinations →"
   },
+  "mdTargetLogseqToken": { "message": "Logseq HTTP API token" },
+  "mdTargetLogseqPage": { "message": "Target page" },
+  "mdTargetLogseqPort": { "message": "Port" },
+  "mdSendLogseqDown": { "message": "Can't reach Logseq. Open the desktop app and enable Settings → Features → HTTP APIs server. Full text copied to clipboard — paste to finish." },
+  "mdSendLogseqBadToken": { "message": "Logseq rejected the token. Re-copy it from the HTTP APIs server panel. Full text copied to clipboard." },
+  "mdSendLogseqApiFailed": { "message": "Logseq couldn't save this. Full text copied to clipboard — paste to finish." },
   "mdTargetLogseqOnboarding": {
-    "message": "Installez l’application de bureau Logseq et ouvrez un graphe une fois (cela enregistre le gestionnaire logseq://). Les clips atterrissent sur la page du journal du jour."
+    "message": "Optional one-click: in Logseq desktop, Settings → Features → enable 'HTTP APIs server', create a token, and keep the app running, then paste the token here. Without a token, clips open via the logseq:// link (short clips; long ones copy to clipboard)."
   }
 }

@@ -97,7 +97,39 @@ const PBP_EXPORT_TARGETS = {
         "&url=" + enc(meta.url || "") + "&content=" + enc(content) +
         "&page=TODAY&append=true";
     },
-    settings: [],
+    // --- Logseq local HTTP API (used when cfg.token is set) ---
+    origin: "http://127.0.0.1/*",
+    buildRequest(meta, body, cfg, token) {
+      cfg = cfg || {}; meta = meta || {};
+      const port = String(cfg.port || "12315");
+      const page = cfg.page || "Clipped from Web";
+      const tagLine = (Array.isArray(meta.tags) && meta.tags.length)
+        ? meta.tags.map((t) => "#" + String(t).replace(/\s+/g, "-")).join(" ") : "";
+      const content = "## " + (meta.title || "") + "\n" +
+        (meta.url ? "Source: " + meta.url + "\n" : "") +
+        (meta.date ? "Date: " + meta.date + "\n" : "") +
+        (tagLine ? tagLine + "\n" : "") + "\n" + String(body || "");
+      return {
+        url: "http://127.0.0.1:" + port + "/api",
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify({ method: "logseq.Editor.appendBlockInPage", args: [page, content] })
+      };
+    },
+    precheckRequest(cfg, token) {
+      const port = String((cfg && cfg.port) || "12315");
+      return {
+        url: "http://127.0.0.1:" + port + "/api",
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify({ method: "logseq.App.getUserConfigs" })
+      };
+    },
+    settings: [
+      { key: "token", type: "secret", label: "mdTargetLogseqToken" },
+      { key: "page", type: "text", label: "mdTargetLogseqPage", placeholder: "Clipped from Web" },
+      { key: "port", type: "text", label: "mdTargetLogseqPort", placeholder: "12315" }
+    ],
     onboarding: "mdTargetLogseqOnboarding"
   }
 };

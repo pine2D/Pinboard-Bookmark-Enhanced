@@ -546,6 +546,12 @@ function ensureKatex() {
         showSendStatus(t("mdSendTooLongFellBack").replace("{name}", row.label), false); // long -> roomy block
       } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {
         showSendStatus(t("mdSendNeedsSetup"), false);
+      } else if (res.error === "logseq-down") {
+        showSendStatus(t("mdSendLogseqDown"), true);
+      } else if (res.error === "logseq-token") {
+        showSendStatus(t("mdSendLogseqBadToken"), true);
+      } else if (res.error === "logseq-api") {
+        showSendStatus(t("mdSendLogseqApiFailed"), true);
       } else {
         showSendStatus(t("mdSendFailed"), true);
       }

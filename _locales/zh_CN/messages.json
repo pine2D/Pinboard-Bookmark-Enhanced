@@ -2256,7 +2256,13 @@
   "mdManageDestinations": {
     "message": "管理目标 →"
   },
+  "mdTargetLogseqToken": { "message": "Logseq HTTP API 令牌" },
+  "mdTargetLogseqPage": { "message": "目标页面" },
+  "mdTargetLogseqPort": { "message": "端口" },
+  "mdSendLogseqDown": { "message": "无法连接 Logseq。请打开桌面应用并启用 设置 → 功能 → HTTP APIs server。已复制全文到剪贴板——粘贴即可完成。" },
+  "mdSendLogseqBadToken": { "message": "Logseq 拒绝了令牌。请从 HTTP APIs server 面板重新复制。已复制全文到剪贴板。" },
+  "mdSendLogseqApiFailed": { "message": "Logseq 未能保存。已复制全文到剪贴板——粘贴即可完成。" },
   "mdTargetLogseqOnboarding": {
-    "message": "安装 Logseq 桌面版并打开一个图谱（这会注册 logseq:// 协议）。剪藏会写入当天的日记页。"
+    "message": "可选一键直送：在 Logseq 桌面版中，设置 → 功能 → 启用「HTTP APIs server」，创建令牌并保持应用运行，然后将令牌粘贴到此处。未配置令牌时，剪藏会通过 logseq:// 链接打开（短内容直接写入；长内容复制到剪贴板）。"
   }
 }

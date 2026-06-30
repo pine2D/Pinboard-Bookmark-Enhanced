@@ -34,6 +34,43 @@ async function pbpSendToTarget(id, ctx) {
   if (missing) return { ok: false, fellBack: false, error: "missing:" + missing.key };
 
   try {
+    // Token-API path: used when the target supports it AND the user configured a token.
+    if (row.buildRequest && cfg.token) {
+      const token = (typeof deobfuscateKey === "function") ? deobfuscateKey(cfg.token) : cfg.token;
+      // Ensure host permission (this runs inside the user's click gesture).
+      try {
+        const has = await chrome.permissions.contains({ origins: [row.origin] });
+        if (!has) {
+          const granted = await chrome.permissions.request({ origins: [row.origin] });
+          if (!granted) return { ok: false, fellBack: false, error: "logseq-down" };
+        }
+      } catch (_) {}
+      // Helper: on API failure, copy full body to clipboard so content is never lost.
+      const apiFail = async (errCode) => {
+        try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_) {}
+        return { ok: false, fellBack: false, error: errCode };
+      };
+      // Liveness/token precheck.
+      if (row.precheckRequest) {
+        try {
+          const pr = row.precheckRequest(cfg, token);
+          const presp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body });
+          if (presp.status === 401) return apiFail("logseq-token");
+          if (!presp.ok) return apiFail("logseq-down");
+        } catch (_) { return apiFail("logseq-down"); }
+      }
+      // Send.
+      try {
+        const req = row.buildRequest(meta, rawBody, cfg, token);
+        const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body });
+        if (resp.status === 401) return apiFail("logseq-token");
+        if (!resp.ok) return apiFail("logseq-api");
+        const json = await resp.json().catch(() => null);
+        if (json && json.uuid) return { ok: true, fellBack: false, error: null };
+        return apiFail("logseq-api");
+      } catch (_) { return apiFail("logseq-down"); }
+    }
+
     if (row.mechanism === "url-scheme") {
       if (row.viaClipboard) {
         // Body rides the clipboard; the URI references it (never too long).
