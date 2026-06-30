@@ -226,6 +226,14 @@ html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--
 .pf.hidden { display: none; }
 .pf h3 { font-size: 12px; color: #555; margin-bottom: 8px; font-weight: bold; }
 
+/* ---- Markdown export targets (Send-to destination cards) ---- */
+.et-field { margin-top: 8px; }
+.et-onboarding { margin-top: 8px; font-size: 12px; color: #555; }
+.et-onboarding summary { cursor: pointer; padding: 4px 0; color: #4477bb; user-select: none; }
+.et-onboarding summary:hover { text-decoration: underline; }
+.et-onboarding[open] summary { margin-bottom: 4px; }
+.et-onboarding .hint { margin: 0; }
+
 /* ---- Accordion ---- */
 .accordion-section { border-bottom: 1px solid #e8e8e8; }
 .accordion-section:last-child { border-bottom: none; }
@@ -645,6 +653,8 @@ html[data-theme] .btn { background: var(--opt-btn-bg); border-color: var(--opt-b
 html[data-theme] .btn:hover { background: var(--opt-btn-hover); }
 html[data-theme] .pf { background: var(--opt-pf-bg); border-color: var(--opt-border); }
 html[data-theme] .pf h3 { color: var(--opt-fg-muted); }
+html[data-theme] .et-onboarding { color: var(--opt-fg-muted); }
+html[data-theme] .et-onboarding summary { color: var(--opt-accent); }
 html[data-theme] .section-title { color: var(--opt-fg-muted); }
 html[data-theme] .save-status { color: var(--opt-save); }
 html[data-theme] .auto-save-hint { color: var(--opt-fg-hint); }

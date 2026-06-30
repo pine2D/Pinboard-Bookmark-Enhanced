@@ -259,8 +259,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     pbpExportTargetIds().forEach((id) => {
       const row = PBP_EXPORT_TARGETS[id];
       const cfg = exportTargets[id] || {};
+
+      const sec = document.createElement("div");
+      sec.className = "accordion-section";
+      const head = document.createElement("div");
+      head.className = "accordion-header";
+      head.dataset.target = "et-" + id;
+      const arrow = document.createElement("span");
+      arrow.className = "accordion-arrow";
+      const titleEl = document.createElement("span");
+      titleEl.textContent = row.label;
+      head.appendChild(arrow); head.appendChild(document.createTextNode(" ")); head.appendChild(titleEl);
+
       const card = document.createElement("div");
-      card.className = "fg export-target-card";
+      card.className = "accordion-body export-target-card";
+      card.id = "et-" + id;
 
       const enableLabel = document.createElement("label");
       const cb = document.createElement("input");
@@ -301,8 +314,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         det.appendChild(sum); det.appendChild(p);
         card.appendChild(det);
       }
-      host.appendChild(card);
+      sec.appendChild(head); sec.appendChild(card);
+      host.appendChild(sec);
     });
+    pbpAccRestore(host);
   }
 
   // Collect the rendered target cards back into an exportTargets object.
@@ -403,10 +418,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- Accordion sections ----
-  document.querySelectorAll(".accordion-header").forEach((header) => {
-    header.addEventListener("click", () => {
-      header.closest(".accordion-section").classList.toggle("open");
+  // Accordion expand/collapse state, persisted device-locally (localStorage = synchronous
+  // read at render = no open->collapse flash; same class as pp-i18n-* / pp-options-fields).
+  const PP_ACC_KEY = "pp-acc";
+  function pbpAccState() { try { return JSON.parse(localStorage.getItem(PP_ACC_KEY)) || {}; } catch (_) { return {}; } }
+  function pbpAccSet(key, open) { const m = pbpAccState(); m[key] = open; try { localStorage.setItem(PP_ACC_KEY, JSON.stringify(m)); } catch (_) {} }
+  // Apply persisted open/closed to every accordion-section that has a header data-target.
+  function pbpAccRestore(root) {
+    (root || document).querySelectorAll(".accordion-section").forEach((sec) => {
+      const head = sec.querySelector(".accordion-header[data-target]");
+      if (!head) return;
+      const st = pbpAccState()[head.dataset.target];
+      if (st === true) sec.classList.add("open");
+      else if (st === false) sec.classList.remove("open");
+      // st === undefined -> leave the HTML default (.open or not)
     });
+  }
+  // Event delegation handles both static and dynamically-created accordion headers.
+  document.addEventListener("click", (e) => {
+    const header = e.target.closest(".accordion-header");
+    if (!header) return;
+    const sec = header.closest(".accordion-section");
+    if (!sec) return;
+    const isOpen = sec.classList.toggle("open");
+    const key = header.dataset.target;
+    if (key) pbpAccSet(key, isOpen);
   });
 
   // ---- API key show/hide toggle ----
@@ -587,6 +623,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     _et.obsidian = { enabled: !!s.obsidianEnabled, vault: s.obsidianVault || "", folder: s.obsidianFolder || "" };
   }
   renderExportTargets(_et);
+  pbpAccRestore(document); // restore all accordion states (static quick-actions + export targets)
 
   // ---- Fill checkbox fields ----
   const checkMap = {
@@ -763,6 +800,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     sessionStorage.setItem("activeTab", activePanel);
     document.body.style.transition = "opacity 0.18s";
     document.body.style.opacity = "0";
+    // Prime the i18n mirror BEFORE reload so the reload's SYNC read is fresh —
+    // otherwise renderExportTargets() and other t()-at-build-time labels paint the
+    // PREVIOUS language (the mirror is normally written only after the async fetch).
+    try {
+      if (lang === "auto") {
+        localStorage.setItem("pp-i18n-lang", "auto");
+        localStorage.removeItem("pp-i18n-msgs");
+      } else {
+        const _r = await fetch(chrome.runtime.getURL(`_locales/${lang}/messages.json`));
+        if (_r.ok) {
+          localStorage.setItem("pp-i18n-lang", lang);
+          localStorage.setItem("pp-i18n-msgs", JSON.stringify(await _r.json()));
+        }
+      }
+    } catch (_) {}
     setTimeout(() => location.reload(), 180);
   });
   // Real-time switch when theme dropdown changes (affects options-page theme + preset preview)
