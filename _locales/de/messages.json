@@ -2091,7 +2091,9 @@
       }
     }
   },
-  "trExtracting": { "message": "Terminologie wird extrahiert…" },
+  "trExtracting": {
+    "message": "Terminologie wird extrahiert…"
+  },
   "trBlockFailed": {
     "message": "Übersetzung dieses Absatzes fehlgeschlagen"
   },
@@ -2210,60 +2212,60 @@
     "message": "Aus"
   },
   "secSendDestinations": {
-    "message": "Send-to Destinations"
+    "message": "Sendeziele"
   },
   "secSendDestinationsHint": {
-    "message": "Each enabled destination appears in the preview page's \"Send to\" menu."
+    "message": "Jedes aktivierte Ziel erscheint im „Senden an“-Menü der Vorschauseite."
   },
   "mdSendEnableTo": {
-    "message": "Enable export to {name}"
+    "message": "Export nach {name} aktivieren"
   },
   "mdSendHowToSetUp": {
-    "message": "How to set up"
+    "message": "Einrichtung"
   },
   "mdSendChoose": {
-    "message": "Choose destination"
+    "message": "Ziel auswählen"
   },
   "mdSendTo": {
-    "message": "Send to {name}"
+    "message": "Senden an {name}"
   },
   "mdSendToEllipsis": {
-    "message": "Send to…"
+    "message": "Senden an…"
   },
   "mdSentTo": {
-    "message": "Sent to {name}"
+    "message": "Gesendet an {name}"
   },
   "mdSending": {
-    "message": "Sending…"
+    "message": "Wird gesendet…"
   },
   "mdSendLastUsed": {
-    "message": "last used"
+    "message": "zuletzt verwendet"
   },
   "mdSendTooLongFellBack": {
-    "message": "Too long for a link — downloaded .md + copied to clipboard"
+    "message": "Zu lang für einen direkten Link — vollständiger Text kopiert. In {name} einfügen (Ctrl+V), um den Vorgang abzuschließen."
   },
   "mdSendNeedsSetup": {
-    "message": "Finish setup in Settings"
+    "message": "Einrichtung in den Einstellungen abschließen"
   },
   "mdSendFailed": {
-    "message": "Send failed"
+    "message": "Senden fehlgeschlagen"
   },
   "mdSendNoneConfigured": {
-    "message": "No destinations enabled — add one in Settings"
+    "message": "Keine Ziele aktiviert — eines in den Einstellungen hinzufügen"
   },
   "mdManageDestinations": {
-    "message": "Manage destinations →"
+    "message": "Ziele verwalten →"
   },
   "mdTargetCapacitiesSpaceId": {
-    "message": "Capacities space ID"
+    "message": "Capacities-Bereichs-ID"
   },
   "mdTargetCapacitiesType": {
-    "message": "Object type"
+    "message": "Objekttyp"
   },
   "mdTargetLogseqOnboarding": {
-    "message": "Install the Logseq desktop app and open a graph once (this registers the logseq:// handler). Clips land on today's journal page."
+    "message": "Installiere die Logseq-Desktop-App und öffne einmal einen Graphen (dadurch wird der logseq://-Handler registriert). Clips landen auf der heutigen Tagebuchseite."
   },
   "mdTargetCapacitiesOnboarding": {
-    "message": "In Capacities, open a space and copy its space ID. Paste it here. The object type must match a singular type name in your space (default: Weblink)."
+    "message": "Öffne in Capacities einen Bereich und kopiere dessen Bereichs-ID. Füge sie hier ein. Der Objekttyp muss einem einzelnen Typnamen in deinem Bereich entsprechen (Standard: Weblink)."
   }
 }

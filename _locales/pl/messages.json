@@ -2091,7 +2091,9 @@
       }
     }
   },
-  "trExtracting": { "message": "Wyodrębnianie terminologii…" },
+  "trExtracting": {
+    "message": "Wyodrębnianie terminologii…"
+  },
   "trBlockFailed": {
     "message": "Tłumaczenie tego akapitu nie powiodło się"
   },
@@ -2210,60 +2212,60 @@
     "message": "Wyłączone"
   },
   "secSendDestinations": {
-    "message": "Send-to Destinations"
+    "message": "Miejsca docelowe"
   },
   "secSendDestinationsHint": {
-    "message": "Each enabled destination appears in the preview page's \"Send to\" menu."
+    "message": "Każde włączone miejsce docelowe pojawia się w menu „Wyślij do“ na stronie podglądu."
   },
   "mdSendEnableTo": {
-    "message": "Enable export to {name}"
+    "message": "Włącz eksport do {name}"
   },
   "mdSendHowToSetUp": {
-    "message": "How to set up"
+    "message": "Jak skonfigurować"
   },
   "mdSendChoose": {
-    "message": "Choose destination"
+    "message": "Wybierz miejsce docelowe"
   },
   "mdSendTo": {
-    "message": "Send to {name}"
+    "message": "Wyślij do {name}"
   },
   "mdSendToEllipsis": {
-    "message": "Send to…"
+    "message": "Wyślij do…"
   },
   "mdSentTo": {
-    "message": "Sent to {name}"
+    "message": "Wysłano do {name}"
   },
   "mdSending": {
-    "message": "Sending…"
+    "message": "Wysyłanie…"
   },
   "mdSendLastUsed": {
-    "message": "last used"
+    "message": "ostatnio używane"
   },
   "mdSendTooLongFellBack": {
-    "message": "Too long for a link — downloaded .md + copied to clipboard"
+    "message": "Za długi na bezpośredni link — skopiowano pełny tekst. Wklej do {name} (Ctrl+V), aby zakończyć."
   },
   "mdSendNeedsSetup": {
-    "message": "Finish setup in Settings"
+    "message": "Dokończ konfigurację w Ustawieniach"
   },
   "mdSendFailed": {
-    "message": "Send failed"
+    "message": "Wysyłanie nie powiodło się"
   },
   "mdSendNoneConfigured": {
-    "message": "No destinations enabled — add one in Settings"
+    "message": "Brak włączonych miejsc docelowych — dodaj jedno w Ustawieniach"
   },
   "mdManageDestinations": {
-    "message": "Manage destinations →"
+    "message": "Zarządzaj miejscami docelowymi →"
   },
   "mdTargetCapacitiesSpaceId": {
-    "message": "Capacities space ID"
+    "message": "ID przestrzeni Capacities"
   },
   "mdTargetCapacitiesType": {
-    "message": "Object type"
+    "message": "Typ obiektu"
   },
   "mdTargetLogseqOnboarding": {
-    "message": "Install the Logseq desktop app and open a graph once (this registers the logseq:// handler). Clips land on today's journal page."
+    "message": "Zainstaluj aplikację Logseq na komputerze i otwórz raz graf (rejestruje to procedurę obsługi logseq://). Klipy trafiają na dzisiejszą stronę dziennika."
   },
   "mdTargetCapacitiesOnboarding": {
-    "message": "In Capacities, open a space and copy its space ID. Paste it here. The object type must match a singular type name in your space (default: Weblink)."
+    "message": "W Capacities otwórz przestrzeń i skopiuj jej ID. Wklej tutaj. Typ obiektu musi odpowiadać nazwie jednego typu w twojej przestrzeni (domyślnie: Weblink)."
   }
 }
