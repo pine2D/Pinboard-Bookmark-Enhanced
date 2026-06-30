@@ -612,6 +612,34 @@ body.md-empty main { margin-left: 0; }
 /* Send-to-Obsidian: full-width action below the Copy/Download grid */
 .obsidian-btn { width: 100%; justify-content: center; margin-top: 8px; }
 
+/* ---- Send-to split button (replaces .obsidian-btn) ---- */
+.send-split { position: relative; display: flex; margin-top: 8px; }
+.send-primary { flex: 1; justify-content: flex-start; gap: 7px;
+  border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.send-primary .send-ic { display: inline-flex; width: 14px; height: 14px; flex: 0 0 14px; }
+.send-primary .send-ic svg { width: 14px; height: 14px; }
+.send-caret { flex: 0 0 30px; justify-content: center; margin-left: -1px;
+  border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.send-caret[hidden] { display: none; }
+.send-tri { width: 0; height: 0;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid currentColor; }
+.send-empty .send-primary { justify-content: center;
+  border-top-right-radius: 6px; border-bottom-right-radius: 6px; opacity: .85; }
+.send-menu { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
+  background: var(--bg, #fff); border: 1px solid var(--border, #d8dee4); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 4px; max-height: 320px; overflow: auto; }
+.send-menu[hidden] { display: none; }
+.send-mi { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px;
+  background: none; border: 0; border-radius: 6px; font: inherit; color: inherit;
+  text-align: left; cursor: pointer; }
+.send-mi:hover, .send-mi:focus-visible { background: var(--row-hover, rgba(127,127,127,.14)); outline: none; }
+.send-mi-ic { display: inline-flex; width: 14px; height: 14px; flex: 0 0 14px; }
+.send-mi-ic svg { width: 14px; height: 14px; }
+.send-mi-tag { margin-left: auto; font-size: 10px; opacity: .6; }
+.send-mi-foot { border-top: 1px solid var(--border, #d8dee4); margin-top: 4px;
+  border-radius: 0; opacity: .8; font-size: 12px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

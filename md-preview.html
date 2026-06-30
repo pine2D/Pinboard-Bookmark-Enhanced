@@ -65,10 +65,18 @@
           </button>
         </div>
       </div>
-      <button id="btn-obsidian" class="action-btn obsidian-btn" aria-label="Send to Obsidian" data-i18n-aria="mdSendObsidian">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>
-        <span class="btn-label" data-i18n="mdSendObsidian">Send to Obsidian</span>
-      </button>
+      <div class="send-split" id="send-split">
+        <button id="send-primary" class="action-btn send-primary" type="button">
+          <span class="send-ic" id="send-primary-ic" aria-hidden="true"></span>
+          <span class="btn-label" id="send-primary-label">Send to…</span>
+        </button>
+        <button id="send-caret" class="action-btn send-caret" type="button"
+                aria-haspopup="menu" aria-expanded="false"
+                aria-label="Choose destination" data-i18n-aria="mdSendChoose">
+          <span class="send-tri" aria-hidden="true"></span>
+        </button>
+        <div id="send-menu" class="send-menu" role="menu" hidden></div>
+      </div>
     </div>
     <nav id="toc" class="toc rail-section" aria-label="Table of contents" hidden>
       <div class="rail-label" data-i18n="mdTocContents">Contents</div>
