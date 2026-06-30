@@ -34,7 +34,11 @@ async function pbpSendToTarget(id, ctx) {
   if (missing) return { ok: false, fellBack: false, error: "missing:" + missing.key };
 
   try {
-    // Token-API path: used when the target supports it AND the user configured a token.
+    // Token-API path (reusable scaffolding for token-authenticated targets):
+    // used when a row exposes buildRequest AND the user configured a token.
+    // No row ships this today; kept as the template for future cloud-API
+    // targets — generic shape: permission -> precheck ->
+    // optional preRequest -> request, with a clipboard-safe failure fallback.
     if (row.buildRequest && cfg.token) {
       const token = (typeof deobfuscateKey === "function") ? deobfuscateKey(cfg.token) : cfg.token;
       // Ensure host permission (this runs inside the user's click gesture).
@@ -42,7 +46,7 @@ async function pbpSendToTarget(id, ctx) {
         const has = await chrome.permissions.contains({ origins: [row.origin] });
         if (!has) {
           const granted = await chrome.permissions.request({ origins: [row.origin] });
-          if (!granted) return { ok: false, fellBack: false, error: "logseq-down" };
+          if (!granted) return { ok: false, fellBack: false, error: "api-down" };
         }
       } catch (_) {}
       // Helper: on API failure, copy full body to clipboard so content is never lost.
@@ -55,12 +59,12 @@ async function pbpSendToTarget(id, ctx) {
         try {
           const pr = row.precheckRequest(cfg, token);
           const presp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body });
-          if (presp.status === 401) return apiFail("logseq-token");
-          if (!presp.ok) return apiFail("logseq-down");
-        } catch (_) { return apiFail("logseq-down"); }
+          if (presp.status === 401) return apiFail("api-token");
+          if (!presp.ok) return apiFail("api-down");
+        } catch (_) { return apiFail("api-down"); }
       }
-      // Best-effort: create the per-article page and navigate Logseq to it.
-      // If this fails, appendBlockInPage below still auto-creates the page (no navigation).
+      // Best-effort pre-request (e.g. create the target container/page).
+      // Failures are swallowed — the main request below is the source of truth.
       if (row.preRequest) {
         try {
           const prq = row.preRequest(meta, cfg, token);
@@ -71,12 +75,14 @@ async function pbpSendToTarget(id, ctx) {
       try {
         const req = row.buildRequest(meta, rawBody, cfg, token);
         const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body });
-        if (resp.status === 401) return apiFail("logseq-token");
-        if (!resp.ok) return apiFail("logseq-api");
+        if (resp.status === 401) return apiFail("api-token");
+        if (!resp.ok) return apiFail("api-failed");
         const json = await resp.json().catch(() => null);
-        if (json && json.uuid) return { ok: true, fellBack: false, error: null };
-        return apiFail("logseq-api");
-      } catch (_) { return apiFail("logseq-down"); }
+        // ponytail: success heuristic (truthy id/uuid). Per-target rows can
+        // refine this when a real cloud-API target lands.
+        if (json && (json.uuid || json.id)) return { ok: true, fellBack: false, error: null };
+        return apiFail("api-failed");
+      } catch (_) { return apiFail("api-down"); }
     }
 
     if (row.mechanism === "url-scheme") {

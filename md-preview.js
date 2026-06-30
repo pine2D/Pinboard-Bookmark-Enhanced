@@ -477,7 +477,7 @@ function ensureKatex() {
     if (_sendMenuCtl) _sendMenuCtl.abort();
     _sendMenuCtl = new AbortController();
     const _sig = _sendMenuCtl.signal;
-    // Re-read the send-related settings fresh so an options change (fixed Logseq token,
+    // Re-read the send-related settings fresh so an options change (fixed token,
     // enabled/disabled target, changed vault/folder) is reflected WITHOUT reopening the preview.
     try {
       const _fresh = await settingsArea.get({ exportTargets: {}, obsidianEnabled: false, obsidianVault: "", obsidianFolder: "" });
@@ -565,12 +565,12 @@ function ensureKatex() {
         showSendStatus(t("mdSendTooLongFellBack").replace("{name}", row.label), false); // long -> roomy block
       } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {
         showSendStatus(t("mdSendNeedsSetup"), false);
-      } else if (res.error === "logseq-down") {
-        showSendStatus(t("mdSendLogseqDown"), true);
-      } else if (res.error === "logseq-token") {
-        showSendStatus(t("mdSendLogseqBadToken"), true);
-      } else if (res.error === "logseq-api") {
-        showSendStatus(t("mdSendLogseqApiFailed"), true);
+      } else if (res.error === "api-down") {
+        showSendStatus(t("mdSendApiDown"), true);
+      } else if (res.error === "api-token") {
+        showSendStatus(t("mdSendApiBadToken"), true);
+      } else if (res.error === "api-failed") {
+        showSendStatus(t("mdSendApiFailed"), true);
       } else {
         showSendStatus(t("mdSendFailed"), true);
       }

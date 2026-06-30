@@ -2256,23 +2256,13 @@
   "mdManageDestinations": {
     "message": "管理目标 →"
   },
-  "mdTargetLogseqToken": { "message": "Logseq HTTP API 令牌" },
-  "mdTargetLogseqPage": { "message": "目标页面" },
-  "mdTargetLogseqPort": { "message": "端口" },
-  "mdSendLogseqDown": { "message": "无法连接 Logseq。请打开桌面应用并启用 设置 → 功能 → HTTP APIs server。已复制全文到剪贴板——粘贴即可完成。" },
-  "mdSendLogseqBadToken": { "message": "Logseq 拒绝了令牌。请从 HTTP APIs server 面板重新复制。已复制全文到剪贴板。" },
-  "mdSendLogseqApiFailed": { "message": "Logseq 未能保存。已复制全文到剪贴板——粘贴即可完成。" },
-  "mdTargetLogseqOnboarding": {
-    "message": "自动发送全文：在 Logseq 桌面端，设置 → 功能 → 启用「HTTP APIs server」，点击插头图标 → 启动服务器，创建授权令牌并粘贴到下方。每条剪藏会成为以文章标题命名的独立页面并自动打开；你设置的「笔记本」会作为页面标签加到该页，在 Logseq 中打开该标签页即可看到所有剪藏。不配置令牌时，较长的剪藏会复制到剪贴板，需手动粘贴到 Logseq。"
-  },
+  "mdSendApiDown": { "message": "无法连接到导出服务器，全文已复制到剪贴板——粘贴即可完成。" },
+  "mdSendApiBadToken": { "message": "服务器拒绝了令牌，请从应用中重新复制。全文已复制到剪贴板。" },
+  "mdSendApiFailed": { "message": "导出请求失败，全文已复制到剪贴板——粘贴即可完成。" },
   "mdSendTest": { "message": "测试连接" },
-  "mdSendTestOk": { "message": "已连接到 Logseq" },
-  "mdSendTestDown": { "message": "无法连接 Logseq——桌面应用是否已打开并启动了 HTTP APIs server？" },
-  "mdSendTestBadToken": { "message": "令牌被拒绝——请从 Logseq 的 HTTP APIs server 面板重新复制。" },
+  "mdSendTestOk": { "message": "连接成功" },
+  "mdSendTestDown": { "message": "无法连接到服务器——应用是否正在运行？" },
+  "mdSendTestBadToken": { "message": "令牌被拒绝——请从应用中重新复制。" },
   "mdSendTestNoToken": { "message": "请先输入令牌。" },
-  "mdSendTestPerm": { "message": "本地访问权限被拒绝。" },
-  "mdSendSetupGuide": { "message": "官方配置指南 →" },
-  "mdTargetLogseqNotebook": {
-    "message": "笔记本（Logseq 标签）"
-  }
+  "mdSendTestPerm": { "message": "本地访问权限被拒绝。" }
 }

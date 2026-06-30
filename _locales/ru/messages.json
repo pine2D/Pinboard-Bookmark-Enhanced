@@ -2256,37 +2256,19 @@
   "mdManageDestinations": {
     "message": "Управление местами назначения →"
   },
-  "mdTargetLogseqToken": { "message": "Logseq HTTP API token" },
-  "mdTargetLogseqPage": { "message": "Target page" },
-  "mdTargetLogseqPort": { "message": "Port" },
-  "mdSendLogseqDown": { "message": "Can't reach Logseq. Open the desktop app and enable Settings → Features → HTTP APIs server. Full text copied to clipboard — paste to finish." },
-  "mdSendLogseqBadToken": { "message": "Logseq rejected the token. Re-copy it from the HTTP APIs server panel. Full text copied to clipboard." },
-  "mdSendLogseqApiFailed": { "message": "Logseq couldn't save this. Full text copied to clipboard — paste to finish." },
-  "mdTargetLogseqOnboarding": {
-    "message": "For automatic full-text send: in Logseq desktop, Settings → Features → enable \"HTTP APIs server\", click the plug icon → Start server, create an Authorization token, and paste it below. Each clip becomes its own page named after the article and Logseq opens it; the Notebook you set is added as a page tag, so open that tag's page in Logseq to see all your clips. Without a token, long clips are copied to your clipboard to paste into Logseq manually."
-  },
+  "mdSendApiDown": { "message": "Couldn't reach the export server. Full text copied to clipboard — paste to finish." },
+  "mdSendApiBadToken": { "message": "The server rejected the token. Re-copy it from the app. Full text copied to clipboard." },
+  "mdSendApiFailed": { "message": "The export request failed. Full text copied to clipboard — paste to finish." },
   "mdSendTest": {
     "message": "Test connection"
   },
-  "mdSendTestOk": {
-    "message": "Connected to Logseq"
-  },
-  "mdSendTestDown": {
-    "message": "Can't reach Logseq — is the desktop app running with the HTTP APIs server started?"
-  },
-  "mdSendTestBadToken": {
-    "message": "Token rejected — re-copy it from Logseq's HTTP APIs server panel."
-  },
+  "mdSendTestOk": { "message": "Connected" },
+  "mdSendTestDown": { "message": "Can't reach the server — is the app running?" },
+  "mdSendTestBadToken": { "message": "Token rejected — re-copy it from the app." },
   "mdSendTestNoToken": {
     "message": "Enter a token first."
   },
   "mdSendTestPerm": {
     "message": "Local-access permission was denied."
-  },
-  "mdSendSetupGuide": {
-    "message": "Official setup guide →"
-  },
-  "mdTargetLogseqNotebook": {
-    "message": "Notebook (Logseq tag)"
   }
 }
