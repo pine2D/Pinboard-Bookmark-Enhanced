@@ -2256,16 +2256,7 @@
   "mdManageDestinations": {
     "message": "送信先を管理 →"
   },
-  "mdTargetCapacitiesSpaceId": {
-    "message": "Capacities スペース ID"
-  },
-  "mdTargetCapacitiesType": {
-    "message": "オブジェクトタイプ"
-  },
   "mdTargetLogseqOnboarding": {
     "message": "Logseq デスクトップアプリをインストールし、グラフを一度開いてください（logseq:// ハンドラーが登録されます）。クリップは今日のジャーナルページに保存されます。"
-  },
-  "mdTargetCapacitiesOnboarding": {
-    "message": "Capacities でスペースを開き、そのスペース ID をコピーしてここに貼り付けてください。オブジェクトタイプはスペース内の単数形タイプ名と一致する必要があります（デフォルト：Weblink）。"
   }
 }

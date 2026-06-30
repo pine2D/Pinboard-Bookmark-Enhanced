@@ -2091,7 +2091,9 @@
       }
     }
   },
-  "trExtracting": { "message": "Extracting terminology…" },
+  "trExtracting": {
+    "message": "Extracting terminology…"
+  },
   "trBlockFailed": {
     "message": "Translation failed for this paragraph"
   },
@@ -2254,16 +2256,7 @@
   "mdManageDestinations": {
     "message": "Manage destinations →"
   },
-  "mdTargetCapacitiesSpaceId": {
-    "message": "Capacities space ID"
-  },
-  "mdTargetCapacitiesType": {
-    "message": "Object type"
-  },
   "mdTargetLogseqOnboarding": {
     "message": "Install the Logseq desktop app and open a graph once (this registers the logseq:// handler). Clips land on today's journal page."
-  },
-  "mdTargetCapacitiesOnboarding": {
-    "message": "In Capacities, open a space and copy its space ID. Paste it here. The object type must match a singular type name in your space (default: Weblink)."
   }
 }

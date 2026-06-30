@@ -2256,16 +2256,7 @@
   "mdManageDestinations": {
     "message": "Управление местами назначения →"
   },
-  "mdTargetCapacitiesSpaceId": {
-    "message": "ID пространства Capacities"
-  },
-  "mdTargetCapacitiesType": {
-    "message": "Тип объекта"
-  },
   "mdTargetLogseqOnboarding": {
     "message": "Установите настольное приложение Logseq и откройте граф один раз (это зарегистрирует обработчик logseq://). Клипы попадают на страницу дневника сегодняшнего дня."
-  },
-  "mdTargetCapacitiesOnboarding": {
-    "message": "В Capacities откройте пространство и скопируйте его ID. Вставьте сюда. Тип объекта должен соответствовать названию типа в единственном числе в вашем пространстве (по умолчанию: Weblink)."
   }
 }

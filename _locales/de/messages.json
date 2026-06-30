@@ -2256,16 +2256,7 @@
   "mdManageDestinations": {
     "message": "Ziele verwalten →"
   },
-  "mdTargetCapacitiesSpaceId": {
-    "message": "Capacities-Bereichs-ID"
-  },
-  "mdTargetCapacitiesType": {
-    "message": "Objekttyp"
-  },
   "mdTargetLogseqOnboarding": {
     "message": "Installiere die Logseq-Desktop-App und öffne einmal einen Graphen (dadurch wird der logseq://-Handler registriert). Clips landen auf der heutigen Tagebuchseite."
-  },
-  "mdTargetCapacitiesOnboarding": {
-    "message": "Öffne in Capacities einen Bereich und kopiere dessen Bereichs-ID. Füge sie hier ein. Der Objekttyp muss einem einzelnen Typnamen in deinem Bereich entsprechen (Standard: Weblink)."
   }
 }

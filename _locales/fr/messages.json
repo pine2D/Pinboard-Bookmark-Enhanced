@@ -2256,16 +2256,7 @@
   "mdManageDestinations": {
     "message": "Gérer les destinations →"
   },
-  "mdTargetCapacitiesSpaceId": {
-    "message": "ID d’espace Capacities"
-  },
-  "mdTargetCapacitiesType": {
-    "message": "Type d’objet"
-  },
   "mdTargetLogseqOnboarding": {
     "message": "Installez l’application de bureau Logseq et ouvrez un graphe une fois (cela enregistre le gestionnaire logseq://). Les clips atterrissent sur la page du journal du jour."
-  },
-  "mdTargetCapacitiesOnboarding": {
-    "message": "Dans Capacities, ouvrez un espace et copiez son ID d’espace. Collez-le ici. Le type d’objet doit correspondre à un nom de type singulier dans votre espace (défaut : Weblink)."
   }
 }

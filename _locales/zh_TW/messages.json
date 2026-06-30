@@ -2256,16 +2256,7 @@
   "mdManageDestinations": {
     "message": "管理目標 →"
   },
-  "mdTargetCapacitiesSpaceId": {
-    "message": "Capacities 空間 ID"
-  },
-  "mdTargetCapacitiesType": {
-    "message": "物件類型"
-  },
   "mdTargetLogseqOnboarding": {
     "message": "安裝 Logseq 桌面版並開啟一次圖譜（這會註冊 logseq:// 協定處理程式）。剪藏會寫入今天的日誌頁面。"
-  },
-  "mdTargetCapacitiesOnboarding": {
-    "message": "在 Capacities 中開啟一個空間並複製其空間 ID，貼上到此處。物件類型需與空間中某個單數類型名稱相符（預設：Weblink）。"
   }
 }

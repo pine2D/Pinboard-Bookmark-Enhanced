@@ -45,7 +45,7 @@ assertEq(pbpToLogseqProps({ title: "T", url: "U", date: "D", tags: ["a","b"] }),
 assertEq(pbpToLogseqProps({ title: "T" }), "title:: T", "omits empty fields");
 
 section("registry shape");
-assertEq(pbpExportTargetIds().join(","), "obsidian,logseq,capacities", "id order");
+assertEq(pbpExportTargetIds().join(","), "obsidian,logseq", "id order");
 assert(PBP_EXPORT_TARGETS.obsidian.mechanism === "url-scheme", "obsidian is url-scheme");
 assert(PBP_EXPORT_TARGETS.obsidian.viaClipboard === true, "obsidian uses clipboard");
 assert(PBP_URI_BUDGET === 2000, "budget constant");
@@ -70,23 +70,6 @@ section("logseq file body — map policy");
   assert(!body.includes("---"), "no YAML fences in map policy");
 }
 
-section("capacities.buildUri");
-{
-  const uri = PBP_EXPORT_TARGETS.capacities.buildUri(
-    { title: "Clip" }, "body", { spaceId: "sp-123", type: "Weblink" });
-  assert(uri.startsWith("capacities://x-callback-url/createNewObject?"), "capacities scheme");
-  assert(uri.includes("name=Clip") && uri.includes("title=Clip"), "sends BOTH name and title");
-  assert(uri.includes("type=Weblink") && uri.includes("spaceId=sp-123"), "type + spaceId");
-  assert(uri.includes("x-source=Pinboard"), "x-source attribution");
-}
-{
-  const uri = PBP_EXPORT_TARGETS.capacities.buildUri({ title: "T" }, "b", {});
-  assert(!uri.includes("spaceId="), "omits spaceId when not configured");
-}
-
-section("capacities file body — strip policy");
-assertEq(pbpBuildFileBody("capacities", { title: "T" }, "already-clean body"),
-  "already-clean body", "strip policy returns the raw body unchanged");
 
 section("pbpUriTooLong");
 assert(pbpUriTooLong("x".repeat(2001)) === true, "over budget");

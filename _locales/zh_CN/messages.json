@@ -2091,7 +2091,9 @@
       }
     }
   },
-  "trExtracting": { "message": "抽取术语中…" },
+  "trExtracting": {
+    "message": "抽取术语中…"
+  },
   "trBlockFailed": {
     "message": "此段翻译失败"
   },
@@ -2254,16 +2256,7 @@
   "mdManageDestinations": {
     "message": "管理目标 →"
   },
-  "mdTargetCapacitiesSpaceId": {
-    "message": "Capacities 空间 ID"
-  },
-  "mdTargetCapacitiesType": {
-    "message": "对象类型"
-  },
   "mdTargetLogseqOnboarding": {
     "message": "安装 Logseq 桌面版并打开一个图谱（这会注册 logseq:// 协议）。剪藏会写入当天的日记页。"
-  },
-  "mdTargetCapacitiesOnboarding": {
-    "message": "在 Capacities 中打开一个空间并复制其空间 ID，粘贴到此处。对象类型需与空间中某个单数类型名一致（默认：Weblink）。"
   }
 }

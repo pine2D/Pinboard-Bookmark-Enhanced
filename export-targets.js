@@ -55,8 +55,6 @@ const _PBP_ICON_OBSIDIAN =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>';
 const _PBP_ICON_LOGSEQ =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>';
-const _PBP_ICON_CAPACITIES =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/></svg>';
 
 const PBP_EXPORT_TARGETS = {
   obsidian: {
@@ -101,33 +99,8 @@ const PBP_EXPORT_TARGETS = {
     },
     settings: [],
     onboarding: "mdTargetLogseqOnboarding"
-  },
-
-  capacities: {
-    id: "capacities",
-    label: "Capacities",
-    icon: _PBP_ICON_CAPACITIES,
-    mechanism: "url-scheme",
-    viaClipboard: false,
-    frontmatter: "strip",
-    buildUri(meta, rawBody, cfg) {
-      meta = meta || {}; cfg = cfg || {};
-      const enc = encodeURIComponent;
-      const title = meta.title || "";
-      // createNewObject now uses `name` (verified) — send both name and title.
-      return "capacities://x-callback-url/createNewObject?name=" + enc(title) +
-        "&title=" + enc(title) + "&type=" + enc(cfg.type || "Weblink") +
-        (cfg.spaceId ? "&spaceId=" + enc(cfg.spaceId) : "") +
-        "&content=" + enc(String(rawBody || "")) +
-        "&x-source=" + enc("Pinboard Bookmark Enhanced");
-    },
-    settings: [
-      { key: "spaceId", type: "text", label: "mdTargetCapacitiesSpaceId", required: true },
-      { key: "type", type: "text", label: "mdTargetCapacitiesType", placeholder: "Weblink" }
-    ],
-    onboarding: "mdTargetCapacitiesOnboarding"
   }
 };
 
 // Display order for the menu + settings rendering.
-function pbpExportTargetIds() { return ["obsidian", "logseq", "capacities"]; }
+function pbpExportTargetIds() { return ["obsidian", "logseq"]; }
