@@ -2208,5 +2208,62 @@
   },
   "explainTriggerOff": {
     "message": "關閉"
+  },
+  "secSendDestinations": {
+    "message": "发送目标"
+  },
+  "secSendDestinationsHint": {
+    "message": "每个启用的目标都会出现在预览页的“发送到”菜单中。"
+  },
+  "mdSendEnableTo": {
+    "message": "启用导出到 {name}"
+  },
+  "mdSendHowToSetUp": {
+    "message": "如何设置"
+  },
+  "mdSendChoose": {
+    "message": "选择目标"
+  },
+  "mdSendTo": {
+    "message": "发送到 {name}"
+  },
+  "mdSendToEllipsis": {
+    "message": "发送到…"
+  },
+  "mdSentTo": {
+    "message": "已发送到 {name}"
+  },
+  "mdSending": {
+    "message": "发送中…"
+  },
+  "mdSendLastUsed": {
+    "message": "最近使用"
+  },
+  "mdSendTooLongFellBack": {
+    "message": "内容过长，无法用链接发送——已下载 .md 并复制到剪贴板"
+  },
+  "mdSendNeedsSetup": {
+    "message": "请先在设置中完成配置"
+  },
+  "mdSendFailed": {
+    "message": "发送失败"
+  },
+  "mdSendNoneConfigured": {
+    "message": "尚未启用任何目标——请在设置中添加"
+  },
+  "mdManageDestinations": {
+    "message": "管理目标 →"
+  },
+  "mdTargetCapacitiesSpaceId": {
+    "message": "Capacities 空间 ID"
+  },
+  "mdTargetCapacitiesType": {
+    "message": "对象类型"
+  },
+  "mdTargetLogseqOnboarding": {
+    "message": "安装 Logseq 桌面版并打开一个图谱（这会注册 logseq:// 协议）。剪藏会写入当天的日记页。"
+  },
+  "mdTargetCapacitiesOnboarding": {
+    "message": "在 Capacities 中打开一个空间并复制其空间 ID，粘贴到此处。对象类型需与空间中某个单数类型名一致（默认：Weblink）。"
   }
 }

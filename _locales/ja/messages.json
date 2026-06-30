@@ -2208,5 +2208,62 @@
   },
   "explainTriggerOff": {
     "message": "オフ"
+  },
+  "secSendDestinations": {
+    "message": "Send-to Destinations"
+  },
+  "secSendDestinationsHint": {
+    "message": "Each enabled destination appears in the preview page's \"Send to\" menu."
+  },
+  "mdSendEnableTo": {
+    "message": "Enable export to {name}"
+  },
+  "mdSendHowToSetUp": {
+    "message": "How to set up"
+  },
+  "mdSendChoose": {
+    "message": "Choose destination"
+  },
+  "mdSendTo": {
+    "message": "Send to {name}"
+  },
+  "mdSendToEllipsis": {
+    "message": "Send to…"
+  },
+  "mdSentTo": {
+    "message": "Sent to {name}"
+  },
+  "mdSending": {
+    "message": "Sending…"
+  },
+  "mdSendLastUsed": {
+    "message": "last used"
+  },
+  "mdSendTooLongFellBack": {
+    "message": "Too long for a link — downloaded .md + copied to clipboard"
+  },
+  "mdSendNeedsSetup": {
+    "message": "Finish setup in Settings"
+  },
+  "mdSendFailed": {
+    "message": "Send failed"
+  },
+  "mdSendNoneConfigured": {
+    "message": "No destinations enabled — add one in Settings"
+  },
+  "mdManageDestinations": {
+    "message": "Manage destinations →"
+  },
+  "mdTargetCapacitiesSpaceId": {
+    "message": "Capacities space ID"
+  },
+  "mdTargetCapacitiesType": {
+    "message": "Object type"
+  },
+  "mdTargetLogseqOnboarding": {
+    "message": "Install the Logseq desktop app and open a graph once (this registers the logseq:// handler). Clips land on today's journal page."
+  },
+  "mdTargetCapacitiesOnboarding": {
+    "message": "In Capacities, open a space and copy its space ID. Paste it here. The object type must match a singular type name in your space (default: Weblink)."
   }
 }
