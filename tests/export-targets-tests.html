@@ -71,33 +71,34 @@ section("logseq file body — map policy");
 }
 
 
-section("logseq.pageTitle (namespace + sanitize)");
-assert(PBP_EXPORT_TARGETS.logseq.pageTitle({ title: "My Article" }, { notebook: "Clippings" }) === "Clippings/My Article", "notebook namespace + title");
-assert(PBP_EXPORT_TARGETS.logseq.pageTitle({ title: "a/b#c" }, {}) === "a-b-c", "sanitizes / # and no notebook");
-assert(PBP_EXPORT_TARGETS.logseq.pageTitle({}, {}) === "Untitled", "untitled fallback");
+section("logseq.pageTitle (article only, sanitized)");
+assert(PBP_EXPORT_TARGETS.logseq.pageTitle({ title: "My Article" }) === "My Article", "article title, no namespace");
+assert(PBP_EXPORT_TARGETS.logseq.pageTitle({ title: "a/b#c" }) === "a-b-c", "sanitizes / and #");
+assert(PBP_EXPORT_TARGETS.logseq.pageTitle({}) === "Untitled", "untitled fallback");
 
-section("logseq.buildRequest (per-article page)");
+section("logseq.buildRequest (clean title + notebook tag)");
 {
-  const req = PBP_EXPORT_TARGETS.logseq.buildRequest({ title: "T", url: "U", date: "D", tags: ["a b"] }, "the body", { notebook: "Clippings", port: "9999" }, "tok123");
+  const req = PBP_EXPORT_TARGETS.logseq.buildRequest({ title: "T", url: "U", date: "D", tags: ["news"] }, "the body", { notebook: "Clippings", port: "9999" }, "tok123");
   assert(req.url === "http://127.0.0.1:9999/api", "configured port");
   assert(req.headers.Authorization === "Bearer tok123", "bearer token");
   const parsed = JSON.parse(req.body);
-  assert(parsed.method === "logseq.Editor.appendBlockInPage", "appendBlockInPage method");
-  assert(parsed.args[0] === "Clippings/T", "page = notebook/title");
-  assert(parsed.args[1].includes("the body") && parsed.args[1].includes("Source: U") && parsed.args[1].includes("#a-b"), "content = meta line + body");
+  assert(parsed.method === "logseq.Editor.appendBlockInPage", "appendBlockInPage");
+  assert(parsed.args[0] === "T", "page = article title only (no namespace prefix)");
+  assert(parsed.args[1].startsWith("tags:: Clippings, news"), "notebook + article tags as page property");
+  assert(parsed.args[1].includes("Source: U") && parsed.args[1].includes("the body"), "source line + body present");
 }
 {
-  const req = PBP_EXPORT_TARGETS.logseq.buildRequest({ title: "T" }, "b", {}, "x");
-  assert(req.url === "http://127.0.0.1:12315/api", "default port 12315");
+  const req2 = PBP_EXPORT_TARGETS.logseq.buildRequest({ title: "T" }, "b", {}, "x");  // no notebook, no tags
+  assert(!JSON.parse(req2.body).args[1].startsWith("tags::"), "no tags:: line when nothing to tag");
 }
 
-section("logseq.preRequest (createPage + redirect)");
+section("logseq.preRequest (createPage article title + redirect)");
 {
   const pr = PBP_EXPORT_TARGETS.logseq.preRequest({ title: "T" }, { notebook: "Clippings" }, "x");
   const p = JSON.parse(pr.body);
-  assert(p.method === "logseq.Editor.createPage", "createPage method");
-  assert(p.args[0] === "Clippings/T", "createPage namespaced title");
-  assert(p.args[2] && p.args[2].redirect === true, "redirect:true to open the page");
+  assert(p.method === "logseq.Editor.createPage", "createPage");
+  assert(p.args[0] === "T", "createPage uses the article title (not namespaced)");
+  assert(p.args[2] && p.args[2].redirect === true, "redirect:true");
 }
 
 section("pbpUriTooLong");

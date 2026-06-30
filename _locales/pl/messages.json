@@ -2263,7 +2263,7 @@
   "mdSendLogseqBadToken": { "message": "Logseq rejected the token. Re-copy it from the HTTP APIs server panel. Full text copied to clipboard." },
   "mdSendLogseqApiFailed": { "message": "Logseq couldn't save this. Full text copied to clipboard — paste to finish." },
   "mdTargetLogseqOnboarding": {
-    "message": "For automatic full-text send: in Logseq desktop, Settings → Features → enable \"HTTP APIs server\", click the plug icon → Start server, create an Authorization token, and paste it below. Each clip becomes its own page named after the article, filed under the Notebook namespace you set (leave blank for top-level pages), and Logseq opens it. Without a token, long clips are copied to your clipboard to paste into Logseq manually."
+    "message": "For automatic full-text send: in Logseq desktop, Settings → Features → enable \"HTTP APIs server\", click the plug icon → Start server, create an Authorization token, and paste it below. Each clip becomes its own page named after the article and Logseq opens it; the Notebook you set is added as a page tag, so open that tag's page in Logseq to see all your clips. Without a token, long clips are copied to your clipboard to paste into Logseq manually."
   },
   "mdSendTest": {
     "message": "Test connection"
@@ -2287,6 +2287,6 @@
     "message": "Official setup guide →"
   },
   "mdTargetLogseqNotebook": {
-    "message": "Notebook (namespace)"
+    "message": "Notebook (Logseq tag)"
   }
 }

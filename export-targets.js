@@ -99,14 +99,10 @@ const PBP_EXPORT_TARGETS = {
     },
     // --- Logseq local HTTP API (used when cfg.token is set) ---
     origin: "http://127.0.0.1/*",
-    pageTitle(meta, cfg) {
-      meta = meta || {}; cfg = cfg || {};
-      const ns = String(cfg.notebook || "").trim().replace(/^\/+|\/+$/g, "");
-      // sanitize the article title for a Logseq page name: strip chars that
-      // would create unintended namespaces / break the filename, collapse ws, cap length.
+    pageTitle(meta) {
+      meta = meta || {};
       let title = String(meta.title || "Untitled").replace(/[\/\\#%\[\]]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 100);
-      if (!title) title = "Untitled";
-      return ns ? ns + "/" + title : title;
+      return title || "Untitled";
     },
     preRequest(meta, cfg, token) {
       const port = String((cfg && cfg.port) || "12315");
@@ -116,22 +112,25 @@ const PBP_EXPORT_TARGETS = {
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
         body: JSON.stringify({
           method: "logseq.Editor.createPage",
-          args: [this.pageTitle(meta, cfg), {}, { createFirstBlock: false, journal: false, redirect: true }]
+          args: [this.pageTitle(meta), {}, { createFirstBlock: false, journal: false, redirect: true }]
         })
       };
     },
     buildRequest(meta, body, cfg, token) {
       cfg = cfg || {}; meta = meta || {};
       const port = String(cfg.port || "12315");
-      const tagLine = (Array.isArray(meta.tags) && meta.tags.length)
-        ? meta.tags.map((t) => "#" + String(t).replace(/\s+/g, "-")).join(" ") : "";
-      const metaLine = [meta.url ? "Source: " + meta.url : "", meta.date || "", tagLine].filter(Boolean).join("  ·  ");
-      const content = (metaLine ? metaLine + "\n\n" : "") + String(body || "");
+      // Logseq has no folders; group via a page tag (tags:: on the page's first block).
+      const tags = [];
+      if (cfg.notebook && String(cfg.notebook).trim()) tags.push(String(cfg.notebook).trim());
+      if (Array.isArray(meta.tags)) meta.tags.forEach((t) => { const s = String(t).trim(); if (s) tags.push(s); });
+      const propLine = tags.length ? "tags:: " + tags.join(", ") + "\n\n" : "";
+      const metaLine = [meta.url ? "Source: " + meta.url : "", meta.date || ""].filter(Boolean).join("  ·  ");
+      const content = propLine + (metaLine ? metaLine + "\n\n" : "") + String(body || "");
       return {
         url: "http://127.0.0.1:" + port + "/api",
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-        body: JSON.stringify({ method: "logseq.Editor.appendBlockInPage", args: [this.pageTitle(meta, cfg), content] })
+        body: JSON.stringify({ method: "logseq.Editor.appendBlockInPage", args: [this.pageTitle(meta), content] })
       };
     },
     precheckRequest(cfg, token) {
