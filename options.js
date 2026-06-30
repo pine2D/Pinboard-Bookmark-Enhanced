@@ -318,13 +318,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         p.className = "hint";
         p.textContent = t(row.onboarding);
         det.appendChild(sum); det.appendChild(p);
-        if (row.docUrl) {
-          const a = document.createElement("a");
-          a.href = row.docUrl; a.target = "_blank"; a.rel = "noopener noreferrer";
-          a.className = "hint et-doc-link";
-          a.textContent = t("mdSendSetupGuide");
-          det.appendChild(a);
-        }
         card.appendChild(det);
       }
       if (row.precheckRequest) {

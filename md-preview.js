@@ -467,9 +467,22 @@ function ensureKatex() {
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
   });
 
+  let _sendMenuCtl = null;
   async function setupSendMenu() {
     const split = document.getElementById("send-split");
     if (!split || typeof PBP_EXPORT_TARGETS === "undefined") return;
+
+    // Live-update: tear down the previous render's persistent (non-menu-item) listeners
+    // so a re-render on a settings change doesn't stack duplicate handlers.
+    if (_sendMenuCtl) _sendMenuCtl.abort();
+    _sendMenuCtl = new AbortController();
+    const _sig = _sendMenuCtl.signal;
+    // Re-read the send-related settings fresh so an options change (fixed Logseq token,
+    // enabled/disabled target, changed vault/folder) is reflected WITHOUT reopening the preview.
+    try {
+      const _fresh = await settingsArea.get({ exportTargets: {}, obsidianEnabled: false, obsidianVault: "", obsidianFolder: "" });
+      Object.assign(exportSettings, _fresh);
+    } catch (_) {}
 
     // Resolve enabled targets. Back-compat: if exportTargets is empty but the
     // legacy obsidian* settings exist, synthesize the obsidian row so existing
@@ -501,7 +514,13 @@ function ensureKatex() {
     }
     if (sendStatus) sendStatus.addEventListener("click", () => {
       clearTimeout(sendStatusTimer); sendStatus.hidden = true; sendStatus.textContent = "";
-    });
+    }, { signal: _sig });
+
+    split.classList.remove("send-empty");
+    primary.title = "";
+    caret.removeAttribute("hidden");
+    menu.setAttribute("hidden", "");
+    caret.setAttribute("aria-expanded", "false");
 
     if (!enabledIds.length) {
       split.classList.add("send-empty");
@@ -509,7 +528,7 @@ function ensureKatex() {
       primaryLabel.textContent = t("mdSendToEllipsis");
       caret.setAttribute("hidden", "");
       primary.title = t("mdSendNoneConfigured");
-      primary.addEventListener("click", () => chrome.runtime.openOptionsPage());
+      primary.addEventListener("click", () => chrome.runtime.openOptionsPage(), { signal: _sig });
       return;
     }
 
@@ -557,7 +576,7 @@ function ensureKatex() {
       }
     }
 
-    primary.addEventListener("click", () => { if (primary.dataset.targetId) doSend(primary.dataset.targetId); });
+    primary.addEventListener("click", () => { if (primary.dataset.targetId) doSend(primary.dataset.targetId); }, { signal: _sig });
 
     function closeMenu() { menu.setAttribute("hidden", ""); caret.setAttribute("aria-expanded", "false"); }
     function openMenu() {
@@ -566,15 +585,15 @@ function ensureKatex() {
       const f = menu.querySelector(".send-mi");
       if (f) f.focus();
     }
-    caret.addEventListener("click", (e) => { e.stopPropagation(); menu.hasAttribute("hidden") ? openMenu() : closeMenu(); });
-    document.addEventListener("click", (e) => { if (!split.contains(e.target)) closeMenu(); });
+    caret.addEventListener("click", (e) => { e.stopPropagation(); menu.hasAttribute("hidden") ? openMenu() : closeMenu(); }, { signal: _sig });
+    document.addEventListener("click", (e) => { if (!split.contains(e.target)) closeMenu(); }, { signal: _sig });
     menu.addEventListener("keydown", (e) => {
       const items = [...menu.querySelectorAll(".send-mi")];
       const i = items.indexOf(document.activeElement);
       if (e.key === "Escape") { closeMenu(); caret.focus(); }
       else if (e.key === "ArrowDown") { e.preventDefault(); (items[i + 1] || items[0]).focus(); }
       else if (e.key === "ArrowUp") { e.preventDefault(); (items[i - 1] || items[items.length - 1]).focus(); }
-    });
+    }, { signal: _sig });
 
     menu.innerHTML = "";
     const ordered = [lastId].concat(enabledIds.filter((id) => id !== lastId)); // last-used pinned on top
@@ -607,6 +626,11 @@ function ensureKatex() {
   }
 
   await setupSendMenu();
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.exportTargets || changes.obsidianEnabled || changes.obsidianVault || changes.obsidianFolder) {
+      setupSendMenu();
+    }
+  });
 })();
 
 // ---- Copy to clipboard with visual feedback ----

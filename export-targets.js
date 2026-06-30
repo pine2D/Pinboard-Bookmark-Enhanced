@@ -130,8 +130,7 @@ const PBP_EXPORT_TARGETS = {
       { key: "page", type: "text", label: "mdTargetLogseqPage", placeholder: "Clipped from Web" },
       { key: "port", type: "text", label: "mdTargetLogseqPort", placeholder: "12315" }
     ],
-    onboarding: "mdTargetLogseqOnboarding",
-    docUrl: "https://github.com/logseq/logseq/blob/master/resources/docs/api_server.html"
+    onboarding: "mdTargetLogseqOnboarding"
   }
 };
 
