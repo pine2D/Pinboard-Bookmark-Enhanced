@@ -281,6 +281,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         lab.textContent = t(s.label);
         const inp = document.createElement("input");
         inp.type = "text"; inp.autocomplete = "off";
+        inp.id = id + "-" + s.key;
+        lab.htmlFor = inp.id;
         inp.dataset.et = id + "." + s.key;
         inp.value = cfg[s.key] || "";
         if (s.placeholder) inp.placeholder = s.placeholder;
@@ -308,7 +310,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const out = {};
     pbpExportTargetIds().forEach((id) => { out[id] = {}; });
     document.querySelectorAll("#export-targets [data-et]").forEach((el) => {
-      const [id, key] = el.dataset.et.split(".");
+      const [id, key] = el.dataset.et.split(".", 2);
       if (!out[id]) out[id] = {};
       out[id][key] = el.type === "checkbox" ? el.checked : el.value.trim();
     });
@@ -389,10 +391,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       noText: t("cancel"),
       onConfirm: () => {
         applyPanelReset(def, document);
+        // export-targets has no static fields; reset = re-render with defaults (all disabled).
+        // Must run BEFORE saveAll() so collectExportTargets() sees cleared cards, not stale ones.
+        if (panel === "markdown") renderExportTargets({});
         saveAll();
         if (typeof def.after === "function") def.after();
-        // export-targets has no static fields; reset = re-render with defaults (all disabled).
-        if (panel === "markdown") renderExportTargets({});
         syncObsidianEnabledState();
         syncTranslateLangCustomState();
       },
