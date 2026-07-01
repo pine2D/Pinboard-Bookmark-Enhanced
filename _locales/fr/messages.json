@@ -2088,6 +2088,9 @@
   "trRetryBlock": {
     "message": "Réessayer ce paragraphe"
   },
+  "trRetryAllFailed": {
+    "message": "Tout réessayer"
+  },
   "trShowOriginal": {
     "message": "Cliquer pour afficher temporairement l'original"
   },

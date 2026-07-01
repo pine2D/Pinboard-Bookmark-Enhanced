@@ -2088,6 +2088,9 @@
   "trRetryBlock": {
     "message": "この段落を再試行"
   },
+  "trRetryAllFailed": {
+    "message": "失敗をすべて再試行"
+  },
   "trShowOriginal": {
     "message": "クリックして一時的に原文を表示"
   },

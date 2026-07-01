@@ -2088,6 +2088,9 @@
   "trRetryBlock": {
     "message": "Diesen Absatz erneut versuchen"
   },
+  "trRetryAllFailed": {
+    "message": "Alle fehlgeschlagenen wiederholen"
+  },
   "trShowOriginal": {
     "message": "Klicken, um Original vorübergehend anzuzeigen"
   },

@@ -2088,6 +2088,9 @@
   "trRetryBlock": {
     "message": "Повторить этот абзац"
   },
+  "trRetryAllFailed": {
+    "message": "Повторить все неудачные"
+  },
   "trShowOriginal": {
     "message": "Нажмите, чтобы временно показать оригинал"
   },

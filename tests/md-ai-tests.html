@@ -1969,5 +1969,25 @@ suiteIf("_pbpTrSerializeForumView", "_pbpTrSerializeForumView", () => {
     } finally { document.body.removeChild(view); }
   });
 });
+
+suiteIf("_pbpTrSyncRetryAll", "_pbpTrSyncRetryAll", () => {
+  function mk() {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = '<button id="tr-retry-all" hidden></button>';
+    document.body.appendChild(wrap);
+    return wrap;
+  }
+  test("stays hidden when there are no .pb-tr-err pills", () => {
+    const w = mk();
+    try { _pbpTrSyncRetryAll(); assertEq(document.getElementById("tr-retry-all").hidden, true, "hidden"); }
+    finally { document.body.removeChild(w); }
+  });
+  test("shows when >=1 .pb-tr-err pill exists", () => {
+    const w = mk();
+    const pill = document.createElement("button"); pill.className = "pb-tr-err"; document.body.appendChild(pill);
+    try { _pbpTrSyncRetryAll(); assertEq(document.getElementById("tr-retry-all").hidden, false, "shown"); }
+    finally { document.body.removeChild(w); document.body.removeChild(pill); }
+  });
+});
 </script>
 </body></html>

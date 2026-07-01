@@ -462,6 +462,7 @@ function _pbpTrSerializeForumView(mode) {
 // ============================================================
 
 const PBP_TR_ERR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16.5" x2="12" y2="16.5"/></svg>';
+const PBP_TR_RETRY_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
 const PBP_TR_BTN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h8"/><path d="M8 3v2c0 4-2.5 7.5-5 9"/><path d="M5 9c1.5 2.5 4 4.5 7 5"/><path d="M14 21l4-9 4 9"/><path d="M15.5 17.5h5"/></svg>';
 
 let _pbpTrState = null;
@@ -607,6 +608,17 @@ function _pbpTrBuildSection(st) {
   prog.setAttribute("aria-live", "polite");
   prog.hidden = true;
   sec.appendChild(prog);
+
+  const retryAll = document.createElement("button");
+  retryAll.type = "button";
+  retryAll.id = "tr-retry-all";
+  retryAll.hidden = true;
+  retryAll.innerHTML = PBP_TR_RETRY_SVG;               // static inline SVG only (no emoji)
+  const raLab = document.createElement("span");
+  raLab.textContent = t("trRetryAllFailed");
+  retryAll.appendChild(raLab);
+  retryAll.addEventListener("click", () => { _pbpTrRetryAllFailed(st).catch(() => {}); });
+  prog.insertAdjacentElement("afterend", retryAll);
 
   anchor.insertAdjacentElement("afterend", sec);
   btn.addEventListener("click", () => {
@@ -843,6 +855,7 @@ function _pbpTrMarkFailed(st, w, message) {
   btn.appendChild(lab);
   orig.insertAdjacentElement("afterend", btn);
   btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
+  _pbpTrSyncRetryAll();
 }
 
 // Translate one whole block, sub-splitting if it exceeds the part limit so its
@@ -889,6 +902,7 @@ async function _pbpTrRetryBlock(st, w, btn) {
   try {
     const got = await _pbpTrTranslateBlock(st, w, ctrl.signal);
     btn.remove();
+    _pbpTrSyncRetryAll();
     _pbpTrFill(st, w, got);
     const one = {};
     one[w.hash] = got;
@@ -901,6 +915,30 @@ async function _pbpTrRetryBlock(st, w, btn) {
   } finally {
     window.removeEventListener("pagehide", onHide);
   }
+}
+
+// Show the "retry all failed" button iff >=1 failed block (.pb-tr-err) remains.
+function _pbpTrSyncRetryAll() {
+  const all = document.getElementById("tr-retry-all");
+  if (!all) return;
+  const remaining = document.querySelectorAll(".pb-tr-err").length;
+  all.hidden = remaining === 0;
+  if (remaining === 0) all.disabled = false;
+}
+
+// Retry every failed block, SEQUENTIALLY (await each) so we never fire N concurrent
+// API calls. Reuses _pbpTrRetryBlock, which owns each pill's controller/state and
+// removes the pill on success. Snapshot the pills first — retries mutate the DOM.
+async function _pbpTrRetryAllFailed(st) {
+  const all = document.getElementById("tr-retry-all");
+  if (all) all.disabled = true;
+  const pills = Array.from(document.querySelectorAll(".pb-tr-err"));
+  for (const btn of pills) {
+    const n = Number(btn.dataset.pbTrErr);
+    const w = st.work.find((x) => x.n === n);
+    if (w) await _pbpTrRetryBlock(st, w, btn);
+  }
+  _pbpTrSyncRetryAll();
 }
 
 function _pbpTrSetStatus(st, status) {

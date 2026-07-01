@@ -2088,6 +2088,9 @@
   "trRetryBlock": {
     "message": "Ponów ten akapit"
   },
+  "trRetryAllFailed": {
+    "message": "Ponów wszystkie nieudane"
+  },
   "trShowOriginal": {
     "message": "Kliknij, aby tymczasowo wyświetlić oryginał"
   },

@@ -2088,6 +2088,9 @@
   "trRetryBlock": {
     "message": "重试此段"
   },
+  "trRetryAllFailed": {
+    "message": "重试全部失败"
+  },
   "trShowOriginal": {
     "message": "点击临时显示原文"
   },

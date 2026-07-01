@@ -890,6 +890,27 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 .pb-tr-err:hover { background: var(--btn-hover); }
 .pb-tr-err:disabled { opacity: 0.5; cursor: wait; }
 
+/* One-click "retry all failed" — shown in the rail translate section when >=1 block failed. */
+#tr-retry-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 100px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 12px;
+  cursor: pointer;
+}
+/* MUST restate [hidden] AFTER display:inline-flex or the button shows while hidden
+   (inline-flex overrides the UA [hidden]{display:none}). */
+#tr-retry-all[hidden] { display: none; }
+#tr-retry-all svg { width: 13px; height: 13px; flex-shrink: 0; }
+#tr-retry-all:hover { background: var(--btn-hover); }
+#tr-retry-all:disabled { opacity: 0.5; cursor: wait; }
+
 /* Rail translate section */
 #tr-section .tr-row { display: flex; gap: 6px; }
 #tr-section .tr-row .action-btn { flex: 1; justify-content: center; }
