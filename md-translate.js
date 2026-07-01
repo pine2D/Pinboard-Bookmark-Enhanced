@@ -704,6 +704,7 @@ async function _pbpTrStart(st) {
   const pending = st.work.filter((w) => !(w.n in st.trMd));
   if (!pending.length) { _pbpTrSetStatus(st, "done"); _pbpTrShowViewToggle(st); return; }
   st.running = true;
+  _pbpTrClearFailures();
   st.ctrl = new AbortController();
   pbpAiBumpCounter("translate");
   _pbpTrSetStatus(st, "translating");
@@ -942,6 +943,13 @@ async function _pbpTrRetryBlock(st, w, btn) {
   } finally {
     window.removeEventListener("pagehide", onHide);
   }
+}
+
+// Clear the previous run's failure UI so a re-run starts clean (pending blocks
+// re-mark themselves if they fail again).
+function _pbpTrClearFailures() {
+  document.querySelectorAll(".pb-tr-err").forEach((e) => e.remove());
+  _pbpTrSyncRetryAll();
 }
 
 // Show the "retry all failed" button iff >=1 failed block (.pb-tr-err) remains.

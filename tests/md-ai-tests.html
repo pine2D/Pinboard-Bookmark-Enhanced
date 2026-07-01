@@ -2051,4 +2051,20 @@ suiteIf("_pbpTrGlossaryWorthIt", "_pbpTrGlossaryWorthIt", () => {
   });
 });
 </script>
+<script>
+suiteIf("_pbpTrClearFailures", "_pbpTrClearFailures", () => {
+  test("removes all pb-tr-err pills and hides retry-all", () => {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = '<button id="tr-retry-all"></button>';
+    document.body.appendChild(wrap);
+    const p1 = document.createElement("button"); p1.className = "pb-tr-err"; document.body.appendChild(p1);
+    const p2 = document.createElement("button"); p2.className = "pb-tr-err"; document.body.appendChild(p2);
+    try {
+      _pbpTrClearFailures();
+      assertEq(document.querySelectorAll(".pb-tr-err").length, 0, "pills removed");
+      assertEq(document.getElementById("tr-retry-all").hidden, true, "retry-all hidden");
+    } finally { document.body.removeChild(wrap); }
+  });
+});
+</script>
 </body></html>
