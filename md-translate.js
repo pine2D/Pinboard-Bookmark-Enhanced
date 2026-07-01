@@ -800,7 +800,7 @@ async function _pbpTrStart(st) {
       segMap.set(w.n, { n: w.n, idx: 0, parts: 1 });
     } else {
       const split = _pbpTrSplitText(w.shielded.text, PBP_TR_PART_LIMIT);
-      partBuf.set(w.n, { chunks: new Array(split.chunks.length), seps: split.seps });
+      partBuf.set(w.n, _pbpTrMakePartBuf(split));
       split.chunks.forEach((chunk, idx) => {
         const id = idx === 0 ? w.n : nextSegId++;
         segs.push({ id, text: chunk });
@@ -819,17 +819,23 @@ async function _pbpTrStart(st) {
       if (m.parts === 1) { _pbpTrFill(st, w, text); newly[w.hash] = text; return; }
       const pb = partBuf.get(m.n);
       if (!pb) return;
-      pb.chunks[m.idx] = text;
-      if (pb.chunks.every((c) => typeof c === "string")) {
-        const joined = pb.chunks.map((c, i) => (pb.seps[i] || "") + c).join("");
-        _pbpTrFill(st, w, joined);
-        newly[w.hash] = joined;
+      _pbpTrPartFill(pb, m.idx, text);
+      const done = _pbpTrPartDone(pb);
+      if (done) {
+        _pbpTrFill(st, w, done.text);
+        if (done.partial) _pbpTrMarkPartial(st, w); else newly[w.hash] = done.text;
       }
     },
     onBlockFail: (id, message) => {
       const m = segMap.get(id);
       const w = m && byId.get(m.n);
-      if (w) _pbpTrMarkFailed(st, w, message);       // any failed part fails its block
+      if (!w) return;
+      if (m.parts === 1) { _pbpTrMarkFailed(st, w, message); return; }  // single-part: unchanged
+      const pb = partBuf.get(m.n);
+      if (!pb) return;
+      _pbpTrPartFail(pb, m.idx);                    // keep this part's original, don't discard the block
+      const done = _pbpTrPartDone(pb);
+      if (done) { _pbpTrFill(st, w, done.text); _pbpTrMarkPartial(st, w); }  // partial -> not cached
     },
     onProgress: (done, total) => {
       const prog = document.getElementById("tr-progress");
@@ -907,6 +913,42 @@ function _pbpTrMarkFailed(st, w, message) {
   lab.textContent = t("trRetryBlock");
   btn.appendChild(lab);
   orig.insertAdjacentElement("afterend", btn);
+  btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
+  _pbpTrSyncRetryAll();
+}
+
+// Part buffer for an oversize (multi-part) block. A FAILED part stores its own
+// ORIGINAL shielded chunk (origChunks[idx]) so the block can still assemble with
+// that segment untranslated, instead of the whole block being discarded.
+function _pbpTrMakePartBuf(split) {
+  return { chunks: new Array(split.chunks.length).fill(null), seps: split.seps, origChunks: split.chunks, partial: false };
+}
+function _pbpTrPartFill(pb, idx, text) { pb.chunks[idx] = text; }
+function _pbpTrPartFail(pb, idx) { pb.chunks[idx] = pb.origChunks[idx]; pb.partial = true; }
+function _pbpTrPartDone(pb) {
+  if (!pb.chunks.every((c) => typeof c === "string")) return null;
+  return { text: pb.chunks.map((c, i) => (pb.seps[i] || "") + c).join(""), partial: pb.partial };
+}
+
+// Partial-fill retry pill: inserted AFTER the block's .pb-tr (does NOT replace it),
+// so the partial translation stays visible while offering a whole-block retry.
+function _pbpTrMarkPartial(st, w) {
+  const orig = pbpAiBlockEl(w.n);
+  if (!orig) return;
+  const tr = orig.nextElementSibling;
+  const anchor = (tr && tr.classList && tr.classList.contains("pb-tr")) ? tr : orig;
+  const after = anchor.nextElementSibling;
+  if (after && after.classList && after.classList.contains("pb-tr-err")) after.remove();
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "pb-tr-err";
+  btn.dataset.pbTrErr = String(w.n);
+  btn.title = t("trBlockFailed");
+  btn.innerHTML = PBP_TR_ERR_SVG;
+  const lab = document.createElement("span");
+  lab.textContent = t("trRetryBlock");
+  btn.appendChild(lab);
+  anchor.insertAdjacentElement("afterend", btn);
   btn.addEventListener("click", () => { _pbpTrRetryBlock(st, w, btn).catch(() => {}); });
   _pbpTrSyncRetryAll();
 }

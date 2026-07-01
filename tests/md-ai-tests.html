@@ -2094,4 +2094,28 @@ suiteIf("pbpForumShouldMark", "pbpForumShouldMark", () => {
   });
 });
 </script>
+<script>
+suiteIf("_pbpTrPartDone", "_pbpTrPartDone", () => {
+  const split = { chunks: ["AAA", "BBB", "CCC"], seps: ["", "\n\n", "\n\n"] };
+  test("all parts filled -> joined, not partial", () => {
+    const pb = _pbpTrMakePartBuf(split);
+    _pbpTrPartFill(pb, 0, "a"); _pbpTrPartFill(pb, 1, "b"); _pbpTrPartFill(pb, 2, "c");
+    const r = _pbpTrPartDone(pb);
+    assert(r && r.partial === false, "not partial");
+    assertEq(r.text, "a\n\nb\n\nc", "joined with seps");
+  });
+  test("a failed part keeps its ORIGINAL chunk + marks partial", () => {
+    const pb = _pbpTrMakePartBuf(split);
+    _pbpTrPartFill(pb, 0, "a"); _pbpTrPartFail(pb, 1); _pbpTrPartFill(pb, 2, "c");
+    const r = _pbpTrPartDone(pb);
+    assert(r && r.partial === true, "partial flagged");
+    assertEq(r.text, "a\n\nBBB\n\nc", "failed slot 1 keeps original 'BBB'");
+  });
+  test("not all resolved -> null", () => {
+    const pb = _pbpTrMakePartBuf(split);
+    _pbpTrPartFill(pb, 0, "a");
+    assertEq(_pbpTrPartDone(pb), null, "incomplete -> null");
+  });
+});
+</script>
 </body></html>
