@@ -2077,5 +2077,21 @@ suiteIf("_pbpTrApplyTargetLang", "_pbpTrApplyTargetLang", () => {
     assert(el.textContent && el.textContent.length > 0, "label text set");
   });
 });
+
+suiteIf("pbpForumShouldMark", "pbpForumShouldMark", () => {
+  const root = (html) => { const d = document.createElement("div"); d.innerHTML = html; return d; };
+  test("forum flag -> true even without nesting", () => {
+    assertEq(pbpForumShouldMark({ forum: true }, root("<p>x</p>")), true, "forum flag");
+  });
+  test("nested blockquote -> true (no flag needed)", () => {
+    assertEq(pbpForumShouldMark({}, root("<blockquote><p>a</p><blockquote><p>b</p></blockquote></blockquote>")), true, "nested bq");
+  });
+  test("single-level quote -> false (normal article untouched)", () => {
+    assertEq(pbpForumShouldMark({}, root("<blockquote><p>a</p></blockquote>")), false, "flat quote");
+  });
+  test("no blockquote -> false", () => {
+    assertEq(pbpForumShouldMark({}, root("<p>a</p><h2>b</h2>")), false, "no bq");
+  });
+});
 </script>
 </body></html>

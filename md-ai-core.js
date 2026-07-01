@@ -98,6 +98,13 @@ function pbpForumMarkComments(rootEl) {
   }
 }
 
+// Whether to run per-comment decomposition: a site-rule forum page, OR any page
+// whose rendered content contains a NESTED blockquote (the comment-thread shape).
+// Single-level quotes (no nesting) return false, so normal articles are untouched.
+function pbpForumShouldMark(info, rootEl) {
+  return !!(info && info.forum) || !!(rootEl && rootEl.querySelector("blockquote blockquote"));
+}
+
 // KaTeX pre-pass (translation fidelity): on a CLONE of the block, swap each
 // rendered KaTeX tree for its TeX source pulled from the MathML annotation,
 // wrapped back in $/$$ delimiters. Display math first (its wrapper contains
