@@ -2269,9 +2269,9 @@
     "message": "Endpoint URL"
   },
   "mdTargetWebhookToken": {
-    "message": "Bearer token (optional)"
+    "message": "Authorization header (optional)"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. If you set a token it is sent as Authorization: Bearer. Works with n8n, Make, Zapier, or any self-hosted receiver — no account needed here."
+    "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. Any Authorization value you set is sent verbatim (e.g. Bearer <token> or Token <key>), so any auth scheme works. For n8n, Make, Zapier, Readwise, or any self-hosted receiver — no account needed here."
   }
 }

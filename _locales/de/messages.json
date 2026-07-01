@@ -2244,40 +2244,40 @@
   "mdManageDestinations": {
     "message": "Ziele verwalten →"
   },
-  "mdSendApiDown": { "message": "Couldn't reach the export server. Full text copied to clipboard — paste to finish." },
-  "mdSendApiBadToken": { "message": "The server rejected the token. Re-copy it from the app. Full text copied to clipboard." },
-  "mdSendApiFailed": { "message": "The export request failed. Full text copied to clipboard — paste to finish." },
+  "mdSendApiDown": { "message": "Export-Server nicht erreichbar. Volltext in die Zwischenablage kopiert — zum Abschließen einfügen." },
+  "mdSendApiBadToken": { "message": "Der Server hat den Token abgelehnt. Erneut aus der App kopieren. Volltext in die Zwischenablage kopiert." },
+  "mdSendApiFailed": { "message": "Die Export-Anfrage ist fehlgeschlagen. Volltext in die Zwischenablage kopiert — zum Abschließen einfügen." },
   "mdSendTest": {
-    "message": "Test connection"
+    "message": "Verbindung testen"
   },
-  "mdSendTestOk": { "message": "Connected" },
-  "mdSendTestDown": { "message": "Can't reach the server — is the app running?" },
-  "mdSendTestBadToken": { "message": "Token rejected — re-copy it from the app." },
+  "mdSendTestOk": { "message": "Verbunden" },
+  "mdSendTestDown": { "message": "Server nicht erreichbar — läuft die App?" },
+  "mdSendTestBadToken": { "message": "Token abgelehnt — erneut aus der App kopieren." },
   "mdSendTestNoToken": {
-    "message": "Enter a token first."
+    "message": "Zuerst einen Token eingeben."
   },
   "mdSendTestPerm": {
-    "message": "Local-access permission was denied."
+    "message": "Berechtigung für lokalen Zugriff verweigert."
   },
   "mdTargetGithubToken": {
-    "message": "GitHub token (classic, gist scope)"
+    "message": "GitHub-Token (classic, gist-Scope)"
   },
   "mdTargetGithubOnboarding": {
-    "message": "Create a Personal Access Token (classic) at GitHub → Settings → Developer settings → Tokens (classic) with the \"gist\" scope, then paste it below. Each clip is saved as a private gist. Note: fine-grained tokens can't create gists yet — use a classic token."
+    "message": "Erstelle bei GitHub → Settings → Developer settings → Tokens (classic) einen Personal Access Token (classic) mit dem „gist“-Scope und füge ihn unten ein. Jeder Clip wird als privater gist gespeichert. Hinweis: fine-grained Tokens können noch keine gists erstellen — verwende einen classic Token."
   },
   "mdSendViewGist": {
-    "message": "View gist →"
+    "message": "gist ansehen →"
   },
   "mdSendApiPerm": {
-    "message": "Access permission was denied. Full text copied to clipboard — paste to finish."
+    "message": "Zugriffsberechtigung verweigert. Volltext in die Zwischenablage kopiert — zum Abschließen einfügen."
   },
   "mdTargetWebhookUrl": {
-    "message": "Endpoint URL"
+    "message": "Endpunkt-URL"
   },
   "mdTargetWebhookToken": {
-    "message": "Bearer token (optional)"
+    "message": "Authorization-Header (optional)"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. If you set a token it is sent as Authorization: Bearer. Works with n8n, Make, Zapier, or any self-hosted receiver — no account needed here."
+    "message": "Sendet ein JSON-Payload {title, url, date, tags, markdown} per POST an deinen Endpunkt. Ein von dir gesetzter Authorization-Wert wird unverändert gesendet (z. B. Bearer <token> oder Token <key>), sodass jedes Auth-Schema funktioniert. Für n8n, Make, Zapier, Readwise oder jeden selbst gehosteten Empfänger — hier ist kein Konto nötig."
   }
 }

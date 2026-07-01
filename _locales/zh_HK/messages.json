@@ -2244,40 +2244,40 @@
   "mdManageDestinations": {
     "message": "管理目標 →"
   },
-  "mdSendApiDown": { "message": "Couldn't reach the export server. Full text copied to clipboard — paste to finish." },
-  "mdSendApiBadToken": { "message": "The server rejected the token. Re-copy it from the app. Full text copied to clipboard." },
-  "mdSendApiFailed": { "message": "The export request failed. Full text copied to clipboard — paste to finish." },
+  "mdSendApiDown": { "message": "無法連接匯出伺服器，全文已複製到剪貼簿 — 貼上即可完成。" },
+  "mdSendApiBadToken": { "message": "伺服器拒絕了 Token，請從應用程式重新複製。全文已複製到剪貼簿。" },
+  "mdSendApiFailed": { "message": "匯出請求失敗，全文已複製到剪貼簿 — 貼上即可完成。" },
   "mdSendTest": {
-    "message": "Test connection"
+    "message": "測試連接"
   },
-  "mdSendTestOk": { "message": "Connected" },
-  "mdSendTestDown": { "message": "Can't reach the server — is the app running?" },
-  "mdSendTestBadToken": { "message": "Token rejected — re-copy it from the app." },
+  "mdSendTestOk": { "message": "已連接" },
+  "mdSendTestDown": { "message": "無法連接伺服器 — 應用程式是否正在執行？" },
+  "mdSendTestBadToken": { "message": "Token 被拒絕 — 請從應用程式重新複製。" },
   "mdSendTestNoToken": {
-    "message": "Enter a token first."
+    "message": "請先輸入 Token。"
   },
   "mdSendTestPerm": {
-    "message": "Local-access permission was denied."
+    "message": "本機存取權限被拒絕。"
   },
   "mdTargetGithubToken": {
-    "message": "GitHub token (classic, gist scope)"
+    "message": "GitHub Token（classic 類型，gist 權限）"
   },
   "mdTargetGithubOnboarding": {
-    "message": "Create a Personal Access Token (classic) at GitHub → Settings → Developer settings → Tokens (classic) with the \"gist\" scope, then paste it below. Each clip is saved as a private gist. Note: fine-grained tokens can't create gists yet — use a classic token."
+    "message": "在 GitHub → Settings → Developer settings → Tokens (classic) 建立一個 classic 類型的個人存取 Token，勾選「gist」權限，然後貼到下方。每次剪藏都會儲存為一個私人 gist。注意：fine-grained Token 暫時無法建立 gist — 請使用 classic Token。"
   },
   "mdSendViewGist": {
-    "message": "View gist →"
+    "message": "檢視 gist →"
   },
   "mdSendApiPerm": {
-    "message": "Access permission was denied. Full text copied to clipboard — paste to finish."
+    "message": "存取權限被拒絕，全文已複製到剪貼簿 — 貼上即可完成。"
   },
   "mdTargetWebhookUrl": {
-    "message": "Endpoint URL"
+    "message": "接收端 URL"
   },
   "mdTargetWebhookToken": {
-    "message": "Bearer token (optional)"
+    "message": "Authorization 標頭（可選）"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. If you set a token it is sent as Authorization: Bearer. Works with n8n, Make, Zapier, or any self-hosted receiver — no account needed here."
+    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填寫的 Authorization 值會原樣傳送（例如 Bearer <token> 或 Token <key>），因此支援任何驗證方式。可搭配 n8n、Make、Zapier、Readwise 或任何自架接收端使用 — 這裡無需註冊帳戶。"
   }
 }

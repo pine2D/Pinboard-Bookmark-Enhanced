@@ -2269,9 +2269,9 @@
     "message": "接收端 URL"
   },
   "mdTargetWebhookToken": {
-    "message": "Bearer 令牌（可选）"
+    "message": "Authorization 头（可选）"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。若填写令牌，会作为 Authorization: Bearer 发送。可对接 n8n、Make、Zapier 或任意自建接收端——无需在此注册账号。"
+    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填写的 Authorization 值会原样发送（如 Bearer <令牌> 或 Token <密钥>），任何认证方案都支持。可对接 n8n、Make、Zapier、Readwise 或任意自建接收端——无需在此注册账号。"
   }
 }

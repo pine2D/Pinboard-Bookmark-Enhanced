@@ -2244,40 +2244,40 @@
   "mdManageDestinations": {
     "message": "Gérer les destinations →"
   },
-  "mdSendApiDown": { "message": "Couldn't reach the export server. Full text copied to clipboard — paste to finish." },
-  "mdSendApiBadToken": { "message": "The server rejected the token. Re-copy it from the app. Full text copied to clipboard." },
-  "mdSendApiFailed": { "message": "The export request failed. Full text copied to clipboard — paste to finish." },
+  "mdSendApiDown": { "message": "Impossible de joindre le serveur d'export. Texte intégral copié dans le presse-papiers — collez pour terminer." },
+  "mdSendApiBadToken": { "message": "Le serveur a rejeté le jeton. Recopiez-le depuis l'application. Texte intégral copié dans le presse-papiers." },
+  "mdSendApiFailed": { "message": "La requête d'export a échoué. Texte intégral copié dans le presse-papiers — collez pour terminer." },
   "mdSendTest": {
-    "message": "Test connection"
+    "message": "Tester la connexion"
   },
-  "mdSendTestOk": { "message": "Connected" },
-  "mdSendTestDown": { "message": "Can't reach the server — is the app running?" },
-  "mdSendTestBadToken": { "message": "Token rejected — re-copy it from the app." },
+  "mdSendTestOk": { "message": "Connecté" },
+  "mdSendTestDown": { "message": "Impossible de joindre le serveur — l'application est-elle en cours d'exécution ?" },
+  "mdSendTestBadToken": { "message": "Jeton rejeté — recopiez-le depuis l'application." },
   "mdSendTestNoToken": {
-    "message": "Enter a token first."
+    "message": "Entrez d'abord un jeton."
   },
   "mdSendTestPerm": {
-    "message": "Local-access permission was denied."
+    "message": "L'autorisation d'accès local a été refusée."
   },
   "mdTargetGithubToken": {
-    "message": "GitHub token (classic, gist scope)"
+    "message": "Jeton GitHub (classic, portée gist)"
   },
   "mdTargetGithubOnboarding": {
-    "message": "Create a Personal Access Token (classic) at GitHub → Settings → Developer settings → Tokens (classic) with the \"gist\" scope, then paste it below. Each clip is saved as a private gist. Note: fine-grained tokens can't create gists yet — use a classic token."
+    "message": "Créez un jeton d'accès personnel (classic) sur GitHub → Settings → Developer settings → Tokens (classic) avec la portée « gist », puis collez-le ci-dessous. Chaque extrait est enregistré comme un gist privé. Remarque : les jetons fine-grained ne peuvent pas encore créer de gists — utilisez un jeton classic."
   },
   "mdSendViewGist": {
-    "message": "View gist →"
+    "message": "Voir le gist →"
   },
   "mdSendApiPerm": {
-    "message": "Access permission was denied. Full text copied to clipboard — paste to finish."
+    "message": "L'autorisation d'accès a été refusée. Texte intégral copié dans le presse-papiers — collez pour terminer."
   },
   "mdTargetWebhookUrl": {
-    "message": "Endpoint URL"
+    "message": "URL du point de terminaison"
   },
   "mdTargetWebhookToken": {
-    "message": "Bearer token (optional)"
+    "message": "En-tête Authorization (facultatif)"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. If you set a token it is sent as Authorization: Bearer. Works with n8n, Make, Zapier, or any self-hosted receiver — no account needed here."
+    "message": "Envoie une requête POST avec une charge utile JSON {title, url, date, tags, markdown} vers votre point de terminaison. Toute valeur Authorization que vous définissez est envoyée telle quelle (p. ex. Bearer <token> ou Token <key>), donc n'importe quel schéma d'authentification fonctionne. Pour n8n, Make, Zapier, Readwise ou tout récepteur auto-hébergé — aucun compte requis ici."
   }
 }

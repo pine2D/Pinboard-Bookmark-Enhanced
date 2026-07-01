@@ -84,19 +84,24 @@ section("github.precheckRequest");
 section("webhook.buildRequest (JSON envelope + optional auth)");
 {
   const req = PBP_EXPORT_TARGETS.webhook.buildRequest(
-    { title: "T", url: "U", date: "D", tags: ["a", "b"] }, "# body", { url: "https://hook.example.com/x" }, "tok");
+    { title: "T", url: "U", date: "D", tags: ["a", "b"] }, "# body", { url: "https://hook.example.com/x" }, "Bearer tok");
   assert(req.url === "https://hook.example.com/x", "posts to the user URL");
   assert(req.method === "POST", "POST");
   assert(req.headers["Content-Type"] === "application/json", "json content-type");
-  assert(req.headers.Authorization === "Bearer tok", "token -> Bearer header");
+  assert(req.headers.Authorization === "Bearer tok", "auth value sent verbatim");
   const b = JSON.parse(req.body);
   assert(b.title === "T" && b.url === "U" && b.date === "D", "envelope carries meta fields");
   assert(Array.isArray(b.tags) && b.tags[0] === "a", "tags array");
   assert(b.markdown === "# body", "markdown field carries the body");
 }
 {
+  // any scheme is sent verbatim — Readwise uses "Token", not "Bearer"
+  const r = PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T" }, "x", { url: "https://h/x" }, "Token rw_key");
+  assert(r.headers.Authorization === "Token rw_key", "non-Bearer scheme sent verbatim");
+}
+{
   const req2 = PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T" }, "x", { url: "https://h/x" }, "");
-  assert(req2.headers.Authorization === undefined, "no Authorization header when token is empty");
+  assert(req2.headers.Authorization === undefined, "no Authorization header when value is empty");
 }
 
 section("webhook.origin (derived from the user URL)");

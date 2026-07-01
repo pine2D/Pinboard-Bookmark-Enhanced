@@ -2244,40 +2244,40 @@
   "mdManageDestinations": {
     "message": "送信先を管理 →"
   },
-  "mdSendApiDown": { "message": "Couldn't reach the export server. Full text copied to clipboard — paste to finish." },
-  "mdSendApiBadToken": { "message": "The server rejected the token. Re-copy it from the app. Full text copied to clipboard." },
-  "mdSendApiFailed": { "message": "The export request failed. Full text copied to clipboard — paste to finish." },
+  "mdSendApiDown": { "message": "エクスポートサーバーに接続できませんでした。全文をクリップボードにコピーしました — 貼り付けて完了してください。" },
+  "mdSendApiBadToken": { "message": "サーバーがトークンを拒否しました。アプリからコピーし直してください。全文をクリップボードにコピーしました。" },
+  "mdSendApiFailed": { "message": "エクスポートリクエストに失敗しました。全文をクリップボードにコピーしました — 貼り付けて完了してください。" },
   "mdSendTest": {
-    "message": "Test connection"
+    "message": "接続テスト"
   },
-  "mdSendTestOk": { "message": "Connected" },
-  "mdSendTestDown": { "message": "Can't reach the server — is the app running?" },
-  "mdSendTestBadToken": { "message": "Token rejected — re-copy it from the app." },
+  "mdSendTestOk": { "message": "接続成功" },
+  "mdSendTestDown": { "message": "サーバーに接続できません — アプリは起動していますか？" },
+  "mdSendTestBadToken": { "message": "トークンが拒否されました — アプリからコピーし直してください。" },
   "mdSendTestNoToken": {
-    "message": "Enter a token first."
+    "message": "先にトークンを入力してください。"
   },
   "mdSendTestPerm": {
-    "message": "Local-access permission was denied."
+    "message": "ローカルアクセス権限が拒否されました。"
   },
   "mdTargetGithubToken": {
-    "message": "GitHub token (classic, gist scope)"
+    "message": "GitHub トークン（classic、gist スコープ）"
   },
   "mdTargetGithubOnboarding": {
-    "message": "Create a Personal Access Token (classic) at GitHub → Settings → Developer settings → Tokens (classic) with the \"gist\" scope, then paste it below. Each clip is saved as a private gist. Note: fine-grained tokens can't create gists yet — use a classic token."
+    "message": "GitHub → Settings → Developer settings → Tokens (classic) で「gist」スコープを付与した個人アクセストークン（classic）を作成し、下に貼り付けてください。各クリップは非公開 gist として保存されます。注意：fine-grained トークンはまだ gist を作成できません — classic トークンを使用してください。"
   },
   "mdSendViewGist": {
-    "message": "View gist →"
+    "message": "gist を表示 →"
   },
   "mdSendApiPerm": {
-    "message": "Access permission was denied. Full text copied to clipboard — paste to finish."
+    "message": "アクセス権限が拒否されました。全文をクリップボードにコピーしました — 貼り付けて完了してください。"
   },
   "mdTargetWebhookUrl": {
-    "message": "Endpoint URL"
+    "message": "エンドポイント URL"
   },
   "mdTargetWebhookToken": {
-    "message": "Bearer token (optional)"
+    "message": "Authorization ヘッダー（任意）"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. If you set a token it is sent as Authorization: Bearer. Works with n8n, Make, Zapier, or any self-hosted receiver — no account needed here."
+    "message": "JSON ペイロード {title, url, date, tags, markdown} をエンドポイントに POST します。設定した Authorization 値はそのまま送信されるため（例：Bearer <token> や Token <key>）、あらゆる認証方式に対応します。n8n、Make、Zapier、Readwise、または任意の自己ホスト型レシーバーで利用できます — ここでのアカウント登録は不要です。"
   }
 }

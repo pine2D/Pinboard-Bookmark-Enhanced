@@ -126,7 +126,10 @@ const PBP_EXPORT_TARGETS = {
     buildRequest(meta, body, cfg, token) {
       meta = meta || {};
       const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = "Bearer " + token;
+      // token = the FULL Authorization header value (e.g. "Bearer <x>",
+      // "Token <x>", "Basic <x>") — sent verbatim so ANY auth scheme works
+      // (Readwise uses "Token", not "Bearer").
+      if (token) headers["Authorization"] = token;
       const payload = {
         title: String(meta.title || ""),
         url: String(meta.url || ""),
@@ -138,7 +141,7 @@ const PBP_EXPORT_TARGETS = {
     },
     settings: [
       { key: "url", type: "text", required: true, label: "mdTargetWebhookUrl", placeholder: "https://…" },
-      { key: "token", type: "secret", label: "mdTargetWebhookToken" }
+      { key: "token", type: "secret", label: "mdTargetWebhookToken", placeholder: "Bearer …  /  Token …" }
     ],
     onboarding: "mdTargetWebhookOnboarding"
   }
