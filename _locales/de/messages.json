@@ -1321,26 +1321,14 @@
   "mdObsidianVault": {
     "message": "Obsidian-Vault"
   },
-  "mdObsidianVaultHint": {
-    "message": "Leer lassen, um den aktuellen Vault zu verwenden."
-  },
   "mdObsidianFolder": {
     "message": "Obsidian-Ordner"
-  },
-  "mdObsidianFolderHint": {
-    "message": "Leer lassen, um im Vault-Stammverzeichnis zu speichern."
   },
   "tabMarkdown": {
     "message": "Markdown"
   },
   "tabArchive": {
     "message": "Archiv"
-  },
-  "mdObsidianEnabled": {
-    "message": "Export nach Obsidian aktivieren"
-  },
-  "mdObsidianEnabledHint": {
-    "message": "Zeigt die „An Obsidian senden“-Schaltflächen in der Vorschauseite und im Popup an."
   },
   "mdStripObsidian": {
     "message": "Obsidian"

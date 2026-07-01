@@ -1321,26 +1321,14 @@
   "mdObsidianVault": {
     "message": "Хранилище Obsidian"
   },
-  "mdObsidianVaultHint": {
-    "message": "Оставьте пустым, чтобы использовать текущее хранилище."
-  },
   "mdObsidianFolder": {
     "message": "Папка Obsidian"
-  },
-  "mdObsidianFolderHint": {
-    "message": "Оставьте пустым, чтобы сохранить в корне хранилища."
   },
   "tabMarkdown": {
     "message": "Markdown"
   },
   "tabArchive": {
     "message": "Архив"
-  },
-  "mdObsidianEnabled": {
-    "message": "Включить экспорт в Obsidian"
-  },
-  "mdObsidianEnabledHint": {
-    "message": "Показывает кнопки «Отправить в Obsidian» на странице предпросмотра и во всплывающем окне."
   },
   "mdStripObsidian": {
     "message": "Obsidian"

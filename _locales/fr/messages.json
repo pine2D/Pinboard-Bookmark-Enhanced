@@ -1321,26 +1321,14 @@
   "mdObsidianVault": {
     "message": "Coffre Obsidian"
   },
-  "mdObsidianVaultHint": {
-    "message": "Laisser vide pour utiliser le coffre actuel."
-  },
   "mdObsidianFolder": {
     "message": "Dossier Obsidian"
-  },
-  "mdObsidianFolderHint": {
-    "message": "Laisser vide pour enregistrer à la racine du coffre."
   },
   "tabMarkdown": {
     "message": "Markdown"
   },
   "tabArchive": {
     "message": "Archivage"
-  },
-  "mdObsidianEnabled": {
-    "message": "Activer l'export vers Obsidian"
-  },
-  "mdObsidianEnabledHint": {
-    "message": "Affiche les boutons « Envoyer vers Obsidian » dans la page d'aperçu et le popup."
   },
   "mdStripObsidian": {
     "message": "Obsidian"

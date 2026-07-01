@@ -1321,26 +1321,14 @@
   "mdObsidianVault": {
     "message": "Obsidian 庫"
   },
-  "mdObsidianVaultHint": {
-    "message": "留空則使用目前的庫。"
-  },
   "mdObsidianFolder": {
     "message": "Obsidian 資料夾"
-  },
-  "mdObsidianFolderHint": {
-    "message": "留空則儲存至庫根目錄。"
   },
   "tabMarkdown": {
     "message": "Markdown"
   },
   "tabArchive": {
     "message": "存檔"
-  },
-  "mdObsidianEnabled": {
-    "message": "啟用匯出到 Obsidian"
-  },
-  "mdObsidianEnabledHint": {
-    "message": "在預覽頁面和彈出式視窗中顯示「傳送到 Obsidian」按鈕。"
   },
   "mdStripObsidian": {
     "message": "Obsidian"

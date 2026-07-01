@@ -1321,26 +1321,14 @@
   "mdObsidianVault": {
     "message": "Skarbiec Obsidian"
   },
-  "mdObsidianVaultHint": {
-    "message": "Pozostaw puste, aby użyć bieżącego skarbca."
-  },
   "mdObsidianFolder": {
     "message": "Folder Obsidian"
-  },
-  "mdObsidianFolderHint": {
-    "message": "Pozostaw puste, aby zapisać w katalogu głównym skarbca."
   },
   "tabMarkdown": {
     "message": "Markdown"
   },
   "tabArchive": {
     "message": "Archiwum"
-  },
-  "mdObsidianEnabled": {
-    "message": "Włącz eksport do Obsidian"
-  },
-  "mdObsidianEnabledHint": {
-    "message": "Pokazuje przyciski „Wyślij do Obsidian” na stronie podglądu i w wyskakującym okienku."
   },
   "mdStripObsidian": {
     "message": "Obsidian"

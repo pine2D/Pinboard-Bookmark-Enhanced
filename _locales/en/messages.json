@@ -1321,26 +1321,14 @@
   "mdObsidianVault": {
     "message": "Obsidian vault"
   },
-  "mdObsidianVaultHint": {
-    "message": "Leave empty to use the current vault."
-  },
   "mdObsidianFolder": {
     "message": "Obsidian folder"
-  },
-  "mdObsidianFolderHint": {
-    "message": "Leave empty to save at the vault root."
   },
   "tabMarkdown": {
     "message": "Markdown"
   },
   "tabArchive": {
     "message": "Archive"
-  },
-  "mdObsidianEnabled": {
-    "message": "Enable export to Obsidian"
-  },
-  "mdObsidianEnabledHint": {
-    "message": "Shows the Send-to-Obsidian buttons in the preview page and the popup."
   },
   "mdStripObsidian": {
     "message": "Obsidian"

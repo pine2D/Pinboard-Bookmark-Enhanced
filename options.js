@@ -239,16 +239,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Gray out the Obsidian vault/folder inputs when the master toggle is off.
   // Safe to call on any page/panel (guards on element existence); programmatic
   // .checked changes (load, reset) don't fire 'change', so call it explicitly.
-  function syncObsidianEnabledState() {
-    const en = $id("opt-obsidian-enabled");
-    if (!en) return;
-    const off = !en.checked;
-    const v = $id("opt-obsidian-vault");
-    const f = $id("opt-obsidian-folder");
-    if (v) v.disabled = off;
-    if (f) f.disabled = off;
-  }
-
   // Render one settings card per export target from the registry. Inputs use
   // data-et="<id>.<key>" so saveSettings can collect them generically.
   function renderExportTargets(exportTargets) {
@@ -450,7 +440,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (panel === "markdown") renderExportTargets({});
         saveAll();
         if (typeof def.after === "function") def.after();
-        syncObsidianEnabledState();
         syncTranslateLangCustomState();
       },
     });
@@ -705,8 +694,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const el = $id(id);
     if (el) el.checked = val;
   }
-  syncObsidianEnabledState();
-
   // ---- Preview AI: translation target language (select + custom free-text) ----
   // Stored value is either an option code or a free-text language name; map it
   // back onto the two controls. Guard against a hand-edited backup that smuggled
@@ -1206,9 +1193,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll('.panel input[type="radio"]').forEach(el => {
     el.addEventListener("change", scheduleAutoSave);
   });
-  const obsEnabledEl = $id("opt-obsidian-enabled");
-  if (obsEnabledEl) obsEnabledEl.addEventListener("change", syncObsidianEnabledState);
-
   function flashAutoSave() {
     const el = $id("auto-save-status");
     setStatusIcon(el, true, t("optAutoSaved"));
