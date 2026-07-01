@@ -345,7 +345,7 @@ function ensureKatex() {
   // BEFORE the AI layer indexes (pbp:rendered). Structural detection (blockquote blockquote)
   // means Reddit and similar pages benefit without a per-site rule. Single-level quotes
   // are untouched. canonicalMarkdown (export/Copy/Raw) is unaffected — DOM-only.
-  if (pbpForumShouldMark(info, renderedView) && typeof pbpForumMarkComments === "function") pbpForumMarkComments(renderedView);
+  if (typeof pbpForumShouldMark === "function" && pbpForumShouldMark(info, renderedView) && typeof pbpForumMarkComments === "function") pbpForumMarkComments(renderedView);
   const _articleLang = detectArticleLang(canonicalMarkdown);
   if (_articleLang) renderedView.lang = _articleLang; // article-script font for the reading content
   // Syntax highlighting is OFF the critical first-paint path: the article paints

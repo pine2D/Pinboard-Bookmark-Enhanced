@@ -513,6 +513,7 @@ async function pbpTrInit(detail) {
   // bypass the memoized stale pbpAiGetSettings promise.
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener((changes, area) => {
+      if (st.running) return;   // don't swap target mid-run: mixes languages + mis-keys the end-of-run cache
       if ((area === "sync" || area === "local") && changes.translateTargetLang) {
         _pbpTrApplyTargetLang(st, { translateTargetLang: changes.translateTargetLang.newValue }).catch(() => {});
       }
@@ -729,7 +730,7 @@ async function _pbpTrStart(st) {
   const pending = st.work.filter((w) => !(w.n in st.trMd));
   if (!pending.length) { _pbpTrSetStatus(st, "done"); _pbpTrShowViewToggle(st); return; }
   st.running = true;
-  _pbpTrClearFailures();
+  _pbpTrClearPendingFailures(new Set(pending.map((w) => w.n)));
   st.ctrl = new AbortController();
   pbpAiBumpCounter("translate");
   _pbpTrSetStatus(st, "translating");
@@ -1012,10 +1013,12 @@ async function _pbpTrRetryBlock(st, w, btn) {
   }
 }
 
-// Clear the previous run's failure UI so a re-run starts clean (pending blocks
-// re-mark themselves if they fail again).
-function _pbpTrClearFailures() {
-  document.querySelectorAll(".pb-tr-err").forEach((e) => e.remove());
+// Clear only the failure pills for blocks about to be re-attempted (pending). A
+// PARTIAL block is already in st.trMd (not pending) and keeps its coexisting retry pill.
+function _pbpTrClearPendingFailures(pendingNs) {
+  document.querySelectorAll(".pb-tr-err").forEach((e) => {
+    if (pendingNs.has(Number(e.dataset.pbTrErr))) e.remove();
+  });
   _pbpTrSyncRetryAll();
 }
 

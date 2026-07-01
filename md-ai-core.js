@@ -73,8 +73,9 @@ function pbpAiTextOf(n) {
 // already-sanitized element nodes — never builds markup other than the wrapper
 // <div>. Relies on marked wrapping blockquote text in <p> (element children
 // carry all content). canonicalMarkdown (export/Copy/Raw) is unaffected — this
-// only mutates the rendered DOM. md-preview runs it (only when info.forum) right
-// after innerHTML, before pbpAiIndexBlocks.
+// only mutates the rendered DOM. md-preview runs it when info.forum is set OR
+// when pbpForumShouldMark detects the structural trigger (nested blockquote),
+// right after innerHTML, before pbpAiIndexBlocks.
 function _pbpMarkComment(bq) {
   const own = [];
   const childBqs = [];
