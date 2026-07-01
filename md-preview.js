@@ -345,7 +345,7 @@ function ensureKatex() {
   // BEFORE the AI layer indexes (pbp:rendered). Gated on info.forum so non-forum
   // pages with a nested quote are untouched. canonicalMarkdown (export/Copy/Raw) is
   // unaffected — this only mutates the rendered DOM.
-  if (info.forum && typeof pbpForumFlatten === "function") pbpForumFlatten(renderedView);
+  if (info.forum && typeof pbpForumMarkComments === "function") pbpForumMarkComments(renderedView);
   const _articleLang = detectArticleLang(canonicalMarkdown);
   if (_articleLang) renderedView.lang = _articleLang; // article-script font for the reading content
   // Syntax highlighting is OFF the critical first-paint path: the article paints

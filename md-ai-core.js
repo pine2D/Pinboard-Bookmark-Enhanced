@@ -49,38 +49,42 @@ function pbpAiTextOf(n) {
   return text;
 }
 
-// ---- Forum thread flatten (per-comment blocks) ----
+// ---- Forum thread mark (per-comment body wrappers) ----
 // Forum site rules (HN/V2EX/SO-discussions) emit nested <blockquote> threads;
-// after marked, one top-level thread = one block, so translate/ask/explain treat
-// the whole thread as a unit. md-preview runs this (only when info.forum) right
-// after innerHTML, before pbpAiIndexBlocks: it rewrites each top-level <blockquote>
-// into a flat PRE-ORDER sequence of top-level sibling blockquotes — one per comment
-// — tagged with data-pb-depth for CSS indentation. The block indexer then sees each
-// comment as its own block; the rest of the AI layer is unchanged. Deterministic
-// (depth = nesting level); a non-nested quote is just re-wrapped at depth 0 (visually
-// identical). Moves already-sanitized element nodes — never builds new markup. Relies
-// on marked wrapping blockquote text in <p> (so element children carry all content).
-function _pbpFlattenBlockquote(bq, depth, out) {
-  const own = document.createElement("blockquote");
-  own.className = "pb-forum-comment";
-  own.dataset.pbDepth = String(depth);
+// after marked, one top-level thread = one block, so translate/ask/explain would
+// treat the whole thread as a single unit. Earlier we FLATTENED (hoisted each
+// comment to a top-level blockquote), which destroyed the nested-blockquote
+// styling. Instead we mark IN PLACE: each comment's own content (its leading
+// non-blockquote children) is wrapped in a <div class="pb-comment-body">, while
+// the reply <blockquote>s stay nested exactly where they are. The block indexer
+// (pbpAiIndexBlocks) then indexes each .pb-comment-body as one comment, so
+// per-comment translation is unchanged; but the nested DOM is preserved, so
+// md-preview.css renders the thread like the exported/downloaded HTML. Moves
+// already-sanitized element nodes — never builds markup other than the wrapper
+// <div>. Relies on marked wrapping blockquote text in <p> (element children
+// carry all content). canonicalMarkdown (export/Copy/Raw) is unaffected — this
+// only mutates the rendered DOM. md-preview runs it (only when info.forum) right
+// after innerHTML, before pbpAiIndexBlocks.
+function _pbpMarkComment(bq) {
+  const own = [];
   const childBqs = [];
-  for (const c of Array.from(bq.children)) {   // snapshot, then move (live collection)
+  for (const c of Array.from(bq.children)) {   // snapshot: we reparent live nodes
     if (c.tagName === "BLOCKQUOTE") childBqs.push(c);
-    else own.appendChild(c);                    // this comment's own header + body
+    else own.push(c);                           // this comment's own header + body
   }
-  if (own.childNodes.length) out.push(own);      // skip shells with no own content
-  for (const c of childBqs) _pbpFlattenBlockquote(c, depth + 1, out);
+  if (own.length) {                             // skip shells with no own content
+    const body = document.createElement("div");
+    body.className = "pb-comment-body";
+    bq.insertBefore(body, own[0]);              // wrapper takes the own content's slot,
+    for (const c of own) body.appendChild(c);   // ...ahead of the reply blockquotes
+  }
+  for (const c of childBqs) _pbpMarkComment(c); // recurse into replies (nesting kept)
 }
 
-function pbpForumFlatten(rootEl) {
+function pbpForumMarkComments(rootEl) {
   if (!rootEl) return;
   for (const el of Array.from(rootEl.children)) {
-    if (el.tagName !== "BLOCKQUOTE") continue;
-    const out = [];
-    _pbpFlattenBlockquote(el, 0, out);
-    for (const node of out) rootEl.insertBefore(node, el);
-    rootEl.removeChild(el);
+    if (el.tagName === "BLOCKQUOTE") _pbpMarkComment(el);
   }
 }
 

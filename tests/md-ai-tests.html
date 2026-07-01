@@ -362,61 +362,72 @@ suite("pbpAiIndexBlocks family", () => {
   });
 });
 
-suiteIf("pbpForumFlatten", "pbpForumFlatten", () => {
+suiteIf("pbpForumMarkComments", "pbpForumMarkComments", () => {
   function root(html) { const d = document.createElement("div"); d.innerHTML = html; return d; }
-  const tops = (r) => Array.from(r.querySelectorAll(":scope > blockquote"));
+  // A comment's own text = the .pb-comment-body directly inside a blockquote,
+  // EXCLUDING nested reply blockquotes (which sit as siblings of the wrapper).
+  const bodyText = (bq) => {
+    const b = Array.from(bq.children).find((c) => c.className === "pb-comment-body");
+    return b ? b.textContent.trim() : null;
+  };
 
-  test("non-nested blockquote -> one depth-0 comment, content preserved", () => {
+  test("non-nested blockquote -> one comment body, content preserved, no extra nesting", () => {
     const r = root("<blockquote><p><strong>#1 · alice</strong></p><p>body one</p></blockquote>");
-    pbpForumFlatten(r);
-    const bqs = tops(r);
-    assertEq(bqs.length, 1, "one block");
-    assertEq(bqs[0].className, "pb-forum-comment", "class");
-    assertEq(bqs[0].dataset.pbDepth, "0", "depth 0");
-    assert(/#1 · alice/.test(bqs[0].textContent) && /body one/.test(bqs[0].textContent), "content");
-    assert(!bqs[0].querySelector("blockquote"), "no residual nesting");
+    pbpForumMarkComments(r);
+    const bq = r.querySelector(":scope > blockquote");
+    assertEq(r.querySelectorAll(".pb-comment-body").length, 1, "one comment body");
+    assert(/#1 · alice/.test(bodyText(bq)) && /body one/.test(bodyText(bq)), "own content in wrapper");
+    assert(!bq.querySelector("blockquote"), "no residual nesting");
   });
 
-  test("2-level nest -> two top-level comments, depths [0,1] pre-order", () => {
+  test("2-level nest -> nesting preserved, 2 comment bodies, pre-order [A,B]", () => {
     const r = root("<blockquote><p>A</p><blockquote><p>B</p></blockquote></blockquote>");
-    pbpForumFlatten(r);
-    const bqs = tops(r);
-    assertEq(bqs.map((b) => b.dataset.pbDepth).join(","), "0,1", "depth seq");
-    assertEq(bqs.map((b) => b.textContent.trim()).join("|"), "A|B", "pre-order");
+    pbpForumMarkComments(r);
+    assertEq(r.querySelectorAll(".pb-comment-body").length, 2, "two bodies");
+    // nesting kept: inner blockquote still inside the outer one
+    assert(r.querySelector(":scope > blockquote > blockquote"), "still nested");
+    const bodies = Array.from(r.querySelectorAll(".pb-comment-body")).map((b) => b.textContent.trim());
+    assertEq(bodies.join(","), "A,B", "document (pre) order");
+    // wrapper precedes the reply blockquote inside the outer comment
+    const outer = r.querySelector(":scope > blockquote");
+    assertEq(outer.children[0].className, "pb-comment-body", "wrapper is first child");
+    assertEq(outer.children[1].tagName, "BLOCKQUOTE", "reply blockquote follows wrapper");
   });
 
-  test("3-level with sibling -> depths [0,1,2,1] pre-order (n1,n2,n4,n3)", () => {
+  test("3-level with sibling -> pre-order n1,n2,n4,n3; depth preserved", () => {
     const r = root(
       "<blockquote><p>n1</p>" +
         "<blockquote><p>n2</p><blockquote><p>n4</p></blockquote></blockquote>" +
         "<blockquote><p>n3</p></blockquote>" +
       "</blockquote>");
-    pbpForumFlatten(r);
-    const bqs = tops(r);
-    assertEq(bqs.map((b) => b.dataset.pbDepth).join(","), "0,1,2,1", "depth seq");
-    assertEq(bqs.map((b) => b.textContent.trim()).join(","), "n1,n2,n4,n3", "pre-order");
+    pbpForumMarkComments(r);
+    const bodies = Array.from(r.querySelectorAll(".pb-comment-body")).map((b) => b.textContent.trim());
+    assertEq(bodies.join(","), "n1,n2,n4,n3", "pre-order");
+    assert(r.querySelector(":scope > blockquote > blockquote > blockquote"), "3 levels deep kept");
   });
 
-  test("empty shell (only child blockquotes) skipped; child kept at depth 1", () => {
+  test("empty shell (only child blockquotes) gets no wrapper; child still marked", () => {
     const r = root("<blockquote><blockquote><p>only child</p></blockquote></blockquote>");
-    pbpForumFlatten(r);
-    const bqs = tops(r);
-    assertEq(bqs.length, 1, "shell dropped");
-    assertEq(bqs[0].dataset.pbDepth, "1", "child depth 1");
-    assertEq(bqs[0].textContent.trim(), "only child", "child content");
+    pbpForumMarkComments(r);
+    assertEq(r.querySelectorAll(".pb-comment-body").length, 1, "one body (shell skipped)");
+    assertEq(r.querySelector(".pb-comment-body").textContent.trim(), "only child", "child content");
+    // outer shell has no own body wrapper
+    const outer = r.querySelector(":scope > blockquote");
+    assert(!Array.from(outer.children).some((c) => c.className === "pb-comment-body"), "shell unwrapped");
   });
 
   test("non-blockquote top-level elements untouched, order preserved", () => {
     const r = root("<h2>Replies</h2><blockquote><p>c1</p><blockquote><p>c2</p></blockquote></blockquote><p>after</p>");
-    pbpForumFlatten(r);
-    const kids = Array.from(r.children).map((e) => e.tagName + (e.dataset.pbDepth != null ? ":" + e.dataset.pbDepth : ""));
-    assertEq(kids.join(","), "H2,BLOCKQUOTE:0,BLOCKQUOTE:1,P", "order");
+    pbpForumMarkComments(r);
+    const kids = Array.from(r.children).map((e) => e.tagName);
+    assertEq(kids.join(","), "H2,BLOCKQUOTE,P", "top-level order + tags intact");
     assertEq(r.querySelector("h2").textContent, "Replies", "h2 intact");
     assertEq(r.querySelector(":scope > p").textContent, "after", "trailing p intact");
+    assertEq(r.querySelectorAll(".pb-comment-body").length, 2, "two comment bodies inside the thread");
   });
 
   test("null root is a no-op (no throw)", () => {
-    pbpForumFlatten(null);
+    pbpForumMarkComments(null);
     assert(true, "no throw");
   });
 });
