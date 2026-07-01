@@ -2040,4 +2040,15 @@ suiteIf("_pbpTrSyncRetryAll", "_pbpTrSyncRetryAll", () => {
   });
 })();
 </script>
+<script>
+suiteIf("_pbpTrGlossaryWorthIt", "_pbpTrGlossaryWorthIt", () => {
+  const stWith = (lens) => ({ work: lens.map((n) => ({ shielded: { text: "x".repeat(n) } })) });
+  test("short article -> not worth extracting", () => {
+    assertEq(_pbpTrGlossaryWorthIt(stWith([200, 300])), false, "500 chars < threshold");
+  });
+  test("long article -> worth extracting", () => {
+    assertEq(_pbpTrGlossaryWorthIt(stWith([1000, 1000, 1000])), true, "3000 chars >= threshold");
+  });
+});
+</script>
 </body></html>

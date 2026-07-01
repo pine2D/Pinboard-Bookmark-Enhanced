@@ -108,6 +108,14 @@ function pbpTrMergeGlossary(auto, user) {
 // Single-call terminology extraction over the whole article; >limit chars -> chunk
 // and union. Output is small (a term list), so cost is ~1x article INPUT once.
 const PBP_TR_GLOSSARY_LIMIT = 24000;
+// Below this many total shielded chars, skip auto glossary extraction: too few
+// blocks for cross-batch term drift, so the model self-coheres. Named for tuning
+// on real pages. (~a single translation batch.)
+const PBP_TR_GLOSSARY_SKIP_CHARS = 1500;
+function _pbpTrGlossaryWorthIt(st) {
+  const total = (st.work || []).reduce((a, w) => a + (w.shielded ? w.shielded.text.length : 0), 0);
+  return total >= PBP_TR_GLOSSARY_SKIP_CHARS;
+}
 const PBP_TR_GLOSSARY_SYSTEM = [
   "You are a terminology extractor for a document translator.",
   "Read the whole source text and extract the key terms that must be translated CONSISTENTLY:",
@@ -678,6 +686,7 @@ async function _pbpTrExtractGlossary(st) {
 async function _pbpTrEnsureGlossary(st) {
   if (st.glossary) return st.glossary;
   const user = pbpTrParseGlossary(st.s.translateGlossary);
+  if (!_pbpTrGlossaryWorthIt(st)) { st.glossary = pbpTrMergeGlossary(Object.create(null), user); return st.glossary; }
   let auto = null;
   try {
     auto = await pbpTrGlossaryCacheGet(st.url, st.target.code, st.modelKey);
