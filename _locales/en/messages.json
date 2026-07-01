@@ -2264,5 +2264,14 @@
   },
   "mdSendApiPerm": {
     "message": "Access permission was denied. Full text copied to clipboard — paste to finish."
+  },
+  "mdTargetWebhookUrl": {
+    "message": "Endpoint URL"
+  },
+  "mdTargetWebhookToken": {
+    "message": "Bearer token (optional)"
+  },
+  "mdTargetWebhookOnboarding": {
+    "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. If you set a token it is sent as Authorization: Bearer. Works with n8n, Make, Zapier, or any self-hosted receiver — no account needed here."
   }
 }

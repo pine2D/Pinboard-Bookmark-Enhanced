@@ -2264,5 +2264,14 @@
   },
   "mdSendApiPerm": {
     "message": "未授予访问权限，全文已复制到剪贴板——粘贴即可完成。"
+  },
+  "mdTargetWebhookUrl": {
+    "message": "接收端 URL"
+  },
+  "mdTargetWebhookToken": {
+    "message": "Bearer 令牌（可选）"
+  },
+  "mdTargetWebhookOnboarding": {
+    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。若填写令牌，会作为 Authorization: Bearer 发送。可对接 n8n、Make、Zapier 或任意自建接收端——无需在此注册账号。"
   }
 }

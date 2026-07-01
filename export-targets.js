@@ -40,6 +40,8 @@ const _PBP_ICON_OBSIDIAN =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>';
 const _PBP_ICON_GITHUB =
   '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1C5.9 1 1 5.9 1 12c0 4.9 3.2 9 7.6 10.4.6.1.8-.2.8-.5v-1.8c-3.1.7-3.8-1.5-3.8-1.5-.5-1.3-1.2-1.6-1.2-1.6-1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 1.7 2.6 1.2 3.2.9.1-.7.4-1.2.7-1.5-2.5-.3-5.1-1.2-5.1-5.5 0-1.2.4-2.2 1.1-3-.1-.3-.5-1.4.1-2.9 0 0 .9-.3 3 1.1.9-.2 1.8-.4 2.7-.4.9 0 1.8.1 2.7.4 2.1-1.4 3-1.1 3-1.1.6 1.5.2 2.6.1 2.9.7.8 1.1 1.8 1.1 3 0 4.3-2.6 5.2-5.1 5.5.4.3.8 1 .8 2.1v3.1c0 .3.2.6.8.5C19.8 21 23 16.9 23 12c0-6.1-4.9-11-11-11z"/></svg>';
+const _PBP_ICON_WEBHOOK =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h11"/><path d="M10 7l5 5-5 5"/><circle cx="19.5" cy="12" r="2.5"/></svg>';
 
 const PBP_EXPORT_TARGETS = {
   obsidian: {
@@ -104,8 +106,43 @@ const PBP_EXPORT_TARGETS = {
       { key: "token", type: "secret", required: true, label: "mdTargetGithubToken" }
     ],
     onboarding: "mdTargetGithubOnboarding"
+  },
+
+  // Generic webhook — token-api to a user-supplied endpoint. POSTs a JSON
+  // envelope {title,url,date,tags,markdown}; optional Bearer token. The host
+  // origin is derived from the user's URL (dynamic), so `origin` is a fn of cfg.
+  // Success = any 2xx (the endpoint returns no id). For automation/self-hosted
+  // receivers (n8n / Make / Zapier / Readwise / Discord-via-relay).
+  webhook: {
+    id: "webhook",
+    label: "Webhook",
+    icon: _PBP_ICON_WEBHOOK,
+    mechanism: "token-api",
+    frontmatter: "strip",          // bare markdown rides the envelope's `markdown` field
+    origin(cfg) {
+      try { return new URL((cfg && cfg.url) || "").origin + "/*"; } catch (_) { return null; }
+    },
+    parseSuccess(resp) { return !!(resp && resp.ok); },
+    buildRequest(meta, body, cfg, token) {
+      meta = meta || {};
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = "Bearer " + token;
+      const payload = {
+        title: String(meta.title || ""),
+        url: String(meta.url || ""),
+        date: String(meta.date || ""),
+        tags: Array.isArray(meta.tags) ? meta.tags : [],
+        markdown: String(body || "")
+      };
+      return { url: String((cfg && cfg.url) || ""), method: "POST", headers, body: JSON.stringify(payload) };
+    },
+    settings: [
+      { key: "url", type: "text", required: true, label: "mdTargetWebhookUrl", placeholder: "https://…" },
+      { key: "token", type: "secret", label: "mdTargetWebhookToken" }
+    ],
+    onboarding: "mdTargetWebhookOnboarding"
   }
 };
 
 // Display order for the menu + settings rendering.
-function pbpExportTargetIds() { return ["obsidian", "github"]; }
+function pbpExportTargetIds() { return ["obsidian", "github", "webhook"]; }

@@ -40,12 +40,15 @@ assertEq(pbpStripFrontmatter(pbpStripFrontmatter("---\na: b\n---\nx")), "x", "id
 assertEq(pbpStripFrontmatter("---\ntitle: X\n---"), "", "strips a closing --- with no trailing newline");
 
 section("registry shape");
-assertEq(pbpExportTargetIds().join(","), "obsidian,github", "id order");
+assertEq(pbpExportTargetIds().join(","), "obsidian,github,webhook", "id order");
 assert(PBP_EXPORT_TARGETS.obsidian.mechanism === "url-scheme", "obsidian is url-scheme");
 assert(PBP_EXPORT_TARGETS.obsidian.viaClipboard === true, "obsidian uses clipboard");
 assert(PBP_EXPORT_TARGETS.github.mechanism === "token-api", "github is token-api");
 assert(PBP_EXPORT_TARGETS.github.frontmatter === "inline", "github keeps YAML (inline)");
 assert(PBP_EXPORT_TARGETS.github.settings[0].required === true, "github token is required (-> needs-setup gate)");
+assert(PBP_EXPORT_TARGETS.webhook.mechanism === "token-api", "webhook is token-api");
+assert(typeof PBP_EXPORT_TARGETS.webhook.origin === "function", "webhook origin is a fn of cfg (dynamic host)");
+assert(PBP_EXPORT_TARGETS.webhook.settings[0].required === true, "webhook url is required");
 assert(PBP_URI_BUDGET === 2000, "budget constant");
 
 section("github.buildRequest (private gist)");
@@ -77,6 +80,32 @@ section("github.precheckRequest");
   assert(pr.method === "GET", "GET");
   assert(pr.headers.Authorization === "Bearer tok", "bearer token");
 }
+
+section("webhook.buildRequest (JSON envelope + optional auth)");
+{
+  const req = PBP_EXPORT_TARGETS.webhook.buildRequest(
+    { title: "T", url: "U", date: "D", tags: ["a", "b"] }, "# body", { url: "https://hook.example.com/x" }, "tok");
+  assert(req.url === "https://hook.example.com/x", "posts to the user URL");
+  assert(req.method === "POST", "POST");
+  assert(req.headers["Content-Type"] === "application/json", "json content-type");
+  assert(req.headers.Authorization === "Bearer tok", "token -> Bearer header");
+  const b = JSON.parse(req.body);
+  assert(b.title === "T" && b.url === "U" && b.date === "D", "envelope carries meta fields");
+  assert(Array.isArray(b.tags) && b.tags[0] === "a", "tags array");
+  assert(b.markdown === "# body", "markdown field carries the body");
+}
+{
+  const req2 = PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T" }, "x", { url: "https://h/x" }, "");
+  assert(req2.headers.Authorization === undefined, "no Authorization header when token is empty");
+}
+
+section("webhook.origin (derived from the user URL)");
+assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "https://hook.example.com/abc?x=1" }) === "https://hook.example.com/*", "origin = URL host + /*");
+assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "not a url" }) === null, "malformed URL -> null origin");
+
+section("webhook.parseSuccess (any 2xx)");
+assert(PBP_EXPORT_TARGETS.webhook.parseSuccess({ ok: true }) === true, "2xx -> delivered");
+assert(PBP_EXPORT_TARGETS.webhook.parseSuccess({ ok: false }) === false, "non-2xx -> not delivered");
 
 section("pbpUriTooLong");
 assert(pbpUriTooLong("x".repeat(2001)) === true, "over budget");

@@ -37,8 +37,11 @@ async function pbpSendToTarget(id, ctx) {
     // Token-API path: permission -> precheck -> optional preRequest -> request,
     // with a clipboard-safe failure fallback. GitHub Gist ships on this branch
     // today; it is also the generic template for further token-api targets.
-    if (row.buildRequest && cfg.token) {
-      const token = (typeof deobfuscateKey === "function") ? deobfuscateKey(cfg.token) : cfg.token;
+    // A row's token may be REQUIRED (github) or OPTIONAL (webhook) — the
+    // required-config guard above gates entry, so keying off buildRequest alone
+    // is correct.
+    if (row.buildRequest) {
+      const token = (cfg.token && typeof deobfuscateKey === "function") ? deobfuscateKey(cfg.token) : (cfg.token || "");
       // Helper: on ANY failure, copy the full body to the clipboard so the
       // article is never lost (degrade-never-lose). Defined before the
       // permission gate so a denial also lands the clip on the clipboard.
@@ -46,14 +49,18 @@ async function pbpSendToTarget(id, ctx) {
         try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_) {}
         return { ok: false, fellBack: false, error: errCode };
       };
-      // Ensure host permission (this runs inside the user's click gesture).
-      try {
-        const has = await chrome.permissions.contains({ origins: [row.origin] });
-        if (!has) {
-          const granted = await chrome.permissions.request({ origins: [row.origin] });
-          if (!granted) return apiFail("api-perm");   // copy + accurate "denied" cause
-        }
-      } catch (_) {}
+      // Resolve the host origin — a fixed string, or a fn of cfg for user-URL
+      // targets (webhook) — and ensure permission inside the click gesture.
+      const origin = (typeof row.origin === "function") ? row.origin(cfg) : row.origin;
+      if (origin) {
+        try {
+          const has = await chrome.permissions.contains({ origins: [origin] });
+          if (!has) {
+            const granted = await chrome.permissions.request({ origins: [origin] });
+            if (!granted) return apiFail("api-perm");   // copy + accurate "denied" cause
+          }
+        } catch (_) {}
+      }
       // Liveness/token precheck.
       if (row.precheckRequest) {
         try {
@@ -80,11 +87,12 @@ async function pbpSendToTarget(id, ctx) {
         if (resp.status === 401) return apiFail("api-token");
         if (!resp.ok) return apiFail("api-failed");
         const json = await resp.json().catch(() => null);
-        // ponytail: success heuristic (truthy id/uuid). Per-target rows can
-        // refine this when a real cloud-API target lands. url = the created
-        // resource's web link when the API returns one (gist: html_url).
-        if (json && (json.uuid || json.id)) {
-          return { ok: true, fellBack: false, error: null, url: json.html_url || json.url || null };
+        // Success: row-defined (webhook = any 2xx, since it returns no id) else
+        // the id/uuid heuristic (gist returns id). url = the created resource's
+        // web link when the API returns one (gist: html_url).
+        const ok = row.parseSuccess ? row.parseSuccess(resp, json) : !!(json && (json.uuid || json.id));
+        if (ok) {
+          return { ok: true, fellBack: false, error: null, url: (json && (json.html_url || json.url)) || null };
         }
         return apiFail("api-failed");
       } catch (_) { return apiFail("api-down"); }
