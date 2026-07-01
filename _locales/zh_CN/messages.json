@@ -109,7 +109,7 @@
     "message": "认证失败"
   },
   "settingsPassword": {
-    "message": "settings/password"
+    "message": "设置/密码"
   },
   "labelUrl": {
     "message": "网址"

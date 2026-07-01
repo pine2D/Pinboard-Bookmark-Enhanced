@@ -1000,7 +1000,7 @@
     "message": "Passen Sie die an die AI gesendeten Prompts an. Platzhalter: {{title}} {{url}} {{content}} {{description}} {{lang_instruction}} {{separator_instruction}}. Leer lassen für Standardwerte."
   },
   "labelTagPrompt": {
-    "message": "AI Tags Prompt"
+    "message": "AI-Tags-Prompt"
   },
   "tagPromptHint": {
     "message": "Leer lassen für den oben angezeigten Standard-Prompt. Muss die AI anweisen, [\"tag1\",\"tag2\"] Format zurückzugeben."

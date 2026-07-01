@@ -351,7 +351,7 @@
     "message": "未読"
   },
   "qlNotes": {
-    "message": "Notes"
+    "message": "メモ"
   },
   "qlPopular": {
     "message": "人気"
@@ -1182,7 +1182,7 @@
     "message": "未読ブックマーク"
   },
   "qlNotesTitle": {
-    "message": "Notes"
+    "message": "メモ"
   },
   "secSync": {
     "message": "データ同期"
