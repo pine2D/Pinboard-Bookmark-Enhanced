@@ -2007,4 +2007,37 @@ suiteIf("_pbpTrSyncRetryAll", "_pbpTrSyncRetryAll", () => {
   });
 });
 </script>
+<script>
+// ============ _pbpTrMapLimit (async, self-reporting) ============
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2"); h.textContent = "_pbpTrMapLimit (async)"; host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  if (typeof _pbpTrMapLimit !== "function") {
+    const div = document.createElement("div"); div.className = "case skip";
+    div.textContent = "SKIP _pbpTrMapLimit (not loaded)"; host.appendChild(div); SKIP++; return;
+  }
+  await atest("preserves input order and returns all results", async () => {
+    const out = await _pbpTrMapLimit([1, 2, 3, 4], 2, async (x) => x * 10);
+    assertEq(out.join(","), "10,20,30,40", "order preserved");
+  });
+  await atest("never exceeds the concurrency limit", async () => {
+    let inFlight = 0, peak = 0;
+    await _pbpTrMapLimit([1, 2, 3, 4, 5, 6], 2, async () => {
+      inFlight++; peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 3));      // real delay so overlap is observable
+      inFlight--;
+    });
+    assert(peak <= 2, "peak concurrency " + peak + " must be <= 2");
+  });
+})();
+</script>
 </body></html>

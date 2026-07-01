@@ -633,6 +633,19 @@ function _pbpTrBuildSection(st) {
   stop.addEventListener("click", () => { if (st.ctrl) st.ctrl.abort(); });
 }
 
+// Bounded-concurrency map: run fn over items, at most `limit` in flight, results
+// in input order. (DOM-free; the Map half of a map-reduce over glossary chunks.)
+async function _pbpTrMapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) { const i = next++; results[i] = await fn(items[i], i); }
+  }
+  const n = Math.min(limit || 1, Math.max(items.length, 1));
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  return results;
+}
+
 // Run the extraction pass over the full shielded article text. Returns a term map
 // (possibly empty) on success, or null on failure (caller then uses user glossary only).
 async function _pbpTrExtractGlossary(st) {
@@ -643,15 +656,20 @@ async function _pbpTrExtractGlossary(st) {
     : _pbpTrSplitText(full, PBP_TR_GLOSSARY_LIMIT).chunks;
   const model = pbpAiResolveModelOverride(st.s);
   const merged = Object.create(null);
-  for (const chunk of chunks) {
-    if (st.ctrl && st.ctrl.signal && st.ctrl.signal.aborted) break;
+  // Bounded fan-out (limit 2 = queue default; NOT naked Promise.all — 24k-char
+  // chunks would blow TPM). A chunk that errors degrades to no terms; the others
+  // still merge. The <=24000-char common case is a single chunk = one call.
+  const outs = await _pbpTrMapLimit(chunks, 2, async (chunk) => {
+    if (st.ctrl && st.ctrl.signal && st.ctrl.signal.aborted) return "";
     const { system, prompt } = pbpTrBuildGlossaryPrompt(chunk, st.target.name);
-    const out = await callAIStream(st.s, prompt, {
-      system, model, temperature: 0.1, noThinking: true,
-      signal: st.ctrl && st.ctrl.signal, maxTokens: 2048
-    }, () => {});
-    Object.assign(merged, pbpTrParseGlossaryJson(out));
-  }
+    try {
+      return await callAIStream(st.s, prompt, {
+        system, model, temperature: 0.1, noThinking: true,
+        signal: st.ctrl && st.ctrl.signal, maxTokens: 2048
+      }, () => {});
+    } catch (_) { return ""; }
+  });
+  for (const out of outs) Object.assign(merged, pbpTrParseGlossaryJson(out));
   return merged;
 }
 
