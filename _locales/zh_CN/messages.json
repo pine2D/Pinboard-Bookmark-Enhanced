@@ -1367,7 +1367,7 @@
     "message": "在预览页面复制或下载 Markdown 时应用。可在每次导出时单独覆盖。"
   },
   "mdExportIncludeToc": {
-    "message": "包含目录"
+    "message": "包含文章目录"
   },
   "mdOptIncludeToc": {
     "message": "含目录"

@@ -1367,7 +1367,7 @@
     "message": "在預覽頁面複製或下載 Markdown 時套用。可於每次匯出時個別覆寫。"
   },
   "mdExportIncludeToc": {
-    "message": "包含目錄"
+    "message": "包含文章目錄"
   },
   "mdOptIncludeToc": {
     "message": "含目錄"
