@@ -1851,6 +1851,38 @@ suiteIf("pbpTrBuildGlossaryPrompt", "pbpTrBuildGlossaryPrompt", () => {
   });
 });
 
+// ============ _pbpExplainPackContext forum regression ============
+suiteIf("_pbpExplainPackContext forum", "_pbpExplainPackContext", () => {
+  test("explains bob's comment body, not the whole thread", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    view.innerHTML =
+      "<blockquote><p>alice body</p>" +
+        "<blockquote><p>bob body</p><blockquote><p>carol body</p></blockquote></blockquote>" +
+        "<blockquote><p>dave body</p></blockquote>" +
+      "</blockquote>";
+    document.body.appendChild(view);
+    try {
+      pbpForumMarkComments(view);
+      pbpAiIndexBlocks(view);
+      // document order after marking: alice=1, bob=2, carol=3, dave=4
+      const bodies = view.querySelectorAll(".pb-comment-body");
+      const bobP = bodies[1].querySelector("p"); // bodies[0]=alice, [1]=bob
+      const range = document.createRange();
+      range.selectNodeContents(bobP);
+      const ctx = _pbpExplainPackContext({ range, text: "bob body" });
+      assert(ctx.blockText.indexOf("bob body") !== -1, "blockText must contain bob");
+      assert(ctx.blockText.indexOf("alice") === -1, "blockText must NOT contain alice (whole-thread leak)");
+      assert(ctx.blockText.indexOf("carol") === -1, "blockText must NOT contain carol");
+      assert(ctx.blockText.indexOf("dave") === -1, "blockText must NOT contain dave");
+      assert(ctx.prevText.indexOf("alice body") !== -1, "prevText is alice (n-1)");
+      assert(ctx.nextText.indexOf("carol body") !== -1, "nextText is carol (n+1)");
+    } finally {
+      document.body.removeChild(view);
+    }
+  });
+});
+
 // ============ Task 5 (T0-c): thinkingOff dialect + 4xx self-healing ============
 suite("effectiveExtraBody: provider dialect when not rejected", () => {
   test("zhipu gets thinking disabled", () => {

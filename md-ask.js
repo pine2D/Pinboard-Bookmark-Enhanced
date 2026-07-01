@@ -1309,7 +1309,7 @@ function _pbpExplainPackContext(cap) {
   if (view && !pbpAiBlocks().length) pbpAiIndexBlocks(view);
   let node = cap.range.startContainer;
   if (node && node.nodeType !== 1) node = node.parentElement;
-  const blockEl = node ? node.closest("#rendered-view > *") : null;
+  const blockEl = node ? node.closest("[data-pb], .pb-tr, #rendered-view > *") : null;
   let n = 0;
   let trText = "";
   if (blockEl && blockEl.dataset.pb) {
