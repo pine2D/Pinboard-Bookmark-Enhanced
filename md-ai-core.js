@@ -22,11 +22,21 @@ function pbpAiIndexBlocks(rootEl) {
   _pbpAiMdCache = Object.create(null);
   if (!rootEl) return _pbpAiBlockIndex;
   let n = 0;
-  for (const el of rootEl.children) {
-    if (PBP_AI_BLOCK_TAGS.indexOf(el.tagName) === -1) continue;
+  const add = (el, tag) => {
     n += 1;
     el.dataset.pb = String(n);
-    _pbpAiBlockIndex.push({ n, el, tag: el.tagName.toLowerCase() });
+    _pbpAiBlockIndex.push({ n, el, tag });
+  };
+  // Forum pages (pbpForumMarkComments ran): a thread <blockquote> is a container,
+  // not a block — index each comment's .pb-comment-body in document (pre) order.
+  const isForum = !!rootEl.querySelector(".pb-comment-body");
+  for (const el of rootEl.children) {
+    if (isForum && el.tagName === "BLOCKQUOTE" && el.querySelector(".pb-comment-body")) {
+      for (const body of el.querySelectorAll(".pb-comment-body")) add(body, "div");
+      continue;
+    }
+    if (PBP_AI_BLOCK_TAGS.indexOf(el.tagName) === -1) continue;
+    add(el, el.tagName.toLowerCase());
   }
   return _pbpAiBlockIndex;
 }

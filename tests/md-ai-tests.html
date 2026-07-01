@@ -432,6 +432,38 @@ suiteIf("pbpForumMarkComments", "pbpForumMarkComments", () => {
   });
 });
 
+suiteIf("pbpAiIndexBlocks forum", "pbpAiIndexBlocks", () => {
+  test("non-forum: unchanged — indexes top-level block tags in order", () => {
+    const r = document.createElement("div");
+    r.innerHTML = "<p>a</p><blockquote><p>quote</p></blockquote><pre><code>x</code></pre>";
+    const idx = pbpAiIndexBlocks(r);
+    assertEq(idx.length, 3, "3 blocks");
+    assertEq(idx.map((b) => b.tag).join(","), "p,blockquote,pre", "tags in order");
+    assertEq(r.querySelector("p").dataset.pb, "1", "first p is block 1");
+  });
+
+  test("forum: indexes each comment body in document order; thread container is not a block", () => {
+    const r = document.createElement("div");
+    r.innerHTML =
+      "<h2>Story</h2>" +
+      "<blockquote><p>alice</p>" +
+        "<blockquote><p>bob</p><blockquote><p>carol</p></blockquote></blockquote>" +
+        "<blockquote><p>dave</p></blockquote>" +
+      "</blockquote>" +
+      "<p>footer</p>";
+    pbpForumMarkComments(r);
+    const idx = pbpAiIndexBlocks(r);
+    // 1=Story(h2), 2=alice, 3=bob, 4=carol, 5=dave, 6=footer
+    assertEq(idx.length, 6, "block count");
+    assertEq(idx.map((b) => b.el.textContent.trim()).join(","),
+      "Story,alice,bob,carol,dave,footer", "document order, own-content only");
+    assert(!Array.from(r.querySelectorAll("blockquote")).some((bq) => bq.dataset.pb),
+      "no blockquote container carries data-pb");
+    assertEq(r.querySelector(".pb-comment-body").dataset.pb, "2", "first comment body is block 2");
+    assertEq(idx[1].tag, "div", "comment body tag is div");
+  });
+});
+
 // ============ Task 4: pbpAiShield / pbpAiRestore ============
 suite("pbpAiShield", () => {
   test("inline code becomes C placeholder", () => {
