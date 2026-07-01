@@ -371,6 +371,24 @@ main {
   background: rgba(128, 128, 128, 0.4);
   transform: translateY(-50%);
 }
+/* Translated-only view: the original .pb-comment-body is display:none, so mirror the
+   author accent + elbow onto the visible .pb-tr translation. Scoped to body.tr-only so
+   bilingual (original still shown) never gets a duplicate elbow. `blockquote > .pb-tr`
+   only matches forum comment translations (a non-forum block's .pb-tr sits beside the
+   blockquote, not inside it), so non-forum views are unaffected. */
+body.tr-only #rendered-view blockquote > .pb-tr > p:first-child > strong:first-child { color: var(--bq-border); }
+body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child { position: relative; }
+body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  width: 14px;
+  height: 1px;
+  background: rgba(128, 128, 128, 0.4);
+  transform: translateY(-50%);
+}
+
 /* Forum comment own-body wrapper (pbpForumMarkComments): transparent passthrough.
    It exists only to give the block indexer / translation one element per comment;
    the nested-blockquote rules above provide all the visual structure. */
