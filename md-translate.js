@@ -435,6 +435,25 @@ function pbpTrComposeView(mode, items) {
   return parts.join("\n\n");
 }
 
+// Forum translated-view export: pbpTrComposeView joins the FLAT block index, which
+// loses comment nesting (each comment's own md concatenated at top level). For forum
+// pages we serialize the already-nested rendered DOM instead — turndown yields the same
+// nested blockquotes as canonicalMarkdown, with each comment's .pb-tr translation inline
+// — so the download matches the on-screen preview. Reuses _pbpAiKatexPrepass (rendered
+// KaTeX -> $tex$) for math fidelity, drops failure pills, and in translated-only mode
+// drops the translated originals (mirrors the tr-only CSS, which hides [data-pb-tr-done]).
+function _pbpTrSerializeForumView(mode) {
+  const view = document.getElementById("rendered-view");
+  if (!view) return "";
+  const clone = view.cloneNode(true);
+  _pbpAiKatexPrepass(clone);
+  clone.querySelectorAll(".pb-tr-err").forEach((e) => e.remove());
+  if (mode !== "bilingual") {
+    clone.querySelectorAll("[data-pb-tr-done]").forEach((e) => e.remove());
+  }
+  return htmlToMarkdown(clone.innerHTML).trim();
+}
+
 // ============================================================
 // DOM / UI layer. Lazily mounted: pbpTrInit runs on "pbp:rendered",
 // builds the rail section only when gating passes; everything heavier
@@ -956,8 +975,12 @@ function _pbpTrSetMode(st, mode, persist) {
   _pbpTrSyncToc(st, mode);
   // Export follows the view: md-preview.js consults window.pbpViewMarkdown
   // (function in bilingual/translated, null in original) before getMarkdown().
-  window.pbpViewMarkdown = (mode === "original") ? null
-    : () => pbpTrComposeView(mode, pbpAiBlocks().map((b) => ({ orig: pbpAiMdOf(b.n), tr: st.trMd[b.n] || null })));
+  window.pbpViewMarkdown = (mode === "original") ? null : () => {
+    // Forum pages: serialize the nested rendered DOM so the export keeps the thread
+    // structure (matches the preview); non-forum: the flat block-index compose is correct.
+    if (document.querySelector("#rendered-view .pb-comment-body")) return _pbpTrSerializeForumView(mode);
+    return pbpTrComposeView(mode, pbpAiBlocks().map((b) => ({ orig: pbpAiMdOf(b.n), tr: st.trMd[b.n] || null })));
+  };
   if (persist) pbpTrViewSet(st.url, { mode, lang: st.target.code }).catch(() => {});
 }
 

@@ -1926,5 +1926,48 @@ suite("shouldRetryNoThink: only 400/422 with thinkingOff and not rejected", () =
     assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.groq, false, 400), false, "no thinkingOff");
   });
 });
+
+suiteIf("_pbpTrSerializeForumView", "_pbpTrSerializeForumView", () => {
+  function build() {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    document.body.appendChild(view);
+    view.innerHTML =
+      "<blockquote><p>alice body</p>" +
+        "<blockquote><p>bob body</p></blockquote>" +
+      "</blockquote>";
+    pbpForumMarkComments(view);
+    pbpAiIndexBlocks(view);
+    // simulate translations: mark each original done + insert its .pb-tr sibling
+    view.querySelectorAll(".pb-comment-body").forEach((b, i) => {
+      b.setAttribute("data-pb-tr-done", "1");
+      const tr = document.createElement("div");
+      tr.className = "pb-tr";
+      tr.innerHTML = "<p>" + (i === 0 ? "ALTR" : "BOTR") + "</p>";
+      b.insertAdjacentElement("afterend", tr);
+    });
+    return view;
+  }
+
+  test("bilingual: NOT flat — nested (>>) blockquote present, orig + tr both kept", () => {
+    const view = build();
+    try {
+      const md = _pbpTrSerializeForumView("bilingual");
+      assert(/^>\s*>/m.test(md), "output has a doubly-nested blockquote line (not flat)");
+      assert(md.indexOf("alice body") !== -1 && md.indexOf("bob body") !== -1, "originals kept");
+      assert(md.indexOf("ALTR") !== -1 && md.indexOf("BOTR") !== -1, "translations kept");
+    } finally { document.body.removeChild(view); }
+  });
+
+  test("translated-only: originals dropped, translations kept + still nested", () => {
+    const view = build();
+    try {
+      const md = _pbpTrSerializeForumView("translated");
+      assert(md.indexOf("alice body") === -1 && md.indexOf("bob body") === -1, "translated originals dropped");
+      assert(md.indexOf("ALTR") !== -1 && md.indexOf("BOTR") !== -1, "translations kept");
+      assert(/^>\s*>/m.test(md), "translations still nested (>>)");
+    } finally { document.body.removeChild(view); }
+  });
+});
 </script>
 </body></html>
