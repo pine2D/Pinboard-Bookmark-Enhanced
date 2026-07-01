@@ -81,8 +81,11 @@ async function pbpSendToTarget(id, ctx) {
         if (!resp.ok) return apiFail("api-failed");
         const json = await resp.json().catch(() => null);
         // ponytail: success heuristic (truthy id/uuid). Per-target rows can
-        // refine this when a real cloud-API target lands.
-        if (json && (json.uuid || json.id)) return { ok: true, fellBack: false, error: null };
+        // refine this when a real cloud-API target lands. url = the created
+        // resource's web link when the API returns one (gist: html_url).
+        if (json && (json.uuid || json.id)) {
+          return { ok: true, fellBack: false, error: null, url: json.html_url || json.url || null };
+        }
         return apiFail("api-failed");
       } catch (_) { return apiFail("api-down"); }
     }

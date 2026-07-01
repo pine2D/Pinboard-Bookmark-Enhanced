@@ -504,13 +504,25 @@ function ensureKatex() {
     const menu = document.getElementById("send-menu");
     const sendStatus = document.getElementById("send-status");
     let sendStatusTimer;
-    function showSendStatus(msg, isError) {
+    function showSendStatus(msg, isError, url) {
       if (!sendStatus) return;
       clearTimeout(sendStatusTimer);
       sendStatus.classList.toggle("error", !!isError);
       sendStatus.hidden = false;          // unhide before setting text so aria-live announces it
       sendStatus.textContent = msg;
-      sendStatusTimer = setTimeout(() => { sendStatus.hidden = true; sendStatus.textContent = ""; }, 6000);
+      if (url) {
+        if (msg) sendStatus.appendChild(document.createTextNode(" "));
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = t("mdSendViewGist");
+        // Let the link open without the parent's dismiss-on-click swallowing it.
+        a.addEventListener("click", (e) => e.stopPropagation());
+        sendStatus.appendChild(a);
+      }
+      // Give a clickable link longer before it auto-hides.
+      sendStatusTimer = setTimeout(() => { sendStatus.hidden = true; sendStatus.textContent = ""; }, url ? 15000 : 6000);
     }
     if (sendStatus) sendStatus.addEventListener("click", () => {
       clearTimeout(sendStatusTimer); sendStatus.hidden = true; sendStatus.textContent = "";
@@ -561,6 +573,7 @@ function ensureKatex() {
       setPrimary(id);
       if (res.ok && !res.fellBack) {
         flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label));        // short -> button
+        if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url); // + clickable link
       } else if (res.ok) {
         showSendStatus(t("mdSendTooLongFellBack").replace("{name}", row.label), false); // long -> roomy block
       } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {

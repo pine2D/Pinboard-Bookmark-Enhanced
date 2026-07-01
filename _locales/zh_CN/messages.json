@@ -2270,5 +2270,8 @@
   },
   "mdTargetGithubOnboarding": {
     "message": "在 GitHub → Settings → Developer settings → Tokens (classic) 创建一个经典个人访问令牌，勾选「gist」权限，粘贴到下方。每条剪藏会保存为一个私有 gist。注意：细粒度（fine-grained）令牌暂不支持创建 gist，请使用 classic 令牌。"
+  },
+  "mdSendViewGist": {
+    "message": "查看 gist →"
   }
 }

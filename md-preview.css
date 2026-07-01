@@ -647,6 +647,8 @@ body.md-empty main { margin-left: 0; }
   border-radius: 6px; cursor: pointer;
 }
 .send-status.error { color: var(--danger); border-left-color: var(--danger); }
+.send-status a { color: var(--link); font-weight: 600; text-decoration: underline; white-space: nowrap; }
+.send-status a:hover { color: var(--link-hover); }
 .send-status[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
