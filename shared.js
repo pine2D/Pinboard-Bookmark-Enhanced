@@ -198,6 +198,12 @@ const SETTINGS_DEFAULTS = {
   popupWidth: 550,
   mdExportFrontmatter: true, mdExportImagePolicy: "keep", mdExportIncludeToc: false,
   obsidianEnabled: false, obsidianVault: "", obsidianFolder: "",
+  // Registry-driven "Send to ▾" per-target config (Obsidian, GitHub Gist, …).
+  // MUST live here: options loads settings via get(SETTINGS_DEFAULTS), so a key
+  // absent from this object is never fetched — the card renders empty on reload
+  // and a subsequent save overwrites the stored value (github had no legacy
+  // mirror to fall back on, unlike obsidian*).
+  exportTargets: {},
   urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] },
   // pinboard.in tag-page "sort by popularity" control (site enhancement, default on)
   tagSortByPopEnabled: true,
