@@ -939,6 +939,10 @@ async function _pbpTrRetryAllFailed(st) {
     if (w) await _pbpTrRetryBlock(st, w, btn);
   }
   _pbpTrSyncRetryAll();
+  // If some blocks still failed, the button is shown again but was disabled at entry;
+  // re-arm it so the user can run retry-all again. (Kept disabled DURING the run above
+  // to prevent concurrent re-clicks.)
+  if (all && !all.hidden) all.disabled = false;
 }
 
 function _pbpTrSetStatus(st, status) {

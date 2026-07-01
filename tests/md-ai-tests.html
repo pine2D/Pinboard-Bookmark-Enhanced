@@ -1988,6 +1988,23 @@ suiteIf("_pbpTrSyncRetryAll", "_pbpTrSyncRetryAll", () => {
     try { _pbpTrSyncRetryAll(); assertEq(document.getElementById("tr-retry-all").hidden, false, "shown"); }
     finally { document.body.removeChild(w); document.body.removeChild(pill); }
   });
+  test("retry-all re-arms the button (not disabled) when failures still remain", () => {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = '<button id="tr-retry-all"></button>';
+    document.body.appendChild(wrap);
+    const pill = document.createElement("button");
+    pill.className = "pb-tr-err";
+    pill.dataset.pbTrErr = "99";           // no matching st.work item -> loop is a no-op
+    document.body.appendChild(pill);
+    try {
+      // async fn, but with empty work it hits NO await -> runs fully synchronously,
+      // so the button's final state is observable right after the call.
+      _pbpTrRetryAllFailed({ work: [] });
+      const all = document.getElementById("tr-retry-all");
+      assertEq(all.hidden, false, "still shown while a failure remains");
+      assertEq(all.disabled, false, "re-armed, not stuck disabled");
+    } finally { document.body.removeChild(wrap); document.body.removeChild(pill); }
+  });
 });
 </script>
 </body></html>
