@@ -2267,5 +2267,8 @@
   },
   "mdSendViewGist": {
     "message": "View gist →"
+  },
+  "mdSendApiPerm": {
+    "message": "Access permission was denied. Full text copied to clipboard — paste to finish."
   }
 }

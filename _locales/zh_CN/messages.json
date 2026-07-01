@@ -2261,5 +2261,8 @@
   },
   "mdSendViewGist": {
     "message": "查看 gist →"
+  },
+  "mdSendApiPerm": {
+    "message": "未授予访问权限，全文已复制到剪贴板——粘贴即可完成。"
   }
 }

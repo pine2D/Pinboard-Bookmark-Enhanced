@@ -34,26 +34,26 @@ async function pbpSendToTarget(id, ctx) {
   if (missing) return { ok: false, fellBack: false, error: "missing:" + missing.key };
 
   try {
-    // Token-API path (reusable scaffolding for token-authenticated targets):
-    // used when a row exposes buildRequest AND the user configured a token.
-    // No row ships this today; kept as the template for future cloud-API
-    // targets — generic shape: permission -> precheck ->
-    // optional preRequest -> request, with a clipboard-safe failure fallback.
+    // Token-API path: permission -> precheck -> optional preRequest -> request,
+    // with a clipboard-safe failure fallback. GitHub Gist ships on this branch
+    // today; it is also the generic template for further token-api targets.
     if (row.buildRequest && cfg.token) {
       const token = (typeof deobfuscateKey === "function") ? deobfuscateKey(cfg.token) : cfg.token;
+      // Helper: on ANY failure, copy the full body to the clipboard so the
+      // article is never lost (degrade-never-lose). Defined before the
+      // permission gate so a denial also lands the clip on the clipboard.
+      const apiFail = async (errCode) => {
+        try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_) {}
+        return { ok: false, fellBack: false, error: errCode };
+      };
       // Ensure host permission (this runs inside the user's click gesture).
       try {
         const has = await chrome.permissions.contains({ origins: [row.origin] });
         if (!has) {
           const granted = await chrome.permissions.request({ origins: [row.origin] });
-          if (!granted) return { ok: false, fellBack: false, error: "api-down" };
+          if (!granted) return apiFail("api-perm");   // copy + accurate "denied" cause
         }
       } catch (_) {}
-      // Helper: on API failure, copy full body to clipboard so content is never lost.
-      const apiFail = async (errCode) => {
-        try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_) {}
-        return { ok: false, fellBack: false, error: errCode };
-      };
       // Liveness/token precheck.
       if (row.precheckRequest) {
         try {
@@ -94,7 +94,11 @@ async function pbpSendToTarget(id, ctx) {
       if (row.viaClipboard) {
         // Body rides the clipboard; the URI references it (never too long).
         const fileBody = pbpBuildFileBody(id, meta, rawBody);
-        try { await navigator.clipboard.writeText(fileBody); } catch (_) {}
+        let copied = true;
+        try { await navigator.clipboard.writeText(fileBody); } catch (_) { copied = false; }
+        // If the clipboard write failed, opening the app would create an EMPTY
+        // note while claiming success — report failure instead (no data loss).
+        if (!copied) return { ok: false, fellBack: false, error: "" };
         const uri = row.buildUri(meta, rawBody, cfg);
         window.open(uri, "_blank");
         return { ok: true, fellBack: false, error: null };

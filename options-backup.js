@@ -21,6 +21,20 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
       Object.entries(raw).filter(([, v]) => v !== undefined)
     );
     exportData._schemaVersion = 2;
+    // Strip NESTED secrets (e.g. exportTargets.github.token) — the top-level
+    // API_KEY_FIELDS exclusion only covers flat keys, so a nested token would
+    // otherwise ride into this shareable plaintext backup. Keep non-secret
+    // fields (enabled/vault/folder) so config still roundtrips.
+    if (exportData.exportTargets && typeof PBP_EXPORT_TARGETS !== "undefined") {
+      const cleaned = {};
+      for (const [tid, cfg] of Object.entries(exportData.exportTargets)) {
+        cleaned[tid] = Object.assign({}, cfg);
+        const row = PBP_EXPORT_TARGETS[tid];
+        ((row && row.settings) || []).forEach((s) => { if (s.type === "secret") delete cleaned[tid][s.key]; });
+        delete cleaned[tid].token;   // belt: also drop a bare token from orphan/removed targets (e.g. old logseq)
+      }
+      exportData.exportTargets = cleaned;
+    }
     // Read overlay from sync OR local fallback (preserve user data either way)
     const overlayFlags = await chrome.storage.sync.get({ optOverlayInLocal: false });
     let overlay = "";

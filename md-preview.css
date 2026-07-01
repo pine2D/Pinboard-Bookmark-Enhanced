@@ -633,7 +633,8 @@ body.md-empty main { margin-left: 0; }
 .send-mi { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px;
   background: none; border: 0; border-radius: 6px; font: inherit; color: inherit;
   text-align: left; cursor: pointer; }
-.send-mi:hover, .send-mi:focus-visible { background: var(--row-hover, rgba(127,127,127,.14)); outline: none; }
+.send-mi:hover { background: var(--row-hover, rgba(127,127,127,.14)); }
+.send-mi:focus-visible { background: var(--row-hover, rgba(127,127,127,.14)); outline: 2px solid var(--link); outline-offset: -2px; }
 .send-mi-ic { display: inline-flex; width: 14px; height: 14px; flex: 0 0 14px; }
 .send-mi-ic svg { width: 14px; height: 14px; }
 .send-mi-tag { margin-left: auto; font-size: 10px; opacity: .6; }

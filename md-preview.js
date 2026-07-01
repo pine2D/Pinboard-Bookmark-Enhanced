@@ -510,19 +510,29 @@ function ensureKatex() {
       sendStatus.classList.toggle("error", !!isError);
       sendStatus.hidden = false;          // unhide before setting text so aria-live announces it
       sendStatus.textContent = msg;
+      let hasLink = false;
       if (url) {
-        if (msg) sendStatus.appendChild(document.createTextNode(" "));
-        const a = document.createElement("a");
-        a.href = url;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.textContent = t("mdSendViewGist");
-        // Let the link open without the parent's dismiss-on-click swallowing it.
-        a.addEventListener("click", (e) => e.stopPropagation());
-        sendStatus.appendChild(a);
+        // href comes from a network JSON response and lands in a privileged
+        // extension page — only allow https: (blocks a javascript:/data: sink).
+        let safe = "";
+        try { if (new URL(url).protocol === "https:") safe = url; } catch (_) {}
+        if (safe) {
+          hasLink = true;
+          if (msg) sendStatus.appendChild(document.createTextNode(" "));
+          const a = document.createElement("a");
+          a.href = safe;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.textContent = t("mdSendViewGist");
+          // Let the link open without the parent's dismiss-on-click swallowing it.
+          a.addEventListener("click", (e) => e.stopPropagation());
+          sendStatus.appendChild(a);
+        }
       }
-      // Give a clickable link longer before it auto-hides.
-      sendStatusTimer = setTimeout(() => { sendStatus.hidden = true; sendStatus.textContent = ""; }, url ? 15000 : 6000);
+      // Plain messages auto-hide; a status carrying the gist link stays until the
+      // next send or a manual click-dismiss — so the sole URL isn't lost on a
+      // timer (and a focused link isn't yanked out from under the user).
+      if (!hasLink) sendStatusTimer = setTimeout(() => { sendStatus.hidden = true; sendStatus.textContent = ""; }, 6000);
     }
     if (sendStatus) sendStatus.addEventListener("click", () => {
       clearTimeout(sendStatusTimer); sendStatus.hidden = true; sendStatus.textContent = "";
@@ -555,37 +565,46 @@ function ensureKatex() {
     }
     setPrimary(lastId);
 
+    let _sending = false;
     async function doSend(id) {
-      const row = PBP_EXPORT_TARGETS[id];
-      setPrimary(id);
-      await pbpSetLastTarget(id);
-      const _exp = buildExportOpts();
-      const _sendBody = composeExport(getViewMarkdown(), buildMeta(), { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc });
-      primary.classList.add("sending");
-      primaryLabel.textContent = t("mdSending");
-      let res;
-      try {
-        res = await pbpSendToTarget(id, { meta: buildMeta(), rawBody: _sendBody, cfg: et[id] });
-      } catch (_) {
-        res = { ok: false, fellBack: false, error: "" };
-      }
-      primary.classList.remove("sending");
-      setPrimary(id);
-      if (res.ok && !res.fellBack) {
-        flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label));        // short -> button
-        if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url); // + clickable link
-      } else if (res.ok) {
-        showSendStatus(t("mdSendTooLongFellBack").replace("{name}", row.label), false); // long -> roomy block
-      } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {
-        showSendStatus(t("mdSendNeedsSetup"), false);
-      } else if (res.error === "api-down") {
-        showSendStatus(t("mdSendApiDown"), true);
-      } else if (res.error === "api-token") {
-        showSendStatus(t("mdSendApiBadToken"), true);
-      } else if (res.error === "api-failed") {
-        showSendStatus(t("mdSendApiFailed"), true);
-      } else {
-        showSendStatus(t("mdSendFailed"), true);
+      if (_sending) return;                 // re-entrancy guard: a double-click on a
+      _sending = true;                      // slow gist POST must not create two gists
+      try {                                 // (the "mdSending" label is the affordance;
+        const row = PBP_EXPORT_TARGETS[id]; // not disabling keeps the restored focus, F8)
+        setPrimary(id);
+        await pbpSetLastTarget(id);
+        const _exp = buildExportOpts();
+        const _sendBody = composeExport(getViewMarkdown(), buildMeta(), { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc });
+        primary.classList.add("sending");
+        primaryLabel.textContent = t("mdSending");
+        let res;
+        try {
+          res = await pbpSendToTarget(id, { meta: buildMeta(), rawBody: _sendBody, cfg: et[id] });
+        } catch (_) {
+          res = { ok: false, fellBack: false, error: "" };
+        }
+        primary.classList.remove("sending");
+        setPrimary(id);
+        if (res.ok && !res.fellBack) {
+          flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label));        // short -> button
+          if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url); // + clickable link
+        } else if (res.ok) {
+          showSendStatus(t("mdSendTooLongFellBack").replace("{name}", row.label), false); // long -> roomy block
+        } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {
+          showSendStatus(t("mdSendNeedsSetup"), false);
+        } else if (res.error === "api-perm") {
+          showSendStatus(t("mdSendApiPerm"), true);
+        } else if (res.error === "api-down") {
+          showSendStatus(t("mdSendApiDown"), true);
+        } else if (res.error === "api-token") {
+          showSendStatus(t("mdSendApiBadToken"), true);
+        } else if (res.error === "api-failed") {
+          showSendStatus(t("mdSendApiFailed"), true);
+        } else {
+          showSendStatus(t("mdSendFailed"), true);
+        }
+      } finally {
+        _sending = false;
       }
     }
 
@@ -627,7 +646,9 @@ function ensureKatex() {
         tag.className = "send-mi-tag"; tag.textContent = t("mdSendLastUsed");
         item.appendChild(tag);
       }
-      item.addEventListener("click", () => { closeMenu(); doSend(id); });
+      // Restore focus to the primary button before the menu collapses, so a
+      // keyboard user isn't dropped to <body> (WCAG 2.4.3).
+      item.addEventListener("click", () => { closeMenu(); primary.focus(); doSend(id); });
       menu.appendChild(item);
     });
 
