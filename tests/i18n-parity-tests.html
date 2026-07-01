@@ -111,6 +111,23 @@ async function loadLocale(loc) {
     check(`H5 ${loc} has no non-brand English-identical keys`, offenders.length === 0,
           `${offenders.length} left: ${offenders.slice(0,12).join(", ")}…`);
   }
+  // H6: SHAPE + full key-set parity. A prior bulk json.dump rewrite turned
+  // {"message":...} into ["message",...] and STILL passed the presence-only
+  // checks + node --check. Assert every value is a {message:string} OBJECT and
+  // each locale's key SET matches en exactly (no missing, no extra).
+  const enKeys = Object.keys(msgs.en);
+  for (const loc of LOCALES) {
+    const badShape = Object.keys(msgs[loc]).filter(k => {
+      const v = msgs[loc][k];
+      return !v || typeof v !== "object" || Array.isArray(v) || typeof v.message !== "string";
+    });
+    check(`H6 ${loc} every value is {message:string}`, badShape.length === 0,
+          `bad shape: ${badShape.slice(0,12).join(", ")}`);
+    const missing = enKeys.filter(k => !(k in msgs[loc]));
+    const extra = Object.keys(msgs[loc]).filter(k => !(k in msgs.en));
+    check(`H6 ${loc} has every en key`, missing.length === 0, `missing: ${missing.slice(0,12).join(", ")}`);
+    check(`H6 ${loc} has no extra keys`, extra.length === 0, `extra: ${extra.slice(0,12).join(", ")}`);
+  }
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>
