@@ -2066,5 +2066,16 @@ suiteIf("_pbpTrClearFailures", "_pbpTrClearFailures", () => {
     } finally { document.body.removeChild(wrap); }
   });
 });
+
+suiteIf("_pbpTrApplyTargetLang", "_pbpTrApplyTargetLang", () => {
+  test("re-resolves target + updates the label from provided settings", async () => {
+    const el = document.createElement("span");
+    const st = { tgtTextEl: el, target: { code: "en", name: "English", display: "English" } };
+    // pass settings explicitly so the async fn hits no await -> runs synchronously
+    _pbpTrApplyTargetLang(st, { translateTargetLang: "zh-CN" });
+    assert(st.target && st.target.code === "zh-CN", "st.target updated to zh-CN, got " + (st.target && st.target.code));
+    assert(el.textContent && el.textContent.length > 0, "label text set");
+  });
+});
 </script>
 </body></html>

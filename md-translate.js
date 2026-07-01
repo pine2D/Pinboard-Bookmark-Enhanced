@@ -508,6 +508,17 @@ async function pbpTrInit(detail) {
   if (!st.work.length) return;
   _pbpTrBuildSection(st);
 
+  // Refresh the rail label live when the user changes the target language in options.
+  // Area is dynamic (sync or local per optSyncEnabled); pass newValue directly to
+  // bypass the memoized stale pbpAiGetSettings promise.
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if ((area === "sync" || area === "local") && changes.translateTargetLang) {
+        _pbpTrApplyTargetLang(st, { translateTargetLang: changes.translateTargetLang.newValue }).catch(() => {});
+      }
+    });
+  }
+
   // tr-only escape hatch: click a translated block to peek at its original.
   view.addEventListener("click", (e) => {
     if (!document.body.classList.contains("tr-only")) return;
@@ -585,6 +596,7 @@ function _pbpTrBuildSection(st) {
   tgt.className = "tr-meta tr-target";
   const tgtText = document.createElement("span");
   tgtText.textContent = t("trTargetLang", st.target.display || st.target.name);
+  st.tgtTextEl = tgtText;
   tgt.appendChild(tgtText);
   const tgtLink = document.createElement("button");
   tgtLink.type = "button";
@@ -639,6 +651,19 @@ function _pbpTrBuildSection(st) {
     });
   });
   stop.addEventListener("click", () => { if (st.ctrl) st.ctrl.abort(); });
+}
+
+// Re-resolve target language from settings and update the rail label.
+// `s` may be passed (test / storage-change fast path) or fetched.
+// No-op-safe if the label element isn't mounted yet.
+// ponytail: passes s from the onChanged event to bypass the memoized stale promise.
+async function _pbpTrApplyTargetLang(st, s) {
+  s = s || await pbpAiGetSettings();
+  // ponytail: uiLangToBCP47 lives in md-preview.js (not in test env); falls back to "" which
+  // is fine since "auto" is the only code that reads uiLang, and tests pass an explicit code.
+  const uiLang = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : "";
+  st.target = pbpTrResolveTargetLang(s, uiLang);
+  if (st.tgtTextEl) st.tgtTextEl.textContent = t("trTargetLang", st.target.display || st.target.name);
 }
 
 // Bounded-concurrency map: run fn over items, at most `limit` in flight, results
