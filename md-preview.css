@@ -341,8 +341,10 @@ main {
   color: var(--bq-fg);
 }
 #rendered-view blockquote p { margin: 0.4em 0; }
-/* Author/floor header line — accent colour so each reply's author scans easily. */
-#rendered-view blockquote > p:first-child > strong:first-child { color: var(--bq-border); }
+/* Author/floor header line — accent colour so each reply's author scans easily.
+   The .pb-comment-body variant covers forum comments (own body wrapped). */
+#rendered-view blockquote > p:first-child > strong:first-child,
+#rendered-view blockquote > .pb-comment-body > p:first-child > strong:first-child { color: var(--bq-border); }
 /* Nested levels (deep reply threads): thin neutral guide + a small elbow connector,
    no tint stacking, tighter — reads as a comment tree instead of stacked blue bars.
    Only the outermost quote keeps the accent bar + tint. */
@@ -356,8 +358,10 @@ main {
 }
 /* Elbow connector anchored to the author line so it sits on its vertical centre
    (top:50% of the header <p>, not a fixed em — robust to font size / wrapping). */
-#rendered-view blockquote blockquote > p:first-child { position: relative; }
-#rendered-view blockquote blockquote > p:first-child::before {
+#rendered-view blockquote blockquote > p:first-child,
+#rendered-view blockquote blockquote > .pb-comment-body > p:first-child { position: relative; }
+#rendered-view blockquote blockquote > p:first-child::before,
+#rendered-view blockquote blockquote > .pb-comment-body > p:first-child::before {
   content: "";
   position: absolute;
   left: -16px;
@@ -367,6 +371,10 @@ main {
   background: rgba(128, 128, 128, 0.4);
   transform: translateY(-50%);
 }
+/* Forum comment own-body wrapper (pbpForumMarkComments): transparent passthrough.
+   It exists only to give the block indexer / translation one element per comment;
+   the nested-blockquote rules above provide all the visual structure. */
+#rendered-view .pb-comment-body { margin: 0; }
 
 /* Images */
 #rendered-view img {
@@ -861,7 +869,7 @@ body.tr-only #rendered-view .pb-tr { display: block; }
    and not-yet-translated blocks never carry data-pb-tr-done, so they stay
    visible by construction. .pb-show-orig is the per-block escape hatch
    (click the translated block to peek at its original, click again to hide). */
-body.tr-only #rendered-view > [data-pb-tr-done]:not(.pb-show-orig) { display: none; }
+body.tr-only #rendered-view [data-pb-tr-done]:not(.pb-show-orig) { display: none; }
 body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 
 /* Per-block failure pill: inline SVG + retry label; title carries the error. */
@@ -1095,20 +1103,4 @@ body.ask-open main { margin-right: 396px; }
 #explain-pill svg { width: 15px; height: 15px; }
 #explain-pill[hidden] { display: none; }
 
-/* ---- Forum per-comment blocks (pbpForumFlatten) ---- */
-/* Each comment is a top-level blockquote tagged with its thread depth; the adjacent
-   .pb-tr (translation sibling, when bilingual/translated) inherits the same indent so
-   the translation engine needs no forum awareness. Depth 0 = normal blockquote look.
-   The #rendered-view prefix is REQUIRED: it lifts specificity above the (1,0,1)
-   `#rendered-view blockquote { margin: 1.5em 0 }` rule, which would otherwise zero
-   margin-left. Indent is capped (deep chains clamp to the depth-6 step). */
-#rendered-view .pb-forum-comment[data-pb-depth="1"], #rendered-view .pb-forum-comment[data-pb-depth="1"] + .pb-tr { margin-left: 1.6em; }
-#rendered-view .pb-forum-comment[data-pb-depth="2"], #rendered-view .pb-forum-comment[data-pb-depth="2"] + .pb-tr { margin-left: 3.2em; }
-#rendered-view .pb-forum-comment[data-pb-depth="3"], #rendered-view .pb-forum-comment[data-pb-depth="3"] + .pb-tr { margin-left: 4.8em; }
-#rendered-view .pb-forum-comment[data-pb-depth="4"], #rendered-view .pb-forum-comment[data-pb-depth="4"] + .pb-tr { margin-left: 6.4em; }
-#rendered-view .pb-forum-comment[data-pb-depth="5"], #rendered-view .pb-forum-comment[data-pb-depth="5"] + .pb-tr { margin-left: 8em; }
-#rendered-view .pb-forum-comment[data-pb-depth="6"], #rendered-view .pb-forum-comment[data-pb-depth="6"] + .pb-tr { margin-left: 9.6em; }
-/* depth >= 7 clamps to the depth-6 step (attribute selectors can't do arithmetic) */
-#rendered-view .pb-forum-comment[data-pb-depth="7"], #rendered-view .pb-forum-comment[data-pb-depth="7"] + .pb-tr,
-#rendered-view .pb-forum-comment[data-pb-depth="8"], #rendered-view .pb-forum-comment[data-pb-depth="8"] + .pb-tr { margin-left: 9.6em; }
 
