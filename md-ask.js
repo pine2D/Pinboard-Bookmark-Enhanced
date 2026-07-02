@@ -928,7 +928,16 @@ async function _pbpAskHistRestore() {
     // SAME pipeline as live answers: pbpAiParseCites -> renderMarkdown
     // (single sanitize point) -> chip pass -> verification runs AGAIN
     // against the current block index -> decorate (copy button).
-    _pbpAskFinalize(aEl, rec.a);
+    const parsed = _pbpAskFinalize(aEl, rec.a);
+    // Seed st.rounds with the restored Q&A too, not just the DOM: it is
+    // what pbpAskBuildPrompt/_pbpAskUpdateMeta read (_pbpAskRun), so a
+    // follow-up question after a page reload still carries PREVIOUS
+    // Q&A context - same {q, a: <parsed body>} shape _pbpAskRun pushes
+    // for a live answer (md-ask.js:466).
+    if (_pbpAskState) {
+      _pbpAskState.rounds = _pbpAskState.rounds || [];
+      _pbpAskState.rounds.push({ q: String(rec.q || ""), a: parsed.body });
+    }
   }
   // Prepend: if a live round raced in before the async read finished,
   // restored history still reads in chronological order above it.
