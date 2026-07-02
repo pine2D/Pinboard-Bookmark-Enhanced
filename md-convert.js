@@ -455,10 +455,13 @@ function composeExport(canonicalMd, meta, opts) {
 }
 
 // ── Shared download helpers (used by popup + preview) ──
-// safeFilename: keep latin word chars, digits, CJK, space, hyphen; everything
-// else -> "_"; cap at 80; empty -> "untitled". (Moved/unified from md-preview.js.)
+// safeFilename: blacklist filesystem-hostile chars (/ \ ? % * : | " < > # +
+// control chars) -> "_"; all other Unicode (kana, hangul, cyrillic, accented
+// latin, ...) passes through untouched; cap at 80; empty -> "untitled".
+// (Moved/unified from md-preview.js. Was a script whitelist until B3 -- that
+// collapsed ja/ko/ru/de titles into underscore strings.)
 function safeFilename(title) {
-  const base = (title || "untitled").replace(/[^a-zA-Z0-9_一-鿿 -]/g, "_").slice(0, 80);
+  const base = (title || "untitled").replace(/[\\/?%*:|"<>#\x00-\x1F]/g, "_").slice(0, 80);
   return base || "untitled";
 }
 
