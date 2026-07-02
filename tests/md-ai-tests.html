@@ -565,6 +565,20 @@ suite("pbpAiRestore", () => {
     const sh = pbpAiShield(md);
     assertEq(pbpAiRestore(sh.text, sh.slots), md, "no cascade");
   });
+  test("KNOWN BOUNDARY: descending bare absorbed-literal placeholders swap on restore", () => {
+    // Outside the reverse-order guarantee documented at md-ai-core.js pbpAiRestore:
+    // that guarantee unwinds NESTING (a later slot's orig only ever embeds an
+    // earlier-minted ph). Here both ⟦C2⟧ and ⟦C1⟧ are bare pre-existing literals
+    // absorbed by the first shield pass, so their origs ARE placeholder strings,
+    // not markdown containing one -- absorption order (left-to-right in source)
+    // mints ⟦C1⟧ for the ⟦C2⟧ literal and ⟦C2⟧ for the ⟦C1⟧ literal, so restore
+    // walks newest-first into an unintended swap instead of a clean round trip.
+    // Pinned as documented/accepted (real content doesn't emit this shape); if a
+    // future fix changes this output, update this pin consciously.
+    const md = "⟦C2⟧ and ⟦C1⟧";
+    const sh = pbpAiShield(md);
+    assertEq(pbpAiRestore(sh.text, sh.slots), "⟦C2⟧ and ⟦C2⟧", "documented swap boundary, not a faithful round trip");
+  });
   test("nested placeholder: image alt containing inline code restores both levels", () => {
     // I-pass runs after C-pass, so the image's whole-match swallows the already-
     // shielded code placeholder into I1.orig (see md-ai-core.js:181 pbpAiShield doc).

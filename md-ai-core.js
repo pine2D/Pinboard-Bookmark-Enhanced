@@ -215,16 +215,18 @@ function pbpAiRestore(text, slots) {
   // Reverse creation order, one literal substitution per slot (not a rescanning
   // regex pass): a later shield pass's whole-match can swallow an earlier pass's
   // placeholder into its own orig (e.g. an image whose alt text already got its
-  // inline code replaced by ⟦C1⟧ -> I1.orig literally contains "⟦C1⟧"). Slots
-  // are pushed in shield order (C, then M, then I, then L), so nesting only ever
-  // goes "later kind's orig may embed an earlier kind's placeholder" -- walking
-  // the array newest-first means an outer slot is always expanded before the
-  // placeholder it reveals is resolved. Each slot's ph is substituted EXACTLY
-  // once, so a slot's own orig that happens to look like ANOTHER placeholder
-  // (see the "non-cascading" test below) is never re-matched afterward -- no
-  // rescanning means no risk of an infinite ping-pong between two slots whose
-  // texts alias each other. .split/.join (not .replace with a string arg) so an
-  // orig containing "$" never triggers replacement-pattern interpretation.
+  // inline code replaced by ⟦C1⟧ -> I1.orig literally contains "⟦C1⟧"). Walking
+  // the array newest-first fully unwinds this NESTING, because a later slot's
+  // orig is a substring of text whose placeholders were all minted earlier, so
+  // it can only ever embed an already-minted ph, never one from its own future.
+  // That guarantee does NOT cover ABSORBED literal slots (pre-existing
+  // placeholder-shaped text taken in at shield start, see the first pass
+  // above): their origs ARE placeholder strings themselves, so descending bare
+  // literals in the source (e.g. "⟦C2⟧ ... ⟦C1⟧") can swap/cycle on restore.
+  // Accepted boundary -- real content doesn't produce that shape (pinned by
+  // the "absorbed-literal swap" test below). .split/.join (not .replace with a
+  // string arg) so an orig containing "$" never triggers replacement-pattern
+  // interpretation.
   let out = s;
   for (let i = slots.length - 1; i >= 0; i--) {
     out = out.split(slots[i].ph).join(slots[i].orig);
