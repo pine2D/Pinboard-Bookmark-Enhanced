@@ -51,9 +51,16 @@ function _splitMergedComments(html) {
 
 // ---- HTML -> Markdown via Turndown (popup uses lazy ensureTurndown) ----
 // baseUrl is accepted now (used by P2 image absolutization); ignored here.
-function htmlToMarkdown(html, opts) {
-  if (typeof TurndownService === "undefined") return html;
-  html = _splitMergedComments(String(html == null ? "" : html));
+// Module-level singleton (perf): building a TurndownService + its 8 custom rules on
+// every call was a real multiplier when pbpAiMdOf() converts a page block by block
+// (a forum thread is hundreds of blocks). turndown() holds no per-call mutable state,
+// and the table/callout rules already call td.turndown() reentrantly on the same
+// instance, so one shared instance is safe. Built lazily so popup's deferred
+// turndown.js injection still works (TurndownService undefined at module load).
+let _pbpTurndown = null;
+function _pbpGetTurndown() {
+  if (_pbpTurndown) return _pbpTurndown;
+  if (typeof TurndownService === "undefined") return null;
   const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced", bulletListMarker: "-" });
   // MathML (LaTeXML/arxiv-html, KaTeX): a <math> carries BOTH presentation MathML
   // and the TeX source (alttext attr, or <annotation encoding="application/x-tex">).
@@ -168,6 +175,14 @@ function htmlToMarkdown(html, opts) {
       return prefix + content.trim() + "\n";
     }
   });
+  _pbpTurndown = td;
+  return td;
+}
+
+function htmlToMarkdown(html, opts) {
+  const td = _pbpGetTurndown();
+  if (!td) return html;
+  html = _splitMergedComments(String(html == null ? "" : html));
   return td.turndown(html);
 }
 

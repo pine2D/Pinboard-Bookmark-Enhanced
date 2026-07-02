@@ -492,20 +492,19 @@ async function pbpTrInit(detail) {
     target,
     modelKey: (s.aiProvider || "gemini") + ":" + (pbpAiResolveModelOverride(s) || "default"),
     work: [],                      // non-pre blocks: {n, md, hash, shielded:{text,slots}}
+    workReady: null,               // Promise: resolves once the rAF-chunked st.work build finishes
     trMd: Object.create(null),     // n -> RESTORED translated markdown (export + TOC)
     mode: "original",
     running: false,
     ctrl: null
   };
-  for (const b of pbpAiBlocks()) {
-    if (b.tag === "pre") continue;                 // code blocks never travel (spec 4.4)
-    const md = pbpAiMdOf(b.n);
-    if (!md.trim()) continue;
-    const shielded = pbpAiShield(md);
-    if (!_pbpTrHasText(shielded.text)) continue;   // image/badge/logo wall: nothing to translate
-    st.work.push({ n: b.n, md, hash: pbpAiHash(md), shielded });
-  }
-  if (!st.work.length) return;
+  // Cheap pre-gate + cost estimate WITHOUT Turndown: any non-pre block carrying text is
+  // a translation candidate; sum its textContent length as the rough char count for the
+  // estimate. The precise st.work (pbpAiMdOf = Turndown per block) is built off the
+  // first-paint critical path below (audit #2), so nothing here blocks the first frame.
+  const cand = pbpAiBlocks().filter((b) => b.tag !== "pre" && (b.el.textContent || "").trim());
+  if (!cand.length) return;
+  st.approxChars = cand.reduce((a, b) => a + (b.el.textContent || "").length, 0);
   _pbpTrBuildSection(st);
 
   // Refresh the rail label live when the user changes the target language in options.
@@ -533,8 +532,44 @@ async function pbpTrInit(detail) {
   // Page close terminates every in-flight request (error matrix last row).
   window.addEventListener("pagehide", () => { if (st.ctrl) st.ctrl.abort(); });
 
-  // Cache probe (partial-hit aware): full hit -> zero requests + restore the
-  // remembered view; partial hit -> fill what we have, button says Continue.
+  // Build st.work OFF the first-paint critical path, then probe the cache. pbpAiMdOf()
+  // runs Turndown per block; synchronously here it was a single long task right after the
+  // first frame on forum pages (hundreds of comment blocks) — audit #2. Chunk the build
+  // across rAF so the article paints first. The load-time cache probe HARD-depends on
+  // every block's hash (pbpAiHash(pbpAiMdOf(n))), so it can't move to first-Translate-
+  // click without losing no-network cache restore (finding #5); hence idle chunking here.
+  st.workReady = _pbpTrBuildWork(st, cand).then(() => {
+    if (!st.work.length) { const sec = document.getElementById("tr-section"); if (sec) sec.remove(); return; }
+    return _pbpTrProbeCache(st);
+  }).catch(() => {});
+}
+
+// Build st.work in rAF-yielded chunks so a long article's per-block Turndown pass
+// (pbpAiMdOf) doesn't block the first paint. Resolves when every candidate is done.
+const PBP_TR_WORK_CHUNK = 20;
+function _pbpTrBuildWork(st, cand) {
+  return new Promise((resolve) => {
+    const raf = (typeof requestAnimationFrame === "function") ? requestAnimationFrame : (fn) => setTimeout(fn, 0);
+    let i = 0;
+    const step = () => {
+      const end = Math.min(i + PBP_TR_WORK_CHUNK, cand.length);
+      for (; i < end; i++) {
+        const b = cand[i];
+        const md = pbpAiMdOf(b.n);
+        if (!md.trim()) continue;
+        const shielded = pbpAiShield(md);
+        if (!_pbpTrHasText(shielded.text)) continue;   // image/badge/logo wall: nothing to translate
+        st.work.push({ n: b.n, md, hash: pbpAiHash(md), shielded });
+      }
+      if (i < cand.length) raf(step); else resolve();
+    };
+    raf(step);
+  });
+}
+
+// Cache probe (partial-hit aware): full hit -> zero requests + restore the remembered
+// view; partial hit -> fill what we have, button says Continue. Runs after st.work built.
+async function _pbpTrProbeCache(st) {
   try {
     const cached = await pbpTrCacheGet(st.url, st.target.code, st.modelKey);
     if (cached) {
@@ -619,7 +654,7 @@ function _pbpTrBuildSection(st) {
   const est = document.createElement("div");
   est.id = "tr-estimate";
   est.className = "tr-meta";
-  const chars = st.work.reduce((a, w) => a + w.shielded.text.length, 0);
+  const chars = st.approxChars || st.work.reduce((a, w) => a + w.shielded.text.length, 0);
   est.textContent = t("trEstCost", String(pbpAiEstimateTokens(chars) * 3),
     (st.s.aiProvider || "gemini") + "/" + (pbpAiResolveModelOverride(st.s) || "default"));
   sec.appendChild(est);
@@ -751,9 +786,11 @@ async function _pbpTrEnsureGlossary(st) {
 
 async function _pbpTrStart(st) {
   if (st.running) return;
+  st.running = true;                       // claim the run synchronously so a double-click during
+                                           // the rAF-chunked st.work build can't start two runs
+  if (st.workReady) await st.workReady;    // ensure the deferred st.work build finished
   const pending = st.work.filter((w) => !(w.n in st.trMd));
-  if (!pending.length) { _pbpTrSetStatus(st, "done"); _pbpTrShowViewToggle(st); return; }
-  st.running = true;
+  if (!pending.length) { st.running = false; _pbpTrSetStatus(st, "done"); _pbpTrShowViewToggle(st); return; }
   _pbpTrClearPendingFailures(new Set(pending.map((w) => w.n)));
   st.ctrl = new AbortController();
   pbpAiBumpCounter("translate");

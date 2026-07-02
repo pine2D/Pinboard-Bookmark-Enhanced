@@ -2263,4 +2263,28 @@ suite("renderMarkdown heading id dedup === buildToc slug dedup", () => {
   });
 })();
 </script>
+<script>
+// ============ Task 9 (#2): htmlToMarkdown shared TurndownService (byte-identical output) ============
+suite("htmlToMarkdown shared TurndownService", () => {
+  const html = '<h2>Title</h2><p>see <strong>bold</strong> and <a href="https://x.test/">link</a></p>'
+    + '<pre><code class="language-js">const a = 1;</code></pre>'
+    + '<table><tr><th>h</th></tr><tr><td>c</td></tr></table>';
+  test("repeated conversions are identical (reused instance holds no per-call state)", () => {
+    assertEq(htmlToMarkdown(html), htmlToMarkdown(html), "same output across calls");
+  });
+  test("block hash pinned (translation cache key invariant)", () => {
+    // Golden hash of the fixture's canonical markdown. The block hash keys every cached
+    // translation (pbpAiHash(pbpAiMdOf(n))); a byte change here silently invalidates all
+    // caches. Must stay constant across the TurndownService hoist.
+    assertEq(pbpAiHash(htmlToMarkdown(html)), "79e9f8fd", "golden hash unchanged");
+  });
+  test("custom rules still applied through the shared instance", () => {
+    const md = htmlToMarkdown(html);
+    assert(md.indexOf("**bold**") !== -1, "bold: " + md);
+    assert(md.indexOf("](https://x.test/)") !== -1, "link: " + md);
+    assert(md.indexOf("```js") !== -1, "fenced code + lang: " + md);
+    assert(md.indexOf("| h |") !== -1, "table header: " + md);
+  });
+});
+</script>
 </body></html>
