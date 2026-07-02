@@ -16,6 +16,8 @@ h2 { margin-top: 24px; }
 <script src="../vendor/marked.min.js"></script>
 <script src="../vendor/purify.min.js"></script>
 <script src="../vendor/highlight.min.js"></script>
+<script src="../vendor/katex/katex.min.js"></script>
+<script src="../vendor/katex/auto-render.min.js"></script>
 <script src="../md-convert.js?v=obs2"></script>
 <script src="../site-rules.js?v=1"></script>
 <script>
@@ -445,6 +447,32 @@ function assertEq(actual, expected, label) {
     assert(!/^---/m.test(fm.replace(/<[^>]+>/g, "")), "no YAML --- fences in styled HTML");
 
     assert(/HLJSMARKER/.test(composeStyledHtml(md, meta, { hljsCss: "/*HLJSMARKER*/" })), "injects caller hljsCss");
+
+    // Math (audit E3 gap): Download .html / Copy HTML should match the live preview's
+    // KaTeX rendering instead of leaving raw $...$/$$...$$ source in the export.
+    const mathMd = "See $E=mc^2$ and\n\n$$x+y=z$$\n";
+    const noMathOpt = composeStyledHtml(mathMd, meta, { frontmatter: false, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+    assert(/\$E=mc\^2\$/.test(noMathOpt), "opts.math unset: inline TeX source left untouched");
+    assert(/\$\$x\+y=z\$\$/.test(noMathOpt), "opts.math unset: display TeX source left untouched");
+
+    const mathOn = composeStyledHtml(mathMd, meta, { frontmatter: false, imagePolicy: "keep", includeToc: false, hljsCss: "", math: true });
+    assert(/class="katex/.test(mathOn), "opts.math + KaTeX loaded: renders katex spans");
+    assert(!/\$E=mc\^2\$/.test(mathOn), "opts.math on: inline TeX source no longer bare text");
+
+    assert(/KATEXMARKER/.test(composeStyledHtml(md, meta, { hljsCss: "", katexCss: "/*KATEXMARKER*/" })), "injects caller katexCss");
+
+    // Degrade: opts.math requested but renderMathInElement unavailable on the caller's
+    // page (e.g. a load failure) must not throw, and the TeX source stays untouched.
+    (() => {
+      const saved = window.renderMathInElement;
+      try {
+        delete window.renderMathInElement;
+        const degraded = composeStyledHtml(mathMd, meta, { frontmatter: false, imagePolicy: "keep", includeToc: false, hljsCss: "", math: true });
+        assert(/\$E=mc\^2\$/.test(degraded), "degrade: KaTeX unavailable -> TeX source untouched, no throw");
+      } finally {
+        window.renderMathInElement = saved;
+      }
+    })();
 
     const evil = composeStyledHtml(md, { ...meta, url: "javascript:alert(1)" }, { frontmatter: true, imagePolicy: "keep", includeToc: false, hljsCss: "" });
     assert(!/href="javascript:/i.test(evil), "non-http(s) url is NOT emitted as an href (XSS guard)");

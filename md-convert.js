@@ -563,7 +563,7 @@ function _xmlEscape(s) {
 // detached node (needs a DOM — preview/test page, not the popup). The caller
 // passes opts.hljsCss (fetched from the vendored theme) so this stays chrome-free.
 // meta: {title,url,date,tags,source,description?}
-// opts: { frontmatter, imagePolicy, includeToc, hljsCss }
+// opts: { frontmatter, imagePolicy, includeToc, hljsCss, math, katexCss }
 function composeStyledHtml(canonicalMd, meta, opts) {
   meta = meta || {};
   opts = opts || {};
@@ -578,6 +578,25 @@ function composeStyledHtml(canonicalMd, meta, opts) {
     tmp.innerHTML = article;
     highlightCodeBlocks(tmp);
     article = tmp.innerHTML;
+  }
+  // Math (audit E3 gap): mirrors the hljs pass above — a second detached-node
+  // render so Download .html / Copy HTML match the live preview's KaTeX
+  // rendering instead of leaving raw $...$/$$...$$ TeX source in the export.
+  // Same delimiters as md-preview.js's live renderMathInElement call. Caller
+  // only sets opts.math for math-bearing pages (info.math); if KaTeX isn't
+  // loaded on the caller's page (load failure, or a page — e.g. this file's
+  // own test harness — that never vendors it), renderMathInElement is simply
+  // undefined and the $...$ source passes through untouched (degrade, not throw).
+  if (opts.math && typeof document !== "undefined" && typeof renderMathInElement === "function") {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = article;
+    try {
+      renderMathInElement(tmp, {
+        delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }],
+        throwOnError: false
+      });
+      article = tmp.innerHTML;
+    } catch (_) { /* leave $...$ source untouched on failure */ }
   }
   let header = "";
   if (opts.frontmatter) {
@@ -597,7 +616,7 @@ function composeStyledHtml(canonicalMd, meta, opts) {
   return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n' +
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
     "<title>" + _xmlEscape(meta.title || "Document") + "</title>\n<style>\n" +
-    READER_CSS + (opts.hljsCss || "") + "\n</style>\n</head>\n<body>\n" +
+    READER_CSS + (opts.hljsCss || "") + (opts.katexCss || "") + "\n</style>\n</head>\n<body>\n" +
     '<main class="export-doc">\n' + header + article + "\n</main>\n</body>\n</html>\n";
 }
 

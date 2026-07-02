@@ -333,7 +333,10 @@ function ensureKatex() {
     return {
       frontmatter: expFrontmatter ? expFrontmatter.checked : !!exportSettings.mdExportFrontmatter,
       imagePolicy: expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep"),
-      includeToc: expIncludeToc ? expIncludeToc.checked : !!exportSettings.mdExportIncludeToc
+      includeToc: expIncludeToc ? expIncludeToc.checked : !!exportSettings.mdExportIncludeToc,
+      // Same gate as the live-preview KaTeX pass below (info.math) — composeStyledHtml
+      // only attempts renderMathInElement when this is true (audit E3 gap).
+      math: !!info.math
     };
   }
   // Raw view markdown, following the translation view: md-translate.js sets
@@ -584,7 +587,9 @@ function ensureKatex() {
     // buildExportMarkdown() would double it into the body as plain text.
     if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights
     const hljsCss = await loadHljsCss();
-    const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
+    if (info.math) await ensureKatex(); // so composeStyledHtml renders math (mirrors hljs above)
+    const katexCss = info.math ? await loadKatexCss() : "";
+    const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss, katexCss });
     await copyToClipboard(doc, btn);
   });
 
@@ -596,11 +601,13 @@ function ensureKatex() {
   document.getElementById("btn-dl-html").addEventListener("click", async () => {
     if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights the export
     const hljsCss = await loadHljsCss();
+    if (info.math) await ensureKatex(); // so composeStyledHtml renders math (mirrors hljs above)
+    const katexCss = info.math ? await loadKatexCss() : "";
     // Follow the original/bilingual/translation-only view like the Markdown export
     // does, but pass RAW view markdown (getViewMarkdown, no YAML frontmatter):
     // composeStyledHtml turns frontmatter into a styled <header>. Passing the
     // YAML-prefixed buildExportMarkdown() rendered the YAML into the body as text.
-    const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
+    const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss, katexCss });
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
   });
 
@@ -875,6 +882,21 @@ async function loadHljsCss() {
     let dark = "";
     try { dark = await (await fetch(chrome.runtime.getURL("vendor/hljs-github-dark.min.css"))).text(); } catch (_) {}
     return light + (dark ? "\n@media (prefers-color-scheme:dark){\n" + dark + "\n}\n" : "");
+  } catch (_) { return ""; }
+}
+
+// Same pattern as loadHljsCss: inline the vendored KaTeX stylesheet so a math
+// export renders offline (audit E3 gap). Note: katex.min.css references its
+// webfonts via relative "fonts/..." url()s — those don't resolve once inlined
+// into a standalone exported .html (no fonts/ dir alongside it), so exported
+// math falls back to the browser's default font metrics instead of KaTeX's
+// web fonts. Accepted: the composed glyph layout still renders correctly,
+// only the font face degrades, and we deliberately do NOT inline the font
+// files themselves (would bloat every export by the whole KaTeX font set).
+async function loadKatexCss() {
+  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.getURL) return "";
+  try {
+    return await (await fetch(chrome.runtime.getURL("vendor/katex/katex.min.css"))).text();
   } catch (_) { return ""; }
 }
 
