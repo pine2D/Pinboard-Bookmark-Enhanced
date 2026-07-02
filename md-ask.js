@@ -441,6 +441,11 @@ function _pbpAskAppendRound(question) {
   qEl.textContent = question;
   const aEl = document.createElement("div");
   aEl.className = "ask-a streaming";
+  // #ask-thread is aria-live=polite; without aria-busy, every rAF-throttled
+  // textContent replace during streaming re-announces the whole accumulated
+  // answer (audit md-ask.js:140). Mirrors the Explain popover's aria-busy
+  // pattern (_pbpExplainRun, .xp-body).
+  aEl.setAttribute("aria-busy", "true");
   thread.appendChild(qEl);
   thread.appendChild(aEl);
   thread.scrollTop = thread.scrollHeight;
@@ -460,6 +465,7 @@ function _pbpAskErrorUi(aEl, message, question) {
   retry.addEventListener("click", () => {
     aEl.replaceChildren();
     aEl.classList.add("streaming");
+    aEl.setAttribute("aria-busy", "true");
     _pbpAskRun(question, aEl).catch(() => {});
   });
   aEl.appendChild(err);
@@ -499,6 +505,7 @@ async function _pbpAskRun(question, aEl) {
     );
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     aEl.classList.remove("streaming");
+    aEl.removeAttribute("aria-busy");
     const parsed = _pbpAskFinalize(aEl, full);
     st.rounds.push({ q: question, a: parsed.body });
     // History read-modify-write is safe: st.running serializes sends so only
@@ -516,6 +523,7 @@ async function _pbpAskRun(question, aEl) {
   } catch (e) {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     aEl.classList.remove("streaming");
+    aEl.removeAttribute("aria-busy");
     aEl.textContent = acc; // keep whatever already streamed in
     if (e && e.name === "AbortError") {
       const note = document.createElement("p");
@@ -637,6 +645,10 @@ function _pbpAskChipPass(el, cites) {
         chip.dataset.qs = String(hit.start);
         chip.dataset.qe = String(hit.end);
         chip.classList.add("verified");
+        // verified vs not is currently only a color dot (::after) -- invisible
+        // to SR/color-blind users, who can't tell "jumps to the exact quote"
+        // apart from "jumps to the whole block" (audit md-preview.css:829).
+        chip.setAttribute("aria-label", "P" + seg.p + " · " + t("askChipVerified"));
       }
       chip.addEventListener("click", () => _pbpAskJump(chip));
       chip.addEventListener("mouseenter", () => _pbpAskTipShow(chip));
@@ -755,6 +767,12 @@ function _pbpAskTipShow(chip) {
   b.className = "ask-tip-block";
   b.textContent = "P" + p + " · " + blockText.slice(0, 80) + (blockText.length > 80 ? "…" : "");
   tip.appendChild(b);
+  if (chip.classList.contains("verified")) {
+    const v = document.createElement("div");
+    v.className = "ask-tip-status";
+    v.textContent = t("askChipVerified");
+    tip.appendChild(v);
+  }
   // Measure, then place above the chip; flip below when viewport space
   // above is too small. Clamp horizontally to the viewport.
   tip.style.visibility = "hidden";

@@ -853,6 +853,7 @@ body.md-empty main { margin-left: 0; }
 }
 #ask-tip .ask-tip-quote { color: var(--fg); }
 #ask-tip .ask-tip-block { color: var(--fg-muted); margin-top: 4px; }
+#ask-tip .ask-tip-status { color: var(--success); margin-top: 4px; font-weight: 600; }
 
 /* Jump flash: CSS Custom Highlight API (primary path). */
 ::highlight(pbp-flash) { background-color: rgba(250, 204, 21, 0.5); }

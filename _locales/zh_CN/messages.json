@@ -2184,6 +2184,9 @@
   "askChipData": {
     "message": "文中引用了哪些数据？"
   },
+  "askChipVerified": {
+    "message": "已验证"
+  },
   "askErrRetry": {
     "message": "重试"
   },

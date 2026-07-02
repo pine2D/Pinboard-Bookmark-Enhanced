@@ -2184,6 +2184,9 @@
   "askChipData": {
     "message": "What data does it cite?"
   },
+  "askChipVerified": {
+    "message": "Verified"
+  },
   "askErrRetry": {
     "message": "Retry"
   },
