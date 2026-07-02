@@ -254,7 +254,7 @@ function ensureKatex() {
         });
       });
     }
-    attemptExtract(info.engine);
+    await attemptExtract(info.engine); // awaited so a synchronous throw here still reaches the IIFE's top-level .catch()
     return;
   }
   // Canonical Markdown: Defuddle HTML -> Turndown; Jina already gives MD.
