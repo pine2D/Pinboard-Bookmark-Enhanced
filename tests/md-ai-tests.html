@@ -428,6 +428,19 @@ suiteIf("pbpForumMarkComments", "pbpForumMarkComments", () => {
     assertEq(r.querySelectorAll(".pb-comment-body").length, 2, "two comment bodies inside the thread");
   });
 
+  test("trailing non-blockquote after a reply stays in place (A,B,C order kept)", () => {
+    const r = root("<blockquote><p>A</p><blockquote><p>B</p></blockquote><p>C</p></blockquote>");
+    pbpForumMarkComments(r);
+    // document order must remain A, B, C — the trailing <p>C</p> must NOT hoist above the reply
+    assertEq(r.textContent.replace(/\s+/g, ""), "ABC", "order preserved");
+    const outer = r.querySelector(":scope > blockquote");
+    assertEq(outer.children[0].className, "pb-comment-body", "leading A wrapped");
+    assertEq(outer.children[0].textContent.trim(), "A", "only leading A in the wrapper");
+    assertEq(outer.children[1].tagName, "BLOCKQUOTE", "reply blockquote second");
+    assertEq(outer.children[2].tagName, "P", "trailing C stays as a bare sibling");
+    assertEq(outer.children[2].textContent.trim(), "C", "C in place");
+  });
+
   test("null root is a no-op (no throw)", () => {
     pbpForumMarkComments(null);
     assert(true, "no throw");

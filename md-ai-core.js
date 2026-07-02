@@ -79,14 +79,17 @@ function pbpAiTextOf(n) {
 function _pbpMarkComment(bq) {
   const own = [];
   const childBqs = [];
-  for (const c of Array.from(bq.children)) {   // snapshot: we reparent live nodes
-    if (c.tagName === "BLOCKQUOTE") childBqs.push(c);
-    else own.push(c);                           // this comment's own header + body
+  let seenBq = false;
+  for (const c of Array.from(bq.children)) {    // snapshot: we reparent live nodes
+    if (c.tagName === "BLOCKQUOTE") { childBqs.push(c); seenBq = true; }
+    else if (!seenBq) own.push(c);              // LEADING non-blockquote = this comment's own header + body
+    // non-blockquote nodes AFTER the first reply stay in place (don't reorder them: `> A / >> B / > C`
+    // renders as <bq><p>A</p><bq>B</bq><p>C</p></bq> and must keep document order A,B,C)
   }
   if (own.length) {                             // skip shells with no own content
     const body = document.createElement("div");
     body.className = "pb-comment-body";
-    bq.insertBefore(body, own[0]);              // wrapper takes the own content's slot,
+    bq.insertBefore(body, own[0]);              // wrapper takes the leading content's slot,
     for (const c of own) body.appendChild(c);   // ...ahead of the reply blockquotes
   }
   for (const c of childBqs) _pbpMarkComment(c); // recurse into replies (nesting kept)
