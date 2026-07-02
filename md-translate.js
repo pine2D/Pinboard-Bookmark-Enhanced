@@ -1058,6 +1058,7 @@ async function _pbpTrTranslateBlock(st, w, signal) {
 }
 
 async function _pbpTrRetryBlock(st, w, btn) {
+  if (st.running) return;   // a batch run owns the queue + cache; don't fire a concurrent single-block request
   if (btn.disabled) return;
   btn.disabled = true;
   // Fresh controller: the run-level st.ctrl may already be aborted (Stop /
@@ -1106,6 +1107,7 @@ function _pbpTrSyncRetryAll() {
 // API calls. Reuses _pbpTrRetryBlock, which owns each pill's controller/state and
 // removes the pill on success. Snapshot the pills first — retries mutate the DOM.
 async function _pbpTrRetryAllFailed(st) {
+  if (st.running) return;   // batch run in progress: retrying now races the queue + cache get-merge-put
   const all = document.getElementById("tr-retry-all");
   if (all) all.disabled = true;
   const pills = Array.from(document.querySelectorAll(".pb-tr-err"));
