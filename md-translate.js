@@ -684,27 +684,33 @@ async function _pbpTrMapLimit(items, limit, fn) {
 // (possibly empty) on success, or null on failure (caller then uses user glossary only).
 async function _pbpTrExtractGlossary(st) {
   const full = st.work.map((w) => w.shielded.text).join("\n\n");
-  if (!full.trim()) return Object.create(null);
+  if (!full.trim()) return Object.create(null);   // no source text: a REAL empty table, cacheable
   const chunks = full.length <= PBP_TR_GLOSSARY_LIMIT
     ? [full]
     : _pbpTrSplitText(full, PBP_TR_GLOSSARY_LIMIT).chunks;
   const model = pbpAiResolveModelOverride(st.s);
-  const merged = Object.create(null);
   // Bounded fan-out (limit 2 = queue default; NOT naked Promise.all — 24k-char
-  // chunks would blow TPM). A chunk that errors degrades to no terms; the others
+  // chunks would blow TPM). Each chunk resolves to a term map on success (possibly
+  // empty) or null on abort/error; a null chunk is dropped from the merge, the rest
   // still merge. The <=24000-char common case is a single chunk = one call.
   const outs = await _pbpTrMapLimit(chunks, 2, async (chunk) => {
-    if (st.ctrl && st.ctrl.signal && st.ctrl.signal.aborted) return "";
+    if (st.ctrl && st.ctrl.signal && st.ctrl.signal.aborted) return null;
     const { system, prompt } = pbpTrBuildGlossaryPrompt(chunk, st.target.name);
     try {
-      return await callAIStream(st.s, prompt, {
+      const raw = await callAIStream(st.s, prompt, {
         system, model, temperature: 0.1, noThinking: true,
         signal: st.ctrl && st.ctrl.signal, maxTokens: 2048
       }, () => {});
-    } catch (_) { return ""; }
+      return pbpTrParseGlossaryJson(raw);
+    } catch (_) { return null; }
   });
-  for (const out of outs) Object.assign(merged, pbpTrParseGlossaryJson(out));
-  return merged;
+  // All chunks failed/aborted -> null (a FAILURE the caller must not cache, per the
+  // contract). At least one succeeded (even with zero terms) -> the merged map (a
+  // real, cacheable vacuum table when empty). Distinguishing the two is the fix.
+  let any = false;
+  const merged = Object.create(null);
+  for (const out of outs) { if (out) { any = true; Object.assign(merged, out); } }
+  return any ? merged : null;
 }
 
 // Build st.glossary = merge(auto, user), once. auto = cached or freshly extracted;

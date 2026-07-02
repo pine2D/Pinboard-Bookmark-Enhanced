@@ -2189,4 +2189,78 @@ suite("renderMarkdown heading id dedup === buildToc slug dedup", () => {
   });
 });
 </script>
+<script>
+// ============ Task 6 (#8): glossary extraction null-vs-{} semantics (async) ============
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "_pbpTrExtractGlossary null-vs-{} (async)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  if (typeof _pbpTrExtractGlossary !== "function") {
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP _pbpTrExtractGlossary suite (not loaded)";
+    host.appendChild(div); SKIP++; return;
+  }
+  function makeSt() {
+    return {
+      s: { aiProvider: "gemini", geminiApiKey: "k" },
+      target: { name: "Simplified Chinese", code: "zh-CN" },
+      work: [{ shielded: { text: "The Transformer architecture uses attention." } }]
+    };
+  }
+
+  await atest("success with terms -> object (not null)", async () => {
+    const real = window.callAIStream;
+    window.callAIStream = async () => '{"terms":[{"term":"Transformer","translation":"变换器"}]}';
+    try {
+      const r = await _pbpTrExtractGlossary(makeSt());
+      if (r === null) throw new Error("should not be null on success");
+      assertEq(r.Transformer, "变换器", "term parsed");
+    } finally { window.callAIStream = real; }
+  });
+
+  await atest("success with empty term list -> {} (real vacuum table, NOT null)", async () => {
+    const real = window.callAIStream;
+    window.callAIStream = async () => '{"terms":[]}';
+    try {
+      const r = await _pbpTrExtractGlossary(makeSt());
+      if (r === null) throw new Error("empty extraction must be {} not null");
+      assertEq(Object.keys(r).length, 0, "no terms");
+    } finally { window.callAIStream = real; }
+  });
+
+  await atest("network failure -> null (failure, not vacuum table)", async () => {
+    const real = window.callAIStream;
+    window.callAIStream = async () => { throw new Error("boom"); };
+    try {
+      const r = await _pbpTrExtractGlossary(makeSt());
+      if (r !== null) throw new Error("all-chunk failure must return null, got " + JSON.stringify(r));
+    } finally { window.callAIStream = real; }
+  });
+
+  await atest("aborted before call -> null (no request, not vacuum table)", async () => {
+    const real = window.callAIStream;
+    let called = false;
+    window.callAIStream = async () => { called = true; return '{"terms":[]}'; };
+    try {
+      const st = makeSt();
+      st.ctrl = new AbortController();
+      st.ctrl.abort();
+      const r = await _pbpTrExtractGlossary(st);
+      if (r !== null) throw new Error("aborted extraction must return null");
+      if (called) throw new Error("callAIStream must not run when already aborted");
+    } finally { window.callAIStream = real; }
+  });
+})();
+</script>
 </body></html>
