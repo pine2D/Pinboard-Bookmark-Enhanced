@@ -37,6 +37,9 @@
     "http://127.0.0.1:*/*",
     "https://web.archive.org/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'"
+  },
   "background": {
     "service_worker": "background.js"
   },
