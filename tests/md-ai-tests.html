@@ -1430,6 +1430,31 @@ suiteIf("pbpAskBuildContext", "pbpAskBuildContext", () => {
     assertEq(r.totalBlocks, 0, "0 total");
     assertEq(pbpAskBuildContext(null, 100).totalBlocks, 0, "null tolerated");
   });
+  test("a single oversized block is capped before entering the budget calc", () => {
+    // Mirrors PBP_EXPLAIN_BLOCK_CAP's pattern: one huge <pre>/log block must
+    // not alone blow the whole budget. Budget here is large enough that
+    // only the per-block cap (not the token budget) limits the line.
+    const big = "x".repeat(20000);
+    const r = pbpAskBuildContext(ctxBlocks("<p>" + big + "</p>"), 100000);
+    assertEq(r.totalBlocks, 1, "total");
+    assertEq(r.sentBlocks, 1, "sent");
+    assertEq(r.text.length, "[P1] ".length + 8000, "line capped at the 8000-char block cap");
+  });
+  test("mandatory set downgrades via evenly-spaced sampling when it alone overflows the budget", () => {
+    // 5 blocks: first-3 + last-2 covers every block (totalBlocks<=5), so
+    // ALL 5 are mandatory and middle is empty. Each line is 15 chars
+    // ("[Pn] " + a 10-digit body); mandLens (line + 1) = 16/block.
+    // budget 15 tokens = 60 chars: full mandatory is 80 chars/20 tokens,
+    // over budget, so it degrades the same way middle degrades below: k=4
+    // (64 chars/16 tok) still over, k=3 (floor(j*5/3) = 0,1,3 -> 48
+    // chars/12 tok) fits -> P1, P2, P4 kept; P3 and the "always kept" last
+    // block P5 are dropped.
+    const html = "<p>0123456789</p>".repeat(5);
+    const r = pbpAskBuildContext(ctxBlocks(html), 15);
+    assertEq(r.totalBlocks, 5, "total");
+    assertEq(r.sentBlocks, 3, "mandatory downgraded to a 3-block sample");
+    assertEq(r.text, "[P1] 0123456789\n[P2] 0123456789\n[P4] 0123456789", "evenly-spaced mandatory sample; P3/P5 dropped despite being 'always kept'");
+  });
 });
 
 // ============ Task 13: pbpAskBuildPrompt ============

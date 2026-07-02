@@ -280,6 +280,11 @@ if (typeof document !== "undefined") {
 
 // Context budget in estimated tokens (chars/4; spec 5.1: ~24k, tunable).
 const PBP_ASK_CTX_BUDGET = 24000;
+// Hard per-block char cap applied before a line enters the budget calc
+// (naming mirrors PBP_EXPLAIN_BLOCK_CAP below): a single abnormally huge
+// block (e.g. a full-page <pre> log dump) must not alone blow the whole
+// context budget.
+const PBP_ASK_BLOCK_CAP = 8000;
 
 // Layered context builder. blocks = pbpAiBlocks() entries ({n, el, tag}).
 // Always keeps every heading block (h2/h3/h4) plus the first 3 and last 2
@@ -293,7 +298,25 @@ function pbpAskBuildContext(blocks, budgetTokens) {
   const totalBlocks = list.length;
   if (!totalBlocks) return { text: "", sentBlocks: 0, totalBlocks: 0 };
   const lineOf = (b) => "[P" + b.n + "] " +
-    String((b.el && b.el.textContent) || "").replace(/\s+/g, " ").trim();
+    String((b.el && b.el.textContent) || "").slice(0, PBP_ASK_BLOCK_CAP).replace(/\s+/g, " ").trim();
+  // Largest k whose evenly-spaced sample of `items` (chars taken from the
+  // matching index of `lens`, plus a fixed `offsetChars`) fits within
+  // `budgetTokens`. Shared by the mandatory-downgrade branch and the
+  // middle-sampling pass below: same "largest count that fits" rule,
+  // applied to whichever candidate list/budget needs it.
+  const sampleFit = (items, lens, offsetChars, budgetTokens2) => {
+    for (let k = items.length; k >= 1; k--) {
+      let chars = offsetChars;
+      const idxs = [];
+      for (let j = 0; j < k; j++) {
+        const ix = Math.floor(j * items.length / k);
+        idxs.push(ix);
+        chars += lens[ix];
+      }
+      if (pbpAiEstimateTokens(chars) <= budgetTokens2) return idxs;
+    }
+    return [];
+  };
   const mandatory = [];
   const middle = [];
   list.forEach((b, i) => {
@@ -301,22 +324,21 @@ function pbpAskBuildContext(blocks, budgetTokens) {
       || i < 3 || i >= totalBlocks - 2;
     (must ? mandatory : middle).push(b);
   });
+  const mandLens = mandatory.map((b) => lineOf(b).length + 1);
   let baseChars = 0;
-  for (const b of mandatory) baseChars += lineOf(b).length + 1;
-  const midLens = middle.map((b) => lineOf(b).length + 1);
-  // Largest k whose evenly-spaced sample fits the budget. O(middle^2)
-  // worst case but middle is at most a few hundred blocks - negligible.
-  let chosen = [];
-  for (let k = middle.length; k >= 1; k--) {
-    let chars = baseChars;
-    for (let j = 0; j < k; j++) chars += midLens[Math.floor(j * middle.length / k)];
-    if (pbpAiEstimateTokens(chars) <= budget) {
-      for (let j = 0; j < k; j++) chosen.push(Math.floor(j * middle.length / k));
-      break;
-    }
+  for (const len of mandLens) baseChars += len;
+  let picked;
+  if (pbpAiEstimateTokens(baseChars) > budget) {
+    // mandatory alone (headings + first 3 + last 2) already overflows
+    // the WHOLE budget - e.g. a page-long <pre> sits among the first 3
+    // blocks. Degrade it with the same sampling rule middle uses below;
+    // no room is left for middle in this branch.
+    picked = new Set(sampleFit(mandatory, mandLens, 0, budget).map((ix) => mandatory[ix].n));
+  } else {
+    picked = new Set(mandatory.map((b) => b.n));
+    const midLens = middle.map((b) => lineOf(b).length + 1);
+    for (const ix of sampleFit(middle, midLens, baseChars, budget)) picked.add(middle[ix].n);
   }
-  const picked = new Set(mandatory.map((b) => b.n));
-  for (const ix of chosen) picked.add(middle[ix].n);
   const lines = [];
   for (const b of list) if (picked.has(b.n)) lines.push(lineOf(b));
   return { text: lines.join("\n"), sentBlocks: lines.length, totalBlocks };
