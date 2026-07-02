@@ -394,6 +394,22 @@ function ensureKatex() {
       frag.appendChild(li);
     });
     tocList.appendChild(frag);
+    // tr-only view hides the ORIGINAL heading and shows its .pb-tr translation
+    // sibling instead (see trOnlyScrollTarget) — the anchor's native #slug jump
+    // targets the (display:none) original, which never scrolls (0-size rect).
+    // Intercept and redirect to the visible sibling; the id stays owned by the
+    // original heading (untouched invariant), only the SCROLL target changes.
+    tocList.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-slug]");
+      if (!a) return;
+      const headEl = renderedView.querySelector("#" + cssEscape(a.dataset.slug));
+      if (!headEl) return;
+      const target = trOnlyScrollTarget(headEl);
+      if (target !== headEl) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
     tocNav.hidden = false;
     setupScrollSpy(renderedView, tocList);
   }
@@ -777,6 +793,18 @@ function setupDrawer() {
   });
 }
 
+// In tr-only mode, a translated ORIGINAL heading is display:none (md-preview.css:890
+// hides every [data-pb-tr-done] unless .pb-show-orig is toggled back on) while its
+// .pb-tr sibling (inserted by _pbpTrFill, md-translate.js) carries the visible text.
+// Anything that scrolls to or measures the geometry of a heading element must resolve
+// through this first, or it reads/targets a collapsed 0/0/0/0 box.
+function trOnlyScrollTarget(headEl) {
+  if (!document.body.classList.contains("tr-only")) return headEl;
+  if (!headEl.dataset || !headEl.dataset.pbTrDone || headEl.classList.contains("pb-show-orig")) return headEl;
+  const sib = headEl.nextElementSibling;
+  return (sib && sib.classList && sib.classList.contains("pb-tr")) ? sib : headEl;
+}
+
 // ---- Scroll-spy: highlight the TOC entry for the heading nearest the top ----
 function setupScrollSpy(renderedView, tocList) {
   const links = Array.from(tocList.querySelectorAll("a"));
@@ -808,6 +836,19 @@ function setupScrollSpy(renderedView, tocList) {
 
   // Track which headings are currently intersecting; the topmost wins.
   const visible = new Set();
+
+  // Bottom-up scan for the last heading above the viewport. In tr-only mode
+  // the heading itself is display:none (see trOnlyScrollTarget) and always
+  // reports a degenerate 0/0/0/0 rect — measure its visible .pb-tr sibling
+  // instead. Shared by the observer callback (nothing intersecting) and the
+  // scroll fallback below (observer starved because all targets are
+  // display:none, so it never fires again after the initial hide).
+  const runFallback = () => {
+    for (let i = targets.length - 1; i >= 0; i--) {
+      if (trOnlyScrollTarget(targets[i]).getBoundingClientRect().top < topClear + 12) { setActive(targets[i].id); return; }
+    }
+  };
+
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       const id = entry.target.id;
@@ -819,14 +860,10 @@ function setupScrollSpy(renderedView, tocList) {
     for (const t of targets) {
       if (visible.has(t.id)) { topId = t.id; break; }
     }
+    if (topId) { setActive(topId); return; }
     // If nothing is intersecting (scrolled past all into a long section),
     // keep the last heading above the viewport active.
-    if (!topId) {
-      for (let i = targets.length - 1; i >= 0; i--) {
-        if (targets[i].getBoundingClientRect().top < topClear + 12) { topId = targets[i].id; break; }
-      }
-    }
-    if (topId) setActive(topId);
+    runFallback();
   }, {
     // top margin clears the (measured) sticky toolbar; -70% bottom keeps the
     // "current" heading active until the next one nears the top.
@@ -834,6 +871,20 @@ function setupScrollSpy(renderedView, tocList) {
     threshold: 0,
   });
   targets.forEach((t) => observer.observe(t));
+
+  // In tr-only view every target is display:none (md-preview.css
+  // `body.tr-only #rendered-view [data-pb-tr-done]:not(.pb-show-orig)`), so
+  // it never intersects and the observer callback fires once (the hide
+  // transition) and then never again — the highlight freezes. Drive the
+  // same fallback off scroll instead, throttled to one measure per frame.
+  // In original/bilingual views `visible` stays populated by the observer,
+  // so this bails out immediately and costs nothing.
+  let spyRaf = 0;
+  window.addEventListener("scroll", () => {
+    if (visible.size) return;
+    if (spyRaf) return;
+    spyRaf = requestAnimationFrame(() => { spyRaf = 0; runFallback(); });
+  }, { passive: true });
 }
 
 // CSS.escape fallback for slugs used in querySelector("#"+id).
