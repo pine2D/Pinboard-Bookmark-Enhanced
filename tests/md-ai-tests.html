@@ -553,6 +553,21 @@ suite("pbpAiRestore", () => {
     const sh = pbpAiShield(md);
     assertEq(pbpAiRestore(sh.text, sh.slots), md, "no cascade");
   });
+  test("nested placeholder: image alt containing inline code restores both levels", () => {
+    // I-pass runs after C-pass, so the image's whole-match swallows the already-
+    // shielded code placeholder into I1.orig (see md-ai-core.js:181 pbpAiShield doc).
+    const md = "See ![see `config.yaml`](d.png) flow.";
+    const r = pbpAiShield(md);
+    assertEq(r.text, "See ⟦I1⟧ flow.", "shielded to single top-level placeholder");
+    assertEq(r.slots.length, 2, "2 slots: C1 (code) + I1 (image, orig embeds ⟦C1⟧)");
+    assert(r.slots[1].orig.indexOf("⟦C1⟧") !== -1, "I1.orig embeds C1's placeholder: " + r.slots[1].orig);
+    assertEq(pbpAiRestore(r.text, r.slots), md, "both levels restored, no literal ⟦C1⟧ left over");
+  });
+  test("nested placeholder: display math containing inline code restores both levels", () => {
+    const md = "eq $$x_i = `f(x)`$$ done";
+    const r = pbpAiShield(md);
+    assertEq(pbpAiRestore(r.text, r.slots), md, "math+code nesting restored");
+  });
 });
 
 // ============ Task 5: pbpAiMakeStreamJsonParser ============

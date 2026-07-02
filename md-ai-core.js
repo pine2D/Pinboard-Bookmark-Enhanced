@@ -205,12 +205,24 @@ function pbpAiShield(md) {
 function pbpAiRestore(text, slots) {
   const s = String(text == null ? "" : text);
   if (!slots || !slots.length) return s;
-  const map = Object.create(null);
-  for (const slot of slots) map[slot.ph] = slot.orig;
-  // One pass: each placeholder maps to its original; an unknown/hallucinated
-  // placeholder (not in the map) is left untouched. Replacement is via a
-  // function callback, so no $-escaping pitfalls.
-  return s.replace(/⟦[CLIM]\d+⟧/g, (m) => (m in map ? map[m] : m));
+  // Reverse creation order, one literal substitution per slot (not a rescanning
+  // regex pass): a later shield pass's whole-match can swallow an earlier pass's
+  // placeholder into its own orig (e.g. an image whose alt text already got its
+  // inline code replaced by ⟦C1⟧ -> I1.orig literally contains "⟦C1⟧"). Slots
+  // are pushed in shield order (C, then M, then I, then L), so nesting only ever
+  // goes "later kind's orig may embed an earlier kind's placeholder" -- walking
+  // the array newest-first means an outer slot is always expanded before the
+  // placeholder it reveals is resolved. Each slot's ph is substituted EXACTLY
+  // once, so a slot's own orig that happens to look like ANOTHER placeholder
+  // (see the "non-cascading" test below) is never re-matched afterward -- no
+  // rescanning means no risk of an infinite ping-pong between two slots whose
+  // texts alias each other. .split/.join (not .replace with a string arg) so an
+  // orig containing "$" never triggers replacement-pattern interpretation.
+  let out = s;
+  for (let i = slots.length - 1; i >= 0; i--) {
+    out = out.split(slots[i].ph).join(slots[i].orig);
+  }
+  return out;
 }
 
 // ---- Incremental parser for streamed {"translations":[{id,text},...]} ----
