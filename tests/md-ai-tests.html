@@ -2427,4 +2427,32 @@ suite("safeFilename: blacklist hostile chars, keep all other Unicode", () => {
   });
 });
 </script>
+<script>
+// ============ Task B4 #25: applyImagePolicy skips fenced code blocks ============
+suite("applyImagePolicy: fenced code blocks are left untouched", () => {
+  const md = "Real ![a](pic.png) here.\n\n```\nExample: ![alt](x.png)\n```\n\nAnother real ![b](https://cdn.io/y.png) end.";
+  test("strip: real images removed, fenced literal image syntax untouched", () => {
+    const out = applyImagePolicy(md, { policy: "strip" });
+    assert(out.indexOf("![alt](x.png)") !== -1, "fenced image literal survives: " + out);
+    assert(out.indexOf("![a](pic.png)") === -1, "real image before fence stripped: " + out);
+    assert(out.indexOf("![b](https://cdn.io/y.png)") === -1, "real image after fence stripped: " + out);
+  });
+  test("alt: real images collapse to alt text, fenced literal image syntax untouched", () => {
+    const out = applyImagePolicy(md, { policy: "alt" });
+    assert(out.indexOf("![alt](x.png)") !== -1, "fenced image literal survives: " + out);
+    assert(out.indexOf("Real a here") !== -1, "real image alt-ified: " + out);
+  });
+  test("keep: real relative src absolutized, fenced literal image syntax untouched", () => {
+    const out = applyImagePolicy(md, { policy: "keep", baseUrl: "https://e.test/blog/" });
+    assert(out.indexOf("![alt](x.png)") !== -1, "fenced image literal survives (not absolutized): " + out);
+    assert(out.indexOf("![a](https://e.test/blog/pic.png)") !== -1, "real image absolutized: " + out);
+  });
+  test("~~~ fences are also respected", () => {
+    const tilde = "~~~\n![alt](x.png)\n~~~\n\nreal ![c](pic.png)";
+    const out = applyImagePolicy(tilde, { policy: "strip" });
+    assert(out.indexOf("![alt](x.png)") !== -1, "tilde-fenced literal survives: " + out);
+    assert(out.indexOf("![c](pic.png)") === -1, "real image outside tilde fence stripped: " + out);
+  });
+});
+</script>
 </body></html>

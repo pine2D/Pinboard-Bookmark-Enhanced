@@ -363,20 +363,26 @@ function applyImagePolicy(md, opts) {
   const policy = opts.policy || "keep";
   const baseUrl = opts.baseUrl || "";
   const IMG = /!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
-  if (policy === "strip") {
-    return (md || "").replace(IMG, "");
-  }
-  if (policy === "alt") {
-    return (md || "").replace(IMG, (_, alt) => (alt || ""));
-  }
-  // keep: absolutize relative src
-  return (md || "").replace(IMG, (whole, alt, src) => {
-    let abs = src;
-    if (baseUrl && !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith("//")) {
-      try { abs = new URL(src, baseUrl).href; } catch (_) { return whole; }
-    }
-    return "![" + alt + "](" + abs + ")";
-  });
+  const rewrite = (line) => {
+    if (policy === "strip") return line.replace(IMG, "");
+    if (policy === "alt") return line.replace(IMG, (_, alt) => (alt || ""));
+    // keep: absolutize relative src
+    return line.replace(IMG, (whole, alt, src) => {
+      let abs = src;
+      if (baseUrl && !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith("//")) {
+        try { abs = new URL(src, baseUrl).href; } catch (_) { return whole; }
+      }
+      return "![" + alt + "](" + abs + ")";
+    });
+  };
+  // Same inFence line-scan as buildToc: a code sample showing ![alt](src)
+  // syntax is literal content, not a real image, and must not be rewritten.
+  let inFence = false;
+  return (md || "").split("\n").map((line) => {
+    if (line.match(/^\s*(```|~~~)/)) { inFence = !inFence; return line; }
+    if (inFence) return line;
+    return rewrite(line);
+  }).join("\n");
 }
 
 // ── Export transform ③: table of contents ──
