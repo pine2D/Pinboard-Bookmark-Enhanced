@@ -977,6 +977,7 @@ function _pbpTrMarkFailed(st, w, message) {
   if (!orig) return;
   const sib = orig.nextElementSibling;
   if (sib && sib.classList && (sib.classList.contains("pb-tr") || sib.classList.contains("pb-tr-err"))) sib.remove();
+  delete orig.dataset.pbTrDone; // tr-only scroll targeting assumes pbTrDone ⇒ a visible .pb-tr sibling
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "pb-tr-err";
