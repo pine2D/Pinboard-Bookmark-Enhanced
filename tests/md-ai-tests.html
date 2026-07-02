@@ -372,6 +372,35 @@ suite("pbpAiIndexBlocks family", () => {
     pbpAiIndexBlocks(makeRoot("<p>one</p>"));
     assert(pbpAiBlocksFingerprint() !== fp1, "different block count -> different fingerprint");
   });
+  test("H1/H5/H6 are indexed as block tags", () => {
+    const root = makeRoot("<h1>Title</h1><p>body</p><h5>Sub</h5><h6>Tiny</h6>");
+    const blocks = pbpAiIndexBlocks(root);
+    assertEq(blocks.map((b) => b.tag).join(","), "h1,p,h5,h6", "all four indexed in order");
+  });
+  test("top-level DIV wrapping the whole article: descends one level into its block children", () => {
+    const root = makeRoot('<div id="wrap"><h2>Title</h2><p>one</p><p>two</p></div>');
+    const blocks = pbpAiIndexBlocks(root);
+    assertEq(blocks.length, 3, "3 blocks recovered from inside the wrapper");
+    assertEq(blocks.map((b) => b.tag).join(","), "h2,p,p", "tags in document order");
+    assertEq(root.querySelector("#wrap").dataset.pb, undefined, "wrapper itself is not a block");
+  });
+  test("container descent interleaves with top-level blocks in document order", () => {
+    const root = makeRoot("<p>lead</p><section><h3>inside</h3><p>inner</p></section><p>trail</p>");
+    const blocks = pbpAiIndexBlocks(root);
+    assertEq(blocks.map((b) => b.el.textContent.trim()).join(","),
+      "lead,inside,inner,trail", "document order preserved across the container boundary");
+  });
+  test("container-of-containers: descent is exactly one level, nested wrapper yields nothing", () => {
+    const root = makeRoot("<div><div><p>buried two levels deep</p></div></div>");
+    const blocks = pbpAiIndexBlocks(root);
+    assertEq(blocks.length, 0, "no recursion past one level");
+  });
+  test("ARTICLE container also descends one level", () => {
+    const root = makeRoot("<article><p>a</p></article>");
+    const blocks = pbpAiIndexBlocks(root);
+    assertEq(blocks.length, 1, "one block recovered from the article wrapper");
+    assertEq(blocks[0].tag, "p", "p indexed");
+  });
 });
 
 suiteIf("pbpForumMarkComments", "pbpForumMarkComments", () => {

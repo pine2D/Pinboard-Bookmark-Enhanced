@@ -11,7 +11,12 @@
 // Block id n is 1-based and triple-purpose: citation anchor [Pn] ->
 // [data-pb="n"], translation slot (translated block = nextSibling),
 // cache key component (blockHash = pbpAiHash(pbpAiMdOf(n))).
-const PBP_AI_BLOCK_TAGS = ["P", "H2", "H3", "H4", "UL", "OL", "BLOCKQUOTE", "TABLE", "PRE"];
+const PBP_AI_BLOCK_TAGS = ["P", "H1", "H2", "H3", "H4", "H5", "H6", "UL", "OL", "BLOCKQUOTE", "TABLE", "PRE"];
+// Non-block wrappers a whole-article extraction can land under (Jina/some
+// site DOMs wrap everything in one <div>). Descended exactly ONE level —
+// see the loop below — never recursed, so a container-of-containers still
+// yields zero blocks rather than silently walking arbitrarily deep.
+const PBP_AI_CONTAINER_TAGS = ["DIV", "SECTION", "ARTICLE"];
 let _pbpAiBlockIndex = [];
 let _pbpAiTextCache = Object.create(null);
 let _pbpAiMdCache = Object.create(null);
@@ -35,8 +40,18 @@ function pbpAiIndexBlocks(rootEl) {
       for (const body of el.querySelectorAll(".pb-comment-body")) add(body, "div");
       continue;
     }
-    if (PBP_AI_BLOCK_TAGS.indexOf(el.tagName) === -1) continue;
-    add(el, el.tagName.toLowerCase());
+    if (PBP_AI_BLOCK_TAGS.indexOf(el.tagName) !== -1) {
+      add(el, el.tagName.toLowerCase());
+      continue;
+    }
+    // Top-level non-block container (e.g. the whole article inside one
+    // <div>): descend one level and index its direct children that match,
+    // in their document order, at this container's position in the sequence.
+    if (PBP_AI_CONTAINER_TAGS.indexOf(el.tagName) !== -1) {
+      for (const child of el.children) {
+        if (PBP_AI_BLOCK_TAGS.indexOf(child.tagName) !== -1) add(child, child.tagName.toLowerCase());
+      }
+    }
   }
   return _pbpAiBlockIndex;
 }
