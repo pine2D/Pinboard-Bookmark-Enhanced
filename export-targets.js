@@ -46,7 +46,8 @@ function pbpWebhookHttpWarn(url) {
   try { u = new URL(String(url || "")); } catch (_) { return false; }
   if (u.protocol !== "http:") return false;
   const h = u.hostname;
-  if (h === "localhost" || h === "127.0.0.1" || h === "::1") return false;
+  // URL#hostname returns IPv6 literals WITH brackets ("[::1]"), never bare "::1".
+  if (h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]") return false;
   if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return false;
   if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return false;
   if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return false;
