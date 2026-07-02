@@ -262,6 +262,8 @@ function _ensurePurifyHook() {
   if (_purifyHooked || typeof DOMPurify === "undefined") return;
   DOMPurify.addHook("afterSanitizeAttributes", (node) => {
     if (node.tagName === "A") {
+      const href = node.getAttribute("href") || "";
+      if (href.startsWith("#")) return; // page-internal (TOC/footnote) — keep same-tab
       node.setAttribute("target", "_blank");
       node.setAttribute("rel", "noopener noreferrer");
     }

@@ -2243,6 +2243,32 @@ suite("renderMarkdown heading id dedup === buildToc slug dedup", () => {
 });
 </script>
 <script>
+// ============ B2: renderMarkdown fragment links don't get target=_blank ============
+suite("renderMarkdown: #fragment links stay same-tab, external links keep target=_blank", () => {
+  test("href starting with # gets no target/rel attribute", () => {
+    const md = "[jump to section](#example)";
+    const html = renderMarkdown(md);
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    const a = div.querySelector("a");
+    assert(!!a, "anchor tag rendered");
+    assertEq(a.getAttribute("href"), "#example", "fragment href preserved");
+    assert(!a.hasAttribute("target"), "fragment link has no target attribute");
+    assert(!a.hasAttribute("rel"), "fragment link has no rel attribute");
+  });
+  test("http(s) links still get target=_blank + rel=noopener noreferrer", () => {
+    const md = "[external](https://example.com/page)";
+    const html = renderMarkdown(md);
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    const a = div.querySelector("a");
+    assert(!!a, "anchor tag rendered");
+    assertEq(a.getAttribute("target"), "_blank", "external link opens in new tab");
+    assertEq(a.getAttribute("rel"), "noopener noreferrer", "external link carries noopener noreferrer");
+  });
+});
+</script>
+<script>
 // ============ Task 6 (#8): glossary extraction null-vs-{} semantics (async) ============
 (async function () {
   const host = document.createElement("div");
