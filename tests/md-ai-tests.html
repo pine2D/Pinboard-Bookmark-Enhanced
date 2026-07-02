@@ -528,6 +528,18 @@ suite("pbpAiShield", () => {
     const r = pbpAiShield("");
     assert(r.text === "" && r.slots.length === 0, "empty ok");
   });
+  test("pre-existing placeholder-shaped literal text is absorbed into its own slot", () => {
+    const r = pbpAiShield("literal ⟦C1⟧ then `real code`");
+    assertEq(r.slots.length, 2, "two slots, got " + r.slots.length);
+    assertEq(r.slots[0].orig, "⟦C1⟧", "absorbed literal orig");
+    assertEq(r.slots[1].orig, "`real code`", "real code orig");
+    assert(r.slots[0].ph !== r.slots[1].ph, "distinct placeholders: " + r.slots[0].ph + " vs " + r.slots[1].ph);
+  });
+  test("round trip preserves literal placeholder text without corrupting real code", () => {
+    const md = "literal ⟦C1⟧ then `real code`";
+    const r = pbpAiShield(md);
+    assertEq(pbpAiRestore(r.text, r.slots), md, "round trip");
+  });
 });
 
 suite("pbpAiRestore", () => {
