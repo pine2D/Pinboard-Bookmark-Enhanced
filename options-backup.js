@@ -65,7 +65,21 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
       const safeData = Object.fromEntries(
         Object.entries(rest).filter(([k]) => exportableKeys.includes(k))
       );
-      await (await getSettingsStorage()).set(safeData);
+      const settingsStorage = await getSettingsStorage();
+      if (safeData.exportTargets) {
+        // Export strips nested secrets (see the `cleaned` pass in the export handler
+        // above), so a raw key-set here would blast away live tokens (github PAT,
+        // webhook Authorization) with the secret-less backup copy. Merge per target
+        // onto what's already stored so untouched secret fields survive; only the
+        // backed-up (non-secret) fields actually update.
+        const { exportTargets: current } = await settingsStorage.get({ exportTargets: {} });
+        const merged = Object.assign({}, current);
+        for (const [tid, cfg] of Object.entries(safeData.exportTargets)) {
+          merged[tid] = Object.assign({}, merged[tid], cfg);
+        }
+        safeData.exportTargets = merged;
+      }
+      await settingsStorage.set(safeData);
 
       if (schemaVersion >= 2) {
         if (customOverlayCSS !== undefined) await saveOverlayWithFallback(customOverlayCSS);
