@@ -578,6 +578,9 @@
   "mdEngineTabGone": {
     "message": "源标签页已不可用 — 重新打开该页面才能使用 Defuddle"
   },
+  "mdEngineGroupAria": {
+    "message": "抽取引擎"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard：还需一步完成保存"
   },
@@ -1395,6 +1398,38 @@
   },
   "mdPreviewNoContent": {
     "message": "未能从该页面提取到内容。"
+  },
+  "mdStatWords": {
+    "message": "$COUNT$ 词",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatCjk": {
+    "message": "$COUNT$ 字",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatMin": {
+    "message": "~$COUNT$ 分钟",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatTokens": {
+    "message": "$COUNT$ tokens",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "secAiContentSource": {
     "message": "AI 内容来源"

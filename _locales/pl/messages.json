@@ -578,6 +578,9 @@
   "mdEngineTabGone": {
     "message": "Karta źródłowa niedostępna — otwórz stronę ponownie, aby użyć Defuddle"
   },
+  "mdEngineGroupAria": {
+    "message": "Silnik ekstrakcji"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard: jeszcze jeden krok"
   },
@@ -1395,6 +1398,38 @@
   },
   "mdPreviewNoContent": {
     "message": "Nie udało się wyodrębnić treści z tej strony."
+  },
+  "mdStatWords": {
+    "message": "$COUNT$ słów",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatCjk": {
+    "message": "$COUNT$ zn. CJK",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatMin": {
+    "message": "~$COUNT$ min",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatTokens": {
+    "message": "$COUNT$ tokens",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "secAiContentSource": {
     "message": "Źródło treści AI"

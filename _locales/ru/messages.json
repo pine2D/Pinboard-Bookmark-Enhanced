@@ -578,6 +578,9 @@
   "mdEngineTabGone": {
     "message": "Исходная вкладка недоступна — откройте страницу заново, чтобы использовать Defuddle"
   },
+  "mdEngineGroupAria": {
+    "message": "Механизм извлечения"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard: остался один шаг"
   },
@@ -1395,6 +1398,38 @@
   },
   "mdPreviewNoContent": {
     "message": "Не удалось извлечь содержимое со страницы."
+  },
+  "mdStatWords": {
+    "message": "$COUNT$ слов",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatCjk": {
+    "message": "$COUNT$ CJK-симв.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatMin": {
+    "message": "~$COUNT$ мин",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatTokens": {
+    "message": "$COUNT$ tokens",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "secAiContentSource": {
     "message": "Источник контента для ИИ"

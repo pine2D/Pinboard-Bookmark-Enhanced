@@ -578,6 +578,9 @@
   "mdEngineTabGone": {
     "message": "Source tab no longer available — reopen the page to use Defuddle"
   },
+  "mdEngineGroupAria": {
+    "message": "Extraction engine"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard: One more step to save"
   },
@@ -1371,6 +1374,38 @@
   },
   "mdPreviewNoContent": {
     "message": "No content was extracted from this page."
+  },
+  "mdStatWords": {
+    "message": "$COUNT$ words",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatCjk": {
+    "message": "$COUNT$ CJK",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatMin": {
+    "message": "~$COUNT$ min",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatTokens": {
+    "message": "$COUNT$ tokens",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "secAiContentSource": {
     "message": "AI Content Source"

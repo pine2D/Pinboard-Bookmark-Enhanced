@@ -578,6 +578,9 @@
   "mdEngineTabGone": {
     "message": "來源分頁已無法使用 — 重新開啟該頁面才能使用 Defuddle"
   },
+  "mdEngineGroupAria": {
+    "message": "擷取引擎"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard：還差一步完成儲存"
   },
@@ -1395,6 +1398,38 @@
   },
   "mdPreviewNoContent": {
     "message": "未能從該頁面擷取到內容。"
+  },
+  "mdStatWords": {
+    "message": "$COUNT$ 詞",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatCjk": {
+    "message": "$COUNT$ 字",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatMin": {
+    "message": "~$COUNT$ 分鐘",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatTokens": {
+    "message": "$COUNT$ tokens",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "secAiContentSource": {
     "message": "AI 內容來源"

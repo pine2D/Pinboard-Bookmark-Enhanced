@@ -155,7 +155,7 @@ function ensureKatex() {
   const data = await chrome.storage.local.get("md_preview_data");
   const info = data.md_preview_data;
   if (!info) {
-    renderEmptyState(chrome.i18n.getMessage("mdPreviewEmpty") || "No preview data available. Please use the Markdown button in the popup first.");
+    renderEmptyState(t("mdPreviewEmpty"));
     return;
   }
   // Clear temporary data — but KEEP a pending/restore placeholder so a manual reload
@@ -219,7 +219,7 @@ function ensureKatex() {
   if (info.pending || info.restore) {
     const titleEl0 = document.getElementById("preview-title");
     if (titleEl0) { titleEl0.textContent = title || t("mdPreviewUntitled"); titleEl0.title = title || ""; }
-    document.title = (title || "Markdown") + " — Preview";
+    document.title = (title || "Markdown") + " — " + t("mdStripPreview");
 
     // One function drives the initial attempt, the error state's retry button, and the
     // rail's engine-switch badge clicks — all funnel back through the same
@@ -262,7 +262,7 @@ function ensureKatex() {
   const canonicalMarkdown = info.markdown || (contentHtml ? htmlToMarkdown(contentHtml, { baseUrl }) : "");
   function getMarkdown() { return canonicalMarkdown; }
   if (!canonicalMarkdown.trim()) {
-    renderEmptyState(chrome.i18n.getMessage("mdPreviewNoContent") || "No content was extracted from this page.");
+    renderEmptyState(t("mdPreviewNoContent"));
     return;
   }
 
@@ -357,7 +357,7 @@ function ensureKatex() {
   urlEl.href = url || "#";
   const tokenEl = document.getElementById("token-count");
   if (source === "jina" && tokens && info.hasApiKey) {
-    tokenEl.textContent = `${tokens} tokens`;
+    tokenEl.textContent = t("mdStatTokens", String(tokens));
   } else {
     tokenEl.style.display = "none";
   }
@@ -401,16 +401,16 @@ function ensureKatex() {
       });
     });
   }
-  document.title = `${title || "Markdown"} — Preview`;
+  document.title = `${title || "Markdown"} — ${t("mdStripPreview")}`;
 
   // Reading stats (header) — computed from canonical Markdown
   const statsEl = document.getElementById("reading-stats");
   if (statsEl) {
     const stats = readingStats(getMarkdown());
     const wordLabel = stats.cjkChars > 0
-      ? `${stats.words.toLocaleString()} words · ${stats.cjkChars.toLocaleString()} CJK`
-      : `${stats.words.toLocaleString()} words`;
-    statsEl.textContent = `${wordLabel} · ~${stats.minutes} min`;
+      ? `${t("mdStatWords", stats.words.toLocaleString())} · ${t("mdStatCjk", stats.cjkChars.toLocaleString())}`
+      : t("mdStatWords", stats.words.toLocaleString());
+    statsEl.textContent = `${wordLabel} · ${t("mdStatMin", String(stats.minutes))}`;
   }
 
   // Single render path: canonical Markdown -> marked() -> DOMPurify -> innerHTML.

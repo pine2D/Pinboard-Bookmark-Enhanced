@@ -578,6 +578,9 @@
   "mdEngineTabGone": {
     "message": "Onglet source indisponible — rouvrez la page pour utiliser Defuddle"
   },
+  "mdEngineGroupAria": {
+    "message": "Moteur d'extraction"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard : une dernière étape"
   },
@@ -1395,6 +1398,38 @@
   },
   "mdPreviewNoContent": {
     "message": "Aucun contenu n'a pu être extrait de cette page."
+  },
+  "mdStatWords": {
+    "message": "$COUNT$ mots",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatCjk": {
+    "message": "$COUNT$ car. CJK",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatMin": {
+    "message": "~$COUNT$ min",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatTokens": {
+    "message": "$COUNT$ tokens",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "secAiContentSource": {
     "message": "Source de contenu IA"

@@ -578,6 +578,9 @@
   "mdEngineTabGone": {
     "message": "Quell-Tab nicht mehr verfügbar — Seite erneut öffnen, um Defuddle zu nutzen"
   },
+  "mdEngineGroupAria": {
+    "message": "Extraktions-Engine"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard: Noch ein Schritt zum Speichern"
   },
@@ -1395,6 +1398,38 @@
   },
   "mdPreviewNoContent": {
     "message": "Aus dieser Seite konnte kein Inhalt extrahiert werden."
+  },
+  "mdStatWords": {
+    "message": "$COUNT$ Wörter",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatCjk": {
+    "message": "$COUNT$ CJK-Zeichen",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatMin": {
+    "message": "~$COUNT$ Min.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatTokens": {
+    "message": "$COUNT$ tokens",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "secAiContentSource": {
     "message": "KI-Inhaltsquelle"

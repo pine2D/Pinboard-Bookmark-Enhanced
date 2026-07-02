@@ -578,6 +578,9 @@
   "mdEngineTabGone": {
     "message": "元のタブが利用できません — ページを開き直すと Defuddle を使えます"
   },
+  "mdEngineGroupAria": {
+    "message": "抽出エンジン"
+  },
   "bgTabSetSaved": {
     "message": "Pinboard：保存まであと一歩"
   },
@@ -1395,6 +1398,38 @@
   },
   "mdPreviewNoContent": {
     "message": "このページからコンテンツを抽出できませんでした。"
+  },
+  "mdStatWords": {
+    "message": "$COUNT$ 語",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatCjk": {
+    "message": "$COUNT$ 字",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatMin": {
+    "message": "~$COUNT$ 分",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "mdStatTokens": {
+    "message": "$COUNT$ tokens",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "secAiContentSource": {
     "message": "AIコンテンツソース"
