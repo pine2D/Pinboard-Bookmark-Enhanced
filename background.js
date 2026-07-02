@@ -787,6 +787,34 @@ async function sweepSuggestCache() {
   } catch (_) {}
 }
 
+// Best-effort sweep of orphaned per-tab preview payloads (md_preview_data_<uuid>).
+// Each preview tab owns a token key; storage.local.remove for it only runs on the
+// render path, never on tab close/crash — so closed previews leak their key. Cross-
+// references CURRENTLY-live preview tabs (incl. discarded Memory-Saver tabs, which
+// stay in tabs.query with their ?k= intact) and drops the rest. The legacy no-token
+// global key `md_preview_data` (no trailing underscore) is deliberately excluded by
+// the prefix so a pre-update tab's fallback slot is never swept out from under it.
+// ponytail: get(null) enumerates ALL local keys — fine at current key counts;
+// upgrade to chrome.storage.local.getKeys() (Chrome ≥130) if this turns hot.
+async function pbpSweepPreviewOrphans() {
+  try {
+    const tabs = await chrome.tabs.query({});            // includes discarded tabs
+    const base = chrome.runtime.getURL("md-preview.html");
+    const live = new Set();
+    for (const tb of tabs) {
+      if (tb.url && tb.url.startsWith(base)) {
+        const kk = new URL(tb.url).searchParams.get("k");
+        if (kk) live.add("md_preview_data_" + kk);
+      }
+    }
+    const all = await chrome.storage.local.get(null);
+    const stale = Object.keys(all).filter((x) => x.startsWith("md_preview_data_") && !live.has(x));
+    if (stale.length) await chrome.storage.local.remove(stale);
+  } catch (_) { /* best-effort: leaked keys just linger to the next sweep */ }
+}
+// Cold-start residue clean: runs once per SW script evaluation (fire-and-forget).
+pbpSweepPreviewOrphans();
+
 // Startup: process offline queue + update badge + prime settings (cheap no-op when already primed)
 chrome.runtime.onStartup.addListener(() => {
   _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
@@ -899,15 +927,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "reextractMarkdown") {
-    const { tabId, url, engine, tags, description } = message;
+    const { tabId, url, engine, tags, description, k } = message;
     if (!url || (engine !== "local" && engine !== "jina")) {
       sendResponse({ ok: false, error: "bad_request" }); return true;
     }
+    // Write back to the requesting tab's own token key so the reload reads the
+    // fresh payload from the SAME slot it owns. No k = pre-update tab → fall
+    // back to the legacy global key.
+    const key = k ? "md_preview_data_" + k : "md_preview_data";
     extractForPreview({ tabId, url, engine })
       .then(out => {
         if (out.error) { sendResponse({ ok: false, error: out.error }); return; }
         return chrome.storage.local.set({
-          md_preview_data: {
+          [key]: {
             ...out, baseUrl: out.url || url, tabId,
             tags: Array.isArray(tags) ? tags : [],
             description: typeof description === "string" ? description : ""
@@ -1212,6 +1244,7 @@ async function extractForPreview({ tabId, url, engine }) {
 }
 
 async function openMarkdownPreviewFromShortcut() {
+  pbpSweepPreviewOrphans(); // best-effort: clear closed-preview residue before adding one
   let tab;
   try {
     [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -1225,14 +1258,30 @@ async function openMarkdownPreviewFromShortcut() {
   // path as the in-preview toggle). Follow the aiContentSource setting (fresh read).
   const raw = await (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource });
   const engine = raw.aiContentSource === "jina" ? "jina" : "local";
-  await chrome.storage.local.set({
-    md_preview_data: {
-      pending: true, engine, source: engine,
-      tabId: tab.id, url: tab.url, baseUrl: tab.url, title: tab.title || "",
-      tags: [], description: ""
-    }
-  });
-  await chrome.tabs.create({ url: "md-preview.html" });
+  // Per-open token key so two shortcut opens (or a shortcut + a popup Preview)
+  // never share one storage slot and clobber each other before their tabs read.
+  const k = crypto.randomUUID();
+  try {
+    await chrome.storage.local.set({
+      ["md_preview_data_" + k]: {
+        pending: true, engine, source: engine,
+        tabId: tab.id, url: tab.url, baseUrl: tab.url, title: tab.title || "",
+        tags: [], description: ""
+      }
+    });
+    await chrome.tabs.create({ url: "md-preview.html?k=" + k });
+  } catch (e) {
+    // storage.local.set can reject on quota; tabs.create can reject too. Surface
+    // it instead of silently opening nothing (aligns with the read_later/quick_save
+    // failure notifications in the onCommand listener below).
+    const quota = /quota/i.test((e && e.message) || "");
+    showNotification(
+      "mdpv-error",
+      t("bgMdPreviewFailed"),
+      quota ? t("bgMdPreviewTooLarge") : ((e && e.message) || t("bgMdPreviewNoContent")),
+      "error"
+    );
+  }
 }
 
 // ===================== Keyboard Shortcuts =====================

@@ -535,23 +535,34 @@ async function htmlToMarkdownAsync(html, opts) {
         btn._t = setTimeout(() => { if (lbl) lbl.textContent = btn._orig; btn.classList.remove("copied"); btn._orig = null; }, 1500);
       };
       const openPreview = async () => {
-        await chrome.storage.local.set({
-          md_preview_data: {
-            markdown: markdown || "",
-            contentHtml: result.contentHtml || "",
-            title: result.title || $id("title-input")?.value || "",
-            url: result.url || url,
-            baseUrl: result.url || url,
-            tags: Array.isArray(currentTags) ? currentTags.slice() : [],
-            tokens: result.tokens || 0,
-            hasApiKey: !!result._hasApiKey,
-            source: settings.aiContentSource || "local",
-            math: !!result.math,
-            forum: !!result.forum,
-            tabId: tab.id
-          }
-        });
-        chrome.tabs.create({ url: "md-preview.html" });
+        // Per-open token key so concurrent previews never clobber each other's
+        // payload (the old single global key let a second open overwrite the
+        // first before its tab read it). Wrapped in try/catch because this is
+        // mounted as previewBtn.onclick: the returned Promise is unconsumed, so
+        // a storage-quota reject (huge article) would otherwise be a silent
+        // unhandled rejection with no preview tab and no feedback.
+        try {
+          const k = crypto.randomUUID();
+          await chrome.storage.local.set({
+            ["md_preview_data_" + k]: {
+              markdown: markdown || "",
+              contentHtml: result.contentHtml || "",
+              title: result.title || $id("title-input")?.value || "",
+              url: result.url || url,
+              baseUrl: result.url || url,
+              tags: Array.isArray(currentTags) ? currentTags.slice() : [],
+              tokens: result.tokens || 0,
+              hasApiKey: !!result._hasApiKey,
+              source: settings.aiContentSource || "local",
+              math: !!result.math,
+              forum: !!result.forum,
+              tabId: tab.id
+            }
+          });
+          await chrome.tabs.create({ url: "md-preview.html?k=" + k });
+        } catch (_) {
+          showStatus("status-msg", t("mdPreviewOpenFailed"), "error");
+        }
       };
       const downloadMd = () => {
         const meta = {

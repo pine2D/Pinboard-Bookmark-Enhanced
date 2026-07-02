@@ -553,6 +553,12 @@
   "bgMdPreviewNoContent": {
     "message": "このページから読み取れるコンテンツが見つかりませんでした。"
   },
+  "bgMdPreviewTooLarge": {
+    "message": "このページは大きすぎてプレビューできません。短いページでお試しください。"
+  },
+  "mdPreviewOpenFailed": {
+    "message": "プレビューを開けませんでした。ページが大きすぎて保存できない可能性があります。"
+  },
   "mdEngineSwitchTo": {
     "message": "$ENGINE$ に切り替え",
     "placeholders": {

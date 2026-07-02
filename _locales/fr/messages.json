@@ -553,6 +553,12 @@
   "bgMdPreviewNoContent": {
     "message": "Aucun contenu lisible n'a été trouvé sur cette page."
   },
+  "bgMdPreviewTooLarge": {
+    "message": "Cette page est trop volumineuse pour l'aperçu. Essayez une page plus courte."
+  },
+  "mdPreviewOpenFailed": {
+    "message": "Impossible d'ouvrir l'aperçu — la page est peut-être trop volumineuse pour être stockée."
+  },
   "mdEngineSwitchTo": {
     "message": "Passer à $ENGINE$",
     "placeholders": {

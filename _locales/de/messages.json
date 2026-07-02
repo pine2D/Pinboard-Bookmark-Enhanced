@@ -553,6 +553,12 @@
   "bgMdPreviewNoContent": {
     "message": "Auf dieser Seite wurde kein lesbarer Inhalt gefunden."
   },
+  "bgMdPreviewTooLarge": {
+    "message": "Diese Seite ist zu groß für eine Vorschau. Versuchen Sie es mit einer kürzeren Seite."
+  },
+  "mdPreviewOpenFailed": {
+    "message": "Vorschau konnte nicht geöffnet werden – die Seite ist möglicherweise zu groß zum Speichern."
+  },
   "mdEngineSwitchTo": {
     "message": "Zu $ENGINE$ wechseln",
     "placeholders": {

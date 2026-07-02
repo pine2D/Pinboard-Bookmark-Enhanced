@@ -151,9 +151,15 @@ function ensureKatex() {
   initI18n();
   applyI18n();
   document.documentElement.lang = uiLangToBCP47(); // UI-locale font for the rail/UI chrome
+  // Per-tab token key: the opener (popup / shortcut) minted ?k=<uuid> and wrote the
+  // payload to md_preview_data_<uuid>, so this tab reads ONLY its own slot and can't
+  // be clobbered by a concurrent preview. No k = a pre-update tab → fall back to the
+  // legacy global key so it still opens.
+  const k = new URLSearchParams(location.search).get("k");
+  const MP_KEY = k ? "md_preview_data_" + k : "md_preview_data";
   // Read preview data from storage
-  const data = await chrome.storage.local.get("md_preview_data");
-  const info = data.md_preview_data;
+  const data = await chrome.storage.local.get(MP_KEY);
+  const info = data[MP_KEY];
   if (!info) {
     renderEmptyState(t("mdPreviewEmpty"));
     return;
@@ -163,7 +169,7 @@ function ensureKatex() {
   // it instead of hitting the empty state (the reextract success path overwrites
   // md_preview_data with the full payload, which that load then clears).
   if (!info.pending && !info.restore) {
-    await chrome.storage.local.remove("md_preview_data");
+    await chrome.storage.local.remove(MP_KEY);
   }
 
   const { contentHtml, title, url, tokens, source } = info;
@@ -237,7 +243,7 @@ function ensureKatex() {
       let pr;
       try {
         pr = await chrome.runtime.sendMessage({
-          type: "reextractMarkdown", tabId: srcTabId, url, engine, tags, description: ""
+          type: "reextractMarkdown", tabId: srcTabId, url, engine, tags, description: "", k
         });
       } catch (_) { pr = { ok: false, error: "network" }; }
       inFlight = false;
@@ -274,7 +280,7 @@ function ensureKatex() {
   // degrades to the pre-existing behavior (empty state on the next reload).
   try {
     await chrome.storage.local.set({
-      md_preview_data: { restore: true, url, tabId: srcTabId, engine: source === "jina" ? "jina" : "local", tags }
+      [MP_KEY]: { restore: true, url, tabId: srcTabId, engine: source === "jina" ? "jina" : "local", tags, ts: Date.now() }
     });
   } catch (_) { /* degrade to current behavior: next reload hits the empty state */ }
 
@@ -383,7 +389,7 @@ function ensureKatex() {
           r = await chrome.runtime.sendMessage({
             type: "reextractMarkdown",
             tabId: srcTabId, url: srcUrlForSwitch, engine: e,
-            tags, description
+            tags, description, k
           });
         } catch (_) { r = { ok: false, error: "network" }; }
         if (r && r.ok) { location.reload(); return; }

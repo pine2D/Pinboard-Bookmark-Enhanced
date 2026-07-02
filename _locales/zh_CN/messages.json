@@ -553,6 +553,12 @@
   "bgMdPreviewNoContent": {
     "message": "未能从该页面提取到可读内容。"
   },
+  "bgMdPreviewTooLarge": {
+    "message": "该页面过大，无法预览。请尝试较短的页面。"
+  },
+  "mdPreviewOpenFailed": {
+    "message": "无法打开预览——该页面可能过大，无法存储。"
+  },
   "mdEngineSwitchTo": {
     "message": "切换到 $ENGINE$",
     "placeholders": {

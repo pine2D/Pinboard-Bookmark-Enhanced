@@ -553,6 +553,12 @@
   "bgMdPreviewNoContent": {
     "message": "未能從此頁面擷取到可讀內容。"
   },
+  "bgMdPreviewTooLarge": {
+    "message": "此頁面過大，無法預覽。請嘗試較短的頁面。"
+  },
+  "mdPreviewOpenFailed": {
+    "message": "無法開啟預覽——此頁面可能過大，無法儲存。"
+  },
   "mdEngineSwitchTo": {
     "message": "切換到 $ENGINE$",
     "placeholders": {

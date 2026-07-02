@@ -553,6 +553,12 @@
   "bgMdPreviewNoContent": {
     "message": "No readable content was found on this page."
   },
+  "bgMdPreviewTooLarge": {
+    "message": "This page is too large to preview. Try a shorter page."
+  },
+  "mdPreviewOpenFailed": {
+    "message": "Couldn't open the preview — the page may be too large to store."
+  },
   "mdEngineSwitchTo": {
     "message": "Switch to $ENGINE$",
     "placeholders": {

@@ -553,6 +553,12 @@
   "bgMdPreviewNoContent": {
     "message": "Nie znaleziono czytelnej treści na tej stronie."
   },
+  "bgMdPreviewTooLarge": {
+    "message": "Ta strona jest zbyt duża, aby wyświetlić podgląd. Spróbuj krótszej strony."
+  },
+  "mdPreviewOpenFailed": {
+    "message": "Nie można otworzyć podglądu — strona może być zbyt duża, aby ją zapisać."
+  },
   "mdEngineSwitchTo": {
     "message": "Przełącz na $ENGINE$",
     "placeholders": {
