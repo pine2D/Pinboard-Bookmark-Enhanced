@@ -845,6 +845,15 @@ body.md-empty main { margin-left: 0; }
   margin-left: 3px;
   flex-shrink: 0;
 }
+/* Stale citation (audit #29): the block index changed (extraction engine
+   switch, re-render) since this answer was persisted, so [Pn] no longer
+   reliably maps to the same content. Kept visible for context, but
+   non-interactive (native :disabled also drops it from the tab order). */
+.ask-chip.stale, .ask-chip:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.ask-chip.stale:hover, .ask-chip:disabled:hover { background: var(--btn-bg); border-color: var(--btn-border); }
 
 #ask-tip {
   position: fixed;

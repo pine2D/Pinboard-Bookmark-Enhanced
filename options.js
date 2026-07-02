@@ -297,6 +297,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (s.placeholder) inp.placeholder = s.placeholder;
         wrap.appendChild(lab); wrap.appendChild(inp);
         card.appendChild(wrap);
+        // Webhook URL: warn (never block — self-hosted/LAN http is a
+        // legitimate opt-in target) when the Authorization header would ride
+        // in plaintext (audit #31).
+        if (id === "webhook" && s.key === "url") {
+          const warn = document.createElement("p");
+          warn.className = "hint hint-warn";
+          warn.hidden = true;
+          warn.textContent = t("mdTargetWebhookHttpWarn");
+          const syncWarn = () => {
+            warn.hidden = !(typeof pbpWebhookHttpWarn === "function" && pbpWebhookHttpWarn(inp.value.trim()));
+          };
+          inp.addEventListener("input", syncWarn);
+          syncWarn();
+          card.appendChild(warn);
+        }
       });
 
       if (row.onboarding) {

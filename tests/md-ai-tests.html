@@ -362,6 +362,16 @@ suite("pbpAiIndexBlocks family", () => {
     pbpAiIndexBlocks(makeRoot("<p>second</p>"));
     assert(pbpAiTextOf(1) === "second", "cache reset");
   });
+  test("pbpAiBlocksFingerprint: stable for the same block text, changes when it differs", () => {
+    pbpAiIndexBlocks(makeRoot("<p>one</p><p>two</p>"));
+    const fp1 = pbpAiBlocksFingerprint();
+    pbpAiIndexBlocks(makeRoot("<p>one</p><p>two</p>"));
+    assert(pbpAiBlocksFingerprint() === fp1, "same text -> same fingerprint");
+    pbpAiIndexBlocks(makeRoot("<p>one</p><p>three</p>"));
+    assert(pbpAiBlocksFingerprint() !== fp1, "different text -> different fingerprint");
+    pbpAiIndexBlocks(makeRoot("<p>one</p>"));
+    assert(pbpAiBlocksFingerprint() !== fp1, "different block count -> different fingerprint");
+  });
 });
 
 suiteIf("pbpForumMarkComments", "pbpForumMarkComments", () => {

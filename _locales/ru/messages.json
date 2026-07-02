@@ -2323,5 +2323,8 @@
   },
   "mdTargetWebhookOnboarding": {
     "message": "Отправляет POST-запросом JSON-данные {title, url, date, tags, markdown} на ваш эндпоинт. Указанное значение Authorization отправляется как есть (например, Bearer <token> или Token <key>), поэтому подходит любая схема аутентификации. Для n8n, Make, Zapier, Readwise или любого самостоятельно размещённого приёмника — аккаунт здесь не нужен."
+  },
+  "mdTargetWebhookHttpWarn": {
+    "message": "Эта конечная точка использует HTTP, а не HTTPS — значение Authorization отправляется в открытом виде. Подходит для localhost/локальной сети; избегайте в публичном интернете."
   }
 }

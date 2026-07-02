@@ -2323,5 +2323,8 @@
   },
   "mdTargetWebhookOnboarding": {
     "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填寫的 Authorization 值會原樣傳送（例如 Bearer <token> 或 Token <key>），因此支援任何驗證方式。可搭配 n8n、Make、Zapier、Readwise 或任何自架接收端使用 — 無需在此註冊帳號。"
+  },
+  "mdTargetWebhookHttpWarn": {
+    "message": "該位址使用 HTTP 而非 HTTPS——Authorization 值會以明文傳送。區域網路／本機位址沒問題，公網位址請避免。"
   }
 }

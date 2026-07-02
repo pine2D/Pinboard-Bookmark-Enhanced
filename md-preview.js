@@ -722,9 +722,15 @@ function ensureKatex() {
         }
         primary.classList.remove("sending");
         setPrimary(id);
+        // Non-local http webhook: the Authorization header rides in plaintext
+        // (audit #31). Advisory only — never blocks the send (self-hosted/LAN
+        // receivers are a legitimate opt-in target).
+        const httpWarn = id === "webhook" && typeof pbpWebhookHttpWarn === "function"
+          && pbpWebhookHttpWarn((et[id] && et[id].url) || "");
         if (res.ok && !res.fellBack) {
           flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label));        // short -> button
-          if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url); // + clickable link
+          if (httpWarn) showSendStatus(t("mdTargetWebhookHttpWarn"), false);
+          else if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url); // + clickable link
         } else if (res.ok) {
           showSendStatus(t("mdSendTooLongFellBack").replace("{name}", row.label), false); // long -> roomy block
         } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {

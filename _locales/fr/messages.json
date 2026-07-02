@@ -2323,5 +2323,8 @@
   },
   "mdTargetWebhookOnboarding": {
     "message": "Envoie une requête POST avec une charge utile JSON {title, url, date, tags, markdown} vers votre point de terminaison. Toute valeur Authorization que vous définissez est envoyée telle quelle (p. ex. Bearer <token> ou Token <key>), donc n'importe quel schéma d'authentification fonctionne. Pour n8n, Make, Zapier, Readwise ou tout récepteur auto-hébergé — aucun compte requis ici."
+  },
+  "mdTargetWebhookHttpWarn": {
+    "message": "Ce point de terminaison utilise HTTP, pas HTTPS — la valeur Authorization est envoyée en clair. Sans risque pour localhost/réseau local ; à éviter sur Internet public."
   }
 }

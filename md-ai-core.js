@@ -59,6 +59,18 @@ function pbpAiTextOf(n) {
   return text;
 }
 
+// Fingerprint of the CURRENT block list's text (order + content). Ask history
+// is keyed only by URL (md-ai-core.js _pbpAskHistKey), not by extraction
+// engine/content version — switching Defuddle<->Jina (or a site re-render)
+// re-indexes blocks with different boundaries/order, so a [Pn] chip persisted
+// under the old index can point at unrelated content after restore (audit
+// #29). Callers persist this alongside a saved answer and re-derive it at
+// restore time to detect the mismatch; never a security boundary, just a
+// content-drift signal.
+function pbpAiBlocksFingerprint() {
+  return pbpAiHash(pbpAiBlocks().map((b) => pbpAiTextOf(b.n)).join("\n"));
+}
+
 // ---- Forum thread mark (per-comment body wrappers) ----
 // Forum site rules (HN/V2EX/SO-discussions) emit nested <blockquote> threads;
 // after marked, one top-level thread = one block, so translate/ask/explain would

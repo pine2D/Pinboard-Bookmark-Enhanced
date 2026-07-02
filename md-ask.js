@@ -530,7 +530,10 @@ async function _pbpAskRun(question, aEl) {
       a: full,
       cites: parsed.cites,
       ts: Date.now(),
-      model: _pbpAskProviderLabel(st.s)
+      model: _pbpAskProviderLabel(st.s),
+      // Compared against the live fingerprint at restore time to catch a
+      // stale [Pn] index after an engine switch (audit #29).
+      blocksHash: (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : ""
     });
     await pbpAskHistSet(st.url, hist); // pbpAskHistSet caps at the last 20
     pbpAiBumpCounter("ask");
@@ -970,6 +973,13 @@ async function _pbpAskHistRestore() {
   note.className = "ask-restored";
   note.textContent = t("askRestoredNote", String(hist.length));
   frag.appendChild(note);
+  // Block-fingerprint check (audit #29): a persisted answer's [Pn] chips
+  // index into the CURRENT block list (pbpAiBlockEl(p) is a plain array
+  // lookup, no content check) — switching extraction engine, or a page
+  // re-render, re-indexes with different boundaries/order, so old chips can
+  // silently jump to unrelated content. rec.blocksHash absent (history saved
+  // before this fix) skips the check rather than false-flagging.
+  const curFp = (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : "";
   // Perf (audit #27): finalize (renderMarkdown + fuzzy chip verification,
   // md-ai-core.js's bounded Levenshtein scan on exact-miss) is spread across
   // rAF frames instead of one synchronous pass over up to 20 records, so a
@@ -996,6 +1006,12 @@ async function _pbpAskHistRestore() {
         // (single sanitize point) -> chip pass -> verification runs AGAIN
         // against the current block index -> decorate (copy button).
         const parsed = _pbpAskFinalize(aEl, rec.a);
+        if (rec.blocksHash && curFp && rec.blocksHash !== curFp) {
+          aEl.querySelectorAll(".ask-chip").forEach((chip) => {
+            chip.classList.add("stale");
+            chip.disabled = true; // native: also drops it from the tab order + blocks click
+          });
+        }
         // Seed st.rounds with the restored Q&A too, not just the DOM: it is
         // what pbpAskBuildPrompt/_pbpAskUpdateMeta read (_pbpAskRun), so a
         // follow-up question after a page reload still carries PREVIOUS

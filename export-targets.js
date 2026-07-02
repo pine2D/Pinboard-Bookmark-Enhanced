@@ -35,6 +35,24 @@ function pbpBuildFileBody(id, meta, rawBody) {
 // Is the assembled URI too long to hand to the OS protocol launcher?
 function pbpUriTooLong(uri) { return String(uri || "").length > PBP_URI_BUDGET; }
 
+// Should this webhook URL get an http-not-encrypted warning? webhook.origin
+// has no scheme check, so a user-supplied http:// endpoint would carry the
+// full Authorization header value in plaintext (audit #31). Local/self-hosted
+// receivers are a legitimate opt-in use case (manifest already grants
+// *://*/* for exactly this) and must NOT be flagged — this is advisory only,
+// never a hard block.
+function pbpWebhookHttpWarn(url) {
+  let u;
+  try { u = new URL(String(url || "")); } catch (_) { return false; }
+  if (u.protocol !== "http:") return false;
+  const h = u.hostname;
+  if (h === "localhost" || h === "127.0.0.1" || h === "::1") return false;
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return false;
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return false;
+  if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return false;
+  return true;
+}
+
 // Inline SVG icons (no emoji — font-fallback rule). 16px line icons.
 const _PBP_ICON_OBSIDIAN =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>';

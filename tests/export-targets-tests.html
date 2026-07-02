@@ -108,6 +108,20 @@ section("webhook.origin (derived from the user URL)");
 assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "https://hook.example.com/abc?x=1" }) === "https://hook.example.com/*", "origin = URL host + /*");
 assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "not a url" }) === null, "malformed URL -> null origin");
 
+section("pbpWebhookHttpWarn (audit #31 — advisory, never a hard block)");
+assert(pbpWebhookHttpWarn("http://example.com/hook") === true, "public http -> warn");
+assert(pbpWebhookHttpWarn("https://example.com/hook") === false, "https -> no warn");
+assert(pbpWebhookHttpWarn("http://localhost:3000/hook") === false, "localhost http -> exempt");
+assert(pbpWebhookHttpWarn("http://127.0.0.1:8080/hook") === false, "127.0.0.1 http -> exempt");
+assert(pbpWebhookHttpWarn("http://192.168.1.50/hook") === false, "192.168.x.x http -> exempt");
+assert(pbpWebhookHttpWarn("http://10.0.0.5/hook") === false, "10.x.x.x http -> exempt");
+assert(pbpWebhookHttpWarn("http://172.16.0.1/hook") === false, "172.16.x.x (low bound) http -> exempt");
+assert(pbpWebhookHttpWarn("http://172.31.255.255/hook") === false, "172.31.x.x (high bound) http -> exempt");
+assert(pbpWebhookHttpWarn("http://172.32.0.1/hook") === true, "172.32.x.x (just outside the private range) -> warn");
+assert(pbpWebhookHttpWarn("http://172.15.0.1/hook") === true, "172.15.x.x (just below the private range) -> warn");
+assert(pbpWebhookHttpWarn("not a url") === false, "malformed URL -> no warn (no crash)");
+assert(pbpWebhookHttpWarn("") === false, "empty -> no warn");
+
 section("webhook.parseSuccess (any 2xx)");
 assert(PBP_EXPORT_TARGETS.webhook.parseSuccess({ ok: true }) === true, "2xx -> delivered");
 assert(PBP_EXPORT_TARGETS.webhook.parseSuccess({ ok: false }) === false, "non-2xx -> not delivered");

@@ -2323,5 +2323,8 @@
   },
   "mdTargetWebhookOnboarding": {
     "message": "JSON ペイロード {title, url, date, tags, markdown} をエンドポイントに POST します。設定した Authorization 値はそのまま送信されるため（例：Bearer <token> や Token <key>）、あらゆる認証方式に対応します。n8n、Make、Zapier、Readwise、または任意の自己ホスト型レシーバーで利用できます — ここでのアカウント登録は不要です。"
+  },
+  "mdTargetWebhookHttpWarn": {
+    "message": "このエンドポイントは HTTPS ではなく HTTP を使用しています — Authorization の値は平文で送信されます。localhost や LAN なら問題ありませんが、公開インターネット上では避けてください。"
   }
 }

@@ -2323,5 +2323,8 @@
   },
   "mdTargetWebhookOnboarding": {
     "message": "Wysyła metodą POST ładunek JSON {title, url, date, tags, markdown} do Twojego endpointu. Ustawiona wartość Authorization jest wysyłana dosłownie (np. Bearer <token> lub Token <key>), więc działa dowolny schemat uwierzytelniania. Do n8n, Make, Zapier, Readwise lub dowolnego samodzielnie hostowanego odbiorcy — bez potrzeby zakładania konta."
+  },
+  "mdTargetWebhookHttpWarn": {
+    "message": "Ten punkt końcowy używa HTTP, a nie HTTPS — wartość Authorization jest wysyłana jawnym tekstem. W porządku dla localhost/sieci lokalnej; unikaj w publicznym internecie."
   }
 }

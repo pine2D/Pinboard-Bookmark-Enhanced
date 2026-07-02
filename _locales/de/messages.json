@@ -2323,5 +2323,8 @@
   },
   "mdTargetWebhookOnboarding": {
     "message": "Sendet ein JSON-Payload {title, url, date, tags, markdown} per POST an deinen Endpunkt. Ein von dir gesetzter Authorization-Wert wird unverändert gesendet (z. B. Bearer <token> oder Token <key>), sodass jedes Auth-Schema funktioniert. Für n8n, Make, Zapier, Readwise oder jeden selbst gehosteten Empfänger — hier ist kein Konto nötig."
+  },
+  "mdTargetWebhookHttpWarn": {
+    "message": "Dieser Endpunkt verwendet HTTP statt HTTPS – der Authorization-Wert wird im Klartext gesendet. Für localhost/LAN unbedenklich; im öffentlichen Internet vermeiden."
   }
 }

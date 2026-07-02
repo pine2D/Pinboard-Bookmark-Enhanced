@@ -73,7 +73,7 @@ async function pbpSendToTarget(id, ctx) {
       if (row.precheckRequest) {
         try {
           const pr = row.precheckRequest(cfg, token);
-          const presp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body });
+          const presp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body, signal: AbortSignal.timeout(20000) });
           if (presp.status === 401) return apiFail("api-token");
           if (!presp.ok) return apiFail("api-down");
         } catch (_) { return apiFail("api-down"); }
@@ -91,7 +91,11 @@ async function pbpSendToTarget(id, ctx) {
       // clipboard/fallback paths, so each target controls its own body.
       try {
         const req = row.buildRequest(meta, pbpBuildFileBody(id, meta, rawBody), cfg, token);
-        const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body });
+        // A hung endpoint (esp. webhook: user-supplied URL, no precheck) used to
+        // block indefinitely — _sending's re-entrancy guard then silently ate every
+        // click on the split button until the browser's own network-stack timeout
+        // (minutes) fired, with no way to cancel (audit #30). 20s -> apiFail("api-down").
+        const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body, signal: AbortSignal.timeout(20000) });
         if (resp.status === 401) return apiFail("api-token");
         // GitHub-only: a fine-grained PAT passes the /user precheck (401 never
         // fires) but POST /gists rejects it with 403/404 -- fine-grained

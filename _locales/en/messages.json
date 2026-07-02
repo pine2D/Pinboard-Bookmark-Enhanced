@@ -2317,5 +2317,8 @@
   },
   "mdTargetWebhookOnboarding": {
     "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. Any Authorization value you set is sent verbatim (e.g. Bearer <token> or Token <key>), so any auth scheme works. For n8n, Make, Zapier, Readwise, or any self-hosted receiver — no account needed here."
+  },
+  "mdTargetWebhookHttpWarn": {
+    "message": "This endpoint uses HTTP, not HTTPS — the Authorization value is sent in plaintext. Fine for localhost/LAN; avoid on the public internet."
   }
 }
