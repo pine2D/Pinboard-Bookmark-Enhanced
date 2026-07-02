@@ -581,14 +581,25 @@ async function htmlToMarkdownAsync(html, opts) {
           imagePolicy: settings.mdExportImagePolicy,
           includeToc: settings.mdExportIncludeToc
         });
-        let usedClipboard = false;
-        try { await navigator.clipboard.writeText(out); usedClipboard = true; } catch (_) {}
+        try {
+          await navigator.clipboard.writeText(out);
+        } catch (_) {
+          // Clipboard failed — do NOT fall back to inlining `out` into the
+          // obsidian:// URI: popup.html doesn't load export-targets.js's
+          // PBP_URI_BUDGET gate, so a long note would silently no-op past
+          // Chromium's external-protocol length wall (~2046 chars) on Windows,
+          // reporting success while creating nothing. Report and stop instead
+          // (matches md-export-send.js's "clipboard failure -> error, no data
+          // loss" semantics).
+          showStatus("status-msg", t("obsidianClipboardFailed"), "error");
+          return;
+        }
         const uri = buildObsidianUri({
           vault: settings.obsidianVault,
           folder: settings.obsidianFolder,
           name: safeFilename(meta.title),
-          clipboard: usedClipboard,
-          content: usedClipboard ? "" : out
+          clipboard: true,
+          content: ""
         });
         window.open(uri, "_blank");
         if (!sessionStorage.getItem("_obsidian_hint_shown")) {

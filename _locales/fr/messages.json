@@ -1598,6 +1598,9 @@
   "obsidianInstallHint": {
     "message": "Obsidian doit être installé pour que la note s'ouvre. Le contenu a également été copié dans le presse-papiers en guise de sauvegarde."
   },
+  "obsidianClipboardFailed": {
+    "message": "Échec de la copie dans le presse-papiers — la note n'a pas été créée. Réessayez."
+  },
   "apiKeySecurityHint": {
     "message": "Les clés API sont masquées (pas chiffrées) et synchronisées via chrome.storage.sync. Ne partagez pas vos fichiers d'export de paramètres."
   },

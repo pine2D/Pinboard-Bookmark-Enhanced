@@ -1598,6 +1598,9 @@
   "obsidianInstallHint": {
     "message": "Aby otworzyć notatkę, musi być zainstalowany Obsidian. Treść została również skopiowana do schowka jako kopia zapasowa."
   },
+  "obsidianClipboardFailed": {
+    "message": "Nie udało się skopiować do schowka — notatka nie została utworzona. Spróbuj ponownie."
+  },
   "apiKeySecurityHint": {
     "message": "Klucze API są zaciemnione (nie szyfrowane) i synchronizowane przez chrome.storage.sync. Nie udostępniaj plików eksportu ustawień."
   },

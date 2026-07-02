@@ -1598,6 +1598,9 @@
   "obsidianInstallHint": {
     "message": "需要安裝 Obsidian 才能開啟筆記。筆記內容已複製到剪貼簿作為備份。"
   },
+  "obsidianClipboardFailed": {
+    "message": "寫入剪貼簿失敗——筆記未建立，請重試。"
+  },
   "apiKeySecurityHint": {
     "message": "API 金鑰已混淆（非加密），並透過 chrome.storage.sync 同步。請勿分享您的設定匯出檔案。"
   },

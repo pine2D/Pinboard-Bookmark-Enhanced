@@ -1598,6 +1598,9 @@
   "obsidianInstallHint": {
     "message": "Obsidian muss installiert sein, damit die Notiz geöffnet werden kann. Der Inhalt wurde zur Sicherheit auch in die Zwischenablage kopiert."
   },
+  "obsidianClipboardFailed": {
+    "message": "Kopieren in die Zwischenablage fehlgeschlagen — die Notiz wurde nicht erstellt. Bitte erneut versuchen."
+  },
   "apiKeySecurityHint": {
     "message": "API-Schlüssel werden verschleiert (nicht verschlüsselt) und über chrome.storage.sync synchronisiert. Teilen Sie Ihre Einstellungs-Exportdateien nicht."
   },

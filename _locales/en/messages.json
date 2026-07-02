@@ -1598,6 +1598,9 @@
   "obsidianInstallHint": {
     "message": "Obsidian must be installed for the note to open. Your note is also copied to the clipboard as a backup."
   },
+  "obsidianClipboardFailed": {
+    "message": "Couldn't copy to clipboard — the note wasn't created. Try again."
+  },
   "apiKeySecurityHint": {
     "message": "API keys are obfuscated (not encrypted) and sync via chrome.storage.sync. Do not share your settings export files."
   },

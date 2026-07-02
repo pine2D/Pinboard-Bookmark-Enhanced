@@ -1598,6 +1598,9 @@
   "obsidianInstallHint": {
     "message": "ノートを開くには Obsidian がインストールされている必要があります。ノートの内容はバックアップとしてクリップボードにもコピーされています。"
   },
+  "obsidianClipboardFailed": {
+    "message": "クリップボードへの書き込みに失敗しました — ノートは作成されていません。もう一度お試しください。"
+  },
   "apiKeySecurityHint": {
     "message": "API キーは難読化（暗号化ではない）されており、chrome.storage.sync で同期されます。設定エクスポートファイルを共有しないでください。"
   },

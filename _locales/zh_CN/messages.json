@@ -1598,6 +1598,9 @@
   "obsidianInstallHint": {
     "message": "需要安装 Obsidian 才能打开笔记。笔记内容已复制到剪贴板作为备份。"
   },
+  "obsidianClipboardFailed": {
+    "message": "写入剪贴板失败——笔记未创建，请重试。"
+  },
   "apiKeySecurityHint": {
     "message": "API 密钥已混淆（非加密），并通过 chrome.storage.sync 同步。请勿分享您的设置导出文件。"
   },
