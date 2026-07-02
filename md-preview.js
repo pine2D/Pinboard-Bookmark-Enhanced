@@ -438,6 +438,11 @@ function ensureKatex() {
     await copyToClipboard(buildExportMarkdown(), e.currentTarget);
   });
   document.getElementById("btn-copy-html").addEventListener("click", async (e) => {
+    // Capture the target BEFORE any await — per DOM spec, currentTarget is nulled
+    // once the event dispatch that invoked this listener finishes, and this handler
+    // crosses real async boundaries (ensureHljs's script load, loadHljsCss's fetches)
+    // before ever touching it. Same fix already applied to btn-copy-md.
+    const btn = e.currentTarget;
     // Same content as the HTML download: a complete styled doc that follows the
     // original/bilingual/translation-only view (getViewMarkdown), copied as
     // text — symmetric with Copy MD == Download MD. (Was renderedView.innerHTML,
@@ -448,7 +453,7 @@ function ensureKatex() {
     if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights
     const hljsCss = await loadHljsCss();
     const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss });
-    await copyToClipboard(doc, e.currentTarget);
+    await copyToClipboard(doc, btn);
   });
 
   // Download buttons
