@@ -454,9 +454,13 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 #rendered-view em { font-style: italic; }
 
 /* ---- Copy Feedback ---- */
+/* White text on --success failed AA at 13px (light 3.3:1, dark 2.3:1 — v2.87
+   popup progress bar hit the same green-bg/white-text trap). A fixed dark-green
+   foreground clears 4.5:1 against BOTH --success values (light #16a34a: 4.89:1,
+   dark #22c55e: 7.08:1), so no per-mode override is needed. */
 .action-btn.copied {
   background: var(--success);
-  color: #fff;
+  color: #04270f;
   border-color: var(--success);
 }
 
@@ -663,7 +667,10 @@ body.md-empty main { margin-left: 0; }
 .send-mi:focus-visible { background: var(--row-hover, rgba(127,127,127,.14)); outline: 2px solid var(--link); outline-offset: -2px; }
 .send-mi-ic { display: inline-flex; width: 14px; height: 14px; flex: 0 0 14px; }
 .send-mi-ic svg { width: 14px; height: 14px; }
-.send-mi-tag { margin-left: auto; font-size: 10px; opacity: .6; }
+/* opacity:.6 on 10px text failed AA (blends toward --bg, no floor); --fg-muted
+   is a solid token that clears 4.5:1 against --bg in both light/dark (5.43:1 /
+   6.09:1) regardless of what's behind it. */
+.send-mi-tag { margin-left: auto; font-size: 11px; color: var(--fg-muted); }
 .send-mi-foot { border-top: 1px solid var(--border, #d8dee4); margin-top: 4px;
   border-radius: 0; opacity: .8; font-size: 12px; }
 .send-status {

@@ -508,7 +508,27 @@ function ensureKatex() {
   const btnRendered = document.getElementById("btn-rendered");
   const rawView = document.getElementById("raw-view");
 
+  // Reading-position mapping across the switch: Raw (13px <pre>) and Rendered
+  // (clamp 17-22px article typography) are the same content at very different
+  // heights, so keeping window.scrollY strands the reader. Map by content-block
+  // index instead (approximate is fine): find the topmost visible block in the
+  // view being LEFT, convert to a fraction of total blocks, land on the same
+  // fraction in the view being ENTERED. Indexed lazily via md-ai-core.js's
+  // pbpAiIndexBlocks — translate/ask only index when AI is configured, so this
+  // can't assume it already ran.
+  function pbpScrollMapBlocks() {
+    if (typeof pbpAiBlocks !== "function") return [];
+    if (!pbpAiBlocks().length && typeof pbpAiIndexBlocks === "function") pbpAiIndexBlocks(renderedView);
+    return pbpAiBlocks();
+  }
+
   btnRaw.addEventListener("click", () => {
+    const blocks = pbpScrollMapBlocks();
+    let frac = null;
+    if (blocks.length && !renderedView.classList.contains("hidden")) {
+      const idx = blocks.findIndex((b) => trOnlyScrollTarget(b.el).getBoundingClientRect().bottom > 0);
+      frac = (idx === -1 ? blocks.length - 1 : idx) / blocks.length;
+    }
     if (!rawView.textContent) rawView.textContent = getMarkdown();
     rawView.classList.remove("hidden");
     renderedView.classList.add("hidden");
@@ -517,8 +537,18 @@ function ensureKatex() {
     btnRaw.setAttribute("aria-pressed", "true");
     btnRendered.setAttribute("aria-pressed", "false");
     document.body.classList.add("raw-active");
+    if (frac !== null) {
+      const top = rawView.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo(0, top + frac * rawView.scrollHeight);
+    }
   });
   btnRendered.addEventListener("click", () => {
+    let frac = null;
+    if (!rawView.classList.contains("hidden")) {
+      const top = rawView.getBoundingClientRect().top + window.scrollY;
+      const h = rawView.scrollHeight || 1; // guard: div-by-zero if not yet laid out
+      frac = Math.min(Math.max((window.scrollY - top) / h, 0), 0.999);
+    }
     renderedView.classList.remove("hidden");
     rawView.classList.add("hidden");
     btnRendered.classList.add("active");
@@ -526,6 +556,13 @@ function ensureKatex() {
     btnRendered.setAttribute("aria-pressed", "true");
     btnRaw.setAttribute("aria-pressed", "false");
     document.body.classList.remove("raw-active");
+    if (frac !== null) {
+      const blocks = pbpScrollMapBlocks();
+      if (blocks.length) {
+        const idx = Math.min(Math.floor(frac * blocks.length), blocks.length - 1);
+        trOnlyScrollTarget(blocks[idx].el).scrollIntoView({ block: "start" });
+      }
+    }
   });
 
   // Copy buttons
