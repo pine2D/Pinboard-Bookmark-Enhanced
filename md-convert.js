@@ -7,10 +7,53 @@
 //   - renderMarkdown: marked() -> DOMPurify.sanitize() (preview only)
 // ============================================================
 
+// ---- Defuddle comment-tree normalization ----
+// Defuddle's buildCommentTree opens a new <blockquote> only when the comment depth
+// INCREASES (and always for depth 0), so consecutive SAME-depth comments at depth >= 1
+// land as sibling <div class="comment"> nodes inside ONE <blockquote>. Downstream that
+// merges two comments into a single block: the second author's <p> is no longer
+// :first-child (no accent/elbow), both comments become one translation unit, and a
+// comment that follows its sibling's replies gets reordered above them by the
+// per-comment marker. Split such blockquotes into one per comment BEFORE turndown,
+// anchored on Defuddle's own .comment wrapper class (no text heuristics). Reply
+// <blockquote>s sitting between two comment divs stay with the PRECEDING comment.
+function _splitMergedComments(html) {
+  if (typeof document === "undefined" || html.indexOf('class="comment"') === -1) return html;
+  // Inert document (same pattern turndown uses internally): scripts never execute
+  // and resources (<img src>) never load while we restructure third-party HTML.
+  const doc = document.implementation.createHTMLDocument("");
+  const root = doc.createElement("div");
+  root.innerHTML = html;
+  const isComment = (n) => n.tagName === "DIV" && n.classList.contains("comment");
+  // Deepest-first (querySelectorAll is document order; reversed = children before
+  // parents) so a nested reply's split happens before its ancestor is walked.
+  const bqs = Array.from(root.querySelectorAll("blockquote")).reverse();
+  for (const bq of bqs) {
+    const kids = Array.from(bq.children);
+    if (kids.filter(isComment).length < 2) continue;
+    const groups = [];
+    let cur = null;
+    for (const k of kids) {
+      if (isComment(k)) { cur = [k]; groups.push(cur); }
+      else if (cur) cur.push(k);
+      // nodes before the first comment div (not emitted by Defuddle) stay in place
+    }
+    let anchor = bq;
+    for (let g = 1; g < groups.length; g++) {
+      const nb = doc.createElement("blockquote");
+      for (const node of groups[g]) nb.appendChild(node);
+      anchor.insertAdjacentElement("afterend", nb);
+      anchor = nb;
+    }
+  }
+  return root.innerHTML;
+}
+
 // ---- HTML -> Markdown via Turndown (popup uses lazy ensureTurndown) ----
 // baseUrl is accepted now (used by P2 image absolutization); ignored here.
 function htmlToMarkdown(html, opts) {
   if (typeof TurndownService === "undefined") return html;
+  html = _splitMergedComments(String(html == null ? "" : html));
   const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced", bulletListMarker: "-" });
   // MathML (LaTeXML/arxiv-html, KaTeX): a <math> carries BOTH presentation MathML
   // and the TeX source (alttext attr, or <annotation encoding="application/x-tex">).

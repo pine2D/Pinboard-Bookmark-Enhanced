@@ -981,6 +981,48 @@ section("site-rules: hacker news");
 </script>
 
 <script>
+// ---- Defuddle comment-tree: split same-depth sibling comments ----
+// Defuddle's buildCommentTree opens a new <blockquote> only when depth INCREASES,
+// so consecutive same-depth comments share one blockquote. htmlToMarkdown must
+// split them so each comment is its own blockquote downstream (author accent,
+// per-comment translation, ordering vs replies).
+{
+  section("htmlToMarkdown Defuddle sibling-comment split");
+  const meta = (name) => '<div class="comment-metadata"><span class="comment-author"><strong>' + name +
+    '</strong></span> · <a href="https://reddit.com/c/' + name + '" class="comment-link">2026-07-01</a> · <span class="comment-points">1 points</span></div>';
+  const cmt = (name, body) => '<div class="comment">' + meta(name) + '<div class="comment-content"><p>' + body + '</p></div></div>';
+  const render = (html) => { const d = document.createElement("div"); d.innerHTML = renderMarkdown(htmlToMarkdown(html, { baseUrl: "https://reddit.com" })); return d; };
+
+  // 1. two same-depth siblings merged by buildCommentTree -> split into sibling blockquotes
+  const v1 = render("<blockquote>" + cmt("alice", "alice body") + cmt("bob", "bob body") + "</blockquote>");
+  const tops1 = v1.querySelectorAll(":scope > blockquote");
+  check("merged siblings → two sibling blockquotes", tops1.length === 2, v1.innerHTML);
+  check("each split comment's author <p> is first child with <strong>",
+    tops1.length === 2 &&
+    Array.from(tops1).every((b) => { const p = b.firstElementChild; return p && p.tagName === "P" && p.firstElementChild && p.firstElementChild.tagName === "STRONG"; }),
+    v1.innerHTML);
+
+  // 2. sibling B after A's nested replies: reply stays with A, B stays BELOW the reply
+  const v2 = render("<blockquote>" + cmt("alice", "alice body") +
+    "<blockquote>" + cmt("carol", "carol reply text") + "</blockquote>" +
+    cmt("bob", "bob body") + "</blockquote>");
+  const tops2 = v2.querySelectorAll(":scope > blockquote");
+  check("A + A-replies + B → two top blockquotes", tops2.length === 2, v2.innerHTML);
+  check("carol stays nested under alice; bob's text after carol's",
+    tops2.length === 2 && /carol/.test(tops2[0].textContent) && !/carol/.test(tops2[1].textContent) &&
+    v2.textContent.indexOf("carol reply") < v2.textContent.indexOf("bob body"), v2.innerHTML);
+
+  // 3. single comment per blockquote → unchanged
+  const v3 = render("<blockquote>" + cmt("dave", "dave body") + "</blockquote>");
+  check("single comment per blockquote unchanged", v3.querySelectorAll(":scope > blockquote").length === 1, v3.innerHTML);
+
+  // 4. plain quote without comment divs → untouched
+  const v4 = render("<blockquote><p>just a quote</p><p>second para</p></blockquote>");
+  check("plain blockquote untouched", v4.querySelectorAll("blockquote").length === 1, v4.innerHTML);
+}
+</script>
+
+<script>
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>
