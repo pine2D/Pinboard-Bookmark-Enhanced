@@ -2455,4 +2455,30 @@ suite("applyImagePolicy: fenced code blocks are left untouched", () => {
   });
 });
 </script>
+<script>
+// ============ Task B4 #26: table rule collects only direct rows ============
+suite("htmlToMarkdown table rule: nested table in a cell is not flattened/duplicated", () => {
+  test("outer table row count unaffected by a nested table's rows", () => {
+    const html = "<table><tr><th>Name</th><th>Sub</th></tr>" +
+      "<tr><td>Alice</td><td><table><tr><td>inner1</td></tr><tr><td>inner2</td></tr></table></td></tr></table>";
+    const md = htmlToMarkdown(html);
+    const pipeLines = md.split("\n").filter((l) => /^\|/.test(l));
+    assertEq(pipeLines.length, 3, "outer table emits exactly header+separator+1 row: " + md);
+  });
+  test("nested table's cell content appears exactly once (no duplicate top-level row)", () => {
+    const html = "<table><tr><th>Name</th><th>Sub</th></tr>" +
+      "<tr><td>Alice</td><td><table><tr><td>inner1</td></tr><tr><td>inner2</td></tr></table></td></tr></table>";
+    const md = htmlToMarkdown(html);
+    assertEq((md.match(/inner1/g) || []).length, 1, "inner1 not duplicated: " + md);
+    assertEq((md.match(/inner2/g) || []).length, 1, "inner2 not duplicated: " + md);
+  });
+  test("normal (non-nested) table unaffected by the :scope row selector", () => {
+    const html = "<table><thead><tr><th>A</th><th>B</th></tr></thead>" +
+      "<tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody></table>";
+    const md = htmlToMarkdown(html);
+    assert(/\|\s*A\s*\|\s*B\s*\|/.test(md), "header row intact: " + md);
+    assert(/\|\s*1\s*\|\s*2\s*\|/.test(md) && /\|\s*3\s*\|\s*4\s*\|/.test(md), "both data rows intact: " + md);
+  });
+});
+</script>
 </body></html>

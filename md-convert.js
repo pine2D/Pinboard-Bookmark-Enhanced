@@ -103,7 +103,11 @@ function _pbpGetTurndown() {
   td.addRule("table", {
     filter: "table",
     replacement: (content, node) => {
-      const rows = Array.from(node.querySelectorAll("tr"));
+      // :scope-limited to this table's own direct rows -- a plain "tr" query would
+      // also pull in a nested <table>'s rows (cell content), which then gets output
+      // twice: once flattened into this table (wrong column count) and once again
+      // via the cell's own recursive td.turndown() call below.
+      const rows = Array.from(node.querySelectorAll(":scope > thead > tr, :scope > tbody > tr, :scope > tr, :scope > tfoot > tr"));
       if (!rows.length) return content;
       // Convert each cell's INNER HTML to markdown so inline formatting
       // (inline code, links, bold/em) survives — plain textContent would
