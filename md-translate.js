@@ -897,7 +897,9 @@ async function _pbpTrStart(st) {
       if (!pb) return;
       _pbpTrPartFail(pb, m.idx);                    // keep this part's original, don't discard the block
       const done = _pbpTrPartDone(pb);
-      if (done) { _pbpTrFill(st, w, done.text); _pbpTrMarkPartial(st, w); }  // partial -> not cached
+      if (!done) return;
+      if (done.allFailed) { _pbpTrMarkFailed(st, w, message); return; }  // 0 parts translated: whole-block failure, not a fake success (don't fill st.trMd / count as done)
+      _pbpTrFill(st, w, done.text); _pbpTrMarkPartial(st, w);            // partial (>=1 real part) -> not cached
     },
     onProgress: (done, total) => {
       const prog = document.getElementById("tr-progress");
@@ -993,13 +995,17 @@ function _pbpTrMarkFailed(st, w, message) {
 // ORIGINAL shielded chunk (origChunks[idx]) so the block can still assemble with
 // that segment untranslated, instead of the whole block being discarded.
 function _pbpTrMakePartBuf(split) {
-  return { chunks: new Array(split.chunks.length).fill(null), seps: split.seps, origChunks: split.chunks, partial: false };
+  return { chunks: new Array(split.chunks.length).fill(null), seps: split.seps, origChunks: split.chunks, partial: false, failed: 0 };
 }
 function _pbpTrPartFill(pb, idx, text) { pb.chunks[idx] = text; }
-function _pbpTrPartFail(pb, idx) { pb.chunks[idx] = pb.origChunks[idx]; pb.partial = true; }
+function _pbpTrPartFail(pb, idx) { pb.chunks[idx] = pb.origChunks[idx]; pb.partial = true; pb.failed += 1; }
 function _pbpTrPartDone(pb) {
   if (!pb.chunks.every((c) => typeof c === "string")) return null;
-  return { text: pb.chunks.map((c, i) => (pb.seps[i] || "") + c).join(""), partial: pb.partial };
+  return {
+    text: pb.chunks.map((c, i) => (pb.seps[i] || "") + c).join(""),
+    partial: pb.partial,
+    allFailed: pb.failed === pb.chunks.length   // every part fell back to its original: 0 real translations
+  };
 }
 
 // Partial-fill retry pill: inserted AFTER the block's .pb-tr (does NOT replace it),

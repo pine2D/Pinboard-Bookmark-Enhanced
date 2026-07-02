@@ -2135,6 +2135,21 @@ suiteIf("_pbpTrPartDone", "_pbpTrPartDone", () => {
     _pbpTrPartFill(pb, 0, "a");
     assertEq(_pbpTrPartDone(pb), null, "incomplete -> null");
   });
+  test("every part failed -> allFailed true (whole-block failure, not fake success)", () => {
+    const pb = _pbpTrMakePartBuf(split);
+    _pbpTrPartFail(pb, 0); _pbpTrPartFail(pb, 1); _pbpTrPartFail(pb, 2);
+    const r = _pbpTrPartDone(pb);
+    assert(r && r.allFailed === true, "allFailed set when 0 parts translated");
+    assert(r.partial === true, "still flagged partial");
+    assertEq(r.text, "AAA\n\nBBB\n\nCCC", "all originals reassembled");
+  });
+  test("at least one part translated -> allFailed false", () => {
+    const pb = _pbpTrMakePartBuf(split);
+    _pbpTrPartFill(pb, 0, "a"); _pbpTrPartFail(pb, 1); _pbpTrPartFail(pb, 2);
+    const r = _pbpTrPartDone(pb);
+    assertEq(r.allFailed, false, "one real translation -> not allFailed");
+    assert(r.partial === true, "partial");
+  });
 });
 </script>
 <script>
