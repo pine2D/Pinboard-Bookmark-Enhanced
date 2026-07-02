@@ -513,10 +513,12 @@ async function pbpTrInit(detail) {
   // bypass the memoized stale pbpAiGetSettings promise.
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (st.running) return;   // don't swap target mid-run: mixes languages + mis-keys the end-of-run cache
-      if ((area === "sync" || area === "local") && changes.translateTargetLang) {
-        _pbpTrApplyTargetLang(st, { translateTargetLang: changes.translateTargetLang.newValue }).catch(() => {});
-      }
+      if ((area !== "sync" && area !== "local") || !changes.translateTargetLang) return;
+      const next = { translateTargetLang: changes.translateTargetLang.newValue };
+      // Don't swap target mid-run (mixes languages + mis-keys the end-of-run cache);
+      // stash it and apply once the run settles (see _pbpTrStart tail).
+      if (st.running) { st.pendingLangChange = next; return; }
+      _pbpTrApplyTargetLang(st, next).catch(() => {});
     });
   }
 
@@ -868,6 +870,16 @@ async function _pbpTrStart(st) {
   st.running = false;
   if (Object.keys(newly).length) {
     try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, newly); } catch (_) {}
+  }
+  // A target-language change arrived mid-run (deferred by the onChanged listener). The
+  // old-language results are now cached under the OLD st.target.code above; apply the
+  // change (Task 7: resets filled state + re-arms the button for the new language) and
+  // stop — don't persist the old-language status/view.
+  if (st.pendingLangChange) {
+    const pending = st.pendingLangChange;
+    st.pendingLangChange = null;
+    await _pbpTrApplyTargetLang(st, pending).catch(() => {});
+    return;
   }
   const doneAll = st.work.every((w) => (w.n in st.trMd));
   _pbpTrSetStatus(st, doneAll ? "done" : "partial"); // partial = Stop / failures: Continue
