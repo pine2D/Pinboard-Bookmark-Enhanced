@@ -105,6 +105,28 @@ function cleanup() {
   }
 }
 
+// ---- Check 0: dynamically-injected vendor assets survived packaging ----
+// md-preview.js createElement-injects these (not <script src>/<link href>),
+// so release.sh's static HTML-tag sanity check can't see them — only a
+// real packaged-ZIP check catches an accidental vendor/ deletion.
+console.log('[zip-smoke] check 0: dynamically-injected vendor assets present...');
+const REQUIRED_VENDOR_FILES = [
+  'vendor/highlight.min.js',
+  'vendor/hljs-github.min.css',
+  'vendor/hljs-github-dark.min.css',
+  'vendor/katex/katex.min.js',
+  'vendor/katex/katex.min.css',
+  'vendor/katex/auto-render.min.js',
+];
+const missingVendor = REQUIRED_VENDOR_FILES.filter(f => !existsSync(join(extPath, f)));
+if (missingVendor.length) {
+  console.error('[zip-smoke] FAIL: ZIP missing dynamically-injected vendor file(s):');
+  missingVendor.forEach(f => console.error(`    - ${f}`));
+  cleanup();
+  process.exit(1);
+}
+console.log(`  present: ${REQUIRED_VENDOR_FILES.join(', ')}`);
+
 // ---- Launch fresh Chromium with extension ----
 console.log('[zip-smoke] launching Chromium with extension loaded...');
 let ctx;
