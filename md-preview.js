@@ -129,10 +129,11 @@ function ensureKatex() {
     renderEmptyState(chrome.i18n.getMessage("mdPreviewEmpty") || "No preview data available. Please use the Markdown button in the popup first.");
     return;
   }
-  // Clear temporary data — but KEEP a pending placeholder so a manual reload during
-  // extraction re-drives it instead of hitting the empty state (the reextract success
-  // path overwrites md_preview_data with the full payload, which that load then clears).
-  if (!info.pending) {
+  // Clear temporary data — but KEEP a pending/restore placeholder so a manual reload
+  // during extraction (or before it retriggers, on F5 / Memory Saver discard) re-drives
+  // it instead of hitting the empty state (the reextract success path overwrites
+  // md_preview_data with the full payload, which that load then clears).
+  if (!info.pending && !info.restore) {
     await chrome.storage.local.remove("md_preview_data");
   }
 
@@ -145,7 +146,7 @@ function ensureKatex() {
   // preview drives extraction via the reextract path (so the tab appears immediately
   // even when Jina needs a network round-trip). On success the SW has written the
   // full md_preview_data, so we reload into the normal render path.
-  if (info.pending) {
+  if (info.pending || info.restore) {
     const titleEl0 = document.getElementById("preview-title");
     if (titleEl0) { titleEl0.textContent = title || t("mdPreviewUntitled"); titleEl0.title = title || ""; }
     document.title = (title || "Markdown") + " — Preview";
@@ -156,7 +157,7 @@ function ensureKatex() {
     let pr;
     try {
       pr = await chrome.runtime.sendMessage({
-        type: "reextractMarkdown", tabId: srcTabId, url, engine: info.engine, tags: [], description: ""
+        type: "reextractMarkdown", tabId: srcTabId, url, engine: info.engine, tags, description: ""
       });
     } catch (_) { pr = { ok: false, error: "network" }; }
     if (pr && pr.ok) { location.reload(); return; }
@@ -171,6 +172,18 @@ function ensureKatex() {
     renderEmptyState(chrome.i18n.getMessage("mdPreviewNoContent") || "No content was extracted from this page.");
     return;
   }
+
+  // Reload/Memory-Saver recovery: replace the (now redundant) full payload with a
+  // lightweight restore record — url/tabId/engine/tags, NO markdown/contentHtml (avoids
+  // storage.local quota on huge articles) — so a later reload rebuilds the article via
+  // the SAME reextractMarkdown path the engine-switch control uses (below), instead of
+  // landing on the "no preview data" empty state. Best-effort: a write failure just
+  // degrades to the pre-existing behavior (empty state on the next reload).
+  try {
+    await chrome.storage.local.set({
+      md_preview_data: { restore: true, url, tabId: srcTabId, engine: source === "jina" ? "jina" : "local", tags }
+    });
+  } catch (_) { /* degrade to current behavior: next reload hits the empty state */ }
 
   // Export-options defaults from settings (per-export overridable via the header row).
   // Read from the SAME storage area options.js writes to: sync when the user enabled
