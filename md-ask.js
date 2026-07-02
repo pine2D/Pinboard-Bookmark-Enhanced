@@ -991,6 +991,15 @@ async function _pbpAskHistRestore() {
   let hi = 0;
   await new Promise((resolve) => {
     const step = () => {
+      // Aborted mid-flight: _pbpAskClearThread (md-ask.js:267) flips
+      // _pbpAskHistRestored back to false when the user hits Clear while
+      // this chunked restore is still running. restore() is single-shot per
+      // page (guarded by _pbpAskState.panel in _pbpAskBuildPanel, which
+      // calls it exactly once), so the flag only ever goes true->false here
+      // - never back to true mid-loop - making it safe to re-check directly
+      // (no ABA risk that would call for a generation token instead). Stop
+      // seeding st.rounds from now-erased history and never insert frag.
+      if (!_pbpAskHistRestored) { resolve(); return; }
       const end = Math.min(hi + PBP_ASK_HIST_CHUNK, hist.length);
       for (; hi < end; hi++) {
         const rec = hist[hi];
@@ -1026,6 +1035,10 @@ async function _pbpAskHistRestore() {
     };
     raf(step);
   });
+  // Re-check right before inserting: a clear that lands after the loop's
+  // last chunk (between its guard check and this line) must still block
+  // the insert, or cleared history would silently reappear in the DOM.
+  if (!_pbpAskHistRestored) return;
   // Prepend: if a live round raced in before the async build finished,
   // restored history still reads in chronological order above it.
   thread.insertBefore(frag, thread.firstChild);
