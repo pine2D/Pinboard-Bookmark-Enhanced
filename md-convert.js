@@ -216,6 +216,11 @@ function slugify(text) {
 
 // ---- Markdown -> safe HTML (preview only; needs marked + DOMPurify) ----
 let _markedConfigured = false;
+// Reset per renderMarkdown() call (one parse = one heading-id namespace) so the
+// heading renderer's dedup can never straddle unrelated renderMarkdown() calls
+// (ask.js re-renders individual answer chunks, md-translate re-renders individual
+// blocks -- those must NOT share a running "-1/-2" counter with each other).
+let _headingSeen = null;
 function _configureMarked() {
   if (_markedConfigured || typeof marked === "undefined") return;
   const renderer = new marked.Renderer();
@@ -224,7 +229,13 @@ function _configureMarked() {
   // the inline content via this.parser.parseInline and slug the raw token.text.
   renderer.heading = function (token) {
     const text = this.parser.parseInline(token.tokens);
-    const id = slugify(token.text);
+    let id = slugify(token.text);
+    // Same -1/-2 dedup rule as buildToc (below), so a TOC anchor built there
+    // always resolves to a real heading id here even when headings repeat.
+    if (_headingSeen) {
+      if (_headingSeen[id] != null) { _headingSeen[id] += 1; id = id + "-" + _headingSeen[id]; }
+      else _headingSeen[id] = 0;
+    }
     return `<h${token.depth} id="${id}">${text}</h${token.depth}>\n`;
   };
   marked.use({ gfm: true, breaks: false, renderer });
@@ -256,7 +267,13 @@ function renderMarkdown(md) {
   }
   _configureMarked();
   _ensurePurifyHook();
-  const rawHtml = marked.parse(md);
+  _headingSeen = Object.create(null); // fresh dedup namespace for this parse
+  let rawHtml;
+  try {
+    rawHtml = marked.parse(md);
+  } finally {
+    _headingSeen = null;
+  }
   return DOMPurify.sanitize(rawHtml, {
     // Keep heading slug ids for TOC anchors; allow GFM task-list checkboxes.
     ADD_ATTR: ["id", "target", "rel"],
@@ -364,11 +381,16 @@ function buildToc(md, opts) {
     const m = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
     if (!m) continue;
     const level = m[1].length;
-    if (level < minLevel || level > maxLevel) continue;
     const text = m[2].trim();
+    // Count EVERY heading level into the dedup map (matching renderer.heading's
+    // all-level _headingSeen), even ones outside [minLevel,maxLevel] -- an
+    // out-of-range heading still occupies a slug slot at render time, so it must
+    // burn one here too or a later in-range TOC entry would point at a slug the
+    // renderer already reassigned to a different (out-of-range) heading.
     let slug = slugify(text);
     if (seen[slug] != null) { seen[slug] += 1; slug = slug + "-" + seen[slug]; }
     else seen[slug] = 0;
+    if (level < minLevel || level > maxLevel) continue;
     headings.push({ level, text, slug });
   }
   if (!headings.length) return { tocMarkdown: "", headings };

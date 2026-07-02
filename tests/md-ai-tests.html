@@ -19,6 +19,8 @@ h2 { margin-top: 24px; font-size: 16px; }
      exist yet in early plan tasks: a 404 here only logs to the console and
      does not break the page; their suites use suiteIf() and show as SKIP. -->
 <script src="../vendor/turndown.js"></script>
+<script src="../vendor/marked.min.js"></script>
+<script src="../vendor/purify.min.js"></script>
 <script src="../md-convert.js"></script>
 <script src="../i18n.js"></script>
 <script src="../shared.js"></script>
@@ -2149,6 +2151,41 @@ suite("htmlToMarkdown: fenced code backtick-run safety", () => {
     const md = htmlToMarkdown(html, {});
     assertEq(fenceOf(md), 5, "5-backtick fence outruns a literal ```` run");
     assert(md.includes("nested ```` fence example"), "quad-backtick text preserved verbatim");
+  });
+});
+</script>
+<script>
+// ============ md-convert.js: renderMarkdown heading id dedup === buildToc slug dedup ============
+suite("renderMarkdown heading id dedup === buildToc slug dedup", () => {
+  test("repeated headings get identical -1/-2 slugs in both renderer and buildToc", () => {
+    const md = "## Example\n\ntext one\n\n## Example\n\ntext two\n\n## Example\n\ntext three";
+    const { headings } = buildToc(md);
+    const html = renderMarkdown(md);
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    const ids = Array.from(div.querySelectorAll("h2")).map((h) => h.id);
+    assertEq(ids.join(","), headings.map((h) => h.slug).join(","), "renderer ids === buildToc slugs");
+    assertEq(ids.join(","), "example,example-1,example-2", "expected -1/-2 dedup sequence");
+  });
+  test("two independent renderMarkdown() calls don't leak dedup state across parses", () => {
+    const md = "## Example\n\ntext";
+    const html1 = renderMarkdown(md);
+    const html2 = renderMarkdown(md);
+    const id1 = (html1.match(/id="([^"]+)"/) || [])[1];
+    const id2 = (html2.match(/id="([^"]+)"/) || [])[1];
+    assertEq(id1, "example", "first parse gets the bare slug");
+    assertEq(id2, "example", "second independent parse also gets the bare slug (no cross-call leak)");
+  });
+  test("mixed-level headings: out-of-range h1 still consumes a dedup slot so TOC anchors match rendered ids", () => {
+    const md = "# Example\n\n## Example\n\n## Example";
+    const { headings } = buildToc(md, { minLevel: 2, maxLevel: 4 });
+    assertEq(headings.map((h) => h.slug).join(","), "example-1,example-2", "buildToc skips h1 but still burns its dedup slot");
+    const html = renderMarkdown(md);
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    const allIds = Array.from(div.querySelectorAll("h1,h2")).map((h) => h.id);
+    assertEq(allIds.join(","), "example,example-1,example-2", "renderer ids for h1+h2+h2");
+    assertEq(new Set(allIds).size, allIds.length, "no duplicate ids across the whole document");
   });
 });
 </script>
