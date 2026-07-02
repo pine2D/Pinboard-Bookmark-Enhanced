@@ -85,7 +85,12 @@ function htmlToMarkdown(html, opts) {
       }
       if (!lang) lang = node.getAttribute("data-language") || "";
       const text = (code || node).textContent || "";
-      return "\n\n```" + lang + "\n" + text.replace(/`/g, "\\`") + "\n```\n\n";
+      // Fence must outrun the longest backtick run already inside the code, or a
+      // literal ``` (or longer) in the sample would prematurely close the block
+      // (turndown's default fenced strategy). Content is never escaped/mutated.
+      const longestRun = (text.match(/`+/g) || []).reduce((max, run) => Math.max(max, run.length), 0);
+      const fence = "`".repeat(Math.max(3, longestRun + 1));
+      return "\n\n" + fence + lang + "\n" + text + "\n" + fence + "\n\n";
     }
   });
   td.addRule("table", {

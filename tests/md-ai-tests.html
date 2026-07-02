@@ -2122,4 +2122,34 @@ suiteIf("_pbpTrPartDone", "_pbpTrPartDone", () => {
   });
 });
 </script>
+<script>
+// ============ md-convert.js: fenced-code backtick-run safety ============
+suite("htmlToMarkdown: fenced code backtick-run safety", () => {
+  const fenceOf = (md) => { const m = md.match(/^\n*(`{3,})/); return m ? m[1].length : 0; };
+  test("no backticks in code -> 3-backtick fence, content verbatim", () => {
+    const html = "<pre><code>const x = 1;</code></pre>";
+    const md = htmlToMarkdown(html, {});
+    assertEq(fenceOf(md), 3, "3-backtick fence");
+    assert(md.includes("const x = 1;"), "content verbatim");
+  });
+  test("1 lone backtick in code -> still 3-backtick fence, NOT escaped", () => {
+    const html = "<pre><code>const s = `hi`;</code></pre>";
+    const md = htmlToMarkdown(html, {});
+    assertEq(fenceOf(md), 3, "3-backtick fence covers a lone backtick");
+    assert(md.includes("const s = `hi`;"), "backticks preserved verbatim, no \\` escaping");
+  });
+  test("3-backtick run in code -> 4-backtick fence outruns it", () => {
+    const html = "<pre><code>docs use ``` for fences</code></pre>";
+    const md = htmlToMarkdown(html, {});
+    assertEq(fenceOf(md), 4, "4-backtick fence outruns a literal ``` run");
+    assert(md.includes("docs use ``` for fences"), "triple-backtick text preserved verbatim");
+  });
+  test("4-backtick run in code -> 5-backtick fence outruns it", () => {
+    const html = "<pre><code>nested ```` fence example</code></pre>";
+    const md = htmlToMarkdown(html, {});
+    assertEq(fenceOf(md), 5, "5-backtick fence outruns a literal ```` run");
+    assert(md.includes("nested ```` fence example"), "quad-backtick text preserved verbatim");
+  });
+});
+</script>
 </body></html>
