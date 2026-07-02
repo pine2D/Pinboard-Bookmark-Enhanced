@@ -181,8 +181,13 @@ function _pbpAskBuildPanel() {
     e.preventDefault();
     _pbpAskOnSubmit();
   });
-  // Enter sends, Shift+Enter inserts a newline (spec 5.1).
+  // Enter sends, Shift+Enter inserts a newline (spec 5.1). IME guard
+  // first: Chrome dispatches a key="Enter" keydown with isComposing=true
+  // (keyCode 229 as a fallback signal) when the user confirms an IME
+  // candidate - that Enter must never submit the still-uncommitted
+  // composition text.
   panel.querySelector("#ask-input").addEventListener("keydown", (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       _pbpAskOnSubmit();
