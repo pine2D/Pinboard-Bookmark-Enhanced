@@ -264,12 +264,33 @@ function _configureMarked() {
 let _purifyHooked = false;
 function _ensurePurifyHook() {
   if (_purifyHooked || typeof DOMPurify === "undefined") return;
+  // D1-2: ADD_TAGS:["input"] exists solely so GFM task-list checkboxes survive
+  // sanitize. uponSanitizeElement runs BEFORE attribute filtering, on the raw
+  // (untrusted) attributes, so it's the right hook to drop an instance outright
+  // (per DOMPurify's own docs pattern: node.parentNode.removeChild(node)) rather
+  // than trying to un-render it via an attribute change later.
+  DOMPurify.addHook("uponSanitizeElement", (node, data) => {
+    if (data.tagName === "input") {
+      const type = (node.getAttribute("type") || "").toLowerCase();
+      if (type !== "checkbox" && node.parentNode) node.parentNode.removeChild(node);
+    }
+  });
   DOMPurify.addHook("afterSanitizeAttributes", (node) => {
     if (node.tagName === "A") {
       const href = node.getAttribute("href") || "";
-      if (href.startsWith("#")) return; // page-internal (TOC/footnote) — keep same-tab
-      node.setAttribute("target", "_blank");
-      node.setAttribute("rel", "noopener noreferrer");
+      if (!href.startsWith("#")) { // not page-internal (TOC/footnote) — open in new tab
+        node.setAttribute("target", "_blank");
+        node.setAttribute("rel", "noopener noreferrer");
+      }
+    }
+    // Any checkbox that survived the hook above must never be interactive.
+    if (node.tagName === "INPUT") node.setAttribute("disabled", "");
+    // D1-1: ADD_ATTR:["id"] exists only so heading slugs (TOC anchors) survive.
+    // Any OTHER element's id from untrusted content could clobber a real page
+    // id (e.g. #ask-input) via same-id shadowing of getElementById/querySelector,
+    // so strip it post-filter on everything except h1-h6.
+    if (!/^H[1-6]$/.test(node.tagName) && node.hasAttribute("id")) {
+      node.removeAttribute("id");
     }
   });
   _purifyHooked = true;

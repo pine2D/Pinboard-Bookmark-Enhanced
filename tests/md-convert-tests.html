@@ -125,6 +125,55 @@ function assertEq(actual, expected, label) {
   check("renderMarkdown safe link gets target+rel", /rel="noopener noreferrer"/.test(s) && /target="_blank"/.test(s), s);
 })();
 
+// ---- D1-1/D1-2: sanitize hardening (id-clobber + input allowlist) ----
+(() => {
+  const s = norm(renderMarkdown('before <input type="text" id="ask-input" value="x"> after'));
+  check("renderMarkdown drops non-checkbox <input> entirely", !/<input/i.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown('<div id="ask-input">x</div>'));
+  check("renderMarkdown keeps non-heading element but strips clobber id",
+    /<div>x<\/div>/.test(s) && !/id="ask-input"/.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown('<a id="ask-input" href="https://e.com">x</a>'));
+  check("renderMarkdown strips id from <a> but keeps href + target/rel",
+    !/id="ask-input"/.test(s) && /href="https:\/\/e\.com"/.test(s) &&
+    /target="_blank"/.test(s) && /rel="noopener noreferrer"/.test(s), s);
+})();
+(() => {
+  const h = norm(renderMarkdown("## Hello World"));
+  check("renderMarkdown keeps id on real heading (h1-h6 exempt from id-strip)",
+    /<h2 id="hello-world">/.test(h), h);
+})();
+(() => {
+  // TOC fragment anchor must still resolve after the id-strip hardening.
+  const md = "## Hello World\n\n[jump](#hello-world)";
+  const { headings } = buildToc(md, { minLevel: 2, maxLevel: 4 });
+  const fixture = document.createElement("div");
+  fixture.innerHTML = renderMarkdown(md);
+  check("buildToc slug still resolves to a rendered heading id after hardening",
+    headings.length === 1 && fixture.querySelector("#" + headings[0].slug) !== null,
+    JSON.stringify(headings) + " | " + fixture.innerHTML);
+})();
+(() => {
+  const h = norm(renderMarkdown("- [ ] a\n- [x] b"));
+  const inputs = h.match(/<input[^>]*>/g) || [];
+  check("renderMarkdown emits 2 task-list checkboxes", inputs.length === 2, h);
+  check("every surviving checkbox is forced disabled",
+    inputs.length > 0 && inputs.every((tag) => /disabled/.test(tag)), h);
+  check("every surviving checkbox keeps type=checkbox",
+    inputs.length > 0 && inputs.every((tag) => /type="checkbox"/.test(tag)), h);
+})();
+(() => {
+  // regression: fragment hrefs stay same-tab (no target/rel), unaffected by the
+  // afterSanitizeAttributes refactor (early-return removed to let id-strip run).
+  const s = norm(renderMarkdown("## Section\n\n[jump](#section)"));
+  const aTag = (s.match(/<a[^>]*href="#section"[^>]*>/) || [""])[0];
+  check("renderMarkdown fragment link keeps no target/rel",
+    !!aTag && !/target=/.test(aTag) && !/rel=/.test(aTag), s);
+})();
+
 // ---- END of existing tests ----
 
   // ---- safeFilename (shared download helper) ----
