@@ -576,11 +576,21 @@ async function htmlToMarkdownAsync(html, opts) {
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
           source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
         };
-        const out = composeExport(markdown, meta, {
-          frontmatter: settings.mdExportFrontmatter,
-          imagePolicy: settings.mdExportImagePolicy,
-          includeToc: settings.mdExportIncludeToc
-        });
+        // Obsidian ALWAYS gets YAML frontmatter (registry semantics: the preview
+        // page's export-targets.js row hardcodes obsidian.frontmatter = "inline",
+        // independent of the mdExportFrontmatter checkbox — see
+        // pbpBuildFileBody()/md-export-send.js). Mirror that shape here — compose
+        // without frontmatter, then wrap with applyFrontmatter — so popup and
+        // preview sends produce byte-identical output for the same article.
+        const out = applyFrontmatter(
+          composeExport(markdown, meta, {
+            frontmatter: false,
+            imagePolicy: settings.mdExportImagePolicy,
+            includeToc: settings.mdExportIncludeToc
+          }),
+          meta,
+          {}
+        );
         try {
           await navigator.clipboard.writeText(out);
         } catch (_) {

@@ -463,6 +463,12 @@ function _pbpAskErrorUi(aEl, message, question) {
   retry.className = "action-btn ask-retry";
   retry.textContent = t("askErrRetry");
   retry.addEventListener("click", () => {
+    // Guard BEFORE touching the DOM: _pbpAskRun silently no-ops while another
+    // question is running (line ~478 `if (!st || st.running) return;`). Without
+    // this check, clicking Retry on Q1's failed answer while Q2 streams wipes
+    // Q1's error UI + adds .streaming shimmer, but the request never fires --
+    // a permanent empty "streaming" bubble (audit md-ask.js:423).
+    if (_pbpAskState && _pbpAskState.running) return;
     aEl.replaceChildren();
     aEl.classList.add("streaming");
     aEl.setAttribute("aria-busy", "true");

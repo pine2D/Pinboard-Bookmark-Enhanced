@@ -45,9 +45,17 @@ async function pbpSendToTarget(id, ctx) {
       // Helper: on ANY failure, copy the full body to the clipboard so the
       // article is never lost (degrade-never-lose). Defined before the
       // permission gate so a denial also lands the clip on the clipboard.
+      // Clipboard writes are best-effort (focus loss, missing permission) --
+      // every mdSendApi* string claims "Full text copied to clipboard", so
+      // when the write actually failed we must NOT hand back a reason code
+      // that renders that false claim. Fall back to error:"" instead, which
+      // doSend's switch (md-preview.js) already routes to the generic
+      // "Send failed" text -- the same degrade the sibling viaClipboard path
+      // uses a few lines below when its own clipboard write fails.
       const apiFail = async (errCode) => {
-        try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_) {}
-        return { ok: false, fellBack: false, error: errCode };
+        let copied = true;
+        try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_) { copied = false; }
+        return { ok: false, fellBack: false, error: copied ? errCode : "" };
       };
       // Resolve the host origin — a fixed string, or a fn of cfg for user-URL
       // targets (webhook) — and ensure permission inside the click gesture.
@@ -85,6 +93,12 @@ async function pbpSendToTarget(id, ctx) {
         const req = row.buildRequest(meta, pbpBuildFileBody(id, meta, rawBody), cfg, token);
         const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body });
         if (resp.status === 401) return apiFail("api-token");
+        // GitHub-only: a fine-grained PAT passes the /user precheck (401 never
+        // fires) but POST /gists rejects it with 403/404 -- fine-grained
+        // tokens can't create gists (registry comment, export-targets.js).
+        // Reuse the "api-token" code so the user gets the same "re-copy a
+        // classic PAT" guidance instead of a dead-end "request failed".
+        if (id === "github" && (resp.status === 403 || resp.status === 404)) return apiFail("api-token");
         if (!resp.ok) return apiFail("api-failed");
         const json = await resp.json().catch(() => null);
         // Success: row-defined (webhook = any 2xx, since it returns no id) else
