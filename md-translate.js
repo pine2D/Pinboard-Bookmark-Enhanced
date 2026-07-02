@@ -663,8 +663,24 @@ async function _pbpTrApplyTargetLang(st, s) {
   // ponytail: uiLangToBCP47 lives in md-preview.js (not in test env); falls back to "" which
   // is fine since "auto" is the only code that reads uiLang, and tests pass an explicit code.
   const uiLang = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : "";
+  const prevCode = st.target && st.target.code;
   st.target = pbpTrResolveTargetLang(s, uiLang);
   if (st.tgtTextEl) st.tgtTextEl.textContent = t("trTargetLang", st.target.display || st.target.name);
+  if (st.target.code === prevCode) return;   // label refresh only: no real language change
+  // Target language actually changed: every language-keyed derived state is now stale.
+  // Drop the memoized (old-language) glossary, remove all filled translations + their
+  // DOM (.pb-tr), done markers and failure pills, reset to Original view, and re-arm the
+  // button so the page can be translated afresh into the new language. Cache/view keys
+  // use st.target.code, so the next run reads the correct entries. ponytail: no cache
+  // re-probe — clicking Translate re-requests; correctness only needs "can retranslate".
+  st.glossary = null;
+  st.trMd = Object.create(null);
+  document.querySelectorAll("#rendered-view .pb-tr").forEach((el) => el.remove());
+  document.querySelectorAll("#rendered-view .pb-tr-err").forEach((el) => el.remove());
+  document.querySelectorAll("#rendered-view [data-pb-tr-done]").forEach((el) => { delete el.dataset.pbTrDone; });
+  _pbpTrSyncRetryAll();
+  if (st.mode !== "original") _pbpTrSetMode(st, "original", false);
+  _pbpTrSetStatus(st, "idle");
 }
 
 // Bounded-concurrency map: run fn over items, at most `limit` in flight, results
@@ -1085,6 +1101,15 @@ function _pbpTrSetStatus(st, status) {
     const n = st.work.filter((w) => w.n in st.trMd).length;
     prog.hidden = false;
     prog.textContent = t("trDone", String(n));
+  } else if (status === "idle") {
+    // Pristine pre-translation state (used when a target-language change resets the
+    // page): re-arm the Translate button, hide progress, show the cost estimate again.
+    label.textContent = t("trTranslate");
+    btn.disabled = false;
+    btn.hidden = false;
+    stop.hidden = true;
+    prog.hidden = true;
+    est.hidden = false;
   }
 }
 
