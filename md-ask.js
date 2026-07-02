@@ -235,6 +235,16 @@ function _pbpAskSetOpen(open) {
 // Clear: wipe the visible thread, restore starter chips + empty hint,
 // and erase the persisted ask_<url> history.
 async function _pbpAskClearThread() {
+  // Wipe the in-memory conversation FIRST: st.rounds feeds every future
+  // prompt (_pbpAskRun/_pbpAskUpdateMeta), and aborting any in-flight
+  // request sends it down the AbortError branch of _pbpAskRun's catch -
+  // which never pushes to st.rounds or ask history - so a stream that
+  // was mid-flight when the user clicked Clear can't silently "revive"
+  // the wiped conversation once it finishes.
+  if (_pbpAskState) {
+    _pbpAskState.rounds = [];
+    if (_pbpAskState.ctrl) _pbpAskState.ctrl.abort();
+  }
   const thread = document.getElementById("ask-thread");
   if (thread) {
     const empty = document.createElement("p");
