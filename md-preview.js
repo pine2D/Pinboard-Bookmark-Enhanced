@@ -7,6 +7,7 @@
 function renderEmptyState(message) {
   const view = document.getElementById("rendered-view");
   if (view) {
+    view.removeAttribute("aria-busy");
     const wrap = document.createElement("div");
     wrap.className = "empty-state";
     const p = document.createElement("p");
@@ -15,6 +16,34 @@ function renderEmptyState(message) {
     view.replaceChildren(wrap);
   }
   document.body.classList.add("md-empty");
+}
+
+// Same visual shell as renderEmptyState, but for a recoverable extraction failure: keeps
+// the rail (incl. the Defuddle/Jina engine-switch badge) visible/usable instead of hiding
+// it, and offers a retry button that re-runs retryFn (the same reextractMarkdown flow the
+// engine-switch control already uses — see the pending-extraction branch below). Bare
+// renderEmptyState stays reserved for genuinely nothing-to-do states (no preview data /
+// no content at all), where there is nothing to retry or switch.
+function renderErrorState(message, retryFn) {
+  const view = document.getElementById("rendered-view");
+  if (view) {
+    view.removeAttribute("aria-busy");
+    const wrap = document.createElement("div");
+    wrap.className = "empty-state";
+    const p = document.createElement("p");
+    p.textContent = message;
+    wrap.appendChild(p);
+    if (typeof retryFn === "function") {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "action-btn";
+      btn.textContent = t("askErrRetry"); // reuse the existing "Retry" i18n key (used by md-ask.js's own error/retry buttons on this same page)
+      btn.addEventListener("click", retryFn, { once: true });
+      wrap.appendChild(btn);
+    }
+    view.replaceChildren(wrap);
+  }
+  document.body.classList.remove("md-empty"); // undo renderLoadingState's rail-hide so the engine-switch badge stays reachable
 }
 
 function renderLoadingState(message, note) {
@@ -142,6 +171,47 @@ function ensureKatex() {
   const baseUrl = info.baseUrl || url || "";
   const tags = Array.isArray(info.tags) ? info.tags : [];
   const description = info.description || "";
+
+  // Engine-switch plumbing, hoisted above the pending-extraction branch so a failed
+  // shortcut/reload attempt can offer a working Defuddle<->Jina escape hatch (below)
+  // instead of only the later "switch engine on an already-rendered article" control
+  // that reuses these same functions/elements further down.
+  const sourceEl = document.getElementById("source-badge");
+  const engineStatusEl = document.getElementById("engine-status");
+  const srcUrlForSwitch = url || "";
+  function setEngineStatus(text, isError) {
+    if (!engineStatusEl) return;
+    engineStatusEl.textContent = text || "";
+    engineStatusEl.classList.toggle("error", !!isError);
+  }
+  function engineLabel(e) { return e === "jina" ? "Jina Reader" : "Defuddle"; }
+  function engineUnavailable(e) {
+    if (e === "jina") return !/^https?:\/\//i.test(srcUrlForSwitch);
+    return !srcTabId; // local needs the source tab
+  }
+  function friendlyEngineErr(r) {
+    const code = r && r.error;
+    if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
+    if (code === "empty") return t("mdPreviewNoContent");
+    return t("mdEngineExtractFailed");
+  }
+  function applyAvailability(curEngine) {
+    if (!sourceEl) return;
+    sourceEl.querySelectorAll(".src-seg").forEach((seg) => {
+      const e = seg.getAttribute("data-engine");
+      const active = e === curEngine;
+      const unavail = engineUnavailable(e) && !active;
+      seg.classList.toggle("active", active);
+      seg.setAttribute("aria-pressed", active ? "true" : "false");
+      seg.disabled = unavail;
+      if (unavail) seg.setAttribute("aria-disabled", "true");
+      else seg.removeAttribute("aria-disabled");
+      if (!active && !unavail) seg.title = t("mdEngineSwitchTo", engineLabel(e));
+      else if (unavail && e === "local") seg.title = t("mdEngineTabGone");
+      else seg.removeAttribute("title");
+    });
+  }
+
   // Shortcut opens the preview INSTANTLY with a pending placeholder, then the
   // preview drives extraction via the reextract path (so the tab appears immediately
   // even when Jina needs a network round-trip). On success the SW has written the
@@ -150,18 +220,41 @@ function ensureKatex() {
     const titleEl0 = document.getElementById("preview-title");
     if (titleEl0) { titleEl0.textContent = title || t("mdPreviewUntitled"); titleEl0.title = title || ""; }
     document.title = (title || "Markdown") + " — Preview";
-    renderLoadingState(
-      t("mdEngineExtracting", engineLabel(info.engine)),
-      info.engine === "jina" ? t("mdEngineExtractingNoteJina") : ""
-    );
-    let pr;
-    try {
-      pr = await chrome.runtime.sendMessage({
-        type: "reextractMarkdown", tabId: srcTabId, url, engine: info.engine, tags, description: ""
+
+    // One function drives the initial attempt, the error state's retry button, and the
+    // rail's engine-switch badge clicks — all funnel back through the same
+    // reextractMarkdown message, never a separate channel.
+    let attemptedEngine = info.engine;
+    let inFlight = false;
+    async function attemptExtract(engine) {
+      inFlight = true;
+      attemptedEngine = engine;
+      applyAvailability(engine);
+      renderLoadingState(
+        t("mdEngineExtracting", engineLabel(engine)),
+        engine === "jina" ? t("mdEngineExtractingNoteJina") : ""
+      );
+      let pr;
+      try {
+        pr = await chrome.runtime.sendMessage({
+          type: "reextractMarkdown", tabId: srcTabId, url, engine, tags, description: ""
+        });
+      } catch (_) { pr = { ok: false, error: "network" }; }
+      inFlight = false;
+      if (pr && pr.ok) { location.reload(); return; }
+      renderErrorState(friendlyEngineErr(pr), () => attemptExtract(attemptedEngine));
+      applyAvailability(attemptedEngine);
+    }
+    if (sourceEl) {
+      sourceEl.querySelectorAll(".src-seg").forEach((seg) => {
+        seg.addEventListener("click", () => {
+          const e = seg.getAttribute("data-engine");
+          if (inFlight || e === attemptedEngine || seg.disabled) return;
+          attemptExtract(e);
+        });
       });
-    } catch (_) { pr = { ok: false, error: "network" }; }
-    if (pr && pr.ok) { location.reload(); return; }
-    renderEmptyState(friendlyEngineErr(pr));
+    }
+    attemptExtract(info.engine);
     return;
   }
   // Canonical Markdown: Defuddle HTML -> Turndown; Jina already gives MD.
@@ -191,10 +284,7 @@ function ensureKatex() {
   // area inline rather than via getSettingsStorage. Reading chrome.storage.sync directly
   // would miss every customization for the default (sync-off) user — including the
   // obsidianEnabled gate, the vault/folder, and the frontmatter/image/TOC defaults.
-  const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
-  const settingsArea = optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
-  window.pbpSettingsArea = settingsArea;
-  const exportSettings = await settingsArea.get({
+  const EXPORT_SETTINGS_DEFAULTS = {
     mdExportFrontmatter: true,
     mdExportImagePolicy: "keep",
     mdExportIncludeToc: false,
@@ -202,7 +292,19 @@ function ensureKatex() {
     obsidianVault: "",
     obsidianFolder: "",
     exportTargets: {}
-  });
+  };
+  // Own try/catch: a storage read failure here (sync quota hiccup, corrupt area, etc.)
+  // must degrade to defaults rather than propagate and blank the whole article — the
+  // extraction above already succeeded and there's real content ready to render.
+  let exportSettings = EXPORT_SETTINGS_DEFAULTS;
+  try {
+    const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
+    const settingsArea = optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+    window.pbpSettingsArea = settingsArea;
+    exportSettings = await settingsArea.get(EXPORT_SETTINGS_DEFAULTS);
+  } catch (_) {
+    window.pbpSettingsArea = chrome.storage.local; // degrade: default area + defaults
+  }
   const expFrontmatter = document.getElementById("exp-frontmatter");
   const expImagePolicy = document.getElementById("exp-image-policy");
   const expIncludeToc = document.getElementById("exp-include-toc");
@@ -259,47 +361,11 @@ function ensureKatex() {
   } else {
     tokenEl.style.display = "none";
   }
-  const sourceEl = document.getElementById("source-badge");
-  const engineStatusEl = document.getElementById("engine-status");
   const curEngine = source === "jina" ? "jina" : "local";
   let switching = false;
 
-  function setEngineStatus(text, isError) {
-    if (!engineStatusEl) return;
-    engineStatusEl.textContent = text || "";
-    engineStatusEl.classList.toggle("error", !!isError);
-  }
-  function engineLabel(e) { return e === "jina" ? "Jina Reader" : "Defuddle"; }
-  function engineUnavailable(e) {
-    if (e === "jina") return !/^https?:\/\//i.test(srcUrlForSwitch);
-    return !srcTabId; // local needs the source tab
-  }
-  function friendlyEngineErr(r) {
-    const code = r && r.error;
-    if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
-    if (code === "empty") return t("mdPreviewNoContent");
-    return t("mdEngineExtractFailed");
-  }
-  function applyAvailability() {
-    if (!sourceEl) return;
-    sourceEl.querySelectorAll(".src-seg").forEach((seg) => {
-      const e = seg.getAttribute("data-engine");
-      const active = e === curEngine;
-      const unavail = engineUnavailable(e) && !active;
-      seg.classList.toggle("active", active);
-      seg.setAttribute("aria-pressed", active ? "true" : "false");
-      seg.disabled = unavail;
-      if (unavail) seg.setAttribute("aria-disabled", "true");
-      else seg.removeAttribute("aria-disabled");
-      if (!active && !unavail) seg.title = t("mdEngineSwitchTo", engineLabel(e));
-      else if (unavail && e === "local") seg.title = t("mdEngineTabGone");
-      else seg.removeAttribute("title");
-    });
-  }
-
-  const srcUrlForSwitch = url || "";
   if (sourceEl) {
-    applyAvailability();
+    applyAvailability(curEngine);
     sourceEl.querySelectorAll(".src-seg").forEach((seg) => {
       seg.addEventListener("click", async () => {
         const e = seg.getAttribute("data-engine");
@@ -322,7 +388,7 @@ function ensureKatex() {
         switching = false;
         sourceEl.removeAttribute("aria-busy");
         seg.classList.remove("loading");
-        applyAvailability();
+        applyAvailability(curEngine);
         setEngineStatus(friendlyEngineErr(r), true);
         if (e === "local" && r && (r.error === "tab_unavailable" || r.error === "tab_navigated")) {
           const localSeg = sourceEl.querySelector('.src-seg[data-engine="local"]');
@@ -699,7 +765,15 @@ function ensureKatex() {
       setupSendMenu();
     }
   });
-})();
+})().catch((e) => {
+  // Top-level backstop: any unhandled throw in the init flow above (malformed HTML into
+  // Turndown, a rejected storage read, marked.parse choking on the extracted markdown,
+  // etc.) previously left the page mid-render — title/rail filled in, #rendered-view
+  // blank, no error text, no aria-busy cleared. Fall back to the empty state instead of
+  // a silent half-rendered page.
+  console.error("md-preview init failed:", e);
+  renderEmptyState(t("mdEngineExtractFailed"));
+});
 
 // ---- Copy to clipboard with visual feedback ----
 async function copyToClipboard(text, btn) {
