@@ -236,6 +236,9 @@ main {
   border-radius: 8px;
   color: var(--code-fg);
   tab-size: 2;
+  /* MB-scale markdown in one text node has no containment; a first-time Raw
+     switch or a window resize forces a full-document layout pass (audit #19). */
+  contain: layout style;
 }
 
 /* ---- Rendered View: Article Typography ---- */

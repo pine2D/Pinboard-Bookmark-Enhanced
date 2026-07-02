@@ -432,7 +432,7 @@ function ensureKatex() {
   // and applied after paint (rAF). Avoids blocking the page on a 122KB compile + a
   // synchronous whole-document highlight pass (the cold-load spinner).
   if (renderedView.querySelector("pre > code")) {
-    requestAnimationFrame(() => { ensureHljs().then(() => highlightCodeBlocks(renderedView)); });
+    requestAnimationFrame(() => { ensureHljs().then(() => highlightCodeBlocksChunked(renderedView)); });
   }
   // Math rendering — ONLY for LaTeX-bearing content (info.math, e.g. arXiv). Gating on
   // the flag (not just a "$") keeps KaTeX off every other page so currency like "$5"

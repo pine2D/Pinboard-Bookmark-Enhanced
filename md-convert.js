@@ -323,6 +323,35 @@ function highlightCodeBlocks(root) {
   });
 }
 
+// Chunked variant (preview page only). Same per-block logic as
+// highlightCodeBlocks, spread across rAF frames so a code-dense article
+// doesn't pay one synchronous hljs pass over every block as a single long
+// task (audit #18). composeStyledHtml (export) keeps the synchronous
+// highlightCodeBlocks: it reads tmp.innerHTML immediately after the call
+// and can't wait for frames.
+const PBP_HLJS_CHUNK = 4;
+function highlightCodeBlocksChunked(root) {
+  if (!root || typeof hljs === "undefined") return;
+  const blocks = Array.from(root.querySelectorAll('pre > code'));
+  if (!blocks.length) return;
+  const raf = (typeof requestAnimationFrame === "function") ? requestAnimationFrame : (fn) => setTimeout(fn, 0);
+  let i = 0;
+  const step = () => {
+    const end = Math.min(i + PBP_HLJS_CHUNK, blocks.length);
+    for (; i < end; i++) {
+      const block = blocks[i];
+      if (block.classList.contains("hljs")) continue; // idempotent
+      try {
+        hljs.highlightElement(block);
+      } catch (_) {
+        // A single malformed block must not abort the rest of the page.
+      }
+    }
+    if (i < blocks.length) raf(step);
+  };
+  raf(step);
+}
+
 // ── Export transform ①: YAML frontmatter ──
 
 // Escape a string for a YAML double-quoted scalar (quotes / colons / newlines).

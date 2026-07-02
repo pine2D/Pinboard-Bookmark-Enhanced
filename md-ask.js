@@ -157,6 +157,14 @@ function _pbpAskBuildPanel() {
   applyI18n(panel);
   document.body.appendChild(panel);
   _pbpAskState.panel = panel;
+  // #ask-thread now exists in the live document — restore history straight
+  // away instead of polling for it via MutationObserver (audit #28).
+  // _pbpAskHistRestore is idempotent (_pbpAskHistRestored guard) and a no-op
+  // until the "pbp:rendered" listener below has set _pbpAskHistUrl, which by
+  // construction (this function is only reachable through wiring pbpAskInit
+  // adds AFTER that same event) has already run by the time a user can open
+  // the panel.
+  _pbpAskHistRestore().catch(() => {});
 
   panel.querySelector("#ask-close").addEventListener("click", () => _pbpAskSetOpen(false));
   // Clear seam: Task 15 appends _pbpAskShowClearConfirm (inline confirm
@@ -962,48 +970,58 @@ async function _pbpAskHistRestore() {
   note.className = "ask-restored";
   note.textContent = t("askRestoredNote", String(hist.length));
   frag.appendChild(note);
-  for (const rec of hist) {
-    if (!rec || typeof rec.a !== "string") continue;
-    const qEl = document.createElement("div");
-    qEl.className = "ask-q";
-    qEl.textContent = String(rec.q || "");
-    const aEl = document.createElement("div");
-    aEl.className = "ask-a";
-    frag.appendChild(qEl);
-    frag.appendChild(aEl);
-    // SAME pipeline as live answers: pbpAiParseCites -> renderMarkdown
-    // (single sanitize point) -> chip pass -> verification runs AGAIN
-    // against the current block index -> decorate (copy button).
-    const parsed = _pbpAskFinalize(aEl, rec.a);
-    // Seed st.rounds with the restored Q&A too, not just the DOM: it is
-    // what pbpAskBuildPrompt/_pbpAskUpdateMeta read (_pbpAskRun), so a
-    // follow-up question after a page reload still carries PREVIOUS
-    // Q&A context - same {q, a: <parsed body>} shape _pbpAskRun pushes
-    // for a live answer (md-ask.js:466).
-    if (_pbpAskState) {
-      _pbpAskState.rounds = _pbpAskState.rounds || [];
-      _pbpAskState.rounds.push({ q: String(rec.q || ""), a: parsed.body });
-    }
-  }
-  // Prepend: if a live round raced in before the async read finished,
+  // Perf (audit #27): finalize (renderMarkdown + fuzzy chip verification,
+  // md-ai-core.js's bounded Levenshtein scan on exact-miss) is spread across
+  // rAF frames instead of one synchronous pass over up to 20 records, so a
+  // long history doesn't stall the panel's first open. The whole fragment
+  // still lands in the DOM with a single insertBefore once every record is
+  // built, preserving the "live round races in" ordering guarantee below.
+  const raf = (typeof requestAnimationFrame === "function") ? requestAnimationFrame : (fn) => setTimeout(fn, 0);
+  const PBP_ASK_HIST_CHUNK = 2;
+  let hi = 0;
+  await new Promise((resolve) => {
+    const step = () => {
+      const end = Math.min(hi + PBP_ASK_HIST_CHUNK, hist.length);
+      for (; hi < end; hi++) {
+        const rec = hist[hi];
+        if (!rec || typeof rec.a !== "string") continue;
+        const qEl = document.createElement("div");
+        qEl.className = "ask-q";
+        qEl.textContent = String(rec.q || "");
+        const aEl = document.createElement("div");
+        aEl.className = "ask-a";
+        frag.appendChild(qEl);
+        frag.appendChild(aEl);
+        // SAME pipeline as live answers: pbpAiParseCites -> renderMarkdown
+        // (single sanitize point) -> chip pass -> verification runs AGAIN
+        // against the current block index -> decorate (copy button).
+        const parsed = _pbpAskFinalize(aEl, rec.a);
+        // Seed st.rounds with the restored Q&A too, not just the DOM: it is
+        // what pbpAskBuildPrompt/_pbpAskUpdateMeta read (_pbpAskRun), so a
+        // follow-up question after a page reload still carries PREVIOUS
+        // Q&A context - same {q, a: <parsed body>} shape _pbpAskRun pushes
+        // for a live answer (md-ask.js:466).
+        if (_pbpAskState) {
+          _pbpAskState.rounds = _pbpAskState.rounds || [];
+          _pbpAskState.rounds.push({ q: String(rec.q || ""), a: parsed.body });
+        }
+      }
+      if (hi < hist.length) raf(step); else resolve();
+    };
+    raf(step);
+  });
+  // Prepend: if a live round raced in before the async build finished,
   // restored history still reads in chronological order above it.
   thread.insertBefore(frag, thread.firstChild);
 }
 
+// Just remember the URL for _pbpAskHistRestore. Restore itself now fires
+// from _pbpAskBuildPanel right after #ask-thread mounts (audit #28) — no
+// need to watch document.body for the panel's lazy first open, which used
+// to leave a MutationObserver running for the rest of the session on any
+// page where AI is configured but the user never opens the panel.
 document.addEventListener("pbp:rendered", (e) => {
   _pbpAskHistUrl = (e.detail && e.detail.url) || "";
-  pbpAiGetSettings().then((s) => {
-    if (!pbpAiAvailable(s)) return; // master gate: zero residue when off
-    if (_pbpAskHistThread()) { _pbpAskHistRestore(); return; }
-    // The panel mounts lazily on first open (rail button, hotkey "a", or
-    // the explain bridge). Watch for #ask-thread, restore once, disconnect.
-    const mo = new MutationObserver(() => {
-      if (!_pbpAskHistThread()) return;
-      mo.disconnect();
-      _pbpAskHistRestore();
-    });
-    mo.observe(document.body, { childList: true, subtree: true });
-  }).catch(() => {});
 }, { once: true });
 
 // ============================================================
