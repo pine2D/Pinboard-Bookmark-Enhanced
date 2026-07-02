@@ -509,8 +509,24 @@ async function htmlToMarkdownAsync(html, opts) {
         const lbl = btn.querySelector("span:last-child");
         if (btn._t) clearTimeout(btn._t);
         if (btn._orig == null) btn._orig = lbl ? lbl.textContent : "";
+        // Same meta/opts as downloadMd/sendObsidian below — composeExport applies
+        // frontmatter/imagePolicy/TOC so Copy matches Download/Obsidian/preview's
+        // Copy MD instead of copying the bare canonical markdown (relative image
+        // src left unresolved, frontmatter/TOC settings silently ignored).
+        const meta = {
+          title: result.title || $id("title-input")?.value || "",
+          url: result.url || url,
+          date: (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(),
+          tags: Array.isArray(currentTags) ? currentTags.slice() : [],
+          source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
+        };
+        const out = composeExport(markdown, meta, {
+          frontmatter: settings.mdExportFrontmatter,
+          imagePolicy: settings.mdExportImagePolicy,
+          includeToc: settings.mdExportIncludeToc
+        });
         try {
-          await navigator.clipboard.writeText(markdown);
+          await navigator.clipboard.writeText(out);
           if (lbl) lbl.textContent = t("jinaCopied");
           btn.classList.add("copied");
         } catch (_) {
