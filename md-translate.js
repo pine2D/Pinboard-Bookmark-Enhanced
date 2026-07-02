@@ -475,6 +475,40 @@ const PBP_TR_BTN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 
 let _pbpTrState = null;
 
+// tr-only escape hatch: shared by the click and keydown delegated listeners
+// in pbpTrInit (audit md-translate.js:524). No-op outside tr-only mode.
+// Returns true iff it actually toggled the peek, so the keydown listener
+// only preventDefault()s when it's actually consuming the key (otherwise a
+// stray Enter/Space on e.g. a link inside the block would lose its default
+// action for no reason).
+function _pbpTrPeekToggle(target) {
+  if (!document.body.classList.contains("tr-only")) return false;
+  const tr = target.closest(".pb-tr");
+  if (!tr || target.closest("a")) return false;      // never hijack links
+  const orig = tr.previousElementSibling;
+  if (!orig || !orig.dataset || !orig.dataset.pb) return false;
+  orig.classList.toggle("pb-show-orig");
+  return true;
+}
+
+// The peek is only a real affordance in tr-only mode (click/Enter/Space are
+// a no-op otherwise, per _pbpTrPeekToggle above) -- so role/tabindex/title
+// only apply there; elsewhere they'd be a misleading tab stop / hover hint
+// (audit md-translate.js:524). Called both when a .pb-tr is (re)filled and
+// whenever the view mode changes (_pbpTrSetMode), so late-created blocks
+// pick up the right state too.
+function _pbpTrApplyPeekAttrs(div) {
+  if (document.body.classList.contains("tr-only")) {
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.title = t("trShowOriginal");
+  } else {
+    div.removeAttribute("role");
+    div.removeAttribute("tabindex");
+    div.removeAttribute("title");
+  }
+}
+
 async function pbpTrInit(detail) {
   const view = document.getElementById("rendered-view");
   if (!view || _pbpTrState) return;
@@ -521,13 +555,16 @@ async function pbpTrInit(detail) {
     });
   }
 
-  // tr-only escape hatch: click a translated block to peek at its original.
-  view.addEventListener("click", (e) => {
-    if (!document.body.classList.contains("tr-only")) return;
-    const tr = e.target.closest(".pb-tr");
-    if (!tr || e.target.closest("a")) return;      // never hijack links
-    const orig = tr.previousElementSibling;
-    if (orig && orig.dataset && orig.dataset.pb) orig.classList.toggle("pb-show-orig");
+  // tr-only escape hatch: click OR keyboard (Enter/Space, when the block is
+  // focusable in tr-only mode — see _pbpTrApplyPeekAttrs) a translated block
+  // to peek at its original (audit md-translate.js:524).
+  view.addEventListener("click", (e) => _pbpTrPeekToggle(e.target));
+  view.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    // Only consume the key (and stop Space from scrolling the page) when the
+    // peek actually fires -- otherwise this must not swallow Enter/Space on
+    // e.g. a focusable link inside the block.
+    if (_pbpTrPeekToggle(e.target)) e.preventDefault();
   });
   // Page close terminates every in-flight request (error matrix last row).
   window.addEventListener("pagehide", () => { if (st.ctrl) st.ctrl.abort(); });
@@ -951,7 +988,7 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   }
   div.innerHTML = renderMarkdown(restored);
   div.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
-  div.title = t("trShowOriginal");
+  _pbpTrApplyPeekAttrs(div);
   orig.dataset.pbTrDone = "1";
   // KaTeX: only when the article actually rendered math (md-preview gated
   // loading on info.math; a .katex node proves it). ensureKatex is a
@@ -983,6 +1020,9 @@ function _pbpTrMarkFailed(st, w, message) {
   btn.className = "pb-tr-err";
   btn.dataset.pbTrErr = String(w.n);
   btn.title = t("trBlockFailed") + " - " + String(message || "");
+  // title only surfaces on hover: keyboard/touch/SR users need the reason in
+  // the accessible name too (audit md-translate.js:911).
+  btn.setAttribute("aria-label", btn.title);
   btn.innerHTML = PBP_TR_ERR_SVG;                   // static inline SVG only
   const lab = document.createElement("span");
   lab.textContent = t("trRetryBlock");
@@ -1023,6 +1063,7 @@ function _pbpTrMarkPartial(st, w) {
   btn.className = "pb-tr-err";
   btn.dataset.pbTrErr = String(w.n);
   btn.title = t("trBlockFailed");
+  btn.setAttribute("aria-label", btn.title);
   btn.innerHTML = PBP_TR_ERR_SVG;
   const lab = document.createElement("span");
   lab.textContent = t("trRetryBlock");
@@ -1076,9 +1117,23 @@ async function _pbpTrRetryBlock(st, w, btn) {
   window.addEventListener("pagehide", onHide, { once: true });
   try {
     const got = await _pbpTrTranslateBlock(st, w, ctrl.signal);
-    btn.remove();
-    _pbpTrSyncRetryAll();
+    // Fill BEFORE removing the pill: _pbpTrFill creates/updates the .pb-tr
+    // sibling we want to move focus into. If the pill (btn) is the currently
+    // focused element, hand focus to that new .pb-tr instead of letting
+    // btn.remove() drop focus to <body> (audit md-translate.js:1000).
+    const hadFocus = document.activeElement === btn;
     _pbpTrFill(st, w, got);
+    if (hadFocus) {
+      const tr = pbpAiBlockEl(w.n) && pbpAiBlockEl(w.n).nextElementSibling;
+      if (tr && tr.classList && tr.classList.contains("pb-tr")) {
+        // Don't clobber the tabindex=0 _pbpTrApplyPeekAttrs (just run inside
+        // _pbpTrFill) may have already given it for tr-only keyboard peek.
+        if (!tr.hasAttribute("tabindex")) tr.tabIndex = -1;
+        tr.focus();
+      }
+    }
+    btn.remove(); // no-op if _pbpTrFill's own cleanup already removed it
+    _pbpTrSyncRetryAll();
     const one = {};
     one[w.hash] = got;
     try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, one); } catch (_) {}
@@ -1087,6 +1142,7 @@ async function _pbpTrRetryBlock(st, w, btn) {
   } catch (e) {
     btn.disabled = false;
     btn.title = t("trBlockFailed") + " - " + String((e && e.message) || "");
+    btn.setAttribute("aria-label", btn.title);
   } finally {
     window.removeEventListener("pagehide", onHide);
   }
@@ -1116,7 +1172,16 @@ function _pbpTrSyncRetryAll() {
 async function _pbpTrRetryAllFailed(st) {
   if (st.running) return;   // batch run in progress: retrying now races the queue + cache get-merge-put
   const all = document.getElementById("tr-retry-all");
-  if (all) all.disabled = true;
+  if (all) {
+    // Disabling the focused button drops focus to <body> (audit md-translate.js:1000);
+    // tr-progress is already visible whenever retry-all is (both follow a "translating"
+    // or "partial" status, which unhides it), so it's a safe, always-live focus target.
+    if (document.activeElement === all) {
+      const prog = document.getElementById("tr-progress");
+      if (prog) { prog.tabIndex = -1; prog.focus(); }
+    }
+    all.disabled = true;
+  }
   const pills = Array.from(document.querySelectorAll(".pb-tr-err"));
   for (const btn of pills) {
     const n = Number(btn.dataset.pbTrErr);
@@ -1139,10 +1204,13 @@ function _pbpTrSetStatus(st, status) {
   const label = btn.querySelector(".btn-label");
   if (status === "translating") {
     label.textContent = t("trTranslating");
-    btn.disabled = true;
     stop.hidden = false;
     prog.hidden = false;
     est.hidden = true;
+    // Move focus to the now-visible Stop button before disabling Translate,
+    // so a keyboard user doesn't drop to <body> (audit md-translate.js:1000).
+    if (document.activeElement === btn) stop.focus();
+    btn.disabled = true;
   } else if (status === "partial") {
     label.textContent = t("trContinue");
     btn.disabled = false;
@@ -1207,6 +1275,9 @@ function _pbpTrSetMode(st, mode, persist) {
   if (mode !== "translated") {
     document.querySelectorAll("#rendered-view .pb-show-orig").forEach((el) => el.classList.remove("pb-show-orig"));
   }
+  // Re-sync every already-filled .pb-tr's peek affordance for the new mode
+  // (blocks filled while a DIFFERENT mode was active still need updating).
+  document.querySelectorAll("#rendered-view .pb-tr").forEach(_pbpTrApplyPeekAttrs);
   _pbpTrSyncToggle(mode);
   _pbpTrSyncToc(st, mode);
   // Export follows the view: md-preview.js consults window.pbpViewMarkdown

@@ -1062,6 +1062,8 @@ body.ask-open main { margin-right: 396px; }
 @media print {
   #ask-panel, #ask-section { display: none; }
   body.ask-open main { margin-right: 0; }
+  /* must sit AFTER the base .pb-tr-err display rule in source order to win the cascade */
+  .pb-tr-err { display: none; }
 }
 
 /* ---- Ask send pipeline: streaming caret, stop note, error + retry ---- */
