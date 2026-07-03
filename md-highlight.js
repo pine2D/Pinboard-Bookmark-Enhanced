@@ -79,6 +79,108 @@ function pbpHlLocate(blockText, item) {
   return { start: best, end: best + quote.length };
 }
 
+// ---- H2 export: aggregation section (spec 5). Tag slugs are FIXED
+// English strings (a markdown interchange format, like frontmatter)
+// -- i18n only touches UI labels, never these.
+const PBP_HL_SLUGS = ["#hl-quote", "#hl-definition", "#hl-example", "#hl-doubt", "#hl-todo"];
+
+// Blockquote a possibly-multi-line string: prefix every line with
+// "> " (a bare "> " would print a trailing space, so an empty line
+// gets just ">" instead -- both are valid CommonMark blockquote
+// lines).
+function _pbpHlQuoteLines(text) {
+  return String(text).split("\n").map((line) => (line ? "> " + line : ">")).join("\n");
+}
+
+// items -> "## Highlights" section: one blockquote (+ optional note
+// paragraph, via spec 5's blank quoted "> " line trick for a second
+// paragraph) and a fixed-slug tag line per item. Empty/missing items
+// -> "" (no heading at all) so Task 6's composeExport
+// "no highlights -> byte-identical output" regression guard holds
+// trivially.
+function pbpHlComposeSection(items) {
+  const list = Array.isArray(items) ? items.filter((it) => it && typeof it.quote === "string" && it.quote) : [];
+  if (!list.length) return "";
+  const groups = list.map((it) => {
+    let block = _pbpHlQuoteLines(it.quote);
+    if (it.note) block += "\n>\n" + _pbpHlQuoteLines(it.note);
+    const slug = PBP_HL_SLUGS[(Number(it.color) | 0) - 1] || PBP_HL_SLUGS[0];
+    return block + "\n\n" + slug;
+  });
+  return "## Highlights\n\n" + groups.join("\n\n");
+}
+
+// ---- Opportunistic inline marking (spec 5). "Protected" spans are
+// fenced code blocks (```...```) and inline code spans (`...`) --
+// matches inside either are never wrapped. ponytail: this is a
+// substring/regex scan, not a real CommonMark tokenizer (no nested
+// fence-length counting, no multi-line inline spans); good enough
+// for "is this quote inside SOME code span" -- upgrade to
+// md-convert's real parser only if that ceiling is ever hit in
+// practice.
+function _pbpHlProtectedRanges(md) {
+  const ranges = [];
+  const re = /```[\s\S]*?```|`[^`\n]*`/g;
+  let m;
+  while ((m = re.exec(md))) {
+    ranges.push([m.index, m.index + m[0].length]);
+  }
+  return ranges;
+}
+
+function _pbpHlInProtected(ranges, start, end) {
+  return ranges.some(([a, b]) => start < b && end > a);
+}
+
+// md, items -> md with each item's quote wrapped in "==...==" IFF it
+// matches verbatim exactly ONCE outside any protected span. Zero or
+// multiple (ambiguous) matches -> that item is skipped (spec 5: the
+// aggregation section is the always-complete record; this is
+// best-effort on top, zero data loss either way). Overlapping wraps
+// across items are resolved by keeping the earliest and dropping the
+// rest -- also treated as "ambiguous".
+function pbpHlInlineMark(md, items) {
+  const text = typeof md === "string" ? md : "";
+  const list = Array.isArray(items) ? items : [];
+  if (!text || !list.length) return text;
+  const protectedRanges = _pbpHlProtectedRanges(text);
+  const wraps = [];
+  for (const it of list) {
+    if (!it || typeof it.quote !== "string" || !it.quote) continue;
+    const quote = it.quote;
+    let hit = null;
+    let count = 0;
+    let idx = text.indexOf(quote);
+    while (idx !== -1) {
+      const end = idx + quote.length;
+      if (!_pbpHlInProtected(protectedRanges, idx, end)) {
+        count++;
+        hit = { start: idx, end };
+      }
+      idx = text.indexOf(quote, idx + 1);
+    }
+    if (count === 1) wraps.push(hit);
+  }
+  if (!wraps.length) return text;
+  wraps.sort((a, b) => a.start - b.start);
+  const kept = [];
+  let lastEnd = -1;
+  for (const w of wraps) {
+    if (w.start >= lastEnd) {
+      kept.push(w);
+      lastEnd = w.end;
+    }
+  }
+  let out = "";
+  let pos = 0;
+  for (const w of kept) {
+    out += text.slice(pos, w.start) + "==" + text.slice(w.start, w.end) + "==";
+    pos = w.end;
+  }
+  out += text.slice(pos);
+  return out;
+}
+
 // ============================================================
 // DOM / UI layer. Lazily mounted: pbpHlInit runs on "pbp:rendered"
 // (same pattern as pbpTrInit / pbpAskInit). This is a placeholder

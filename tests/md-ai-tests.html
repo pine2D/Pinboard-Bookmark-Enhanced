@@ -3484,4 +3484,58 @@ suiteIf("pbpHlLocate", "pbpHlLocate", () => {
   });
 });
 </script>
+
+<script>
+// ============ Task 2: md-highlight.js H2 export (spec 5) ============
+suiteIf("pbpHlComposeSection", "pbpHlComposeSection", () => {
+  test("empty items -> empty string, no heading emitted", () => {
+    assertEq(pbpHlComposeSection([]), "", "no items -> empty string");
+  });
+  test("single item without note -> blockquote + blank line + slug, no note paragraph", () => {
+    const out = pbpHlComposeSection([{ quote: "hello world", color: 1, note: "" }]);
+    assertEq(out, "## Highlights\n\n> hello world\n\n#hl-quote", "no-note shape");
+  });
+  test("single item with note -> two-paragraph blockquote (quote, blank quoted line, note) + slug", () => {
+    const out = pbpHlComposeSection([{ quote: "hello world", color: 2, note: "my note" }]);
+    assertEq(out, "## Highlights\n\n> hello world\n>\n> my note\n\n#hl-definition", "with-note shape");
+  });
+  test("all 5 colors map to their fixed English slug in order", () => {
+    const items = [1, 2, 3, 4, 5].map((c) => ({ quote: "q" + c, color: c, note: "" }));
+    const out = pbpHlComposeSection(items);
+    assertEq(out, "## Highlights\n\n> q1\n\n#hl-quote\n\n> q2\n\n#hl-definition\n\n> q3\n\n#hl-example\n\n> q4\n\n#hl-doubt\n\n> q5\n\n#hl-todo", "all 5 slugs in order");
+  });
+});
+
+suiteIf("pbpHlInlineMark", "pbpHlInlineMark", () => {
+  test("unique verbatim hit outside code -> wrapped in ==...==", () => {
+    const md = "Some prose with a unique phrase here.";
+    const items = [{ quote: "unique phrase", color: 1 }];
+    assertEq(pbpHlInlineMark(md, items), md.replace("unique phrase", "==unique phrase=="), "wrapped once");
+  });
+  test("quote occurring twice outside code -> ambiguous -> skipped", () => {
+    const md = "cat sat cat mat";
+    const items = [{ quote: "cat", color: 1 }];
+    assertEq(pbpHlInlineMark(md, items), md, "unchanged, no wrap");
+  });
+  test("quote's only occurrence is inside a fenced code block -> skipped", () => {
+    const md = "prose\n\n```\nfenceOnlyPhrase inside\n```\n\nmore prose";
+    const items = [{ quote: "fenceOnlyPhrase", color: 1 }];
+    assertEq(pbpHlInlineMark(md, items), md, "unchanged, fenced hit not wrapped");
+  });
+  test("quote's only occurrence is inside inline code -> skipped", () => {
+    const md = "before `inlineOnlyPhrase` after";
+    const items = [{ quote: "inlineOnlyPhrase", color: 1 }];
+    assertEq(pbpHlInlineMark(md, items), md, "unchanged, inline-code hit not wrapped");
+  });
+  test("multi-item mixed: unique wrapped, fenced/ambiguous left alone", () => {
+    const md = "keepme text\n\n```\nfenced-in-a-cave\n```\n\ndupe here dupe there";
+    const items = [
+      { quote: "keepme", color: 1 },
+      { quote: "fenced-in-a-cave", color: 2 },
+      { quote: "dupe", color: 3 },
+    ];
+    assertEq(pbpHlInlineMark(md, items), md.replace("keepme", "==keepme=="), "only the unique out-of-code quote is wrapped");
+  });
+});
+</script>
 </body></html>
