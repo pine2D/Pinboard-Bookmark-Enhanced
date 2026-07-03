@@ -353,6 +353,13 @@ suite("_pbpUsageSink + _pbpSseConsumer onRaw", () => {
     sink.flush();
     assert(true, "extractor throw degraded");
   });
+  test("throwing onUsage consumer does not escape flush() (side channel must not break the stream)", () => {
+    const sink = _pbpUsageSink(_pbpOpenAIUsage, { onUsage: () => { throw new Error("boom"); } });
+    sink.onRaw({ usage: { prompt_tokens: 1, completion_tokens: 2 } });
+    let threw = false;
+    try { sink.flush(); } catch (_) { threw = true; }
+    assertEq(threw, false, "flush() must swallow a throwing onUsage callback");
+  });
 });
 </script>
 

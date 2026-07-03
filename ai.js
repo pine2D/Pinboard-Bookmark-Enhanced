@@ -610,7 +610,9 @@ function _pbpUsageSink(extractUsage, opts) {
     },
     flush() {
       if (saw && opts && typeof opts.onUsage === "function") {
-        opts.onUsage({ inTok: acc.inTok || 0, outTok: acc.outTok || 0 });
+        // Side channel must never break the primary result: a throwing
+        // consumer callback must not reject the surrounding stream promise.
+        try { opts.onUsage({ inTok: acc.inTok || 0, outTok: acc.outTok || 0 }); } catch (_) {}
       }
     }
   };
