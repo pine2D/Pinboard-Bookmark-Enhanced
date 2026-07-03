@@ -29,6 +29,7 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../md-ai-core.js"></script>
 <script src="../md-translate.js"></script>
 <script src="../md-ask.js"></script>
+<script src="../md-highlight.js"></script>
 
 <script>
 let PASS = 0, FAIL = 0, SKIP = 0;
@@ -3407,6 +3408,79 @@ suiteIf("pbpTrIsTypingContext", "pbpTrIsTypingContext", () => {
   });
   test("null tagName, not contentEditable -> false", () => {
     assertEq(pbpTrIsTypingContext(null, false), false, "null tag, not editable");
+  });
+});
+</script>
+<script>
+// ============ Task 1: md-highlight.js anchor/locate (spec 3) ============
+suiteIf("pbpHlSelectorOf", "pbpHlSelectorOf", () => {
+  test("quote in the middle of a long block clamps prefix/suffix to 32 chars each", () => {
+    const block = "A".repeat(40) + "QUOTE" + "B".repeat(40);
+    const sel = pbpHlSelectorOf(block, 40, 45);
+    assertEq(sel.quote, "QUOTE", "quote");
+    assertEq(sel.prefix, "A".repeat(32), "prefix clamped to 32");
+    assertEq(sel.suffix, "B".repeat(32), "suffix clamped to 32");
+  });
+  test("quote at the very start of the block clamps prefix to empty", () => {
+    const block = "QUOTE" + "C".repeat(50);
+    const sel = pbpHlSelectorOf(block, 0, 5);
+    assertEq(sel.quote, "QUOTE", "quote");
+    assertEq(sel.prefix, "", "prefix clamped to block start");
+    assertEq(sel.suffix, "C".repeat(32), "suffix clamped to 32");
+  });
+  test("quote at the very end of the block clamps suffix to empty", () => {
+    const block = "D".repeat(50) + "QUOTE";
+    const sel = pbpHlSelectorOf(block, 50, 55);
+    assertEq(sel.quote, "QUOTE", "quote");
+    assertEq(sel.prefix, "D".repeat(32), "prefix clamped to 32");
+    assertEq(sel.suffix, "", "suffix clamped to block end");
+  });
+  test("CJK block text slices correctly", () => {
+    // \u escapes, not literal glyphs, per the iron rule (zero literal
+    // non-ASCII inside code, byte-scan with grep -P after editing):
+    // U+7532 (filler), U+91CD U+70B9 (the quote), U+4E59 (filler).
+    const block = "\u7532".repeat(10) + "\u91cd\u70b9" + "\u4e59".repeat(10);
+    const sel = pbpHlSelectorOf(block, 10, 12);
+    assertEq(sel.quote, "\u91cd\u70b9", "quote is the 2-char CJK selection");
+    assertEq(sel.prefix, "\u7532".repeat(10), "prefix is all 10 available CJK chars (< 32, naturally short)");
+    assertEq(sel.suffix, "\u4e59".repeat(10), "suffix is all 10 available CJK chars (< 32, naturally short)");
+  });
+  test("whole-block quote leaves both affixes empty", () => {
+    const sel = pbpHlSelectorOf("hi", 0, 2);
+    assertEq(sel.quote, "hi", "quote");
+    assertEq(sel.prefix, "", "empty prefix");
+    assertEq(sel.suffix, "", "empty suffix");
+  });
+});
+
+suiteIf("pbpHlLocate", "pbpHlLocate", () => {
+  test("unique occurrence -> {start, end}", () => {
+    const r = pbpHlLocate("the quick fox jumps", { quote: "quick", prefix: "the ", suffix: " fox" });
+    assert(r, "match found");
+    assertEq(r.start, 4, "start");
+    assertEq(r.end, 9, "end");
+  });
+  test("multiple occurrences disambiguated by matching prefix/suffix", () => {
+    const block = "AA quick BB quick CC";
+    const item = { quote: "quick", prefix: "AA quick BB ", suffix: " CC" };
+    const r = pbpHlLocate(block, item);
+    assert(r, "match found");
+    assertEq(r.start, 12, "picks the second occurrence (prefix/suffix match it)");
+    assertEq(r.end, 17, "end follows quote length");
+  });
+  test("multiple occurrences, no prefix/suffix signal -> tie -> first occurrence wins", () => {
+    const block = "quick fox quick fox";
+    const item = { quote: "quick", prefix: "", suffix: "" };
+    const r = pbpHlLocate(block, item);
+    assert(r, "match found");
+    assertEq(r.start, 0, "tie resolves to the first occurrence");
+    assertEq(r.end, 5, "end follows quote length");
+  });
+  test("quote absent from block -> null", () => {
+    assertEq(pbpHlLocate("hello world", { quote: "missing", prefix: "", suffix: "" }), null, "no occurrence");
+  });
+  test("degenerate empty quote -> null", () => {
+    assertEq(pbpHlLocate("abc", { quote: "", prefix: "x", suffix: "y" }), null, "empty quote never matches");
   });
 });
 </script>
