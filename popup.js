@@ -556,7 +556,8 @@ async function htmlToMarkdownAsync(html, opts) {
               source: settings.aiContentSource || "local",
               math: !!result.math,
               forum: !!result.forum,
-              tabId: tab.id
+              tabId: tab.id,
+              ts: Date.now() // sweep grace: don't orphan-collect a slot mid-handoff
             }
           });
           await chrome.tabs.create({ url: "md-preview.html?k=" + k });

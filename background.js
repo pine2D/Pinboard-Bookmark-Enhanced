@@ -808,7 +808,13 @@ async function pbpSweepPreviewOrphans() {
       }
     }
     const all = await chrome.storage.local.get(null);
-    const stale = Object.keys(all).filter((x) => x.startsWith("md_preview_data_") && !live.has(x));
+    // Grace window: keep keys written in the last 60s even if their tab isn't in
+    // tabs.query yet — closes the cold-start TOCTOU where popup set()s a token key
+    // (waking the SW → this sweep) before its tabs.create() registers the ?k= tab.
+    const now = Date.now();
+    const stale = Object.keys(all).filter((x) =>
+      x.startsWith("md_preview_data_") && !live.has(x) &&
+      !(all[x] && all[x].ts && (now - all[x].ts) < 60000));
     if (stale.length) await chrome.storage.local.remove(stale);
   } catch (_) { /* best-effort: leaked keys just linger to the next sweep */ }
 }
@@ -942,7 +948,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           [key]: {
             ...out, baseUrl: out.url || url, tabId,
             tags: Array.isArray(tags) ? tags : [],
-            description: typeof description === "string" ? description : ""
+            description: typeof description === "string" ? description : "",
+            ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
           }
         }).then(() => sendResponse({ ok: true }));
       })
@@ -1266,7 +1273,7 @@ async function openMarkdownPreviewFromShortcut() {
       ["md_preview_data_" + k]: {
         pending: true, engine, source: engine,
         tabId: tab.id, url: tab.url, baseUrl: tab.url, title: tab.title || "",
-        tags: [], description: ""
+        tags: [], description: "", ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
       }
     });
     await chrome.tabs.create({ url: "md-preview.html?k=" + k });
