@@ -1233,6 +1233,21 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
     ok(failedIds.slice().sort().join(",") === "1,2", "batch-1 blocks failed");
   });
 
+  await atest("D4-1: every block fails -> onProgress still fires (progress line must not freeze on stale text)", async () => {
+    const progress = [];
+    const r = await pbpTrRunQueue({
+      batches: [segs([1, 2]), segs([3])],
+      requestBatch: async () => { throw new Error("network error"); }, // offline: every batch hard-fails
+      requestSingle: async () => { throw new Error("no downgrade"); },
+      onFill: () => { throw new Error("no fill expected"); },
+      onBlockFail: () => {},
+      onProgress: (d, total) => progress.push(d + "/" + total)
+    });
+    ok(r.done === 0 && r.failed.length === 3 && r.total === 3, "all 3 failed: " + JSON.stringify(r));
+    ok(progress.length === 3, "onProgress called once per failed block, got " + progress.length);
+    ok(progress.every((p) => p === "0/3"), "each repaint reflects 0 done: " + JSON.stringify(progress));
+  });
+
   await atest("abort stops claiming work and resolves stopped:true", async () => {
     const ctrl = new AbortController();
     let calls = 0;

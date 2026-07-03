@@ -313,6 +313,11 @@ async function pbpTrRunQueue(plan) {
   const fail = (id, message) => {
     failed.push({ id, message: String(message || "translation failed") });
     try { plan.onBlockFail(id, String(message || "translation failed")); } catch (_) {}
+    // Mirror fill()'s onProgress call so a run where every block fails (e.g. offline)
+    // still repaints #tr-progress -- otherwise it freezes on the pre-run "Extracting
+    // terminology..." text forever (D4-1: onProgress was fill()-only, so 0 successes
+    // meant 0 repaints of the batch-start placeholder).
+    try { plan.onProgress(done, total); } catch (_) {}
   };
 
   async function runBatch(batch) {
