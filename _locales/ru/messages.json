@@ -2173,6 +2173,14 @@
   "trExtracting": {
     "message": "Извлечение терминологии…"
   },
+  "trSkippedTargetLang": {
+    "message": "$COUNT$ сегмент(ов) уже на целевом языке — пропущено",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "trBlockFailed": {
     "message": "Перевод этого абзаца не удался"
   },

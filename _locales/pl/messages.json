@@ -2173,6 +2173,14 @@
   "trExtracting": {
     "message": "Wyodrębnianie terminologii…"
   },
+  "trSkippedTargetLang": {
+    "message": "$COUNT$ segment(y) jest już w języku docelowym — pominięto",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "trBlockFailed": {
     "message": "Tłumaczenie tego akapitu nie powiodło się"
   },

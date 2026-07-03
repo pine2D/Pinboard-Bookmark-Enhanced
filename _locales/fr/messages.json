@@ -2173,6 +2173,14 @@
   "trExtracting": {
     "message": "Extraction de la terminologie…"
   },
+  "trSkippedTargetLang": {
+    "message": "$COUNT$ segment(s) déjà dans la langue cible, ignoré(s)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "trBlockFailed": {
     "message": "Échec de la traduction de ce paragraphe"
   },

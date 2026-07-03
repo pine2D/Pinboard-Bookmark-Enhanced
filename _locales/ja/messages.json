@@ -2173,6 +2173,14 @@
   "trExtracting": {
     "message": "用語を抽出中…"
   },
+  "trSkippedTargetLang": {
+    "message": "$COUNT$ 個のセグメントはすでに翻訳先の言語のため、スキップしました",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "trBlockFailed": {
     "message": "この段落の翻訳に失敗しました"
   },

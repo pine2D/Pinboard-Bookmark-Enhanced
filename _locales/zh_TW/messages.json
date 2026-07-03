@@ -2173,6 +2173,14 @@
   "trExtracting": {
     "message": "擷取術語中…"
   },
+  "trSkippedTargetLang": {
+    "message": "已有 $COUNT$ 個分段本就是目標語言，已略過",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "trBlockFailed": {
     "message": "此段翻譯失敗"
   },
