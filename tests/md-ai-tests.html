@@ -3548,4 +3548,60 @@ suiteIf("pbpHlInlineMark", "pbpHlInlineMark", () => {
   });
 });
 </script>
+
+<script>
+// ============ pbpIsNeverClearKey: pbp_hl_ prefix (shared.js, always loaded) ============
+suite("pbpIsNeverClearKey pbp_hl_ prefix", () => {
+  test("pbp_hl_<hash> never-clear", () => {
+    assertEq(pbpIsNeverClearKey("pbp_hl_" + "deadbeef"), true, "hashed url key");
+  });
+  test("pbp_hl_last_color never-clear", () => {
+    assertEq(pbpIsNeverClearKey("pbp_hl_last_color"), true, "last-color key");
+  });
+  test("unrelated key still reclaimable-eligible (negative control)", () => {
+    assertEq(pbpIsNeverClearKey("jina_md_somehash"), false, "not a pbp_hl_ key");
+  });
+});
+</script>
+
+<script>
+// ============ md-highlight.js storage helpers (chrome absent -> degrade) ============
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "md-highlight storage helpers (chrome absent -> degrade)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  if (typeof _pbpHlLoad !== "function" || typeof _pbpHlSave !== "function") {
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP md-highlight storage helpers (md-highlight.js DOM layer not loaded)";
+    host.appendChild(div); SKIP++; return;
+  }
+  await atest("_pbpHlLoad: no chrome.storage -> empty array, no throw", async () => {
+    const r = await _pbpHlLoad("https://example.com/x");
+    assert(Array.isArray(r), "returns an array");
+    assertEq(r.length, 0, "empty when chrome is unavailable");
+  });
+  await atest("_pbpHlSave: no chrome.storage -> resolves false, no throw", async () => {
+    const ok = await _pbpHlSave("https://example.com/x", [{ id: "h1" }], null);
+    assertEq(ok, false, "save reports failure gracefully");
+  });
+  await atest("_pbpHlLastColorGet: no chrome.storage -> defaults to 1", async () => {
+    const c = await _pbpHlLastColorGet();
+    assertEq(c, 1, "default color 1 (yellow)");
+  });
+  await atest("_pbpHlLastColorSet: no chrome.storage -> resolves, no throw", async () => {
+    await _pbpHlLastColorSet(3); // no assertion beyond "did not throw" -- nothing to read back without chrome.storage
+  });
+})();
+</script>
 </body></html>

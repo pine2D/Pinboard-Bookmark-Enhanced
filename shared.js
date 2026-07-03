@@ -428,6 +428,7 @@ function pbpIsNeverClearKey(key) {
   if (key === "offlineQueue" || key === "batch_progress") return true;
   if (key.startsWith("_tagGov")) return true;              // _tagGovAiGroups / _tagGovLastRun / _tagGovIgnored
   if (key.startsWith("md_preview_data")) return true;      // md_preview_data + md_preview_data_<uuid> handoffs
+  if (key.startsWith("pbp_hl_")) return true;               // pbp_hl_<urlKey> highlight sets + pbp_hl_last_color (user data, never reclaimable)
   // Local-only settings that are NOT in SETTINGS_DEFAULTS.
   if (key === "optSyncEnabled" || key === "customOverlayCSS_localFallback" || key === "lastUsedTags") return true;
   // Any setting (and, with sync off, any obfuscated API key) lives under a

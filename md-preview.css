@@ -957,6 +957,23 @@ body.md-empty main { margin-left: 0; }
   100% { background-color: transparent; }
 }
 
+/* User highlights (md-highlight.js): CSS Custom Highlight API, zero DOM
+   mutation (D10 convention 3/6). Colors: 1 yellow=quote, 2 green=definition,
+   3 blue=example, 4 red=doubt, 5 purple=todo. Dark variant desaturates
+   each (same technique as ::highlight(pbp-flash) above). */
+::highlight(pbp-hl-1) { background-color: rgba(250, 204, 21, 0.45); }
+::highlight(pbp-hl-2) { background-color: rgba(74, 222, 128, 0.4); }
+::highlight(pbp-hl-3) { background-color: rgba(96, 165, 250, 0.4); }
+::highlight(pbp-hl-4) { background-color: rgba(248, 113, 113, 0.4); }
+::highlight(pbp-hl-5) { background-color: rgba(192, 132, 252, 0.4); }
+@media (prefers-color-scheme: dark) {
+  ::highlight(pbp-hl-1) { background-color: rgba(202, 138, 4, 0.4); }
+  ::highlight(pbp-hl-2) { background-color: rgba(21, 128, 61, 0.4); }
+  ::highlight(pbp-hl-3) { background-color: rgba(29, 78, 216, 0.4); }
+  ::highlight(pbp-hl-4) { background-color: rgba(185, 28, 28, 0.4); }
+  ::highlight(pbp-hl-5) { background-color: rgba(126, 34, 206, 0.4); }
+}
+
 /* ============================================================
    Full-text translation (md-translate.js)
    ============================================================ */

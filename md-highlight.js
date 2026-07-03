@@ -192,20 +192,189 @@ function pbpHlInlineMark(md, items) {
 
 // ============================================================
 // DOM / UI layer. Lazily mounted: pbpHlInit runs on "pbp:rendered"
-// (same pattern as pbpTrInit / pbpAskInit). This is a placeholder
-// body only -- Task 3 REPLACES it (via Edit, not append) with the
-// real storage-restore + floating-bar + edit-card wiring (spec
-// sections 1, 3, 4, 6), including the D10-mandated "don't index
-// unconditionally" mount gate.
+// (same pattern as pbpTrInit / pbpAskInit).
 // ============================================================
 
-// ponytail: empty body on purpose. Keeps the file loadable
-// end-to-end (script tag wired below) before the DOM layer task
-// lands; Task 3 upgrades this to the real mount logic, not here.
-async function pbpHlInit(detail) {
-  // no-op until the DOM layer task lands
+// ---- Storage (storage.local only; highlights are permanent user data,
+// never routed through ai-cache.js's LRU/TTL cache) ----
+function _pbpHlKey(url) {
+  return "pbp_hl_" + pbpAiHash(String(url || ""));
 }
 
+// Degrades to [] on any storage failure or when chrome.storage is absent
+// (file:// tests) -- spec 6: a storage read failure silently disables
+// highlighting for this page instead of crashing.
+async function _pbpHlLoad(url) {
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return [];
+  try {
+    const key = _pbpHlKey(url);
+    const d = await chrome.storage.local.get(key);
+    const rec = d && d[key];
+    if (!rec || typeof rec !== "object" || !Array.isArray(rec.items)) return [];
+    return rec.items;
+  } catch (_) { return []; }
+}
+
+// Single-key read-modify-write: caller passes the FULL current items array.
+// Deletes the key outright when items is empty (spec 2: deleting down to
+// zero items removes the whole key, no empty-shell leftover). On write
+// failure, toasts via btn if given, else the #copy-status live region;
+// never throws.
+async function _pbpHlSave(url, items, btn) {
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return false;
+  const key = _pbpHlKey(url);
+  try {
+    if (!items.length) { await chrome.storage.local.remove(key); return true; }
+    await chrome.storage.local.set({ [key]: { v: 1, items } });
+    return true;
+  } catch (_) {
+    _pbpHlToast(t("hlSaveFailed"), btn);
+    return false;
+  }
+}
+
+async function _pbpHlLastColorGet() {
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return 1;
+  try {
+    const d = await chrome.storage.local.get({ pbp_hl_last_color: 1 });
+    const c = Number(d.pbp_hl_last_color);
+    return (c >= 1 && c <= 5) ? c : 1;
+  } catch (_) { return 1; }
+}
+
+async function _pbpHlLastColorSet(color) {
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
+  try { await chrome.storage.local.set({ pbp_hl_last_color: Number(color) || 1 }); } catch (_) {}
+}
+
+// Write-failure toast (spec 6: a save failure must toast, not fail silently
+// -- reuse the existing feedback mechanism). When a button is available
+// (bar color dot / note button), reuse
+// flashButtonLabel (md-preview.js:989) exactly like send/X2 do. The
+// keyboard-triggered creation path (H/1-5, no button in view) has no btn to
+// flash, so it falls back to the SAME #copy-status aria-live node
+// copyToClipboard's announce() already uses (md-preview.js:967) -- not a
+// new mechanism, the page's one buttonless toast channel.
+function _pbpHlToast(msg, btn) {
+  if (btn && typeof flashButtonLabel === "function") { flashButtonLabel(btn, msg); return; }
+  const el = document.getElementById("copy-status");
+  if (!el) return;
+  el.textContent = msg;
+  setTimeout(() => { if (el.textContent === msg) el.textContent = ""; }, 1500);
+}
+
+// ---- Init + restore ----
+const PBP_HL_COLORS = [1, 2, 3, 4, 5];
+let _pbpHlState = null; // { url, items, ranges: {id -> {color, range}}, degraded: {id -> true} }
+
+async function pbpHlInit(detail) {
+  const view = document.getElementById("rendered-view");
+  if (!view || _pbpHlState) return;
+  // D10 guard 2 (never unconditionally re-index): only take the first-index
+  // path when there is BOTH no index yet AND no .pb-tr sentinel (meaning
+  // translation never ran and never indexed either); otherwise, if the
+  // index is still empty after that, bail without mounting rather than
+  // touching pbpAiIndexBlocks a second time.
+  if (!pbpAiBlocks().length) {
+    if (!view.querySelector(".pb-tr")) pbpAiIndexBlocks(view);
+    if (!pbpAiBlocks().length) return;
+  }
+  const url = String((detail && detail.url) || "");
+  const items = await _pbpHlLoad(url);
+  _pbpHlState = { url, items, ranges: Object.create(null), degraded: Object.create(null) };
+  pbpHlRestore();
+  _pbpHlBindInteractions(view); // Task 4
+}
+
+// Build (or rebuild) one item's Range: locate the quote in blockText, map
+// the found offsets to a live Range via ask's _pbpAskRangeFromOffsets
+// (md-ask.js:697); zero/no match degrades to the whole block (spec 3).
+// blockText is passed in by the caller so normal restore (frozen
+// pbpAiTextOf cache) and re-anchor (live blockEl.textContent) share this
+// one code path with the correct text source for each (spec 3: anchor
+// text and mapping text must always come from the same source).
+function _pbpHlBuildRange(item, blockEl, blockText) {
+  const loc = pbpHlLocate(blockText, item);
+  let range = loc ? _pbpAskRangeFromOffsets(blockEl, loc.start, loc.end) : null;
+  if (!range) {
+    range = document.createRange();
+    range.selectNodeContents(blockEl);
+    _pbpHlState.degraded[item.id] = true;
+  } else {
+    delete _pbpHlState.degraded[item.id];
+  }
+  return range;
+}
+
+// Idempotent full rebuild (spec 3): clears every pbp-hl-* Highlight and
+// rebuilds all 5 from _pbpHlState.items. Safe to call more than once (a
+// second call just re-clears + re-derives from the same items array).
+function pbpHlRestore() {
+  if (typeof Highlight !== "function" || typeof CSS === "undefined" || !("highlights" in CSS)) return;
+  for (const c of PBP_HL_COLORS) CSS.highlights.delete("pbp-hl-" + c);
+  if (!_pbpHlState) return;
+  _pbpHlState.ranges = Object.create(null);
+  _pbpHlState.degraded = Object.create(null);
+  const byColor = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+  for (const item of _pbpHlState.items) {
+    const blockEl = pbpAiBlockEl(item.n);
+    if (!blockEl) continue; // block gone (content drift) -- item silently absent from this render, storage untouched
+    const range = _pbpHlBuildRange(item, blockEl, pbpAiTextOf(item.n));
+    const col = (item.color >= 1 && item.color <= 5) ? item.color : 1;
+    byColor[col].push(range);
+    _pbpHlState.ranges[item.id] = { color: col, range };
+    _pbpHlArmBlockObserver(blockEl, item.n);
+  }
+  for (const c of PBP_HL_COLORS) {
+    if (byColor[c].length) CSS.highlights.set("pbp-hl-" + c, new Highlight(...byColor[c]));
+  }
+}
+
+// hljs/KaTeX rewrite pre/math blocks' text nodes on their own rAF-deferred
+// pass; a Range built against pre-rewrite text detaches silently (spec 3).
+// One-shot per block: arm a MutationObserver, disconnect on its first
+// firing, double-rAF then re-anchor ONLY that block's items (spec 3: rebuild
+// just that block's Ranges locally, never a full-page rerun). dataset flag
+// guards against re-arming an already-watched block on a later
+// pbpHlRestore() call.
+function _pbpHlNeedsWatch(blockEl) {
+  return !!blockEl.querySelector("pre code, .katex, math");
+}
+
+function _pbpHlArmBlockObserver(blockEl, n) {
+  if (!_pbpHlNeedsWatch(blockEl) || blockEl.dataset.pbHlWatched) return;
+  blockEl.dataset.pbHlWatched = "1";
+  const obs = new MutationObserver(() => {
+    obs.disconnect();
+    requestAnimationFrame(() => requestAnimationFrame(() => _pbpHlReanchorBlock(n)));
+  });
+  obs.observe(blockEl, { childList: true, subtree: true });
+}
+
+function _pbpHlReanchorBlock(n) {
+  if (!_pbpHlState || typeof Highlight !== "function" || typeof CSS === "undefined" || !("highlights" in CSS)) return;
+  const blockEl = pbpAiBlockEl(n);
+  if (!blockEl) return;
+  const liveText = blockEl.textContent || ""; // NOT pbpAiTextOf(n): that cache may be frozen pre-hljs/KaTeX (spec 3)
+  for (const item of _pbpHlState.items) {
+    if (item.n !== n) continue;
+    const prev = _pbpHlState.ranges[item.id];
+    if (prev) {
+      const h = CSS.highlights.get("pbp-hl-" + prev.color);
+      if (h) h.delete(prev.range);
+    }
+    const range = _pbpHlBuildRange(item, blockEl, liveText);
+    const col = (item.color >= 1 && item.color <= 5) ? item.color : 1;
+    let h = CSS.highlights.get("pbp-hl-" + col);
+    if (!h) { h = new Highlight(); CSS.highlights.set("pbp-hl-" + col, h); }
+    h.add(range);
+    _pbpHlState.ranges[item.id] = { color: col, range };
+  }
+}
+
+// Init hookup: top-level listener registration only (no other side effects;
+// the tests page loads this file on file:// and never fires the event) --
+// same idiom as md-ask.js:279-283 / md-translate.js:1650-1654.
 if (typeof document !== "undefined") {
   document.addEventListener("pbp:rendered", (e) => {
     pbpHlInit((e && e.detail) || {}).catch(() => {});
