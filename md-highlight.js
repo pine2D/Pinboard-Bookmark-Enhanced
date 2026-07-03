@@ -808,8 +808,8 @@ function _pbpHlOpenCard(id) {
   noteEl.value = item.note || ""; // textContent-equivalent for a form control's value
 
   if (!card.matches(":popover-open")) card.showPopover();
-  // Position AFTER showPopover so offsetHeight is real (mirrors _pbpTrPeekShow's
-  // measure-then-place two-step at md-translate.js:654-663).
+  // Position AFTER showPopover so offsetHeight is real (measure-then-place
+  // two-step, same as the ask subsystem's #explain-pop pattern).
   card.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - card.offsetWidth - 8)) + "px";
   const pos = pbpTrPeekPopPos(rect, card.offsetHeight, window.innerHeight);
   card.style.top = pos.top + "px";
