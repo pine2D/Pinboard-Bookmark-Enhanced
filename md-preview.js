@@ -775,6 +775,19 @@ function ensureKatex() {
     }
     caret.addEventListener("click", (e) => { e.stopPropagation(); menu.hasAttribute("hidden") ? openMenu() : closeMenu(); }, { signal: _sig });
     document.addEventListener("click", (e) => { if (!split.contains(e.target)) closeMenu(); }, { signal: _sig });
+    // Keyboard-only close: Tab-ing off the last/first menu item has no click event, so
+    // without this the menu stays visually open until the next click-outside or Escape
+    // (audit D5-3). relatedTarget is reliable for focus()/Tab moves within the same
+    // document; it can be null when focus leaves the document entirely, so fall back to
+    // an immediate re-check of document.activeElement once the change has settled.
+    menu.addEventListener("focusout", (e) => {
+      const next = e.relatedTarget;
+      if (next !== null && next !== undefined) {
+        if (!split.contains(next)) closeMenu();
+        return;
+      }
+      setTimeout(() => { if (!split.contains(document.activeElement)) closeMenu(); }, 0);
+    }, { signal: _sig });
     menu.addEventListener("keydown", (e) => {
       const items = [...menu.querySelectorAll(".send-mi")];
       const i = items.indexOf(document.activeElement);

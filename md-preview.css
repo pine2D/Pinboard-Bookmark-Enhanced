@@ -909,6 +909,9 @@ body.tr-only #rendered-view .pb-tr { display: block; }
    (click the translated block to peek at its original, click again to hide). */
 body.tr-only #rendered-view [data-pb-tr-done]:not(.pb-show-orig) { display: none; }
 body.tr-only #rendered-view .pb-tr { cursor: pointer; }
+/* role="button" is only set in tr-only mode (see _pbpTrApplyPeekAttrs), so this
+   never becomes a misleading focus target in original/bilingual view. */
+#rendered-view .pb-tr[role="button"]:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
 /* Per-block failure pill: inline SVG + retry label; title carries the error. */
 .pb-tr-err {
@@ -927,6 +930,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 .pb-tr-err svg { width: 13px; height: 13px; flex-shrink: 0; }
 .pb-tr-err:hover { background: var(--btn-hover); }
 .pb-tr-err:disabled { opacity: 0.5; cursor: wait; }
+.pb-tr-err:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
 /* One-click "retry all failed" — shown in the rail translate section when >=1 block failed. */
 #tr-retry-all {
@@ -948,6 +952,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #tr-retry-all svg { width: 13px; height: 13px; flex-shrink: 0; }
 #tr-retry-all:hover { background: var(--btn-hover); }
 #tr-retry-all:disabled { opacity: 0.5; cursor: wait; }
+#tr-retry-all:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
 /* Rail translate section */
 #tr-section .tr-row { display: flex; gap: 6px; }
@@ -965,6 +970,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   font: inherit; font-size: 12px; color: var(--link); text-decoration: underline;
 }
 #tr-section .tr-link:hover { color: var(--link-hover); }
+#tr-section .tr-link:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 #tr-section .view-toggle { margin-top: 8px; }
 
 /* ---- Ask panel (md-ask.js): fixed right column on wide viewports ---- */
