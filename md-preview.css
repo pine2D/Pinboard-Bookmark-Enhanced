@@ -562,6 +562,32 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .rail-ident a { display: block; margin-top: 3px; font-size: 12px; color: var(--fg-muted); text-decoration: none; word-break: break-all; }
 .rail-ident a:hover { color: var(--link); }
+/* X2: bookmarked badge — higher specificity than ".rail-ident a" above so it
+   doesn't inherit that rule's display:block/word-break:break-all (both wrong
+   for a pill-shaped badge). Reuses existing header tokens only. */
+.rail-ident a.bookmark-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 500;
+  word-break: normal;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+}
+.rail-ident a.bookmark-badge:hover { color: var(--link); border-color: var(--link); }
+.bookmark-badge .bb-icon { display: inline-flex; flex: none; }
+.bookmark-badge .bb-icon svg { width: 12px; height: 12px; display: block; }
+.bookmark-badge .bb-tags { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+.bookmark-badge .bb-lock { display: inline-flex; flex: none; margin-left: 1px; }
+.bookmark-badge .bb-lock svg { width: 11px; height: 11px; display: block; }
 .rail-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 12px; }
 .rail .view-toggle { width: 100%; }
 .rail .view-toggle .toggle-btn { flex: 1; justify-content: center; }
