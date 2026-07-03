@@ -956,6 +956,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;
   }
+
+  if (message.type === "mdPreviewBookmarkInfo" && message.url) {
+    // Same checkBookmarked()/statusCache the toolbar icon uses (X2: badge = one
+    // cache, one source of truth). checkBookmarked()'s TTL-hit branch can return
+    // bookmarked:true from a cache entry that was populated WITHOUT .posts (see
+    // bookmark_saved / quick-save / batch-save / skip-mode / offline-queue call
+    // sites) — so the boolean alone isn't enough to read tags/shared/toread from.
+    // Mirror get_bookmark_data's guard (background.js:845-846: require
+    // cached.posts, not just cached.bookmarked) and force one fresh posts/get
+    // lookup when .posts is missing, same shape as fetchExistingBookmark
+    // (background.js:242). Any failure collapses to bookmarked:false.
+    const url = message.url;
+    checkBookmarked(url)
+      .then(async (bookmarked) => {
+        if (!bookmarked) { sendResponse({ bookmarked: false }); return; }
+        let post = statusCache.get(url)?.posts?.[0];
+        if (!post) {
+          const token = await getCachedToken();
+          if (!token) { sendResponse({ bookmarked: false }); return; }
+          const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
+          const posts = resp.ok ? (await resp.json()).posts || [] : [];
+          statusCache.set(url, { bookmarked: posts.length > 0, timestamp: Date.now(), posts });
+          post = posts[0];
+        }
+        if (!post) { sendResponse({ bookmarked: false }); return; }
+        sendResponse({ bookmarked: true, tags: post.tags || "", shared: post.shared, toread: post.toread });
+      })
+      .catch(() => sendResponse({ bookmarked: false }));
+    return true;
+  }
 });
 
 // ===================== Batch Bookmark 保存（后台） =====================
