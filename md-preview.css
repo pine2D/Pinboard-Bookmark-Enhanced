@@ -1309,4 +1309,73 @@ body.ask-open main { margin-right: 396px; }
 #explain-pill svg { width: 15px; height: 15px; }
 #explain-pill[hidden] { display: none; }
 
+/* ---- Highlight edit card (md-highlight.js) ---- */
+#pb-hl-card {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(320px, calc(100vw - 32px));
+  max-height: min(360px, calc(100vh - 32px));
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.22);
+  font-size: 13px;
+}
+#pb-hl-card:popover-open { display: flex; }
+#pb-hl-card button, #pb-hl-card textarea { font-family: inherit; }
+.hl-card-quote {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--fg-muted);
+  color: var(--fg-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+  max-height: 4.5em;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+.hl-card-degraded { color: var(--danger); font-size: 12px; }
+.hl-card-colors { display: flex; gap: 8px; }
+.hl-card-dot {
+  width: 22px; height: 22px; padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.hl-card-dot-1 { background: #f5c518; }
+.hl-card-dot-2 { background: #4caf50; }
+.hl-card-dot-3 { background: #3b82f6; }
+.hl-card-dot-4 { background: #ef4444; }
+.hl-card-dot-5 { background: #a855f7; }
+.hl-card-dot.active, .hl-card-dot:focus-visible { border-color: var(--fg); }
+.hl-card-note {
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+  resize: vertical;
+  box-sizing: border-box;
+}
+.hl-card-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.hl-card-save, .hl-card-delete {
+  padding: 4px 10px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+.hl-card-save:hover, .hl-card-delete:hover { background: var(--btn-hover); }
+.hl-card-delete { color: var(--danger); }
+
 

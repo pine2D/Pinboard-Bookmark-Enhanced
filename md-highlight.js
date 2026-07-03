@@ -648,3 +648,214 @@ function _pbpHlBindInteractions(view) {
     if ((!sel || sel.isCollapsed) && _pbpHlBarEl && _pbpHlBarEl.matches(":popover-open")) _pbpHlHideBar();
   });
 }
+
+// ---- Cross-file accessor (md-preview.js reads this into buildExportOpts() -- Task 6). ----
+// Returns a COPY so a caller can't mutate the live store by reference.
+function pbpHlCurrentItems() {
+  return _pbpHlState ? _pbpHlState.items.slice() : [];
+}
+
+// ---- Click hit-detection -> edit card (spec sec.4 "点已有高亮 → 卡片") ----
+document.addEventListener("pbp:rendered", () => {
+  const view = document.getElementById("rendered-view");
+  if (!view) return;
+  view.addEventListener("click", _pbpHlOnClick);
+});
+
+function _pbpHlOnClick(e) {
+  // A just-finished drag selection reaching here means mouseup already handed off to
+  // the floating bar (Task 4) -- don't also open the edit card underneath it.
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed) return;
+  if (typeof document.caretRangeFromPoint !== "function") return;
+  if (!_pbpHlState) return;
+  const caret = document.caretRangeFromPoint(e.clientX, e.clientY);
+  if (!caret) return;
+  const node = caret.startContainer;
+  const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+  const blockEl = el && el.closest("[data-pb]");
+  if (!blockEl) return;
+
+  // Map the caret hit back to an item via the _pbpHlState.ranges[id] registry
+  // (Range identity/boundary lookup) -- never via expandos stamped on Range
+  // objects (Task 3 keeps no such expandos).
+  let best = null; // {id, ts}
+  for (const id in _pbpHlState.ranges) {
+    const entry = _pbpHlState.ranges[id];
+    const r = entry && entry.range;
+    if (!r || !blockEl.contains(r.commonAncestorContainer)) continue;
+    let hit;
+    try { hit = r.isPointInRange(caret.startContainer, caret.startOffset); } catch (_) { hit = false; }
+    if (!hit) continue;
+    const item = _pbpHlState.items.find((it) => it.id === id);
+    const ts = item ? Number(item.ts) || 0 : 0;
+    if (!best || ts > best.ts) best = { id, ts };
+  }
+  if (!best) return;
+  _pbpHlOpenCard(best.id);
+}
+
+// ---- Edit card (spec sec.4). Native popover="auto": Esc + light-dismiss for free,
+// same mechanism as md-ask.js's #explain-pop (md-ask.js:1341-1424). ----
+const PBP_HL_COLOR_KEYS = ["hlColorQuote", "hlColorDefinition", "hlColorExample", "hlColorDoubt", "hlColorTodo"]; // index 0..4 = color 1..5, fixed order (spec sec.5 slugs)
+let _pbpHlCard = null;
+let _pbpHlCardItemId = null;
+
+function _pbpHlEnsureCard() {
+  if (_pbpHlCard) return _pbpHlCard;
+  const card = document.createElement("div");
+  card.id = "pb-hl-card";
+  card.setAttribute("popover", "auto");
+
+  const quote = document.createElement("blockquote");
+  quote.className = "hl-card-quote";
+  card.appendChild(quote);
+
+  const degraded = document.createElement("div");
+  degraded.className = "hl-card-degraded";
+  degraded.hidden = true;
+  card.appendChild(degraded);
+
+  const dots = document.createElement("div");
+  dots.className = "hl-card-colors";
+  dots.setAttribute("role", "group");
+  for (let color = 1; color <= 5; color++) {
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "hl-card-dot hl-card-dot-" + color;
+    dot.dataset.color = String(color);
+    dot.addEventListener("click", () => _pbpHlSwitchColor(color));
+    dots.appendChild(dot);
+  }
+  card.appendChild(dots);
+
+  const note = document.createElement("textarea");
+  note.className = "hl-card-note";
+  note.rows = 3;
+  note.addEventListener("blur", _pbpHlCommitNote);
+  card.appendChild(note);
+
+  const foot = document.createElement("div");
+  foot.className = "hl-card-foot";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "hl-card-save";
+  save.addEventListener("click", _pbpHlCommitNote);
+  foot.appendChild(save);
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "hl-card-delete";
+  del.addEventListener("click", _pbpHlDeleteCurrent);
+  foot.appendChild(del);
+  card.appendChild(foot);
+
+  card.addEventListener("toggle", (e) => {
+    if (e.newState === "closed") _pbpHlCardItemId = null;
+  });
+  document.body.appendChild(card);
+  _pbpHlCard = card;
+  return card;
+}
+
+// Re-applies i18n text to the card's static labels. Called on every open (cheap; the
+// card is a singleton so this can't be a first-paint cost).
+function _pbpHlApplyCardI18n(card) {
+  card.querySelectorAll(".hl-card-dot").forEach((dot) => {
+    const label = t(PBP_HL_COLOR_KEYS[Number(dot.dataset.color) - 1]);
+    dot.title = label;
+    dot.setAttribute("aria-label", label);
+  });
+  card.querySelector(".hl-card-note").placeholder = t("hlNotePlaceholder");
+  card.querySelector(".hl-card-save").textContent = t("hlSave");
+  card.querySelector(".hl-card-delete").textContent = t("hlDelete");
+}
+
+// Single entry point for both the click-hit-detection path (Step 2) and Task 4's
+// note-button ("用上次色创建 + 直接打开卡片聚焦 textarea" -- spec sec.4). Re-derives
+// position/rect from the item's id every time, so it never depends on the caller
+// already having a live Range in hand.
+function _pbpHlOpenCard(id) {
+  if (!_pbpHlState) return;
+  const item = _pbpHlState.items.find((it) => it.id === id);
+  if (!item) return;
+  const blockEl = pbpAiBlockEl(item.n);
+  if (!blockEl) return;
+
+  const degraded = !!_pbpHlState.degraded[item.id];
+  let rect = blockEl.getBoundingClientRect();
+  if (!degraded) {
+    const entry = _pbpHlState.ranges[id];
+    if (entry && entry.range) rect = entry.range.getBoundingClientRect();
+  }
+
+  const card = _pbpHlEnsureCard();
+  _pbpHlApplyCardI18n(card);
+  _pbpHlCardItemId = id;
+  card.querySelector(".hl-card-quote").textContent = item.quote || ""; // textContent only (spec sec.6)
+  card.querySelectorAll(".hl-card-dot").forEach((dot) => {
+    const active = Number(dot.dataset.color) === Number(item.color);
+    dot.classList.toggle("active", active);
+    dot.setAttribute("aria-pressed", String(active));
+  });
+  const degradedEl = card.querySelector(".hl-card-degraded");
+  degradedEl.hidden = !degraded;
+  degradedEl.textContent = degraded ? t("hlDegraded") : "";
+  const noteEl = card.querySelector(".hl-card-note");
+  noteEl.value = item.note || ""; // textContent-equivalent for a form control's value
+
+  if (!card.matches(":popover-open")) card.showPopover();
+  // Position AFTER showPopover so offsetHeight is real (mirrors _pbpTrPeekShow's
+  // measure-then-place two-step at md-translate.js:654-663).
+  card.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - card.offsetWidth - 8)) + "px";
+  const pos = pbpTrPeekPopPos(rect, card.offsetHeight, window.innerHeight);
+  card.style.top = pos.top + "px";
+  noteEl.focus();
+  noteEl.setSelectionRange(noteEl.value.length, noteEl.value.length); // caret at end, no accidental select-all
+}
+
+window._pbpHlOpenCard = _pbpHlOpenCard; // explicit window attach: makes the "Task 4 calls it directly" contract self-documenting.
+
+// Color switch: mutate + persist + full rebuild (pbpHlRestore is idempotent -- spec
+// sec.3 -- so re-running it is the simplest correct way to move this item's Range from
+// its old pbp-hl-N Highlight to the new one; no manual .delete()/.add() bookkeeping).
+function _pbpHlSwitchColor(color) {
+  if (!_pbpHlState) return;
+  const item = _pbpHlState.items.find((it) => it.id === _pbpHlCardItemId);
+  if (!item) return;
+  if (item.color === color) return;
+  item.color = color;
+  _pbpHlSave(_pbpHlState.url, _pbpHlState.items, _pbpHlCard.querySelector(".hl-card-dot-" + color)).then(() => {
+    if (typeof pbpHlRestore === "function") pbpHlRestore();
+    _pbpHlOpenCard(item.id); // re-render the card's active dot + re-measure position
+  });
+}
+
+let _pbpHlNoteDirty = false;
+document.addEventListener("input", (e) => {
+  if (e.target && e.target.classList && e.target.classList.contains("hl-card-note")) _pbpHlNoteDirty = true;
+});
+
+// Blur AND explicit Save button both route here (spec: "note textarea(失焦或保存钮落存储)").
+function _pbpHlCommitNote() {
+  if (!_pbpHlNoteDirty || !_pbpHlCardItemId || !_pbpHlState) return;
+  const item = _pbpHlState.items.find((it) => it.id === _pbpHlCardItemId);
+  if (!item || !_pbpHlCard) return;
+  item.note = _pbpHlCard.querySelector(".hl-card-note").value;
+  _pbpHlNoteDirty = false;
+  _pbpHlSave(_pbpHlState.url, _pbpHlState.items, _pbpHlCard.querySelector(".hl-card-save")); // no pbpHlRestore -- notes never touch the Range/Highlight
+}
+
+function _pbpHlDeleteCurrent() {
+  if (!_pbpHlState) return;
+  const id = _pbpHlCardItemId;
+  if (!id) return;
+  const idx = _pbpHlState.items.findIndex((it) => it.id === id);
+  if (idx === -1) return;
+  _pbpHlState.items.splice(idx, 1);
+  const btn = _pbpHlCard.querySelector(".hl-card-delete");
+  _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn).then(() => {
+    if (typeof pbpHlRestore === "function") pbpHlRestore();
+    if (typeof _pbpHlUpdateRailCount === "function") _pbpHlUpdateRailCount(); // Task 6
+    if (_pbpHlCard) _pbpHlCard.hidePopover();
+  });
+}
