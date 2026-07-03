@@ -2416,5 +2416,11 @@
   "hlColorDoubt": { "message": "疑問" },
   "hlColorTodo": { "message": "やること" },
   "hlNoteBtn": { "message": "メモ付きでハイライト" },
-  "hlSaveFailed": { "message": "ハイライトを保存できませんでした（ストレージが一杯です）" }
+  "hlSaveFailed": { "message": "ハイライトを保存できませんでした（ストレージが一杯です）" },
+  "hlNotePlaceholder": { "message": "メモを追加…" },
+  "hlSave": { "message": "保存" },
+  "hlDelete": { "message": "ハイライトを削除" },
+  "hlDegraded": { "message": "位置がずれました — 周囲のテキストが変更されたため、このハイライトは段落全体に適用されています。" },
+  "hlRailLine": { "message": "ハイライト $COUNT$ 件 · Markdownとしてコピー", "placeholders": { "count": { "content": "$1" } } },
+  "hlCopied": { "message": "ハイライトをコピーしました" }
 }

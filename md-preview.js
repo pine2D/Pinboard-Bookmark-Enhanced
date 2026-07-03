@@ -427,7 +427,12 @@ function renderBookmarkBadge(resp, url) {
       includeToc: expIncludeToc ? expIncludeToc.checked : !!exportSettings.mdExportIncludeToc,
       // Same gate as the live-preview KaTeX pass below (info.math) — composeStyledHtml
       // only attempts renderMathInElement when this is true (audit E3 gap).
-      math: !!info.math
+      math: !!info.math,
+      // H2 export (md-highlight.js, loaded after this file — guarded because
+      // buildExportOpts() only runs from click handlers, long after every deferred
+      // script has executed; the typeof check just protects against md-highlight.js
+      // failing to load at all).
+      highlights: (typeof pbpHlCurrentItems === "function") ? pbpHlCurrentItems() : []
     };
   }
   // Raw view markdown, following the translation view: md-translate.js sets
@@ -826,7 +831,7 @@ function renderBookmarkBadge(resp, url) {
         setPrimary(id);
         await pbpSetLastTarget(id);
         const _exp = buildExportOpts();
-        const _sendBody = composeExport(getViewMarkdown(), buildMeta(), { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc });
+        const _sendBody = composeExport(getViewMarkdown(), buildMeta(), { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights });
         primary.classList.add("sending");
         primaryLabel.textContent = t("mdSending");
         let res;

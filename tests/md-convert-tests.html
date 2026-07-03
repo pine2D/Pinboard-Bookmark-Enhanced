@@ -20,6 +20,7 @@ h2 { margin-top: 24px; }
 <script src="../vendor/katex/auto-render.min.js"></script>
 <script src="../md-convert.js?v=obs2"></script>
 <script src="../site-rules.js?v=1"></script>
+<script src="../md-highlight.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -379,6 +380,35 @@ function assertEq(actual, expected, label) {
   // imagePolicy resolves baseUrl from meta.url automatically
   const altd = composeExport("![cap](rel.png)", cmeta, { frontmatter: false, imagePolicy: "alt", includeToc: false });
   assertEq(altd.trim(), "cap", "alt policy uses meta.url baseUrl, yields alt text");
+
+  // ---- H2 highlights branch (spec sec.5) ----
+  const hlItems = [
+    { id: "a", n: 1, quote: "Section One", prefix: "", suffix: "", color: 1, note: "important", ts: 1 },
+    { id: "b", n: 2, quote: "body text", prefix: "", suffix: "", color: 4, note: "", ts: 2 }
+  ];
+
+  // Regression guard: absent highlights -> byte-identical to the pre-H2 baseline captured above.
+  const noHl = composeExport(cmd, cmeta, { frontmatter: false, imagePolicy: "keep", includeToc: false });
+  assertEq(noHl, bare, "composeExport with no opts.highlights is byte-identical to the pre-H2 bare case");
+  const emptyHl = composeExport(cmd, cmeta, { frontmatter: false, imagePolicy: "keep", includeToc: false, highlights: [] });
+  assertEq(emptyHl, bare, "composeExport with opts.highlights:[] is byte-identical to the pre-H2 bare case");
+
+  // Non-empty: section appended, inline mark applied by default (highlightsInline unset -> true).
+  const withHl = composeExport(cmd, cmeta, { frontmatter: false, imagePolicy: "keep", includeToc: false, highlights: hlItems });
+  assert(withHl.includes("## Highlights"), "highlights section appended");
+  assert(withHl.includes("#hl-quote") && withHl.includes("#hl-doubt"), "fixed color slugs present");
+  assert(withHl.includes("==Section One=="), "unique quote gets opportunistic inline mark by default");
+
+  // highlightsInline:false -- section only, no "==...==".
+  const htmlPath = composeExport(cmd, cmeta, { frontmatter: false, imagePolicy: "keep", includeToc: false, highlights: hlItems, highlightsInline: false });
+  assert(htmlPath.includes("## Highlights"), "section still appended when highlightsInline:false");
+  assert(!htmlPath.includes("=="), "no inline mark when highlightsInline:false");
+
+  // composeStyledHtml threads highlights into its own bodyMd and forces highlightsInline:false --
+  // the exported HTML must render the aggregation heading and must NOT leave literal "==" in the doc.
+  const styled = composeStyledHtml(cmd, cmeta, { frontmatter: false, imagePolicy: "keep", includeToc: false, hljsCss: "", highlights: hlItems });
+  assert(/<h2[^>]*>Highlights<\/h2>/.test(styled), "composeStyledHtml renders the Highlights heading");
+  assert(!styled.includes("=="), "composeStyledHtml never leaks a literal == inline mark");
 </script>
 
 <script>

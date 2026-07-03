@@ -1379,3 +1379,5 @@ body.ask-open main { margin-right: 396px; }
 .hl-card-delete { color: var(--danger); }
 
 
+/* ---- Highlight rail entry (md-highlight.js) ---- */
+.hl-rail-btn { width: 100%; justify-content: center; }

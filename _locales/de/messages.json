@@ -2416,5 +2416,11 @@
   "hlColorDoubt": { "message": "Zweifel" },
   "hlColorTodo": { "message": "Aufgabe" },
   "hlNoteBtn": { "message": "Mit Notiz markieren" },
-  "hlSaveFailed": { "message": "Markierung konnte nicht gespeichert werden (Speicher voll)" }
+  "hlSaveFailed": { "message": "Markierung konnte nicht gespeichert werden (Speicher voll)" },
+  "hlNotePlaceholder": { "message": "Notiz hinzufügen…" },
+  "hlSave": { "message": "Speichern" },
+  "hlDelete": { "message": "Markierung löschen" },
+  "hlDegraded": { "message": "Position verloren — der umliegende Text hat sich geändert, diese Markierung deckt jetzt den ganzen Absatz ab." },
+  "hlRailLine": { "message": "$COUNT$ Markierung(en) · Als Markdown kopieren", "placeholders": { "count": { "content": "$1" } } },
+  "hlCopied": { "message": "Markierungen kopiert" }
 }

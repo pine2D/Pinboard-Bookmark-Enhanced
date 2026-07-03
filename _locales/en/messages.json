@@ -2410,5 +2410,11 @@
   "hlColorDoubt": { "message": "Doubt" },
   "hlColorTodo": { "message": "To-do" },
   "hlNoteBtn": { "message": "Highlight with a note" },
-  "hlSaveFailed": { "message": "Highlight couldn't be saved (storage full)" }
+  "hlSaveFailed": { "message": "Highlight couldn't be saved (storage full)" },
+  "hlNotePlaceholder": { "message": "Add a note…" },
+  "hlSave": { "message": "Save" },
+  "hlDelete": { "message": "Delete highlight" },
+  "hlDegraded": { "message": "Position lost — the surrounding text changed, so this highlight now covers the whole paragraph." },
+  "hlRailLine": { "message": "$COUNT$ highlight(s) · Copy as Markdown", "placeholders": { "count": { "content": "$1" } } },
+  "hlCopied": { "message": "Highlights copied" }
 }

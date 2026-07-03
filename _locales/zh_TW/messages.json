@@ -2416,5 +2416,11 @@
   "hlColorDoubt": { "message": "存疑" },
   "hlColorTodo": { "message": "待辦" },
   "hlNoteBtn": { "message": "連筆記一併標記" },
-  "hlSaveFailed": { "message": "標記未能儲存（儲存空間已滿）" }
+  "hlSaveFailed": { "message": "標記未能儲存（儲存空間已滿）" },
+  "hlNotePlaceholder": { "message": "新增筆記…" },
+  "hlSave": { "message": "儲存" },
+  "hlDelete": { "message": "刪除標記" },
+  "hlDegraded": { "message": "位置已失準——周圍文字有變動，此標記已回退為整段標示。" },
+  "hlRailLine": { "message": "$COUNT$ 個標記 · 複製為 Markdown", "placeholders": { "count": { "content": "$1" } } },
+  "hlCopied": { "message": "標記已複製" }
 }

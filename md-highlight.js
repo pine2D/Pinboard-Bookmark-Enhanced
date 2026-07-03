@@ -867,3 +867,51 @@ function _pbpHlDeleteCurrent() {
     if (_pbpHlCard && _pbpHlCardItemId === id) _pbpHlCard.hidePopover();
   });
 }
+
+// ---- Rail entry: "N highlights · Copy as Markdown" (spec sec.5) ----
+function _pbpHlUpdateRailCount() {
+  const rail = document.getElementById("rail");
+  if (!rail) return;
+  let sec = document.getElementById("hl-rail-section");
+  if (!sec) {
+    sec = document.createElement("div");
+    sec.className = "rail-section";
+    sec.id = "hl-rail-section";
+    sec.hidden = true;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "hl-rail-copy";
+    btn.className = "action-btn hl-rail-btn";
+    const lab = document.createElement("span");
+    lab.className = "btn-label";
+    btn.appendChild(lab);
+    sec.appendChild(btn);
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(pbpHlComposeSection(_pbpHlState ? _pbpHlState.items : []));
+        flashButtonLabel(btn, t("hlCopied"));
+      } catch (_) {
+        flashButtonLabel(btn, t("mdPreviewFailed"));
+      }
+    });
+    const toc = document.getElementById("toc");
+    if (toc) toc.insertAdjacentElement("beforebegin", sec);
+    else rail.appendChild(sec);
+  }
+  const n = _pbpHlState ? _pbpHlState.items.length : 0;
+  sec.hidden = n === 0;
+  const label = sec.querySelector(".btn-label");
+  if (label) label.textContent = t("hlRailLine", String(n));
+}
+
+// Reactive trigger: fires on ANY write to this page's pbp_hl_<urlKey> key, regardless of
+// which code path performed it. _pbpHlState.items is always current by the time any write
+// lands (every mutator updates it in place BEFORE persisting), so this never reloads from
+// the change record (storage doesn't carry the transient `degraded` flag).
+if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local" || !_pbpHlState) return;
+    if (!(_pbpHlKey(_pbpHlState.url) in changes)) return;
+    _pbpHlUpdateRailCount();
+  });
+}

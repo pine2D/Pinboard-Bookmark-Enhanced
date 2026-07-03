@@ -2416,5 +2416,11 @@
   "hlColorDoubt": { "message": "Doute" },
   "hlColorTodo": { "message": "À faire" },
   "hlNoteBtn": { "message": "Surligner avec une note" },
-  "hlSaveFailed": { "message": "Le surlignage n'a pas pu être enregistré (stockage plein)" }
+  "hlSaveFailed": { "message": "Le surlignage n'a pas pu être enregistré (stockage plein)" },
+  "hlNotePlaceholder": { "message": "Ajouter une note…" },
+  "hlSave": { "message": "Enregistrer" },
+  "hlDelete": { "message": "Supprimer le surlignage" },
+  "hlDegraded": { "message": "Position perdue — le texte environnant a changé, ce surlignage couvre désormais tout le paragraphe." },
+  "hlRailLine": { "message": "$COUNT$ surlignage(s) · Copier en Markdown", "placeholders": { "count": { "content": "$1" } } },
+  "hlCopied": { "message": "Surlignages copiés" }
 }

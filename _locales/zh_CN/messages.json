@@ -2410,5 +2410,11 @@
   "hlColorDoubt": { "message": "存疑" },
   "hlColorTodo": { "message": "待办" },
   "hlNoteBtn": { "message": "带笔记高亮" },
-  "hlSaveFailed": { "message": "高亮未能保存（存储空间已满）" }
+  "hlSaveFailed": { "message": "高亮未能保存（存储空间已满）" },
+  "hlNotePlaceholder": { "message": "添加笔记…" },
+  "hlSave": { "message": "保存" },
+  "hlDelete": { "message": "删除高亮" },
+  "hlDegraded": { "message": "位置已失准——周围文本发生了变化，该高亮已回退为整段标注。" },
+  "hlRailLine": { "message": "$COUNT$ 条高亮 · 复制为 Markdown", "placeholders": { "count": { "content": "$1" } } },
+  "hlCopied": { "message": "高亮已复制" }
 }

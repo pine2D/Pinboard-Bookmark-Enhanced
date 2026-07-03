@@ -2416,5 +2416,11 @@
   "hlColorDoubt": { "message": "Wątpliwość" },
   "hlColorTodo": { "message": "Do zrobienia" },
   "hlNoteBtn": { "message": "Zaznacz z notatką" },
-  "hlSaveFailed": { "message": "Nie udało się zapisać zaznaczenia (brak miejsca)" }
+  "hlSaveFailed": { "message": "Nie udało się zapisać zaznaczenia (brak miejsca)" },
+  "hlNotePlaceholder": { "message": "Dodaj notatkę…" },
+  "hlSave": { "message": "Zapisz" },
+  "hlDelete": { "message": "Usuń zaznaczenie" },
+  "hlDegraded": { "message": "Pozycja utracona — otaczający tekst się zmienił, to zaznaczenie obejmuje teraz cały akapit." },
+  "hlRailLine": { "message": "$COUNT$ zaznaczenie(a) · Kopiuj jako Markdown", "placeholders": { "count": { "content": "$1" } } },
+  "hlCopied": { "message": "Skopiowano zaznaczenia" }
 }

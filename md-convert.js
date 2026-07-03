@@ -495,8 +495,17 @@ function readingStats(md) {
 }
 
 // ── Export orchestrator ──
-// opts: { frontmatter:bool, imagePolicy:"keep"|"alt"|"strip", includeToc:bool }
-// Order: imagePolicy → (TOC prepend) → (frontmatter prepend). baseUrl = meta.url.
+// opts: { frontmatter:bool, imagePolicy:"keep"|"alt"|"strip", includeToc:bool,
+//         highlights:Array|null, highlightsInline:bool (default true) }
+// Order: imagePolicy → (highlights inline mark) → (TOC prepend) → (highlights section
+// append) → (frontmatter prepend). baseUrl = meta.url.
+// highlights (H2, md-highlight.js): absent/empty -> byte-identical to the pre-H2 output
+// (regression guard, spec sec.5/9). highlightsInline:false lets composeStyledHtml's own
+// internal call opt OUT of the "==...==" inline mark (marked doesn't parse ==, so styled
+// HTML only ever gets the aggregation section) while the plain .md export path (default
+// true) gets both. Both pbpHlInlineMark/pbpHlComposeSection calls are typeof-guarded:
+// popup.html loads this file WITHOUT md-highlight.js and never passes opts.highlights,
+// but a guard costs nothing and removes a latent ReferenceError for any future caller.
 function composeExport(canonicalMd, meta, opts) {
   meta = meta || {};
   opts = opts || {};
@@ -504,9 +513,16 @@ function composeExport(canonicalMd, meta, opts) {
     policy: opts.imagePolicy || "keep",
     baseUrl: meta.url || ""
   });
+  const hlItems = Array.isArray(opts.highlights) ? opts.highlights : null;
+  if (hlItems && hlItems.length && opts.highlightsInline !== false && typeof pbpHlInlineMark === "function") {
+    body = pbpHlInlineMark(body, hlItems);
+  }
   if (opts.includeToc) {
     const { tocMarkdown } = buildToc(body, { minLevel: 2, maxLevel: 4 });
     if (tocMarkdown) body = tocMarkdown + "\n\n" + body;
+  }
+  if (hlItems && hlItems.length && typeof pbpHlComposeSection === "function") {
+    body = body + "\n\n" + pbpHlComposeSection(hlItems);
   }
   if (opts.frontmatter) {
     body = applyFrontmatter(body, meta, {});
@@ -584,14 +600,19 @@ function _xmlEscape(s) {
 // detached node (needs a DOM — preview/test page, not the popup). The caller
 // passes opts.hljsCss (fetched from the vendored theme) so this stays chrome-free.
 // meta: {title,url,date,tags,source,description?}
-// opts: { frontmatter, imagePolicy, includeToc, hljsCss, math, katexCss }
+// opts: { frontmatter, imagePolicy, includeToc, hljsCss, math, katexCss, highlights }
 function composeStyledHtml(canonicalMd, meta, opts) {
   meta = meta || {};
   opts = opts || {};
+  // highlightsInline:false -- styled HTML gets ONLY the aggregation section (spec
+  // sec.5): marked doesn't parse "==...==", so an inline mark would render as literal
+  // text in the exported doc.
   const bodyMd = composeExport(canonicalMd || "", meta, {
     frontmatter: false,
     imagePolicy: opts.imagePolicy || "keep",
-    includeToc: !!opts.includeToc
+    includeToc: !!opts.includeToc,
+    highlights: Array.isArray(opts.highlights) ? opts.highlights : null,
+    highlightsInline: false
   });
   let article = renderMarkdown(bodyMd);
   if (typeof document !== "undefined" && typeof hljs !== "undefined") {
