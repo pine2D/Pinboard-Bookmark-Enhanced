@@ -283,6 +283,10 @@ async function pbpHlInit(detail) {
   const items = await _pbpHlLoad(url);
   _pbpHlState = { url, items, ranges: Object.create(null), degraded: Object.create(null) };
   pbpHlRestore();
+  // Restored-from-storage highlights must surface the rail entry on first
+  // paint too -- storage.local.get fires no onChanged, so without this call
+  // the rail stays hidden until the session's first mutation (create/delete).
+  if (typeof _pbpHlUpdateRailCount === "function") _pbpHlUpdateRailCount();
   _pbpHlBindInteractions(view); // Task 4
 }
 
