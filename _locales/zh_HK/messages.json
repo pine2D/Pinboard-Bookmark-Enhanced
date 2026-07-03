@@ -554,10 +554,57 @@
     "message": "未能從此頁面擷取到可讀內容。"
   },
   "bgMdPreviewTooLarge": {
-    "message": "此頁面過大，無法預覽。請嘗試較短的頁面。"
+    "message": "儲存空間已滿。請在擴充功能選項的「儲存」中清理快取資料後重試。"
   },
   "mdPreviewOpenFailed": {
     "message": "無法開啟預覽——此頁面可能過大，無法儲存。"
+  },
+  "mdPreviewQuotaFull": {
+    "message": "儲存空間已滿，無法儲存預覽。請先騰出空間再重試。"
+  },
+  "manageStorage": {
+    "message": "管理儲存"
+  },
+  "tabStorage": {
+    "message": "儲存"
+  },
+  "secStorage": {
+    "message": "儲存管理"
+  },
+  "storageIntro": {
+    "message": "清理本機快取以騰出空間。這些快取清理後會自動重建。你的設定、憑證、待儲存書籤及進行中的資料絕不會被觸碰。"
+  },
+  "storageCatJina": {
+    "message": "頁面閱讀快取"
+  },
+  "storageCatUrls": {
+    "message": "書籤網址快取"
+  },
+  "storageCatTags": {
+    "message": "標籤快取"
+  },
+  "storageCatMisc": {
+    "message": "封存記錄與 AI 用量"
+  },
+  "storageReclaimable": {
+    "message": "可清理：$AMOUNT$",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClear": {
+    "message": "清理所選"
+  },
+  "storageNoneSelected": {
+    "message": "請至少選擇一個要清理的類別。"
+  },
+  "storageCleared": {
+    "message": "已釋放 $AMOUNT$。",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClearFailed": {
+    "message": "清理快取失敗，請重試。"
+  },
+  "storageMeasureFailed": {
+    "message": "無法讀取儲存空間用量。"
   },
   "mdEngineSwitchTo": {
     "message": "切換到 $ENGINE$",

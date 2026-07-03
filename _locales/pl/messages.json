@@ -554,10 +554,57 @@
     "message": "Nie znaleziono czytelnej treści na tej stronie."
   },
   "bgMdPreviewTooLarge": {
-    "message": "Ta strona jest zbyt duża, aby wyświetlić podgląd. Spróbuj krótszej strony."
+    "message": "Pamięć jest pełna. Wyczyść dane z pamięci podręcznej w opcjach rozszerzenia (Pamięć) i spróbuj ponownie."
   },
   "mdPreviewOpenFailed": {
     "message": "Nie można otworzyć podglądu — strona może być zbyt duża, aby ją zapisać."
+  },
+  "mdPreviewQuotaFull": {
+    "message": "Pamięć jest pełna, więc nie można było zapisać podglądu. Zwolnij miejsce i spróbuj ponownie."
+  },
+  "manageStorage": {
+    "message": "Zarządzaj pamięcią"
+  },
+  "tabStorage": {
+    "message": "Pamięć"
+  },
+  "secStorage": {
+    "message": "Zarządzanie pamięcią"
+  },
+  "storageIntro": {
+    "message": "Zwolnij miejsce w pamięci podręcznej. Te pamięci odbudowują się automatycznie po wyczyszczeniu. Twoje ustawienia, dane logowania, oczekujące zapisy i dane w toku nigdy nie są naruszane."
+  },
+  "storageCatJina": {
+    "message": "Pamięć podręczna czytnika stron"
+  },
+  "storageCatUrls": {
+    "message": "Pamięć podręczna adresów URL zakładek"
+  },
+  "storageCatTags": {
+    "message": "Pamięć podręczna tagów"
+  },
+  "storageCatMisc": {
+    "message": "Dziennik archiwum i użycie AI"
+  },
+  "storageReclaimable": {
+    "message": "Do zwolnienia: $AMOUNT$",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClear": {
+    "message": "Wyczyść wybrane"
+  },
+  "storageNoneSelected": {
+    "message": "Wybierz co najmniej jedną kategorię do wyczyszczenia."
+  },
+  "storageCleared": {
+    "message": "Zwolniono $AMOUNT$.",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClearFailed": {
+    "message": "Nie można wyczyścić pamięci podręcznej. Spróbuj ponownie."
+  },
+  "storageMeasureFailed": {
+    "message": "Nie można odczytać wykorzystania pamięci."
   },
   "mdEngineSwitchTo": {
     "message": "Przełącz na $ENGINE$",

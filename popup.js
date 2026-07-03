@@ -561,8 +561,22 @@ async function htmlToMarkdownAsync(html, opts) {
             }
           });
           await chrome.tabs.create({ url: "md-preview.html?k=" + k });
-        } catch (_) {
-          showStatus("status-msg", t("mdPreviewOpenFailed"), "error");
+        } catch (e) {
+          // Quota-full is recoverable: offer a one-click path to the Storage
+          // panel where the user can reclaim cache, then reopen the preview.
+          if (/quota/i.test((e && e.message) || "")) {
+            if (window._lastStatusFeedback) window._lastStatusFeedback.dismiss();
+            window._lastStatusFeedback = showFeedback({
+              variant: "error",
+              message: t("mdPreviewQuotaFull"),
+              actions: [{
+                label: t("manageStorage"),
+                onClick: () => chrome.tabs.create({ url: chrome.runtime.getURL("options.html#storage") }),
+              }],
+            });
+          } else {
+            showStatus("status-msg", t("mdPreviewOpenFailed"), "error");
+          }
         }
       };
       const downloadMd = () => {

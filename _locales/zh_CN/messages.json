@@ -554,10 +554,57 @@
     "message": "未能从该页面提取到可读内容。"
   },
   "bgMdPreviewTooLarge": {
-    "message": "该页面过大，无法预览。请尝试较短的页面。"
+    "message": "存储空间已满。请在扩展选项的“存储”中清理缓存数据后重试。"
   },
   "mdPreviewOpenFailed": {
     "message": "无法打开预览——该页面可能过大，无法存储。"
+  },
+  "mdPreviewQuotaFull": {
+    "message": "存储空间已满，预览无法保存。请先腾出空间再重试。"
+  },
+  "manageStorage": {
+    "message": "管理存储"
+  },
+  "tabStorage": {
+    "message": "存储"
+  },
+  "secStorage": {
+    "message": "存储管理"
+  },
+  "storageIntro": {
+    "message": "清理本地缓存以腾出空间。这些缓存清理后会自动重建。你的设置、凭据、待保存书签及进行中的数据绝不会被触碰。"
+  },
+  "storageCatJina": {
+    "message": "页面阅读缓存"
+  },
+  "storageCatUrls": {
+    "message": "书签网址缓存"
+  },
+  "storageCatTags": {
+    "message": "标签缓存"
+  },
+  "storageCatMisc": {
+    "message": "存档日志与 AI 用量"
+  },
+  "storageReclaimable": {
+    "message": "可清理：$AMOUNT$",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClear": {
+    "message": "清理所选"
+  },
+  "storageNoneSelected": {
+    "message": "请至少选择一个要清理的类别。"
+  },
+  "storageCleared": {
+    "message": "已释放 $AMOUNT$。",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClearFailed": {
+    "message": "清理缓存失败，请重试。"
+  },
+  "storageMeasureFailed": {
+    "message": "无法读取存储占用。"
   },
   "mdEngineSwitchTo": {
     "message": "切换到 $ENGINE$",

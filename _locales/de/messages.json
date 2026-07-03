@@ -554,10 +554,57 @@
     "message": "Auf dieser Seite wurde kein lesbarer Inhalt gefunden."
   },
   "bgMdPreviewTooLarge": {
-    "message": "Diese Seite ist zu groß für eine Vorschau. Versuchen Sie es mit einer kürzeren Seite."
+    "message": "Der Speicher ist voll. Löschen Sie zwischengespeicherte Daten in den Erweiterungsoptionen (Speicher) und versuchen Sie es erneut."
   },
   "mdPreviewOpenFailed": {
     "message": "Vorschau konnte nicht geöffnet werden – die Seite ist möglicherweise zu groß zum Speichern."
+  },
+  "mdPreviewQuotaFull": {
+    "message": "Der Speicher ist voll, daher konnte die Vorschau nicht gespeichert werden. Geben Sie Speicher frei und versuchen Sie es erneut."
+  },
+  "manageStorage": {
+    "message": "Speicher verwalten"
+  },
+  "tabStorage": {
+    "message": "Speicher"
+  },
+  "secStorage": {
+    "message": "Speicherverwaltung"
+  },
+  "storageIntro": {
+    "message": "Lokalen Cache freigeben. Diese Caches werden nach dem Löschen automatisch neu aufgebaut. Ihre Einstellungen, Zugangsdaten, ausstehenden Speicherungen und laufenden Daten werden nie angetastet."
+  },
+  "storageCatJina": {
+    "message": "Seiten-Lese-Cache"
+  },
+  "storageCatUrls": {
+    "message": "Lesezeichen-URL-Cache"
+  },
+  "storageCatTags": {
+    "message": "Tag-Cache"
+  },
+  "storageCatMisc": {
+    "message": "Archivprotokoll & KI-Nutzung"
+  },
+  "storageReclaimable": {
+    "message": "Freigebbar: $AMOUNT$",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClear": {
+    "message": "Auswahl löschen"
+  },
+  "storageNoneSelected": {
+    "message": "Wählen Sie mindestens eine Kategorie zum Löschen aus."
+  },
+  "storageCleared": {
+    "message": "$AMOUNT$ freigegeben.",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClearFailed": {
+    "message": "Cache konnte nicht gelöscht werden. Bitte erneut versuchen."
+  },
+  "storageMeasureFailed": {
+    "message": "Speichernutzung konnte nicht gelesen werden."
   },
   "mdEngineSwitchTo": {
     "message": "Zu $ENGINE$ wechseln",

@@ -554,10 +554,57 @@
     "message": "このページから読み取れるコンテンツが見つかりませんでした。"
   },
   "bgMdPreviewTooLarge": {
-    "message": "このページは大きすぎてプレビューできません。短いページでお試しください。"
+    "message": "ストレージがいっぱいです。拡張機能のオプションの「ストレージ」でキャッシュを削除してからもう一度お試しください。"
   },
   "mdPreviewOpenFailed": {
     "message": "プレビューを開けませんでした。ページが大きすぎて保存できない可能性があります。"
+  },
+  "mdPreviewQuotaFull": {
+    "message": "ストレージがいっぱいのため、プレビューを保存できませんでした。空き容量を確保してからもう一度お試しください。"
+  },
+  "manageStorage": {
+    "message": "ストレージを管理"
+  },
+  "tabStorage": {
+    "message": "ストレージ"
+  },
+  "secStorage": {
+    "message": "ストレージ管理"
+  },
+  "storageIntro": {
+    "message": "ローカルキャッシュを整理して空き容量を確保します。これらのキャッシュは削除後に自動的に再構築されます。設定・認証情報・保存待ちのブックマーク・処理中のデータには一切触れません。"
+  },
+  "storageCatJina": {
+    "message": "ページ読み込みキャッシュ"
+  },
+  "storageCatUrls": {
+    "message": "ブックマークURLキャッシュ"
+  },
+  "storageCatTags": {
+    "message": "タグキャッシュ"
+  },
+  "storageCatMisc": {
+    "message": "アーカイブログとAI使用量"
+  },
+  "storageReclaimable": {
+    "message": "整理可能: $AMOUNT$",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClear": {
+    "message": "選択項目を削除"
+  },
+  "storageNoneSelected": {
+    "message": "削除するカテゴリを1つ以上選択してください。"
+  },
+  "storageCleared": {
+    "message": "$AMOUNT$ を解放しました。",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClearFailed": {
+    "message": "キャッシュを削除できませんでした。もう一度お試しください。"
+  },
+  "storageMeasureFailed": {
+    "message": "ストレージ使用量を読み取れませんでした。"
   },
   "mdEngineSwitchTo": {
     "message": "$ENGINE$ に切り替え",

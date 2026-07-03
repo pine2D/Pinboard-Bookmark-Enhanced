@@ -20,6 +20,7 @@
       <button class="tab-btn" id="tab-tags" data-panel="tags" role="tab" aria-selected="false" aria-controls="panel-tags" data-i18n="tabTags">Tags</button>
       <button class="tab-btn" id="tab-archive" data-panel="archive" role="tab" aria-selected="false" aria-controls="panel-archive" data-i18n="tabArchive">Archive</button>
       <button class="tab-btn" id="tab-appearance" data-panel="appearance" role="tab" aria-selected="false" aria-controls="panel-appearance" data-i18n="tabAppearance">Appearance</button>
+      <button class="tab-btn" id="tab-storage" data-panel="storage" role="tab" aria-selected="false" aria-controls="panel-storage" data-i18n="tabStorage">Storage</button>
       <button class="reset-tab-btn" id="reset-panel-btn" title="Reset current tab settings to defaults" data-i18n="resetTabBtn" data-i18n-title="resetTabTitle">Reset This Tab</button>
     </div>
 
@@ -740,6 +741,17 @@
         <pre id="preset-preview-content" class="preset-preview-content"></pre>
       </details>
 
+    </div>
+
+    <!-- Tab 7: Storage -->
+    <div id="panel-storage" class="panel" role="tabpanel" aria-labelledby="tab-storage">
+      <div class="section-title" data-i18n="secStorage">Storage Management</div>
+      <p class="hint" data-i18n="storageIntro">Reclaim local cache space. These caches rebuild automatically after clearing. Your settings, credentials, pending saves and in-progress data are never touched.</p>
+      <div id="storage-cats" class="storage-cats"></div>
+      <div class="fg" style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button type="button" class="btn" id="storage-clear-btn" data-i18n="storageClear">Clear selected</button>
+        <span id="storage-status" class="et-test-status hidden" role="status" aria-live="polite"></span>
+      </div>
     </div>
   </div>
   <script defer src="i18n.js"></script>

@@ -123,6 +123,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // W3: lazy-init expensive per-panel rendering on first view.
     if (btn.dataset.panel === "appearance") _initAppearancePanel();
     if (btn.dataset.panel === "tags") _initTagGovPanel();
+    if (btn.dataset.panel === "storage") renderStoragePanel();
   }
   _tabBtns.forEach((btn, i) => {
     btn.tabIndex = btn.classList.contains("active") ? 0 : -1;
@@ -144,6 +145,92 @@ document.addEventListener("DOMContentLoaded", async () => {
     sessionStorage.removeItem("activeTab");
     const btn = document.querySelector(`.tab-btn[data-panel="${savedTab}"]`);
     if (btn) btn.click();
+  }
+
+  // Deep-link: options.html#<panel> activates that tab on load (used by the
+  // popup / shortcut "storage full" recovery link -> options.html#storage).
+  const _hashPanel = (location.hash || "").replace(/^#/, "");
+  if (_hashPanel) {
+    const _dlBtn = document.querySelector(`.tab-btn[data-panel="${_hashPanel}"]`);
+    if (_dlBtn) _dlBtn.click();
+  }
+
+  // ---- Storage management (C2-6) ----
+  // Category checkboxes over the reclaimable-cache allowlist in shared.js.
+  // Defaults: large+cheap-to-rebuild caches checked; tag cache off (clearing it
+  // briefly slows tag autocomplete).
+  const STORAGE_CATS = [
+    { id: "jina", labelKey: "storageCatJina", defaultOn: true },
+    { id: "urls", labelKey: "storageCatUrls", defaultOn: true },
+    { id: "tags", labelKey: "storageCatTags", defaultOn: false },
+    { id: "misc", labelKey: "storageCatMisc", defaultOn: true },
+  ];
+  function showStorageStatus(msg, kind) {
+    const el = $id("storage-status");
+    if (!el) return;
+    el.textContent = msg;
+    // Reuse the AA-tuned .et-test-status colors (.ok/.err/.warn) already themed
+    // across all presets, rather than the popup-only status-msg classes.
+    el.className = "et-test-status " + (kind || "");
+    el.classList.remove("hidden");
+  }
+  async function renderStoragePanel() {
+    const host = $id("storage-cats");
+    if (!host) return;
+    let measured = null;
+    try { measured = await pbpMeasureLocalStorage(); } catch (_) { measured = null; }
+    host.textContent = "";
+    if (!measured) {
+      const p = document.createElement("p");
+      p.className = "hint";
+      p.textContent = t("storageMeasureFailed");
+      host.appendChild(p);
+      return;
+    }
+    let total = 0;
+    STORAGE_CATS.forEach((c) => {
+      const m = measured[c.id] || { keys: [], bytes: 0 };
+      total += m.bytes;
+      const row = document.createElement("div");
+      row.className = "fg";
+      const label = document.createElement("label");
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "storage-cat-cb";
+      cb.dataset.cat = c.id;
+      cb.checked = c.defaultOn;
+      cb.disabled = m.keys.length === 0;
+      const span = document.createElement("span");
+      span.textContent = `${t(c.labelKey)} — ${pbpFormatBytes(m.bytes)} (${m.keys.length})`;
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(" "));
+      label.appendChild(span);
+      row.appendChild(label);
+      host.appendChild(row);
+    });
+    const totalP = document.createElement("p");
+    totalP.className = "hint";
+    totalP.textContent = t("storageReclaimable", pbpFormatBytes(total));
+    host.appendChild(totalP);
+  }
+  const _storageClearBtn = $id("storage-clear-btn");
+  if (_storageClearBtn) {
+    _storageClearBtn.addEventListener("click", async () => {
+      const cats = [...document.querySelectorAll(".storage-cat-cb:checked")].map((cb) => cb.dataset.cat);
+      if (!cats.length) { showStorageStatus(t("storageNoneSelected"), "warn"); return; }
+      _storageClearBtn.disabled = true;
+      let freed = 0;
+      try {
+        freed = await pbpReclaimLocalStorage(cats);
+      } catch (_) {
+        showStorageStatus(t("storageClearFailed"), "err");
+        _storageClearBtn.disabled = false;
+        return;
+      }
+      await renderStoragePanel();
+      _storageClearBtn.disabled = false;
+      showStorageStatus(t("storageCleared", pbpFormatBytes(freed)), "ok");
+    });
   }
 
   // ---- Reset current tab to defaults ----

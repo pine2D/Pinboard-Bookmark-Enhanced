@@ -554,10 +554,57 @@
     "message": "No readable content was found on this page."
   },
   "bgMdPreviewTooLarge": {
-    "message": "This page is too large to preview. Try a shorter page."
+    "message": "Storage is full. Clear cached data in the extension's options (Storage), then try again."
   },
   "mdPreviewOpenFailed": {
     "message": "Couldn't open the preview — the page may be too large to store."
+  },
+  "mdPreviewQuotaFull": {
+    "message": "Storage is full, so the preview couldn't be saved. Free up space, then try again."
+  },
+  "manageStorage": {
+    "message": "Manage storage"
+  },
+  "tabStorage": {
+    "message": "Storage"
+  },
+  "secStorage": {
+    "message": "Storage Management"
+  },
+  "storageIntro": {
+    "message": "Reclaim local cache space. These caches rebuild automatically after clearing. Your settings, credentials, pending saves and in-progress data are never touched."
+  },
+  "storageCatJina": {
+    "message": "Page reader cache"
+  },
+  "storageCatUrls": {
+    "message": "Bookmark URL cache"
+  },
+  "storageCatTags": {
+    "message": "Tag cache"
+  },
+  "storageCatMisc": {
+    "message": "Archive log & AI usage"
+  },
+  "storageReclaimable": {
+    "message": "Reclaimable: $AMOUNT$",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClear": {
+    "message": "Clear selected"
+  },
+  "storageNoneSelected": {
+    "message": "Select at least one category to clear."
+  },
+  "storageCleared": {
+    "message": "Freed $AMOUNT$.",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClearFailed": {
+    "message": "Couldn't clear the cache. Try again."
+  },
+  "storageMeasureFailed": {
+    "message": "Couldn't read storage usage."
   },
   "mdEngineSwitchTo": {
     "message": "Switch to $ENGINE$",

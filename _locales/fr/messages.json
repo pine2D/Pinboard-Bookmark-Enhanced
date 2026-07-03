@@ -554,10 +554,57 @@
     "message": "Aucun contenu lisible n'a été trouvé sur cette page."
   },
   "bgMdPreviewTooLarge": {
-    "message": "Cette page est trop volumineuse pour l'aperçu. Essayez une page plus courte."
+    "message": "Le stockage est plein. Effacez les données en cache dans les options de l'extension (Stockage), puis réessayez."
   },
   "mdPreviewOpenFailed": {
     "message": "Impossible d'ouvrir l'aperçu — la page est peut-être trop volumineuse pour être stockée."
+  },
+  "mdPreviewQuotaFull": {
+    "message": "Le stockage est plein, l'aperçu n'a pas pu être enregistré. Libérez de l'espace, puis réessayez."
+  },
+  "manageStorage": {
+    "message": "Gérer le stockage"
+  },
+  "tabStorage": {
+    "message": "Stockage"
+  },
+  "secStorage": {
+    "message": "Gestion du stockage"
+  },
+  "storageIntro": {
+    "message": "Libérez de l'espace de cache local. Ces caches se reconstruisent automatiquement après nettoyage. Vos paramètres, identifiants, enregistrements en attente et données en cours ne sont jamais touchés."
+  },
+  "storageCatJina": {
+    "message": "Cache de lecture des pages"
+  },
+  "storageCatUrls": {
+    "message": "Cache des URL de favoris"
+  },
+  "storageCatTags": {
+    "message": "Cache des tags"
+  },
+  "storageCatMisc": {
+    "message": "Journal d'archivage et usage de l'IA"
+  },
+  "storageReclaimable": {
+    "message": "Récupérable : $AMOUNT$",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClear": {
+    "message": "Effacer la sélection"
+  },
+  "storageNoneSelected": {
+    "message": "Sélectionnez au moins une catégorie à effacer."
+  },
+  "storageCleared": {
+    "message": "$AMOUNT$ libéré.",
+    "placeholders": { "amount": { "content": "$1" } }
+  },
+  "storageClearFailed": {
+    "message": "Impossible d'effacer le cache. Réessayez."
+  },
+  "storageMeasureFailed": {
+    "message": "Impossible de lire l'utilisation du stockage."
   },
   "mdEngineSwitchTo": {
     "message": "Passer à $ENGINE$",
