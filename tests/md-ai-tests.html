@@ -1638,6 +1638,183 @@ suiteIf("PBP_TR_RTL_LANGS / dir branch", "pbpTrResolveTargetLang", () => {
   });
 });
 
+// T3: script-based "already in the target language" detector. Table per spec
+// 2026-07-03 sec.3 -- one representative code per script row (plus 2 alias
+// checks for the two rows that cover multiple codes: ru/uk/bg and ar/fa/ur).
+suiteIf("pbpTrBlockIsTargetLang", "pbpTrBlockIsTargetLang", () => {
+  // One fixture per script, each long enough (>=20 letters) to clear the
+  // minimum on its own.
+  const zhHit = "这是一段完全用简体中文书写的句子用来测试翻译跳过逻辑是否正确工作";
+  const jaHit = "これは日本語のテスト文章です漢字とひらがなが混在しています翻訳をスキップするかどうかを確認するためのテストです";
+  const koHit = "이것은 완전히 한국어로 작성된 문장입니다 번역을 건너뛰는지 확인하기 위한 테스트입니다 충분히 긴 문장을 준비했습니다";
+  const ruHit = "Это абзац написанный полностью на русском языке для проверки логики пропуска перевода";
+  const elHit = "Αυτό είναι ένα κείμενο γραμμένο εξ ολοκλήρου στα ελληνικά για δοκιμή της λογικής παράλειψης μετάφρασης";
+  const arHit = "هذه فقرة مكتوبة بالكامل باللغة العربية لاختبار منطق تخطي الترجمة في هذا النص الطويل بما فيه الكفاية";
+  const heHit = "זהו קטע שנכתב כולו בעברית כדי לבדוק את ההיגיון של דילוג על התרגום הזה עבור המבחן הזה כולו";
+  const enLong = "This paragraph is written entirely in English and should never be treated as already translated text for any target language";
+  const frHit = "Ceci est un paragraphe entierement ecrit en francais pour verifier que les langues latines ne sont jamais ignorees";
+  // 20 shielded placeholders: each ⟦L1⟧..⟦L20⟧ carries a Latin letter that MUST
+  // be excluded (with the rest of the token) before counting, or every
+  // dilution case below would wrongly drop under the 0.7 threshold.
+  const dilute = " ⟦L1⟧⟦L2⟧⟦L3⟧⟦L4⟧⟦L5⟧⟦L6⟧⟦L7⟧⟦L8⟧⟦L9⟧⟦L10⟧⟦L11⟧⟦L12⟧⟦L13⟧⟦L14⟧⟦L15⟧⟦L16⟧⟦L17⟧⟦L18⟧⟦L19⟧⟦L20⟧";
+
+  // -- zh --
+  test("zh: Han-only block >=0.7 ratio -> skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(zhHit, "zh-Hans"), true, "zh hit");
+  });
+  test("zh: English block -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(enLong, "zh-Hans"), false, "zh miss");
+  });
+  test("zh: below the 20-letter minimum -> not skip even if 100% Han", () => {
+    assertEq(pbpTrBlockIsTargetLang("你好", "zh-Hans"), false, "zh short");
+  });
+  test("zh: half Han half Latin -> ratio under threshold -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(zhHit + " " + enLong, "zh-Hans"), false, "zh mixed");
+  });
+  test("zh: placeholders stripped before counting -> dilution doesn't sink the ratio", () => {
+    assertEq(pbpTrBlockIsTargetLang(zhHit + dilute, "zh-Hans"), true, "zh dilution");
+  });
+
+  // -- ja (Han+Kana; pure Han must NOT match -- "may be Chinese") --
+  test("ja: Han+Kana block >=0.7 ratio with kana present -> skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(jaHit, "ja"), true, "ja hit");
+  });
+  test("ja: pure Han block (kana=0) -> not skip (could be Chinese)", () => {
+    assertEq(pbpTrBlockIsTargetLang(zhHit, "ja"), false, "ja miss (pure han)");
+  });
+  test("ja: below the 20-letter minimum -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang("こんにちは", "ja"), false, "ja short");
+  });
+  test("ja: half Japanese half Latin -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(jaHit + " " + enLong, "ja"), false, "ja mixed");
+  });
+  test("ja: placeholder dilution doesn't sink the ratio", () => {
+    assertEq(pbpTrBlockIsTargetLang(jaHit + dilute, "ja"), true, "ja dilution");
+  });
+
+  // -- ko --
+  test("ko: Hangul block >=0.7 ratio -> skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(koHit, "ko"), true, "ko hit");
+  });
+  test("ko: English block -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(enLong, "ko"), false, "ko miss");
+  });
+  test("ko: below the 20-letter minimum -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang("안녕", "ko"), false, "ko short");
+  });
+  test("ko: half Korean half Latin -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(koHit + " " + enLong, "ko"), false, "ko mixed");
+  });
+  test("ko: placeholder dilution doesn't sink the ratio", () => {
+    assertEq(pbpTrBlockIsTargetLang(koHit + dilute, "ko"), true, "ko dilution");
+  });
+
+  // -- ru / uk / bg (Cyrillic) --
+  test("ru: Cyrillic block >=0.7 ratio -> skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(ruHit, "ru"), true, "ru hit");
+  });
+  test("ru: English block -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(enLong, "ru"), false, "ru miss");
+  });
+  test("ru: below the 20-letter minimum -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang("Да", "ru"), false, "ru short");
+  });
+  test("ru: half Cyrillic half Latin -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(ruHit + " " + enLong, "ru"), false, "ru mixed");
+  });
+  test("ru: placeholder dilution doesn't sink the ratio", () => {
+    assertEq(pbpTrBlockIsTargetLang(ruHit + dilute, "ru"), true, "ru dilution");
+  });
+  test("uk alias resolves to the Cyrillic branch", () => {
+    assertEq(pbpTrBlockIsTargetLang(ruHit, "uk"), true, "uk alias");
+  });
+  test("bg alias resolves to the Cyrillic branch", () => {
+    assertEq(pbpTrBlockIsTargetLang(ruHit, "bg"), true, "bg alias");
+  });
+
+  // -- el (Greek) --
+  test("el: Greek block >=0.7 ratio -> skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(elHit, "el"), true, "el hit");
+  });
+  test("el: English block -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(enLong, "el"), false, "el miss");
+  });
+  test("el: below the 20-letter minimum -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang("Ναι", "el"), false, "el short");
+  });
+  test("el: half Greek half Latin -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(elHit + " " + enLong, "el"), false, "el mixed");
+  });
+  test("el: placeholder dilution doesn't sink the ratio", () => {
+    assertEq(pbpTrBlockIsTargetLang(elHit + dilute, "el"), true, "el dilution");
+  });
+
+  // -- ar / fa / ur (Arabic script) --
+  test("ar: Arabic block >=0.7 ratio -> skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(arHit, "ar"), true, "ar hit");
+  });
+  test("ar: English block -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(enLong, "ar"), false, "ar miss");
+  });
+  test("ar: below the 20-letter minimum -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang("نعم", "ar"), false, "ar short");
+  });
+  test("ar: half Arabic half Latin -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(arHit + " " + enLong, "ar"), false, "ar mixed");
+  });
+  test("ar: placeholder dilution doesn't sink the ratio", () => {
+    assertEq(pbpTrBlockIsTargetLang(arHit + dilute, "ar"), true, "ar dilution");
+  });
+  test("fa alias resolves to the Arabic branch", () => {
+    assertEq(pbpTrBlockIsTargetLang(arHit, "fa"), true, "fa alias");
+  });
+  test("ur alias resolves to the Arabic branch", () => {
+    assertEq(pbpTrBlockIsTargetLang(arHit, "ur"), true, "ur alias");
+  });
+
+  // -- he (Hebrew) --
+  test("he: Hebrew block >=0.7 ratio -> skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(heHit, "he"), true, "he hit");
+  });
+  test("he: English block -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(enLong, "he"), false, "he miss");
+  });
+  test("he: below the 20-letter minimum -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang("כן", "he"), false, "he short");
+  });
+  test("he: half Hebrew half Latin -> not skip", () => {
+    assertEq(pbpTrBlockIsTargetLang(heHit + " " + enLong, "he"), false, "he mixed");
+  });
+  test("he: placeholder dilution doesn't sink the ratio", () => {
+    assertEq(pbpTrBlockIsTargetLang(heHit + dilute, "he"), true, "he dilution");
+  });
+
+  // -- Latin targets: NEVER skip (the honest boundary, spec sec.3) --
+  test("en target: English-in-English never skips (heuristic can't tell en from fr/de/es)", () => {
+    assertEq(pbpTrBlockIsTargetLang(enLong, "en"), false, "en never skips");
+  });
+  test("fr target: French-in-French never skips", () => {
+    assertEq(pbpTrBlockIsTargetLang(frHit, "fr"), false, "fr never skips");
+  });
+  test("en target: a Han block still never skips (no Latin branch exists at all)", () => {
+    assertEq(pbpTrBlockIsTargetLang(zhHit, "en"), false, "han->en never skips");
+  });
+
+  // -- defensive / edge inputs --
+  test("null text -> false", () => {
+    assertEq(pbpTrBlockIsTargetLang(null, "zh-Hans"), false, "null text");
+  });
+  test("null targetCode -> false (falls through every branch)", () => {
+    assertEq(pbpTrBlockIsTargetLang(zhHit, null), false, "null target");
+  });
+  test("empty targetCode -> false", () => {
+    assertEq(pbpTrBlockIsTargetLang(zhHit, ""), false, "empty target");
+  });
+  test("empty text -> false", () => {
+    assertEq(pbpTrBlockIsTargetLang("", "zh-Hans"), false, "empty text");
+  });
+});
+
 suiteIf("_pbpTrLocalizedLangName", "_pbpTrLocalizedLangName", () => {
   test("preset code localized to the UI language", () => {
     assert(_pbpTrLocalizedLangName("zh-Hans", "Simplified Chinese", "zh-Hans").indexOf("简") >= 0, "zh-Hans -> 简*");

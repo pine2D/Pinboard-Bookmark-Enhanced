@@ -412,6 +412,52 @@ const PBP_TR_LANG_NAMES = {
 // RTL/LTR, so _pbpTrFill falls back to dir="auto" for anything not in here.
 const PBP_TR_RTL_LANGS = new Set(["ar", "he", "fa", "ur"]);
 
+// ---- Target-language skip detection (spec T3, 2026-07-03): a shielded block
+// already written in the TARGET SCRIPT needs no translation. Deliberately
+// SCRIPT-based, not language-based: a lightweight heuristic can reliably tell
+// Han from Hangul but cannot tell English from French, so every Latin target
+// (en/fr/de/es/pt/it/pl/nl/tr/vi/id/... and any unrecognized or custom
+// free-text code) NEVER skips -- a false "already translated" verdict
+// silently drops a block with no per-block retry path, the worst failure
+// mode this file has, so every threshold below is conservative on purpose.
+// All ranges are \u escapes (zero literal non-ASCII in the regex source),
+// matching the PBP_TR_RTL_LANGS / detectArticleLang (md-preview.js) convention.
+const PBP_TR_SCRIPT_MIN_LETTERS = 20;   // fewer letters than this: too little signal, never skip
+const PBP_TR_SCRIPT_THRESHOLD = 0.7;    // script-letter ratio required to call a block "already translated"
+const PBP_TR_SCRIPT_RX = {
+  han: /[\u4E00-\u9FFF\u3400-\u4DBF]/g,
+  kana: /[\u3040-\u30FF]/g,
+  hangul: /[\uAC00-\uD7AF\u1100-\u11FF]/g,
+  cyrillic: /[\u0400-\u04FF]/g,
+  greek: /[\u0370-\u03FF]/g,
+  arabic: /[\u0600-\u06FF\u0750-\u077F]/g,
+  hebrew: /[\u0590-\u05FF]/g
+};
+function _pbpTrScriptCount(s, rx) { return (s.match(rx) || []).length; }
+
+// text: a block's shielded (or plain) markdown -- placeholders are stripped
+// before counting so they never dilute the ratio either way. targetCode:
+// st.target.code (a dropdown ISO code like "zh-Hans"/"ar", or a custom
+// free-text target, which never matches a branch below and correctly falls
+// through to "never skip").
+function pbpTrBlockIsTargetLang(text, targetCode) {
+  const bare = String(text == null ? "" : text).replace(/⟦[CLIM]\d+⟧/g, "");
+  const letters = _pbpTrScriptCount(bare, /\p{L}/gu);
+  if (letters < PBP_TR_SCRIPT_MIN_LETTERS) return false;
+  const base = String(targetCode || "").toLowerCase().split(/[-_]/)[0];
+  const han = () => _pbpTrScriptCount(bare, PBP_TR_SCRIPT_RX.han);
+  const kana = () => _pbpTrScriptCount(bare, PBP_TR_SCRIPT_RX.kana);
+  const hangul = () => _pbpTrScriptCount(bare, PBP_TR_SCRIPT_RX.hangul);
+  if (base === "zh") return (han() / letters) >= PBP_TR_SCRIPT_THRESHOLD && kana() === 0 && hangul() === 0;
+  if (base === "ja") { const k = kana(); return k > 0 && ((han() + k) / letters) >= PBP_TR_SCRIPT_THRESHOLD; }
+  if (base === "ko") return (hangul() / letters) >= PBP_TR_SCRIPT_THRESHOLD;
+  if (base === "ru" || base === "uk" || base === "bg") return (_pbpTrScriptCount(bare, PBP_TR_SCRIPT_RX.cyrillic) / letters) >= PBP_TR_SCRIPT_THRESHOLD;
+  if (base === "el") return (_pbpTrScriptCount(bare, PBP_TR_SCRIPT_RX.greek) / letters) >= PBP_TR_SCRIPT_THRESHOLD;
+  if (base === "ar" || base === "fa" || base === "ur") return (_pbpTrScriptCount(bare, PBP_TR_SCRIPT_RX.arabic) / letters) >= PBP_TR_SCRIPT_THRESHOLD;
+  if (base === "he") return (_pbpTrScriptCount(bare, PBP_TR_SCRIPT_RX.hebrew) / letters) >= PBP_TR_SCRIPT_THRESHOLD;
+  return false; // Latin targets + unrecognized/custom codes: never skip (see file-header rationale)
+}
+
 // Localized language name for UI display (e.g. zh UI shows "简体中文", not the
 // English "Simplified Chinese"). Uses the built-in Intl.DisplayNames (zero-dep);
 // falls back to the English name for custom/free-text targets Intl can't resolve
