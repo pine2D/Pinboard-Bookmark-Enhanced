@@ -333,6 +333,14 @@ main {
   color: var(--code-fg);
   font-weight: 400;
 }
+/* D8-7: dark mode routed the hljs container background through --surface
+   (#1e293b), which is lighter than hljs-github-dark's own designed #0d1117 and
+   compounds its already-tight token contrast further down (e.g. .hljs-section
+   4.08:1 -> 3.16:1). Pin back to hljs's own bg — scoped to screen so it never
+   fights the @media print re-pin above (print always wants the light --surface). */
+@media screen and (prefers-color-scheme: dark) {
+  #rendered-view pre { background: #0d1117; }
+}
 
 /* Blockquotes — top level keeps the accent bar + faint tint (nice for a single quote). */
 #rendered-view blockquote {
@@ -350,11 +358,14 @@ main {
 #rendered-view blockquote > .pb-comment-body > p:first-child > strong:first-child { color: var(--bq-border); }
 /* Nested levels (deep reply threads): thin neutral guide + a small elbow connector,
    no tint stacking, tighter — reads as a comment tree instead of stacked blue bars.
-   Only the outermost quote keeps the accent bar + tint. */
+   Only the outermost quote keeps the accent bar + tint.
+   Alpha 0.9 (not var(--border), which is only ~1:1 against --bq-bg dark) is the
+   lowest value that clears 3:1 non-text-UI contrast against both --bq-bg tints
+   (D8-3): light 3.16:1, dark 3.28:1. */
 #rendered-view blockquote blockquote {
   position: relative;
   background: transparent;
-  border-left: 1px solid rgba(128, 128, 128, 0.4);
+  border-left: 1px solid rgba(128, 128, 128, 0.9);
   padding: 4px 0 4px 16px;
   margin: 0.4em 0;
   border-radius: 0;
@@ -371,7 +382,7 @@ main {
   top: 50%;
   width: 14px;
   height: 1px;
-  background: rgba(128, 128, 128, 0.4);
+  background: rgba(128, 128, 128, 0.9);
   transform: translateY(-50%);
 }
 /* Translated-only view: the original .pb-comment-body is display:none, so mirror the
@@ -388,7 +399,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   top: 50%;
   width: 14px;
   height: 1px;
-  background: rgba(128, 128, 128, 0.4);
+  background: rgba(128, 128, 128, 0.9);
   transform: translateY(-50%);
 }
 
@@ -627,6 +638,27 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 
 /* ---- Print ---- */
 @media print {
+  /* prefers-color-scheme is orthogonal to print — a dark-OS user printing still
+     matches the dark :root block above, so re-pin every token the printed
+     article actually uses back to its light value (D8-1). Without this, links/
+     blockquote/code keep dark-theme colors on the forced-white page below. */
+  :root {
+    color-scheme: light;
+    --link: #2563eb;
+    --link-hover: #1d4ed8;
+    --bq-border: #2563eb;
+    --bq-bg: #f0f9ff;
+    --bq-fg: #1e3a5f;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --code-bg: #f1f5f9;
+    --code-fg: #334155;
+    --btn-bg: #ffffff;
+    --btn-border: #e2e8f0;
+    --btn-hover: #f1f5f9;
+    --danger: #dc2626;
+  }
   .rail, .rail-toggle, .rail-scrim { display: none; }
   main { margin-left: 0; max-width: 100%; padding: 0; }
   body { background: white; color: black; }
@@ -850,8 +882,13 @@ body.md-empty main { margin-left: 0; }
    reliably maps to the same content. Kept visible for context, but
    non-interactive (native :disabled also drops it from the tab order). */
 .ask-chip.stale, .ask-chip:disabled {
+  /* D8-2: whole-element opacity faded the [Pn] text to ~2.1-2.5:1 against the
+     panel backdrop. Keep the text solid on --fg-muted (already AA-clean) and
+     only drop the border/background — no opacity applied to the box at all. */
   cursor: default;
-  opacity: 0.5;
+  color: var(--fg-muted);
+  background: transparent;
+  border-color: transparent;
 }
 .ask-chip.stale:hover, .ask-chip:disabled:hover { background: var(--btn-bg); border-color: var(--btn-border); }
 
@@ -928,7 +965,10 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   cursor: pointer;
 }
 .pb-tr-err svg { width: 13px; height: 13px; flex-shrink: 0; }
-.pb-tr-err:hover { background: var(--btn-hover); }
+/* D8-4: swapping to --btn-hover dropped --danger text under AA (worst case
+   3.74:1 dark). Background stays transparent (rest-state contrast already
+   clears AA); hover cue is a currentColor ring instead. */
+.pb-tr-err:hover { box-shadow: inset 0 0 0 1px currentColor; }
 .pb-tr-err:disabled { opacity: 0.5; cursor: wait; }
 .pb-tr-err:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
@@ -950,7 +990,8 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
    (inline-flex overrides the UA [hidden]{display:none}). */
 #tr-retry-all[hidden] { display: none; }
 #tr-retry-all svg { width: 13px; height: 13px; flex-shrink: 0; }
-#tr-retry-all:hover { background: var(--btn-hover); }
+/* D8-4: same fix as .pb-tr-err — keep transparent background on hover, ring instead. */
+#tr-retry-all:hover { box-shadow: inset 0 0 0 1px currentColor; }
 #tr-retry-all:disabled { opacity: 0.5; cursor: wait; }
 #tr-retry-all:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
