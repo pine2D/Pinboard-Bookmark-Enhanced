@@ -3410,48 +3410,4 @@ suiteIf("pbpTrIsTypingContext", "pbpTrIsTypingContext", () => {
   });
 });
 </script>
-
-<script>
-// ============ T1 remainder Task 2: hover-peek clone-strip (DOM layer) ============
-suiteIf("_pbpTrPeekCloneOrig", "_pbpTrPeekCloneOrig", () => {
-  function fixture(html) {
-    const d = document.createElement("div");
-    d.innerHTML = html;
-    document.body.appendChild(d);
-    return d;
-  }
-  test("valid pair -> clone of the original sibling, id/data-pb/data-pb-tr-done stripped on root + every descendant", () => {
-    const r = fixture(
-      '<p id="p1" data-pb="1" data-pb-tr-done="1">hello <span id="inner" data-pb="9">world</span></p>' +
-      '<div class="pb-tr" data-pb-tr-done="1"><p>translated</p></div>'
-    );
-    const orig = r.querySelector("p");
-    const tr = r.querySelector(".pb-tr");
-    const clone = _pbpTrPeekCloneOrig(tr);
-    assert(clone, "clone returned");
-    assertEq(clone.tagName, "P", "clone is the original p");
-    assertEq(clone.textContent.trim(), "hello world", "content preserved");
-    assertEq(clone.id, "", "root id stripped");
-    assertEq(clone.hasAttribute("data-pb"), false, "root data-pb stripped");
-    assertEq(clone.hasAttribute("data-pb-tr-done"), false, "root data-pb-tr-done stripped");
-    assertEq(clone.querySelectorAll("[id]").length, 0, "zero ids anywhere in the clone");
-    assertEq(clone.querySelectorAll("[data-pb]").length, 0, "zero data-pb anywhere in the clone");
-    assertEq(clone.querySelectorAll("[data-pb-tr-done]").length, 0, "zero data-pb-tr-done anywhere in the clone");
-    // the LIVE original must be untouched -- this is a copy, not a move
-    assertEq(orig.id, "p1", "live original id untouched");
-    assertEq(orig.dataset.pb, "1", "live original data-pb untouched");
-    r.remove();
-  });
-  test("no previousElementSibling -> null", () => {
-    const r = fixture('<div class="pb-tr">x</div>');
-    assertEq(_pbpTrPeekCloneOrig(r.querySelector(".pb-tr")), null, "no sibling -> null");
-    r.remove();
-  });
-  test("previous sibling missing data-pb -> null (mirrors _pbpTrPeekToggle's own gate)", () => {
-    const r = fixture('<p>plain</p><div class="pb-tr">x</div>');
-    assertEq(_pbpTrPeekCloneOrig(r.querySelector(".pb-tr")), null, "no data-pb -> null");
-    r.remove();
-  });
-});
-</script>
 </body></html>

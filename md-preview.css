@@ -984,85 +984,6 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
    never becomes a misleading focus target in original/bilingual view. */
 #rendered-view .pb-tr[role="button"]:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
-/* Hover peek popover (tr-only view only; md-translate.js _pbpTrPeek*). Fixed
-   singleton on document.body, deliberately OUTSIDE #rendered-view so the
-   body.tr-only [data-pb-tr-done] hide rule above never matches the clone
-   (it would otherwise render empty). position:fixed = zero reflow of the
-   article on show/hide. pointer-events:none: glance-only, no text
-   selection (that stays on the existing click-peek .pb-show-orig).
-   z-index matches the existing #ask-tip fixed tooltip (this file's other
-   hover-triggered overlay, the highest layer already in use). Hidden via
-   the native [hidden] attribute -- no display override here on purpose,
-   avoiding the [hidden]-restatement footgun this file hits elsewhere when
-   a rule also sets its own display.
-   Being a document.body sibling of #rendered-view (required, see above)
-   means it gets NONE of the `#rendered-view ...` descendant typography
-   rules for free -- every one of those is scoped by that ancestor
-   selector. Re-declare the subset the cloned original can plausibly
-   contain (headings/paragraphs/links/code/pre/blockquote/lists/images)
-   directly under #pb-peek-pop below so a hovered block's clone reads like
-   the article instead of unstyled browser defaults. img is the load-
-   bearing one: without max-width:100% here, an <img> in the clone renders
-   at native pixel width inside this box's JS-pinned `width` (see
-   _pbpTrPeekShow), overflowing it. */
-#pb-peek-pop {
-  position: fixed;
-  z-index: 80;
-  max-height: 40vh;
-  overflow-y: auto;
-  overflow-wrap: break-word;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--fg);
-  font-size: clamp(1.0625rem, 1rem + 0.4vw, 1.375rem);
-  line-height: 1.75;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
-  pointer-events: none;
-}
-#pb-peek-pop > :first-child { margin-top: 0; }
-#pb-peek-pop > :last-child { margin-bottom: 0; }
-#pb-peek-pop img { max-width: 100%; height: auto; border-radius: 8px; }
-#pb-peek-pop h1, #pb-peek-pop h2, #pb-peek-pop h3,
-#pb-peek-pop h4, #pb-peek-pop h5, #pb-peek-pop h6 {
-  font-weight: 600;
-  line-height: 1.35;
-  margin: 0.6em 0 0.3em;
-}
-#pb-peek-pop h1 { font-size: 1.4em; }
-#pb-peek-pop h2 { font-size: 1.25em; }
-#pb-peek-pop h3 { font-size: 1.1em; }
-#pb-peek-pop p { margin: 0.6em 0; }
-#pb-peek-pop a { color: var(--link); text-decoration: underline; }
-#pb-peek-pop code {
-  font-family: var(--mono-latin), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-ko), var(--han-rest), monospace;
-  background: var(--code-bg);
-  color: var(--code-fg);
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-size: 0.875em;
-}
-#pb-peek-pop pre {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 10px 14px;
-  border-radius: 8px;
-  overflow-x: auto;
-  margin: 0.8em 0;
-}
-#pb-peek-pop pre code { background: none; padding: 0; border-radius: 0; font-size: 13px; }
-#pb-peek-pop blockquote {
-  border-left: 3px solid var(--bq-border);
-  background: var(--bq-bg);
-  padding: 8px 14px;
-  margin: 0.8em 0;
-  border-radius: 0 6px 6px 0;
-  color: var(--bq-fg);
-}
-#pb-peek-pop ul, #pb-peek-pop ol { margin: 0.6em 0; padding-left: 1.5em; }
-#pb-peek-pop li { margin: 0.3em 0; }
-
 /* Per-block failure pill: inline SVG + retry label; title carries the error. */
 .pb-tr-err {
   display: inline-flex;
@@ -1243,9 +1164,6 @@ body.ask-open main { margin-right: 396px; }
   body.ask-open main { margin-right: 0; }
   /* must sit AFTER the base .pb-tr-err display rule in source order to win the cascade */
   .pb-tr-err { display: none; }
-  /* insurance: the popover is only ever visible mid-hover, which print
-     can't be mid-way through, but re-pin it hard here anyway. */
-  #pb-peek-pop { display: none; }
 }
 
 /* ---- Ask send pipeline: streaming caret, stop note, error + retry ---- */
