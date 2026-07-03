@@ -714,6 +714,10 @@ async function pbpTrInit(detail) {
     workReady: null,               // Promise: resolves once the rAF-chunked st.work build finishes
     trMd: Object.create(null),     // n -> RESTORED translated markdown (export + TOC)
     mode: "original",
+    lastViewMode: "bilingual",     // V-key toggle target (spec sec.2); _pbpTrSetMode updates
+                                    // this whenever mode !== "original", including the
+                                    // persisted-mode restore below, so a returning reader's
+                                    // last view (e.g. "translated") is what V returns to.
     running: false,
     ctrl: null
   };
@@ -770,6 +774,18 @@ async function pbpTrInit(detail) {
   window.addEventListener("scroll", _pbpTrPeekOnLeave, { passive: true });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") _pbpTrPeekOnLeave();
+  });
+  // V key: toggle original <-> last non-original view mode (spec sec.2).
+  // A separate listener (not folded into the Escape one above) so this
+  // task's diff doesn't have to touch Task 2's code again.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "v" && e.key !== "V") return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;      // don't hijack Ctrl+V paste etc.
+    const ae = document.activeElement;
+    if (pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))) return;
+    if (!document.getElementById("tr-view-toggle")) return;  // nothing to toggle yet
+    e.preventDefault();
+    _pbpTrSetMode(st, st.mode === "original" ? st.lastViewMode : "original", true);
   });
 
   // Build st.work OFF the first-paint critical path, then probe the cache. pbpAiMdOf()
@@ -1553,12 +1569,14 @@ function _pbpTrShowViewToggle(st) {
   const wrap = document.createElement("div");
   wrap.id = "tr-view-toggle";
   wrap.className = "view-toggle";
+  wrap.setAttribute("aria-keyshortcuts", "v");
   for (const [mode, key] of [["original", "trViewOriginal"], ["bilingual", "trViewBilingual"], ["translated", "trViewTranslated"]]) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "toggle-btn";
     b.dataset.trMode = mode;
     b.textContent = t(key);
+    b.title = t(key) + " (V)"; // "V" is the literal key name, deliberately not translated
     b.setAttribute("aria-pressed", "false");
     b.addEventListener("click", () => _pbpTrSetMode(st, mode, true));
     wrap.appendChild(b);
@@ -1579,6 +1597,7 @@ function _pbpTrSetMode(st, mode, persist) {
   _pbpTrPeekClearTimer();                  // any mode switch hides a lingering hover popover (spec sec.1.6)
   _pbpTrPeekHide();
   st.mode = mode;
+  if (mode !== "original") st.lastViewMode = mode;   // V-key toggle target (spec sec.2)
   document.body.classList.toggle("tr-bilingual", mode === "bilingual");
   document.body.classList.toggle("tr-only", mode === "translated");
   if (mode !== "translated") {
