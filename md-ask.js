@@ -305,8 +305,12 @@ function pbpAskBuildContext(blocks, budgetTokens) {
   const list = Array.isArray(blocks) ? blocks : [];
   const totalBlocks = list.length;
   if (!totalBlocks) return { text: "", sentBlocks: 0, totalBlocks: 0 };
+  // pbpAiTextOfKatex (not raw b.el.textContent): a math block's textContent
+  // gets mutated by KaTeX's async render into a glyph+MathML+annotation
+  // duplicate string (D10-1) - the KaTeX-aware variant gives the model a
+  // clean "$tex$" source instead.
   const lineOf = (b) => "[P" + b.n + "] " +
-    String((b.el && b.el.textContent) || "").slice(0, PBP_ASK_BLOCK_CAP).replace(/\s+/g, " ").trim();
+    String(pbpAiTextOfKatex(b.n) || "").slice(0, PBP_ASK_BLOCK_CAP).replace(/\s+/g, " ").trim();
   // Largest k whose evenly-spaced sample of `items` (chars taken from the
   // matching index of `lens`, plus a fixed `offsetChars`) fits within
   // `budgetTokens`. Shared by the mandatory-downgrade branch and the
@@ -522,10 +526,16 @@ async function _pbpAskRun(question, aEl) {
     aEl.removeAttribute("aria-busy");
     const parsed = _pbpAskFinalize(aEl, full);
     st.rounds.push({ q: question, a: parsed.body });
-    // History read-modify-write is safe: st.running serializes sends so only
-    // one answer finalizes at a time, making this sequence race-free.
-    const hist = await pbpAskHistGet(st.url);
-    hist.push({
+    // In-memory history must stay bounded too (D6-5): reuse the persisted
+    // layer's trim (md-ai-core.js _pbpAskHistTrim, PBP_ASK_HIST_MAX=20)
+    // instead of maintaining a second cap here.
+    st.rounds = _pbpAskHistTrim(st.rounds);
+    // Persisted append: st.running only serializes sends WITHIN this tab,
+    // not across tabs, so a plain get+push+set here would race two preview
+    // tabs open on the same URL (D2-2). pbpAskHistAppend runs the
+    // read-modify-write in one IDB transaction instead, which IndexedDB
+    // serializes across tabs - no lost update.
+    await pbpAskHistAppend(st.url, {
       q: question,
       a: full,
       cites: parsed.cites,
@@ -535,7 +545,6 @@ async function _pbpAskRun(question, aEl) {
       // stale [Pn] index after an engine switch (audit #29).
       blocksHash: (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : ""
     });
-    await pbpAskHistSet(st.url, hist); // pbpAskHistSet caps at the last 20
     pbpAiBumpCounter("ask");
   } catch (e) {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
@@ -619,7 +628,10 @@ function _pbpAskChipPass(el, cites) {
   const verify = (p) => {
     if (!verifyByP.has(p)) {
       const quote = quoteByP.get(p);
-      verifyByP.set(p, quote ? pbpAiFuzzyFind(quote, pbpAiTextOf(p)) : null);
+      // pbpAiTextOfKatex, not pbpAiTextOf: the model quoted against the
+      // KaTeX-aware context lineOf() sends it (D10-1), so verification must
+      // fuzzy-match against that same clean-text representation.
+      verifyByP.set(p, quote ? pbpAiFuzzyFind(quote, pbpAiTextOfKatex(p)) : null);
     }
     return verifyByP.get(p);
   };
@@ -779,7 +791,7 @@ function _pbpAskTipShow(chip) {
     q.textContent = '"' + chip.dataset.quote + '"';
     tip.appendChild(q);
   }
-  const blockText = pbpAiTextOf(p).replace(/\s+/g, " ").trim();
+  const blockText = pbpAiTextOfKatex(p).replace(/\s+/g, " ").trim();
   const b = document.createElement("div");
   b.className = "ask-tip-block";
   b.textContent = "P" + p + " · " + blockText.slice(0, 80) + (blockText.length > 80 ? "…" : "");
@@ -832,7 +844,7 @@ function _pbpAskFinalize(el, fullText) {
 // DOM contract (Task 12/13): panel #ask-panel, conversation container
 // #ask-thread, question/answer elements .ask-q/.ask-a. Records persisted
 // by the Task 13 send path as {q, a: full raw model text, cites, ts, model}
-// via pbpAskHistSet (cap 20, md-ai-core).
+// via pbpAskHistAppend (atomic append + cap 20, md-ai-core; D2-2).
 
 // Static inline SVG (clipboard, same path set as the rail Copy buttons in
 // md-preview.html). Constant string, never model text.
@@ -1436,7 +1448,7 @@ function _pbpExplainPackContext(cap) {
     n = Number(blockEl.previousElementSibling.dataset.pb);
     trText = blockEl.textContent || "";
   }
-  const origText = n ? pbpAiTextOf(n) : ((blockEl && blockEl.textContent) || cap.text);
+  const origText = n ? pbpAiTextOfKatex(n) : ((blockEl && blockEl.textContent) || cap.text);
   // The sentence is scanned in the text the selection actually lives in
   // (the translated block when selecting inside .pb-tr).
   const hostText = trText || origText;
@@ -1449,8 +1461,8 @@ function _pbpExplainPackContext(cap) {
     blockText += "\n\nTranslated rendering of the same paragraph (the selection comes from this translation):\n"
       + trText.slice(0, PBP_EXPLAIN_BLOCK_CAP);
   }
-  const prevText = n > 1 ? pbpAiTextOf(n - 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
-  const nextText = (n && pbpAiBlockEl(n + 1)) ? pbpAiTextOf(n + 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
+  const prevText = n > 1 ? pbpAiTextOfKatex(n - 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
+  const nextText = (n && pbpAiBlockEl(n + 1)) ? pbpAiTextOfKatex(n + 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
   return { sentence, blockText, prevText, nextText };
 }
 

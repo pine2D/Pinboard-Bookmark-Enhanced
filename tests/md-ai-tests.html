@@ -362,6 +362,41 @@ suite("pbpAiIndexBlocks family", () => {
     pbpAiIndexBlocks(makeRoot("<p>second</p>"));
     assert(pbpAiTextOf(1) === "second", "cache reset");
   });
+  test("pbpAiTextOfKatex (D10-1): plain blocks match pbpAiTextOf", () => {
+    const root = makeRoot("<p>hello <strong>world</strong></p>");
+    pbpAiIndexBlocks(root);
+    assert(pbpAiTextOfKatex(1) === "hello world", "plain block unaffected: " + pbpAiTextOfKatex(1));
+  });
+  test("pbpAiTextOfKatex (D10-1): rendered KaTeX block yields $tex$, not the expanded glyph+MathML string", () => {
+    const root = makeRoot('<p>mass <span class="katex"><span class="katex-mathml"><math><semantics><mrow></mrow><annotation encoding="application/x-tex">E=mc^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">Emc2glyphs</span></span> end</p>');
+    pbpAiIndexBlocks(root);
+    const text = pbpAiTextOfKatex(1);
+    assert(text.indexOf("$E=mc^2$") !== -1, "tex source present: " + text);
+    assert(text.indexOf("Emc2glyphs") === -1, "rendered glyphs dropped: " + text);
+    // Independent cache: the plain (non-KaTeX-aware) variant still sees the raw expansion.
+    assert(pbpAiTextOf(1).indexOf("Emc2glyphs") !== -1, "pbpAiTextOf unaffected: " + pbpAiTextOf(1));
+  });
+  test("pbpAiTextOfKatex (D10-1): caches and re-index resets its cache separately from pbpAiTextOf's", () => {
+    const root = makeRoot('<p><span class="katex"><span class="katex-mathml"><math><semantics><mrow></mrow><annotation encoding="application/x-tex">x+y</annotation></semantics></math></span><span class="katex-html">xyglyphs</span></span></p>');
+    pbpAiIndexBlocks(root);
+    const first = pbpAiTextOfKatex(1);
+    root.querySelector(".katex-html").textContent = "changed";
+    assert(pbpAiTextOfKatex(1) === first, "cached across DOM mutation");
+    pbpAiIndexBlocks(makeRoot("<p>fresh</p>"));
+    assert(pbpAiTextOfKatex(1) === "fresh", "cache reset by re-index");
+  });
+  test("pbpAiTextOfKatex (D10-1): degrades to pbpAiTextOf if the KaTeX prepass throws", () => {
+    const root = makeRoot('<p>x <span class="katex"><span class="katex-mathml"><math><semantics><mrow></mrow><annotation encoding="application/x-tex">a</annotation></semantics></math></span><span class="katex-html">glyphs</span></span></p>');
+    pbpAiIndexBlocks(root);
+    const orig = _pbpAiKatexPrepass;
+    _pbpAiKatexPrepass = () => { throw new Error("boom"); };
+    try {
+      const text = pbpAiTextOfKatex(1);
+      assert(text.indexOf("glyphs") !== -1, "degrade falls back to plain textContent, no throw: " + text);
+    } finally {
+      _pbpAiKatexPrepass = orig;
+    }
+  });
   test("pbpAiBlocksFingerprint: stable for the same block text, changes when it differs", () => {
     pbpAiIndexBlocks(makeRoot("<p>one</p><p>two</p>"));
     const fp1 = pbpAiBlocksFingerprint();
@@ -797,6 +832,68 @@ suite("md-ai IDB key conventions", () => {
     assert(Array.isArray(_pbpAskHistTrim(null)) && _pbpAskHistTrim(null).length === 0, "null -> []");
   });
 });
+</script>
+
+<script>
+// ============ D2-2: pbpAiCacheAppend / pbpAskHistAppend (async, real IDB) ============
+// Real IndexedDB (this page loads over file://, which Chromium supports) -
+// these exercise the actual atomic get-then-put transaction, not a mock.
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "pbpAiCacheAppend / pbpAskHistAppend (async, D2-2)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  if (typeof pbpAiCacheAppend !== "function" || typeof pbpAskHistAppend !== "function") {
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP pbpAiCacheAppend/pbpAskHistAppend (not loaded)";
+    host.appendChild(div); SKIP++; return;
+  }
+  await atest("first append on a missing key seeds from undefined", async () => {
+    const key = "test_append_seed_" + Date.now() + "_" + Math.random();
+    await pbpAiCacheAppend(key, (prev) => (Array.isArray(prev) ? prev : []).concat(["a"]));
+    const entry = await pbpAiCacheGet(key);
+    assert(entry && Array.isArray(entry.result) && entry.result.join(",") === "a", "seeded: " + JSON.stringify(entry));
+  });
+  await atest("sequential appends accumulate in order", async () => {
+    const key = "test_append_seq_" + Date.now() + "_" + Math.random();
+    await pbpAiCacheAppend(key, (prev) => (Array.isArray(prev) ? prev : []).concat(["a"]));
+    await pbpAiCacheAppend(key, (prev) => (Array.isArray(prev) ? prev : []).concat(["b"]));
+    const entry = await pbpAiCacheGet(key);
+    assertEq(entry.result.join(","), "a,b", "both entries present in order");
+  });
+  await atest("concurrent appends never lose an update (D2-2 race closed)", async () => {
+    // The bug this closes: pbpAskHistGet()+push+pbpAskHistSet() is TWO
+    // separate IDB transactions, so two callers racing a get-then-put on
+    // the same key can silently drop one caller's entry (last-writer-wins).
+    // pbpAiCacheAppend does it in ONE transaction; fire two concurrently
+    // against the same key and assert neither push is lost.
+    const key = "test_append_race_" + Date.now() + "_" + Math.random();
+    await Promise.all([
+      pbpAiCacheAppend(key, (prev) => (Array.isArray(prev) ? prev : []).concat(["x"])),
+      pbpAiCacheAppend(key, (prev) => (Array.isArray(prev) ? prev : []).concat(["y"]))
+    ]);
+    const entry = await pbpAiCacheGet(key);
+    assertEq(entry.result.length, 2, "both concurrent pushes survived: " + JSON.stringify(entry && entry.result));
+  });
+  await atest("pbpAskHistAppend appends a round and trims to 20 (PBP_ASK_HIST_MAX)", async () => {
+    const url = "https://append-test.example/" + Date.now() + "_" + Math.random();
+    for (let i = 1; i <= 22; i++) await pbpAskHistAppend(url, { q: "q" + i });
+    const hist = await pbpAskHistGet(url);
+    assertEq(hist.length, 20, "capped at 20, got " + hist.length);
+    assertEq(hist[0].q, "q3", "oldest 2 dropped");
+    assertEq(hist[19].q, "q22", "newest kept");
+  });
+})();
 </script>
 
 <script>
@@ -1485,6 +1582,12 @@ suiteIf("pbpAskBuildContext", "pbpAskBuildContext", () => {
   test("block text is whitespace-collapsed in its line", () => {
     const r = pbpAskBuildContext(ctxBlocks("<p>a   b\n c</p>"), 1000);
     assertEq(r.text, "[P1] a b c", "collapsed");
+  });
+  test("D10-1: a rendered KaTeX block contributes $tex$ to the model context, not the expanded glyph+MathML string", () => {
+    const html = '<p>see <span class="katex"><span class="katex-mathml"><math><semantics><mrow></mrow><annotation encoding="application/x-tex">E=mc^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">Emc2glyphs</span></span> here</p>';
+    const r = pbpAskBuildContext(ctxBlocks(html), 1000);
+    assert(r.text.indexOf("$E=mc^2$") !== -1, "clean tex source reached the context: " + r.text);
+    assert(r.text.indexOf("Emc2glyphs") === -1, "expanded KaTeX glyphs did not leak into the context: " + r.text);
   });
   test("headings always kept even when middles are dropped", () => {
     // P1-P3 first three, P5 heading, P7/P8 last two = mandatory (6 blocks).

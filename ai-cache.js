@@ -44,6 +44,45 @@ async function pbpAiCacheGet(key) {
   }
 }
 
+// LRU enforcement shared by pbpAiCacheSet/pbpAiCacheAppend: count entries;
+// if over cap, delete oldest by ts. Runs in its own transaction(s) AFTER
+// the write transaction resolves - an eviction race here is benign (see
+// D2 checked_clean: worst case an extra recent entry is evicted, which
+// just re-populates on next miss), unlike the get-then-put race
+// pbpAiCacheAppend exists to close.
+async function _pbpAiEvictOverflow(db) {
+  const count = await new Promise((resolve) => {
+    try {
+      const tx = db.transaction(_PBP_AI_STORE, "readonly");
+      const req = tx.objectStore(_PBP_AI_STORE).count();
+      req.onsuccess = () => resolve(req.result || 0);
+      req.onerror = () => resolve(0);
+    } catch (_) { resolve(0); }
+  });
+  if (count > _PBP_AI_CACHE_MAX_ENTRIES) {
+    const overflow = count - _PBP_AI_CACHE_MAX_ENTRIES;
+    await new Promise((resolve) => {
+      try {
+        const tx = db.transaction(_PBP_AI_STORE, "readwrite");
+        const store = tx.objectStore(_PBP_AI_STORE);
+        const cursorReq = store.index("ts").openCursor(); // ASC by ts (oldest first)
+        let deleted = 0;
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (cursor && deleted < overflow) {
+            cursor.delete();
+            deleted++;
+            cursor.continue();
+          } else {
+            resolve();
+          }
+        };
+        cursorReq.onerror = () => resolve();
+      } catch (_) { resolve(); }
+    });
+  }
+}
+
 async function pbpAiCacheSet(key, result, ts) {
   try {
     const db = await _pbpAiOpenDB();
@@ -53,37 +92,42 @@ async function pbpAiCacheSet(key, result, ts) {
       req.onsuccess = () => resolve();
       req.onerror = () => resolve();
     });
-    // LRU enforcement: count entries; if > cap, delete oldest by ts
-    const count = await new Promise((resolve) => {
-      try {
-        const tx = db.transaction(_PBP_AI_STORE, "readonly");
-        const req = tx.objectStore(_PBP_AI_STORE).count();
-        req.onsuccess = () => resolve(req.result || 0);
-        req.onerror = () => resolve(0);
-      } catch (_) { resolve(0); }
-    });
-    if (count > _PBP_AI_CACHE_MAX_ENTRIES) {
-      const overflow = count - _PBP_AI_CACHE_MAX_ENTRIES;
-      await new Promise((resolve) => {
+    await _pbpAiEvictOverflow(db);
+  } catch (_) {}
+}
+
+// Atomic get-then-transform-then-put, in ONE readwrite IDB transaction
+// (D2-2). Unlike a separate pbpAiCacheGet()+pbpAiCacheSet() pair, this
+// closes the lost-update race two tabs can hit on the same key (IndexedDB
+// serializes readwrite transactions on the same store across ALL
+// connections/tabs, so the get inside this transaction always sees the
+// latest committed value). `transform(prevResult)` runs synchronously
+// inside the transaction and returns the new `result` to store - it must
+// not await or touch other stores. Used by md-ai-core.js's
+// pbpAskHistAppend for ask history; degrades to a no-op on any failure
+// (same swallow-all-errors contract as the rest of this file).
+async function pbpAiCacheAppend(key, transform, ts) {
+  try {
+    const db = await _pbpAiOpenDB();
+    await new Promise((resolve) => {
+      const tx = db.transaction(_PBP_AI_STORE, "readwrite");
+      const store = tx.objectStore(_PBP_AI_STORE);
+      const getReq = store.get(key);
+      getReq.onsuccess = () => {
+        let next;
         try {
-          const tx = db.transaction(_PBP_AI_STORE, "readwrite");
-          const store = tx.objectStore(_PBP_AI_STORE);
-          const cursorReq = store.index("ts").openCursor(); // ASC by ts (oldest first)
-          let deleted = 0;
-          cursorReq.onsuccess = () => {
-            const cursor = cursorReq.result;
-            if (cursor && deleted < overflow) {
-              cursor.delete();
-              deleted++;
-              cursor.continue();
-            } else {
-              resolve();
-            }
-          };
-          cursorReq.onerror = () => resolve();
-        } catch (_) { resolve(); }
-      });
-    }
+          next = transform(getReq.result ? getReq.result.result : undefined);
+        } catch (_) {
+          resolve();
+          return;
+        }
+        const putReq = store.put({ key, result: next, ts: ts == null ? Date.now() : ts });
+        putReq.onsuccess = () => resolve();
+        putReq.onerror = () => resolve();
+      };
+      getReq.onerror = () => resolve();
+    });
+    await _pbpAiEvictOverflow(db);
   } catch (_) {}
 }
 

@@ -20,11 +20,13 @@ const PBP_AI_CONTAINER_TAGS = ["DIV", "SECTION", "ARTICLE"];
 let _pbpAiBlockIndex = [];
 let _pbpAiTextCache = Object.create(null);
 let _pbpAiMdCache = Object.create(null);
+let _pbpAiTextKatexCache = Object.create(null);
 
 function pbpAiIndexBlocks(rootEl) {
   _pbpAiBlockIndex = [];
   _pbpAiTextCache = Object.create(null);
   _pbpAiMdCache = Object.create(null);
+  _pbpAiTextKatexCache = Object.create(null);
   if (!rootEl) return _pbpAiBlockIndex;
   let n = 0;
   const add = (el, tag) => {
@@ -171,6 +173,34 @@ function pbpAiMdOf(n) {
   }
   _pbpAiMdCache[key] = md;
   return md;
+}
+
+// ---- KaTeX-aware text variant (ask context/citations; D10-1) ----
+// pbpAiTextOf caches the raw el.textContent, which KaTeX's async
+// renderMathInElement (md-preview.js) mutates in place for math blocks:
+// the block's textContent becomes rendered glyphs + presentation MathML +
+// the TeX annotation, all concatenated (a 2-3x duplicated string per
+// equation). Ask's context builder and citation tooltips want the clean
+// "$tex$" source instead - the same fidelity the translation path already
+// gets from _pbpAiKatexPrepass via pbpAiMdOf. Only blocks that actually
+// contain rendered KaTeX pay the clone+prepass cost; everything else is
+// just pbpAiTextOf. Degrades to pbpAiTextOf on any failure - never throws,
+// never blocks ask.
+function pbpAiTextOfKatex(n) {
+  const key = String(n);
+  if (key in _pbpAiTextKatexCache) return _pbpAiTextKatexCache[key];
+  const el = pbpAiBlockEl(n);
+  if (!el) return "";
+  let text = pbpAiTextOf(n);
+  if (el.querySelector(".katex")) {
+    try {
+      const clone = el.cloneNode(true);
+      _pbpAiKatexPrepass(clone);
+      text = clone.textContent || "";
+    } catch (_) { /* degrade: keep the plain pbpAiTextOf(n) assigned above */ }
+  }
+  _pbpAiTextKatexCache[key] = text;
+  return text;
 }
 
 // ---- FNV-1a 32-bit hash, hex string. Math.imul keeps the multiply in
@@ -499,6 +529,20 @@ async function pbpAskHistGet(url) {
 
 async function pbpAskHistSet(url, arr) {
   await pbpAiCacheSet(_pbpAskHistKey(url), _pbpAskHistTrim(arr), Date.now());
+}
+
+// Atomic history append (D2-2): a plain pbpAskHistGet()+push+pbpAskHistSet()
+// sequence is two separate IDB transactions, so two preview tabs open on the
+// same URL can race a concurrent get-then-put and silently lose one tab's
+// round (classic last-writer-wins). Routing the read-modify-write through
+// ai-cache.js's pbpAiCacheAppend puts it in ONE readwrite transaction,
+// which IndexedDB serializes across tabs/connections - closing the race.
+async function pbpAskHistAppend(url, round) {
+  await pbpAiCacheAppend(_pbpAskHistKey(url), (prev) => {
+    const hist = Array.isArray(prev) ? prev.slice() : [];
+    hist.push(round);
+    return _pbpAskHistTrim(hist);
+  });
 }
 
 async function pbpTrViewGet(url) {
