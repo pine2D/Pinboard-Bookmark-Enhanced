@@ -594,7 +594,15 @@ async function pbpTrInit(detail) {
   // first-paint critical path below (audit #2), so nothing here blocks the first frame.
   const cand = pbpAiBlocks().filter((b) => b.tag !== "pre" && (b.el.textContent || "").trim());
   if (!cand.length) return;
-  st.approxChars = cand.reduce((a, b) => a + (b.el.textContent || "").length, 0);
+  // T3 cost-estimate pre-gate: a cheap heuristic on raw textContent (no Turndown/
+  // shield yet -- st.work isn't built here) so the pre-run cost estimate already
+  // reflects blocks the queue-build skip (_pbpTrApplySkips, below) will exclude.
+  // Best-effort only; the authoritative per-block decision runs on shielded text
+  // once st.work exists.
+  st.approxChars = cand.reduce((a, b) => {
+    const txt = b.el.textContent || "";
+    return pbpTrBlockIsTargetLang(txt, target.code) ? a : a + txt.length;
+  }, 0);
   _pbpTrBuildSection(st);
 
   // Refresh the rail label live when the user changes the target language in options.
@@ -634,6 +642,8 @@ async function pbpTrInit(detail) {
   st.workReady = _pbpTrBuildWork(st, cand).then(() => {
     if (!st.work.length) { const sec = document.getElementById("tr-section"); if (sec) sec.remove(); return; }
     return _pbpTrProbeCache(st);
+  }).then(() => {
+    _pbpTrApplySkips(st);
   }).catch(() => {});
 }
 
