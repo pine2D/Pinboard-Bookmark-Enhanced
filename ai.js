@@ -420,6 +420,62 @@ function _pbpOllamaDelta(obj) {
   return (typeof t === "string" && t.length) ? t : null;
 }
 
+// Per-provider USAGE extractors (opportunistic): parsed JSON chunk ->
+// {inTok, outTok} (either field may be null) or null when the chunk carries no
+// token counts. ZERO request mutation — we never set stream_options.include_usage
+// or any per-provider dialect field (free-text `model` makes blanket params the
+// "disable-thinking 400" class of footgun). If a provider does not happen to emit
+// usage in its stream, the extractor returns null and the caller falls back to a
+// chars/4 estimate. Field names verified against official provider docs (cited).
+function _pbpOpenAIUsage(obj) {
+  // OpenAI Chat Completions streaming: final chunk carries usage.prompt_tokens /
+  // usage.completion_tokens (choices then []). Present only when the server emits
+  // it — standard OpenAI needs stream_options.include_usage (we DON'T send it), but
+  // several compat providers (e.g. DeepSeek) include it by default. Opportunistic.
+  // developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events
+  const u = obj && obj.usage;
+  if (!u) return null;
+  const inTok = typeof u.prompt_tokens === "number" ? u.prompt_tokens : null;
+  const outTok = typeof u.completion_tokens === "number" ? u.completion_tokens : null;
+  return (inTok === null && outTok === null) ? null : { inTok, outTok };
+}
+
+function _pbpGeminiUsage(obj) {
+  // Gemini streamGenerateContent: usageMetadata.promptTokenCount /
+  // usageMetadata.candidatesTokenCount, repeated (cumulative) on each chunk.
+  // ai.google.dev/api/generate-content (UsageMetadata)
+  const u = obj && obj.usageMetadata;
+  if (!u) return null;
+  const inTok = typeof u.promptTokenCount === "number" ? u.promptTokenCount : null;
+  const outTok = typeof u.candidatesTokenCount === "number" ? u.candidatesTokenCount : null;
+  return (inTok === null && outTok === null) ? null : { inTok, outTok };
+}
+
+function _pbpClaudeUsage(obj) {
+  // Anthropic Messages streaming: input_tokens arrives in message_start
+  // (message.usage.input_tokens); cumulative output_tokens in message_delta
+  // (usage.output_tokens). Two events -> the sink merges per field.
+  // platform.claude.com/docs/en/docs/build-with-claude/streaming
+  if (obj && obj.type === "message_start") {
+    const it = obj.message && obj.message.usage && obj.message.usage.input_tokens;
+    return typeof it === "number" ? { inTok: it, outTok: null } : null;
+  }
+  if (obj && obj.type === "message_delta") {
+    const ot = obj.usage && obj.usage.output_tokens;
+    return typeof ot === "number" ? { inTok: null, outTok: ot } : null;
+  }
+  return null;
+}
+
+function _pbpOllamaUsage(obj) {
+  // Ollama /api/chat: final object (done:true) carries prompt_eval_count /
+  // eval_count. github.com/ollama/ollama/blob/main/docs/api.md
+  if (!obj || !obj.done) return null;
+  const inTok = typeof obj.prompt_eval_count === "number" ? obj.prompt_eval_count : null;
+  const outTok = typeof obj.eval_count === "number" ? obj.eval_count : null;
+  return (inTok === null && outTok === null) ? null : { inTok, outTok };
+}
+
 // ---- Stream plumbing ----
 
 const PBP_STREAM_IDLE_MS = 30000;
@@ -520,17 +576,43 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
 // run the provider delta extractor, forward text via onText(delta).
 // "[DONE]" (OpenAI terminator) and unparseable keep-alives are skipped;
 // stream end is signaled by the reader, not by the terminator.
-function _pbpSseConsumer(extractDelta, onText) {
+function _pbpSseConsumer(extractDelta, onText, onRaw) {
   return (buf, isFinal) => {
     const { events, rest } = _pbpSseChunks(isFinal ? buf + "\n\n" : buf);
     for (const ev of events) {
       if (ev === "[DONE]") continue;
       let obj;
       try { obj = JSON.parse(ev); } catch (_) { continue; }
+      if (onRaw) onRaw(obj);            // T4: opportunistic usage side-channel (per parsed chunk)
       const d = extractDelta(obj);
       if (d) onText(d);
     }
     return isFinal ? "" : rest;
+  };
+}
+
+// Opportunistic usage collector shared by every streaming path. `extractUsage`
+// is a per-provider extractor above. onRaw() runs it on each parsed chunk and
+// keeps the LAST non-null value PER FIELD (Gemini repeats cumulative usage each
+// chunk -> last wins; Claude splits input/output across two events -> merged).
+// flush() invokes opts.onUsage exactly once after a NORMAL stream end, iff any
+// field was captured. Any extractor throw is swallowed (degrade to estimate).
+function _pbpUsageSink(extractUsage, opts) {
+  const acc = { inTok: null, outTok: null };
+  let saw = false;
+  return {
+    onRaw(obj) {
+      let u;
+      try { u = extractUsage(obj); } catch (_) { u = null; }
+      if (!u) return;
+      if (u.inTok != null) { acc.inTok = u.inTok; saw = true; }
+      if (u.outTok != null) { acc.outTok = u.outTok; saw = true; }
+    },
+    flush() {
+      if (saw && opts && typeof opts.onUsage === "function") {
+        opts.onUsage({ inTok: acc.inTok || 0, outTok: acc.outTok || 0 });
+      }
+    }
   };
 }
 
@@ -541,6 +623,7 @@ async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta
   if (opts.system) messages.push({ role: "system", content: opts.system });
   messages.push({ role: "user", content: prompt });
   let full = "";
+  const usage = _pbpUsageSink(_pbpOpenAIUsage, opts);
   await _pbpStreamRead(
     `${baseUrl.replace(/\/+$/, "")}/chat/completions`,
     {
@@ -555,9 +638,10 @@ async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta
       })
     },
     opts, "API",
-    _pbpSseConsumer(_pbpOpenAIDelta, (d) => { full += d; onDelta(d, full); })
+    _pbpSseConsumer(_pbpOpenAIDelta, (d) => { full += d; onDelta(d, full); }, usage.onRaw)
   );
   if (!full.trim()) throw new Error("API returned empty response");
+  usage.flush();
   return full;
 }
 
@@ -572,14 +656,16 @@ async function _streamGemini(s, prompt, opts, onDelta) {
   const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig };
   if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
   let full = "";
+  const usage = _pbpUsageSink(_pbpGeminiUsage, opts);
   // Gemini requires the key as a URL param (same limitation as callGemini)
   await _pbpStreamRead(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${s.geminiApiKey}`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
     opts, "Gemini",
-    _pbpSseConsumer(_pbpGeminiDelta, (d) => { full += d; onDelta(d, full); })
+    _pbpSseConsumer(_pbpGeminiDelta, (d) => { full += d; onDelta(d, full); }, usage.onRaw)
   );
   if (!full.trim()) throw new Error("Gemini returned empty response");
+  usage.flush();
   return full;
 }
 
@@ -593,6 +679,7 @@ async function _streamClaude(s, prompt, opts, onDelta) {
   };
   if (opts.system) body.system = opts.system;
   let full = "";
+  const usage = _pbpUsageSink(_pbpClaudeUsage, opts);
   await _pbpStreamRead(
     "https://api.anthropic.com/v1/messages",
     {
@@ -606,9 +693,10 @@ async function _streamClaude(s, prompt, opts, onDelta) {
       body: JSON.stringify(body)
     },
     opts, "Claude",
-    _pbpSseConsumer(_pbpClaudeDelta, (d) => { full += d; onDelta(d, full); })
+    _pbpSseConsumer(_pbpClaudeDelta, (d) => { full += d; onDelta(d, full); }, usage.onRaw)
   );
   if (!full.trim()) throw new Error("Claude returned empty response");
+  usage.flush();
   return full;
 }
 
@@ -627,6 +715,7 @@ async function _streamOllama(s, prompt, opts, onDelta) {
     }
   };
   let full = "";
+  const usage = _pbpUsageSink(_pbpOllamaUsage, opts);
   // Ollama streams NDJSON (one JSON object per line), not SSE.
   const consume = (buf, isFinal) => {
     const lines = buf.split("\n");
@@ -636,6 +725,7 @@ async function _streamOllama(s, prompt, opts, onDelta) {
       if (!trimmed) continue;
       let obj;
       try { obj = JSON.parse(trimmed); } catch (_) { continue; }
+      usage.onRaw(obj);                 // T4: final done:true chunk carries the counts
       const d = _pbpOllamaDelta(obj);
       if (d) { full += d; onDelta(d, full); }
     }
@@ -647,6 +737,7 @@ async function _streamOllama(s, prompt, opts, onDelta) {
     opts, "Ollama", consume
   );
   if (!full.trim()) throw new Error("Ollama returned empty response");
+  usage.flush();
   return full;
 }
 
@@ -654,7 +745,10 @@ async function _streamOllama(s, prompt, opts, onDelta) {
 // callAIStream(s, prompt, opts, onDelta) -> Promise<string fullText>
 //   opts: { maxTokens?, model? (override provider default), system?,
 //           signal? (AbortSignal), temperature? (default 0.3),
-//           noThinking? (Gemini only) }
+//           noThinking? (Gemini only),
+//           onUsage?({inTok,outTok}) — T4: fired at most once after a NORMAL
+//             stream end IFF the provider opportunistically emitted usage in the
+//             stream (ZERO request mutation). Callers omitting it are unaffected. }
 //   onDelta(deltaText, accumulatedText) fires once per text chunk.
 //   Resolves with the full accumulated text (identical to the last
 //   accumulatedText passed to onDelta). Rejects with handleAIError

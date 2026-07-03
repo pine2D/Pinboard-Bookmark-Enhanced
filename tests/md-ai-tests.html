@@ -240,6 +240,123 @@ suite("_pbpOllamaDelta", () => {
 </script>
 
 <script>
+// ============ T4: provider usage extractors (opportunistic, ZERO request mutation) ============
+suite("_pbpOpenAIUsage", () => {
+  test("final usage chunk -> {inTok,outTok}", () => {
+    assertEq(JSON.stringify(_pbpOpenAIUsage({ choices: [], usage: { prompt_tokens: 12, completion_tokens: 34, total_tokens: 46 } })),
+      JSON.stringify({ inTok: 12, outTok: 34 }), "usage extracted");
+  });
+  test("content-only chunk -> null", () => {
+    assertEq(_pbpOpenAIUsage({ choices: [{ delta: { content: "hi" } }] }), null, "no usage");
+  });
+  test("partial usage (prompt only) -> outTok null", () => {
+    assertEq(JSON.stringify(_pbpOpenAIUsage({ usage: { prompt_tokens: 5 } })),
+      JSON.stringify({ inTok: 5, outTok: null }), "partial");
+  });
+  test("garbage/null -> null, no throw", () => {
+    assertEq(_pbpOpenAIUsage({}), null, "empty");
+    assertEq(_pbpOpenAIUsage(null), null, "null");
+  });
+});
+
+suite("_pbpGeminiUsage", () => {
+  test("usageMetadata -> {inTok,outTok}", () => {
+    assertEq(JSON.stringify(_pbpGeminiUsage({ usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 40, totalTokenCount: 140 } })),
+      JSON.stringify({ inTok: 100, outTok: 40 }), "gemini usage");
+  });
+  test("no usageMetadata -> null", () => {
+    assertEq(_pbpGeminiUsage({ candidates: [{ content: { parts: [{ text: "x" }] } }] }), null, "no meta");
+  });
+  test("null -> null", () => {
+    assertEq(_pbpGeminiUsage(null), null, "null");
+  });
+});
+
+suite("_pbpClaudeUsage", () => {
+  test("message_start -> input only", () => {
+    assertEq(JSON.stringify(_pbpClaudeUsage({ type: "message_start", message: { usage: { input_tokens: 25, output_tokens: 1 } } })),
+      JSON.stringify({ inTok: 25, outTok: null }), "input from message_start");
+  });
+  test("message_delta -> output only", () => {
+    assertEq(JSON.stringify(_pbpClaudeUsage({ type: "message_delta", usage: { output_tokens: 88 } })),
+      JSON.stringify({ inTok: null, outTok: 88 }), "output from message_delta");
+  });
+  test("content_block_delta -> null", () => {
+    assertEq(_pbpClaudeUsage({ type: "content_block_delta", delta: { type: "text_delta", text: "hi" } }), null, "text chunk");
+  });
+  test("null -> null", () => {
+    assertEq(_pbpClaudeUsage(null), null, "null");
+  });
+});
+
+suite("_pbpOllamaUsage", () => {
+  test("final done chunk -> {inTok,outTok}", () => {
+    assertEq(JSON.stringify(_pbpOllamaUsage({ done: true, prompt_eval_count: 30, eval_count: 60, total_duration: 1 })),
+      JSON.stringify({ inTok: 30, outTok: 60 }), "ollama counts");
+  });
+  test("streaming chunk (done false) -> null", () => {
+    assertEq(_pbpOllamaUsage({ message: { content: "hi" }, done: false }), null, "not final");
+  });
+  test("final chunk missing counts -> null", () => {
+    assertEq(_pbpOllamaUsage({ done: true }), null, "no counts");
+  });
+  test("null -> null", () => {
+    assertEq(_pbpOllamaUsage(null), null, "null");
+  });
+});
+
+suite("_pbpUsageSink + _pbpSseConsumer onRaw", () => {
+  test("sink merges input+output across two Claude events, flush fires once", () => {
+    const seen = [];
+    const sink = _pbpUsageSink(_pbpClaudeUsage, { onUsage: (u) => seen.push(u) });
+    sink.onRaw({ type: "message_start", message: { usage: { input_tokens: 10, output_tokens: 1 } } });
+    sink.onRaw({ type: "content_block_delta", delta: { type: "text_delta", text: "x" } });
+    sink.onRaw({ type: "message_delta", usage: { output_tokens: 42 } });
+    assertEq(seen.length, 0, "no call before flush");
+    sink.flush();
+    assertEq(seen.length, 1, "flush fires exactly once");
+    assertEq(JSON.stringify(seen[0]), JSON.stringify({ inTok: 10, outTok: 42 }), "merged in/out");
+  });
+  test("last non-null wins per field (Gemini cumulative repeats)", () => {
+    const seen = [];
+    const sink = _pbpUsageSink(_pbpGeminiUsage, { onUsage: (u) => seen.push(u) });
+    sink.onRaw({ usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 5 } });
+    sink.onRaw({ usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 30 } });
+    sink.flush();
+    assertEq(JSON.stringify(seen[0]), JSON.stringify({ inTok: 50, outTok: 30 }), "last cumulative wins");
+  });
+  test("no usage seen -> flush does not call onUsage", () => {
+    let called = 0;
+    const sink = _pbpUsageSink(_pbpOpenAIUsage, { onUsage: () => { called++; } });
+    sink.onRaw({ choices: [{ delta: { content: "hi" } }] });
+    sink.flush();
+    assertEq(called, 0, "no usage -> no call");
+  });
+  test("missing opts.onUsage tolerated (no throw)", () => {
+    const sink = _pbpUsageSink(_pbpOpenAIUsage, {});
+    sink.onRaw({ usage: { prompt_tokens: 1, completion_tokens: 2 } });
+    sink.flush();
+    assert(true, "no throw when onUsage absent");
+  });
+  test("_pbpSseConsumer calls onRaw once per parsed JSON chunk, skips [DONE]", () => {
+    const raw = [];
+    const consume = _pbpSseConsumer(_pbpOpenAIDelta, () => {}, (obj) => raw.push(obj));
+    consume('data: {"choices":[{"delta":{"content":"a"}}]}\n\n' +
+            'data: {"choices":[],"usage":{"prompt_tokens":3,"completion_tokens":4}}\n\n' +
+            'data: [DONE]\n\n', true);
+    assertEq(raw.length, 2, "two JSON chunks seen, [DONE] skipped");
+    assertEq(raw[1].usage.completion_tokens, 4, "second chunk is the usage chunk");
+  });
+  test("extractor exception inside sink.onRaw is swallowed (degrade, no throw)", () => {
+    const sink = _pbpUsageSink(() => { throw new Error("boom"); }, { onUsage: () => {} });
+    sink.onRaw({ any: 1 });
+    sink.flush();
+    assert(true, "extractor throw degraded");
+  });
+});
+</script>
+
+<script>
 // ============ ai.js: _pbpChainAbort ============
 suite("_pbpChainAbort", () => {
   test("no parent -> fresh non-aborted controller", () => {
