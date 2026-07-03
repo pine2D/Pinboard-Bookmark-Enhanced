@@ -2712,6 +2712,30 @@ suiteIf("_pbpTrApplyTargetLang", "_pbpTrApplyTargetLang", () => {
     assert(st.target && st.target.code === "zh-CN", "st.target updated to zh-CN, got " + (st.target && st.target.code));
     assert(el.textContent && el.textContent.length > 0, "label text set");
   });
+  test("T3: a REAL language change resets skippedSet/skippedCount and hides the skip note (no stale state)", () => {
+    const el = document.createElement("span");
+    const note = document.createElement("div");
+    note.id = "tr-skip-note";
+    note.hidden = false;
+    note.textContent = "3 blocks already in target language, skipped";
+    document.body.appendChild(note);
+    try {
+      const st = {
+        tgtTextEl: el,
+        target: { code: "zh-Hans", name: "Simplified Chinese", display: "简体中文" },
+        trMd: { 1: "a", 2: "b" },
+        skippedSet: new Set([1, 2]),
+        skippedCount: 2
+      };
+      _pbpTrApplyTargetLang(st, { translateTargetLang: "en" });
+      assertEq(Object.keys(st.trMd).length, 0, "trMd reset (existing behavior)");
+      assertEq(st.skippedSet.size, 0, "skippedSet reset for the new language");
+      assertEq(st.skippedCount, 0, "skippedCount reset for the new language");
+      assertEq(note.hidden, true, "skip note hidden after a real language change");
+    } finally {
+      document.body.removeChild(note);
+    }
+  });
 });
 
 suiteIf("pbpForumShouldMark", "pbpForumShouldMark", () => {

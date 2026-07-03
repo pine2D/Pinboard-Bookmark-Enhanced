@@ -857,6 +857,10 @@ async function _pbpTrApplyTargetLang(st, s) {
   // re-probe — clicking Translate re-requests; correctness only needs "can retranslate".
   st.glossary = null;
   st.trMd = Object.create(null);
+  st.skippedSet = new Set();      // T3: stale skip verdicts were computed for the OLD language
+  st.skippedCount = 0;
+  const skipNote = document.getElementById("tr-skip-note");
+  if (skipNote) { skipNote.hidden = true; skipNote.textContent = ""; }
   document.querySelectorAll("#rendered-view .pb-tr").forEach((el) => el.remove());
   document.querySelectorAll("#rendered-view .pb-tr-err").forEach((el) => el.remove());
   document.querySelectorAll("#rendered-view [data-pb-tr-done]").forEach((el) => { delete el.dataset.pbTrDone; });
