@@ -2344,11 +2344,20 @@
   "mdSendTooLongFellBack": {
     "message": "Za długi na bezpośredni link — skopiowano pełny tekst. Wklej do {name} (Ctrl+V), aby zakończyć."
   },
+  "mdSentUrlScheme": {
+    "message": "Otwarto {name} — pełny tekst skopiowano do schowka"
+  },
+  "mdOpenedApp": {
+    "message": "Otwarto {name}"
+  },
   "mdSendNeedsSetup": {
     "message": "Dokończ konfigurację w Ustawieniach"
   },
   "mdSendFailed": {
     "message": "Wysyłanie nie powiodło się"
+  },
+  "mdSendOpenBlocked": {
+    "message": "Nie udało się otworzyć aplikacji — pełny tekst skopiowano do schowka"
   },
   "mdSendNoneConfigured": {
     "message": "Brak włączonych miejsc docelowych — dodaj jedno w Ustawieniach"

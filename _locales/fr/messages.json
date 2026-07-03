@@ -2344,11 +2344,20 @@
   "mdSendTooLongFellBack": {
     "message": "Trop long pour un lien direct — texte complet copié. Collez dans {name} (Ctrl+V) pour terminer."
   },
+  "mdSentUrlScheme": {
+    "message": "{name} ouvert — texte complet copié dans le presse-papiers"
+  },
+  "mdOpenedApp": {
+    "message": "{name} ouvert"
+  },
   "mdSendNeedsSetup": {
     "message": "Terminer la configuration dans les Paramètres"
   },
   "mdSendFailed": {
     "message": "Échec de l’envoi"
+  },
+  "mdSendOpenBlocked": {
+    "message": "Impossible d’ouvrir l’application — texte complet copié dans le presse-papiers"
   },
   "mdSendNoneConfigured": {
     "message": "Aucune destination activée — en ajouter une dans les Paramètres"

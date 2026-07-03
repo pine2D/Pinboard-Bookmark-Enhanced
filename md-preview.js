@@ -756,9 +756,20 @@ function ensureKatex() {
         const httpWarn = id === "webhook" && typeof pbpWebhookHttpWarn === "function"
           && pbpWebhookHttpWarn((et[id] && et[id].url) || "");
         if (res.ok && !res.fellBack) {
-          flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label));        // short -> button
-          if (httpWarn) showSendStatus(t("mdTargetWebhookHttpWarn"), false);
-          else if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url); // + clickable link
+          // token-api (gist/webhook) has a real HTTP receipt -- text unchanged.
+          // url-scheme (obsidian) has no receipt: the OS may have silently
+          // dropped the open, so the claim is scoped to what's verifiably
+          // true ("opened" + "copied"), not "sent".
+          if (row.mechanism === "url-scheme") {
+            flashButtonLabel(primary, t("mdOpenedApp").replace("{name}", row.label));
+            showSendStatus(t("mdSentUrlScheme").replace("{name}", row.label), false);
+          } else {
+            flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label));        // short -> button
+            if (httpWarn) showSendStatus(t("mdTargetWebhookHttpWarn"), false);
+            else if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url); // + clickable link
+          }
+        } else if (res.error === "open-blocked") {
+          showSendStatus(t("mdSendOpenBlocked"), true);
         } else if (res.ok) {
           showSendStatus(t("mdSendTooLongFellBack").replace("{name}", row.label), false); // long -> roomy block
         } else if (typeof res.error === "string" && res.error.startsWith("missing:")) {

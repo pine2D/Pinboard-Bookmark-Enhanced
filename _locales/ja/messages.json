@@ -2344,11 +2344,20 @@
   "mdSendTooLongFellBack": {
     "message": "直接リンクには長すぎます — 全文をコピーしました。{name} に貼り付けて（Ctrl+V）完了してください。"
   },
+  "mdSentUrlScheme": {
+    "message": "{name} を開きました · 全文をクリップボードにコピーしました"
+  },
+  "mdOpenedApp": {
+    "message": "{name} を開きました"
+  },
   "mdSendNeedsSetup": {
     "message": "設定で初期設定を完了してください"
   },
   "mdSendFailed": {
     "message": "送信失敗"
+  },
+  "mdSendOpenBlocked": {
+    "message": "アプリを開けませんでした · 全文をクリップボードにコピーしました"
   },
   "mdSendNoneConfigured": {
     "message": "送信先が有効化されていません — 設定で追加してください"

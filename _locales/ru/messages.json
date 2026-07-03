@@ -2344,11 +2344,20 @@
   "mdSendTooLongFellBack": {
     "message": "Слишком длинный для прямой ссылки — полный текст скопирован. Вставьте в {name} (Ctrl+V), чтобы завершить."
   },
+  "mdSentUrlScheme": {
+    "message": "Открыто {name} — полный текст скопирован в буфер обмена"
+  },
+  "mdOpenedApp": {
+    "message": "Открыто {name}"
+  },
   "mdSendNeedsSetup": {
     "message": "Завершите настройку в Параметрах"
   },
   "mdSendFailed": {
     "message": "Ошибка отправки"
+  },
+  "mdSendOpenBlocked": {
+    "message": "Не удалось открыть приложение — полный текст скопирован в буфер обмена"
   },
   "mdSendNoneConfigured": {
     "message": "Нет включённых мест назначения — добавьте одно в Параметрах"

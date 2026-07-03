@@ -2344,11 +2344,20 @@
   "mdSendTooLongFellBack": {
     "message": "內容過長，無法用直接連結傳送——已複製全文，在 {name} 中貼上（Ctrl+V）即可完成。"
   },
+  "mdSentUrlScheme": {
+    "message": "已開啟 {name} · 全文已複製到剪貼簿"
+  },
+  "mdOpenedApp": {
+    "message": "已開啟 {name}"
+  },
   "mdSendNeedsSetup": {
     "message": "請先在設定中完成配置"
   },
   "mdSendFailed": {
     "message": "傳送失敗"
+  },
+  "mdSendOpenBlocked": {
+    "message": "無法開啟應用程式 · 全文已複製到剪貼簿"
   },
   "mdSendNoneConfigured": {
     "message": "尚未啟用任何目標——請在設定中新增"

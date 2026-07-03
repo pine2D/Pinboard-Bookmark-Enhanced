@@ -2344,11 +2344,20 @@
   "mdSendTooLongFellBack": {
     "message": "Zu lang für einen direkten Link — vollständiger Text kopiert. In {name} einfügen (Ctrl+V), um den Vorgang abzuschließen."
   },
+  "mdSentUrlScheme": {
+    "message": "{name} geöffnet — vollständiger Text in die Zwischenablage kopiert"
+  },
+  "mdOpenedApp": {
+    "message": "{name} geöffnet"
+  },
   "mdSendNeedsSetup": {
     "message": "Einrichtung in den Einstellungen abschließen"
   },
   "mdSendFailed": {
     "message": "Senden fehlgeschlagen"
+  },
+  "mdSendOpenBlocked": {
+    "message": "App konnte nicht geöffnet werden — vollständiger Text in die Zwischenablage kopiert"
   },
   "mdSendNoneConfigured": {
     "message": "Keine Ziele aktiviert — eines in den Einstellungen hinzufügen"

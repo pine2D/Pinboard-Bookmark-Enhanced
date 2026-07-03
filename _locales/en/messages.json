@@ -2344,11 +2344,20 @@
   "mdSendTooLongFellBack": {
     "message": "Too long for a direct link — full text copied. Paste into {name} (Ctrl+V) to finish."
   },
+  "mdSentUrlScheme": {
+    "message": "Opened {name} — full text copied to clipboard"
+  },
+  "mdOpenedApp": {
+    "message": "Opened {name}"
+  },
   "mdSendNeedsSetup": {
     "message": "Finish setup in Settings"
   },
   "mdSendFailed": {
     "message": "Send failed"
+  },
+  "mdSendOpenBlocked": {
+    "message": "Could not open the app — full text copied to clipboard"
   },
   "mdSendNoneConfigured": {
     "message": "No destinations enabled — add one in Settings"

@@ -2344,11 +2344,20 @@
   "mdSendTooLongFellBack": {
     "message": "内容较长，无法用链接直接发送——已复制全文，在 {name} 中粘贴（Ctrl+V）即可完成。"
   },
+  "mdSentUrlScheme": {
+    "message": "已打开 {name} · 全文已复制到剪贴板"
+  },
+  "mdOpenedApp": {
+    "message": "已打开 {name}"
+  },
   "mdSendNeedsSetup": {
     "message": "请先在设置中完成配置"
   },
   "mdSendFailed": {
     "message": "发送失败"
+  },
+  "mdSendOpenBlocked": {
+    "message": "无法打开应用 · 全文已复制到剪贴板"
   },
   "mdSendNoneConfigured": {
     "message": "尚未启用任何目标——请在设置中添加"

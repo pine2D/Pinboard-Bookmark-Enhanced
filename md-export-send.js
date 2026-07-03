@@ -126,7 +126,13 @@ async function pbpSendToTarget(id, ctx) {
         // note while claiming success — report failure instead (no data loss).
         if (!copied) return { ok: false, fellBack: false, error: "" };
         const uri = row.buildUri(meta, rawBody, cfg);
-        window.open(uri, "_blank");
+        const win = window.open(uri, "_blank");
+        // window.open returns null when the popup was blocked or the user
+        // cancelled the browser's "open <app>?" external-protocol prompt
+        // (Obsidian Clipper #828-style false success). copied is already
+        // true here (early-return above), so "full text on clipboard" stays
+        // a true claim even when the app never opened.
+        if (!win) return { ok: false, fellBack: false, error: "open-blocked" };
         return { ok: true, fellBack: false, error: null };
       }
       // Inline-content scheme: build the URI, fall back if it's too long.
@@ -136,11 +142,23 @@ async function pbpSendToTarget(id, ctx) {
         // Copy the full body to the clipboard and open the app with EMPTY content
         // (a short, valid URI) so the user lands paste-ready and finishes with one Ctrl+V.
         const fileBody = pbpBuildFileBody(id, meta, rawBody);
-        try { await navigator.clipboard.writeText(fileBody); } catch (_) {}
+        let copied = true;
+        try { await navigator.clipboard.writeText(fileBody); } catch (_) { copied = false; }
         const openUri = row.buildUri(meta, "", cfg); // empty content -> short URI -> opens app
-        window.open(openUri, "_blank");
+        const win = window.open(openUri, "_blank");
+        // Only claim "full text copied to clipboard" when copied is actually
+        // true -- a double failure (copy failed AND open blocked) must not
+        // reuse the open-blocked text, which asserts the clipboard has it.
+        if (!win) return { ok: false, fellBack: false, error: copied ? "open-blocked" : "" };
         return { ok: true, fellBack: true, error: null };
       }
+      // No live consumer takes this sub-path today (every url-scheme row in
+      // export-targets.js sets viaClipboard:true, so this bare-URI branch is
+      // unreachable) -- and unlike the two branches above, it never writes to
+      // the clipboard at all. Reusing "open-blocked" here would assert a false
+      // "full text copied to clipboard" claim, so a blocked open here degrades
+      // through the generic error path instead of inventing a claim this
+      // branch can't back up.
       window.open(uri, "_blank");
       return { ok: true, fellBack: false, error: null };
     }
