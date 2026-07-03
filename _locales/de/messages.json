@@ -2409,5 +2409,12 @@
   },
   "mdTargetWebhookHttpWarn": {
     "message": "Dieser Endpunkt verwendet HTTP statt HTTPS – der Authorization-Wert wird im Klartext gesendet. Für localhost/LAN unbedenklich; im öffentlichen Internet vermeiden."
-  }
+  },
+  "hlColorQuote": { "message": "Zitat" },
+  "hlColorDefinition": { "message": "Definition" },
+  "hlColorExample": { "message": "Beispiel" },
+  "hlColorDoubt": { "message": "Zweifel" },
+  "hlColorTodo": { "message": "Aufgabe" },
+  "hlNoteBtn": { "message": "Mit Notiz markieren" },
+  "hlSaveFailed": { "message": "Markierung konnte nicht gespeichert werden (Speicher voll)" }
 }

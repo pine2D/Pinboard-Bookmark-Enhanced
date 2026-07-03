@@ -2403,5 +2403,12 @@
   },
   "mdTargetWebhookHttpWarn": {
     "message": "This endpoint uses HTTP, not HTTPS — the Authorization value is sent in plaintext. Fine for localhost/LAN; avoid on the public internet."
-  }
+  },
+  "hlColorQuote": { "message": "Quote" },
+  "hlColorDefinition": { "message": "Definition" },
+  "hlColorExample": { "message": "Example" },
+  "hlColorDoubt": { "message": "Doubt" },
+  "hlColorTodo": { "message": "To-do" },
+  "hlNoteBtn": { "message": "Highlight with a note" },
+  "hlSaveFailed": { "message": "Highlight couldn't be saved (storage full)" }
 }

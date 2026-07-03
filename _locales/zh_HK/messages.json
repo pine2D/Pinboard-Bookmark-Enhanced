@@ -2409,5 +2409,12 @@
   },
   "mdTargetWebhookHttpWarn": {
     "message": "該位址使用 HTTP 而非 HTTPS——Authorization 值會以明文傳送。區域網絡／本機位址沒問題，公網位址請避免。"
-  }
+  },
+  "hlColorQuote": { "message": "金句" },
+  "hlColorDefinition": { "message": "定義" },
+  "hlColorExample": { "message": "例子" },
+  "hlColorDoubt": { "message": "存疑" },
+  "hlColorTodo": { "message": "待辦" },
+  "hlNoteBtn": { "message": "連筆記一併標記" },
+  "hlSaveFailed": { "message": "標記未能儲存（儲存空間已滿）" }
 }

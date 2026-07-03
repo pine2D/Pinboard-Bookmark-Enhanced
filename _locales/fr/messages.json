@@ -2409,5 +2409,12 @@
   },
   "mdTargetWebhookHttpWarn": {
     "message": "Ce point de terminaison utilise HTTP, pas HTTPS — la valeur Authorization est envoyée en clair. Sans risque pour localhost/réseau local ; à éviter sur Internet public."
-  }
+  },
+  "hlColorQuote": { "message": "Citation" },
+  "hlColorDefinition": { "message": "Définition" },
+  "hlColorExample": { "message": "Exemple" },
+  "hlColorDoubt": { "message": "Doute" },
+  "hlColorTodo": { "message": "À faire" },
+  "hlNoteBtn": { "message": "Surligner avec une note" },
+  "hlSaveFailed": { "message": "Le surlignage n'a pas pu être enregistré (stockage plein)" }
 }

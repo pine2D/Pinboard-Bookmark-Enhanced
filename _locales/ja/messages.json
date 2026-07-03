@@ -2409,5 +2409,12 @@
   },
   "mdTargetWebhookHttpWarn": {
     "message": "このエンドポイントは HTTPS ではなく HTTP を使用しています — Authorization の値は平文で送信されます。localhost や LAN なら問題ありませんが、公開インターネット上では避けてください。"
-  }
+  },
+  "hlColorQuote": { "message": "引用" },
+  "hlColorDefinition": { "message": "定義" },
+  "hlColorExample": { "message": "例" },
+  "hlColorDoubt": { "message": "疑問" },
+  "hlColorTodo": { "message": "やること" },
+  "hlNoteBtn": { "message": "メモ付きでハイライト" },
+  "hlSaveFailed": { "message": "ハイライトを保存できませんでした（ストレージが一杯です）" }
 }

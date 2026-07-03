@@ -2403,5 +2403,12 @@
   },
   "mdTargetWebhookHttpWarn": {
     "message": "该地址使用 HTTP 而非 HTTPS——Authorization 值会以明文发送。局域网/本机地址没问题，公网地址请避免。"
-  }
+  },
+  "hlColorQuote": { "message": "金句" },
+  "hlColorDefinition": { "message": "定义" },
+  "hlColorExample": { "message": "例子" },
+  "hlColorDoubt": { "message": "存疑" },
+  "hlColorTodo": { "message": "待办" },
+  "hlNoteBtn": { "message": "带笔记高亮" },
+  "hlSaveFailed": { "message": "高亮未能保存（存储空间已满）" }
 }

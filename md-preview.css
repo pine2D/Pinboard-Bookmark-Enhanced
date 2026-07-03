@@ -974,6 +974,53 @@ body.md-empty main { margin-left: 0; }
   ::highlight(pbp-hl-5) { background-color: rgba(126, 34, 206, 0.4); }
 }
 
+/* Highlight creation bar (md-highlight.js). Native popover -- visibility,
+   top-layer, and [hidden] all managed by the popover attribute itself, no
+   [hidden]-restatement needed (mirrors #explain-pop, md-preview.css:766-783). */
+#pb-hl-bar {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+}
+#pb-hl-bar:popover-open { display: flex; }
+.pb-hl-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  padding: 0;
+  cursor: pointer;
+}
+.pb-hl-dot-1 { background: #facc15; }
+.pb-hl-dot-2 { background: #4ade80; }
+.pb-hl-dot-3 { background: #60a5fa; }
+.pb-hl-dot-4 { background: #f87171; }
+.pb-hl-dot-5 { background: #c084fc; }
+.pb-hl-dot:hover, .pb-hl-dot:focus-visible { transform: scale(1.15); outline: 2px solid var(--link); outline-offset: 2px; }
+.pb-hl-note-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.pb-hl-note-btn:hover, .pb-hl-note-btn:focus-visible { color: var(--fg); background: var(--btn-hover); outline: none; }
+.pb-hl-note-btn svg { width: 13px; height: 13px; }
+
 /* ============================================================
    Full-text translation (md-translate.js)
    ============================================================ */

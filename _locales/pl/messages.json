@@ -2409,5 +2409,12 @@
   },
   "mdTargetWebhookHttpWarn": {
     "message": "Ten punkt końcowy używa HTTP, a nie HTTPS — wartość Authorization jest wysyłana jawnym tekstem. W porządku dla localhost/sieci lokalnej; unikaj w publicznym internecie."
-  }
+  },
+  "hlColorQuote": { "message": "Cytat" },
+  "hlColorDefinition": { "message": "Definicja" },
+  "hlColorExample": { "message": "Przykład" },
+  "hlColorDoubt": { "message": "Wątpliwość" },
+  "hlColorTodo": { "message": "Do zrobienia" },
+  "hlNoteBtn": { "message": "Zaznacz z notatką" },
+  "hlSaveFailed": { "message": "Nie udało się zapisać zaznaczenia (brak miejsca)" }
 }

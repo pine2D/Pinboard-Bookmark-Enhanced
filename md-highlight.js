@@ -380,3 +380,271 @@ if (typeof document !== "undefined") {
     pbpHlInit((e && e.detail) || {}).catch(() => {});
   }, { once: true });
 }
+
+// ---- Range <-> block-text-offset seam (creation side; DOM layer, not the
+// pure top section, since it takes live Range/Node arguments). No existing
+// "Range -> offsets" helper exists anywhere in the repo (verified: only
+// _pbpAskRangeFromOffsets, the opposite direction, exists in md-ask.js) --
+// this is the first one, written once here and reused by both the mouseup
+// and keyboard creation paths. ----
+
+// A Range boundary's container can be a text node (offset = character
+// index) or an element (offset = child index) -- e.g. triple-click / "select
+// paragraph" boundaries land on the element. Normalize either shape to a
+// concrete {node: TEXT_NODE, offset} pair so the walker below only ever
+// compares against text nodes.
+function _pbpHlNormalizeBoundary(container, offset) {
+  if (container.nodeType === Node.TEXT_NODE) return { node: container, offset };
+  const child = container.childNodes[offset];
+  if (child) {
+    if (child.nodeType === Node.TEXT_NODE) return { node: child, offset: 0 };
+    const w = document.createTreeWalker(child, NodeFilter.SHOW_TEXT);
+    const t = w.nextNode();
+    if (t) return { node: t, offset: 0 };
+  }
+  // offset points past the last child (or nothing text-bearing under it):
+  // fall back to the end of container's last text descendant.
+  const w2 = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let last = null, n;
+  while ((n = w2.nextNode())) last = n;
+  return last ? { node: last, offset: last.nodeValue.length } : { node: container, offset: 0 };
+}
+
+// Map a live Range (already known to lie within blockEl) to blockEl's raw
+// textContent [start, end) offsets -- the exact inverse of ask's
+// _pbpAskRangeFromOffsets (md-ask.js:697), same TreeWalker-accumulation
+// technique so the two stay symmetric.
+function _pbpHlOffsetsFromRange(blockEl, range) {
+  const startB = _pbpHlNormalizeBoundary(range.startContainer, range.startOffset);
+  const endB = _pbpHlNormalizeBoundary(range.endContainer, range.endOffset);
+  const walker = document.createTreeWalker(blockEl, NodeFilter.SHOW_TEXT);
+  let pos = 0, start = null, end = null, node;
+  while ((node = walker.nextNode())) {
+    const len = node.nodeValue.length;
+    if (start === null && node === startB.node) start = pos + startB.offset;
+    if (node === endB.node) end = pos + endB.offset;
+    pos += len;
+  }
+  if (start === null || end === null || end <= start) return null;
+  return { start, end };
+}
+
+// Clip an arbitrary selection Range to blockEl's bounds (native
+// Range.compareBoundaryPoints -- no hand-rolled boundary math). Used both to
+// test intersection depth and to produce the per-block segment actually
+// highlighted; this naturally drops any portion of the selection that falls
+// in a non-indexed sibling like .pb-tr (spec 3: a selection spanning
+// translated text must anchor only to the original-text block), since
+// .pb-tr elements are never part of blockRange to begin with.
+function _pbpHlClipRangeToBlock(range, blockEl) {
+  const r = range.cloneRange();
+  const blockRange = document.createRange();
+  blockRange.selectNodeContents(blockEl);
+  if (r.compareBoundaryPoints(Range.START_TO_START, blockRange) < 0) {
+    r.setStart(blockRange.startContainer, blockRange.startOffset);
+  }
+  if (r.compareBoundaryPoints(Range.END_TO_END, blockRange) > 0) {
+    r.setEnd(blockRange.endContainer, blockRange.endOffset);
+  }
+  return r;
+}
+
+// Split a user selection Range into one clipped segment per intersecting
+// indexed (data-pb) block, in document order. Blocks the selection never
+// touches, and any portion outside every indexed block (e.g. inside a
+// .pb-tr sibling), are simply absent from the result (spec 3).
+function _pbpHlSelectionSegments(range) {
+  const segments = [];
+  for (const b of pbpAiBlocks()) {
+    if (!range.intersectsNode(b.el)) continue;
+    const seg = _pbpHlClipRangeToBlock(range, b.el);
+    if (!seg || seg.collapsed) continue;
+    segments.push({ n: b.n, el: b.el, range: seg });
+  }
+  return segments;
+}
+
+function _pbpHlNewId() {
+  return "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// ---- Floating creation bar (#pb-hl-bar). Native Popover API (mirrors
+// md-ask.js's #explain-pop, md-ask.js:1338-1427/1557-1582): "top-layer +
+// Esc + light-dismiss for free" -- no hand-rolled outside-click/Escape
+// wiring needed. Positioned above the selection via pbpTrPeekPopPos (spec
+// 4), horizontally clamped to the viewport the same way #explain-pop is. ----
+let _pbpHlBarEl = null;
+let _pbpHlBarRange = null;
+
+function _pbpHlEnsureBar() {
+  if (_pbpHlBarEl) return _pbpHlBarEl;
+  const bar = document.createElement("div");
+  bar.id = "pb-hl-bar";
+  bar.setAttribute("popover", "auto");
+  const names = [t("hlColorQuote"), t("hlColorDefinition"), t("hlColorExample"), t("hlColorDoubt"), t("hlColorTodo")];
+  for (let c = 1; c <= 5; c++) {
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "pb-hl-dot pb-hl-dot-" + c;
+    dot.dataset.color = String(c);
+    dot.title = names[c - 1];
+    dot.setAttribute("aria-label", names[c - 1]);
+    // Keep the live text selection alive through the click (mousedown on
+    // any element normally clears window.getSelection()).
+    dot.addEventListener("mousedown", (e) => e.preventDefault());
+    dot.addEventListener("click", () => _pbpHlCreateFromSelection(c, dot));
+    bar.appendChild(dot);
+  }
+  const noteBtn = document.createElement("button");
+  noteBtn.type = "button";
+  noteBtn.className = "pb-hl-note-btn";
+  noteBtn.title = t("hlNoteBtn");
+  noteBtn.setAttribute("aria-label", t("hlNoteBtn"));
+  noteBtn.innerHTML = (typeof PBP_ICONS === "object" && PBP_ICONS && PBP_ICONS.pencil) || "";
+  noteBtn.addEventListener("mousedown", (e) => e.preventDefault());
+  noteBtn.addEventListener("click", () => _pbpHlCreateWithNote(noteBtn));
+  bar.appendChild(noteBtn);
+  bar.addEventListener("toggle", (e) => { if (e.newState === "closed") _pbpHlBarRange = null; });
+  document.body.appendChild(bar);
+  _pbpHlBarEl = bar;
+  return bar;
+}
+
+function _pbpHlShowBar(range) {
+  const bar = _pbpHlEnsureBar();
+  _pbpHlBarRange = range;
+  try { bar.hidePopover(); } catch (_) {} // re-invoke while open: reset first (mirrors _pbpExplainOpenPop)
+  bar.showPopover();
+  const rect = range.getBoundingClientRect();
+  const pos = pbpTrPeekPopPos(rect, bar.offsetHeight, window.innerHeight);
+  const bw = bar.offsetWidth;
+  const x = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - bw - 8));
+  bar.style.left = x + "px";
+  bar.style.top = pos.top + "px";
+}
+
+function _pbpHlHideBar() {
+  if (_pbpHlBarEl) { try { _pbpHlBarEl.hidePopover(); } catch (_) {} }
+}
+
+// ---- Creation ----
+// Creates one item per block the range intersects (spec 3: cross-block
+// selections). Stores quote/prefix/suffix via the pure pbpHlSelectorOf
+// (Task 1), but registers the ALREADY-SELECTED Range directly for immediate
+// paint -- no locate round-trip needed for the item that was just created
+// from a live selection (spec 4: register the new Range immediately,
+// without a full pbpHlRestore rerun).
+async function _pbpHlCreateFromRange(range, color, btn) {
+  if (!_pbpHlState) return [];
+  const segments = _pbpHlSelectionSegments(range);
+  const created = [];
+  for (const seg of segments) {
+    const offsets = _pbpHlOffsetsFromRange(seg.el, seg.range);
+    if (!offsets) continue;
+    // NOT pbpAiTextOf(seg.n): that cache may be frozen pre-hljs/KaTeX and can
+    // diverge from the live DOM _pbpHlOffsetsFromRange just walked (same
+    // same-source rule _pbpHlReanchorBlock already follows with
+    // blockEl.textContent -- see its comment above).
+    const blockText = seg.el.textContent || "";
+    const sel = pbpHlSelectorOf(blockText, offsets.start, offsets.end);
+    const item = {
+      id: _pbpHlNewId(),
+      n: seg.n,
+      quote: sel.quote,
+      prefix: sel.prefix,
+      suffix: sel.suffix,
+      color,
+      note: "",
+      ts: Date.now()
+    };
+    _pbpHlState.items.push(item);
+    created.push(item);
+    _pbpHlRegisterRange(item, seg.range.cloneRange());
+    _pbpHlArmBlockObserver(seg.el, seg.n);
+  }
+  if (created.length) {
+    await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn);
+    await _pbpHlLastColorSet(color);
+  }
+  return created;
+}
+
+function _pbpHlRegisterRange(item, range) {
+  if (typeof Highlight !== "function" || typeof CSS === "undefined" || !("highlights" in CSS)) return;
+  let h = CSS.highlights.get("pbp-hl-" + item.color);
+  if (!h) { h = new Highlight(); CSS.highlights.set("pbp-hl-" + item.color, h); }
+  h.add(range);
+  _pbpHlState.ranges[item.id] = { color: item.color, range };
+}
+
+async function _pbpHlCreateFromSelection(color, btn) {
+  const range = _pbpHlBarRange;
+  _pbpHlHideBar();
+  if (!range) return;
+  await _pbpHlCreateFromRange(range, color, btn);
+  const sel = window.getSelection();
+  if (sel) sel.removeAllRanges();
+}
+
+async function _pbpHlCreateWithNote(btn) {
+  const range = _pbpHlBarRange;
+  _pbpHlHideBar();
+  if (!range) return;
+  const color = await _pbpHlLastColorGet();
+  const created = await _pbpHlCreateFromRange(range, color, btn);
+  const sel = window.getSelection();
+  if (sel) sel.removeAllRanges();
+  if (created.length && typeof window._pbpHlOpenCard === "function") {
+    window._pbpHlOpenCard(created[created.length - 1].id); // Task 5's card (window hook; no-op until Task 5 lands)
+  }
+}
+
+// ---- Interaction binder: mouseup (show bar) + keydown (H/1-5 hotkeys) +
+// scroll/selection-collapse hide. Esc + click-elsewhere dismiss are free
+// via the popover's own light-dismiss (no listener needed for those). ----
+function _pbpHlOnMouseUp(e) {
+  const view = document.getElementById("rendered-view");
+  if (!view || !view.contains(e.target)) return;
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) { _pbpHlHideBar(); return; }
+  const range = sel.getRangeAt(0);
+  const segments = _pbpHlSelectionSegments(range);
+  if (!segments.length) { _pbpHlHideBar(); return; }
+  _pbpHlShowBar(range);
+}
+
+// Same 4-condition gate pattern as the existing V/a/e hotkeys (md-ask.js:56-69,
+// md-translate.js keydown): explicit e.shiftKey exclusion (not just case-
+// sensitive e.key checks) so Caps Lock without Shift ("H", shiftKey=false)
+// still fires while Shift+h ("H", shiftKey=true) does not.
+function _pbpHlOnKeyDown(e) {
+  if (e.key !== "h" && e.key !== "H" && !/^[1-5]$/.test(e.key)) return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  const ae = document.activeElement;
+  if (pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))) return;
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  const view = document.getElementById("rendered-view");
+  if (!view || !view.contains(range.commonAncestorContainer)) return;
+  const segments = _pbpHlSelectionSegments(range);
+  if (!segments.length) return;
+  e.preventDefault();
+  const color = /^[1-5]$/.test(e.key) ? Number(e.key) : null;
+  (async () => {
+    const c = color || await _pbpHlLastColorGet();
+    await _pbpHlCreateFromRange(range, c, null);
+    sel.removeAllRanges();
+    _pbpHlHideBar();
+  })();
+}
+
+function _pbpHlBindInteractions(view) {
+  view.addEventListener("mouseup", _pbpHlOnMouseUp);
+  document.addEventListener("keydown", _pbpHlOnKeyDown);
+  window.addEventListener("scroll", () => _pbpHlHideBar(), true);
+  document.addEventListener("selectionchange", () => {
+    const sel = window.getSelection();
+    if ((!sel || sel.isCollapsed) && _pbpHlBarEl && _pbpHlBarEl.matches(":popover-open")) _pbpHlHideBar();
+  });
+}

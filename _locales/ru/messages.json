@@ -2409,5 +2409,12 @@
   },
   "mdTargetWebhookHttpWarn": {
     "message": "Эта конечная точка использует HTTP, а не HTTPS — значение Authorization отправляется в открытом виде. Подходит для localhost/локальной сети; избегайте в публичном интернете."
-  }
+  },
+  "hlColorQuote": { "message": "Цитата" },
+  "hlColorDefinition": { "message": "Определение" },
+  "hlColorExample": { "message": "Пример" },
+  "hlColorDoubt": { "message": "Сомнение" },
+  "hlColorTodo": { "message": "Задача" },
+  "hlNoteBtn": { "message": "Выделить с заметкой" },
+  "hlSaveFailed": { "message": "Не удалось сохранить выделение (хранилище заполнено)" }
 }

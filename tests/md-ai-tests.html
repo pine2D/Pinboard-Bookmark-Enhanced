@@ -3604,4 +3604,88 @@ suite("pbpIsNeverClearKey pbp_hl_ prefix", () => {
   });
 })();
 </script>
+
+<script>
+// ============ md-highlight.js: Range <-> block-text-offset seam ============
+suiteIf("_pbpHlOffsetsFromRange / _pbpHlClipRangeToBlock / _pbpHlSelectionSegments", "_pbpHlOffsetsFromRange", () => {
+  function fixture(html) {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    document.body.appendChild(d);
+    return d;
+  }
+
+  test("plain text-node range round-trips through ask's offsets->Range", () => {
+    const root = fixture('<p id="b1">hello world</p>');
+    const p = root.querySelector("#b1");
+    const textNode = p.firstChild;
+    const range = document.createRange();
+    range.setStart(textNode, 6);
+    range.setEnd(textNode, 11); // "world"
+    const off = _pbpHlOffsetsFromRange(p, range);
+    assert(off, "offsets found");
+    assertEq(off.start, 6, "start");
+    assertEq(off.end, 11, "end");
+    const rebuilt = _pbpAskRangeFromOffsets(p, off.start, off.end);
+    assertEq(rebuilt.toString(), "world", "round-trip via ask's _pbpAskRangeFromOffsets");
+    root.remove();
+  });
+
+  test("element-container boundaries normalize to text-node offsets (selectNodeContents)", () => {
+    const root = fixture('<p id="b1">foo <b>bar</b> baz</p>');
+    const p = root.querySelector("#b1");
+    const range = document.createRange();
+    range.selectNodeContents(p); // startContainer/endContainer = p itself, not a text node
+    const off = _pbpHlOffsetsFromRange(p, range);
+    assert(off, "offsets found for whole-element selection");
+    assertEq(off.start, 0, "start at block start");
+    assertEq(off.end, p.textContent.length, "end at block end");
+    root.remove();
+  });
+
+  test("_pbpHlClipRangeToBlock: cross-block selection clips to each block's own text", () => {
+    const root = fixture('<p>alpha beta</p><p>gamma delta</p>');
+    pbpAiIndexBlocks(root);
+    const blocks = pbpAiBlocks();
+    assertEq(blocks.length, 2, "two indexed blocks");
+    const range = document.createRange();
+    range.setStart(blocks[0].el.firstChild, 6); // "beta"
+    range.setEnd(blocks[1].el.firstChild, 5);   // "gamma"
+    assert(range.intersectsNode(blocks[0].el), "intersects block 1");
+    assert(range.intersectsNode(blocks[1].el), "intersects block 2");
+    assertEq(_pbpHlClipRangeToBlock(range, blocks[0].el).toString(), "beta", "segment 1 clipped to block 1");
+    assertEq(_pbpHlClipRangeToBlock(range, blocks[1].el).toString(), "gamma", "segment 2 clipped to block 2");
+    root.remove();
+  });
+
+  test("_pbpHlSelectionSegments: a .pb-tr sibling inserted AFTER indexing (real translate timing) is never indexed, so a selection inside it yields zero segments", () => {
+    const root = fixture('<p>alpha</p>');
+    pbpAiIndexBlocks(root); // index BEFORE translation would insert .pb-tr (D10: never re-index afterward)
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.innerHTML = "<p>translated text</p>";
+    root.appendChild(tr);
+    const trP = tr.querySelector("p");
+    const range = document.createRange();
+    range.selectNodeContents(trP);
+    const segs = _pbpHlSelectionSegments(range);
+    assertEq(segs.length, 0, "nothing intersects a data-pb block");
+    root.remove();
+  });
+
+  test("_pbpHlSelectionSegments: selection spanning two indexed blocks yields two segments in document order", () => {
+    const root = fixture('<p>one two</p><p>three four</p>');
+    pbpAiIndexBlocks(root);
+    const blocks = pbpAiBlocks();
+    const range = document.createRange();
+    range.setStart(blocks[0].el.firstChild, 4); // "two"
+    range.setEnd(blocks[1].el.firstChild, 5);   // "three"
+    const segs = _pbpHlSelectionSegments(range);
+    assertEq(segs.length, 2, "two segments");
+    assertEq(segs[0].n, blocks[0].n, "segment 1 -> block 1");
+    assertEq(segs[1].n, blocks[1].n, "segment 2 -> block 2");
+    root.remove();
+  });
+});
+</script>
 </body></html>
