@@ -3367,4 +3367,47 @@ suite("_pbpTrUsageFallback (T4)", () => {
   });
 });
 </script>
+<script>
+// ============ T1 remainder Task 1: hover-peek positioning + typing-context pure helpers ============
+suiteIf("pbpTrPeekPopPos", "pbpTrPeekPopPos", () => {
+  test("plenty of room above -> place above, top = rect.top - popH - 8", () => {
+    const r = pbpTrPeekPopPos({ top: 200, bottom: 260, left: 40, width: 500 }, 150, 800);
+    assertEq(r.place, "above", "above fits");
+    assertEq(r.top, 42, "top = 200 - 150 - 8");
+  });
+  test("not enough clearance above -> flips below, top = rect.bottom + 8", () => {
+    const r = pbpTrPeekPopPos({ top: 30, bottom: 90, left: 0, width: 300 }, 150, 800);
+    assertEq(r.place, "below", "flips below");
+    assertEq(r.top, 98, "top = 90 + 8");
+  });
+  test("exact boundary (computed above-top === 8) stays above, not < 8", () => {
+    const r = pbpTrPeekPopPos({ top: 116, bottom: 150, left: 0, width: 300 }, 100, 800);
+    assertEq(r.place, "above", "8 is not < 8, stays above");
+    assertEq(r.top, 8, "top = 116 - 100 - 8");
+  });
+  test("both above and below are tight (short viewport) -> still returns below (no viewport-bottom clamp)", () => {
+    const r = pbpTrPeekPopPos({ top: 50, bottom: 80, left: 0, width: 200 }, 90, 100);
+    assertEq(r.place, "below", "below even though it overflows the 100px viewport");
+    assertEq(r.top, 88, "top = 80 + 8, uncapped");
+  });
+});
+
+suiteIf("pbpTrIsTypingContext", "pbpTrIsTypingContext", () => {
+  test("INPUT -> true", () => { assertEq(pbpTrIsTypingContext("INPUT", false), true, "input"); });
+  test("TEXTAREA -> true", () => { assertEq(pbpTrIsTypingContext("TEXTAREA", false), true, "textarea"); });
+  test("SELECT -> true", () => { assertEq(pbpTrIsTypingContext("SELECT", false), true, "select"); });
+  test("contentEditable true with an unrelated tag -> true", () => {
+    assertEq(pbpTrIsTypingContext("DIV", true), true, "contentEditable DIV");
+  });
+  test("contentEditable true with a null tag -> true", () => {
+    assertEq(pbpTrIsTypingContext(null, true), true, "contentEditable null tag");
+  });
+  test("plain DIV, not contentEditable -> false", () => {
+    assertEq(pbpTrIsTypingContext("DIV", false), false, "plain div");
+  });
+  test("null tagName, not contentEditable -> false", () => {
+    assertEq(pbpTrIsTypingContext(null, false), false, "null tag, not editable");
+  });
+});
+</script>
 </body></html>

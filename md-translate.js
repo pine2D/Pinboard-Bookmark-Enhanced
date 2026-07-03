@@ -518,6 +518,32 @@ function _pbpTrSerializeForumView(mode) {
   return htmlToMarkdown(clone.innerHTML).trim();
 }
 
+// ---- Hover peek popover positioning (spec sec.1.5): the popover renders
+// OUTSIDE #rendered-view (Task 2) so this can't measure the block/pop
+// through the DOM -- callers pass the already-measured numbers instead.
+// Prefers ABOVE the hovered block; flips BELOW when there isn't enough
+// clearance above the viewport top. Deliberately does NOT clamp against
+// viewportH on the "below" branch (spec: both-tight still takes below --
+// no viewport-bottom clamping logic nobody asked for). blockRect only
+// needs {top, bottom}: a real getBoundingClientRect() works, so does a
+// plain test fixture.
+function pbpTrPeekPopPos(blockRect, popH, viewportH) {
+  const above = blockRect.top - popH - 8;
+  if (above < 8) return { top: blockRect.bottom + 8, place: "below" };
+  return { top: above, place: "above" };
+}
+
+// ---- Typing-context gate for global single-key shortcuts (spec sec.2
+// gate 1): true when a key like "v" should reach the field instead of
+// firing a page shortcut. tagName: e.g. document.activeElement.tagName
+// (or null/undefined); isContentEditable: document.activeElement
+// .isContentEditable (already boolean; callers coerce with !! anyway).
+function pbpTrIsTypingContext(tagName, isContentEditable) {
+  if (isContentEditable) return true;
+  const tag = String(tagName || "").toUpperCase();
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
 // ============================================================
 // DOM / UI layer. Lazily mounted: pbpTrInit runs on "pbp:rendered",
 // builds the rail section only when gating passes; everything heavier
