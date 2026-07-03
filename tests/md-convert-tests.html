@@ -128,7 +128,8 @@ function assertEq(actual, expected, label) {
 // ---- D1-1/D1-2: sanitize hardening (id-clobber + input allowlist) ----
 (() => {
   const s = norm(renderMarkdown('before <input type="text" id="ask-input" value="x"> after'));
-  check("renderMarkdown drops non-checkbox <input> entirely", !/<input/i.test(s), s);
+  check("renderMarkdown drops non-checkbox <input> but KEEPS sibling text (NodeIterator survives removeChild)",
+    !/<input/i.test(s) && /before/.test(s) && /after/.test(s), s);
 })();
 (() => {
   const s = norm(renderMarkdown('<div id="ask-input">x</div>'));
