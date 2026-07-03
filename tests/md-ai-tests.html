@@ -1611,6 +1611,33 @@ suiteIf("pbpTrResolveTargetLang / entry visibility", "pbpTrResolveTargetLang", (
   });
 });
 
+// D9-1: PBP_TR_RTL_LANGS drives the dir="rtl" vs dir="auto" branch in
+// _pbpTrFill (md-translate.js). Gated on pbpTrResolveTargetLang purely as an
+// "md-translate.js loaded" signal, same as the suite above.
+suiteIf("PBP_TR_RTL_LANGS / dir branch", "pbpTrResolveTargetLang", () => {
+  test("known RTL target codes are in the set", () => {
+    assert(PBP_TR_RTL_LANGS.has("ar"), "ar -> rtl");
+    assert(PBP_TR_RTL_LANGS.has("he"), "he -> rtl");
+    assert(PBP_TR_RTL_LANGS.has("fa"), "fa -> rtl");
+    assert(PBP_TR_RTL_LANGS.has("ur"), "ur -> rtl");
+  });
+  test("known LTR target codes are NOT in the set (dir=auto path)", () => {
+    assert(!PBP_TR_RTL_LANGS.has("en"), "en -> not rtl");
+    assert(!PBP_TR_RTL_LANGS.has("ja"), "ja -> not rtl");
+    assert(!PBP_TR_RTL_LANGS.has("zh-Hans"), "zh-Hans -> not rtl");
+    assert(!PBP_TR_RTL_LANGS.has("de"), "de -> not rtl");
+  });
+  test("custom free-text target (unresolvable statically) falls to dir=auto", () => {
+    const r = pbpTrResolveTargetLang({ translateTargetLang: "Classical Chinese" }, "en");
+    assert(!PBP_TR_RTL_LANGS.has(r.code), "custom code never matches the static RTL set");
+  });
+  test("st.target.code from pbpTrResolveTargetLang for ar feeds the set correctly", () => {
+    const r = pbpTrResolveTargetLang({ translateTargetLang: "ar" }, "en");
+    assertEq(r.code, "ar", "resolved code");
+    assert(PBP_TR_RTL_LANGS.has(r.code), "resolved ar code matches the RTL set _pbpTrFill checks");
+  });
+});
+
 suiteIf("_pbpTrLocalizedLangName", "_pbpTrLocalizedLangName", () => {
   test("preset code localized to the UI language", () => {
     assert(_pbpTrLocalizedLangName("zh-Hans", "Simplified Chinese", "zh-Hans").indexOf("简") >= 0, "zh-Hans -> 简*");
