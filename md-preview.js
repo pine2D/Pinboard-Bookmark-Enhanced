@@ -188,10 +188,12 @@ function renderBookmarkBadge(resp, url) {
   a.href = "https://pinboard.in/add?url=" + encodeURIComponent(url);
   a.target = "_blank";
   a.rel = "noopener noreferrer";
-  // Spec X2 i18n key group: badge aria-label reuses mdBookmarkedBadge (children
-  // below still get their own aria-label/title for the lock; the anchor-level
-  // label is what a screen reader announces for the badge as a whole).
-  a.setAttribute("aria-label", t("mdBookmarkedBadge"));
+  // Spec X2 i18n key group: an explicit aria-label on the anchor becomes the
+  // ENTIRE accessible name (descendants are not traversed), so the private
+  // state must be folded in here — the lock span's own aria-label below is
+  // never announced through the anchor (it keeps its title tooltip only).
+  a.setAttribute("aria-label",
+    t("mdBookmarkedBadge") + (model.isPrivate ? ", " + t("mdBookmarkedPrivate") : ""));
 
   const icon = document.createElement("span");
   icon.className = "bb-icon";
