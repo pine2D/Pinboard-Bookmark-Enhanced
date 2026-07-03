@@ -106,9 +106,11 @@ function cleanup() {
 }
 
 // ---- Check 0: dynamically-injected vendor assets survived packaging ----
-// md-preview.js createElement-injects these (not <script src>/<link href>),
-// so release.sh's static HTML-tag sanity check can't see them — only a
-// real packaged-ZIP check catches an accidental vendor/ deletion.
+// These aren't referenced by <script src>/<link href> in any HTML, so
+// release.sh's static HTML-tag sanity check can't see them — only a real
+// packaged-ZIP check catches an accidental vendor/ deletion. Two mechanisms:
+// md-preview.js createElement-injects the hljs/KaTeX assets; background.js
+// chrome.scripting.executeScript({files:["vendor/defuddle.js"]}) injects Defuddle.
 console.log('[zip-smoke] check 0: dynamically-injected vendor assets present...');
 const REQUIRED_VENDOR_FILES = [
   'vendor/highlight.min.js',
@@ -117,6 +119,7 @@ const REQUIRED_VENDOR_FILES = [
   'vendor/katex/katex.min.js',
   'vendor/katex/katex.min.css',
   'vendor/katex/auto-render.min.js',
+  'vendor/defuddle.js',
 ];
 const missingVendor = REQUIRED_VENDOR_FILES.filter(f => !existsSync(join(extPath, f)));
 if (missingVendor.length) {
