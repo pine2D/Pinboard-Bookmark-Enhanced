@@ -934,6 +934,7 @@ async function _pbpTrStart(st) {
   st.running = true;                       // claim the run synchronously so a double-click during
                                            // the rAF-chunked st.work build can't start two runs
   if (st.workReady) await st.workReady;    // ensure the deferred st.work build finished
+  _pbpTrApplySkips(st);                    // T3: re-detect every run -- target may have changed since init/last run
   const pending = st.work.filter((w) => !(w.n in st.trMd));
   if (!pending.length) { st.running = false; _pbpTrSetStatus(st, "done"); _pbpTrShowViewToggle(st); return; }
   _pbpTrClearPendingFailures(new Set(pending.map((w) => w.n)));
@@ -1048,7 +1049,10 @@ async function _pbpTrStart(st) {
     },
     onProgress: (done, total) => {
       const prog = document.getElementById("tr-progress");
-      if (prog) prog.textContent = t("trProgress", String(done), String(total));
+      // T3: N/M counts from the skip baseline, not from zero -- skipped blocks are
+      // already "done" and were never queued, so both the numerator and the
+      // denominator need the offset for the fraction to read honestly.
+      if (prog) prog.textContent = t("trProgress", String(done + (st.skippedCount || 0)), String(total + (st.skippedCount || 0)));
     }
   });
   st.running = false;
