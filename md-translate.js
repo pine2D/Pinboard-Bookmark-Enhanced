@@ -591,6 +591,109 @@ function _pbpTrApplyPeekAttrs(div) {
   }
 }
 
+// ---- Hover peek popover (tr-only view only; spec sec.1). Distinct from
+// _pbpTrPeekToggle above: click-peek PINS .pb-show-orig open (selectable
+// text, sticks until clicked again); this is a glance-only FIXED overlay
+// that never touches #rendered-view's DOM flow, so it can never push the
+// hovered block away from the pointer (the enter/leave loop a
+// display:none->block reveal would cause -- spec's no-in-place-expand rule).
+// Singleton <div id="pb-peek-pop"> lives on document.body, NOT inside
+// #rendered-view, so the body.tr-only [data-pb-tr-done] hide rule in
+// md-preview.css never matches the clone.
+const PBP_TR_PEEK_DELAY_MS = 400;
+let _pbpTrPeekTimer = null;
+
+function _pbpTrPeekClearTimer() {
+  if (_pbpTrPeekTimer) { clearTimeout(_pbpTrPeekTimer); _pbpTrPeekTimer = null; }
+}
+
+// Clone tr's original sibling for the popover, stripped of id/data-pb/
+// data-pb-tr-done on the root AND every descendant (mirrors the
+// _pbpTrPeekToggle dataset.pb validation above) so the clone can never
+// collide with the live DOM (duplicate ids / mis-hit selectors). Returns
+// null when tr has no valid original sibling (nothing to show).
+function _pbpTrPeekCloneOrig(tr) {
+  const orig = tr && tr.previousElementSibling;
+  if (!orig || !orig.dataset || !orig.dataset.pb) return null;
+  const clone = orig.cloneNode(true);
+  const strip = (el) => {
+    el.removeAttribute("id");
+    el.removeAttribute("data-pb");
+    el.removeAttribute("data-pb-tr-done");
+  };
+  strip(clone);
+  clone.querySelectorAll("[id],[data-pb],[data-pb-tr-done]").forEach(strip);
+  return clone;
+}
+
+function _pbpTrPeekEnsurePop() {
+  let pop = document.getElementById("pb-peek-pop");
+  if (!pop) {
+    pop = document.createElement("div");
+    pop.id = "pb-peek-pop";
+    pop.setAttribute("aria-hidden", "true");
+    pop.hidden = true;
+    document.body.appendChild(pop);
+  }
+  return pop;
+}
+
+function _pbpTrPeekHide() {
+  const pop = document.getElementById("pb-peek-pop");
+  if (!pop || pop.hidden) return;
+  pop.hidden = true;
+  pop.textContent = "";
+}
+
+// Fires PBP_TR_PEEK_DELAY_MS after the pointer enters tr. Re-checks
+// tr-only mode (the user may have switched views during the delay).
+function _pbpTrPeekShow(tr) {
+  if (!document.body.classList.contains("tr-only")) return;
+  const content = _pbpTrPeekCloneOrig(tr);
+  if (!content) return;
+  const pop = _pbpTrPeekEnsurePop();
+  pop.textContent = "";
+  pop.appendChild(content);
+  const rect = tr.getBoundingClientRect();
+  pop.style.left = rect.left + "px";
+  pop.style.width = rect.width + "px";
+  pop.style.top = "-9999px";
+  pop.hidden = false;
+  const pos = pbpTrPeekPopPos(rect, pop.offsetHeight, window.innerHeight);
+  pop.style.top = pos.top + "px";
+}
+
+function _pbpTrPeekOnEnter(tr) {
+  _pbpTrPeekClearTimer();
+  _pbpTrPeekHide(); // moving to an adjacent block: drop the old popover immediately
+  _pbpTrPeekTimer = setTimeout(() => { _pbpTrPeekTimer = null; _pbpTrPeekShow(tr); }, PBP_TR_PEEK_DELAY_MS);
+}
+
+function _pbpTrPeekOnLeave() {
+  _pbpTrPeekClearTimer();
+  _pbpTrPeekHide();
+}
+
+// Delegated mouseover/mouseout on #rendered-view, filtered to ".pb-tr"
+// boundary crossings via relatedTarget (mouseover/out bubble; mouseenter/
+// leave do NOT, so they can't be used for delegation -- spec sec.1.1).
+function _pbpTrPeekOnMouseOver(e) {
+  if (!document.body.classList.contains("tr-only")) return;
+  const tr = e.target.closest && e.target.closest(".pb-tr");
+  if (!tr) return;
+  const from = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".pb-tr");
+  if (from === tr) return; // still inside the same block, no boundary crossed
+  _pbpTrPeekOnEnter(tr);
+}
+
+function _pbpTrPeekOnMouseOut(e) {
+  const tr = e.target.closest && e.target.closest(".pb-tr");
+  if (!tr) return;
+  const to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".pb-tr");
+  if (to === tr) return; // moving within the same block, no boundary crossed
+  _pbpTrPeekOnLeave();
+}
+
 async function pbpTrInit(detail) {
   const view = document.getElementById("rendered-view");
   if (!view || _pbpTrState) return;
@@ -658,6 +761,16 @@ async function pbpTrInit(detail) {
   });
   // Page close terminates every in-flight request (error matrix last row).
   window.addEventListener("pagehide", () => { if (st.ctrl) st.ctrl.abort(); });
+
+  // Hover peek (tr-only view only): delegated mouseover/mouseout filtered
+  // to ".pb-tr" boundary crossings (spec sec.1.1).
+  view.addEventListener("mouseover", _pbpTrPeekOnMouseOver);
+  view.addEventListener("mouseout", _pbpTrPeekOnMouseOut);
+  // Fixed popover never follows scroll -- hide it outright (spec sec.1.6).
+  window.addEventListener("scroll", _pbpTrPeekOnLeave, { passive: true });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") _pbpTrPeekOnLeave();
+  });
 
   // Build st.work OFF the first-paint critical path, then probe the cache. pbpAiMdOf()
   // runs Turndown per block; synchronously here it was a single long task right after the
@@ -997,6 +1110,8 @@ async function _pbpTrStart(st) {
   if (st.running) return;
   st.running = true;                       // claim the run synchronously so a double-click during
                                            // the rAF-chunked st.work build can't start two runs
+  _pbpTrPeekClearTimer();                  // run start hides any lingering hover popover (spec sec.1.6)
+  _pbpTrPeekHide();
   if (st.workReady) await st.workReady;    // ensure the deferred st.work build finished
   _pbpTrApplySkips(st);                    // T3: re-detect every run -- target may have changed since init/last run
   const pending = st.work.filter((w) => !(w.n in st.trMd));
@@ -1461,6 +1576,8 @@ function _pbpTrSyncToggle(mode) {
 }
 
 function _pbpTrSetMode(st, mode, persist) {
+  _pbpTrPeekClearTimer();                  // any mode switch hides a lingering hover popover (spec sec.1.6)
+  _pbpTrPeekHide();
   st.mode = mode;
   document.body.classList.toggle("tr-bilingual", mode === "bilingual");
   document.body.classList.toggle("tr-only", mode === "translated");
