@@ -644,6 +644,14 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
      blockquote/code keep dark-theme colors on the forced-white page below. */
   :root {
     color-scheme: light;
+    /* #rendered-view declares `color: var(--fg)` on itself, so print's
+       `body { color: black }` never cascades to article text — --fg (and its
+       secondary/muted/stripe kin) MUST be re-pinned here too, else dark-OS
+       printing renders body text at ~1.2:1 (near-invisible). */
+    --fg: #0f172a;
+    --fg-secondary: #475569;
+    --fg-muted: #5b6878;
+    --table-stripe: #f8fafc;
     --link: #2563eb;
     --link-hover: #1d4ed8;
     --bq-border: #2563eb;
