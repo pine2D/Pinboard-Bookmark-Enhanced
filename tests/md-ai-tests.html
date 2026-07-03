@@ -3344,4 +3344,27 @@ suite("htmlToMarkdown table rule: nested table in a cell is not flattened/duplic
   window.chrome = realChrome;
 })();
 </script>
+<script>
+// ============ T4: _pbpTrUsageFallback (per-batch estimate when provider omits usage) ============
+suite("_pbpTrUsageFallback (T4)", () => {
+  test("real usage present -> no estimate added, approx stays false", () => {
+    const st = { usage: { inTok: 100, outTok: 50, approx: false } };
+    _pbpTrUsageFallback(st, true, 4000, "some output text");
+    assertEq(st.usage.inTok, 100, "in unchanged");
+    assertEq(st.usage.outTok, 50, "out unchanged");
+    assertEq(st.usage.approx, false, "not approx");
+  });
+  test("no real usage -> chars/4 added for sent + received, approx flagged", () => {
+    const st = { usage: { inTok: 0, outTok: 0, approx: false } };
+    _pbpTrUsageFallback(st, false, 4000, "x".repeat(400));
+    assertEq(st.usage.inTok, 1000, "sent 4000 chars -> 1000 est tokens");
+    assertEq(st.usage.outTok, 100, "received 400 chars -> 100 est tokens");
+    assertEq(st.usage.approx, true, "approx flagged");
+  });
+  test("null st.usage tolerated (no throw)", () => {
+    _pbpTrUsageFallback({ usage: null }, false, 100, "y");
+    assert(true, "no throw");
+  });
+});
+</script>
 </body></html>

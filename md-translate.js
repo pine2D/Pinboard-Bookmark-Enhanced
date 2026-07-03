@@ -836,6 +836,37 @@ function _pbpTrBuildSection(st) {
   stop.addEventListener("click", () => { if (st.ctrl) st.ctrl.abort(); });
 }
 
+// T4: if the provider didn't emit usage for this call, estimate it (chars/4)
+// from the sent shielded text and the received model output, and flag approx.
+// `full` is the raw model output (translate JSON envelope) = the tokens the model
+// actually produced, so full.length/4 is the honest output-token proxy.
+function _pbpTrUsageFallback(st, gotReal, sentChars, full) {
+  if (!st.usage || gotReal) return;
+  st.usage.approx = true;
+  st.usage.inTok += pbpAiEstimateTokens(sentChars);
+  st.usage.outTok += pbpAiEstimateTokens((full || "").length);
+}
+
+// T4: render the run's actual token usage in tr-section (session-only, never
+// persisted). When any batch fell back to an estimate, prefix the U+2248 ALMOST
+// EQUAL TO sign — it is TEXT (renders in the body font), NOT an icon glyph, so the
+// emoji/dingbat font-fallback ban does not apply. Written as a \u escape in code.
+function _pbpTrRenderUsage(st) {
+  const sec = document.getElementById("tr-section");
+  if (!sec || !st.usage) return;
+  let el = document.getElementById("tr-usage");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "tr-usage";
+    el.className = "tr-meta";
+    const prog = document.getElementById("tr-progress");
+    if (prog) prog.insertAdjacentElement("afterend", el); else sec.appendChild(el);
+  }
+  const line = t("trActualUsage", String(st.usage.inTok), String(st.usage.outTok));
+  el.textContent = st.usage.approx ? "\u2248 " + line : line;
+  el.hidden = false;
+}
+
 // Re-resolve target language from settings and update the rail label.
 // `s` may be passed (test / storage-change fast path) or fetched.
 // No-op-safe if the label element isn't mounted yet.
@@ -901,7 +932,10 @@ async function _pbpTrExtractGlossary(st) {
     try {
       const raw = await callAIStream(st.s, prompt, {
         system, model, temperature: 0.1, noThinking: true,
-        signal: st.ctrl && st.ctrl.signal, maxTokens: 2048
+        signal: st.ctrl && st.ctrl.signal, maxTokens: 2048,
+        // T4: fold real glossary-pass usage into the run total when the provider
+        // emits it (no estimate fallback here — this pass is optional/often cached).
+        onUsage: (u) => { if (st.usage) { st.usage.inTok += u.inTok; st.usage.outTok += u.outTok; } }
       }, () => {});
       return pbpTrParseGlossaryJson(raw);
     } catch (_) { return null; }
@@ -943,6 +977,7 @@ async function _pbpTrStart(st) {
   if (!pending.length) { st.running = false; _pbpTrSetStatus(st, "done"); _pbpTrShowViewToggle(st); return; }
   _pbpTrClearPendingFailures(new Set(pending.map((w) => w.n)));
   st.ctrl = new AbortController();
+  st.usage = { inTok: 0, outTok: 0, approx: false };   // T4: reset actual/estimated usage per run
   pbpAiBumpCounter("translate");
   _pbpTrSetStatus(st, "translating");
   // Progressive display: reveal the view toggle and switch to bilingual NOW so
@@ -976,12 +1011,15 @@ async function _pbpTrStart(st) {
   const requestBatch = (segments, onItem) => {
     const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, glossary: pbpTrMatchGlossary(st.glossary, segments), segments });
     const parser = pbpAiMakeStreamJsonParser(onItem);
-    const opts = streamOpts(segments.reduce((a, x) => a + x.text.length, 0));
+    const sentChars = segments.reduce((a, x) => a + x.text.length, 0);
+    const opts = streamOpts(sentChars);
     opts.system = system;
+    const u = { got: false };            // T4: did the provider report real usage for this batch?
+    opts.onUsage = (usage) => { u.got = true; st.usage.inTok += usage.inTok; st.usage.outTok += usage.outTok; };
     const key = "tr:" + st.modelKey + ":" + st.target.code + ":" + segments.map((x) => x.id).join(",");
     return getOrCreateInflight(key, () =>
       callAIStream(st.s, prompt, opts, (d, acc) => parser.push(acc))
-    ).then((full) => parser.finish(full));
+    ).then((full) => { _pbpTrUsageFallback(st, u.got, sentChars, full); return parser.finish(full); });
   };
   const requestSingle = async (seg) => {
     const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, glossary: pbpTrMatchGlossary(st.glossary, [seg]), segments: [seg] });
@@ -989,7 +1027,10 @@ async function _pbpTrStart(st) {
     const parser = pbpAiMakeStreamJsonParser((it) => { if (it.id === seg.id) got = it.text; });
     const opts = streamOpts(seg.text.length);
     opts.system = system;
+    const u = { got: false };            // T4
+    opts.onUsage = (usage) => { u.got = true; st.usage.inTok += usage.inTok; st.usage.outTok += usage.outTok; };
     const full = await callAIStream(st.s, prompt, opts, (d, acc) => parser.push(acc));
+    _pbpTrUsageFallback(st, u.got, seg.text.length, full);
     parser.finish(full);
     return got;
   };
@@ -1075,6 +1116,7 @@ async function _pbpTrStart(st) {
   }
   const doneAll = st.work.every((w) => (w.n in st.trMd));
   _pbpTrSetStatus(st, doneAll ? "done" : "partial"); // partial = Stop / failures: Continue
+  _pbpTrRenderUsage(st);                              // T4: show run's in/out token usage
   // Toggle is already shown and the mode already switched to bilingual at the
   // start of the run; persist the FINAL mode (unless the user switched back to
   // Original mid-run, in which case there is nothing translated to remember).
@@ -1327,6 +1369,8 @@ function _pbpTrSetStatus(st, status) {
     stop.hidden = false;
     prog.hidden = false;
     est.hidden = true;
+    const usg = document.getElementById("tr-usage");
+    if (usg) usg.hidden = true;          // T4: clear last run's usage line before the new run
     // Move focus to the now-visible Stop button before disabling Translate,
     // so a keyboard user doesn't drop to <body> (audit md-translate.js:1000).
     if (document.activeElement === btn) stop.focus();
@@ -1356,6 +1400,8 @@ function _pbpTrSetStatus(st, status) {
     stop.hidden = true;
     prog.hidden = true;
     est.hidden = false;
+    const usg = document.getElementById("tr-usage");
+    if (usg) usg.hidden = true;          // T4: language reset clears the stale usage line
   }
 }
 

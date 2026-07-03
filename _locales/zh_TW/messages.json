@@ -2170,6 +2170,13 @@
       }
     }
   },
+  "trActualUsage": {
+    "message": "本次用量：輸入 $IN$ / 輸出 $OUT$ tokens",
+    "placeholders": {
+      "in": { "content": "$1" },
+      "out": { "content": "$2" }
+    }
+  },
   "trExtracting": {
     "message": "擷取術語中…"
   },

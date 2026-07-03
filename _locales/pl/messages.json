@@ -2170,6 +2170,13 @@
       }
     }
   },
+  "trActualUsage": {
+    "message": "Zużycie: wejście $IN$ / wyjście $OUT$ tokenów",
+    "placeholders": {
+      "in": { "content": "$1" },
+      "out": { "content": "$2" }
+    }
+  },
   "trExtracting": {
     "message": "Wyodrębnianie terminologii…"
   },

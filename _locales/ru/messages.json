@@ -2170,6 +2170,13 @@
       }
     }
   },
+  "trActualUsage": {
+    "message": "Расход: вход $IN$ / выход $OUT$ токенов",
+    "placeholders": {
+      "in": { "content": "$1" },
+      "out": { "content": "$2" }
+    }
+  },
   "trExtracting": {
     "message": "Извлечение терминологии…"
   },

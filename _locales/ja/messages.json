@@ -2170,6 +2170,13 @@
       }
     }
   },
+  "trActualUsage": {
+    "message": "今回の使用量：入力 $IN$ / 出力 $OUT$ トークン",
+    "placeholders": {
+      "in": { "content": "$1" },
+      "out": { "content": "$2" }
+    }
+  },
   "trExtracting": {
     "message": "用語を抽出中…"
   },

@@ -2170,6 +2170,13 @@
       }
     }
   },
+  "trActualUsage": {
+    "message": "Consommation : entrée $IN$ / sortie $OUT$ jetons",
+    "placeholders": {
+      "in": { "content": "$1" },
+      "out": { "content": "$2" }
+    }
+  },
   "trExtracting": {
     "message": "Extraction de la terminologie…"
   },

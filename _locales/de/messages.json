@@ -2170,6 +2170,13 @@
       }
     }
   },
+  "trActualUsage": {
+    "message": "Verbrauch: Eingabe $IN$ / Ausgabe $OUT$ Tokens",
+    "placeholders": {
+      "in": { "content": "$1" },
+      "out": { "content": "$2" }
+    }
+  },
   "trExtracting": {
     "message": "Terminologie wird extrahiert…"
   },
