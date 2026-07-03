@@ -490,6 +490,25 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     if (timedOut && !(opts.signal && opts.signal.aborted)) {
       throw new Error("AI stream timeout");
     }
+    // Network disconnection: fetch() rejects with a bare TypeError ("Failed to
+    // fetch") when offline / DNS or connection fails — distinct from
+    // handleAIError's provider-classified Error (.status set) and the caller's
+    // AbortError (.name === "AbortError"), so this never touches provider error
+    // classification. Ask/Translate display e.message directly (no code lookup
+    // downstream), so bake the localized text into the message here (D4-2).
+    // Best-effort: if t() is unavailable for any reason, degrade to the
+    // original error untouched rather than let classification itself fail.
+    const offline = (e instanceof TypeError && /failed to fetch/i.test(e.message || "")) ||
+      (typeof navigator !== "undefined" && navigator.onLine === false);
+    if (offline) {
+      let offlineMsg = "";
+      try { offlineMsg = t("pinboardErrorOffline"); } catch (_) { offlineMsg = ""; }
+      if (offlineMsg) {
+        const netErr = new Error(offlineMsg);
+        netErr.code = "network";
+        throw netErr;
+      }
+    }
     throw e;
   } finally {
     clearTimeout(idleTimer);

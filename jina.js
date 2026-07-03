@@ -53,6 +53,14 @@ async function fetchJinaMarkdown(url, options = {}) {
 
     return { ...result, fromCache: false };
   } catch (e) {
-    return { error: e.message || "Jina API request failed", fallback: true };
+    // Chrome throws a bare TypeError("Failed to fetch") for network failures
+    // (offline, DNS, connection refused) — distinct from the HTTP-status branch
+    // above (a real response, just non-2xx). Collapse it to the "network" code,
+    // the same sentinel md-preview.js's own sendMessage-failure catches already
+    // use, so friendlyEngineErr can map it to a dedicated message instead of
+    // every Jina failure falling into one generic bucket (D4-2).
+    const offline = (e instanceof TypeError && /failed to fetch/i.test(e.message || "")) ||
+      (typeof navigator !== "undefined" && navigator.onLine === false);
+    return { error: offline ? "network" : (e.message || "Jina API request failed"), fallback: true };
   }
 }

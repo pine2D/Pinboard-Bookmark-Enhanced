@@ -199,6 +199,12 @@ function ensureKatex() {
     const code = r && r.error;
     if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
     if (code === "empty") return t("mdPreviewNoContent");
+    // "network" covers both this file's own sendMessage-throw catches (below,
+    // and the engine-switch handler further down) and jina.js's fetch-TypeError
+    // classification relayed unchanged through background.js — otherwise every
+    // offline failure fell into the generic mdEngineExtractFailed bucket,
+    // indistinguishable from a bad API key or a dead Jina service (D4-2).
+    if (code === "network") return t("pinboardErrorOffline");
     return t("mdEngineExtractFailed");
   }
   function applyAvailability(curEngine) {

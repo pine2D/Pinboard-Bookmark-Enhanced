@@ -1209,6 +1209,117 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
   });
 });
 </script>
+<script>
+// ============ D4-2: _pbpStreamRead offline classification (async) ============
+// Ask/Translate both funnel every provider's streaming call through this one
+// catch block. Verifies the new network-disconnect branch fires only for a
+// genuine offline signal, and leaves handleAIError / AbortError untouched.
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "_pbpStreamRead offline classification (D4-2, async)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  function ok(cond, msg) { if (!cond) throw new Error(msg || "assert"); }
+  if (typeof _pbpStreamRead !== "function") {
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP _pbpStreamRead suite (not loaded)";
+    host.appendChild(div);
+    return;
+  }
+  const noopConsume = () => "";
+  const realFetch = window.fetch;
+  const realChrome = window.chrome;
+  const onlineDesc = Object.getOwnPropertyDescriptor(navigator, "onLine");
+  // This file:// harness has no extension context, so t()'s chrome.i18n.getMessage
+  // call would throw — which the implementation must (and does) survive via its own
+  // internal try/catch, degrading to the raw error (see the dedicated degrade-path
+  // test below). To exercise the HAPPY path too, stub chrome.i18n like the existing
+  // K2 signal suite does (search "Stub chrome.i18n" above).
+  const STUB_OFFLINE_MSG = "STUB: network error, check connection";
+  window.chrome = { i18n: { getMessage: (key) => key === "pinboardErrorOffline" ? STUB_OFFLINE_MSG : "" } };
+  try {
+    await atest("offline TypeError('Failed to fetch') -> localized network error, code='network'", async () => {
+      window.fetch = async () => { throw new TypeError("Failed to fetch"); };
+      let caught = null;
+      try { await _pbpStreamRead("https://example.test/x", {}, {}, "API", noopConsume); }
+      catch (e) { caught = e; }
+      ok(caught, "expected a rejection");
+      ok(caught.code === "network", "code should be network, got " + caught.code);
+      ok(caught.message === STUB_OFFLINE_MSG, "message should reuse pinboardErrorOffline via t(), got: " + caught.message);
+    });
+
+    await atest("navigator.onLine===false with a non-TypeError fetch failure is still classified as network", async () => {
+      Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
+      window.fetch = async () => { throw new Error("network unreachable"); };
+      let caught = null;
+      try { await _pbpStreamRead("https://example.test/x", {}, {}, "API", noopConsume); }
+      catch (e) { caught = e; }
+      if (onlineDesc) Object.defineProperty(navigator, "onLine", onlineDesc); else delete navigator.onLine;
+      ok(caught && caught.code === "network", "onLine=false should still classify as network");
+    });
+
+    await atest("regression guard: handleAIError HTTP errors are NOT reclassified as network", async () => {
+      window.fetch = async () => ({
+        ok: false, status: 500,
+        json: async () => ({ error: { message: "boom" } })
+      });
+      let caught = null;
+      try { await _pbpStreamRead("https://example.test/x", {}, {}, "API", noopConsume); }
+      catch (e) { caught = e; }
+      ok(caught, "expected a rejection");
+      ok(caught.code !== "network", "provider HTTP error must not be reclassified as network");
+      ok(/boom/.test(caught.message), "original handleAIError message must survive, got: " + caught.message);
+    });
+
+    await atest("regression guard: caller AbortError is NOT reclassified as network", async () => {
+      const ctrl = new AbortController();
+      ctrl.abort();
+      window.fetch = async (url, init) => {
+        if (init && init.signal && init.signal.aborted) {
+          throw new DOMException("The operation was aborted.", "AbortError");
+        }
+        throw new Error("test setup error: signal not chained");
+      };
+      let caught = null;
+      try { await _pbpStreamRead("https://example.test/x", {}, { signal: ctrl.signal }, "API", noopConsume); }
+      catch (e) { caught = e; }
+      ok(caught && caught.name === "AbortError", "expected AbortError, got " + (caught && caught.name));
+      ok(caught && caught.code !== "network", "AbortError must not be reclassified as network");
+    });
+
+    await atest("degrade path: if t()/chrome.i18n is unavailable, the original error is rethrown untouched", async () => {
+      window.chrome = undefined; // simulate t() throwing (no extension context)
+      window.fetch = async () => { throw new TypeError("Failed to fetch"); };
+      let caught = null;
+      try { await _pbpStreamRead("https://example.test/x", {}, {}, "API", noopConsume); }
+      catch (e) { caught = e; }
+      window.chrome = { i18n: { getMessage: (key) => key === "pinboardErrorOffline" ? STUB_OFFLINE_MSG : "" } };
+      ok(caught instanceof TypeError, "must degrade to the original TypeError, got " + (caught && caught.constructor.name));
+      ok(caught.message === "Failed to fetch", "original message preserved: " + caught.message);
+      ok(caught.code === undefined, "no .code stamped when classification itself can't run");
+    });
+  } finally {
+    window.fetch = realFetch;
+    window.chrome = realChrome;
+    if (onlineDesc) Object.defineProperty(navigator, "onLine", onlineDesc); else delete navigator.onLine;
+  }
+
+  const sum = document.createElement("div");
+  sum.className = "case pass";
+  sum.textContent = "STREAMREAD-OFFLINE SUMMARY done";
+  host.appendChild(sum);
+})();
+</script>
 
 <script>
 // ============ Task 10: pbpTrRunQueue (async, self-reporting) ============
