@@ -117,10 +117,19 @@ function pbpHlComposeSection(items) {
 // fence-length counting, no multi-line inline spans); good enough
 // for "is this quote inside SOME code span" -- upgrade to
 // md-convert's real parser only if that ceiling is ever hit in
-// practice.
+// practice. Trap (Important-1): an UNCLOSED fence at EOF has no
+// closing ``` for the first branch to find, so WITHOUT a dedicated
+// branch the alternation falls through to the inline-code branch,
+// which greedily swallows just the fence opener's first two
+// backticks as an empty `` span -- leaving everything after the
+// fence opener (to end of document) completely unprotected. Per
+// CommonMark, an unclosed fence runs to end of document, so the
+// middle branch below closes that gap; it MUST stay ordered AFTER
+// the closed-fence branch so a real closer still wins when one
+// exists (alternation tries branches left-to-right per start index).
 function _pbpHlProtectedRanges(md) {
   const ranges = [];
-  const re = /```[\s\S]*?```|`[^`\n]*`/g;
+  const re = /```[\s\S]*?```|```[\s\S]*$|`[^`\n]*`/g;
   let m;
   while ((m = re.exec(md))) {
     ranges.push([m.index, m.index + m[0].length]);

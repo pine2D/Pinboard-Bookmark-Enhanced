@@ -3536,6 +3536,16 @@ suiteIf("pbpHlInlineMark", "pbpHlInlineMark", () => {
     ];
     assertEq(pbpHlInlineMark(md, items), md.replace("keepme", "==keepme=="), "only the unique out-of-code quote is wrapped");
   });
+  test("Important-1: quote's only occurrence is inside an UNCLOSED fence at EOF -> skipped", () => {
+    const md = "prose\n\n```\ntext with no closing fence and an unclosedOnlyPhrase inside";
+    const items = [{ quote: "unclosedOnlyPhrase", color: 1 }];
+    assertEq(pbpHlInlineMark(md, items), md, "unchanged, unclosed-EOF-fence hit not wrapped");
+  });
+  test("Important-1 regression: CLOSED fence followed by prose, quote unique in the prose -> still wrapped", () => {
+    const md = "```\ncode here\n```\n\nprose with a closedFenceProseUnique phrase";
+    const items = [{ quote: "closedFenceProseUnique", color: 1 }];
+    assertEq(pbpHlInlineMark(md, items), md.replace("closedFenceProseUnique", "==closedFenceProseUnique=="), "prose after a closed fence is still wrapped");
+  });
 });
 </script>
 </body></html>
