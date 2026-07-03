@@ -101,6 +101,11 @@ function detectArticleLang(text) {
     if (simp > trad) return "zh-Hans";
     return ""; // ambiguous → default (TC-first) stack handles it
   }
+  // D9-3: Arabic / Hebrew script blocks (escaped code points, not literal RTL
+  // characters, to avoid embedding bidi source in this file). Codes double as
+  // the RTL signal below (renderedView.dir), unlike the LTR branches above.
+  if (/[\u0600-\u06FF]/.test(s)) return "ar"; // Arabic
+  if (/[\u0590-\u05FF]/.test(s)) return "he"; // Hebrew
   return ""; // Latin / Cyrillic → default stack's Latin head
 }
 
@@ -442,6 +447,10 @@ function ensureKatex() {
   if (typeof pbpForumShouldMark === "function" && pbpForumShouldMark(info, renderedView) && typeof pbpForumMarkComments === "function") pbpForumMarkComments(renderedView);
   const _articleLang = detectArticleLang(canonicalMarkdown);
   if (_articleLang) renderedView.lang = _articleLang; // article-script font for the reading content
+  // D9-3: RTL article -> container-level dir so blockquote/list/TOC physical
+  // direction CSS mirrors along with the text (renderedView is fresh DOM per
+  // page load — no stale dir from a prior render to clear on the LTR path).
+  if (_articleLang === "ar" || _articleLang === "he") renderedView.dir = "rtl";
   // Syntax highlighting is OFF the critical first-paint path: the article paints
   // immediately, then — only if it actually contains code — highlight.js is lazy-loaded
   // and applied after paint (rAF). Avoids blocking the page on a 122KB compile + a

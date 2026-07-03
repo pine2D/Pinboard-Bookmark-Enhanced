@@ -146,7 +146,7 @@ function _pbpAskBuildPanel() {
     '  <button type="button" class="ask-chip" data-i18n="askChipData"></button>',
     '</div>',
     '<form id="ask-form">',
-    '  <textarea id="ask-input" rows="2" data-i18n-placeholder="askPlaceholder"></textarea>',
+    '  <textarea id="ask-input" rows="2" dir="auto" data-i18n-placeholder="askPlaceholder"></textarea>',
     '  <div class="ask-actions">',
     '    <button type="button" id="ask-stop" class="action-btn" hidden data-i18n="askStop">Stop</button>',
     '    <button type="submit" id="ask-send" class="action-btn">' + PBP_ASK_SEND_SVG + '<span class="btn-label" data-i18n="askSend">Send</span></button>',
@@ -450,9 +450,11 @@ function _pbpAskAppendRound(question) {
   if (chips) chips.hidden = true;
   const qEl = document.createElement("div");
   qEl.className = "ask-q";
+  qEl.dir = "auto"; // D9-2: user question may be RTL, independent of UI language
   qEl.textContent = question;
   const aEl = document.createElement("div");
   aEl.className = "ask-a streaming";
+  aEl.dir = "auto"; // D9-2: answer follows the question's language (system prompt rule)
   // #ask-thread is aria-live=polite; without aria-busy, every rAF-throttled
   // textContent replace during streaming re-announces the whole accumulated
   // answer (audit md-ask.js:140). Mirrors the Explain popover's aria-busy
@@ -830,6 +832,7 @@ function _pbpAskFinalize(el, fullText) {
   // DOMPurify); assigning its return via innerHTML is the established
   // md-preview.js pattern (renderedView.innerHTML = renderMarkdown(...),
   // md-preview.js ~line 330-333). NEVER assign raw model text to innerHTML.
+  el.dir = "auto"; // D9-2: also covers the history-restore aEl, which skips _pbpAskAppendRound
   el.innerHTML = renderMarkdown(parsed.body);
   _pbpAskChipPass(el, parsed.cites);
   // Task 15 hook (copy button + history chrome). typeof-guarded so this
@@ -1018,6 +1021,7 @@ async function _pbpAskHistRestore() {
         if (!rec || typeof rec.a !== "string") continue;
         const qEl = document.createElement("div");
         qEl.className = "ask-q";
+        qEl.dir = "auto"; // D9-2: mirror the live _pbpAskAppendRound path (structure is replicated verbatim, see comment above)
         qEl.textContent = String(rec.q || "");
         const aEl = document.createElement("div");
         aEl.className = "ask-a";

@@ -407,6 +407,11 @@ const PBP_TR_LANG_NAMES = {
   th: "Thai", id: "Indonesian"
 };
 
+// RTL scripts among the known target-language codes above (D9-1). Custom
+// free-text targets (e.g. "Classical Chinese") can't be statically judged
+// RTL/LTR, so _pbpTrFill falls back to dir="auto" for anything not in here.
+const PBP_TR_RTL_LANGS = new Set(["ar", "he", "fa", "ur"]);
+
 // Localized language name for UI display (e.g. zh UI shows "简体中文", not the
 // English "Simplified Chinese"). Uses the built-in Intl.DisplayNames (zero-dep);
 // falls back to the English name for custom/free-text targets Intl can't resolve
@@ -991,6 +996,10 @@ function _pbpTrFill(st, w, shieldedTranslation) {
     div.dataset.pbTr = String(w.n);
     orig.insertAdjacentElement("afterend", div);
   }
+  // D9-1: known RTL target -> explicit rtl (auto's first-char sniff misreads
+  // segments that lead with an untranslated Latin brand/code term); custom
+  // free-text targets can't be judged statically -> degrade to dir="auto".
+  div.dir = PBP_TR_RTL_LANGS.has(st.target.code) ? "rtl" : "auto";
   div.innerHTML = renderMarkdown(restored);
   div.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
   _pbpTrApplyPeekAttrs(div);
