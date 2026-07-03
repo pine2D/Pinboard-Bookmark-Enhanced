@@ -2763,4 +2763,131 @@ suite("htmlToMarkdown table rule: nested table in a cell is not flattened/duplic
   });
 });
 </script>
+
+<script>
+// C2-6: storage.local reclaim safety (pbpMeasureLocalStorage / pbpReclaimLocalStorage).
+// Adversarial: never-clear keys (pending data, credentials, settings, in-progress
+// handoffs) must survive reclaim(ALL categories); only allowlist keys are removed.
+(async function () {
+  if (typeof pbpReclaimLocalStorage !== "function" || typeof pbpMeasureLocalStorage !== "function") {
+    SKIP++;
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP suite C2-6 storage reclaim (functions not loaded)";
+    document.getElementById("results").appendChild(div);
+    return;
+  }
+  // async mirror of test(): await fn, append pass/fail div, bump counters.
+  async function atest(name, fn) {
+    const div = document.createElement("div");
+    try { await fn(); PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    catch (e) { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + e.message; }
+    document.getElementById("results").appendChild(div);
+  }
+  // In-memory chrome.storage.local mock (get(null)/get(str)/get(arr)/get(obj), remove).
+  function mockLocal(initial) {
+    const store = { ...initial };
+    return {
+      _store: store,
+      get: (arg) => Promise.resolve(
+        arg == null ? { ...store }
+        : typeof arg === "string" ? (arg in store ? { [arg]: store[arg] } : {})
+        : Array.isArray(arg) ? arg.reduce((o, k) => { if (k in store) o[k] = store[k]; return o; }, {})
+        : Object.keys(arg).reduce((o, k) => { o[k] = (k in store) ? store[k] : arg[k]; return o; }, {})
+      ),
+      remove: (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((k) => delete store[k]); return Promise.resolve(); },
+    };
+  }
+  const NEVER = [
+    "offlineQueue", "batch_progress", "pinboardToken", "openaiApiKey", "jinaApiKey",
+    "md_preview_data", "md_preview_data_abc123", "_tagGovIgnored", "_tagGovLastRun",
+    "_tagGovAiGroups", "lastUsedTags", "optSyncEnabled", "customOverlayCSS_localFallback",
+    "aiContentSource", "customBaseUrl",
+  ];
+  const RECLAIMABLE = [
+    "jina_md_https://ex.com/a", "jina_md_https://ex.com/b", "cached_existing_urls",
+    "cached_user_tags", "cached_suggest_https://ex.com/a", "_waybackLog",
+    "_waybackAttempts", "pbp_ai_usage", "pbpThinkReject",
+  ];
+  function freshStore() {
+    const s = {};
+    NEVER.forEach((k) => { s[k] = { secret: "DO_NOT_DELETE_" + k, blob: "x".repeat(50) }; });
+    RECLAIMABLE.forEach((k) => { s[k] = { cache: "y".repeat(200), timestamp: 1 }; });
+    return s;
+  }
+  const realChrome = window.chrome;
+
+  await atest("C2-6 reclaim(all cats): never-clear survive, allowlist removed, freed>0", async () => {
+    const local = mockLocal(freshStore());
+    window.chrome = { storage: { local } };
+    const freed = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
+    NEVER.forEach((k) => assert(k in local._store, "must SURVIVE reclaim: " + k));
+    RECLAIMABLE.forEach((k) => assert(!(k in local._store), "must be CLEARED: " + k));
+    assert(freed > 0, "freed bytes must be > 0, got " + freed);
+  });
+
+  await atest("C2-6 reclaim([]): empty categories deletes nothing", async () => {
+    const local = mockLocal(freshStore());
+    window.chrome = { storage: { local } };
+    const before = Object.keys(local._store).length;
+    const freed = await pbpReclaimLocalStorage([]);
+    assertEq(Object.keys(local._store).length, before, "no keys removed on empty selection");
+    assertEq(freed, 0, "zero freed on empty selection");
+  });
+
+  await atest("C2-6 reclaim(garbage/unknown categories): zero deletions", async () => {
+    const local = mockLocal(freshStore());
+    window.chrome = { storage: { local } };
+    const before = Object.keys(local._store).length;
+    const freed = await pbpReclaimLocalStorage(["everything", "__proto__", "settings", null, 42]);
+    assertEq(Object.keys(local._store).length, before, "garbage category names delete nothing");
+    assertEq(freed, 0, "zero freed for garbage categories");
+  });
+
+  await atest("C2-6 reclaim(non-array input): treated as empty, no deletions", async () => {
+    const local = mockLocal(freshStore());
+    window.chrome = { storage: { local } };
+    const before = Object.keys(local._store).length;
+    await pbpReclaimLocalStorage("jina");        // string, not array
+    await pbpReclaimLocalStorage(undefined);
+    assertEq(Object.keys(local._store).length, before, "non-array categories delete nothing");
+  });
+
+  await atest("C2-6 reclaim(tags only): removes tag caches, leaves jina/urls/misc + never-clear", async () => {
+    const local = mockLocal(freshStore());
+    window.chrome = { storage: { local } };
+    await pbpReclaimLocalStorage(["tags"]);
+    assert(!("cached_user_tags" in local._store), "cached_user_tags cleared");
+    assert(!("cached_suggest_https://ex.com/a" in local._store), "cached_suggest_ cleared");
+    assert("jina_md_https://ex.com/a" in local._store, "jina cache untouched");
+    assert("cached_existing_urls" in local._store, "url cache untouched");
+    assert("pbp_ai_usage" in local._store, "misc untouched");
+    NEVER.forEach((k) => assert(k in local._store, "never-clear untouched: " + k));
+  });
+
+  await atest("C2-6 measure: groups keys by category with byte totals, ignores never-clear", async () => {
+    const local = mockLocal(freshStore());
+    window.chrome = { storage: { local } };
+    const m = await pbpMeasureLocalStorage();
+    assertEq(m.jina.keys.length, 2, "two jina keys");
+    assertEq(m.urls.keys.length, 1, "one url key");
+    assertEq(m.tags.keys.length, 2, "cached_user_tags + one suggest");
+    assertEq(m.misc.keys.length, 4, "wayback log+attempts + ai usage + think reject");
+    ["jina", "urls", "tags", "misc"].forEach((c) => assert(m[c].bytes > 0, c + " bytes > 0"));
+    // never-clear keys never appear in any category
+    const allMeasured = [].concat(m.jina.keys, m.urls.keys, m.tags.keys, m.misc.keys);
+    NEVER.forEach((k) => assert(!allMeasured.includes(k), "never-clear absent from measure: " + k));
+  });
+
+  await atest("C2-6 measure/reclaim degrade (storage.get throws) without throwing", async () => {
+    window.chrome = { storage: { local: { get: () => Promise.reject(new Error("boom")), remove: () => Promise.resolve() } } };
+    const m = await pbpMeasureLocalStorage();
+    assertEq(m.jina.keys.length, 0, "empty measure on storage failure");
+    const freed = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
+    assertEq(freed, 0, "zero freed on storage failure");
+  });
+
+  window.chrome = realChrome;
+})();
+</script>
 </body></html>

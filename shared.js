@@ -403,6 +403,108 @@ async function fetchExistingUrlSet(token) {
   }
 }
 
+// ---- C2-6: reclaimable storage.local cache management ----
+// Frees the quota that "storage full" preview failures hit. Runs in the SW,
+// popup and options (no window/DOM deps — chrome.storage only).
+//
+// SAFETY (constructive, non-negotiable): reclaim is a POSITIVE ALLOWLIST of
+// known-safe cache keys, NEVER a denylist. Root cause: with sync OFF, user
+// settings AND obfuscated API keys live in storage.local (getSettingsStorage
+// routes there), so "clear everything not in a blocklist" would wipe
+// credentials. A key is deleted ONLY if it matches a category below.
+const PBP_RECLAIM_CATEGORIES = {
+  jina: { keys: [], prefixes: ["jina_md_"] },                       // Jina page extract cache (usually the largest)
+  urls: { keys: ["cached_existing_urls"], prefixes: [] },           // bookmark URL set (re-fetched)
+  tags: { keys: ["cached_user_tags"], prefixes: ["cached_suggest_"] }, // tag autocomplete caches
+  misc: { keys: ["_waybackLog", "_waybackAttempts", "pbp_ai_usage", "pbpThinkReject"], prefixes: [] }, // archive log + AI usage + think-reject memo
+};
+
+// Second line of defense (belt-and-suspenders): even if a caller passes a bogus
+// or over-broad category, these keys are NEVER removed. The allowlist above is
+// the primary guard; this makes accidental deletion structurally impossible.
+function pbpIsNeverClearKey(key) {
+  if (typeof key !== "string") return true;
+  // Pending user data / in-progress state.
+  if (key === "offlineQueue" || key === "batch_progress") return true;
+  if (key.startsWith("_tagGov")) return true;              // _tagGovAiGroups / _tagGovLastRun / _tagGovIgnored
+  if (key.startsWith("md_preview_data")) return true;      // md_preview_data + md_preview_data_<uuid> handoffs
+  // Local-only settings that are NOT in SETTINGS_DEFAULTS.
+  if (key === "optSyncEnabled" || key === "customOverlayCSS_localFallback" || key === "lastUsedTags") return true;
+  // Any setting (and, with sync off, any obfuscated API key) lives under a
+  // SETTINGS_DEFAULTS key when routed to local.
+  if (typeof SETTINGS_DEFAULTS === "object" && SETTINGS_DEFAULTS &&
+      Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, key)) return true;
+  return false;
+}
+
+function pbpKeyMatchesCategory(key, def) {
+  // Reject non-defs (incl. inherited props like PBP_RECLAIM_CATEGORIES["__proto__"],
+  // which resolves to Object.prototype — truthy but with no keys/prefixes arrays).
+  if (!def || !Array.isArray(def.keys) || !Array.isArray(def.prefixes)) return false;
+  if (def.keys.includes(key)) return true;
+  return def.prefixes.some((p) => key.startsWith(p));
+}
+
+// Rough per-key storage cost (key + JSON value length) — good enough for display,
+// avoids a getBytesInUse round-trip per category and works in file:// tests.
+function pbpEntryBytes(key, value) {
+  try { return key.length + JSON.stringify(value).length; } catch (_) { return key.length; }
+}
+
+// Enumerate reclaimable local storage grouped by category: { cat: { keys, bytes } }.
+// Degrades to an all-zero shape on any storage failure (never throws).
+async function pbpMeasureLocalStorage() {
+  const out = {};
+  for (const cat of Object.keys(PBP_RECLAIM_CATEGORIES)) out[cat] = { keys: [], bytes: 0 };
+  let all;
+  try { all = await chrome.storage.local.get(null); } catch (_) { return out; }
+  for (const key of Object.keys(all || {})) {
+    if (pbpIsNeverClearKey(key)) continue;
+    for (const cat of Object.keys(PBP_RECLAIM_CATEGORIES)) {
+      if (pbpKeyMatchesCategory(key, PBP_RECLAIM_CATEGORIES[cat])) {
+        out[cat].keys.push(key);
+        out[cat].bytes += pbpEntryBytes(key, all[key]);
+        break; // a key belongs to at most one category
+      }
+    }
+  }
+  return out;
+}
+
+// Remove ONLY the allowlist keys for the given categories. Every candidate is
+// re-checked against pbpIsNeverClearKey before deletion. Returns freed bytes.
+// Degrades to 0 (no throw) on any storage failure.
+async function pbpReclaimLocalStorage(categories) {
+  const cats = Array.isArray(categories) ? categories : [];
+  let all;
+  try { all = await chrome.storage.local.get(null); } catch (_) { return 0; }
+  const toRemove = [];
+  let freed = 0;
+  for (const key of Object.keys(all || {})) {
+    if (pbpIsNeverClearKey(key)) continue; // second-line guard
+    for (const cat of cats) {
+      const def = PBP_RECLAIM_CATEGORIES[cat]; // unknown/garbage category -> undefined -> skipped
+      if (def && pbpKeyMatchesCategory(key, def)) {
+        toRemove.push(key);
+        freed += pbpEntryBytes(key, all[key]);
+        break;
+      }
+    }
+  }
+  if (toRemove.length) {
+    try { await chrome.storage.local.remove(toRemove); } catch (_) { return 0; }
+  }
+  return freed;
+}
+
+// Human-readable byte size (B / KB / MB) for the storage panel.
+function pbpFormatBytes(b) {
+  if (!(b > 0)) return "0 B";
+  if (b < 1024) return b + " B";
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + " KB";
+  return (b / (1024 * 1024)).toFixed(1) + " MB";
+}
+
 // ---- Pinboard error classifier ----
 // Returns an i18n key describing a Pinboard API failure.
 // Input: HTTP Response, Error, or status number. Caller handles 401 (pinboardFetch redirects)
