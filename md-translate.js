@@ -1406,7 +1406,10 @@ function _pbpTrSetMode(st, mode, persist) {
     // Forum pages: serialize the nested rendered DOM so the export keeps the thread
     // structure (matches the preview); non-forum: the flat block-index compose is correct.
     if (document.querySelector("#rendered-view .pb-comment-body")) return _pbpTrSerializeForumView(mode);
-    return pbpTrComposeView(mode, pbpAiBlocks().map((b) => ({ orig: pbpAiMdOf(b.n), tr: st.trMd[b.n] || null })));
+    return pbpTrComposeView(mode, pbpAiBlocks().map((b) => {
+      const orig = pbpAiMdOf(b.n), tr = st.trMd[b.n];
+      return { orig, tr: (tr && tr !== orig) ? tr : null };
+    }));
   };
   if (persist) pbpTrViewSet(st.url, { mode, lang: st.target.code }).catch(() => {});
 }

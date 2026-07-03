@@ -2703,6 +2703,29 @@ suiteIf("_pbpTrApplySkips", "_pbpTrApplySkips", () => {
   });
 });
 
+// Minor-1 regression: the non-forum bilingual EXPORT compose call site
+// (md-translate.js _pbpTrSetMode's pbpViewMarkdown, around the pbpTrComposeView
+// call) must map a T3-skipped block (trMd[n] byte-identical to its own orig)
+// to tr:null, or pbpTrComposeView's bilingual branch pushes orig then tr and
+// the block appears twice in the downloaded bilingual markdown/html.
+suiteIf("pbpTrComposeView bilingual export + T3 skip mapping (Minor-1)", "pbpTrComposeView", () => {
+  test("a skipped block (tr === orig) is emitted exactly once in the bilingual export", () => {
+    const skippedOrig = "Already in the target language.";
+    const translatedOrig = "Needs translation.";
+    const st = { trMd: Object.create(null) };
+    st.trMd[1] = skippedOrig; // T3 skip-fill: trMd[n] set to its OWN original md
+    st.trMd[2] = "已翻译完成。";
+    const mdOf = { 1: skippedOrig, 2: translatedOrig };
+    // Same mapping as the pbpViewMarkdown call site's pbpAiBlocks().map(...).
+    const items = [{ n: 1 }, { n: 2 }].map((b) => {
+      const orig = mdOf[b.n], tr = st.trMd[b.n];
+      return { orig, tr: (tr && tr !== orig) ? tr : null };
+    });
+    const md = pbpTrComposeView("bilingual", items);
+    assertEq(md, skippedOrig + "\n\n" + translatedOrig + "\n\n已翻译完成。", "skipped block once, translated block interleaved");
+  });
+});
+
 suiteIf("_pbpTrApplyTargetLang", "_pbpTrApplyTargetLang", () => {
   test("re-resolves target + updates the label from provided settings", async () => {
     const el = document.createElement("span");
