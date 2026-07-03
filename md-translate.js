@@ -686,6 +686,38 @@ async function _pbpTrProbeCache(st) {
   } catch (_) {}
 }
 
+// T3: mark every st.work block already written in the target script as
+// "translated" with its OWN original markdown -- no request, no .pb-tr DOM
+// (the bilingual view would otherwise show the same text twice), no IDB
+// write (spec 3: detection is cheap and deterministic, recompute every run
+// rather than risk an "original cached as translation" entry surviving a
+// later target-language change). A cache hit (or an already-real
+// translation) always wins: skip detection never overwrites an existing
+// st.trMd entry. st.skippedSet is cumulative across calls -- pbpTrInit calls
+// this once after the cache probe, _pbpTrStart calls it again on every
+// run/Continue click (so a language change picked up between calls is
+// honoured) -- so a block already marked skipped is never re-counted.
+function _pbpTrApplySkips(st) {
+  const set = st.skippedSet || (st.skippedSet = new Set());
+  for (const w of st.work) {
+    if (w.n in st.trMd) continue;
+    if (pbpTrBlockIsTargetLang(w.shielded.text, st.target.code)) {
+      st.trMd[w.n] = w.md;
+      set.add(w.n);
+    }
+  }
+  st.skippedCount = set.size;
+  const note = document.getElementById("tr-skip-note");
+  if (!note) return;
+  if (st.skippedCount > 0) {
+    note.textContent = t("trSkippedTargetLang", String(st.skippedCount));
+    note.hidden = false;
+  } else {
+    note.hidden = true;
+    note.textContent = "";
+  }
+}
+
 function _pbpTrBuildSection(st) {
   const rail = document.getElementById("rail");
   const anchor = rail ? rail.querySelector(".view-toggle") : null;
@@ -751,6 +783,16 @@ function _pbpTrBuildSection(st) {
   est.textContent = t("trEstCost", String(pbpAiEstimateTokens(chars) * 3),
     (st.s.aiProvider || "gemini") + "/" + (pbpAiResolveModelOverride(st.s) || "default"));
   sec.appendChild(est);
+
+  // T3: "N blocks already in target language, skipped" -- a separate element
+  // (not tr-progress) so it survives the translating/partial/done status text
+  // swaps in _pbpTrSetStatus instead of being clobbered by them. Populated by
+  // _pbpTrApplySkips; stays hidden (spec: "zero noise" when nothing is skipped).
+  const skipNote = document.createElement("div");
+  skipNote.id = "tr-skip-note";
+  skipNote.className = "tr-meta";
+  skipNote.hidden = true;
+  sec.appendChild(skipNote);
 
   const prog = document.createElement("div");
   prog.id = "tr-progress";

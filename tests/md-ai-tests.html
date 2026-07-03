@@ -2624,6 +2624,85 @@ suiteIf("_pbpTrClearPendingFailures", "_pbpTrClearPendingFailures", () => {
   });
 });
 
+suiteIf("_pbpTrApplySkips", "_pbpTrApplySkips", () => {
+  test("skip-matched blocks get trMd = their OWN original md; cache-hit blocks untouched; note shown with the count", () => {
+    const prevChrome = window.chrome;
+    window.chrome = { i18n: { getMessage: (key, subs) => key === "trSkippedTargetLang" ? ((subs && subs[0]) + " skipped") : "" } };
+    const note = document.createElement("div");
+    note.id = "tr-skip-note";
+    note.hidden = true;
+    document.body.appendChild(note);
+    try {
+      const zhHit = "这是一段完全用简体中文书写的句子用来测试翻译跳过逻辑是否正确工作";
+      const enHit = "This block is written entirely in English and stays queued for translation into Chinese";
+      const st = {
+        target: { code: "zh-Hans" },
+        trMd: Object.create(null),
+        work: [
+          { n: 1, md: zhHit, shielded: { text: zhHit } },
+          { n: 2, md: enHit, shielded: { text: enHit } },
+          { n: 3, md: "third block original", shielded: { text: "third block original" } }
+        ]
+      };
+      st.trMd[3] = "already resolved by cache"; // cache hit: must NOT be touched by skip detection
+      _pbpTrApplySkips(st);
+      assertEq(st.trMd[1], zhHit, "block 1 (zh match) skip-filled with its OWN original md");
+      assert(!(2 in st.trMd), "block 2 (english) stays pending, not skip-filled");
+      assertEq(st.trMd[3], "already resolved by cache", "cache-hit block 3 untouched by the skip pass");
+      assertEq(st.skippedCount, 1, "exactly 1 block skip-detected");
+      assertEq(note.hidden, false, "note revealed");
+      assert(note.textContent.indexOf("1") !== -1, "note mentions the skip count: " + note.textContent);
+    } finally {
+      document.body.removeChild(note);
+      window.chrome = prevChrome;
+    }
+  });
+  test("re-invocation is cumulative + idempotent (a second call, e.g. Continue click, doesn't double-count)", () => {
+    const prevChrome = window.chrome;
+    window.chrome = { i18n: { getMessage: () => "" } };
+    const note = document.createElement("div");
+    note.id = "tr-skip-note";
+    document.body.appendChild(note);
+    try {
+      const zhHit = "这是一段完全用简体中文书写的句子用来测试翻译跳过逻辑是否正确工作";
+      const st = {
+        target: { code: "zh-Hans" },
+        trMd: Object.create(null),
+        work: [{ n: 1, md: zhHit, shielded: { text: zhHit } }]
+      };
+      _pbpTrApplySkips(st);
+      assertEq(st.skippedCount, 1, "first pass: 1 skip");
+      _pbpTrApplySkips(st);
+      assertEq(st.skippedCount, 1, "second pass: still 1, not double-counted");
+    } finally {
+      document.body.removeChild(note);
+      window.chrome = prevChrome;
+    }
+  });
+  test("zero skips: note stays hidden, skippedCount is 0", () => {
+    const prevChrome = window.chrome;
+    window.chrome = { i18n: { getMessage: () => "" } };
+    const note = document.createElement("div");
+    note.id = "tr-skip-note";
+    note.hidden = false; // pre-dirty, to prove the function actually re-hides it
+    document.body.appendChild(note);
+    try {
+      const enHit = "This entire block is English prose and matches no target script for a zh run at all";
+      const st = {
+        target: { code: "zh-Hans" },
+        trMd: Object.create(null),
+        work: [{ n: 1, md: enHit, shielded: { text: enHit } }]
+      };
+      _pbpTrApplySkips(st);
+      assertEq(st.skippedCount, 0, "0 skips");
+      assertEq(note.hidden, true, "note hidden when nothing was skipped");
+    } finally {
+      document.body.removeChild(note);
+      window.chrome = prevChrome;
+    }
+  });
+});
+
 suiteIf("_pbpTrApplyTargetLang", "_pbpTrApplyTargetLang", () => {
   test("re-resolves target + updates the label from provided settings", async () => {
     const el = document.createElement("span");
