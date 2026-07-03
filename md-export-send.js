@@ -144,12 +144,17 @@ async function pbpSendToTarget(id, ctx) {
         const fileBody = pbpBuildFileBody(id, meta, rawBody);
         let copied = true;
         try { await navigator.clipboard.writeText(fileBody); } catch (_) { copied = false; }
+        // If the clipboard write failed, opening the app would land the user in an
+        // EMPTY note with nothing to paste while claiming "full text copied" --
+        // report failure instead (no data loss, matches the viaClipboard path above).
+        if (!copied) return { ok: false, fellBack: false, error: "" };
         const openUri = row.buildUri(meta, "", cfg); // empty content -> short URI -> opens app
         const win = window.open(openUri, "_blank");
-        // Only claim "full text copied to clipboard" when copied is actually
-        // true -- a double failure (copy failed AND open blocked) must not
-        // reuse the open-blocked text, which asserts the clipboard has it.
-        if (!win) return { ok: false, fellBack: false, error: copied ? "open-blocked" : "" };
+        // win is null only when the popup was blocked or the user cancelled the
+        // browser's "open <app>?" external-protocol prompt. copied is already true
+        // here (early-return above), so "full text copied to clipboard" stays a
+        // true claim even when the app never opened.
+        if (!win) return { ok: false, fellBack: false, error: "open-blocked" };
         return { ok: true, fellBack: true, error: null };
       }
       // No live consumer takes this sub-path today (every url-scheme row in
