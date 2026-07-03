@@ -660,7 +660,7 @@ document.addEventListener("pbp:rendered", () => {
   const view = document.getElementById("rendered-view");
   if (!view) return;
   view.addEventListener("click", _pbpHlOnClick);
-});
+}, { once: true });
 
 function _pbpHlOnClick(e) {
   // A just-finished drag selection reaching here means mouseup already handed off to
@@ -826,7 +826,10 @@ function _pbpHlSwitchColor(color) {
   item.color = color;
   _pbpHlSave(_pbpHlState.url, _pbpHlState.items, _pbpHlCard.querySelector(".hl-card-dot-" + color)).then(() => {
     if (typeof pbpHlRestore === "function") pbpHlRestore();
-    _pbpHlOpenCard(item.id); // re-render the card's active dot + re-measure position
+    // Guard: only reopen/reposition the card onto this item if it's still the one displayed --
+    // the user may have closed this card and opened a different highlight's card while the
+    // save was in flight (same bug class as the run-start-pill guards in 57642a2).
+    if (_pbpHlCardItemId === item.id) _pbpHlOpenCard(item.id); // re-render the card's active dot + re-measure position
   });
 }
 
@@ -854,8 +857,13 @@ function _pbpHlDeleteCurrent() {
   _pbpHlState.items.splice(idx, 1);
   const btn = _pbpHlCard.querySelector(".hl-card-delete");
   _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn).then(() => {
+    // State cleanup (items already spliced above, this just persists + re-derives) runs
+    // unconditionally regardless of what card is open now. Only the UI action -- hiding the
+    // card -- is guarded: the user may have opened a DIFFERENT highlight's card while this
+    // delete's save was in flight, and that card must stay open (same bug class as the
+    // run-start-pill guards in 57642a2).
     if (typeof pbpHlRestore === "function") pbpHlRestore();
     if (typeof _pbpHlUpdateRailCount === "function") _pbpHlUpdateRailCount(); // Task 6
-    if (_pbpHlCard) _pbpHlCard.hidePopover();
+    if (_pbpHlCard && _pbpHlCardItemId === id) _pbpHlCard.hidePopover();
   });
 }
