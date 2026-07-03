@@ -1484,6 +1484,12 @@
       }
     }
   },
+  "mdBookmarkedBadge": {
+    "message": "ブックマーク済み"
+  },
+  "mdBookmarkedPrivate": {
+    "message": "非公開"
+  },
   "secAiContentSource": {
     "message": "AIコンテンツソース"
   },

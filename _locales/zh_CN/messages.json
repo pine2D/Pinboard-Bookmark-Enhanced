@@ -1484,6 +1484,12 @@
       }
     }
   },
+  "mdBookmarkedBadge": {
+    "message": "已收藏"
+  },
+  "mdBookmarkedPrivate": {
+    "message": "私密"
+  },
   "secAiContentSource": {
     "message": "AI 内容来源"
   },

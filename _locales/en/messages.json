@@ -1460,6 +1460,12 @@
       }
     }
   },
+  "mdBookmarkedBadge": {
+    "message": "Bookmarked"
+  },
+  "mdBookmarkedPrivate": {
+    "message": "Private"
+  },
   "secAiContentSource": {
     "message": "AI Content Source"
   },

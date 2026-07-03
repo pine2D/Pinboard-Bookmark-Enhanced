@@ -1484,6 +1484,12 @@
       }
     }
   },
+  "mdBookmarkedBadge": {
+    "message": "Сохранено"
+  },
+  "mdBookmarkedPrivate": {
+    "message": "Приватная"
+  },
   "secAiContentSource": {
     "message": "Источник контента для ИИ"
   },

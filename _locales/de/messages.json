@@ -1484,6 +1484,12 @@
       }
     }
   },
+  "mdBookmarkedBadge": {
+    "message": "Gespeichert"
+  },
+  "mdBookmarkedPrivate": {
+    "message": "Privat"
+  },
   "secAiContentSource": {
     "message": "KI-Inhaltsquelle"
   },

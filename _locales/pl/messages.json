@@ -1484,6 +1484,12 @@
       }
     }
   },
+  "mdBookmarkedBadge": {
+    "message": "Zapisano"
+  },
+  "mdBookmarkedPrivate": {
+    "message": "Prywatne"
+  },
   "secAiContentSource": {
     "message": "Źródło treści AI"
   },
