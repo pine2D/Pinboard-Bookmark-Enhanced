@@ -152,6 +152,78 @@ function ensureKatex() {
   return _katexPromise;
 }
 
+// X2: bookmarked badge padlock icon (no PBP_ICONS entry for this yet — kept
+// local to md-preview.js rather than growing shared.js's icon bank for one
+// consumer). Same style budget as PBP_ICONS entries in shared.js: viewBox
+// 0 0 16 16, stroke currentColor, aria-hidden (a11y label lives on the
+// wrapping span in renderBookmarkBadge, not the SVG itself).
+const PBP_BOOKMARK_LOCK_SVG = '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6.5" rx="1.3"/><path d="M5.5 7V4.8a2.5 2.5 0 0 1 5 0V7"/></svg>';
+
+// Pure: turns the background.js mdPreviewBookmarkInfo response into the
+// badge's render model. No DOM/chrome access — kept side-effect-free even
+// though md-preview.js has no test harness to exercise it directly (the
+// file's top-level IIFE below depends on chrome.storage/real DOM ids, so
+// it isn't loaded by tests/md-ai-tests.html; see the task note).
+function pbpBuildBookmarkBadgeModel(resp) {
+  if (!resp || resp.bookmarked !== true) return { show: false, tagsShown: [], tagsFull: "", isPrivate: false };
+  const tagsFull = typeof resp.tags === "string" ? resp.tags.trim() : "";
+  const tagsShown = tagsFull ? tagsFull.split(/\s+/).slice(0, 3) : [];
+  return { show: true, tagsShown, tagsFull, isPrivate: resp.shared === "no" };
+}
+
+// Builds the bookmarked-badge DOM from a mdPreviewBookmarkInfo response and
+// inserts it right after #preview-url. No-op when the model says not to
+// show (unbookmarked / offline / no token / any exception — all collapse
+// to {bookmarked:false} in background.js, so this silently does nothing).
+// Tags are remote data (Pinboard-stored, not this extension's own strings)
+// so they're only ever set via textContent/title, never innerHTML.
+function renderBookmarkBadge(resp, url) {
+  const model = pbpBuildBookmarkBadgeModel(resp);
+  if (!model.show) return;
+  const urlEl = document.getElementById("preview-url");
+  if (!urlEl || !urlEl.parentNode) return;
+
+  const a = document.createElement("a");
+  a.className = "bookmark-badge";
+  a.href = "https://pinboard.in/add?url=" + encodeURIComponent(url);
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  // Spec X2 i18n key group: badge aria-label reuses mdBookmarkedBadge (children
+  // below still get their own aria-label/title for the lock; the anchor-level
+  // label is what a screen reader announces for the badge as a whole).
+  a.setAttribute("aria-label", t("mdBookmarkedBadge"));
+
+  const icon = document.createElement("span");
+  icon.className = "bb-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.innerHTML = PBP_ICONS.pin; // shared.js icon bank — fixed literal, no interpolation
+  a.appendChild(icon);
+
+  const label = document.createElement("span");
+  label.textContent = t("mdBookmarkedBadge");
+  a.appendChild(label);
+
+  if (model.tagsShown.length) {
+    const tagsEl = document.createElement("span");
+    tagsEl.className = "bb-tags";
+    tagsEl.textContent = model.tagsShown.join(" "); // remote data -> textContent only
+    tagsEl.title = model.tagsFull;                  // full tag string, remote data -> title attr only
+    a.appendChild(tagsEl);
+  }
+
+  if (model.isPrivate) {
+    const lock = document.createElement("span");
+    lock.className = "bb-lock";
+    lock.setAttribute("role", "img");
+    lock.setAttribute("aria-label", t("mdBookmarkedPrivate"));
+    lock.title = t("mdBookmarkedPrivate");
+    lock.innerHTML = PBP_BOOKMARK_LOCK_SVG; // fixed literal, no interpolation
+    a.appendChild(lock);
+  }
+
+  urlEl.insertAdjacentElement("afterend", a);
+}
+
 (async function () {
   initI18n();
   applyI18n();
@@ -375,6 +447,19 @@ function ensureKatex() {
   const urlEl = document.getElementById("preview-url");
   urlEl.textContent = url || "";
   urlEl.href = url || "#";
+
+  // X2: bookmarked badge. Fire-and-forget against the same checkBookmarked/
+  // statusCache the toolbar icon uses (background.js) — never blocks first
+  // paint. Skipped entirely when there's no URL to look up; every failure
+  // path (offline/no token/exception) resolves to {bookmarked:false} in the
+  // handler, so renderBookmarkBadge's model.show stays false and nothing
+  // renders — no console noise, no visible error state.
+  if (url) {
+    chrome.runtime.sendMessage({ type: "mdPreviewBookmarkInfo", url })
+      .then((resp) => renderBookmarkBadge(resp, url))
+      .catch(() => {});
+  }
+
   const tokenEl = document.getElementById("token-count");
   if (source === "jina" && tokens && info.hasApiKey) {
     tokenEl.textContent = t("mdStatTokens", String(tokens));
