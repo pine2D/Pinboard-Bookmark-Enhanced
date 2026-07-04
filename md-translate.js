@@ -727,6 +727,7 @@ async function _pbpTrProbeCache(st) {
         const v = await pbpTrViewGet(st.url);
         if (v && v.lang === st.target.code && (v.mode === "bilingual" || v.mode === "translated")) {
           _pbpTrSetMode(st, v.mode, false);
+          if (st.railHandle) st.railHandle.expand(true); // restored to bilingual/translated -> auto-expand (temp)
         }
       } else if (hits > 0) {
         _pbpTrSetStatus(st, "partial");
@@ -863,8 +864,16 @@ function _pbpTrBuildSection(st) {
   retryAll.addEventListener("click", () => { _pbpTrRetryAllFailed(st).catch(() => {}); });
   prog.insertAdjacentElement("afterend", retryAll);
 
+  // Rail accordion (spec 2026-07-04): install AFTER every direct child above
+  // exists (pbpRailCollapsible's CSS-driven hide covers whatever's already
+  // in `sec` at install time PLUS anything appended to `sec` later, e.g.
+  // _pbpTrShowViewToggle's view-toggle wrap and _pbpTrRenderUsage's #tr-usage
+  // line below -- both still land as direct children of `sec`).
+  st.railHandle = pbpRailCollapsible(sec, "tr", { label, defaultCollapsed: true });
+
   anchor.insertAdjacentElement("afterend", sec);
   btn.addEventListener("click", () => {
+    if (st.railHandle) st.railHandle.expand(true); // Translate/Continue click -> auto-expand (temp)
     _pbpTrStart(st).catch(() => {
       // Unexpected rejection (setup error etc.): never leave the UI stuck on
       // "翻译中". Reset run flag and settle to a terminal status the user can act on.
@@ -1137,10 +1146,20 @@ async function _pbpTrStart(st) {
       // T3: N/M counts from the skip baseline, not from zero -- skipped blocks are
       // already "done" and were never queued, so both the numerator and the
       // denominator need the offset for the fraction to read honestly.
-      if (prog) prog.textContent = t("trProgress", String(done + (st.skippedCount || 0)), String(total + (st.skippedCount || 0)));
+      const d = done + (st.skippedCount || 0), tt = total + (st.skippedCount || 0);
+      if (prog) prog.textContent = t("trProgress", String(d), String(tt));
+      // Rail accordion: mini "(done/total)" in the header, visible only while
+      // tr-section is collapsed (CSS-gated) so run progress isn't lost when the
+      // user has it tucked away. Plain digits -- no i18n needed (spec 1.3 example).
+      const headProg = document.querySelector("#tr-section .rail-sec-progress");
+      if (headProg) headProg.textContent = "(" + d + "/" + tt + ")";
     }
   });
   st.running = false;
+  // Rail accordion: clear the mini progress unconditionally at run end
+  // (done/partial/stopped alike) so a later collapse never shows a stale count.
+  const headProgEnd = document.querySelector("#tr-section .rail-sec-progress");
+  if (headProgEnd) headProgEnd.textContent = "";
   if (Object.keys(newly).length) {
     try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, newly); } catch (_) {}
   }

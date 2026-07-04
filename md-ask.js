@@ -25,6 +25,7 @@ function pbpAskIsTypingTarget(el) {
 }
 
 let _pbpAskState = null;
+let _pbpAskRailHandle = null; // rail accordion (spec 2026-07-04): headless handle, see _pbpAskBuildRailEntry
 
 async function pbpAskInit(detail) {
   const view = document.getElementById("rendered-view");
@@ -116,6 +117,12 @@ function _pbpAskBuildRailEntry() {
   bl.textContent = t("askOpen");
   btn.appendChild(bl);
   sec.appendChild(btn);
+  // Rail accordion (spec 2026-07-04): headless mode -- #ask-section's only
+  // child is this same button, whose aria-expanded/aria-controls already
+  // correctly describe "is #ask-panel visible" (see the design-decision note
+  // above this task). pbpRailCollapsible leaves it untouched; only wires the
+  // storage-backed handle for interface conformance.
+  _pbpAskRailHandle = pbpRailCollapsible(sec, "ask", { label: btn, defaultCollapsed: true });
   anchor.insertAdjacentElement("afterend", sec);
   btn.addEventListener("click", () => _pbpAskSetOpen(!_pbpAskIsOpen()));
 }
@@ -218,6 +225,7 @@ function _pbpAskSetOpen(open) {
   const panel = _pbpAskBuildPanel();
   if (!panel) return;
   if (open) {
+    if (_pbpAskRailHandle) _pbpAskRailHandle.expand(true); // ask entry activation -> auto-expand (temp; no-op visually, see design note)
     // Remember who opened us so we can hand focus back on close (non-modal,
     // so this is focus-RETURN only, not a trap). Skip if focus is already
     // inside the panel (e.g. re-open while open).
