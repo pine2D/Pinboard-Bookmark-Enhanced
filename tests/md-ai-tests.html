@@ -3884,4 +3884,61 @@ suiteIf("pbpRailCollapseState", "pbpRailCollapseState", () => {
   });
 })();
 </script>
+<script>
+// ============ Notebook list model (spec 2.1, design doc 2026-07-04) ============
+suiteIf("pbpHlNotebookModel", "pbpHlNotebookModel", () => {
+  test("empty items -> []", () => {
+    assertEq(JSON.stringify(pbpHlNotebookModel([], null)), "[]", "empty in -> empty out");
+  });
+  test("document order: sorted by n ascending", () => {
+    const items = [
+      { id: "a", n: 3, ts: 1, quote: "third", color: 1, note: "" },
+      { id: "b", n: 1, ts: 1, quote: "first", color: 2, note: "" },
+      { id: "c", n: 2, ts: 1, quote: "second", color: 3, note: "" },
+    ];
+    const out = pbpHlNotebookModel(items, null);
+    assertEq(out.map((i) => i.id).join(","), "b,c,a", "n ascending");
+  });
+  test("same-block (same n) tiebreak: sorted by ts ascending", () => {
+    const items = [
+      { id: "later", n: 5, ts: 200, quote: "later", color: 1, note: "" },
+      { id: "earlier", n: 5, ts: 100, quote: "earlier", color: 1, note: "" },
+    ];
+    const out = pbpHlNotebookModel(items, null);
+    assertEq(out.map((i) => i.id).join(","), "earlier,later", "ts ascending within same n");
+  });
+  test("colorFilter Set restricts to matching colors only", () => {
+    const items = [1, 2, 3, 4, 5].map((c) => ({ id: "i" + c, n: c, ts: c, quote: "q" + c, color: c, note: "" }));
+    const out = pbpHlNotebookModel(items, new Set([2, 4]));
+    assertEq(out.map((i) => i.id).join(","), "i2,i4", "only colors 2 and 4 survive");
+  });
+  test("colorFilter null/undefined -> all colors included", () => {
+    const items = [1, 2, 3].map((c) => ({ id: "i" + c, n: c, ts: c, quote: "q" + c, color: c, note: "" }));
+    assertEq(pbpHlNotebookModel(items, null).length, 3, "null filter keeps all");
+    assertEq(pbpHlNotebookModel(items, undefined).length, 3, "undefined filter keeps all");
+  });
+  test("quote over 60 chars -> truncated to 60 + ellipsis", () => {
+    const quote = "A".repeat(61);
+    const out = pbpHlNotebookModel([{ id: "x", n: 1, ts: 1, quote, color: 1, note: "" }], null);
+    assertEq(out[0].excerpt, "A".repeat(60) + "\u2026", "60 chars + ellipsis appended");
+  });
+  test("quote exactly 60 chars -> unchanged, no ellipsis", () => {
+    const quote = "B".repeat(60);
+    const out = pbpHlNotebookModel([{ id: "x", n: 1, ts: 1, quote, color: 1, note: "" }], null);
+    assertEq(out[0].excerpt, quote, "no ellipsis at exactly the limit");
+  });
+  test("multi-line quote: excerpt is the first line only, then truncated", () => {
+    const out = pbpHlNotebookModel([{ id: "x", n: 1, ts: 1, quote: "line one\nline two", color: 1, note: "" }], null);
+    assertEq(out[0].excerpt, "line one", "first line only");
+  });
+  test("empty note -> noteExcerpt null", () => {
+    const out = pbpHlNotebookModel([{ id: "x", n: 1, ts: 1, quote: "q", color: 1, note: "" }], null);
+    assertEq(out[0].noteExcerpt, null, "empty note -> null");
+  });
+  test("non-empty note -> noteExcerpt truncated same as quote", () => {
+    const out = pbpHlNotebookModel([{ id: "x", n: 1, ts: 1, quote: "q", color: 1, note: "C".repeat(70) }], null);
+    assertEq(out[0].noteExcerpt, "C".repeat(60) + "\u2026", "note truncated + ellipsis");
+  });
+});
+</script>
 </body></html>

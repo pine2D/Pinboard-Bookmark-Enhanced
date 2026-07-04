@@ -2415,6 +2415,9 @@
   "hlSave": { "message": "Save" },
   "hlDelete": { "message": "Delete highlight" },
   "hlDegraded": { "message": "Position lost — the surrounding text changed, so this highlight now covers the whole paragraph." },
-  "hlRailLine": { "message": "$COUNT$ highlight(s) · Copy as Markdown", "placeholders": { "count": { "content": "$1" } } },
-  "hlCopied": { "message": "Highlights copied" }
+  "hlSectionTitle": { "message": "Highlights" },
+  "hlFilterGroupAria": { "message": "Filter by highlight color" },
+  "hlCopyMd": { "message": "Copy as Markdown" },
+  "hlCopied": { "message": "Highlights copied" },
+  "hlFilterEmpty": { "message": "No highlights match the selected colors" }
 }

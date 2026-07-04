@@ -190,6 +190,46 @@ function pbpHlInlineMark(md, items) {
   return out;
 }
 
+// ---- Notebook list model (spec 2.1, pure/testable): document order (n asc,
+// ts asc within the same block) -> optional color filter -> excerpt
+// truncation. Never touches Ranges/Highlights/DOM -- the DOM layer below
+// (_pbpHlNotebookRender) maps this over live blockEl lookups separately.
+const PBP_HL_EXCERPT_LEN = 60;
+
+// First line of a possibly-multi-line string, truncated to
+// PBP_HL_EXCERPT_LEN chars with a trailing ellipsis (U+2026, \u escape per
+// the iron rule -- no literal non-ASCII in code) ONLY when it actually
+// exceeds the limit; exactly at the limit stays bare (spec: truncate + ellipsis
+// only past the 60-char cutoff, not at it).
+function _pbpHlExcerpt(text) {
+  const first = String(text).split("\n")[0];
+  return first.length > PBP_HL_EXCERPT_LEN
+    ? first.slice(0, PBP_HL_EXCERPT_LEN) + "\u2026"
+    : first;
+}
+
+// items -> notebook rows, document order, optionally filtered by color.
+// colorFilter: a Set of enabled colors (1..5), or null/undefined meaning
+// "all colors" (spec 2.2 default all-on). noteExcerpt is null (not "")
+// when the item's note is empty, so DOM callers can tell "no note line"
+// from "an empty-string note line" with one falsy check.
+function pbpHlNotebookModel(items, colorFilter) {
+  const list = Array.isArray(items) ? items.filter((it) => it && typeof it.quote === "string") : [];
+  const filtered = colorFilter
+    ? list.filter((it) => colorFilter.has((it.color >= 1 && it.color <= 5) ? it.color : 1))
+    : list.slice();
+  filtered.sort((a, b) => {
+    const dn = (Number(a.n) || 0) - (Number(b.n) || 0);
+    return dn !== 0 ? dn : (Number(a.ts) || 0) - (Number(b.ts) || 0);
+  });
+  return filtered.map((it) => ({
+    id: it.id,
+    color: (it.color >= 1 && it.color <= 5) ? it.color : 1,
+    excerpt: _pbpHlExcerpt(it.quote),
+    noteExcerpt: it.note ? _pbpHlExcerpt(it.note) : null,
+  }));
+}
+
 // ============================================================
 // DOM / UI layer. Lazily mounted: pbpHlInit runs on "pbp:rendered"
 // (same pattern as pbpTrInit / pbpAskInit).
@@ -286,7 +326,7 @@ async function pbpHlInit(detail) {
   // Restored-from-storage highlights must surface the rail entry on first
   // paint too -- storage.local.get fires no onChanged, so without this call
   // the rail stays hidden until the session's first mutation (create/delete).
-  if (typeof _pbpHlUpdateRailCount === "function") _pbpHlUpdateRailCount();
+  _pbpHlNotebookRender();
   _pbpHlBindInteractions(view); // Task 4
 }
 
@@ -569,6 +609,16 @@ async function _pbpHlCreateFromRange(range, color, btn) {
   if (created.length) {
     await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn);
     await _pbpHlLastColorSet(color);
+    _pbpHlNotebookRender();
+    // Spec 1.3 trigger 4: the FIRST highlight created this session
+    // auto-expands the rail's hl section (session-visual only, via
+    // expand(temp) -- never persisted, never overwrites the user's
+    // stored collapse preference). A restore from storage (pbpHlInit)
+    // does NOT set this flag, only an actual creation does.
+    if (!_pbpHlAutoExpandedThisSession) {
+      _pbpHlAutoExpandedThisSession = true;
+      if (_pbpHlNbEls && _pbpHlNbEls.handle) _pbpHlNbEls.handle.expand(true);
+    }
   }
   return created;
 }
@@ -830,6 +880,7 @@ function _pbpHlSwitchColor(color) {
   item.color = color;
   _pbpHlSave(_pbpHlState.url, _pbpHlState.items, _pbpHlCard.querySelector(".hl-card-dot-" + color)).then(() => {
     if (typeof pbpHlRestore === "function") pbpHlRestore();
+    _pbpHlNotebookRender(); // list dot color + color-filter membership can both change
     // Guard: only reopen/reposition the card onto this item if it's still the one displayed --
     // the user may have closed this card and opened a different highlight's card while the
     // save was in flight (same bug class as the run-start-pill guards in 57642a2).
@@ -849,63 +900,213 @@ function _pbpHlCommitNote() {
   if (!item || !_pbpHlCard) return;
   item.note = _pbpHlCard.querySelector(".hl-card-note").value;
   _pbpHlNoteDirty = false;
-  _pbpHlSave(_pbpHlState.url, _pbpHlState.items, _pbpHlCard.querySelector(".hl-card-save")); // no pbpHlRestore -- notes never touch the Range/Highlight
+  // no pbpHlRestore -- notes never touch the Range/Highlight, but the
+  // list's note-excerpt line does need to reflect the edit.
+  _pbpHlSave(_pbpHlState.url, _pbpHlState.items, _pbpHlCard.querySelector(".hl-card-save")).then(() => _pbpHlNotebookRender());
 }
 
-function _pbpHlDeleteCurrent() {
+// Shared delete core (spec 2.1: the list's x button and the card's delete
+// button MUST be the same code path). State cleanup (splice + persist +
+// re-derive Ranges + re-render the notebook) runs unconditionally; only
+// the UI action of hiding the CARD is guarded, because the user may have
+// opened a DIFFERENT highlight's card while this delete's save was in
+// flight, and that card must stay open (same bug class as the
+// run-start-pill guards in 57642a2).
+function _pbpHlDeleteItem(id, btn) {
   if (!_pbpHlState) return;
-  const id = _pbpHlCardItemId;
-  if (!id) return;
   const idx = _pbpHlState.items.findIndex((it) => it.id === id);
   if (idx === -1) return;
   _pbpHlState.items.splice(idx, 1);
-  const btn = _pbpHlCard.querySelector(".hl-card-delete");
-  _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn).then(() => {
-    // State cleanup (items already spliced above, this just persists + re-derives) runs
-    // unconditionally regardless of what card is open now. Only the UI action -- hiding the
-    // card -- is guarded: the user may have opened a DIFFERENT highlight's card while this
-    // delete's save was in flight, and that card must stay open (same bug class as the
-    // run-start-pill guards in 57642a2).
+  return _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn).then(() => {
     if (typeof pbpHlRestore === "function") pbpHlRestore();
-    if (typeof _pbpHlUpdateRailCount === "function") _pbpHlUpdateRailCount(); // Task 6
+    _pbpHlNotebookRender();
     if (_pbpHlCard && _pbpHlCardItemId === id) _pbpHlCard.hidePopover();
   });
 }
 
-// ---- Rail entry: "N highlights · Copy as Markdown" (spec sec.5) ----
-function _pbpHlUpdateRailCount() {
+function _pbpHlDeleteCurrent() {
+  if (!_pbpHlState || !_pbpHlCardItemId) return;
+  _pbpHlDeleteItem(_pbpHlCardItemId, _pbpHlCard.querySelector(".hl-card-delete"));
+}
+
+// ---- Notebook list: collapsible "Highlights (N)" section (spec 2). N is
+// ALWAYS the total item count, never the color-filtered count (spec 2.2:
+// the badge must not read as "how many are showing"). Rebuilds on every
+// mutation path (create/switch-color/commit-note/delete, all above) plus
+// chrome.storage.onChanged below (cross-window fallback). Renamed from the
+// old count-only _pbpHlUpdateRailCount; verified (grep, see plan) that its
+// only 3 call sites are init/delete/onChanged, all in this file -- renamed
+// directly below rather than keeping a now-pointless alias.
+let _pbpHlColorFilter = new Set(PBP_HL_COLORS); // session-only, default all-on (spec 2.2 -- never persisted)
+let _pbpHlNbEls = null; // {sec, list, filterBtns, emptyHint, copyBtn, handle} -- built once
+let _pbpHlAutoExpandedThisSession = false; // spec 1.3 trigger 4 guard
+
+function _pbpHlNotebookRender() {
   const rail = document.getElementById("rail");
   if (!rail) return;
-  let sec = document.getElementById("hl-rail-section");
-  if (!sec) {
-    sec = document.createElement("div");
-    sec.className = "rail-section";
-    sec.id = "hl-rail-section";
-    sec.hidden = true;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.id = "hl-rail-copy";
-    btn.className = "action-btn hl-rail-btn";
-    const lab = document.createElement("span");
-    lab.className = "btn-label";
-    btn.appendChild(lab);
-    sec.appendChild(btn);
-    btn.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(pbpHlComposeSection(_pbpHlState ? _pbpHlState.items : []));
-        flashButtonLabel(btn, t("hlCopied"));
-      } catch (_) {
-        flashButtonLabel(btn, t("mdPreviewFailed"));
-      }
+  if (!_pbpHlNbEls) _pbpHlNbEls = _pbpHlBuildNotebookDom(rail);
+  const items = _pbpHlState ? _pbpHlState.items : [];
+  _pbpHlNbEls.sec.hidden = items.length === 0; // 0 total -> whole section hidden (unchanged from before)
+  // Header count badge is TOTAL and always live. pbpRailCollapsible (Task 1)
+  // reads opts.count ONCE at build to seed the .rail-sec-count span; keeping
+  // it in sync on every mutation is this render's job (spec 2.3: render =
+  // count + list), mirroring md-translate.js writing #tr-section
+  // .rail-sec-progress by selector rather than relying on the engine to re-poll.
+  const countEl = _pbpHlNbEls.sec.querySelector(".rail-sec-count");
+  if (countEl) countEl.textContent = "(" + items.length + ")";
+  _pbpHlNbEls.filterBtns.forEach((b) => {
+    const on = _pbpHlColorFilter.has(Number(b.dataset.color));
+    b.setAttribute("aria-pressed", String(on));
+    b.classList.toggle("off", !on);
+  });
+  const model = pbpHlNotebookModel(items, _pbpHlColorFilter);
+  _pbpHlNbEls.list.replaceChildren(...model.map(_pbpHlBuildItemEl));
+  _pbpHlNbEls.emptyHint.hidden = !(items.length > 0 && model.length === 0);
+}
+
+// One-time DOM build: filter row + list + empty-filter hint + copy footer,
+// then installs the collapsible header via pbpRailCollapsible (Task 1,
+// md-preview.js). Same insertion point as before (immediately before #toc, or
+// appended to #rail if #toc is absent).
+function _pbpHlBuildNotebookDom(rail) {
+  const sec = document.createElement("div");
+  sec.className = "rail-section";
+  sec.id = "hl-rail-section";
+  sec.hidden = true;
+
+  const filterRow = document.createElement("div");
+  filterRow.className = "hl-filter-row";
+  filterRow.setAttribute("role", "group");
+  filterRow.setAttribute("aria-label", t("hlFilterGroupAria"));
+  const filterBtns = PBP_HL_COLORS.map((c) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "hl-filter-dot hl-filter-dot-" + c;
+    b.dataset.color = String(c);
+    const label = t(PBP_HL_COLOR_KEYS[c - 1]);
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.setAttribute("aria-pressed", "true");
+    b.addEventListener("click", () => {
+      if (_pbpHlColorFilter.has(c)) _pbpHlColorFilter.delete(c); else _pbpHlColorFilter.add(c);
+      _pbpHlNotebookRender();
     });
-    const toc = document.getElementById("toc");
-    if (toc) toc.insertAdjacentElement("beforebegin", sec);
-    else rail.appendChild(sec);
+    filterRow.appendChild(b);
+    return b;
+  });
+  sec.appendChild(filterRow);
+
+  const list = document.createElement("ul");
+  list.className = "hl-list";
+  list.id = "hl-list";
+  sec.appendChild(list);
+
+  const emptyHint = document.createElement("p");
+  emptyHint.className = "hl-filter-empty";
+  emptyHint.textContent = t("hlFilterEmpty");
+  emptyHint.hidden = true;
+  sec.appendChild(emptyHint);
+
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.id = "hl-rail-copy";
+  copyBtn.className = "action-btn hl-rail-btn";
+  const lab = document.createElement("span");
+  lab.className = "btn-label";
+  lab.textContent = t("hlCopyMd");
+  copyBtn.appendChild(lab);
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(pbpHlComposeSection(_pbpHlState ? _pbpHlState.items : []));
+      flashButtonLabel(copyBtn, t("hlCopied"));
+    } catch (_) {
+      flashButtonLabel(copyBtn, t("mdPreviewFailed"));
+    }
+  });
+  sec.appendChild(copyBtn);
+
+  const toc = document.getElementById("toc");
+  if (toc) toc.insertAdjacentElement("beforebegin", sec);
+  else rail.appendChild(sec);
+
+  const handle = (typeof pbpRailCollapsible === "function")
+    ? pbpRailCollapsible(sec, "hl", {
+        label: t("hlSectionTitle"),
+        count: () => "(" + (_pbpHlState ? _pbpHlState.items.length : 0) + ")",
+        defaultCollapsed: false,
+      })
+    : null; // degrade: no collapsible header (file:// test harness has no #rail at all, never reaches here)
+
+  return { sec, list, filterBtns, emptyHint, copyBtn, handle };
+}
+
+// One <li> per notebook entry (spec 2.1). textContent/title only for all
+// user text -- zero innerHTML for user data, same rule as the edit card.
+function _pbpHlBuildItemEl(m) {
+  const full = _pbpHlState.items.find((it) => it.id === m.id);
+  const blockEl = full ? pbpAiBlockEl(full.n) : null;
+  // tr-only escape hatch mirrors md-translate.js's own visibility rule
+  // (body.tr-only + [data-pb-tr-done] hides the original unless .pb-show-orig
+  // is toggled on -- md-preview.css:1045). Dim, don't disable: spec 2.3
+  // wants a silent no-op at click time (checked again in _pbpHlNotebookJump),
+  // not a permanently-disabled control, since this view state can change
+  // within the same page load.
+  const dimmed = !!blockEl && document.body.classList.contains("tr-only")
+    && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig");
+
+  const li = document.createElement("li");
+  li.className = "hl-item" + (dimmed ? " hl-item-dim" : "");
+
+  const main = document.createElement("button");
+  main.type = "button";
+  main.className = "hl-item-main";
+  const dot = document.createElement("span");
+  dot.className = "hl-item-dot hl-item-dot-" + m.color;
+  dot.setAttribute("aria-hidden", "true");
+  main.appendChild(dot);
+  const q = document.createElement("span");
+  q.className = "hl-item-quote";
+  q.textContent = m.excerpt;
+  main.appendChild(q);
+  main.title = full ? full.quote : m.excerpt;
+  if (!blockEl) {
+    main.disabled = true; // block gone (content drift): permanent for this render, native disabled is correct here
+  } else {
+    main.addEventListener("click", () => _pbpHlNotebookJump(full));
   }
-  const n = _pbpHlState ? _pbpHlState.items.length : 0;
-  sec.hidden = n === 0;
-  const label = sec.querySelector(".btn-label");
-  if (label) label.textContent = t("hlRailLine", String(n));
+  li.appendChild(main);
+
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "hl-item-del";
+  const delLabel = t("hlDelete"); // reuse the existing card-delete label, per spec 2.1
+  del.title = delLabel;
+  del.setAttribute("aria-label", delLabel);
+  del.innerHTML = (typeof PBP_ICONS === "object" && PBP_ICONS && PBP_ICONS.cross) || "";
+  del.addEventListener("click", () => _pbpHlDeleteItem(m.id, del));
+  li.appendChild(del);
+
+  if (m.noteExcerpt) {
+    const note = document.createElement("div");
+    note.className = "hl-item-note";
+    note.textContent = m.noteExcerpt;
+    li.appendChild(note);
+  }
+  return li;
+}
+
+// Item click: scroll + flash the source block, reusing ask's citation-jump
+// flash verbatim (md-ask.js:730 _pbpAskFlash) -- no independent/third flash
+// mechanism (spec 2.1). Re-checks tr-only visibility at click time (not just
+// at last render) so a stale dim-class never causes an incorrect jump.
+function _pbpHlNotebookJump(item) {
+  const blockEl = pbpAiBlockEl(item.n);
+  if (!blockEl) return;
+  if (document.body.classList.contains("tr-only") && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig")) return; // spec 2.3: silent no-op
+  blockEl.scrollIntoView({ block: "center", behavior: "smooth" });
+  const entry = _pbpHlState.ranges[item.id];
+  const range = (entry && entry.range) || (() => { const r = document.createRange(); r.selectNode(blockEl); return r; })();
+  _pbpAskFlash(range, blockEl);
 }
 
 // Reactive trigger: fires on ANY write to this page's pbp_hl_<urlKey> key, regardless of
@@ -916,6 +1117,6 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || !_pbpHlState) return;
     if (!(_pbpHlKey(_pbpHlState.url) in changes)) return;
-    _pbpHlUpdateRailCount();
+    _pbpHlNotebookRender();
   });
 }

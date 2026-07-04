@@ -2421,6 +2421,9 @@
   "hlSave": { "message": "Сохранить" },
   "hlDelete": { "message": "Удалить выделение" },
   "hlDegraded": { "message": "Позиция утеряна — окружающий текст изменился, это выделение теперь охватывает весь абзац." },
-  "hlRailLine": { "message": "Выделений: $COUNT$ · Копировать как Markdown", "placeholders": { "count": { "content": "$1" } } },
-  "hlCopied": { "message": "Выделения скопированы" }
+  "hlSectionTitle": { "message": "Выделения" },
+  "hlFilterGroupAria": { "message": "Фильтр по цвету выделения" },
+  "hlCopyMd": { "message": "Копировать как Markdown" },
+  "hlCopied": { "message": "Выделения скопированы" },
+  "hlFilterEmpty": { "message": "Нет выделений, соответствующих выбранным цветам" }
 }

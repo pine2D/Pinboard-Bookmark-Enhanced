@@ -2421,6 +2421,9 @@
   "hlSave": { "message": "儲存" },
   "hlDelete": { "message": "刪除標記" },
   "hlDegraded": { "message": "位置已失準——周圍文字有變動，此標記已回退為整段標示。" },
-  "hlRailLine": { "message": "$COUNT$ 個標記 · 複製為 Markdown", "placeholders": { "count": { "content": "$1" } } },
-  "hlCopied": { "message": "標記已複製" }
+  "hlSectionTitle": { "message": "標記" },
+  "hlFilterGroupAria": { "message": "按標記顏色篩選" },
+  "hlCopyMd": { "message": "複製為 Markdown" },
+  "hlCopied": { "message": "標記已複製" },
+  "hlFilterEmpty": { "message": "沒有標記符合所選顏色" }
 }

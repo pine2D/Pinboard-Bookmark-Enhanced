@@ -2421,6 +2421,9 @@
   "hlSave": { "message": "Speichern" },
   "hlDelete": { "message": "Markierung löschen" },
   "hlDegraded": { "message": "Position verloren — der umliegende Text hat sich geändert, diese Markierung deckt jetzt den ganzen Absatz ab." },
-  "hlRailLine": { "message": "$COUNT$ Markierung(en) · Als Markdown kopieren", "placeholders": { "count": { "content": "$1" } } },
-  "hlCopied": { "message": "Markierungen kopiert" }
+  "hlSectionTitle": { "message": "Markierungen" },
+  "hlFilterGroupAria": { "message": "Nach Markierungsfarbe filtern" },
+  "hlCopyMd": { "message": "Als Markdown kopieren" },
+  "hlCopied": { "message": "Markierungen kopiert" },
+  "hlFilterEmpty": { "message": "Keine Markierungen entsprechen den ausgewählten Farben" }
 }

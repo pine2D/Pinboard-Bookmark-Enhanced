@@ -2421,6 +2421,9 @@
   "hlSave": { "message": "Zapisz" },
   "hlDelete": { "message": "Usuń zaznaczenie" },
   "hlDegraded": { "message": "Pozycja utracona — otaczający tekst się zmienił, to zaznaczenie obejmuje teraz cały akapit." },
-  "hlRailLine": { "message": "$COUNT$ zaznaczenie(a) · Kopiuj jako Markdown", "placeholders": { "count": { "content": "$1" } } },
-  "hlCopied": { "message": "Skopiowano zaznaczenia" }
+  "hlSectionTitle": { "message": "Zaznaczenia" },
+  "hlFilterGroupAria": { "message": "Filtruj według koloru zaznaczenia" },
+  "hlCopyMd": { "message": "Kopiuj jako Markdown" },
+  "hlCopied": { "message": "Skopiowano zaznaczenia" },
+  "hlFilterEmpty": { "message": "Żadne zaznaczenie nie pasuje do wybranych kolorów" }
 }

@@ -2421,6 +2421,9 @@
   "hlSave": { "message": "保存" },
   "hlDelete": { "message": "ハイライトを削除" },
   "hlDegraded": { "message": "位置がずれました — 周囲のテキストが変更されたため、このハイライトは段落全体に適用されています。" },
-  "hlRailLine": { "message": "ハイライト $COUNT$ 件 · Markdownとしてコピー", "placeholders": { "count": { "content": "$1" } } },
-  "hlCopied": { "message": "ハイライトをコピーしました" }
+  "hlSectionTitle": { "message": "ハイライト" },
+  "hlFilterGroupAria": { "message": "ハイライトの色で絞り込み" },
+  "hlCopyMd": { "message": "Markdownとしてコピー" },
+  "hlCopied": { "message": "ハイライトをコピーしました" },
+  "hlFilterEmpty": { "message": "選択した色に一致するハイライトがありません" }
 }
