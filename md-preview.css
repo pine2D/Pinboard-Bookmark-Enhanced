@@ -556,6 +556,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   padding: 20px 16px;
   background: var(--surface);
   border-right: 1px solid var(--border);
+  scrollbar-width: thin;
   overflow-y: auto;
   z-index: 20;
 }
@@ -613,7 +614,12 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .export-fmt .action-btn.icon-only svg { margin: 0; }
 
 /* TOC inside the rail (no longer a fixed gutter; the rail is fixed) */
-.toc-list { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto; }
+/* No inner max-height: the TOC is the rail's LAST section, so capping it buys
+   nothing below it and only nests a second scrollbar beside the rail's own
+   (user feedback: two adjacent scrollbars are jarring). The rail is the single
+   scroller for a long TOC. The mid-rail .hl-list keeps its cap (a huge
+   highlight list would bury the TOC), with a thin scrollbar to stay subtle. */
+.toc-list { list-style: none; margin: 0; padding: 0; }
 .toc-list li { margin: 0; }
 .toc-list a {
   display: block; padding: 4px 10px; color: var(--fg-secondary); text-decoration: none;
@@ -1419,7 +1425,10 @@ body.ask-open main { margin-right: 396px; }
 .hl-filter-dot.off { opacity: 0.25; }
 .hl-filter-dot:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .hl-filter-empty { font-size: 13px; color: var(--fg-muted); margin: 4px 2px 8px; }
-.hl-list { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto; }
+.hl-list {
+  list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto;
+  scrollbar-width: thin; /* de-emphasize the inner bar vs the rail's own scroller */
+}
 .hl-item {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   padding: 4px 2px;
