@@ -83,6 +83,25 @@ html { font-size: 100%; } /* rem-based reading size honors the browser's default
 
 ::selection { background: var(--selection); }
 
+/* ---- Scrollbars (document-wide: body's rightmost bar, rail, hl-list, pre) ----
+   Transparent track so bars melt into --bg/--surface; the thumb is a neutral
+   translucent gray pill (same rgba(128,128,128,*) family as the highlight dot
+   borders and blockquote guide lines) that reads on BOTH color schemes without
+   per-mode overrides. The 3px transparent border + background-clip inset the
+   visible pill to ~4px at rest; hover deepens it. NOTE: do not (re)introduce
+   scrollbar-width/scrollbar-color anywhere -- the standard properties disable
+   these ::-webkit-scrollbar customizations wholesale. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: rgba(128, 128, 128, 0.35);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: rgba(128, 128, 128, 0.55); }
+
 body {
   font-family: var(--latin), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-ko), var(--han-rest), sans-serif;
   background: var(--bg);
@@ -556,7 +575,6 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   padding: 20px 16px;
   background: var(--surface);
   border-right: 1px solid var(--border);
-  scrollbar-width: thin;
   overflow-y: auto;
   z-index: 20;
 }
@@ -1425,10 +1443,7 @@ body.ask-open main { margin-right: 396px; }
 .hl-filter-dot.off { opacity: 0.25; }
 .hl-filter-dot:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .hl-filter-empty { font-size: 13px; color: var(--fg-muted); margin: 4px 2px 8px; }
-.hl-list {
-  list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto;
-  scrollbar-width: thin; /* de-emphasize the inner bar vs the rail's own scroller */
-}
+.hl-list { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto; }
 .hl-item {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   padding: 4px 2px;
