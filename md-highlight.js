@@ -350,6 +350,22 @@ function _pbpHlBuildRange(item, blockEl, blockText) {
   return range;
 }
 
+// M1 hardening (spec sec.3): the locate-text source for a FULL pbpHlRestore
+// rebuild pass. A block flagged dataset.pbHlWatched contains pre/math and
+// may already have been rewritten by hljs/KaTeX (or may be rewritten
+// shortly) -- either way its blockEl.textContent, not the frozen
+// pbpAiTextOf(n) snapshot taken before any such rewrite, is the source of
+// truth once the flag is set: relocating a quote against the frozen text
+// while _pbpAskRangeFromOffsets maps the result onto the LIVE tree can
+// mis-anchor or wrongly degrade. Mirrors _pbpHlReanchorBlock's own
+// textContent discipline (line 418 in this file) so both rebuild paths
+// agree on which text is authoritative for a watched block. Plain
+// (non-watched) blocks are byte-for-byte unaffected: they still resolve to
+// pbpAiTextOf, exactly as before this change.
+function _pbpHlLocateTextFor(blockEl, n) {
+  return blockEl.dataset.pbHlWatched ? (blockEl.textContent || "") : pbpAiTextOf(n);
+}
+
 // Idempotent full rebuild (spec 3): clears every pbp-hl-* Highlight and
 // rebuilds all 5 from _pbpHlState.items. Safe to call more than once (a
 // second call just re-clears + re-derives from the same items array).
@@ -363,7 +379,7 @@ function pbpHlRestore() {
   for (const item of _pbpHlState.items) {
     const blockEl = pbpAiBlockEl(item.n);
     if (!blockEl) continue; // block gone (content drift) -- item silently absent from this render, storage untouched
-    const range = _pbpHlBuildRange(item, blockEl, pbpAiTextOf(item.n));
+    const range = _pbpHlBuildRange(item, blockEl, _pbpHlLocateTextFor(blockEl, item.n));
     const col = (item.color >= 1 && item.color <= 5) ? item.color : 1;
     byColor[col].push(range);
     _pbpHlState.ranges[item.id] = { color: col, range };

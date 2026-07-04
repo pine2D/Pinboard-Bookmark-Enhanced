@@ -3941,4 +3941,34 @@ suiteIf("pbpHlNotebookModel", "pbpHlNotebookModel", () => {
   });
 });
 </script>
+<script>
+// ============ M1 hardening: watched-block locate-text source ============
+suiteIf("_pbpHlLocateTextFor", "_pbpHlLocateTextFor", () => {
+  test("watched block: uses live textContent, ignoring a stale pbpAiTextOf cache", () => {
+    const root = document.createElement("div");
+    root.innerHTML = '<pre id="b1"><code>original</code></pre>';
+    document.body.appendChild(root);
+    pbpAiIndexBlocks(root);
+    const n = pbpAiBlocks()[0].n;
+    assertEq(pbpAiTextOf(n), "original", "cache seeded with pre-mutation text");
+    const blockEl = pbpAiBlockEl(n);
+    blockEl.querySelector("code").textContent = "rewritten-by-katex";
+    blockEl.dataset.pbHlWatched = "1"; // simulates _pbpHlArmBlockObserver having already fired once
+    assertEq(_pbpHlLocateTextFor(blockEl, n), "rewritten-by-katex", "live text used, not the frozen cache");
+    root.remove();
+  });
+  test("plain (non-watched) block: still uses the frozen pbpAiTextOf cache (regression guard)", () => {
+    const root = document.createElement("div");
+    root.innerHTML = '<p id="b1">original</p>';
+    document.body.appendChild(root);
+    pbpAiIndexBlocks(root);
+    const n = pbpAiBlocks()[0].n;
+    assertEq(pbpAiTextOf(n), "original", "cache seeded");
+    const blockEl = pbpAiBlockEl(n);
+    blockEl.textContent = "mutated-but-should-be-ignored";
+    assertEq(_pbpHlLocateTextFor(blockEl, n), "original", "plain block path unchanged: frozen cache still wins");
+    root.remove();
+  });
+});
+</script>
 </body></html>
