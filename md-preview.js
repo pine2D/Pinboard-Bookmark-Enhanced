@@ -226,10 +226,174 @@ function renderBookmarkBadge(resp, url) {
   urlEl.insertAdjacentElement("afterend", a);
 }
 
+// ============================================================
+// Rail accordion (spec: docs/superpowers/specs/2026-07-04-md-preview-hl-
+// notebook-rail-design.md). pbpRailCollapseState is PURE (no DOM/chrome).
+// pbpRailCollapsible touches DOM + chrome.storage.local, but (like
+// renderBookmarkBadge above) only inside functions invoked at call time --
+// defining it here has no side effect. tests/md-ai-tests.html loads this
+// whole file on file:// (the boot IIFE above early-returns without chrome),
+// so both are directly unit-testable.
+// ============================================================
+const PBP_RAIL_STORAGE_KEY = "pbp_rail_collapse";
+
+// Merge stored collapse-state against a defaults map: only defaults' own
+// keys are read (unknown keys in stored are dropped), a missing/non-boolean
+// value for a key falls back to defaults, and a non-object/null stored
+// value yields defaults untouched. `defaults` may carry 1 key (a single
+// section's own call) or all 5 (tests, or a hypothetical bulk read).
+function pbpRailCollapseState(stored, defaults) {
+  const out = {};
+  const src = (stored && typeof stored === "object") ? stored : {};
+  for (const k of Object.keys(defaults || {})) {
+    out[k] = typeof src[k] === "boolean" ? src[k] : !!defaults[k];
+  }
+  return out;
+}
+
+// Read-modify-write a single key into the shared storage object so one
+// section's toggle never clobbers another's remembered state. Best-effort:
+// any failure (including no chrome.storage at all) degrades silently.
+function _pbpRailPersist(key, collapsed) {
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
+  chrome.storage.local.get(PBP_RAIL_STORAGE_KEY).then((r) => {
+    const cur = (r && typeof r[PBP_RAIL_STORAGE_KEY] === "object" && r[PBP_RAIL_STORAGE_KEY]) || {};
+    const next = Object.assign({}, cur, { [key]: collapsed });
+    return chrome.storage.local.set({ [PBP_RAIL_STORAGE_KEY]: next });
+  }).catch(() => {});
+}
+
+// Installs a collapsible header on sectionEl. opts: {label: string|Element,
+// count?: () => string|null, defaultCollapsed: boolean}.
+//
+// opts.count is read ONCE here to seed the header badge span (class
+// .rail-sec-count). It is NOT re-polled by this engine -- a section whose
+// count changes over its lifetime (the hl notebook) keeps the badge live by
+// writing .rail-sec-count.textContent itself on each re-render (Task 3),
+// exactly as md-translate.js writes .rail-sec-progress for the tr mini-count.
+//
+// HEADLESS MODE: when opts.label is an Element that is sectionEl's ONLY
+// child, there is no separate content to hide (ask-section's sole content
+// IS its entry button, whose aria-expanded/aria-controls already correctly
+// describe "is the thing I control -- #ask-panel -- visible", which for a
+// one-row section already means exactly the same thing as "is this section
+// expanded"). In that case pbpRailCollapsible does NOT touch the element's
+// classes/attributes at all -- any DOM change here would either duplicate
+// or fight that pre-existing, already-correct wiring. It only returns the
+// storage-backed expand/collapse/isCollapsed trio (collapse()/persisted
+// expand() DO write pbp_rail_collapse for interface conformance, but have
+// no visible effect since there is nothing to show/hide).
+//
+// NORMAL MODE (Export/TOC/tr/hl): opts.label is a plain string or a plain
+// non-interactive label element. A new <button class="rail-sec-head">
+// replaces it in place (same text, optional data-i18n carried over so live
+// language switches keep working, optional count badge, a CSS-triangle
+// indicator, an always-present-but-empty mini-progress slot, and
+// aria-expanded/aria-controls pointing at sectionEl's own id -- assigned
+// one if it doesn't have one). Collapsing toggles sectionEl.classList
+// "rail-collapsed"; CSS (`.rail-collapsed > *:not(.rail-sec-head)`) hides
+// every OTHER direct child, so anything appended to sectionEl LATER (a
+// progress span, the view-toggle wrap, a usage line) is automatically
+// covered without pbpRailCollapsible tracking a separate content-wrapper
+// reference.
+function pbpRailCollapsible(sectionEl, key, opts) {
+  opts = opts || {};
+  const headless = opts.label instanceof Element
+    && sectionEl.children.length === 1
+    && sectionEl.children[0] === opts.label;
+  let collapsed = !!opts.defaultCollapsed;
+  let headBtn = null;
+
+  function applyDom(next) {
+    sectionEl.classList.toggle("rail-collapsed", next);
+    if (headBtn) headBtn.setAttribute("aria-expanded", next ? "false" : "true");
+  }
+
+  function setState(next, persist) {
+    collapsed = next;
+    if (!headless) applyDom(next);
+    if (persist) _pbpRailPersist(key, next);
+  }
+
+  if (!headless) {
+    const existingLabelEl = (opts.label instanceof Element) ? opts.label : null;
+    const labelText = existingLabelEl ? existingLabelEl.textContent : String(opts.label || "");
+    const dataI18n = (existingLabelEl && existingLabelEl.getAttribute)
+      ? existingLabelEl.getAttribute("data-i18n") : null;
+
+    headBtn = document.createElement("button");
+    headBtn.type = "button";
+    headBtn.className = "rail-sec-head";
+
+    const tri = document.createElement("span");
+    tri.className = "rail-sec-tri";
+    tri.setAttribute("aria-hidden", "true");
+    headBtn.appendChild(tri);
+
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "rail-sec-label";
+    labelSpan.textContent = labelText;
+    if (dataI18n) labelSpan.setAttribute("data-i18n", dataI18n);
+    headBtn.appendChild(labelSpan);
+
+    if (typeof opts.count === "function") {
+      const c = opts.count();
+      if (c != null) {
+        const countSpan = document.createElement("span");
+        countSpan.className = "rail-sec-count";
+        countSpan.textContent = c;
+        headBtn.appendChild(countSpan);
+      }
+    }
+
+    const prog = document.createElement("span");
+    prog.className = "rail-sec-progress";
+    headBtn.appendChild(prog);
+
+    if (!sectionEl.id) sectionEl.id = "rail-sec-" + key;
+    headBtn.setAttribute("aria-controls", sectionEl.id);
+
+    if (existingLabelEl) existingLabelEl.replaceWith(headBtn);
+    else sectionEl.insertBefore(headBtn, sectionEl.firstChild);
+
+    headBtn.addEventListener("click", () => setState(!collapsed, true));
+
+    // Apply the default SYNCHRONOUSLY, before the async storage read below.
+    // chrome.storage.local.get() is a real IPC round-trip in the extension
+    // (not a same-tick resolved promise) -- without this, every collapsed-
+    // by-default section (Export, tr) would render fully expanded for at
+    // least one frame then visibly snap shut once the promise resolves.
+    // `collapsed` already equals `!!opts.defaultCollapsed` at this point
+    // (see its declaration above), so this paints the common case (no
+    // stored override, or an override that matches the default) with zero
+    // flash; only a genuinely different stored value causes the async
+    // branch below to fix it up with one visible re-toggle.
+    applyDom(collapsed);
+  }
+
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(PBP_RAIL_STORAGE_KEY).then((r) => {
+      const merged = pbpRailCollapseState(r && r[PBP_RAIL_STORAGE_KEY], { [key]: !!opts.defaultCollapsed });
+      if (merged[key] !== collapsed) setState(merged[key], false);
+    }).catch(() => {});
+  }
+
+  return {
+    expand(temp) { setState(false, !temp); },
+    collapse() { setState(true, true); },
+    isCollapsed() { return collapsed; },
+  };
+}
+
 (async function () {
   initI18n();
   applyI18n();
   document.documentElement.lang = uiLangToBCP47(); // UI-locale font for the rail/UI chrome
+  // file://-safe bailout: tests/md-ai-tests.html loads this whole file (deferred
+  // scripts, no extension context) to reach pbpRailCollapseState/pbpRailCollapsible
+  // below -- neither needs anything past this point. Mirrors the same typeof-chrome
+  // guard already used for md-highlight.js's top-level chrome.storage.onChanged wiring.
+  if (typeof chrome === "undefined" || !chrome.storage) return;
   // Per-tab token key: the opener (popup / shortcut) minted ?k=<uuid> and wrote the
   // payload to md_preview_data_<uuid>, so this tab reads ONLY its own slot and can't
   // be clobbered by a concurrent preview. No k = a pre-update tab → fall back to the
@@ -569,6 +733,13 @@ function renderBookmarkBadge(resp, url) {
   // ---- Build TOC sidebar from the canonical markdown ----
   const tocNav = document.getElementById("toc");
   const tocList = document.getElementById("toc-list");
+  // Rail accordion (spec 2026-07-04): install regardless of whether headings
+  // exist below -- #toc's own [hidden] gate (unset only inside the
+  // headings.length branch) stays the orthogonal "does a TOC exist at all"
+  // control; this is "is its content collapsed" and coexists with it.
+  pbpRailCollapsible(tocNav, "toc", { label: tocNav.querySelector(".rail-label"), defaultCollapsed: false });
+  const expSec = document.getElementById("export-section");
+  if (expSec) pbpRailCollapsible(expSec, "export", { label: expSec.querySelector(".rail-label"), defaultCollapsed: true });
   // Walk the already-rendered (and sanitized) headings so each TOC anchor
   // equals a real element id (buildToc's markdown-derived slugs can diverge from
   // marked's rendered ids for headings with inline links/images or duplicates).

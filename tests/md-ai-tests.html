@@ -26,6 +26,7 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../shared.js"></script>
 <script src="../ai.js"></script>
 <script src="../ai-cache.js"></script>
+<script src="../md-preview.js"></script>
 <script src="../md-ai-core.js"></script>
 <script src="../md-translate.js"></script>
 <script src="../md-ask.js"></script>
@@ -3687,5 +3688,174 @@ suiteIf("_pbpHlOffsetsFromRange / _pbpHlClipRangeToBlock / _pbpHlSelectionSegmen
     root.remove();
   });
 });
+</script>
+
+<script>
+// ============ md-preview.js: pbpRailCollapseState (rail accordion) ============
+suiteIf("pbpRailCollapseState", "pbpRailCollapseState", () => {
+  const DEFAULTS = { tr: true, ask: true, export: true, toc: false, hl: false };
+
+  test("defaults merge: stored partially overrides defaults", () => {
+    const r = pbpRailCollapseState({ tr: false }, DEFAULTS);
+    assertEq(r.tr, false, "tr overridden");
+    assertEq(r.ask, true, "ask falls back to default");
+    assertEq(r.export, true, "export falls back to default");
+    assertEq(r.toc, false, "toc falls back to default");
+    assertEq(r.hl, false, "hl falls back to default");
+  });
+
+  test("unknown keys in stored are ignored", () => {
+    const r = pbpRailCollapseState({ tr: false, bogus: true }, DEFAULTS);
+    assertEq(Object.prototype.hasOwnProperty.call(r, "bogus"), false, "bogus key must not leak through");
+    assertEq(Object.keys(r).length, 5, "exactly the 5 defaults keys");
+  });
+
+  test("missing keys default: empty stored object -> every key from defaults", () => {
+    const r = pbpRailCollapseState({}, DEFAULTS);
+    assertEq(JSON.stringify(r), JSON.stringify(DEFAULTS), "empty stored == defaults");
+  });
+
+  test("non-object stored (null) -> all defaults", () => {
+    assertEq(JSON.stringify(pbpRailCollapseState(null, DEFAULTS)), JSON.stringify(DEFAULTS), "null stored");
+  });
+
+  test("non-object stored (string) -> all defaults", () => {
+    assertEq(JSON.stringify(pbpRailCollapseState("garbage", DEFAULTS)), JSON.stringify(DEFAULTS), "string stored");
+  });
+
+  test("non-boolean value for a key is treated as missing (defaults wins)", () => {
+    const r = pbpRailCollapseState({ tr: "yes" }, DEFAULTS);
+    assertEq(r.tr, true, "non-boolean stored value falls back to default, not coerced");
+  });
+
+  test("single-key defaults map (per-section call shape) merges just that key", () => {
+    const r = pbpRailCollapseState({ ask: false, tr: false }, { ask: true });
+    assertEq(Object.keys(r).length, 1, "only the requested key comes back");
+    assertEq(r.ask, false, "ask key honored from stored");
+  });
+});
+</script>
+
+<script>
+// ============ md-preview.js: pbpRailCollapsible (install + storage, async) ============
+// NOTE: this suite is a hand-rolled async IIFE, NOT suiteIf()/test() -- this
+// file's test() helper is fully synchronous (calls fn() and records PASS
+// with no await), so an async test body's assertions would run AFTER test()
+// already recorded PASS, surfacing only as an unhandled rejection, never a
+// FAIL. Worse, since these cases share-and-restore the global `window.chrome`
+// at start/end, unawaited concurrent bodies would race and clobber each
+// other's mock mid-flight. Mirrors this file's own established pattern for
+// async suites (see pbpAiCacheAppend/_pbpExplainPersistTrigger/_pbpStreamRead/
+// pbpTrRunQueue below) so every case fully resolves before the next starts.
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "pbpRailCollapsible (install + storage)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  if (typeof pbpRailCollapsible !== "function") {
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP pbpRailCollapsible (not loaded)";
+    host.appendChild(div); SKIP++; return;
+  }
+
+  function mockLocal(initial) {
+    const store = { ...initial };
+    return {
+      _store: store,
+      get: (arg) => Promise.resolve(
+        arg == null ? { ...store }
+        : typeof arg === "string" ? (arg in store ? { [arg]: store[arg] } : {})
+        : {}
+      ),
+      set: (obj) => { Object.assign(store, obj); return Promise.resolve(); },
+    };
+  }
+  const realChrome = window.chrome;
+
+  await atest("normal mode: replaces a plain label div with a button.rail-sec-head, wires aria", async () => {
+    window.chrome = { storage: { local: mockLocal({}) } };
+    const sec = document.createElement("div");
+    sec.className = "rail-section";
+    const label = document.createElement("div");
+    label.className = "rail-label";
+    label.textContent = "Export";
+    sec.appendChild(label);
+    const extra = document.createElement("div");
+    extra.textContent = "content";
+    sec.appendChild(extra);
+    pbpRailCollapsible(sec, "export", { label, defaultCollapsed: true });
+    await Promise.resolve().then(() => {}).then(() => {}); // flush the storage.get microtask chain
+    const head = sec.querySelector(".rail-sec-head");
+    assert(!!head, "header button installed");
+    assertEq(head.tagName, "BUTTON", "header is a real button");
+    assertEq(sec.contains(label), false, "original label node removed");
+    assertEq(sec.classList.contains("rail-collapsed"), true, "defaultCollapsed:true applied (no stored value)");
+    window.chrome = realChrome;
+  });
+
+  await atest("headless mode: sectionEl whose ONLY child is opts.label is left untouched (ask degenerate case)", async () => {
+    window.chrome = { storage: { local: mockLocal({}) } };
+    const sec = document.createElement("div");
+    const btn = document.createElement("button");
+    btn.id = "ask-open";
+    btn.setAttribute("aria-expanded", "false");
+    btn.setAttribute("aria-controls", "ask-panel");
+    sec.appendChild(btn);
+    const h = pbpRailCollapsible(sec, "ask", { label: btn, defaultCollapsed: true });
+    await Promise.resolve().then(() => {}).then(() => {});
+    assertEq(sec.querySelector(".rail-sec-head"), null, "no header installed in headless mode");
+    assertEq(btn.getAttribute("aria-expanded"), "false", "pre-existing aria-expanded left untouched");
+    assertEq(btn.className, "", "no rail-sec-head class added to the reused button");
+    h.expand(true); // must not throw, must not touch DOM
+    assertEq(sec.children.length, 1, "still exactly one child");
+    window.chrome = realChrome;
+  });
+
+  await atest("click on header persists to storage.local under the section's own key, preserving sibling keys", async () => {
+    const local = mockLocal({ pbp_rail_collapse: { toc: false } });
+    window.chrome = { storage: { local } };
+    const sec = document.createElement("div");
+    const label = document.createElement("div");
+    label.textContent = "Translate";
+    sec.appendChild(label);
+    const extra = document.createElement("div"); // 2nd child so normal mode (not headless) installs
+    sec.appendChild(extra);
+    pbpRailCollapsible(sec, "tr", { label, defaultCollapsed: true });
+    await Promise.resolve().then(() => {}).then(() => {});
+    sec.querySelector(".rail-sec-head").click();
+    await Promise.resolve().then(() => {}).then(() => {});
+    assertEq(local._store.pbp_rail_collapse.tr, false, "tr toggled to expanded and persisted");
+    assertEq(local._store.pbp_rail_collapse.toc, false, "sibling key toc untouched by tr's write");
+    window.chrome = realChrome;
+  });
+
+  await atest("expand(temp=true) does not persist (session-only auto-expand)", async () => {
+    const local = mockLocal({});
+    window.chrome = { storage: { local } };
+    const sec = document.createElement("div");
+    const label = document.createElement("div");
+    label.textContent = "Translate";
+    sec.appendChild(label);
+    const extra = document.createElement("div"); // 2nd child so normal mode (not headless) installs
+    sec.appendChild(extra);
+    const h = pbpRailCollapsible(sec, "tr", { label, defaultCollapsed: true });
+    await Promise.resolve().then(() => {}).then(() => {});
+    h.expand(true);
+    await Promise.resolve().then(() => {}).then(() => {});
+    assertEq(local._store.pbp_rail_collapse, undefined, "temp expand must not write storage");
+    assertEq(sec.classList.contains("rail-collapsed"), false, "temp expand still visually expands");
+    window.chrome = realChrome;
+  });
+})();
 </script>
 </body></html>
