@@ -1016,7 +1016,7 @@ body.md-empty main { margin-left: 0; }
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1px solid rgba(15, 23, 42, 0.15);
+  border: 1px solid rgba(128, 128, 128, 0.45); /* neutral gray: visible on light AND dark schemes (slate-tinted borders vanish on dark) */
   padding: 0;
   cursor: pointer;
 }
@@ -1408,7 +1408,7 @@ body.ask-open main { margin-right: 396px; }
 .hl-filter-dot {
   width: 12px; height: 12px; padding: 0;
   border-radius: 50%;
-  border: 1px solid rgba(15, 23, 42, 0.15);
+  border: 1px solid rgba(128, 128, 128, 0.45); /* neutral gray: visible on light AND dark schemes (slate-tinted borders vanish on dark) */
   cursor: pointer;
 }
 .hl-filter-dot-1 { background: #facc15; }
