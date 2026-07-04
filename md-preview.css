@@ -3,33 +3,56 @@
    ============================================================ */
 
 :root {
-  /* Slate palette — document-optimized */
-  --bg: #f8fafc;
-  --fg: #0f172a;
-  --fg-secondary: #475569;
-  --fg-muted: #5b6878;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
-  --code-bg: #f1f5f9;
-  --code-fg: #334155;
-  --link: #2563eb;
-  --link-hover: #1d4ed8;
-  --badge-bg: #e0f2fe;
-  --badge-fg: #0369a1;
-  --btn-bg: #ffffff;
-  --btn-border: #e2e8f0;
-  --btn-hover: #f1f5f9;
-  --btn-fg: #334155;
-  --active-bg: #0f172a;
-  --active-fg: #f8fafc;
-  --success: #16a34a;
-  --bq-border: #2563eb;
-  --bq-bg: #f0f9ff;
-  --bq-fg: #1e3a5f;
-  --table-stripe: #f8fafc;
-  --selection: #bfdbfe;
-  --surface: #ffffff;
-  --danger: #dc2626;
+  /* Slate palette -- document-optimized. Single light-dark() definition
+     per token (Chrome 123+); color-scheme tells the UA which branch to
+     resolve and also themes native form controls / scrollbar chrome.
+     The old separate @media (prefers-color-scheme: dark) { :root {...} }
+     override block is gone -- every token below carries both values. */
+  color-scheme: light dark;
+  --bg: light-dark(#f8fafc, #0f172a);
+  --fg: light-dark(#0f172a, #e2e8f0);
+  --fg-secondary: light-dark(#475569, #94a3b8);
+  --fg-muted: light-dark(#5b6878, #8a98ab);
+  --border: light-dark(#e2e8f0, #1e293b);
+  --border-light: light-dark(#f1f5f9, #1e293b);
+  --code-bg: light-dark(#f1f5f9, #1e293b);
+  --code-fg: light-dark(#334155, #cbd5e1);
+  --link: light-dark(#2563eb, #60a5fa);
+  --link-hover: light-dark(#1d4ed8, #93bbfd);
+  --badge-bg: light-dark(#e0f2fe, #1e3a5f);
+  --badge-fg: light-dark(#0369a1, #7dd3fc);
+  --btn-bg: light-dark(#ffffff, #1e293b);
+  --btn-border: light-dark(#e2e8f0, #334155);
+  --btn-hover: light-dark(#f1f5f9, #334155);
+  --btn-fg: light-dark(#334155, #cbd5e1);
+  --active-bg: light-dark(#0f172a, #e2e8f0);
+  --active-fg: light-dark(#f8fafc, #0f172a);
+  --success: light-dark(#16a34a, #22c55e);
+  --bq-border: light-dark(#2563eb, #3b82f6);
+  --bq-bg: light-dark(#f0f9ff, #172554);
+  --bq-fg: light-dark(#1e3a5f, #bfdbfe);
+  --table-stripe: light-dark(#f8fafc, #1e293b);
+  --selection: light-dark(#bfdbfe, #1e3a5f);
+  --surface: light-dark(#ffffff, #1e293b);
+  --danger: light-dark(#dc2626, #f87171);
+  /* D8-7: hljs-github-dark's own designed bg (#0d1117) is darker/more
+     contrast than --surface's dark value (#1e293b) -- kept as its own
+     token (not derived from --surface) so #rendered-view pre never
+     regresses that contrast fix. Was a screen-only @media dark override;
+     light-dark() makes it unconditional -- print still forces the light
+     branch via :root's print color-scheme (see the print block below),
+     same mechanism as every other token, so nothing extra is needed here. */
+  --pre-bg: light-dark(#ffffff, #0d1117);
+  /* Jump flash + user highlights (md-ask.js / md-highlight.js): CSS Custom
+     Highlight API backgrounds. Dark variants desaturate each -- was 2
+     separate @media (prefers-color-scheme: dark) blocks, now single
+     tokens. */
+  --hl-flash: light-dark(rgba(250, 204, 21, 0.5), rgba(202, 138, 4, 0.45));
+  --hl-1: light-dark(rgba(250, 204, 21, 0.45), rgba(202, 138, 4, 0.4));
+  --hl-2: light-dark(rgba(74, 222, 128, 0.4), rgba(21, 128, 61, 0.4));
+  --hl-3: light-dark(rgba(96, 165, 250, 0.4), rgba(29, 78, 216, 0.4));
+  --hl-4: light-dark(rgba(248, 113, 113, 0.4), rgba(185, 28, 28, 0.4));
+  --hl-5: light-dark(rgba(192, 132, 252, 0.4), rgba(126, 34, 206, 0.4));
   /* Per-script font stacks — DRY building blocks for the :lang() rules below.
      Latin head first (handles en/de/fr/pl/ru + Latin in CJK articles), then the
      script-preferred Han/Kana/Hangul families, then a covering fallback. */
@@ -44,37 +67,6 @@
   --han-ko: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR";
   --han-rest: "Source Han Sans", "Noto Sans CJK SC", "WenQuanYi Micro Hei";
   font-variant-emoji: text;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f172a;
-    --fg: #e2e8f0;
-    --fg-secondary: #94a3b8;
-    --fg-muted: #8a98ab;
-    --border: #1e293b;
-    --border-light: #1e293b;
-    --code-bg: #1e293b;
-    --code-fg: #cbd5e1;
-    --link: #60a5fa;
-    --link-hover: #93bbfd;
-    --badge-bg: #1e3a5f;
-    --badge-fg: #7dd3fc;
-    --btn-bg: #1e293b;
-    --btn-border: #334155;
-    --btn-hover: #334155;
-    --btn-fg: #cbd5e1;
-    --active-bg: #e2e8f0;
-    --active-fg: #0f172a;
-    --success: #22c55e;
-    --bq-border: #3b82f6;
-    --bq-bg: #172554;
-    --bq-fg: #bfdbfe;
-    --table-stripe: #1e293b;
-    --selection: #1e3a5f;
-    --surface: #1e293b;
-    --danger: #f87171;
-  }
 }
 
 /* ---- Reset & Base ---- */
@@ -336,7 +328,7 @@ main {
 
 /* Code blocks */
 #rendered-view pre {
-  background: var(--surface);
+  background: var(--pre-bg);
   border: 1px solid var(--border);
   padding: 20px 24px;
   border-radius: 8px;
@@ -352,15 +344,6 @@ main {
   color: var(--code-fg);
   font-weight: 400;
 }
-/* D8-7: dark mode routed the hljs container background through --surface
-   (#1e293b), which is lighter than hljs-github-dark's own designed #0d1117 and
-   compounds its already-tight token contrast further down (e.g. .hljs-section
-   4.08:1 -> 3.16:1). Pin back to hljs's own bg — scoped to screen so it never
-   fights the @media print re-pin above (print always wants the light --surface). */
-@media screen and (prefers-color-scheme: dark) {
-  #rendered-view pre { background: #0d1117; }
-}
-
 /* Blockquotes — top level keeps the accent bar + faint tint (nice for a single quote). */
 #rendered-view blockquote {
   border-left: 3px solid var(--bq-border);
@@ -709,37 +692,30 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 
 /* ---- Print ---- */
 @media print {
-  /* prefers-color-scheme is orthogonal to print — a dark-OS user printing still
-     matches the dark :root block above, so re-pin every token the printed
-     article actually uses back to its light value (D8-1). Without this, links/
-     blockquote/code keep dark-theme colors on the forced-white page below. */
-  :root {
-    color-scheme: light;
-    /* #rendered-view declares `color: var(--fg)` on itself, so print's
-       `body { color: black }` never cascades to article text — --fg (and its
-       secondary/muted/stripe kin) MUST be re-pinned here too, else dark-OS
-       printing renders body text at ~1.2:1 (near-invisible). */
-    --fg: #0f172a;
-    --fg-secondary: #475569;
-    --fg-muted: #5b6878;
-    --table-stripe: #f8fafc;
-    --link: #2563eb;
-    --link-hover: #1d4ed8;
-    --bq-border: #2563eb;
-    --bq-bg: #f0f9ff;
-    --bq-fg: #1e3a5f;
-    --surface: #ffffff;
-    --border: #e2e8f0;
-    --border-light: #f1f5f9;
-    --code-bg: #f1f5f9;
-    --code-fg: #334155;
-    --btn-bg: #ffffff;
-    --btn-border: #e2e8f0;
-    --btn-hover: #f1f5f9;
-    --danger: #dc2626;
-  }
+  /* D8-1: a dark-OS user printing must still get the light palette on
+     paper. Under the old scattered-dark-media design this needed 18
+     explicit token re-pins here (every token the article actually uses).
+     Now that every token is a single light-dark(light, dark) definition,
+     forcing color-scheme: light on :root is the mechanism -- an
+     inherited property, it cascades to every descendant and makes every
+     light-dark() on the page resolve its light branch, document-wide.
+     No per-token re-pin needed (verified: docs/superpowers/plans/
+     2026-07-04-md-preview-color-scheme.md Task 1 Step 1.7).
+     !important is REQUIRED, not decorative: the forced-mode switcher
+     (md-preview.js pbpApplyColorScheme, Task 2) sets
+     document.documentElement.style.colorScheme = "dark" as an INLINE
+     style on <html>. An inline style beats any stylesheet rule of equal
+     importance targeting the same element -- including this rule --
+     regardless of media-query specificity or source order. Without
+     !important, printing while optTheme is forced to "dark" would print
+     the dark palette (verified: Step 1.7's print-dark-forced-inline
+     scenario). */
+  :root { color-scheme: light !important; }
   .rail, .rail-toggle, .rail-scrim { display: none; }
   main { margin-left: 0; max-width: 100%; padding: 0; }
+  /* Deliberate pure white/black (not --bg/--fg, which are near-white
+     #f8fafc / near-black #0f172a by design) -- an intentional ink-saving
+     choice, independent of the token system. */
   body { background: white; color: black; }
 }
 
@@ -991,10 +967,7 @@ body.md-empty main { margin-left: 0; }
 #ask-tip .ask-tip-status { color: var(--success); margin-top: 4px; font-weight: 600; }
 
 /* Jump flash: CSS Custom Highlight API (primary path). */
-::highlight(pbp-flash) { background-color: rgba(250, 204, 21, 0.5); }
-@media (prefers-color-scheme: dark) {
-  ::highlight(pbp-flash) { background-color: rgba(202, 138, 4, 0.45); }
-}
+::highlight(pbp-flash) { background-color: var(--hl-flash); }
 /* Fallback when CSS.highlights is unavailable: flash the whole block. */
 .pb-flash-fallback { animation: pbp-flash-fade 1.6s ease-out; }
 @keyframes pbp-flash-fade {
@@ -1006,18 +979,11 @@ body.md-empty main { margin-left: 0; }
    mutation (D10 convention 3/6). Colors: 1 yellow=quote, 2 green=definition,
    3 blue=example, 4 red=doubt, 5 purple=todo. Dark variant desaturates
    each (same technique as ::highlight(pbp-flash) above). */
-::highlight(pbp-hl-1) { background-color: rgba(250, 204, 21, 0.45); }
-::highlight(pbp-hl-2) { background-color: rgba(74, 222, 128, 0.4); }
-::highlight(pbp-hl-3) { background-color: rgba(96, 165, 250, 0.4); }
-::highlight(pbp-hl-4) { background-color: rgba(248, 113, 113, 0.4); }
-::highlight(pbp-hl-5) { background-color: rgba(192, 132, 252, 0.4); }
-@media (prefers-color-scheme: dark) {
-  ::highlight(pbp-hl-1) { background-color: rgba(202, 138, 4, 0.4); }
-  ::highlight(pbp-hl-2) { background-color: rgba(21, 128, 61, 0.4); }
-  ::highlight(pbp-hl-3) { background-color: rgba(29, 78, 216, 0.4); }
-  ::highlight(pbp-hl-4) { background-color: rgba(185, 28, 28, 0.4); }
-  ::highlight(pbp-hl-5) { background-color: rgba(126, 34, 206, 0.4); }
-}
+::highlight(pbp-hl-1) { background-color: var(--hl-1); }
+::highlight(pbp-hl-2) { background-color: var(--hl-2); }
+::highlight(pbp-hl-3) { background-color: var(--hl-3); }
+::highlight(pbp-hl-4) { background-color: var(--hl-4); }
+::highlight(pbp-hl-5) { background-color: var(--hl-5); }
 
 /* Highlight creation bar (md-highlight.js). Native popover -- visibility,
    top-layer, and [hidden] all managed by the popover attribute itself, no
