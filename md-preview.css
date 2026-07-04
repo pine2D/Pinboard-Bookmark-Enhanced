@@ -1427,7 +1427,12 @@ body.ask-open main { margin-right: 396px; }
 }
 .hl-item:last-child { border-bottom: none; }
 .hl-item-main {
-  flex: 1 1 auto; min-width: 0;
+  /* flex-basis 0 (not auto): in the wrapping .hl-item container, an auto basis
+     makes this button's preferred width the UN-ellipsized quote text, which
+     forces the delete button onto its own wrapped row (wrap happens before
+     shrink). Basis 0 keeps main + delete on one line; the note row still
+     breaks out via its own flex-basis:100%. */
+  flex: 1 1 0; min-width: 0;
   display: flex; align-items: center; gap: 6px;
   background: none; border: none; padding: 2px 4px;
   color: inherit; font: inherit; text-align: left;
