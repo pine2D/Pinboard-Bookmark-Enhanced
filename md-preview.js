@@ -303,6 +303,11 @@ function pbpRailCollapsible(sectionEl, key, opts) {
     && sectionEl.children[0] === opts.label;
   let collapsed = !!opts.defaultCollapsed;
   let headBtn = null;
+  // Set true by a user click or an explicit expand()/collapse() call (e.g. Task 2's
+  // cache-restore auto-expand). Once true, the async storage catch-up below never
+  // applies its correction -- otherwise a toggle landing between install and the
+  // chrome.storage.local.get() resolving gets silently reverted by a stale read.
+  let overridden = false;
 
   function applyDom(next) {
     sectionEl.classList.toggle("rail-collapsed", next);
@@ -356,7 +361,7 @@ function pbpRailCollapsible(sectionEl, key, opts) {
     if (existingLabelEl) existingLabelEl.replaceWith(headBtn);
     else sectionEl.insertBefore(headBtn, sectionEl.firstChild);
 
-    headBtn.addEventListener("click", () => setState(!collapsed, true));
+    headBtn.addEventListener("click", () => { overridden = true; setState(!collapsed, true); });
 
     // Apply the default SYNCHRONOUSLY, before the async storage read below.
     // chrome.storage.local.get() is a real IPC round-trip in the extension
@@ -373,14 +378,15 @@ function pbpRailCollapsible(sectionEl, key, opts) {
 
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(PBP_RAIL_STORAGE_KEY).then((r) => {
+      if (overridden) return; // a click or expand()/collapse() already set the authoritative state -- don't fight it
       const merged = pbpRailCollapseState(r && r[PBP_RAIL_STORAGE_KEY], { [key]: !!opts.defaultCollapsed });
       if (merged[key] !== collapsed) setState(merged[key], false);
     }).catch(() => {});
   }
 
   return {
-    expand(temp) { setState(false, !temp); },
-    collapse() { setState(true, true); },
+    expand(temp) { overridden = true; setState(false, !temp); },
+    collapse() { overridden = true; setState(true, true); },
     isCollapsed() { return collapsed; },
   };
 }

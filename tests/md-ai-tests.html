@@ -3856,6 +3856,32 @@ suiteIf("pbpRailCollapseState", "pbpRailCollapseState", () => {
     assertEq(sec.classList.contains("rail-collapsed"), false, "temp expand still visually expands");
     window.chrome = realChrome;
   });
+
+  await atest("expand(true) fired before the async storage catch-up resolves is not reverted", async () => {
+    // Deferred get(): resolves only when resolveGet() is called below, so we can fire
+    // expand() into the window between install (which starts the read) and its resolution
+    // -- the exact race a header click or Task 2's cache-restore auto-expand can hit.
+    let resolveGet;
+    const local = {
+      _store: {},
+      get: () => new Promise((resolve) => { resolveGet = resolve; }),
+      set: (obj) => { Object.assign(local._store, obj); return Promise.resolve(); },
+    };
+    window.chrome = { storage: { local } };
+    const sec = document.createElement("div");
+    const label = document.createElement("div");
+    label.textContent = "Translate";
+    sec.appendChild(label);
+    const extra = document.createElement("div"); // 2nd child so normal mode (not headless) installs
+    sec.appendChild(extra);
+    const h = pbpRailCollapsible(sec, "tr", { label, defaultCollapsed: true });
+    h.expand(true); // races ahead of the still-pending storage.get() below
+    assertEq(sec.classList.contains("rail-collapsed"), false, "expand applied immediately");
+    resolveGet({ pbp_rail_collapse: { tr: true } }); // stored says collapsed -- would revert if not guarded
+    await Promise.resolve().then(() => {}).then(() => {}).then(() => {});
+    assertEq(sec.classList.contains("rail-collapsed"), false, "explicit expand() wins over the late catch-up");
+    window.chrome = realChrome;
+  });
 })();
 </script>
 </body></html>
