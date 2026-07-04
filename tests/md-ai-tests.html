@@ -3734,6 +3734,43 @@ suiteIf("pbpRailCollapseState", "pbpRailCollapseState", () => {
     assertEq(r.ask, false, "ask key honored from stored");
   });
 });
+
+// ============ md-preview.js: pbpResolveColorScheme (color-scheme switcher) ============
+// spec: docs/superpowers/specs/2026-07-04-md-preview-color-scheme-design.md
+suiteIf("pbpResolveColorScheme", "pbpResolveColorScheme", () => {
+  test("dark mode forces colorScheme and flips hljs link media", () => {
+    const r = pbpResolveColorScheme("dark");
+    assertEq(r.colorScheme, "dark", "colorScheme");
+    assertEq(r.lightMedia, "not all", "light sheet disabled");
+    assertEq(r.darkMedia, "all", "dark sheet forced on");
+  });
+
+  test("light mode forces colorScheme and flips hljs link media the other way", () => {
+    const r = pbpResolveColorScheme("light");
+    assertEq(r.colorScheme, "light", "colorScheme");
+    assertEq(r.lightMedia, "all", "light sheet forced on");
+    assertEq(r.darkMedia, "not all", "dark sheet disabled");
+  });
+
+  test("auto mode clears colorScheme and restores the original prefers-color-scheme queries", () => {
+    const r = pbpResolveColorScheme("auto");
+    assertEq(r.colorScheme, "", "empty string restores the CSS light-dark default");
+    assertEq(r.lightMedia, "(prefers-color-scheme: light)", "light query restored");
+    assertEq(r.darkMedia, "(prefers-color-scheme: dark)", "dark query restored");
+  });
+
+  test("unknown or missing mode degrades to auto (spec: missing/read-failure -> follow system)", () => {
+    assertEq(pbpResolveColorScheme(undefined).colorScheme, "", "undefined -> auto");
+    assertEq(pbpResolveColorScheme("bogus").colorScheme, "", "garbage string -> auto");
+  });
+
+  test("pbpApplyColorScheme sets documentElement.style.colorScheme without throwing when the hljs links are absent", () => {
+    pbpApplyColorScheme("dark");
+    assertEq(document.documentElement.style.colorScheme, "dark", "dark applied to documentElement");
+    pbpApplyColorScheme("auto");
+    assertEq(document.documentElement.style.colorScheme, "", "auto clears colorScheme (cleanup for later suites)");
+  });
+});
 </script>
 
 <script>

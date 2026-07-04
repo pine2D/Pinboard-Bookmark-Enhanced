@@ -391,6 +391,45 @@ function pbpRailCollapsible(sectionEl, key, opts) {
   };
 }
 
+// ============================================================
+// Color scheme (spec: docs/superpowers/specs/2026-07-04-md-preview-color-
+// scheme-design.md). optTheme ("dark"|"light"|"auto") forces the preview
+// page's color-scheme, overriding the CSS default of following the
+// system (:root { color-scheme: light dark } + light-dark() tokens in
+// md-preview.css). The two hljs <link>s' media attribute is the one
+// thing light-dark() cannot drive (their media query targets the OS's
+// prefers-color-scheme, not the page's color-scheme property) -- a
+// forced mode rewrites it directly: the "off" sheet gets media="not all"
+// (never matches, but the stylesheet stays in the DOM so nothing else
+// has to change) and the wanted one gets media="all". "auto" restores
+// the literal media strings md-preview.html ships with.
+// pbpResolveColorScheme is PURE (no DOM/chrome) -- unit-tested in
+// tests/md-ai-tests.html. md-preview-theme-early.js carries its own tiny
+// copy of this same pair (it must run standalone, before this deferred
+// file loads) -- see that file's header comment.
+// ============================================================
+// Must mirror the literal media attributes on the two hljs <link>s in
+// md-preview.html (lines 8-9) -- "auto" mode restores exactly these.
+const PBP_HLJS_AUTO_LIGHT_MEDIA = "(prefers-color-scheme: light)";
+const PBP_HLJS_AUTO_DARK_MEDIA = "(prefers-color-scheme: dark)";
+
+function pbpResolveColorScheme(mode) {
+  if (mode === "dark") return { colorScheme: "dark", lightMedia: "not all", darkMedia: "all" };
+  if (mode === "light") return { colorScheme: "light", lightMedia: "all", darkMedia: "not all" };
+  return { colorScheme: "", lightMedia: PBP_HLJS_AUTO_LIGHT_MEDIA, darkMedia: PBP_HLJS_AUTO_DARK_MEDIA };
+}
+
+function pbpApplyColorScheme(mode) {
+  try {
+    const r = pbpResolveColorScheme(mode);
+    document.documentElement.style.colorScheme = r.colorScheme;
+    const lightLink = document.getElementById("hljs-light-link");
+    const darkLink = document.getElementById("hljs-dark-link");
+    if (lightLink) lightLink.media = r.lightMedia;
+    if (darkLink) darkLink.media = r.darkMedia;
+  } catch (_) { /* degrade: leave the system-following CSS default in place */ }
+}
+
 (async function () {
   initI18n();
   applyI18n();
@@ -400,6 +439,27 @@ function pbpRailCollapsible(sectionEl, key, opts) {
   // below -- neither needs anything past this point. Mirrors the same typeof-chrome
   // guard already used for md-highlight.js's top-level chrome.storage.onChanged wiring.
   if (typeof chrome === "undefined" || !chrome.storage) return;
+
+  // optTheme: authoritative confirmation pass. md-preview-theme-early.js already
+  // applied a best-effort guess (localStorage mirror) before first paint; this read
+  // is the real chrome.storage source of truth, run as early as possible (before
+  // extraction/render below) so it never lags behind on a slow page. Own try/catch
+  // (must never block the render path on a settings hiccup) -- degrades to whatever
+  // the early script (or the CSS default) already set. storage.onChanged keeps an
+  // already-open preview in sync when optTheme changes in Options (same dynamic
+  // sync/local area handling as md-translate.js's translateTargetLang listener).
+  try {
+    const settingsArea = await getSettingsStorage();
+    const { optTheme } = await settingsArea.get({ optTheme: "auto" });
+    pbpApplyColorScheme(optTheme);
+  } catch (_) { /* degrade: leave whatever md-preview-theme-early.js (or the CSS default) set */ }
+  if (chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if ((area !== "sync" && area !== "local") || !changes.optTheme) return;
+      pbpApplyColorScheme(changes.optTheme.newValue);
+    });
+  }
+
   // Per-tab token key: the opener (popup / shortcut) minted ?k=<uuid> and wrote the
   // payload to md_preview_data_<uuid>, so this tab reads ONLY its own slot and can't
   // be clobbered by a concurrent preview. No k = a pre-update tab → fall back to the
