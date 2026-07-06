@@ -1203,6 +1203,20 @@ function pbpExplainInit(detail) {
     _pbpExplainTrigger = s.selectionTrigger || "icon";
     if (_pbpExplainTrigger === "off") return; // "off": zero listeners, zero DOM
 
+    // Refresh the explain-translate target language live when the user
+    // changes it in options (mirrors md-translate.js's pbpTrInit listener,
+    // commit 90ad094). _pbpExplainRun (below) reads
+    // _pbpExplainSettings.translateTargetLang fresh on every run via
+    // pbpTrResolveTargetLang, so patching the field here is enough; an
+    // in-flight stream already captured its language and finishes
+    // unaffected -- only the NEXT translate run picks up the new target.
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if ((area !== "sync" && area !== "local") || !changes.translateTargetLang) return;
+        _pbpExplainSettings.translateTargetLang = changes.translateTargetLang.newValue;
+      });
+    }
+
     // Mouse selection: suppress UI while dragging; read the selection 10ms
     // after mouseup (the browser settles the final range after the event).
     document.addEventListener("mousedown", (e) => {
