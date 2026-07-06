@@ -2431,5 +2431,7 @@
   "hlFilterGroupAria": { "message": "Nach Markierungsfarbe filtern" },
   "hlCopyMd": { "message": "Als Markdown kopieren" },
   "hlCopied": { "message": "Markierungen kopiert" },
-  "hlFilterEmpty": { "message": "Keine Markierungen entsprechen den ausgewählten Farben" }
+  "hlFilterEmpty": { "message": "Keine Markierungen entsprechen den ausgewählten Farben" },
+  "explainSaveNote": { "message": "Als Notiz speichern" },
+  "explainSavedNote": { "message": "Gespeichert" }
 }

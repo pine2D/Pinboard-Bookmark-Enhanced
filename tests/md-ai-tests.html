@@ -4058,4 +4058,24 @@ suiteIf("_pbpHlLocateTextFor", "_pbpHlLocateTextFor", () => {
   });
 });
 </script>
+<script>
+// ============ H4: md-highlight.js pbpHlAppendNoteText (save-answer-as-note) ============
+suiteIf("pbpHlAppendNoteText", "pbpHlAppendNoteText", () => {
+  test("empty existing note -> answer verbatim", () => {
+    assertEq(pbpHlAppendNoteText("", "the answer"), "the answer", "empty existing");
+  });
+  test("whitespace-only existing note -> answer verbatim", () => {
+    assertEq(pbpHlAppendNoteText("   \n\t  ", "the answer"), "the answer", "whitespace-only existing");
+  });
+  test("non-empty existing note -> existing + blank line + answer", () => {
+    assertEq(pbpHlAppendNoteText("existing note", "new answer"), "existing note\n\nnew answer", "blank-line join");
+  });
+  test("null existing treated as empty", () => {
+    assertEq(pbpHlAppendNoteText(null, "the answer"), "the answer", "null -> empty");
+  });
+  test("undefined existing treated as empty", () => {
+    assertEq(pbpHlAppendNoteText(undefined, "the answer"), "the answer", "undefined -> empty");
+  });
+});
+</script>
 </body></html>

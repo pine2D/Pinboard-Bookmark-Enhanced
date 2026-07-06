@@ -862,7 +862,7 @@ body.md-empty main { margin-left: 0; }
 @keyframes xp-shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .xp-skel { animation: none; } }
 .xp-error p { color: var(--danger); margin: 0 0 8px; font-size: 13px; }
-.xp-retry, .xp-ask {
+.xp-retry, .xp-ask, .xp-save {
   padding: 4px 10px;
   border: 1px solid var(--btn-border);
   border-radius: 6px;
@@ -872,7 +872,8 @@ body.md-empty main { margin-left: 0; }
   cursor: pointer;
   white-space: nowrap;
 }
-.xp-retry:hover, .xp-ask:hover { background: var(--btn-hover); }
+.xp-retry:hover, .xp-ask:hover, .xp-save:hover:not(:disabled) { background: var(--btn-hover); }
+.xp-save:disabled { opacity: 0.6; cursor: default; }
 .xp-foot {
   display: flex;
   align-items: center;

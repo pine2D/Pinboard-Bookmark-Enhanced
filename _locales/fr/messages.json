@@ -2431,5 +2431,7 @@
   "hlFilterGroupAria": { "message": "Filtrer par couleur de surlignage" },
   "hlCopyMd": { "message": "Copier en Markdown" },
   "hlCopied": { "message": "Surlignages copiés" },
-  "hlFilterEmpty": { "message": "Aucun surlignage ne correspond aux couleurs sélectionnées" }
+  "hlFilterEmpty": { "message": "Aucun surlignage ne correspond aux couleurs sélectionnées" },
+  "explainSaveNote": { "message": "Enregistrer comme note" },
+  "explainSavedNote": { "message": "Enregistré" }
 }

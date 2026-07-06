@@ -2431,5 +2431,7 @@
   "hlFilterGroupAria": { "message": "Фильтр по цвету выделения" },
   "hlCopyMd": { "message": "Копировать как Markdown" },
   "hlCopied": { "message": "Выделения скопированы" },
-  "hlFilterEmpty": { "message": "Нет выделений, соответствующих выбранным цветам" }
+  "hlFilterEmpty": { "message": "Нет выделений, соответствующих выбранным цветам" },
+  "explainSaveNote": { "message": "Сохранить как заметку" },
+  "explainSavedNote": { "message": "Сохранено" }
 }

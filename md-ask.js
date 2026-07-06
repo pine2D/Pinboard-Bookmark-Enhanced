@@ -1185,6 +1185,12 @@ function pbpExplainInvoke() {
   const cap = _pbpExplainGetSelection();
   if (!cap) return;
   if (cap.range) cap.rect = cap.range.getBoundingClientRect();
+  // H4 2.2: clone the Range into an independent snapshot. The popover's
+  // light-dismiss (or any later DOM interaction) can collapse
+  // window.getSelection() -- cloneRange() keeps pointing at the same
+  // start/end nodes/offsets but lives on its own, so "Save as note" can still
+  // dereference cap.range long after the live selection is gone.
+  cap.range = cap.range.cloneRange();
   _pbpExplainHidePill();
   if (typeof _pbpExplainOpenPop === "function") _pbpExplainOpenPop(cap);
 }
@@ -1333,6 +1339,13 @@ function pbpExplainBuildTranslatePrompt(p) {
 // ---- Explain: popover shell (lazy-mounted on first invoke) ----
 let _pbpExplainPopEl = null;
 let _pbpExplainAbort = null;
+// H4 2.2: the save-as-note target + answer text for whichever run most
+// recently finished successfully. Module-level because the .xp-save button is
+// a singleton reused across invocations/re-runs; both are set inside
+// _pbpExplainRun (target at the top of every run, answer text only once that
+// run's stream completes).
+let _pbpExplainSaveTarget = null; // { itemId } | { range } | null
+let _pbpExplainAnswerText = "";
 // Action switch (spec 2.1): "explain" | "translate", session-only per open
 // (never persisted). _pbpExplainCap/_pbpExplainCtx cache the CURRENT
 // invocation so the .xp-act buttons (Step 7) can re-run _pbpExplainRun
@@ -1418,6 +1431,27 @@ function _pbpExplainEnsurePop() {
   foot.className = "xp-foot";
   const model = document.createElement("span");
   model.className = "xp-model";
+  // H4 2.2: "Save as note" -- hidden while streaming/on error, shown once an
+  // answer finishes; typeof-guarded (window.pbpHlAttachNote may not exist if
+  // md-highlight.js failed to load/init). Disabled immediately on click to
+  // guard against a double-click firing two attach-note calls; re-enabled
+  // only if the attach turns out to have failed.
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "xp-save";
+  save.hidden = true;
+  save.textContent = t("explainSaveNote");
+  save.addEventListener("click", () => {
+    if (typeof window.pbpHlAttachNote !== "function") return;
+    save.disabled = true;
+    window.pbpHlAttachNote(_pbpExplainSaveTarget, _pbpExplainAnswerText).then((ok) => {
+      if (ok) {
+        save.textContent = t("explainSavedNote");
+      } else {
+        save.disabled = false; // pbpHlAttachNote already toasted the failure
+      }
+    }).catch(() => { save.disabled = false; });
+  });
   const ask = document.createElement("button");
   ask.type = "button";
   ask.className = "xp-ask";
@@ -1474,6 +1508,7 @@ function _pbpExplainEnsurePop() {
   gearWrap.appendChild(gear);
   gearWrap.appendChild(menu);
   foot.appendChild(model);
+  foot.appendChild(save);
   foot.appendChild(ask);
   foot.appendChild(gearWrap);
   pop.appendChild(head);
@@ -1572,6 +1607,16 @@ function _pbpExplainPackContext(cap) {
 async function _pbpExplainRun(cap, ctx, pop) {
   const s = _pbpExplainSettings || await pbpAiGetSettings();
   const body = pop.querySelector(".xp-body");
+  // H4 2.2: reset the save button on every run -- hidden + re-enabled +
+  // default label until this run's answer actually finishes. Target derives
+  // from cap (itemId wins when present, i.e. a card entry point from Task 3;
+  // otherwise the live-selection cap.range, always a cloneRange() snapshot per
+  // pbpExplainInvoke) so the click handler never touches window.getSelection().
+  const save = pop.querySelector(".xp-save");
+  save.hidden = true;
+  save.disabled = false;
+  save.textContent = t("explainSaveNote");
+  _pbpExplainSaveTarget = cap.itemId ? { itemId: cap.itemId } : { range: cap.range };
   // Skeleton: 3 shimmer lines + an SR-only loading announcement.
   body.setAttribute("aria-busy", "true");
   body.replaceChildren();
@@ -1643,6 +1688,11 @@ async function _pbpExplainRun(cap, ctx, pop) {
     md.className = "xp-md";
     md.innerHTML = renderMarkdown(full);
     body.replaceChildren(md);
+    // H4 2.2: the answer is now final -- stash the raw markdown text (never
+    // the rendered HTML) for "Save as note", and reveal the button only if
+    // md-highlight.js actually exposed the hook.
+    _pbpExplainAnswerText = full;
+    if (typeof window.pbpHlAttachNote === "function") save.hidden = false;
   } catch (e) {
     if (rafId) cancelAnimationFrame(rafId);
     if (e && e.name === "AbortError") return; // closed or re-invoked: silent

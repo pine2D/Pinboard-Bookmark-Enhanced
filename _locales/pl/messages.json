@@ -2431,5 +2431,7 @@
   "hlFilterGroupAria": { "message": "Filtruj według koloru zaznaczenia" },
   "hlCopyMd": { "message": "Kopiuj jako Markdown" },
   "hlCopied": { "message": "Skopiowano zaznaczenia" },
-  "hlFilterEmpty": { "message": "Żadne zaznaczenie nie pasuje do wybranych kolorów" }
+  "hlFilterEmpty": { "message": "Żadne zaznaczenie nie pasuje do wybranych kolorów" },
+  "explainSaveNote": { "message": "Zapisz jako notatkę" },
+  "explainSavedNote": { "message": "Zapisano" }
 }

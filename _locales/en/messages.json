@@ -2425,5 +2425,7 @@
   "hlFilterGroupAria": { "message": "Filter by highlight color" },
   "hlCopyMd": { "message": "Copy as Markdown" },
   "hlCopied": { "message": "Highlights copied" },
-  "hlFilterEmpty": { "message": "No highlights match the selected colors" }
+  "hlFilterEmpty": { "message": "No highlights match the selected colors" },
+  "explainSaveNote": { "message": "Save as note" },
+  "explainSavedNote": { "message": "Saved to note" }
 }

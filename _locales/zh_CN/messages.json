@@ -2425,5 +2425,7 @@
   "hlFilterGroupAria": { "message": "按高亮颜色筛选" },
   "hlCopyMd": { "message": "复制为 Markdown" },
   "hlCopied": { "message": "高亮已复制" },
-  "hlFilterEmpty": { "message": "没有高亮匹配所选颜色" }
+  "hlFilterEmpty": { "message": "没有高亮匹配所选颜色" },
+  "explainSaveNote": { "message": "存为笔记" },
+  "explainSavedNote": { "message": "已存" }
 }

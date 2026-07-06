@@ -230,6 +230,17 @@ function pbpHlNotebookModel(items, colorFilter) {
   }));
 }
 
+// ---- Save-answer-as-note text join (H4 spec 2.2, pure/testable): appended
+// to an item's note by the DOM-layer pbpHlAttachNote below. A blank note (or
+// one that is only whitespace) is replaced outright; a non-empty note gets
+// the new answer appended after a blank line, so multiple saved answers read
+// as separate paragraphs.
+function pbpHlAppendNoteText(existing, answer) {
+  const e = typeof existing === "string" ? existing : "";
+  const a = typeof answer === "string" ? answer : "";
+  return e.trim() ? e + "\n\n" + a : a;
+}
+
 // ============================================================
 // DOM / UI layer. Lazily mounted: pbpHlInit runs on "pbp:rendered"
 // (same pattern as pbpTrInit / pbpAskInit).
@@ -764,6 +775,75 @@ function _pbpHlOnClick(e) {
   if (!best) return;
   _pbpHlOpenCard(best.id);
 }
+
+// ---- Save-answer-as-note bridge (H4 spec 2.2): explain/translate answers
+// land on a highlight's note through this single entry point. target =
+// { itemId } (card entry point, used by Task 3) or { range } (live-selection
+// entry point, a frozen cloneRange() snapshot from md-ask.js's
+// pbpExplainInvoke). The range path hit-tests the SAME isPointInRange
+// primitive _pbpHlOnClick uses just above against every registered Range in
+// _pbpHlState.ranges, tie -> newest item.ts. A miss creates a new highlight
+// through the one creation path (_pbpHlCreateFromRange, last-used color) and
+// the note lands on the LAST item that call created (mirrors
+// _pbpHlCreateWithNote's own "open the last created item" choice). Persists
+// via _pbpHlSave + _pbpHlNotebookRender only (spec invariant 2). Returns
+// false (after a hlSaveFailed toast) when creation fails so the caller's
+// button can re-enable itself; _pbpHlSave toasts its own failures.
+async function pbpHlAttachNote(target, answerText) {
+  if (!_pbpHlState) return false;
+  const answer = typeof answerText === "string" ? answerText : "";
+  let item = null;
+
+  if (target && target.itemId) {
+    item = _pbpHlState.items.find((it) => it.id === target.itemId) || null;
+    if (!item) return false;
+  } else if (target && target.range) {
+    const range = target.range;
+    let best = null; // { ts, item }
+    for (const id in _pbpHlState.ranges) {
+      const entry = _pbpHlState.ranges[id];
+      const r = entry && entry.range;
+      if (!r) continue;
+      let hit;
+      try { hit = r.isPointInRange(range.startContainer, range.startOffset); } catch (_) { hit = false; }
+      if (!hit) continue;
+      const it = _pbpHlState.items.find((x) => x.id === id);
+      const ts = it ? Number(it.ts) || 0 : 0;
+      if (!best || ts > best.ts) best = { ts, item: it };
+    }
+    if (best && best.item) {
+      item = best.item;
+    } else {
+      const color = await _pbpHlLastColorGet();
+      // ponytail: _pbpHlCreateFromRange already does its own _pbpHlSave +
+      // _pbpHlNotebookRender internally before returning, with the new item's
+      // note still "". The append below then triggers a SECOND save + render
+      // with the real note. That is one extra storage.local write and a
+      // one-frame Notebook flash for this miss-branch only -- harmless, not
+      // worth a bespoke non-persisting creation path (would violate the
+      // single-creation-path invariant).
+      const created = await _pbpHlCreateFromRange(range, color, null);
+      if (!created.length) {
+        _pbpHlToast(t("hlSaveFailed"));
+        return false;
+      }
+      item = created[created.length - 1];
+    }
+  } else {
+    return false;
+  }
+
+  item.note = pbpHlAppendNoteText(item.note, answer);
+  const ok = await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, null);
+  if (!ok) return false;
+  _pbpHlNotebookRender();
+  if (_pbpHlCard && _pbpHlCardItemId === item.id) {
+    const noteEl = _pbpHlCard.querySelector(".hl-card-note");
+    if (noteEl) noteEl.value = item.note;
+  }
+  return true;
+}
+window.pbpHlAttachNote = pbpHlAttachNote; // explicit window attach: makes the md-ask.js "Save as note" contract self-documenting.
 
 // ---- Edit card (spec sec.4). Native popover="auto": Esc + light-dismiss for free,
 // same mechanism as md-ask.js's #explain-pop (md-ask.js:1341-1424). ----

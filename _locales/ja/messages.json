@@ -2431,5 +2431,7 @@
   "hlFilterGroupAria": { "message": "ハイライトの色で絞り込み" },
   "hlCopyMd": { "message": "Markdownとしてコピー" },
   "hlCopied": { "message": "ハイライトをコピーしました" },
-  "hlFilterEmpty": { "message": "選択した色に一致するハイライトがありません" }
+  "hlFilterEmpty": { "message": "選択した色に一致するハイライトがありません" },
+  "explainSaveNote": { "message": "メモとして保存" },
+  "explainSavedNote": { "message": "保存しました" }
 }

@@ -2431,5 +2431,7 @@
   "hlFilterGroupAria": { "message": "按標記顏色篩選" },
   "hlCopyMd": { "message": "複製為 Markdown" },
   "hlCopied": { "message": "標記已複製" },
-  "hlFilterEmpty": { "message": "沒有標記符合所選顏色" }
+  "hlFilterEmpty": { "message": "沒有標記符合所選顏色" },
+  "explainSaveNote": { "message": "存為筆記" },
+  "explainSavedNote": { "message": "已儲存" }
 }
