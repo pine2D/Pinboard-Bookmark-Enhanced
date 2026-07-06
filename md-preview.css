@@ -1022,25 +1022,24 @@ body.md-empty main { margin-left: 0; }
 ::highlight(pbp-hl-4) { background-color: var(--hl-4); }
 ::highlight(pbp-hl-5) { background-color: var(--hl-5); }
 
-/* H5 block-level mirror bar (spec 1.5): a 3px left border echoing the OTHER
+/* H5 block-level mirror bar (spec 1.5): a 3px left bar echoing the OTHER
    side's highlight color onto the paired block, so a highlight on one side is
    discoverable from the other. Only meaningful when both sides are on screen,
    so scoped to the two translated view modes -- the original view is
    pixel-unchanged (spec 1.5 / 3 / 6). Reuses the five --hl-* tokens
    (light-dark() aware, already tuned so dark doesn't overexpose, spec 6.2);
-   no new color literal. padding-left keeps text off the bar. */
-body.tr-bilingual #rendered-view [data-pb-hl-mirror],
-body.tr-only #rendered-view [data-pb-hl-mirror] { padding-left: 8px; }
+   no new color literal. inset box-shadow instead of border-left so blockquote
+   and pre keep their own intrinsic left border and padding untouched. */
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="1"],
-body.tr-only #rendered-view [data-pb-hl-mirror="1"] { border-left: 3px solid var(--hl-1); }
+body.tr-only #rendered-view [data-pb-hl-mirror="1"] { box-shadow: inset 3px 0 0 0 var(--hl-1); }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="2"],
-body.tr-only #rendered-view [data-pb-hl-mirror="2"] { border-left: 3px solid var(--hl-2); }
+body.tr-only #rendered-view [data-pb-hl-mirror="2"] { box-shadow: inset 3px 0 0 0 var(--hl-2); }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="3"],
-body.tr-only #rendered-view [data-pb-hl-mirror="3"] { border-left: 3px solid var(--hl-3); }
+body.tr-only #rendered-view [data-pb-hl-mirror="3"] { box-shadow: inset 3px 0 0 0 var(--hl-3); }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="4"],
-body.tr-only #rendered-view [data-pb-hl-mirror="4"] { border-left: 3px solid var(--hl-4); }
+body.tr-only #rendered-view [data-pb-hl-mirror="4"] { box-shadow: inset 3px 0 0 0 var(--hl-4); }
 body.tr-bilingual #rendered-view [data-pb-hl-mirror="5"],
-body.tr-only #rendered-view [data-pb-hl-mirror="5"] { border-left: 3px solid var(--hl-5); }
+body.tr-only #rendered-view [data-pb-hl-mirror="5"] { box-shadow: inset 3px 0 0 0 var(--hl-5); }
 
 /* H5 Notebook translated-side language chip (spec 1.4). kbd-ish chip using the
    same tokens as the edit card / rail controls; no new color literal. Lives
