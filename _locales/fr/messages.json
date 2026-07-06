@@ -2437,5 +2437,7 @@
   "explainSavedNote": { "message": "Enregistré" },
   "hlCardExplain": { "message": "Expliquer" },
   "hlCardTranslate": { "message": "Traduire" },
-  "hlCardAsk": { "message": "Demander" }
+  "hlCardAsk": { "message": "Demander" },
+  "fnPopLabel": { "message": "Note de bas de page" },
+  "fnPopJump": { "message": "Aller à la note" }
 }

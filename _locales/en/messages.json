@@ -2431,5 +2431,7 @@
   "explainSavedNote": { "message": "Saved to note" },
   "hlCardExplain": { "message": "Explain" },
   "hlCardTranslate": { "message": "Translate" },
-  "hlCardAsk": { "message": "Ask" }
+  "hlCardAsk": { "message": "Ask" },
+  "fnPopLabel": { "message": "Footnote" },
+  "fnPopJump": { "message": "Jump to footnote" }
 }

@@ -31,6 +31,7 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../md-translate.js"></script>
 <script src="../md-ask.js"></script>
 <script src="../md-highlight.js"></script>
+<script src="../md-reader.js"></script>
 
 <script>
 let PASS = 0, FAIL = 0, SKIP = 0;
@@ -4294,6 +4295,47 @@ suiteIf("pbpHlAppendNoteText", "pbpHlAppendNoteText", () => {
   });
   test("undefined existing treated as empty", () => {
     assertEq(pbpHlAppendNoteText(undefined, "the answer"), "the answer", "undefined -> empty");
+  });
+});
+</script>
+<script>
+// ============ Task 3: md-reader.js pbpFnHrefParse (spec sec.3 R3) ============
+suiteIf("pbpFnHrefParse", "pbpFnHrefParse", () => {
+  test("body ref link -> {kind:'ref', id}", () => {
+    const r = pbpFnHrefParse("#fn:1");
+    assert(r, "parsed");
+    assertEq(r.kind, "ref", "kind");
+    assertEq(r.id, "1", "id");
+  });
+  test("first (unsuffixed) backref -> {kind:'backref', id}", () => {
+    const r = pbpFnHrefParse("#fnref:1");
+    assert(r, "parsed");
+    assertEq(r.kind, "backref", "kind");
+    assertEq(r.id, "1", "id");
+  });
+  test("multi-citation suffixed backref strips the occurrence suffix", () => {
+    const r = pbpFnHrefParse("#fnref:1-2");
+    assert(r, "parsed");
+    assertEq(r.kind, "backref", "kind");
+    assertEq(r.id, "1", "occurrence suffix stripped -- ref side never carries it (spec sec.3)");
+  });
+  test("non-numeric footnote id survives verbatim on the ref side", () => {
+    const r = pbpFnHrefParse("#fn:note-abc");
+    assert(r, "parsed");
+    assertEq(r.kind, "ref", "kind");
+    assertEq(r.id, "note-abc", "id kept opaque -- no digit assumption");
+  });
+  test("unrelated in-page anchor -> null", () => {
+    assertEq(pbpFnHrefParse("#toc-slug-1"), null, "not a footnote link");
+  });
+  test("external URL containing the fn: substring -> null (must start with #)", () => {
+    assertEq(pbpFnHrefParse("https://example.com/fn:1"), null, "not an in-page fragment");
+  });
+  test("malformed near-miss with an empty id -> null", () => {
+    assertEq(pbpFnHrefParse("#fn:"), null, "no id after the colon");
+  });
+  test("non-string input -> null", () => {
+    assertEq(pbpFnHrefParse(undefined), null, "undefined input");
   });
 });
 </script>

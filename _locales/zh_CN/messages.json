@@ -2431,5 +2431,7 @@
   "explainSavedNote": { "message": "已存" },
   "hlCardExplain": { "message": "解释" },
   "hlCardTranslate": { "message": "翻译" },
-  "hlCardAsk": { "message": "提问" }
+  "hlCardAsk": { "message": "提问" },
+  "fnPopLabel": { "message": "脚注" },
+  "fnPopJump": { "message": "跳到脚注" }
 }

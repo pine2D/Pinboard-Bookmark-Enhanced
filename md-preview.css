@@ -1305,7 +1305,7 @@ body.ask-open main { margin-right: 396px; }
 }
 
 @media print {
-  #ask-panel, #ask-section { display: none; }
+  #ask-panel, #ask-section, #fn-pop { display: none; }
   body.ask-open main { margin-right: 0; }
   /* must sit AFTER the base .pb-tr-err display rule in source order to win the cascade */
   .pb-tr-err { display: none; }
@@ -1543,3 +1543,53 @@ body.ask-open main { margin-right: 396px; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .hl-item-dim .hl-item-main { opacity: 0.45; }
+
+/* ---- Footnote popover (md-reader.js, spec 2026-07-06 sec.3 R3).
+   Derived from the #explain-pop/#pb-hl-card popover family above --
+   same border/background/radius/shadow/font-size tokens, no new color
+   tokens needed. Box-shadow literal matches #explain-pop/#pb-hl-card
+   verbatim (this codebase's box-shadow values are not tokenized
+   anywhere -- every popover in this file uses the same literal
+   rgba(15,23,42,*) family regardless of light/dark, an existing,
+   deliberate repo-wide convention, not a new hardcoded color). ---- */
+#fn-pop {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(320px, calc(100vh - 32px));
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.22);
+  font-size: 13px;
+}
+#fn-pop:popover-open { display: flex; }
+#fn-pop button { font-family: inherit; }
+.fn-pop-body {
+  overflow-y: auto;
+  min-height: 0;
+  line-height: 1.5;
+}
+.fn-pop-body > :first-child { margin-top: 0; }
+.fn-pop-body > :last-child { margin-bottom: 0; }
+.fn-pop-foot { display: flex; justify-content: flex-end; flex-shrink: 0; }
+.fn-pop-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+.fn-pop-jump:hover, .fn-pop-jump:focus-visible { background: var(--btn-hover); }
+.fn-pop-jump svg { width: 13px; height: 13px; flex-shrink: 0; }

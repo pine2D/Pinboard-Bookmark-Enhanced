@@ -2437,5 +2437,7 @@
   "explainSavedNote": { "message": "Сохранено" },
   "hlCardExplain": { "message": "Объяснить" },
   "hlCardTranslate": { "message": "Перевести" },
-  "hlCardAsk": { "message": "Спросить" }
+  "hlCardAsk": { "message": "Спросить" },
+  "fnPopLabel": { "message": "Сноска" },
+  "fnPopJump": { "message": "Перейти к сноске" }
 }

@@ -2437,5 +2437,7 @@
   "explainSavedNote": { "message": "已儲存" },
   "hlCardExplain": { "message": "解釋" },
   "hlCardTranslate": { "message": "翻譯" },
-  "hlCardAsk": { "message": "提問" }
+  "hlCardAsk": { "message": "提問" },
+  "fnPopLabel": { "message": "腳註" },
+  "fnPopJump": { "message": "跳到腳註" }
 }
