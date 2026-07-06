@@ -1444,13 +1444,21 @@ function _pbpExplainEnsurePop() {
   save.addEventListener("click", () => {
     if (typeof window.pbpHlAttachNote !== "function") return;
     save.disabled = true;
-    window.pbpHlAttachNote(_pbpExplainSaveTarget, _pbpExplainAnswerText).then((ok) => {
+    // Capture this run's identity: _pbpExplainRun assigns a fresh object to
+    // _pbpExplainSaveTarget on every run, so a reference check below tells a
+    // superseded run's late resolve apart from the current one -- without it,
+    // an old run's resolve could mutate a button that a newer run already reset.
+    const myTarget = _pbpExplainSaveTarget;
+    window.pbpHlAttachNote(myTarget, _pbpExplainAnswerText).then((ok) => {
+      if (_pbpExplainSaveTarget !== myTarget) return; // superseded run, do not touch the button
       if (ok) {
         save.textContent = t("explainSavedNote");
       } else {
         save.disabled = false; // pbpHlAttachNote already toasted the failure
       }
-    }).catch(() => { save.disabled = false; });
+    }).catch(() => {
+      if (_pbpExplainSaveTarget === myTarget) save.disabled = false;
+    });
   });
   const ask = document.createElement("button");
   ask.type = "button";

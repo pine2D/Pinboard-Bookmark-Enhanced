@@ -790,7 +790,7 @@ function _pbpHlOnClick(e) {
 // false (after a hlSaveFailed toast) when creation fails so the caller's
 // button can re-enable itself; _pbpHlSave toasts its own failures.
 async function pbpHlAttachNote(target, answerText) {
-  if (!_pbpHlState) return false;
+  if (!_pbpHlState) { _pbpHlToast(t("hlSaveFailed")); return false; }
   const answer = typeof answerText === "string" ? answerText : "";
   let item = null;
 
@@ -833,9 +833,10 @@ async function pbpHlAttachNote(target, answerText) {
     return false;
   }
 
+  const prev = item.note;
   item.note = pbpHlAppendNoteText(item.note, answer);
   const ok = await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, null);
-  if (!ok) return false;
+  if (!ok) { item.note = prev; return false; } // roll back the in-memory append so a retry doesn't double-append
   _pbpHlNotebookRender();
   if (_pbpHlCard && _pbpHlCardItemId === item.id) {
     const noteEl = _pbpHlCard.querySelector(".hl-card-note");
