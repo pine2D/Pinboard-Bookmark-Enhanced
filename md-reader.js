@@ -479,6 +479,7 @@ function _pbpSearchEnsurePop() {
     if (input.value !== _pbpSearchState.query) {
       clearTimeout(_pbpSearchInputTimer);
       _pbpSearchRun(input.value);
+      return; // _pbpSearchRun already lands on match 1; don't also step past it
     }
     _pbpSearchStep(e.shiftKey ? -1 : 1);
   });
@@ -546,7 +547,10 @@ function _pbpSearchOpen() {
 // no-op there so native Ctrl+F keeps working on raw text untouched.
 function _pbpSearchOnKeyDown(e) {
   if (e.key !== "/") return;
-  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  // Don't gate on shiftKey: on some layouts (German QWERTZ, French AZERTY)
+  // "/" requires Shift, and on US layouts Shift+/ yields "?" so e.key
+  // already disambiguates -- same reasoning as the "?" help hotkey.
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   const ae = document.activeElement;
   if (pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))) return;
   if (document.body.classList.contains("raw-active")) return;
