@@ -1566,6 +1566,11 @@ function _pbpExplainPackFromBlock(n, selText) {
 }
 
 function _pbpExplainPackContext(cap) {
+  // H4 (Task 3, spec 2.3): a card-path cap has no live Range -- only .n and
+  // .text (see window.pbpExplainOpenForItem in this file). Dispatch straight
+  // to the shared core instead of touching cap.range.startContainer below,
+  // which does not exist on a range-less cap.
+  if (!cap.range) return _pbpExplainPackFromBlock(cap.n, cap.text);
   const view = document.getElementById("rendered-view");
   // Ask/translate init owns the canonical pbpAiIndexBlocks call on
   // pbp:rendered; this is only a lazy backfill (re-indexing resets caches).
@@ -1759,3 +1764,22 @@ function _pbpExplainOpenPop(cap, initialAction) {
   pop.style.top = y + "px";
   _pbpExplainRun(cap, ctx, pop);
 }
+
+// ---- Card AI row entry point (H4, spec 2.3): the highlight card's
+// explain/translate buttons call this instead of pbpExplainInvoke -- there is
+// no live Range for a highlight item, so the cap is synthesized directly from
+// the item's stored quote/block index. _pbpExplainPackContext dispatches on
+// cap.range's absence (Step 5) and packs context via
+// _pbpExplainPackFromBlock(cap.n, cap.text). Setting cap.itemId here is also
+// what makes the popover's "save as note" button target this highlight
+// instead of a live selection.
+window.pbpExplainOpenForItem = function (opts) {
+  if (!opts || typeof _pbpExplainOpenPop !== "function") return;
+  const cap = {
+    text: String(opts.text == null ? "" : opts.text),
+    rect: opts.rect,
+    itemId: opts.itemId,
+    n: opts.n
+  };
+  _pbpExplainOpenPop(cap, opts.action);
+};

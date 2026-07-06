@@ -796,7 +796,11 @@ async function pbpHlAttachNote(target, answerText) {
 
   if (target && target.itemId) {
     item = _pbpHlState.items.find((it) => it.id === target.itemId) || null;
-    if (!item) return false;
+    // H4 (Task 3): the card's "save as note" now targets a stored itemId,
+    // making a stale-id miss reachable (item deleted between card open and
+    // the async round-trip finishing) -- mirror the null-state toast above
+    // instead of failing silently.
+    if (!item) { _pbpHlToast(t("hlSaveFailed")); return false; }
   } else if (target && target.range) {
     const range = target.range;
     let best = null; // { ts, item }
@@ -880,6 +884,34 @@ function _pbpHlEnsureCard() {
   }
   card.appendChild(dots);
 
+  // ---- H4: AI action row (explain / translate / ask), above the note
+  // textarea. Hidden until the async availability check resolves; stays hidden
+  // forever when AI is unavailable (spec 2.3: "AI unavailable -> card stays
+  // pixel-identical to today" -- `hidden` gives zero layout footprint, same
+  // technique .hl-card-degraded above already uses). pbpAiGetSettings() is
+  // memoized page-wide, so this settles once no matter how many cards open.
+  const aiRow = document.createElement("div");
+  aiRow.className = "hl-card-ai";
+  aiRow.setAttribute("role", "group");
+  aiRow.hidden = true;
+  const explainBtn = document.createElement("button");
+  explainBtn.type = "button";
+  explainBtn.className = "hl-card-ai-explain";
+  explainBtn.addEventListener("click", () => _pbpHlCardAiOpen("explain"));
+  aiRow.appendChild(explainBtn);
+  const translateBtn = document.createElement("button");
+  translateBtn.type = "button";
+  translateBtn.className = "hl-card-ai-translate";
+  translateBtn.addEventListener("click", () => _pbpHlCardAiOpen("translate"));
+  aiRow.appendChild(translateBtn);
+  const askBtn = document.createElement("button");
+  askBtn.type = "button";
+  askBtn.className = "hl-card-ai-ask";
+  askBtn.addEventListener("click", _pbpHlCardAskCurrent);
+  aiRow.appendChild(askBtn);
+  card.appendChild(aiRow);
+  pbpAiGetSettings().then((s) => { if (pbpAiAvailable(s)) aiRow.hidden = false; }).catch(() => {});
+
   const note = document.createElement("textarea");
   note.className = "hl-card-note";
   note.rows = 3;
@@ -908,6 +940,50 @@ function _pbpHlEnsureCard() {
   return card;
 }
 
+// ---- H4: card AI row handlers (spec 2.3). Rect derivation mirrors
+// _pbpHlOpenCard: the registered live Range's rect when this highlight isn't
+// degraded, else the host block's rect. Returns null when the block can't be
+// found (e.g. a stale item.n after re-extraction) so callers can bail
+// silently instead of opening at a garbage position.
+function _pbpHlItemRect(item) {
+  const blockEl = pbpAiBlockEl(item.n);
+  if (!blockEl) return null;
+  let rect = blockEl.getBoundingClientRect();
+  const degraded = !!(_pbpHlState && _pbpHlState.degraded[item.id]);
+  if (!degraded) {
+    const entry = _pbpHlState && _pbpHlState.ranges[item.id];
+    if (entry && entry.range) rect = entry.range.getBoundingClientRect();
+  }
+  return rect;
+}
+
+// Card "Explain"/"Translate" buttons -> window.pbpExplainOpenForItem
+// (md-ask.js). No typeof guard needed: md-ask.js loads before md-highlight.js
+// and defines it at parse time, not behind any async gate.
+function _pbpHlCardAiOpen(action) {
+  if (!_pbpHlState || !_pbpHlCardItemId) return;
+  const item = _pbpHlState.items.find((it) => it.id === _pbpHlCardItemId);
+  if (!item) return;
+  const rect = _pbpHlItemRect(item);
+  if (!rect) return;
+  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) {} } // two auto popovers must not overlap
+  window.pbpExplainOpenForItem({ text: item.quote, n: item.n, itemId: item.id, rect, action });
+}
+
+// Card "Ask" button -> window.pbpAskOpenPanel directly (typeof-guarded per
+// the canonical contract). The row only shows once AI is available, but the
+// guard costs one line and keeps this safe even if the ask-panel bootstrap
+// failed.
+function _pbpHlCardAskCurrent() {
+  if (!_pbpHlState || !_pbpHlCardItemId) return;
+  const item = _pbpHlState.items.find((it) => it.id === _pbpHlCardItemId);
+  if (!item) return;
+  if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) {} }
+  if (typeof window.pbpAskOpenPanel === "function") {
+    window.pbpAskOpenPanel('"' + item.quote + '" ');
+  }
+}
+
 // Re-applies i18n text to the card's static labels. Called on every open (cheap; the
 // card is a singleton so this can't be a first-paint cost).
 function _pbpHlApplyCardI18n(card) {
@@ -919,6 +995,9 @@ function _pbpHlApplyCardI18n(card) {
   card.querySelector(".hl-card-note").placeholder = t("hlNotePlaceholder");
   card.querySelector(".hl-card-save").textContent = t("hlSave");
   card.querySelector(".hl-card-delete").textContent = t("hlDelete");
+  card.querySelector(".hl-card-ai-explain").textContent = t("hlCardExplain");
+  card.querySelector(".hl-card-ai-translate").textContent = t("hlCardTranslate");
+  card.querySelector(".hl-card-ai-ask").textContent = t("hlCardAsk");
 }
 
 // Single entry point for both the click-hit-detection path (Step 2) and Task 4's

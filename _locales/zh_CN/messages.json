@@ -2427,5 +2427,8 @@
   "hlCopied": { "message": "高亮已复制" },
   "hlFilterEmpty": { "message": "没有高亮匹配所选颜色" },
   "explainSaveNote": { "message": "存为笔记" },
-  "explainSavedNote": { "message": "已存" }
+  "explainSavedNote": { "message": "已存" },
+  "hlCardExplain": { "message": "解释" },
+  "hlCardTranslate": { "message": "翻译" },
+  "hlCardAsk": { "message": "提问" }
 }

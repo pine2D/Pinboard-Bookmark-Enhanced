@@ -2433,5 +2433,8 @@
   "hlCopied": { "message": "Skopiowano zaznaczenia" },
   "hlFilterEmpty": { "message": "Żadne zaznaczenie nie pasuje do wybranych kolorów" },
   "explainSaveNote": { "message": "Zapisz jako notatkę" },
-  "explainSavedNote": { "message": "Zapisano" }
+  "explainSavedNote": { "message": "Zapisano" },
+  "hlCardExplain": { "message": "Wyjaśnij" },
+  "hlCardTranslate": { "message": "Przetłumacz" },
+  "hlCardAsk": { "message": "Zapytaj" }
 }

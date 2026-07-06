@@ -2433,5 +2433,8 @@
   "hlCopied": { "message": "ハイライトをコピーしました" },
   "hlFilterEmpty": { "message": "選択した色に一致するハイライトがありません" },
   "explainSaveNote": { "message": "メモとして保存" },
-  "explainSavedNote": { "message": "保存しました" }
+  "explainSavedNote": { "message": "保存しました" },
+  "hlCardExplain": { "message": "解説" },
+  "hlCardTranslate": { "message": "翻訳" },
+  "hlCardAsk": { "message": "質問" }
 }

@@ -2612,6 +2612,31 @@ suiteIf("_pbpExplainPackContext forum", "_pbpExplainPackContext", () => {
   });
 });
 
+// ============ H4 (Task 3): _pbpExplainPackContext range-less dispatch (spec 2.3) ============
+// A card-path cap (window.pbpExplainOpenForItem) has no live Range -- only
+// {n, text}. _pbpExplainPackContext must dispatch to
+// _pbpExplainPackFromBlock(cap.n, cap.text) instead of dereferencing
+// cap.range.startContainer, which does not exist on this cap shape.
+suite("_pbpExplainPackContext range-less (H4 card path, spec 2.3)", () => {
+  test("cap without .range packs context via _pbpExplainPackFromBlock(cap.n, cap.text), no throw", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    view.innerHTML = "<p>alpha block</p><p>beta block holding the target phrase inside it</p><p>gamma block</p>";
+    document.body.appendChild(view);
+    try {
+      pbpAiIndexBlocks(view);
+      const n = pbpAiBlocks()[1].n; // the middle <p>
+      const ctx = _pbpExplainPackContext({ n, text: "target phrase" });
+      assert(ctx.blockText.indexOf("beta block") !== -1, "blockText comes from cap.n's block");
+      assert(ctx.sentence.indexOf("target phrase") !== -1, "sentence located inside that block's text");
+      assert(ctx.prevText.indexOf("alpha block") !== -1, "prevText is block n-1");
+      assert(ctx.nextText.indexOf("gamma block") !== -1, "nextText is block n+1");
+    } finally {
+      document.body.removeChild(view);
+    }
+  });
+});
+
 // ============ Task 5 (T0-c): thinkingOff dialect + 4xx self-healing ============
 suite("effectiveExtraBody: provider dialect when not rejected", () => {
   test("zhipu gets thinking disabled", () => {

@@ -2433,5 +2433,8 @@
   "hlCopied": { "message": "Markierungen kopiert" },
   "hlFilterEmpty": { "message": "Keine Markierungen entsprechen den ausgewählten Farben" },
   "explainSaveNote": { "message": "Als Notiz speichern" },
-  "explainSavedNote": { "message": "Gespeichert" }
+  "explainSavedNote": { "message": "Gespeichert" },
+  "hlCardExplain": { "message": "Erklären" },
+  "hlCardTranslate": { "message": "Übersetzen" },
+  "hlCardAsk": { "message": "Fragen" }
 }

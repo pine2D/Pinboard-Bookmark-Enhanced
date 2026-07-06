@@ -2433,5 +2433,8 @@
   "hlCopied": { "message": "Выделения скопированы" },
   "hlFilterEmpty": { "message": "Нет выделений, соответствующих выбранным цветам" },
   "explainSaveNote": { "message": "Сохранить как заметку" },
-  "explainSavedNote": { "message": "Сохранено" }
+  "explainSavedNote": { "message": "Сохранено" },
+  "hlCardExplain": { "message": "Объяснить" },
+  "hlCardTranslate": { "message": "Перевести" },
+  "hlCardAsk": { "message": "Спросить" }
 }

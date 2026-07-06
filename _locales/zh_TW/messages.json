@@ -2433,5 +2433,8 @@
   "hlCopied": { "message": "標記已複製" },
   "hlFilterEmpty": { "message": "沒有標記符合所選顏色" },
   "explainSaveNote": { "message": "存為筆記" },
-  "explainSavedNote": { "message": "已儲存" }
+  "explainSavedNote": { "message": "已儲存" },
+  "hlCardExplain": { "message": "解釋" },
+  "hlCardTranslate": { "message": "翻譯" },
+  "hlCardAsk": { "message": "提問" }
 }

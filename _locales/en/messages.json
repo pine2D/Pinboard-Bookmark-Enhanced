@@ -2427,5 +2427,8 @@
   "hlCopied": { "message": "Highlights copied" },
   "hlFilterEmpty": { "message": "No highlights match the selected colors" },
   "explainSaveNote": { "message": "Save as note" },
-  "explainSavedNote": { "message": "Saved to note" }
+  "explainSavedNote": { "message": "Saved to note" },
+  "hlCardExplain": { "message": "Explain" },
+  "hlCardTranslate": { "message": "Translate" },
+  "hlCardAsk": { "message": "Ask" }
 }

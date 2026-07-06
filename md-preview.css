@@ -1396,6 +1396,18 @@ body.ask-open main { margin-right: 396px; }
 .hl-card-dot-4 { background: #ef4444; }
 .hl-card-dot-5 { background: #a855f7; }
 .hl-card-dot.active, .hl-card-dot:focus-visible { border-color: var(--fg); }
+.hl-card-ai { display: flex; gap: 6px; }
+.hl-card-ai[hidden] { display: none; }
+.hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask {
+  padding: 3px 9px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+.hl-card-ai-explain:hover, .hl-card-ai-translate:hover, .hl-card-ai-ask:hover { background: var(--btn-hover); }
 .hl-card-note {
   width: 100%;
   min-height: 56px;
