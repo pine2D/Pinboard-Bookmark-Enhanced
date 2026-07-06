@@ -2317,6 +2317,12 @@
   "explainTriggerOff": {
     "message": "Aus"
   },
+  "explainActionExplain": {
+    "message": "Erklären"
+  },
+  "explainActionTranslate": {
+    "message": "Übersetzen"
+  },
   "secSendDestinations": {
     "message": "Sendeziele"
   },

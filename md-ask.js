@@ -1308,9 +1308,38 @@ function pbpExplainBuildPrompt(p) {
   return { system, prompt: parts.join("\n\n") };
 }
 
+// ---- Explain: translate-action prompt builder (pure) ----
+// Sibling of pbpExplainBuildPrompt (spec 2.1): a lightweight single-shot
+// translation, NOT the full-document translation pipeline (md-translate.js)
+// -- no glossary, no placeholder shield, no neighbor blocks. The 4000-char
+// cap mirrors PBP_EXPLAIN_BLOCK_CAP; it is hardcoded here as its own literal
+// so this builder stays self-contained per the cross-task contract.
+function pbpExplainBuildTranslatePrompt(p) {
+  const CAP = 4000; // same cap as PBP_EXPLAIN_BLOCK_CAP
+  const selection = String((p && p.selection) || "").slice(0, CAP);
+  const blockText = String((p && p.blockText) || "").slice(0, CAP);
+  const targetLangName = (p && p.targetLangName) || "English";
+  const system = "You are a precise translation assistant embedded in an article viewer. " +
+    "Translate the selected text into " + targetLangName + ". " +
+    "Output ONLY the translation itself: no commentary, no explanation, no quotation marks wrapping the output, and no \"Translation:\" prefix or any other label. " +
+    "Preserve any inline markdown formatting present in the selection (emphasis, inline code, link text) exactly as it appears.";
+  const parts = [];
+  parts.push("Article title: " + ((p && p.title) || "(untitled)"));
+  parts.push("Paragraph containing the selection (context only -- do not translate this part):\n" + blockText);
+  parts.push("Text to translate:\n" + selection);
+  return { system, prompt: parts.join("\n\n") };
+}
+
 // ---- Explain: popover shell (lazy-mounted on first invoke) ----
 let _pbpExplainPopEl = null;
 let _pbpExplainAbort = null;
+// Action switch (spec 2.1): "explain" | "translate", session-only per open
+// (never persisted). _pbpExplainCap/_pbpExplainCtx cache the CURRENT
+// invocation so the .xp-act buttons (Step 7) can re-run _pbpExplainRun
+// without re-packing context or re-capturing the selection.
+let _pbpExplainAction = "explain";
+let _pbpExplainCap = null;
+let _pbpExplainCtx = null;
 
 // Static inline SVG (Feather settings gear). Constant string, never model text.
 const PBP_EXPLAIN_GEAR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
@@ -1343,6 +1372,13 @@ function _pbpExplainOpenAsk(selText) {
   }
 }
 
+// Mirrors _pbpExplainAction onto the two .xp-act buttons' aria-pressed state.
+function _pbpExplainSyncActButtons(pop) {
+  pop.querySelectorAll(".xp-act").forEach((btn) => {
+    btn.setAttribute("aria-pressed", String(btn.dataset.action === _pbpExplainAction));
+  });
+}
+
 function _pbpExplainEnsurePop() {
   if (_pbpExplainPopEl) return _pbpExplainPopEl;
   const pop = document.createElement("div");
@@ -1353,6 +1389,29 @@ function _pbpExplainEnsurePop() {
   const term = document.createElement("span");
   term.className = "xp-term";
   head.appendChild(term);
+  const actGroup = document.createElement("div");
+  actGroup.className = "xp-act-group";
+  actGroup.setAttribute("role", "group");
+  ["explain", "translate"].forEach((action) => {
+    const actBtn = document.createElement("button");
+    actBtn.type = "button";
+    actBtn.className = "xp-act";
+    actBtn.dataset.action = action;
+    actBtn.textContent = t(action === "explain" ? "explainActionExplain" : "explainActionTranslate");
+    actBtn.setAttribute("aria-pressed", String(action === _pbpExplainAction));
+    actBtn.addEventListener("click", () => {
+      // Click on the already-active action: no-op (spec 2.1 only defines
+      // behavior for clicking the INACTIVE action).
+      if (_pbpExplainAction === action) return;
+      _pbpExplainAction = action;
+      _pbpExplainSyncActButtons(pop);
+      // Re-run with the SAME cap/ctx: existing abort-previous-stream in
+      // _pbpExplainRun handles the concurrency, no extra dedup needed.
+      if (_pbpExplainCap && _pbpExplainCtx) _pbpExplainRun(_pbpExplainCap, _pbpExplainCtx, pop);
+    });
+    actGroup.appendChild(actBtn);
+  });
+  head.appendChild(actGroup);
   const body = document.createElement("div");
   body.className = "xp-body";
   const foot = document.createElement("div");
@@ -1443,6 +1502,26 @@ function _pbpExplainEnsurePop() {
 const PBP_EXPLAIN_BLOCK_CAP = 4000;
 const PBP_EXPLAIN_NEIGHBOR_CAP = 1200;
 
+// Shared core (spec 2.3): given a RESOLVED block index n and the selected
+// text, builds {sentence, blockText, prevText, nextText} purely from
+// pbpAiTextOfKatex(n) -- no Range, no blockEl. This is what Task 3's
+// pbpExplainOpenForItem calls directly for a highlight-card invocation
+// (a card only ever has item.n, never a live Range). n===0 / the .pb-tr
+// live-translation overlay are edge cases only the live-range path can see,
+// so they stay in _pbpExplainPackContext below, which calls this core for
+// the common case and adjusts on top for those two edge cases.
+function _pbpExplainPackFromBlock(n, selText) {
+  const origText = n ? pbpAiTextOfKatex(n) : String(selText || "");
+  const idx = origText.indexOf(selText);
+  const sentence = idx === -1
+    ? selText
+    : pbpExplainSentenceAround(origText, idx, idx + selText.length);
+  const blockText = origText.slice(0, PBP_EXPLAIN_BLOCK_CAP);
+  const prevText = n > 1 ? pbpAiTextOfKatex(n - 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
+  const nextText = (n && pbpAiBlockEl(n + 1)) ? pbpAiTextOfKatex(n + 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
+  return { sentence, blockText, prevText, nextText };
+}
+
 function _pbpExplainPackContext(cap) {
   const view = document.getElementById("rendered-view");
   // Ask/translate init owns the canonical pbpAiIndexBlocks call on
@@ -1460,22 +1539,33 @@ function _pbpExplainPackContext(cap) {
     n = Number(blockEl.previousElementSibling.dataset.pb);
     trText = blockEl.textContent || "";
   }
-  const origText = n ? pbpAiTextOfKatex(n) : ((blockEl && blockEl.textContent) || cap.text);
-  // The sentence is scanned in the text the selection actually lives in
-  // (the translated block when selecting inside .pb-tr).
-  const hostText = trText || origText;
-  const idx = hostText.indexOf(cap.text);
+  if (!n) {
+    // No resolved block index (rare: a direct #rendered-view child
+    // pbpAiIndexBlocks never tagged) -- the shared core needs a real n, so
+    // this edge case stays inline exactly as it behaved before extraction.
+    const origText = (blockEl && blockEl.textContent) || cap.text;
+    const idx = origText.indexOf(cap.text);
+    const sentence = idx === -1
+      ? cap.text
+      : pbpExplainSentenceAround(origText, idx, idx + cap.text.length);
+    return { sentence, blockText: origText.slice(0, PBP_EXPLAIN_BLOCK_CAP), prevText: "", nextText: "" };
+  }
+  const core = _pbpExplainPackFromBlock(n, cap.text);
+  if (!trText) return core;
+  // .pb-tr branch: the selection lives in the translated rendering, so the
+  // sentence must be scanned against THAT text; the translated text is
+  // appended to blockText for disambiguation (unchanged from pre-extraction).
+  const idx = trText.indexOf(cap.text);
   const sentence = idx === -1
     ? cap.text
-    : pbpExplainSentenceAround(hostText, idx, idx + cap.text.length);
-  let blockText = origText.slice(0, PBP_EXPLAIN_BLOCK_CAP);
-  if (trText) {
-    blockText += "\n\nTranslated rendering of the same paragraph (the selection comes from this translation):\n"
-      + trText.slice(0, PBP_EXPLAIN_BLOCK_CAP);
-  }
-  const prevText = n > 1 ? pbpAiTextOfKatex(n - 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
-  const nextText = (n && pbpAiBlockEl(n + 1)) ? pbpAiTextOfKatex(n + 1).slice(0, PBP_EXPLAIN_NEIGHBOR_CAP) : "";
-  return { sentence, blockText, prevText, nextText };
+    : pbpExplainSentenceAround(trText, idx, idx + cap.text.length);
+  return {
+    sentence,
+    blockText: core.blockText + "\n\nTranslated rendering of the same paragraph (the selection comes from this translation):\n"
+      + trText.slice(0, PBP_EXPLAIN_BLOCK_CAP),
+    prevText: core.prevText,
+    nextText: core.nextText
+  };
 }
 
 // ---- Explain: streamed request into the popover body ----
@@ -1499,17 +1589,34 @@ async function _pbpExplainRun(cap, ctx, pop) {
   if (_pbpExplainAbort) _pbpExplainAbort.abort();
   const ctrl = new AbortController();
   _pbpExplainAbort = ctrl;
-  const { system, prompt } = pbpExplainBuildPrompt({
-    selection: cap.text,
-    sentence: ctx.sentence,
-    blockText: ctx.blockText,
-    prevText: ctx.prevText,
-    nextText: ctx.nextText,
-    title: _pbpExplainPage.title || document.title,
-    answerLang: pbpExplainLangName(uiLangToBCP47()),
-    isTerm: pbpExplainIsTerm(cap.text)
-  });
-  pbpAiBumpCounter("explain"); // local usage counter, storage.local only
+  // Action switch (spec 2.1): translate is a lightweight single-shot prompt
+  // (no term/passage routing, no neighbor blocks); explain keeps the existing
+  // routed prompt. maxTokens 2048 for translate vs 1024 for explain.
+  const isTranslate = _pbpExplainAction === "translate";
+  let system, prompt;
+  if (isTranslate) {
+    const targetLangName = (typeof pbpTrResolveTargetLang === "function")
+      ? pbpTrResolveTargetLang(s, uiLangToBCP47()).name
+      : "English";
+    ({ system, prompt } = pbpExplainBuildTranslatePrompt({
+      selection: cap.text,
+      blockText: ctx.blockText,
+      title: _pbpExplainPage.title || document.title,
+      targetLangName
+    }));
+  } else {
+    ({ system, prompt } = pbpExplainBuildPrompt({
+      selection: cap.text,
+      sentence: ctx.sentence,
+      blockText: ctx.blockText,
+      prevText: ctx.prevText,
+      nextText: ctx.nextText,
+      title: _pbpExplainPage.title || document.title,
+      answerLang: pbpExplainLangName(uiLangToBCP47()),
+      isTerm: pbpExplainIsTerm(cap.text)
+    }));
+  }
+  pbpAiBumpCounter("explain"); // local usage counter, storage.local only (both actions share the bucket)
   const stream = document.createElement("div");
   stream.className = "xp-stream";
   let started = false;
@@ -1520,7 +1627,7 @@ async function _pbpExplainRun(cap, ctx, pop) {
     // temperature intentionally omitted: callAIStream defaults to 0.3 (the
     // existing ask/explain default). maxTokens 1024 per spec 5.3.
     const full = await callAIStream(s, prompt, {
-      maxTokens: 1024,
+      maxTokens: isTranslate ? 2048 : 1024,
       model: pbpAiResolveModelOverride(s),
       system,
       signal: ctrl.signal
@@ -1562,10 +1669,14 @@ async function _pbpExplainRun(cap, ctx, pop) {
 // touches the live range. The block lookup below reads cap.range.startContainer
 // synchronously (before any await) — light dismiss only collapses the range
 // after this turn, so the DOM node is still valid here (spec 5.3).
-function _pbpExplainOpenPop(cap) {
+function _pbpExplainOpenPop(cap, initialAction) {
   const pop = _pbpExplainEnsurePop();
   pop.querySelector(".xp-term").textContent = cap.text; // ellipsized via CSS
   pop.querySelector(".xp-model").textContent = _pbpExplainModelLabel(_pbpExplainSettings || {});
+  // Action resets to "explain" on every open unless an explicit initial
+  // action is passed (Task 3's highlight-card entry point); session-only.
+  _pbpExplainAction = (initialAction === "translate") ? "translate" : "explain";
+  _pbpExplainSyncActButtons(pop);
   // Gear radios mirror the live trigger value; menu starts closed.
   const menu = pop.querySelector(".xp-gear-menu");
   menu.hidden = true;
@@ -1575,6 +1686,8 @@ function _pbpExplainOpenPop(cap) {
   });
   // Pack context first (reads the live DOM node synchronously), then show.
   const ctx = _pbpExplainPackContext(cap);
+  _pbpExplainCap = cap;
+  _pbpExplainCtx = ctx;
   const rect = cap.rect || cap.range.getBoundingClientRect(); // frozen snapshot
   try { pop.hidePopover(); } catch (_) {} // re-invoke while open: reset first
   pop.showPopover();

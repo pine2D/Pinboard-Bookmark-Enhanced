@@ -2317,6 +2317,12 @@
   "explainTriggerOff": {
     "message": "Выключено"
   },
+  "explainActionExplain": {
+    "message": "Объяснить"
+  },
+  "explainActionTranslate": {
+    "message": "Перевести"
+  },
   "secSendDestinations": {
     "message": "Места назначения"
   },

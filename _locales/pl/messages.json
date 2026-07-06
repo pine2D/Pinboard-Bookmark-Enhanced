@@ -2317,6 +2317,12 @@
   "explainTriggerOff": {
     "message": "Wyłączone"
   },
+  "explainActionExplain": {
+    "message": "Wyjaśnij"
+  },
+  "explainActionTranslate": {
+    "message": "Przetłumacz"
+  },
   "secSendDestinations": {
     "message": "Miejsca docelowe"
   },

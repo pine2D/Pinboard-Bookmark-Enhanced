@@ -804,13 +804,43 @@ body.md-empty main { margin-left: 0; }
 #explain-pop:popover-open { display: flex; }
 #explain-pop button, #explain-pop input { font-family: inherit; }
 .xp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 14px 8px;
   border-bottom: 1px solid var(--border-light);
   font-weight: 600;
   font-size: 13px;
+}
+.xp-term {
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.xp-act-group {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+.xp-act {
+  padding: 3px 9px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.xp-act:hover { background: var(--btn-hover); }
+.xp-act[aria-pressed="true"] {
+  background: var(--active-bg);
+  color: var(--active-fg);
+  border-color: var(--active-bg);
+  cursor: default;
 }
 .xp-body {
   padding: 10px 14px;

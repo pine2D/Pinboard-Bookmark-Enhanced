@@ -2435,6 +2435,56 @@ suiteIf("pbpExplainBuildPrompt", "pbpAskInit", () => {
 </script>
 
 <script>
+// ============ Task 1 (H4): translate-action prompt builder ============
+suiteIf("pbpExplainBuildTranslatePrompt", "pbpExplainBuildTranslatePrompt", () => {
+  const base = {
+    selection: "gradient descent",
+    blockText: "Block text here. We use gradient descent to fit it.",
+    title: "Intro to ML",
+    targetLangName: "Simplified Chinese"
+  };
+  test("system names the target language and forbids commentary/prefix/quotes", () => {
+    const r = pbpExplainBuildTranslatePrompt(base);
+    assert(r.system.indexOf("Simplified Chinese") !== -1, "target language named");
+    assert(r.system.indexOf("no commentary") !== -1, "forbids commentary");
+    assert(r.system.indexOf("quotation marks") !== -1, "forbids quote-wrapping");
+    assert(r.system.indexOf("Translation:") !== -1, "forbids the Translation: prefix by naming it");
+    assert(/preserve/i.test(r.system), "asks to preserve inline markdown");
+  });
+  test("prompt carries title, block text and the selection, labeled, in order", () => {
+    const r = pbpExplainBuildTranslatePrompt(base);
+    const iTitle = r.prompt.indexOf("Article title: Intro to ML");
+    const iBlock = r.prompt.indexOf("Paragraph containing the selection");
+    const iSel = r.prompt.indexOf("Text to translate:\ngradient descent");
+    assert(iTitle !== -1 && iBlock !== -1 && iSel !== -1, "all parts present");
+    assert(iTitle < iBlock && iBlock < iSel, "document order: title, block, selection");
+  });
+  test("no neighbor-block context is sent (translate is a lightweight single-shot)", () => {
+    const r = pbpExplainBuildTranslatePrompt(base);
+    assert(r.prompt.indexOf("Previous paragraph") === -1, "no prev block");
+    assert(r.prompt.indexOf("Next paragraph") === -1, "no next block");
+  });
+  test("selection is capped at 4000 chars inside the builder", () => {
+    const long = "x".repeat(5000);
+    const r = pbpExplainBuildTranslatePrompt(Object.assign({}, base, { selection: long }));
+    assert(r.prompt.indexOf("Text to translate:\n" + "x".repeat(4000)) !== -1, "capped run present");
+    assert(r.prompt.indexOf("x".repeat(4001)) === -1, "not 4001 chars");
+  });
+  test("blockText is capped at 4000 chars inside the builder", () => {
+    const long = "y".repeat(5000);
+    const r = pbpExplainBuildTranslatePrompt(Object.assign({}, base, { blockText: long }));
+    assert(r.prompt.indexOf("y".repeat(4000)) !== -1, "capped block present");
+    assert(r.prompt.indexOf("y".repeat(4001)) === -1, "not 4001 chars");
+  });
+  test("missing targetLangName falls back to English; missing title falls back to (untitled)", () => {
+    const r = pbpExplainBuildTranslatePrompt({ selection: "hi", blockText: "hi there" });
+    assert(r.system.indexOf("English") !== -1, "default target language");
+    assert(r.prompt.indexOf("Article title: (untitled)") !== -1, "default title");
+  });
+});
+</script>
+
+<script>
 // ============ Group B1: prompt builders must substitute LITERALLY ============
 suite("buildTagPrompt / buildSummaryPrompt $-literal substitution", () => {
   // Minimal settings: force the DEFAULT templates (no custom prompt) so {{...}}

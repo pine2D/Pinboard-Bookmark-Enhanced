@@ -2317,6 +2317,12 @@
   "explainTriggerOff": {
     "message": "關閉"
   },
+  "explainActionExplain": {
+    "message": "解釋"
+  },
+  "explainActionTranslate": {
+    "message": "翻譯"
+  },
   "secSendDestinations": {
     "message": "傳送目標"
   },

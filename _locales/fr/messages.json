@@ -2317,6 +2317,12 @@
   "explainTriggerOff": {
     "message": "Désactivé"
   },
+  "explainActionExplain": {
+    "message": "Expliquer"
+  },
+  "explainActionTranslate": {
+    "message": "Traduire"
+  },
   "secSendDestinations": {
     "message": "Destinations d’envoi"
   },

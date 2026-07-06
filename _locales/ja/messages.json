@@ -2317,6 +2317,12 @@
   "explainTriggerOff": {
     "message": "オフ"
   },
+  "explainActionExplain": {
+    "message": "解説"
+  },
+  "explainActionTranslate": {
+    "message": "翻訳"
+  },
   "secSendDestinations": {
     "message": "送信先"
   },
