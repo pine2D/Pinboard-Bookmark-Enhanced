@@ -2333,6 +2333,26 @@ suiteIf("ask chip pass", "pbpAskBuildContext", () => {
     assertEq(a.querySelectorAll(".ask-chip").length, 1, "only prose token chipped");
     assertEq(a.querySelector("code").textContent, "[P1]", "code untouched");
   });
+  test("chip pass admits a text node with ONLY a full-width group citation (no literal [Pn])", () => {
+    makeBlocks("<p>a</p><p>b</p><p>c</p><p>d</p><p>e</p>");
+    const a = document.createElement("div");
+    a.innerHTML = "<p>\uFF08P3\uFF0CP5\uFF09</p>";
+    _pbpAskChipPass(a, []);
+    const chips = a.querySelectorAll("button.ask-chip");
+    assertEq(chips.length, 2, "both group members chipped");
+    assertEq(chips[0].dataset.p, "3", "first member p3");
+    assertEq(chips[1].dataset.p, "5", "second member p5");
+  });
+  test("group with an out-of-range member: in-range chip, out-of-range falls back to literal text", () => {
+    makeBlocks("<p>a</p><p>b</p><p>c</p>");
+    const a = document.createElement("div");
+    a.innerHTML = "<p>(P3, P999)</p>";
+    _pbpAskChipPass(a, []);
+    const chips = a.querySelectorAll("button.ask-chip");
+    assertEq(chips.length, 1, "only in-range member chipped");
+    assertEq(chips[0].dataset.p, "3", "p3 chip");
+    assert(a.textContent.indexOf("[P999]") !== -1, "out-of-range member literal fallback");
+  });
 });
 </script>
 <script>

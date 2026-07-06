@@ -617,7 +617,7 @@ function _pbpAskSplitCiteTokens(text) {
   const s = String(text == null ? "" : text);
   const ws = "[ \\t\\u3000]";
   const sepChar = "[,;\\uFF0C\\u3001\\uFF1B]";
-  const sep = "(?:" + ws + "*" + sepChar + ws + "*)+";
+  const sep = "(?:" + ws + "*" + sepChar + ws + "*)";
   const item = "P\\d+";
   const content = ws + "*" + item + "(?:" + sep + item + ")*" + ws + "*";
   const re = new RegExp(
@@ -682,7 +682,13 @@ function _pbpAskChipPass(el, cites) {
   const nodes = [];
   let node;
   while ((node = walker.nextNode())) {
-    if (!/\[P\d+\]/.test(node.nodeValue)) continue;
+    // Superset gate: cheap pre-filter before the real tokenizer runs. Must
+    // admit every form _pbpAskSplitCiteTokens can parse, including GROUPED
+    // citations like "(P3, P5)" that have no literal "[Pn]" substring -- a
+    // strict "\[P\d+\]" gate here starves the tokenizer of group-only text
+    // nodes (product bug). A false-admit just runs the tokenizer and emits
+    // pure text segs, which is harmless.
+    if (!/P\d+/.test(node.nodeValue)) continue;
     // [Pn] inside code/pre is answer content (e.g. a code sample), not a cite.
     if (node.parentElement && node.parentElement.closest("pre, code")) continue;
     nodes.push(node);
