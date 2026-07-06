@@ -684,9 +684,10 @@ function _pbpAskChipPass(el, cites) {
         chip.dataset.qs = String(hit.start);
         chip.dataset.qe = String(hit.end);
         chip.classList.add("verified");
-        // verified vs not is currently only a color dot (::after) -- invisible
-        // to SR/color-blind users, who can't tell "jumps to the exact quote"
-        // apart from "jumps to the whole block" (audit md-preview.css:829).
+        // Verified vs unverified is carried by border line style, not just
+        // the ::after dot: dashed = unverified (base .ask-chip rule), solid
+        // = verified (.ask-chip.verified rule, md-preview.css) -- a non-color
+        // channel; the aria-label below still names the state for SR users.
         chip.setAttribute("aria-label", "P" + seg.p + " · " + t("askChipVerified"));
       }
       chip.addEventListener("click", () => _pbpAskJump(chip));

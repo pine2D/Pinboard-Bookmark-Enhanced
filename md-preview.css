@@ -941,7 +941,7 @@ body.md-empty main { margin-left: 0; }
   height: 16px;
   padding: 0 4px;
   margin: 0 2px;
-  border: 1px solid var(--btn-border);
+  border: 1px dashed var(--btn-border);
   border-radius: 8px;
   background: var(--btn-bg);
   color: var(--link);
@@ -963,6 +963,12 @@ body.md-empty main { margin-left: 0; }
   margin-left: 3px;
   flex-shrink: 0;
 }
+/* Verified vs unverified is also carried by border line style, not just the
+   dot color above -- a non-color channel so it stays distinguishable for
+   color-blind users: dashed = unverified (base .ask-chip rule above), solid
+   = verified. .stale/:disabled below already force border-color: transparent,
+   which hides line style entirely, so their faded appearance is unchanged. */
+.ask-chip.verified { border-style: solid; }
 /* Stale citation (audit #29): the block index changed (extraction engine
    switch, re-render) since this answer was persisted, so [Pn] no longer
    reliably maps to the same content. Kept visible for context, but
