@@ -79,6 +79,18 @@ function pbpHlLocate(blockText, item) {
   return { start: best, end: best + quote.length };
 }
 
+// ---- H5 translated-side paint gate (spec 1.3, pure/testable). An
+// original-side item (no side, or side !== "tr") is always eligible here --
+// its own block-existence check lives in the DOM layer. A translated-side
+// item paints ONLY when the language it was recorded in (item.lang) still
+// matches the language the .pb-tr block currently displays (blockTrLang, read
+// off the element's data-pb-tr-lang by the DOM caller -- memo-immune, never
+// from the stale settings promise).
+function pbpHlItemPaints(item, blockTrLang) {
+  if (!item || item.side !== "tr") return true;
+  return typeof item.lang === "string" && item.lang.length > 0 && item.lang === blockTrLang;
+}
+
 // ---- H2 export: aggregation section (spec 5). Tag slugs are FIXED
 // English strings (a markdown interchange format, like frontmatter)
 // -- i18n only touches UI labels, never these.
@@ -388,13 +400,30 @@ function pbpHlRestore() {
   _pbpHlState.degraded = Object.create(null);
   const byColor = { 1: [], 2: [], 3: [], 4: [], 5: [] };
   for (const item of _pbpHlState.items) {
-    const blockEl = pbpAiBlockEl(item.n);
-    if (!blockEl) continue; // block gone (content drift) -- item silently absent from this render, storage untouched
-    const range = _pbpHlBuildRange(item, blockEl, _pbpHlLocateTextFor(blockEl, item.n));
+    let blockEl, blockText;
+    const isTr = item.side === "tr";
+    if (isTr) {
+      // H5 restore (spec 1.3): resolve the .pb-tr sibling; paint gate = it
+      // exists AND still displays item.lang. Otherwise the item is
+      // Notebook-only (regray + lang badge, Task 2) -- no range, no paint,
+      // no error.
+      blockEl = document.querySelector('.pb-tr[data-pb-tr="' + item.n + '"]');
+      if (!blockEl || !pbpHlItemPaints(item, blockEl.dataset.pbTrLang || "")) continue;
+      blockText = blockEl.textContent || "";
+    } else {
+      blockEl = pbpAiBlockEl(item.n);
+      if (!blockEl) continue; // block gone (content drift) -- item silently absent from this render, storage untouched
+      blockText = _pbpHlLocateTextFor(blockEl, item.n);
+    }
+    // _pbpHlBuildRange degrades a 0-hit locate to selectNodeContents(blockEl)
+    // -- for a tr item that is the whole .pb-tr Range (spec 1.3 tr degrade).
+    const range = _pbpHlBuildRange(item, blockEl, blockText);
     const col = (item.color >= 1 && item.color <= 5) ? item.color : 1;
     byColor[col].push(range);
     _pbpHlState.ranges[item.id] = { color: col, range };
-    _pbpHlArmBlockObserver(blockEl, item.n);
+    // Only original blocks arm the hljs/KaTeX watcher; .pb-tr re-anchors via
+    // pbpHlReanchorTr (Step 6).
+    if (!isTr) _pbpHlArmBlockObserver(blockEl, item.n);
   }
   for (const c of PBP_HL_COLORS) {
     if (byColor[c].length) CSS.highlights.set("pbp-hl-" + c, new Highlight(...byColor[c]));
@@ -442,6 +471,79 @@ function _pbpHlReanchorBlock(n) {
     _pbpHlState.ranges[item.id] = { color: col, range };
   }
 }
+
+// ---- H5 translated-layer lifecycle (spec 1.3). md-translate.js calls the
+// two window hooks below via typeof guards; it never hard-depends on this
+// file. All work is wrapped so a highlight failure can never break the
+// translation main flow (spec 7.2). ----
+
+// Incremental re-anchor of block n's translated-side highlights against the
+// just-(re)built .pb-tr. Mirrors _pbpHlReanchorBlock but for the tr side:
+// resolve the .pb-tr, read the language it now shows, and for each tr item in
+// this block delete any stale range then rebuild IFF the paint gate passes.
+function _pbpHlReanchorTrBlock(n) {
+  if (!_pbpHlState || typeof Highlight !== "function" || typeof CSS === "undefined" || !("highlights" in CSS)) return;
+  const trEl = document.querySelector('.pb-tr[data-pb-tr="' + n + '"]');
+  const lang = trEl ? (trEl.dataset.pbTrLang || "") : "";
+  const liveText = trEl ? (trEl.textContent || "") : "";
+  for (const item of _pbpHlState.items) {
+    if (item.side !== "tr" || item.n !== n) continue;
+    const prev = _pbpHlState.ranges[item.id];
+    if (prev) {
+      const h = CSS.highlights.get("pbp-hl-" + prev.color);
+      if (h) h.delete(prev.range);
+      delete _pbpHlState.ranges[item.id];
+    }
+    if (!trEl || !pbpHlItemPaints(item, lang)) { delete _pbpHlState.degraded[item.id]; continue; }
+    const range = _pbpHlBuildRange(item, trEl, liveText);
+    const col = (item.color >= 1 && item.color <= 5) ? item.color : 1;
+    let h = CSS.highlights.get("pbp-hl-" + col);
+    if (!h) { h = new Highlight(); CSS.highlights.set("pbp-hl-" + col, h); }
+    h.add(range);
+    _pbpHlState.ranges[item.id] = { color: col, range };
+  }
+}
+
+// Hook 1 (called at the end of _pbpTrFill, via typeof guard): the .pb-tr for
+// block n was just (re)built in the current target language. Re-anchor its
+// tr highlights, refresh its mirror bar (Task 2 seam) + the Notebook.
+function pbpHlReanchorTr(n) {
+  if (!_pbpHlState) return;
+  try {
+    _pbpHlReanchorTrBlock(n);
+    // ponytail: pbpHlSyncMirror/_pbpHlNotebookRender per filled block is
+    // O(blocks) across a run; both are cheap DOM writes and only run during
+    // active translation. Batch only if a profiler ever flags it.
+    if (typeof pbpHlSyncMirror === "function") pbpHlSyncMirror(n);
+    _pbpHlNotebookRender();
+  } catch (_) {}
+}
+window.pbpHlReanchorTr = pbpHlReanchorTr; // explicit window attach: md-translate calls it by name.
+
+// Hook 2 (called after _pbpTrApplyTargetLang removes the whole .pb-tr layer,
+// via typeof guard): every translated-side range's host element is gone. Drop
+// them all from CSS.highlights, clear their degraded flags, regray the
+// Notebook, recompute mirrors. Item STORAGE is untouched -- switching back to
+// the original language and retranslating revives them through Hook 1.
+function pbpHlTrLayerCleared() {
+  if (!_pbpHlState) return;
+  try {
+    const canHl = typeof CSS !== "undefined" && "highlights" in CSS;
+    for (const item of _pbpHlState.items) {
+      if (item.side !== "tr") continue;
+      const prev = _pbpHlState.ranges[item.id];
+      if (prev && canHl) {
+        const h = CSS.highlights.get("pbp-hl-" + prev.color);
+        if (h) h.delete(prev.range);
+      }
+      delete _pbpHlState.ranges[item.id];
+      delete _pbpHlState.degraded[item.id];
+    }
+    _pbpHlNotebookRender();
+    if (typeof pbpHlSyncMirrorAll === "function") pbpHlSyncMirrorAll();
+  } catch (_) {}
+}
+window.pbpHlTrLayerCleared = pbpHlTrLayerCleared; // explicit window attach: md-translate calls it by name.
 
 // Init hookup: top-level listener registration only (no other side effects;
 // the tests page loads this file on file:// and never fires the event) --
@@ -531,6 +633,19 @@ function _pbpHlSelectionSegments(range) {
     const seg = _pbpHlClipRangeToBlock(range, b.el);
     if (!seg || seg.collapsed) continue;
     segments.push({ n: b.n, el: b.el, range: seg });
+  }
+  // H5 (spec 1.2): a selection that touched NO indexed original block may
+  // still lie inside one or more translated-side .pb-tr siblings (never part
+  // of the block index -- D10). Clip to those ONLY when the original pass
+  // produced nothing; a mixed selection spanning both sides stays
+  // original-only (spec 1.2 / 9: no cross-side double highlight).
+  if (!segments.length) {
+    document.querySelectorAll("#rendered-view .pb-tr[data-pb-tr]").forEach((tr) => {
+      if (!range.intersectsNode(tr)) return;
+      const seg = _pbpHlClipRangeToBlock(range, tr);
+      if (!seg || seg.collapsed) return;
+      segments.push({ n: Number(tr.dataset.pbTr), el: tr, range: seg, side: "tr" });
+    });
   }
   return segments;
 }
@@ -628,10 +743,20 @@ async function _pbpHlCreateFromRange(range, color, btn) {
       note: "",
       ts: Date.now()
     };
+    // H5 (spec 1.1): translated-side highlights carry side + the language of
+    // the .pb-tr they were drawn in (read straight off the element, so it is
+    // exactly the shown language). Original items get NO extra fields --
+    // legacy items and orig items stay identical (backward compat / spec 7.1).
+    if (seg.side === "tr") {
+      item.side = "tr";
+      item.lang = (seg.el.dataset && seg.el.dataset.pbTrLang) || "";
+    }
     _pbpHlState.items.push(item);
     created.push(item);
     _pbpHlRegisterRange(item, seg.range.cloneRange());
-    _pbpHlArmBlockObserver(seg.el, seg.n);
+    // .pb-tr re-anchors via pbpHlReanchorTr (fired from _pbpTrFill), NOT the
+    // hljs/KaTeX watcher (which targets pbpAiBlockEl -- the original block).
+    if (seg.side !== "tr") _pbpHlArmBlockObserver(seg.el, seg.n);
   }
   if (created.length) {
     await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn);
@@ -754,7 +879,11 @@ function _pbpHlOnClick(e) {
   if (!caret) return;
   const node = caret.startContainer;
   const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-  const blockEl = el && el.closest("[data-pb]");
+  // H5 (spec 1.4): a click inside a .pb-tr resolves to that translated block
+  // (data-pb-tr); original clicks still match [data-pb] first. The scan below
+  // filters registered ranges by containment in this element, so tr ranges
+  // (which live inside the .pb-tr) match correctly; tie still keeps newest ts.
+  const blockEl = el && (el.closest("[data-pb]") || el.closest("[data-pb-tr]"));
   if (!blockEl) return;
 
   // Map the caret hit back to an item via the _pbpHlState.ranges[id] registry

@@ -3849,6 +3849,80 @@ suiteIf("_pbpHlOffsetsFromRange / _pbpHlClipRangeToBlock / _pbpHlSelectionSegmen
 </script>
 
 <script>
+// ============ H5: pbpHlItemPaints (paint gate, pure) ============
+suiteIf("pbpHlItemPaints", "pbpHlItemPaints", () => {
+  test("original item (no side) always paints, any lang", () => {
+    assertEq(pbpHlItemPaints({ quote: "x" }, "en"), true, "no-side + lang");
+    assertEq(pbpHlItemPaints({ quote: "x" }, ""), true, "no-side + empty lang");
+  });
+  test("null item is treated as paintable (defensive)", () => {
+    assertEq(pbpHlItemPaints(null, "en"), true, "null -> true");
+  });
+  test("tr item paints when its recorded lang matches the block lang", () => {
+    assertEq(pbpHlItemPaints({ side: "tr", lang: "zh-CN" }, "zh-CN"), true, "match");
+  });
+  test("tr item does NOT paint on lang mismatch", () => {
+    assertEq(pbpHlItemPaints({ side: "tr", lang: "zh-CN" }, "en"), false, "mismatch");
+  });
+  test("tr item with missing lang never paints", () => {
+    assertEq(pbpHlItemPaints({ side: "tr" }, "en"), false, "no lang");
+  });
+  test("tr item with empty lang never paints (even vs empty block lang)", () => {
+    assertEq(pbpHlItemPaints({ side: "tr", lang: "" }, ""), false, "empty vs empty");
+  });
+});
+
+// ============ H5: _pbpHlSelectionSegments tr-side fallback (DOM) ============
+suiteIf("_pbpHlSelectionSegments tr-side", "_pbpHlSelectionSegments", () => {
+  function fixture(html) {
+    const d = document.createElement("div");
+    d.id = "rendered-view"; // the tr fallback queries "#rendered-view .pb-tr[data-pb-tr]"
+    d.innerHTML = html;
+    document.body.appendChild(d);
+    return d;
+  }
+
+  test("pure .pb-tr selection yields one tr segment (side:'tr', n from data-pb-tr)", () => {
+    const root = fixture('<p>alpha</p>');
+    pbpAiIndexBlocks(root); // index BEFORE inserting the .pb-tr (real translate timing)
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.dataset.pbTr = "1";
+    tr.dataset.pbTrLang = "zh-CN";
+    tr.innerHTML = "<p>translated one</p>";
+    root.appendChild(tr);
+    const range = document.createRange();
+    range.selectNodeContents(tr.querySelector("p"));
+    const segs = _pbpHlSelectionSegments(range);
+    assertEq(segs.length, 1, "one tr segment");
+    assertEq(segs[0].side, "tr", "segment marked tr");
+    assertEq(segs[0].n, 1, "n from data-pb-tr");
+    assertEq(segs[0].el, tr, "segment element is the .pb-tr");
+    root.remove();
+  });
+
+  test("selection spanning original block + .pb-tr stays original-only (no tr segment)", () => {
+    const root = fixture('<p>alpha beta</p>');
+    pbpAiIndexBlocks(root);
+    const origP = root.querySelector("p");
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.dataset.pbTr = "1";
+    tr.dataset.pbTrLang = "zh-CN";
+    tr.innerHTML = "<p>translated one</p>";
+    root.appendChild(tr);
+    const range = document.createRange();
+    range.setStart(origP.firstChild, 6);              // inside the original block
+    range.setEnd(tr.querySelector("p").firstChild, 5); // ...through into the .pb-tr
+    const segs = _pbpHlSelectionSegments(range);
+    assert(segs.length >= 1, "at least the original segment");
+    assert(segs.every((s) => s.side !== "tr"), "no tr segment when the original pass matched");
+    root.remove();
+  });
+});
+</script>
+
+<script>
 // ============ md-preview.js: pbpRailCollapseState (rail accordion) ============
 suiteIf("pbpRailCollapseState", "pbpRailCollapseState", () => {
   const DEFAULTS = { tr: true, ask: true, export: true, toc: false, hl: false };

@@ -944,6 +944,10 @@ async function _pbpTrApplyTargetLang(st, s) {
   document.querySelectorAll("#rendered-view .pb-tr").forEach((el) => el.remove());
   document.querySelectorAll("#rendered-view .pb-tr-err").forEach((el) => el.remove());
   document.querySelectorAll("#rendered-view [data-pb-tr-done]").forEach((el) => { delete el.dataset.pbTrDone; });
+  // H5 (spec 1.3): the whole translated layer just vanished -- drop every
+  // tr-side highlight range + regray its Notebook rows. typeof-guarded so
+  // md-translate never hard-depends on md-highlight (spec 7.2).
+  if (typeof window.pbpHlTrLayerCleared === "function") { try { window.pbpHlTrLayerCleared(); } catch (_) {} }
   _pbpTrSyncRetryAll();
   if (st.mode !== "original") _pbpTrSetMode(st, "original", false);
   _pbpTrSetStatus(st, "idle");
@@ -1208,6 +1212,11 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   // free-text targets can't be judged statically -> degrade to dir="auto".
   div.dir = PBP_TR_RTL_LANGS.has(st.target.code) ? "rtl" : "auto";
   div.innerHTML = renderMarkdown(restored);
+  // H5 paint gate (spec 1.3): stamp the language this .pb-tr currently shows
+  // so a translated-side highlight only re-paints when its recorded lang
+  // still matches. Read straight off the element by md-highlight -- immune to
+  // the stale pbpAiGetSettings memo (md-ai-core.js:460).
+  div.dataset.pbTrLang = st.target.code;
   div.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
   _pbpTrApplyPeekAttrs(div);
   orig.dataset.pbTrDone = "1";
@@ -1226,6 +1235,11 @@ function _pbpTrFill(st, w, shieldedTranslation) {
       } catch (_) {}
     });
   }
+  // H5 (spec 1.3): the .pb-tr for block w.n was just (re)built in the current
+  // target language -- let md-highlight re-anchor any translated-side
+  // highlights on it. typeof-guarded so md-translate never hard-depends on
+  // md-highlight (spec 7.2).
+  if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) {} }
 }
 
 // Per-block failure: inline error pill after the block. Hover (title) shows
