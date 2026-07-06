@@ -4384,4 +4384,43 @@ suiteIf("pbpSearchEnumerate", "pbpSearchEnumerate", () => {
   });
 });
 </script>
+<script>
+// ============ R9: md-reader.js pbpReaderPickScrollAnchor (scroll-restore anchor pick) ============
+suiteIf("pbpReaderPickScrollAnchor", "pbpReaderPickScrollAnchor", () => {
+  test("empty rects -> null", () => {
+    assertEq(pbpReaderPickScrollAnchor([]), null, "empty input");
+  });
+  test("non-array input -> null", () => {
+    assertEq(pbpReaderPickScrollAnchor(null), null, "null input");
+  });
+  test("picks the first block whose bottom edge is still below the viewport top", () => {
+    const rects = [{ top: -500, bottom: -50 }, { top: -50, bottom: 150 }, { top: 150, bottom: 350 }];
+    const r = pbpReaderPickScrollAnchor(rects);
+    assertEq(r.n, 2, "second block (index 1) is the first with bottom > 0");
+  });
+  test("frac reflects how far scrolled into the picked block", () => {
+    const rects = [{ top: -100, bottom: 300 }]; // 400px tall block, scrolled 100px into it
+    const r = pbpReaderPickScrollAnchor(rects);
+    assertEq(r.n, 1, "only block");
+    assertEq(Math.round(r.frac * 100), 25, "100/400 = 0.25");
+  });
+  test("block not yet reached (top >= 0) clamps frac to 0", () => {
+    const rects = [{ top: 40, bottom: 240 }];
+    const r = pbpReaderPickScrollAnchor(rects);
+    assertEq(r.frac, 0, "clamped to 0, not negative");
+  });
+  test("all blocks scrolled past (every bottom <= 0) falls back to the last block, frac clamped to 1", () => {
+    const rects = [{ top: -900, bottom: -500 }, { top: -500, bottom: -100 }];
+    const r = pbpReaderPickScrollAnchor(rects);
+    assertEq(r.n, 2, "falls back to the last block");
+    assertEq(r.frac, 1, "clamped to 1 (fully past)");
+  });
+  test("zero-height rect does not throw / NaN -> frac 0", () => {
+    const rects = [{ top: 0, bottom: 0 }];
+    const r = pbpReaderPickScrollAnchor(rects);
+    assertEq(r.n, 1, "still picks it");
+    assertEq(r.frac, 0, "degenerate height guarded to 0, not NaN");
+  });
+});
+</script>
 </body></html>

@@ -922,6 +922,136 @@ function pbpApplyColorScheme(mode) {
     }
   });
 
+  // ---- R9: silent scroll-position restore (spec 2) ----
+  // Records where the reader was (block index n + fraction scrolled into
+  // that block) so a later reopen of the SAME article (exact tab.url string
+  // match, same limitation tr_/ask_ caches already accept) lands back there
+  // with zero UI. Storage: the generic IDB KV in ai-cache.js, keyed
+  // "scroll_" + pbpAiHash(url) -- pbpAiHash/pbpAiBlockEl are defined in
+  // md-ai-core.js, which loads AFTER this file (script tag order), hence the
+  // typeof guards; pbpAiCacheGet/Set/Delete are in ai-cache.js, which loads
+  // BEFORE this file, so those are called ungated (same as md-ai-core.js
+  // itself does).
+  let _pbpScrollSaveTimer = null;
+  // Timestamp (ms, Date.now()) until which the save-side 'scroll' listener
+  // below ignores every event entirely (doesn't even arm the debounce).
+  // Restore's own scrollIntoView/scrollBy calls fire native 'scroll' events
+  // on window exactly like a real user scroll would; without this guard, one
+  // of those restore-triggered events can arm the 600ms debounce, which then
+  // reads a scrollY that -- because hljs/KaTeX/lazy-image layout can differ
+  // slightly between the original save and this reopen -- lands just on the
+  // OTHER side of the one-viewport boundary from where it was originally
+  // saved, so _pbpReaderSaveScroll silently deletes the very record that was
+  // just used to restore. Sole writer: applyRestore() in the rAF block below.
+  let _pbpScrollRestoreUntil = 0;
+
+  function _pbpReaderSaveScroll() {
+    if (renderedView.classList.contains("hidden")) return; // raw view active: rects would read 0x0
+    if (typeof pbpAiHash !== "function") return;
+    const key = "scroll_" + pbpAiHash(url);
+    if (window.scrollY <= window.innerHeight) {
+      // Back inside the first screen: nothing worth restoring, and any
+      // earlier deeper-scroll record is now stale -- drop it.
+      pbpAiCacheDelete(key).catch(() => {});
+      return;
+    }
+    const blocks = pbpScrollMapBlocks(); // force-index if empty, same defensive call the Raw/Rendered toggle above already makes
+    if (!blocks.length) return;
+    const rects = blocks.map((b) => trOnlyScrollTarget(b.el).getBoundingClientRect());
+    const anchor = typeof pbpReaderPickScrollAnchor === "function" ? pbpReaderPickScrollAnchor(rects) : null;
+    if (!anchor) return;
+    const ts = Date.now();
+    pbpAiCacheSet(key, { n: anchor.n, frac: anchor.frac, ts }, ts).catch(() => {});
+  }
+
+  window.addEventListener("scroll", () => {
+    if (Date.now() < _pbpScrollRestoreUntil) return; // ignore our own restore's programmatic scroll -- see _pbpScrollRestoreUntil above
+    clearTimeout(_pbpScrollSaveTimer);
+    _pbpScrollSaveTimer = setTimeout(_pbpReaderSaveScroll, 600);
+  }, { passive: true });
+  // Best-effort extra flush: pagehide can race an in-flight IDB write (no
+  // working precedent anywhere in this codebase for a reliable async write
+  // from pagehide -- md-ask.js/md-translate.js's own pagehide handlers only
+  // do synchronous ctrl.abort()), so this is a bonus on top of the debounce
+  // above, not the primary save path.
+  window.addEventListener("pagehide", () => {
+    clearTimeout(_pbpScrollSaveTimer);
+    _pbpReaderSaveScroll();
+  });
+
+  // Restore: after render + two animation frames (one layout pass in) --
+  // hljs/KaTeX/lazy images may still shift things later, but the block
+  // anchor keeps any resulting error inside one block, not the whole page.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
+      if (typeof pbpAiHash !== "function") return;
+      const key = "scroll_" + pbpAiHash(url);
+      let entry;
+      try {
+        entry = await pbpAiCacheGet(key);
+      } catch (_) {
+        return;
+      }
+      const rec = entry && entry.result;
+      if (!rec || !Number.isFinite(rec.n) || rec.n < 1) return;
+      if (window.scrollY > 200) return; // reader already scrolled on their own -- don't fight them
+      const blocks = pbpScrollMapBlocks();
+      if (!blocks.length) return;
+
+      // Resolves rec against the CURRENT view (trOnlyScrollTarget reads
+      // document.body's tr-only class live each call) and performs the jump.
+      // Factored into a function so it can be re-run once below if the view
+      // mode flips shortly after this first call -- see the MutationObserver.
+      // Returns false (no-op) if the block no longer exists.
+      let restoredAtY = null;
+      const applyRestore = () => {
+        const blockEl = typeof pbpAiBlockEl === "function" ? pbpAiBlockEl(rec.n) : null;
+        if (!blockEl) return false;
+        const target = trOnlyScrollTarget(blockEl);
+        _pbpScrollRestoreUntil = Date.now() + 1000; // suppress the save listener for this programmatic scroll (both calls below fire native 'scroll' events)
+        target.scrollIntoView({ block: "start", behavior: "instant" });
+        const frac = Math.min(Math.max(Number(rec.frac) || 0, 0), 1);
+        if (frac > 0) {
+          const h = target.getBoundingClientRect().height;
+          if (h > 0) window.scrollBy(0, frac * h);
+        }
+        restoredAtY = window.scrollY;
+        return true;
+      };
+      if (!applyRestore()) return;
+
+      // Race guard: md-translate.js's pbpTrInit runs its OWN auto view-restore
+      // (rAF-chunked st.work build, THEN an IDB cache probe, THEN -- only on a
+      // full cache hit with a persisted tr-only/bilingual view -- _pbpTrSetMode,
+      // which is what actually flips document.body's tr-only/tr-bilingual
+      // classes) fully asynchronously, on a timeline this double-rAF window is
+      // too short to observe. trOnlyScrollTarget above only redirects to the
+      // .pb-tr sibling when document.body already carries "tr-only" AT THE
+      // MOMENT IT'S CALLED -- so if translate's mode flip lands moments after
+      // this restore, the reader was just silently placed on the original
+      // block that's about to become display:none. Watch body's class
+      // attribute for that flip; if it fires while the reader is still
+      // sitting exactly where this restore put them (no manual scroll in
+      // between), re-resolve trOnlyScrollTarget against the now-current view
+      // and land again -- still silent, still block-anchored, only ever fires
+      // once. A real scroll away in the meantime means they're reading; back
+      // off and leave them alone.
+      let resettled = false;
+      const mo = new MutationObserver(() => {
+        if (resettled) return;
+        if (restoredAtY === null || Math.abs(window.scrollY - restoredAtY) > 4) { resettled = true; mo.disconnect(); return; }
+        resettled = true;
+        mo.disconnect();
+        applyRestore();
+      });
+      mo.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+      // pbpTrInit's cache probe is a one-shot pass near page boot -- 5s is a
+      // generous upper bound even for a very long article, so stop watching
+      // well after it could plausibly still be running.
+      setTimeout(() => mo.disconnect(), 5000);
+    });
+  });
+
   // Copy buttons
   document.getElementById("btn-copy-md").addEventListener("click", async (e) => {
     await copyToClipboard(buildExportMarkdown(), e.currentTarget);

@@ -78,6 +78,26 @@ function pbpSearchEnumerate(text, query, cap) {
   return out;
 }
 
+// ---- R9 (spec 2): scroll-restore anchor picker ----
+// Pure math only -- the caller (md-preview.js) does the live DOM measuring
+// (getBoundingClientRect per block, view-aware via trOnlyScrollTarget) and
+// hands the resulting {top, bottom} list in here. rects are VIEWPORT-
+// relative (0 = current top of the viewport), the same convention
+// getBoundingClientRect() itself uses -- exactly what md-preview.js's own
+// pbpScrollMapBlocks "topmost visible block" scan already assumes for its
+// `bottom > 0` test, copied here. Returns { n, frac } (n is 1-based,
+// matching data-pb / data-pb-tr) or null when there is nothing to anchor to.
+function pbpReaderPickScrollAnchor(rects) {
+  if (!Array.isArray(rects) || !rects.length) return null;
+  let idx = rects.findIndex((r) => r && r.bottom > 0);
+  if (idx === -1) idx = rects.length - 1;
+  const r = rects[idx];
+  if (!r) return null;
+  const h = r.bottom - r.top;
+  const frac = h > 0 ? Math.min(Math.max(-r.top / h, 0), 1) : 0;
+  return { n: idx + 1, frac };
+}
+
 // ---- DOM wiring ----
 
 // View-mode-aware visibility check for R3 (spec sec.3, reusing R4's exact
