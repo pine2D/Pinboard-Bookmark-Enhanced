@@ -27,6 +27,59 @@
     return (gg && gg["__PBP_" + name] != null) ? gg["__PBP_" + name] : def;
   }
 
+  // ---- lazy image normalization (background.js / popup.js extractors) ---
+  // Generic (non-site-specific) lazy-image src promotion. Unlike fixLazyImages()
+  // below (Zhihu-only, invoked from inside a site-rule's extract()), this runs on
+  // the OUTPUT of either extraction path: a detached div holding a site-rule's
+  // contentHtml, or a cloneNode(true) Document right before Defuddle.parse(). It
+  // therefore must accept both an Element and a Document as rootEl, and it must
+  // NEVER be pointed at the live page DOM -- callers own that guarantee.
+  //
+  // Per <img>: only a placeholder src (missing / empty-or-whitespace / a "data:"
+  // URI) is eligible; a real src is left untouched. Candidate order: data-src,
+  // then data-original, then data-lazy-src -- the first of the three that is
+  // PRESENT wins even if its value later fails URL validation (no fallthrough to
+  // srcset in that case). Only when none of the three attributes exists does it
+  // fall back to the LAST candidate in srcset (or data-srcset when srcset is
+  // absent), which by convention is the highest-resolution source. The winning
+  // candidate is resolved against baseHref and only kept when the result is
+  // http: or https: -- this also rejects the background extractor's SafeURL
+  // about:blank shim result, plus javascript:/data: candidates.
+  function lastSrcsetCandidate(srcset) {
+    var segs = String(srcset).split(",");
+    var last = segs[segs.length - 1].replace(/^\s+|\s+$/g, "");
+    return last.split(/\s+/)[0] || "";
+  }
+
+  function pbpNormalizeLazyImages(rootEl, baseHref) {
+    if (!rootEl || typeof rootEl.querySelectorAll !== "function") return 0;
+    var count = 0;
+    rootEl.querySelectorAll("img").forEach(function (img) {
+      var src = img.getAttribute("src");
+      var trimmed = (src == null) ? "" : String(src).replace(/^\s+|\s+$/g, "");
+      var isPlaceholder = (src === null) || trimmed === "" || trimmed.indexOf("data:") === 0;
+      if (!isPlaceholder) return; // real src: never touched
+
+      var candidate = null;
+      if (img.hasAttribute("data-src")) candidate = img.getAttribute("data-src");
+      else if (img.hasAttribute("data-original")) candidate = img.getAttribute("data-original");
+      else if (img.hasAttribute("data-lazy-src")) candidate = img.getAttribute("data-lazy-src");
+      else {
+        var srcset = img.hasAttribute("srcset") ? img.getAttribute("srcset")
+          : (img.hasAttribute("data-srcset") ? img.getAttribute("data-srcset") : null);
+        if (srcset) candidate = lastSrcsetCandidate(srcset);
+      }
+      if (!candidate) return; // present-but-empty or absent: no write, no fallthrough
+
+      var u;
+      try { u = new URL(candidate, baseHref); } catch (_) { return; }
+      if (u.protocol !== "http:" && u.protocol !== "https:") return;
+      img.setAttribute("src", u.href);
+      count++;
+    });
+    return count;
+  }
+
   // ---- shared helpers ----------------------------------------------------
 
   function readEntities(doc) {
@@ -709,6 +762,7 @@
   g.SITE_RULES = SITE_RULES;
   g.matchRule = matchRule;
   g.applySiteRule = applySiteRule;
+  g.pbpNormalizeLazyImages = pbpNormalizeLazyImages;
   g.buildReplyTree = buildReplyTree;
   g.buildDepthTree = buildDepthTree;
   g.renderThreadHtml = renderThreadHtml;

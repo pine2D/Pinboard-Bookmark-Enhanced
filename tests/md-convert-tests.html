@@ -1131,6 +1131,181 @@ section("site-rules: hacker news");
 </script>
 
 <script>
+section("site-rules: pbpNormalizeLazyImages");
+{
+  const BASE = "https://example.com/articles/1";
+  const wrap = (html) => { const d = document.createElement("div"); d.innerHTML = html; return d; };
+
+  // 1. placeholder: missing src attribute
+  {
+    const d = wrap('<img data-src="/a.jpg">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("missing src + data-src -> promoted", d.querySelector("img").getAttribute("src") === "https://example.com/a.jpg", d.innerHTML);
+    assertEq(n, 1, "missing src -> return count 1");
+  }
+
+  // 2. placeholder: empty string src
+  {
+    const d = wrap('<img src="" data-src="/a.jpg">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("empty src + data-src -> promoted", d.querySelector("img").getAttribute("src") === "https://example.com/a.jpg", d.innerHTML);
+    assertEq(n, 1, "empty src -> return count 1");
+  }
+
+  // 3. placeholder: whitespace-only src
+  {
+    const d = wrap('<img src="   " data-src="/a.jpg">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("whitespace src + data-src -> promoted", d.querySelector("img").getAttribute("src") === "https://example.com/a.jpg", d.innerHTML);
+    assertEq(n, 1, "whitespace src -> return count 1");
+  }
+
+  // 4. placeholder: data: URI src
+  {
+    const d = wrap('<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP" data-src="/a.jpg">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("data: src + data-src -> promoted", d.querySelector("img").getAttribute("src") === "https://example.com/a.jpg", d.innerHTML);
+    assertEq(n, 1, "data: src -> return count 1");
+  }
+
+  // 5. real src untouched
+  {
+    const d = wrap('<img src="https://real.com/pic.jpg" data-src="https://other.com/x.jpg">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("real src untouched", d.querySelector("img").getAttribute("src") === "https://real.com/pic.jpg", d.innerHTML);
+    assertEq(n, 0, "real src -> return count 0");
+  }
+
+  // 6. candidate order: data-src wins over data-original and data-lazy-src
+  {
+    const d = wrap('<img data-src="/a.jpg" data-original="/b.jpg" data-lazy-src="/c.jpg">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("data-src wins over data-original/data-lazy-src", d.querySelector("img").getAttribute("src") === "https://example.com/a.jpg", d.innerHTML);
+    assertEq(n, 1, "data-src wins -> return count 1");
+  }
+
+  // 7. data-original picked when data-src absent
+  {
+    const d = wrap('<img data-original="/b.jpg" data-lazy-src="/c.jpg">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("data-original picked when data-src absent", d.querySelector("img").getAttribute("src") === "https://example.com/b.jpg", d.innerHTML);
+    assertEq(n, 1, "data-original picked -> return count 1");
+  }
+
+  // 8. data-lazy-src picked when data-src and data-original absent
+  {
+    const d = wrap('<img data-lazy-src="/c.jpg">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("data-lazy-src picked when others absent", d.querySelector("img").getAttribute("src") === "https://example.com/c.jpg", d.innerHTML);
+    assertEq(n, 1, "data-lazy-src picked -> return count 1");
+  }
+
+  // 9. data-src present but invalid URL does NOT fall through to srcset
+  {
+    const d = wrap('<img data-src="http://[invalid" srcset="/valid.jpg 1x">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("invalid data-src does not fall through to srcset", d.querySelector("img").getAttribute("src") === null, d.innerHTML);
+    assertEq(n, 0, "invalid data-src, no fallthrough -> return count 0");
+  }
+
+  // 10. invalid URL skipped (no alternative candidate present)
+  {
+    const d = wrap('<img data-src="http://[invalid">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("invalid data-src alone -> skipped, no src written", d.querySelector("img").getAttribute("src") === null, d.innerHTML);
+    assertEq(n, 0, "invalid URL alone -> return count 0");
+  }
+
+  // 11. srcset last-candidate extraction (with descriptors)
+  {
+    const d = wrap('<img srcset="a.jpg 1x, b.jpg 2x">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("srcset picks last candidate", d.querySelector("img").getAttribute("src") === "https://example.com/articles/b.jpg", d.innerHTML);
+    assertEq(n, 1, "srcset last candidate -> return count 1");
+  }
+
+  // 12. srcset messy whitespace
+  {
+    const d = wrap('<img srcset="  a.jpg   1x  ,   b.jpg   2x   ">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("srcset messy whitespace still extracts last URL", d.querySelector("img").getAttribute("src") === "https://example.com/articles/b.jpg", d.innerHTML);
+    assertEq(n, 1, "srcset messy whitespace -> return count 1");
+  }
+
+  // 13. data-srcset fallback when srcset absent
+  {
+    const d = wrap('<img data-srcset="a.jpg 1x, b.jpg 2x">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("data-srcset used when srcset absent", d.querySelector("img").getAttribute("src") === "https://example.com/articles/b.jpg", d.innerHTML);
+    assertEq(n, 1, "data-srcset fallback -> return count 1");
+  }
+
+  // 14. relative URL absolutized against a baseHref with a path
+  {
+    const d = wrap('<img data-src="assets/pic.png">');
+    const n = pbpNormalizeLazyImages(d, "https://example.com/articles/2026/post.html");
+    check("relative URL absolutized against baseHref path", d.querySelector("img").getAttribute("src") === "https://example.com/articles/2026/assets/pic.png", d.innerHTML);
+    assertEq(n, 1, "relative URL absolutized -> return count 1");
+  }
+
+  // 15. non-http(s) rejected: javascript: candidate
+  {
+    const d = wrap('<img data-src="javascript:alert(1)">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("javascript: candidate skipped", d.querySelector("img").getAttribute("src") === null, d.innerHTML);
+    assertEq(n, 0, "javascript: candidate -> return count 0");
+  }
+
+  // 16. non-http(s) rejected: data: candidate
+  {
+    const d = wrap('<img data-src="data:image/png;base64,xx">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("data: data-src candidate skipped", d.querySelector("img").getAttribute("src") === null, d.innerHTML);
+    assertEq(n, 0, "data: data-src candidate -> return count 0");
+  }
+
+  // 17. about:blank (SafeURL shim) rejected
+  {
+    const d = wrap('<img data-src="about:blank">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("about:blank candidate skipped (SafeURL shim compat)", d.querySelector("img").getAttribute("src") === null, d.innerHTML);
+    assertEq(n, 0, "about:blank candidate -> return count 0");
+  }
+
+  // 18. falsy / non-element rootEl -> 0
+  assertEq(pbpNormalizeLazyImages(null, BASE), 0, "null rootEl -> 0");
+  assertEq(pbpNormalizeLazyImages(undefined, BASE), 0, "undefined rootEl -> 0");
+  assertEq(pbpNormalizeLazyImages({}, BASE), 0, "no querySelectorAll rootEl -> 0");
+
+  // 19. Document-as-rootEl works
+  {
+    const hdoc = document.implementation.createHTMLDocument("t");
+    hdoc.body.innerHTML = '<img data-src="/a.jpg">';
+    const n = pbpNormalizeLazyImages(hdoc, BASE);
+    check("Document rootEl: img promoted", hdoc.querySelector("img").getAttribute("src") === "https://example.com/a.jpg", hdoc.body.innerHTML);
+    assertEq(n, 1, "Document rootEl -> return count 1");
+  }
+
+  // 20. return count correctness across a mixed batch
+  {
+    const d = wrap(
+      '<img src="https://real.com/pic.jpg" data-src="https://other.com/x.jpg">' +
+      '<img data-src="/ok.jpg">' +
+      '<img data-src="http://[invalid">' +
+      '<img srcset="c.jpg 1x, d.jpg 2x">'
+    );
+    const n = pbpNormalizeLazyImages(d, BASE);
+    const imgs = d.querySelectorAll("img");
+    assertEq(n, 2, "mixed batch -> return count 2");
+    check("mixed batch: real src untouched", imgs[0].getAttribute("src") === "https://real.com/pic.jpg", d.innerHTML);
+    check("mixed batch: valid data-src promoted", imgs[1].getAttribute("src") === "https://example.com/ok.jpg", d.innerHTML);
+    check("mixed batch: invalid data-src skipped", imgs[2].getAttribute("src") === null, d.innerHTML);
+    check("mixed batch: srcset promoted", imgs[3].getAttribute("src") === "https://example.com/articles/d.jpg", d.innerHTML);
+  }
+}
+</script>
+
+<script>
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>
