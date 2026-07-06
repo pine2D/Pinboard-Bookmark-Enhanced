@@ -2168,6 +2168,69 @@ suiteIf("ask citation tokenizer", "pbpAskBuildContext", () => {
   test("empty input -> empty array", () => {
     assertEq(_pbpAskSplitCiteTokens("").length, 0, "empty");
   });
+  test("full-width paren group, 3 members, full-width comma", () => {
+    const segs = _pbpAskSplitCiteTokens("\uFF08P3\uFF0CP5\uFF0CP15\uFF09");
+    assertEq(segs.length, 3, "three cite segs");
+    assertEq(segs[0].kind, "cite", "seg0 kind");
+    assertEq(segs[0].p, 3, "seg0 p");
+    assertEq(segs[0].token, "[P3]", "seg0 token");
+    assertEq(segs[1].p, 5, "seg1 p");
+    assertEq(segs[2].p, 15, "seg2 p");
+  });
+  test("ASCII paren group", () => {
+    const segs = _pbpAskSplitCiteTokens("(P6, P17, P29)");
+    assertEq(segs.length, 3, "three cite segs");
+    assertEq(segs[0].p, 6, "p6");
+    assertEq(segs[1].p, 17, "p17");
+    assertEq(segs[2].p, 29, "p29");
+  });
+  test("square-bracket group", () => {
+    const segs = _pbpAskSplitCiteTokens("[P3, P5]");
+    assertEq(segs.length, 2, "two cite segs");
+    assertEq(segs[0].p, 3, "p3");
+    assertEq(segs[1].p, 5, "p5");
+  });
+  test("single-member paren group is still a valid group", () => {
+    const segs = _pbpAskSplitCiteTokens("(P3)");
+    assertEq(segs.length, 1, "one seg");
+    assertEq(segs[0].kind, "cite", "cite kind");
+    assertEq(segs[0].p, 3, "p3");
+    assertEq(segs[0].token, "[P3]", "normalized token");
+  });
+  test("lenticular group with ideographic comma", () => {
+    const segs = _pbpAskSplitCiteTokens("\u3010P4\u3001P7\u3011");
+    assertEq(segs.length, 2, "two cite segs");
+    assertEq(segs[0].p, 4, "p4");
+    assertEq(segs[1].p, 7, "p7");
+  });
+  test("group embedded in surrounding text keeps text segs", () => {
+    const segs = _pbpAskSplitCiteTokens("before \uFF08P3\uFF0CP5\uFF09 after");
+    assertEq(segs.length, 4, "four segs");
+    assertEq(segs[0].kind, "text", "head kind");
+    assertEq(segs[0].text, "before ", "head text");
+    assertEq(segs[1].p, 3, "p3");
+    assertEq(segs[2].p, 5, "p5");
+    assertEq(segs[3].kind, "text", "tail kind");
+    assertEq(segs[3].text, " after", "tail text");
+  });
+  test("negative: prose inside ASCII parens stays plain text", () => {
+    const segs = _pbpAskSplitCiteTokens("(see P3)");
+    assertEq(segs.length, 1, "single text seg");
+    assertEq(segs[0].kind, "text", "text kind");
+    assertEq(segs[0].text, "(see P3)", "unchanged text");
+  });
+  test("negative: CJK word between refs stays plain text", () => {
+    const segs = _pbpAskSplitCiteTokens("(P3\u548CP5)");
+    assertEq(segs.length, 1, "single text seg");
+    assertEq(segs[0].kind, "text", "text kind");
+    assertEq(segs[0].text, "(P3\u548CP5)", "unchanged text");
+  });
+  test("group member tokens are normalized regardless of inner spacing", () => {
+    const segs = _pbpAskSplitCiteTokens("( P3 , P5 )");
+    assertEq(segs.length, 2, "two cite segs");
+    assertEq(segs[0].token, "[P3]", "normalized token 1");
+    assertEq(segs[1].token, "[P5]", "normalized token 2");
+  });
 });
 
 // ============ Task 14: raw offsets -> DOM Range ============

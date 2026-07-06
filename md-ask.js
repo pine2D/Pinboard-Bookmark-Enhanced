@@ -377,7 +377,7 @@ function pbpAskBuildPrompt(args) {
     "Rules:",
     "1. Answer in the same language as the question.",
     "2. Use ONLY the article. Do not use outside knowledge.",
-    "3. After every claim the article supports, add an inline citation token [P<n>] where <n> is the paragraph number from the article.",
+    "3. After every claim the article supports, add an inline citation token [P<n>] where <n> is the paragraph number from the article. Write each citation as its own token, e.g. [P3][P5]. NEVER group citations inside one pair of brackets or parentheses such as (P3, P5).",
     "4. End the answer with a CITES: block - one line per cited paragraph, formatted exactly as:",
     "   P<n>: \"verbatim quote of 15 words or fewer, in the article's original language\"",
     "5. If the article does not contain the answer, say so plainly. Never invent citations."
@@ -599,19 +599,50 @@ async function _pbpAskSend() {
 // -> tooltip -> jump + flash. Replaces the Task 13 placeholder.
 // ============================================================
 
-// Pure tokenizer: split answer text into segments around [Pn] tokens.
+// Pure tokenizer: split answer text into segments around [Pn] tokens, plus
+// GROUPED forms the model sometimes emits when answering in a CJK language:
+// [P3, P5], (P6, P17), full-width parens (\uFF08...\uFF09), lenticular
+// brackets (\u3010...\u3011).
 // -> [{kind:"text", text}, {kind:"cite", p, token}, ...]; "" -> [].
 // Drives the chip pass below (splits each text node at token boundaries,
 // i.e. the splitText semantics, but unit-testable without a DOM).
+// Group grammar: one-or-more P<digits> items separated by ASCII comma/
+// semicolon, full-width comma \uFF0C, ideographic comma \u3001, full-width
+// semicolon \uFF1B, with optional ASCII/ideographic (\u3000) whitespace
+// anywhere between items. Anything else inside the brackets (a word, "see",
+// CJK prose) fails the whole group -> falls through to plain text, same as
+// today. The strict single-token alternative is FIRST so plain [P7] keeps
+// matching it with its original token text (untouched behavior).
 function _pbpAskSplitCiteTokens(text) {
   const s = String(text == null ? "" : text);
-  const re = /\[P(\d+)\]/g;
+  const ws = "[ \\t\\u3000]";
+  const sepChar = "[,;\\uFF0C\\u3001\\uFF1B]";
+  const sep = "(?:" + ws + "*" + sepChar + ws + "*)+";
+  const item = "P\\d+";
+  const content = ws + "*" + item + "(?:" + sep + item + ")*" + ws + "*";
+  const re = new RegExp(
+    "\\[P(\\d+)\\]" +
+    "|\\[(" + content + ")\\]" +
+    "|\\((" + content + ")\\)" +
+    "|\\uFF08(" + content + ")\\uFF09" +
+    "|\\u3010(" + content + ")\\u3011",
+    "g"
+  );
   const segs = [];
   let last = 0;
   let m;
   while ((m = re.exec(s)) !== null) {
     if (m.index > last) segs.push({ kind: "text", text: s.slice(last, m.index) });
-    segs.push({ kind: "cite", p: Number(m[1]), token: m[0] });
+    if (m[1] !== undefined) {
+      segs.push({ kind: "cite", p: Number(m[1]), token: m[0] });
+    } else {
+      const grouped = m[2] !== undefined ? m[2] : (m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : m[5]));
+      const items = grouped.match(/P\d+/g) || [];
+      for (const it of items) {
+        const n = Number(it.slice(1));
+        segs.push({ kind: "cite", p: n, token: "[P" + n + "]" });
+      }
+    }
     last = m.index + m[0].length;
   }
   if (last < s.length) segs.push({ kind: "text", text: s.slice(last) });
