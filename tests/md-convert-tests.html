@@ -1208,6 +1208,14 @@ section("site-rules: pbpNormalizeLazyImages");
     assertEq(n, 0, "invalid data-src, no fallthrough -> return count 0");
   }
 
+  // 9b. data-src present but whitespace-only does NOT fall through to srcset
+  {
+    const d = wrap('<img data-src="   " srcset="/valid.jpg 1x">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("whitespace-only data-src does not fall through to srcset", d.querySelector("img").getAttribute("src") === null, d.innerHTML);
+    assertEq(n, 0, "whitespace-only data-src, no fallthrough -> return count 0");
+  }
+
   // 10. invalid URL skipped (no alternative candidate present)
   {
     const d = wrap('<img data-src="http://[invalid">');

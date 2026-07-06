@@ -69,7 +69,8 @@
           : (img.hasAttribute("data-srcset") ? img.getAttribute("data-srcset") : null);
         if (srcset) candidate = lastSrcsetCandidate(srcset);
       }
-      if (!candidate) return; // present-but-empty or absent: no write, no fallthrough
+      if (candidate != null) candidate = String(candidate).replace(/^\s+|\s+$/g, "");
+      if (!candidate) return; // present-but-empty/whitespace or absent: no write, no fallthrough
 
       var u;
       try { u = new URL(candidate, baseHref); } catch (_) { return; }
