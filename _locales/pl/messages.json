@@ -2439,5 +2439,9 @@
   "hlCardTranslate": { "message": "Przetłumacz" },
   "hlCardAsk": { "message": "Zapytaj" },
   "fnPopLabel": { "message": "Przypis" },
-  "fnPopJump": { "message": "Przejdź do przypisu" }
+  "fnPopJump": { "message": "Przejdź do przypisu" },
+  "srchPlaceholder": { "message": "Szukaj na stronie…" },
+  "srchInputAria": { "message": "Szukaj w tym dokumencie" },
+  "srchPrevAria": { "message": "Poprzednie dopasowanie" },
+  "srchNextAria": { "message": "Następne dopasowanie" }
 }

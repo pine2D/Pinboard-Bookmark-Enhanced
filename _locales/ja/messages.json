@@ -2439,5 +2439,9 @@
   "hlCardTranslate": { "message": "翻訳" },
   "hlCardAsk": { "message": "質問" },
   "fnPopLabel": { "message": "脚注" },
-  "fnPopJump": { "message": "脚注へ移動" }
+  "fnPopJump": { "message": "脚注へ移動" },
+  "srchPlaceholder": { "message": "ページ内検索…" },
+  "srchInputAria": { "message": "この文書内を検索" },
+  "srchPrevAria": { "message": "前の一致" },
+  "srchNextAria": { "message": "次の一致" }
 }

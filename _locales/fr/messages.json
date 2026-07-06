@@ -2439,5 +2439,9 @@
   "hlCardTranslate": { "message": "Traduire" },
   "hlCardAsk": { "message": "Demander" },
   "fnPopLabel": { "message": "Note de bas de page" },
-  "fnPopJump": { "message": "Aller à la note" }
+  "fnPopJump": { "message": "Aller à la note" },
+  "srchPlaceholder": { "message": "Rechercher dans la page…" },
+  "srchInputAria": { "message": "Rechercher dans ce document" },
+  "srchPrevAria": { "message": "Correspondance précédente" },
+  "srchNextAria": { "message": "Correspondance suivante" }
 }

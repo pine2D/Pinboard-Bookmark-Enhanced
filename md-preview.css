@@ -53,6 +53,14 @@
   --hl-3: light-dark(rgba(96, 165, 250, 0.4), rgba(29, 78, 216, 0.4));
   --hl-4: light-dark(rgba(248, 113, 113, 0.4), rgba(185, 28, 28, 0.4));
   --hl-5: light-dark(rgba(192, 132, 252, 0.4), rgba(126, 34, 206, 0.4));
+  /* R4 in-document search (md-reader.js): a low-saturation NEUTRAL tint
+     distinct from every saturated user-highlight hue above (yellow/
+     green/blue/red/purple) and from --hl-flash's yellow, so all three
+     stay visually distinguishable in both color schemes (spec sec.6.3).
+     -current is one step deeper/teal so the active match still reads as
+     "the same family, emphasized" rather than an unrelated new hue. */
+  --hl-search: light-dark(rgba(100, 116, 139, 0.32), rgba(148, 163, 184, 0.3));
+  --hl-search-current: light-dark(rgba(20, 184, 166, 0.5), rgba(45, 212, 191, 0.42));
   /* Per-script font stacks — DRY building blocks for the :lang() rules below.
      Latin head first (handles en/de/fr/pl/ru + Latin in CJK articles), then the
      script-preferred Han/Kana/Hangul families, then a covering fallback. */
@@ -1022,6 +1030,15 @@ body.md-empty main { margin-left: 0; }
 ::highlight(pbp-hl-4) { background-color: var(--hl-4); }
 ::highlight(pbp-hl-5) { background-color: var(--hl-5); }
 
+/* In-document search (md-reader.js, R4): explicit .priority is set in JS
+   (search=1, current=2, pbp-flash=3, user pbp-hl-* default 0) -- see
+   md-reader.js's _pbpSearchPaintAll/_pbpSearchPaintCurrent and md-ask.js's
+   _pbpAskFlash. Only ONE background wins per overlapping run (CSS Custom
+   Highlight spec has no compositing); the priority order is what makes
+   that outcome deterministic instead of implicit registration order. */
+::highlight(pbp-search) { background-color: var(--hl-search); }
+::highlight(pbp-search-current) { background-color: var(--hl-search-current); }
+
 /* H5 block-level mirror bar (spec 1.5): a 3px left bar echoing the OTHER
    side's highlight color onto the paired block, so a highlight on one side is
    discoverable from the other. Only meaningful when both sides are on screen,
@@ -1593,3 +1610,67 @@ body.ask-open main { margin-right: 396px; }
 }
 .fn-pop-jump:hover, .fn-pop-jump:focus-visible { background: var(--btn-hover); }
 .fn-pop-jump svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* ---- In-document search (md-reader.js, "/" hotkey) ----
+   Top-center floating bar: fixed CSS position, not JS-measured like
+   #explain-pop/#pb-hl-card (it isn't anchored to a selection rect).
+   Same visual family otherwise: border/background/radius/shadow/font-size
+   copied from #explain-pop. */
+#search-pop {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--btn-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.22);
+  font-size: 13px;
+}
+#search-pop:popover-open { display: flex; }
+/* Styled after #ask-input (border/radius/background/font-size/focus all
+   copied verbatim, spec sec.6.4). */
+#search-input {
+  width: min(240px, 40vw);
+  padding: 6px 8px;
+  border: 1px solid var(--btn-border);
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+}
+#search-input:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.srch-count {
+  min-width: 52px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.srch-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.srch-nav:hover { background: var(--btn-hover); border-color: var(--border); }
+.srch-nav:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.srch-nav svg { width: 13px; height: 13px; }
+
+@media print {
+  #search-pop { display: none; }
+}

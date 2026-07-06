@@ -2439,5 +2439,9 @@
   "hlCardTranslate": { "message": "Übersetzen" },
   "hlCardAsk": { "message": "Fragen" },
   "fnPopLabel": { "message": "Fußnote" },
-  "fnPopJump": { "message": "Zur Fußnote springen" }
+  "fnPopJump": { "message": "Zur Fußnote springen" },
+  "srchPlaceholder": { "message": "In der Seite suchen…" },
+  "srchInputAria": { "message": "In diesem Dokument suchen" },
+  "srchPrevAria": { "message": "Vorherige Übereinstimmung" },
+  "srchNextAria": { "message": "Nächste Übereinstimmung" }
 }

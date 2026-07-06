@@ -2433,5 +2433,9 @@
   "hlCardTranslate": { "message": "Translate" },
   "hlCardAsk": { "message": "Ask" },
   "fnPopLabel": { "message": "Footnote" },
-  "fnPopJump": { "message": "Jump to footnote" }
+  "fnPopJump": { "message": "Jump to footnote" },
+  "srchPlaceholder": { "message": "Search in page…" },
+  "srchInputAria": { "message": "Search in this document" },
+  "srchPrevAria": { "message": "Previous match" },
+  "srchNextAria": { "message": "Next match" }
 }

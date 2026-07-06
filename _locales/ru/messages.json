@@ -2439,5 +2439,9 @@
   "hlCardTranslate": { "message": "Перевести" },
   "hlCardAsk": { "message": "Спросить" },
   "fnPopLabel": { "message": "Сноска" },
-  "fnPopJump": { "message": "Перейти к сноске" }
+  "fnPopJump": { "message": "Перейти к сноске" },
+  "srchPlaceholder": { "message": "Поиск на странице…" },
+  "srchInputAria": { "message": "Поиск в этом документе" },
+  "srchPrevAria": { "message": "Предыдущее совпадение" },
+  "srchNextAria": { "message": "Следующее совпадение" }
 }

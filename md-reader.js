@@ -54,6 +54,30 @@ function pbpFnHrefParse(href) {
   return null;
 }
 
+// ---- R4: in-document search match enumeration (pure, no DOM) ----
+// Case-insensitive, non-overlapping consecutive occurrences of `query`
+// inside `text`, capped at `cap` results. Offsets are into `text` as-is
+// (toLowerCase() is length-preserving for the overwhelming common case;
+// exotic Unicode casefolding that changes length is a known, accepted
+// limitation -- same category of simplification the codebase already
+// accepts elsewhere, e.g. pbpAiFuzzyFind's ASCII-oriented matching).
+function pbpSearchEnumerate(text, query, cap) {
+  const out = [];
+  if (typeof text !== "string" || typeof query !== "string" || !query.length) return out;
+  const limit = (typeof cap === "number" && cap > 0) ? cap : 0;
+  if (limit <= 0) return out;
+  const hay = text.toLowerCase();
+  const needle = query.toLowerCase();
+  let from = 0;
+  while (out.length < limit) {
+    const idx = hay.indexOf(needle, from);
+    if (idx === -1) break;
+    out.push({ start: idx, end: idx + needle.length });
+    from = idx + needle.length;
+  }
+  return out;
+}
+
 // ---- DOM wiring ----
 
 // View-mode-aware visibility check for R3 (spec sec.3, reusing R4's exact
@@ -247,6 +271,295 @@ function _pbpFnInit() {
   view.addEventListener("click", _pbpFnOnClick);
 }
 
+// ---- R4: in-document search ("/" hotkey, #search-pop) ----
+// Bare "/" opens a floating top-center search bar scoped to the RENDERED
+// view only (raw view keeps native Ctrl+F, spec sec.4). Candidates are
+// #rendered-view's direct children, filtered by the two known view-mode
+// hidden-selectors (never offsetParent -- content-visibility:auto makes
+// off-screen-but-visible content report offsetParent===null too, see
+// recon R4 risk 3). Matches paint via two CSS Custom Highlight names with
+// EXPLICIT .priority (search=1, current=2) so overlap with user
+// highlights (pbp-hl-*, default priority 0) and the jump flash
+// (pbp-flash, priority 3 as of this task's one-line md-ask.js touch) is a
+// defined contract, not the previous implicit Map-insertion-order
+// tie-break. Per the CSS Custom Highlight spec only ONE background wins
+// per overlapping text run (no compositing) -- the priority order above
+// is the best achievable "both stay discernible" outcome: the
+// NON-overlapping portion of each highlight keeps its own color, only
+// the exact overlap switches to the higher-priority tint.
+const PBP_SEARCH_PREV_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l4-4 4 4"/></svg>';
+const PBP_SEARCH_NEXT_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>';
+
+let _pbpSearchInited = false;
+let _pbpSearchPopEl = null;
+let _pbpSearchState = { query: "", matches: [], ranges: [], idx: -1 };
+let _pbpSearchInputTimer = null;
+let _pbpSearchMo = null;
+let _pbpSearchMoTimer = null;
+
+// Candidate containers: #rendered-view's DIRECT children only (matches
+// spec sec.4 -- cross-top-level-block matches are out of scope), filtered
+// by the two known view-mode hidden-selectors (md-preview.css): a .pb-tr
+// sibling is hidden unless a translation view is active; an original
+// block carrying data-pb-tr-done is hidden in tr-only mode unless peeked
+// open via .pb-show-orig.
+function _pbpSearchVisibleCandidates(view) {
+  const bilingual = document.body.classList.contains("tr-bilingual");
+  const trOnly = document.body.classList.contains("tr-only");
+  const out = [];
+  for (const el of view.children) {
+    if (el.classList.contains("pb-tr")) {
+      if (!bilingual && !trOnly) continue;
+    } else if (trOnly && el.hasAttribute("data-pb-tr-done") && !el.classList.contains("pb-show-orig")) {
+      continue;
+    }
+    out.push(el);
+  }
+  return out;
+}
+
+// Gate matches md-ask.js's _pbpAskFlash precedent verbatim (typeof Highlight
+// === "function" && typeof CSS !== "undefined" && "highlights" in CSS) --
+// kept identical across every CSS Custom Highlight call site in this
+// feature family so the call sites can't drift apart.
+function _pbpSearchPaintAll() {
+  if (typeof Highlight !== "function" || typeof CSS === "undefined" || !("highlights" in CSS)) return;
+  const valid = _pbpSearchState.ranges.filter((r) => !!r);
+  if (!valid.length) { CSS.highlights.delete("pbp-search"); return; }
+  const h = new Highlight(...valid);
+  h.priority = 1; // spec sec.4: explicit contract, below current (2) and flash (3)
+  CSS.highlights.set("pbp-search", h);
+}
+
+function _pbpSearchPaintCurrent(jump) {
+  const st = _pbpSearchState;
+  if (typeof Highlight === "function" && typeof CSS !== "undefined" && "highlights" in CSS) {
+    const r = st.idx >= 0 ? st.ranges[st.idx] : null;
+    if (r) {
+      const h = new Highlight(r);
+      h.priority = 2;
+      CSS.highlights.set("pbp-search-current", h);
+    } else {
+      CSS.highlights.delete("pbp-search-current");
+    }
+  }
+  if (jump && st.idx >= 0) {
+    const m = st.matches[st.idx];
+    if (m && m.el && typeof m.el.scrollIntoView === "function") {
+      m.el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }
+}
+
+function _pbpSearchUpdateCounter() {
+  const pop = _pbpSearchPopEl;
+  if (!pop) return;
+  const counter = pop.querySelector("#search-count");
+  if (!counter) return;
+  const st = _pbpSearchState;
+  const total = st.matches.length >= 500 ? "500+" : String(st.matches.length);
+  const cur = st.matches.length ? String(st.idx + 1) : "0";
+  counter.textContent = cur + " / " + total;
+  // Pairs with the aria-busy set in _pbpSearchOnInput / _pbpSearchArmObserver
+  // -- this is the ONLY place that clears it, so every debounced rescan
+  // settles into exactly one AT announcement of the FINAL count.
+  counter.removeAttribute("aria-busy");
+}
+
+// Re-run the whole scan against the CURRENT DOM. Called on input
+// (debounced in _pbpSearchOnInput) and on rescan triggers (view-mode
+// toggle / target-language change, observed via _pbpSearchArmObserver).
+function _pbpSearchRun(query) {
+  const st = _pbpSearchState;
+  st.query = query;
+  st.matches = [];
+  st.ranges = [];
+  const CAP = 500;
+  const view = document.getElementById("rendered-view");
+  if (query && view) {
+    const cands = _pbpSearchVisibleCandidates(view);
+    scan:
+    for (const el of cands) {
+      const hits = pbpSearchEnumerate(el.textContent, query, CAP - st.matches.length);
+      for (const h of hits) {
+        st.matches.push({ el: el, start: h.start, end: h.end });
+        if (st.matches.length >= CAP) break scan;
+      }
+    }
+    for (const m of st.matches) {
+      st.ranges.push(typeof _pbpAskRangeFromOffsets === "function" ? _pbpAskRangeFromOffsets(m.el, m.start, m.end) : null);
+    }
+  }
+  st.idx = st.matches.length ? 0 : -1;
+  _pbpSearchPaintAll();
+  _pbpSearchPaintCurrent(true);
+  _pbpSearchUpdateCounter();
+}
+
+function _pbpSearchStep(dir) {
+  const st = _pbpSearchState;
+  if (!st.matches.length) return;
+  st.idx = (st.idx + dir + st.matches.length) % st.matches.length;
+  _pbpSearchPaintCurrent(true);
+  _pbpSearchUpdateCounter();
+}
+
+function _pbpSearchOnInput(e) {
+  clearTimeout(_pbpSearchInputTimer);
+  const val = e.target.value;
+  // aria-busy set here, cleared in _pbpSearchUpdateCounter once the
+  // debounced _pbpSearchRun below settles.
+  if (_pbpSearchPopEl) {
+    const counter = _pbpSearchPopEl.querySelector("#search-count");
+    if (counter) counter.setAttribute("aria-busy", "true");
+  }
+  _pbpSearchInputTimer = setTimeout(() => _pbpSearchRun(val), 150);
+}
+
+// Rescan trigger (spec sec.4: "view change / lang change"): a single
+// MutationObserver on #rendered-view (attributes+childList+subtree+
+// characterData) covers BOTH without touching md-translate.js. Debounced
+// 300ms past the last mutation; no-ops while the popover is closed.
+function _pbpSearchArmObserver() {
+  _pbpSearchDisarmObserver();
+  const view = document.getElementById("rendered-view");
+  if (!view) return;
+  _pbpSearchMo = new MutationObserver(() => {
+    // Condition checked BEFORE scheduling so aria-busy below is only ever
+    // set when a rescan is actually going to run.
+    if (!(_pbpSearchPopEl && _pbpSearchPopEl.matches(":popover-open") && _pbpSearchState.query)) return;
+    clearTimeout(_pbpSearchMoTimer);
+    const counter = _pbpSearchPopEl.querySelector("#search-count");
+    if (counter) counter.setAttribute("aria-busy", "true");
+    _pbpSearchMoTimer = setTimeout(() => {
+      _pbpSearchRun(_pbpSearchState.query);
+    }, 300);
+  });
+  _pbpSearchMo.observe(view, { childList: true, subtree: true, attributes: true, characterData: true });
+}
+
+function _pbpSearchDisarmObserver() {
+  clearTimeout(_pbpSearchMoTimer);
+  if (_pbpSearchMo) { _pbpSearchMo.disconnect(); _pbpSearchMo = null; }
+}
+
+// Full state teardown: both highlight names cleared, observer stopped,
+// in-memory match list reset. Runs on EVERY dismissal path (Esc,
+// click-outside, explicit hidePopover) via the popover's own "toggle"
+// event registered once in _pbpSearchEnsurePop.
+function _pbpSearchTeardown() {
+  if (typeof Highlight === "function" && typeof CSS !== "undefined" && "highlights" in CSS) {
+    CSS.highlights.delete("pbp-search");
+    CSS.highlights.delete("pbp-search-current");
+  }
+  _pbpSearchDisarmObserver();
+  _pbpSearchState = { query: "", matches: [], ranges: [], idx: -1 };
+}
+
+function _pbpSearchEnsurePop() {
+  if (_pbpSearchPopEl) return _pbpSearchPopEl;
+  const pop = document.createElement("div");
+  pop.id = "search-pop";
+  pop.setAttribute("popover", "auto"); // top-layer + Esc + light-dismiss for free
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.id = "search-input";
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  input.placeholder = t("srchPlaceholder");
+  input.setAttribute("aria-label", t("srchInputAria"));
+  input.addEventListener("input", _pbpSearchOnInput);
+  input.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    // Flush a pending 150ms debounce: comparing the live input value
+    // against the last-RUN query catches "Enter pressed before
+    // _pbpSearchRun fired yet" without introspecting the timer.
+    if (input.value !== _pbpSearchState.query) {
+      clearTimeout(_pbpSearchInputTimer);
+      _pbpSearchRun(input.value);
+    }
+    _pbpSearchStep(e.shiftKey ? -1 : 1);
+  });
+  pop.appendChild(input);
+
+  // aria-live=polite counter, paired with aria-busy around each debounced
+  // rescan (same pairing md-ask.js uses for its streaming .ask-a).
+  const count = document.createElement("span");
+  count.id = "search-count";
+  count.className = "srch-count";
+  count.setAttribute("aria-live", "polite");
+  count.textContent = "0 / 0";
+  pop.appendChild(count);
+
+  const prev = document.createElement("button");
+  prev.type = "button";
+  prev.id = "search-prev";
+  prev.className = "srch-nav";
+  prev.innerHTML = PBP_SEARCH_PREV_SVG;
+  prev.setAttribute("aria-label", t("srchPrevAria"));
+  prev.title = t("srchPrevAria");
+  prev.addEventListener("click", () => _pbpSearchStep(-1));
+  pop.appendChild(prev);
+
+  const next = document.createElement("button");
+  next.type = "button";
+  next.id = "search-next";
+  next.className = "srch-nav";
+  next.innerHTML = PBP_SEARCH_NEXT_SVG;
+  next.setAttribute("aria-label", t("srchNextAria"));
+  next.title = t("srchNextAria");
+  next.addEventListener("click", () => _pbpSearchStep(1));
+  pop.appendChild(next);
+
+  pop.addEventListener("toggle", (e) => {
+    if (e.newState === "closed") _pbpSearchTeardown();
+  });
+  document.body.appendChild(pop);
+  _pbpSearchPopEl = pop;
+  return pop;
+}
+
+// Mutual exclusion with the other popover families (spec sec.6.1) --
+// "#fn-pop" is Task 3's footnote popover; a plain getElementById is used
+// since it degrades to a safe no-op (null) whether or not that feature
+// happened to mount.
+function _pbpSearchOpen() {
+  const pop = _pbpSearchEnsurePop();
+  ["explain-pop", "pb-hl-card", "pb-hl-bar", "fn-pop"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && el.matches && el.matches(":popover-open")) { try { el.hidePopover(); } catch (_) {} }
+  });
+  _pbpSearchTeardown();
+  const input = pop.querySelector("#search-input");
+  input.value = "";
+  _pbpSearchUpdateCounter();
+  if (!pop.matches(":popover-open")) pop.showPopover();
+  input.focus();
+  _pbpSearchArmObserver();
+}
+
+// Same 4-condition gate as the existing e/V/H/1-5 hotkeys
+// (pbpTrIsTypingContext, md-translate.js), plus one search-specific 5th
+// gate: raw view is a plain <pre>, not a rendered document -- "/" is a
+// no-op there so native Ctrl+F keeps working on raw text untouched.
+function _pbpSearchOnKeyDown(e) {
+  if (e.key !== "/") return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  const ae = document.activeElement;
+  if (pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))) return;
+  if (document.body.classList.contains("raw-active")) return;
+  e.preventDefault();
+  _pbpSearchOpen();
+}
+
+function _pbpSearchInit() {
+  if (_pbpSearchInited) return;
+  _pbpSearchInited = true;
+  document.addEventListener("keydown", _pbpSearchOnKeyDown);
+}
+
 // ---- bootstrap: ONE shared "pbp:rendered" listener for every
 // md-reader.js feature (spec sec.8: R3 footnotes / R4 search / "?"
 // keyboard help all live in this one file). Later tasks extend this
@@ -260,5 +573,6 @@ function _pbpFnInit() {
 if (typeof document !== "undefined") {
   document.addEventListener("pbp:rendered", () => {
     try { _pbpFnInit(); } catch (_) {}
+    try { _pbpSearchInit(); } catch (_) {}
   }, { once: true });
 }

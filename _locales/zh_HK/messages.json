@@ -2439,5 +2439,9 @@
   "hlCardTranslate": { "message": "翻譯" },
   "hlCardAsk": { "message": "提問" },
   "fnPopLabel": { "message": "腳註" },
-  "fnPopJump": { "message": "跳到腳註" }
+  "fnPopJump": { "message": "跳到腳註" },
+  "srchPlaceholder": { "message": "頁面搜尋…" },
+  "srchInputAria": { "message": "在文件中搜尋" },
+  "srchPrevAria": { "message": "上一個相符項目" },
+  "srchNextAria": { "message": "下一個相符項目" }
 }

@@ -776,7 +776,12 @@ let _pbpAskFlashEl = null;
 function _pbpAskFlash(range, targetEl) {
   clearTimeout(_pbpAskFlashTimer);
   if (typeof Highlight === "function" && typeof CSS !== "undefined" && "highlights" in CSS) {
-    CSS.highlights.set("pbp-flash", new Highlight(range));
+    // R4 (md-reader.js) explicit priority contract: search=1, current
+    // match=2, this jump flash=3 -- replaces the previous implicit
+    // CSS.highlights Map-insertion-order tie-break.
+    const flashHl = new Highlight(range);
+    flashHl.priority = 3;
+    CSS.highlights.set("pbp-flash", flashHl);
     _pbpAskFlashTimer = setTimeout(() => { CSS.highlights.delete("pbp-flash"); }, 1600);
   } else {
     if (_pbpAskFlashEl) _pbpAskFlashEl.classList.remove("pb-flash-fallback");

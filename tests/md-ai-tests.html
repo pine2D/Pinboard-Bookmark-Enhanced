@@ -4339,4 +4339,49 @@ suiteIf("pbpFnHrefParse", "pbpFnHrefParse", () => {
   });
 });
 </script>
+<script>
+// ============ R4: pbpSearchEnumerate (md-reader.js) ============
+suiteIf("pbpSearchEnumerate", "pbpSearchEnumerate", () => {
+  test("empty query returns no matches", () => {
+    assertEq(pbpSearchEnumerate("hello world", "", 10).length, 0, "empty query");
+  });
+  test("non-string text returns no matches", () => {
+    assertEq(pbpSearchEnumerate(null, "a", 10).length, 0, "null text");
+  });
+  test("finds a single occurrence", () => {
+    const r = pbpSearchEnumerate("the quick brown fox", "quick", 10);
+    assertEq(r.length, 1, "one match");
+    assertEq(r[0].start, 4, "start");
+    assertEq(r[0].end, 9, "end");
+  });
+  test("finds multiple consecutive non-overlapping occurrences in order", () => {
+    const r = pbpSearchEnumerate("ababab", "ab", 10);
+    assertEq(r.length, 3, "three matches");
+    assertEq(r[0].start, 0, "m0 start");
+    assertEq(r[1].start, 2, "m1 start");
+    assertEq(r[2].start, 4, "m2 start");
+  });
+  test("case-insensitive matching", () => {
+    const r = pbpSearchEnumerate("The Quick Fox", "quick", 10);
+    assertEq(r.length, 1, "one match");
+    assertEq(r[0].start, 4, "start ignores case");
+  });
+  test("overlapping single-character query still finds every position", () => {
+    const r = pbpSearchEnumerate("aaaaaa", "a", 10);
+    assertEq(r.length, 6, "six positions");
+    assertEq(r[5].start, 5, "last position");
+  });
+  test("stops scanning once the cap is reached", () => {
+    const r = pbpSearchEnumerate("aaaaaa", "a", 3);
+    assertEq(r.length, 3, "capped at 3");
+    assertEq(r[2].end, 3, "third match ends at offset 3");
+  });
+  test("no match returns an empty array", () => {
+    assertEq(pbpSearchEnumerate("hello", "xyz", 10).length, 0, "no match");
+  });
+  test("non-positive cap returns an empty array", () => {
+    assertEq(pbpSearchEnumerate("hello hello", "hello", 0).length, 0, "cap 0");
+  });
+});
+</script>
 </body></html>

@@ -2433,5 +2433,9 @@
   "hlCardTranslate": { "message": "翻译" },
   "hlCardAsk": { "message": "提问" },
   "fnPopLabel": { "message": "脚注" },
-  "fnPopJump": { "message": "跳到脚注" }
+  "fnPopJump": { "message": "跳到脚注" },
+  "srchPlaceholder": { "message": "页内搜索…" },
+  "srchInputAria": { "message": "在文档中搜索" },
+  "srchPrevAria": { "message": "上一个匹配项" },
+  "srchNextAria": { "message": "下一个匹配项" }
 }
