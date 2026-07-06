@@ -2421,6 +2421,7 @@
   "hlColorExample": { "message": "Przykład" },
   "hlColorDoubt": { "message": "Wątpliwość" },
   "hlColorTodo": { "message": "Do zrobienia" },
+  "hlTrBadgeAria": { "message": "Podświetlenie tłumaczenia ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "Zaznacz z notatką" },
   "hlSaveFailed": { "message": "Nie udało się zapisać zaznaczenia (brak miejsca)" },
   "hlNotePlaceholder": { "message": "Dodaj notatkę…" },

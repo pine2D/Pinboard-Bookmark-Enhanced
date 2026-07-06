@@ -515,7 +515,7 @@ function composeExport(canonicalMd, meta, opts) {
   });
   const hlItems = Array.isArray(opts.highlights) ? opts.highlights : null;
   if (hlItems && hlItems.length && opts.highlightsInline !== false && typeof pbpHlInlineMark === "function") {
-    body = pbpHlInlineMark(body, hlItems);
+    body = pbpHlInlineMark(body, hlItems, opts.hlView); // H5 (spec 1.6): filter marks by the exported view
   }
   if (opts.includeToc) {
     const { tocMarkdown } = buildToc(body, { minLevel: 2, maxLevel: 4 });

@@ -662,7 +662,11 @@ function pbpApplyColorScheme(mode) {
       // buildExportOpts() only runs from click handlers, long after every deferred
       // script has executed; the typeof check just protects against md-highlight.js
       // failing to load at all).
-      highlights: (typeof pbpHlCurrentItems === "function") ? pbpHlCurrentItems() : []
+      highlights: (typeof pbpHlCurrentItems === "function") ? pbpHlCurrentItems() : [],
+      // H5 (spec 1.6): which translation view the highlights are exported for,
+      // read off the body class _pbpTrSetMode toggles (tr-only / tr-bilingual).
+      hlView: document.body.classList.contains("tr-only") ? "tr"
+        : (document.body.classList.contains("tr-bilingual") ? "bilingual" : "orig")
     };
   }
   // Raw view markdown, following the translation view: md-translate.js sets
@@ -1068,7 +1072,7 @@ function pbpApplyColorScheme(mode) {
         setPrimary(id);
         await pbpSetLastTarget(id);
         const _exp = buildExportOpts();
-        const _sendBody = composeExport(getViewMarkdown(), buildMeta(), { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights });
+        const _sendBody = composeExport(getViewMarkdown(), buildMeta(), { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights, hlView: _exp.hlView }); // H5 (spec 1.6): send-to honors the exported view's tri-state too
         primary.classList.add("sending");
         primaryLabel.textContent = t("mdSending");
         let res;

@@ -2421,6 +2421,7 @@
   "hlColorExample": { "message": "例" },
   "hlColorDoubt": { "message": "疑問" },
   "hlColorTodo": { "message": "やること" },
+  "hlTrBadgeAria": { "message": "翻訳のハイライト（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "メモ付きでハイライト" },
   "hlSaveFailed": { "message": "ハイライトを保存できませんでした（ストレージが一杯です）" },
   "hlNotePlaceholder": { "message": "メモを追加…" },

@@ -2415,6 +2415,7 @@
   "hlColorExample": { "message": "例子" },
   "hlColorDoubt": { "message": "存疑" },
   "hlColorTodo": { "message": "待办" },
+  "hlTrBadgeAria": { "message": "译文高亮（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "带笔记高亮" },
   "hlSaveFailed": { "message": "高亮未能保存（存储空间已满）" },
   "hlNotePlaceholder": { "message": "添加笔记…" },

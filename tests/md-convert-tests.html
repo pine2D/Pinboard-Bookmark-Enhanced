@@ -412,6 +412,37 @@ function assertEq(actual, expected, label) {
 </script>
 
 <script>
+  section("H5 export tri-state (spec 1.6)");
+  const h5meta = { title: "T", url: "https://e.com/", date: "2026-06-03", tags: ["dev"], source: "defuddle" };
+  // A bilingual-style body carrying BOTH an original phrase and a translated phrase.
+  const h5body = "Section One paragraph.\n\ntranslated body paragraph.";
+  const h5items = [
+    { id: "o", n: 1, quote: "Section One", prefix: "", suffix: "", color: 1, note: "", ts: 1 },
+    { id: "t", n: 1, quote: "translated body", prefix: "", suffix: "", color: 3, note: "", ts: 2, side: "tr", lang: "zh-CN" }
+  ];
+
+  const orig = composeExport(h5body, h5meta, { frontmatter: false, imagePolicy: "keep", includeToc: false, highlights: h5items, hlView: "orig" });
+  check("hlView orig marks the original quote", orig.includes("==Section One=="), orig);
+  check("hlView orig does NOT mark the tr quote", !orig.includes("==translated body=="), orig);
+
+  const tr = composeExport(h5body, h5meta, { frontmatter: false, imagePolicy: "keep", includeToc: false, highlights: h5items, hlView: "tr" });
+  check("hlView tr marks the tr quote (fixes the old dropped-mark bug)", tr.includes("==translated body=="), tr);
+  check("hlView tr does NOT mark the original quote", !tr.includes("==Section One=="), tr);
+
+  const bi = composeExport(h5body, h5meta, { frontmatter: false, imagePolicy: "keep", includeToc: false, highlights: h5items, hlView: "bilingual" });
+  check("hlView bilingual marks both sides", bi.includes("==Section One==") && bi.includes("==translated body=="), bi);
+
+  // Aggregation section: all items always present; tr item annotated, orig not.
+  const sect = pbpHlComposeSection(h5items);
+  check("composeSection lists both quotes", sect.includes("Section One") && sect.includes("translated body"), sect);
+  check("composeSection tags the tr item with [tr:zh-CN]", sect.includes("[tr:zh-CN]"), sect);
+  check("composeSection does not tag the original item's slug", !/#hl-quote[^\n]*\[tr:/.test(sect), sect);
+
+  // Back-compat: 2-arg pbpHlInlineMark (no view) still wraps a unique quote.
+  check("pbpHlInlineMark 2-arg back-compat still wraps", pbpHlInlineMark("a Section One b", [{ quote: "Section One", color: 1 }]).includes("==Section One=="), "back-compat");
+</script>
+
+<script>
   // ---- P3.2 highlightCodeBlocks (needs vendor/highlight.min.js loaded above) ----
   section("P3.2 highlightCodeBlocks");
   (() => {

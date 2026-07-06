@@ -3920,6 +3920,43 @@ suiteIf("_pbpHlSelectionSegments tr-side", "_pbpHlSelectionSegments", () => {
     root.remove();
   });
 });
+
+// ============ H5: pbpHlLatestColorOnSide (mirror color, pure) ============
+suiteIf("pbpHlLatestColorOnSide", "pbpHlLatestColorOnSide", () => {
+  test("returns the newest-by-ts original color in the block", () => {
+    const items = [
+      { n: 1, side: undefined, color: 2, ts: 1 },
+      { n: 1, side: undefined, color: 5, ts: 3 },
+    ];
+    assertEq(pbpHlLatestColorOnSide(items, 1, "orig", ""), 5, "latest orig by ts");
+  });
+  test("tr side returns the newest paintable tr color when lang matches", () => {
+    const items = [
+      { n: 1, side: "tr", lang: "zh-CN", color: 3, ts: 2 },
+      { n: 1, side: "tr", lang: "zh-CN", color: 4, ts: 4 },
+    ];
+    assertEq(pbpHlLatestColorOnSide(items, 1, "tr", "zh-CN"), 4, "latest tr, lang match");
+  });
+  test("tr side returns 0 when the block language does not match", () => {
+    const items = [{ n: 1, side: "tr", lang: "zh-CN", color: 4, ts: 4 }];
+    assertEq(pbpHlLatestColorOnSide(items, 1, "tr", "en"), 0, "lang mismatch -> 0");
+  });
+  test("orig query ignores tr items and vice versa", () => {
+    const items = [
+      { n: 1, side: undefined, color: 2, ts: 5 },
+      { n: 1, side: "tr", lang: "zh-CN", color: 3, ts: 9 },
+    ];
+    assertEq(pbpHlLatestColorOnSide(items, 1, "orig", "zh-CN"), 2, "orig ignores tr");
+    assertEq(pbpHlLatestColorOnSide(items, 1, "tr", "zh-CN"), 3, "tr ignores orig");
+  });
+  test("empty / other-block input returns 0", () => {
+    assertEq(pbpHlLatestColorOnSide([], 1, "orig", ""), 0, "empty -> 0");
+    assertEq(pbpHlLatestColorOnSide([{ n: 2, color: 1, ts: 1 }], 1, "orig", ""), 0, "other block -> 0");
+  });
+  test("out-of-range color clamps to 1", () => {
+    assertEq(pbpHlLatestColorOnSide([{ n: 1, color: 9, ts: 1 }], 1, "orig", ""), 1, "color 9 -> 1");
+  });
+});
 </script>
 
 <script>

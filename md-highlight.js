@@ -91,6 +91,26 @@ function pbpHlItemPaints(item, blockTrLang) {
   return typeof item.lang === "string" && item.lang.length > 0 && item.lang === blockTrLang;
 }
 
+// ---- H5 block-level mirror color (spec 1.5, pure/testable). Among the
+// highlights in block n anchored to `side` ("orig"|"tr") that would actually
+// paint (tr items gated by blockTrLang), return the color (1..5) of the
+// newest by ts, else 0. pbpHlSyncMirror uses it cross-side: the .pb-tr shows
+// the ORIGINAL side's color, the original block shows the TRANSLATED side's.
+function pbpHlLatestColorOnSide(items, n, side, blockTrLang) {
+  const list = Array.isArray(items) ? items : [];
+  let best = null;
+  for (const it of list) {
+    if (!it || (Number(it.n) || 0) !== n) continue;
+    const itSide = it.side === "tr" ? "tr" : "orig";
+    if (itSide !== side) continue;
+    if (side === "tr" && !pbpHlItemPaints(it, blockTrLang)) continue;
+    if (!best || (Number(it.ts) || 0) > (Number(best.ts) || 0)) best = it;
+  }
+  if (!best) return 0;
+  const c = Number(best.color) | 0;
+  return (c >= 1 && c <= 5) ? c : 1;
+}
+
 // ---- H2 export: aggregation section (spec 5). Tag slugs are FIXED
 // English strings (a markdown interchange format, like frontmatter)
 // -- i18n only touches UI labels, never these.
@@ -117,7 +137,11 @@ function pbpHlComposeSection(items) {
     let block = _pbpHlQuoteLines(it.quote);
     if (it.note) block += "\n>\n" + _pbpHlQuoteLines(it.note);
     const slug = PBP_HL_SLUGS[(Number(it.color) | 0) - 1] || PBP_HL_SLUGS[0];
-    return block + "\n\n" + slug;
+    // H5 (spec 1.6): a translated-side highlight prints its own-language quote,
+    // tagged so a mixed-language export is unambiguous. Original items get no
+    // tag -> byte-identical to today (regression guard holds).
+    const tag = (it.side === "tr" && it.lang) ? " [tr:" + it.lang + "]" : "";
+    return block + "\n\n" + slug + tag;
   });
   return "## Highlights\n\n" + groups.join("\n\n");
 }
@@ -160,9 +184,17 @@ function _pbpHlInProtected(ranges, start, end) {
 // best-effort on top, zero data loss either way). Overlapping wraps
 // across items are resolved by keeping the earliest and dropping the
 // rest -- also treated as "ambiguous".
-function pbpHlInlineMark(md, items) {
+function pbpHlInlineMark(md, items, view) {
   const text = typeof md === "string" ? md : "";
-  const list = Array.isArray(items) ? items : [];
+  let list = Array.isArray(items) ? items : [];
+  // H5 (spec 1.6): filter by the translation view being exported. orig -> only
+  // original-side items; tr -> only translated-side items (fixes the old
+  // tr-only export silently dropping every == mark, because an orig-language
+  // quote never matched the translated-only body); bilingual/undefined ->
+  // both sides (each quote matches its own language's text in the interleaved
+  // body). Legacy 2-arg callers pass view=undefined -> unchanged.
+  if (view === "orig") list = list.filter((it) => it && it.side !== "tr");
+  else if (view === "tr") list = list.filter((it) => it && it.side === "tr");
   if (!text || !list.length) return text;
   const protectedRanges = _pbpHlProtectedRanges(text);
   const wraps = [];
@@ -428,6 +460,7 @@ function pbpHlRestore() {
   for (const c of PBP_HL_COLORS) {
     if (byColor[c].length) CSS.highlights.set("pbp-hl-" + c, new Highlight(...byColor[c]));
   }
+  if (typeof pbpHlSyncMirrorAll === "function") pbpHlSyncMirrorAll(); // H5 (spec 1.5)
 }
 
 // hljs/KaTeX rewrite pre/math blocks' text nodes on their own rAF-deferred
@@ -476,6 +509,41 @@ function _pbpHlReanchorBlock(n) {
 // two window hooks below via typeof guards; it never hard-depends on this
 // file. All work is wrapped so a highlight failure can never break the
 // translation main flow (spec 7.2). ----
+
+// ---- H5 block-level mirror bars (spec 1.5). data-pb-hl-mirror="<1..5>" on
+// the paired element; the CSS (md-preview.css) draws a 3px left border in the
+// matching --hl-N color, ONLY under body.tr-bilingual / body.tr-only, so the
+// original view is pixel-unchanged (spec 1.5 / 3). Cross-side: the .pb-tr
+// mirrors the ORIGINAL side's highlights, the original block mirrors the
+// TRANSLATED side's paintable highlights. ----
+function _pbpHlSetMirror(el, color) {
+  if (!el) return;
+  if (color >= 1 && color <= 5) el.dataset.pbHlMirror = String(color);
+  else if (el.dataset && "pbHlMirror" in el.dataset) delete el.dataset.pbHlMirror;
+}
+
+function pbpHlSyncMirror(n) {
+  if (!_pbpHlState) return;
+  const items = _pbpHlState.items;
+  const origEl = pbpAiBlockEl(n);
+  const trEl = document.querySelector('.pb-tr[data-pb-tr="' + n + '"]');
+  const trLang = trEl ? (trEl.dataset.pbTrLang || "") : "";
+  const origColor = pbpHlLatestColorOnSide(items, n, "orig", trLang); // -> shown on the .pb-tr
+  const trColor = pbpHlLatestColorOnSide(items, n, "tr", trLang);     // -> shown on the original block
+  _pbpHlSetMirror(trEl, origColor);
+  _pbpHlSetMirror(origEl, trColor);
+}
+
+function pbpHlSyncMirrorAll() {
+  if (!_pbpHlState) return;
+  const seen = new Set();
+  for (const it of _pbpHlState.items) {
+    const n = Number(it.n) || 0;
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    pbpHlSyncMirror(n);
+  }
+}
 
 // Incremental re-anchor of block n's translated-side highlights against the
 // just-(re)built .pb-tr. Mirrors _pbpHlReanchorBlock but for the tr side:
@@ -761,6 +829,7 @@ async function _pbpHlCreateFromRange(range, color, btn) {
   if (created.length) {
     await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn);
     await _pbpHlLastColorSet(color);
+    for (const it of created) pbpHlSyncMirror(it.n); // H5 (spec 1.5)
     _pbpHlNotebookRender();
     // Spec 1.3 trigger 4: the FIRST highlight created this session
     // auto-expands the rail's hl section (session-visual only, via
@@ -1221,8 +1290,10 @@ function _pbpHlDeleteItem(id, btn) {
   if (!_pbpHlState) return;
   const idx = _pbpHlState.items.findIndex((it) => it.id === id);
   if (idx === -1) return;
+  const removedN = Number(_pbpHlState.items[idx].n) || 0;
   _pbpHlState.items.splice(idx, 1);
   return _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn).then(() => {
+    if (removedN && typeof pbpHlSyncMirror === "function") pbpHlSyncMirror(removedN); // H5 (spec 1.5)
     if (typeof pbpHlRestore === "function") pbpHlRestore();
     _pbpHlNotebookRender();
     if (_pbpHlCard && _pbpHlCardItemId === id) _pbpHlCard.hidePopover();
@@ -1356,8 +1427,13 @@ function _pbpHlBuildItemEl(m) {
   // wants a silent no-op at click time (checked again in _pbpHlNotebookJump),
   // not a permanently-disabled control, since this view state can change
   // within the same page load.
-  const dimmed = !!blockEl && document.body.classList.contains("tr-only")
-    && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig");
+  const isTr = !!full && full.side === "tr";
+  const painted = !!(_pbpHlState.ranges && _pbpHlState.ranges[m.id]);
+  const trVisible = document.body.classList.contains("tr-bilingual") || document.body.classList.contains("tr-only");
+  const dimmed = isTr
+    ? !(painted && trVisible)
+    : (!!blockEl && document.body.classList.contains("tr-only")
+        && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig"));
 
   const li = document.createElement("li");
   li.className = "hl-item" + (dimmed ? " hl-item-dim" : "");
@@ -1373,6 +1449,13 @@ function _pbpHlBuildItemEl(m) {
   q.className = "hl-item-quote";
   q.textContent = m.excerpt;
   main.appendChild(q);
+  if (isTr) {
+    const badge = document.createElement("span");
+    badge.className = "hl-item-lang";
+    badge.textContent = full.lang || "";
+    badge.setAttribute("aria-label", t("hlTrBadgeAria", full.lang || ""));
+    main.appendChild(badge);
+  }
   main.title = full ? full.quote : m.excerpt;
   if (!blockEl) {
     main.disabled = true; // block gone (content drift): permanent for this render, native disabled is correct here
@@ -1405,6 +1488,17 @@ function _pbpHlBuildItemEl(m) {
 // mechanism (spec 2.1). Re-checks tr-only visibility at click time (not just
 // at last render) so a stale dim-class never causes an incorrect jump.
 function _pbpHlNotebookJump(item) {
+  if (item && item.side === "tr") {
+    const trEl = document.querySelector('.pb-tr[data-pb-tr="' + item.n + '"]');
+    if (!trEl) return;
+    // .pb-tr is display:none in the pure original view -> silent no-op (spec 1.4).
+    if (!document.body.classList.contains("tr-bilingual") && !document.body.classList.contains("tr-only")) return;
+    trEl.scrollIntoView({ block: "center", behavior: "smooth" });
+    const entry = _pbpHlState.ranges[item.id];
+    const range = (entry && entry.range) || (() => { const r = document.createRange(); r.selectNode(trEl); return r; })();
+    _pbpAskFlash(range, trEl);
+    return;
+  }
   const blockEl = pbpAiBlockEl(item.n);
   if (!blockEl) return;
   if (document.body.classList.contains("tr-only") && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig")) return; // spec 2.3: silent no-op
@@ -1424,4 +1518,25 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     if (!(_pbpHlKey(_pbpHlState.url) in changes)) return;
     _pbpHlNotebookRender();
   });
+}
+
+// H5 (spec 1.4 / 1.5): the Notebook dim state of tr rows and the mirror bars
+// both depend on the current translation view (tr-bilingual / tr-only), which
+// md-translate toggles as a body class (V key, mode buttons, peek). Re-render
+// on any body-class mutation so those stay correct without md-translate
+// calling us. Cheap: replaceChildren + attribute writes; class mutations are
+// rare (view toggle, rail open, raw toggle). ponytail: not filtered to the
+// tr-* classes specifically -- the extra renders are harmless; narrow only if
+// ever profiled.
+if (typeof MutationObserver === "function" && typeof document !== "undefined") {
+  const startBodyObs = () => {
+    if (!document.body) return;
+    new MutationObserver(() => {
+      if (!_pbpHlState) return;
+      _pbpHlNotebookRender();
+      pbpHlSyncMirrorAll();
+    }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  };
+  if (document.body) startBodyObs();
+  else document.addEventListener("DOMContentLoaded", startBodyObs, { once: true });
 }

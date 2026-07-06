@@ -2421,6 +2421,7 @@
   "hlColorExample": { "message": "例子" },
   "hlColorDoubt": { "message": "存疑" },
   "hlColorTodo": { "message": "待辦" },
+  "hlTrBadgeAria": { "message": "譯文標示（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "連筆記一併標記" },
   "hlSaveFailed": { "message": "標記未能儲存（儲存空間已滿）" },
   "hlNotePlaceholder": { "message": "新增筆記…" },

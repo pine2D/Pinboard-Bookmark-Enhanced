@@ -2421,6 +2421,7 @@
   "hlColorExample": { "message": "Exemple" },
   "hlColorDoubt": { "message": "Doute" },
   "hlColorTodo": { "message": "À faire" },
+  "hlTrBadgeAria": { "message": "Surlignage de la traduction ($LANG$)", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "Surligner avec une note" },
   "hlSaveFailed": { "message": "Le surlignage n'a pas pu être enregistré (stockage plein)" },
   "hlNotePlaceholder": { "message": "Ajouter une note…" },

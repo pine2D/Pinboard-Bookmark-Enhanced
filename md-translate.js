@@ -1233,6 +1233,11 @@ function _pbpTrFill(st, w, shieldedTranslation) {
           throwOnError: false
         });
       } catch (_) {}
+      // H5 controller fix (Task 1 review finding): this deferred KaTeX pass
+      // rewrites .pb-tr text nodes AFTER the reanchor hook above already ran,
+      // silently detaching tr-side highlight ranges on math-bearing blocks.
+      // Re-run the same typeof-guarded reanchor once KaTeX has finished.
+      if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) {} }
     });
   }
   // H5 (spec 1.3): the .pb-tr for block w.n was just (re)built in the current
