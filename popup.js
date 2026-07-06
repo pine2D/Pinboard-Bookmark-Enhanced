@@ -395,7 +395,14 @@ async function extractLocalMarkdown(tabId) {
           if (typeof applySiteRule === "function") {
             const hit = applySiteRule(document, location.href);
             if (hit && hit.contentHtml) {
-              return { contentHtml: hit.contentHtml, title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum };
+              // E1: normalize lazy-load img placeholders (data-src/srcset) on
+              // a DETACHED div -- the live DOM is never touched;
+              // pbpNormalizeLazyImages comes from site-rules.js, already
+              // injected above (extractLocalMarkdown's _cbExecuteScript call).
+              const div = document.createElement("div");
+              div.innerHTML = hit.contentHtml;
+              if (typeof pbpNormalizeLazyImages === "function") pbpNormalizeLazyImages(div, location.href);
+              return { contentHtml: div.innerHTML, title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum };
             }
           }
         } catch (_) { /* fall through to Defuddle */ }
@@ -419,6 +426,9 @@ async function extractLocalMarkdown(tabId) {
         }
         try {
           const clone = document.cloneNode(true);
+          // E1: normalize lazy-load img placeholders on the CLONE before
+          // Defuddle parses it -- the live DOM is never touched.
+          if (typeof pbpNormalizeLazyImages === "function") pbpNormalizeLazyImages(clone, location.href);
           // Suppress Defuddle's internal console.error for malformed schema.org JSON on third-party pages
           const _origCE = console.error;
           console.error = (...a) => { if (!String(a[0]).startsWith("Defuddle:")) _origCE.apply(console, a); };

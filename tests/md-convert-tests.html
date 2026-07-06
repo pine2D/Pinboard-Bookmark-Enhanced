@@ -1314,6 +1314,43 @@ section("site-rules: pbpNormalizeLazyImages");
 </script>
 
 <script>
+// ---- E1: detached-div innerHTML roundtrip (site-rule path regression, spec invariant 4) ----
+// Hook Pattern A stuffs a site-rule's contentHtml into a DETACHED div, calls
+// pbpNormalizeLazyImages(div, baseHref), then reads back div.innerHTML as the
+// new contentHtml -- on a page with no lazy images this must not silently
+// mutate the returned markup. This is NOT a general innerHTML guarantee (see
+// the second half of this block); it holds because every existing site-rule
+// already builds contentHtml in canonical serialized form.
+{
+  section("E1: detached-div innerHTML roundtrip (non-lazy site-rule content)");
+  const rep = '<p>See <a href="https://example.com/ref">reference</a> for details.</p>'
+    + '<img src="https://example.com/real.png" alt="diagram">'
+    + '<pre><code>const x = 1;\nconsole.log(x);</code></pre>'
+    + '<ul><li>a<ul><li>b</li><li>c</li></ul></li><li>d</li></ul>';
+  const div = document.createElement("div");
+  div.innerHTML = rep;
+  const n = pbpNormalizeLazyImages(div, "https://example.com/page");
+  check("real-src-only fragment -> 0 images normalized (real src never touched)", n === 0, String(n));
+  check("canonical-form fragment (link, real-src img, pre/code, nested list) round-trips byte-identical",
+    div.innerHTML === rep, div.innerHTML);
+
+  // Boundary: byte-identity is NOT a general innerHTML guarantee -- it holds
+  // because contentHtml is already canonical, not because Chrome preserves
+  // arbitrary input syntax. Single-quoted + self-closing markup normalizes
+  // on the FIRST pass, then is stable (idempotent) from then on.
+  const nonCanonical = "<img src='https://example.com/x.png'/>";
+  const div2 = document.createElement("div");
+  div2.innerHTML = nonCanonical;
+  const firstPass = div2.innerHTML;
+  check("non-canonical syntax (single quotes + self-close) is NOT preserved byte-for-byte",
+    firstPass !== nonCanonical, firstPass);
+  div2.innerHTML = firstPass;
+  check("second roundtrip of already-canonical output is stable (idempotent -- the real guarantee)",
+    div2.innerHTML === firstPass, div2.innerHTML);
+}
+</script>
+
+<script>
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>
