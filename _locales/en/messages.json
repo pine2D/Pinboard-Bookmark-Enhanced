@@ -1392,6 +1392,9 @@
   "mdOptIncludeToc": {
     "message": "Include TOC"
   },
+  "mdOptIncludeHl": {
+    "message": "Include highlights"
+  },
   "mdCopy": {
     "message": "Copy"
   },

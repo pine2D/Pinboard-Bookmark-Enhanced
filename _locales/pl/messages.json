@@ -1416,6 +1416,9 @@
   "mdOptIncludeToc": {
     "message": "Dołącz spis treści"
   },
+  "mdOptIncludeHl": {
+    "message": "Uwzględnij zaznaczenia"
+  },
   "mdCopy": {
     "message": "Kopiuj"
   },

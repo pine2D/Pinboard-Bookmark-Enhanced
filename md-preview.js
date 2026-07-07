@@ -629,6 +629,9 @@ function pbpApplyColorScheme(mode) {
   const expFrontmatter = document.getElementById("exp-frontmatter");
   const expImagePolicy = document.getElementById("exp-image-policy");
   const expIncludeToc = document.getElementById("exp-include-toc");
+  // Per-export toggle, not settings-backed -- checked by default in the HTML
+  // itself (today's behavior unchanged); see buildExportOpts below.
+  const expIncludeHl = document.getElementById("exp-include-hl");
   if (expFrontmatter) expFrontmatter.checked = !!exportSettings.mdExportFrontmatter;
   if (expImagePolicy) expImagePolicy.value = exportSettings.mdExportImagePolicy || "keep";
   if (expIncludeToc) expIncludeToc.checked = !!exportSettings.mdExportIncludeToc;
@@ -661,8 +664,10 @@ function pbpApplyColorScheme(mode) {
       // H2 export (md-highlight.js, loaded after this file — guarded because
       // buildExportOpts() only runs from click handlers, long after every deferred
       // script has executed; the typeof check just protects against md-highlight.js
-      // failing to load at all).
-      highlights: (typeof pbpHlCurrentItems === "function") ? pbpHlCurrentItems() : [],
+      // failing to load at all). Unchecking exp-include-hl drops BOTH the inline
+      // ==marks== and the "## Highlights" section (composeExport already skips
+      // both for an empty array).
+      highlights: (expIncludeHl && !expIncludeHl.checked) ? [] : ((typeof pbpHlCurrentItems === "function") ? pbpHlCurrentItems() : []),
       // H5 (spec 1.6): which translation view the highlights are exported for,
       // read off the body class _pbpTrSetMode toggles (tr-only / tr-bilingual).
       hlView: document.body.classList.contains("tr-only") ? "tr"

@@ -1416,6 +1416,9 @@
   "mdOptIncludeToc": {
     "message": "Включить оглавление"
   },
+  "mdOptIncludeHl": {
+    "message": "Включать выделения"
+  },
   "mdCopy": {
     "message": "Копировать"
   },

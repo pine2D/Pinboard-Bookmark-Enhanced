@@ -1416,6 +1416,9 @@
   "mdOptIncludeToc": {
     "message": "Inclure la TDM"
   },
+  "mdOptIncludeHl": {
+    "message": "Inclure les surlignages"
+  },
   "mdCopy": {
     "message": "Copier"
   },

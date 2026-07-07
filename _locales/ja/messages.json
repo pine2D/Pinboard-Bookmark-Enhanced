@@ -1416,6 +1416,9 @@
   "mdOptIncludeToc": {
     "message": "目次を含める"
   },
+  "mdOptIncludeHl": {
+    "message": "ハイライトを含める"
+  },
   "mdCopy": {
     "message": "コピー"
   },

@@ -1416,6 +1416,9 @@
   "mdOptIncludeToc": {
     "message": "含目录"
   },
+  "mdOptIncludeHl": {
+    "message": "包含高亮"
+  },
   "mdCopy": {
     "message": "复制"
   },

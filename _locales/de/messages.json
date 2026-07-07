@@ -1416,6 +1416,9 @@
   "mdOptIncludeToc": {
     "message": "Inhaltsverzeichnis einfügen"
   },
+  "mdOptIncludeHl": {
+    "message": "Markierungen einbeziehen"
+  },
   "mdCopy": {
     "message": "Kopieren"
   },
