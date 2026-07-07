@@ -288,6 +288,71 @@ async function run() {
     delete globalThis.__pbpTestSyncSetLarge;
   })();
 
+  // ---------- E5: three-state matrix + migration idempotency ----------
+  await (async () => {
+    const syncArea = {};
+    const localArea = { optSyncEnabled: true, syncApiKeys: false };
+    globalThis.chrome = {
+      storage: {
+        sync: {
+          get: (keys) => {
+            const out = {};
+            (Array.isArray(keys) ? keys : Object.keys(keys || {})).forEach((k) => { if (k in syncArea) out[k] = syncArea[k]; });
+            return Promise.resolve(out);
+          },
+          set: (d) => { Object.assign(syncArea, d); return Promise.resolve(); },
+          remove: (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((k) => delete syncArea[k]); return Promise.resolve(); },
+        },
+        local: {
+          get: (keys) => {
+            if (Array.isArray(keys)) { const out = {}; keys.forEach((k) => { if (k in localArea) out[k] = localArea[k]; }); return Promise.resolve(out); }
+            const out = Object.assign({}, keys); Object.keys(keys || {}).forEach((k) => { if (k in localArea) out[k] = localArea[k]; }); return Promise.resolve(out);
+          },
+          set: (d) => { Object.assign(localArea, d); return Promise.resolve(); },
+        },
+      },
+    };
+    globalThis.__pbpTestStorage = {
+      set: (d) => { Object.assign(syncArea, d); return Promise.resolve(); },
+      get: (keys) => Promise.resolve({}),
+    };
+    globalThis.__pbpTestSyncSetLarge = () => Promise.resolve();
+
+    await persistSettings({ optTheme: "nord", geminiApiKey: "obf:g1", pinboardToken: "obf:p1", exportTargets: { github: { token: "obf:t1", enabled: true } } });
+    check("E5 default-state: sync area has NO API_KEY_FIELDS after saveAll", API_KEY_FIELDS.every((k) => !(k in syncArea)));
+    // Parenthesized member-access-then-fallback BEFORE the `in` check: `in`
+    // binds tighter than `||`, so the naive `!("token" in (x||{}).y || {})`
+    // form always evaluates false for BOTH leak and no-leak — never fails.
+    check("E5 default-state: sync exportTargets has no token", !("token" in ((syncArea.exportTargets || {}).github || {})));
+    check("E5 default-state: local has the real secrets", localArea.geminiApiKey === "obf:g1" && localArea.pinboardToken === "obf:p1");
+
+    // Migration idempotency: seed sync with a stale leftover secret, run migration twice.
+    syncArea.geminiApiKey = "obf:STALE";
+    await pbpMigrateSecretsToLocal();
+    check("E5 migration: stale sync secret moved to local", localArea.geminiApiKey === "obf:STALE");
+    check("E5 migration: stale sync secret removed from sync", !("geminiApiKey" in syncArea) || syncArea.geminiApiKey === undefined);
+    const localAreaSnapshot = JSON.stringify(localArea);
+    await pbpMigrateSecretsToLocal(); // second run: must be a no-op (idempotent)
+    check("E5 migration: second run is a no-op (idempotent)", JSON.stringify(localArea) === localAreaSnapshot);
+
+    // pbpEnableSyncApiKeys: must write sync BEFORE flipping the flag.
+    const writeOrder = [];
+    const realSyncSet = globalThis.chrome.storage.sync.set;
+    globalThis.chrome.storage.sync.set = (d) => { writeOrder.push("sync"); return realSyncSet(d); };
+    const realLocalSet = globalThis.chrome.storage.local.set;
+    globalThis.chrome.storage.local.set = (d) => { if ("syncApiKeys" in d) writeOrder.push("flag"); return realLocalSet(d); };
+    await pbpEnableSyncApiKeys();
+    check("E5 pbpEnableSyncApiKeys: writes sync BEFORE flipping the flag (C4 ordering)",
+      writeOrder.indexOf("sync") < writeOrder.indexOf("flag"));
+    check("E5 pbpEnableSyncApiKeys: flag ends up true", localArea.syncApiKeys === true);
+    check("E5 pbpEnableSyncApiKeys: secrets landed in sync", syncArea.geminiApiKey === "obf:STALE" && syncArea.pinboardToken === "obf:p1");
+    globalThis.chrome.storage.sync.set = realSyncSet;
+    globalThis.chrome.storage.local.set = realLocalSet;
+
+    delete globalThis.__pbpTestStorage;
+    delete globalThis.__pbpTestSyncSetLarge;
+  })();
+
   const summary = document.createElement("h2");
   summary.textContent = `Results: ${pass} pass, ${fail} fail`;
   root.insertBefore(summary, root.firstChild);

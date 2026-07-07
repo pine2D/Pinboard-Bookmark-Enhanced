@@ -1293,6 +1293,12 @@
   "optSyncHint": {
     "message": "When enabled, settings sync across Chrome installations signed into the same Google account."
   },
+  "syncApiKeysLabel": {
+    "message": "Also sync API keys"
+  },
+  "syncApiKeysHint": {
+    "message": "Sends your API keys through your Google account too (obfuscated, not encrypted). Off by default — keys stay on this device only. Enable only if you trust every device signed into this account."
+  },
   "qlPopularTitle": {
     "message": "Popular"
   },

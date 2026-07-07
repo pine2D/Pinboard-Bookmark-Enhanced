@@ -1293,6 +1293,12 @@
   "optSyncHint": {
     "message": "開啟後，設定將在登入同一 Google 帳戶的所有 Chrome 之間同步。"
   },
+  "syncApiKeysLabel": {
+    "message": "同時同步 API 金鑰"
+  },
+  "syncApiKeysHint": {
+    "message": "開啟後 API 金鑰也會透過 Google 帳戶同步（僅作混淆儲存，非加密）。預設關閉，金鑰只留在本機；開啟前請確認信任所有登入該帳戶的裝置。"
+  },
   "qlPopularTitle": {
     "message": "熱門"
   },

@@ -1293,6 +1293,12 @@
   "optSyncHint": {
     "message": "Quand activé, les paramètres se synchronisent entre les installations de Chrome connectées au même compte Google."
   },
+  "syncApiKeysLabel": {
+    "message": "Synchroniser aussi les clés API"
+  },
+  "syncApiKeysHint": {
+    "message": "Si activé, vos clés API sont aussi synchronisées via votre compte Google (simplement obfusquées, pas chiffrées). Désactivé par défaut — les clés restent uniquement sur cet appareil. À activer seulement si vous faites confiance à tous les appareils connectés à ce compte."
+  },
   "qlPopularTitle": {
     "message": "Populaire"
   },

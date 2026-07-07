@@ -440,7 +440,7 @@ function pbpIsNeverClearKey(key) {
   if (key.startsWith("md_preview_data")) return true;      // md_preview_data + md_preview_data_<uuid> handoffs
   if (key.startsWith("pbp_hl_")) return true;               // pbp_hl_<urlKey> highlight sets + pbp_hl_last_color (user data, never reclaimable)
   // Local-only settings that are NOT in SETTINGS_DEFAULTS.
-  if (key === "optSyncEnabled" || key === "customOverlayCSS_localFallback" || key === "lastUsedTags") return true;
+  if (key === "optSyncEnabled" || key === "syncApiKeys" || key === "customOverlayCSS_localFallback" || key === "lastUsedTags") return true;
   // Any setting (and, with sync off, any obfuscated API key) lives under a
   // SETTINGS_DEFAULTS key when routed to local.
   if (typeof SETTINGS_DEFAULTS === "object" && SETTINGS_DEFAULTS &&
@@ -816,6 +816,57 @@ async function pbpApplySecretOverlay(s) {
   } catch (_) {
     return s; // degrade: leave s exactly as read from the main settings area
   }
+}
+
+// One-time-per-boot (but always idempotent/re-runnable) cleanup: when secret
+// routing is active but chrome.storage.sync still holds cloud-synced API keys
+// or exportTargets tokens (pre-feature data, a stale multi-device sync, or the
+// user just flipped syncApiKeys off), move them to local and scrub sync.
+// Iron rule: write the local copy FIRST and confirm it, THEN remove from sync.
+// Any failure at any step aborts with BOTH copies retained — never delete
+// before the target write is confirmed. Safe to call any number of times:
+// a clean sync area (no secrets) is a no-op.
+async function pbpMigrateSecretsToLocal() {
+  try {
+    const flags = await chrome.storage.local.get({ optSyncEnabled: false, syncApiKeys: false });
+    if (!pbpSecretRoutingActive(flags.optSyncEnabled, flags.syncApiKeys)) return; // routing inactive: nothing to clean
+    const keys = API_KEY_FIELDS.concat(["exportTargets"]);
+    const fromSync = await chrome.storage.sync.get(keys);
+    const hasSecret = API_KEY_FIELDS.some((k) => fromSync[k]) ||
+      (fromSync.exportTargets && Object.values(fromSync.exportTargets).some((cfg) => cfg && cfg.token));
+    if (!hasSecret) return; // already clean — idempotent no-op
+
+    // 1. Write the full secrets to local FIRST.
+    const localPayload = {};
+    API_KEY_FIELDS.forEach((k) => { if (fromSync[k] !== undefined) localPayload[k] = fromSync[k]; });
+    if (fromSync.exportTargets !== undefined) localPayload.exportTargets = fromSync.exportTargets;
+    await chrome.storage.local.set(localPayload);
+
+    // 2. ONLY after the local write is confirmed: scrub sync.
+    const presentKeys = API_KEY_FIELDS.filter((k) => fromSync[k] !== undefined);
+    if (presentKeys.length) await chrome.storage.sync.remove(presentKeys);
+    if (fromSync.exportTargets !== undefined) {
+      await chrome.storage.sync.set({ exportTargets: pbpStripExportTargetTokens(fromSync.exportTargets) });
+    }
+  } catch (e) {
+    // Best-effort: log and leave both copies in place. Self-heals on next boot
+    // (re-runs and re-checks hasSecret) — never worse than a no-op.
+    console.warn("[secrets-migration] failed, both copies retained:", e && e.message || e);
+  }
+}
+
+// syncApiKeys enable-path: copy local secrets up to sync, confirm the write,
+// THEN flip the flag — same "write target before flag/source" discipline as
+// pbpMigrateSecretsToLocal. Disable-path reuses pbpMigrateSecretsToLocal
+// directly (no separate helper needed there — see options.js call site).
+async function pbpEnableSyncApiKeys() {
+  const keys = API_KEY_FIELDS.concat(["exportTargets"]);
+  const local = await chrome.storage.local.get(keys);
+  const payload = {};
+  API_KEY_FIELDS.forEach((k) => { if (local[k] !== undefined) payload[k] = local[k]; });
+  if (local.exportTargets !== undefined) payload.exportTargets = local.exportTargets;
+  if (Object.keys(payload).length) await chrome.storage.sync.set(payload);
+  await chrome.storage.local.set({ syncApiKeys: true });
 }
 
 // ---- DOM cache helper (P1.6) ----

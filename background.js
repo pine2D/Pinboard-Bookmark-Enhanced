@@ -692,6 +692,13 @@ async function migrateBgSaveMode() {
 // bgSaveNoClobber=false user's "overwrite" preference.
 const _bgSaveModeMigration = migrateBgSaveMode();
 
+// syncApiKeys cleanup (batch ④): idempotent, best-effort, fire-and-forget at
+// boot — self-heals on the next boot/alarm tick if it fails partway (see
+// pbpMigrateSecretsToLocal's own try/catch in shared.js). Also re-run on the
+// existing storage-warm alarm below so a mid-session syncApiKeys-off toggle
+// and any stray reintroduction of a secret into sync gets swept within 5 minutes.
+pbpMigrateSecretsToLocal().catch(() => {});
+
 async function syncPrewarmTagsAlarm() {
   const s = await loadSettings();
   const existing = await chrome.alarms.get("prewarm-tags");
@@ -733,6 +740,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
   if (alarm.name === "storage-warm") {
     _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
+    pbpMigrateSecretsToLocal().catch(() => {});
   }
 });
 

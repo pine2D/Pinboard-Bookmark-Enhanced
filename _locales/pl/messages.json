@@ -1293,6 +1293,12 @@
   "optSyncHint": {
     "message": "Po włączeniu ustawienia synchronizują się między instalacjami Chrome zalogowanymi na to samo konto Google."
   },
+  "syncApiKeysLabel": {
+    "message": "Synchronizuj też klucze API"
+  },
+  "syncApiKeysHint": {
+    "message": "Po włączeniu klucze API również będą synchronizowane przez konto Google (tylko zaciemnione, nie zaszyfrowane). Domyślnie wyłączone — klucze pozostają tylko na tym urządzeniu. Włącz tylko, jeśli ufasz wszystkim urządzeniom zalogowanym na to konto."
+  },
   "qlPopularTitle": {
     "message": "Popularne"
   },

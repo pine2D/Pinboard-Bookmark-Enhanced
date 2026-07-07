@@ -607,6 +607,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- All settings with defaults (from shared.js) ----
+  await pbpMigrateSecretsToLocal();
   let s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
   s = await pbpApplySecretOverlay(s); // MUST run before deobfuscateSettings (see shared.js note)
   deobfuscateSettings(s);
@@ -884,15 +885,46 @@ document.addEventListener("DOMContentLoaded", async () => {
   const syncToggle = $id("opt-sync-enabled");
   if (syncToggle) syncToggle.checked = optSyncEnabled;
 
+  // ---- syncApiKeys (batch ④): local-only meta-setting, same precedent as
+  // optSyncEnabled — NOT in SETTINGS_DEFAULTS, NOT in backup export, disabled
+  // (grayed) whenever sync itself is off. Default unchecked (keys stay local).
+  const { syncApiKeys } = await chrome.storage.local.get({ syncApiKeys: false });
+  const syncKeysToggle = $id("opt-sync-api-keys");
+  if (syncKeysToggle) {
+    syncKeysToggle.checked = syncApiKeys;
+    syncKeysToggle.disabled = !optSyncEnabled;
+  }
+
   // Sync toggle change: migrate settings then reload
   syncToggle?.addEventListener("change", async () => {
     const enabling = syncToggle.checked;
+    if (syncKeysToggle) syncKeysToggle.disabled = !enabling;
     const oldStorage = enabling ? chrome.storage.local : chrome.storage.sync;
     const newStorage = enabling ? chrome.storage.sync : chrome.storage.local;
     try {
       // 1. Migrate regular settings
       const data = await oldStorage.get(Object.keys(SETTINGS_DEFAULTS));
-      await newStorage.set(data);
+      // syncApiKeys secret routing (batch ④): when ENABLING sync (local -> sync)
+      // and the user has NOT opted API keys into sync, strip the 18
+      // API_KEY_FIELDS + exportTargets tokens out of what's headed to sync and
+      // keep the full copy local. Disabling (sync -> local): `data` is read from
+      // SYNC via an array-form get, so when routing was already active the
+      // API_KEY_FIELDS were never in sync — simply absent from `data`.
+      // `newStorage.set(data)` into local is safe only because
+      // chrome.storage.set() MERGES rather than replaces: pre-existing local
+      // secrets survive by omission, not by an explicit copy.
+      if (enabling) {
+        const { syncApiKeys } = await chrome.storage.local.get({ syncApiKeys: false });
+        if (!syncApiKeys) {
+          const { main, secrets } = pbpSplitSecretBatch(data);
+          if (Object.keys(secrets).length) await chrome.storage.local.set(secrets);
+          await newStorage.set(main);
+        } else {
+          await newStorage.set(data);
+        }
+      } else {
+        await newStorage.set(data);
+      }
       // 2. Migrate customOverlayCSS (large value) — read from old, then switch pref, then write to new
       const customOverlayCSS = await syncGetLarge("customOverlayCSS", "");
       const savedThemes = await syncGetLarge("savedThemes", []);
@@ -918,6 +950,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.body.style.transition = "opacity 0.18s";
     document.body.style.opacity = "0";
     setTimeout(() => location.reload(), 180);
+  });
+
+  // syncApiKeys toggle: on = copy local secrets up to sync (opt back into cloud
+  // keys, full exportTargets incl. token — this IS opting in); off = scrub sync
+  // back down, reusing the exact same idempotent routine SW boot runs.
+  syncKeysToggle?.addEventListener("change", async () => {
+    const enabling = syncKeysToggle.checked;
+    try {
+      if (enabling) {
+        await pbpEnableSyncApiKeys();
+      } else {
+        await chrome.storage.local.set({ syncApiKeys: false });
+        await pbpMigrateSecretsToLocal();
+      }
+    } catch (e) {
+      console.error("syncApiKeys toggle failed:", e);
+      syncKeysToggle.checked = !enabling;
+      await chrome.storage.local.set({ syncApiKeys: !enabling }).catch(() => {});
+    }
   });
 
   // ---- Apply options page theme based on Pinboard theme preset ----

@@ -1293,6 +1293,12 @@
   "optSyncHint": {
     "message": "有効にすると、同じ Google アカウントにサインインした Chrome 間で設定が同期されます。"
   },
+  "syncApiKeysLabel": {
+    "message": "API キーも同期する"
+  },
+  "syncApiKeysHint": {
+    "message": "有効にすると、API キーも Google アカウント経由で同期されます（難読化のみで暗号化はされません）。既定では無効で、キーはこの端末にのみ保存されます。同じアカウントにサインインしているすべての端末を信頼できる場合のみ有効にしてください。"
+  },
   "qlPopularTitle": {
     "message": "人気"
   },
