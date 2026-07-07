@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>options-notes Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; } .fail { color: #c00; font-weight: bold; }
+h2 { margin-top: 24px; }
+</style></head>
+<body>
+<h1>options-notes.js tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+
+<script src="../options-notes.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond; ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+function section(name) { const h = document.createElement("h2"); h.textContent = name; root.appendChild(h); }
+function assert(cond, detail) { check(detail || String(cond), cond, detail); }
+function assertEq(a, e, label) {
+  const ok = a === e;
+  check(label || (String(e) + " === " + String(a)), ok, ok ? "" : "expected " + JSON.stringify(e) + " got " + JSON.stringify(a));
+}
+
+section("pbpNotesRow — normal record");
+{
+  const rec = { v: 1, url: "https://example.com/a", title: "Example A",
+    items: [
+      { id: "1", n: 1, quote: "q1", color: 1, note: "hello", ts: 100 },
+      { id: "2", n: 2, quote: "q2", color: 2, note: "", ts: 300 },
+      { id: "3", n: 3, quote: "q3", color: 3, note: "  ", ts: 200 },
+    ] };
+  const row = pbpNotesRow("pbp_hl_abc123", rec);
+  assert(row !== null, "returns a row for a well-formed record");
+  assertEq(row.key, "pbp_hl_abc123", "key carried through");
+  assertEq(row.url, "https://example.com/a", "url carried through");
+  assertEq(row.title, "Example A", "title carried through");
+  assertEq(row.hlCount, 3, "hlCount = items.length");
+  assertEq(row.noteCount, 1, "noteCount counts only the one non-blank note (blank/whitespace notes excluded)");
+  assertEq(row.lastTs, 300, "lastTs = max(items[].ts)");
+  assert(typeof row.bytes === "number" && row.bytes > 0, "bytes is a positive number");
+}
+
+section("pbpNotesRow — old record (no url/title)");
+{
+  const rec = { v: 1, items: [{ id: "1", n: 1, quote: "q", color: 1, note: "", ts: 50 }] };
+  const row = pbpNotesRow("pbp_hl_old1", rec);
+  assert(row !== null, "old-shape record still produces a row");
+  assertEq(row.url, "", "missing url -> empty string");
+  assertEq(row.title, "", "missing title -> empty string");
+  assertEq(row.hlCount, 1, "hlCount still counted");
+}
+
+section("pbpNotesRow — bad records skip to null, never throw");
+{
+  assertEq(pbpNotesRow("pbp_hl_x", null), null, "null rec -> null");
+  assertEq(pbpNotesRow("pbp_hl_x", "not an object"), null, "string rec -> null");
+  assertEq(pbpNotesRow("pbp_hl_x", { v: 1 }), null, "missing items -> null");
+  assertEq(pbpNotesRow("pbp_hl_x", { v: 1, items: "not an array" }), null, "non-array items -> null");
+}
+
+section("pbpNotesRow — empty items array (valid, not a bad record)");
+{
+  const row = pbpNotesRow("pbp_hl_empty", { v: 1, url: "u", title: "t", items: [] });
+  assert(row !== null, "empty items -> still a row (not null)");
+  assertEq(row.hlCount, 0, "hlCount 0");
+  assertEq(row.noteCount, 0, "noteCount 0");
+  assertEq(row.lastTs, 0, "lastTs 0 (max of empty -> 0)");
+}
+
+section("pbpNotesMatch — empty/whitespace query always matches");
+{
+  const rec = { title: "T", url: "U", items: [] };
+  assert(pbpNotesMatch(rec, "") === true, "empty string -> true");
+  assert(pbpNotesMatch(rec, "   ") === true, "whitespace-only -> true");
+  assert(pbpNotesMatch(rec, undefined) === true, "undefined -> true");
+}
+
+section("pbpNotesMatch — hits on title/url/quote/note, case-insensitive");
+{
+  const rec = {
+    title: "Deep Learning Basics", url: "https://example.com/dl",
+    items: [{ quote: "gradient descent explained", note: "review LATER" }],
+  };
+  assert(pbpNotesMatch(rec, "deep learning") === true, "matches title, case-insensitive");
+  assert(pbpNotesMatch(rec, "EXAMPLE.COM") === true, "matches url, case-insensitive");
+  assert(pbpNotesMatch(rec, "Gradient") === true, "matches item quote");
+  assert(pbpNotesMatch(rec, "later") === true, "matches item note, case-insensitive");
+  assert(pbpNotesMatch(rec, "no such term") === false, "no match anywhere -> false");
+}
+
+document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+</script>
+</body></html>
