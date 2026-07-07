@@ -1326,6 +1326,7 @@ body.ask-open main { margin-right: 396px; }
   body.ask-open main { margin-right: 0; }
   /* must sit AFTER the base .pb-tr-err display rule in source order to win the cascade */
   .pb-tr-err { display: none; }
+  #kbd-help-pop { display: none; }
 }
 
 /* ---- Ask send pipeline: streaming caret, stop note, error + retry ---- */
@@ -1674,3 +1675,70 @@ body.ask-open main { margin-right: 396px; }
 @media print {
   #search-pop { display: none; }
 }
+
+/* ---- Keyboard shortcuts popover + rail entry (md-reader.js, spec 5).
+   Derived from #explain-pop/#pb-hl-card: same surface/border/radius/shadow
+   tokens (var(--surface)/var(--fg)/var(--border), the same literal
+   box-shadow rgba() those two popovers already hardcode). Centered rather
+   than anchor-positioned -- it has no anchor element, so the native
+   popover top-layer's own inset:0 + margin:auto centering is used as-is
+   instead of pbpTrPeekPopPos. ---- */
+#kbd-help-pop {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(420px, calc(100vw - 32px));
+  max-width: 420px;
+  max-height: min(480px, calc(100vh - 32px));
+  height: fit-content;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.22);
+  font-size: 13px;
+  overflow-y: auto;
+}
+#kbd-help-pop:popover-open { display: flex; }
+.kbd-help-title { font-weight: 600; font-size: 14px; }
+.kbd-help-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.kbd-help-row { display: flex; align-items: center; gap: 10px; }
+.kbd-help-chips { display: flex; gap: 4px; flex: none; min-width: 66px; }
+.kbd-help-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  /* Font iron rule: named Latin font first, named CJK families before the
+     generic `monospace` keyword, never bare monospace/ui-monospace at the
+     head -- reusing the page's existing --mono-latin/--han-* tokens
+     (md-preview.css :root) rather than retyping a literal font stack. */
+  font-family: var(--mono-latin), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-ko), var(--han-rest), monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.kbd-help-desc { color: var(--fg-secondary); flex: 1 1 auto; }
+
+/* Rail-bottom unobtrusive entry point (spec 5.2): plain muted text button,
+   same "quiet link" look as .rail-ident a (this file), appended as #rail's
+   LAST child (after #toc) by _pbpKbdHelpInit. */
+.rail-kbd-help-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 4px 2px;
+  border: none;
+  background: none;
+  color: var(--fg-muted);
+  font-size: 11.5px;
+  text-align: center;
+  cursor: pointer;
+}
+.rail-kbd-help-btn:hover { color: var(--link); }
+.rail-kbd-help-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }

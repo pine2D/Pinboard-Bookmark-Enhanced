@@ -584,6 +584,102 @@ function _pbpSearchInit() {
   document.addEventListener("keydown", _pbpSearchOnKeyDown);
 }
 
+// ---- Keyboard-shortcuts help (spec 5): "?" hotkey + rail-bottom link +
+// options static section all point at the same popover. ----
+const PBP_KBD_HELP_ROWS = [
+  { chips: ["e"], key: "kbdHelpExplain" },
+  { chips: ["V"], key: "kbdHelpToggleView" },
+  { chips: ["H", "1-5"], key: "kbdHelpHighlight" },
+  { chips: ["a"], key: "kbdHelpAsk" },
+  { chips: ["/"], key: "kbdHelpSearch" },
+  { chips: ["?"], key: "kbdHelpShowHelp" },
+  { chips: ["Esc"], key: "kbdHelpClose" }
+];
+let _pbpKbdHelpPopEl = null;
+
+function _pbpKbdHelpEnsurePop() {
+  if (_pbpKbdHelpPopEl) return _pbpKbdHelpPopEl;
+  const pop = document.createElement("div");
+  pop.id = "kbd-help-pop";
+  pop.setAttribute("popover", "auto"); // top-layer + Esc + light-dismiss for free, same as #explain-pop/#pb-hl-card
+  const title = document.createElement("div");
+  title.className = "kbd-help-title";
+  title.textContent = t("kbdHelpTitle");
+  pop.appendChild(title);
+  const list = document.createElement("ul");
+  list.className = "kbd-help-list";
+  PBP_KBD_HELP_ROWS.forEach((row) => {
+    const li = document.createElement("li");
+    li.className = "kbd-help-row";
+    const chipWrap = document.createElement("span");
+    chipWrap.className = "kbd-help-chips";
+    row.chips.forEach((c) => {
+      const kbd = document.createElement("kbd");
+      kbd.className = "kbd-help-chip";
+      kbd.textContent = c;
+      chipWrap.appendChild(kbd);
+    });
+    li.appendChild(chipWrap);
+    const desc = document.createElement("span");
+    desc.className = "kbd-help-desc";
+    desc.textContent = t(row.key);
+    li.appendChild(desc);
+    list.appendChild(li);
+  });
+  pop.appendChild(list);
+  document.body.appendChild(pop);
+  _pbpKbdHelpPopEl = pop;
+  return pop;
+}
+
+// Mutual exclusion with the other popover families (explain-pop / pb-hl-bar
+// / pb-hl-card / fn-pop / search-pop): explicitly hide any other open
+// popover first, same belt-and-suspenders pattern md-highlight.js already
+// uses before opening #explain-pop.
+function _pbpKbdHelpOpen() {
+  const pop = _pbpKbdHelpEnsurePop();
+  document.querySelectorAll(":popover-open").forEach((el) => {
+    if (el !== pop) { try { el.hidePopover(); } catch (_) {} }
+  });
+  try { pop.showPopover(); } catch (_) {}
+}
+
+// "?" hotkey: same 4-condition gate pattern as the existing V/H/a hotkeys,
+// EXCEPT shiftKey is explicitly allowed through (not rejected) -- "?" is
+// typed as Shift+/ on most keyboard layouts, so e.shiftKey is normally true
+// for this key and must not be treated as a modifier that cancels the
+// shortcut.
+function _pbpKbdHelpOnKeyDown(e) {
+  if (e.key !== "?") return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const ae = document.activeElement;
+  if (typeof pbpTrIsTypingContext === "function"
+    && pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))) return;
+  e.preventDefault();
+  _pbpKbdHelpOpen();
+}
+
+let _pbpKbdHelpInited = false;
+
+function _pbpKbdHelpInit() {
+  if (_pbpKbdHelpInited) return;
+  _pbpKbdHelpInited = true;
+  document.addEventListener("keydown", _pbpKbdHelpOnKeyDown);
+  const rail = document.getElementById("rail");
+  if (rail) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "rail-kbd-help-btn";
+    btn.className = "rail-kbd-help-btn";
+    btn.textContent = t("kbdHelpRailBtn");
+    btn.addEventListener("click", () => _pbpKbdHelpOpen());
+    rail.appendChild(btn); // #toc (nav) is #rail's static last child today, and every
+    // dynamic rail section (tr/ask/hl) inserts itself BEFORE #toc -- so a
+    // plain appendChild here always lands truly last, i.e. at the rail's
+    // bottom, matching spec 5.2's "unobtrusive rail-bottom entry."
+  }
+}
+
 // ---- bootstrap: ONE shared "pbp:rendered" listener for every
 // md-reader.js feature (spec sec.8: R3 footnotes / R4 search / "?"
 // keyboard help all live in this one file). Later tasks extend this
@@ -598,5 +694,6 @@ if (typeof document !== "undefined") {
   document.addEventListener("pbp:rendered", () => {
     try { _pbpFnInit(); } catch (_) {}
     try { _pbpSearchInit(); } catch (_) {}
+    try { _pbpKbdHelpInit(); } catch (_) {}
   }, { once: true });
 }

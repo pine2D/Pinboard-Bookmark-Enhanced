@@ -182,6 +182,42 @@ html[data-theme] .panel-foot a:hover { color: var(--opt-accent); }
 .fg + .hint { margin-top: -6px; }  /* a hint owned by the preceding group: pull close (net ~4px gap above, 10px below) */
 .hint a { color: #4477bb; }
 .hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
+
+/* ---- Markdown tab: keyboard shortcuts static list (Task 6, spec 5.3).
+   kbd chip font stack intentionally omits the literal-Han-script fallback
+   entry (a Chinese-character rendering of the same Microsoft YaHei name)
+   this file uses elsewhere (.hint code, just above) -- that entry is
+   pre-existing text this task does not touch, and spelling it out again
+   here would break this batch's own byte-scan iron rule (this comment is
+   NEW text in a non-_locales file, so it must stay 100% ASCII). The ASCII
+   "Microsoft YaHei"/"Noto Sans SC"/etc. entries already resolve the same
+   real fonts on Win/Mac/Linux, so no font coverage is lost. Named font
+   first, CJK named families before the generic `monospace` keyword (font
+   iron rule).
+   Colors below are hardcoded light-mode literals + an html[data-theme]
+   override, same two-layer convention .hint code above already uses in
+   this file -- this is options.css's OWN token system (--opt-*), a
+   separate hand-maintained surface outside the theme factory and outside
+   md-preview.css's light-dark() token system. */
+.kbd-help-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.kbd-help-row { display: flex; align-items: baseline; gap: 10px; font-size: 12px; }
+.kbd-help-chips { flex: none; min-width: 70px; }
+.kbd-help-chips kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-right: 2px;
+  border: 1px solid #cdd1d6;
+  border-radius: var(--opt-radius-sm);
+  background: #f5f5f0;
+  color: #333;
+  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
+  font-size: 11px;
+}
+html[data-theme] .kbd-help-chips kbd {
+  background: var(--opt-input-bg, #f5f5f0);
+  border-color: var(--opt-input-border, #cdd1d6);
+  color: var(--opt-fg, #333);
+}
 .hint-warn::before {
   content: "";
   display: inline-block;

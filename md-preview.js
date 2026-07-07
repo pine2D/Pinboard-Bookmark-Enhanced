@@ -1037,8 +1037,17 @@ function pbpApplyColorScheme(mode) {
       // once. A real scroll away in the meantime means they're reading; back
       // off and leave them alone.
       let resettled = false;
+      // Body's class attribute also flips for unrelated reasons during this
+      // window (rail-open, ask-open, ...) -- snapshot the two view-mode
+      // classes up front so an unrelated mutation doesn't consume the
+      // one-shot re-settle before the real tr-only/tr-bilingual flip shows up.
+      const hadTrOnly = document.body.classList.contains("tr-only");
+      const hadTrBilingual = document.body.classList.contains("tr-bilingual");
       const mo = new MutationObserver(() => {
         if (resettled) return;
+        const nowTrOnly = document.body.classList.contains("tr-only");
+        const nowTrBilingual = document.body.classList.contains("tr-bilingual");
+        if (nowTrOnly === hadTrOnly && nowTrBilingual === hadTrBilingual) return; // not the flip we're waiting for -- keep observing
         if (restoredAtY === null || Math.abs(window.scrollY - restoredAtY) > 4) { resettled = true; mo.disconnect(); return; }
         resettled = true;
         mo.disconnect();
