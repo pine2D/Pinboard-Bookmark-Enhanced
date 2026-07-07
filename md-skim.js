@@ -134,7 +134,6 @@ function _pbpSkimBuildSection(view) {
   ].join("\n");
   docBody.insertBefore(sec, view);
   applyI18n(sec);
-  _pbpSkimState.section = sec;
 
   const regenBtn = sec.querySelector("#skim-regen");
   const collapseBtn = sec.querySelector("#skim-collapse");
@@ -241,7 +240,11 @@ async function _pbpSkimRun() {
     const ctx = pbpAskBuildContext(pbpAiBlocks(), PBP_SKIM_CTX_BUDGET);
     const langInstruction = aiSummaryLangInstruction(st.s);
     built = pbpSkimBuildPrompt(ctx.text, langInstruction);
-    const full = await getOrCreateInflight("skim_" + st.url, () =>
+    // st.gen in the key: a future regen fired mid-stream would otherwise
+    // collide with the not-yet-cleaned-up previous inflight promise for the
+    // same url and be silently swallowed instead of restarted (reviewer
+    // hardening -- unreachable via today's UI, cheap to close now).
+    const full = await getOrCreateInflight("skim_" + st.url + "_" + myGen, () =>
       callAIStream(st.s, built.prompt, {
         maxTokens: 1024,
         model: pbpAiResolveModelOverride(st.s),
