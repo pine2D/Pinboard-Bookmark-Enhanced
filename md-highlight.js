@@ -320,7 +320,11 @@ async function _pbpHlSave(url, items, btn) {
   const key = _pbpHlKey(url);
   try {
     if (!items.length) { await chrome.storage.local.remove(key); return true; }
-    await chrome.storage.local.set({ [key]: { v: 1, items } });
+    // url/title ride the record because the key is a one-way hash of the url:
+    // without them an aggregate "all pages with notes" view cannot name the
+    // page. Records saved before this field existed self-heal on next save.
+    const title = (_pbpHlState && _pbpHlState.title) || "";
+    await chrome.storage.local.set({ [key]: { v: 1, url: String(url || ""), title, items } });
     return true;
   } catch (_) {
     _pbpHlToast(t("hlSaveFailed"), btn);
@@ -360,7 +364,7 @@ function _pbpHlToast(msg, btn) {
 
 // ---- Init + restore ----
 const PBP_HL_COLORS = [1, 2, 3, 4, 5];
-let _pbpHlState = null; // { url, items, ranges: {id -> {color, range}}, degraded: {id -> true} }
+let _pbpHlState = null; // { url, title, items, ranges: {id -> {color, range}}, degraded: {id -> true} }
 
 async function pbpHlInit(detail) {
   const view = document.getElementById("rendered-view");
@@ -375,8 +379,9 @@ async function pbpHlInit(detail) {
     if (!pbpAiBlocks().length) return;
   }
   const url = String((detail && detail.url) || "");
+  const title = String((detail && detail.title) || "");
   const items = await _pbpHlLoad(url);
-  _pbpHlState = { url, items, ranges: Object.create(null), degraded: Object.create(null) };
+  _pbpHlState = { url, title, items, ranges: Object.create(null), degraded: Object.create(null) };
   pbpHlRestore();
   // Restored-from-storage highlights must surface the rail entry on first
   // paint too -- storage.local.get fires no onChanged, so without this call
