@@ -240,6 +240,85 @@ main {
 }
 .doc-body { max-width: 880px; margin: 0 auto; min-width: 0; }
 
+/* ---- R2: Zen (focus) reading mode (md-reader.js, "z" hotkey / rail
+   button, spec sec.1/4). body.zen hides #rail (+ its mobile drawer toggle
+   and scrim -- see below) and lets .doc-body reclaim the width main's
+   margin-left used to reserve for it; --zen-width is a JS-driven custom
+   property (three-step 680/880/1080 cycle, persisted in
+   chrome.storage.local pbp_zen_width) so the width-cycle button can change
+   it without touching this stylesheet -- zen ON/OFF itself is NEVER
+   persisted (spec sec.1.1: always starts normal on a fresh preview open).
+   ask-open's own `body.ask-open main { margin-right: 396px }` (below) is
+   orthogonal -- margin-left and margin-right are independent properties,
+   so a zen session opened while Ask is open keeps both simultaneously, no
+   extra rule needed (spec sec.1.2: orthogonal, not force-closed). */
+body.zen #rail, body.zen .rail-toggle, body.zen .rail-scrim { display: none; }
+/* .rail-scrim's inclusion above is NOT literal spec text but closes the
+   PAINT half of a real gap traced from it: the zen rail-entry button only
+   exists inside #rail, which on mobile is only reachable with the drawer
+   open (body.rail-open, scrim visible) -- without this, entering zen from
+   that flow would hide #rail but strand the dimming scrim on screen with
+   nothing behind it. The STATE half (body.rail-open / the scrim's hidden
+   attribute / #rail's role+aria-modal) is separately force-cleared by
+   md-reader.js's _pbpZenEnter() calling md-preview.js's
+   pbpRailDrawerClose() (Step 3) -- this CSS rule only covers the paint,
+   not the underlying drawer state. Specificity note: this selector is
+   HIGHER than .rail-scrim[hidden] (0,2,1 vs 0,2,0 -- the `body` type
+   selector contributes a point that [hidden] alone doesn't), so it always
+   wins an ordering tie regardless of source order; both rules agree on
+   display:none either way, so the practical paint result is identical --
+   this note only corrects the specificity math, not the behavior. */
+body.zen main { margin-left: 0; }
+body.zen .doc-body { max-width: var(--zen-width, 880px); }
+
+/* #zen-bar: the ONLY new chrome zen introduces -- fixed top-right, two
+   icon buttons (width cycle / exit). Same border/surface/radius/focus-
+   visible token family as #search-pop/.srch-nav (this file, R4 search) --
+   deliberately NOT a popover (no Esc/light-dismiss semantics; it stays put
+   for the whole zen session, only fading via mouse-idle below). */
+#zen-bar {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--btn-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+  transition: opacity 200ms ease;
+}
+body.zen #zen-bar { display: flex; }
+/* Mouse-idle fade (spec sec.1.3): opacity/pointer-events only, never
+   display/visibility, so #zen-bar:focus-within below can override a fade
+   in progress without forcing a reflow. pointer-events:none while faded so
+   the (still-in-flow) invisible bar can't eat a click meant for the
+   article underneath it. */
+#zen-bar.faded { opacity: 0.06; pointer-events: none; }
+#zen-bar:focus-within { opacity: 1 !important; pointer-events: auto !important; }
+@media (prefers-reduced-motion: reduce) {
+  #zen-bar { transition: none; }
+}
+.zen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.zen-btn:hover { background: var(--btn-hover); border-color: var(--border); }
+.zen-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.zen-btn svg { width: 13px; height: 13px; }
+
 .content-view.hidden { display: none; }
 
 /* ---- Raw View ---- */
@@ -734,7 +813,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
      the dark palette (verified: Step 1.7's print-dark-forced-inline
      scenario). */
   :root { color-scheme: light !important; }
-  .rail, .rail-toggle, .rail-scrim { display: none; }
+  .rail, .rail-toggle, .rail-scrim, #zen-bar { display: none; }
   main { margin-left: 0; max-width: 100%; padding: 0; }
   /* Deliberate pure white/black (not --bg/--fg, which are near-white
      #f8fafc / near-black #0f172a by design) -- an intentional ink-saving
@@ -1760,19 +1839,38 @@ body.ask-open main { margin-right: 396px; }
 }
 .kbd-help-desc { color: var(--fg-secondary); flex: 1 1 auto; }
 
-/* Rail-bottom unobtrusive entry point (spec 5.2): plain muted text button,
-   same "quiet link" look as .rail-ident a (this file), appended as #rail's
-   LAST child (after #toc) by _pbpKbdHelpInit. */
-.rail-kbd-help-btn {
-  display: block;
-  width: 100%;
+/* Rail-bottom unobtrusive entry ROW (spec sec.1.1/5.2, R2 batch): a shared
+   flex row appended as #rail's LAST child (after #toc) by
+   _pbpRailBottomRow -- holds every small rail-bottom text button. Was a
+   single full-width block button (_pbpKbdHelpInit alone); now two share
+   the row (kbd-help + zen entry), so .rail-kbd-help-btn itself switches
+   from block/width:100% to flex:1 so both halves stay equal width.
+   white-space/overflow/text-overflow (+ min-width:0, required for a flex
+   item to actually shrink below its content's intrinsic width instead of
+   just overflowing the row) added because translated button text varies
+   noticeably in length across locales (e.g. German's zenEnterBtn text is
+   visibly longer than its kbdHelpRailBtn row neighbor) -- without it, a
+   longer translation in one half wraps to two lines while its neighbor
+   stays on one, producing visibly uneven button heights in the same row;
+   truncating with an ellipsis keeps both halves the same single-line
+   height in every locale. */
+.rail-bottom-row {
+  display: flex;
+  gap: 6px;
   margin-top: 10px;
+}
+.rail-kbd-help-btn {
+  flex: 1;
+  min-width: 0;
   padding: 6px 4px 2px;
   border: none;
   background: none;
   color: var(--fg-muted);
   font-size: 11.5px;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 .rail-kbd-help-btn:hover { color: var(--link); }

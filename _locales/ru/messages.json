@@ -2457,5 +2457,9 @@
   "srchInputAria": { "message": "Поиск в этом документе" },
   "srchPrevAria": { "message": "Предыдущее совпадение" },
   "srchNextAria": { "message": "Следующее совпадение" },
-  "srchRegexAria": { "message": "Поиск по регулярному выражению" }
+  "srchRegexAria": { "message": "Поиск по регулярному выражению" },
+  "kbdHelpZen": { "message": "Переключить режим дзен (фокусировка)" },
+  "zenEnterBtn": { "message": "Включить режим дзен" },
+  "zenExitAria": { "message": "Выйти из режима дзен" },
+  "zenWidthAria": { "message": "Ширина содержимого" }
 }

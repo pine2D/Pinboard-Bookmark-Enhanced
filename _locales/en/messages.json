@@ -2451,5 +2451,9 @@
   "srchInputAria": { "message": "Search in this document" },
   "srchPrevAria": { "message": "Previous match" },
   "srchNextAria": { "message": "Next match" },
-  "srchRegexAria": { "message": "Regular expression search" }
+  "srchRegexAria": { "message": "Regular expression search" },
+  "kbdHelpZen": { "message": "Toggle zen (focus) mode" },
+  "zenEnterBtn": { "message": "Enter zen mode" },
+  "zenExitAria": { "message": "Exit zen mode" },
+  "zenWidthAria": { "message": "Content width" }
 }

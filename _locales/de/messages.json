@@ -2457,5 +2457,9 @@
   "srchInputAria": { "message": "In diesem Dokument suchen" },
   "srchPrevAria": { "message": "Vorherige Übereinstimmung" },
   "srchNextAria": { "message": "Nächste Übereinstimmung" },
-  "srchRegexAria": { "message": "Suche mit regulärem Ausdruck" }
+  "srchRegexAria": { "message": "Suche mit regulärem Ausdruck" },
+  "kbdHelpZen": { "message": "Zen-Modus (Fokus) umschalten" },
+  "zenEnterBtn": { "message": "Zen-Modus aktivieren" },
+  "zenExitAria": { "message": "Zen-Modus verlassen" },
+  "zenWidthAria": { "message": "Inhaltsbreite" }
 }

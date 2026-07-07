@@ -2451,5 +2451,9 @@
   "srchInputAria": { "message": "在文档中搜索" },
   "srchPrevAria": { "message": "上一个匹配项" },
   "srchNextAria": { "message": "下一个匹配项" },
-  "srchRegexAria": { "message": "正则表达式搜索" }
+  "srchRegexAria": { "message": "正则表达式搜索" },
+  "kbdHelpZen": { "message": "切换禅模式(专注阅读)" },
+  "zenEnterBtn": { "message": "进入禅模式" },
+  "zenExitAria": { "message": "退出禅模式" },
+  "zenWidthAria": { "message": "内容宽度" }
 }

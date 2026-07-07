@@ -2457,5 +2457,9 @@
   "srchInputAria": { "message": "この文書内を検索" },
   "srchPrevAria": { "message": "前の一致" },
   "srchNextAria": { "message": "次の一致" },
-  "srchRegexAria": { "message": "正規表現で検索" }
+  "srchRegexAria": { "message": "正規表現で検索" },
+  "kbdHelpZen": { "message": "禅(集中)モードを切り替える" },
+  "zenEnterBtn": { "message": "禅モードに入る" },
+  "zenExitAria": { "message": "禅モードを終了" },
+  "zenWidthAria": { "message": "本文の幅" }
 }

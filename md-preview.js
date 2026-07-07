@@ -1469,6 +1469,40 @@ function setupDrawer() {
   });
 }
 
+// Closes the mobile off-canvas rail drawer if it happens to be open (R2
+// zen batch, spec sec.1.2 "zen also hides the drawer toggle"). Entering
+// zen while the drawer is open only CSS-hides #rail/.rail-toggle/
+// .rail-scrim (md-preview.css) -- it does NOT clear the drawer's OWN
+// state, which lives entirely inside setupDrawer()'s closure above
+// (body.rail-open, the scrim's hidden attribute, #rail's role/aria-modal).
+// Left uncleared, exiting zen hands control back to the pre-existing
+// `body.rail-open .rail { transform: translateX(0); visibility: visible }`
+// rule and the scrim's now-stale visible state, popping the full-screen
+// drawer overlay back onto the screen even though the user only asked to
+// leave zen. Declared top-level (genuinely page-global, like
+// trOnlyScrollTarget right below) rather than added inside setupDrawer's
+// closure, so md-reader.js's zen feature can reach it via a typeof guard,
+// same as every other cross-file call in this file. Mirrors setupDrawer's
+// own setOpen(false) branch (rail-open class / aria-expanded /
+// scrim.hidden / role+aria-modal) but deliberately does NOT restore focus
+// to setupDrawer's private `lastFocus` -- that variable isn't reachable
+// from outside setupDrawer's closure, and the caller (md-reader.js's
+// _pbpZenEnter) already handles its own focus target for the zen-entry
+// case.
+function pbpRailDrawerClose() {
+  if (!document.body.classList.contains("rail-open")) return;
+  document.body.classList.remove("rail-open");
+  const toggle = document.getElementById("rail-toggle");
+  const scrim = document.getElementById("rail-scrim");
+  const rail = document.getElementById("rail");
+  if (toggle) toggle.setAttribute("aria-expanded", "false");
+  if (scrim) scrim.hidden = true;
+  if (rail) {
+    rail.removeAttribute("role");
+    rail.removeAttribute("aria-modal");
+  }
+}
+
 // In tr-only mode, a translated ORIGINAL heading is display:none (md-preview.css:890
 // hides every [data-pb-tr-done] unless .pb-show-orig is toggled back on) while its
 // .pb-tr sibling (inserted by _pbpTrFill, md-translate.js) carries the visible text.

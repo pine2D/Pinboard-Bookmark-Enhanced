@@ -668,6 +668,7 @@ const PBP_KBD_HELP_ROWS = [
   { chips: ["H", "1-5"], key: "kbdHelpHighlight" },
   { chips: ["a"], key: "kbdHelpAsk" },
   { chips: ["/"], key: "kbdHelpSearch" },
+  { chips: ["z"], key: "kbdHelpZen" },
   { chips: ["?"], key: "kbdHelpShowHelp" },
   { chips: ["Esc"], key: "kbdHelpClose" }
 ];
@@ -735,24 +736,306 @@ function _pbpKbdHelpOnKeyDown(e) {
   _pbpKbdHelpOpen();
 }
 
+// Shared rail-bottom row (spec sec.1.1, R2 batch): ONE flex row container
+// appended as #rail's LAST child, holding every small rail-bottom text
+// button. Idempotent via a plain id lookup (not a dataset flag -- a second
+// call from a different feature's init must find and reuse the same row,
+// not skip because ITS OWN flag was never set) so whichever of
+// _pbpKbdHelpInit / _pbpZenInit runs first creates it and the other just
+// appends into it -- neither call owns creation. Interface for any FUTURE
+// rail-bottom text button: call this, then row.appendChild(yourButton) --
+// never rail.appendChild directly, never a new sibling container class.
+function _pbpRailBottomRow() {
+  const rail = document.getElementById("rail");
+  if (!rail) return null;
+  let row = document.getElementById("rail-bottom-row");
+  if (row) return row;
+  row = document.createElement("div");
+  row.id = "rail-bottom-row";
+  row.className = "rail-bottom-row";
+  rail.appendChild(row); // #toc (nav) is #rail's static last child today, and every
+  // dynamic rail section (tr/ask/hl) inserts itself BEFORE #toc -- so a
+  // plain appendChild here always lands truly last, i.e. at the rail's
+  // bottom, matching spec 5.2's "unobtrusive rail-bottom entry" (comment
+  // moved verbatim from the old rail.appendChild(btn) call this replaces).
+  return row;
+}
+
 let _pbpKbdHelpInited = false;
 
 function _pbpKbdHelpInit() {
   if (_pbpKbdHelpInited) return;
   _pbpKbdHelpInited = true;
   document.addEventListener("keydown", _pbpKbdHelpOnKeyDown);
-  const rail = document.getElementById("rail");
-  if (rail) {
+  const row = _pbpRailBottomRow();
+  if (row) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = "rail-kbd-help-btn";
     btn.className = "rail-kbd-help-btn";
     btn.textContent = t("kbdHelpRailBtn");
     btn.addEventListener("click", () => _pbpKbdHelpOpen());
-    rail.appendChild(btn); // #toc (nav) is #rail's static last child today, and every
-    // dynamic rail section (tr/ask/hl) inserts itself BEFORE #toc -- so a
-    // plain appendChild here always lands truly last, i.e. at the rail's
-    // bottom, matching spec 5.2's "unobtrusive rail-bottom entry."
+    row.appendChild(btn);
+  }
+}
+
+// ---- R2: Zen (focus) reading mode (spec sec.1/3/4 -- "z" hotkey / rail
+// button / #zen-bar). Scroll-preservation on enter/exit/width-cycle reuses
+// the block-index + fraction technique the Raw<->Rendered toggle (md-
+// preview.js:889-930) and its own R9 restore (md-preview.js:955-1029)
+// already established -- pbpReaderPickScrollAnchor (this file's pure
+// section, above) is the shared math; pbpAiBlocks/pbpAiIndexBlocks/
+// pbpAiBlockEl (md-ai-core.js) and trOnlyScrollTarget (md-preview.js) are
+// the genuinely page-global pieces this file can reach. NOTE:
+// md-preview.js's own pbpScrollMapBlocks() wrapper is NOT page-global --
+// it's declared inside that file's `(async function () {...})()` IIFE, so
+// it is invisible outside md-preview.js despite looking like a top-level
+// declaration; _pbpZenScrollBlocks() below is this file's own copy of its
+// three-line body against the genuinely-global pbpAiBlocks/
+// pbpAiIndexBlocks pair. Also reaches md-preview.js's own
+// pbpRailDrawerClose() (Step 3, this batch) to force-close the mobile
+// drawer on zen entry, and moves focus off of #rail before it's hidden if
+// that's where focus was -- see _pbpZenEnter() below for both. Spec
+// sec.1.4: no R9 self-scroll suppression window is needed here -- the
+// settle call's programmatic scroll lands on the correct NEW position, so
+// even if it re-arms R9's own save-scroll debounce (md-preview.js), R9
+// saving that position is harmless (unlike R9's OWN restore-vs-save race,
+// which the suppression window there exists to prevent). ----
+const PBP_ZEN_WIDTHS = [680, 880, 1080];
+let _pbpZenWidth = 880; // in-memory current width (px); loaded async below. Zen ON/OFF itself is never persisted (spec sec.1.1) -- only this width step is.
+let _pbpZenBarEl = null;
+let _pbpZenFadeTimer = null;
+let _pbpZenInited = false;
+
+// Width-cycle icon (spec sec.4: PBP_ICONS-style linear stroke, same
+// viewBox/stroke-width/linecap/linejoin family as PBP_SEARCH_PREV_SVG/
+// PBP_SEARCH_NEXT_SVG above -- kept as a local const like those two rather
+// than added to shared.js's PBP_ICONS bank, same precedent). Two arrows
+// pointing outward from center reads as "resize/cycle width."
+const PBP_ZEN_WIDTH_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4 2 8l4 4M10 4l4 4-4 4"/></svg>';
+
+// This file's own copy of md-preview.js's pbpScrollMapBlocks() body (see
+// the header comment above) against the same genuinely page-global
+// pbpAiBlocks/pbpAiIndexBlocks pair -- force-indexes #rendered-view once
+// if nothing has indexed it yet (translate/ask only index when AI is
+// configured, so this can't assume it already ran), same defensive shape
+// every existing caller of that pair already uses.
+function _pbpZenScrollBlocks() {
+  if (typeof pbpAiBlocks !== "function") return [];
+  if (!pbpAiBlocks().length && typeof pbpAiIndexBlocks === "function") {
+    const view = document.getElementById("rendered-view");
+    if (view) pbpAiIndexBlocks(view);
+  }
+  return pbpAiBlocks();
+}
+
+// Capture-before-relayout half of the scroll-preservation technique:
+// topmost visible block + the fraction already scrolled into it, via this
+// file's own pbpReaderPickScrollAnchor (pure section, above). null in raw
+// view -- #rendered-view is display:none there (.content-view.hidden), so
+// every rect would read 0x0 -- same scope limit _pbpReaderSaveScroll
+// (md-preview.js:956) already accepts for the R9 save path; a raw-view
+// zen toggle simply doesn't reposition scroll, an accepted simplification.
+function _pbpZenCaptureAnchor() {
+  if (document.body.classList.contains("raw-active")) return null;
+  const blocks = _pbpZenScrollBlocks();
+  if (!blocks.length) return null;
+  const rects = blocks.map((b) => (typeof trOnlyScrollTarget === "function" ? trOnlyScrollTarget(b.el) : b.el).getBoundingClientRect());
+  return typeof pbpReaderPickScrollAnchor === "function" ? pbpReaderPickScrollAnchor(rects) : null;
+}
+
+// Re-settle half: resolve the anchor against the block list AFTER the
+// layout change (the class/style mutations already happened synchronously
+// above each call site below) -- same scrollIntoView + scrollBy(frac *
+// height) shape as md-preview.js's own R9 applyRestore().
+function _pbpZenSettleAnchor(anchor) {
+  if (!anchor || typeof pbpAiBlockEl !== "function") return;
+  const blockEl = pbpAiBlockEl(anchor.n);
+  if (!blockEl) return;
+  const target = typeof trOnlyScrollTarget === "function" ? trOnlyScrollTarget(blockEl) : blockEl;
+  target.scrollIntoView({ block: "start" });
+  const frac = Math.min(Math.max(Number(anchor.frac) || 0, 0), 1);
+  if (frac > 0) {
+    const h = target.getBoundingClientRect().height;
+    if (h > 0) window.scrollBy(0, frac * h);
+  }
+}
+
+// Width persistence: exact pbp_srch_regex shape (md-reader.js:565-575) --
+// chrome.storage.local.get with an inline default, both chrome/
+// chrome.storage typeof-guarded, read once here at init; written back
+// only from the cycle button below. An unrecognized stored value (e.g. a
+// stale format from a future/rolled-back version) degrades to the 880
+// default rather than propagating garbage into --zen-width.
+function _pbpZenLoadWidth() {
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
+  try {
+    chrome.storage.local.get({ pbp_zen_width: 880 }, (res) => {
+      _pbpZenWidth = (res && PBP_ZEN_WIDTHS.indexOf(res.pbp_zen_width) !== -1) ? res.pbp_zen_width : 880;
+    });
+  } catch (_) {}
+}
+
+// Width button title/aria (spec sec.1.3: "simplest honest form") -- one
+// i18n key + the concatenated step value, not a 3-way translated string.
+function _pbpZenUpdateWidthBtn() {
+  const btn = document.getElementById("zen-width-btn");
+  if (!btn) return;
+  const label = t("zenWidthAria") + ": " + _pbpZenWidth + "px";
+  btn.setAttribute("aria-label", label);
+  btn.title = label;
+}
+
+// Lazily builds the singleton #zen-bar (spec sec.1.3): NOT a popover -- no
+// Esc/light-dismiss semantics, it stays mounted (CSS-hidden outside
+// body.zen) for the rest of the page's life once zen is entered once.
+function _pbpZenEnsureBar() {
+  if (_pbpZenBarEl) return _pbpZenBarEl;
+  const bar = document.createElement("div");
+  bar.id = "zen-bar";
+
+  const widthBtn = document.createElement("button");
+  widthBtn.type = "button";
+  widthBtn.id = "zen-width-btn";
+  widthBtn.className = "zen-btn";
+  widthBtn.innerHTML = PBP_ZEN_WIDTH_SVG;
+  widthBtn.addEventListener("click", _pbpZenCycleWidth);
+  bar.appendChild(widthBtn);
+
+  const exitBtn = document.createElement("button");
+  exitBtn.type = "button";
+  exitBtn.id = "zen-exit-btn";
+  exitBtn.className = "zen-btn";
+  exitBtn.innerHTML = (typeof PBP_ICONS === "object" && PBP_ICONS && PBP_ICONS.cross) || "";
+  exitBtn.setAttribute("aria-label", t("zenExitAria"));
+  exitBtn.title = t("zenExitAria");
+  exitBtn.addEventListener("click", _pbpZenExit);
+  bar.appendChild(exitBtn);
+
+  document.body.appendChild(bar);
+  _pbpZenBarEl = bar;
+  return bar;
+}
+
+// Width-cycle button click: 680 -> 880 -> 1080 -> 680 ..., persisted (spec
+// sec.1.2), reflows .doc-body's max-width and re-settles scroll like every
+// other zen layout change.
+function _pbpZenCycleWidth() {
+  const anchor = _pbpZenCaptureAnchor();
+  const idx = PBP_ZEN_WIDTHS.indexOf(_pbpZenWidth);
+  _pbpZenWidth = PBP_ZEN_WIDTHS[(idx === -1 ? 0 : idx + 1) % PBP_ZEN_WIDTHS.length];
+  document.body.style.setProperty("--zen-width", _pbpZenWidth + "px");
+  _pbpZenUpdateWidthBtn();
+  _pbpZenSettleAnchor(anchor);
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+    try { chrome.storage.local.set({ pbp_zen_width: _pbpZenWidth }); } catch (_) {}
+  }
+}
+
+// Mouse-idle fade (spec sec.1.3): 2s of stillness fades #zen-bar to near-
+// invisible + pointer-events:none (CSS .faded, md-preview.css); any
+// mousemove restores it immediately; #zen-bar:focus-within overrides
+// .faded in CSS so a keyboard user tabbed onto a bar button never has it
+// fade under them.
+function _pbpZenOnMouseMove() {
+  if (_pbpZenBarEl) _pbpZenBarEl.classList.remove("faded");
+  clearTimeout(_pbpZenFadeTimer);
+  _pbpZenFadeTimer = setTimeout(() => {
+    if (_pbpZenBarEl) _pbpZenBarEl.classList.add("faded");
+  }, 2000);
+}
+
+function _pbpZenArmFade() {
+  document.addEventListener("mousemove", _pbpZenOnMouseMove, { passive: true });
+  _pbpZenOnMouseMove(); // starts the 2s countdown immediately on entry, same effect as a real mousemove would
+}
+
+// Zero-leak teardown (spec sec.1.3): removes the listener + clears the
+// timer + un-fades the bar so the NEXT zen entry starts from a clean state.
+function _pbpZenDisarmFade() {
+  document.removeEventListener("mousemove", _pbpZenOnMouseMove);
+  clearTimeout(_pbpZenFadeTimer);
+  _pbpZenFadeTimer = null;
+  if (_pbpZenBarEl) _pbpZenBarEl.classList.remove("faded");
+}
+
+// Enter zen. Two adversarial-review fixes live here (see corrections 4/5
+// above): (a) force-closes the mobile drawer via md-preview.js's
+// pbpRailDrawerClose() -- entering zen from the ONLY reachable mobile path
+// (the zen button inside the open drawer) must not leave body.rail-open /
+// the scrim's visible state / #rail's dialog attributes stranded, or
+// exiting zen would resurrect the drawer overlay; (b) if focus was inside
+// #rail before this call (the rail button that was just clicked, or a
+// keyboard user tabbed onto it before pressing "z"), #rail is about to be
+// display:none'd out from under that focus, so focus is explicitly moved
+// to #zen-exit-btn once the bar exists -- otherwise the browser blurs the
+// vanishing element and focus silently falls back to <body> with no
+// indication of where it went. The ordinary "z"-from-elsewhere path (focus
+// NOT inside #rail) is untouched -- it never had a focus-loss problem, and
+// forcing focus onto the bar in that case would be a needless surprise
+// mid-document.
+function _pbpZenEnter() {
+  if (document.body.classList.contains("zen")) return;
+  const anchor = _pbpZenCaptureAnchor();
+  const ae = document.activeElement;
+  const focusWasInRail = !!(ae && typeof ae.closest === "function" && ae.closest("#rail"));
+  document.body.style.setProperty("--zen-width", _pbpZenWidth + "px");
+  document.body.classList.add("zen");
+  if (typeof pbpRailDrawerClose === "function") pbpRailDrawerClose();
+  _pbpZenEnsureBar();
+  _pbpZenUpdateWidthBtn();
+  _pbpZenSettleAnchor(anchor);
+  _pbpZenArmFade();
+  if (focusWasInRail) {
+    const exitBtn = document.getElementById("zen-exit-btn");
+    if (exitBtn) exitBtn.focus();
+  }
+}
+
+function _pbpZenExit() {
+  if (!document.body.classList.contains("zen")) return;
+  const anchor = _pbpZenCaptureAnchor();
+  document.body.classList.remove("zen");
+  document.body.style.removeProperty("--zen-width");
+  _pbpZenSettleAnchor(anchor);
+  _pbpZenDisarmFade();
+}
+
+function _pbpZenToggle() {
+  if (document.body.classList.contains("zen")) _pbpZenExit();
+  else _pbpZenEnter();
+}
+
+// Same 4-condition gate as this file's own "?" hotkey (_pbpKbdHelpOnKeyDown,
+// above) and md-highlight.js's "H" hotkey (_pbpHlOnKeyDown:921-923) -- z is
+// a bare letter, so shiftKey is REJECTED like every other bare-letter
+// hotkey in this codebase (unlike "/" and "?", which are already-shifted
+// characters on most keyboard layouts and so are exempted from the shift
+// check; z has no such exemption).
+function _pbpZenOnKeyDown(e) {
+  if (e.key !== "z" && e.key !== "Z") return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  const ae = document.activeElement;
+  if (typeof pbpTrIsTypingContext === "function"
+    && pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))) return;
+  e.preventDefault();
+  _pbpZenToggle();
+}
+
+function _pbpZenInit() {
+  if (_pbpZenInited) return;
+  _pbpZenInited = true;
+  _pbpZenLoadWidth();
+  document.addEventListener("keydown", _pbpZenOnKeyDown);
+  const row = _pbpRailBottomRow();
+  if (row) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "rail-zen-btn";
+    btn.className = "rail-kbd-help-btn"; // spec sec.1.1: reuse the existing rail-bottom text-button visual, don't fork a near-duplicate rule
+    btn.textContent = t("zenEnterBtn");
+    btn.addEventListener("click", () => _pbpZenEnter());
+    row.appendChild(btn);
   }
 }
 
@@ -771,5 +1054,6 @@ if (typeof document !== "undefined") {
     try { _pbpFnInit(); } catch (_) {}
     try { _pbpSearchInit(); } catch (_) {}
     try { _pbpKbdHelpInit(); } catch (_) {}
+    try { _pbpZenInit(); } catch (_) {}
   }, { once: true });
 }
