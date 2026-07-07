@@ -2458,8 +2458,8 @@
   "srchPrevAria": { "message": "上一個相符項目" },
   "srchNextAria": { "message": "下一個相符項目" },
   "srchRegexAria": { "message": "正規表示式搜尋" },
-  "kbdHelpZen": { "message": "切換禪模式(專注閱讀)" },
-  "zenEnterBtn": { "message": "進入禪模式" },
-  "zenExitAria": { "message": "退出禪模式" },
+  "kbdHelpZen": { "message": "切換專注模式" },
+  "zenEnterBtn": { "message": "進入專注模式" },
+  "zenExitAria": { "message": "退出專注模式" },
   "zenWidthAria": { "message": "內容寬度" }
 }
