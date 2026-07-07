@@ -640,7 +640,7 @@ function _xmlEscape(s) {
 // VISIBLE header (never YAML). renderMarkdown + highlightCodeBlocks run on a
 // detached node (needs a DOM — preview/test page, not the popup). The caller
 // passes opts.hljsCss (fetched from the vendored theme) so this stays chrome-free.
-// meta: {title,url,date,tags,source,description?}
+// meta: {title,url,date,tags,source,description?,author?,published?,site?,image?,words?}
 // opts: { frontmatter, imagePolicy, includeToc, hljsCss, math, katexCss, highlights }
 function composeStyledHtml(canonicalMd, meta, opts) {
   meta = meta || {};
