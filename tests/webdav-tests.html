@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>webdav Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; } .fail { color: #c00; font-weight: bold; }
+h2 { margin-top: 24px; }
+</style></head>
+<body>
+<h1>webdav.js tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+
+<script src="../shared.js"></script>
+<script src="../webdav.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond; ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+function section(name) { const h = document.createElement("h2"); h.textContent = name; root.appendChild(h); }
+function assert(cond, detail) { check(detail || String(cond), cond, detail); }
+function assertEq(a, e, label) {
+  const ok = a === e;
+  check(label || (String(e) + " === " + String(a)), ok, ok ? "" : "expected " + JSON.stringify(e) + " got " + JSON.stringify(a));
+}
+
+section("pbpWebdavFileUrl");
+assertEq(pbpWebdavFileUrl("https://dav.example.com/backups"),
+  "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json",
+  "no trailing slash -> appends /filename");
+assertEq(pbpWebdavFileUrl("https://dav.example.com/backups/"),
+  "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json",
+  "trailing slash -> no double slash");
+assertEq(pbpWebdavFileUrl(""), "", "empty baseUrl -> empty string (degrade, no throw)");
+assertEq(pbpWebdavFileUrl("   "), "", "whitespace-only baseUrl -> empty string");
+assertEq(pbpWebdavFileUrl("https://dav.example.com/remote.php/webdav"),
+  "https://dav.example.com/remote.php/webdav/pinboard-bookmark-enhanced-settings.json",
+  "multi-segment path, no trailing slash");
+assertEq(pbpWebdavFileUrl(null), "", "null -> empty string, no throw");
+
+section("pbpWebdavAuthHeader");
+assertEq(pbpWebdavAuthHeader("", ""), null, "empty user + empty pass -> null (no header)");
+assertEq(pbpWebdavAuthHeader("bob", "secret"), "Basic " + btoa("bob:secret"), "user+pass -> Basic base64(user:pass)");
+assertEq(pbpWebdavAuthHeader("bob", ""), "Basic " + btoa("bob:"), "user only -> still builds a header (empty pass is valid Basic auth)");
+assertEq(pbpWebdavAuthHeader("", "secret"), "Basic " + btoa(":secret"), "pass only -> still builds a header");
+assert(typeof pbpWebdavAuthHeader("büro", "pässwört") === "string" &&
+  pbpWebdavAuthHeader("büro", "pässwört").startsWith("Basic "),
+  "unicode user/pass does not throw, returns a Basic header");
+
+section("pbpWebdavOrigin");
+assertEq(pbpWebdavOrigin("https://dav.example.com/backups/"), "https://dav.example.com/*", "derives origin + /*");
+assertEq(pbpWebdavOrigin("not a url"), null, "malformed URL -> null, no throw");
+assertEq(pbpWebdavOrigin(""), null, "empty -> null");
+
+section("pbpWebdavBuildPayload — zero secrets (spec invariant #1)");
+{
+  const fullSettings = Object.assign({}, SETTINGS_DEFAULTS);
+  API_KEY_FIELDS.forEach((k, i) => { fullSettings[k] = "obf:v" + i; });
+  fullSettings.optTheme = "nord";
+  fullSettings.exportTargets = { github: { enabled: true, token: "ghp_x", repo: "r" } };
+  const meta = { pushedAt: "2026-07-08T00:00:00.000Z", appVersion: "2.88" };
+  const payload = pbpWebdavBuildPayload(fullSettings, meta);
+
+  assert(API_KEY_FIELDS.every((k) => !(k in payload)),
+    "every one of the " + API_KEY_FIELDS.length + " API_KEY_FIELDS is absent from the payload");
+  assert(!("webdavPass" in payload), "webdavPass absent from payload (not a settings field yet in this batch)");
+  assertEq(payload.optTheme, "nord", "a non-secret setting rides the payload");
+  assert(!("token" in payload.exportTargets.github), "exportTargets token stripped");
+  assertEq(payload.exportTargets.github.repo, "r", "exportTargets non-secret fields survive");
+  assertEq(payload._schemaVersion, 2, "envelope schema version is 2");
+  assertEq(payload._webdav.pushedAt, "2026-07-08T00:00:00.000Z", "envelope pushedAt comes from meta, verbatim");
+  assertEq(payload._webdav.appVersion, "2.88", "envelope appVersion comes from meta, verbatim");
+  assertEq(fullSettings.optTheme, "nord", "input settings object is not mutated");
+  assert("token" in fullSettings.exportTargets.github, "input exportTargets still has its token (proves no mutation)");
+}
+section("pbpWebdavBuildPayload — purity (no internal clock)");
+{
+  const s = Object.assign({}, SETTINGS_DEFAULTS);
+  const p1 = pbpWebdavBuildPayload(s, { pushedAt: "A", appVersion: "1" });
+  const p2 = pbpWebdavBuildPayload(s, { pushedAt: "B", appVersion: "1" });
+  assert(p1._webdav.pushedAt === "A" && p2._webdav.pushedAt === "B",
+    "pushedAt only ever reflects the meta argument -- function never calls Date.now itself");
+}
+
+section("pbpWebdavBuildRequest");
+{
+  const cfg = { baseUrl: "https://dav.example.com/backups", user: "bob", pass: "secret" };
+  const push = pbpWebdavBuildRequest("push", cfg);
+  assertEq(push.method, "PUT", "push -> PUT");
+  assertEq(push.headers["Content-Type"], "application/json", "push sets JSON content-type");
+  assertEq(push.url, pbpWebdavFileUrl(cfg.baseUrl), "push url built via pbpWebdavFileUrl");
+
+  const pull = pbpWebdavBuildRequest("pull", cfg);
+  assertEq(pull.method, "GET", "pull -> GET");
+  assert(!("Content-Type" in pull.headers), "pull has no content-type header");
+
+  const testReq = pbpWebdavBuildRequest("test", cfg);
+  assertEq(testReq.method, "GET", "test -> GET");
+
+  assertEq(push.headers.Authorization, "Basic " + btoa("bob:secret"), "Authorization present when user/pass set");
+  const noAuth = pbpWebdavBuildRequest("push", { baseUrl: "https://dav.example.com/backups", user: "", pass: "" });
+  assert(!("Authorization" in noAuth.headers), "Authorization omitted when user+pass both empty");
+}
+
+document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+</script>
+</body></html>
