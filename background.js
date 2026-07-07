@@ -1237,7 +1237,13 @@ function extractPageForMarkdown() {
     let result;
     try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
     if (!result?.content) return { error: "No content extracted" };
-    return { contentHtml: result.content, title: result.title || document.title, url: location.href, math: !!document.querySelector("math") };
+    // X4: mirrors popup.js's extractLocalMarkdown -- keep Defuddle's
+    // author/published/site/image alongside content/title/url/math.
+    return {
+      contentHtml: result.content, title: result.title || document.title, url: location.href,
+      math: !!document.querySelector("math"),
+      author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || ""
+    };
   } catch (e) { return { error: e.message }; }
 }
 
@@ -1261,7 +1267,12 @@ async function extractForPreview({ tabId, url, engine }) {
     return {
       source: "jina", markdown: r.markdown, contentHtml: "",
       title: r.title || "", url: r.url || url,
-      tokens: r.tokens || 0, hasApiKey: !!key, math: false
+      tokens: r.tokens || 0, hasApiKey: !!key, math: false,
+      // X4: published is jina.js's best-effort field; author/site/image have no
+      // Jina counterpart. site's hostname fallback happens at meta-build time in
+      // buildMeta() (design spec 4.2), not here -- this layer only transports
+      // what the engine actually gave us.
+      published: r.published || ""
     };
   }
   // engine === "local" (Defuddle)
@@ -1286,7 +1297,12 @@ async function extractForPreview({ tabId, url, engine }) {
   return {
     source: "local", markdown: "", contentHtml: out.contentHtml,
     title: out.title || "", url: url, // prefer caller url over extractor's
-    tokens: 0, hasApiKey: false, math: !!out.math, forum: !!out.forum
+    tokens: 0, hasApiKey: false, math: !!out.math, forum: !!out.forum,
+    // X4: forward the four metadata fields extractPageForMarkdown's Defuddle
+    // branch now keeps. The reextractMarkdown handler's `...out` spread
+    // (background.js ~943-953) forwards these automatically into storage --
+    // no separate edit needed there.
+    author: out.author || "", published: out.published || "", site: out.site || "", image: out.image || ""
   };
 }
 

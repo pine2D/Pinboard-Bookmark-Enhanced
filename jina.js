@@ -41,7 +41,12 @@ async function fetchJinaMarkdown(url, options = {}) {
       markdown: d.content || "",
       title: d.title || "",
       url: d.url || url,
-      tokens: d.usage?.tokens || json.meta?.usage?.tokens || 0
+      tokens: d.usage?.tokens || json.meta?.usage?.tokens || 0,
+      // X4: best-effort published date from Jina's upstream response. No
+      // author/site/image counterpart -- Jina Reader doesn't expose them.
+      // Entries cached before this field existed simply read back undefined
+      // here -> "" downstream (degrade, no cache migration).
+      published: d.publishedTime || ""
     };
 
     // Cache result

@@ -486,6 +486,14 @@ function pbpApplyColorScheme(mode) {
   const baseUrl = info.baseUrl || url || "";
   const tags = Array.isArray(info.tags) ? info.tags : [];
   const description = info.description || "";
+  // X4: raw metadata transported by popup.js/background.js's widened
+  // extraction payload. Gated by buildMeta()'s exportSettings.mdExportExtendedMeta
+  // check (design spec 4.2) -- this file only reads them here; T4's buildMeta()
+  // consumes these consts by closure (same scope as `description` above).
+  const author = info.author || "";
+  const published = info.published || "";
+  const site = info.site || "";
+  const image = info.image || "";
 
   // Engine-switch plumbing, hoisted above the pending-extraction branch so a failed
   // shortcut/reload attempt can offer a working Defuddle<->Jina escape hatch (below)

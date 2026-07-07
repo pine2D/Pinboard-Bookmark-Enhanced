@@ -435,7 +435,14 @@ async function extractLocalMarkdown(tabId) {
           let result;
           try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
           if (!result?.content) return { error: "No content extracted" };
-          return { contentHtml: result.content, title: result.title || document.title, url: location.href, math: !!document.querySelector("math") };
+          // X4: Defuddle's parse() result also carries author/published/site/image
+          // (its internal MetadataExtractor already does JSON-LD + meta-tag
+          // resolution) -- keep them so the preview/export layer can surface them.
+          return {
+            contentHtml: result.content, title: result.title || document.title, url: location.href,
+            math: !!document.querySelector("math"),
+            author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || ""
+          };
         } catch (e) { return { error: e.message }; }
       }
     });
@@ -566,6 +573,13 @@ async function htmlToMarkdownAsync(html, opts) {
               source: settings.aiContentSource || "local",
               math: !!result.math,
               forum: !!result.forum,
+              // X4: raw metadata transport -- md-preview.js reads these into
+              // info.author/published/site/image; gated by buildMeta()'s
+              // exportSettings.mdExportExtendedMeta check (design spec 4.2).
+              author: result.author || "",
+              published: result.published || "",
+              site: result.site || "",
+              image: result.image || "",
               tabId: tab.id,
               ts: Date.now() // sweep grace: don't orphan-collect a slot mid-handoff
             }
