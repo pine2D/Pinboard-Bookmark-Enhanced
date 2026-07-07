@@ -710,7 +710,13 @@
     "message": "Popup"
   },
   "tabAI": {
-    "message": "IA"
+    "message": "Fournisseurs IA"
+  },
+  "tabAiBehavior": {
+    "message": "Comportement IA"
+  },
+  "tabReader": {
+    "message": "Lecture"
   },
   "tabQuickActions": {
     "message": "Actions rapides"
@@ -1381,7 +1387,7 @@
     "message": "Dossier Obsidian"
   },
   "tabMarkdown": {
-    "message": "Markdown"
+    "message": "Export"
   },
   "tabArchive": {
     "message": "Archivage"

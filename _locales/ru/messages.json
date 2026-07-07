@@ -710,7 +710,13 @@
     "message": "Всплывающее окно"
   },
   "tabAI": {
-    "message": "AI"
+    "message": "AI-провайдеры"
+  },
+  "tabAiBehavior": {
+    "message": "Поведение AI"
+  },
+  "tabReader": {
+    "message": "Чтение"
   },
   "tabQuickActions": {
     "message": "Быстрые действия"
@@ -1381,7 +1387,7 @@
     "message": "Папка Obsidian"
   },
   "tabMarkdown": {
-    "message": "Markdown"
+    "message": "Экспорт"
   },
   "tabArchive": {
     "message": "Архив"

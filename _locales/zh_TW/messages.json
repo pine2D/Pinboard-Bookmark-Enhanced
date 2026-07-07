@@ -710,7 +710,13 @@
     "message": "彈窗"
   },
   "tabAI": {
-    "message": "AI"
+    "message": "AI 服務商"
+  },
+  "tabAiBehavior": {
+    "message": "AI 行為"
+  },
+  "tabReader": {
+    "message": "閱讀器"
   },
   "tabQuickActions": {
     "message": "快捷操作"
@@ -1381,7 +1387,7 @@
     "message": "Obsidian 資料夾"
   },
   "tabMarkdown": {
-    "message": "Markdown"
+    "message": "匯出"
   },
   "tabArchive": {
     "message": "存檔"

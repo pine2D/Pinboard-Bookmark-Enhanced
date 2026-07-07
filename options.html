@@ -14,9 +14,11 @@
       <button class="tab-btn active" id="tab-general" data-panel="general" role="tab" aria-selected="true" aria-controls="panel-general" data-i18n="tabGeneral">General</button>
       <button class="tab-btn" id="tab-popup" data-panel="popup" role="tab" aria-selected="false" aria-controls="panel-popup" data-i18n="tabPopup">Popup</button>
       <button class="tab-btn" id="tab-bookmarks" data-panel="bookmarks" role="tab" aria-selected="false" aria-controls="panel-bookmarks" data-i18n="tabBookmarks">Bookmarks</button>
-      <button class="tab-btn" id="tab-ai" data-panel="ai" role="tab" aria-selected="false" aria-controls="panel-ai" data-i18n="tabAI">AI</button>
+      <button class="tab-btn" id="tab-ai" data-panel="ai" role="tab" aria-selected="false" aria-controls="panel-ai" data-i18n="tabAI">AI Providers</button>
+      <button class="tab-btn" id="tab-ai-behavior" data-panel="ai-behavior" role="tab" aria-selected="false" aria-controls="panel-ai-behavior" data-i18n="tabAiBehavior">AI Behavior</button>
+      <button class="tab-btn" id="tab-reader" data-panel="reader" role="tab" aria-selected="false" aria-controls="panel-reader" data-i18n="tabReader">Reader</button>
+      <button class="tab-btn" id="tab-markdown" data-panel="markdown" role="tab" aria-selected="false" aria-controls="panel-markdown" data-i18n="tabMarkdown">Export</button>
       <button class="tab-btn" id="tab-quick" data-panel="quick" role="tab" aria-selected="false" aria-controls="panel-quick" data-i18n="tabQuickActions">Quick Actions</button>
-      <button class="tab-btn" id="tab-markdown" data-panel="markdown" role="tab" aria-selected="false" aria-controls="panel-markdown" data-i18n="tabMarkdown">Markdown</button>
       <button class="tab-btn" id="tab-tags" data-panel="tags" role="tab" aria-selected="false" aria-controls="panel-tags" data-i18n="tabTags">Tags</button>
       <button class="tab-btn" id="tab-archive" data-panel="archive" role="tab" aria-selected="false" aria-controls="panel-archive" data-i18n="tabArchive">Archive</button>
       <button class="tab-btn" id="tab-appearance" data-panel="appearance" role="tab" aria-selected="false" aria-controls="panel-appearance" data-i18n="tabAppearance">Appearance</button>
@@ -421,6 +423,18 @@
       </div>
 
       <div class="divider"></div>
+      <div class="section-title" data-i18n="secJinaReader">Jina Reader</div>
+      <div class="fg">
+        <label class="bl" data-i18n="jinaApiKeyLabel">API Key (optional)</label>
+        <input type="password" id="opt-jina-key" placeholder="jina_xxxx (leave empty for free tier)" data-i18n-placeholder="jinaApiKeyPlaceholder" />
+        <button type="button" class="key-toggle" data-target="opt-jina-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
+        <p class="hint"><span data-i18n="jinaFreeTierHint">Free tier: 20 RPM. Add key for higher quota.</span> <a href="https://jina.ai/reader#pricing" target="_blank" data-i18n="getKey">Get key</a></p>
+      </div>
+
+    </div>
+
+    <!-- Tab: AI Behavior -->
+    <div id="panel-ai-behavior" class="panel" role="tabpanel" aria-labelledby="tab-ai-behavior">
       <div class="section-title" data-i18n="secAiContentSource">AI Content Source</div>
       <div class="fg">
         <label><input type="radio" name="ai-content-source" id="opt-ai-src-local" value="local" checked /> <span data-i18n="aiContentSourceLocal">Local (Defuddle)</span></label>
@@ -429,15 +443,6 @@
       <div class="fg">
         <label><input type="radio" name="ai-content-source" id="opt-ai-src-jina" value="jina" /> <span data-i18n="aiContentSourceJina">Jina Reader</span></label>
         <p class="hint" data-i18n="aiContentSourceJinaHint">Fetch cleaned Markdown via Jina Reader API (requires network; API key optional for higher quota).</p>
-      </div>
-
-      <div class="divider"></div>
-      <div class="section-title" data-i18n="secJinaReader">Jina Reader</div>
-      <div class="fg">
-        <label class="bl" data-i18n="jinaApiKeyLabel">API Key (optional)</label>
-        <input type="password" id="opt-jina-key" placeholder="jina_xxxx (leave empty for free tier)" data-i18n-placeholder="jinaApiKeyPlaceholder" />
-        <button type="button" class="key-toggle" data-target="opt-jina-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
-        <p class="hint"><span data-i18n="jinaFreeTierHint">Free tier: 20 RPM. Add key for higher quota.</span> <a href="https://jina.ai/reader#pricing" target="_blank" data-i18n="getKey">Get key</a></p>
       </div>
 
       <div class="divider"></div>
@@ -507,8 +512,10 @@
         <p class="hint" data-i18n="summaryPromptHint">Leave empty to use the default prompt shown above. Use <code>{{lang_instruction}}</code> for auto language.</p>
         <button class="btn btn-sm" id="reset-summary-prompt" style="margin-top:4px" data-i18n="resetToDefault">Reset to default</button>
       </div>
+    </div>
 
-      <div class="divider"></div>
+    <!-- Tab: Reader -->
+    <div id="panel-reader" class="panel" role="tabpanel" aria-labelledby="tab-reader">
       <div class="section-title" data-i18n="secPreviewAi">Preview Page AI</div>
       <p class="hint" data-i18n="previewAiSectionHint">Explain selection, ask the page, and full-text translation on the Markdown preview page. Uses the AI provider and key configured above; every request is user-invoked, nothing runs in the background.</p>
 
@@ -571,6 +578,19 @@
         <p class="hint" data-i18n="skimEnableHint">Shows 3-5 key points at the top of the preview page. Each generation uses AI tokens; results are cached per article.</p>
       </div>
 
+      <div class="divider"></div>
+      <div class="section-title" data-i18n="kbdHelpTitle">Keyboard Shortcuts</div>
+      <p class="hint" data-i18n="kbdHelpIntro">These shortcuts work on the Markdown preview page (not here in Settings).</p>
+      <ul class="kbd-help-list">
+        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>e</kbd></span><span data-i18n="kbdHelpExplain">Explain the current selection</span></li>
+        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>V</kbd></span><span data-i18n="kbdHelpToggleView">Toggle bilingual / original view</span></li>
+        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>H</kbd> <kbd>1-5</kbd></span><span data-i18n="kbdHelpHighlight">Highlight the current selection (H = last color used, 1-5 = pick a color)</span></li>
+        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>a</kbd></span><span data-i18n="kbdHelpAsk">Open the Ask-the-page panel</span></li>
+        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>/</kbd></span><span data-i18n="kbdHelpSearch">Search within the article</span></li>
+        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>z</kbd></span><span data-i18n="kbdHelpZen">Toggle zen (focus) mode</span></li>
+        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>?</kbd></span><span data-i18n="kbdHelpShowHelp">Show this shortcuts list</span></li>
+        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>Esc</kbd></span><span data-i18n="kbdHelpClose">Close the open popover</span></li>
+      </ul>
     </div>
 
     <!-- Tab: Markdown -->
@@ -600,22 +620,15 @@
       <div class="section-title" data-i18n="secSendDestinations">Send-to Destinations</div>
       <p class="hint" data-i18n="secSendDestinationsHint">Each enabled destination appears in the preview page's "Send to" menu.</p>
       <div id="export-targets"></div>
-      <div class="section-title" data-i18n="kbdHelpTitle">Keyboard Shortcuts</div>
-      <p class="hint" data-i18n="kbdHelpIntro">These shortcuts work on the Markdown preview page (not here in Settings).</p>
-      <ul class="kbd-help-list">
-        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>e</kbd></span><span data-i18n="kbdHelpExplain">Explain the current selection</span></li>
-        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>V</kbd></span><span data-i18n="kbdHelpToggleView">Toggle bilingual / original view</span></li>
-        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>H</kbd> <kbd>1-5</kbd></span><span data-i18n="kbdHelpHighlight">Highlight the current selection (H = last color used, 1-5 = pick a color)</span></li>
-        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>a</kbd></span><span data-i18n="kbdHelpAsk">Open the Ask-the-page panel</span></li>
-        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>/</kbd></span><span data-i18n="kbdHelpSearch">Search within the article</span></li>
-        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>z</kbd></span><span data-i18n="kbdHelpZen">Toggle zen (focus) mode</span></li>
-        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>?</kbd></span><span data-i18n="kbdHelpShowHelp">Show this shortcuts list</span></li>
-        <li class="kbd-help-row"><span class="kbd-help-chips"><kbd>Esc</kbd></span><span data-i18n="kbdHelpClose">Close the open popover</span></li>
-      </ul>
     </div>
 
     <!-- Tab: Tags -->
     <div id="panel-tags" class="panel" role="tabpanel" aria-labelledby="tab-tags">
+      <div class="section-title" data-i18n="secPinboardTagPages">Pinboard.in Tag Pages</div>
+      <div class="fg"><label><input type="checkbox" id="opt-tag-sort-by-pop" checked /> <span data-i18n="optTagSortByPop">Add a "sort by popularity" control on tag pages</span></label></div>
+      <p class="hint" data-i18n="optTagSortByPopHint">On pinboard.in tag pages, shows a "pop" control next to date/title that reorders the current page's bookmarks by how many people saved each link. Click again to restore the original order.</p>
+
+      <div class="divider"></div>
       <div class="section-title" data-i18n="tagGovGroupsTitle">Tag Groups</div>
       <div class="fg" id="tag-gov-overview">
         <span>…</span>
@@ -698,10 +711,6 @@
       <p class="hint" data-i18n="popupFollowHint">When enabled, the popup appearance matches the selected Pinboard CSS theme.</p>
 
       <div class="divider"></div>
-      <div class="section-title" data-i18n="secPinboardTagPages">Pinboard.in Tag Pages</div>
-      <div class="fg"><label><input type="checkbox" id="opt-tag-sort-by-pop" checked /> <span data-i18n="optTagSortByPop">Add a "sort by popularity" control on tag pages</span></label></div>
-      <p class="hint" data-i18n="optTagSortByPopHint">On pinboard.in tag pages, shows a "pop" control next to date/title that reorders the current page's bookmarks by how many people saved each link. Click again to restore the original order.</p>
-
       <div class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</div>
       <p class="hint" data-i18n="customStyleHint">Inject custom CSS into pinboard.in pages. Useful for changing fonts, colors, layout etc.</p>
       <div class="fg">

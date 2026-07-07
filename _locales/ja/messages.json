@@ -710,7 +710,13 @@
     "message": "ポップアップ"
   },
   "tabAI": {
-    "message": "AI"
+    "message": "AI プロバイダー"
+  },
+  "tabAiBehavior": {
+    "message": "AI の動作"
+  },
+  "tabReader": {
+    "message": "リーダー"
   },
   "tabQuickActions": {
     "message": "クイック操作"
@@ -1381,7 +1387,7 @@
     "message": "Obsidian フォルダ"
   },
   "tabMarkdown": {
-    "message": "Markdown"
+    "message": "エクスポート"
   },
   "tabArchive": {
     "message": "アーカイブ"

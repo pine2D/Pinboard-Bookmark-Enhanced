@@ -271,9 +271,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     ai: {
       fields: {
-        "opt-ai-provider": "gemini", "opt-ai-tag-lang": "en", "opt-ai-summary-lang": "auto", "opt-ai-cache-duration": "60",
-        "opt-ai-auto-tags": false, "opt-ai-tag-separator": "-",
-        "opt-custom-tag-prompt": "", "opt-custom-summary-prompt": "",
+        "opt-ai-provider": "gemini",
         "opt-gemini-model": "gemini-2.5-flash-lite", "opt-openai-model": "gpt-5.4-nano",
         "opt-openai-baseurl": "https://api.openai.com/v1", "opt-claude-model": "claude-haiku-4-5",
         "opt-deepseek-model": "deepseek-v4-flash", "opt-qwen-model": "qwen-flash",
@@ -282,13 +280,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-cohere-model": "command-r7b-12-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B",
         "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6",
         "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
-        "opt-custom-name": "Custom", "opt-custom-baseurl": "", "opt-custom-model": "",
+        "opt-custom-name": "Custom", "opt-custom-baseurl": "", "opt-custom-model": ""
+      },
+      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-custom-key"]
+    },
+    "ai-behavior": {
+      fields: {
+        "opt-ai-tag-lang": "en", "opt-ai-summary-lang": "auto", "opt-ai-cache-duration": "60",
+        "opt-ai-auto-tags": false, "opt-ai-tag-separator": "-",
+        "opt-custom-tag-prompt": "", "opt-custom-summary-prompt": ""
+      },
+      radios: { "ai-content-source": "local" }
+    },
+    reader: {
+      fields: {
         "opt-preview-ai-enabled": true, "opt-preview-skim": false, "opt-preview-ai-model": "",
         "translate-target-lang": "auto", "translate-target-lang-custom": "",
         "opt-translate-glossary": "", "opt-selection-trigger": "icon"
-      },
-      radios: { "ai-content-source": "local" },
-      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-custom-key"]
+      }
     },
     quick: {
       fields: {
@@ -314,11 +323,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     appearance: {
       fields: {
         "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": "",
-        "opt-custom-css": "", "opt-tag-sort-by-pop": true
+        "opt-custom-css": ""
       }
     },
     tags: {
-      fields: {},
+      fields: { "opt-tag-sort-by-pop": true },
       skip: []
     }
   };
