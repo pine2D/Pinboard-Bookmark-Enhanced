@@ -335,6 +335,19 @@ async function run() {
     await pbpMigrateSecretsToLocal(); // second run: must be a no-op (idempotent)
     check("E5 migration: second run is a no-op (idempotent)", JSON.stringify(localArea) === localAreaSnapshot);
 
+    // pbpMigrateSecretsToLocal: must write the local secret payload BEFORE removing from sync.
+    syncArea.geminiApiKey = "obf:STALE";
+    const migrateOrder = [];
+    const realLocalSetM = globalThis.chrome.storage.local.set;
+    globalThis.chrome.storage.local.set = (d) => { if ("geminiApiKey" in d) migrateOrder.push("local"); return realLocalSetM(d); };
+    const realSyncRemoveM = globalThis.chrome.storage.sync.remove;
+    globalThis.chrome.storage.sync.remove = (keys) => { migrateOrder.push("remove"); return realSyncRemoveM(keys); };
+    await pbpMigrateSecretsToLocal();
+    check("E5 pbpMigrateSecretsToLocal: writes local payload BEFORE removing from sync",
+      migrateOrder.indexOf("local") < migrateOrder.indexOf("remove"));
+    globalThis.chrome.storage.local.set = realLocalSetM;
+    globalThis.chrome.storage.sync.remove = realSyncRemoveM;
+
     // pbpEnableSyncApiKeys: must write sync BEFORE flipping the flag.
     const writeOrder = [];
     const realSyncSet = globalThis.chrome.storage.sync.set;
