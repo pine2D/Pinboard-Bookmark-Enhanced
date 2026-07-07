@@ -387,10 +387,37 @@ function yamlString(s) {
   return '"' + escaped + '"';
 }
 
-// meta: {title,url,date,tags,source,description?}
+// Normalize a page's raw "published" metadata string to a YAML-safe date shape.
+// Called ONLY at meta-build time (md-preview.js buildMeta / popup.js's three meta
+// construction points) -- applyFrontmatter/composeStyledHtml/the webhook payload
+// never call this; they just format whatever meta.published already holds.
+//   - "/^\d{4}-\d{2}-\d{2}/" prefix (JSON-LD/meta datePublished mainstream ISO 8601
+//     shapes) -> take that 10-char YYYY-MM-DD prefix directly (zero timezone math).
+//   - Otherwise Date.parse()-able -> format the UTC calendar date as YYYY-MM-DD.
+//   - Unparseable -> return the input unchanged (caller must render it via
+//     yamlString, never as a bare YAML date scalar).
+// Empty in, empty out. Pure (no Date.now(), no locale, no DOM).
+function publishedIso(s) {
+  if (!s) return "";
+  const str = String(s);
+  const isoPrefix = str.match(/^\d{4}-\d{2}-\d{2}/);
+  if (isoPrefix) return isoPrefix[0];
+  const t = Date.parse(str);
+  if (Number.isNaN(t)) return str;
+  const d = new Date(t);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return y + "-" + m + "-" + day;
+}
+
+// meta: {title,url,date,tags,source,description?,author?,published?,site?,image?,words?}
 // opts.fields: ordered subset of [title,url,date,tags,source]; description always
 // trails (only when present). Bare scalars for url/date/source; quoted for
-// title/description; tags as an inline flow array.
+// title/description; tags as an inline flow array. Extended fields (author/
+// published/site/image/words) trail description in that fixed order, each only
+// when present on meta -- see applyFrontmatter's own tail below for the
+// emission rules.
 function applyFrontmatter(md, meta, opts) {
   meta = meta || {};
   opts = opts || {};
@@ -404,6 +431,20 @@ function applyFrontmatter(md, meta, opts) {
     else if (f === "source") lines.push("source: " + (meta.source || ""));
   }
   if (meta.description) lines.push("description: " + yamlString(meta.description));
+  // X4 (metadata export pack): extended fields, fixed order, each only when present
+  // on meta. published: bare scalar when it already looks like a normalized
+  // YYYY-MM-DD (the meta-build-time publishedIso() call's success shape), else
+  // yamlString-quoted (never emitted bare unless it looks like a real date).
+  // author/site/image are always yamlString-quoted (arbitrary page-sourced text).
+  // words: bare integer, gated on Number.isFinite (NOT truthiness -- 0 is a
+  // legitimate word count).
+  if (meta.published) {
+    lines.push("published: " + (/^\d{4}-\d{2}-\d{2}$/.test(meta.published) ? meta.published : yamlString(meta.published)));
+  }
+  if (meta.author) lines.push("author: " + yamlString(meta.author));
+  if (meta.site) lines.push("site: " + yamlString(meta.site));
+  if (meta.image) lines.push("image: " + yamlString(meta.image));
+  if (Number.isFinite(meta.words)) lines.push("words: " + meta.words);
   lines.push("---");
   return lines.join("\n") + "\n\n" + (md || "");
 }
@@ -653,6 +694,15 @@ function composeStyledHtml(canonicalMd, meta, opts) {
     if (meta.date) sub.push("<span>" + _xmlEscape(meta.date) + "</span>");
     if (Array.isArray(meta.tags) && meta.tags.length) sub.push("<span>" + meta.tags.map(_xmlEscape).join(", ") + "</span>");
     if (sub.length) parts.push('<p class="doc-meta">' + sub.join(" &middot; ") + "</p>");
+    // X4: a SECOND .doc-meta line for extended metadata (author/site/published),
+    // reusing the same class (zero new CSS). Rendered only when at least one of
+    // the three is present; published here is meta.published (already normalized
+    // at meta-build time, or the raw unparseable string -- either way just text).
+    const sub2 = [];
+    if (meta.author) sub2.push("<span>" + _xmlEscape(meta.author) + "</span>");
+    if (meta.site) sub2.push("<span>" + _xmlEscape(meta.site) + "</span>");
+    if (meta.published) sub2.push("<span>" + _xmlEscape(meta.published) + "</span>");
+    if (sub2.length) parts.push('<p class="doc-meta">' + sub2.join(" &middot; ") + "</p>");
     if (parts.length) header = '<header class="doc-header">' + parts.join("") + "</header>\n";
   }
   return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n' +

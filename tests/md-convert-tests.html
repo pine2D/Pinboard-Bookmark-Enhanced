@@ -1382,6 +1382,133 @@ section("site-rules: pbpNormalizeLazyImages");
 </script>
 
 <script>
+  // ---- X4: publishedIso (pure date normalizer, called ONLY at meta-build time) ----
+  section("publishedIso");
+
+  // ISO-prefixed: JSON-LD/meta datePublished mainstream shapes -> take the 10-char prefix
+  assertEq(publishedIso("2026-01-05T10:00:00Z"), "2026-01-05", "ISO datetime with Z -> date prefix");
+  assertEq(publishedIso("2026-01-05T10:00:00+08:00"), "2026-01-05", "ISO datetime with offset -> date prefix");
+  assertEq(publishedIso("2026-01-05"), "2026-01-05", "bare ISO date is idempotent");
+
+  // Date.parse()-able but not ISO-prefixed: RFC 2822 with an explicit GMT offset (TZ-independent --
+  // getUTCDate() reads an absolute instant, not a local-time interpretation of a date-only string).
+  assertEq(publishedIso("Tue, 05 Jan 2026 00:00:00 GMT"), "2026-01-05", "RFC 2822 (explicit GMT) -> UTC YYYY-MM-DD");
+
+  // Unparseable: returned unchanged so the caller renders it via yamlString, never as a bare date
+  assertEq(publishedIso("not a real date at all"), "not a real date at all", "unparseable string returned as-is");
+
+  // Empty in, empty out
+  assertEq(publishedIso(""), "", "empty string -> empty string");
+  assertEq(publishedIso(null), "", "null -> empty string");
+  assertEq(publishedIso(undefined), "", "undefined -> empty string");
+</script>
+
+<script>
+  // ---- X4: applyFrontmatter extended metadata trailers ----
+  section("X4 applyFrontmatter extended metadata trailers");
+
+  const fmBase = { title: "T", url: "https://e.com/p", date: "2026-06-03", tags: ["dev"], source: "defuddle" };
+
+  // Regression gate: an old-shape meta (no extended fields) renders BYTE-IDENTICAL
+  // to fm1 above (P2.1 section) -- same literal fields, computed before this batch
+  // existed. If any extended key ever leaked into the no-extended-field path this
+  // equality breaks immediately.
+  const fmNoExt = applyFrontmatter("# Body\n", {
+    title: 'A: "quoted"',
+    url: "https://e.com/p",
+    date: "2026-06-03",
+    tags: ["dev", "go"],
+    source: "defuddle",
+    description: "Desc: with colon"
+  }, {});
+  assertEq(fmNoExt, fm1, "meta without any extended field renders byte-identical to the pre-X4 baseline (fm1)");
+
+  // Full extended fields: fixed order published, author, site, image, words -- AFTER description.
+  const fmFull = applyFrontmatter("body", {
+    ...fmBase,
+    description: "Desc",
+    published: "2026-01-05",
+    author: "Jane Doe",
+    site: "The Verge",
+    image: "https://cdn.example.com/cover.jpg",
+    words: 1534
+  }, {});
+  const trailerBlock = fmFull.split("description: \"Desc\"\n")[1].split("\n---\n\n")[0];
+  const trailerLines = trailerBlock.split("\n");
+  assertEq(trailerLines[0], "published: 2026-01-05", "published bare scalar (matches YYYY-MM-DD) comes right after description: " + trailerBlock);
+  assertEq(trailerLines[1], 'author: "Jane Doe"', "author quoted, second: " + trailerBlock);
+  assertEq(trailerLines[2], 'site: "The Verge"', "site quoted, third: " + trailerBlock);
+  assertEq(trailerLines[3], 'image: "https://cdn.example.com/cover.jpg"', "image quoted, fourth: " + trailerBlock);
+  assertEq(trailerLines[4], "words: 1534", "words bare integer, fifth (last, right before closing ---): " + trailerBlock);
+  assert(fmFull.includes("\n---\n\nbody"), "closing fence still immediately precedes the body");
+
+  // published that failed normalization upstream (not YYYY-MM-DD shaped) renders quoted, not bare --
+  // meta-build time is responsible for normalizing; applyFrontmatter only judges the shape it's given.
+  const fmBadPublished = applyFrontmatter("body", { ...fmBase, published: "circa 1990s" }, {});
+  assert(fmBadPublished.includes('published: "circa 1990s"'), "unnormalized published string is yamlString-quoted, not emitted bare: " + fmBadPublished);
+
+  // author/site/image individually absent -> individually omitted (independent presence, not all-or-nothing)
+  const fmPartial = applyFrontmatter("body", { ...fmBase, author: "Jane Doe" }, {});
+  assert(fmPartial.includes('author: "Jane Doe"'), "author alone still renders: " + fmPartial);
+  assert(!/published:|site:|image:|words:/.test(fmPartial), "site/image/published/words individually omitted when absent from meta: " + fmPartial);
+
+  // words: only a finite number renders; NaN/Infinity/non-number are omitted (Number.isFinite gate)
+  assert(!applyFrontmatter("body", { ...fmBase, words: NaN }, {}).includes("words:"), "words:NaN omitted");
+  assert(!applyFrontmatter("body", { ...fmBase, words: Infinity }, {}).includes("words:"), "words:Infinity omitted");
+  assert(!applyFrontmatter("body", { ...fmBase, words: "1534" }, {}).includes("words:"), "words as a string (not Number.isFinite) omitted");
+  assert(applyFrontmatter("body", { ...fmBase, words: 0 }, {}).includes("words: 0"), "words:0 IS finite -> renders (0 is not falsy-omitted)");
+
+  // yamlString escaping applies to author (quotes/newlines), same as title/description
+  const fmEscaped = applyFrontmatter("body", { ...fmBase, author: 'Jane "JD" Doe\nSecond line' }, {});
+  assert(fmEscaped.includes('author: "Jane \\"JD\\" Doe\\nSecond line"'), "author with quotes+newline escaped via yamlString: " + fmEscaped);
+</script>
+
+<script>
+  // ---- X4: composeStyledHtml byline (second .doc-meta: author (middot) site (middot) published) ----
+  section("X4 composeStyledHtml byline");
+
+  const bylineMeta = {
+    title: "Piece", url: "https://e.com/a", date: "2026-06-04", tags: ["x"],
+    source: "defuddle",
+    author: "Jane Doe", site: "The Verge", published: "2026-01-05"
+  };
+  const bylineMd = "## Intro\n\nBody.";
+
+  const withByline = composeStyledHtml(bylineMd, bylineMeta, { frontmatter: true, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+  const bylineParas = withByline.match(/<p class="doc-meta">[\s\S]*?<\/p>/g) || [];
+  assertEq(bylineParas.length, 2, "extended meta present -> TWO .doc-meta paragraphs (url/date/tags, then author/site/published)");
+  const byline2 = bylineParas[1] || "";
+  assert(byline2.includes("Jane Doe") && byline2.includes("The Verge") && byline2.includes("2026-01-05"), "second .doc-meta carries author, site, published: " + byline2);
+  assert(byline2.indexOf("Jane Doe") < byline2.indexOf("The Verge") && byline2.indexOf("The Verge") < byline2.indexOf("2026-01-05"), "byline order is author, site, published: " + byline2);
+
+  // Absent extended meta -> only the original ONE .doc-meta paragraph, no empty second line
+  const noBylineMeta = { title: "Piece", url: "https://e.com/a", date: "2026-06-04", tags: ["x"], source: "defuddle" };
+  const noByline = composeStyledHtml(bylineMd, noBylineMeta, { frontmatter: true, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+  const noBylineParas = noByline.match(/<p class="doc-meta">[\s\S]*?<\/p>/g) || [];
+  assertEq(noBylineParas.length, 1, "no extended meta -> only ONE .doc-meta paragraph, no empty second line");
+
+  // Partial (author only, no site/published) -> byline still renders with just that one span
+  const partialByline = composeStyledHtml(bylineMd, { ...noBylineMeta, author: "Solo Author" }, { frontmatter: true, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+  const partialParas = partialByline.match(/<p class="doc-meta">[\s\S]*?<\/p>/g) || [];
+  assertEq(partialParas.length, 2, "author alone still triggers the second .doc-meta");
+  const partial2 = partialParas[1] || "";
+  assert(partial2.includes("Solo Author") && !partial2.includes("&middot;"), "single-field byline has no dangling middot separator: " + partial2);
+
+  // Escaping: author/site with HTML-significant chars must be _xmlEscape'd
+  const evilByline = composeStyledHtml(bylineMd, { ...noBylineMeta, author: '<b>Evil</b> & "Author"', site: "A & B" }, { frontmatter: true, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+  assert(!/<b>Evil<\/b>/.test(evilByline) && /&lt;b&gt;Evil&lt;\/b&gt;/.test(evilByline), "author HTML is escaped, not rendered as markup: " + evilByline);
+  assert(/A &amp; B/.test(evilByline), "site ampersand is escaped: " + evilByline);
+
+  // frontmatter:false -> no header at all, so no byline either (existing invariant, extended meta
+  // present). NOTE: must match the rendered <p class="doc-meta"> tag, NOT a bare /doc-meta/
+  // substring -- READER_CSS unconditionally embeds a ".doc-meta{...}" style rule in every
+  // <style> block regardless of opts.frontmatter, so a bare substring test always finds a hit
+  // and this assertion would falsely fail even when the byline is correctly suppressed.
+  const noHeaderAtAll = composeStyledHtml(bylineMd, bylineMeta, { frontmatter: false, imagePolicy: "keep", includeToc: false, hljsCss: "" });
+  assert(!/<p class="doc-meta">/.test(noHeaderAtAll), "frontmatter:false suppresses the byline too (no header rendered at all)");
+</script>
+
+<script>
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>
