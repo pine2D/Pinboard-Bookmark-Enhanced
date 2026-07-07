@@ -548,7 +548,7 @@ function _pbpSearchEnsurePop() {
 // happened to mount.
 function _pbpSearchOpen() {
   const pop = _pbpSearchEnsurePop();
-  ["explain-pop", "pb-hl-card", "pb-hl-bar", "fn-pop"].forEach((id) => {
+  ["explain-pop", "pb-hl-card", "pb-hl-bar", "fn-pop", "kbd-help-pop"].forEach((id) => {
     const el = document.getElementById(id);
     if (el && el.matches && el.matches(":popover-open")) { try { el.hidePopover(); } catch (_) {} }
   });
@@ -641,7 +641,7 @@ function _pbpKbdHelpOpen() {
   document.querySelectorAll(":popover-open").forEach((el) => {
     if (el !== pop) { try { el.hidePopover(); } catch (_) {} }
   });
-  try { pop.showPopover(); } catch (_) {}
+  if (!pop.matches(":popover-open")) pop.showPopover();
 }
 
 // "?" hotkey: same 4-condition gate pattern as the existing V/H/a hotkeys,
