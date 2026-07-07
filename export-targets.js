@@ -156,6 +156,16 @@ const PBP_EXPORT_TARGETS = {
         tags: Array.isArray(meta.tags) ? meta.tags : [],
         markdown: String(body || "")
       };
+      // X4: extended metadata (opt-in via mdExportExtendedMeta), appended AFTER the
+      // original 5 keys -- absent entirely when the meta-build-time gate didn't
+      // attach these fields, so the payload stays byte-identical to today's when
+      // the setting is off. words is gated on Number.isFinite, not truthiness (0
+      // is a legitimate word count and must still be carried).
+      if (meta.author) payload.author = String(meta.author);
+      if (meta.published) payload.published = String(meta.published);
+      if (meta.site) payload.site = String(meta.site);
+      if (meta.image) payload.image = String(meta.image);
+      if (Number.isFinite(meta.words)) payload.words = meta.words;
       return { url: String((cfg && cfg.url) || ""), method: "POST", headers, body: JSON.stringify(payload) };
     },
     settings: [

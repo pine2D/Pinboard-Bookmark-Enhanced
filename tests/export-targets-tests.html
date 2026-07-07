@@ -104,6 +104,52 @@ section("webhook.buildRequest (JSON envelope + optional auth)");
   assert(req2.headers.Authorization === undefined, "no Authorization header when value is empty");
 }
 
+section("webhook.buildRequest -- X4 extended metadata (author/published/site/image/words)");
+{
+  // Extended metadata absent from meta -> payload stays byte-identical to the 5-key envelope
+  const req = PBP_EXPORT_TARGETS.webhook.buildRequest(
+    { title: "T", url: "U", date: "D", tags: ["a"] }, "# body", { url: "https://h/x" }, "");
+  const b = JSON.parse(req.body);
+  assertEq(Object.keys(b).join(","), "title,url,date,tags,markdown", "no extended meta -> exactly the original 5 keys, same order");
+}
+{
+  // Extended metadata present -> conditionally appended AFTER the original 5 keys
+  const req = PBP_EXPORT_TARGETS.webhook.buildRequest(
+    { title: "T", url: "U", date: "D", tags: ["a"], author: "Jane Doe", published: "2026-01-05", site: "The Verge", image: "https://cdn.example.com/x.jpg", words: 1534 },
+    "# body", { url: "https://h/x" }, "");
+  const b = JSON.parse(req.body);
+  assertEq(Object.keys(b).join(","), "title,url,date,tags,markdown,author,published,site,image,words", "extended meta appended after the original 5 keys, in order author/published/site/image/words");
+  assertEq(b.author, "Jane Doe", "author carried");
+  assertEq(b.published, "2026-01-05", "published carried");
+  assertEq(b.site, "The Verge", "site carried");
+  assertEq(b.image, "https://cdn.example.com/x.jpg", "image carried");
+  assertEq(b.words, 1534, "words carried as a number, not a string");
+}
+{
+  // Non-string meta values are coerced via String() for author/site (published/image are strings already elsewhere)
+  const req = PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T", author: 123, site: 456 }, "x", { url: "https://h/x" }, "");
+  const b = JSON.parse(req.body);
+  assertEq(b.author, "123", "author coerced to string via String()");
+  assertEq(b.site, "456", "site coerced to string via String()");
+}
+{
+  // words gate is Number.isFinite, not truthiness -- 0 must still be carried, NaN/Infinity/string must not
+  const zero = JSON.parse(PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T", words: 0 }, "x", { url: "https://h/x" }, "").body);
+  assert("words" in zero && zero.words === 0, "words:0 is finite -> carried (not falsy-omitted)");
+  const nanReq = JSON.parse(PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T", words: NaN }, "x", { url: "https://h/x" }, "").body);
+  assert(!("words" in nanReq), "words:NaN -> omitted");
+  const infReq = JSON.parse(PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T", words: Infinity }, "x", { url: "https://h/x" }, "").body);
+  assert(!("words" in infReq), "words:Infinity -> omitted");
+  const strReq = JSON.parse(PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T", words: "1534" }, "x", { url: "https://h/x" }, "").body);
+  assert(!("words" in strReq), "words as a string -> omitted (not Number.isFinite)");
+}
+{
+  // Extended fields individually optional -- one present, others absent, no leaked keys
+  const req = PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T", author: "Solo" }, "x", { url: "https://h/x" }, "");
+  const b = JSON.parse(req.body);
+  assertEq(Object.keys(b).join(","), "title,url,date,tags,markdown,author", "author alone appended; published/site/image/words stay absent");
+}
+
 section("webhook.origin (derived from the user URL)");
 assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "https://hook.example.com/abc?x=1" }) === "https://hook.example.com/*", "origin = URL host + /*");
 assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "not a url" }) === null, "malformed URL -> null origin");
