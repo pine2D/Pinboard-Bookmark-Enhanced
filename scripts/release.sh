@@ -17,6 +17,34 @@ echo ""
 echo "  ZIP : ${ZIP_PATH}"
 echo ""
 
+# ---- Step 0: Docs freshness gate ----
+#
+# A release that ships features must not leave user-facing docs behind.
+# If the range since the previous tag contains feat commits while README.md,
+# CLAUDE.md, and docs/privacy.md are ALL untouched, abort. After verifying
+# the docs are genuinely current, re-run with --docs-ok to proceed.
+if [[ " $* " == *" --docs-ok "* ]]; then
+  echo "  --docs-ok: skipping docs freshness gate"
+else
+  # gh release create tags the REMOTE only -- sync local tags first or this
+  # gate (and the changelog's PREV_TAG below) would measure from a stale tag.
+  git fetch --tags --quiet origin 2>/dev/null || true
+  DOCS_PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1) || true
+  if [ -n "${DOCS_PREV_TAG}" ]; then
+    FEAT_COUNT=$(git log "${DOCS_PREV_TAG}..HEAD" --pretty=format:%s --no-merges | grep -c "^feat" || true)
+    DOCS_TOUCHED=$(git diff --name-only "${DOCS_PREV_TAG}..HEAD" -- README.md CLAUDE.md docs/privacy.md | wc -l)
+    if [ "${FEAT_COUNT}" -gt 0 ] && [ "${DOCS_TOUCHED}" -eq 0 ]; then
+      echo "  ABORT: docs freshness gate."
+      echo "  ${FEAT_COUNT} feat commit(s) since ${DOCS_PREV_TAG}, but README.md, CLAUDE.md and"
+      echo "  docs/privacy.md are all untouched in that range. Update user-facing docs"
+      echo "  (README x9 locales / CLAUDE.md / privacy policy for new data flows),"
+      echo "  or re-run with --docs-ok if they are genuinely current."
+      exit 1
+    fi
+    echo "  Docs gate OK (${FEAT_COUNT} feat commit(s); docs files touched: ${DOCS_TOUCHED})"
+  fi
+fi
+
 # Note: README version badge is dynamic (shields.io reads GitHub release tag),
 # so no manual sync step is required here.
 
