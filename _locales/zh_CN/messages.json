@@ -2455,5 +2455,13 @@
   "kbdHelpZen": { "message": "切换专注模式" },
   "zenEnterBtn": { "message": "进入专注模式" },
   "zenExitAria": { "message": "退出专注模式" },
-  "zenWidthAria": { "message": "内容宽度" }
+  "zenWidthAria": { "message": "内容宽度" },
+  "skimEnable": { "message": "在预览页生成 AI 要点摘要" },
+  "skimEnableHint": { "message": "在预览页顶部自动生成 3-5 条要点。每次生成都会消耗 AI token，结果按文章缓存。" },
+  "skimTitle": { "message": "要点" },
+  "skimRegen": { "message": "重新生成" },
+  "skimCollapseAria": { "message": "折叠或展开要点区块" },
+  "skimStaleNote": { "message": "内容已变化，这些要点可能已过时" },
+  "skimStop": { "message": "停止" },
+  "skimFailed": { "message": "要点生成失败" }
 }

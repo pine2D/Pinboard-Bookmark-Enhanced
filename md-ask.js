@@ -807,15 +807,18 @@ function _pbpAskJump(chip) {
   const orig = pbpAiBlockEl(p);
   if (!orig) return;
   _pbpAskTipHide();
-  let target = orig;
   // Three-view interplay: in translated-only view a filled original is
   // hidden (body.tr-only + [data-pb-tr-done]) -> jump to its .pb-tr
   // nextElementSibling instead. Bilingual view keeps originals visible,
-  // so the precise quote span still applies there.
-  if (document.body.classList.contains("tr-only") && orig.hasAttribute("data-pb-tr-done")) {
-    const sib = orig.nextElementSibling;
-    if (sib && sib.classList && sib.classList.contains("pb-tr")) target = sib;
-  }
+  // so the precise quote span still applies there. Delegates to the shared
+  // trOnlyScrollTarget() (md-preview.js) instead of reimplementing the
+  // redirect inline -- that shared helper also honors .pb-show-orig (a
+  // peeked-open original stays the jump target instead of its translated
+  // sibling), a check this inline version previously omitted (drive-by fix,
+  // skim-layer spec 1.4). Behavior delta: a tr-only block whose original
+  // was peeked back open (.pb-show-orig) now jumps to the visible ORIGINAL
+  // instead of its (hidden) translated sibling -- the only case that changes.
+  let target = (typeof trOnlyScrollTarget === "function") ? trOnlyScrollTarget(orig) : orig;
   target.scrollIntoView({ block: "center", behavior: "smooth" });
   let range = null;
   // Verified offsets index the ORIGINAL block's textContent (translation

@@ -2461,5 +2461,13 @@
   "kbdHelpZen": { "message": "Zen-Modus (Fokus) umschalten" },
   "zenEnterBtn": { "message": "Zen-Modus aktivieren" },
   "zenExitAria": { "message": "Zen-Modus verlassen" },
-  "zenWidthAria": { "message": "Inhaltsbreite" }
+  "zenWidthAria": { "message": "Inhaltsbreite" },
+  "skimEnable": { "message": "KI-Kernpunkte-Zusammenfassung auf der Vorschauseite aktivieren" },
+  "skimEnableHint": { "message": "Zeigt 3-5 Kernpunkte oben auf der Vorschauseite. Jede Erzeugung verbraucht KI-Tokens; die Ergebnisse werden pro Artikel zwischengespeichert." },
+  "skimTitle": { "message": "Kernpunkte" },
+  "skimRegen": { "message": "Neu erzeugen" },
+  "skimCollapseAria": { "message": "Abschnitt Kernpunkte ein-/ausblenden" },
+  "skimStaleNote": { "message": "Inhalt hat sich geändert — diese Kernpunkte könnten veraltet sein" },
+  "skimStop": { "message": "Stopp" },
+  "skimFailed": { "message": "Kernpunkte konnten nicht erzeugt werden" }
 }

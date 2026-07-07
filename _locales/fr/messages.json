@@ -2461,5 +2461,13 @@
   "kbdHelpZen": { "message": "Basculer le mode zen (concentration)" },
   "zenEnterBtn": { "message": "Activer le mode zen" },
   "zenExitAria": { "message": "Quitter le mode zen" },
-  "zenWidthAria": { "message": "Largeur du contenu" }
+  "zenWidthAria": { "message": "Largeur du contenu" },
+  "skimEnable": { "message": "Générer un résumé des points clés IA sur la page de prévisualisation" },
+  "skimEnableHint": { "message": "Affiche 3 à 5 points clés en haut de la page de prévisualisation. Chaque génération consomme des jetons IA ; les résultats sont mis en cache par article." },
+  "skimTitle": { "message": "Points clés" },
+  "skimRegen": { "message": "Régénérer" },
+  "skimCollapseAria": { "message": "Basculer la section des points clés" },
+  "skimStaleNote": { "message": "Le contenu a changé — ces points clés peuvent être obsolètes" },
+  "skimStop": { "message": "Arrêter" },
+  "skimFailed": { "message": "Impossible de générer les points clés" }
 }

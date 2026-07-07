@@ -283,7 +283,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6",
         "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
         "opt-custom-name": "Custom", "opt-custom-baseurl": "", "opt-custom-model": "",
-        "opt-preview-ai-enabled": true, "opt-preview-ai-model": "",
+        "opt-preview-ai-enabled": true, "opt-preview-skim": false, "opt-preview-ai-model": "",
         "translate-target-lang": "auto", "translate-target-lang-custom": "",
         "opt-translate-glossary": "", "opt-selection-trigger": "icon"
       },
@@ -791,7 +791,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-wayback-enabled": s.waybackArchiveEnabled === true,
     "opt-wayback-batch": s.waybackArchiveBatch === true,
     "opt-wayback-skip-private": s.waybackSkipPrivate !== false,
-    "opt-preview-ai-enabled": s.previewAiEnabled !== false
+    "opt-preview-ai-enabled": s.previewAiEnabled !== false,
+    "opt-preview-skim": s.previewSkimEnabled === true
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
@@ -1156,6 +1157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       obsidianFolder: (_ets.obsidian && _ets.obsidian.folder) || "",
       // Preview-page AI (md-preview explain / ask / translate)
       previewAiEnabled: $id("opt-preview-ai-enabled").checked,
+      previewSkimEnabled: $id("opt-preview-skim").checked,
       previewAiModel: $id("opt-preview-ai-model").value.trim(),
       translateTargetLang: resolveTranslateTargetLang(),
       translateGlossary: $id("opt-translate-glossary").value,

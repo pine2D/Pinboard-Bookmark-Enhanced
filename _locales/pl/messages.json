@@ -2461,5 +2461,13 @@
   "kbdHelpZen": { "message": "Przełącz tryb zen (skupienia)" },
   "zenEnterBtn": { "message": "Włącz tryb zen" },
   "zenExitAria": { "message": "Wyłącz tryb zen" },
-  "zenWidthAria": { "message": "Szerokość treści" }
+  "zenWidthAria": { "message": "Szerokość treści" },
+  "skimEnable": { "message": "Generuj podsumowanie kluczowych punktów AI na stronie podglądu" },
+  "skimEnableHint": { "message": "Pokazuje 3-5 kluczowych punktów u góry strony podglądu. Każde generowanie zużywa tokeny AI; wyniki są buforowane dla każdego artykułu." },
+  "skimTitle": { "message": "Kluczowe punkty" },
+  "skimRegen": { "message": "Wygeneruj ponownie" },
+  "skimCollapseAria": { "message": "Przełącz sekcję kluczowych punktów" },
+  "skimStaleNote": { "message": "Treść uległa zmianie — te kluczowe punkty mogą być nieaktualne" },
+  "skimStop": { "message": "Zatrzymaj" },
+  "skimFailed": { "message": "Nie udało się wygenerować kluczowych punktów" }
 }

@@ -2455,5 +2455,13 @@
   "kbdHelpZen": { "message": "Toggle zen (focus) mode" },
   "zenEnterBtn": { "message": "Enter zen mode" },
   "zenExitAria": { "message": "Exit zen mode" },
-  "zenWidthAria": { "message": "Content width" }
+  "zenWidthAria": { "message": "Content width" },
+  "skimEnable": { "message": "Generate an AI key-points summary on the preview page" },
+  "skimEnableHint": { "message": "Shows 3-5 key points at the top of the preview page. Each generation uses AI tokens; results are cached per article." },
+  "skimTitle": { "message": "Key Points" },
+  "skimRegen": { "message": "Regenerate" },
+  "skimCollapseAria": { "message": "Toggle key points section" },
+  "skimStaleNote": { "message": "Content has changed — these key points may be out of date" },
+  "skimStop": { "message": "Stop" },
+  "skimFailed": { "message": "Couldn't generate key points" }
 }

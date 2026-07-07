@@ -217,6 +217,11 @@ const SETTINGS_DEFAULTS = {
   waybackS3Secret: "",
   // md-preview in-page AI (explain / ask / translate)
   previewAiEnabled: true,
+  // R11 skim layer (key-points summary): default OFF, unlike previewAiEnabled --
+  // generation runs automatically on every article open (no user click per
+  // use), so it spends AI tokens without an explicit per-use invocation. The
+  // user must opt in explicitly (spec: docs/superpowers/specs/2026-07-07-skim-layer-design.md).
+  previewSkimEnabled: false,
   previewAiModel: "",
   translateTargetLang: "auto",
   translateGlossary: "",
