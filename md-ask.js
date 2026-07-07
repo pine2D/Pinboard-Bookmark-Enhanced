@@ -233,6 +233,14 @@ function _pbpAskSetOpen(open) {
     if (ae && ae !== document.body && !panel.contains(ae)) _pbpAskState.opener = ae;
   }
   document.body.classList.toggle("ask-open", open);
+  // First-ever open: _pbpAskBuildPanel just appendChild'd the panel in this
+  // same synchronous task, so without a style flush between mount and the
+  // hidden flip the browser computes only the final state and the slide-in
+  // transition (md-preview.css #ask-panel[hidden]) never runs. Forcing one
+  // reflow while [hidden] styles are applied makes the first open animate
+  // like every later one -- same void-offsetWidth trick _pbpAskFlash below
+  // already uses to restart its fallback animation.
+  if (open && panel.hidden) void panel.offsetWidth;
   panel.hidden = !open;
   const btn = document.getElementById("ask-open");
   if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
