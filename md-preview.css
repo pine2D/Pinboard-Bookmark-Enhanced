@@ -319,6 +319,11 @@ body.zen .rail-toggle, body.zen .rail-scrim { display: none; }
    this note only corrects the specificity math, not the behavior. */
 body.zen main { margin-left: 0; }
 body.zen .doc-body { max-width: var(--zen-width, 880px); }
+/* Skim bullets are meta content ABOUT the article (like the rail's
+   tr/ask/hl panels), not part of the article body (like highlights) --
+   hidden in zen to preserve its distraction-free intent, mirroring how
+   #rail's own chrome is hidden above. */
+body.zen #skim-section { display: none; }
 
 /* #zen-bar: the ONLY new chrome zen introduces -- fixed top-right, two
    icon buttons (width cycle / exit). Same border/surface/radius/focus-
@@ -883,6 +888,9 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 
 /* Raw view: the TOC navigates the rendered doc, which is hidden in Raw mode. */
 body.raw-active #toc { display: none; }
+/* Skim is an AI overlay on the rendered doc; raw view shows literal
+   markdown source with zero AI chrome. */
+body.raw-active #skim-section { display: none; }
 
 /* Empty state: hide the rail + reset the doc offset so the .empty-state centers. */
 body.md-empty .rail { display: none; }
@@ -1538,7 +1546,7 @@ body.ask-open main { margin-right: 396px; }
      specificity, which outranks a bare #ask-panel here -- without the
      [hidden] variant a closed panel would print as flex and only rely on
      its off-canvas transform to happen to fall outside the page. */
-  #ask-panel, #ask-panel[hidden], #ask-section, #fn-pop { display: none; }
+  #ask-panel, #ask-panel[hidden], #ask-section, #fn-pop, #skim-section { display: none; }
   body.ask-open main { margin-right: 0; }
   /* must sit AFTER the base .pb-tr-err display rule in source order to win the cascade */
   .pb-tr-err { display: none; }
@@ -1977,3 +1985,70 @@ body.ask-open main { margin-right: 396px; }
 }
 .rail-kbd-help-btn:hover { color: var(--link); }
 .rail-kbd-help-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+
+/* ---- Skim / key-points layer (md-skim.js, spec docs/superpowers/
+   specs/2026-07-07-skim-layer-design.md). #skim-section is the first
+   genuine in-flow auxiliary UI element inside .doc-body -- everywhere
+   else this kind of chrome lives in the fixed #rail sidebar, so unlike
+   .rail's children it inherits NONE of the free raw-active/zen/print
+   hiding those get automatically; each of the three view-mode rules is
+   added separately, beside its own existing precedent, further below
+   in this file. Meta content about the article, not part of it, so it
+   gets its own smaller UI-scale font-size (14px) independent of
+   #rendered-view's large clamp()-based article prose size. ---- */
+#skim-section {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+.skim-head { display: flex; align-items: center; gap: 6px; }
+.skim-head h2 { flex: 1; font-size: 15px; font-weight: 600; margin: 0; }
+#skim-stop[hidden] { display: none; }
+/* Icon-only header buttons -- same 28x28/border/hover/focus-visible
+   token family as .ask-ic (md-preview.css ~:1442-1450), given its own
+   class rather than reusing .ask-ic's name (this codebase's existing
+   convention: each feature's near-identical icon-button styles get
+   their own feature-scoped class, e.g. .xp-gear/.fn-pop-jump/
+   .srch-regex, rather than sharing one class across files). */
+.skim-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  border: 1px solid transparent; border-radius: 6px;
+  background: none; color: var(--fg-muted); cursor: pointer;
+}
+.skim-ic:hover { background: var(--btn-hover); color: var(--fg); }
+.skim-ic:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.skim-ic svg { width: 15px; height: 15px; transition: transform 150ms ease; }
+#skim-section.collapsed #skim-collapse svg { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .skim-ic svg { transition: none; }
+}
+.skim-stale {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 8px; padding: 6px 10px;
+  font-size: 12px; color: var(--fg-secondary);
+  background: var(--btn-bg); border: 1px solid var(--border);
+  border-left: 3px solid var(--link); border-radius: 6px;
+}
+#skim-stale[hidden] { display: none; }
+.skim-stale-btn { padding: 3px 10px; font-size: 12px; }
+#skim-body { margin-top: 8px; }
+#skim-body > :first-child { margin-top: 0; }
+#skim-body > :last-child { margin-bottom: 0; }
+#skim-body ul { margin: 0; padding-left: 1.3em; }
+#skim-body li { margin: 4px 0; }
+.skim-err { font-size: 13px; color: var(--danger); margin: 0 0 6px; overflow-wrap: break-word; }
+.skim-retry { padding: 3px 10px; font-size: 12px; }
+#skim-usage { margin-top: 8px; font-size: 12px; color: var(--fg-secondary); }
+#skim-usage[hidden] { display: none; }
+/* Collapsed state (spec 1.2.1/1.3): CSS-only, storage-persisted via
+   md-skim.js's _pbpSkimWireCollapse -- header row stays visible, the
+   three content regions collapse away. */
+#skim-section.collapsed #skim-body,
+#skim-section.collapsed #skim-stale,
+#skim-section.collapsed #skim-usage { display: none; }

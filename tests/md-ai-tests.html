@@ -32,6 +32,7 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../md-ask.js"></script>
 <script src="../md-highlight.js"></script>
 <script src="../md-reader.js"></script>
+<script src="../md-skim.js"></script>
 
 <script>
 let PASS = 0, FAIL = 0, SKIP = 0;
@@ -4524,6 +4525,41 @@ suiteIf("_pbpSearchRangesOverlap", "_pbpSearchRangesOverlap", () => {
     b.setEnd(text, 9); // "beta", starts exactly where a ends
     assert(!_pbpSearchRangesOverlap(a, b), "touching boundary is not an overlap");
     root.remove();
+  });
+});
+
+// ============ Skim layer: pbpSkimBuildPrompt ============
+suiteIf("pbpSkimBuildPrompt", "pbpSkimBuildPrompt", () => {
+  test("system requires 3-5 bullet points as a markdown unordered list", () => {
+    const r = pbpSkimBuildPrompt("[P1] alpha", "Write in English.");
+    assert(r.system.indexOf("3 to 5") !== -1, "bullet count rule");
+    assert(r.system.indexOf("unordered list") !== -1, "markdown list format rule");
+  });
+  test("never-group citation wording matches ask's rule 3 verbatim", () => {
+    const r = pbpSkimBuildPrompt("[P1] alpha", "Write in English.");
+    assert(r.system.indexOf("[P3][P5]") !== -1, "per-token citation example");
+    assert(r.system.indexOf("NEVER group citations inside one pair of brackets or parentheses such as (P3, P5)") !== -1, "never-group wording");
+  });
+  test("CITES block format matches ask's rule 4 verbatim", () => {
+    const r = pbpSkimBuildPrompt("[P1] alpha", "Write in English.");
+    assert(r.system.indexOf("CITES:") !== -1, "cites block marker");
+    assert(r.system.indexOf("15 words or fewer") !== -1, "quote length cap");
+    assert(r.system.indexOf("article's original language") !== -1, "quote language rule");
+  });
+  test("language instruction is embedded verbatim", () => {
+    const r = pbpSkimBuildPrompt("[P1] alpha", "Write in Chinese (simplified).");
+    assert(r.system.indexOf("Write in Chinese (simplified).") !== -1, "language instruction line");
+  });
+  test("article-only / no-invention rule is present", () => {
+    const r = pbpSkimBuildPrompt("[P1] alpha", "Write in English.");
+    assert(r.system.indexOf("Use ONLY the article") !== -1, "article-only rule");
+    assert(r.system.indexOf("Do not invent") !== -1, "no-invention rule");
+  });
+  test("prompt embeds the article context under ARTICLE:; pure and null-safe", () => {
+    const r = pbpSkimBuildPrompt("[P1] hello\n[P2] world", "Write in English.");
+    assert(r.prompt.indexOf("ARTICLE:\n[P1] hello\n[P2] world") !== -1, "context embedded");
+    const r2 = pbpSkimBuildPrompt();
+    assert(typeof r2.system === "string" && typeof r2.prompt === "string", "null args tolerated, shapes stay strings");
   });
 });
 </script>
