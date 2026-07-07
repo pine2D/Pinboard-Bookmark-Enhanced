@@ -719,6 +719,87 @@ function deobfuscateSettings(s) {
   return s;
 }
 
+// ---- syncApiKeys secret routing (batch (4)) ----
+// When optSyncEnabled=true and syncApiKeys=false (the new default), the 18
+// API_KEY_FIELDS + exportTargets[*].token never leave chrome.storage.local --
+// only the rest of the settings batch rides chrome.storage.sync. These are
+// the pure primitives; the async read/write wiring below them is the only
+// part that touches chrome.storage directly.
+
+// True iff secrets should be routed to local instead of following optSyncEnabled.
+function pbpSecretRoutingActive(optSyncEnabled, syncApiKeys) {
+  return !!optSyncEnabled && !syncApiKeys;
+}
+
+// Deep-copies exportTargets with every target's `token` field deleted.
+// Belt-only strip (no PBP_EXPORT_TARGETS secret-type lookup): the SW doesn't
+// load export-targets.js and can't depend on the registry (same constraint
+// options-backup.js's own token-strip already documents at :24-30).
+function pbpStripExportTargetTokens(ets) {
+  const cleaned = {};
+  if (!ets || typeof ets !== "object") return cleaned;
+  for (const [tid, cfg] of Object.entries(ets)) {
+    cleaned[tid] = Object.assign({}, cfg);
+    delete cleaned[tid].token;
+  }
+  return cleaned;
+}
+
+// Splits a saveAll-shaped batch into { main, secrets }:
+//  - main    = batch with the 18 API_KEY_FIELDS removed and exportTargets
+//              (if present) token-stripped -- safe to write to whatever area
+//              getSettingsStorage() resolves to.
+//  - secrets = the API_KEY_FIELDS that were present, plus (if batch had
+//              exportTargets) the FULL untouched exportTargets -- the local truth.
+// Pure: never mutates `batch`.
+function pbpSplitSecretBatch(batch) {
+  const main = Object.assign({}, batch);
+  const secrets = {};
+  API_KEY_FIELDS.forEach((k) => {
+    if (Object.prototype.hasOwnProperty.call(main, k)) {
+      secrets[k] = main[k];
+      delete main[k];
+    }
+  });
+  if (Object.prototype.hasOwnProperty.call(batch, "exportTargets")) {
+    secrets.exportTargets = batch.exportTargets;
+    main.exportTargets = pbpStripExportTargetTokens(batch.exportTargets);
+  }
+  return { main, secrets };
+}
+
+// Overlays API_KEY_FIELDS + exportTargets from localVals onto a copy of `s`,
+// wherever localVals has that key present (own-property, INCLUDING empty
+// string -- local is the truth once routing is active, even a just-cleared
+// key must win over a stale/absent sync-side value). Pure: never mutates `s`.
+function pbpOverlaySecrets(s, localVals) {
+  const out = Object.assign({}, s);
+  if (!localVals || typeof localVals !== "object") return out;
+  API_KEY_FIELDS.forEach((k) => {
+    if (Object.prototype.hasOwnProperty.call(localVals, k)) out[k] = localVals[k];
+  });
+  if (Object.prototype.hasOwnProperty.call(localVals, "exportTargets")) {
+    out.exportTargets = localVals.exportTargets;
+  }
+  return out;
+}
+
+// Async consumer-facing helper -- the ONE call every settings reader makes.
+// Degrades to `s` unchanged on any failure or when routing is inactive (sync
+// off, or keys-on) -- byte-identical to today for every user not in this
+// feature's routing state (spec invariant #5). MUST run BEFORE deobfuscate.
+async function pbpApplySecretOverlay(s) {
+  try {
+    if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return s;
+    const flags = await chrome.storage.local.get({ optSyncEnabled: false, syncApiKeys: false });
+    if (!pbpSecretRoutingActive(flags.optSyncEnabled, flags.syncApiKeys)) return s;
+    const localVals = await chrome.storage.local.get(API_KEY_FIELDS.concat(["exportTargets"]));
+    return pbpOverlaySecrets(s, localVals);
+  } catch (_) {
+    return s; // degrade: leave s exactly as read from the main settings area
+  }
+}
+
 // ---- DOM cache helper (P1.6) ----
 // Popup/options DOM is static — elements never removed, only toggled via classList.
 // Memoize getElementById to avoid repeated DOM tree walks on hot paths.

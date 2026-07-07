@@ -82,6 +82,136 @@ async function run() {
   check("E3 themePresetKey NOT forced into sync", synced.themePresetKey === undefined);
   globalThis.chrome = prevChrome;
 
+  // ---------- E4: syncApiKeys secret routing (pure helpers) ----------
+
+  // -- pbpSecretRoutingActive --
+  check("E4 routing active: sync on + keys off", pbpSecretRoutingActive(true, false) === true);
+  check("E4 routing inactive: sync off + keys off", pbpSecretRoutingActive(false, false) === false);
+  check("E4 routing inactive: sync on + keys on", pbpSecretRoutingActive(true, true) === false);
+  check("E4 routing inactive: sync off + keys on", pbpSecretRoutingActive(false, true) === false);
+
+  // -- pbpStripExportTargetTokens --
+  const etsIn = {
+    github: { enabled: true, token: "obf:ghtok", repo: "r" },
+    webhook: { enabled: false, token: "obf:whtok", url: "https://x" },
+    obsidian: { enabled: true, vault: "v", folder: "f" }, // no token field at all
+  };
+  const etsOut = pbpStripExportTargetTokens(etsIn);
+  check("E4 strip: github token removed", !("token" in etsOut.github));
+  check("E4 strip: webhook token removed", !("token" in etsOut.webhook));
+  check("E4 strip: non-secret fields survive", etsOut.github.repo === "r" && etsOut.webhook.url === "https://x");
+  check("E4 strip: obsidian (no token) untouched", etsOut.obsidian.vault === "v" && etsOut.obsidian.folder === "f");
+  check("E4 strip: does not mutate input", etsIn.github.token === "obf:ghtok");
+  check("E4 strip: null/undefined -> {}", Object.keys(pbpStripExportTargetTokens(null)).length === 0
+    && Object.keys(pbpStripExportTargetTokens(undefined)).length === 0);
+
+  // -- pbpSplitSecretBatch: every one of the 18 API_KEY_FIELDS routed --
+  const fullBatch = {};
+  API_KEY_FIELDS.forEach((k, i) => { fullBatch[k] = "obf:v" + i; });
+  fullBatch.optTheme = "nord"; // non-secret, must stay in main
+  fullBatch.exportTargets = { github: { enabled: true, token: "obf:ghtok", repo: "r" } };
+  const { main: splitMain, secrets: splitSecrets } = pbpSplitSecretBatch(fullBatch);
+  let allRouted = true;
+  API_KEY_FIELDS.forEach((k, i) => {
+    if (splitSecrets[k] !== "obf:v" + i) allRouted = false;
+    if (k in splitMain) allRouted = false;
+  });
+  check("E4 split: every one of the 18 API_KEY_FIELDS routed to secrets, absent from main", allRouted);
+  check("E4 split: non-secret key stays in main", splitMain.optTheme === "nord");
+  check("E4 split: exportTargets in secrets is the FULL (with-token) object",
+    splitSecrets.exportTargets.github.token === "obf:ghtok");
+  check("E4 split: exportTargets in main is token-stripped",
+    !("token" in splitMain.exportTargets.github) && splitMain.exportTargets.github.repo === "r");
+  check("E4 split: does not mutate input batch", fullBatch.geminiApiKey === "obf:v" + API_KEY_FIELDS.indexOf("geminiApiKey"));
+
+  // -- pbpSplitSecretBatch: no exportTargets in batch -> secrets has no exportTargets key --
+  const { secrets: noEtsSecrets } = pbpSplitSecretBatch({ pinboardToken: "obf:pb", optTheme: "dark" });
+  check("E4 split: no exportTargets in input -> none in secrets", !("exportTargets" in noEtsSecrets));
+  check("E4 split: single-key batch still isolates just that key", noEtsSecrets.pinboardToken === "obf:pb");
+
+  // -- pbpSplitSecretBatch: empty batch -> both empty, no throw --
+  const { main: emptyMain, secrets: emptySecrets } = pbpSplitSecretBatch({});
+  check("E4 split: empty batch -> empty main", Object.keys(emptyMain).length === 0);
+  check("E4 split: empty batch -> empty secrets", Object.keys(emptySecrets).length === 0);
+
+  // -- pbpOverlaySecrets: overlay applies every present key --
+  const baseS = { pinboardToken: "", geminiApiKey: "", optTheme: "nord", exportTargets: { github: { enabled: true } } };
+  const overlaid = pbpOverlaySecrets(baseS, { pinboardToken: "obf:realpb", geminiApiKey: "obf:realgem" });
+  check("E4 overlay: pinboardToken replaced", overlaid.pinboardToken === "obf:realpb");
+  check("E4 overlay: geminiApiKey replaced", overlaid.geminiApiKey === "obf:realgem");
+  check("E4 overlay: non-secret untouched", overlaid.optTheme === "nord");
+  check("E4 overlay: exportTargets untouched when absent from localVals", overlaid.exportTargets.github.enabled === true);
+
+  // -- pbpOverlaySecrets: exportTargets REPLACED wholesale when present in localVals --
+  const overlaidEts = pbpOverlaySecrets(baseS, { exportTargets: { webhook: { enabled: true, token: "obf:whtok" } } });
+  check("E4 overlay: exportTargets replaced wholesale (old github key gone)", !("github" in overlaidEts.exportTargets));
+  check("E4 overlay: exportTargets replaced wholesale (new webhook present)", overlaidEts.exportTargets.webhook.token === "obf:whtok");
+
+  // -- pbpOverlaySecrets: EMPTY-VALUE semantics — local "" wins over a non-empty s[k] --
+  const staleS = { geminiApiKey: "obf:stale-should-not-survive" };
+  const clearedOverlay = pbpOverlaySecrets(staleS, { geminiApiKey: "" });
+  check("E4 overlay empty-value: present-but-empty local value STILL overlays (wins over stale s[k])",
+    clearedOverlay.geminiApiKey === "");
+
+  // -- pbpOverlaySecrets: key absent from localVals -> s[k] untouched (not forced to "") --
+  const untouchedOverlay = pbpOverlaySecrets({ geminiApiKey: "obf:keepme" }, { pinboardToken: "obf:x" });
+  check("E4 overlay: key absent from localVals leaves s[k] alone", untouchedOverlay.geminiApiKey === "obf:keepme");
+
+  // -- pbpOverlaySecrets: does not mutate s or localVals --
+  const sBeforeMutCheck = JSON.stringify(baseS);
+  pbpOverlaySecrets(baseS, { pinboardToken: "obf:x" });
+  check("E4 overlay: does not mutate its s argument", JSON.stringify(baseS) === sBeforeMutCheck);
+
+  // -- pbpOverlaySecrets: null/undefined localVals -> s unchanged, no throw --
+  check("E4 overlay: null localVals returns s copy unchanged", pbpOverlaySecrets({ a: 1 }, null).a === 1);
+  check("E4 overlay: undefined localVals returns s copy unchanged", pbpOverlaySecrets({ a: 1 }, undefined).a === 1);
+
+  // -- pbpApplySecretOverlay: chrome undefined -> degrades to input, no throw.
+  // MUST be awaited: without await, this IIFE's continuation (restoring
+  // globalThis.chrome) fires mid-flight inside the next test's own two-step
+  // chrome.storage.local.get() chain, resetting globalThis.chrome to undefined
+  // between those two calls and spuriously failing that next test.
+  await (async () => {
+    const prevChromeE4 = globalThis.chrome;
+    delete globalThis.chrome;
+    const degraded = await pbpApplySecretOverlay({ geminiApiKey: "obf:untouched" });
+    check("E4 pbpApplySecretOverlay: chrome undefined -> degrades to input, no throw", degraded.geminiApiKey === "obf:untouched");
+    globalThis.chrome = prevChromeE4;
+  })();
+
+  // -- pbpApplySecretOverlay: routing active -> real overlay from a stubbed chrome.storage.local --
+  await (async () => {
+    const prevChromeE4b = globalThis.chrome;
+    const localBacking = { optSyncEnabled: true, syncApiKeys: false, geminiApiKey: "obf:fromlocal" };
+    globalThis.chrome = {
+      storage: {
+        local: { get: (keys) => {
+          if (Array.isArray(keys)) {
+            const out = {}; keys.forEach((k) => { if (k in localBacking) out[k] = localBacking[k]; }); return Promise.resolve(out);
+          }
+          const out = Object.assign({}, keys);
+          Object.keys(keys).forEach((k) => { if (k in localBacking) out[k] = localBacking[k]; });
+          return Promise.resolve(out);
+        } },
+      },
+    };
+    const active = await pbpApplySecretOverlay({ geminiApiKey: "obf:stale-sync-value", optTheme: "nord" });
+    check("E4 pbpApplySecretOverlay: routing active -> geminiApiKey overlaid from local", active.geminiApiKey === "obf:fromlocal");
+    check("E4 pbpApplySecretOverlay: routing active -> non-secret field untouched", active.optTheme === "nord");
+    globalThis.chrome = prevChromeE4b;
+  })();
+
+  // -- pbpApplySecretOverlay: routing inactive (syncApiKeys:true) -> untouched --
+  await (async () => {
+    const prevChromeE4c = globalThis.chrome;
+    globalThis.chrome = {
+      storage: { local: { get: () => Promise.resolve({ optSyncEnabled: true, syncApiKeys: true }) } },
+    };
+    const untouched = await pbpApplySecretOverlay({ geminiApiKey: "obf:should-stay" });
+    check("E4 pbpApplySecretOverlay: keys-on -> not overlaid (byte-identical passthrough)", untouched.geminiApiKey === "obf:should-stay");
+    globalThis.chrome = prevChromeE4c;
+  })();
+
   const summary = document.createElement("h2");
   summary.textContent = `Results: ${pass} pass, ${fail} fail`;
   root.insertBefore(summary, root.firstChild);
