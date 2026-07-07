@@ -2109,7 +2109,7 @@
     "message": "選択説明のトリガー"
   },
   "selectionTriggerIcon": {
-    "message": "選択範囲の横に小さなボタンを表示"
+    "message": "選択ツールバーの解説ボタン"
   },
   "selectionTriggerHotkey": {
     "message": "ホットキー E のみ（ボタンなし）"

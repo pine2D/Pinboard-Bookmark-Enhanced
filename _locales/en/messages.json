@@ -2109,7 +2109,7 @@
     "message": "Explain-selection trigger"
   },
   "selectionTriggerIcon": {
-    "message": "Small button next to the selection"
+    "message": "Explain button in the selection toolbar"
   },
   "selectionTriggerHotkey": {
     "message": "Hotkey E only (no button)"

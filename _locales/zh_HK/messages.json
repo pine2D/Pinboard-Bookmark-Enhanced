@@ -2109,7 +2109,7 @@
     "message": "劃詞解釋觸發方式"
   },
   "selectionTriggerIcon": {
-    "message": "選取文字旁顯示小按鈕"
+    "message": "選取工具列中的解釋按鈕"
   },
   "selectionTriggerHotkey": {
     "message": "僅快捷鍵 E（不顯示按鈕）"

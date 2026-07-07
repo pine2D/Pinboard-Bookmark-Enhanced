@@ -2109,7 +2109,7 @@
     "message": "Wyzwalacz wyjaśniania zaznaczenia"
   },
   "selectionTriggerIcon": {
-    "message": "Mały przycisk obok zaznaczenia"
+    "message": "Przycisk wyjaśniania na pasku zaznaczenia"
   },
   "selectionTriggerHotkey": {
     "message": "Tylko skrót E (bez przycisku)"

@@ -2109,7 +2109,7 @@
     "message": "Auslöser für Auswahlbeschreibung"
   },
   "selectionTriggerIcon": {
-    "message": "Kleiner Button neben der Auswahl"
+    "message": "Erklären-Schaltfläche in der Auswahl-Leiste"
   },
   "selectionTriggerHotkey": {
     "message": "Nur Hotkey E (kein Button)"

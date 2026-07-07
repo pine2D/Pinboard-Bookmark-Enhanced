@@ -758,6 +758,32 @@ function _pbpHlEnsureBar() {
   noteBtn.addEventListener("mousedown", (e) => e.preventDefault());
   noteBtn.addEventListener("click", () => _pbpHlCreateWithNote(noteBtn));
   bar.appendChild(noteBtn);
+  // Explain entry fused into this bar (was a standalone #explain-pill,
+  // md-ask.js): one floating control on selection instead of two. Icon is
+  // md-ask.js's PBP_EXPLAIN_PILL_SVG constant -- the same help-circle glyph
+  // the old pill used. pbpExplainInvoke (md-ask.js) captures the live
+  // selection itself and opening #explain-pop auto-closes this bar, so the
+  // click handler needs nothing else.
+  const explainBtn = document.createElement("button");
+  explainBtn.type = "button";
+  explainBtn.className = "pb-hl-explain-btn";
+  explainBtn.hidden = true;
+  explainBtn.title = t("explainSelection");
+  explainBtn.setAttribute("aria-label", t("explainSelection"));
+  explainBtn.innerHTML = (typeof PBP_EXPLAIN_PILL_SVG === "string" && PBP_EXPLAIN_PILL_SVG) || "";
+  explainBtn.addEventListener("mousedown", (e) => e.preventDefault());
+  explainBtn.addEventListener("click", () => {
+    if (typeof pbpExplainInvoke === "function") pbpExplainInvoke();
+  });
+  bar.appendChild(explainBtn);
+  // Visibility gate memoized once at bar creation (same accepted pattern as
+  // the hl-card AI row, md-highlight.js:1111 -- see _pbpHlEnsureCard):
+  // AI-less users and "hotkey"/"off" trigger modes see the bar exactly as
+  // before this fusion. A trigger-mode/AI-availability change mid-session
+  // needs a reopen to update this button (same known corner as the card row).
+  pbpAiGetSettings().then((s) => {
+    if (pbpAiAvailable(s) && (s.selectionTrigger || "icon") === "icon") explainBtn.hidden = false;
+  }).catch(() => {});
   bar.addEventListener("toggle", (e) => { if (e.newState === "closed") _pbpHlBarRange = null; });
   document.body.appendChild(bar);
   _pbpHlBarEl = bar;

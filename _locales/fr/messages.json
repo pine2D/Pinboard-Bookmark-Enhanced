@@ -2109,7 +2109,7 @@
     "message": "Déclencheur d'explication de sélection"
   },
   "selectionTriggerIcon": {
-    "message": "Petit bouton à côté de la sélection"
+    "message": "Bouton « Expliquer » dans la barre de sélection"
   },
   "selectionTriggerHotkey": {
     "message": "Raccourci E uniquement (sans bouton)"

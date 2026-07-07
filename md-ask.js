@@ -1121,16 +1121,21 @@ document.addEventListener("pbp:rendered", (e) => {
 }, { once: true });
 
 // ============================================================
-// Explain-selection (spec 5.3): selection observer + pill + popover.
+// Explain-selection (spec 5.3): hotkey + popover. The "icon" trigger's click
+// entry is a button fused into the highlight selection bar (md-highlight.js,
+// _pbpHlEnsureBar) rather than a standalone pill -- this file used to own
+// #explain-pill; see PBP_EXPLAIN_PILL_SVG below, now consumed cross-file.
 // Trigger ladder lives in settings key selectionTrigger:
-//   "icon" (default) -> pill next to the selection end + hotkey "e"
-//   "hotkey"         -> no pill, hotkey "e" only
+//   "icon" (default) -> explain button in the highlight bar + hotkey "e"
+//   "hotkey"         -> no bar button, hotkey "e" only
 //   "off"            -> nothing registers at all
 // ============================================================
 
 // Pill geometry: 28px square, 6px gap from the selection rect, 8px viewport
 // margin. Placed below-right of the selection end so it NEVER covers the
 // selected line; flips above when the viewport bottom is too close.
+// ponytail: no longer called (the pill it positioned is gone) -- kept as-is,
+// out of this fusion's explicit deletion list, still unit-tested.
 function pbpExplainPillPos(rect, vw, vh) {
   const S = 28, GAP = 6, M = 8;
   let x = rect.right + GAP;
@@ -1163,11 +1168,10 @@ async function _pbpExplainPersistTrigger(value) {
   } catch (_) { /* quota/throttle: in-memory switch already applied */ }
 }
 
-let _pbpExplainMouseDown = false;
-let _pbpExplainSelTimer = null;
-let _pbpExplainPillEl = null;
-
 // Static inline SVG (Feather help-circle). Constant string, never model text.
+// Was #explain-pill's icon; now consumed by the highlight selection bar's
+// explain button instead (md-highlight.js, _pbpHlEnsureBar) -- keep this the
+// single source of the explain glyph.
 const PBP_EXPLAIN_PILL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
 
 // Current selection if (and only if) it is explainable: non-collapsed, both
@@ -1184,46 +1188,11 @@ function _pbpExplainGetSelection() {
   return { range, text: text.trim() };
 }
 
-function _pbpExplainEnsurePill() {
-  if (_pbpExplainPillEl) return _pbpExplainPillEl;
-  const pill = document.createElement("button");
-  pill.id = "explain-pill";
-  pill.type = "button";
-  pill.hidden = true;
-  pill.title = t("explainSelection");
-  pill.setAttribute("aria-label", t("explainSelection"));
-  pill.innerHTML = PBP_EXPLAIN_PILL_SVG; // static constant, see above
-  // Keep the selection alive through the click (mousedown would clear it).
-  pill.addEventListener("mousedown", (e) => e.preventDefault());
-  pill.addEventListener("click", () => pbpExplainInvoke());
-  document.body.appendChild(pill);
-  _pbpExplainPillEl = pill;
-  return pill;
-}
-
-function _pbpExplainHidePill() {
-  clearTimeout(_pbpExplainSelTimer);
-  _pbpExplainSelTimer = null;
-  if (_pbpExplainPillEl) _pbpExplainPillEl.hidden = true;
-}
-
-function _pbpExplainShowPill() {
-  if (_pbpExplainTrigger !== "icon") { _pbpExplainHidePill(); return; }
-  const cap = _pbpExplainGetSelection();
-  if (!cap) { _pbpExplainHidePill(); return; }
-  const rect = cap.range.getBoundingClientRect();
-  if (!rect || (rect.width === 0 && rect.height === 0)) { _pbpExplainHidePill(); return; }
-  const pos = pbpExplainPillPos(rect, window.innerWidth, window.innerHeight);
-  const pill = _pbpExplainEnsurePill();
-  pill.style.left = pos.x + "px";
-  pill.style.top = pos.y + "px";
-  pill.hidden = false;
-}
-
-// Entry point for BOTH the pill click and the "e" hotkey. Captures the
-// selection NOW (the popover's light-dismiss may clear it later) and hands
-// off to the popover (Task 17). The typeof guard keeps this commit shippable
-// before the popover lands: invoke is then a silent no-op.
+// Entry point for BOTH the highlight bar's explain button (md-highlight.js)
+// and the "e" hotkey. Captures the selection NOW (the popover's light-dismiss
+// may clear it later) and hands off to the popover (Task 17). The typeof
+// guard keeps this commit shippable before the popover lands: invoke is then
+// a silent no-op.
 function pbpExplainInvoke() {
   const cap = _pbpExplainGetSelection();
   if (!cap) return;
@@ -1234,7 +1203,6 @@ function pbpExplainInvoke() {
   // start/end nodes/offsets but lives on its own, so "Save as note" can still
   // dereference cap.range long after the live selection is gone.
   cap.range = cap.range.cloneRange();
-  _pbpExplainHidePill();
   if (typeof _pbpExplainOpenPop === "function") _pbpExplainOpenPop(cap);
 }
 
@@ -1260,28 +1228,11 @@ function pbpExplainInit(detail) {
       });
     }
 
-    // Mouse selection: suppress UI while dragging; read the selection 10ms
-    // after mouseup (the browser settles the final range after the event).
-    document.addEventListener("mousedown", (e) => {
-      if (_pbpExplainPillEl && _pbpExplainPillEl.contains(e.target)) return;
-      _pbpExplainMouseDown = true;
-      _pbpExplainHidePill();
-    });
-    document.addEventListener("mouseup", () => {
-      setTimeout(() => { _pbpExplainMouseDown = false; _pbpExplainShowPill(); }, 10);
-    });
-    // Keyboard selection (Shift+arrows): 100ms debounce; skipped while the
-    // mouse is down (mouseup owns that path).
-    document.addEventListener("selectionchange", () => {
-      if (_pbpExplainMouseDown) return;
-      clearTimeout(_pbpExplainSelTimer);
-      _pbpExplainSelTimer = setTimeout(_pbpExplainShowPill, 100);
-    });
-    // Fixed-position pill drifts on scroll: just hide it (re-select or "e").
-    window.addEventListener("scroll", _pbpExplainHidePill, { passive: true });
-    // Hotkey "e": works in both "icon" and "hotkey" modes. Guarded like the
-    // ask panel's "a": no modifiers, not in editable targets. Coexists with
-    // the "a"/Esc keydown handler above — different keys entirely.
+    // Hotkey "e": works in both "icon" and "hotkey" modes (the "icon" mode's
+    // click entry is the highlight bar's explain button, md-highlight.js).
+    // Guarded like the ask panel's "a": no modifiers, not in editable
+    // targets. Coexists with the "a"/Esc keydown handler above -- different
+    // keys entirely.
     document.addEventListener("keydown", (e) => {
       if (e.key !== "e" || e.ctrlKey || e.metaKey || e.altKey) return;
       const el = e.target;
@@ -1548,9 +1499,10 @@ function _pbpExplainEnsurePop() {
       radio.addEventListener("change", () => {
         // On-the-spot trigger-ladder switch (spec 5.3), persisted to the
         // SAME storage area options.js writes (sync when optSyncEnabled,
-        // else local). Takes effect immediately via the live module var.
+        // else local). Takes effect immediately via the live module var; the
+        // highlight bar's explain button is memoized at bar-creation time
+        // (spec 2e known corner), so this doesn't retroactively show/hide it.
         _pbpExplainTrigger = value;
-        if (value !== "icon") _pbpExplainHidePill();
         _pbpExplainPersistTrigger(value);   // fire-and-forget; never rejects
       });
       lab.appendChild(radio);
