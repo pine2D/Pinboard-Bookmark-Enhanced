@@ -718,6 +718,44 @@
   "tabReader": {
     "message": "Reader"
   },
+  "tabNotes": {
+    "message": "Notes"
+  },
+  "notesFilterPlaceholder": {
+    "message": "Filter titles and notes…"
+  },
+  "notesColHighlights": {
+    "message": "Highlights"
+  },
+  "notesColNotes": {
+    "message": "Notes"
+  },
+  "notesColLastActive": {
+    "message": "Last active"
+  },
+  "notesColSize": {
+    "message": "Size"
+  },
+  "notesEmpty": {
+    "message": "Select text on a Markdown preview page to highlight it or add a note."
+  },
+  "notesUnknownPage": {
+    "message": "Unknown page"
+  },
+  "notesUnknownHint": {
+    "message": "Reopen this page's preview and save a highlight to fill in the title and link."
+  },
+  "notesDeleteBtn": {
+    "message": "Delete"
+  },
+  "notesDeleteConfirm": {
+    "message": "Delete notes for \"$TITLE$\"?",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
   "tabQuickActions": {
     "message": "Quick Actions"
   },

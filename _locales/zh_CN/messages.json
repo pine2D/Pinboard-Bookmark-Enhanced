@@ -718,6 +718,44 @@
   "tabReader": {
     "message": "阅读器"
   },
+  "tabNotes": {
+    "message": "笔记"
+  },
+  "notesFilterPlaceholder": {
+    "message": "按标题或笔记筛选…"
+  },
+  "notesColHighlights": {
+    "message": "高亮数"
+  },
+  "notesColNotes": {
+    "message": "笔记数"
+  },
+  "notesColLastActive": {
+    "message": "最后活动"
+  },
+  "notesColSize": {
+    "message": "大小"
+  },
+  "notesEmpty": {
+    "message": "在 Markdown 预览页选中文字即可高亮或记笔记。"
+  },
+  "notesUnknownPage": {
+    "message": "未知页面"
+  },
+  "notesUnknownHint": {
+    "message": "重新打开该页的预览并保存一次高亮，即可自动补全标题与链接。"
+  },
+  "notesDeleteBtn": {
+    "message": "删除"
+  },
+  "notesDeleteConfirm": {
+    "message": "删除「$TITLE$」的笔记？",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
   "tabQuickActions": {
     "message": "快捷操作"
   },

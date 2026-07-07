@@ -718,6 +718,44 @@
   "tabReader": {
     "message": "Czytnik"
   },
+  "tabNotes": {
+    "message": "Notatki"
+  },
+  "notesFilterPlaceholder": {
+    "message": "Filtruj wg tytułu lub notatki…"
+  },
+  "notesColHighlights": {
+    "message": "Zaznaczenia"
+  },
+  "notesColNotes": {
+    "message": "Notatki"
+  },
+  "notesColLastActive": {
+    "message": "Ostatnia aktywność"
+  },
+  "notesColSize": {
+    "message": "Rozmiar"
+  },
+  "notesEmpty": {
+    "message": "Zaznacz tekst na stronie podglądu Markdown, aby go wyróżnić lub dodać notatkę."
+  },
+  "notesUnknownPage": {
+    "message": "Nieznana strona"
+  },
+  "notesUnknownHint": {
+    "message": "Otwórz ponownie podgląd tej strony i zapisz zaznaczenie, aby uzupełnić tytuł i link."
+  },
+  "notesDeleteBtn": {
+    "message": "Usuń"
+  },
+  "notesDeleteConfirm": {
+    "message": "Usunąć notatki dla „$TITLE$”?",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
   "tabQuickActions": {
     "message": "Skróty"
   },

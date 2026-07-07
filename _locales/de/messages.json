@@ -718,6 +718,44 @@
   "tabReader": {
     "message": "Leseansicht"
   },
+  "tabNotes": {
+    "message": "Notizen"
+  },
+  "notesFilterPlaceholder": {
+    "message": "Nach Titel oder Notiz filtern…"
+  },
+  "notesColHighlights": {
+    "message": "Markierungen"
+  },
+  "notesColNotes": {
+    "message": "Notizen"
+  },
+  "notesColLastActive": {
+    "message": "Zuletzt aktiv"
+  },
+  "notesColSize": {
+    "message": "Größe"
+  },
+  "notesEmpty": {
+    "message": "Markieren Sie Text auf der Markdown-Vorschauseite, um ihn hervorzuheben oder eine Notiz hinzuzufügen."
+  },
+  "notesUnknownPage": {
+    "message": "Unbekannte Seite"
+  },
+  "notesUnknownHint": {
+    "message": "Öffnen Sie die Vorschau dieser Seite erneut und speichern Sie eine Markierung, um Titel und Link zu ergänzen."
+  },
+  "notesDeleteBtn": {
+    "message": "Löschen"
+  },
+  "notesDeleteConfirm": {
+    "message": "Notizen für \"$TITLE$\" löschen?",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
   "tabQuickActions": {
     "message": "Schnellaktionen"
   },

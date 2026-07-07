@@ -17,6 +17,7 @@
       <button class="tab-btn" id="tab-ai" data-panel="ai" role="tab" aria-selected="false" aria-controls="panel-ai" data-i18n="tabAI">AI Providers</button>
       <button class="tab-btn" id="tab-ai-behavior" data-panel="ai-behavior" role="tab" aria-selected="false" aria-controls="panel-ai-behavior" data-i18n="tabAiBehavior">AI Behavior</button>
       <button class="tab-btn" id="tab-reader" data-panel="reader" role="tab" aria-selected="false" aria-controls="panel-reader" data-i18n="tabReader">Reader</button>
+      <button class="tab-btn" id="tab-notes" data-panel="notes" role="tab" aria-selected="false" aria-controls="panel-notes" data-i18n="tabNotes">Notes</button>
       <button class="tab-btn" id="tab-markdown" data-panel="markdown" role="tab" aria-selected="false" aria-controls="panel-markdown" data-i18n="tabMarkdown">Export</button>
       <button class="tab-btn" id="tab-quick" data-panel="quick" role="tab" aria-selected="false" aria-controls="panel-quick" data-i18n="tabQuickActions">Quick Actions</button>
       <button class="tab-btn" id="tab-tags" data-panel="tags" role="tab" aria-selected="false" aria-controls="panel-tags" data-i18n="tabTags">Tags</button>
@@ -593,6 +594,15 @@
       </ul>
     </div>
 
+    <!-- Tab: Notes -->
+    <div id="panel-notes" class="panel" role="tabpanel" aria-labelledby="tab-notes">
+      <div class="section-title" data-i18n="tabNotes">Notes</div>
+      <div class="fg">
+        <input type="search" id="notes-filter" placeholder="Filter titles and notes…" data-i18n-placeholder="notesFilterPlaceholder" />
+      </div>
+      <div id="notes-list"></div>
+    </div>
+
     <!-- Tab: Markdown -->
     <div id="panel-markdown" class="panel" role="tabpanel" aria-labelledby="tab-markdown">
       <div class="fg">
@@ -793,5 +803,6 @@
   <script defer src="tag-gov.js"></script>
   <script defer src="export-targets.js"></script>
   <script defer src="options.js"></script>
+  <script defer src="options-notes.js"></script>
 </body>
 </html>

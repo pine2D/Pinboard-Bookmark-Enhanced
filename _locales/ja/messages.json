@@ -718,6 +718,44 @@
   "tabReader": {
     "message": "リーダー"
   },
+  "tabNotes": {
+    "message": "メモ"
+  },
+  "notesFilterPlaceholder": {
+    "message": "タイトルやメモで絞り込み…"
+  },
+  "notesColHighlights": {
+    "message": "ハイライト数"
+  },
+  "notesColNotes": {
+    "message": "メモ数"
+  },
+  "notesColLastActive": {
+    "message": "最終更新"
+  },
+  "notesColSize": {
+    "message": "サイズ"
+  },
+  "notesEmpty": {
+    "message": "Markdown プレビューページで文字を選択するとハイライトやメモを追加できます。"
+  },
+  "notesUnknownPage": {
+    "message": "不明なページ"
+  },
+  "notesUnknownHint": {
+    "message": "このページのプレビューを再度開いてハイライトを保存すると、タイトルとリンクが自動的に補完されます。"
+  },
+  "notesDeleteBtn": {
+    "message": "削除"
+  },
+  "notesDeleteConfirm": {
+    "message": "「$TITLE$」のメモを削除しますか？",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
   "tabQuickActions": {
     "message": "クイック操作"
   },

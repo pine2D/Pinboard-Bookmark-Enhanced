@@ -124,6 +124,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (btn.dataset.panel === "appearance") _initAppearancePanel();
     if (btn.dataset.panel === "tags") _initTagGovPanel();
     if (btn.dataset.panel === "storage") renderStoragePanel();
+    if (btn.dataset.panel === "notes") renderNotesPanel();
   }
   _tabBtns.forEach((btn, i) => {
     btn.tabIndex = btn.classList.contains("active") ? 0 : -1;
@@ -328,6 +329,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     tags: {
       fields: { "opt-tag-sort-by-pop": true },
+      skip: []
+    },
+    notes: {
+      fields: {},
       skip: []
     }
   };

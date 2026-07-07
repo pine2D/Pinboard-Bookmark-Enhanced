@@ -58,3 +58,191 @@ function pbpNotesMatch(rec, q) {
   }
   return false;
 }
+
+// ============================================================
+// Render / interaction layer (DOM + chrome.storage). Lazily invoked by
+// options.js's activateTab on first (and every subsequent) "notes" tab
+// activation -- same no-guard, rescan-every-time pattern as
+// renderStoragePanel() in options.js (a fresh chrome.storage.local.get(null)
+// scan per activation; the data set is small enough that this is cheap).
+// ============================================================
+
+let _notesAllRows = []; // [{ row, rec }], last full scan, sorted lastTs desc
+
+async function _pbpNotesScan() {
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return [];
+  let all;
+  try { all = await chrome.storage.local.get(null); } catch (_) { return []; }
+  const rows = [];
+  for (const key of Object.keys(all || {})) {
+    if (!key.startsWith("pbp_hl_") || key === "pbp_hl_last_color") continue;
+    const row = pbpNotesRow(key, all[key]);
+    if (row) rows.push({ row, rec: all[key] });
+  }
+  rows.sort((a, b) => b.row.lastTs - a.row.lastTs);
+  return rows;
+}
+
+function _pbpNotesFormatDate(ts) {
+  if (!ts) return "";
+  try { return new Date(ts).toLocaleDateString(); } catch (_) { return ""; }
+}
+
+function _pbpNotesBuildRow(entry) {
+  const { row, rec } = entry;
+  const details = document.createElement("details");
+  details.className = "notes-row";
+
+  const summary = document.createElement("summary");
+  // The flex row lives on an INNER span, never on <summary> itself:
+  // display:flex on <summary> deletes its native ::marker triangle (verified
+  // empirically -- Chromium only paints ::marker while summary keeps its UA
+  // default display:list-item). Wrapping keeps the native disclosure
+  // triangle with zero custom marker CSS/glyph (no dingbat character).
+  const inner = document.createElement("span");
+  inner.className = "notes-row-inner";
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "notes-row-title";
+  if (row.url) {
+    const a = document.createElement("a");
+    a.href = row.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = row.title || row.url;
+    titleEl.appendChild(a);
+  } else {
+    titleEl.textContent = t("notesUnknownPage");
+  }
+  inner.appendChild(titleEl);
+
+  const meta = document.createElement("span");
+  meta.className = "notes-row-meta";
+
+  const hlSpan = document.createElement("span");
+  hlSpan.textContent = String(row.hlCount) + " " + t("notesColHighlights");
+  meta.appendChild(hlSpan);
+
+  const noteSpan = document.createElement("span");
+  noteSpan.textContent = String(row.noteCount) + " " + t("notesColNotes");
+  meta.appendChild(noteSpan);
+
+  const dateSpan = document.createElement("span");
+  dateSpan.textContent = _pbpNotesFormatDate(row.lastTs);
+  dateSpan.title = t("notesColLastActive");
+  meta.appendChild(dateSpan);
+
+  const bytesSpan = document.createElement("span");
+  bytesSpan.textContent = typeof pbpFormatBytes === "function" ? pbpFormatBytes(row.bytes) : String(row.bytes);
+  bytesSpan.title = t("notesColSize");
+  meta.appendChild(bytesSpan);
+
+  inner.appendChild(meta);
+
+  const delBtn = document.createElement("button");
+  delBtn.type = "button";
+  delBtn.className = "btn btn-sm notes-row-del";
+  delBtn.textContent = t("notesDeleteBtn");
+  delBtn.addEventListener("click", (e) => {
+    e.preventDefault(); // stop the click from also toggling <details> open/closed
+    _pbpNotesDelete(row);
+  });
+  inner.appendChild(delBtn);
+
+  summary.appendChild(inner);
+  details.appendChild(summary);
+
+  if (!row.url) {
+    const hint = document.createElement("p");
+    hint.className = "notes-unknown-hint";
+    hint.textContent = t("notesUnknownHint");
+    details.appendChild(hint);
+  }
+
+  const itemsEl = document.createElement("div");
+  itemsEl.className = "notes-items";
+  const items = Array.isArray(rec.items) ? rec.items : [];
+  items.forEach((it) => {
+    if (!it || typeof it !== "object") return;
+    const itemEl = document.createElement("div");
+    itemEl.className = "notes-item";
+
+    const dot = document.createElement("span");
+    const color = Number(it.color);
+    dot.className = "note-dot c" + (color >= 1 && color <= 5 ? color : 1);
+    itemEl.appendChild(dot);
+
+    const textEl = document.createElement("div");
+    textEl.className = "notes-item-text";
+    const quote = typeof it.quote === "string" ? it.quote : "";
+    const quoteEl = document.createElement("div");
+    quoteEl.className = "notes-item-quote";
+    quoteEl.textContent = quote.length > 200 ? quote.slice(0, 200) + "\u2026" : quote;
+    textEl.appendChild(quoteEl);
+
+    const note = typeof it.note === "string" ? it.note : "";
+    if (note.trim()) {
+      const noteEl = document.createElement("div");
+      noteEl.className = "notes-item-note";
+      noteEl.textContent = note;
+      textEl.appendChild(noteEl);
+    }
+    itemEl.appendChild(textEl);
+    itemsEl.appendChild(itemEl);
+  });
+  details.appendChild(itemsEl);
+
+  return details;
+}
+
+function _pbpNotesRenderList(entries) {
+  const list = $id("notes-list");
+  if (!list) return;
+  list.textContent = "";
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "notes-empty";
+    empty.textContent = t("notesEmpty");
+    list.appendChild(empty);
+    return;
+  }
+  entries.forEach((entry) => list.appendChild(_pbpNotesBuildRow(entry)));
+}
+
+async function _pbpNotesDelete(row) {
+  const label = row.title || row.url || t("notesUnknownPage");
+  if (!confirm(t("notesDeleteConfirm", label))) return;
+  try { await chrome.storage.local.remove(row.key); } catch (_) { return; }
+  _notesAllRows = _notesAllRows.filter((e) => e.row.key !== row.key);
+  const filterInput = $id("notes-filter");
+  _pbpNotesRenderList(_notesAllRows.filter((e) => pbpNotesMatch(e.rec, filterInput ? filterInput.value : "")));
+}
+
+// Called from options.js's activateTab -- the sole lazy-init line added
+// there. Re-scans storage every activation (no "already inited" guard),
+// matching renderStoragePanel()'s convention.
+async function renderNotesPanel() {
+  if (!$id("notes-list")) return;
+  _notesAllRows = await _pbpNotesScan();
+  const filterInput = $id("notes-filter");
+  _pbpNotesRenderList(_notesAllRows.filter((e) => pbpNotesMatch(e.rec, filterInput ? filterInput.value : "")));
+}
+
+// The filter input is static markup (never recreated), so bind its listener
+// once at script-load time rather than re-binding inside renderNotesPanel on
+// every tab activation (same one-time-bind convention options.js uses for
+// storage-clear-btn). Guarded on `$id` existing: this whole file is also
+// loaded standalone by tests/options-notes-tests.html, which exercises only
+// the pure layer above and never loads shared.js -- without this guard the
+// bootstrap would throw ReferenceError: $id is not defined and fail that
+// test's page-error check even though every assertion still passes (dry-run
+// confirmed this exact failure mode before the guard was added, and confirmed
+// 0 page errors after).
+if (typeof $id === "function") {
+  const _notesFilterInput = $id("notes-filter");
+  if (_notesFilterInput) {
+    _notesFilterInput.addEventListener("input", () => {
+      _pbpNotesRenderList(_notesAllRows.filter((e) => pbpNotesMatch(e.rec, _notesFilterInput.value)));
+    });
+  }
+}

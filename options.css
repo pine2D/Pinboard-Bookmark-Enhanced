@@ -1172,3 +1172,81 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   margin-left: 8px;
   position: relative;
 }
+
+/* ---- Notes tab (hand-maintained; note-dot colors match md-preview's 5-color highlight tokens) ---- */
+.notes-row {
+  border: 1px solid var(--opt-border, #ccc);
+  border-radius: var(--opt-radius-sm, 3px);
+  padding: 6px 10px;
+  margin-bottom: 6px;
+}
+.notes-row summary {
+  cursor: pointer;
+}
+.notes-row-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.notes-row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: bold;
+  font-size: 13px;
+}
+.notes-row-title a {
+  color: inherit;
+}
+.notes-row-meta {
+  flex-shrink: 0;
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--opt-fg-muted, #666);
+}
+.notes-unknown-hint {
+  font-size: 11px;
+  color: var(--opt-fg-muted, #666);
+  margin: 4px 0 0 0;
+}
+.notes-items {
+  margin-top: 8px;
+  padding-left: 20px;
+}
+.notes-item {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+}
+.note-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.note-dot.c1 { background: #facc15; }
+.note-dot.c2 { background: #4ade80; }
+.note-dot.c3 { background: #60a5fa; }
+.note-dot.c4 { background: #f87171; }
+.note-dot.c5 { background: #c084fc; }
+.notes-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.notes-item-quote {
+  color: var(--opt-fg-muted, #666);
+}
+.notes-item-note {
+  margin-top: 2px;
+}
+.notes-empty {
+  font-size: 12px;
+  color: var(--opt-fg-muted, #666);
+  padding: 12px 0;
+}
