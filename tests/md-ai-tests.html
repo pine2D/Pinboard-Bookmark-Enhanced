@@ -4432,4 +4432,99 @@ suiteIf("pbpReaderPickScrollAnchor", "pbpReaderPickScrollAnchor", () => {
   });
 });
 </script>
+<script>
+// ============ H6: pbpSearchFilterNotes (md-reader.js note-text search) ============
+suiteIf("pbpSearchFilterNotes", "pbpSearchFilterNotes", () => {
+  test("literal mode finds a case-insensitive substring hit", () => {
+    const items = [{ id: "a", note: "remember to re-read this" }];
+    assertEq(JSON.stringify(pbpSearchFilterNotes(items, "REMEMBER", false)), JSON.stringify(["a"]), "literal hit, case-insensitive");
+  });
+  test("literal mode misses a non-matching note", () => {
+    const items = [{ id: "a", note: "nothing relevant here" }];
+    assertEq(pbpSearchFilterNotes(items, "xyz", false).length, 0, "literal miss");
+  });
+  test("literal mode is case-insensitive on both sides", () => {
+    const items = [{ id: "a", note: "Important Detail" }];
+    assertEq(JSON.stringify(pbpSearchFilterNotes(items, "detail", false)), JSON.stringify(["a"]), "case-insensitive match");
+  });
+  test("regex mode tests the pattern against each note", () => {
+    const items = [{ id: "a", note: "page 12" }, { id: "b", note: "no digits" }];
+    assertEq(JSON.stringify(pbpSearchFilterNotes(items, "\\d+", true)), JSON.stringify(["a"]), "regex hit only on item a");
+  });
+  test("invalid regex pattern returns null", () => {
+    const items = [{ id: "a", note: "anything" }];
+    assertEq(pbpSearchFilterNotes(items, "[", true), null, "unterminated character class");
+  });
+  test("empty query returns an empty array", () => {
+    const items = [{ id: "a", note: "some note" }];
+    assertEq(pbpSearchFilterNotes(items, "", false).length, 0, "empty query");
+  });
+  test("items without a note string are skipped, not thrown on", () => {
+    const items = [{ id: "a" }, { id: "b", note: "" }, { id: "c", note: "match me" }];
+    assertEq(JSON.stringify(pbpSearchFilterNotes(items, "match", false)), JSON.stringify(["c"]), "only c has a matching note");
+  });
+  test("non-array input returns an empty array", () => {
+    assertEq(pbpSearchFilterNotes(null, "match", false).length, 0, "null items");
+  });
+});
+</script>
+<script>
+// ============ H6: _pbpSearchRangesOverlap (md-reader.js note-search overlap guard) ============
+suiteIf("_pbpSearchRangesOverlap", "_pbpSearchRangesOverlap", () => {
+  function fixture(html) {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    document.body.appendChild(d);
+    return d;
+  }
+  test("a note-hit range that WHOLLY CONTAINS a DOM-scan substring range overlaps (the exact double-count shape the guard exists for)", () => {
+    const root = fixture('<p id="b1">hello world</p>');
+    const text = root.querySelector("#b1").firstChild;
+    const whole = document.createRange();
+    whole.setStart(text, 0);
+    whole.setEnd(text, 11); // "hello world" -- the highlight's full quoted span
+    const sub = document.createRange();
+    sub.setStart(text, 6);
+    sub.setEnd(text, 11); // "world" -- the DOM-scan's exact substring hit
+    assert(_pbpSearchRangesOverlap(whole, sub), "containing range overlaps its own substring");
+    root.remove();
+  });
+  test("partially overlapping ranges overlap", () => {
+    const root = fixture('<p id="b1">hello world</p>');
+    const text = root.querySelector("#b1").firstChild;
+    const a = document.createRange();
+    a.setStart(text, 0);
+    a.setEnd(text, 7); // "hello w"
+    const b = document.createRange();
+    b.setStart(text, 6);
+    b.setEnd(text, 11); // "world"
+    assert(_pbpSearchRangesOverlap(a, b), "partial overlap");
+    root.remove();
+  });
+  test("disjoint ranges do not overlap", () => {
+    const root = fixture('<p id="b1">alpha beta</p>');
+    const text = root.querySelector("#b1").firstChild;
+    const a = document.createRange();
+    a.setStart(text, 0);
+    a.setEnd(text, 5); // "alpha"
+    const b = document.createRange();
+    b.setStart(text, 6);
+    b.setEnd(text, 10); // "beta"
+    assert(!_pbpSearchRangesOverlap(a, b), "no overlap");
+    root.remove();
+  });
+  test("ranges that only touch at a boundary (share zero characters) do not overlap", () => {
+    const root = fixture('<p id="b1">alphabeta</p>');
+    const text = root.querySelector("#b1").firstChild;
+    const a = document.createRange();
+    a.setStart(text, 0);
+    a.setEnd(text, 5); // "alpha"
+    const b = document.createRange();
+    b.setStart(text, 5);
+    b.setEnd(text, 9); // "beta", starts exactly where a ends
+    assert(!_pbpSearchRangesOverlap(a, b), "touching boundary is not an overlap");
+    root.remove();
+  });
+});
+</script>
 </body></html>

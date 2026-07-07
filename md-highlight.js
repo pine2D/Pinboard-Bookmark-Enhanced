@@ -956,6 +956,14 @@ function pbpHlCurrentItems() {
   return _pbpHlState ? _pbpHlState.items.slice() : [];
 }
 
+// ---- H6 (spec sec.2): cross-file accessor for md-reader.js's note-search
+// hook -- the underlying Range lives in _pbpHlState.ranges, never exposed
+// directly (md-reader.js must not reach into another file's private state).
+function pbpHlRangeOf(id) {
+  const e = _pbpHlState && _pbpHlState.ranges[id];
+  return (e && e.range) || null;
+}
+
 // ---- Click hit-detection -> edit card (spec sec.4 "点已有高亮 → 卡片") ----
 document.addEventListener("pbp:rendered", () => {
   const view = document.getElementById("rendered-view");

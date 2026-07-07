@@ -123,6 +123,41 @@ function pbpReaderPickScrollAnchor(rects) {
   return { n: idx + 1, frac };
 }
 
+// ---- H6 (spec sec.2): note-text search matching, pure ----
+// Filters `items` (the pbpHlCurrentItems() shape: array of {id, note, ...})
+// down to the ids whose `note` field matches `query`. Literal mode
+// (isRegex falsy) = case-insensitive indexOf on item.note, same
+// case-folding convention as pbpSearchEnumerate. Regex mode compiles
+// `query` as `new RegExp(query, "i")` and .test()s it against the note --
+// an invalid pattern returns null, the same "tell bad pattern apart from
+// zero matches" contract pbpSearchEnumerateRegex uses (the _pbpSearchRun
+// caller never even reaches this path on an invalid pattern -- its own
+// compile-once check already short-circuits the whole run before the
+// note pass runs; this null return is for direct/unit-test callers and
+// defense in depth). An item whose `note` is not a string (missing,
+// undefined, non-string) is silently skipped -- it can never be a hit,
+// not an error; an item with note === "" is not specially skipped either,
+// it simply never matches a non-empty query on its own. Only the `note`
+// field is ever inspected -- `quote` is already live in the rendered DOM
+// and covered by the existing DOM scan, so matching it here too would
+// double-count (spec sec.2). Order is preserved exactly as given in
+// `items` (already document order per pbpHlCurrentItems).
+function pbpSearchFilterNotes(items, query, isRegex) {
+  if (!Array.isArray(items) || typeof query !== "string" || !query.length) return [];
+  let re = null;
+  if (isRegex) {
+    try { re = new RegExp(query, "i"); } catch (_) { return null; }
+  }
+  const needle = query.toLowerCase();
+  const out = [];
+  for (const item of items) {
+    if (!item || typeof item.note !== "string") continue;
+    const hit = re ? re.test(item.note) : item.note.toLowerCase().indexOf(needle) !== -1;
+    if (hit) out.push(item.id);
+  }
+  return out;
+}
+
 // ---- DOM wiring ----
 
 // View-mode-aware visibility check for R3 (spec sec.3, reusing R4's exact
@@ -379,6 +414,14 @@ function _pbpSearchPaintAll() {
   CSS.highlights.set("pbp-search", h);
 }
 
+// H6 (spec sec.2): note hits (see _pbpSearchRun) carry a Range but no
+// `.el` -- this derives the element to scroll into view from the Range's
+// start container, text node vs element node both handled.
+function _pbpSearchElFromRangeStart(range) {
+  const c = range.startContainer;
+  return c.nodeType === Node.TEXT_NODE ? c.parentElement : c;
+}
+
 function _pbpSearchPaintCurrent(jump) {
   const st = _pbpSearchState;
   if (typeof Highlight === "function" && typeof CSS !== "undefined" && "highlights" in CSS) {
@@ -393,8 +436,12 @@ function _pbpSearchPaintCurrent(jump) {
   }
   if (jump && st.idx >= 0) {
     const m = st.matches[st.idx];
-    if (m && m.el && typeof m.el.scrollIntoView === "function") {
-      m.el.scrollIntoView({ block: "center", behavior: "smooth" });
+    // H6 (spec sec.2): a note hit is {noteId, range}, not {el, start, end}
+    // -- fall back to deriving the element from the Range's start
+    // container so the jump-to-current behavior is identical either way.
+    const el = m && (m.el || (m.range && _pbpSearchElFromRangeStart(m.range)));
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
     }
   }
 }
@@ -412,6 +459,33 @@ function _pbpSearchUpdateCounter() {
   // -- this is the ONLY place that clears it, so every debounced rescan
   // settles into exactly one AT announcement of the FINAL count.
   counter.removeAttribute("aria-busy");
+}
+
+// H6 (spec sec.2) note-search overlap guard: a search query can
+// independently match BOTH a highlight's rendered quote text (found by
+// the DOM scan in _pbpSearchRun below) and that SAME highlight's
+// separate `note` field (found by the note pass) -- two different
+// match shapes (an {el,start,end} exact substring vs a {noteId,range}
+// whole-quote span) pointing at the same visual location. Two ranges
+// overlap unless one ends at-or-before the other starts; START_TO_END
+// is the compareBoundaryPoints() constant that yields "this range's
+// end vs. the other range's start" (its naming is notoriously easy to
+// get backwards -- verified against a real Chromium instance, not
+// assumed). Same primitive md-highlight.js's _pbpHlClipRangeToBlock
+// already uses for range-vs-range geometry, so this decides true
+// overlap correctly across every view mode (bilingual/tr-only/etc), no
+// text-heuristic guessing needed.
+function _pbpSearchRangesOverlap(a, b) {
+  if (a.compareBoundaryPoints(Range.START_TO_END, b) <= 0) return false; // a ends at/before b starts
+  if (b.compareBoundaryPoints(Range.START_TO_END, a) <= 0) return false; // b ends at/before a starts
+  return true;
+}
+
+function _pbpSearchRangeOverlapsAny(range, ranges) {
+  for (const r of ranges) {
+    if (r && _pbpSearchRangesOverlap(range, r)) return true;
+  }
+  return false;
 }
 
 // Re-run the whole scan against the CURRENT DOM. Called on input
@@ -446,6 +520,34 @@ function _pbpSearchRun(query) {
     }
     for (const m of st.matches) {
       st.ranges.push(typeof _pbpAskRangeFromOffsets === "function" ? _pbpAskRangeFromOffsets(m.el, m.start, m.end) : null);
+    }
+    // H6 (spec sec.2): note-text pass, AFTER the DOM scan + its ranges
+    // are built above -- so (a) DOM matches keep first claim on the 500
+    // cap (body-text hits win ties for the shared budget), and (b) each
+    // candidate note hit can be checked with _pbpSearchRangeOverlapsAny
+    // against the DOM-scan ranges already collected. Without that check
+    // a query matching both a highlight's rendered quote (already
+    // surfaced by the DOM scan above) and its separate `note` field
+    // would land the SAME highlight in st.matches twice. typeof-guarded
+    // on pbpHlCurrentItems -- a no-op whenever md-highlight.js never
+    // loaded/inited (AI-less users) or the user simply has zero
+    // highlights, which is exactly the "search behaves byte-identically
+    // to today" guarantee this hook must uphold.
+    if (st.matches.length < CAP && typeof pbpHlCurrentItems === "function") {
+      const noteIds = pbpSearchFilterNotes(pbpHlCurrentItems(), query, _pbpSearchRegexOn);
+      // null = invalid regex -- the DOM scan above already short-circuited
+      // itself (the `bad` guard) and flagged srch-bad; this pass
+      // contributes nothing extra on top, same as the DOM side.
+      if (noteIds) {
+        for (const id of noteIds) {
+          if (st.matches.length >= CAP) break;
+          const range = typeof pbpHlRangeOf === "function" ? pbpHlRangeOf(id) : null;
+          if (!range) continue; // not painted (tr-lang mismatch / block drift, spec sec.2) -- skip this hit
+          if (_pbpSearchRangeOverlapsAny(range, st.ranges)) continue; // dedup: this same highlight's quote text already produced a DOM-scan hit (spec sec.2 coincidental cross-hit overlap)
+          st.matches.push({ noteId: id, range: range });
+          st.ranges.push(range);
+        }
+      }
     }
   }
   if (_pbpSearchPopEl) {
