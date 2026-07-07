@@ -1686,6 +1686,12 @@
   "mdExportIncludeToc": {
     "message": "Include table of contents"
   },
+  "mdExportExtendedMeta": {
+    "message": "Include extended metadata (author, published, site, image, word count)"
+  },
+  "mdExportExtendedMetaHint": {
+    "message": "Adds these fields to frontmatter, the HTML byline, and webhook payloads when available. Turn off for byte-identical legacy exports."
+  },
   "optBgSaveNoClobber": {
     "message": "Merge tags in background saves (Quick Save / Read Later)"
   },

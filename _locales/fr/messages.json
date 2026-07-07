@@ -1413,6 +1413,12 @@
   "mdExportIncludeToc": {
     "message": "Inclure la table des matières"
   },
+  "mdExportExtendedMeta": {
+    "message": "Inclure les métadonnées étendues (auteur, date de publication, site, image, nombre de mots)"
+  },
+  "mdExportExtendedMetaHint": {
+    "message": "Ajoute ces champs au frontmatter, à la ligne d'auteur HTML et aux payloads webhook lorsqu'ils sont disponibles. Désactivez pour des exports identiques à l'ancienne version."
+  },
   "mdOptIncludeToc": {
     "message": "Inclure la TDM"
   },

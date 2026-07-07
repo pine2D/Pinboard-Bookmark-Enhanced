@@ -199,6 +199,9 @@ const SETTINGS_DEFAULTS = {
   popupWidth: 550,
   mdExportFrontmatter: true, mdExportImagePolicy: "keep", mdExportIncludeToc: false,
   mdExportIncludeHighlights: true,
+  // Default-on: attaches author/published/site/image/words to export meta when
+  // available. Off = byte-identical legacy exports (X4).
+  mdExportExtendedMeta: true,
   obsidianEnabled: false, obsidianVault: "", obsidianFolder: "",
   // Registry-driven "Send to ▾" per-target config (Obsidian, GitHub Gist, …).
   // MUST live here: options loads settings via get(SETTINGS_DEFAULTS), so a key

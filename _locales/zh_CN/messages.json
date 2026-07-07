@@ -1413,6 +1413,12 @@
   "mdExportIncludeToc": {
     "message": "包含文章目录"
   },
+  "mdExportExtendedMeta": {
+    "message": "包含扩展元数据(作者、发布日期、来源站点、封面图、字数)"
+  },
+  "mdExportExtendedMetaHint": {
+    "message": "在有值时把这些字段加入 frontmatter、HTML 署名行与 webhook 载荷;关闭后导出与旧版逐字节一致。"
+  },
   "mdOptIncludeToc": {
     "message": "含目录"
   },

@@ -1413,6 +1413,12 @@
   "mdExportIncludeToc": {
     "message": "Dołącz spis treści"
   },
+  "mdExportExtendedMeta": {
+    "message": "Dołącz rozszerzone metadane (autor, data publikacji, witryna, obraz, liczba słów)"
+  },
+  "mdExportExtendedMetaHint": {
+    "message": "Dodaje te pola do frontmatter, wiersza autora HTML i ładunków webhook, gdy są dostępne. Wyłącz, aby eksport był identyczny bajt w bajt ze starą wersją."
+  },
   "mdOptIncludeToc": {
     "message": "Dołącz spis treści"
   },

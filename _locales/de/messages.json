@@ -1413,6 +1413,12 @@
   "mdExportIncludeToc": {
     "message": "Inhaltsverzeichnis einfügen"
   },
+  "mdExportExtendedMeta": {
+    "message": "Erweiterte Metadaten einschließen (Autor, Veröffentlichungsdatum, Website, Bild, Wortzahl)"
+  },
+  "mdExportExtendedMetaHint": {
+    "message": "Fügt diese Felder bei Verfügbarkeit dem Frontmatter, der HTML-Kopfzeile und den Webhook-Payloads hinzu. Deaktivieren für byte-identische Exporte wie zuvor."
+  },
   "mdOptIncludeToc": {
     "message": "Inhaltsverzeichnis einfügen"
   },

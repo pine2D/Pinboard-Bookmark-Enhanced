@@ -1413,6 +1413,12 @@
   "mdExportIncludeToc": {
     "message": "包含文章目錄"
   },
+  "mdExportExtendedMeta": {
+    "message": "包含擴充中繼資料(作者、發布日期、來源網站、封面圖、字數)"
+  },
+  "mdExportExtendedMetaHint": {
+    "message": "有值時會加入 frontmatter、HTML 署名列與 webhook 酬載;關閉後匯出將與舊版逐位元組一致。"
+  },
   "mdOptIncludeToc": {
     "message": "含目錄"
   },

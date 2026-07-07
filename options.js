@@ -300,7 +300,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     markdown: {
       fields: {
-        "opt-md-frontmatter": true, "opt-md-image-policy": "keep", "opt-md-include-toc": false
+        "opt-md-frontmatter": true, "opt-md-extended-meta": true,
+        "opt-md-image-policy": "keep", "opt-md-include-toc": false
       }
     },
     archive: {
@@ -785,6 +786,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-auto-close": s.optAutoCloseAfterSave,
     "opt-popup-follow-theme": s.optPopupFollowTheme,
     "opt-md-frontmatter": s.mdExportFrontmatter,
+    "opt-md-extended-meta": s.mdExportExtendedMeta,
     "opt-md-include-toc": s.mdExportIncludeToc,
     "opt-md-include-hl": s.mdExportIncludeHighlights,
     "opt-tag-sort-by-pop": s.tagSortByPopEnabled,
@@ -1146,6 +1148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       customTagPrompt: $id("opt-custom-tag-prompt").value,
       customSummaryPrompt: $id("opt-custom-summary-prompt").value,
       mdExportFrontmatter: $id("opt-md-frontmatter").checked,
+      mdExportExtendedMeta: $id("opt-md-extended-meta").checked,
       mdExportImagePolicy: $id("opt-md-image-policy").value,
       mdExportIncludeToc: $id("opt-md-include-toc").checked,
       mdExportIncludeHighlights: $id("opt-md-include-hl").checked,

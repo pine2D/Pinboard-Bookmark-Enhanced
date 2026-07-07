@@ -618,6 +618,7 @@ function pbpApplyColorScheme(mode) {
     mdExportImagePolicy: "keep",
     mdExportIncludeToc: false,
     mdExportIncludeHighlights: true,
+    mdExportExtendedMeta: true,
     obsidianEnabled: false,
     obsidianVault: "",
     obsidianFolder: "",
@@ -659,6 +660,26 @@ function pbpApplyColorScheme(mode) {
       source: source === "jina" ? "jina" : "defuddle"
     };
     if (description) meta.description = description;
+    // X4: extended metadata (author/published/site/image/words), gated by the
+    // mdExportExtendedMeta setting (default on). Off -> meta stays exactly the
+    // six keys above, byte-identical to pre-X4 exports (spec invariant 1).
+    // author/published/site/image below are the outer-scope consts Task 3
+    // declared off `info` (same closure as `description` above) -- reused here,
+    // not re-read from `info.*` a second time.
+    if (exportSettings.mdExportExtendedMeta !== false) {
+      const trimmedAuthor = author.trim();
+      if (trimmedAuthor) meta.author = trimmedAuthor.slice(0, 200);
+      let resolvedSite = site.trim();
+      if (!resolvedSite) {
+        try { resolvedSite = new URL(url).hostname; } catch (_) { resolvedSite = ""; }
+      }
+      if (resolvedSite) meta.site = resolvedSite.slice(0, 200);
+      const publishedDate = publishedIso(published);
+      if (publishedDate) meta.published = publishedDate;
+      if (image) meta.image = image;
+      const stats = readingStats(getViewMarkdown());
+      meta.words = stats.words + stats.cjkChars;
+    }
     return meta;
   }
   function buildExportOpts() {

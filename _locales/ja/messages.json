@@ -1413,6 +1413,12 @@
   "mdExportIncludeToc": {
     "message": "目次を含める"
   },
+  "mdExportExtendedMeta": {
+    "message": "拡張メタデータ(著者、公開日、サイト、画像、文字数)を含める"
+  },
+  "mdExportExtendedMetaHint": {
+    "message": "値がある場合、これらの項目を frontmatter、HTML の署名行、webhook ペイロードに追加します。オフにすると旧バージョンと完全に同一のエクスポートになります。"
+  },
   "mdOptIncludeToc": {
     "message": "目次を含める"
   },

@@ -518,6 +518,25 @@ async function htmlToMarkdownAsync(html, opts) {
       // Convert to markdown (Jina already has it, Local needs Turndown)
       const markdown = result.markdown || await htmlToMarkdownAsync(result.contentHtml, { baseUrl: result.url || url });
 
+      // X4: extended metadata (author/published/site/image/words), gated by the
+      // mdExportExtendedMeta setting (default on). Off -> meta stays exactly the
+      // five base keys, byte-identical to pre-X4 exports (spec invariant 1).
+      // Shared by copyMd/downloadMd/sendObsidian below -- same fields, same gate.
+      function attachExtendedMeta(meta) {
+        if (settings.mdExportExtendedMeta === false) return meta;
+        const author = (result.author || "").trim();
+        if (author) meta.author = author.slice(0, 200);
+        let site = (result.site || "").trim();
+        if (!site) { try { site = new URL(result.url || url).hostname; } catch (_) { site = ""; } }
+        if (site) meta.site = site.slice(0, 200);
+        const published = publishedIso(result.published || "");
+        if (published) meta.published = published;
+        if (result.image) meta.image = result.image;
+        const stats = readingStats(markdown);
+        meta.words = stats.words + stats.cjkChars;
+        return meta;
+      }
+
       // Reveal the action strip; the user picks Copy / Preview / Download / Obsidian.
       // No auto-copy: clicking Markdown must not silently clobber the clipboard, nor be
       // aborted by a clipboard failure when the user only wanted preview/download/Obsidian.
@@ -530,13 +549,13 @@ async function htmlToMarkdownAsync(html, opts) {
         // frontmatter/imagePolicy/TOC so Copy matches Download/Obsidian/preview's
         // Copy MD instead of copying the bare canonical markdown (relative image
         // src left unresolved, frontmatter/TOC settings silently ignored).
-        const meta = {
+        const meta = attachExtendedMeta({
           title: result.title || $id("title-input")?.value || "",
           url: result.url || url,
           date: (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(),
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
           source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
-        };
+        });
         const out = composeExport(markdown, meta, {
           frontmatter: settings.mdExportFrontmatter,
           imagePolicy: settings.mdExportImagePolicy,
@@ -604,13 +623,13 @@ async function htmlToMarkdownAsync(html, opts) {
         }
       };
       const downloadMd = () => {
-        const meta = {
+        const meta = attachExtendedMeta({
           title: result.title || $id("title-input")?.value || "",
           url: result.url || url,
           date: (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(),
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
           source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
-        };
+        });
         const out = composeExport(markdown, meta, {
           frontmatter: settings.mdExportFrontmatter,
           imagePolicy: settings.mdExportImagePolicy,
@@ -619,13 +638,13 @@ async function htmlToMarkdownAsync(html, opts) {
         downloadFile(safeFilename(meta.title) + ".md", out, "text/markdown;charset=utf-8");
       };
       const sendObsidian = async () => {
-        const meta = {
+        const meta = attachExtendedMeta({
           title: result.title || $id("title-input")?.value || "",
           url: result.url || url,
           date: (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(),
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
           source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
-        };
+        });
         // Obsidian ALWAYS gets YAML frontmatter (registry semantics: the preview
         // page's export-targets.js row hardcodes obsidian.frontmatter = "inline",
         // independent of the mdExportFrontmatter checkbox — see
