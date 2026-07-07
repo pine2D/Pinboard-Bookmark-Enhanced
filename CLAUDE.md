@@ -130,6 +130,10 @@ git push origin main
 bash scripts/release.sh
 ```
 
+### 发版前文档核查（硬规则）
+
+每次发版前核查三件套是否与新功能同步：**README.md（×9 locale 逐行镜像，同 commit 内更新）/ CLAUDE.md / docs/privacy.md（隐私政策）**。新增任何数据出口（新 API 调用、新导出目标、新 AI 触发面）时，privacy.md 的 Network Requests / Permissions / Third-Party 三处必须同步披露。`release.sh` 内置硬门：自上个 tag 以来存在 feat commit 而三件套全部未改动时直接中止；确认确实无需更新后可用 `--docs-ok` 显式跳过。privacy.md 经 GitHub Pages 自动部署（push 即生效），不依赖扩展发版。
+
 ### Release 打包规则（release.sh）
 
 `release.sh` 自动扫描 + sanity check，不再硬编码文件清单：
