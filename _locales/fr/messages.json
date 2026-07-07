@@ -870,7 +870,7 @@
     "message": "Activer la file d'attente d'enregistrement hors ligne"
   },
   "secBackupRestore": {
-    "message": "Backup et restauration"
+    "message": "Sauvegarde et synchronisation"
   },
   "backupHint": {
     "message": "Exporter/importer vos paramètres (les clés API sont exclues de l'export pour des raisons de sécurité)."
@@ -889,6 +889,81 @@
   },
   "importSettingsTitle": {
     "message": "Importer les paramètres depuis un fichier JSON"
+  },
+  "webdavHint": {
+    "message": "Sauvegardez vos paramètres sur un serveur WebDAV que vous contrôlez (ex. Nextcloud). N'inclut jamais les clés API."
+  },
+  "webdavUrlLabel": {
+    "message": "URL du serveur"
+  },
+  "webdavUserLabel": {
+    "message": "Nom d'utilisateur (facultatif)"
+  },
+  "webdavPassLabel": {
+    "message": "Mot de passe (facultatif)"
+  },
+  "webdavAutoPushLabel": {
+    "message": "Envoi automatique"
+  },
+  "webdavAutoPushOff": {
+    "message": "Désactivé"
+  },
+  "webdavAutoPushHourly": {
+    "message": "Toutes les heures"
+  },
+  "webdavAutoPushDaily": {
+    "message": "Une fois par jour"
+  },
+  "webdavTestBtn": {
+    "message": "Tester"
+  },
+  "webdavPushBtn": {
+    "message": "Envoyer maintenant"
+  },
+  "webdavPullBtn": {
+    "message": "Récupérer maintenant"
+  },
+  "webdavTestOkFound": {
+    "message": "Sauvegarde trouvée sur le serveur"
+  },
+  "webdavTestOkEmpty": {
+    "message": "Serveur accessible — aucune sauvegarde pour l'instant"
+  },
+  "webdavTestAuthFail": {
+    "message": "Échec de l'authentification"
+  },
+  "webdavTestUnreachable": {
+    "message": "Serveur inaccessible"
+  },
+  "webdavPushOk": {
+    "message": "Envoyé à $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPushFail": {
+    "message": "Échec de l'envoi : $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPermDenied": {
+    "message": "Permission refusée — cliquez sur « Tester » pour l'accorder"
+  },
+  "webdavPullConfirm": {
+    "message": "Écraser les paramètres locaux avec la sauvegarde du $TIME$ ? Vos clés API ne sont pas affectées.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPullInvalid": {
+    "message": "Fichier de sauvegarde invalide"
   },
   "jinaMdNonWebHint": {
     "message": "Fonctionne uniquement sur les pages web"

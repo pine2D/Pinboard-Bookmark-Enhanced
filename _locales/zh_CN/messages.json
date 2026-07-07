@@ -870,7 +870,7 @@
     "message": "启用离线保存队列"
   },
   "secBackupRestore": {
-    "message": "备份与恢复"
+    "message": "备份与同步"
   },
   "backupHint": {
     "message": "导出或导入设置（出于安全考虑，API 密钥不包含在导出文件中）。"
@@ -889,6 +889,81 @@
   },
   "importSettingsTitle": {
     "message": "从 JSON 文件导入设置"
+  },
+  "webdavHint": {
+    "message": "将设置备份到你自己的 WebDAV 服务器（如 Nextcloud）。绝不包含 API 密钥。"
+  },
+  "webdavUrlLabel": {
+    "message": "服务器地址"
+  },
+  "webdavUserLabel": {
+    "message": "用户名（可选）"
+  },
+  "webdavPassLabel": {
+    "message": "密码（可选）"
+  },
+  "webdavAutoPushLabel": {
+    "message": "自动推送"
+  },
+  "webdavAutoPushOff": {
+    "message": "关闭"
+  },
+  "webdavAutoPushHourly": {
+    "message": "每小时"
+  },
+  "webdavAutoPushDaily": {
+    "message": "每天一次"
+  },
+  "webdavTestBtn": {
+    "message": "测试"
+  },
+  "webdavPushBtn": {
+    "message": "立即推送"
+  },
+  "webdavPullBtn": {
+    "message": "立即拉取"
+  },
+  "webdavTestOkFound": {
+    "message": "服务器上已找到备份"
+  },
+  "webdavTestOkEmpty": {
+    "message": "服务器可连接——尚无备份"
+  },
+  "webdavTestAuthFail": {
+    "message": "身份验证失败"
+  },
+  "webdavTestUnreachable": {
+    "message": "无法连接服务器"
+  },
+  "webdavPushOk": {
+    "message": "已于 $TIME$ 推送",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPushFail": {
+    "message": "推送失败：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPermDenied": {
+    "message": "权限被拒绝——点击“测试”以授权"
+  },
+  "webdavPullConfirm": {
+    "message": "用来自 $TIME$ 的备份覆盖本地设置？不会影响你的 API 密钥。",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPullInvalid": {
+    "message": "备份文件无效"
   },
   "jinaMdNonWebHint": {
     "message": "仅适用于网页"

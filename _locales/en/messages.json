@@ -870,7 +870,7 @@
     "message": "Enable offline save queue"
   },
   "secBackupRestore": {
-    "message": "Backup & Restore"
+    "message": "Backup & Sync"
   },
   "backupHint": {
     "message": "Export/import your settings (API keys are excluded from export for security)."
@@ -889,6 +889,81 @@
   },
   "importSettingsTitle": {
     "message": "Import settings from JSON file"
+  },
+  "webdavHint": {
+    "message": "Back up your settings to a WebDAV server you control (e.g. Nextcloud). Never includes API keys."
+  },
+  "webdavUrlLabel": {
+    "message": "Server URL"
+  },
+  "webdavUserLabel": {
+    "message": "Username (optional)"
+  },
+  "webdavPassLabel": {
+    "message": "Password (optional)"
+  },
+  "webdavAutoPushLabel": {
+    "message": "Automatic push"
+  },
+  "webdavAutoPushOff": {
+    "message": "Off"
+  },
+  "webdavAutoPushHourly": {
+    "message": "Every hour"
+  },
+  "webdavAutoPushDaily": {
+    "message": "Once a day"
+  },
+  "webdavTestBtn": {
+    "message": "Test"
+  },
+  "webdavPushBtn": {
+    "message": "Push now"
+  },
+  "webdavPullBtn": {
+    "message": "Pull now"
+  },
+  "webdavTestOkFound": {
+    "message": "Backup found on server"
+  },
+  "webdavTestOkEmpty": {
+    "message": "Server reachable — no backup yet"
+  },
+  "webdavTestAuthFail": {
+    "message": "Authentication failed"
+  },
+  "webdavTestUnreachable": {
+    "message": "Server unreachable"
+  },
+  "webdavPushOk": {
+    "message": "Pushed at $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPushFail": {
+    "message": "Push failed: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPermDenied": {
+    "message": "Permission denied — click Test to grant access"
+  },
+  "webdavPullConfirm": {
+    "message": "Overwrite local settings with the backup from $TIME$? Your API keys are not affected.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPullInvalid": {
+    "message": "Invalid backup file"
   },
   "jinaMdNonWebHint": {
     "message": "Only works on web pages"

@@ -870,7 +870,7 @@
     "message": "Включить офлайн-очередь сохранения"
   },
   "secBackupRestore": {
-    "message": "Резервное копирование и восстановление"
+    "message": "Резервное копирование и синхронизация"
   },
   "backupHint": {
     "message": "Экспорт/импорт настроек (API-ключи исключаются из экспорта в целях безопасности)."
@@ -889,6 +889,81 @@
   },
   "importSettingsTitle": {
     "message": "Импортировать настройки из JSON-файла"
+  },
+  "webdavHint": {
+    "message": "Резервное копирование настроек на собственный сервер WebDAV (например, Nextcloud). Никогда не включает API-ключи."
+  },
+  "webdavUrlLabel": {
+    "message": "URL сервера"
+  },
+  "webdavUserLabel": {
+    "message": "Имя пользователя (необязательно)"
+  },
+  "webdavPassLabel": {
+    "message": "Пароль (необязательно)"
+  },
+  "webdavAutoPushLabel": {
+    "message": "Автоматическая отправка"
+  },
+  "webdavAutoPushOff": {
+    "message": "Выключено"
+  },
+  "webdavAutoPushHourly": {
+    "message": "Каждый час"
+  },
+  "webdavAutoPushDaily": {
+    "message": "Раз в день"
+  },
+  "webdavTestBtn": {
+    "message": "Проверить"
+  },
+  "webdavPushBtn": {
+    "message": "Отправить сейчас"
+  },
+  "webdavPullBtn": {
+    "message": "Получить сейчас"
+  },
+  "webdavTestOkFound": {
+    "message": "На сервере найдена резервная копия"
+  },
+  "webdavTestOkEmpty": {
+    "message": "Сервер доступен — резервной копии пока нет"
+  },
+  "webdavTestAuthFail": {
+    "message": "Ошибка аутентификации"
+  },
+  "webdavTestUnreachable": {
+    "message": "Сервер недоступен"
+  },
+  "webdavPushOk": {
+    "message": "Отправлено в $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPushFail": {
+    "message": "Ошибка отправки: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPermDenied": {
+    "message": "Доступ запрещён — нажмите «Проверить», чтобы разрешить"
+  },
+  "webdavPullConfirm": {
+    "message": "Перезаписать локальные настройки резервной копией от $TIME$? Ваши API-ключи не затрагиваются.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPullInvalid": {
+    "message": "Недействительный файл резервной копии"
   },
   "jinaMdNonWebHint": {
     "message": "Работает только на веб-страницах"

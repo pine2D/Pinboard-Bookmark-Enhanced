@@ -14,6 +14,78 @@ function importThemesResult(err) {
   return null;
 }
 
+// Applies a parsed backup JSON blob (from a file import OR a WebDAV pull) to
+// storage: whitelist-filters to exportableKeys, merges exportTargets per-target
+// (protecting live secret fields the backup never carried), persists via
+// persistSettings, migrates v1->v2 CSS if needed, and imports savedThemes.
+// Returns a t() status key ("importedReload" | "importPartial"). Throws on
+// a genuine persist failure -- callers decide how to surface that.
+async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback }) {
+  const schemaVersion = data._schemaVersion || 1;
+  const { _schemaVersion, customCSS, customOverlayCSS, savedThemes: importedThemes, ...rest } = data;
+  const safeData = Object.fromEntries(
+    Object.entries(rest).filter(([k]) => exportableKeys.includes(k))
+  );
+  const settingsStorage = await getSettingsStorage();
+  if (safeData.exportTargets) {
+    // Export/webdav-push strips nested secrets, so a raw key-set here would
+    // blast away live tokens (github PAT, webhook Authorization) with the
+    // secret-less backup copy. Merge per target onto what's already stored
+    // so untouched secret fields survive; only the backed-up (non-secret)
+    // fields actually update.
+    let curRead = await settingsStorage.get({ exportTargets: {} });
+    curRead = await pbpApplySecretOverlay(curRead);
+    const current = curRead.exportTargets || {};
+    const merged = Object.assign({}, current);
+    for (const [tid, cfg] of Object.entries(safeData.exportTargets)) {
+      merged[tid] = Object.assign({}, merged[tid], cfg);
+    }
+    safeData.exportTargets = merged;
+  }
+  const importRes = await persistSettings(safeData);
+  if (!importRes.ok) throw importRes.error || new Error("settings import failed");
+
+  if (schemaVersion >= 2) {
+    if (customOverlayCSS !== undefined) await saveOverlayWithFallback(customOverlayCSS);
+  } else {
+    // v1 → v2: detect preset match, derive overlay
+    const oldKey = safeData.themePresetKey || "";
+    let resolvedKey = oldKey;
+    if (!resolvedKey && customCSS) {
+      for (const [key, theme] of Object.entries(PINBOARD_THEMES)) {
+        if (theme.css.trim() === customCSS.trim()) { resolvedKey = key; break; }
+      }
+      if (resolvedKey) {
+        for (const [parent, [light, dark]] of Object.entries(ADAPTIVE_THEME_MAP)) {
+          if (resolvedKey === light || resolvedKey === dark) { resolvedKey = parent; break; }
+        }
+      }
+    }
+    let newOverlay = "";
+    if (customCSS) {
+      const preset = resolvedKey ? PINBOARD_THEMES[resolvedKey] : null;
+      const presetCSS = preset ? preset.css : "";
+      const variants = ADAPTIVE_THEME_MAP[resolvedKey] || [];
+      const allowed = [presetCSS, ...variants.map(k => PINBOARD_THEMES[k]?.css || "")];
+      newOverlay = allowed.some(c => c && c.trim() === customCSS.trim()) ? "" : customCSS;
+    }
+    await (await getSettingsStorage()).set({ themePresetKey: resolvedKey || "" });
+    await saveOverlayWithFallback(newOverlay);
+  }
+
+  let themesStatusKey = "importedReload";
+  if (importedThemes !== undefined) {
+    try {
+      await syncSetLarge("savedThemes", importedThemes);
+    } catch (e) {
+      const key = importThemesResult(e);
+      if (key === null) throw e; // null sentinel = non-quota failure -> caller's catch handles it
+      themesStatusKey = key; // "importPartial": data preserved to local by syncSetLarge fallback
+    }
+  }
+  return themesStatusKey;
+}
+
 function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
   $id("export-settings").addEventListener("click", async () => {
     const raw = await (await getSettingsStorage()).get(exportableKeys);
@@ -60,69 +132,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      const schemaVersion = data._schemaVersion || 1;
-      const { _schemaVersion, customCSS, customOverlayCSS, savedThemes: importedThemes, ...rest } = data;
-      const safeData = Object.fromEntries(
-        Object.entries(rest).filter(([k]) => exportableKeys.includes(k))
-      );
-      const settingsStorage = await getSettingsStorage();
-      if (safeData.exportTargets) {
-        // Export strips nested secrets (see the `cleaned` pass in the export handler
-        // above), so a raw key-set here would blast away live tokens (github PAT,
-        // webhook Authorization) with the secret-less backup copy. Merge per target
-        // onto what's already stored so untouched secret fields survive; only the
-        // backed-up (non-secret) fields actually update.
-        let curRead = await settingsStorage.get({ exportTargets: {} });
-        curRead = await pbpApplySecretOverlay(curRead);
-        const current = curRead.exportTargets || {};
-        const merged = Object.assign({}, current);
-        for (const [tid, cfg] of Object.entries(safeData.exportTargets)) {
-          merged[tid] = Object.assign({}, merged[tid], cfg);
-        }
-        safeData.exportTargets = merged;
-      }
-      const importRes = await persistSettings(safeData);
-      if (!importRes.ok) throw importRes.error || new Error("settings import failed");
-
-      if (schemaVersion >= 2) {
-        if (customOverlayCSS !== undefined) await saveOverlayWithFallback(customOverlayCSS);
-      } else {
-        // v1 → v2: detect preset match, derive overlay
-        const oldKey = safeData.themePresetKey || "";
-        let resolvedKey = oldKey;
-        if (!resolvedKey && customCSS) {
-          for (const [key, theme] of Object.entries(PINBOARD_THEMES)) {
-            if (theme.css.trim() === customCSS.trim()) { resolvedKey = key; break; }
-          }
-          if (resolvedKey) {
-            for (const [parent, [light, dark]] of Object.entries(ADAPTIVE_THEME_MAP)) {
-              if (resolvedKey === light || resolvedKey === dark) { resolvedKey = parent; break; }
-            }
-          }
-        }
-        let newOverlay = "";
-        if (customCSS) {
-          const preset = resolvedKey ? PINBOARD_THEMES[resolvedKey] : null;
-          const presetCSS = preset ? preset.css : "";
-          const variants = ADAPTIVE_THEME_MAP[resolvedKey] || [];
-          const allowed = [presetCSS, ...variants.map(k => PINBOARD_THEMES[k]?.css || "")];
-          newOverlay = allowed.some(c => c && c.trim() === customCSS.trim()) ? "" : customCSS;
-        }
-        await (await getSettingsStorage()).set({ themePresetKey: resolvedKey || "" });
-        await saveOverlayWithFallback(newOverlay);
-      }
-
-      let themesStatusKey = "importedReload";
-      if (importedThemes !== undefined) {
-        try {
-          await syncSetLarge("savedThemes", importedThemes);
-        } catch (e) {
-          const key = importThemesResult(e);
-          // null sentinel = non-quota failure → let the outer catch handle it.
-          if (key === null) throw e;
-          themesStatusKey = key; // "importPartial": data preserved to local by syncSetLarge fallback
-        }
-      }
+      const themesStatusKey = await pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback });
       const status = $id("import-status");
       setStatusIcon(status, themesStatusKey === "importPartial" ? false : true, t(themesStatusKey));
       setTimeout(() => { status.textContent = ""; }, 3000);

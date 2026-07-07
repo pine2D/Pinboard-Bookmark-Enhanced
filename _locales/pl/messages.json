@@ -870,7 +870,7 @@
     "message": "Włącz kolejkę zapisu offline"
   },
   "secBackupRestore": {
-    "message": "Archiwum i przywracanie"
+    "message": "Kopia zapasowa i synchronizacja"
   },
   "backupHint": {
     "message": "Eksportuj/importuj ustawienia (klucze API nie są eksportowane ze względów bezpieczeństwa)."
@@ -889,6 +889,81 @@
   },
   "importSettingsTitle": {
     "message": "Importuj ustawienia z pliku JSON"
+  },
+  "webdavHint": {
+    "message": "Twórz kopię zapasową ustawień na własnym serwerze WebDAV (np. Nextcloud). Nigdy nie zawiera kluczy API."
+  },
+  "webdavUrlLabel": {
+    "message": "Adres URL serwera"
+  },
+  "webdavUserLabel": {
+    "message": "Nazwa użytkownika (opcjonalnie)"
+  },
+  "webdavPassLabel": {
+    "message": "Hasło (opcjonalnie)"
+  },
+  "webdavAutoPushLabel": {
+    "message": "Automatyczne wysyłanie"
+  },
+  "webdavAutoPushOff": {
+    "message": "Wyłączone"
+  },
+  "webdavAutoPushHourly": {
+    "message": "Co godzinę"
+  },
+  "webdavAutoPushDaily": {
+    "message": "Raz dziennie"
+  },
+  "webdavTestBtn": {
+    "message": "Testuj"
+  },
+  "webdavPushBtn": {
+    "message": "Wyślij teraz"
+  },
+  "webdavPullBtn": {
+    "message": "Pobierz teraz"
+  },
+  "webdavTestOkFound": {
+    "message": "Znaleziono kopię zapasową na serwerze"
+  },
+  "webdavTestOkEmpty": {
+    "message": "Serwer dostępny — brak kopii zapasowej"
+  },
+  "webdavTestAuthFail": {
+    "message": "Uwierzytelnienie nie powiodło się"
+  },
+  "webdavTestUnreachable": {
+    "message": "Serwer niedostępny"
+  },
+  "webdavPushOk": {
+    "message": "Wysłano o $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPushFail": {
+    "message": "Wysyłanie nie powiodło się: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPermDenied": {
+    "message": "Odmowa uprawnień — kliknij „Testuj”, aby je przyznać"
+  },
+  "webdavPullConfirm": {
+    "message": "Nadpisać lokalne ustawienia kopią zapasową z $TIME$? Twoje klucze API nie zostaną naruszone.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPullInvalid": {
+    "message": "Nieprawidłowy plik kopii zapasowej"
   },
   "jinaMdNonWebHint": {
     "message": "Działa tylko na stronach internetowych"

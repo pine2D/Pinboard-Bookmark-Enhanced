@@ -737,7 +737,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-wayback-s3secret": s.waybackS3Secret,
     "opt-preview-ai-model": s.previewAiModel,
     "opt-translate-glossary": s.translateGlossary,
-    "opt-selection-trigger": s.selectionTrigger
+    "opt-selection-trigger": s.selectionTrigger,
+    "opt-webdav-url": s.webdavUrl,
+    "opt-webdav-user": s.webdavUser,
+    "opt-webdav-pass": s.webdavPass,
+    "opt-webdav-autopush": s.webdavAutoPush || "off"
   };
   for (const [id, val] of Object.entries(fieldMap)) {
     const el = $id(id);
@@ -1130,6 +1134,162 @@ document.addEventListener("DOMContentLoaded", async () => {
     await renderWaybackLog();
   });
 
+  // ---- WebDAV: http:// advisory warning ----
+  // Reuses pbpWebhookHttpWarn (export-targets.js, already loaded by options.html):
+  // Basic auth also rides the Authorization header, so the same plaintext-
+  // credentials risk applies to a WebDAV URL as to a webhook URL.
+  (() => {
+    const inp = $id("opt-webdav-url");
+    const warn = $id("webdav-http-warn");
+    if (!inp || !warn) return;
+    const syncWarn = () => {
+      warn.hidden = !(typeof pbpWebhookHttpWarn === "function" && pbpWebhookHttpWarn(inp.value.trim()));
+    };
+    inp.addEventListener("input", syncWarn);
+    syncWarn();
+  })();
+
+  // ---- WebDAV: config straight from the live form (never storage) ----
+  // Avoids racing the 500ms debounced auto-save -- a click right after typing
+  // a URL must not test/push/pull against a stale stored value.
+  function _pbpWebdavCfgFromForm() {
+    return {
+      baseUrl: $id("opt-webdav-url").value.trim(),
+      user: $id("opt-webdav-user").value.trim(),
+      pass: $id("opt-webdav-pass").value.trim(),
+    };
+  }
+
+  // Same-gesture permission request (options-connectivity.js precedent):
+  // request() resolves true with no prompt when already granted, so it is
+  // safe to call on every click.
+  async function _pbpWebdavRequestPermission(baseUrl) {
+    const origin = (typeof pbpWebdavOrigin === "function") ? pbpWebdavOrigin(baseUrl) : null;
+    if (!origin) return false;
+    try { return await chrome.permissions.request({ origins: [origin] }); } catch (_) { return false; }
+  }
+
+  // ---- WebDAV: render the persisted last-push status on page load ----
+  (async () => {
+    try {
+      const { webdavLastPush } = await chrome.storage.local.get({ webdavLastPush: null });
+      const statusEl = $id("webdav-status");
+      if (!statusEl || !webdavLastPush) return;
+      const when = new Date(webdavLastPush.ts).toLocaleString();
+      if (webdavLastPush.ok) {
+        setStatusIcon(statusEl, true, t("webdavPushOk", when));
+      } else if (webdavLastPush.error === "perm") {
+        setStatusIcon(statusEl, false, t("webdavPermDenied"));
+      } else {
+        setStatusIcon(statusEl, false, t("webdavPushFail", webdavLastPush.error || ""));
+      }
+    } catch (_) {}
+  })();
+
+  // ---- WebDAV: Test ----
+  $id("webdav-test-btn")?.addEventListener("click", async () => {
+    const statusEl = $id("webdav-status");
+    const cfg = _pbpWebdavCfgFromForm();
+    if (!cfg.baseUrl || !statusEl) return;
+    statusEl.textContent = t("testTesting");
+    statusEl.style.color = "#888";
+    const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
+    if (!granted) {
+      setStatusIcon(statusEl, false, t("webdavPermDenied"));
+      statusEl.style.color = "#c00";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      return;
+    }
+    const res = await pbpWebdavTest(cfg);
+    if (res.kind === "found") { setStatusIcon(statusEl, true, t("webdavTestOkFound")); statusEl.style.color = "#080"; }
+    else if (res.kind === "empty") { setStatusIcon(statusEl, true, t("webdavTestOkEmpty")); statusEl.style.color = "#080"; }
+    else if (res.kind === "auth") { setStatusIcon(statusEl, false, t("webdavTestAuthFail")); statusEl.style.color = "#c00"; }
+    else { setStatusIcon(statusEl, false, t("webdavTestUnreachable")); statusEl.style.color = "#c00"; }
+    setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+  });
+
+  // ---- WebDAV: Push now ----
+  $id("webdav-push-btn")?.addEventListener("click", async () => {
+    const statusEl = $id("webdav-status");
+    const cfg = _pbpWebdavCfgFromForm();
+    if (!cfg.baseUrl || !statusEl) return;
+    statusEl.textContent = t("testTesting");
+    statusEl.style.color = "#888";
+    const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
+    if (!granted) {
+      setStatusIcon(statusEl, false, t("webdavPermDenied"));
+      statusEl.style.color = "#c00";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      return;
+    }
+    const res = await pbpWebdavPush(cfg);
+    if (res.ok) {
+      setStatusIcon(statusEl, true, t("webdavPushOk", new Date(res.ts).toLocaleString()));
+      statusEl.style.color = "#080";
+    } else {
+      setStatusIcon(statusEl, false, t("webdavPushFail", res.error || ""));
+      statusEl.style.color = "#c00";
+    }
+    setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+  });
+
+  // ---- WebDAV: Pull now ----
+  $id("webdav-pull-btn")?.addEventListener("click", async () => {
+    const statusEl = $id("webdav-status");
+    const cfg = _pbpWebdavCfgFromForm();
+    if (!cfg.baseUrl || !statusEl) return;
+    statusEl.textContent = t("testTesting");
+    statusEl.style.color = "#888";
+    const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
+    if (!granted) {
+      setStatusIcon(statusEl, false, t("webdavPermDenied"));
+      statusEl.style.color = "#c00";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      return;
+    }
+    const res = await pbpWebdavPull(cfg);
+    if (!res.ok) {
+      const key = res.error === "auth" ? "webdavTestAuthFail"
+        : res.error === "not-found" ? "webdavTestOkEmpty"
+        : res.error === "invalid" ? "webdavPullInvalid"
+        : "webdavTestUnreachable";
+      setStatusIcon(statusEl, false, t(key));
+      statusEl.style.color = "#c00";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      return;
+    }
+    const pushedAt = (res.data._webdav && res.data._webdav.pushedAt) || "";
+    const when = pushedAt ? new Date(pushedAt).toLocaleString() : "?";
+    // Spec invariant #2: pull only ever applies after this confirm(); Cancel
+    // returns here with zero writes made so far (Test/permission-request
+    // above make no storage changes either).
+    if (!confirm(t("webdavPullConfirm", when))) {
+      statusEl.textContent = "";
+      return;
+    }
+    try {
+      await pbpApplyBackupPayload(res.data, { exportableKeys: EXPORTABLE_KEYS, saveOverlayWithFallback });
+    } catch (err) {
+      console.error("[webdav-pull] apply failed", err);
+      setStatusIcon(statusEl, false, t("webdavPullInvalid"));
+      statusEl.style.color = "#c00";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      return;
+    }
+    // Same fade+reload precedent as the sync-toggle and language-change
+    // handlers below (options.js:952 / options.js:1016) -- NOT the silent
+    // "reload manually" text the plain file-import flow uses, because
+    // overwriting every local setting warrants the same automatic reload
+    // those two other big-state-change flows already use. Also copies their
+    // sessionStorage.activeTab step (read back at options.js:144) so the
+    // reload lands back on the WebDAV sub-section instead of the default tab.
+    const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "general";
+    sessionStorage.setItem("activeTab", activePanel);
+    document.body.style.transition = "opacity 0.18s";
+    document.body.style.opacity = "0";
+    setTimeout(() => location.reload(), 180);
+  });
+
   // ===================== Auto-save =====================
   // Collect all settings from the form and save to chrome.storage.sync
   async function saveAll() {
@@ -1261,6 +1421,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       waybackSkipPrivate: $id("opt-wayback-skip-private").checked,
       waybackS3Key: obfuscateKey($id("opt-wayback-s3key").value.trim()),
       waybackS3Secret: obfuscateKey($id("opt-wayback-s3secret").value.trim()),
+      webdavUrl: $id("opt-webdav-url").value.trim(),
+      webdavUser: $id("opt-webdav-user").value.trim(),
+      webdavPass: obfuscateKey($id("opt-webdav-pass").value.trim()),
+      webdavAutoPush: $id("opt-webdav-autopush").value,
       themePresetKey: currentPresetKey,
       urlClean: {
         enabled: $id("opt-urlclean-enabled").checked,

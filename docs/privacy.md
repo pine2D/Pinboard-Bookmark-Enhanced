@@ -5,7 +5,7 @@ title: Privacy Policy
 
 # Privacy Policy — Pinboard Bookmark Enhanced
 
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-08
 
 ## Summary
 
@@ -50,6 +50,8 @@ The extension only makes network requests to services **you explicitly configure
 
 8. **Webhook** (a URL you configure, optional — inactive until you configure it) — the **Send to Webhook** action POSTs a JSON payload to the endpoint you entered (e.g. Readwise), with an Authorization header value you provide. The payload contains the page's title, URL, save date, tags, and converted Markdown; when extended export metadata is enabled (default on), it also includes the page's author, original publish date, site name, cover-image URL, and word count. Requires a one-time permission grant for that origin. The extension warns if the endpoint is plain `http://`, since credentials and content would travel unencrypted.
 
+9. **WebDAV** (a server URL you configure, optional — inactive until you configure it) — the **Push now** action (and, if you enable it, an hourly or daily automatic push) uploads your non-secret settings as a JSON file to the WebDAV server you specify, authenticated with the username/password you provide (sent as HTTP Basic auth). The payload never includes any API key or export-target token. **Pull now** downloads that file and, only after you explicitly confirm an overwrite dialog showing when it was last pushed, applies it to your local settings. Requires a one-time permission grant for that server's origin. The extension warns if the server URL is plain `http://`, since credentials would travel unencrypted.
+
 All page content and URLs are transmitted **only to the destination you selected** for that action, and **never to the developer**.
 
 ## Permissions
@@ -63,7 +65,7 @@ All page content and URLs are transmitted **only to the destination you selected
 | `notifications` | Show save confirmations and a 30-second Undo button |
 | `alarms` | Keep the service worker warm, refresh caches, and (optionally) prewarm the Pinboard tag list |
 | `host_permissions` | API calls to Pinboard and the 14 user-selectable AI/extraction endpoints (13 cloud providers + Jina) |
-| `optional_host_permissions: *://*/*` | Requested at runtime to extract page text from non-active tabs during batch save, to reach a Custom AI endpoint or non-loopback Ollama URL you configure, and to deliver **Send-to** exports to GitHub Gist (`api.github.com`) or a webhook URL you configure |
+| `optional_host_permissions: *://*/*` | Requested at runtime to extract page text from non-active tabs during batch save, to reach a Custom AI endpoint or non-loopback Ollama URL you configure, to deliver **Send-to** exports to GitHub Gist (`api.github.com`) or a webhook URL you configure, and to push/pull your settings backup to a WebDAV server you configure |
 | `optional_host_permissions: localhost / 127.0.0.1` | Reach a local Ollama instance you run on your own machine |
 | `web.archive.org` (requested on demand) | Submit saved URLs to the Wayback Machine when you enable archiving |
 
@@ -77,6 +79,7 @@ The extension communicates with third-party services **only at your direction**:
 - **Obsidian** — your local desktop app, only via Send to Obsidian
 - **GitHub** — only if you configure the Send-to-Gist target, using your own access token
 - **Your webhook endpoint** — only if you configure one; you choose and control the destination
+- **Your WebDAV server** — only if you configure one; you choose and control the destination
 
 No data is shared with any other third party, and none is sent to the developer.
 

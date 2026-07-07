@@ -870,7 +870,7 @@
     "message": "啟用離線儲存佇列"
   },
   "secBackupRestore": {
-    "message": "備份與恢復"
+    "message": "備份與同步"
   },
   "backupHint": {
     "message": "匯出或匯入設定（出於安全考慮，API 金鑰不包含在匯出檔案中）。"
@@ -889,6 +889,81 @@
   },
   "importSettingsTitle": {
     "message": "從 JSON 檔案匯入設定"
+  },
+  "webdavHint": {
+    "message": "將設定備份到你自己的 WebDAV 伺服器（如 Nextcloud）。絕不包含 API 金鑰。"
+  },
+  "webdavUrlLabel": {
+    "message": "伺服器網址"
+  },
+  "webdavUserLabel": {
+    "message": "使用者名稱（可選）"
+  },
+  "webdavPassLabel": {
+    "message": "密碼（可選）"
+  },
+  "webdavAutoPushLabel": {
+    "message": "自動推送"
+  },
+  "webdavAutoPushOff": {
+    "message": "關閉"
+  },
+  "webdavAutoPushHourly": {
+    "message": "每小時"
+  },
+  "webdavAutoPushDaily": {
+    "message": "每天一次"
+  },
+  "webdavTestBtn": {
+    "message": "測試"
+  },
+  "webdavPushBtn": {
+    "message": "立即推送"
+  },
+  "webdavPullBtn": {
+    "message": "立即提取"
+  },
+  "webdavTestOkFound": {
+    "message": "伺服器上已找到備份"
+  },
+  "webdavTestOkEmpty": {
+    "message": "伺服器可連接——尚無備份"
+  },
+  "webdavTestAuthFail": {
+    "message": "身分驗證失敗"
+  },
+  "webdavTestUnreachable": {
+    "message": "無法連接伺服器"
+  },
+  "webdavPushOk": {
+    "message": "已於 $TIME$ 推送",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPushFail": {
+    "message": "推送失敗：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPermDenied": {
+    "message": "權限遭拒——按「測試」以授權"
+  },
+  "webdavPullConfirm": {
+    "message": "用來自 $TIME$ 的備份覆蓋本機設定？不會影響你的 API 金鑰。",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPullInvalid": {
+    "message": "備份檔案無效"
   },
   "jinaMdNonWebHint": {
     "message": "僅適用於網頁"

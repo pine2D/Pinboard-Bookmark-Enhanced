@@ -870,7 +870,7 @@
     "message": "オフライン保存キューを有効にする"
   },
   "secBackupRestore": {
-    "message": "バックアップと復元"
+    "message": "バックアップと同期"
   },
   "backupHint": {
     "message": "設定のエクスポート・インポート（セキュリティのため API キーはエクスポートに含まれません）。"
@@ -889,6 +889,81 @@
   },
   "importSettingsTitle": {
     "message": "JSONファイルから設定をインポート"
+  },
+  "webdavHint": {
+    "message": "設定を自分の WebDAV サーバー（Nextcloud など）にバックアップします。API キーは含まれません。"
+  },
+  "webdavUrlLabel": {
+    "message": "サーバー URL"
+  },
+  "webdavUserLabel": {
+    "message": "ユーザー名（任意）"
+  },
+  "webdavPassLabel": {
+    "message": "パスワード（任意）"
+  },
+  "webdavAutoPushLabel": {
+    "message": "自動プッシュ"
+  },
+  "webdavAutoPushOff": {
+    "message": "オフ"
+  },
+  "webdavAutoPushHourly": {
+    "message": "1時間ごと"
+  },
+  "webdavAutoPushDaily": {
+    "message": "1日1回"
+  },
+  "webdavTestBtn": {
+    "message": "テスト"
+  },
+  "webdavPushBtn": {
+    "message": "今すぐプッシュ"
+  },
+  "webdavPullBtn": {
+    "message": "今すぐプル"
+  },
+  "webdavTestOkFound": {
+    "message": "サーバー上にバックアップが見つかりました"
+  },
+  "webdavTestOkEmpty": {
+    "message": "サーバーに接続できました — バックアップはまだありません"
+  },
+  "webdavTestAuthFail": {
+    "message": "認証に失敗しました"
+  },
+  "webdavTestUnreachable": {
+    "message": "サーバーに接続できません"
+  },
+  "webdavPushOk": {
+    "message": "$TIME$ にプッシュしました",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPushFail": {
+    "message": "プッシュに失敗しました：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPermDenied": {
+    "message": "権限が拒否されています — 「テスト」をクリックして許可してください"
+  },
+  "webdavPullConfirm": {
+    "message": "$TIME$ のバックアップでローカル設定を上書きしますか？API キーには影響しません。",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPullInvalid": {
+    "message": "無効なバックアップファイルです"
   },
   "jinaMdNonWebHint": {
     "message": "ウェブページでのみ動作します"

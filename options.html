@@ -64,7 +64,7 @@
       <p class="hint" data-i18n="syncApiKeysHint">Sends your API keys through your Google account too (obfuscated, not encrypted). Off by default — keys stay on this device only. Enable only if you trust every device signed into this account.</p>
       <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
       <div class="divider"></div>
-      <div class="section-title" data-i18n="secBackupRestore">Backup &amp; Restore</div>
+      <div class="section-title" data-i18n="secBackupRestore">Backup &amp; Sync</div>
       <p class="hint" data-i18n="backupHint">Export/import your settings (API keys are excluded from export for security).</p>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="btn" id="export-settings" data-i18n="exportSettings">Export Settings</button>
@@ -73,6 +73,25 @@
           <input type="file" id="import-settings-file" accept=".json" style="display:none;" />
         </label>
         <span class="save-status" id="import-status"></span>
+      </div>
+      <p class="hint" data-i18n="webdavHint">Back up your settings to a WebDAV server you control (e.g. Nextcloud). Never includes API keys.</p>
+      <div class="fg"><label class="bl" data-i18n="webdavUrlLabel">Server URL</label><input type="text" id="opt-webdav-url" placeholder="https://dav.example.com/backups/" autocomplete="off" spellcheck="false" /></div>
+      <p class="hint hint-warn" id="webdav-http-warn" hidden data-i18n="mdTargetWebhookHttpWarn"></p>
+      <div class="fg"><label class="bl" data-i18n="webdavUserLabel">Username (optional)</label><input type="text" id="opt-webdav-user" autocomplete="off" spellcheck="false" /></div>
+      <div class="fg"><label class="bl" data-i18n="webdavPassLabel">Password (optional)</label><input type="password" id="opt-webdav-pass" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="opt-webdav-pass" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></div>
+      <div class="fg">
+        <label class="bl" data-i18n="webdavAutoPushLabel">Automatic push</label>
+        <select id="opt-webdav-autopush">
+          <option value="off" data-i18n="webdavAutoPushOff">Off</option>
+          <option value="hourly" data-i18n="webdavAutoPushHourly">Every hour</option>
+          <option value="daily" data-i18n="webdavAutoPushDaily">Once a day</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn" id="webdav-test-btn" data-i18n="webdavTestBtn">Test</button>
+        <button class="btn" id="webdav-push-btn" data-i18n="webdavPushBtn">Push now</button>
+        <button class="btn" id="webdav-pull-btn" data-i18n="webdavPullBtn">Pull now</button>
+        <span class="save-status" id="webdav-status"></span>
       </div>
       <div class="divider"></div>
       <div class="section-title" data-i18n="secNotifications">Notifications</div>
@@ -798,6 +817,7 @@
   <script defer src="i18n.js"></script>
   <script defer src="options-theme-early.js"></script>
   <script defer src="shared.js"></script>
+  <script defer src="webdav.js"></script>
   <script defer src="ai-cache.js"></script>
   <script defer src="ai.js"></script>
   <script defer src="options-connectivity.js"></script>

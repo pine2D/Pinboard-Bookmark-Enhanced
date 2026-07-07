@@ -870,7 +870,7 @@
     "message": "Offline-Speicher-Warteschlange aktivieren"
   },
   "secBackupRestore": {
-    "message": "Sichern & Wiederherstellen"
+    "message": "Sicherung & Synchronisierung"
   },
   "backupHint": {
     "message": "Einstellungen exportieren/importieren (API-Schlüssel werden aus Sicherheitsgründen nicht exportiert)."
@@ -889,6 +889,81 @@
   },
   "importSettingsTitle": {
     "message": "Einstellungen aus JSON-Datei importieren"
+  },
+  "webdavHint": {
+    "message": "Sichert deine Einstellungen auf einem eigenen WebDAV-Server (z. B. Nextcloud). Enthält niemals API-Schlüssel."
+  },
+  "webdavUrlLabel": {
+    "message": "Server-URL"
+  },
+  "webdavUserLabel": {
+    "message": "Benutzername (optional)"
+  },
+  "webdavPassLabel": {
+    "message": "Passwort (optional)"
+  },
+  "webdavAutoPushLabel": {
+    "message": "Automatisches Pushen"
+  },
+  "webdavAutoPushOff": {
+    "message": "Aus"
+  },
+  "webdavAutoPushHourly": {
+    "message": "Stündlich"
+  },
+  "webdavAutoPushDaily": {
+    "message": "Einmal täglich"
+  },
+  "webdavTestBtn": {
+    "message": "Testen"
+  },
+  "webdavPushBtn": {
+    "message": "Jetzt pushen"
+  },
+  "webdavPullBtn": {
+    "message": "Jetzt abrufen"
+  },
+  "webdavTestOkFound": {
+    "message": "Sicherung auf dem Server gefunden"
+  },
+  "webdavTestOkEmpty": {
+    "message": "Server erreichbar — noch keine Sicherung vorhanden"
+  },
+  "webdavTestAuthFail": {
+    "message": "Authentifizierung fehlgeschlagen"
+  },
+  "webdavTestUnreachable": {
+    "message": "Server nicht erreichbar"
+  },
+  "webdavPushOk": {
+    "message": "Gepusht um $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPushFail": {
+    "message": "Push fehlgeschlagen: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPermDenied": {
+    "message": "Zugriff verweigert — auf „Testen“ klicken, um ihn zu gewähren"
+  },
+  "webdavPullConfirm": {
+    "message": "Lokale Einstellungen mit der Sicherung vom $TIME$ überschreiben? Deine API-Schlüssel sind davon nicht betroffen.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "webdavPullInvalid": {
+    "message": "Ungültige Sicherungsdatei"
   },
   "jinaMdNonWebHint": {
     "message": "Funktioniert nur auf Webseiten"
