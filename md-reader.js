@@ -630,6 +630,7 @@ function _pbpSearchOpen() {
   _pbpSearchTeardown();
   const input = pop.querySelector("#search-input");
   input.value = "";
+  input.classList.remove("srch-bad"); // stale invalid-regex border must not survive a close/reopen
   _pbpSearchUpdateCounter();
   if (!pop.matches(":popover-open")) pop.showPopover();
   input.focus();
