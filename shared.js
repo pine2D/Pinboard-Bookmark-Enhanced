@@ -823,7 +823,7 @@ async function pbpApplySecretOverlay(s) {
 // or exportTargets tokens (pre-feature data, a stale multi-device sync, or the
 // user just flipped syncApiKeys off), move them to local and scrub sync.
 // Iron rule: write the local copy FIRST and confirm it, THEN remove from sync.
-// Any failure at any step aborts with BOTH copies retained — never delete
+// Any failure at any step aborts with BOTH copies retained -- never delete
 // before the target write is confirmed. Safe to call any number of times:
 // a clean sync area (no secrets) is a no-op.
 async function pbpMigrateSecretsToLocal() {
@@ -834,7 +834,7 @@ async function pbpMigrateSecretsToLocal() {
     const fromSync = await chrome.storage.sync.get(keys);
     const hasSecret = API_KEY_FIELDS.some((k) => fromSync[k]) ||
       (fromSync.exportTargets && Object.values(fromSync.exportTargets).some((cfg) => cfg && cfg.token));
-    if (!hasSecret) return; // already clean — idempotent no-op
+    if (!hasSecret) return; // already clean -- idempotent no-op
 
     // 1. Write the full secrets to local FIRST.
     const localPayload = {};
@@ -850,15 +850,15 @@ async function pbpMigrateSecretsToLocal() {
     }
   } catch (e) {
     // Best-effort: log and leave both copies in place. Self-heals on next boot
-    // (re-runs and re-checks hasSecret) — never worse than a no-op.
+    // (re-runs and re-checks hasSecret) -- never worse than a no-op.
     console.warn("[secrets-migration] failed, both copies retained:", e && e.message || e);
   }
 }
 
 // syncApiKeys enable-path: copy local secrets up to sync, confirm the write,
-// THEN flip the flag — same "write target before flag/source" discipline as
+// THEN flip the flag -- same "write target before flag/source" discipline as
 // pbpMigrateSecretsToLocal. Disable-path reuses pbpMigrateSecretsToLocal
-// directly (no separate helper needed there — see options.js call site).
+// directly (no separate helper needed there -- see options.js call site).
 async function pbpEnableSyncApiKeys() {
   const keys = API_KEY_FIELDS.concat(["exportTargets"]);
   const local = await chrome.storage.local.get(keys);

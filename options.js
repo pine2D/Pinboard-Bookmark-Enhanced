@@ -885,8 +885,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const syncToggle = $id("opt-sync-enabled");
   if (syncToggle) syncToggle.checked = optSyncEnabled;
 
-  // ---- syncApiKeys (batch ④): local-only meta-setting, same precedent as
-  // optSyncEnabled — NOT in SETTINGS_DEFAULTS, NOT in backup export, disabled
+  // ---- syncApiKeys (batch (4)): local-only meta-setting, same precedent as
+  // optSyncEnabled -- NOT in SETTINGS_DEFAULTS, NOT in backup export, disabled
   // (grayed) whenever sync itself is off. Default unchecked (keys stay local).
   const { syncApiKeys } = await chrome.storage.local.get({ syncApiKeys: false });
   const syncKeysToggle = $id("opt-sync-api-keys");
@@ -904,12 +904,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       // 1. Migrate regular settings
       const data = await oldStorage.get(Object.keys(SETTINGS_DEFAULTS));
-      // syncApiKeys secret routing (batch ④): when ENABLING sync (local -> sync)
+      // syncApiKeys secret routing (batch (4)): when ENABLING sync (local -> sync)
       // and the user has NOT opted API keys into sync, strip the 18
       // API_KEY_FIELDS + exportTargets tokens out of what's headed to sync and
       // keep the full copy local. Disabling (sync -> local): `data` is read from
       // SYNC via an array-form get, so when routing was already active the
-      // API_KEY_FIELDS were never in sync — simply absent from `data`.
+      // API_KEY_FIELDS were never in sync -- simply absent from `data`.
       // `newStorage.set(data)` into local is safe only because
       // chrome.storage.set() MERGES rather than replaces: pre-existing local
       // secrets survive by omission, not by an explicit copy.
@@ -953,7 +953,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // syncApiKeys toggle: on = copy local secrets up to sync (opt back into cloud
-  // keys, full exportTargets incl. token — this IS opting in); off = scrub sync
+  // keys, full exportTargets incl. token -- this IS opting in); off = scrub sync
   // back down, reusing the exact same idempotent routine SW boot runs.
   syncKeysToggle?.addEventListener("change", async () => {
     const enabling = syncKeysToggle.checked;
