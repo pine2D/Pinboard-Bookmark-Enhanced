@@ -698,11 +698,6 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   font-size: 13px;
   font-weight: 400;
 }
-/* hljs adds .hljs background to the code element; route it to the <pre>
-   container so border/radius from the existing pre rule still frame it. */
-#rendered-view pre:has(code.hljs) {
-  padding: 20px 24px;
-}
 
 /* ---- Left control rail ---- */
 /* transition here (transition-round) is the house pattern zen's
