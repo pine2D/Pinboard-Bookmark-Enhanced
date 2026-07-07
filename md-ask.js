@@ -1131,23 +1131,6 @@ document.addEventListener("pbp:rendered", (e) => {
 //   "off"            -> nothing registers at all
 // ============================================================
 
-// Pill geometry: 28px square, 6px gap from the selection rect, 8px viewport
-// margin. Placed below-right of the selection end so it NEVER covers the
-// selected line; flips above when the viewport bottom is too close.
-// ponytail: no longer called (the pill it positioned is gone) -- kept as-is,
-// out of this fusion's explicit deletion list, still unit-tested.
-function pbpExplainPillPos(rect, vw, vh) {
-  const S = 28, GAP = 6, M = 8;
-  let x = rect.right + GAP;
-  if (x + S > vw - M) x = vw - M - S;
-  if (x < M) x = M;
-  let y = rect.bottom + GAP;
-  let above = false;
-  if (y + S > vh - M) { above = true; y = rect.top - GAP - S; }
-  if (y < M) y = M;
-  return { x, y, above };
-}
-
 // Minimum meaningful selection: >= 2 chars after trimming (spec 5.3).
 function pbpExplainSelectionValid(text) {
   return typeof text === "string" && text.trim().length >= 2;
