@@ -234,11 +234,20 @@ button, input, select, textarea { font-family: inherit; }
 .view-toggle .toggle-btn:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
 
 /* ---- Layout: fixed left rail + centered doc body ---- */
+/* Transitions here (this batch, transition-round): animate zen enter/exit
+   (margin-left 264->0), the zen width cycle (.doc-body max-width), AND the
+   ask panel push (margin-right 0->396px, see body.ask-open main below) in
+   one coordinated motion -- covered by the two blanket reduced-motion kill
+   switches below (~:615 transition-duration:0s!important, ~:880 the same
+   at 0.01ms), no per-rule override needed: neither property here ever
+   carries a transition-delay, so forcing duration to ~0 is a complete,
+   instant cutover on its own. */
 main {
   margin-left: 264px;
   padding: 48px 32px 96px;
+  transition: margin-left 200ms ease, margin-right 200ms ease;
 }
-.doc-body { max-width: 880px; margin: 0 auto; min-width: 0; }
+.doc-body { max-width: 880px; margin: 0 auto; min-width: 0; transition: max-width 200ms ease; }
 
 /* ---- R2: Zen (focus) reading mode (md-reader.js, "z" hotkey / rail
    button, spec sec.1/4). body.zen hides #rail (+ its mobile drawer toggle
@@ -252,7 +261,47 @@ main {
    orthogonal -- margin-left and margin-right are independent properties,
    so a zen session opened while Ask is open keeps both simultaneously, no
    extra rule needed (spec sec.1.2: orthogonal, not force-closed). */
-body.zen #rail, body.zen .rail-toggle, body.zen .rail-scrim { display: none; }
+/* #rail's hide is now a slide (transition-round), the SAME transform +
+   visibility-delay pattern the mobile drawer already uses below (.rail's
+   own base rule ~:654 and the @media(max-width:1000px) block ~:776) --
+   translateX(-105%), the extra 5% clearing #rail's own box-shadow the way
+   the drawer's -100% doesn't need to (drawer has no shadow toward the
+   canvas edge it exits through). visibility flips to hidden only AFTER the
+   200ms slide finishes (transition-delay on visibility, not duration) so
+   it stays in the paint/hit-test tree for the whole slide-out; .rail's own
+   base transition (~:654, `visibility 0s` with NO delay) is what makes the
+   reverse (zen exit) instant-visible so the slide-back is seen from frame
+   one. Interplay with the mobile drawer verified: at narrow viewport the
+   drawer's resting transform is translateX(-100%) (@media block ~:776) --
+   same direction as zen's -105%, so they never fight -- and regardless,
+   body.zen #rail's id-selector specificity (1,1,1) always outranks both
+   the drawer's bare `.rail` (0,1,0) and `body.rail-open .rail` (0,2,0)
+   rules, so zen's transform/visibility apply unconditionally at any
+   viewport width or drawer-open state. zen entry additionally
+   force-closes the drawer itself via md-reader.js's _pbpZenEnter calling
+   pbpRailDrawerClose(), so there is no stray rail-open STATE left to fight
+   either -- belt and suspenders. */
+body.zen #rail {
+  transform: translateX(-105%);
+  visibility: hidden;
+  transition: transform 200ms ease, visibility 0s linear 200ms;
+}
+/* Reduced motion (transition-round): the two blanket kill switches below
+   only zero out transition-DURATION, never transition-DELAY -- so without
+   this, the 200ms visibility delay above would survive reduced motion and
+   leave #rail sitting in the a11y/hit-test tree for 200ms after it has
+   already snapped off-screen. Same specificity (1,1,1) as the rule above,
+   so it fully replaces (not just supplements) that transition, delay
+   included -- exactly the "needs visibility-delay special-casing" case;
+   the plain margin-left/margin-right/max-width transitions above don't
+   carry a delay and don't get one of these. */
+@media (prefers-reduced-motion: reduce) {
+  body.zen #rail { transition: none; }
+}
+/* .rail-toggle/.rail-scrim stay instant display:none (mobile-only chrome,
+   never visible in zen anyway once the drawer is force-closed above) --
+   kept as their own rule, separate from #rail's animated one. */
+body.zen .rail-toggle, body.zen .rail-scrim { display: none; }
 /* .rail-scrim's inclusion above is NOT literal spec text but closes the
    PAINT half of a real gap traced from it: the zen rail-entry button only
    exists inside #rail, which on mobile is only reachable with the drawer
@@ -651,6 +700,16 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 }
 
 /* ---- Left control rail ---- */
+/* transition here (transition-round) is the house pattern zen's
+   `body.zen #rail` rule (~:255) reuses: transform + `visibility 0s` (no
+   delay), so showing the rail is instant-visible from frame one and only
+   HIDING it (a selector with a delayed visibility, layered on top by
+   higher specificity) defers the visibility flip until the slide finishes.
+   This bare rule is overridden inside @media(max-width:1000px) below
+   (~:776) -- same selector `.rail`, so at narrow viewports that block's
+   OWN `transition: transform 200ms ease, visibility 0s linear 200ms;`
+   wins by source order (verified: it appears later in the file) and
+   supersedes this one entirely, delay included. */
 .rail {
   position: fixed;
   top: 0; left: 0; bottom: 0;
@@ -662,6 +721,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   border-right: 1px solid var(--border);
   overflow-y: auto;
   z-index: 20;
+  transition: transform 200ms ease, visibility 0s;
 }
 .rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .rail-ident a { display: block; margin-top: 3px; font-size: 12px; color: var(--fg-muted); text-decoration: none; word-break: break-all; }
@@ -1337,9 +1397,41 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   border-left: 1px solid var(--border);
   overflow: hidden;
   z-index: 18; /* deliberately below .rail-scrim (19) and .rail (20) */
+  transition: transform 200ms ease, visibility 0s;
 }
-/* The flex rule above outspecifies the UA "[hidden]" rule - restate it. */
-#ask-panel[hidden] { display: none; }
+/* md-ask.js only ever flips the `hidden` PROPERTY (panel.hidden = !open) --
+   it never touches CSS itself (transition-round; do not add a JS-side
+   animation there). The flex rule above already outspecifies the UA
+   "[hidden] { display:none }" rule, so [hidden] never actually hid this
+   element by itself; this redefinition keeps display:flex (a transform
+   can't animate across display:none) and does the hiding with
+   transform+visibility instead, same technique as `.rail`/`body.zen #rail`
+   above. +24px past 100% clears the panel's own box-shadow (mobile variant
+   below, ~1000px breakpoint, overrides just the transform axis to slide
+   down instead of sideways). visibility is delayed on the way OUT (stays
+   in the paint/hit-test/a11y tree for the whole 200ms slide) but flips
+   back to visible with 0 delay on the way IN, via the base #ask-panel rule
+   above -- required for _pbpAskSetOpen's immediate `ta.focus()` (md-ask.js)
+   to land on a genuinely focusable element the instant `hidden` is
+   cleared, not 200ms later. On first page load the panel doesn't even
+   exist yet (_pbpAskBuildPanel only creates + appends it lazily on first
+   open, already `hidden` at creation, before insertion) -- so there is no
+   connected element to recompute a transition against and nothing flashes
+   on initial paint. */
+#ask-panel[hidden] {
+  display: flex;
+  transform: translateX(calc(100% + 24px));
+  visibility: hidden;
+  transition: transform 200ms ease, visibility 0s linear 200ms;
+}
+/* Reduced motion (transition-round): same reasoning as body.zen #rail
+   above -- the blanket kill switches only zero transition-DURATION, never
+   transition-DELAY, so without this the 200ms visibility delay would
+   survive reduced motion. Same specificity (1,0,1: id + attribute) as the
+   rule above, so it fully replaces it, delay included. */
+@media (prefers-reduced-motion: reduce) {
+  #ask-panel[hidden] { transition: none; }
+}
 
 /* Third column: push the centered doc body away from the open panel. */
 /* panel width (380) + panel padding (16) = 396 */
@@ -1433,6 +1525,11 @@ body.ask-open main { margin-right: 396px; }
     border-radius: 12px 12px 0 0;
     box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.18);
   }
+  /* Bottom sheet slides down, not sideways -- only the transform axis
+     differs from the base #ask-panel[hidden] rule above; same selector, so
+     this just overrides the `transform` value by source order, everything
+     else (visibility, transition, display:flex) is inherited from it. */
+  #ask-panel[hidden] { transform: translateY(105%); }
 }
 
 @media print {

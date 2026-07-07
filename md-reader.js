@@ -963,6 +963,66 @@ function _pbpZenSettleAnchor(anchor) {
   }
 }
 
+// Two-phase settle (transition-round): main/.doc-body now carry
+// margin-left/margin-right/max-width transitions (md-preview.css), so the
+// single immediate _pbpZenSettleAnchor() call above (still called first,
+// unchanged) can run against MID-ANIMATION geometry -- correct under
+// reduced motion (those transitions collapse to 0s there, so "immediately
+// after the class/style mutation" already IS the final geometry) and only
+// an approximation otherwise. This phase re-settles ONCE more after the
+// layout transition actually finishes, against the final geometry.
+// Harmless when it's redundant (reduced motion, or the immediate call
+// already nailed it): same "no R9 suppression needed" reasoning as
+// _pbpZenSettleAnchor's own call sites already document above (spec
+// sec.1.4) -- a second correct programmatic scroll can only re-arm R9's
+// save-scroll debounce (md-preview.js), never race its restore.
+//
+// Module-level handles (not per-call locals): a re-settle armed by one
+// call must be torn down if another zen action (enter/exit/width-cycle)
+// happens before it fires, so rapid repeated toggles never stack listeners
+// or timers -- _pbpZenSettleClearPending() is called at the start of every
+// _pbpZenSettleAfterLayout() for exactly this reason, in addition to being
+// the normal one-shot cleanup path.
+let _pbpZenSettleTimer = null;
+let _pbpZenSettlePending = null; // non-null (the anchor) while a re-settle is armed; also doubles as the "already fired" guard
+
+function _pbpZenSettleClearPending() {
+  if (_pbpZenSettleTimer !== null) {
+    clearTimeout(_pbpZenSettleTimer);
+    _pbpZenSettleTimer = null;
+  }
+  document.removeEventListener("transitionend", _pbpZenSettleOnTransitionEnd);
+  _pbpZenSettlePending = null;
+}
+
+function _pbpZenSettleFire() {
+  if (!_pbpZenSettlePending) return; // already fired via the other race leg (or nothing armed)
+  const anchor = _pbpZenSettlePending;
+  _pbpZenSettleClearPending();
+  _pbpZenSettleAnchor(anchor);
+}
+
+// Delegated on document rather than bound to a single element: the
+// transitioning properties live on two different elements (margin-left/
+// margin-right on `main`, max-width on `.doc-body`), and delegation is the
+// simplest reliable way to catch either without wiring two listeners.
+function _pbpZenSettleOnTransitionEnd(e) {
+  const el = e.target;
+  const isTracked = el && (el.tagName === "MAIN" || (el.classList && el.classList.contains("doc-body")));
+  if (!isTracked) return;
+  if (e.propertyName !== "margin-left" && e.propertyName !== "margin-right" && e.propertyName !== "max-width") return;
+  _pbpZenSettleFire();
+}
+
+function _pbpZenSettleAfterLayout(anchor) {
+  _pbpZenSettleAnchor(anchor); // phase 1: immediate, correct under reduced motion
+  _pbpZenSettleClearPending(); // repeated rapid toggles must not stack listeners/timers
+  if (!anchor) return;
+  _pbpZenSettlePending = anchor; // phase 2, armed: transitionend or the 300ms fallback, whichever fires first
+  document.addEventListener("transitionend", _pbpZenSettleOnTransitionEnd);
+  _pbpZenSettleTimer = setTimeout(_pbpZenSettleFire, 300);
+}
+
 // Width persistence: exact pbp_srch_regex shape (md-reader.js:565-575) --
 // chrome.storage.local.get with an inline default, both chrome/
 // chrome.storage typeof-guarded, read once here at init; written back
@@ -1028,7 +1088,7 @@ function _pbpZenCycleWidth() {
   _pbpZenWidth = PBP_ZEN_WIDTHS[(idx === -1 ? 0 : idx + 1) % PBP_ZEN_WIDTHS.length];
   document.body.style.setProperty("--zen-width", _pbpZenWidth + "px");
   _pbpZenUpdateWidthBtn();
-  _pbpZenSettleAnchor(anchor);
+  _pbpZenSettleAfterLayout(anchor);
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
     try { chrome.storage.local.set({ pbp_zen_width: _pbpZenWidth }); } catch (_) {}
   }
@@ -1086,7 +1146,7 @@ function _pbpZenEnter() {
   if (typeof pbpRailDrawerClose === "function") pbpRailDrawerClose();
   _pbpZenEnsureBar();
   _pbpZenUpdateWidthBtn();
-  _pbpZenSettleAnchor(anchor);
+  _pbpZenSettleAfterLayout(anchor);
   _pbpZenArmFade();
   if (focusWasInRail) {
     const exitBtn = document.getElementById("zen-exit-btn");
@@ -1099,7 +1159,7 @@ function _pbpZenExit() {
   const anchor = _pbpZenCaptureAnchor();
   document.body.classList.remove("zen");
   document.body.style.removeProperty("--zen-width");
-  _pbpZenSettleAnchor(anchor);
+  _pbpZenSettleAfterLayout(anchor);
   _pbpZenDisarmFade();
 }
 
