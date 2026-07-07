@@ -5,7 +5,7 @@ title: Privacy Policy
 
 # Privacy Policy — Pinboard Bookmark Enhanced
 
-**Last updated:** 2026-06-22
+**Last updated:** 2026-07-07
 
 ## Summary
 
@@ -25,6 +25,7 @@ By **default**, all data is stored **locally** on your device (`chrome.storage.l
 | Bookmark-status cache | `chrome.storage.local` | No |
 | Offline save queue | `chrome.storage.local` | No |
 | Markdown preview data | `chrome.storage.local` | No |
+| Reader highlights & notes | `chrome.storage.local` | No |
 | Wayback archive log | `chrome.storage.local` | No |
 
 Settings sync is implemented with Chrome's `chrome.storage.sync`. The extension itself has no server and uploads nothing on its own. Stored credentials are obfuscated at rest (not cryptographically encrypted) and are sent over HTTPS only to their respective services to authenticate your own requests.
@@ -37,13 +38,17 @@ The extension only makes network requests to services **you explicitly configure
 
 2. **Pinboard website** (`pinboard.in`) — (a) a content script applies your chosen theme CSS and tag-sort tweaks on pinboard.in pages; no data is extracted or transmitted. (b) **Save Tab Set** POSTs the open tabs' titles and URLs to `pinboard.in/tabs/save/` using your existing pinboard.in **login session cookie** (not the API token), then opens `pinboard.in/tabs/show/` for you to confirm.
 
-3. **AI provider APIs** (only when you trigger AI tags, AI summary, Markdown preview, Translate, Ask-the-page, Explain-selection, or batch-save with AI enabled) — the page title, URL, and extracted article text are sent to **the provider you chose** to generate the requested result. Tag/summary requests send roughly the first 8 KB of extracted text; Markdown preview, Translate, and Ask-the-page send more of the extracted content (sampled to a token budget). Supported providers: OpenAI, Anthropic, Google Gemini, DeepSeek, Qwen, MiniMax, OpenRouter, Groq, Mistral, Cohere, SiliconFlow, Zhipu, Moonshot, a **local Ollama** instance, or a **Custom OpenAI-compatible endpoint** (any base URL you enter). **No data is sent to any AI provider unless you explicitly trigger it.**
+3. **AI provider APIs** (only when you trigger AI tags, AI summary, Markdown preview, Translate, Ask-the-page, Explain/Translate-selection, the opt-in key-points skim, or batch-save with AI enabled) — the page title, URL, and extracted article text are sent to **the provider you chose** to generate the requested result. Tag/summary requests send roughly the first 8 KB of extracted text; Markdown preview, Translate, and Ask-the-page send more of the extracted content (sampled to a token budget). Supported providers: OpenAI, Anthropic, Google Gemini, DeepSeek, Qwen, MiniMax, OpenRouter, Groq, Mistral, Cohere, SiliconFlow, Zhipu, Moonshot, a **local Ollama** instance, or a **Custom OpenAI-compatible endpoint** (any base URL you enter). **No data is sent to any AI provider unless you explicitly trigger it.**
 
 4. **Jina Reader** (`r.jina.ai`, optional) — when you choose the Jina content source, the page URL is sent to Jina to fetch a cleaner reader-mode rendering for AI processing or Markdown export. Disabled by default.
 
 5. **Wayback Machine** (`web.archive.org`, optional, opt-in) — when you enable Wayback archiving, the URL of a page you save is sent to the Internet Archive to create a public snapshot. Requires a one-time permission grant; off by default.
 
 6. **Obsidian** (local app, optional) — the **Send to Obsidian** action hands the converted Markdown of the current page to your local Obsidian desktop app via the `obsidian://` protocol or the system clipboard. This stays on your device; nothing is sent over the network.
+
+7. **GitHub Gist** (`api.github.com`, optional — inactive until you configure it) — the **Send to Gist** action uploads the converted Markdown of the current page (including its metadata frontmatter) as a **secret gist** on your own GitHub account, authenticated with a personal access token you provide. Requires a one-time permission grant for `api.github.com`.
+
+8. **Webhook** (a URL you configure, optional — inactive until you configure it) — the **Send to Webhook** action POSTs a JSON payload to the endpoint you entered (e.g. Readwise), with an Authorization header value you provide. The payload contains the page's title, URL, save date, tags, and converted Markdown; when extended export metadata is enabled (default on), it also includes the page's author, original publish date, site name, cover-image URL, and word count. Requires a one-time permission grant for that origin. The extension warns if the endpoint is plain `http://`, since credentials and content would travel unencrypted.
 
 All page content and URLs are transmitted **only to the destination you selected** for that action, and **never to the developer**.
 
@@ -58,7 +63,7 @@ All page content and URLs are transmitted **only to the destination you selected
 | `notifications` | Show save confirmations and a 30-second Undo button |
 | `alarms` | Keep the service worker warm, refresh caches, and (optionally) prewarm the Pinboard tag list |
 | `host_permissions` | API calls to Pinboard and the 14 user-selectable AI/extraction endpoints (13 cloud providers + Jina) |
-| `optional_host_permissions: *://*/*` | Requested at runtime to extract page text from non-active tabs during batch save, and to reach a Custom AI endpoint or non-loopback Ollama URL you configure |
+| `optional_host_permissions: *://*/*` | Requested at runtime to extract page text from non-active tabs during batch save, to reach a Custom AI endpoint or non-loopback Ollama URL you configure, and to deliver **Send-to** exports to GitHub Gist (`api.github.com`) or a webhook URL you configure |
 | `optional_host_permissions: localhost / 127.0.0.1` | Reach a local Ollama instance you run on your own machine |
 | `web.archive.org` (requested on demand) | Submit saved URLs to the Wayback Machine when you enable archiving |
 
@@ -70,6 +75,8 @@ The extension communicates with third-party services **only at your direction**:
 - **Jina Reader** — only if you select it as a content source
 - **Wayback Machine** — only if you enable archiving
 - **Obsidian** — your local desktop app, only via Send to Obsidian
+- **GitHub** — only if you configure the Send-to-Gist target, using your own access token
+- **Your webhook endpoint** — only if you configure one; you choose and control the destination
 
 No data is shared with any other third party, and none is sent to the developer.
 
