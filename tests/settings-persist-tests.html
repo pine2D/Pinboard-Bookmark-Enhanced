@@ -105,7 +105,7 @@ async function run() {
   check("E4 strip: null/undefined -> {}", Object.keys(pbpStripExportTargetTokens(null)).length === 0
     && Object.keys(pbpStripExportTargetTokens(undefined)).length === 0);
 
-  // -- pbpSplitSecretBatch: every one of the 18 API_KEY_FIELDS routed --
+  // -- pbpSplitSecretBatch: every one of the 19 API_KEY_FIELDS routed --
   const fullBatch = {};
   API_KEY_FIELDS.forEach((k, i) => { fullBatch[k] = "obf:v" + i; });
   fullBatch.optTheme = "nord"; // non-secret, must stay in main
@@ -116,7 +116,7 @@ async function run() {
     if (splitSecrets[k] !== "obf:v" + i) allRouted = false;
     if (k in splitMain) allRouted = false;
   });
-  check("E4 split: every one of the 18 API_KEY_FIELDS routed to secrets, absent from main", allRouted);
+  check("E4 split: every one of the 19 API_KEY_FIELDS routed to secrets, absent from main", allRouted);
   check("E4 split: non-secret key stays in main", splitMain.optTheme === "nord");
   check("E4 split: exportTargets in secrets is the FULL (with-token) object",
     splitSecrets.exportTargets.github.token === "obf:ghtok");

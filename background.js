@@ -2,7 +2,7 @@
 // Pinboard Bookmark Enhanced - Background Service Worker (v4.0)
 // ============================================================
 
-importScripts("i18n.js", "shared.js", "ai-cache.js", "ai.js", "jina.js", "wayback.js");
+importScripts("i18n.js", "shared.js", "ai-cache.js", "ai.js", "jina.js", "wayback.js", "webdav.js");
 
 // Load manual language setting (async, t() falls back to browser locale until ready)
 initI18n();
@@ -711,6 +711,22 @@ async function syncPrewarmTagsAlarm() {
   }
 }
 
+// React to webdav settings: create/clear the "webdav-push" alarm. Mirrors
+// syncPrewarmTagsAlarm's gated create/clear above. chrome.alarms.create()
+// silently replaces any existing alarm of the same name, so no explicit
+// clear-then-recreate dance is needed when only the period changes.
+async function syncWebdavPushAlarm() {
+  const s = await loadSettings();
+  const existing = await chrome.alarms.get("webdav-push");
+  const shouldRun = !!s.webdavAutoPush && s.webdavAutoPush !== "off" && !!s.webdavUrl && !!s.webdavPass;
+  const wantedPeriod = s.webdavAutoPush === "daily" ? 1440 : 60;
+  if (shouldRun && (!existing || existing.periodInMinutes !== wantedPeriod)) {
+    chrome.alarms.create("webdav-push", { periodInMinutes: wantedPeriod, delayInMinutes: wantedPeriod });
+  } else if (!shouldRun && existing) {
+    chrome.alarms.clear("webdav-push");
+  }
+}
+
 async function prewarmTagsNow() {
   const s = await loadSettings();
   if (!s.pinboardToken) return;
@@ -742,6 +758,14 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
     pbpMigrateSecretsToLocal().catch(() => {});
   }
+  if (alarm.name === "webdav-push") {
+    // pbpWebdavPush() only ever chrome.permissions.contains()-checks --
+    // never request() -- so this never surfaces a permission prompt with
+    // no user gesture behind it (spec invariant #3). Any failure (missing
+    // permission, network, non-2xx) is recorded into webdavLastPush and
+    // swallowed here; the next scheduled tick retries naturally.
+    pbpWebdavPush().catch(() => {});
+  }
 });
 
 // React to settings change: toggle the prewarm alarm on/off (settings live in sync or local based on optSyncEnabled)
@@ -750,9 +774,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if ((area === "sync" || area === "local") && (changes.tagSyncMode || changes.pinboardToken)) {
     syncPrewarmTagsAlarm().catch(() => {});
   }
+  if ((area === "sync" || area === "local") && (changes.webdavAutoPush || changes.webdavUrl || changes.webdavPass)) {
+    syncWebdavPushAlarm().catch(() => {});
+  }
 });
 // Initial check
 syncPrewarmTagsAlarm().catch(() => {});
+syncWebdavPushAlarm().catch(() => {});
 
 // Sweep expired migration backup (7 days)
 async function sweepAICacheMigrationBackup() {

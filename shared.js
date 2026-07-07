@@ -218,6 +218,9 @@ const SETTINGS_DEFAULTS = {
   waybackSkipPrivate: true,
   waybackS3Key: "",
   waybackS3Secret: "",
+  // WebDAV settings backup (batch (5)): push is explicit-click or scheduled;
+  // pull is always behind a user confirm() -- see webdav.js.
+  webdavUrl: "", webdavUser: "", webdavPass: "", webdavAutoPush: "off", // "off" | "hourly" | "daily"
   // md-preview in-page AI (explain / ask / translate)
   previewAiEnabled: true,
   // R11 skim layer (key-points summary): default OFF, unlike previewAiEnabled --
@@ -695,7 +698,7 @@ async function persistSettings(data) {
   const ssl = (typeof globalThis !== "undefined" && globalThis.__pbpTestSyncSetLarge)
     ? globalThis.__pbpTestSyncSetLarge : syncSetLarge;
   try {
-    // syncApiKeys secret routing (batch (4)): split the 18 API_KEY_FIELDS +
+    // syncApiKeys secret routing (batch (4)): split the 19 API_KEY_FIELDS +
     // exportTargets tokens out of the batch BEFORE anything else touches it,
     // and write them straight to chrome.storage.local instead of `storage`
     // (which may be chrome.storage.sync). Degrades to "inactive" (today's
@@ -730,7 +733,7 @@ async function persistSettings(data) {
   }
 }
 
-const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret"];
+const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","webdavPass"];
 
 function deobfuscateSettings(s) {
   API_KEY_FIELDS.forEach(k => { if (s[k]) s[k] = deobfuscateKey(s[k]); });
@@ -738,7 +741,7 @@ function deobfuscateSettings(s) {
 }
 
 // ---- syncApiKeys secret routing (batch (4)) ----
-// When optSyncEnabled=true and syncApiKeys=false (the new default), the 18
+// When optSyncEnabled=true and syncApiKeys=false (the new default), the 19
 // API_KEY_FIELDS + exportTargets[*].token never leave chrome.storage.local --
 // only the rest of the settings batch rides chrome.storage.sync. These are
 // the pure primitives; the async read/write wiring below them is the only
@@ -764,7 +767,7 @@ function pbpStripExportTargetTokens(ets) {
 }
 
 // Splits a saveAll-shaped batch into { main, secrets }:
-//  - main    = batch with the 18 API_KEY_FIELDS removed and exportTargets
+//  - main    = batch with the 19 API_KEY_FIELDS removed and exportTargets
 //              (if present) token-stripped -- safe to write to whatever area
 //              getSettingsStorage() resolves to.
 //  - secrets = the API_KEY_FIELDS that were present, plus (if batch had
