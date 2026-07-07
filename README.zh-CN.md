@@ -21,8 +21,9 @@
 - **AI 标签与摘要** — 自备 API key 接入 13 家主流 LLM 服务商，或任意 OpenAI 兼容接口；AI 读取的是去除广告、菜单、侧边栏后的纯净正文
 - **标签工具** — 从你自己的标签、Pinboard 建议标签和一键标签预设中自动补全；还有标签治理面板，找出重复和低频标签（启发式 + 按需 AI 聚类），限流分批合并并实时显示进度
 - **快速入口与状态** — 一键直达 Unread、Network、Notes、Popular 页面；当前页若已收藏，工具栏图标会自动切换状态
-- **当前页转 Markdown** — 把当前网页转成干净的 Markdown，内置预览（渲染/源码切换、目录、阅读统计）；可复制或下载为 `.md` 或带样式的 `.html`，可调整 frontmatter、图片处理与目录，也可直接导出到 [Obsidian](https://obsidian.md)。站点感知抽取让问答和论坛贴保持可读（知乎、Hacker News、Stack Overflow、…）；后端可选 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本地）或 [Jina Reader](https://jina.ai/reader)（云端）
-- **向页面提问与翻译** — 在 Markdown 预览里向页面提问，获得带可核查引用的流式回答（点击引用即跳到原文出处），就地解读任意选中段落，也可将整页翻译，并配有自定义术语表和原文 / 双语 / 译文三种视图
+- **当前页转 Markdown** — 把当前网页转成干净的 Markdown，内置预览（渲染/源码切换、目录、阅读统计）；可复制或下载为 `.md` 或带样式的 `.html`，可调整 frontmatter（含作者、发布日期、站点、封面图与字数统计）、图片处理与目录，也可直接导出到 [Obsidian](https://obsidian.md)、GitHub Gist，或任意 webhook（兼容 Readwise）。站点感知抽取让问答和论坛贴保持可读（知乎、Hacker News、Stack Overflow、…）；后端可选 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本地）或 [Jina Reader](https://jina.ai/reader)（云端）
+- **向页面提问与翻译** — 在 Markdown 预览里向页面提问，获得带可核查引用的流式回答（点击引用即跳到原文出处），就地解读或翻译任意选中段落（并可将结果存为笔记），也可将整页翻译，配有自定义术语表、实时用量统计，以及原文 / 双语 / 译文三种视图
+- **阅读工具** — 五色高亮且笔记在重新渲染和翻译后依然保留、在 Notebook 面板中浏览高亮、搜索文章（`/`，可选正则 —— 笔记内容也一并匹配）、就地查看脚注、随时接续上次读到的位置、开启专注模式获得清爽的无干扰阅读体验，或启用默认关闭的 AI 要点摘要；按 `?` 查看完整快捷键列表
 - **自动存档** — 可选：保存时把网页一并存入互联网档案馆的 [Wayback Machine](https://web.archive.org)（附存档日志与重试），原网页日后失效也能找回
 - **`pinboard.in` 主题** — 13 套精心调优的配色（Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …），外加多设备同步的自定义 CSS 覆盖层、可调的弹窗宽度，以及标签页按热度排序
 - **9 种语言**、可自定义快捷键、本地优先存储、零追踪
@@ -40,7 +41,7 @@
 
 ## 隐私
 
-零追踪、零分析、零遥测。所有数据默认通过 `chrome.storage` 保存在你的本机；若开启设置同步，你的设置（不含书签内容）会通过 Chrome 账号在你的设备间同步。AI 请求**仅**在你点击"AI 标签"或"AI 摘要"时触发，并直接发送到你配置的服务商。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+零追踪、零分析、零遥测。所有数据默认通过 `chrome.storage` 保存在你的本机；若开启设置同步，你的设置（不含书签内容）会通过 Chrome 账号在你的设备间同步。AI 请求**仅**在你主动触发某个 AI 操作时才会发出——AI 标签/摘要、页面问答、翻译、选中段落解读，或可选启用的 AI 要点摘要——并直接发送到你配置的服务商。扩展页面强制执行严格的内容安全策略（Content-Security-Policy，禁止远程代码）。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## 许可证
 
