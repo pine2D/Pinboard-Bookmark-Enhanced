@@ -1533,7 +1533,12 @@ body.ask-open main { margin-right: 396px; }
 }
 
 @media print {
-  #ask-panel, #ask-section, #fn-pop { display: none; }
+  /* #ask-panel[hidden] repeated explicitly: the base #ask-panel[hidden] rule
+     computes display:flex (for the slide-out transition) at id+attr
+     specificity, which outranks a bare #ask-panel here -- without the
+     [hidden] variant a closed panel would print as flex and only rely on
+     its off-canvas transform to happen to fall outside the page. */
+  #ask-panel, #ask-panel[hidden], #ask-section, #fn-pop { display: none; }
   body.ask-open main { margin-right: 0; }
   /* must sit AFTER the base .pb-tr-err display rule in source order to win the cascade */
   .pb-tr-err { display: none; }
