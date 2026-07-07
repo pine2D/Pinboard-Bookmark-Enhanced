@@ -786,6 +786,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-popup-follow-theme": s.optPopupFollowTheme,
     "opt-md-frontmatter": s.mdExportFrontmatter,
     "opt-md-include-toc": s.mdExportIncludeToc,
+    "opt-md-include-hl": s.mdExportIncludeHighlights,
     "opt-tag-sort-by-pop": s.tagSortByPopEnabled,
     "opt-wayback-enabled": s.waybackArchiveEnabled === true,
     "opt-wayback-batch": s.waybackArchiveBatch === true,
@@ -1146,6 +1147,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       mdExportFrontmatter: $id("opt-md-frontmatter").checked,
       mdExportImagePolicy: $id("opt-md-image-policy").value,
       mdExportIncludeToc: $id("opt-md-include-toc").checked,
+      mdExportIncludeHighlights: $id("opt-md-include-hl").checked,
       exportTargets: _ets,
       // Mirror obsidian into legacy keys so popup.js "Send to Obsidian" strip (which still
       // reads obsidianEnabled/Vault/Folder) stays in sync. P2 migrates popup to read exportTargets.
