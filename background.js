@@ -115,7 +115,8 @@ async function debouncedCheck(tabId, url) {
 let _settingsCache = null;
 async function loadSettings() {
   if (_settingsCache) return _settingsCache;
-  const s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+  let s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+  s = await pbpApplySecretOverlay(s); // MUST run before deobfuscateSettings (see shared.js note)
   deobfuscateSettings(s);
   _settingsCache = s;
   return s;
@@ -1256,10 +1257,11 @@ async function extractForPreview({ tabId, url, engine }) {
     // Fresh read — do NOT use loadSettings() (its _settingsCache can be stale
     // when the user edits settings while the SW is warm). getSettingsStorage()
     // returns RAW (obfuscated) settings, so deobfuscate the key exactly once.
-    const raw = await (await getSettingsStorage()).get({
+    let raw = await (await getSettingsStorage()).get({
       jinaApiKey: SETTINGS_DEFAULTS.jinaApiKey,
       aiCacheDuration: SETTINGS_DEFAULTS.aiCacheDuration
     });
+    raw = await pbpApplySecretOverlay(raw);
     const key = raw.jinaApiKey ? deobfuscateKey(raw.jinaApiKey) : "";
     const r = await fetchJinaMarkdown(url, { apiKey: key, cacheDuration: raw.aiCacheDuration });
     if (r.error) return { error: r.error };

@@ -212,6 +212,82 @@ async function run() {
     globalThis.chrome = prevChromeE4c;
   })();
 
+  // ---------- E4 (cont'd): persistSettings() end-to-end routing ----------
+  await (async () => {
+    const prevChromeE4d = globalThis.chrome;
+    const localWrites = [];
+    globalThis.chrome = {
+      storage: {
+        local: {
+          get: (keys) => {
+            if (Array.isArray(keys) || typeof keys === "object") {
+              return Promise.resolve({ optSyncEnabled: true, syncApiKeys: false });
+            }
+            return Promise.resolve({});
+          },
+          set: (d) => { localWrites.push(d); return Promise.resolve(); },
+        },
+      },
+    };
+    let syncSet = null;
+    globalThis.__pbpTestStorage = { set: (d) => { syncSet = d; return Promise.resolve(); }, get: () => Promise.resolve({}) };
+    globalThis.__pbpTestSyncSetLarge = () => Promise.resolve();
+    const r = await persistSettings({
+      optTheme: "nord",
+      geminiApiKey: "obf:realgem",
+      pinboardToken: "obf:realpb",
+      exportTargets: { github: { enabled: true, token: "obf:ghtok", repo: "r" } },
+    });
+    check("E4 persistSettings: reports ok", r.ok === true);
+    check("E4 persistSettings: geminiApiKey NOT in the main-area batch", syncSet && !("geminiApiKey" in syncSet));
+    check("E4 persistSettings: pinboardToken NOT in the main-area batch", syncSet && !("pinboardToken" in syncSet));
+    check("E4 persistSettings: exportTargets in main-area batch is token-stripped",
+      syncSet && syncSet.exportTargets && !("token" in syncSet.exportTargets.github));
+    check("E4 persistSettings: non-secret optTheme stays in main-area batch", syncSet && syncSet.optTheme === "nord");
+    check("E4 persistSettings: secrets landed in local", localWrites.length === 1 &&
+      localWrites[0].geminiApiKey === "obf:realgem" && localWrites[0].pinboardToken === "obf:realpb");
+    check("E4 persistSettings: local exportTargets is the FULL (with-token) copy",
+      localWrites[0].exportTargets.github.token === "obf:ghtok");
+    globalThis.chrome = prevChromeE4d;
+    delete globalThis.__pbpTestStorage;
+    delete globalThis.__pbpTestSyncSetLarge;
+  })();
+
+  // ---------- E4 (cont'd): routing-INACTIVE byte-scan — full batch reaches the
+  // main area completely unfiltered, identical to pre-feature behavior ----------
+  await (async () => {
+    const prevChromeE4e = globalThis.chrome;
+    globalThis.chrome = { storage: { local: { get: () => Promise.resolve({ optSyncEnabled: false, syncApiKeys: false }) } } };
+    let syncSet2 = null;
+    globalThis.__pbpTestStorage = { set: (d) => { syncSet2 = d; return Promise.resolve(); }, get: () => Promise.resolve({}) };
+    globalThis.__pbpTestSyncSetLarge = () => Promise.resolve();
+    const inputBatch = { optTheme: "dracula", geminiApiKey: "obf:x", exportTargets: { github: { token: "obf:y" } } };
+    await persistSettings(inputBatch);
+    check("E4 byte-scan: routing inactive -> batch written to main area is BYTE-IDENTICAL to input",
+      JSON.stringify(syncSet2) === JSON.stringify(inputBatch));
+    globalThis.chrome = prevChromeE4e;
+    delete globalThis.__pbpTestStorage;
+    delete globalThis.__pbpTestSyncSetLarge;
+  })();
+
+  // ---------- E4 (cont'd): the THIRD state — sync on + syncApiKeys=true
+  // (routing inactive via keys-on, not sync-off) — driven through
+  // persistSettings() itself, same as the other two states. ----------
+  await (async () => {
+    const prevChromeE4f = globalThis.chrome;
+    globalThis.chrome = { storage: { local: { get: () => Promise.resolve({ optSyncEnabled: true, syncApiKeys: true }) } } };
+    let syncSet3 = null;
+    globalThis.__pbpTestStorage = { set: (d) => { syncSet3 = d; return Promise.resolve(); }, get: () => Promise.resolve({}) };
+    globalThis.__pbpTestSyncSetLarge = () => Promise.resolve();
+    const inputBatch3 = { optTheme: "flexoki", geminiApiKey: "obf:z", exportTargets: { github: { token: "obf:w" } } };
+    await persistSettings(inputBatch3);
+    check("E4 keys-on state: routing inactive (syncApiKeys=true) -> batch reaches main area BYTE-IDENTICAL, secrets unsplit",
+      JSON.stringify(syncSet3) === JSON.stringify(inputBatch3));
+    globalThis.chrome = prevChromeE4f;
+    delete globalThis.__pbpTestStorage;
+    delete globalThis.__pbpTestSyncSetLarge;
+  })();
+
   const summary = document.createElement("h2");
   summary.textContent = `Results: ${pass} pass, ${fail} fail`;
   root.insertBefore(summary, root.firstChild);

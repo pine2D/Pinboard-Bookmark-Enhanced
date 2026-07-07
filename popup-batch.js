@@ -72,7 +72,8 @@ function setupTabSet() {
     batchBtn.disabled = true;
     setBtnIcon(batchBtn, "pin", t("batchSaving"));
     try {
-      const rawToken = await (await getSettingsStorage()).get("pinboardToken");
+      let rawToken = await (await getSettingsStorage()).get("pinboardToken");
+      rawToken = await pbpApplySecretOverlay(rawToken);
       const pinboardToken = deobfuscateKey(rawToken.pinboardToken);
       if (!pinboardToken) {
         showStatus("status-msg", t("batchNotLoggedIn"), "error");

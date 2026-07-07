@@ -633,6 +633,7 @@ function pbpApplyColorScheme(mode) {
     const settingsArea = optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
     window.pbpSettingsArea = settingsArea;
     exportSettings = await settingsArea.get(EXPORT_SETTINGS_DEFAULTS);
+    exportSettings = await pbpApplySecretOverlay(exportSettings); // shared.js IS loaded here -- see html script tags
   } catch (_) {
     window.pbpSettingsArea = chrome.storage.local; // degrade: default area + defaults
   }
@@ -1153,7 +1154,8 @@ function pbpApplyColorScheme(mode) {
     // Re-read the send-related settings fresh so an options change (fixed token,
     // enabled/disabled target, changed vault/folder) is reflected WITHOUT reopening the preview.
     try {
-      const _fresh = await settingsArea.get({ exportTargets: {}, obsidianEnabled: false, obsidianVault: "", obsidianFolder: "" });
+      let _fresh = await settingsArea.get({ exportTargets: {}, obsidianEnabled: false, obsidianVault: "", obsidianFolder: "" });
+      _fresh = await pbpApplySecretOverlay(_fresh);
       Object.assign(exportSettings, _fresh);
     } catch (_) {}
 

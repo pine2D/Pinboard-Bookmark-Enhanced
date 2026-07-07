@@ -687,7 +687,7 @@ async function syncGetLarge(key, defaultValue) {
 // Returns {ok, fellBackToLocal, error?} — never throws on quota.
 async function persistSettings(data) {
   const LARGE_KEYS = ["customTagPrompt", "customSummaryPrompt", "translateGlossary", "tagPresets"];
-  const batch = { ...data };
+  let batch = { ...data };
   let fellBackToLocal = false;
   // Test seam: allow stubbing storage + syncSetLarge from the harness.
   const storage = (typeof globalThis !== "undefined" && globalThis.__pbpTestStorage)
@@ -695,6 +695,24 @@ async function persistSettings(data) {
   const ssl = (typeof globalThis !== "undefined" && globalThis.__pbpTestSyncSetLarge)
     ? globalThis.__pbpTestSyncSetLarge : syncSetLarge;
   try {
+    // syncApiKeys secret routing (batch (4)): split the 18 API_KEY_FIELDS +
+    // exportTargets tokens out of the batch BEFORE anything else touches it,
+    // and write them straight to chrome.storage.local instead of `storage`
+    // (which may be chrome.storage.sync). Degrades to "inactive" (today's
+    // unfiltered write) on any read failure or when chrome.storage is
+    // unavailable -- never blocks a save on this check.
+    let routingActive = false;
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        const flags = await chrome.storage.local.get({ optSyncEnabled: false, syncApiKeys: false });
+        routingActive = pbpSecretRoutingActive(flags.optSyncEnabled, flags.syncApiKeys);
+      }
+    } catch (_) { routingActive = false; }
+    if (routingActive) {
+      const { main, secrets } = pbpSplitSecretBatch(batch);
+      batch = main;
+      if (Object.keys(secrets).length) await chrome.storage.local.set(secrets);
+    }
     for (const k of LARGE_KEYS) {
       if (k in batch) {
         try { await ssl(k, batch[k]); }

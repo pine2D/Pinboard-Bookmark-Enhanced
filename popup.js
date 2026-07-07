@@ -15,6 +15,7 @@ pinboardFetch = function(url, options) {
           // Invalid token — redirect to login instead of letting Chrome show the auth dialog
           (async () => {
             try { await (await getSettingsStorage()).remove("pinboardToken"); } catch (_) {}
+            try { await chrome.storage.local.remove("pinboardToken"); } catch (_) {}
           })();
           showLogin();
           // Return a dummy resolved response so call sites don't also throw
@@ -125,6 +126,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (_) {}
 
   settings = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+  settings = await pbpApplySecretOverlay(settings);
   deobfuscateSettings(settings);
 
   // Apply theme: preset-based data-theme (if enabled), or fallback to generic .dark
@@ -159,6 +161,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     e.preventDefault();
     if (!confirm(t("confirmLogout"))) return;
     await (await getSettingsStorage()).remove("pinboardToken");
+    await chrome.storage.local.remove("pinboardToken").catch(() => {});
     settings.pinboardToken = "";
     $id("main-section").classList.add("hidden");
     showLogin();
@@ -185,7 +188,7 @@ $id("login-btn").addEventListener("click", async () => {
         resolve(resp);
       });
     });
-    if (res.ok) { await (await getSettingsStorage()).set({ pinboardToken: obfuscateKey(token) }); settings.pinboardToken = token; showMain(token); }
+    if (res.ok) { await persistSettings({ pinboardToken: obfuscateKey(token) }); settings.pinboardToken = token; showMain(token); }
     else showElement("login-error", t("loginFailed"));
   } catch (e) { showElement("login-error", t("networkError")); }
 });

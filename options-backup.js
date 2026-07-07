@@ -72,14 +72,17 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
         // webhook Authorization) with the secret-less backup copy. Merge per target
         // onto what's already stored so untouched secret fields survive; only the
         // backed-up (non-secret) fields actually update.
-        const { exportTargets: current } = await settingsStorage.get({ exportTargets: {} });
+        let curRead = await settingsStorage.get({ exportTargets: {} });
+        curRead = await pbpApplySecretOverlay(curRead);
+        const current = curRead.exportTargets || {};
         const merged = Object.assign({}, current);
         for (const [tid, cfg] of Object.entries(safeData.exportTargets)) {
           merged[tid] = Object.assign({}, merged[tid], cfg);
         }
         safeData.exportTargets = merged;
       }
-      await settingsStorage.set(safeData);
+      const importRes = await persistSettings(safeData);
+      if (!importRes.ok) throw importRes.error || new Error("settings import failed");
 
       if (schemaVersion >= 2) {
         if (customOverlayCSS !== undefined) await saveOverlayWithFallback(customOverlayCSS);

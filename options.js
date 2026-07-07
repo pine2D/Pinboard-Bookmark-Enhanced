@@ -607,7 +607,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- All settings with defaults (from shared.js) ----
-  const s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+  let s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+  s = await pbpApplySecretOverlay(s); // MUST run before deobfuscateSettings (see shared.js note)
   deobfuscateSettings(s);
 
   // ---- Schema v2 migration: split customCSS into themePresetKey + customOverlayCSS ----
@@ -1710,7 +1711,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // is never written back by saveAll(), so a key/provider configured THIS session
     // (paste key on the AI tab, come back here) was invisible until a full reload —
     // and a provider switch would fire the request at the OLD provider/key/model.
-    const sNow = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+    let sNow = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+    sNow = await pbpApplySecretOverlay(sNow);
     deobfuscateSettings(sNow);
 
     if (!hasAIKey(sNow)) {
@@ -1810,7 +1812,8 @@ function _tagGovShowLoadFailed() {
 // Returns the deobfuscated Pinboard token, or "" if not set / on error.
 async function getTagGovToken() {
   try {
-    const s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+    let s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+    s = await pbpApplySecretOverlay(s);
     const token = deobfuscateKey(s.pinboardToken) || "";
     if (token) _tagGovUser = token.split(":")[0] || _tagGovUser;
     return token;

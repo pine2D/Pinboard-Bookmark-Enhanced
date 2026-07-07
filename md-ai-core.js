@@ -461,6 +461,7 @@ function pbpAiGetSettings() {
   if (!_pbpAiSettingsPromise) {
     _pbpAiSettingsPromise = pbpAiSettingsArea()
       .then((area) => area.get(SETTINGS_DEFAULTS))
+      .then((s) => pbpApplySecretOverlay(s)) // MUST run before deobfuscateSettings (see shared.js note)
       .then((s) => deobfuscateSettings(s));
   }
   return _pbpAiSettingsPromise;
