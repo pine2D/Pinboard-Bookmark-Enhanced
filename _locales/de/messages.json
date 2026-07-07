@@ -2453,5 +2453,6 @@
   "srchPlaceholder": { "message": "In der Seite suchen…" },
   "srchInputAria": { "message": "In diesem Dokument suchen" },
   "srchPrevAria": { "message": "Vorherige Übereinstimmung" },
-  "srchNextAria": { "message": "Nächste Übereinstimmung" }
+  "srchNextAria": { "message": "Nächste Übereinstimmung" },
+  "srchRegexAria": { "message": "Suche mit regulärem Ausdruck" }
 }

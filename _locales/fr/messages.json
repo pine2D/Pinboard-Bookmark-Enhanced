@@ -2453,5 +2453,6 @@
   "srchPlaceholder": { "message": "Rechercher dans la page…" },
   "srchInputAria": { "message": "Rechercher dans ce document" },
   "srchPrevAria": { "message": "Correspondance précédente" },
-  "srchNextAria": { "message": "Correspondance suivante" }
+  "srchNextAria": { "message": "Correspondance suivante" },
+  "srchRegexAria": { "message": "Recherche par expression régulière" }
 }

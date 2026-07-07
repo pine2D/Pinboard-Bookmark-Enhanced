@@ -2447,5 +2447,6 @@
   "srchPlaceholder": { "message": "页内搜索…" },
   "srchInputAria": { "message": "在文档中搜索" },
   "srchPrevAria": { "message": "上一个匹配项" },
-  "srchNextAria": { "message": "下一个匹配项" }
+  "srchNextAria": { "message": "下一个匹配项" },
+  "srchRegexAria": { "message": "正则表达式搜索" }
 }

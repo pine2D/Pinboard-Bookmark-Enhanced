@@ -4385,6 +4385,43 @@ suiteIf("pbpSearchEnumerate", "pbpSearchEnumerate", () => {
 });
 </script>
 <script>
+// ============ R4 (regex mode): pbpSearchEnumerateRegex (md-reader.js) ============
+suiteIf("pbpSearchEnumerateRegex", "pbpSearchEnumerateRegex", () => {
+  test("literal pattern matches", () => {
+    const r = pbpSearchEnumerateRegex("the quick brown fox", "quick", 10);
+    assertEq(r.length, 1, "one match");
+    assertEq(r[0].start, 4, "start");
+    assertEq(r[0].end, 9, "end");
+  });
+  test("case-insensitive matching", () => {
+    const r = pbpSearchEnumerateRegex("The Quick Fox", "quick", 10);
+    assertEq(r.length, 1, "one match");
+    assertEq(r[0].start, 4, "start ignores case");
+  });
+  test("quantifier/character-class pattern finds every occurrence", () => {
+    const r = pbpSearchEnumerateRegex("aab aaab", "a+b", 10);
+    assertEq(r.length, 2, "two matches");
+    assertEq(r[0].start, 0, "m0 start");
+    assertEq(r[1].start, 4, "m1 start");
+  });
+  test("zero-length-capable pattern skips empty matches and terminates", () => {
+    const r = pbpSearchEnumerateRegex("ba", "a*", 10);
+    assertEq(r.length, 1, "only the real 'a' run is reported");
+    assert(r.every((m) => m.end > m.start), "no zero-length match was pushed");
+  });
+  test("invalid pattern returns null", () => {
+    assertEq(pbpSearchEnumerateRegex("hello", "[", 10), null, "unterminated character class");
+  });
+  test("stops scanning once the cap is reached", () => {
+    const r = pbpSearchEnumerateRegex("aaaaaa", "a", 3);
+    assertEq(r.length, 3, "capped at 3");
+  });
+  test("no match returns an empty array", () => {
+    assertEq(pbpSearchEnumerateRegex("hello", "xyz", 10).length, 0, "no match");
+  });
+});
+</script>
+<script>
 // ============ R9: md-reader.js pbpReaderPickScrollAnchor (scroll-restore anchor pick) ============
 suiteIf("pbpReaderPickScrollAnchor", "pbpReaderPickScrollAnchor", () => {
   test("empty rects -> null", () => {

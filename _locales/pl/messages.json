@@ -2453,5 +2453,6 @@
   "srchPlaceholder": { "message": "Szukaj na stronie…" },
   "srchInputAria": { "message": "Szukaj w tym dokumencie" },
   "srchPrevAria": { "message": "Poprzednie dopasowanie" },
-  "srchNextAria": { "message": "Następne dopasowanie" }
+  "srchNextAria": { "message": "Następne dopasowanie" },
+  "srchRegexAria": { "message": "Wyszukiwanie wyrażeniem regularnym" }
 }

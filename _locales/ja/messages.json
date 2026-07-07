@@ -2453,5 +2453,6 @@
   "srchPlaceholder": { "message": "ページ内検索…" },
   "srchInputAria": { "message": "この文書内を検索" },
   "srchPrevAria": { "message": "前の一致" },
-  "srchNextAria": { "message": "次の一致" }
+  "srchNextAria": { "message": "次の一致" },
+  "srchRegexAria": { "message": "正規表現で検索" }
 }

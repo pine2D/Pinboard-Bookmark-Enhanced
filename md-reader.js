@@ -78,6 +78,31 @@ function pbpSearchEnumerate(text, query, cap) {
   return out;
 }
 
+// ---- R4 (regex toggle): same enumeration contract as pbpSearchEnumerate,
+// but the needle is a user-typed regular expression instead of a literal
+// substring. Distinct failure mode: an invalid pattern (new RegExp(pattern,
+// "gi") throws) returns null so the caller can tell "bad pattern" apart
+// from "valid pattern, zero matches" (empty array); every other input
+// guard mirrors pbpSearchEnumerate exactly (non-string text, empty
+// pattern, cap<=0 all return []). This runs the user's own pattern against
+// their own page -- the same trust boundary an editor's find-in-file regex
+// box (VS Code, ...) already accepts, so catastrophic-backtracking risk
+// here is accepted the same way, not a model-facing surface.
+function pbpSearchEnumerateRegex(text, pattern, cap) {
+  const out = [];
+  if (typeof text !== "string" || typeof pattern !== "string" || !pattern.length) return out;
+  const limit = (typeof cap === "number" && cap > 0) ? cap : 0;
+  if (limit <= 0) return out;
+  let re;
+  try { re = new RegExp(pattern, "gi"); } catch (_) { return null; }
+  let m;
+  while (out.length < limit && (m = re.exec(text))) {
+    if (m[0].length === 0) { re.lastIndex++; continue; } // zero-length match guard: advance, don't push (prevents infinite loop, e.g. "x*")
+    out.push({ start: m.index, end: m.index + m[0].length });
+  }
+  return out;
+}
+
 // ---- R9 (spec 2): scroll-restore anchor picker ----
 // Pure math only -- the caller (md-preview.js) does the live DOM measuring
 // (getBoundingClientRect per block, view-aware via trOnlyScrollTarget) and
@@ -316,6 +341,9 @@ let _pbpSearchState = { query: "", matches: [], ranges: [], idx: -1 };
 let _pbpSearchInputTimer = null;
 let _pbpSearchMo = null;
 let _pbpSearchMoTimer = null;
+// Regex-mode toggle: persisted in chrome.storage.local (pbp_srch_regex),
+// read once when the popover is first built (see _pbpSearchEnsurePop).
+let _pbpSearchRegexOn = false;
 
 // Candidate containers: #rendered-view's DIRECT children only (matches
 // spec sec.4 -- cross-top-level-block matches are out of scope), filtered
@@ -396,11 +424,21 @@ function _pbpSearchRun(query) {
   st.ranges = [];
   const CAP = 500;
   const view = document.getElementById("rendered-view");
-  if (query && view) {
+  // Regex mode: compile validity is identical for every candidate container,
+  // so check once per run rather than re-catching inside the loop below --
+  // an invalid pattern degrades to "zero matches" (srch-bad below flags it,
+  // pbpSearchEnumerateRegex itself is never even called in that case).
+  let bad = false;
+  if (_pbpSearchRegexOn && query) {
+    try { new RegExp(query, "gi"); } catch (_) { bad = true; }
+  }
+  if (query && view && !bad) {
     const cands = _pbpSearchVisibleCandidates(view);
     scan:
     for (const el of cands) {
-      const hits = pbpSearchEnumerate(el.textContent, query, CAP - st.matches.length);
+      const hits = _pbpSearchRegexOn
+        ? pbpSearchEnumerateRegex(el.textContent, query, CAP - st.matches.length)
+        : pbpSearchEnumerate(el.textContent, query, CAP - st.matches.length);
       for (const h of hits) {
         st.matches.push({ el: el, start: h.start, end: h.end });
         if (st.matches.length >= CAP) break scan;
@@ -409,6 +447,10 @@ function _pbpSearchRun(query) {
     for (const m of st.matches) {
       st.ranges.push(typeof _pbpAskRangeFromOffsets === "function" ? _pbpAskRangeFromOffsets(m.el, m.start, m.end) : null);
     }
+  }
+  if (_pbpSearchPopEl) {
+    const inputEl = _pbpSearchPopEl.querySelector("#search-input");
+    if (inputEl) inputEl.classList.toggle("srch-bad", bad);
   }
   st.idx = st.matches.length ? 0 : -1;
   _pbpSearchPaintAll();
@@ -504,6 +546,39 @@ function _pbpSearchEnsurePop() {
     _pbpSearchStep(e.shiftKey ? -1 : 1);
   });
   pop.appendChild(input);
+
+  // Regex-mode toggle (spec: regex search). ".*" is plain ASCII text, not
+  // an icon -- the label itself already communicates the mode; aria-pressed
+  // carries the on/off state for AT. State is persisted across popover
+  // sessions in chrome.storage.local; read here (async is fine, the pop is
+  // fresh and the query is empty) and written back on every click.
+  const regexBtn = document.createElement("button");
+  regexBtn.type = "button";
+  regexBtn.id = "search-regex";
+  regexBtn.className = "srch-regex";
+  regexBtn.textContent = ".*";
+  regexBtn.setAttribute("aria-pressed", "false");
+  regexBtn.setAttribute("aria-label", t("srchRegexAria"));
+  regexBtn.title = t("srchRegexAria");
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+    try {
+      chrome.storage.local.get({ pbp_srch_regex: false }, (res) => {
+        _pbpSearchRegexOn = !!(res && res.pbp_srch_regex);
+        regexBtn.setAttribute("aria-pressed", _pbpSearchRegexOn ? "true" : "false");
+      });
+    } catch (_) {}
+  }
+  regexBtn.addEventListener("click", () => {
+    _pbpSearchRegexOn = !_pbpSearchRegexOn;
+    regexBtn.setAttribute("aria-pressed", _pbpSearchRegexOn ? "true" : "false");
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+      try { chrome.storage.local.set({ pbp_srch_regex: _pbpSearchRegexOn }); } catch (_) {}
+    }
+    clearTimeout(_pbpSearchInputTimer);
+    _pbpSearchRun(input.value);
+    input.focus();
+  });
+  pop.appendChild(regexBtn);
 
   // aria-live=polite counter, paired with aria-busy around each debounced
   // rescan (same pairing md-ask.js uses for its streaming .ask-a).

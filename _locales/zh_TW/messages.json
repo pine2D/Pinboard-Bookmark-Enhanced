@@ -2453,5 +2453,6 @@
   "srchPlaceholder": { "message": "頁面搜尋…" },
   "srchInputAria": { "message": "在文件中搜尋" },
   "srchPrevAria": { "message": "上一個相符項目" },
-  "srchNextAria": { "message": "下一個相符項目" }
+  "srchNextAria": { "message": "下一個相符項目" },
+  "srchRegexAria": { "message": "正規表示式搜尋" }
 }

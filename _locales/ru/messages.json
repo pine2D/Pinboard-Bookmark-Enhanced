@@ -2453,5 +2453,6 @@
   "srchPlaceholder": { "message": "Поиск на странице…" },
   "srchInputAria": { "message": "Поиск в этом документе" },
   "srchPrevAria": { "message": "Предыдущее совпадение" },
-  "srchNextAria": { "message": "Следующее совпадение" }
+  "srchNextAria": { "message": "Следующее совпадение" },
+  "srchRegexAria": { "message": "Поиск по регулярному выражению" }
 }

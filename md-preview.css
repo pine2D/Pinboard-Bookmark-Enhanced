@@ -1671,6 +1671,28 @@ body.ask-open main { margin-right: 396px; }
 .srch-nav:hover { background: var(--btn-hover); border-color: var(--border); }
 .srch-nav:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .srch-nav svg { width: 13px; height: 13px; }
+/* Regex-mode toggle: same box as .srch-nav, but a monospace ".*" label
+   instead of an svg icon needs its own font stack + smaller size to fit. */
+.srch-regex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--mono-latin), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-ko), var(--han-rest), monospace;
+  font-size: 11px;
+}
+.srch-regex:hover { background: var(--btn-hover); border-color: var(--border); }
+.srch-regex:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.srch-regex[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: var(--link); }
+/* Invalid regex pattern (compile failure) -- flagged on the input itself. */
+#search-input.srch-bad { border-color: var(--danger); }
 
 @media print {
   #search-pop { display: none; }
