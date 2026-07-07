@@ -322,6 +322,21 @@ main {
   text-decoration-color: var(--link);
   color: var(--link-hover);
 }
+/* Defuddle emits <sup id="fnref:N"><a href="#fn:N">, but Turndown drops the
+   sup wrapper on the round-trip through markdown, so the footnote ref
+   renders as a full-size link -- this restores superscript sizing at
+   render time only (the canonical markdown and every export are
+   untouched). The href-prefix selector cannot hit TOC/heading anchors
+   (those never start with "#fn:") and also covers refs inside translated
+   .pb-tr blocks for free. Backref arrows (#fnref: links inside the
+   footnotes list itself) are NOT touched. */
+#rendered-view a[href^="#fn:"] {
+  font-size: 0.72em;
+  line-height: 0; /* do not inflate the line box */
+  position: relative;
+  top: -0.45em; /* superscript without vertical-align:super line-height side effects */
+  padding: 0 1px;
+}
 
 /* Inline code */
 #rendered-view code {
