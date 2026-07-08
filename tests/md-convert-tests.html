@@ -1519,6 +1519,42 @@ section("site-rules: pbpNormalizeLazyImages");
 </script>
 
 <script>
+  section("E2/E7/E10 md-preview fidelity regressions");
+
+  // E2: code language fidelity. Keep source-provided language hints in the
+  // exported fenced code; no guessing when the source gives none.
+  (() => {
+    const fromPre = htmlToMarkdown('<pre data-lang="python"><code>print(1)</code></pre>');
+    assert(/```python\nprint\(1\)/.test(fromPre), "pre[data-lang] becomes a python fence: " + fromPre);
+    const noLang = htmlToMarkdown('<pre><code>plain text</code></pre>');
+    assert(/```\nplain text\n```/.test(noLang), "no source language hint stays untagged: " + noLang);
+  })();
+
+  // E7: nested span wrappers inside links must not drop the visible link text.
+  (() => {
+    const md = htmlToMarkdown('<p>Read <a href="https://e.test/docs"><span><span>Nested Docs</span></span></a>.</p>');
+    assert(md.includes("[Nested Docs](https://e.test/docs)"), "nested span link text preserved: " + md);
+  })();
+
+  // E10: footnote fragment links stay local; default image export keeps and absolutizes.
+  (() => {
+    const h = renderMarkdown("[1](#fn:note-abc) [back](#fnref:note-abc)");
+    const links = Array.from(new DOMParser().parseFromString(h, "text/html").querySelectorAll('a[href^="#"]'));
+    assert(links.length >= 1 && links.every((a) => !a.hasAttribute("target") && !a.hasAttribute("rel")),
+      "footnote-shaped fragment links do not get target/rel: " + h);
+    const out = composeExport("![alt](img/p.png)", { url: "https://e.test/a/b/" }, {});
+    assert(out.includes("![alt](https://e.test/a/b/img/p.png)"), "default image policy keeps+absolutizes: " + out);
+  })();
+
+  // E10: Zhihu lazy image strategy stays at the site-rule layer.
+  (() => {
+    const doc = new DOMParser().parseFromString(QUESTION_HTML, "text/html");
+    const r = applySiteRule(doc, "https://www.zhihu.com/question/659317023");
+    assert(r && /src="https:\/\/pic\/a\.jpg"/.test(r.contentHtml || ""), "zhihu lazy image promoted: " + (r && r.contentHtml));
+  })();
+</script>
+
+<script>
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
 </script>

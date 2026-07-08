@@ -90,7 +90,7 @@ function _pbpGetTurndown() {
         const m = cls.match(/language-(\S+)/);
         lang = (m && m[1]) || code.getAttribute("data-lang") || code.getAttribute("data-language") || "";
       }
-      if (!lang) lang = node.getAttribute("data-language") || "";
+      if (!lang) lang = node.getAttribute("data-language") || node.getAttribute("data-lang") || "";
       const text = (code || node).textContent || "";
       // Fence must outrun the longest backtick run already inside the code, or a
       // literal ``` (or longer) in the sample would prematurely close the block
