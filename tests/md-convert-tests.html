@@ -346,6 +346,14 @@ function assertEq(actual, expected, label) {
   assertEq(empty.words, 0, "empty words");
   assertEq(empty.cjkChars, 0, "empty cjk");
   assertEq(empty.minutes, 0, "empty minutes 0");
+
+  section("P2.4b readingProgressPercent");
+  assertEq(readingProgressPercent(0, 1000, 3000), 0, "top of article -> 0%");
+  assertEq(readingProgressPercent(1000, 1000, 3000), 50, "halfway through scrollable range -> 50%");
+  assertEq(readingProgressPercent(2000, 1000, 3000), 100, "bottom of scrollable range -> 100%");
+  assertEq(readingProgressPercent(-100, 1000, 3000), 0, "negative scroll clamps to 0%");
+  assertEq(readingProgressPercent(5000, 1000, 3000), 100, "overscroll clamps to 100%");
+  assertEq(readingProgressPercent(0, 1000, 800), 100, "non-scrollable article is already complete");
 </script>
 
 <script>
@@ -1428,6 +1436,7 @@ section("site-rules: pbpNormalizeLazyImages");
     ...fmBase,
     description: "Desc",
     published: "2026-01-05",
+    clipped: "2026-07-08",
     author: "Jane Doe",
     site: "The Verge",
     image: "https://cdn.example.com/cover.jpg",
@@ -1436,10 +1445,11 @@ section("site-rules: pbpNormalizeLazyImages");
   const trailerBlock = fmFull.split("description: \"Desc\"\n")[1].split("\n---\n\n")[0];
   const trailerLines = trailerBlock.split("\n");
   assertEq(trailerLines[0], "published: 2026-01-05", "published bare scalar (matches YYYY-MM-DD) comes right after description: " + trailerBlock);
-  assertEq(trailerLines[1], 'author: "Jane Doe"', "author quoted, second: " + trailerBlock);
-  assertEq(trailerLines[2], 'site: "The Verge"', "site quoted, third: " + trailerBlock);
-  assertEq(trailerLines[3], 'image: "https://cdn.example.com/cover.jpg"', "image quoted, fourth: " + trailerBlock);
-  assertEq(trailerLines[4], "words: 1534", "words bare integer, fifth (last, right before closing ---): " + trailerBlock);
+  assertEq(trailerLines[1], "clipped: 2026-07-08", "clipped bare scalar comes right after published: " + trailerBlock);
+  assertEq(trailerLines[2], 'author: "Jane Doe"', "author quoted, third: " + trailerBlock);
+  assertEq(trailerLines[3], 'site: "The Verge"', "site quoted, fourth: " + trailerBlock);
+  assertEq(trailerLines[4], 'image: "https://cdn.example.com/cover.jpg"', "image quoted, fifth: " + trailerBlock);
+  assertEq(trailerLines[5], "words: 1534", "words bare integer, sixth (last, right before closing ---): " + trailerBlock);
   assert(fmFull.includes("\n---\n\nbody"), "closing fence still immediately precedes the body");
 
   // published that failed normalization upstream (not YYYY-MM-DD shaped) renders quoted, not bare --

@@ -161,6 +161,7 @@ const PBP_EXPORT_TARGETS = {
       // attach these fields, so the payload stays byte-identical to today's when
       // the setting is off. words is gated on Number.isFinite, not truthiness (0
       // is a legitimate word count and must still be carried).
+      if (meta.clipped) payload.clipped = String(meta.clipped);
       if (meta.author) payload.author = String(meta.author);
       if (meta.published) payload.published = String(meta.published);
       if (meta.site) payload.site = String(meta.site);

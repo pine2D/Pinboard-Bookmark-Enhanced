@@ -652,12 +652,13 @@ function pbpApplyColorScheme(mode) {
     const d = new Date();
     return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
   }
+  const clippedDate = todayIso();
   // Shared export metadata + per-export option resolution (used by Copy/Download MD and Download .html).
   function buildMeta() {
     const meta = {
       title: title || "",
       url: url || "",
-      date: todayIso(),
+      date: clippedDate,
       tags,
       source: source === "jina" ? "jina" : "defuddle"
     };
@@ -677,7 +678,9 @@ function pbpApplyColorScheme(mode) {
       }
       if (resolvedSite) meta.site = resolvedSite.slice(0, 200);
       const publishedDate = publishedIso(published);
+      meta.date = publishedDate || "";
       if (publishedDate) meta.published = publishedDate;
+      meta.clipped = clippedDate;
       if (image) meta.image = image;
       const stats = readingStats(getViewMarkdown());
       meta.words = stats.words + stats.cjkChars;
@@ -794,7 +797,22 @@ function pbpApplyColorScheme(mode) {
     const wordLabel = stats.cjkChars > 0
       ? `${t("mdStatWords", stats.words.toLocaleString())} · ${t("mdStatCjk", stats.cjkChars.toLocaleString())}`
       : t("mdStatWords", stats.words.toLocaleString());
-    statsEl.textContent = `${wordLabel} · ${t("mdStatMin", String(stats.minutes))}`;
+    const statBase = `${wordLabel} · ${t("mdStatMin", String(stats.minutes))}`;
+    let statTick = false;
+    const renderStats = () => {
+      statTick = false;
+      const doc = document.documentElement;
+      const pct = readingProgressPercent(window.scrollY, window.innerHeight, doc.scrollHeight);
+      statsEl.textContent = `${statBase} · ${pct}%`;
+    };
+    const queueStats = () => {
+      if (statTick) return;
+      statTick = true;
+      requestAnimationFrame(renderStats);
+    };
+    renderStats();
+    window.addEventListener("scroll", queueStats, { passive: true });
+    window.addEventListener("resize", queueStats);
   }
 
   // Single render path: canonical Markdown -> marked() -> DOMPurify -> innerHTML.

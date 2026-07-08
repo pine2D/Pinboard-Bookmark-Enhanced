@@ -115,10 +115,11 @@ section("webhook.buildRequest -- X4 extended metadata (author/published/site/ima
 {
   // Extended metadata present -> conditionally appended AFTER the original 5 keys
   const req = PBP_EXPORT_TARGETS.webhook.buildRequest(
-    { title: "T", url: "U", date: "D", tags: ["a"], author: "Jane Doe", published: "2026-01-05", site: "The Verge", image: "https://cdn.example.com/x.jpg", words: 1534 },
+    { title: "T", url: "U", date: "2026-01-05", clipped: "2026-07-08", tags: ["a"], author: "Jane Doe", published: "2026-01-05", site: "The Verge", image: "https://cdn.example.com/x.jpg", words: 1534 },
     "# body", { url: "https://h/x" }, "");
   const b = JSON.parse(req.body);
-  assertEq(Object.keys(b).join(","), "title,url,date,tags,markdown,author,published,site,image,words", "extended meta appended after the original 5 keys, in order author/published/site/image/words");
+  assertEq(Object.keys(b).join(","), "title,url,date,tags,markdown,clipped,author,published,site,image,words", "extended meta appended after the original 5 keys, in order clipped/author/published/site/image/words");
+  assertEq(b.clipped, "2026-07-08", "clipped carried");
   assertEq(b.author, "Jane Doe", "author carried");
   assertEq(b.published, "2026-01-05", "published carried");
   assertEq(b.site, "The Verge", "site carried");

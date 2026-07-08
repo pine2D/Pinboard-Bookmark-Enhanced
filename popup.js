@@ -520,6 +520,7 @@ async function htmlToMarkdownAsync(html, opts) {
 
       // Convert to markdown (Jina already has it, Local needs Turndown)
       const markdown = result.markdown || await htmlToMarkdownAsync(result.contentHtml, { baseUrl: result.url || url });
+      const clippedDate = (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })();
 
       // X4: extended metadata (author/published/site/image/words), gated by the
       // mdExportExtendedMeta setting (default on). Off -> meta stays exactly the
@@ -533,7 +534,9 @@ async function htmlToMarkdownAsync(html, opts) {
         if (!site) { try { site = new URL(result.url || url).hostname; } catch (_) { site = ""; } }
         if (site) meta.site = site.slice(0, 200);
         const published = publishedIso(result.published || "");
+        meta.date = published || "";
         if (published) meta.published = published;
+        meta.clipped = clippedDate;
         if (result.image) meta.image = result.image;
         const stats = readingStats(markdown);
         meta.words = stats.words + stats.cjkChars;
@@ -555,7 +558,7 @@ async function htmlToMarkdownAsync(html, opts) {
         const meta = attachExtendedMeta({
           title: result.title || $id("title-input")?.value || "",
           url: result.url || url,
-          date: (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(),
+          date: clippedDate,
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
           source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
         });
@@ -629,7 +632,7 @@ async function htmlToMarkdownAsync(html, opts) {
         const meta = attachExtendedMeta({
           title: result.title || $id("title-input")?.value || "",
           url: result.url || url,
-          date: (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(),
+          date: clippedDate,
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
           source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
         });
@@ -644,7 +647,7 @@ async function htmlToMarkdownAsync(html, opts) {
         const meta = attachExtendedMeta({
           title: result.title || $id("title-input")?.value || "",
           url: result.url || url,
-          date: (() => { const d = new Date(); const p = (n) => (n < 10 ? "0" : "") + n; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(),
+          date: clippedDate,
           tags: Array.isArray(currentTags) ? currentTags.slice() : [],
           source: settings.aiContentSource === "jina" ? "jina" : "defuddle"
         });

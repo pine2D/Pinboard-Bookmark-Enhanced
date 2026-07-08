@@ -411,11 +411,11 @@ function publishedIso(s) {
   return y + "-" + m + "-" + day;
 }
 
-// meta: {title,url,date,tags,source,description?,author?,published?,site?,image?,words?}
+// meta: {title,url,date,tags,source,description?,author?,published?,clipped?,site?,image?,words?}
 // opts.fields: ordered subset of [title,url,date,tags,source]; description always
 // trails (only when present). Bare scalars for url/date/source; quoted for
 // title/description; tags as an inline flow array. Extended fields (author/
-// published/site/image/words) trail description in that fixed order, each only
+// published/clipped/site/image/words) trail description in that fixed order, each only
 // when present on meta -- see applyFrontmatter's own tail below for the
 // emission rules.
 function applyFrontmatter(md, meta, opts) {
@@ -440,6 +440,9 @@ function applyFrontmatter(md, meta, opts) {
   // legitimate word count).
   if (meta.published) {
     lines.push("published: " + (/^\d{4}-\d{2}-\d{2}$/.test(meta.published) ? meta.published : yamlString(meta.published)));
+  }
+  if (meta.clipped) {
+    lines.push("clipped: " + (/^\d{4}-\d{2}-\d{2}$/.test(meta.clipped) ? meta.clipped : yamlString(meta.clipped)));
   }
   if (meta.author) lines.push("author: " + yamlString(meta.author));
   if (meta.site) lines.push("site: " + yamlString(meta.site));
@@ -533,6 +536,13 @@ function readingStats(md) {
   const words = latinPart ? latinPart.split(/\s+/).filter(Boolean).length : 0;
   const minutes = (words === 0 && cjkChars === 0) ? 0 : Math.ceil(words / 200 + cjkChars / 350);
   return { words, cjkChars, minutes };
+}
+
+function readingProgressPercent(scrollY, viewportHeight, scrollHeight) {
+  const total = Math.max(0, Number(scrollHeight || 0) - Number(viewportHeight || 0));
+  if (total <= 0) return 100;
+  const y = Math.min(Math.max(Number(scrollY || 0), 0), total);
+  return Math.round((y / total) * 100);
 }
 
 // ── Export orchestrator ──
@@ -640,7 +650,7 @@ function _xmlEscape(s) {
 // VISIBLE header (never YAML). renderMarkdown + highlightCodeBlocks run on a
 // detached node (needs a DOM — preview/test page, not the popup). The caller
 // passes opts.hljsCss (fetched from the vendored theme) so this stays chrome-free.
-// meta: {title,url,date,tags,source,description?,author?,published?,site?,image?,words?}
+// meta: {title,url,date,tags,source,description?,author?,published?,clipped?,site?,image?,words?}
 // opts: { frontmatter, imagePolicy, includeToc, hljsCss, math, katexCss, highlights }
 function composeStyledHtml(canonicalMd, meta, opts) {
   meta = meta || {};
