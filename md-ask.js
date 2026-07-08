@@ -15,6 +15,7 @@ const PBP_ASK_BTN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const PBP_ASK_CLOSE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 const PBP_ASK_CLEAR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 const PBP_ASK_SEND_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+const PBP_ASK_REGEN_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.7-3.97M13.5 2.5V5h-2.5"/></svg>';
 
 // ---- Pure: should the "a" hotkey ignore this event target? ----
 function pbpAskIsTypingTarget(el) {
@@ -43,6 +44,7 @@ async function pbpAskInit(detail) {
     title: String((detail && detail.title) || ""),
     panel: null,
     ctx: null,        // lazy context cache (filled by the send-flow task)
+    records: [],
     running: false,
     ctrl: null        // shared AbortController (Stop button aborts it)
   };
@@ -141,6 +143,7 @@ function _pbpAskBuildPanel() {
   panel.innerHTML = [
     '<header class="ask-head">',
     '  <h2 id="ask-title" data-i18n="askTitle">Ask the page</h2>',
+    '  <button type="button" id="ask-export" class="ask-ic" data-i18n-title="mdCopyMarkdown" data-i18n-aria="mdCopyMarkdown">' + PBP_ASK_COPY_SVG + '</button>',
     '  <button type="button" id="ask-clear" class="ask-ic" data-i18n-title="askClear" data-i18n-aria="askClear">' + PBP_ASK_CLEAR_SVG + '</button>',
     '  <button type="button" id="ask-close" class="ask-ic" data-i18n-title="askClose" data-i18n-aria="askClose">' + PBP_ASK_CLOSE_SVG + '</button>',
     '</header>',
@@ -162,6 +165,7 @@ function _pbpAskBuildPanel() {
     '<div id="ask-meta" aria-live="polite"></div>'
   ].join("\n");
   applyI18n(panel);
+  _pbpAskRenderSuggestions(panel);
   document.body.appendChild(panel);
   _pbpAskState.panel = panel;
   // #ask-thread now exists in the live document — restore history straight
@@ -174,6 +178,7 @@ function _pbpAskBuildPanel() {
   _pbpAskHistRestore().catch(() => {});
 
   panel.querySelector("#ask-close").addEventListener("click", () => _pbpAskSetOpen(false));
+  panel.querySelector("#ask-export").addEventListener("click", _pbpAskCopyThread);
   // Clear seam: Task 15 appends _pbpAskShowClearConfirm (inline confirm
   // strip) to this same file - function declarations hoist file-wide, so
   // once Task 15 lands this click routes to the confirm strip; until then
@@ -267,6 +272,7 @@ async function _pbpAskClearThread() {
   // the wiped conversation once it finishes.
   if (_pbpAskState) {
     _pbpAskState.rounds = [];
+    _pbpAskState.records = [];
     if (_pbpAskState.ctrl) _pbpAskState.ctrl.abort();
   }
   const thread = document.getElementById("ask-thread");
@@ -372,6 +378,34 @@ function pbpAskBuildContext(blocks, budgetTokens) {
   return { text: lines.join("\n"), sentBlocks: lines.length, totalBlocks };
 }
 
+function pbpAskBuildSuggestions(title, blocks, labels) {
+  const clean = (v) => String(v || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  const l = labels || {};
+  const heads = (Array.isArray(blocks) ? blocks : [])
+    .filter((b) => b && (b.tag === "h2" || b.tag === "h3" || b.tag === "h4"))
+    .map((b) => clean(b.el && b.el.textContent))
+    .filter(Boolean);
+  const topic = clean(title) || heads[0] || "this page";
+  return [
+    (l.summarize || "Summarize") + ": " + topic,
+    (l.argument || "Key claims") + ": " + (heads[0] || topic),
+    (l.data || "Evidence and data") + ": " + (heads[1] || heads[0] || topic)
+  ];
+}
+
+function _pbpAskRenderSuggestions(root) {
+  const panel = root || document;
+  const chips = Array.from(panel.querySelectorAll("#ask-chips .ask-chip"));
+  if (!chips.length) return;
+  const st = _pbpAskState || {};
+  const suggestions = pbpAskBuildSuggestions(st.title, pbpAiBlocks(), {
+    summarize: t("askChipSummarize"),
+    argument: t("askChipArgument"),
+    data: t("askChipData")
+  });
+  chips.forEach((chip, i) => { chip.textContent = suggestions[i] || chip.textContent; });
+}
+
 // Prompt builder. history = [{q, a}] (caller passes the in-memory rounds);
 // only the last 4 are serialized. The CITES contract here is what
 // pbpAiParseCites (md-ai-core, Task 5) parses on the way back.
@@ -470,6 +504,7 @@ function _pbpAskAppendRound(question) {
   qEl.textContent = question;
   const aEl = document.createElement("div");
   aEl.className = "ask-a streaming";
+  aEl.dataset.askQuestion = question;
   aEl.dir = "auto"; // D9-2: answer follows the question's language (system prompt rule)
   // #ask-thread is aria-live=polite; without aria-busy, every rAF-throttled
   // textContent replace during streaming re-announces the whole accumulated
@@ -509,9 +544,10 @@ function _pbpAskErrorUi(aEl, message, question) {
 }
 
 // Core runner: stream into aEl, finalize, persist, count.
-async function _pbpAskRun(question, aEl) {
+async function _pbpAskRun(question, aEl, opts) {
   const st = _pbpAskState;
   if (!st || st.running) return;
+  opts = opts || {};
   st.rounds = st.rounds || []; // lazy: Task 12's state object predates this field
   st.running = true;
   st.ctrl = new AbortController();
@@ -543,17 +579,7 @@ async function _pbpAskRun(question, aEl) {
     aEl.classList.remove("streaming");
     aEl.removeAttribute("aria-busy");
     const parsed = _pbpAskFinalize(aEl, full);
-    st.rounds.push({ q: question, a: parsed.body });
-    // In-memory history must stay bounded too (D6-5): reuse the persisted
-    // layer's trim (md-ai-core.js _pbpAskHistTrim, PBP_ASK_HIST_MAX=20)
-    // instead of maintaining a second cap here.
-    st.rounds = _pbpAskHistTrim(st.rounds);
-    // Persisted append: st.running only serializes sends WITHIN this tab,
-    // not across tabs, so a plain get+push+set here would race two preview
-    // tabs open on the same URL (D2-2). pbpAskHistAppend runs the
-    // read-modify-write in one IDB transaction instead, which IndexedDB
-    // serializes across tabs - no lost update.
-    await pbpAskHistAppend(st.url, {
+    const record = {
       q: question,
       a: full,
       cites: parsed.cites,
@@ -562,13 +588,43 @@ async function _pbpAskRun(question, aEl) {
       // Compared against the live fingerprint at restore time to catch a
       // stale [Pn] index after an engine switch (audit #29).
       blocksHash: (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : ""
-    });
+    };
+    if (opts.replaceLast && st.rounds.length) {
+      st.rounds[st.rounds.length - 1] = { q: question, a: parsed.body };
+    } else {
+      st.rounds.push({ q: question, a: parsed.body });
+    }
+    // In-memory history must stay bounded too (D6-5): reuse the persisted
+    // layer's trim (md-ai-core.js _pbpAskHistTrim, PBP_ASK_HIST_MAX=20)
+    // instead of maintaining a second cap here.
+    st.rounds = _pbpAskHistTrim(st.rounds);
+    st.records = _pbpAskHistTrim((st.records || []).slice());
+    if (opts.replaceLast && st.records.length && st.records[st.records.length - 1].q === question) {
+      st.records[st.records.length - 1] = record;
+    } else {
+      st.records.push(record);
+      st.records = _pbpAskHistTrim(st.records);
+    }
+    // Persisted append: st.running only serializes sends WITHIN this tab,
+    // not across tabs, so a plain get+push+set here would race two preview
+    // tabs open on the same URL (D2-2). pbpAskHistAppend runs the
+    // read-modify-write in one IDB transaction instead, which IndexedDB
+    // serializes across tabs - no lost update.
+    if (opts.replaceLast && typeof pbpAskHistReplaceLast === "function") {
+      await pbpAskHistReplaceLast(st.url, record);
+    } else {
+      await pbpAskHistAppend(st.url, record);
+    }
     pbpAiBumpCounter("ask");
   } catch (e) {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     aEl.classList.remove("streaming");
     aEl.removeAttribute("aria-busy");
-    aEl.textContent = acc; // keep whatever already streamed in
+    if (opts.restoreNodes && opts.restoreNodes.length) {
+      aEl.replaceChildren(...opts.restoreNodes);
+    } else {
+      aEl.textContent = acc; // keep whatever already streamed in
+    }
     if (e && e.name === "AbortError") {
       const note = document.createElement("p");
       note.className = "ask-stopped";
@@ -927,6 +983,54 @@ function _pbpAskBuildCopyText(body, cites) {
   return b + "\n\n" + foot;
 }
 
+function _pbpAskBuildThreadExport(rounds, page) {
+  const list = Array.isArray(rounds) ? rounds : [];
+  const meta = page || {};
+  const parts = [];
+  const title = String(meta.title || "").trim();
+  const url = String(meta.url || "").trim();
+  if (title) parts.push("# " + title);
+  if (url) parts.push(url);
+  list.forEach((r, i) => {
+    const parsed = pbpAiParseCites(String((r && r.a) || ""));
+    parts.push([
+      "## Q" + (i + 1),
+      "**Q:** " + String((r && r.q) || "").trim(),
+      "**A:**",
+      _pbpAskBuildCopyText(parsed.body, parsed.cites)
+    ].join("\n\n"));
+  });
+  return parts.join("\n\n").trim();
+}
+
+async function _pbpAskCopyThread() {
+  const st = _pbpAskState;
+  const btn = document.getElementById("ask-export");
+  if (!st || !btn) return;
+  const records = (st.records && st.records.length) ? st.records : (st.rounds || []);
+  const text = _pbpAskBuildThreadExport(records, { title: st.title, url: st.url });
+  if (!text) return;
+  const origTitle = btn.title;
+  const origAria = btn.getAttribute("aria-label") || "";
+  const flash = (msg) => {
+    btn.title = msg;
+    btn.setAttribute("aria-label", msg);
+    btn.classList.add("copied");
+    clearTimeout(btn._askExportTimer);
+    btn._askExportTimer = setTimeout(() => {
+      btn.title = origTitle;
+      if (origAria) btn.setAttribute("aria-label", origAria); else btn.removeAttribute("aria-label");
+      btn.classList.remove("copied");
+    }, 1500);
+  };
+  try {
+    await navigator.clipboard.writeText(text);
+    flash(t("askCopied"));
+  } catch (_) {
+    flash(t("mdPreviewFailed"));
+  }
+}
+
 function _pbpAskHistThread() {
   return document.getElementById("ask-thread");
 }
@@ -936,25 +1040,58 @@ function _pbpAskHistThread() {
 // makes sure the clear control exists once the thread has content.
 function _pbpAskDecorate(el, parsed) {
   _pbpAskEnsureClear();
-  if (el.querySelector(".ask-copy-btn")) return;
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "action-btn ask-copy-btn";
-  btn.innerHTML = PBP_ASK_COPY_SVG; // static inline SVG constant above
-  const label = document.createElement("span");
-  label.className = "btn-label";
-  label.textContent = t("askCopyAnswer");
-  btn.appendChild(label);
-  const text = _pbpAskBuildCopyText(parsed.body, parsed.cites);
-  btn.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      flashButtonLabel(btn, t("askCopied"));
-    } catch (_) {
-      flashButtonLabel(btn, t("mdPreviewFailed"));
-    }
+  if (!el.querySelector(".ask-copy-btn")) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "action-btn ask-copy-btn";
+    btn.innerHTML = PBP_ASK_COPY_SVG; // static inline SVG constant above
+    const label = document.createElement("span");
+    label.className = "btn-label";
+    label.textContent = t("askCopyAnswer");
+    btn.appendChild(label);
+    const text = _pbpAskBuildCopyText(parsed.body, parsed.cites);
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        flashButtonLabel(btn, t("askCopied"));
+      } catch (_) {
+        flashButtonLabel(btn, t("mdPreviewFailed"));
+      }
+    });
+    el.appendChild(btn);
+  }
+  if (el.dataset.askQuestion && !el.querySelector(".ask-regenerate")) {
+    const regen = document.createElement("button");
+    regen.type = "button";
+    regen.className = "action-btn ask-regenerate";
+    regen.innerHTML = PBP_ASK_REGEN_SVG;
+    const label = document.createElement("span");
+    label.className = "btn-label";
+    label.textContent = t("askErrRetry");
+    regen.appendChild(label);
+    regen.addEventListener("click", () => _pbpAskRegenerate(el));
+    el.appendChild(regen);
+  }
+  _pbpAskSyncRegenerate();
+}
+
+function _pbpAskSyncRegenerate() {
+  const btns = Array.from(document.querySelectorAll("#ask-thread .ask-regenerate"));
+  btns.forEach((btn, i) => {
+    const latest = i === btns.length - 1;
+    btn.hidden = !latest;
+    btn.disabled = !latest;
   });
-  el.appendChild(btn);
+}
+
+function _pbpAskRegenerate(el) {
+  const st = _pbpAskState;
+  if (!st || st.running || !el || !el.dataset.askQuestion) return;
+  const oldNodes = Array.from(el.childNodes);
+  el.replaceChildren();
+  el.classList.add("streaming");
+  el.setAttribute("aria-busy", "true");
+  _pbpAskRun(el.dataset.askQuestion, el, { replaceLast: true, restoreNodes: oldNodes }).catch(() => {});
 }
 
 // ---- Clear: inline two-button confirm strip (never window.confirm) ----
@@ -1039,6 +1176,7 @@ async function _pbpAskHistRestore() {
   let hist = [];
   try { hist = await pbpAskHistGet(_pbpAskHistUrl); } catch (_) {}
   if (!hist.length) return;
+  if (_pbpAskState) _pbpAskState.records = hist.slice();
   // Restored rounds replace the empty-state hint; the starter chips
   // collapse (thread is no longer empty) — mirrors the live send path.
   const empty = document.getElementById("ask-empty");
@@ -1087,6 +1225,7 @@ async function _pbpAskHistRestore() {
         qEl.textContent = String(rec.q || "");
         const aEl = document.createElement("div");
         aEl.className = "ask-a";
+        aEl.dataset.askQuestion = String(rec.q || "");
         frag.appendChild(qEl);
         frag.appendChild(aEl);
         // SAME pipeline as live answers: pbpAiParseCites -> renderMarkdown
@@ -1120,6 +1259,7 @@ async function _pbpAskHistRestore() {
   // Prepend: if a live round raced in before the async build finished,
   // restored history still reads in chronological order above it.
   thread.insertBefore(frag, thread.firstChild);
+  _pbpAskSyncRegenerate();
 }
 
 // Just remember the URL for _pbpAskHistRestore. Restore itself now fires

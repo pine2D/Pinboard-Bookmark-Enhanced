@@ -546,6 +546,18 @@ async function pbpAskHistAppend(url, round) {
   });
 }
 
+async function pbpAskHistReplaceLast(url, round) {
+  await pbpAiCacheAppend(_pbpAskHistKey(url), (prev) => {
+    const hist = Array.isArray(prev) ? prev.slice() : [];
+    if (hist.length && hist[hist.length - 1] && hist[hist.length - 1].q === round.q) {
+      hist[hist.length - 1] = round;
+    } else {
+      hist.push(round);
+    }
+    return _pbpAskHistTrim(hist);
+  });
+}
+
 async function pbpTrViewGet(url) {
   const entry = await pbpAiCacheGet(_pbpTrViewKey(url));
   const r = entry && entry.result;

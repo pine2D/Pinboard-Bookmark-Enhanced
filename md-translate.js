@@ -153,6 +153,11 @@ function pbpTrMatchGlossary(glossary, segments) {
   return out;
 }
 
+function pbpTrGlossaryHitEntries(glossary, segments) {
+  const matched = pbpTrMatchGlossary(glossary, segments);
+  return Object.keys(matched).map((term) => ({ term, translation: matched[term] }));
+}
+
 // ---- Hallucination probe (spec 4.3 ladder step 3) ----
 // A translated block whose char-length ratio vs the original falls outside
 // [0.3, 4] (inclusive) is judged invalid and re-queued for single-block
@@ -615,7 +620,8 @@ async function pbpTrInit(detail) {
                                     // persisted-mode restore below, so a returning reader's
                                     // last view (e.g. "translated") is what V returns to.
     running: false,
-    ctrl: null
+    ctrl: null,
+    glossaryHits: Object.create(null)
   };
   // Cheap pre-gate + cost estimate WITHOUT Turndown: any non-pre block carrying text is
   // a translation candidate; sum its textContent length as the rough char count for the
@@ -845,6 +851,12 @@ function _pbpTrBuildSection(st) {
   skipNote.hidden = true;
   sec.appendChild(skipNote);
 
+  const glossaryHits = document.createElement("div");
+  glossaryHits.id = "tr-glossary-hits";
+  glossaryHits.className = "tr-meta";
+  glossaryHits.hidden = true;
+  sec.appendChild(glossaryHits);
+
   const prog = document.createElement("div");
   prog.id = "tr-progress";
   prog.className = "tr-meta";
@@ -916,6 +928,32 @@ function _pbpTrRenderUsage(st) {
   el.hidden = false;
 }
 
+function _pbpTrRenderGlossaryHits(st) {
+  const el = document.getElementById("tr-glossary-hits");
+  if (!el) return;
+  const hits = st && st.glossaryHits ? st.glossaryHits : Object.create(null);
+  const entries = Object.keys(hits).map((term) => ({ term, translation: hits[term] }));
+  if (!entries.length) {
+    el.hidden = true;
+    el.textContent = "";
+    el.removeAttribute("title");
+    return;
+  }
+  const list = entries.map((x) => x.term + " -> " + (x.translation || x.term)).join(", ");
+  el.textContent = t("translateGlossaryLabel") + ": " + entries.length + " - " + list;
+  el.title = list;
+  el.hidden = false;
+}
+
+function _pbpTrAddGlossaryHits(st, glossary) {
+  if (!st || !glossary) return;
+  const terms = Object.keys(glossary);
+  if (!terms.length) return;
+  if (!st.glossaryHits) st.glossaryHits = Object.create(null);
+  for (const term of terms) st.glossaryHits[term] = glossary[term];
+  _pbpTrRenderGlossaryHits(st);
+}
+
 // Re-resolve target language from settings and update the rail label.
 // `s` may be passed (test / storage-change fast path) or fetched.
 // No-op-safe if the label element isn't mounted yet.
@@ -937,6 +975,8 @@ async function _pbpTrApplyTargetLang(st, s) {
   // re-probe — clicking Translate re-requests; correctness only needs "can retranslate".
   st.glossary = null;
   st.trMd = Object.create(null);
+  st.glossaryHits = Object.create(null);
+  _pbpTrRenderGlossaryHits(st);
   st.skippedSet = new Set();      // T3: stale skip verdicts were computed for the OLD language
   st.skippedCount = 0;
   const skipNote = document.getElementById("tr-skip-note");
@@ -1031,6 +1071,8 @@ async function _pbpTrStart(st) {
   _pbpTrClearPendingFailures(new Set(pending.map((w) => w.n)));
   st.ctrl = new AbortController();
   st.usage = { inTok: 0, outTok: 0, approx: false };   // T4: reset actual/estimated usage per run
+  st.glossaryHits = Object.create(null);
+  _pbpTrRenderGlossaryHits(st);
   pbpAiBumpCounter("translate");
   _pbpTrSetStatus(st, "translating");
   // Progressive display: reveal the view toggle and switch to bilingual NOW so
@@ -1062,7 +1104,9 @@ async function _pbpTrStart(st) {
   });
 
   const requestBatch = (segments, onItem) => {
-    const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, glossary: pbpTrMatchGlossary(st.glossary, segments), segments });
+    const glossary = pbpTrMatchGlossary(st.glossary, segments);
+    _pbpTrAddGlossaryHits(st, glossary);
+    const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, glossary, segments });
     const parser = pbpAiMakeStreamJsonParser(onItem);
     const sentChars = segments.reduce((a, x) => a + x.text.length, 0);
     const opts = streamOpts(sentChars);
@@ -1075,7 +1119,9 @@ async function _pbpTrStart(st) {
     ).then((full) => { _pbpTrUsageFallback(st, u.got, sentChars, full); return parser.finish(full); });
   };
   const requestSingle = async (seg) => {
-    const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, glossary: pbpTrMatchGlossary(st.glossary, [seg]), segments: [seg] });
+    const glossary = pbpTrMatchGlossary(st.glossary, [seg]);
+    _pbpTrAddGlossaryHits(st, glossary);
+    const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, glossary, segments: [seg] });
     let got = null;
     const parser = pbpAiMakeStreamJsonParser((it) => { if (it.id === seg.id) got = it.text; });
     const opts = streamOpts(seg.text.length);
@@ -1325,9 +1371,11 @@ async function _pbpTrTranslateBlock(st, w, signal) {
   const out = [];
   for (let i = 0; i < split.chunks.length; i++) {
     const seg = { id: w.n, text: split.chunks[i] };
+    const hits = pbpTrMatchGlossary(glossary, [seg]);
+    _pbpTrAddGlossaryHits(st, hits);
     const { system, prompt } = pbpTrBuildPrompt({
       targetLanguage: st.target.name, title: st.title,
-      glossary: pbpTrMatchGlossary(glossary, [seg]), segments: [seg]
+      glossary: hits, segments: [seg]
     });
     let got = null;
     const parser = pbpAiMakeStreamJsonParser((it) => { if (it.id === w.n) got = it.text; });

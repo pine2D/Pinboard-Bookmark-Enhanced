@@ -22,6 +22,12 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../vendor/marked.min.js"></script>
 <script src="../vendor/purify.min.js"></script>
 <script src="../md-convert.js"></script>
+<script>
+window.chrome = window.chrome || {
+  i18n: { getMessage: () => "" },
+  storage: { local: { get: async (defaults) => defaults || {} } }
+};
+</script>
 <script src="../i18n.js"></script>
 <script src="../shared.js"></script>
 <script src="../ai.js"></script>
@@ -1020,6 +1026,19 @@ suite("md-ai IDB key conventions", () => {
     assertEq(hist.length, 20, "capped at 20, got " + hist.length);
     assertEq(hist[0].q, "q3", "oldest 2 dropped");
     assertEq(hist[19].q, "q22", "newest kept");
+  });
+  await atest("pbpAskHistReplaceLast replaces only the matching last question", async () => {
+    const url = "https://replace-last.example/" + Date.now() + "_" + Math.random();
+    await pbpAskHistAppend(url, { q: "q1", a: "a1" });
+    await pbpAskHistAppend(url, { q: "q2", a: "old" });
+    await pbpAskHistReplaceLast(url, { q: "q2", a: "new" });
+    let hist = await pbpAskHistGet(url);
+    assertEq(hist.length, 2, "replace keeps length");
+    assertEq(hist[1].a, "new", "last matching round replaced");
+    await pbpAskHistReplaceLast(url, { q: "q3", a: "third" });
+    hist = await pbpAskHistGet(url);
+    assertEq(hist.length, 3, "mismatched last appends instead");
+    assertEq(hist[2].q, "q3", "new round appended");
   });
 })();
 </script>
@@ -2098,6 +2117,29 @@ suiteIf("pbpAskBuildContext", "pbpAskBuildContext", () => {
   });
 });
 
+suiteIf("pbpAskBuildSuggestions", "pbpAskBuildContext", () => {
+  function ctxBlocks(html) {
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    return pbpAiIndexBlocks(root);
+  }
+  test("suggestions include title and local headings", () => {
+    const out = pbpAskBuildSuggestions("Article Title", ctxBlocks("<h2>Setup</h2><p>x</p><h3>Tradeoffs</h3>"), {
+      summarize: "Summarize",
+      argument: "Argument",
+      data: "Data"
+    });
+    assertEq(out.length, 3, "three suggestions");
+    assert(out[0].indexOf("Article Title") !== -1, "title used");
+    assert(out[1].indexOf("Setup") !== -1, "first heading used");
+    assert(out[2].indexOf("Tradeoffs") !== -1, "second heading used");
+  });
+  test("suggestions fall back to generic topic", () => {
+    const out = pbpAskBuildSuggestions("", [], { summarize: "S", argument: "A", data: "D" });
+    assertEq(out[0], "S: this page", "generic topic");
+  });
+});
+
 // ============ Task 13: pbpAskBuildPrompt ============
 suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
   test("system pins question language, article-only and CITES protocol", () => {
@@ -2376,6 +2418,17 @@ suiteIf("ask copy text builder", "pbpAskBuildContext", () => {
   test("empty body with cites still emits footnotes", () => {
     assertEq(_pbpAskBuildCopyText("", [{ p: 1, quote: "q" }]), '\n\n[^1]: "q" — P1', "empty body");
   });
+  test("thread export includes page metadata and all rounds", () => {
+    const out = _pbpAskBuildThreadExport([
+      { q: "What is alpha?", a: "Alpha is first. [P1]\n\nCITES:\nP1: \"Alpha\"" },
+      { q: "What next?", a: "Beta." }
+    ], { title: "Demo", url: "https://example.test" });
+    assert(out.indexOf("# Demo") !== -1, "title");
+    assert(out.indexOf("https://example.test") !== -1, "url");
+    assert(out.indexOf("## Q1") !== -1 && out.indexOf("## Q2") !== -1, "round headers");
+    assert(out.indexOf("**Q:** What is alpha?") !== -1, "question");
+    assert(out.indexOf('[^1]: "Alpha" — P1') !== -1, "cites footnote");
+  });
 });
 </script>
 <script>
@@ -2624,6 +2677,22 @@ suiteIf("pbpTrParseGlossaryJson / pbpTrMergeGlossary / pbpTrMatchGlossary", "pbp
   });
   test("matchGlossary: zero hit -> empty", () => {
     assertEq(Object.keys(pbpTrMatchGlossary({ X: "x" }, [{ id: 1, text: "nothing here" }])).length, 0, "empty");
+  });
+  test("glossaryHitEntries: returns matched terms in glossary order", () => {
+    const hits = pbpTrGlossaryHitEntries(
+      { Transformer: "变换器", Pinboard: "", Llama: "羊驼" },
+      [{ id: 1, text: "Pinboard notes use a Transformer block" }]
+    );
+    assertEq(hits.length, 2, "two hits");
+    assertEq(hits[0].term, "Transformer", "keeps glossary order");
+    assertEq(hits[0].translation, "变换器", "translation preserved");
+    assertEq(hits[1].term, "Pinboard", "second hit");
+    assertEq(hits[1].translation, "", "keep-source empty translation preserved");
+  });
+  test("glossaryHitEntries: miss returns empty array", () => {
+    const hits = pbpTrGlossaryHitEntries({ Transformer: "变换器" }, [{ id: 1, text: "plain text" }]);
+    assertEq(Array.isArray(hits), true, "array");
+    assertEq(hits.length, 0, "empty");
   });
 });
 

@@ -1598,12 +1598,13 @@ body.ask-open main { margin-right: 396px; }
 }
 .ask-clear-confirm .ask-clear-msg { flex: 1 1 100%; }
 .ask-clear-confirm .ask-clear-yes { color: var(--danger); border-color: var(--danger); }
-.ask-copy-btn {
+.ask-copy-btn, .ask-regenerate {
   margin-top: 8px;
+  margin-right: 6px;
   padding: 3px 10px;
   font-size: 12px;
 }
-.ask-copy-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+.ask-copy-btn svg, .ask-regenerate svg { width: 13px; height: 13px; flex-shrink: 0; }
 
 /* ---- Highlight edit card (md-highlight.js) ---- */
 #pb-hl-card {
