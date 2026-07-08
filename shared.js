@@ -221,6 +221,7 @@ const SETTINGS_DEFAULTS = {
   // WebDAV settings backup (batch (5)): push is explicit-click or scheduled;
   // pull is always behind a user confirm() -- see webdav.js.
   webdavUrl: "", webdavUser: "", webdavPass: "", webdavAutoPush: "off", // "off" | "hourly" | "daily"
+  backupIncludeHighlights: true,
   // md-preview in-page AI (explain / ask / translate)
   previewAiEnabled: true,
   // R11 skim layer (key-points summary): default OFF, unlike previewAiEnabled --
@@ -449,6 +450,63 @@ function pbpIsNeverClearKey(key) {
   if (typeof SETTINGS_DEFAULTS === "object" && SETTINGS_DEFAULTS &&
       Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, key)) return true;
   return false;
+}
+
+function pbpIsHighlightBackupKey(key) {
+  return typeof key === "string" && key.startsWith("pbp_hl_");
+}
+
+function pbpSanitizeHighlightBackupItem(item) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+  const out = {};
+  ["id", "quote", "prefix", "suffix", "note", "side", "lang"].forEach((k) => {
+    if (typeof item[k] === "string") out[k] = item[k];
+  });
+  ["n", "color", "ts"].forEach((k) => {
+    if (typeof item[k] === "number") out[k] = item[k];
+  });
+  return out;
+}
+
+function pbpSanitizeHighlightBackupRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !Array.isArray(value.items)) return null;
+  const out = { items: [] };
+  if (typeof value.v === "number") out.v = value.v;
+  if (typeof value.url === "string") out.url = value.url;
+  if (typeof value.title === "string") out.title = value.title;
+  value.items.forEach((item) => {
+    const cleaned = pbpSanitizeHighlightBackupItem(item);
+    if (cleaned) out.items.push(cleaned);
+  });
+  return out;
+}
+
+function pbpBuildHighlightBackup(allLocal) {
+  const out = {};
+  for (const [key, value] of Object.entries(allLocal || {})) {
+    if (!pbpIsHighlightBackupKey(key)) continue;
+    if (key === "pbp_hl_last_color") {
+      if (typeof value === "number" && value >= 1 && value <= 5) out[key] = value;
+      continue;
+    }
+    const cleaned = pbpSanitizeHighlightBackupRecord(value);
+    if (cleaned) out[key] = cleaned;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function pbpCleanHighlightBackup(highlights) {
+  const out = {};
+  for (const [key, value] of Object.entries(highlights || {})) {
+    if (!pbpIsHighlightBackupKey(key)) continue;
+    if (key === "pbp_hl_last_color") {
+      if (typeof value === "number" && value >= 1 && value <= 5) out[key] = value;
+      continue;
+    }
+    const cleaned = pbpSanitizeHighlightBackupRecord(value);
+    if (cleaned) out[key] = cleaned;
+  }
+  return out;
 }
 
 function pbpKeyMatchesCategory(key, def) {

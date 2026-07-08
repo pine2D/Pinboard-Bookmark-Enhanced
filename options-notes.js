@@ -59,6 +59,17 @@ function pbpNotesMatch(rec, q) {
   return false;
 }
 
+function pbpNotesEntryHasColor(rec, colorSet) {
+  if (!colorSet || !colorSet.size) return true;
+  if ([1, 2, 3, 4, 5].every((c) => colorSet.has(c))) return true;
+  const items = rec && Array.isArray(rec.items) ? rec.items : [];
+  return items.some((it) => {
+    if (!it || typeof it !== "object") return false;
+    const c = Number(it.color);
+    return colorSet.has(c >= 1 && c <= 5 ? c : 1);
+  });
+}
+
 // ============================================================
 // Render / interaction layer (DOM + chrome.storage). Lazily invoked by
 // options.js's activateTab on first (and every subsequent) "notes" tab
@@ -67,7 +78,10 @@ function pbpNotesMatch(rec, q) {
 // scan per activation; the data set is small enough that this is cheap).
 // ============================================================
 
+const PBP_NOTES_COLORS = [1, 2, 3, 4, 5];
+const PBP_NOTES_COLOR_KEYS = ["hlColorQuote", "hlColorDefinition", "hlColorExample", "hlColorDoubt", "hlColorTodo"];
 let _notesAllRows = []; // [{ row, rec }], last full scan, sorted lastTs desc
+let _notesActiveColors = new Set(PBP_NOTES_COLORS);
 
 async function _pbpNotesScan() {
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return [];
@@ -88,75 +102,149 @@ function _pbpNotesFormatDate(ts) {
   try { return new Date(ts).toLocaleDateString(); } catch (_) { return ""; }
 }
 
+function _pbpNotesVisibleEntries() {
+  const filterInput = $id("notes-filter");
+  const q = filterInput ? filterInput.value : "";
+  return _notesAllRows.filter((e) => pbpNotesMatch(e.rec, q) && pbpNotesEntryHasColor(e.rec, _notesActiveColors));
+}
+
+function _pbpNotesBuildItem(it) {
+  const itemEl = document.createElement("div");
+  itemEl.className = "notes-item";
+
+  const dot = document.createElement("span");
+  const color = Number(it && it.color);
+  dot.className = "note-dot c" + (color >= 1 && color <= 5 ? color : 1);
+  itemEl.appendChild(dot);
+
+  const textEl = document.createElement("div");
+  textEl.className = "notes-item-text";
+
+  const quote = typeof it.quote === "string" ? it.quote : "";
+  const quoteEl = document.createElement("div");
+  quoteEl.className = "notes-item-quote";
+  quoteEl.textContent = quote.length > 220 ? quote.slice(0, 220) + "\u2026" : quote;
+  textEl.appendChild(quoteEl);
+
+  if (it.side === "tr" && it.lang) {
+    const langEl = document.createElement("span");
+    langEl.className = "notes-item-lang";
+    langEl.textContent = String(it.lang);
+    textEl.appendChild(langEl);
+  }
+
+  const note = typeof it.note === "string" ? it.note : "";
+  if (note.trim()) {
+    const noteEl = document.createElement("div");
+    noteEl.className = "notes-item-note";
+    noteEl.textContent = note;
+    textEl.appendChild(noteEl);
+  }
+
+  itemEl.appendChild(textEl);
+  return itemEl;
+}
+
 function _pbpNotesBuildRow(entry) {
   const { row, rec } = entry;
-  const details = document.createElement("details");
-  details.className = "notes-row";
+  const card = document.createElement("article");
+  card.className = "notes-card";
 
-  const summary = document.createElement("summary");
-  // The flex row lives on an INNER span, never on <summary> itself:
-  // display:flex on <summary> deletes its native ::marker triangle (verified
-  // empirically -- Chromium only paints ::marker while summary keeps its UA
-  // default display:list-item). Wrapping keeps the native disclosure
-  // triangle with zero custom marker CSS/glyph (no dingbat character).
-  const inner = document.createElement("span");
-  inner.className = "notes-row-inner";
+  const top = document.createElement("div");
+  top.className = "notes-card-top";
+
+  const bodyId = "notes-card-body-" + row.key.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const head = document.createElement("button");
+  head.type = "button";
+  head.className = "notes-card-head";
+  head.setAttribute("aria-expanded", "false");
+  head.setAttribute("aria-controls", bodyId);
+
+  const chev = document.createElement("span");
+  chev.className = "notes-card-chevron";
+  chev.setAttribute("aria-hidden", "true");
+  head.appendChild(chev);
+
+  const main = document.createElement("span");
+  main.className = "notes-card-main";
 
   const titleEl = document.createElement("span");
   titleEl.className = "notes-row-title";
-  if (row.url) {
-    const a = document.createElement("a");
-    a.href = row.url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.textContent = row.title || row.url;
-    titleEl.appendChild(a);
-  } else {
-    titleEl.textContent = t("notesUnknownPage");
-  }
-  inner.appendChild(titleEl);
+  titleEl.textContent = row.url ? (row.title || row.url) : t("notesUnknownPage");
+  main.appendChild(titleEl);
 
   const meta = document.createElement("span");
   meta.className = "notes-row-meta";
 
   const hlSpan = document.createElement("span");
+  hlSpan.className = "notes-meta-chip";
   hlSpan.textContent = String(row.hlCount) + " " + t("notesColHighlights");
   meta.appendChild(hlSpan);
 
   const noteSpan = document.createElement("span");
+  noteSpan.className = "notes-meta-chip";
   noteSpan.textContent = String(row.noteCount) + " " + t("notesColNotes");
   meta.appendChild(noteSpan);
 
-  const dateSpan = document.createElement("span");
-  dateSpan.textContent = _pbpNotesFormatDate(row.lastTs);
-  dateSpan.title = t("notesColLastActive");
-  meta.appendChild(dateSpan);
+  const dateText = _pbpNotesFormatDate(row.lastTs);
+  if (dateText) {
+    const dateSpan = document.createElement("span");
+    dateSpan.className = "notes-meta-chip";
+    dateSpan.textContent = dateText;
+    dateSpan.title = t("notesColLastActive");
+    meta.appendChild(dateSpan);
+  }
 
   const bytesSpan = document.createElement("span");
+  bytesSpan.className = "notes-meta-chip";
   bytesSpan.textContent = typeof pbpFormatBytes === "function" ? pbpFormatBytes(row.bytes) : String(row.bytes);
   bytesSpan.title = t("notesColSize");
   meta.appendChild(bytesSpan);
 
-  inner.appendChild(meta);
+  main.appendChild(meta);
+  head.appendChild(main);
+  top.appendChild(head);
+
+  let pageUrl = null;
+  try {
+    pageUrl = row.url ? new URL(row.url) : null;
+    if (pageUrl && pageUrl.protocol !== "http:" && pageUrl.protocol !== "https:") pageUrl = null;
+  } catch (_) {
+    pageUrl = null;
+  }
+  if (pageUrl) {
+    const openLink = document.createElement("a");
+    openLink.className = "btn btn-sm notes-row-open";
+    openLink.href = pageUrl.href;
+    openLink.target = "_blank";
+    openLink.rel = "noopener noreferrer";
+    openLink.textContent = pageUrl.host || pageUrl.href;
+    openLink.addEventListener("click", (e) => e.stopPropagation());
+    top.appendChild(openLink);
+  }
 
   const delBtn = document.createElement("button");
   delBtn.type = "button";
   delBtn.className = "btn btn-sm notes-row-del";
   delBtn.textContent = t("notesDeleteBtn");
   delBtn.addEventListener("click", (e) => {
-    e.preventDefault(); // stop the click from also toggling <details> open/closed
+    e.preventDefault();
+    e.stopPropagation();
     _pbpNotesDelete(row);
   });
-  inner.appendChild(delBtn);
+  top.appendChild(delBtn);
+  card.appendChild(top);
 
-  summary.appendChild(inner);
-  details.appendChild(summary);
+  const body = document.createElement("div");
+  body.id = bodyId;
+  body.className = "notes-card-body";
+  body.hidden = true;
 
   if (!row.url) {
     const hint = document.createElement("p");
     hint.className = "notes-unknown-hint";
     hint.textContent = t("notesUnknownHint");
-    details.appendChild(hint);
+    body.appendChild(hint);
   }
 
   const itemsEl = document.createElement("div");
@@ -164,45 +252,58 @@ function _pbpNotesBuildRow(entry) {
   const items = Array.isArray(rec.items) ? rec.items : [];
   items.forEach((it) => {
     if (!it || typeof it !== "object") return;
-    const itemEl = document.createElement("div");
-    itemEl.className = "notes-item";
-
-    const dot = document.createElement("span");
-    const color = Number(it.color);
-    dot.className = "note-dot c" + (color >= 1 && color <= 5 ? color : 1);
-    itemEl.appendChild(dot);
-
-    const textEl = document.createElement("div");
-    textEl.className = "notes-item-text";
-    const quote = typeof it.quote === "string" ? it.quote : "";
-    const quoteEl = document.createElement("div");
-    quoteEl.className = "notes-item-quote";
-    quoteEl.textContent = quote.length > 200 ? quote.slice(0, 200) + "\u2026" : quote;
-    textEl.appendChild(quoteEl);
-
-    const note = typeof it.note === "string" ? it.note : "";
-    if (note.trim()) {
-      const noteEl = document.createElement("div");
-      noteEl.className = "notes-item-note";
-      noteEl.textContent = note;
-      textEl.appendChild(noteEl);
-    }
-    itemEl.appendChild(textEl);
-    itemsEl.appendChild(itemEl);
+    itemsEl.appendChild(_pbpNotesBuildItem(it));
   });
-  details.appendChild(itemsEl);
+  body.appendChild(itemsEl);
+  card.appendChild(body);
 
-  return details;
+  head.addEventListener("click", () => {
+    const open = body.hidden;
+    body.hidden = !open;
+    head.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+
+  return card;
+}
+
+function _pbpNotesRenderToolbar(total, visible) {
+  const count = $id("notes-count");
+  if (count) count.textContent = String(visible) + " / " + String(total);
+}
+
+function _pbpNotesBuildColorFilters() {
+  const wrap = $id("notes-color-filters");
+  if (!wrap || wrap.dataset.ready) return;
+  wrap.dataset.ready = "1";
+  PBP_NOTES_COLORS.forEach((c, idx) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "notes-filter-dot";
+    b.setAttribute("aria-pressed", "true");
+    b.setAttribute("aria-label", t(PBP_NOTES_COLOR_KEYS[idx]));
+    const dot = document.createElement("span");
+    dot.className = "note-dot c" + c;
+    dot.setAttribute("aria-hidden", "true");
+    b.appendChild(dot);
+    b.addEventListener("click", () => {
+      if (_notesActiveColors.has(c) && _notesActiveColors.size > 1) _notesActiveColors.delete(c);
+      else _notesActiveColors.add(c);
+      b.setAttribute("aria-pressed", _notesActiveColors.has(c) ? "true" : "false");
+      _pbpNotesRenderList(_pbpNotesVisibleEntries());
+    });
+    wrap.appendChild(b);
+  });
 }
 
 function _pbpNotesRenderList(entries) {
   const list = $id("notes-list");
   if (!list) return;
+  _pbpNotesRenderToolbar(_notesAllRows.length, entries.length);
   list.textContent = "";
   if (!entries.length) {
     const empty = document.createElement("p");
     empty.className = "notes-empty";
-    empty.textContent = t("notesEmpty");
+    empty.textContent = _notesAllRows.length ? t("notesFilterEmpty") : t("notesEmpty");
     list.appendChild(empty);
     return;
   }
@@ -214,8 +315,7 @@ async function _pbpNotesDelete(row) {
   if (!confirm(t("notesDeleteConfirm", label))) return;
   try { await chrome.storage.local.remove(row.key); } catch (_) { return; }
   _notesAllRows = _notesAllRows.filter((e) => e.row.key !== row.key);
-  const filterInput = $id("notes-filter");
-  _pbpNotesRenderList(_notesAllRows.filter((e) => pbpNotesMatch(e.rec, filterInput ? filterInput.value : "")));
+  _pbpNotesRenderList(_pbpNotesVisibleEntries());
 }
 
 // Called from options.js's activateTab -- the sole lazy-init line added
@@ -223,9 +323,9 @@ async function _pbpNotesDelete(row) {
 // matching renderStoragePanel()'s convention.
 async function renderNotesPanel() {
   if (!$id("notes-list")) return;
+  _pbpNotesBuildColorFilters();
   _notesAllRows = await _pbpNotesScan();
-  const filterInput = $id("notes-filter");
-  _pbpNotesRenderList(_notesAllRows.filter((e) => pbpNotesMatch(e.rec, filterInput ? filterInput.value : "")));
+  _pbpNotesRenderList(_pbpNotesVisibleEntries());
 }
 
 // The filter input is static markup (never recreated), so bind its listener
@@ -242,7 +342,8 @@ if (typeof $id === "function") {
   const _notesFilterInput = $id("notes-filter");
   if (_notesFilterInput) {
     _notesFilterInput.addEventListener("input", () => {
-      _pbpNotesRenderList(_notesAllRows.filter((e) => pbpNotesMatch(e.rec, _notesFilterInput.value)));
+      _pbpNotesBuildColorFilters();
+      _pbpNotesRenderList(_pbpNotesVisibleEntries());
     });
   }
 }

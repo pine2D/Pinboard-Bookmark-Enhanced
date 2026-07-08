@@ -58,6 +58,24 @@ function _pbpSkimCacheKey(url) {
   return "skim_" + pbpAiHash(String(url || ""));
 }
 
+function _pbpSkimCacheMeta(st) {
+  const s = (st && st.s) || {};
+  const provider = s.aiProvider || "gemini";
+  return {
+    langKey: aiSummaryLangInstruction(s),
+    modelKey: provider + ":" + (pbpAiResolveModelOverride(s) || "default")
+  };
+}
+
+function _pbpSkimCacheMatches(r, st, curBlocksHash) {
+  if (!r || typeof r !== "object") return false;
+  const meta = _pbpSkimCacheMeta(st);
+  if (!r.langKey || !r.modelKey) return false;
+  return r.langKey === meta.langKey
+    && r.modelKey === meta.modelKey
+    && (!r.blocksHash || !curBlocksHash || r.blocksHash === curBlocksHash);
+}
+
 // Double gate (spec 1.1): shared master AI gate first, skim's own
 // opt-in flag second (default off -- token-protection invariant #1,
 // spec sec.3). Then the same force-index-if-empty guard pbpAskInit
@@ -182,13 +200,21 @@ async function _pbpSkimLoad() {
   let entry = null;
   try { entry = await pbpAiCacheGet(_pbpSkimCacheKey(st.url)); } catch (_) {}
   const r = entry && entry.result;
-  if (r && typeof r === "object" && typeof r.md === "string") {
+  const curFp = (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : "";
+  if (r && typeof r === "object" && typeof r.md === "string"
+      && _pbpSkimCacheMatches(r, st, curFp)) {
     _pbpSkimRenderCached(r);
-    const curFp = (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : "";
-    if (r.blocksHash && curFp && r.blocksHash !== curFp) {
-      const stale = document.getElementById("skim-stale");
-      if (stale) stale.hidden = false;
-    }
+    return;
+  }
+  const meta = _pbpSkimCacheMeta(st);
+  if (r && typeof r === "object" && typeof r.md === "string"
+      && r.langKey && r.modelKey
+      && r.langKey === meta.langKey
+      && r.modelKey === meta.modelKey
+      && r.blocksHash && curFp && r.blocksHash !== curFp) {
+    _pbpSkimRenderCached(r);
+    const stale = document.getElementById("skim-stale");
+    if (stale) stale.hidden = false;
     return;
   }
   await _pbpSkimRun();
@@ -301,13 +327,15 @@ function _pbpSkimFinalize(fullText, usage) {
   body.innerHTML = renderMarkdown(parsed.body);
   if (typeof _pbpAskChipPass === "function") _pbpAskChipPass(body, parsed.cites);
   const blocksHash = (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : "";
-  const model = pbpAiResolveModelOverride(st.s) || st.s.aiProvider || "gemini";
+  const meta = _pbpSkimCacheMeta(st);
   pbpAiCacheSet(_pbpSkimCacheKey(st.url), {
     md: parsed.body,
     cites: parsed.cites,
     blocksHash,
     ts: Date.now(),
-    model
+    model: meta.modelKey,
+    langKey: meta.langKey,
+    modelKey: meta.modelKey
   }, Date.now()).catch(() => {});
   const stale = document.getElementById("skim-stale");
   if (stale) stale.hidden = true;

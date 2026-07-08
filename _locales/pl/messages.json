@@ -722,7 +722,7 @@
     "message": "Notatki"
   },
   "notesFilterPlaceholder": {
-    "message": "Filtruj wg tytułu lub notatki…"
+    "message": "Filtruj wg tytułu lub notatki"
   },
   "notesColHighlights": {
     "message": "Zaznaczenia"
@@ -738,6 +738,9 @@
   },
   "notesEmpty": {
     "message": "Zaznacz tekst na stronie podglądu Markdown, aby go wyróżnić lub dodać notatkę."
+  },
+  "notesFilterEmpty": {
+    "message": "Żadne notatki nie pasują do tego filtra."
   },
   "notesUnknownPage": {
     "message": "Nieznana strona"
@@ -875,6 +878,12 @@
   "backupHint": {
     "message": "Eksportuj/importuj ustawienia (klucze API nie są eksportowane ze względów bezpieczeństwa)."
   },
+  "backupIncludeHighlightsLabel": {
+    "message": "Uwzględniaj zaznaczenia i notatki w kopiach zapasowych"
+  },
+  "backupIncludeHighlightsHint": {
+    "message": "Obejmuje adresy URL stron, tytuły, zaznaczony tekst, notatki, kolory i znaczniki czasu w ręcznych oraz WebDAV kopiach zapasowych. Klucze API nadal nigdy nie są uwzględniane."
+  },
   "exportSettings": {
     "message": "Eksportuj ustawienia"
   },
@@ -950,6 +959,12 @@
         "content": "$1"
       }
     }
+  },
+  "webdavPushNotWritable": {
+    "message": "Folder istnieje, ale wysyłanie zostało odrzucone. Wybierz istniejący zapisywalny folder synchronizacji, nie katalog główny WebDAV."
+  },
+  "webdavTargetUnavailable": {
+    "message": "Katalog docelowy nie istnieje albo nie można go utworzyć. Podaj adres URL zapisywalnego folderu WebDAV."
   },
   "webdavPermDenied": {
     "message": "Odmowa uprawnień — kliknij „Testuj”, aby je przyznać"

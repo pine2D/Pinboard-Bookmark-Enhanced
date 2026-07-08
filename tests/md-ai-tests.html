@@ -4272,6 +4272,76 @@ suiteIf("pbpHlAppendNoteText", "pbpHlAppendNoteText", () => {
 });
 </script>
 <script>
+// ============ md-highlight.js dirty note + save-answer-as-note race ============
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "md-highlight dirty note save race";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  if (typeof pbpHlAttachNote !== "function" || typeof _pbpHlCommitNote !== "function") {
+    const div = document.createElement("div");
+    div.className = "case skip";
+    div.textContent = "SKIP md-highlight dirty note save race (DOM layer not loaded)";
+    host.appendChild(div); SKIP++; return;
+  }
+  await atest("dirty card commit preserves answer appended while the card was dirty", async () => {
+    const prevSave = _pbpHlSave;
+    const prevRender = _pbpHlNotebookRender;
+    const prevState = _pbpHlState;
+    const prevCard = _pbpHlCard;
+    const prevCardItemId = _pbpHlCardItemId;
+    const prevCardBaseNote = _pbpHlCardBaseNote;
+    const prevDirty = _pbpHlNoteDirty;
+    const prevQueue = _pbpHlWriteQueue;
+    const card = document.createElement("div");
+    try {
+      _pbpHlSave = async () => true;
+      _pbpHlNotebookRender = () => {};
+      _pbpHlWriteQueue = Promise.resolve();
+      const item = { id: "h1", n: 1, quote: "quote", note: "stored", color: 1, ts: 1 };
+      _pbpHlState = { url: "https://example.com/a", title: "A", items: [item], ranges: {}, degraded: {} };
+      const note = document.createElement("textarea");
+      note.className = "hl-card-note";
+      note.value = "draft edit";
+      const save = document.createElement("button");
+      save.className = "hl-card-save";
+      card.appendChild(note);
+      card.appendChild(save);
+      document.body.appendChild(card);
+      _pbpHlCard = card;
+      _pbpHlCardItemId = "h1";
+      _pbpHlCardBaseNote = "stored";
+      _pbpHlNoteDirty = true;
+
+      const ok = await pbpHlAttachNote({ itemId: "h1" }, "answer from ask");
+      assertEq(ok, true, "attach reports success");
+      _pbpHlCommitNote();
+      await _pbpHlWriteQueue;
+      assertEq(item.note, "draft edit\n\nanswer from ask", "dirty draft and appended answer both survive");
+    } finally {
+      _pbpHlSave = prevSave;
+      _pbpHlNotebookRender = prevRender;
+      _pbpHlState = prevState;
+      _pbpHlCard = prevCard;
+      _pbpHlCardItemId = prevCardItemId;
+      _pbpHlCardBaseNote = prevCardBaseNote;
+      _pbpHlNoteDirty = prevDirty;
+      _pbpHlWriteQueue = prevQueue;
+      card.remove();
+    }
+  });
+})();
+</script>
+<script>
 // ============ Task 3: md-reader.js pbpFnHrefParse (spec sec.3 R3) ============
 suiteIf("pbpFnHrefParse", "pbpFnHrefParse", () => {
   test("body ref link -> {kind:'ref', id}", () => {
@@ -4560,6 +4630,40 @@ suiteIf("pbpSkimBuildPrompt", "pbpSkimBuildPrompt", () => {
     assert(r.prompt.indexOf("ARTICLE:\n[P1] hello\n[P2] world") !== -1, "context embedded");
     const r2 = pbpSkimBuildPrompt();
     assert(typeof r2.system === "string" && typeof r2.prompt === "string", "null args tolerated, shapes stay strings");
+  });
+});
+
+suiteIf("skim cache metadata", "_pbpSkimCacheMeta", () => {
+  test("cache meta includes resolved language instruction and model key", () => {
+    const meta = _pbpSkimCacheMeta({
+      s: { aiProvider: "openai", previewAiModel: "gpt-test", aiSummaryLang: "en" }
+    });
+    assert(meta.langKey && typeof meta.langKey === "string", "langKey present");
+    assertEq(meta.modelKey, "openai:gpt-test", "provider and model override included");
+  });
+
+  test("cache entry with same blocks/lang/model matches", () => {
+    const st = { s: { aiProvider: "gemini", aiSummaryLang: "en" } };
+    const meta = _pbpSkimCacheMeta(st);
+    assert(_pbpSkimCacheMatches(Object.assign({ blocksHash: "b1" }, meta), st, "b1"), "same meta matches");
+  });
+
+  test("cache entry with old language or model is a miss even if blocks match", () => {
+    const st = { s: { aiProvider: "gemini", previewAiModel: "new-model", aiSummaryLang: "zh-CN" } };
+    const meta = _pbpSkimCacheMeta(st);
+    assert(!_pbpSkimCacheMatches(Object.assign({}, meta, { blocksHash: "b1", langKey: "old-lang" }), st, "b1"), "old language misses");
+    assert(!_pbpSkimCacheMatches(Object.assign({}, meta, { blocksHash: "b1", modelKey: "old-model" }), st, "b1"), "old model misses");
+  });
+
+  test("cache entry with same model but different provider is a miss", () => {
+    const st = { s: { aiProvider: "openrouter", previewAiModel: "gpt-test", aiSummaryLang: "en" } };
+    const oldMeta = _pbpSkimCacheMeta({ s: { aiProvider: "openai", previewAiModel: "gpt-test", aiSummaryLang: "en" } });
+    assert(!_pbpSkimCacheMatches(Object.assign({ blocksHash: "b1" }, oldMeta), st, "b1"), "provider drift misses");
+  });
+
+  test("legacy cache entry without lang/model metadata is a miss", () => {
+    const st = { s: { aiProvider: "gemini", aiSummaryLang: "en" } };
+    assert(!_pbpSkimCacheMatches({ md: "- cached", blocksHash: "b1" }, st, "b1"), "legacy cache misses");
   });
 });
 </script>

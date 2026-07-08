@@ -239,6 +239,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     general: {
       fields: {
         "opt-lang": "auto",
+        "opt-backup-include-highlights": true,
         "notify-quick-save": true, "notify-read-later": true, "notify-tab-set": true,
         "notify-batch-save": true, "notify-errors": true
       },
@@ -311,7 +312,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     markdown: {
       fields: {
         "opt-md-frontmatter": true, "opt-md-extended-meta": true,
-        "opt-md-image-policy": "keep", "opt-md-include-toc": false
+        "opt-md-image-policy": "keep", "opt-md-include-toc": false,
+        "opt-md-include-hl": true
       }
     },
     archive: {
@@ -787,6 +789,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "rl-auto-notes": s.rlAutoNotes, "rl-blockquote": s.rlBlockquote,
     "rl-ai-tags": s.rlAiTags, "rl-ai-summary": s.rlAiSummary,
     "opt-batch-tag-enabled": s.optBatchTagEnabled,
+    "opt-backup-include-highlights": s.backupIncludeHighlights !== false,
     "batch-ai-tags": s.batchAiTags, "batch-ai-summary": s.batchAiSummary,
     "batch-skip-existing": s.batchSkipExisting,
     "opt-show-recent": s.optShowRecent, "opt-show-search": s.optShowSearch,
@@ -1157,6 +1160,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       baseUrl: $id("opt-webdav-url").value.trim(),
       user: $id("opt-webdav-user").value.trim(),
       pass: $id("opt-webdav-pass").value.trim(),
+      includeHighlights: $id("opt-backup-include-highlights").checked,
     };
   }
 
@@ -1169,6 +1173,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     try { return await chrome.permissions.request({ origins: [origin] }); } catch (_) { return false; }
   }
 
+  $id("opt-webdav-autopush")?.addEventListener("change", async (e) => {
+    if (e.target.value === "off") return;
+    const statusEl = $id("webdav-status");
+    const cfg = _pbpWebdavCfgFromForm();
+    const fail = (msgKey) => {
+      e.target.value = "off";
+      e.target.dispatchEvent(new Event("change", { bubbles: true }));
+      if (statusEl) {
+        setStatusIcon(statusEl, false, t(msgKey));
+        statusEl.style.color = "#c00";
+      }
+    };
+    if (!cfg.baseUrl || !(typeof pbpWebdavOrigin === "function" && pbpWebdavOrigin(cfg.baseUrl))) {
+      fail("webdavTestUnreachable");
+      return;
+    }
+    const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
+    if (!granted) fail("webdavPermDenied");
+    else if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
+  });
+
   // ---- WebDAV: render the persisted last-push status on page load ----
   (async () => {
     try {
@@ -1180,6 +1205,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         setStatusIcon(statusEl, true, t("webdavPushOk", when));
       } else if (webdavLastPush.error === "perm") {
         setStatusIcon(statusEl, false, t("webdavPermDenied"));
+      } else if (webdavLastPush.error === "not-writable") {
+        setStatusIcon(statusEl, false, webdavLastPush.status ? t("webdavPushFail", "http-" + webdavLastPush.status) : t("webdavPushNotWritable"));
+      } else if (webdavLastPush.error === "not-found") {
+        setStatusIcon(statusEl, false, t("webdavTargetUnavailable"));
       } else {
         setStatusIcon(statusEl, false, t("webdavPushFail", webdavLastPush.error || ""));
       }
@@ -1204,6 +1233,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (res.kind === "found") { setStatusIcon(statusEl, true, t("webdavTestOkFound")); statusEl.style.color = "#080"; }
     else if (res.kind === "empty") { setStatusIcon(statusEl, true, t("webdavTestOkEmpty")); statusEl.style.color = "#080"; }
     else if (res.kind === "auth") { setStatusIcon(statusEl, false, t("webdavTestAuthFail")); statusEl.style.color = "#c00"; }
+    else if (res.kind === "not-writable") { setStatusIcon(statusEl, false, res.status ? t("webdavPushFail", "http-" + res.status) : t("webdavPushNotWritable")); statusEl.style.color = "#c00"; }
+    else if (res.kind === "not-found") { setStatusIcon(statusEl, false, t("webdavTargetUnavailable")); statusEl.style.color = "#c00"; }
     else { setStatusIcon(statusEl, false, t("webdavTestUnreachable")); statusEl.style.color = "#c00"; }
     setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
   });
@@ -1227,7 +1258,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       setStatusIcon(statusEl, true, t("webdavPushOk", new Date(res.ts).toLocaleString()));
       statusEl.style.color = "#080";
     } else {
-      setStatusIcon(statusEl, false, t("webdavPushFail", res.error || ""));
+      const msg = res.error === "not-writable" ? (res.status ? t("webdavPushFail", "http-" + res.status) : t("webdavPushNotWritable"))
+        : res.error === "not-found" ? t("webdavTargetUnavailable")
+        : t("webdavPushFail", res.error || "");
+      setStatusIcon(statusEl, false, msg);
       statusEl.style.color = "#c00";
     }
     setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
@@ -1425,6 +1459,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       webdavUser: $id("opt-webdav-user").value.trim(),
       webdavPass: obfuscateKey($id("opt-webdav-pass").value.trim()),
       webdavAutoPush: $id("opt-webdav-autopush").value,
+      backupIncludeHighlights: $id("opt-backup-include-highlights").checked,
       themePresetKey: currentPresetKey,
       urlClean: {
         enabled: $id("opt-urlclean-enabled").checked,

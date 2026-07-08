@@ -722,7 +722,7 @@
     "message": "Notes"
   },
   "notesFilterPlaceholder": {
-    "message": "Filtrer par titre ou note…"
+    "message": "Filtrer par titre ou note"
   },
   "notesColHighlights": {
     "message": "Surlignages"
@@ -738,6 +738,9 @@
   },
   "notesEmpty": {
     "message": "Sélectionnez du texte sur la page d'aperçu Markdown pour le surligner ou ajouter une note."
+  },
+  "notesFilterEmpty": {
+    "message": "Aucune note ne correspond à ce filtre."
   },
   "notesUnknownPage": {
     "message": "Page inconnue"
@@ -875,6 +878,12 @@
   "backupHint": {
     "message": "Exporter/importer vos paramètres (les clés API sont exclues de l'export pour des raisons de sécurité)."
   },
+  "backupIncludeHighlightsLabel": {
+    "message": "Inclure les surlignages et les notes dans les sauvegardes"
+  },
+  "backupIncludeHighlightsHint": {
+    "message": "Inclut les URL des pages, les titres, le texte sélectionné, les notes, les couleurs et les horodatages dans les sauvegardes manuelles et WebDAV. Les clés API ne sont toujours jamais incluses."
+  },
   "exportSettings": {
     "message": "Exporter les paramètres"
   },
@@ -950,6 +959,12 @@
         "content": "$1"
       }
     }
+  },
+  "webdavPushNotWritable": {
+    "message": "Le dossier existe, mais l’envoi a été refusé. Choisissez un dossier synchronisé existant et accessible en écriture, pas la racine WebDAV."
+  },
+  "webdavTargetUnavailable": {
+    "message": "Le dossier cible est introuvable ou n’a pas pu être créé. Indiquez l’URL d’un dossier WebDAV inscriptible."
   },
   "webdavPermDenied": {
     "message": "Permission refusée — cliquez sur « Tester » pour l'accorder"

@@ -22,7 +22,7 @@ function importThemesResult(err) {
 // a genuine persist failure -- callers decide how to surface that.
 async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback }) {
   const schemaVersion = data._schemaVersion || 1;
-  const { _schemaVersion, customCSS, customOverlayCSS, savedThemes: importedThemes, ...rest } = data;
+  const { _schemaVersion, _highlights, customCSS, customOverlayCSS, savedThemes: importedThemes, ...rest } = data;
   const safeData = Object.fromEntries(
     Object.entries(rest).filter(([k]) => exportableKeys.includes(k))
   );
@@ -83,6 +83,10 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
       themesStatusKey = key; // "importPartial": data preserved to local by syncSetLarge fallback
     }
   }
+  if (_highlights && typeof _highlights === "object") {
+    const cleanedHighlights = pbpCleanHighlightBackup(_highlights);
+    if (Object.keys(cleanedHighlights).length) await chrome.storage.local.set(cleanedHighlights);
+  }
   return themesStatusKey;
 }
 
@@ -93,6 +97,8 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
       Object.entries(raw).filter(([, v]) => v !== undefined)
     );
     exportData._schemaVersion = 2;
+    const includeHighlightsEl = $id("opt-backup-include-highlights");
+    if (includeHighlightsEl) exportData.backupIncludeHighlights = !!includeHighlightsEl.checked;
     // Strip NESTED secrets (e.g. exportTargets.github.token) — the top-level
     // API_KEY_FIELDS exclusion only covers flat keys, so a nested token would
     // otherwise ride into this shareable plaintext backup. Keep non-secret
@@ -119,6 +125,13 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
     if (overlay) exportData.customOverlayCSS = overlay;
     const savedThemesData = await syncGetLarge("savedThemes", []);
     if (savedThemesData.length) exportData.savedThemes = savedThemesData;
+    if (exportData.backupIncludeHighlights !== false) {
+      try {
+        const allLocal = await chrome.storage.local.get(null);
+        const highlights = pbpBuildHighlightBackup(allLocal);
+        if (highlights) exportData._highlights = highlights;
+      } catch (_) {}
+    }
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

@@ -30,6 +30,8 @@ By **default**, all data is stored **locally** on your device (`chrome.storage.l
 
 Settings sync is implemented with Chrome's `chrome.storage.sync`. The extension itself has no server and uploads nothing on its own. Stored credentials are obfuscated at rest (not cryptographically encrypted) and are sent over HTTPS only to their respective services to authenticate your own requests.
 
+Manual settings backups are JSON files you explicitly export. If **Include highlights and notes in backups** is enabled, manual backups also include reader highlight data: page URLs, page titles, selected highlight text, note text, highlight colors, and timestamps. API keys, Pinboard tokens, WebDAV passwords, and export-target tokens are not included.
+
 ## Network Requests
 
 The extension only makes network requests to services **you explicitly configure**, and — except for the bookmark-status check noted below — only when **you** trigger an action:
@@ -50,7 +52,7 @@ The extension only makes network requests to services **you explicitly configure
 
 8. **Webhook** (a URL you configure, optional — inactive until you configure it) — the **Send to Webhook** action POSTs a JSON payload to the endpoint you entered (e.g. Readwise), with an Authorization header value you provide. The payload contains the page's title, URL, save date, tags, and converted Markdown; when extended export metadata is enabled (default on), it also includes the page's author, original publish date, site name, cover-image URL, and word count. Requires a one-time permission grant for that origin. The extension warns if the endpoint is plain `http://`, since credentials and content would travel unencrypted.
 
-9. **WebDAV** (a server URL you configure, optional — inactive until you configure it) — the **Push now** action (and, if you enable it, an hourly or daily automatic push) uploads your non-secret settings as a JSON file to the WebDAV server you specify, authenticated with the username/password you provide (sent as HTTP Basic auth). The payload never includes any API key or export-target token. **Pull now** downloads that file and, only after you explicitly confirm an overwrite dialog showing when it was last pushed, applies it to your local settings. Requires a one-time permission grant for that server's origin. The extension warns if the server URL is plain `http://`, since credentials would travel unencrypted.
+9. **WebDAV** (a server URL you configure, optional — inactive until you configure it) — the **Push now** action (and, if you enable it, an hourly or daily automatic push) uploads your non-secret settings as a JSON file to the WebDAV server you specify, authenticated with the username/password you provide (sent as HTTP Basic auth). If **Include highlights and notes in backups** is enabled, the WebDAV backup also includes page URLs, page titles, selected highlight text, note text, highlight colors, and timestamps. The payload never includes API keys, Pinboard tokens, WebDAV passwords, or export-target tokens. **Pull now** downloads that file and, only after you explicitly confirm an overwrite dialog showing when it was last pushed, applies it to your local settings. Requires a one-time permission grant for that server's origin. The extension warns if the server URL is plain `http://`, since credentials would travel unencrypted.
 
 All page content and URLs are transmitted **only to the destination you selected** for that action, and **never to the developer**.
 
@@ -79,7 +81,7 @@ The extension communicates with third-party services **only at your direction**:
 - **Obsidian** — your local desktop app, only via Send to Obsidian
 - **GitHub** — only if you configure the Send-to-Gist target, using your own access token
 - **Your webhook endpoint** — only if you configure one; you choose and control the destination
-- **Your WebDAV server** — only if you configure one; you choose and control the destination
+- **Your WebDAV server** — only if you configure one; you choose and control the destination for settings backups and, if enabled, highlights and notes backups
 
 No data is shared with any other third party, and none is sent to the developer.
 

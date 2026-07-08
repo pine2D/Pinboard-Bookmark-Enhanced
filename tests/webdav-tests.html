@@ -34,6 +34,9 @@ section("pbpWebdavFileUrl");
 assertEq(pbpWebdavFileUrl("https://dav.example.com/backups"),
   "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json",
   "no trailing slash -> appends /filename");
+assertEq(pbpWebdavFileUrl("https://dav.jianguoyun.com/dav/"),
+  "https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-settings.json",
+  "provider root URL stores under the extension data collection");
 assertEq(pbpWebdavFileUrl("https://dav.example.com/backups/"),
   "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json",
   "trailing slash -> no double slash");
@@ -88,6 +91,28 @@ section("pbpWebdavBuildPayload — purity (no internal clock)");
     "pushedAt only ever reflects the meta argument -- function never calls Date.now itself");
 }
 
+section("pbpWebdavBuildPayload — optional highlights");
+{
+  const highlights = {
+    pbp_hl_abc123ef: { v: 1, url: "https://x.test", title: "X", items: [] },
+    pbp_hl_last_color: 4
+  };
+  const payloadWithHl = pbpWebdavBuildPayload(
+    Object.assign({}, SETTINGS_DEFAULTS, { backupIncludeHighlights: true }),
+    { pushedAt: "t", appVersion: "v" },
+    { highlights }
+  );
+  assert(payloadWithHl._highlights && payloadWithHl._highlights.pbp_hl_abc123ef,
+    "highlight backup included when enabled");
+
+  const payloadWithoutHl = pbpWebdavBuildPayload(
+    Object.assign({}, SETTINGS_DEFAULTS, { backupIncludeHighlights: false }),
+    { pushedAt: "t", appVersion: "v" },
+    { highlights }
+  );
+  assert(!payloadWithoutHl._highlights, "highlight backup omitted when disabled");
+}
+
 section("pbpWebdavBuildRequest");
 {
   const cfg = { baseUrl: "https://dav.example.com/backups", user: "bob", pass: "secret" };
@@ -103,11 +128,217 @@ section("pbpWebdavBuildRequest");
   const testReq = pbpWebdavBuildRequest("test", cfg);
   assertEq(testReq.method, "GET", "test -> GET");
 
+  const probe = pbpWebdavBuildRequest("probe", cfg);
+  assertEq(probe.method, "PROPFIND", "probe -> PROPFIND");
+  assertEq(probe.headers.Depth, "0", "probe checks only the configured collection");
+  assertEq(probe.url, "https://dav.example.com/backups/", "probe url is the collection, not the backup file");
+
+  const writeProbe = pbpWebdavBuildRequest("write-test", Object.assign({}, cfg, { probeName: "pbp-test.txt" }));
+  assertEq(writeProbe.method, "PUT", "write-test -> PUT");
+  assertEq(writeProbe.url, "https://dav.example.com/backups/pbp-test.txt", "write-test targets a temp file in the collection");
+  assertEq(writeProbe.headers["If-None-Match"], "*", "write-test never overwrites an existing temp file");
+
+  const generatedWriteProbe = pbpWebdavBuildRequest("write-test", Object.assign({}, cfg, { probeName: PBP_WEBDAV_WRITE_TEST_PREFIX + "abc.txt" }));
+  assertEq(generatedWriteProbe.url, "https://dav.example.com/backups/pinboard-bookmark-enhanced-write-test-abc.txt",
+    "generated write-test filename is a normal visible file, not a dotfile");
+
+  const deleteProbe = pbpWebdavBuildRequest("write-test-delete", Object.assign({}, cfg, { probeName: "pbp-test.txt" }));
+  assertEq(deleteProbe.method, "DELETE", "write-test-delete -> DELETE");
+  assertEq(deleteProbe.url, writeProbe.url, "delete removes the same temp file");
+
+  const mkdir = pbpWebdavBuildRequest("mkdir", cfg);
+  assertEq(mkdir.method, "MKCOL", "mkdir -> MKCOL");
+  assertEq(mkdir.url, "https://dav.example.com/backups/", "mkdir targets the collection");
+
   assertEq(push.headers.Authorization, "Basic " + btoa("bob:secret"), "Authorization present when user/pass set");
   const noAuth = pbpWebdavBuildRequest("push", { baseUrl: "https://dav.example.com/backups", user: "", pass: "" });
   assert(!("Authorization" in noAuth.headers), "Authorization omitted when user+pass both empty");
 }
 
-document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+async function runChromeLayerTests() {
+  section("pbpWebdavPush — live includeHighlights override");
+  const prevChrome = globalThis.chrome;
+  const prevFetch = globalThis.fetch;
+  const prevCache = _settingsStorageCache;
+  const localArea = Object.assign({}, SETTINGS_DEFAULTS, {
+    optSyncEnabled: false,
+    backupIncludeHighlights: true,
+    webdavUrl: "https://dav.example.com/backups/",
+    pbp_hl_good: { v: 1, url: "https://x.test", title: "X", items: [{ id: "a", n: 1, quote: "q", color: 1 }] },
+    pbp_hl_last_color: 4,
+  });
+  const puts = [];
+  const pushMethods = [];
+  function storageGet(keys) {
+    if (keys === null) return Promise.resolve(Object.assign({}, localArea));
+    if (Array.isArray(keys)) {
+      const out = {};
+      keys.forEach((k) => { if (k in localArea) out[k] = localArea[k]; });
+      return Promise.resolve(out);
+    }
+    if (typeof keys === "object") {
+      const out = Object.assign({}, keys);
+      Object.keys(keys).forEach((k) => { if (k in localArea) out[k] = localArea[k]; });
+      return Promise.resolve(out);
+    }
+    return Promise.resolve({ [keys]: localArea[keys] });
+  }
+  try {
+    _settingsStorageCache = null;
+    globalThis.chrome = {
+      permissions: { contains: () => Promise.resolve(true) },
+      runtime: { getManifest: () => ({ version: "test-version" }) },
+      storage: {
+        local: {
+          get: storageGet,
+          set: (d) => { Object.assign(localArea, d); return Promise.resolve(); },
+          remove: () => Promise.resolve(),
+        },
+        sync: { get: storageGet, set: () => Promise.resolve(), remove: () => Promise.resolve() },
+        onChanged: { addListener() {} },
+      },
+    };
+    globalThis.fetch = (_url, opts) => {
+      pushMethods.push(opts.method);
+      if (opts.method === "PUT") puts.push(JSON.parse(opts.body));
+      return Promise.resolve({ ok: true, status: opts.method === "PROPFIND" ? 207 : 200 });
+    };
+    const res = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: false });
+    check("push succeeds under stubbed chrome/fetch", res.ok === true);
+    check("push verifies the collection before PUT", pushMethods[0] === "PROPFIND" && pushMethods[1] === "PUT");
+    check("live includeHighlights=false omits _highlights despite stale stored true",
+      puts[0] && !("_highlights" in puts[0]));
+    check("live includeHighlights=false is serialized into pushed settings",
+      puts[0] && puts[0].backupIncludeHighlights === false);
+    globalThis.fetch = () => Promise.resolve({ ok: false, status: 404 });
+    const missing = await pbpWebdavPush({ baseUrl: "https://dav.example.com/missing/", user: "", pass: "", includeHighlights: false });
+    check("push 404 maps to not-found instead of raw http-404", missing.error === "not-found");
+    const push404Requests = [];
+    globalThis.fetch = (_url, opts) => {
+      push404Requests.push(opts.method);
+      if (push404Requests.length === 1 && opts.method === "PROPFIND") {
+        return Promise.resolve({ ok: true, status: 207 });
+      }
+      if (opts.method === "PUT") return Promise.resolve({ ok: false, status: 404 });
+      return Promise.resolve({ ok: true, status: 207 });
+    };
+    const notWritable = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: false });
+    check("push 404 + collection PROPFIND ok -> not-writable", notWritable.error === "not-writable");
+    check("push preserves failed PUT status", notWritable.status === 404);
+    check("push 404 path probes the collection", push404Requests.join(",") === "PROPFIND,PUT,PROPFIND");
+
+    const createRequests = [];
+    globalThis.fetch = (url, opts) => {
+      createRequests.push({ url, method: opts.method });
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "MKCOL") return Promise.resolve({ ok: true, status: 201 });
+      return Promise.resolve({ ok: true, status: 200 });
+    };
+    const createdPush = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: false });
+    check("push creates the configured collection before PUT", createdPush.ok && createRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,PUT");
+    check("push probes and creates exactly the configured collection",
+      createRequests[0] && createRequests[0].url === "https://dav.example.com/backups/" &&
+      createRequests[1] && createRequests[1].url === "https://dav.example.com/backups/");
+    check("push writes under the configured collection",
+      createRequests[2] && createRequests[2].url === "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json");
+
+    const rootRequests = [];
+    globalThis.fetch = (url, opts) => {
+      rootRequests.push({ url, method: opts.method });
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "MKCOL") return Promise.resolve({ ok: true, status: 201 });
+      return Promise.resolve({ ok: true, status: 200 });
+    };
+    const rootPush = await pbpWebdavPush({ baseUrl: "https://dav.jianguoyun.com/dav/", user: "", pass: "", includeHighlights: false });
+    check("provider root push creates extension data collection before PUT",
+      rootPush.ok && rootRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,PUT");
+    check("provider root push writes under the extension data collection",
+      rootRequests.some((r) => r.method === "PUT" && r.url === "https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-settings.json"));
+  } catch (e) {
+    check("pbpWebdavPush live includeHighlights override did not throw", false, e.message);
+  } finally {
+    globalThis.chrome = prevChrome;
+    globalThis.fetch = prevFetch;
+    _settingsStorageCache = prevCache;
+  }
+
+  section("pbpWebdavTest — distinguishes missing backup file from missing folder");
+  const prevChrome2 = globalThis.chrome;
+  const prevFetch2 = globalThis.fetch;
+  try {
+    globalThis.chrome = {
+      permissions: { contains: () => Promise.resolve(true) },
+      storage: { onChanged: { addListener() {} } },
+    };
+    const requests = [];
+    globalThis.fetch = (url, opts) => {
+      requests.push({ url, method: opts.method });
+      if (requests.length === 1) return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
+      return Promise.resolve({ ok: true, status: 200 });
+    };
+    const empty = await pbpWebdavTest({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "" });
+    check("file 404 + collection PROPFIND ok -> empty backup", empty.kind === "empty");
+    check("file 404 path performs collection probe + write probe", requests.map((r) => r.method).join(",") === "GET,PROPFIND,PUT,DELETE");
+
+    const missingFolderRequests = [];
+    globalThis.fetch = (url, opts) => {
+      missingFolderRequests.push({ url, method: opts.method });
+      return Promise.resolve({ ok: false, status: 404 });
+    };
+    const missingFolder = await pbpWebdavTest({ baseUrl: "https://dav.example.com/missing/", user: "", pass: "" });
+    check("file 404 + collection PROPFIND 404 + MKCOL 404 -> missing target collection", missingFolder.kind === "not-found");
+
+    const createFolderRequests = [];
+    globalThis.fetch = (url, opts) => {
+      createFolderRequests.push({ url, method: opts.method });
+      if (opts.method === "GET") return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "MKCOL") return Promise.resolve({ ok: true, status: 201 });
+      return Promise.resolve({ ok: true, status: 200 });
+    };
+    const createdFolder = await pbpWebdavTest({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "" });
+    check("test creates the configured collection before write probe", createdFolder.kind === "empty" &&
+      createFolderRequests.map((r) => r.method).join(",") === "GET,PROPFIND,MKCOL,PUT,DELETE");
+    check("test-created collection uses exactly the configured collection",
+      createFolderRequests[1] && createFolderRequests[1].url === "https://dav.example.com/backups/" &&
+      createFolderRequests[2] && createFolderRequests[2].url === "https://dav.example.com/backups/" &&
+      createFolderRequests[3] && createFolderRequests[3].url.startsWith("https://dav.example.com/backups/pinboard-bookmark-enhanced-write-test-"));
+
+    const readOnlyRequests = [];
+    globalThis.fetch = (url, opts) => {
+      readOnlyRequests.push({ url, method: opts.method });
+      if (opts.method === "GET") return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
+      return Promise.resolve({ ok: false, status: 404 });
+    };
+    const readOnly = await pbpWebdavTest({ baseUrl: "https://dav.example.com/dav/", user: "", pass: "" });
+    check("readable collection + failed temp PUT -> not-writable", readOnly.kind === "not-writable");
+    check("failed temp PUT status is preserved", readOnly.status === 404);
+
+    const rootRequests = [];
+    globalThis.fetch = (url, opts) => {
+      rootRequests.push({ url, method: opts.method });
+      if (opts.method === "GET") return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "MKCOL") return Promise.resolve({ ok: true, status: 201 });
+      return Promise.resolve({ ok: true, status: 200 });
+    };
+    const rootEmpty = await pbpWebdavTest({ baseUrl: "https://dav.jianguoyun.com/dav/", user: "", pass: "" });
+    check("provider root test creates extension data collection and verifies write", rootEmpty.kind === "empty");
+    check("provider root test writes under the extension data collection",
+      rootRequests.some((r) => r.method === "PUT" && r.url.startsWith("https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-write-test-")));
+  } catch (e) {
+    check("pbpWebdavTest missing-folder probe did not throw", false, e.message);
+  } finally {
+    globalThis.chrome = prevChrome2;
+    globalThis.fetch = prevFetch2;
+  }
+}
+
+(async function () {
+  await runChromeLayerTests();
+  document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+})();
 </script>
 </body></html>

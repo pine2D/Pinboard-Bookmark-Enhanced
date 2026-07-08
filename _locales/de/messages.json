@@ -722,7 +722,7 @@
     "message": "Notizen"
   },
   "notesFilterPlaceholder": {
-    "message": "Nach Titel oder Notiz filtern…"
+    "message": "Nach Titel oder Notiz filtern"
   },
   "notesColHighlights": {
     "message": "Markierungen"
@@ -738,6 +738,9 @@
   },
   "notesEmpty": {
     "message": "Markieren Sie Text auf der Markdown-Vorschauseite, um ihn hervorzuheben oder eine Notiz hinzuzufügen."
+  },
+  "notesFilterEmpty": {
+    "message": "Keine Notizen entsprechen diesem Filter."
   },
   "notesUnknownPage": {
     "message": "Unbekannte Seite"
@@ -875,6 +878,12 @@
   "backupHint": {
     "message": "Einstellungen exportieren/importieren (API-Schlüssel werden aus Sicherheitsgründen nicht exportiert)."
   },
+  "backupIncludeHighlightsLabel": {
+    "message": "Markierungen und Notizen in Sicherungen einschließen"
+  },
+  "backupIncludeHighlightsHint": {
+    "message": "Enthält Seiten-URLs, Titel, markierten Text, Notizen, Farben und Zeitstempel in manuellen und WebDAV-Sicherungen. API-Schlüssel werden weiterhin nie eingeschlossen."
+  },
   "exportSettings": {
     "message": "Einstellungen exportieren"
   },
@@ -950,6 +959,12 @@
         "content": "$1"
       }
     }
+  },
+  "webdavPushNotWritable": {
+    "message": "Der Ordner existiert, aber der Upload wurde abgelehnt. Wähle einen vorhandenen beschreibbaren Synchronisierungsordner, nicht das WebDAV-Stammverzeichnis."
+  },
+  "webdavTargetUnavailable": {
+    "message": "Zielverzeichnis wurde nicht gefunden oder konnte nicht erstellt werden. Verwende eine beschreibbare WebDAV-Ordner-URL."
   },
   "webdavPermDenied": {
     "message": "Zugriff verweigert — auf „Testen“ klicken, um ihn zu gewähren"

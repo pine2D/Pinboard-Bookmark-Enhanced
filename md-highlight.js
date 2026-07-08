@@ -332,6 +332,14 @@ async function _pbpHlSave(url, items, btn) {
   }
 }
 
+let _pbpHlWriteQueue = Promise.resolve();
+
+function _pbpHlQueueWrite(fn) {
+  const run = _pbpHlWriteQueue.catch(() => {}).then(fn);
+  _pbpHlWriteQueue = run.catch(() => {});
+  return run;
+}
+
 async function _pbpHlLastColorGet() {
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return 1;
   try {
@@ -850,17 +858,23 @@ async function _pbpHlCreateFromRange(range, color, btn) {
       item.side = "tr";
       item.lang = (seg.el.dataset && seg.el.dataset.pbTrLang) || "";
     }
-    _pbpHlState.items.push(item);
-    created.push(item);
-    _pbpHlRegisterRange(item, seg.range.cloneRange());
-    // .pb-tr re-anchors via pbpHlReanchorTr (fired from _pbpTrFill), NOT the
-    // hljs/KaTeX watcher (which targets pbpAiBlockEl -- the original block).
-    if (seg.side !== "tr") _pbpHlArmBlockObserver(seg.el, seg.n);
+    created.push({ item, seg });
   }
-  if (created.length) {
-    await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn);
+  if (!created.length) return [];
+  return _pbpHlQueueWrite(async () => {
+    if (!_pbpHlState) return [];
+    const nextItems = _pbpHlState.items.concat(created.map((x) => x.item));
+    const ok = await _pbpHlSave(_pbpHlState.url, nextItems, btn);
+    if (!ok) return [];
+    _pbpHlState.items = nextItems;
+    created.forEach(({ item, seg }) => {
+      _pbpHlRegisterRange(item, seg.range.cloneRange());
+      // .pb-tr re-anchors via pbpHlReanchorTr (fired from _pbpTrFill), NOT the
+      // hljs/KaTeX watcher (which targets pbpAiBlockEl -- the original block).
+      if (seg.side !== "tr") _pbpHlArmBlockObserver(seg.el, seg.n);
+    });
     await _pbpHlLastColorSet(color);
-    for (const it of created) pbpHlSyncMirror(it.n); // H5 (spec 1.5)
+    for (const { item } of created) pbpHlSyncMirror(item.n); // H5 (spec 1.5)
     _pbpHlNotebookRender();
     // Spec 1.3 trigger 4: the FIRST highlight created this session
     // auto-expands the rail's hl section (session-visual only, via
@@ -871,8 +885,8 @@ async function _pbpHlCreateFromRange(range, color, btn) {
       _pbpHlAutoExpandedThisSession = true;
       if (_pbpHlNbEls && _pbpHlNbEls.handle) _pbpHlNbEls.handle.expand(true);
     }
-  }
-  return created;
+    return created.map((x) => x.item);
+  });
 }
 
 function _pbpHlRegisterRange(item, range) {
@@ -927,7 +941,10 @@ function _pbpHlOnKeyDown(e) {
   if (e.key !== "h" && e.key !== "H" && !/^[1-5]$/.test(e.key)) return;
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
   const ae = document.activeElement;
-  if (pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))) return;
+  const isTyping = (typeof pbpTrIsTypingContext === "function")
+    ? pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))
+    : !!(ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || "")));
+  if (isTyping) return;
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
@@ -1030,6 +1047,7 @@ async function pbpHlAttachNote(target, answerText) {
   if (!_pbpHlState) { _pbpHlToast(t("hlSaveFailed")); return false; }
   const answer = typeof answerText === "string" ? answerText : "";
   let item = null;
+  let itemId = "";
 
   if (target && target.itemId) {
     item = _pbpHlState.items.find((it) => it.id === target.itemId) || null;
@@ -1038,6 +1056,7 @@ async function pbpHlAttachNote(target, answerText) {
     // the async round-trip finishing) -- mirror the null-state toast above
     // instead of failing silently.
     if (!item) { _pbpHlToast(t("hlSaveFailed")); return false; }
+    itemId = item.id;
   } else if (target && target.range) {
     const range = target.range;
     let best = null; // { ts, item }
@@ -1070,20 +1089,34 @@ async function pbpHlAttachNote(target, answerText) {
       }
       item = created[created.length - 1];
     }
+    itemId = item.id;
   } else {
     return false;
   }
 
-  const prev = item.note;
-  item.note = pbpHlAppendNoteText(item.note, answer);
-  const ok = await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, null);
-  if (!ok) { item.note = prev; return false; } // roll back the in-memory append so a retry doesn't double-append
-  _pbpHlNotebookRender();
-  if (_pbpHlCard && _pbpHlCardItemId === item.id) {
-    const noteEl = _pbpHlCard.querySelector(".hl-card-note");
-    if (noteEl) noteEl.value = item.note;
-  }
-  return true;
+  const openNote = (_pbpHlCardItemId === itemId && _pbpHlCard) ? _pbpHlCard.querySelector(".hl-card-note") : null;
+  const cardValueAtStart = openNote ? openNote.value : null;
+
+  return _pbpHlQueueWrite(async () => {
+    if (!_pbpHlState) { _pbpHlToast(t("hlSaveFailed")); return false; }
+    const current = _pbpHlState.items.find((it) => it.id === itemId);
+    if (!current) { _pbpHlToast(t("hlSaveFailed")); return false; }
+    const prev = current.note;
+    current.note = pbpHlAppendNoteText(current.note, answer);
+    const ok = await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, null);
+    if (!ok) { current.note = prev; return false; } // roll back the in-memory append so a retry doesn't double-append
+    _pbpHlNotebookRender();
+    if (_pbpHlCard && _pbpHlCardItemId === current.id) {
+      const noteEl = _pbpHlCard.querySelector(".hl-card-note");
+      if (noteEl && _pbpHlNoteDirty) {
+        noteEl.value = pbpHlAppendNoteText(noteEl.value, answer);
+      } else if (noteEl && !_pbpHlNoteDirty && (cardValueAtStart === null || noteEl.value === cardValueAtStart)) {
+        noteEl.value = current.note;
+        _pbpHlCardBaseNote = current.note || "";
+      }
+    }
+    return true;
+  });
 }
 window.pbpHlAttachNote = pbpHlAttachNote; // explicit window attach: makes the md-ask.js "Save as note" contract self-documenting.
 
@@ -1092,6 +1125,7 @@ window.pbpHlAttachNote = pbpHlAttachNote; // explicit window attach: makes the m
 const PBP_HL_COLOR_KEYS = ["hlColorQuote", "hlColorDefinition", "hlColorExample", "hlColorDoubt", "hlColorTodo"]; // index 0..4 = color 1..5, fixed order (spec sec.5 slugs)
 let _pbpHlCard = null;
 let _pbpHlCardItemId = null;
+let _pbpHlCardBaseNote = "";
 
 function _pbpHlEnsureCard() {
   if (_pbpHlCard) return _pbpHlCard;
@@ -1269,6 +1303,8 @@ function _pbpHlOpenCard(id) {
   degradedEl.textContent = degraded ? t("hlDegraded") : "";
   const noteEl = card.querySelector(".hl-card-note");
   noteEl.value = item.note || ""; // textContent-equivalent for a form control's value
+  _pbpHlCardBaseNote = noteEl.value;
+  _pbpHlNoteDirty = false;
 
   if (!card.matches(":popover-open")) card.showPopover();
   // Position AFTER showPopover so offsetHeight is real (measure-then-place
@@ -1285,13 +1321,22 @@ window._pbpHlOpenCard = _pbpHlOpenCard; // explicit window attach: makes the "Ta
 // Color switch: mutate + persist + full rebuild (pbpHlRestore is idempotent -- spec
 // sec.3 -- so re-running it is the simplest correct way to move this item's Range from
 // its old pbp-hl-N Highlight to the new one; no manual .delete()/.add() bookkeeping).
-function _pbpHlSwitchColor(color) {
-  if (!_pbpHlState) return;
-  const item = _pbpHlState.items.find((it) => it.id === _pbpHlCardItemId);
-  if (!item) return;
-  if (item.color === color) return;
-  item.color = color;
-  _pbpHlSave(_pbpHlState.url, _pbpHlState.items, _pbpHlCard.querySelector(".hl-card-dot-" + color)).then(() => {
+async function _pbpHlSwitchColor(color) {
+  const pendingId = _pbpHlCardItemId;
+  const card = _pbpHlCard;
+  const btn = card && card.querySelector(".hl-card-dot-" + color);
+  return _pbpHlQueueWrite(async () => {
+    if (!_pbpHlState) return;
+    const item = _pbpHlState.items.find((it) => it.id === pendingId);
+    if (!item || item.color === color) return;
+    const oldColor = item.color;
+    item.color = color;
+    const ok = await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn);
+    if (!ok) {
+      if (item.color === color) item.color = oldColor;
+      if (_pbpHlCardItemId === item.id) _pbpHlOpenCard(item.id);
+      return;
+    }
     if (typeof pbpHlRestore === "function") pbpHlRestore();
     _pbpHlNotebookRender(); // list dot color + color-filter membership can both change
     // Guard: only reopen/reposition the card onto this item if it's still the one displayed --
@@ -1309,13 +1354,45 @@ document.addEventListener("input", (e) => {
 // Blur AND explicit Save button both route here (spec: "note textarea(失焦或保存钮落存储)").
 function _pbpHlCommitNote() {
   if (!_pbpHlNoteDirty || !_pbpHlCardItemId || !_pbpHlState) return;
-  const item = _pbpHlState.items.find((it) => it.id === _pbpHlCardItemId);
-  if (!item || !_pbpHlCard) return;
-  item.note = _pbpHlCard.querySelector(".hl-card-note").value;
+  const pendingId = _pbpHlCardItemId;
+  const card = _pbpHlCard;
+  const noteEl = card && card.querySelector(".hl-card-note");
+  if (!noteEl) return;
+  const nextNote = noteEl.value;
+  const baseNote = _pbpHlCardBaseNote || "";
+  const saveBtn = card && card.querySelector(".hl-card-save");
   _pbpHlNoteDirty = false;
   // no pbpHlRestore -- notes never touch the Range/Highlight, but the
   // list's note-excerpt line does need to reflect the edit.
-  _pbpHlSave(_pbpHlState.url, _pbpHlState.items, _pbpHlCard.querySelector(".hl-card-save")).then(() => _pbpHlNotebookRender());
+  _pbpHlQueueWrite(async () => {
+    if (!_pbpHlState) return false;
+    const item = _pbpHlState.items.find((it) => it.id === pendingId);
+    if (!item) return false;
+    const oldNote = item.note || "";
+    let mergedNote = nextNote;
+    if (oldNote !== baseNote && oldNote !== nextNote) {
+      if (oldNote.startsWith(baseNote)) {
+        const suffix = oldNote.slice(baseNote.length);
+        if (suffix && !mergedNote.endsWith(suffix)) {
+          mergedNote = suffix.charAt(0) === "\n" ? mergedNote + suffix : pbpHlAppendNoteText(mergedNote, suffix);
+        }
+      } else {
+        mergedNote = pbpHlAppendNoteText(mergedNote, oldNote);
+      }
+    }
+    item.note = mergedNote;
+    const ok = await _pbpHlSave(_pbpHlState.url, _pbpHlState.items, saveBtn);
+    if (!ok) {
+      item.note = oldNote;
+      _pbpHlNoteDirty = true;
+      const currentNote = _pbpHlCard && _pbpHlCard.querySelector(".hl-card-note");
+      if (_pbpHlCardItemId === item.id && currentNote && currentNote.value === nextNote) _pbpHlOpenCard(item.id);
+      return false;
+    }
+    _pbpHlNotebookRender();
+    if (_pbpHlCardItemId === item.id) _pbpHlCardBaseNote = item.note || "";
+    return true;
+  });
 }
 
 // Shared delete core (spec 2.1: the list's x button and the card's delete
@@ -1326,16 +1403,21 @@ function _pbpHlCommitNote() {
 // flight, and that card must stay open (same bug class as the
 // run-start-pill guards in 57642a2).
 function _pbpHlDeleteItem(id, btn) {
-  if (!_pbpHlState) return;
-  const idx = _pbpHlState.items.findIndex((it) => it.id === id);
-  if (idx === -1) return;
-  const removedN = Number(_pbpHlState.items[idx].n) || 0;
-  _pbpHlState.items.splice(idx, 1);
-  return _pbpHlSave(_pbpHlState.url, _pbpHlState.items, btn).then(() => {
+  return _pbpHlQueueWrite(async () => {
+    if (!_pbpHlState) return false;
+    const idx = _pbpHlState.items.findIndex((it) => it.id === id);
+    if (idx === -1) return false;
+    const removed = _pbpHlState.items[idx];
+    const removedN = Number(removed.n) || 0;
+    const nextItems = _pbpHlState.items.slice(0, idx).concat(_pbpHlState.items.slice(idx + 1));
+    const ok = await _pbpHlSave(_pbpHlState.url, nextItems, btn);
+    if (!ok) return false;
+    _pbpHlState.items = nextItems;
     if (removedN && typeof pbpHlSyncMirror === "function") pbpHlSyncMirror(removedN); // H5 (spec 1.5)
     if (typeof pbpHlRestore === "function") pbpHlRestore();
     _pbpHlNotebookRender();
     if (_pbpHlCard && _pbpHlCardItemId === id) _pbpHlCard.hidePopover();
+    return true;
   });
 }
 

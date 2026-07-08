@@ -96,6 +96,18 @@ section("pbpNotesMatch — hits on title/url/quote/note, case-insensitive");
   assert(pbpNotesMatch(rec, "no such term") === false, "no match anywhere -> false");
 }
 
+section("pbpNotesEntryHasColor");
+{
+  assert(pbpNotesEntryHasColor({items:[{color:2}]}, null), "null filter matches");
+  assert(pbpNotesEntryHasColor({items:[]}, new Set([1, 2, 3, 4, 5])), "all colors active matches empty items");
+  assert(pbpNotesEntryHasColor({items:[{color:4}]}, new Set([4])), "color 4 matches");
+  assert(!pbpNotesEntryHasColor({items:[{color:1}]}, new Set([5])), "color 5 absent");
+  assert(!pbpNotesEntryHasColor({}, new Set([1])), "missing items does not match active set");
+  assert(pbpNotesEntryHasColor({items:[{color:99}]}, new Set([1])), "invalid color falls back to 1");
+  assert(!pbpNotesEntryHasColor({items:[null]}, new Set([2])), "non-object item does not throw or match color 2");
+  assert(!pbpNotesEntryHasColor({items:[null]}, new Set([1])), "non-object item is not treated as color 1");
+}
+
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 </script>
 </body></html>

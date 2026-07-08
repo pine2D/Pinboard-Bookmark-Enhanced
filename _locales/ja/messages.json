@@ -722,7 +722,7 @@
     "message": "メモ"
   },
   "notesFilterPlaceholder": {
-    "message": "タイトルやメモで絞り込み…"
+    "message": "タイトルやメモで絞り込み"
   },
   "notesColHighlights": {
     "message": "ハイライト数"
@@ -738,6 +738,9 @@
   },
   "notesEmpty": {
     "message": "Markdown プレビューページで文字を選択するとハイライトやメモを追加できます。"
+  },
+  "notesFilterEmpty": {
+    "message": "この条件に一致するメモはありません。"
   },
   "notesUnknownPage": {
     "message": "不明なページ"
@@ -875,6 +878,12 @@
   "backupHint": {
     "message": "設定のエクスポート・インポート（セキュリティのため API キーはエクスポートに含まれません）。"
   },
+  "backupIncludeHighlightsLabel": {
+    "message": "バックアップにハイライトとメモを含める"
+  },
+  "backupIncludeHighlightsHint": {
+    "message": "手動バックアップと WebDAV バックアップにページ URL、タイトル、選択テキスト、メモ、色、タイムスタンプを含めます。API キーは引き続き含まれません。"
+  },
   "exportSettings": {
     "message": "設定をエクスポート"
   },
@@ -950,6 +959,12 @@
         "content": "$1"
       }
     }
+  },
+  "webdavPushNotWritable": {
+    "message": "フォルダは存在しますがアップロードできません。WebDAV ルートではなく、既存の書き込み可能な同期フォルダを選択してください。"
+  },
+  "webdavTargetUnavailable": {
+    "message": "対象ディレクトリが存在しないか作成できません。書き込み可能な WebDAV フォルダー URL を指定してください。"
   },
   "webdavPermDenied": {
     "message": "権限が拒否されています — 「テスト」をクリックして許可してください"

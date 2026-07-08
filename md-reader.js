@@ -750,7 +750,10 @@ function _pbpSearchOnKeyDown(e) {
   // already disambiguates -- same reasoning as the "?" help hotkey.
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const ae = document.activeElement;
-  if (pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))) return;
+  const isTyping = (typeof pbpTrIsTypingContext === "function")
+    ? pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))
+    : !!(ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || "")));
+  if (isTyping) return;
   if (document.body.classList.contains("raw-active")) return;
   e.preventDefault();
   _pbpSearchOpen();

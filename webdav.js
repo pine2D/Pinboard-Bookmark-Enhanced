@@ -9,14 +9,38 @@
 // ============================================================
 
 const PBP_WEBDAV_FILENAME = "pinboard-bookmark-enhanced-settings.json";
+const PBP_WEBDAV_WRITE_TEST_PREFIX = "pinboard-bookmark-enhanced-write-test-";
+const PBP_WEBDAV_APP_COLLECTION = "pinboard-bookmark-enhanced";
 
 // Appends the fixed backup filename to a user-supplied collection URL,
 // handling a missing/present trailing slash. Degrades to "" on empty input
 // (never throws) -- callers treat "" as "not configured".
 function pbpWebdavFileUrl(baseUrl) {
+  const base = pbpWebdavTargetCollectionUrl(baseUrl);
+  return base ? base + PBP_WEBDAV_FILENAME : "";
+}
+
+function pbpWebdavCollectionUrl(baseUrl) {
   const raw = String(baseUrl == null ? "" : baseUrl).trim();
   if (!raw) return "";
-  return (raw.endsWith("/") ? raw : raw + "/") + PBP_WEBDAV_FILENAME;
+  return raw.endsWith("/") ? raw : raw + "/";
+}
+
+function pbpWebdavCollectionFileUrl(baseUrl, name) {
+  const base = pbpWebdavTargetCollectionUrl(baseUrl);
+  return base ? base + encodeURIComponent(String(name || "")) : "";
+}
+
+function pbpWebdavTargetCollectionUrl(baseUrl) {
+  const base = pbpWebdavCollectionUrl(baseUrl);
+  if (!base) return "";
+  try {
+    const u = new URL(base);
+    if (u.hostname === "dav.jianguoyun.com" && u.pathname.replace(/\/+$/, "") === "/dav") {
+      return base + PBP_WEBDAV_APP_COLLECTION + "/";
+    }
+  } catch (_) {}
+  return base;
 }
 
 // Basic auth header value, or null when there is nothing to authenticate
@@ -46,8 +70,9 @@ function pbpWebdavOrigin(baseUrl) {
 // caller -- this function never touches Date.now() or chrome.runtime, so the
 // exact same input always produces the exact same output (verified by the
 // "no internal clock" test).
-function pbpWebdavBuildPayload(settings, meta) {
+function pbpWebdavBuildPayload(settings, meta, extra) {
   meta = meta || {};
+  extra = extra || {};
   const s = settings || {};
   const whitelist = Object.keys(SETTINGS_DEFAULTS).filter((k) => !API_KEY_FIELDS.includes(k));
   const payload = {};
@@ -55,24 +80,64 @@ function pbpWebdavBuildPayload(settings, meta) {
     if (Object.prototype.hasOwnProperty.call(s, k)) payload[k] = s[k];
   });
   if (payload.exportTargets) payload.exportTargets = pbpStripExportTargetTokens(payload.exportTargets);
+  if (s.backupIncludeHighlights !== false && extra.highlights) payload._highlights = extra.highlights;
   payload._schemaVersion = 2;
   payload._webdav = { pushedAt: meta.pushedAt, appVersion: meta.appVersion };
   return payload;
 }
 
-// Builds a {url, method, headers} request descriptor for one of the three
-// WebDAV actions. push=PUT (writes the file), pull/test=GET (reads it).
+// Builds a {url, method, headers} request descriptor for WebDAV actions.
+// push=PUT file, pull/test=GET file, probe=PROPFIND collection.
 function pbpWebdavBuildRequest(kind, cfg) {
   cfg = cfg || {};
-  const url = pbpWebdavFileUrl(cfg.baseUrl);
+  const url = (kind === "probe" || kind === "mkdir")
+    ? pbpWebdavTargetCollectionUrl(cfg.baseUrl)
+    : (/^write-test/.test(kind) ? pbpWebdavCollectionFileUrl(cfg.baseUrl, cfg.probeName) : pbpWebdavFileUrl(cfg.baseUrl));
   const headers = {};
   const auth = pbpWebdavAuthHeader(cfg.user, cfg.pass);
   if (auth) headers["Authorization"] = auth;
+  if (kind === "probe") {
+    headers.Depth = "0";
+    return { url, method: "PROPFIND", headers };
+  }
+  if (kind === "write-test") {
+    headers["Content-Type"] = "text/plain";
+    headers["If-None-Match"] = "*";
+    return { url, method: "PUT", headers };
+  }
+  if (kind === "write-test-delete") return { url, method: "DELETE", headers };
+  if (kind === "mkdir") return { url, method: "MKCOL", headers };
   if (kind === "push") {
     headers["Content-Type"] = "application/json";
     return { url, method: "PUT", headers };
   }
   return { url, method: "GET", headers }; // "pull" | "test"
+}
+
+async function pbpWebdavEnsureCollection(cfg) {
+  const probe = pbpWebdavBuildRequest("probe", cfg);
+  const dir = await fetch(probe.url, { method: probe.method, headers: probe.headers, signal: AbortSignal.timeout(20000) });
+  if (dir.ok) return { ok: true };
+  if (dir.status === 401 || dir.status === 403) return { ok: false, error: "auth" };
+  if (dir.status !== 404) return { ok: false, error: "unreachable" };
+  const mk = pbpWebdavBuildRequest("mkdir", cfg);
+  const made = await fetch(mk.url, { method: mk.method, headers: mk.headers, signal: AbortSignal.timeout(20000) });
+  if (made.ok || made.status === 405) return { ok: true };
+  if (made.status === 401 || made.status === 403) return { ok: false, error: "auth" };
+  return { ok: false, error: "not-found" };
+}
+
+async function pbpWebdavProbeWritable(cfg) {
+  const ensured = await pbpWebdavEnsureCollection(cfg);
+  if (!ensured.ok) return ensured;
+  const name = PBP_WEBDAV_WRITE_TEST_PREFIX + Date.now().toString(36) + ".txt";
+  const put = pbpWebdavBuildRequest("write-test", Object.assign({}, cfg, { probeName: name }));
+  const resp = await fetch(put.url, { method: put.method, headers: put.headers, body: "ok", signal: AbortSignal.timeout(20000) });
+  if (resp.status === 401 || resp.status === 403) return { ok: false, error: "auth", status: resp.status };
+  if (!resp.ok) return { ok: false, error: "not-writable", status: resp.status };
+  const del = pbpWebdavBuildRequest("write-test-delete", Object.assign({}, cfg, { probeName: name }));
+  try { await fetch(del.url, { method: del.method, headers: del.headers, signal: AbortSignal.timeout(20000) }); } catch (_) {}
+  return { ok: true };
 }
 
 // ============================================================
@@ -116,15 +181,38 @@ async function pbpWebdavPush(cfgOverride) {
     return result;
   }
   try {
+    const ensured = await pbpWebdavEnsureCollection(cfg);
+    if (!ensured.ok) {
+      const result = { ts: Date.now(), ok: false, error: ensured.error };
+      await chrome.storage.local.set({ webdavLastPush: result });
+      return result;
+    }
     const storage = await getSettingsStorage();
     let settings = await storage.get(SETTINGS_DEFAULTS);
     settings = await pbpApplySecretOverlay(settings);
     deobfuscateSettings(settings);
+    if (Object.prototype.hasOwnProperty.call(cfg, "includeHighlights")) {
+      settings.backupIncludeHighlights = cfg.includeHighlights !== false;
+    }
     const meta = { pushedAt: new Date().toISOString(), appVersion: chrome.runtime.getManifest().version };
-    const payload = pbpWebdavBuildPayload(settings, meta);
+    let highlights = null;
+    if (settings.backupIncludeHighlights !== false) {
+      try { highlights = pbpBuildHighlightBackup(await chrome.storage.local.get(null)); } catch (_) {}
+    }
+    const payload = pbpWebdavBuildPayload(settings, meta, { highlights });
     const req = pbpWebdavBuildRequest("push", cfg);
     const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(payload), signal: AbortSignal.timeout(20000) });
-    const result = { ts: Date.now(), ok: resp.ok, error: resp.ok ? undefined : ("http-" + resp.status) };
+    let error = resp.ok ? undefined : ("http-" + resp.status);
+    const status = resp.ok ? undefined : resp.status;
+    if (resp.status === 404) {
+      error = "not-found";
+      try {
+        const probe = pbpWebdavBuildRequest("probe", cfg);
+        const dir = await fetch(probe.url, { method: probe.method, headers: probe.headers, signal: AbortSignal.timeout(20000) });
+        if (dir.ok) error = "not-writable";
+      } catch (_) {}
+    }
+    const result = { ts: Date.now(), ok: resp.ok, error, status };
     await chrome.storage.local.set({ webdavLastPush: result });
     return result;
   } catch (e) {
@@ -170,8 +258,14 @@ async function pbpWebdavTest(cfgOverride) {
     const req = pbpWebdavBuildRequest("test", cfg);
     const resp = await fetch(req.url, { method: req.method, headers: req.headers, signal: AbortSignal.timeout(20000) });
     if (resp.status === 401 || resp.status === 403) return { ok: false, kind: "auth" };
-    if (resp.status === 404) return { ok: true, kind: "empty" };
-    if (resp.ok) return { ok: true, kind: "found" };
+    if (resp.status === 404) {
+      const writable = await pbpWebdavProbeWritable(cfg);
+      return writable.ok ? { ok: true, kind: "empty" } : { ok: false, kind: writable.error, status: writable.status };
+    }
+    if (resp.ok) {
+      const writable = await pbpWebdavProbeWritable(cfg);
+      return writable.ok ? { ok: true, kind: "found" } : { ok: false, kind: writable.error, status: writable.status };
+    }
     return { ok: false, kind: "unreachable" };
   } catch (_) {
     return { ok: false, kind: "unreachable" };

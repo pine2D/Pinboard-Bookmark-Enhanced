@@ -722,7 +722,7 @@
     "message": "Notes"
   },
   "notesFilterPlaceholder": {
-    "message": "Filter titles and notes…"
+    "message": "Filter titles and notes"
   },
   "notesColHighlights": {
     "message": "Highlights"
@@ -738,6 +738,9 @@
   },
   "notesEmpty": {
     "message": "Select text on a Markdown preview page to highlight it or add a note."
+  },
+  "notesFilterEmpty": {
+    "message": "No notes match this filter."
   },
   "notesUnknownPage": {
     "message": "Unknown page"
@@ -875,6 +878,12 @@
   "backupHint": {
     "message": "Export/import your settings (API keys are excluded from export for security)."
   },
+  "backupIncludeHighlightsLabel": {
+    "message": "Include highlights and notes in backups"
+  },
+  "backupIncludeHighlightsHint": {
+    "message": "Includes page URLs, titles, selected text, notes, colors, and timestamps in manual and WebDAV backups. API keys are still never included."
+  },
   "exportSettings": {
     "message": "Export Settings"
   },
@@ -950,6 +959,12 @@
         "content": "$1"
       }
     }
+  },
+  "webdavPushNotWritable": {
+    "message": "Directory exists but upload was refused. Choose an existing writable synced folder, not the WebDAV root."
+  },
+  "webdavTargetUnavailable": {
+    "message": "Target directory was not found or could not be created. Use a writable WebDAV folder URL."
   },
   "webdavPermDenied": {
     "message": "Permission denied — click Test to grant access"

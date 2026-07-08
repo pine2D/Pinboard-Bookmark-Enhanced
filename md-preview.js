@@ -609,8 +609,9 @@ function pbpApplyColorScheme(mode) {
 
   // Export-options defaults from settings (per-export overridable via the header row).
   // Read from the SAME storage area options.js writes to: sync when the user enabled
-  // sync, else local (the default). md-preview doesn't load shared.js, so resolve the
-  // area inline rather than via getSettingsStorage. Reading chrome.storage.sync directly
+  // sync, else local (the default). md-preview.html loads shared.js for
+  // SETTINGS_DEFAULTS/deobfuscate helpers, but md-preview.* and md-*.js still use
+  // native document.getElementById by convention. Reading chrome.storage.sync directly
   // would miss every customization for the default (sync-off) user — including the
   // obsidianEnabled gate, the vault/folder, and the frontmatter/image/TOC defaults.
   const EXPORT_SETTINGS_DEFAULTS = {

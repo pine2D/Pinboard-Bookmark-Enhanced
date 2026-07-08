@@ -722,7 +722,7 @@
     "message": "筆記"
   },
   "notesFilterPlaceholder": {
-    "message": "按標題或筆記篩選…"
+    "message": "按標題或筆記篩選"
   },
   "notesColHighlights": {
     "message": "標記數"
@@ -738,6 +738,9 @@
   },
   "notesEmpty": {
     "message": "在 Markdown 預覽頁選取文字即可標記或記筆記。"
+  },
+  "notesFilterEmpty": {
+    "message": "沒有符合篩選條件的筆記。"
   },
   "notesUnknownPage": {
     "message": "未知頁面"
@@ -875,6 +878,12 @@
   "backupHint": {
     "message": "匯出或匯入設定（出於安全考慮，API 金鑰不包含在匯出檔案中）。"
   },
+  "backupIncludeHighlightsLabel": {
+    "message": "在備份中包含醒目提示和筆記"
+  },
+  "backupIncludeHighlightsHint": {
+    "message": "手動備份和 WebDAV 備份會包含頁面 URL、標題、選取文字、筆記、顏色和時間戳。API 金鑰仍然不會被包含。"
+  },
   "exportSettings": {
     "message": "匯出設定"
   },
@@ -950,6 +959,12 @@
         "content": "$1"
       }
     }
+  },
+  "webdavPushNotWritable": {
+    "message": "目錄存在但無法寫入。請選擇堅果雲中已存在且可寫的同步資料夾，不要使用 WebDAV 根目錄。"
+  },
+  "webdavTargetUnavailable": {
+    "message": "目標目錄不存在或無法建立。請填寫一個可寫的 WebDAV 資料夾地址。"
   },
   "webdavPermDenied": {
     "message": "權限遭拒——按「測試」以授權"

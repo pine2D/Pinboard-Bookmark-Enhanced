@@ -366,8 +366,116 @@ async function run() {
     delete globalThis.__pbpTestSyncSetLarge;
   })();
 
+  // ---------- E6: highlight backup pure helpers ----------
+  const hlInput = {
+    pbp_hl_good: {
+      v: 1,
+      url: "https://x.test",
+      title: "X",
+      pinboardToken: "secret",
+      webdavPass: "secret",
+      exportTargets: { github: { token: "secret" } },
+      extraField: "drop",
+      items: [{ id: "a", n: 1, quote: "q", color: 4, ts: 123, note: "n", customApiKey: "secret", extra: "drop" }]
+    },
+    pbp_hl_last_color: 4,
+    pbp_hl_bad: { v: 1, items: "nope" },
+    not_hl: { items: [] },
+  };
+  const builtHighlights = pbpBuildHighlightBackup(hlInput);
+  check("E6 build highlights: keeps valid highlight record", builtHighlights.pbp_hl_good.url === "https://x.test");
+  check("E6 build highlights: keeps last color", builtHighlights.pbp_hl_last_color === 4);
+  check("E6 build highlights: skips malformed highlight records", !("pbp_hl_bad" in builtHighlights));
+  check("E6 build highlights: skips non-highlight keys", !("not_hl" in builtHighlights));
+  check("E6 build highlights: empty result returns null", pbpBuildHighlightBackup({ pbp_hl_bad: { items: "nope" } }) === null);
+  check("E6 build highlights: strips secret-like top-level fields",
+    !("pinboardToken" in builtHighlights.pbp_hl_good) && !("webdavPass" in builtHighlights.pbp_hl_good) &&
+    !("exportTargets" in builtHighlights.pbp_hl_good) && !("extraField" in builtHighlights.pbp_hl_good));
+  check("E6 build highlights: strips secret-like item fields",
+    !("customApiKey" in builtHighlights.pbp_hl_good.items[0]) && !("extra" in builtHighlights.pbp_hl_good.items[0]));
+  check("E6 build highlights: rejects invalid last color",
+    !pbpBuildHighlightBackup({ pbp_hl_last_color: "4" }) && !pbpBuildHighlightBackup({ pbp_hl_last_color: { color: 4 } }));
+  check("E6 build highlights: accepts last color 1-5", pbpBuildHighlightBackup({ pbp_hl_last_color: 5 }).pbp_hl_last_color === 5);
+
+  const cleanedHighlights = pbpCleanHighlightBackup(hlInput);
+  check("E6 clean highlights: keeps valid remote highlight record", cleanedHighlights.pbp_hl_good.url === "https://x.test");
+  check("E6 clean highlights: keeps last color", cleanedHighlights.pbp_hl_last_color === 4);
+  check("E6 clean highlights: skips malformed remote records", !("pbp_hl_bad" in cleanedHighlights));
+  check("E6 clean highlights: skips non-highlight keys", !("not_hl" in cleanedHighlights));
+  check("E6 clean highlights: strips secret-like top-level fields",
+    !("pinboardToken" in cleanedHighlights.pbp_hl_good) && !("webdavPass" in cleanedHighlights.pbp_hl_good) &&
+    !("exportTargets" in cleanedHighlights.pbp_hl_good) && !("extraField" in cleanedHighlights.pbp_hl_good));
+  check("E6 clean highlights: strips secret-like item fields",
+    !("customApiKey" in cleanedHighlights.pbp_hl_good.items[0]) && !("extra" in cleanedHighlights.pbp_hl_good.items[0]));
+  check("E6 clean highlights: rejects invalid last color",
+    !("pbp_hl_last_color" in pbpCleanHighlightBackup({ pbp_hl_last_color: "4" })) &&
+    !("pbp_hl_last_color" in pbpCleanHighlightBackup({ pbp_hl_last_color: { color: 4 } })));
+
+  // ---------- E7: manual export uses the live highlight-backup checkbox ----------
+  await (async () => {
+    const prevChromeE7 = globalThis.chrome;
+    const prevCreateObjectURL = URL.createObjectURL;
+    const prevRevokeObjectURL = URL.revokeObjectURL;
+    const prevCache = _settingsStorageCache;
+    let exportedBlob = null;
+    const localArea = Object.assign({}, SETTINGS_DEFAULTS, {
+      optSyncEnabled: false,
+      backupIncludeHighlights: true,
+      pbp_hl_good: { v: 1, url: "https://x.test", title: "X", items: [{ id: "a", n: 1, quote: "q", color: 1 }] },
+      pbp_hl_last_color: 4,
+    });
+    function storageGet(keys) {
+      if (keys === null) return Promise.resolve(Object.assign({}, localArea));
+      if (Array.isArray(keys)) {
+        const out = {};
+        keys.forEach((k) => { if (k in localArea) out[k] = localArea[k]; });
+        return Promise.resolve(out);
+      }
+      if (typeof keys === "object") {
+        const out = Object.assign({}, keys);
+        Object.keys(keys).forEach((k) => { if (k in localArea) out[k] = localArea[k]; });
+        return Promise.resolve(out);
+      }
+      return Promise.resolve({ [keys]: localArea[keys] });
+    }
+    const wrap = document.createElement("div");
+    try {
+      wrap.innerHTML = '<button id="export-settings" type="button"></button><input id="import-settings-file" type="file"><span id="import-status"></span><input id="opt-backup-include-highlights" type="checkbox">';
+      document.body.appendChild(wrap);
+      document.getElementById("opt-backup-include-highlights").checked = false;
+      _settingsStorageCache = null;
+      globalThis.chrome = {
+        storage: {
+          local: { get: storageGet, set: (d) => { Object.assign(localArea, d); return Promise.resolve(); }, remove: () => Promise.resolve() },
+          sync: { get: storageGet, set: () => Promise.resolve(), remove: () => Promise.resolve() },
+          onChanged: { addListener() {} },
+        },
+      };
+      URL.createObjectURL = (blob) => { exportedBlob = blob; return "blob:pbp-test"; };
+      URL.revokeObjectURL = () => {};
+      setupBackup({
+        exportableKeys: Object.keys(SETTINGS_DEFAULTS).filter((k) => !API_KEY_FIELDS.includes(k)),
+        saveOverlayWithFallback: () => Promise.resolve(),
+      });
+      document.getElementById("export-settings").click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const exported = JSON.parse(await exportedBlob.text());
+      check("E7 manual export: live unchecked checkbox serializes backupIncludeHighlights=false",
+        exported.backupIncludeHighlights === false);
+      check("E7 manual export: live unchecked checkbox omits _highlights",
+        !("_highlights" in exported));
+    } finally {
+      globalThis.chrome = prevChromeE7;
+      URL.createObjectURL = prevCreateObjectURL;
+      URL.revokeObjectURL = prevRevokeObjectURL;
+      _settingsStorageCache = prevCache;
+      wrap.remove();
+    }
+  })();
+
   const summary = document.createElement("h2");
-  summary.textContent = `Results: ${pass} pass, ${fail} fail`;
+  summary.id = "summary";
+  summary.textContent = `${pass} passed, ${fail} failed`;
   root.insertBefore(summary, root.firstChild);
 }
 run();
