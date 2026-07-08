@@ -1514,6 +1514,18 @@
   "mdSentObsidian": {
     "message": "Wysłano"
   },
+  "mdObsidianRoute": {
+    "message": "Trasa Obsidian"
+  },
+  "mdObsidianRouteNew": {
+    "message": "Nowa notatka"
+  },
+  "mdObsidianRouteAppend": {
+    "message": "Dopisz do notatki o tej samej nazwie"
+  },
+  "mdObsidianRouteDaily": {
+    "message": "Notatka dzienna"
+  },
   "mdObsidianVault": {
     "message": "Skarbiec Obsidian"
   },
@@ -1618,7 +1630,7 @@
     }
   },
   "mdStatMin": {
-    "message": "~$COUNT$ min",
+    "message": "~$COUNT$ min.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1626,7 +1638,7 @@
     }
   },
   "mdStatTokens": {
-    "message": "$COUNT$ tokens",
+    "message": "$COUNT$ tokenów",
     "placeholders": {
       "count": {
         "content": "$1"

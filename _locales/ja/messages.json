@@ -1514,6 +1514,18 @@
   "mdSentObsidian": {
     "message": "送信しました"
   },
+  "mdObsidianRoute": {
+    "message": "Obsidian ルート"
+  },
+  "mdObsidianRouteNew": {
+    "message": "新規ノート"
+  },
+  "mdObsidianRouteAppend": {
+    "message": "同名ノートに追記"
+  },
+  "mdObsidianRouteDaily": {
+    "message": "デイリーノート"
+  },
   "mdObsidianVault": {
     "message": "Obsidian Vault"
   },

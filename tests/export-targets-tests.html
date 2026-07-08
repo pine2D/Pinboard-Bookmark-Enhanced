@@ -43,6 +43,7 @@ section("registry shape");
 assertEq(pbpExportTargetIds().join(","), "obsidian,github,webhook", "id order");
 assert(PBP_EXPORT_TARGETS.obsidian.mechanism === "url-scheme", "obsidian is url-scheme");
 assert(PBP_EXPORT_TARGETS.obsidian.viaClipboard === true, "obsidian uses clipboard");
+assert(PBP_EXPORT_TARGETS.obsidian.settings.some((s) => s.key === "route" && s.type === "select"), "obsidian has a route select");
 assert(PBP_EXPORT_TARGETS.github.mechanism === "token-api", "github is token-api");
 assert(PBP_EXPORT_TARGETS.github.frontmatter === "inline", "github keeps YAML (inline)");
 assert(PBP_EXPORT_TARGETS.github.settings[0].required === true, "github token is required (-> needs-setup gate)");
@@ -192,6 +193,13 @@ section("obsidian.buildUri");
   assert(uri.includes("vault=V"), "passes vault");
   assert(uri.includes("&clipboard"), "uses clipboard flag");
   assert(!uri.includes("content="), "no inline content (clipboard path)");
+  const appendUri = PBP_EXPORT_TARGETS.obsidian.buildUri({ title: "My Note" }, "ignored", { vault: "V", folder: "F", route: "append" });
+  assert(appendUri.startsWith("obsidian://new?file=F%2FMy%20Note"), "append route keeps target file path");
+  assert(appendUri.includes("&append"), "append route adds append flag");
+  const dailyUri = PBP_EXPORT_TARGETS.obsidian.buildUri({ title: "My Note" }, "ignored", { vault: "V", folder: "F", route: "daily" });
+  assert(dailyUri.startsWith("obsidian://daily?"), "daily route uses daily action");
+  assert(!dailyUri.includes("file="), "daily route does not force the clipped page filename");
+  assert(dailyUri.includes("vault=V") && dailyUri.includes("&clipboard") && dailyUri.includes("&append"), "daily route passes vault, clipboard, append");
 }
 
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;

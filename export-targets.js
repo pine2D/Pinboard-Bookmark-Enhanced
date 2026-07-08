@@ -72,13 +72,21 @@ const PBP_EXPORT_TARGETS = {
     frontmatter: "inline",       // Obsidian parses YAML natively
     buildUri(meta, rawBody, cfg) {
       cfg = cfg || {};
+      const route = cfg.route === "append" || cfg.route === "daily" ? cfg.route : "new";
       return buildObsidianUri({  // md-convert.js global
-        vault: cfg.vault, folder: cfg.folder,
+        action: route === "daily" ? "daily" : "new",
+        append: route === "append" || route === "daily",
+        vault: cfg.vault, folder: route === "daily" ? "" : cfg.folder,
         name: safeFilename((meta && meta.title) || "Untitled"),
         clipboard: true, content: ""
       });
     },
     settings: [
+      { key: "route", type: "select", label: "mdObsidianRoute", default: "new", options: [
+        { value: "new", label: "mdObsidianRouteNew" },
+        { value: "append", label: "mdObsidianRouteAppend" },
+        { value: "daily", label: "mdObsidianRouteDaily" }
+      ] },
       { key: "vault", type: "text", label: "mdObsidianVault" },
       { key: "folder", type: "text", label: "mdObsidianFolder" }
     ],

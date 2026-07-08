@@ -750,12 +750,17 @@ function composeStyledHtml(canonicalMd, meta, opts) {
 // current vault; empty folder = vault root). Pure string assembly — no chrome/DOM.
 function buildObsidianUri(opts) {
   opts = opts || {};
+  const action = opts.action === "daily" ? "daily" : "new";
   const name = opts.name || "Untitled";
   const folder = (opts.folder || "").replace(/^\/+|\/+$/g, "");
   const path = (folder ? folder + "/" : "") + name;
-  let u = "obsidian://new?file=" + encodeURIComponent(path);
-  if (opts.vault) u += "&vault=" + encodeURIComponent(opts.vault);
-  if (opts.clipboard) u += "&clipboard";
-  if (opts.content) u += "&content=" + encodeURIComponent(opts.content);
+  const params = [];
+  if (action === "new") params.push("file=" + encodeURIComponent(path));
+  let u = "obsidian://" + action + (params.length ? "?" + params.join("&") : "");
+  const addParam = (p) => { u += (u.indexOf("?") === -1 ? "?" : "&") + p; };
+  if (opts.vault) addParam("vault=" + encodeURIComponent(opts.vault));
+  if (opts.clipboard) addParam("clipboard");
+  if (opts.append) addParam("append");
+  if (opts.content) addParam("content=" + encodeURIComponent(opts.content));
   return u;
 }

@@ -380,21 +380,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       card.appendChild(enableLabel);
 
       (row.settings || []).forEach((s) => {
-        if (s.type !== "text" && s.type !== "secret") return;
+        if (s.type !== "text" && s.type !== "secret" && s.type !== "select") return;
         const wrap = document.createElement("div");
         wrap.className = "et-field";
         const lab = document.createElement("label");
         lab.className = "bl";
         lab.textContent = t(s.label);
-        const inp = document.createElement("input");
-        inp.type = s.type === "secret" ? "password" : "text";
-        inp.autocomplete = "off";
+        const inp = document.createElement(s.type === "select" ? "select" : "input");
+        if (s.type !== "select") {
+          inp.type = s.type === "secret" ? "password" : "text";
+          inp.autocomplete = "off";
+        }
         inp.id = id + "-" + s.key;
         lab.htmlFor = inp.id;
         inp.dataset.et = id + "." + s.key;
         if (s.type === "secret") {
           inp.dataset.secret = "1";
           inp.value = (typeof deobfuscateKey === "function") ? deobfuscateKey(cfg[s.key] || "") : (cfg[s.key] || "");
+        } else if (s.type === "select") {
+          (s.options || []).forEach((opt) => {
+            const o = document.createElement("option");
+            o.value = opt.value;
+            o.textContent = t(opt.label);
+            inp.appendChild(o);
+          });
+          inp.value = cfg[s.key] || s.default || ((s.options && s.options[0] && s.options[0].value) || "");
         } else {
           inp.value = cfg[s.key] || "";
         }

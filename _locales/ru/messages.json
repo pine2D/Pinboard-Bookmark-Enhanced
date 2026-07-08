@@ -1514,6 +1514,18 @@
   "mdSentObsidian": {
     "message": "Отправлено"
   },
+  "mdObsidianRoute": {
+    "message": "Маршрут Obsidian"
+  },
+  "mdObsidianRouteNew": {
+    "message": "Новая заметка"
+  },
+  "mdObsidianRouteAppend": {
+    "message": "Добавить в заметку с тем же именем"
+  },
+  "mdObsidianRouteDaily": {
+    "message": "Ежедневная заметка"
+  },
   "mdObsidianVault": {
     "message": "Хранилище Obsidian"
   },
@@ -1626,7 +1638,7 @@
     }
   },
   "mdStatTokens": {
-    "message": "$COUNT$ tokens",
+    "message": "$COUNT$ токенов",
     "placeholders": {
       "count": {
         "content": "$1"

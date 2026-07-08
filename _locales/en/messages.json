@@ -1514,6 +1514,18 @@
   "mdSentObsidian": {
     "message": "Sent"
   },
+  "mdObsidianRoute": {
+    "message": "Obsidian route"
+  },
+  "mdObsidianRouteNew": {
+    "message": "New note"
+  },
+  "mdObsidianRouteAppend": {
+    "message": "Append to matching note"
+  },
+  "mdObsidianRouteDaily": {
+    "message": "Daily note"
+  },
   "mdObsidianVault": {
     "message": "Obsidian vault"
   },

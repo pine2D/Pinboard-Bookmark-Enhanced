@@ -719,7 +719,7 @@
     "message": "Lecture"
   },
   "tabNotes": {
-    "message": "Notes"
+    "message": "Bloc-notes"
   },
   "notesFilterPlaceholder": {
     "message": "Filtrer par titre ou note"
@@ -728,7 +728,7 @@
     "message": "Surlignages"
   },
   "notesColNotes": {
-    "message": "Notes"
+    "message": "Nb de notes"
   },
   "notesColLastActive": {
     "message": "Dernière activité"
@@ -1514,6 +1514,18 @@
   "mdSentObsidian": {
     "message": "Envoyé"
   },
+  "mdObsidianRoute": {
+    "message": "Destination Obsidian"
+  },
+  "mdObsidianRouteNew": {
+    "message": "Nouvelle note"
+  },
+  "mdObsidianRouteAppend": {
+    "message": "Ajouter à la note du même nom"
+  },
+  "mdObsidianRouteDaily": {
+    "message": "Note quotidienne"
+  },
   "mdObsidianVault": {
     "message": "Coffre Obsidian"
   },
@@ -1618,7 +1630,7 @@
     }
   },
   "mdStatMin": {
-    "message": "~$COUNT$ min",
+    "message": "~$COUNT$ min.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1626,7 +1638,7 @@
     }
   },
   "mdStatTokens": {
-    "message": "$COUNT$ tokens",
+    "message": "$COUNT$ jetons",
     "placeholders": {
       "count": {
         "content": "$1"

@@ -1514,6 +1514,18 @@
   "mdSentObsidian": {
     "message": "已傳送"
   },
+  "mdObsidianRoute": {
+    "message": "Obsidian 路由"
+  },
+  "mdObsidianRouteNew": {
+    "message": "建立新筆記"
+  },
+  "mdObsidianRouteAppend": {
+    "message": "附加到同名筆記"
+  },
+  "mdObsidianRouteDaily": {
+    "message": "每日筆記"
+  },
   "mdObsidianVault": {
     "message": "Obsidian 庫"
   },
@@ -1626,7 +1638,7 @@
     }
   },
   "mdStatTokens": {
-    "message": "$COUNT$ tokens",
+    "message": "$COUNT$ 個 token",
     "placeholders": {
       "count": {
         "content": "$1"

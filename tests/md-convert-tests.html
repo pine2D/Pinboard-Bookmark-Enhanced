@@ -203,6 +203,8 @@ function assertEq(actual, expected, label) {
       assert(/&clipboard/.test(clip) && !/&content=/.test(clip), "clipboard mode: &clipboard, no &content");
       const cont = buildObsidianUri({ name: "N", clipboard: false, content: "# Hi & bye" });
       assert(/&content=%23%20Hi%20%26%20bye/.test(cont) && !/&clipboard/.test(cont), "content mode: encoded &content, no &clipboard");
+      assertEq(buildObsidianUri({ name: "N", append: true }), "obsidian://new?file=N&append", "append flag");
+      assertEq(buildObsidianUri({ action: "daily", vault: "V", clipboard: true, append: true }), "obsidian://daily?vault=V&clipboard&append", "daily action uses daily endpoint");
       assertEq(buildObsidianUri({}), "obsidian://new?file=Untitled", "empty opts -> Untitled");
     } catch (e) {
       assert(false, "buildObsidianUri threw: " + e.message);

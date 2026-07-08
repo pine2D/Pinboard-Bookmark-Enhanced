@@ -1514,6 +1514,18 @@
   "mdSentObsidian": {
     "message": "Gesendet"
   },
+  "mdObsidianRoute": {
+    "message": "Obsidian-Ziel"
+  },
+  "mdObsidianRouteNew": {
+    "message": "Neue Notiz"
+  },
+  "mdObsidianRouteAppend": {
+    "message": "An gleichnamige Notiz anhängen"
+  },
+  "mdObsidianRouteDaily": {
+    "message": "Tägliche Notiz"
+  },
   "mdObsidianVault": {
     "message": "Obsidian-Vault"
   },
@@ -1626,7 +1638,7 @@
     }
   },
   "mdStatTokens": {
-    "message": "$COUNT$ tokens",
+    "message": "$COUNT$ Token",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2566,7 +2578,7 @@
     "message": "Dieser Endpunkt verwendet HTTP statt HTTPS – der Authorization-Wert wird im Klartext gesendet. Für localhost/LAN unbedenklich; im öffentlichen Internet vermeiden."
   },
   "hlColorQuote": { "message": "Zitat" },
-  "hlColorDefinition": { "message": "Definition" },
+  "hlColorDefinition": { "message": "Begriffsdefinition" },
   "hlColorExample": { "message": "Beispiel" },
   "hlColorDoubt": { "message": "Zweifel" },
   "hlColorTodo": { "message": "Aufgabe" },
