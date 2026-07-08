@@ -21,7 +21,7 @@
 - **AI 標籤與摘要** — 自備 API key 接入 13 家主流 LLM 服務商，或任何 OpenAI 相容端點；送往 AI 的是去除廣告、選單、側欄後的乾淨正文
 - **標籤工具** — 從你自己的標籤、Pinboard 建議標籤，以及一鍵標籤預設中自動補全；另有標籤治理面板，能找出重複與低使用次數的標籤（啟發式 + 隨選 AI 分群），並以限流批次合併，同時即時顯示進度
 - **快速連結與狀態** — 一鍵前往你的 Unread、Network、Notes 與 Popular 頁面；目前頁若已收藏，工具列圖示會自動切換狀態
-- **當前頁轉 Markdown** — 將目前網頁轉為乾淨的 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可複製或下載為 `.md` 或帶樣式的 `.html`，可調整 frontmatter（涵蓋作者、發布日期、網站、封面圖片與字數統計）、圖片處理與目錄，也可直接送往 [Obsidian](https://obsidian.md)、GitHub Gist，或任何 webhook（相容 Readwise）。站台感知擷取讓問答與論壇討論串保持易讀（知乎、Hacker News、Stack Overflow、…）；後端可選 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或 [Jina Reader](https://jina.ai/reader)（雲端）
+- **當前頁轉 Markdown** — 將目前網頁轉為乾淨的 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可複製或下載為 `.md` 或帶樣式的 `.html`，可調整 frontmatter（涵蓋作者、發布日期、網站、封面圖片與字數統計）、圖片處理與目錄，也可直接送往 [Obsidian](https://obsidian.md)、GitHub Gist，或任何 webhook（相容 Readwise）。站台感知擷取讓問答、社群貼文與論壇討論串保持易讀（知乎、Hacker News、Stack Overflow、X/Twitter、…）；後端可選 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或 [Jina Reader](https://jina.ai/reader)（雲端）
 - **向頁面提問與翻譯** — 在該 Markdown 預覽中，你可以提問並取得串流回答，附帶可跳至原文的查證引用，也能就地解說或翻譯任何選取段落（並將回答存為筆記），或以自訂詞彙表翻譯整頁、即時顯示 token 用量，並提供原文／雙語／譯文三種檢視
 - **閱讀工具** — 以五種顏色劃重點並加註筆記，重新渲染或翻譯後依然保留；在筆記本面板瀏覽所有重點，用 `/` 搜尋全文（可選正規表達式，連你的筆記也搜得到），就地檢視註腳，自動接續上次的閱讀進度，開啟專注模式排除干擾，或加開選用的 AI 重點速覽（預設關閉）；按 `?` 可叫出完整快捷鍵列表
 - **自動封存** — 可選擇在每次儲存時將網頁一併存入網際網路檔案館的 [Wayback Machine](https://web.archive.org)（附封存記錄與重試），原網頁日後失效也找得回
