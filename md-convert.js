@@ -58,6 +58,24 @@ function _splitMergedComments(html) {
 // instance, so one shared instance is safe. Built lazily so popup's deferred
 // turndown.js injection still works (TurndownService undefined at module load).
 let _pbpTurndown = null;
+function _pbpSanitizeComplexTableHtml(node) {
+  const clone = node.cloneNode(true);
+  clone.querySelectorAll("script, style, iframe, object, embed, link, meta").forEach((el) => el.remove());
+  clone.querySelectorAll("*").forEach((el) => {
+    Array.from(el.attributes).forEach((attr) => {
+      const name = attr.name.toLowerCase();
+      const value = String(attr.value || "").trim();
+      if (name.startsWith("on") || name === "style" || name === "srcdoc") {
+        el.removeAttribute(attr.name);
+        return;
+      }
+      if ((name === "href" || name === "src" || name === "xlink:href") && /^(?:javascript|vbscript|data):/i.test(value)) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  return clone.outerHTML;
+}
 function _pbpGetTurndown() {
   if (_pbpTurndown) return _pbpTurndown;
   if (typeof TurndownService === "undefined") return null;
@@ -103,6 +121,9 @@ function _pbpGetTurndown() {
   td.addRule("table", {
     filter: "table",
     replacement: (content, node) => {
+      if (node.querySelector && node.querySelector("th[rowspan],td[rowspan],th[colspan],td[colspan]")) {
+        return "\n\n" + _pbpSanitizeComplexTableHtml(node) + "\n\n";
+      }
       // :scope-limited to this table's own direct rows -- a plain "tr" query would
       // also pull in a nested <table>'s rows (cell content), which then gets output
       // twice: once flattened into this table (wrong column count) and once again

@@ -417,6 +417,33 @@
     return { contentHtml: parts.join("\n"), title: title };
   }
 
+  // ---- X / Twitter: single status page ----------------------------------
+  // Scope is deliberately narrow: keep the tweet text's inline <br> fidelity, and
+  // leave thread/reply expansion to Defuddle or a future explicit rule.
+  function extractTwitterStatus(doc) {
+    var article = doc.querySelector('article[data-testid="tweet"]') || doc.querySelector("article");
+    if (!article) return null;
+    var textEl = article.querySelector('[data-testid="tweetText"]');
+    if (!textEl || !textEl.textContent.trim()) return null;
+
+    var spans = [];
+    var userEl = article.querySelector('[data-testid="User-Name"]');
+    if (userEl) {
+      userEl.querySelectorAll("span").forEach(function (s) {
+        var t = (s.textContent || "").trim();
+        if (t && spans.indexOf(t) === -1) spans.push(t);
+      });
+    }
+    var author = spans.slice(0, 2).join(" ");
+    var timeEl = article.querySelector("time");
+    var when = timeEl ? ((timeEl.getAttribute("datetime") || timeEl.textContent || "").trim()) : "";
+    var titleText = (textEl.textContent || "").replace(/\s+/g, " ").trim();
+    var title = titleText.length > 90 ? titleText.slice(0, 87) + "..." : titleText;
+    var meta = author || when ? "<p><strong>" + escapeHtml(author || "X/Twitter") + "</strong>" +
+      (when ? " · " + escapeHtml(when) : "") + "</p>" : "";
+    return { contentHtml: meta + '<div class="tweet-text">' + cleanBodyHtml(doc, textEl.innerHTML) + "</div>", title: title || doc.title };
+  }
+
   // Decode TeX text-mode accents/ligatures in PROSE (e.g. Andr\'e -> André). Punctuation
   // accents allow \'e / \'{e}; letter-command accents (\c \v \u \H \r \k) require braces
   // (\c{c}) to avoid eating \cite/\verb etc. Combining marks + NFC normalize.
@@ -742,6 +769,10 @@
        sampleUrl: "", match: { host: "arxiv.org", url: /\/abs\// }, extract: function (d) { return extractArxiv(d); } }
     ,{ id: "hackernews", source: "self", forum: true, lastVerified: "2026-06-16", driftCheck: "manual",
        sampleUrl: "", match: { host: "news.ycombinator.com", url: /\/item\?id=\d+/ }, extract: function (d) { return extractHackerNews(d); } }
+    ,{ id: "x-status", source: "self", lastVerified: "2026-07-09", driftCheck: "manual",
+       sampleUrl: "", match: { host: "x.com", url: /\/status\/\d+/ }, extract: function (d) { return extractTwitterStatus(d); } }
+    ,{ id: "twitter-status", source: "self", lastVerified: "2026-07-09", driftCheck: "manual",
+       sampleUrl: "", match: { host: "twitter.com", url: /\/status\/\d+/ }, extract: function (d) { return extractTwitterStatus(d); } }
   ];
 
   function applySiteRule(doc, url) {

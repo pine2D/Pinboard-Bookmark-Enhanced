@@ -527,6 +527,19 @@ function assertEq(actual, expected, label) {
     check("table still emits the header separator row", /\|\s*---\s*\|/.test(md), md);
   })();
 
+  // ---- Complex tables preserve HTML structure instead of lossy pipe tables ----
+  section("htmlToMarkdown complex table fidelity");
+  (() => {
+    const html = '<table><tr><th colspan="2">Group</th></tr>' +
+      '<tr><td rowspan="2" onclick="alert(1)" style="color:red">A<scr' + 'ipt>alert(1)</scr' + 'ipt></td><td><a href="/ok">ok</a></td></tr>' +
+      '<tr><td><a href="javascript:alert(1)">bad</a></td></tr></table>';
+    const md = htmlToMarkdown(html, { baseUrl: "https://example.com/base/" });
+    check("complex table keeps raw table HTML with span attributes",
+      /<table[\s>]/i.test(md) && /colspan="2"/i.test(md) && /rowspan="2"/i.test(md) && !/^\|/m.test(md), md);
+    check("complex table strips dangerous HTML before emitting raw table",
+      !/(onclick|style=|<script|javascript:)/i.test(md), md);
+  })();
+
   // ---- GitHub alerts: Defuddle -> Obsidian callout (data-callout) -> > [!TYPE] ----
   section("htmlToMarkdown GitHub alert (callout) restore");
   (() => {
@@ -1124,6 +1137,24 @@ section("site-rules: hacker news");
   check("hn → Comments heading (2)", /<h2>Comments \(2\)<\/h2>/.test(c), c);
   check("hn → authors + bodies present", /alice/.test(c) && /bob/.test(c) && /root comment here/.test(c) && /child reply here/.test(c), c);
   check("hn → bob nested under alice", /<blockquote>[\s\S]*alice[\s\S]*<blockquote>[\s\S]*bob[\s\S]*<\/blockquote>[\s\S]*<\/blockquote>/.test(c), c);
+}
+</script>
+
+<script>
+section("site-rules: X/Twitter status");
+{
+  const X = '<html><head><title>Alice on X</title></head><body>' +
+    '<article data-testid="tweet">' +
+      '<div data-testid="User-Name"><span>Alice</span><span>@alice</span></div>' +
+      '<div data-testid="tweetText"><span>Line one</span><br><span>Line two </span><a href="/hashtag/pbp">#pbp</a></div>' +
+      '<time datetime="2026-07-09T01:00:00.000Z">Jul 9</time>' +
+    '</article></body></html>';
+  const doc = new DOMParser().parseFromString(X, "text/html");
+  const r = applySiteRule(doc, "https://x.com/alice/status/1234567890");
+  const md = r ? htmlToMarkdown(r.contentHtml, { baseUrl: "https://x.com/alice/status/1234567890" }) : "";
+  check("x status → id + title from tweet text", r && r.id === "x-status" && /Line one/.test(r.title), JSON.stringify(r && [r.id, r.title]));
+  check("x status → tweet line break survives markdown", /Line one\s{0,2}\n\s*Line two/.test(md), md);
+  check("twitter.com status → same extractor", applySiteRule(doc, "https://twitter.com/alice/status/1234567890")?.id === "twitter-status");
 }
 </script>
 
