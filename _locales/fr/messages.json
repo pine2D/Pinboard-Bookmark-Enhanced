@@ -2615,5 +2615,6 @@
   "skimCollapseAria": { "message": "Basculer la section des points clés" },
   "skimStaleNote": { "message": "Le contenu a changé — ces points clés peuvent être obsolètes" },
   "skimStop": { "message": "Arrêter" },
+  "skimGenerating": { "message": "Génération des points clés…" },
   "skimFailed": { "message": "Impossible de générer les points clés" }
 }

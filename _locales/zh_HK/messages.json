@@ -2615,5 +2615,6 @@
   "skimCollapseAria": { "message": "摺疊或展開要點區塊" },
   "skimStaleNote": { "message": "內容已變化，這些要點可能已過時" },
   "skimStop": { "message": "停止" },
+  "skimGenerating": { "message": "正在生成要點…" },
   "skimFailed": { "message": "要點生成失敗" }
 }

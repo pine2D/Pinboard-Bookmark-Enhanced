@@ -2609,5 +2609,6 @@
   "skimCollapseAria": { "message": "Toggle key points section" },
   "skimStaleNote": { "message": "Content has changed — these key points may be out of date" },
   "skimStop": { "message": "Stop" },
+  "skimGenerating": { "message": "Generating key points…" },
   "skimFailed": { "message": "Couldn't generate key points" }
 }

@@ -147,6 +147,7 @@ function _pbpSkimBuildSection(view) {
     '  <span data-i18n="skimStaleNote"></span>',
     '  <button type="button" id="skim-stale-regen" class="action-btn skim-stale-btn" data-i18n="skimRegen"></button>',
     '</div>',
+    '<div id="skim-status" role="status" aria-live="polite" hidden></div>',
     '<div id="skim-body" aria-busy="false"></div>',
     '<div id="skim-usage" hidden></div>'
   ].join("\n");
@@ -223,8 +224,17 @@ async function _pbpSkimLoad() {
 function _pbpSkimRenderCached(r) {
   const body = document.getElementById("skim-body");
   if (!body) return;
+  _pbpSkimSetStatus("");
   body.innerHTML = renderMarkdown(r.md);
   if (typeof _pbpAskChipPass === "function") _pbpAskChipPass(body, Array.isArray(r.cites) ? r.cites : []);
+}
+
+function _pbpSkimSetStatus(text) {
+  const el = document.getElementById("skim-status");
+  if (!el) return;
+  const msg = String(text || "");
+  el.textContent = msg;
+  el.hidden = !msg;
 }
 
 // Core generate/regenerate runner (spec 1.2.3-1.2.6). Callers:
@@ -251,6 +261,7 @@ async function _pbpSkimRun() {
   if (stopBtn) stopBtn.hidden = false;
   if (regenBtn) regenBtn.disabled = true;
   if (usageEl) usageEl.hidden = true; // stale number from a previous run must not linger (mirrors _pbpTrRenderUsage's own reset-on-new-run)
+  _pbpSkimSetStatus(t("skimGenerating"));
   body.setAttribute("aria-busy", "true");
   let raf = 0;
   let acc = "";
@@ -294,6 +305,7 @@ async function _pbpSkimRun() {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     if (myGen !== st.gen) return; // superseded: ignore this run's error entirely
     if (e && e.name === "AbortError") {
+      _pbpSkimSetStatus("");
       // Stop button: keep whatever text already streamed, quietly (spec
       // 1.2.3/1.2.6) -- unlike ask's Stop, no "Stopped" note is
       // appended; skim is a single rolling summary, not a conversation
@@ -326,6 +338,7 @@ function _pbpSkimFinalize(fullText, usage) {
   const parsed = pbpAiParseCites(fullText);
   body.innerHTML = renderMarkdown(parsed.body);
   if (typeof _pbpAskChipPass === "function") _pbpAskChipPass(body, parsed.cites);
+  _pbpSkimSetStatus("");
   const blocksHash = (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : "";
   const meta = _pbpSkimCacheMeta(st);
   pbpAiCacheSet(_pbpSkimCacheKey(st.url), {
@@ -368,6 +381,7 @@ function _pbpSkimRenderUsage(usage) {
 function _pbpSkimShowError() {
   const body = document.getElementById("skim-body");
   if (!body) return;
+  _pbpSkimSetStatus("");
   body.replaceChildren();
   const p = document.createElement("p");
   p.className = "skim-err";

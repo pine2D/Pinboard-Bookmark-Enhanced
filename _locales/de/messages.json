@@ -2615,5 +2615,6 @@
   "skimCollapseAria": { "message": "Abschnitt Kernpunkte ein-/ausblenden" },
   "skimStaleNote": { "message": "Inhalt hat sich geändert — diese Kernpunkte könnten veraltet sein" },
   "skimStop": { "message": "Stopp" },
+  "skimGenerating": { "message": "Kernpunkte werden erzeugt…" },
   "skimFailed": { "message": "Kernpunkte konnten nicht erzeugt werden" }
 }

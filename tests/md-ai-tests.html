@@ -4735,5 +4735,24 @@ suiteIf("skim cache metadata", "_pbpSkimCacheMeta", () => {
     assert(!_pbpSkimCacheMatches({ md: "- cached", blocksHash: "b1" }, st, "b1"), "legacy cache misses");
   });
 });
+
+suite("skim status line", () => {
+  test("status helper shows text and hides empty state", () => {
+    const el = document.createElement("div");
+    el.id = "skim-status";
+    el.hidden = true;
+    document.body.appendChild(el);
+    try {
+      _pbpSkimSetStatus("Generating");
+      assertEq(el.hidden, false, "shown");
+      assertEq(el.textContent, "Generating", "text");
+      _pbpSkimSetStatus("");
+      assertEq(el.hidden, true, "hidden");
+      assertEq(el.textContent, "", "cleared");
+    } finally {
+      el.remove();
+    }
+  });
+});
 </script>
 </body></html>

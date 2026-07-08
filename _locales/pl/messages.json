@@ -2615,5 +2615,6 @@
   "skimCollapseAria": { "message": "Przełącz sekcję kluczowych punktów" },
   "skimStaleNote": { "message": "Treść uległa zmianie — te kluczowe punkty mogą być nieaktualne" },
   "skimStop": { "message": "Zatrzymaj" },
+  "skimGenerating": { "message": "Generowanie kluczowych punktów…" },
   "skimFailed": { "message": "Nie udało się wygenerować kluczowych punktów" }
 }
