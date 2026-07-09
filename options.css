@@ -314,7 +314,9 @@ html[data-theme] .et-field select:focus-visible { box-shadow: 0 0 0 3px color-mi
 .accordion-section:last-child { border-bottom: none; }
 .accordion-header {
   display: flex; align-items: center; gap: 6px;
+  width: 100%;
   padding: 10px 0; cursor: pointer; font-size: 13px; font-weight: bold; color: #444;
+  border: 0; background: none; text-align: left;
   user-select: none; transition: color 0.15s;
 }
 .accordion-header:hover { color: #2255aa; }
@@ -928,15 +930,6 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 @media (min-resolution: 144dpi) and (min-width: 1200px) { body { zoom: 1.12; } }
 @media (min-resolution: 192dpi) and (min-width: 1200px) { body { zoom: 1.22; } }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
 /* ---- Wayback Log Viewer ---- */
 #wayback-log {
   margin-top: 6px;
@@ -1387,6 +1380,47 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   padding: 12px 0;
 }
 @media (max-width: 720px) {
+  .container {
+    grid-template-columns: 1fr;
+    row-gap: 16px;
+  }
+  .container > h1,
+  .tabs,
+  .panel.active {
+    grid-column: 1;
+  }
+  .tabs,
+  .panel.active {
+    grid-row: auto;
+  }
+  .tabs {
+    position: static;
+    flex-direction: row;
+    align-items: stretch;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .tab-btn {
+    flex: 0 0 auto;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: var(--opt-radius-sm) var(--opt-radius-sm) 0 0;
+  }
+  .tab-btn:hover:not(.active) {
+    border-left-color: transparent;
+    border-bottom-color: #bbb;
+  }
+  .tab-btn.active {
+    border-left-color: transparent;
+    border-bottom-color: var(--opt-fg, #333);
+  }
+  .reset-tab-btn {
+    flex: 0 0 auto;
+    margin: 0 0 0 8px;
+    padding: 7px 12px;
+    border-top: 0;
+    border-left: 1px solid #e0e0e0;
+  }
   .notes-toolbar {
     grid-template-columns: 1fr;
     align-items: stretch;

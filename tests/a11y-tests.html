@@ -12,6 +12,8 @@ function fail(n,m){const d=document.createElement("div");d.className="case fail"
 function test(n,fn){try{fn();pass(n);}catch(e){fail(n,e.message);}}
 const results=document.getElementById("results");
 
+function assert(cond,msg){if(!cond)throw new Error(msg||"assertion failed");}
+
 // G1: build a Recent edit/delete control exactly as popup.js fetchRecentBookmarks ships it.
 // This helper mirrors the shipped code; if popup.js diverges the contract assertions below catch it.
 function buildRecentControl(kind){
@@ -138,6 +140,30 @@ function buildRecentControl(kind){
   test("G3: close restores focus to opener",()=>{
     setOpen(false);
     if(document.activeElement!==document.getElementById("g3-opener"))throw new Error("opener not refocused on close, active="+(document.activeElement&&document.activeElement.id));
+  });
+})();
+
+// G6: shared confirm popover exposes dialog semantics and restores focus.
+(function(){
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:fixed;left:-9999px;top:-9999px";
+  const anchor = document.createElement("button");
+  anchor.type = "button";
+  anchor.textContent = "Delete";
+  wrap.appendChild(anchor);
+  document.body.appendChild(wrap);
+  test("G6: confirm popover has dialog semantics",()=>{
+    anchor.focus();
+    showConfirmPopover(anchor, { msg: "Sure?" });
+    const pop = anchor.querySelector(".confirm-popover");
+    assert(pop, "popover missing");
+    assert(pop.getAttribute("role") === "dialog", "role=" + pop.getAttribute("role"));
+    assert(pop.getAttribute("aria-modal") === "false", "aria-modal=" + pop.getAttribute("aria-modal"));
+    assert(pop.getAttribute("aria-label"), "missing aria-label");
+  });
+  test("G6: confirm popover restores focus to opener",()=>{
+    anchor.querySelector(".confirm-no").click();
+    assert(document.activeElement === anchor, "focus not restored");
   });
 })();
 </script>

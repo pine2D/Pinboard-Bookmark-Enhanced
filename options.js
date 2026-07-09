@@ -2,6 +2,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   initI18n();
   applyI18n();
 
+  function pbpBindLooseLabels(root) {
+    (root || document).querySelectorAll("label.bl:not([for])").forEach((label) => {
+      const box = label.parentElement;
+      const control = box && box.querySelector("input[id], select[id], textarea[id]");
+      if (control) label.htmlFor = control.id;
+    });
+  }
+  pbpBindLooseLabels(document);
+
   // W3: Lazy-init scaffolding for the appearance panel.
   // Hoisted to the top of DOMContentLoaded so the tab-switch handler and the
   // saved-tab restore (both below) can safely reference _initAppearancePanel.
@@ -360,9 +369,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const sec = document.createElement("div");
       sec.className = "accordion-section";
-      const head = document.createElement("div");
+      const head = document.createElement("button");
+      head.type = "button";
       head.className = "accordion-header";
       head.dataset.target = "et-" + id;
+      head.setAttribute("aria-controls", head.dataset.target);
       const arrow = document.createElement("span");
       arrow.className = "accordion-arrow";
       const titleEl = document.createElement("span");
@@ -592,6 +603,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const st = pbpAccState()[head.dataset.target];
       if (st === true) sec.classList.add("open");
       else if (st === false) sec.classList.remove("open");
+      head.setAttribute("aria-expanded", String(sec.classList.contains("open")));
       // st === undefined -> leave the HTML default (.open or not)
     });
   }
@@ -602,6 +614,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const sec = header.closest(".accordion-section");
     if (!sec) return;
     const isOpen = sec.classList.toggle("open");
+    header.setAttribute("aria-expanded", String(isOpen));
     const key = header.dataset.target;
     if (key) pbpAccSet(key, isOpen);
   });

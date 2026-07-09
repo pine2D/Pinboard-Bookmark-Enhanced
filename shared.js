@@ -984,8 +984,12 @@ function $id(id) {
 function showConfirmPopover(anchor, opts) {
   if (!anchor || anchor.querySelector(".confirm-popover")) return;
   const { msg, yesText, noText, onConfirm, onCancel } = opts || {};
+  const opener = document.activeElement;
   const pop = document.createElement("div");
   pop.className = "confirm-popover";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-modal", "false");
+  pop.setAttribute("aria-label", msg || "Confirm");
   const m = document.createElement("span");
   m.className = "confirm-msg";
   m.textContent = msg || "";
@@ -1003,6 +1007,7 @@ function showConfirmPopover(anchor, opts) {
   function dismiss() {
     pop.remove();
     document.removeEventListener("keydown", onKey);
+    if (opener && opener.isConnected && typeof opener.focus === "function") opener.focus();
   }
   function onKey(ev) {
     if (ev.key === "Escape") { dismiss(); if (onCancel) onCancel(); }

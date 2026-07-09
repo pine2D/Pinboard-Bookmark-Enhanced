@@ -69,7 +69,8 @@ async function fetchPinboardSuggestTags(token, url) {
         return 0;
       });
       resolvedTags.forEach((resolved) => {
-        const el = document.createElement("span");
+        const el = document.createElement("button");
+        el.type = "button";
         el.className = "stag";
         el.dataset.tag = resolved;
         el.appendChild(document.createTextNode(resolved));
@@ -80,15 +81,17 @@ async function fetchPinboardSuggestTags(token, url) {
           cs.textContent = ` (${count})`;
           el.appendChild(cs);
         }
-        el.addEventListener("click", () => { addTag(resolved); el.classList.add("used"); });
+        el.addEventListener("click", () => { addTag(resolved); el.classList.add("used"); el.disabled = true; });
         g.appendChild(el);
         g.appendChild(document.createTextNode(" "));
       });
       if (addAllId) {
-        const aa = document.createElement("span");
+        const aa = document.createElement("button");
+        aa.type = "button";
         aa.className = "add-all-link";
         aa.id = addAllId;
         aa.textContent = t("addAll");
+        aa.setAttribute("aria-label", t("addAll"));
         g.appendChild(aa);
       }
       return g;
@@ -100,7 +103,7 @@ async function fetchPinboardSuggestTags(token, url) {
     const addAllSuggest = $id("add-all-suggest");
     addAllSuggest?.addEventListener("click", () => {
       container.querySelectorAll(".stag:not(.used)").forEach((el) => { addTag(el.dataset.tag); el.classList.add("used"); });
-      if (addAllSuggest) { addAllSuggest.innerHTML = PBP_ICONS.check; addAllSuggest.style.pointerEvents = "none"; addAllSuggest.style.color = "#080"; }
+      if (addAllSuggest) { addAllSuggest.innerHTML = PBP_ICONS.check; addAllSuggest.disabled = true; addAllSuggest.style.color = "#080"; }
     });
   } catch (e) {
     console.error("suggest tags error:", e);
@@ -399,9 +402,12 @@ function renderTags() {
     handle.setAttribute("aria-hidden", "true");
     el.appendChild(handle);
     const text = document.createTextNode(tag);
-    const rm = document.createElement("span");
+    const rm = document.createElement("button");
+    rm.type = "button";
     rm.className = "tag-remove";
-    rm.innerHTML = "&times;";
+    rm.innerHTML = PBP_ICONS.cross;
+    rm.title = "Remove";
+    rm.setAttribute("aria-label", "Remove " + tag);
     rm.addEventListener("click", () => removeTag(tag));
     el.appendChild(text);
     el.appendChild(rm);
@@ -441,7 +447,7 @@ function syncSuggestTagStates() {
   const lowerTags = new Set(currentTags.map(t => t.toLowerCase()));
   document.querySelectorAll("#pinboard-suggest-tags .stag, #ai-suggest-tags .stag").forEach((el) => {
     const tag = (el.dataset.tag || "").toLowerCase();
-    if (lowerTags.has(tag)) el.classList.add("used");
-    else el.classList.remove("used");
+    if (lowerTags.has(tag)) { el.classList.add("used"); el.disabled = true; }
+    else { el.classList.remove("used"); el.disabled = false; }
   });
 }

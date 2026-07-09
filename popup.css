@@ -316,8 +316,14 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   padding: 1px 6px; border-radius: var(--pp-radius-sm); font-size: 11px; gap: 3px;
   line-height: 18px; white-space: nowrap;
 }
-.tag-remove { cursor: pointer; color: #888; font-size: 13px; line-height: 1; transition: color 0.15s; }
+.tag-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: #888; line-height: 1; transition: color 0.15s;
+}
+.tag-remove svg { width: 10px; height: 10px; }
 .tag-remove:hover { color: #c00; }
+.tag-remove:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 1px; }
 .tag-item:hover { background: #d0cfca; }
 .tag-item { position: relative; transition: background 0.15s, transform 80ms ease; }
 .tag-item[draggable] { cursor: grab; }
@@ -385,11 +391,13 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tag-actions-row .clear-all-link { margin-top: 2px; }
 #tags-copy-all:hover { color: #2255aa; text-decoration: underline; }
 .last-used-hint {
+  display: block; width: 100%; border: 0; background: none; text-align: left; font-family: inherit;
   font-size: 10px; color: #757575; cursor: pointer;
   margin-top: 2px; padding: 2px 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .last-used-hint:hover { color: #2255aa; }
+.last-used-hint:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
 .last-used-hint .lu-label { font-weight: bold; margin-right: 4px; }
 .last-used-hint .lu-tags { font-style: italic; }
 .tag-copied-flash { color: #2a8a2a !important; }
@@ -399,9 +407,13 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .suggest-group { margin-bottom: 2px; }
 .suggest-group:last-child { margin-bottom: 0; }
 .group-label { font-size: 10px; color: #757575; font-weight: bold; margin-right: 3px; }
-.stag { color: #2255aa; cursor: pointer; font-size: 12px; margin-right: 5px; white-space: nowrap; }
+.stag {
+  border: 0; background: none; padding: 0; font-family: inherit;
+  color: #2255aa; cursor: pointer; font-size: 12px; margin-right: 5px; white-space: nowrap;
+}
 .stag:hover { text-decoration: underline; }
 .stag.used { color: #bbb; text-decoration: line-through; pointer-events: none; }
+.stag:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
 .stag.ai { color: #7733aa; }
 .stag.ai:hover { color: #5511aa; }
 /* Count badge inside a suggest chip: spacing via padding (not margin) so the
@@ -409,8 +421,9 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    the margin gap. Scoped to .stag so the autocomplete dropdown's .ac-count
    (a flex item that relies on margin-left) is unaffected. */
 .stag .ac-count { margin-left: 0; padding-left: 4px; }
-.add-all-link { color: #757575; font-size: 11px; cursor: pointer; }
+.add-all-link { border: 0; background: none; padding: 0; font-family: inherit; color: #757575; font-size: 11px; cursor: pointer; }
 .add-all-link:hover { text-decoration: underline; color: #666; }
+.add-all-link:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
 .muted { color: #767676; font-size: 11px; font-style: italic; }
 
 .bottom-bar { padding: 6px 12px 4px 72px; display: flex; gap: 16px; font-size: 12px; }
@@ -1752,15 +1765,6 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
 @keyframes autoCloseCountdown {
   from { transform: scaleX(1); }
   to   { transform: scaleX(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0s !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0s !important;
-    scroll-behavior: auto !important;
-  }
 }
 
 /* ---- Markdown post-copy action strip (popup) ---- */
