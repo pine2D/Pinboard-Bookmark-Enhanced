@@ -1908,7 +1908,7 @@
     "message": "儲存為私密的書籤一律不提交到 archive.org"
   },
   "waybackPermDenied": {
-    "message": "拒絕了 web.archive.org 的權限 - 存檔保持關閉。"
+    "message": "缺少 web.archive.org 權限，重新開啟存檔即可授權。"
   },
   "archiveThisSave": {
     "message": "封存"

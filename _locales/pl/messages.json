@@ -1908,7 +1908,7 @@
     "message": "Nigdy nie archiwizuj w archive.org zakładek zapisanych jako prywatne"
   },
   "waybackPermDenied": {
-    "message": "Uprawnienie dla web.archive.org zostało odrzucone - archiwizacja pozostaje wyłączona."
+    "message": "Brakuje uprawnienia dla web.archive.org - włącz archiwizację ponownie, aby je przyznać."
   },
   "archiveThisSave": {
     "message": "archiwizuj"

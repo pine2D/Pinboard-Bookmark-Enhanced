@@ -367,7 +367,10 @@ async function showMain(token) {
             showStatus("status-msg", t("waybackPermDenied"), "error");
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        e.target.checked = false;
+        showStatus("status-msg", t("waybackPermDenied"), "error");
+      }
     }
   });
 

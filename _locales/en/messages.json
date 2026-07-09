@@ -1908,7 +1908,7 @@
     "message": "Never archive bookmarks you save as private"
   },
   "waybackPermDenied": {
-    "message": "Permission for web.archive.org was declined - archiving stays off."
+    "message": "Permission for web.archive.org is missing - turn archiving on again to grant it."
   },
   "archiveThisSave": {
     "message": "archive"

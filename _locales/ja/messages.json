@@ -1908,7 +1908,7 @@
     "message": "非公開で保存したブックマークは archive.org に送信しない"
   },
   "waybackPermDenied": {
-    "message": "web.archive.org の権限が拒否されました - アーカイブはオフのままです。"
+    "message": "web.archive.org の権限がありません。アーカイブを再度オンにして許可してください。"
   },
   "archiveThisSave": {
     "message": "アーカイブ"

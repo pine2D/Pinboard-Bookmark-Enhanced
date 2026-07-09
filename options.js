@@ -1123,6 +1123,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const has = await chrome.permissions.contains({ origins: ["https://web.archive.org/*"] });
       const statusEl = $id("wayback-perm-status");
       if (!has && s.waybackArchiveEnabled) {
+        const toggle = $id("opt-wayback-enabled");
+        if (toggle) toggle.checked = false;
+        s.waybackArchiveEnabled = false;
+        try { await (await getSettingsStorage()).set({ waybackArchiveEnabled: false }); } catch (_) {}
         if (statusEl) statusEl.textContent = t("waybackPermDenied");
       }
     } catch (_) {}
@@ -3071,6 +3075,8 @@ async function renderWaybackLog() {
       outcomeText = t("archiveOutcomeSkipped");
     } else if (outcome === "skippedPrivate") {
       outcomeText = t("archiveOutcomeSkippedPrivate");
+    } else if (outcome === "permDenied") {
+      outcomeText = t("waybackPermDenied");
     } else if (outcome === "rate-limited") {
       outcomeText = t("archiveOutcomeRateLimited");
       outcomeEl.title = t("archiveErrRateLimited");

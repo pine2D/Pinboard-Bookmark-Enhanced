@@ -1908,7 +1908,7 @@
     "message": "Als privat gespeicherte Lesezeichen nie bei archive.org archivieren"
   },
   "waybackPermDenied": {
-    "message": "Berechtigung für web.archive.org wurde abgelehnt - Archivierung bleibt deaktiviert."
+    "message": "Berechtigung für web.archive.org fehlt - aktivieren Sie die Archivierung erneut, um sie zu erteilen."
   },
   "archiveThisSave": {
     "message": "Archivieren"

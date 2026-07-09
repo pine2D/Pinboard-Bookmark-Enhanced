@@ -1908,7 +1908,7 @@
     "message": "Ne jamais archiver sur archive.org les favoris enregistrés comme privés"
   },
   "waybackPermDenied": {
-    "message": "La permission pour web.archive.org a été refusée - l'archivage reste désactivé."
+    "message": "L'autorisation pour web.archive.org manque - réactivez l'archivage pour l'accorder."
   },
   "archiveThisSave": {
     "message": "archiver"
