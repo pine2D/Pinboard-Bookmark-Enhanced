@@ -5,7 +5,7 @@ title: Privacy Policy
 
 # Privacy Policy — Pinboard Bookmark Enhanced
 
-**Last updated:** 2026-07-08
+**Last updated:** 2026-07-09
 
 ## Summary
 
@@ -31,6 +31,19 @@ By **default**, all data is stored **locally** on your device (`chrome.storage.l
 Settings sync is implemented with Chrome's `chrome.storage.sync`. The extension itself has no server and uploads nothing on its own. Stored credentials are obfuscated at rest (not cryptographically encrypted) and are sent over HTTPS only to their respective services to authenticate your own requests.
 
 Manual settings backups are JSON files you explicitly export. If **Include highlights and notes in backups** is enabled, manual backups also include reader highlight data: page URLs, page titles, selected highlight text, note text, highlight colors, and timestamps. API keys, Pinboard tokens, WebDAV passwords, and export-target tokens are not included.
+
+## Chrome Web Store Data Categories
+
+The Chrome Web Store privacy form uses standardized data categories. To keep the store listing consistent with this policy, this extension discloses that it handles the following categories:
+
+| Category | Why it applies |
+|----------|----------------|
+| Personally identifiable information | Your Pinboard API token includes your Pinboard username, and optional backup/export settings may include usernames you enter, such as a WebDAV username |
+| Authentication information | The extension stores and uses credentials you provide, such as your Pinboard API token, AI provider keys, GitHub token, webhook authorization value, and WebDAV password |
+| Web history | The extension reads page URLs and titles for bookmark status, popup prefill, batch save, Save Tab Set, offline queue, and bookmark/export metadata |
+| Website content | The extension can extract page text, selected text, links, metadata, highlights, and notes for AI tags/summaries, Markdown preview, Translate, Ask-the-page, Explain-selection, exports, and optional backups |
+
+The extension does **not** collect health information, financial/payment information, location, personal communications as a separate category, or user activity for analytics/tracking. It has no developer-operated analytics, telemetry, advertising, or profiling.
 
 ## Network Requests
 
