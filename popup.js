@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   else showMain(settings.pinboardToken);
 
   $id("options-link").addEventListener("click", (e) => {
-    e.preventDefault(); chrome.runtime.openOptionsPage();
+    e.preventDefault(); pbpOpenOptionsTab("general");
   });
   $id("logout-link").addEventListener("click", async (e) => {
     e.preventDefault();
@@ -620,7 +620,7 @@ async function htmlToMarkdownAsync(html, opts) {
               message: t("mdPreviewQuotaFull"),
               actions: [{
                 label: t("manageStorage"),
-                onClick: () => chrome.tabs.create({ url: chrome.runtime.getURL("options.html#storage") }),
+                onClick: () => pbpOpenOptionsTab("storage"),
               }],
             });
           } else {

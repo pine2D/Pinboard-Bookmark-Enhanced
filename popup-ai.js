@@ -271,7 +271,7 @@ function showSetKeyError() {
     link.href = "#";
     link.className = "go-settings";
     link.textContent = m[1];
-    link.addEventListener("click", (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); });
+    link.addEventListener("click", (e) => { e.preventDefault(); pbpOpenOptionsTab("ai"); });
     msg.appendChild(link);
     const rest = raw.slice(m.index + m[0].length);
     if (rest) msg.appendChild(document.createTextNode(rest));

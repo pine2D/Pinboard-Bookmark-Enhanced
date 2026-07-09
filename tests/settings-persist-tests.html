@@ -473,6 +473,47 @@ async function run() {
     }
   })();
 
+  // ---------- E8: options deep links route to the requested tab ----------
+  await (async () => {
+    const prevChromeE8 = globalThis.chrome;
+    try {
+      let updated = null;
+      let created = null;
+      globalThis.chrome = {
+        runtime: { getURL: (path) => "chrome-extension://pbp/" + path },
+        tabs: {
+          query: () => Promise.resolve([{ id: 7, url: "chrome-extension://pbp/options.html#general" }]),
+          update: (id, opts) => { updated = { id, opts }; return Promise.resolve(); },
+          create: (opts) => { created = opts; return Promise.resolve(); },
+        },
+      };
+      const hasHelper = typeof pbpOptionsUrl === "function" && typeof pbpOpenOptionsTab === "function";
+      check("E8 options link helper is exported", hasHelper);
+      if (hasHelper) {
+        check("E8 options URL carries the target tab hash",
+          pbpOptionsUrl("markdown") === "chrome-extension://pbp/options.html#markdown");
+        await pbpOpenOptionsTab("ai");
+        check("E8 existing options tab is reused with new hash",
+          updated && updated.id === 7 && updated.opts.url === "chrome-extension://pbp/options.html#ai" && updated.opts.active === true);
+        check("E8 reusing options tab does not create a duplicate", created === null);
+
+        updated = null; created = null;
+        globalThis.chrome.tabs.query = () => Promise.resolve([{ id: 2, url: "chrome-extension://pbp/popup.html" }]);
+        await pbpOpenOptionsTab("storage");
+        check("E8 missing options tab opens a new hashed settings page",
+          created && created.url === "chrome-extension://pbp/options.html#storage" && updated === null);
+      }
+
+      const optionsJs = await (await fetch("../options.js")).text();
+      check("E8 options page reacts to later hash changes",
+        /addEventListener\("hashchange",\s*_activateHashPanel\)/.test(optionsJs));
+      check("E8 clicking an options tab persists that panel in the URL hash",
+        /history\.replaceState\(null,\s*"",\s*"#" \+ btn\.dataset\.panel\)/.test(optionsJs));
+    } finally {
+      globalThis.chrome = prevChromeE8;
+    }
+  })();
+
   const summary = document.createElement("h2");
   summary.id = "summary";
   summary.textContent = `${pass} passed, ${fail} failed`;

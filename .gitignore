@@ -11,6 +11,9 @@ release/
 # CodeGraph local index (regenerable; machine-local socket/pid/db)
 .codegraph/
 
+# Serena MCP local project state
+.serena/
+
 # Internal planning/design drafts (superpowers skill output)
 docs/superpowers/
 .superpowers/

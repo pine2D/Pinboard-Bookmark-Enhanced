@@ -107,6 +107,41 @@ function deobfuscateKey(val) {
   return val;
 }
 
+function pbpOptionsUrl(panel) {
+  const p = /^[a-z0-9-]+$/.test(String(panel || "")) ? String(panel) : "general";
+  const path = "options.html#" + p;
+  return (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL)
+    ? chrome.runtime.getURL(path)
+    : path;
+}
+
+async function pbpOpenOptionsTab(panel) {
+  const url = pbpOptionsUrl(panel);
+  const base = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL)
+    ? chrome.runtime.getURL("options.html")
+    : "options.html";
+  try {
+    if (chrome && chrome.tabs && chrome.tabs.query && chrome.tabs.update) {
+      const tabs = await chrome.tabs.query({});
+      const hit = (tabs || []).find((tab) => tab && typeof tab.url === "string" && tab.url.startsWith(base));
+      if (hit && hit.id != null) {
+        await chrome.tabs.update(hit.id, { url, active: true });
+        if (hit.windowId != null && chrome.windows && chrome.windows.update) {
+          try { await chrome.windows.update(hit.windowId, { focused: true }); } catch (_) {}
+        }
+        return;
+      }
+    }
+  } catch (_) {}
+  try {
+    if (chrome && chrome.tabs && chrome.tabs.create) {
+      await chrome.tabs.create({ url });
+      return;
+    }
+  } catch (_) {}
+  if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.openOptionsPage) chrome.runtime.openOptionsPage();
+}
+
 // ---- Tag merge helper (pure function for union with dedup) ----
 // Merges two space-separated tag strings (existing, new), deduplicates case-insensitively,
 // preserves existing tag casing for duplicates, and appends unique new tags.

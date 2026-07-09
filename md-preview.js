@@ -1244,7 +1244,7 @@ function pbpApplyColorScheme(mode) {
       primaryLabel.textContent = t("mdSendToEllipsis");
       caret.setAttribute("hidden", "");
       primary.title = t("mdSendNoneConfigured");
-      primary.addEventListener("click", () => chrome.runtime.openOptionsPage(), { signal: _sig });
+      primary.addEventListener("click", () => pbpOpenOptionsTab("markdown"), { signal: _sig });
       return;
     }
 
@@ -1379,7 +1379,7 @@ function pbpApplyColorScheme(mode) {
     const foot = document.createElement("button");
     foot.type = "button"; foot.className = "send-mi send-mi-foot"; foot.setAttribute("role", "menuitem");
     foot.textContent = t("mdManageDestinations");
-    foot.addEventListener("click", () => { closeMenu(); chrome.runtime.openOptionsPage(); });
+    foot.addEventListener("click", () => { closeMenu(); pbpOpenOptionsTab("markdown"); });
     menu.appendChild(foot);
   }
 

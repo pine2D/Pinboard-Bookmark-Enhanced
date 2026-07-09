@@ -125,6 +125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (btn.dataset.panel === "tags") _initTagGovPanel();
     if (btn.dataset.panel === "storage") renderStoragePanel();
     if (btn.dataset.panel === "notes") renderNotesPanel();
+    history.replaceState(null, "", "#" + btn.dataset.panel);
   }
   _tabBtns.forEach((btn, i) => {
     btn.tabIndex = btn.classList.contains("active") ? 0 : -1;
@@ -148,13 +149,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (btn) btn.click();
   }
 
-  // Deep-link: options.html#<panel> activates that tab on load (used by the
-  // popup / shortcut "storage full" recovery link -> options.html#storage).
-  const _hashPanel = (location.hash || "").replace(/^#/, "");
-  if (_hashPanel) {
+  // Deep-link: options.html#<panel> activates that tab on load and when a
+  // reused options tab is retargeted to a different hash.
+  function _activateHashPanel() {
+    const _hashPanel = (location.hash || "").replace(/^#/, "");
+    if (!_hashPanel) return;
     const _dlBtn = document.querySelector(`.tab-btn[data-panel="${_hashPanel}"]`);
     if (_dlBtn) _dlBtn.click();
   }
+  _activateHashPanel();
+  window.addEventListener("hashchange", _activateHashPanel);
 
   // ---- Storage management (C2-6) ----
   // Category checkboxes over the reclaimable-cache allowlist in shared.js.
