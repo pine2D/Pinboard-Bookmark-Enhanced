@@ -1942,6 +1942,9 @@
   "archiveOutcomeSkippedPrivate": {
     "message": "skipped (private)"
   },
+  "archiveOutcomePermMissing": {
+    "message": "missing archive.org permission"
+  },
   "archiveOutcomeRateLimited": {
     "message": "rate-limited"
   },

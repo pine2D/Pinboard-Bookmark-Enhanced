@@ -3076,7 +3076,8 @@ async function renderWaybackLog() {
     } else if (outcome === "skippedPrivate") {
       outcomeText = t("archiveOutcomeSkippedPrivate");
     } else if (outcome === "permDenied") {
-      outcomeText = t("waybackPermDenied");
+      outcomeText = t("archiveOutcomePermMissing");
+      outcomeEl.title = t("waybackPermDenied");
     } else if (outcome === "rate-limited") {
       outcomeText = t("archiveOutcomeRateLimited");
       outcomeEl.title = t("archiveErrRateLimited");

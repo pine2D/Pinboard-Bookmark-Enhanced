@@ -1942,6 +1942,9 @@
   "archiveOutcomeSkippedPrivate": {
     "message": "已跳过（私密）"
   },
+  "archiveOutcomePermMissing": {
+    "message": "缺少 archive.org 权限"
+  },
   "archiveOutcomeRateLimited": {
     "message": "频率限制"
   },

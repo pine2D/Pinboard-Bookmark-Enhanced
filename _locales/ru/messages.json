@@ -1942,6 +1942,9 @@
   "archiveOutcomeSkippedPrivate": {
     "message": "пропущено (приватная)"
   },
+  "archiveOutcomePermMissing": {
+    "message": "нет разрешения archive.org"
+  },
   "archiveOutcomeRateLimited": {
     "message": "ограничено по скорости"
   },

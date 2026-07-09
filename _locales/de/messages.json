@@ -1942,6 +1942,9 @@
   "archiveOutcomeSkippedPrivate": {
     "message": "übersprungen (privat)"
   },
+  "archiveOutcomePermMissing": {
+    "message": "archive.org-Berechtigung fehlt"
+  },
   "archiveOutcomeRateLimited": {
     "message": "Rate-begrenzt"
   },

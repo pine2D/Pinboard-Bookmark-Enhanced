@@ -1942,6 +1942,9 @@
   "archiveOutcomeSkippedPrivate": {
     "message": "スキップ（非公開）"
   },
+  "archiveOutcomePermMissing": {
+    "message": "archive.org の権限なし"
+  },
   "archiveOutcomeRateLimited": {
     "message": "レート制限"
   },
