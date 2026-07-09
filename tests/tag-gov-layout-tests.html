@@ -46,6 +46,20 @@ groupsEmptyProbe.className="tag-gov-empty-probe";
 groupsEmptyProbe.textContent="no groups";
 groups.appendChild(groupsEmptyProbe);
 
+// Export target settings render their own .et-field controls outside .fg.
+const etCard=document.createElement("div");
+etCard.className="export-target-card";
+const etField=document.createElement("div");
+etField.className="et-field";
+const etSelect=document.createElement("select");
+const etOption=document.createElement("option");
+etOption.value="new";
+etOption.textContent="New note";
+etSelect.appendChild(etOption);
+etField.appendChild(etSelect);
+etCard.appendChild(etField);
+document.getElementById("fixture").appendChild(etCard);
+
 test("low-count table is a multi-column grid", () => {
   const n = trackCount(table);
   // 650px fixture, minmax(160px,1fr) + 12px col-gap => exactly 3 tracks
@@ -68,6 +82,14 @@ test("non-card child spans the full grid width", () => {
   // A single 280px-min column is ~321px at 650px; a full-span child must be much wider.
   const w = groupsEmptyProbe.offsetWidth;
   if (w < 500) throw new Error("expected full-width (~650px) span, got " + w);
+});
+
+test("export-target select uses the styled field treatment", () => {
+  const cs = getComputedStyle(etSelect);
+  const appearance = cs.appearance || cs.webkitAppearance;
+  if (etSelect.offsetWidth < 600) throw new Error("expected full-width select, got " + etSelect.offsetWidth);
+  if (appearance !== "none") throw new Error("expected appearance:none, got " + appearance);
+  if (!cs.backgroundImage || cs.backgroundImage === "none") throw new Error("expected CSS chevron background");
 });
 
 // --- J2: tag drag-handle uses CSS grip dots, no U+22EE glyph ---
