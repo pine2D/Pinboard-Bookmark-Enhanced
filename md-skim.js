@@ -98,7 +98,8 @@ async function pbpSkimInit(detail) {
     section: null,
     running: false,
     ctrl: null,
-    gen: 0
+    gen: 0,
+    permissionError: null
   };
 
   _pbpSkimBuildSection(view);
@@ -313,7 +314,8 @@ async function _pbpSkimRun() {
       // half-formed bullet list with an unclosed CITES block would
       // parse into garbage/incomplete citations on the next page load).
     } else {
-      _pbpSkimShowError();
+      st.permissionError = (e && e.code === "host_permission") ? e : null;
+      _pbpSkimShowError(e);
     }
   } finally {
     if (myGen === st.gen) {
@@ -335,6 +337,7 @@ function _pbpSkimFinalize(fullText, usage) {
   const st = _pbpSkimState;
   const body = document.getElementById("skim-body");
   if (!body) return;
+  st.permissionError = null;
   const parsed = pbpAiParseCites(fullText);
   body.innerHTML = renderMarkdown(parsed.body);
   if (typeof _pbpAskChipPass === "function") _pbpAskChipPass(body, parsed.cites);
@@ -378,33 +381,25 @@ function _pbpSkimRenderUsage(usage) {
 // in try/catch and this function itself cannot throw (plain DOM writes
 // only), so a generation failure degrades to this without ever
 // breaking the rest of the page (spec sec.3 invariant #4).
-function _pbpSkimShowError() {
+function _pbpSkimShowError(error) {
   const body = document.getElementById("skim-body");
   if (!body) return;
   _pbpSkimSetStatus("");
   body.replaceChildren();
   const p = document.createElement("p");
   p.className = "skim-err";
-  p.textContent = t("skimFailed");
+  p.textContent = (error && error.code === "host_permission" && error.message)
+    ? error.message : t("skimFailed");
   const retry = document.createElement("button");
   retry.type = "button";
   retry.className = "action-btn skim-retry";
-  retry.textContent = t("askErrRetry"); // reused key (spec sec.2: no new skimRetry key)
+  retry.textContent = t(error && error.code === "host_permission" ? "aiGrantRetry" : "askErrRetry");
   retry.addEventListener("click", () => {
     // Same guard shape as ask's retry (md-ask.js _pbpAskErrorUi): a
     // stale click after a newer run already started must not fire a
     // second, overlapping request.
     if (_pbpSkimState && _pbpSkimState.running) return;
-    // Clear the stale error message + retry button BEFORE re-running --
-    // _pbpSkimRun itself never clears #skim-body (it only overwrites it
-    // once the first streamed delta triggers paint()), so without this
-    // the failed message and dead-looking retry button would stay fully
-    // visible on screen for the whole round-trip until the first token
-    // arrives. Mirrors _pbpAskErrorUi's own retry (md-ask.js:502,
-    // `aEl.replaceChildren()` before `_pbpAskRun(...)`) and this file's
-    // own _pbpSkimRegen, which clears #skim-body the same way.
-    body.replaceChildren();
-    _pbpSkimRun().catch(() => {});
+    _pbpSkimRegen().catch(() => {});
   });
   body.appendChild(p);
   body.appendChild(retry);
@@ -419,13 +414,26 @@ function _pbpSkimShowError() {
 // fresh state once _pbpSkimRun bumps st.gen.
 async function _pbpSkimRegen() {
   const st = _pbpSkimState;
-  if (!st) return;
-  if (st.ctrl) st.ctrl.abort();
-  const stale = document.getElementById("skim-stale");
-  if (stale) stale.hidden = true;
-  const body = document.getElementById("skim-body");
-  if (body) body.replaceChildren();
-  await _pbpSkimRun();
+  if (!st || st.running) return;
+  st.running = true;
+  const retry = document.querySelector("#skim-body .skim-retry");
+  if (retry) retry.disabled = true;
+  try {
+    if (st.permissionError) {
+      const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
+      if (!recovered) return;
+      st.permissionError = null;
+    }
+    if (st.ctrl) st.ctrl.abort();
+    const stale = document.getElementById("skim-stale");
+    if (stale) stale.hidden = true;
+    const body = document.getElementById("skim-body");
+    if (body) body.replaceChildren();
+    await _pbpSkimRun();
+  } finally {
+    st.running = false;
+    if (retry) retry.disabled = false;
+  }
 }
 
 // Init hookup: top-level listener registration only (no other side

@@ -41,7 +41,7 @@
 
 ## 隱私
 
-零追蹤、零分析、零遙測。所有資料預設透過 `chrome.storage` 儲存在你的本機；若開啟設定同步，你的設定（不含書籤內容）會透過 Chrome 帳號在你的裝置間同步。AI 請求**僅**在你明確觸發 AI 動作時才會發送——包括 AI 標籤／摘要、頁面問答、翻譯、選取解說，或選用的重點速覽——並直接傳送到你設定的服務商。擴充功能頁面採用嚴格的 Content-Security-Policy（不執行遠端程式碼）。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+零追蹤、零分析、零遙測。所有資料預設透過 `chrome.storage` 儲存在你的本機；若開啟設定同步，你的設定（不含書籤內容）會透過 Chrome 帳號在你的裝置間同步。AI 請求**僅**透過你啟用或使用的功能發送——包括 AI 標籤／摘要、頁面問答、翻譯、選取解說，或選用的重點速覽——並直接傳送到你設定的服務商。安裝時僅授予 Pinboard 存取權限；AI、Jina、批次操作中選取的網站，以及選用的匯出、封存與備份目的地，只會在你執行相應操作時申請目前確切網站的權限。自訂網路端點必須使用 HTTPS；HTTP 僅允許用於 `localhost`、`127.0.0.1` 和 `[::1]`。擴充功能頁面採用嚴格的 Content-Security-Policy（不執行遠端程式碼）。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## 授權
 

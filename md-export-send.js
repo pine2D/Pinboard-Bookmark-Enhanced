@@ -19,6 +19,19 @@ async function pbpSetLastTarget(id) {
   try { await chrome.storage.local.set({ [_PBP_LAST_TARGET_KEY]: id }); } catch (_) {}
 }
 
+// Call only from a direct user gesture. Requesting an already-active exact
+// origin is prompt-free; avoiding a preliminary contains() keeps the request
+// adjacent to the click that authorized it.
+async function pbpRequestTargetPermission(id, cfg) {
+  const row = PBP_EXPORT_TARGETS[id];
+  if (!row || !row.buildRequest) return true;
+  const missing = (row.settings || []).find((s) => s.required && !String((cfg || {})[s.key] || "").trim());
+  if (missing) return true;
+  const origin = (typeof row.origin === "function") ? row.origin(cfg || {}) : row.origin;
+  if (!origin) return false;
+  try { return (await chrome.permissions.request({ origins: [origin] })) === true; } catch (_) { return false; }
+}
+
 // Send one clip to a target. Returns { ok, fellBack, error }. Never throws.
 async function pbpSendToTarget(id, ctx) {
   ctx = ctx || {};
@@ -51,29 +64,27 @@ async function pbpSendToTarget(id, ctx) {
       // that renders that false claim. Fall back to error:"" instead, which
       // doSend's switch (md-preview.js) already routes to the generic
       // "Send failed" text -- the same degrade the sibling viaClipboard path
-      // uses a few lines below when its own clipboard write fails.
+      // uses a few lines below when its own clipboard write fails. The
+      // api-insecure message makes no clipboard claim, so it stays actionable.
       const apiFail = async (errCode) => {
         let copied = true;
         try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_) { copied = false; }
-        return { ok: false, fellBack: false, error: copied ? errCode : "" };
+        return { ok: false, fellBack: false, error: (copied || errCode === "api-insecure") ? errCode : "" };
       };
-      // Resolve the host origin — a fixed string, or a fn of cfg for user-URL
-      // targets (webhook) — and ensure permission inside the click gesture.
+      // Execution is contains-only. The direct click path may request first,
+      // but this second gate also protects background/retry callers and later
+      // permission revocation.
       const origin = (typeof row.origin === "function") ? row.origin(cfg) : row.origin;
-      if (origin) {
-        try {
-          const has = await chrome.permissions.contains({ origins: [origin] });
-          if (!has) {
-            const granted = await chrome.permissions.request({ origins: [origin] });
-            if (!granted) return apiFail("api-perm");   // copy + accurate "denied" cause
-          }
-        } catch (_) {}
-      }
+      if (!origin) return apiFail("api-insecure");
+      try {
+        const has = await chrome.permissions.contains({ origins: [origin] });
+        if (!has) return apiFail("api-perm");
+      } catch (_) { return apiFail("api-perm"); }
       // Liveness/token precheck.
       if (row.precheckRequest) {
         try {
           const pr = row.precheckRequest(cfg, token);
-          const presp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body, signal: AbortSignal.timeout(20000) });
+          const presp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body, redirect: "error", signal: AbortSignal.timeout(20000) });
           if (presp.status === 401) return apiFail("api-token");
           if (!presp.ok) return apiFail("api-down");
         } catch (_) { return apiFail("api-down"); }
@@ -83,7 +94,7 @@ async function pbpSendToTarget(id, ctx) {
       if (row.preRequest) {
         try {
           const prq = row.preRequest(meta, cfg, token);
-          await fetch(prq.url, { method: prq.method, headers: prq.headers, body: prq.body });
+          await fetch(prq.url, { method: prq.method, headers: prq.headers, body: prq.body, redirect: "error" });
         } catch (_) {}
       }
       // Send. buildRequest gets the body with the row's frontmatter policy
@@ -95,7 +106,7 @@ async function pbpSendToTarget(id, ctx) {
         // block indefinitely — _sending's re-entrancy guard then silently ate every
         // click on the split button until the browser's own network-stack timeout
         // (minutes) fired, with no way to cancel (audit #30). 20s -> apiFail("api-down").
-        const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body, signal: AbortSignal.timeout(20000) });
+        const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body, redirect: "error", signal: AbortSignal.timeout(20000) });
         if (resp.status === 401) return apiFail("api-token");
         // GitHub-only: a fine-grained PAT passes the /user precheck (401 never
         // fires) but POST /gists rejects it with 403/404 -- fine-grained

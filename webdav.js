@@ -58,10 +58,9 @@ function pbpWebdavAuthHeader(user, pass) {
   }
 }
 
-// Derives a chrome.permissions origin pattern ("<scheme>://<host>[:port]/*")
-// from the user's WebDAV URL. Mirrors export-targets.js's webhook.origin(cfg).
+// Derives a secure chrome.permissions origin pattern via shared.js.
 function pbpWebdavOrigin(baseUrl) {
-  try { return new URL(String(baseUrl || "")).origin + "/*"; } catch (_) { return null; }
+  return pbpEndpointOriginPattern(baseUrl);
 }
 
 // Whitelist-builds the push payload: every SETTINGS_DEFAULTS key EXCEPT the
@@ -114,29 +113,40 @@ function pbpWebdavBuildRequest(kind, cfg) {
   return { url, method: "GET", headers }; // "pull" | "test"
 }
 
+function _pbpWebdavFetch(kind, cfg, extra) {
+  if (!pbpWebdavOrigin(cfg && cfg.baseUrl)) return Promise.reject(new Error("insecure"));
+  const req = pbpWebdavBuildRequest(kind, cfg);
+  return fetch(req.url, {
+    method: req.method,
+    headers: req.headers,
+    ...(extra || {}),
+    redirect: "error",
+    signal: AbortSignal.timeout(20000),
+  });
+}
+
 async function pbpWebdavEnsureCollection(cfg) {
-  const probe = pbpWebdavBuildRequest("probe", cfg);
-  const dir = await fetch(probe.url, { method: probe.method, headers: probe.headers, signal: AbortSignal.timeout(20000) });
+  if (!pbpWebdavOrigin(cfg && cfg.baseUrl)) return { ok: false, error: "insecure" };
+  const dir = await _pbpWebdavFetch("probe", cfg);
   if (dir.ok) return { ok: true };
   if (dir.status === 401 || dir.status === 403) return { ok: false, error: "auth" };
   if (dir.status !== 404) return { ok: false, error: "unreachable" };
-  const mk = pbpWebdavBuildRequest("mkdir", cfg);
-  const made = await fetch(mk.url, { method: mk.method, headers: mk.headers, signal: AbortSignal.timeout(20000) });
+  const made = await _pbpWebdavFetch("mkdir", cfg);
   if (made.ok || made.status === 405) return { ok: true };
   if (made.status === 401 || made.status === 403) return { ok: false, error: "auth" };
   return { ok: false, error: "not-found" };
 }
 
 async function pbpWebdavProbeWritable(cfg) {
+  if (!pbpWebdavOrigin(cfg && cfg.baseUrl)) return { ok: false, error: "insecure" };
   const ensured = await pbpWebdavEnsureCollection(cfg);
   if (!ensured.ok) return ensured;
   const name = PBP_WEBDAV_WRITE_TEST_PREFIX + Date.now().toString(36) + ".txt";
-  const put = pbpWebdavBuildRequest("write-test", Object.assign({}, cfg, { probeName: name }));
-  const resp = await fetch(put.url, { method: put.method, headers: put.headers, body: "ok", signal: AbortSignal.timeout(20000) });
+  const probeCfg = Object.assign({}, cfg, { probeName: name });
+  const resp = await _pbpWebdavFetch("write-test", probeCfg, { body: "ok" });
   if (resp.status === 401 || resp.status === 403) return { ok: false, error: "auth", status: resp.status };
   if (!resp.ok) return { ok: false, error: "not-writable", status: resp.status };
-  const del = pbpWebdavBuildRequest("write-test-delete", Object.assign({}, cfg, { probeName: name }));
-  try { await fetch(del.url, { method: del.method, headers: del.headers, signal: AbortSignal.timeout(20000) }); } catch (_) {}
+  try { await _pbpWebdavFetch("write-test-delete", probeCfg); } catch (_) {}
   return { ok: true };
 }
 
@@ -167,7 +177,11 @@ async function pbpWebdavPush(cfgOverride) {
   const cfg = cfgOverride || await _pbpWebdavCfg();
   if (!cfg.baseUrl) return { ok: false, error: "no-url" };
   const origin = pbpWebdavOrigin(cfg.baseUrl);
-  if (!origin) return { ok: false, error: "no-url" };
+  if (!origin) {
+    const result = { ts: Date.now(), ok: false, error: "insecure" };
+    try { await chrome.storage.local.set({ webdavLastPush: result }); } catch (_) {}
+    return result;
+  }
   try {
     const has = await chrome.permissions.contains({ origins: [origin] });
     if (!has) {
@@ -200,15 +214,13 @@ async function pbpWebdavPush(cfgOverride) {
       try { highlights = pbpBuildHighlightBackup(await chrome.storage.local.get(null)); } catch (_) {}
     }
     const payload = pbpWebdavBuildPayload(settings, meta, { highlights });
-    const req = pbpWebdavBuildRequest("push", cfg);
-    const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(payload), signal: AbortSignal.timeout(20000) });
+    const resp = await _pbpWebdavFetch("push", cfg, { body: JSON.stringify(payload) });
     let error = resp.ok ? undefined : ("http-" + resp.status);
     const status = resp.ok ? undefined : resp.status;
     if (resp.status === 404) {
       error = "not-found";
       try {
-        const probe = pbpWebdavBuildRequest("probe", cfg);
-        const dir = await fetch(probe.url, { method: probe.method, headers: probe.headers, signal: AbortSignal.timeout(20000) });
+        const dir = await _pbpWebdavFetch("probe", cfg);
         if (dir.ok) error = "not-writable";
       } catch (_) {}
     }
@@ -226,14 +238,13 @@ async function pbpWebdavPull(cfgOverride) {
   const cfg = cfgOverride || await _pbpWebdavCfg();
   if (!cfg.baseUrl) return { ok: false, error: "no-url" };
   const origin = pbpWebdavOrigin(cfg.baseUrl);
-  if (!origin) return { ok: false, error: "no-url" };
+  if (!origin) return { ok: false, error: "insecure" };
   try {
     const has = await chrome.permissions.contains({ origins: [origin] });
     if (!has) return { ok: false, error: "perm" };
   } catch (_) { return { ok: false, error: "perm" }; }
   try {
-    const req = pbpWebdavBuildRequest("pull", cfg);
-    const resp = await fetch(req.url, { method: req.method, headers: req.headers, signal: AbortSignal.timeout(20000) });
+    const resp = await _pbpWebdavFetch("pull", cfg);
     if (resp.status === 401 || resp.status === 403) return { ok: false, error: "auth" };
     if (resp.status === 404) return { ok: false, error: "not-found" };
     if (!resp.ok) return { ok: false, error: "http-" + resp.status };
@@ -249,14 +260,13 @@ async function pbpWebdavTest(cfgOverride) {
   const cfg = cfgOverride || await _pbpWebdavCfg();
   if (!cfg.baseUrl) return { ok: false, kind: "no-url" };
   const origin = pbpWebdavOrigin(cfg.baseUrl);
-  if (!origin) return { ok: false, kind: "unreachable" };
+  if (!origin) return { ok: false, kind: "insecure" };
   try {
     const has = await chrome.permissions.contains({ origins: [origin] });
     if (!has) return { ok: false, kind: "perm" };
   } catch (_) { return { ok: false, kind: "perm" }; }
   try {
-    const req = pbpWebdavBuildRequest("test", cfg);
-    const resp = await fetch(req.url, { method: req.method, headers: req.headers, signal: AbortSignal.timeout(20000) });
+    const resp = await _pbpWebdavFetch("test", cfg);
     if (resp.status === 401 || resp.status === 403) return { ok: false, kind: "auth" };
     if (resp.status === 404) {
       const writable = await pbpWebdavProbeWritable(cfg);

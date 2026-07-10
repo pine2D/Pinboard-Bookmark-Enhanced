@@ -299,12 +299,15 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "Brak dostępu do $HOST$ — otwórz Ustawienia > AI i kliknij Testuj, aby przyznać dostęp",
+    "message": "Brak dostępu do $HOST$ — przyznaj dostęp i spróbuj ponownie.",
     "placeholders": {
       "host": {
         "content": "$1"
       }
     }
+  },
+  "aiGrantRetry": {
+    "message": "Przyznaj dostęp i ponów"
   },
   "aiErrorModelNotFoundHint": {
     "message": "Przejdź do Ustawienia > AI i wybierz dostępny model"
@@ -668,6 +671,14 @@
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" zapisano.",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "bgTitleSavedAiSkipped": {
+    "message": "\"$TITLE$\" zapisano. AI nie uruchomiono; przyznaj dostęp w Ustawienia > AI > Testuj.",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -1062,10 +1073,26 @@
     "message": "Pomiń już dodane URL-e"
   },
   "batchAiHint": {
-    "message": "Funkcje AI będą wolne (osobne wywołanie AI na kartę + 3s odstęp). Wymaga uprawnienia 'Dostęp do wszystkich stron' do odczytu nieaktywnych kart — zapytanie przy pierwszym użyciu."
+    "message": "AI wykonuje jedno wywołanie na kartę i może działać wolno. Przy pierwszym użyciu Batch prosi tylko o dostęp do wymienionych witryn kart i bieżącego dostawcy AI."
   },
   "batchPermDenied": {
-    "message": "Odmówiono uprawnień — funkcje AI wymagają dostępu do wszystkich stron, aby odczytać zawartość kart."
+    "message": "Nie przyznano uprawnień do wymienionych witryn. Batch AI nie został uruchomiony."
+  },
+  "batchPermConfirm": {
+    "message": "Batch AI potrzebuje w tym uruchomieniu dostępu do następujących $COUNT$ witryn:",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchPermProvider": {
+    "message": "$PROVIDER$ (dostawca AI): $ORIGIN$",
+    "placeholders": {
+      "provider": { "content": "$1" },
+      "origin": { "content": "$2" }
+    }
+  },
+  "batchPermGrant": {
+    "message": "Przyznaj dostęp i uruchom"
   },
   "secAiProvider": {
     "message": "Dostawca AI"
@@ -1860,13 +1887,13 @@
     "message": "Klucze API są zaciemnione (nie szyfrowane) i synchronizowane przez chrome.storage.sync. Nie udostępniaj plików eksportu ustawień."
   },
   "batchPermLabel": {
-    "message": "Uprawnienia hosta:"
+    "message": "Starsze uprawnienie do wszystkich witryn:"
   },
   "batchRevokeBtn": {
-    "message": "Cofnij dostęp do wszystkich witryn"
+    "message": "Cofnij starszy dostęp do wszystkich witryn"
   },
   "batchRevokeHint": {
-    "message": "Potrzebne tylko wtedy, gdy włączono masową ekstrakcję AI, ale nie chcesz już, aby rozszerzenie miało dostęp do wszystkich stron."
+    "message": "Starsze wersje mogły uzyskać dostęp do każdej witryny. Nowe uruchomienia Batch proszą tylko o wymienione witryny; ten przycisk usuwa stare szerokie uprawnienie."
   },
   "batchRevokeSuccess": {
     "message": "Cofnięto"
@@ -1875,7 +1902,7 @@
     "message": "cofnięto"
   },
   "batchPermNone": {
-    "message": "Obecnie nie jest przyznany dostęp do wszystkich witryn"
+    "message": "Starszy dostęp do wszystkich witryn nie jest przyznany"
   },
   "batchRevokeFailed": {
     "message": "Niepowodzenie"
@@ -2231,7 +2258,7 @@
     "message": "AI strony podglądu"
   },
   "previewAiSectionHint": {
-    "message": "Wyjaśnianie zaznaczenia, pytania do strony i pełne tłumaczenie na stronie podglądu Markdown. Używa dostawcy AI i klucza skonfigurowanego powyżej; każde żądanie jest wywoływane przez użytkownika, nic nie działa w tle."
+    "message": "Wyjaśnianie zaznaczenia, pytania do strony i pełne tłumaczenie w podglądzie Markdown są uruchamiane przez użytkownika i korzystają z dostawcy AI oraz klucza skonfigurowanego powyżej. Jeśli opcjonalny przegląd kluczowych punktów jest włączony, może uruchomić się po otwarciu podglądu Markdown; nic nie działa jako ukryte zadanie w tle."
   },
   "previewAiEnabled": {
     "message": "Włącz funkcje AI na stronie podglądu"
@@ -2578,7 +2605,7 @@
     "message": "Wysyła metodą POST ładunek JSON {title, url, date, tags, markdown} do Twojego endpointu. Ustawiona wartość Authorization jest wysyłana dosłownie (np. Bearer <token> lub Token <key>), więc działa dowolny schemat uwierzytelniania. Do n8n, Make, Zapier, Readwise lub dowolnego samodzielnie hostowanego odbiorcy — bez potrzeby zakładania konta."
   },
   "mdTargetWebhookHttpWarn": {
-    "message": "Ten punkt końcowy używa HTTP, a nie HTTPS — wartość Authorization jest wysyłana jawnym tekstem. W porządku dla localhost/sieci lokalnej; unikaj w publicznym internecie."
+    "message": "Zablokowano: użyj HTTPS albo HTTP tylko dla localhost, 127.0.0.1 lub [::1]. Adresy HTTP w sieci LAN/publicznej, nieprawidłowe adresy URL i adresy z danymi logowania nie są wysyłane."
   },
   "hlColorQuote": { "message": "Cytat" },
   "hlColorDefinition": { "message": "Definicja" },

@@ -1,7 +1,7 @@
 # Pinboard Bookmark Enhanced 项目配置
 
 作者：pine2D
-更新：2026-07-07
+更新：2026-07-11
 
 ## 项目概述
 
@@ -175,6 +175,7 @@ bash scripts/release.sh
 - AI 请求统一走各 provider 的 chat completion 接口
 - 所有 API key 存储在 `chrome.storage.sync`，不能硬编码
 - Defuddle 在 popup 打开时**懒注入**，避免冷启动开销；`site-rules.js` 与其成对注入且**先于** Defuddle 运行（命中站点规则即短路）
+- **网络端点与 host 权限不变量**：required host 仅 Pinboard；AI / Jina / Wayback / Gist / Webhook / WebDAV 与 Batch 所选站点只在用户动作中请求当前精确 origin，后台/自动路径只做 `permissions.contains`，禁止运行时申请 wildcard。可配置网络端点必须 HTTPS，HTTP 仅允许字面 `localhost` / `127.0.0.1` / `[::1]`；LAN/public HTTP、凭据 URL 与无权限请求一律阻断并保留配置。升级时一次性清理 legacy all-sites grant。
 - **关思考（thinking/reasoning）—— 勿凭记忆改 provider 表**：`ai.js` `OPENAI_COMPAT_PROVIDERS` 每家用 **per-provider `thinkingOff` 方言字段**（非 always-on `extraBody`），经 `_aiWithThinkingFallback` 在 **4xx(400/422) 时去字段重试一次 + `storage.local` 记忆**。根因：model 字段是自由文本，blanket 关思考会把用户切换的不兼容模型打 400。**custom/ollama/groq 不加 thinkingOff**；gemini 走 `thinkingBudget:0`；deepseek 也走 thinkingOff（reasoner 会拒收）。各家已核验字段勿凭记忆改（会 400），核验表见 CC 记忆 `reference_provider_thinking_disable_params`。
 - **md-preview 全文翻译（`md-translate.js`，改前必读）**：block 切分 → `pbpAiShield` 占位符 `⟦C/L/I/M\d+⟧` 屏蔽代码/链接/图片/数学 → JSON `{translations:[{id,text}]}` 流式 → 块 hash 缓存。三条不变量勿破坏：① **占位符守恒**门（`pbpTrPlaceholdersConserved`，硬）+ 长度比（软）二者皆过才 fill；② glossary = 用户表 ∪ 自动抽取（**用户优先**）按批命中裁剪注入；③ 抽取/缓存任何失败必须 **degrade 不阻断**翻译。`md-translate.js` 顶段保持纯（无 DOM/chrome/fetch，供 `tests/md-ai-tests.html` file:// 加载）。
 

@@ -299,12 +299,15 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "无法访问 $HOST$ — 请在 设置 > AI 中点击「测试」以授予访问权限",
+    "message": "无法访问 $HOST$ — 请授权并重试。",
     "placeholders": {
       "host": {
         "content": "$1"
       }
     }
+  },
+  "aiGrantRetry": {
+    "message": "授权并重试"
   },
   "aiErrorModelNotFoundHint": {
     "message": "前往设置 > AI，选择一个可用的模型"
@@ -668,6 +671,14 @@
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" 已保存。",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "bgTitleSavedAiSkipped": {
+    "message": "\"$TITLE$\" 已保存。AI 未执行；请前往「设置 > AI > 测试」授权。",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -1062,10 +1073,26 @@
     "message": "跳过已收藏的网址"
   },
   "batchAiHint": {
-    "message": "AI 功能会比较慢（每个标签页单独调用 AI + 保存间隔 3 秒）。需要「访问所有网站」权限以读取非当前标签页内容，首次使用时会弹出授权。"
+    "message": "AI 会为每个标签页单独调用，可能较慢。首次使用时，批量保存仅申请列表中的标签页站点和当前 AI 服务商权限。"
   },
   "batchPermDenied": {
-    "message": "权限被拒绝——AI 功能需要访问所有网站以读取标签页内容。"
+    "message": "未获得列表中的站点权限，批量 AI 未启动。"
+  },
+  "batchPermConfirm": {
+    "message": "本次批量 AI 需要访问以下 $COUNT$ 个站点：",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchPermProvider": {
+    "message": "$PROVIDER$（AI 服务商）：$ORIGIN$",
+    "placeholders": {
+      "provider": { "content": "$1" },
+      "origin": { "content": "$2" }
+    }
+  },
+  "batchPermGrant": {
+    "message": "授权并开始"
   },
   "secAiProvider": {
     "message": "AI 服务商"
@@ -1860,13 +1887,13 @@
     "message": "API 密钥已混淆（非加密），并通过 chrome.storage.sync 同步。请勿分享您的设置导出文件。"
   },
   "batchPermLabel": {
-    "message": "主机权限："
+    "message": "旧版所有站点权限："
   },
   "batchRevokeBtn": {
-    "message": "撤销所有站点访问权限"
+    "message": "撤销旧版所有站点权限"
   },
   "batchRevokeHint": {
-    "message": "仅在您启用了批量 AI 内容提取但不再希望扩展访问所有页面时使用。"
+    "message": "旧版本可能授予所有站点权限。新版批量保存只申请列表中的站点；此按钮用于移除旧版广泛权限。"
   },
   "batchRevokeSuccess": {
     "message": "已撤销"
@@ -1875,7 +1902,7 @@
     "message": "已撤销"
   },
   "batchPermNone": {
-    "message": "当前未授予所有站点访问权限"
+    "message": "当前未授予旧版所有站点权限"
   },
   "batchRevokeFailed": {
     "message": "失败"
@@ -2231,7 +2258,7 @@
     "message": "预览页 AI"
   },
   "previewAiSectionHint": {
-    "message": "在 Markdown 预览页提供划词解释、全文问答与全文翻译。使用上方配置的 AI 提供商与 Key；所有请求均由你主动触发，不会在后台运行。"
+    "message": "Markdown 预览页的划词解释、全文问答和全文翻译均由你主动调用，并使用上方配置的 AI 提供商与 Key。若启用可选的 AI 要点速览，它可能会在 Markdown 预览打开时运行；所有功能都不会作为隐藏的后台任务运行。"
   },
   "previewAiEnabled": {
     "message": "在预览页启用 AI 功能"
@@ -2572,7 +2599,7 @@
     "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填写的 Authorization 值会原样发送（如 Bearer <令牌> 或 Token <密钥>），任何认证方案都支持。可对接 n8n、Make、Zapier、Readwise 或任意自建接收端——无需在此注册账号。"
   },
   "mdTargetWebhookHttpWarn": {
-    "message": "该地址使用 HTTP 而非 HTTPS——Authorization 值会以明文发送。局域网/本机地址没问题，公网地址请避免。"
+    "message": "已阻止：请使用 HTTPS；HTTP 仅允许 localhost、127.0.0.1 或 [::1]。局域网/公网 HTTP、无效地址及含账号密码的地址不会发送。"
   },
   "hlColorQuote": { "message": "金句" },
   "hlColorDefinition": { "message": "定义" },

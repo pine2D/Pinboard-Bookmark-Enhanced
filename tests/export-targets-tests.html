@@ -15,7 +15,9 @@ h2 { margin-top: 24px; }
 <script src="../vendor/marked.min.js"></script>
 <script src="../vendor/purify.min.js"></script>
 <script src="../md-convert.js"></script>
+<script src="../shared.js"></script>
 <script src="../export-targets.js"></script>
+<script src="../md-export-send.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -154,21 +156,23 @@ section("webhook.buildRequest -- X4 extended metadata (author/published/site/ima
 
 section("webhook.origin (derived from the user URL)");
 assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "https://hook.example.com/abc?x=1" }) === "https://hook.example.com/*", "origin = URL host + /*");
+assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "http://localhost:3000/hook" }) === "http://localhost:3000/*", "localhost http -> exact origin");
+assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "http://127.0.0.1:8080/hook" }) === "http://127.0.0.1:8080/*", "127.0.0.1 http -> exact origin");
+assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "http://[::1]:8080/hook" }) === "http://[::1]:8080/*", "[::1] http -> exact origin");
+assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "http://192.168.1.50/hook" }) === null, "LAN http -> blocked");
+assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "http://example.com/hook" }) === null, "public http -> blocked");
 assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "not a url" }) === null, "malformed URL -> null origin");
+assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "https://user:pass@hook.example.com/x" }) === null, "credential URL -> blocked");
 
-section("pbpWebhookHttpWarn (audit #31 — advisory, never a hard block)");
-assert(pbpWebhookHttpWarn("http://example.com/hook") === true, "public http -> warn");
+section("pbpWebhookHttpWarn (mirrors the hard runtime policy)");
 assert(pbpWebhookHttpWarn("https://example.com/hook") === false, "https -> no warn");
 assert(pbpWebhookHttpWarn("http://localhost:3000/hook") === false, "localhost http -> exempt");
 assert(pbpWebhookHttpWarn("http://127.0.0.1:8080/hook") === false, "127.0.0.1 http -> exempt");
 assert(pbpWebhookHttpWarn("http://[::1]:8080/hook") === false, "[::1] (bracketed IPv6 loopback) http -> exempt");
-assert(pbpWebhookHttpWarn("http://192.168.1.50/hook") === false, "192.168.x.x http -> exempt");
-assert(pbpWebhookHttpWarn("http://10.0.0.5/hook") === false, "10.x.x.x http -> exempt");
-assert(pbpWebhookHttpWarn("http://172.16.0.1/hook") === false, "172.16.x.x (low bound) http -> exempt");
-assert(pbpWebhookHttpWarn("http://172.31.255.255/hook") === false, "172.31.x.x (high bound) http -> exempt");
-assert(pbpWebhookHttpWarn("http://172.32.0.1/hook") === true, "172.32.x.x (just outside the private range) -> warn");
-assert(pbpWebhookHttpWarn("http://172.15.0.1/hook") === true, "172.15.x.x (just below the private range) -> warn");
-assert(pbpWebhookHttpWarn("not a url") === false, "malformed URL -> no warn (no crash)");
+assert(pbpWebhookHttpWarn("http://192.168.1.50/hook") === true, "LAN http -> blocked warning");
+assert(pbpWebhookHttpWarn("http://example.com/hook") === true, "public http -> blocked warning");
+assert(pbpWebhookHttpWarn("not a url") === true, "malformed URL -> blocked warning");
+assert(pbpWebhookHttpWarn("https://user:pass@example.com/hook") === true, "credential URL -> blocked warning");
 assert(pbpWebhookHttpWarn("") === false, "empty -> no warn");
 
 section("webhook.parseSuccess (any 2xx)");
@@ -202,6 +206,89 @@ section("obsidian.buildUri");
   assert(dailyUri.includes("vault=V") && dailyUri.includes("&clipboard") && dailyUri.includes("&append"), "daily route passes vault, clipboard, append");
 }
 
-document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+async function runSendNetworkPolicyTests() {
+  section("pbpSendToTarget network boundary");
+  const prevChrome = globalThis.chrome;
+  const prevFetch = globalThis.fetch;
+  const prevClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  const copied = [];
+  let permissionCalls = 0;
+  let requestCalls = 0;
+  let fetchCalls = 0;
+  try {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (body) => { copied.push(body); } }
+    });
+    globalThis.chrome = {
+      permissions: {
+        contains: async () => { permissionCalls++; return true; },
+        request: async () => { permissionCalls++; requestCalls++; return true; }
+      }
+    };
+    globalThis.fetch = async () => { fetchCalls++; throw new Error("must not fetch"); };
+
+    const blocked = [
+      "http://example.com/hook",
+      "http://192.168.1.50/hook",
+      "not a url",
+      "https://user:pass@example.com/hook"
+    ];
+    const blockedResults = [];
+    for (const url of blocked) {
+      blockedResults.push(await pbpSendToTarget("webhook", { meta: { title: "T" }, rawBody: "body", cfg: { url } }));
+    }
+    assert(blockedResults.every((r) => r.error === "api-insecure"), "all unsafe endpoint classes return recoverable api-insecure");
+    assert(copied.length === blocked.length && copied.every((body) => body === "body"), "unsafe endpoints copy every body to the clipboard fallback");
+    assert(permissionCalls === 0, "unsafe endpoints are rejected before permissions API calls");
+    assert(fetchCalls === 0, "unsafe endpoints are rejected before fetch");
+
+    navigator.clipboard.writeText = async () => { throw new Error("clipboard unavailable"); };
+    const noClipboard = await pbpSendToTarget("webhook", { meta: { title: "T" }, rawBody: "body", cfg: { url: "http://example.com/hook" } });
+    assert(noClipboard.error === "api-insecure", "unsafe endpoint remains actionable when clipboard fallback is unavailable");
+    navigator.clipboard.writeText = async (body) => { copied.push(body); };
+
+    let requested = null;
+    globalThis.chrome.permissions.request = async ({ origins }) => { requestCalls++; requested = origins; return true; };
+    const grant = await pbpRequestTargetPermission("webhook", { url: "https://hook.example.com/x" });
+    assert(grant === true && requested && requested.join(",") === "https://hook.example.com/*", "click helper requests only the target's exact origin");
+
+    for (const mode of ["false", "throw"]) {
+      globalThis.chrome.permissions.contains = async () => {
+        permissionCalls++;
+        if (mode === "throw") throw new Error("permissions unavailable");
+        return false;
+      };
+      const copiedBeforePermError = copied.length;
+      const requestsBeforeSend = requestCalls;
+      const permError = await pbpSendToTarget("webhook", { meta: { title: "T" }, rawBody: "safe body", cfg: { url: "https://hook.example.com/x" } });
+      assert(permError.error === "api-perm", mode + " contains fails closed as api-perm");
+      assert(copied.length === copiedBeforePermError + 1 && copied.at(-1) === "safe body", mode + " contains preserves the clipboard fallback");
+      assert(requestCalls === requestsBeforeSend && fetchCalls === 0, mode + " execution gate neither requests nor fetches");
+    }
+
+    const redirects = [];
+    globalThis.chrome.permissions.contains = async () => true;
+    globalThis.fetch = async (url, opts) => {
+      redirects.push(opts.redirect);
+      if (url.endsWith("/user")) return { ok: true, status: 200 };
+      return { ok: true, status: 201, json: async () => ({ id: "gist-1" }) };
+    };
+    const github = await pbpSendToTarget("github", { meta: { title: "T" }, rawBody: "body", cfg: { token: "token" } });
+    assert(github.ok === true, "safe token API request still succeeds");
+    assert(redirects.length === 2, "GitHub precheck and main request both run");
+    assert(redirects.every((mode) => mode === "error"), "every token API fetch rejects redirects");
+  } finally {
+    globalThis.chrome = prevChrome;
+    globalThis.fetch = prevFetch;
+    if (prevClipboard) Object.defineProperty(navigator, "clipboard", prevClipboard);
+    else delete navigator.clipboard;
+  }
+}
+
+(async function () {
+  await runSendNetworkPolicyTests();
+  document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+})();
 </script>
 </body></html>

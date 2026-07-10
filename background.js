@@ -619,7 +619,11 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // Extract page info if tab available
   let pageInfo = null;
   if (tab?.id) {
-    try { pageInfo = await getPageInfoFromTab(tab.id); } catch (_) { /* content script may not be injected yet — proceed with empty pageInfo */ }
+    try {
+      pageInfo = (s._aiTags || s._aiSummary) && hasAIKey(s)
+        ? await getPageInfoFromTab(tab.id, { withDefuddle: true })
+        : await getPageInfoFromTab(tab.id);
+    } catch (_) { /* content script may not be injected yet — proceed with empty pageInfo */ }
   }
 
   // Build notes from page info
@@ -641,6 +645,9 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // AI features
   const aiPromises = [];
   let combinedHandled = false;
+  let aiHostPermissionMissing = false;
+  let combinedCachedTags = null;
+  let combinedCachedSummary = null;
 
   // Both tags AND summary requested -> one combined call (sends the body once).
   // Gated OFF when the user set a custom tag/summary prompt: the combined prompt uses
@@ -649,8 +656,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   if (pageInfo?.pageText && hasAIKey(s) && s._aiTags && s._aiSummary
       && !s.customTagPrompt?.trim() && !s.customSummaryPrompt?.trim()) {
     try {
-      const tCached = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource);
-      const sCached = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource);
+      const tCached = combinedCachedTags = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource);
+      const sCached = combinedCachedSummary = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource);
       let aiTags, summary;
       if (tCached && sCached) {
         aiTags = tCached; summary = sCached;
@@ -668,11 +675,21 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       }
       combinedHandled = true;
     } catch (e) {
-      console.warn(`${notifyCategory} AI combined failed, falling back to separate calls:`, e.message);
+      if (e?.code === "host_permission") {
+        aiHostPermissionMissing = true;
+        if (combinedCachedTags) tags = [...tags, ...combinedCachedTags];
+        if (combinedCachedSummary) {
+          const wrapped = `[AI Summary]\n<blockquote>${escapeForExtended(combinedCachedSummary)}</blockquote>`;
+          notes = notes ? notes + "\n\n" + wrapped : wrapped;
+        }
+        console.warn(`${notifyCategory} AI skipped:`, e.message);
+      } else {
+        console.warn(`${notifyCategory} AI combined failed, falling back to separate calls:`, e.message);
+      }
     }
   }
 
-  if (!combinedHandled && pageInfo?.pageText && hasAIKey(s)) {
+  if (!combinedHandled && !aiHostPermissionMissing && pageInfo?.pageText && hasAIKey(s)) {
     if (s._aiTags) {
       aiPromises.push(
         (async () => {
@@ -684,7 +701,11 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
             const aiTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
             await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
             return { type: "tags", result: aiTags };
-          } catch (e) { console.warn(`${notifyCategory} AI tags failed:`, e.message); return null; }
+          } catch (e) {
+            if (e?.code === "host_permission") aiHostPermissionMissing = true;
+            console.warn(`${notifyCategory} AI tags failed:`, e.message);
+            return null;
+          }
         })()
       );
     }
@@ -698,7 +719,11 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
             const summary = await callAI(s, prompt);
             await setAICache(url, "summary", summary, s.aiCacheDuration, s.aiContentSource);
             return { type: "summary", result: summary };
-          } catch (e) { console.warn(`${notifyCategory} AI summary failed:`, e.message); return null; }
+          } catch (e) {
+            if (e?.code === "host_permission") aiHostPermissionMissing = true;
+            console.warn(`${notifyCategory} AI summary failed:`, e.message);
+            return null;
+          }
         })()
       );
     }
@@ -737,7 +762,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     showNotification(
       notifyId + "-saved",
       notifyTitle,
-      t("bgTitleSaved", title.substring(0, 60)),
+      t(aiHostPermissionMissing ? "bgTitleSavedAiSkipped" : "bgTitleSaved", title.substring(0, 60)),
       notifyCategory,
       undoInfo
     );
@@ -927,6 +952,28 @@ async function migrateBgSaveMode() {
 // stale snapshot re-inserted the default "merge", permanently clobbering a legacy
 // bgSaveNoClobber=false user's "overwrite" preference.
 const _bgSaveModeMigration = migrateBgSaveMode();
+
+// Security-first permission migration. Older Batch versions could leave the
+// optional all-sites grant active. Removing it also clears matching exact
+// optional grants in Chrome, so configurations stay untouched and each feature
+// restores only its current origin on the next explicit action. A click racing
+// this one-time cleanup may need one retry; every execution path rechecks access
+// before network or cross-tab work, so the race fails closed.
+const PBP_LEGACY_WILDCARD_CLEANUP_KEY = "_legacyWildcardCleanupV1";
+async function pbpMigrateLegacyWildcardPermission() {
+  const stored = await chrome.storage.local.get(PBP_LEGACY_WILDCARD_CLEANUP_KEY);
+  if (stored[PBP_LEGACY_WILDCARD_CLEANUP_KEY] === true) return;
+  const wildcard = "*://*/*";
+  let active = await chrome.permissions.contains({ origins: [wildcard] });
+  if (active) {
+    await chrome.permissions.remove({ origins: [wildcard] });
+    active = await chrome.permissions.contains({ origins: [wildcard] });
+  }
+  if (!active) {
+    await chrome.storage.local.set({ [PBP_LEGACY_WILDCARD_CLEANUP_KEY]: true });
+  }
+}
+pbpMigrateLegacyWildcardPermission().catch(() => {});
 
 // syncApiKeys cleanup (batch (4)): idempotent, best-effort, fire-and-forget at
 // boot -- self-heals on the next boot/alarm tick if it fails partway (see
@@ -1165,9 +1212,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "pinboard_api_call" && message.url) {
+  if (message.type === "pinboard_api_call") {
     // Proxy Pinboard fetch through service worker to avoid Chrome's native auth dialog on 401
-    pinboardFetch(message.url, message.options || undefined)
+    if (!pbpIsAllowedPinboardApiUrl(message.url)) {
+      sendResponse({ ok: false, status: 0, text: "", error: "invalid_pinboard_api_url" });
+      return true;
+    }
+    pinboardFetch(message.url)
       .then(async res => {
         const text = await res.text();
         sendResponse({ ok: res.ok, status: res.status, text });

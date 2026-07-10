@@ -597,6 +597,46 @@ html.dark .batch-progress { background: #252525; border-color: #444; }
 html.dark .batch-progress-fill { background: linear-gradient(90deg, #5599dd, #4477bb); }
 html.dark .batch-progress-text { color: #e0e0e0; mix-blend-mode: normal; filter: none; }
 
+.batch-permission {
+  margin: 6px 12px;
+  padding: 7px 8px;
+  border: 1px solid #d4dae3;
+  border-radius: var(--pp-radius-sm);
+  background: #f5f7fa;
+  color: #333;
+}
+.batch-permission-title { margin: 0 0 5px; font-size: 11px; font-weight: 600; }
+.batch-permission-list {
+  max-height: 92px;
+  margin: 0;
+  padding-left: 18px;
+  overflow: auto;
+  font: 10px/1.45 "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
+  overflow-wrap: anywhere;
+}
+.batch-permission-actions { display: flex; gap: 6px; margin-top: 6px; }
+.batch-permission-actions button {
+  border: 1px solid #aeb8c5;
+  border-radius: var(--pp-radius-sm);
+  padding: 3px 8px;
+  background: #fff;
+  color: #333;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.batch-permission-actions button:first-child { border-color: #4477bb; color: #225599; }
+.batch-permission-actions button:disabled { opacity: 0.55; cursor: default; }
+.batch-permission-actions button:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 1px; }
+html.dark .batch-permission { background: #252525; border-color: #444; color: #ddd; }
+html.dark .batch-permission-actions button { background: #2a2a2a; border-color: #555; color: #ddd; }
+html.dark .batch-permission-actions button:first-child { border-color: #6699ff; color: #88aaff; }
+html[data-theme] .batch-permission { background: var(--pp-bg-soft, var(--pp-bg2)); border-color: var(--pp-border); color: var(--pp-fg); }
+html[data-theme] .batch-permission-actions button { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-fg); }
+html[data-theme] .batch-permission-actions button:first-child { border-color: var(--pp-accent); color: var(--pp-accent); }
+
 /* Cache hint & regenerate */
 .cache-hint {
   font-size: 10px;

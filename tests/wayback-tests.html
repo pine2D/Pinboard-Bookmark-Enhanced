@@ -31,6 +31,21 @@ function test(name, fn) {
   }
 }
 
+async function atest(name, fn) {
+  try {
+    await fn();
+    const div = document.createElement("div");
+    div.className = "case pass";
+    div.textContent = "PASS " + name;
+    document.getElementById("results").appendChild(div);
+  } catch (e) {
+    const div = document.createElement("div");
+    div.className = "case fail";
+    div.textContent = "FAIL " + name + "\n  " + e.message;
+    document.getElementById("results").appendChild(div);
+  }
+}
+
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "assertion failed");
 }
@@ -274,5 +289,43 @@ suite("pbpWaybackShouldArchive", () => {
     assert(pbpWaybackShouldArchive({ enabled: false, skipPrivate: false, isPrivate: false, force: false, override: undefined }) === false, "disabled skips");
   });
 });
+
+(async function () {
+  await atest("missing or unreadable permission preserves the enabled setting and performs no fetch", async () => {
+    const prevChrome = globalThis.chrome;
+    const prevFetch = globalThis.fetch;
+    const settingsWrites = [];
+    const outcomes = [];
+    let fetches = 0;
+    try {
+      globalThis.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      for (const mode of ["false", "throw"]) {
+        globalThis.chrome = {
+          permissions: { contains: async () => {
+            if (mode === "throw") throw new Error("permissions unavailable");
+            return false;
+          } },
+          storage: { local: {
+            get: async (defaults) => defaults,
+            set: async (payload) => {
+              if (Object.prototype.hasOwnProperty.call(payload, "waybackArchiveEnabled")) settingsWrites.push(payload);
+              if (Array.isArray(payload._waybackLog)) outcomes.push(payload._waybackLog.at(-1).outcome);
+            }
+          } }
+        };
+        await pbpWaybackArchive("https://example.com/" + mode, {
+          waybackArchiveEnabled: true,
+          waybackSkipPrivate: false
+        }, {});
+      }
+      assert(settingsWrites.length === 0, "permission failure must not disable Wayback");
+      assert(fetches === 0, "permission failure must not fetch");
+      assert(outcomes.join(",") === "permDenied,permDenied", "both failures should remain recoverable in the archive log");
+    } finally {
+      globalThis.chrome = prevChrome;
+      globalThis.fetch = prevFetch;
+    }
+  });
+})();
 </script>
 </body></html>

@@ -7,11 +7,32 @@ const fail = [];
 const check = (ok, msg) => { if (!ok) fail.push(msg); };
 
 const popupHtml = read("popup.html");
+const manifest = JSON.parse(read("manifest.json"));
 const optionsHtml = read("options.html");
+check(!optionsHtml.includes('Requires "Access all websites" permission'), "options Batch hint still advertises the retired all-sites request");
 const mdHtml = read("md-preview.html");
+const mdPreviewJs = read("md-preview.js");
+const mdExportSendJs = read("md-export-send.js");
+const sharedJs = read("shared.js");
+const jinaJs = read("jina.js");
+const mdAiCoreJs = read("md-ai-core.js");
+const mdAskJs = read("md-ask.js");
+const mdSkimJs = read("md-skim.js");
+const mdTranslateJs = read("md-translate.js");
+const popupJs = read("popup.js");
+const popupAiJs = read("popup-ai.js");
+const popupBatchJs = read("popup-batch.js");
+const popupCss = read("popup.css");
+const optionsConnectivityJs = read("options-connectivity.js");
 const optionsCss = read("options.css");
 const optionsJs = read("options.js");
+check(optionsJs.includes('webdavLastPush.error === "insecure"') && optionsJs.includes('t("mdTargetWebhookHttpWarn")'), "persisted insecure WebDAV status lacks endpoint guidance");
 const popupTagsJs = read("popup-tags.js");
+
+check(manifest.host_permissions.join(",") === "https://api.pinboard.in/*,https://pinboard.in/*",
+  "manifest.json: required hosts are not limited to core Pinboard access");
+check(manifest.optional_host_permissions.join(",") === "*://*/*",
+  "manifest.json: optional host ceiling is redundant or missing");
 
 for (const [name, html] of [["popup.html", popupHtml], ["options.html", optionsHtml], ["md-preview.html", mdHtml]]) {
   const links = html.matchAll(/<a\b[^>]*target="_blank"[^>]*>/g);
@@ -31,6 +52,215 @@ check(/const head = document\.createElement\("button"\);/.test(optionsJs), "opti
 check(/head\.type = "button";/.test(optionsJs), "options.js: dynamic accordion header missing type=button");
 check(/head\.setAttribute\("aria-controls", head\.dataset\.target\);/.test(optionsJs), "options.js: dynamic accordion header missing aria-controls");
 
+const helperSource = optionsJs.slice(0, optionsJs.indexOf('document.addEventListener("DOMContentLoaded"'));
+const permissionHelpers = Function(helperSource + "; return { pbpExactOriginPermissionSnapshot, pbpRevokeLegacyAllSitesPermission }; ")();
+check(permissionHelpers.pbpExactOriginPermissionSnapshot([
+  "*://*/*",
+  "https://api.pinboard.in/*",
+  "https://custom.example:8443/*",
+  "https://*.example.com/*",
+  "http://localhost:*/*",
+  "not a pattern",
+  "https://api.pinboard.in/*"
+]).join(",") === "https://api.pinboard.in/*,https://custom.example:8443/*",
+"options.js: legacy revoke snapshot is not limited to unique exact origins");
+
+{
+  const wildcard = "*://*/*";
+  const exact = ["https://api.pinboard.in/*", "https://custom.example:8443/*"];
+  const active = new Set([wildcard, ...exact]);
+  const calls = [];
+  const result = await permissionHelpers.pbpRevokeLegacyAllSitesPermission({
+    async getAll() { calls.push("getAll"); return { origins: [...active] }; },
+    async remove({ origins }) { calls.push("remove:" + origins.join(",")); active.delete(wildcard); return true; },
+    async request({ origins }) { calls.push("request:" + origins.join(",")); return true; },
+    async contains({ origins }) { calls.push("contains:" + origins[0]); return active.has(origins[0]); }
+  });
+  check(result.ok && calls.join("|") === [
+    "getAll",
+    "remove:*://*/*",
+    "request:" + exact.join(","),
+    "contains:" + exact[0],
+    "contains:" + exact[1],
+    "contains:*://*/*"
+  ].join("|"), "options.js: legacy revoke does not restore/verify the exact snapshot in order");
+}
+
+{
+  const wildcard = "*://*/*";
+  const exact = "https://custom.example/*";
+  const active = new Set([wildcard, exact]);
+  const result = await permissionHelpers.pbpRevokeLegacyAllSitesPermission({
+    async getAll() { return { origins: [...active] }; },
+    async remove() { active.clear(); return true; },
+    async request() { return false; },
+    async contains({ origins }) { return active.has(origins[0]); }
+  });
+  check(!result.ok && result.wildcardAbsent && result.missing.includes(exact),
+    "options.js: partial exact-origin restoration can be reported as success");
+}
+
+check(optionsJs.includes("btn.disabled = result.wildcardAbsent"),
+  "options.js: partial legacy revoke failure can be retried into a false success");
+
+const sendRuntimeStart = mdExportSendJs.indexOf("async function pbpSendToTarget");
+const sendRuntimeEnd = mdExportSendJs.indexOf("\n}", sendRuntimeStart) + 2;
+const sendRuntime = mdExportSendJs.slice(sendRuntimeStart, sendRuntimeEnd);
+check(sendRuntimeStart >= 0 && /permissions\.contains/.test(sendRuntime) && !/permissions\.request/.test(sendRuntime),
+  "md-export-send.js: execution layer must contain-check without requesting");
+const doSendStart = mdPreviewJs.indexOf("async function doSend(id)");
+const doSendEnd = mdPreviewJs.indexOf("primary.addEventListener", doSendStart);
+const doSend = mdPreviewJs.slice(doSendStart, doSendEnd);
+check(doSendStart >= 0 && doSendEnd > doSendStart &&
+  doSend.indexOf("await pbpRequestTargetPermission(id, cfg)") >= 0 &&
+  doSend.indexOf("await pbpRequestTargetPermission(id, cfg)") < doSend.indexOf("await pbpSetLastTarget(id)"),
+  "md-preview.js: Send-to permission request is not the first await before last-target storage");
+
+check(/const PBP_JINA_ORIGIN_PATTERN = "https:\/\/r\.jina\.ai\/\*";/.test(sharedJs) &&
+  !/const\s+JINA_ORIGIN_PATTERN/.test(jinaJs) && /PBP_JINA_ORIGIN_PATTERN/.test(jinaJs),
+  "Jina exact-origin pattern is not shared by preview and Service Worker paths");
+const jinaRetryStart = mdPreviewJs.indexOf("async function retryExtract(engine, failure)");
+const jinaRetryEnd = mdPreviewJs.indexOf("async function attemptExtract(engine)", jinaRetryStart);
+const jinaRetry = mdPreviewJs.slice(jinaRetryStart, jinaRetryEnd);
+check(jinaRetryStart >= 0 && jinaRetryEnd > jinaRetryStart &&
+  jinaRetry.indexOf("inFlight = true") >= 0 &&
+  jinaRetry.indexOf("inFlight = true") < jinaRetry.indexOf("await pbpRequestJinaHostPermission()") &&
+  jinaRetry.indexOf("await pbpRequestJinaHostPermission()") >= 0 &&
+  jinaRetry.indexOf("await pbpRequestJinaHostPermission()") < jinaRetry.indexOf("await attemptExtract(engine)") &&
+  /finally\s*\{\s*inFlight = false;/.test(jinaRetry),
+  "md-preview.js: Jina retry is not guarded before its exact-origin request");
+const switchRetryStart = mdPreviewJs.indexOf('if (e === "jina" && jinaPermissionMissing)');
+const switchHandlerStart = mdPreviewJs.lastIndexOf('seg.addEventListener("click", async () => {', switchRetryStart);
+const switchRetryEnd = mdPreviewJs.indexOf("chrome.runtime.sendMessage", switchRetryStart) + "chrome.runtime.sendMessage".length;
+const switchRetry = mdPreviewJs.slice(switchHandlerStart, switchRetryEnd);
+check(switchHandlerStart >= 0 && switchRetryEnd > switchRetryStart &&
+  switchRetry.indexOf("switching = true") >= 0 &&
+  switchRetry.indexOf("switching = true") < switchRetry.indexOf("await pbpRequestJinaHostPermission()") &&
+  switchRetry.indexOf("await pbpRequestJinaHostPermission()") < switchRetry.indexOf("chrome.runtime.sendMessage") &&
+  /if \(!await pbpRequestJinaHostPermission\(\)\) \{[\s\S]*?switching = false;[\s\S]*?applyAvailability\(curEngine\);[\s\S]*?return;/.test(switchRetry),
+  "md-preview.js: Jina engine retry is not guarded before its permission request");
+const renderErrorState = mdPreviewJs.slice(
+  mdPreviewJs.indexOf("function renderErrorState"),
+  mdPreviewJs.indexOf("function pbpRequestJinaHostPermission")
+);
+check(renderErrorState.indexOf('btn.textContent = t(permissionRequired ? "aiGrantRetry" : "askErrRetry")') >= 0 &&
+  renderErrorState.indexOf("btn.disabled = true") < renderErrorState.indexOf("await retryFn()") &&
+  renderErrorState.indexOf("btn.disabled = false") > renderErrorState.indexOf("await retryFn()") &&
+  mdPreviewJs.includes('pr && pr.error === "host_permission"'),
+  "md-preview.js: Jina permission retry lacks grant copy or synchronous button guard");
+
+const aiRecoveryStart = mdAiCoreJs.indexOf("async function pbpAiRetryWithPermission");
+const aiRecoveryEnd = mdAiCoreJs.indexOf("// ---- IDB persistence", aiRecoveryStart);
+const aiRecovery = mdAiCoreJs.slice(aiRecoveryStart, aiRecoveryEnd);
+check(aiRecoveryStart >= 0 && aiRecovery.indexOf("await requestAIHostPermissions(settings)") >= 0 &&
+  aiRecovery.indexOf("await requestAIHostPermissions(settings)") < aiRecovery.indexOf("await retry()"),
+  "md-ai-core.js: retry callback can run before the provider permission request");
+check((mdAskJs.match(/pbpAiRetryWithPermission\(/g) || []).length >= 2,
+  "md-ask.js: Ask and Explain do not both use permission-aware retry");
+const skimRegenStart = mdSkimJs.indexOf("async function _pbpSkimRegen()");
+const skimRegen = mdSkimJs.slice(skimRegenStart, mdSkimJs.indexOf("// Init hookup", skimRegenStart));
+check(skimRegenStart >= 0 && skimRegen.indexOf("await pbpAiRetryWithPermission") >= 0 &&
+  skimRegen.indexOf("st.running = true") >= 0 &&
+  skimRegen.indexOf("st.running = true") < skimRegen.indexOf("await pbpAiRetryWithPermission") &&
+  skimRegen.indexOf("retry.disabled = true") < skimRegen.indexOf("await pbpAiRetryWithPermission") &&
+  skimRegen.indexOf("await pbpAiRetryWithPermission") < skimRegen.indexOf("body.replaceChildren()") &&
+  /finally\s*\{[\s\S]*?st\.running = false;[\s\S]*?retry\.disabled = false;/.test(skimRegen),
+  "md-skim.js: regenerate is not guarded before permission recovery");
+const explainRetryStart = mdAskJs.indexOf('retry.className = "xp-retry"');
+const explainRetryEnd = mdAskJs.indexOf("wrap.appendChild(retry)", explainRetryStart);
+const explainRetry = mdAskJs.slice(explainRetryStart, explainRetryEnd);
+check(explainRetryStart >= 0 && explainRetryEnd > explainRetryStart &&
+  explainRetry.indexOf("retry.disabled = true") >= 0 &&
+  explainRetry.indexOf("retry.disabled = true") < explainRetry.indexOf("await pbpAiRetryWithPermission") &&
+  (explainRetry.match(/retry\.disabled = false/g) || []).length === 2,
+  "md-ask.js: Explain permission retry lacks a synchronous button guard");
+const trStart = mdTranslateJs.slice(mdTranslateJs.indexOf("async function _pbpTrStart(st)"), mdTranslateJs.indexOf("// Fill one block", mdTranslateJs.indexOf("async function _pbpTrStart(st)")));
+check(trStart.indexOf("await pbpAiRetryWithPermission") >= 0 &&
+  trStart.indexOf("await pbpAiRetryWithPermission") < trStart.indexOf("if (st.workReady) await st.workReady"),
+  "md-translate.js: Continue does work before permission recovery");
+
+check(/async function _pbpWebdavRequestPermission[\s\S]{0,240}if \(!origin\) return null;[\s\S]{0,180}catch \(_\) \{ return false; \}/.test(optionsJs),
+  "options.js: WebDAV permission preflight does not distinguish invalid URL from denied permission");
+check(/function _pbpWebdavPermissionError[\s\S]{0,180}granted === null \? "mdTargetWebhookHttpWarn" : "webdavPermDenied"/.test(optionsJs),
+  "options.js: WebDAV permission errors do not map invalid and denied states separately");
+check((optionsJs.match(/const errorKey = _pbpWebdavPermissionError\(granted\);/g) || []).length === 4,
+  "options.js: WebDAV Test/Push/Pull/auto-push do not all use the permission-state mapping");
+const webdavAutoStart = optionsJs.indexOf('$id("opt-webdav-autopush")?.addEventListener');
+const webdavAutoEnd = optionsJs.indexOf("// ---- WebDAV: render", webdavAutoStart);
+const webdavAutoHandler = optionsJs.slice(webdavAutoStart, webdavAutoEnd);
+check(webdavAutoStart >= 0 && webdavAutoEnd > webdavAutoStart &&
+  !/target\.value\s*=(?!=)|dispatchEvent\(/.test(webdavAutoHandler),
+  "options.js: WebDAV auto-push permission failure mutates the saved schedule");
+
+const waybackLoadStart = optionsJs.indexOf("// ---- Wayback: check permission on load");
+const waybackToggleStart = optionsJs.indexOf("// ---- Wayback: toggle permission", waybackLoadStart);
+const waybackClearStart = optionsJs.indexOf("// ---- Wayback: clear", waybackToggleStart);
+const waybackLoad = optionsJs.slice(waybackLoadStart, waybackToggleStart);
+const waybackToggle = optionsJs.slice(waybackToggleStart, waybackClearStart);
+check(waybackLoadStart >= 0 && waybackToggleStart > waybackLoadStart &&
+  !/checked\s*=\s*false|waybackArchiveEnabled\s*=\s*false|getSettingsStorage\(\)/.test(waybackLoad),
+  "options.js: Wayback load-time permission failure disables the saved setting");
+check(waybackClearStart > waybackToggleStart &&
+  !/checked\s*=\s*false|dispatchEvent\(/.test(waybackToggle),
+  "options.js: Wayback permission denial disables the user's choice");
+check(/result\.missing\.join\(", "\)/.test(optionsJs) && !/result\.ok[\s\S]{0,300}batchPermNone/.test(optionsJs),
+  "options.js: legacy revoke restoration failure is not reported explicitly");
+
+const popupRetryStart = popupAiJs.indexOf('$id("ai-error-retry")?.addEventListener');
+const popupRetryEnd = popupAiJs.indexOf('$id("ai-error-fallback")?.addEventListener', popupRetryStart);
+const popupRetry = popupAiJs.slice(popupRetryStart, popupRetryEnd);
+check(popupRetryStart >= 0 && popupRetryEnd > popupRetryStart &&
+  popupRetry.indexOf("retryBtn.disabled = true") >= 0 &&
+  popupRetry.indexOf("retryBtn.disabled = true") < popupRetry.indexOf("await requestAIHostPermissions") &&
+  popupRetry.indexOf("retryBtn.disabled = false") > popupRetry.indexOf("await requestAIHostPermissions") &&
+  popupRetry.indexOf("await requestAIHostPermissions(recovery.settings, extraOrigins)") === popupRetry.indexOf("await ") &&
+  popupRetry.includes("recovery.origins.filter") && !popupRetry.includes("PBP_JINA_ORIGIN_PATTERN") &&
+  !popupRetry.includes("aiContentSource"),
+  "popup-ai.js: permission retry recomputes destinations instead of using the failed-stage origins");
+check(/err\.permissionStage = "extracting";[\s\S]{0,100}err\.permissionOrigins = origins;/.test(popupAiJs) &&
+  (popupAiJs.match(/e\.permissionStage = "calling";/g) || []).length === 2 &&
+  (popupAiJs.match(/e\.permissionOrigins = _aiRequiredOriginPatterns\(settings\);/g) || []).length === 2,
+  "popup-ai.js: extraction and provider permission failures do not record their actual stage/origins");
+
+const popupWaybackStart = popupJs.indexOf('$id("archive-check").addEventListener("change", async (e) =>');
+const popupWaybackEnd = popupJs.indexOf("// Setup UI features immediately", popupWaybackStart);
+const popupWayback = popupJs.slice(popupWaybackStart, popupWaybackEnd);
+check(popupWaybackStart >= 0 && popupWaybackEnd > popupWaybackStart &&
+  popupWayback.indexOf('await chrome.permissions.request({ origins: ["https://web.archive.org/*"] })') === popupWayback.indexOf("await ") &&
+  !popupWayback.includes("permissions.contains"),
+  "popup.js: Wayback grant is not the first await in the checkbox gesture");
+
+const markdownClickStart = popupJs.indexOf('jinaMdBtn.addEventListener("click", async () =>');
+const markdownClickEnd = popupJs.indexOf("// Fetch all user tags first", markdownClickStart);
+const markdownClick = popupJs.slice(markdownClickStart, markdownClickEnd);
+check(markdownClickStart >= 0 && markdownClickEnd > markdownClickStart &&
+  markdownClick.indexOf("jinaMdBtn.disabled = true") >= 0 &&
+  markdownClick.indexOf("jinaMdBtn.disabled = true") < markdownClick.indexOf("await chrome.permissions.request") &&
+  markdownClick.indexOf("jinaMdBtn.disabled = false") > markdownClick.indexOf("await chrome.permissions.request") &&
+  markdownClick.indexOf("await chrome.permissions.request({ origins: [PBP_JINA_ORIGIN_PATTERN] })") === markdownClick.indexOf("await ") &&
+  markdownClick.includes('result.code === "host_permission"') && markdownClick.includes('t("aiGrantRetry")'),
+  "popup.js: Markdown host-permission recovery is not a Jina-only first-await grant and retry");
+
+const tagGovClickStart = optionsJs.indexOf('$id("tag-gov-ai-btn")?.addEventListener');
+const tagGovClickEnd = optionsJs.indexOf("await renderWaybackLog()", tagGovClickStart);
+const tagGovClick = optionsJs.slice(tagGovClickStart, tagGovClickEnd);
+check(tagGovClickStart >= 0 && tagGovClickEnd > tagGovClickStart &&
+  tagGovClick.indexOf("btn.disabled = true") >= 0 &&
+  tagGovClick.indexOf("btn.disabled = true") < tagGovClick.indexOf("await requestAIHostPermissions(pending)") &&
+  tagGovClick.indexOf("btn.disabled = false") > tagGovClick.indexOf("await requestAIHostPermissions(pending)") &&
+  tagGovClick.indexOf("await requestAIHostPermissions(pending)") === tagGovClick.indexOf("await ") &&
+  tagGovClick.includes("tagGovAiPendingSettings !== pending") &&
+  tagGovClick.includes("await runTagGovAi(pending)"),
+  "options.js: tag-governance grant click does not request before retrying the saved settings snapshot");
+check(/opt-ai-provider[\s\S]{0,160}tagGovAiPendingSettings = null/.test(optionsJs.slice(optionsJs.indexOf("let tagGovAiPendingSettings"))),
+  "options.js: tag-governance pending permission retry is not cleared when provider changes");
+check(/function pbpLiveAiSettingsSnapshot\(provider\)/.test(optionsConnectivityJs) &&
+  /const cs = pbpLiveAiSettingsSnapshot\(provider\);/.test(optionsConnectivityJs) &&
+  (optionsConnectivityJs.match(/geminiApiKey: getOptVal/g) || []).length === 1 &&
+  tagGovClick.indexOf("const live = pbpLiveAiSettingsSnapshot") < tagGovClick.indexOf("let sNow = await") &&
+  tagGovClick.includes("sNow = { ...sNow, ...live }"),
+  "Options connectivity and tag governance do not share one live provider form snapshot");
+
 check(/@media \(max-width: 720px\)[\s\S]*\.container\s*{[\s\S]*grid-template-columns:\s*1fr/.test(optionsCss), "options.css: missing mobile one-column container rule");
 check(/@media \(max-width: 720px\)[\s\S]*\.tabs\s*{[\s\S]*position:\s*static/.test(optionsCss), "options.css: missing mobile static tabs rule");
 
@@ -38,6 +268,25 @@ check(/const el = document\.createElement\("button"\);[\s\S]{0,240}el\.className
 check(/const aa = document\.createElement\("button"\);[\s\S]{0,240}aa\.className = "add-all-link";/.test(popupTagsJs), "popup-tags.js: add-all is not a button");
 check(/const rm = document\.createElement\("button"\);[\s\S]{0,240}rm\.className = "tag-remove";/.test(popupTagsJs), "popup-tags.js: tag remove is not a button");
 check(/<button\b(?=[^>]*id="tags-last-used")(?=[^>]*type="button")[^>]*>/.test(popupHtml), "popup.html: #tags-last-used is not a button");
+
+check(/<section\b(?=[^>]*id="batch-permission")(?=[^>]*aria-labelledby="batch-permission-title")[^>]*>/.test(popupHtml) &&
+  /<ul\b[^>]*id="batch-permission-list"[^>]*>/.test(popupHtml),
+  "popup.html: Batch permission disclosure lacks labelled section/list semantics");
+check(["batch-permission-grant", "batch-permission-cancel"].every(id =>
+  new RegExp(`<button\\b(?=[^>]*id="${id}")(?=[^>]*type="button")[^>]*>`).test(popupHtml)),
+  "popup.html: Batch permission actions are not real buttons");
+const batchGrantStart = popupBatchJs.indexOf('grantBtn?.addEventListener("click", async () =>');
+const batchGrantEnd = popupBatchJs.indexOf('cancelBtn?.addEventListener', batchGrantStart);
+const batchGrant = popupBatchJs.slice(batchGrantStart, batchGrantEnd);
+check(batchGrantStart >= 0 && batchGrantEnd > batchGrantStart &&
+  batchGrant.indexOf("await chrome.permissions.request({ origins: pending.origins })") === batchGrant.indexOf("await ") &&
+  batchGrant.indexOf("await chrome.permissions.request({ origins: pending.origins })") < batchGrant.indexOf("await dispatchBatchSave"),
+  "popup-batch.js: Grant does not request the disclosed origins as its first await before starting Batch");
+check(!/\bconfirm\s*\(/.test(popupBatchJs) && !popupBatchJs.includes("BATCH_PERMISSION_DISCLOSE_LIMIT") &&
+  !popupBatchJs.includes("batchPermMore") && !popupBatchJs.includes("*://*/*"),
+  "popup-batch.js: native confirm, truncated disclosure, or broad wildcard remains");
+check(/\.batch-permission-list\s*\{[\s\S]*?max-height:\s*92px;[\s\S]*?overflow:\s*auto;/.test(popupCss),
+  "popup.css: complete Batch permission list is not bounded with scrolling");
 
 if (fail.length) {
   console.error(fail.join("\n"));

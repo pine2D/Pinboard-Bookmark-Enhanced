@@ -132,7 +132,7 @@ async function getPageInfoFromTab(tabId, opts = {}) {
 function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+  return fetch(url, { ...options, redirect: "error", signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
 // ---- Unified AI error handler ----
@@ -250,47 +250,81 @@ function hasAIKey(s) {
   return !!(keyField && s[keyField]);
 }
 
-// ---- Host-permission gate for user-configured endpoints ----
-// Three providers can target an origin that is NOT in the static host_permissions:
-// "custom" (any base URL), "openai" (a base-URL override, e.g. Azure/a proxy), and
-// "ollama" (a non-loopback/remote URL). Fetching such an origin without a host grant
-// is subject to CORS and usually fails — and the background quick-save path runs in a
-// Service Worker, which has no user gesture to request the permission itself. Resolve
-// the origin a call will hit so we can verify the grant up front and fail with an
-// actionable message instead of a cryptic CORS error. Returns an origin match pattern
-// ("https://host/*"), or null when no runtime grant is needed (the built-in static
-// hosts, or loopback Ollama which is reached via its own permissive CORS).
+// ---- Host-permission gate ----
+// Resolve the exact origin every provider call will hit. Compatible providers reuse
+// their request registry; the three bespoke callers use the same bases as their fetch
+// functions below. User-configured URLs also pass the shared HTTPS/loopback policy.
 function _aiTargetOriginPattern(s) {
-  const p = (s && s.aiProvider) || "gemini";
+  s = s || {};
+  const p = s.aiProvider || "gemini";
   let base;
-  if (p === "custom") base = s.customBaseUrl;
-  else if (p === "openai") base = s.openaiBaseUrl || "https://api.openai.com/v1";
+  if (p === "gemini") base = "https://generativelanguage.googleapis.com";
+  else if (p === "claude") base = "https://api.anthropic.com";
   else if (p === "ollama") base = s.ollamaBaseUrl || "http://localhost:11434";
-  else return null;
+  else {
+    const cfg = OPENAI_COMPAT_PROVIDERS[p];
+    if (!cfg) return null;
+    base = _openaiCompatBase(cfg, s);
+  }
+  const pattern = pbpEndpointOriginPattern(base);
+  if (!pattern) {
+    let message = "Invalid or insecure AI endpoint. Use HTTPS, or HTTP only with localhost, 127.0.0.1, or [::1].";
+    try {
+      const translated = t("mdTargetWebhookHttpWarn");
+      if (translated && translated !== "mdTargetWebhookHttpWarn") message = translated;
+    } catch (_) {}
+    const err = new Error(message);
+    err.code = "endpoint_invalid";
+    throw err;
+  }
+  return pattern;
+}
+
+// Synchronous collector used by direct user gestures. Extra destinations (currently
+// Jina) are normalized through the same policy and deduplicated before request().
+function _aiRequiredOriginPatterns(s, additionalOrigins = []) {
+  const origins = [_aiTargetOriginPattern(s)];
+  for (const raw of (Array.isArray(additionalOrigins) ? additionalOrigins : [additionalOrigins])) {
+    const pattern = pbpEndpointOriginPattern(raw);
+    if (!pattern) {
+      const err = new Error("Invalid or insecure additional AI endpoint.");
+      err.code = "endpoint_invalid";
+      throw err;
+    }
+    origins.push(pattern);
+  }
+  return [...new Set(origins.filter(Boolean))];
+}
+
+// Must be called from a user gesture. Pattern calculation and request() are deliberately
+// adjacent; background/automatic callers use the contains-only gate below instead.
+function requestAIHostPermissions(s, additionalOrigins = []) {
+  const origins = _aiRequiredOriginPatterns(s, additionalOrigins);
+  if (!origins.length || typeof chrome === "undefined" || !chrome.permissions || !chrome.permissions.request) {
+    return Promise.resolve(false);
+  }
   try {
-    const u = new URL(base);
-    if (u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "[::1]") return null;
-    return u.origin + "/*";
+    return Promise.resolve(chrome.permissions.request({ origins })).then(Boolean, () => false);
   } catch (_) {
-    return null; // malformed/empty URL — let the request fail with its own error
+    return Promise.resolve(false);
   }
 }
 
 // Throw an actionable error when the configured endpoint's origin is not granted.
 // Read-only: chrome.permissions.contains needs no user gesture and works in the SW.
-// No-op outside an extension context (e.g. unit-test pages) and for static providers.
+// No-op only outside an extension context (e.g. unit-test pages).
 // The narrow origin is a subset of the declared optional *://*/* permission, which is
 // how the options-page Test button requests it on a real gesture.
 async function _ensureAIHostPermission(s) {
   const pattern = _aiTargetOriginPattern(s);
   if (!pattern) return;
-  if (typeof chrome === "undefined" || !chrome.permissions || !chrome.permissions.contains) return;
-  let has = true;
+  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) return;
+  let has = false;
   try {
-    has = await chrome.permissions.contains({ origins: [pattern] });
-  } catch (_) {
-    return; // contains itself failed — don't block; let the fetch attempt run
-  }
+    if (chrome.permissions && chrome.permissions.contains) {
+      has = await chrome.permissions.contains({ origins: [pattern] });
+    }
+  } catch (_) {}
   if (!has) {
     const err = new Error(t("aiErrorHostPermission", pattern.replace(/\/\*$/, "")));
     err.code = "host_permission";
@@ -515,7 +549,7 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
   let reader = null;
   try {
     resetIdle();
-    const res = await fetch(url, { ...init, signal: ctrl.signal });
+    const res = await fetch(url, { ...init, redirect: "error", signal: ctrl.signal });
     // Headers received: start a fresh idle window for time-to-first-byte.
     resetIdle();
     if (!res.ok) {

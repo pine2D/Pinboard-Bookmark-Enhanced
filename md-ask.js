@@ -519,14 +519,14 @@ function _pbpAskAppendRound(question) {
 
 // Error UI: human message (callAIStream rejects with handleAIError text)
 // plus a retry button that re-runs the SAME question into the same .ask-a.
-function _pbpAskErrorUi(aEl, message, question) {
+function _pbpAskErrorUi(aEl, error, question) {
   const err = document.createElement("p");
   err.className = "ask-err";
-  err.textContent = message;
+  err.textContent = (error && error.message) ? error.message : String(error || "");
   const retry = document.createElement("button");
   retry.type = "button";
   retry.className = "action-btn ask-retry";
-  retry.textContent = t("askErrRetry");
+  retry.textContent = t(error && error.code === "host_permission" ? "aiGrantRetry" : "askErrRetry");
   retry.addEventListener("click", () => {
     // Guard BEFORE touching the DOM: _pbpAskRun silently no-ops while another
     // question is running (line ~478 `if (!st || st.running) return;`). Without
@@ -534,10 +534,13 @@ function _pbpAskErrorUi(aEl, message, question) {
     // Q1's error UI + adds .streaming shimmer, but the request never fires --
     // a permanent empty "streaming" bubble (audit md-ask.js:423).
     if (_pbpAskState && _pbpAskState.running) return;
-    aEl.replaceChildren();
-    aEl.classList.add("streaming");
-    aEl.setAttribute("aria-busy", "true");
-    _pbpAskRun(question, aEl).catch(() => {});
+    pbpAiRetryWithPermission(error, _pbpAskState && _pbpAskState.s, () => {
+      if (_pbpAskState && _pbpAskState.running) return;
+      aEl.replaceChildren();
+      aEl.classList.add("streaming");
+      aEl.setAttribute("aria-busy", "true");
+      return _pbpAskRun(question, aEl);
+    }).catch(() => {});
   });
   aEl.appendChild(err);
   aEl.appendChild(retry);
@@ -631,7 +634,7 @@ async function _pbpAskRun(question, aEl, opts) {
       note.textContent = t("askStopped");
       aEl.appendChild(note);
     } else {
-      _pbpAskErrorUi(aEl, (e && e.message) ? e.message : String(e), question);
+      _pbpAskErrorUi(aEl, e || new Error("Request failed"), question);
     }
   } finally {
     st.running = false;
@@ -1859,8 +1862,17 @@ async function _pbpExplainRun(cap, ctx, pop) {
     const retry = document.createElement("button");
     retry.type = "button";
     retry.className = "xp-retry";
-    retry.textContent = t("explainErrRetry");
-    retry.addEventListener("click", () => _pbpExplainRun(cap, ctx, pop));
+    retry.textContent = t(e && e.code === "host_permission" ? "aiGrantRetry" : "explainErrRetry");
+    retry.addEventListener("click", async () => {
+      if (retry.disabled) return;
+      retry.disabled = true;
+      try {
+        const recovered = await pbpAiRetryWithPermission(e, s, () => _pbpExplainRun(cap, ctx, pop));
+        if (!recovered) retry.disabled = false;
+      } catch (_) {
+        retry.disabled = false;
+      }
+    });
     wrap.appendChild(msg);
     wrap.appendChild(retry);
     body.replaceChildren(wrap);

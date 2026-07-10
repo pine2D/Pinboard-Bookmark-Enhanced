@@ -27,15 +27,15 @@ const CLEANUP_TIMEOUT_MS = 5000;
 // assertions; an unregistered suite is rejected instead of guessed complete.
 const EXPECTED_RESULTS = Object.freeze({
   "tests/a11y-tests.html": 25,
-  "tests/ai-tags-tests.html": 24,
-  "tests/background-active-tab-tests.html": 9,
-  "tests/batch-dedup-tests.html": 10,
+  "tests/ai-tags-tests.html": 43,
+  "tests/background-active-tab-tests.html": 28,
+  "tests/batch-dedup-tests.html": 24,
   "tests/contrast-tests.html": 10,
   "tests/escape-html-tests.html": 8,
-  "tests/export-targets-tests.html": 82,
+  "tests/export-targets-tests.html": 99,
   "tests/i18n-parity-tests.html": 181,
-  "tests/jina-cache-tests.html": 19,
-  "tests/md-ai-tests.html": 584,
+  "tests/jina-cache-tests.html": 23,
+  "tests/md-ai-tests.html": 591,
   "tests/md-convert-tests.html": 358,
   "tests/offline-queue-tests.html": 20,
   "tests/options-notes-tests.html": 36,
@@ -51,8 +51,8 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/tag-gov-tests.html": 61,
   "tests/union-tags-tests.html": 12,
   "tests/url-strip-tests.html": 19,
-  "tests/wayback-tests.html": 39,
-  "tests/webdav-tests.html": 69,
+  "tests/wayback-tests.html": 40,
+  "tests/webdav-tests.html": 87,
 });
 const expected = EXPECTED_RESULTS[rel];
 if (expected === undefined) {

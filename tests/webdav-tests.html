@@ -60,6 +60,13 @@ section("pbpWebdavOrigin");
 assertEq(pbpWebdavOrigin("https://dav.example.com/backups/"), "https://dav.example.com/*", "derives origin + /*");
 assertEq(pbpWebdavOrigin("not a url"), null, "malformed URL -> null, no throw");
 assertEq(pbpWebdavOrigin(""), null, "empty -> null");
+assertEq(pbpWebdavOrigin("https://user:pass@dav.example.com/backups/"), null, "embedded credentials are rejected");
+assertEq(pbpWebdavOrigin("http://localhost:8080/dav/"), "http://localhost:8080/*", "literal localhost HTTP is allowed");
+assertEq(pbpWebdavOrigin("http://127.0.0.1:8080/dav/"), "http://127.0.0.1:8080/*", "literal IPv4 loopback HTTP is allowed");
+assertEq(pbpWebdavOrigin("http://[::1]:8080/dav/"), "http://[::1]:8080/*", "literal IPv6 loopback HTTP is allowed");
+assertEq(pbpWebdavOrigin("http://192.168.1.2/dav/"), null, "LAN HTTP is rejected");
+assertEq(pbpWebdavOrigin("http://127.1/dav/"), null, "alternate loopback spelling is rejected");
+assertEq(pbpWebdavOrigin("ftp://dav.example.com/"), null, "non-HTTP scheme is rejected");
 
 section("pbpWebdavBuildPayload — zero secrets (spec invariant #1)");
 {
@@ -156,6 +163,40 @@ section("pbpWebdavBuildRequest");
 }
 
 async function runChromeLayerTests() {
+  section("WebDAV endpoint gate — zero fetch");
+  const realFetch0 = globalThis.fetch;
+  const realChrome0 = globalThis.chrome;
+  let insecureFetches = 0, insecurePermissionChecks = 0;
+  const persisted = { webdavUrl: "https://saved.example/dav/", webdavAutoPush: "daily" };
+  globalThis.chrome = {
+    permissions: { contains: async () => { insecurePermissionChecks++; return true; } },
+    storage: { local: { set: async (data) => { Object.assign(persisted, data); } } },
+  };
+  globalThis.fetch = async () => { insecureFetches++; throw new Error("must not fetch"); };
+  try {
+    const cfg = { baseUrl: "http://192.168.1.2/dav/", user: "", pass: "" };
+    const ensured = await pbpWebdavEnsureCollection(cfg);
+    check("collection probe rejects insecure endpoint", !ensured.ok && ensured.error === "insecure");
+    const writable = await pbpWebdavProbeWritable(cfg);
+    check("write probe rejects insecure endpoint", !writable.ok && writable.error === "insecure");
+    const pushed = await pbpWebdavPush(cfg);
+    check("push rejects insecure endpoint", !pushed.ok && pushed.error === "insecure");
+    check("insecure push persists its failure status", persisted.webdavLastPush?.error === "insecure" && persisted.webdavLastPush.ts === pushed.ts);
+    check("insecure push preserves WebDAV configuration", persisted.webdavUrl === "https://saved.example/dav/" && persisted.webdavAutoPush === "daily");
+    const pulled = await pbpWebdavPull(cfg);
+    check("pull rejects insecure endpoint", !pulled.ok && pulled.error === "insecure");
+    const tested = await pbpWebdavTest(cfg);
+    check("test rejects insecure endpoint", !tested.ok && tested.kind === "insecure");
+    check("insecure WebDAV paths make zero permission checks", insecurePermissionChecks === 0);
+    globalThis.chrome = { permissions: { contains: async () => { throw new Error("API unavailable"); } } };
+    const denied = await pbpWebdavPull({ baseUrl: "https://dav.example.com/dav/", user: "", pass: "" });
+    check("permission-check failure blocks WebDAV before fetch", !denied.ok && denied.error === "perm");
+    check("all insecure WebDAV paths make zero fetches", insecureFetches === 0, "fetches=" + insecureFetches);
+  } finally {
+    globalThis.fetch = realFetch0;
+    globalThis.chrome = realChrome0;
+  }
+
   section("pbpWebdavPush — live includeHighlights override");
   const prevChrome = globalThis.chrome;
   const prevFetch = globalThis.fetch;
@@ -169,6 +210,7 @@ async function runChromeLayerTests() {
   });
   const puts = [];
   const pushMethods = [];
+  const pushRedirects = [];
   function storageGet(keys) {
     if (keys === null) return Promise.resolve(Object.assign({}, localArea));
     if (Array.isArray(keys)) {
@@ -200,12 +242,14 @@ async function runChromeLayerTests() {
     };
     globalThis.fetch = (_url, opts) => {
       pushMethods.push(opts.method);
+      pushRedirects.push(opts.redirect);
       if (opts.method === "PUT") puts.push(JSON.parse(opts.body));
       return Promise.resolve({ ok: true, status: opts.method === "PROPFIND" ? 207 : 200 });
     };
     const res = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: false });
     check("push succeeds under stubbed chrome/fetch", res.ok === true);
     check("push verifies the collection before PUT", pushMethods[0] === "PROPFIND" && pushMethods[1] === "PUT");
+    check("WebDAV fetches reject redirects", pushRedirects.length === 2 && pushRedirects.every((mode) => mode === "error"));
     check("live includeHighlights=false omits _highlights despite stale stored true",
       puts[0] && !("_highlights" in puts[0]));
     check("live includeHighlights=false is serialized into pushed settings",

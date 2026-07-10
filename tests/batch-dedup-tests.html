@@ -31,9 +31,16 @@ function equal(actual, expected, message) {
 }
 
 let popupBatchSource;
+let popupBatchPermissionSource;
+let popupBatchSetupSource;
+
+async function getPopupBatchSource() {
+  return (await (await fetch("../popup-batch.js")).text());
+}
+
 async function getPopupBatchProgressSource() {
   if (popupBatchSource) return popupBatchSource;
-  const source = await (await fetch("../popup-batch.js")).text();
+  const source = await getPopupBatchSource();
   const start = source.indexOf("function renderBatchProgress");
   const end = source.indexOf("// ---- Tag Presets ----", start);
   assert(start >= 0 && end > start, "batch progress source block not found");
@@ -41,11 +48,45 @@ async function getPopupBatchProgressSource() {
   return popupBatchSource;
 }
 
+async function getPopupBatchPermissionSource() {
+  if (popupBatchPermissionSource) return popupBatchPermissionSource;
+  const source = await getPopupBatchSource();
+  const start = source.indexOf("function batchAiPermissionOrigins");
+  const end = source.indexOf("function showBatchAiPermission", start);
+  assert(start >= 0 && end > start, "batch permission source block not found");
+  popupBatchPermissionSource = source.slice(start, end);
+  return popupBatchPermissionSource;
+}
+
+async function getPopupBatchSetupSource() {
+  if (popupBatchSetupSource) return popupBatchSetupSource;
+  const source = await getPopupBatchSource();
+  const start = source.indexOf("let batchAiPermissionPending");
+  const end = source.indexOf("// ---- Background batch progress", start);
+  assert(start >= 0 && end > start, "batch setup source block not found");
+  popupBatchSetupSource = source.slice(start, end);
+  return popupBatchSetupSource;
+}
+
+async function createPermissionHarness(providerOrigin = "https://api.example/*") {
+  const source = await getPopupBatchPermissionSource();
+  const factory = new Function(
+    "_aiTargetOriginPattern", "t",
+    source + "\nreturn { batchAiPermissionOrigins, batchAiPermissionRows };"
+  );
+  return factory(
+    () => providerOrigin,
+    (key, ...args) => key + ":" + args.join("|")
+  );
+}
+
 function fakeElement() {
   const classes = new Set(["hidden"]);
   return {
     disabled: false,
     innerHTML: "",
+    textContent: "",
+    children: [],
     style: {},
     attributes: {},
     classList: {
@@ -54,6 +95,97 @@ function fakeElement() {
       contains: (name) => classes.has(name),
     },
     setAttribute(name, value) { this.attributes[name] = value; },
+    replaceChildren(...children) { this.children = children; },
+    focus() { this.focused = true; },
+  };
+}
+
+function fakeButton() {
+  const el = fakeElement();
+  el.handlers = {};
+  el.addEventListener = (type, handler) => { el.handlers[type] = handler; };
+  return el;
+}
+
+async function createBatchClickHarness({ ai = true, contains = false, request = true, tabs } = {}) {
+  const elements = {
+    "save-tabset-btn": fakeButton(),
+    "batch-bookmark-btn": fakeButton(),
+    "batch-progress": fakeElement(),
+    "batch-permission": fakeElement(),
+    "batch-permission-title": fakeElement(),
+    "batch-permission-list": fakeElement(),
+    "batch-permission-grant": fakeButton(),
+    "batch-permission-cancel": fakeButton(),
+  };
+  tabs = tabs || [
+    { id: 1, title: "A", url: "https://one.example/a", incognito: false },
+    { id: 2, title: "B", url: "https://two.example/b", incognito: false },
+  ];
+  const state = { request };
+  const calls = { contains: [], request: [], messages: [], statuses: [], writes: 0, order: [] };
+  const chromeStub = {
+    storage: {
+      local: {
+        get: async () => ({ batch_progress: null }),
+        set: async () => { calls.writes++; },
+      },
+    },
+    tabs: { query: async () => tabs },
+    permissions: {
+      contains: async (query) => { calls.contains.push(query); return contains; },
+      request: async (query) => {
+        calls.request.push(query);
+        calls.order.push("request");
+        if (state.request instanceof Error) throw state.request;
+        return state.request;
+      },
+    },
+    runtime: {
+      lastError: null,
+      sendMessage: async (message) => {
+        calls.messages.push(message);
+        calls.order.push("send");
+        if (calls.failSend) throw new Error("dispatch failed");
+        return { status: "started" };
+      },
+    },
+  };
+  const source = await getPopupBatchSetupSource();
+  const factory = new Function(
+    "$id", "t", "setBtnIcon", "chrome", "showStatus", "batchIsRunning",
+    "BATCH_STALE_TTL", "getSettingsStorage", "pbpApplySecretOverlay",
+    "deobfuscateKey", "settings", "hasAIKey", "wireBatchProgress", "setTimeout",
+    "_aiTargetOriginPattern", "document",
+    source + "\nreturn { setupTabSet, getPending: () => batchAiPermissionPending };"
+  );
+  const api = factory(
+    (id) => elements[id] || null,
+    (key, ...args) => args.length ? key + ":" + args.join(":") : key,
+    (button, _icon, label) => { button.label = label; },
+    chromeStub,
+    (id, message, kind) => calls.statuses.push({ id, message, kind }),
+    () => false,
+    BATCH_STALE_TTL,
+    async () => ({ get: async () => ({ pinboardToken: "token" }) }),
+    async (value) => value,
+    (value) => value,
+    { aiProvider: "openai", batchAiTags: ai, batchAiSummary: false },
+    () => true,
+    () => {},
+    () => 0,
+    () => "https://api.example/*",
+    document
+  );
+  api.setupTabSet();
+  return {
+    ...api,
+    elements,
+    calls,
+    setRequest: (value) => { state.request = value; },
+    click: () => elements["batch-bookmark-btn"].handlers.click(),
+    grant: () => elements["batch-permission-grant"].handlers.click(),
+    cancel: () => elements["batch-permission-cancel"].handlers.click(),
   };
 }
 
@@ -93,6 +225,166 @@ async function createUiHarness(storedProgress, now) {
 }
 
 (async () => {
+  await test("Batch AI origins are exact, deduplicated, and include the provider", async () => {
+    const h = await createPermissionHarness();
+    const origins = h.batchAiPermissionOrigins([
+      { url: "https://one.example/a" },
+      { url: "https://one.example/b" },
+      { url: "http://two.example:8080/c" },
+    ], {});
+    equal(origins.join(","), "https://one.example/*,http://two.example:8080/*,https://api.example/*");
+  });
+
+  await test("permission rows disclose every origin and name the AI provider", async () => {
+    const h = await createPermissionHarness();
+    const origins = Array.from({ length: 12 }, (_, i) => "https://site-" + (i + 1) + ".example/*");
+    origins.push("https://api.example/*");
+    const rows = h.batchAiPermissionRows(origins, { aiProvider: "openai" });
+    equal(rows.length, 13, "full list was truncated");
+    assert(rows[10].includes("site-11.example"), "eleventh site missing");
+    assert(rows[12].includes("provOpenai") && rows[12].includes("https://api.example"), "provider is not named");
+  });
+
+  await test("first AI click snapshots tabs and origins without requesting or starting", async () => {
+    const h = await createBatchClickHarness();
+    await h.click();
+    equal(h.calls.request.length, 0);
+    equal(h.calls.messages.length, 0);
+    equal(h.getPending().tabs.length, 2);
+    equal(h.getPending().origins.join(","), "https://one.example/*,https://two.example/*,https://api.example/*");
+    equal(h.elements["batch-bookmark-btn"].disabled, true);
+  });
+
+  await test("inline disclosure renders full count, list, provider, and focuses Grant", async () => {
+    const tabs = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, url: `https://site-${i + 1}.example/page` }));
+    const h = await createBatchClickHarness({ tabs });
+    await h.click();
+    equal(h.elements["batch-permission-title"].textContent, "batchPermConfirm:13");
+    equal(h.elements["batch-permission-list"].children.length, 13);
+    assert(h.elements["batch-permission-list"].children[10].textContent.includes("site-11.example"), "full list missing site 11");
+    assert(h.elements["batch-permission-list"].children[12].textContent.includes("openai"), "provider row is unnamed");
+    equal(h.elements["batch-permission"].classList.contains("hidden"), false);
+    equal(h.elements["batch-permission-grant"].focused, true);
+  });
+
+  await test("already-granted exact origins start directly without showing disclosure", async () => {
+    const h = await createBatchClickHarness({ contains: true });
+    await h.click();
+    equal(h.calls.contains.length, 1);
+    equal(h.calls.request.length, 0);
+    equal(h.calls.messages.length, 1);
+    equal(h.elements["batch-permission"].classList.contains("hidden"), true);
+  });
+
+  await test("Batch without AI starts with zero permission work", async () => {
+    const h = await createBatchClickHarness({ ai: false });
+    await h.click();
+    equal(h.calls.contains.length, 0);
+    equal(h.calls.request.length, 0);
+    equal(h.calls.messages.length, 1);
+    equal(h.calls.messages[0].action, "startBatchSave");
+  });
+
+  await test("Grant requests exact origins before starting Batch", async () => {
+    const h = await createBatchClickHarness();
+    await h.click();
+    await h.grant();
+    equal(h.calls.request.length, 1);
+    equal(h.calls.request[0].origins.join(","), "https://one.example/*,https://two.example/*,https://api.example/*");
+    equal(h.calls.order.slice(-2).join(","), "request,send");
+    equal(h.calls.messages.length, 1);
+    equal(h.getPending(), null);
+    equal(h.elements["batch-progress"].focused, true);
+  });
+
+  await test("permission denial starts nothing, writes nothing, and allows explicit retry", async () => {
+    const h = await createBatchClickHarness({ request: false });
+    await h.click();
+    await h.grant();
+    equal(h.calls.request.length, 1);
+    equal(h.calls.messages.length, 0);
+    equal(h.calls.writes, 0);
+    equal(h.elements["batch-permission"].classList.contains("hidden"), false);
+    equal(h.elements["batch-permission-grant"].disabled, false);
+    h.setRequest(true);
+    await h.grant();
+    equal(h.calls.request.length, 2);
+    equal(h.calls.messages.length, 1);
+  });
+
+  await test("permission exception starts nothing, writes nothing, and allows explicit retry", async () => {
+    const h = await createBatchClickHarness({ request: new Error("permission failed") });
+    await h.click();
+    await h.grant();
+    equal(h.calls.messages.length, 0);
+    equal(h.calls.writes, 0);
+    equal(h.elements["batch-permission"].classList.contains("hidden"), false);
+    equal(h.elements["batch-permission-grant"].disabled, false);
+    h.setRequest(true);
+    await h.grant();
+    equal(h.calls.messages.length, 1);
+  });
+
+  await test("post-grant dispatch failure restores focus to Batch", async () => {
+    const h = await createBatchClickHarness();
+    h.calls.failSend = true;
+    await h.click();
+    await h.grant();
+    equal(h.elements["batch-bookmark-btn"].disabled, false);
+    equal(h.elements["batch-bookmark-btn"].focused, true);
+  });
+
+  await test("Cancel clears the in-memory snapshot and restores the Batch control", async () => {
+    const h = await createBatchClickHarness();
+    await h.click();
+    h.cancel();
+    equal(h.getPending(), null);
+    equal(h.calls.request.length, 0);
+    equal(h.calls.messages.length, 0);
+    equal(h.elements["batch-bookmark-btn"].disabled, false);
+    equal(h.elements["batch-permission"].classList.contains("hidden"), true);
+    equal(h.elements["batch-bookmark-btn"].focused, true);
+  });
+
+  await test("Grant sends the saved tab snapshot, not later tab mutations", async () => {
+    const tabs = [{ id: 1, title: "A", url: "https://one.example/original", incognito: false }];
+    const h = await createBatchClickHarness({ tabs });
+    await h.click();
+    tabs[0].url = "https://changed.example/later";
+    await h.grant();
+    equal(h.calls.messages.length, 1);
+    equal(h.calls.messages[0].tabs[0].url, "https://one.example/original");
+  });
+
+  await test("Batch permission source has no native confirm, truncation, or all-sites wildcard", async () => {
+    const source = await getPopupBatchSource();
+    assert(!source.includes("confirm("), "native confirm remains");
+    assert(!source.includes("BATCH_PERMISSION_DISCLOSE_LIMIT"), "disclosure is still capped");
+    assert(!source.includes("batchPermMore"), "hidden-origin copy remains");
+    assert(!source.includes("*://*/*"), "popup-batch.js still contains all-sites wildcard");
+    const start = source.indexOf('grantBtn?.addEventListener("click", async () =>');
+    const end = source.indexOf('cancelBtn?.addEventListener', start);
+    const handler = source.slice(start, end);
+    equal(handler.indexOf("await chrome.permissions.request"), handler.indexOf("await "), "permission request is not Grant's first await");
+    assert(handler.indexOf("await chrome.permissions.request") < handler.indexOf("await dispatchBatchSave"), "Batch starts before permission grant");
+  });
+
+  await test("permission disclosure markup is semantic and fully keyboard operable", async () => {
+    const html = await (await fetch("../popup.html")).text();
+    const css = await (await fetch("../popup.css")).text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const panel = doc.getElementById("batch-permission");
+    const progress = doc.getElementById("batch-progress");
+    assert(panel?.tagName === "SECTION", "disclosure is not a section");
+    equal(panel.getAttribute("aria-labelledby"), "batch-permission-title");
+    assert(doc.getElementById("batch-permission-list")?.tagName === "UL", "origins are not a semantic list");
+    equal(progress?.getAttribute("tabindex"), "-1", "progress cannot receive focus after Grant");
+    for (const id of ["batch-permission-grant", "batch-permission-cancel"]) {
+      equal(doc.getElementById(id)?.getAttribute("type"), "button", id + " is not a real button");
+    }
+    assert(/\.batch-permission-list\s*\{[\s\S]*?max-height:\s*92px;[\s\S]*?overflow:\s*auto;/.test(css), "full list is not scrollable");
+  });
+
   await test("running + fresh ts -> true", () => {
     equal(batchIsRunning({ running: true, done: false, ts: 1000 }, 1500, 120000), true);
   });

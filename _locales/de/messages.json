@@ -299,12 +299,15 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "Kein Zugriff auf $HOST$ — in Einstellungen > KI auf die Schaltfläche „Test“ klicken, um den Zugriff zu erlauben",
+    "message": "Kein Zugriff auf $HOST$ — Zugriff erlauben und erneut versuchen.",
     "placeholders": {
       "host": {
         "content": "$1"
       }
     }
+  },
+  "aiGrantRetry": {
+    "message": "Erlauben und erneut versuchen"
   },
   "aiErrorModelNotFoundHint": {
     "message": "Öffnen Sie Einstellungen > KI und wählen Sie ein verfügbares Modell"
@@ -668,6 +671,14 @@
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" gespeichert.",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "bgTitleSavedAiSkipped": {
+    "message": "\"$TITLE$\" gespeichert. KI wurde nicht ausgeführt; Zugriff unter Einstellungen > KI > Test erlauben.",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -1062,10 +1073,26 @@
     "message": "Bereits gespeicherte URLs überspringen"
   },
   "batchAiHint": {
-    "message": "AI-Funktionen sind langsam (separater AI-Aufruf pro Tab + 3s Wartezeit). Erfordert die Berechtigung 'Zugriff auf alle Websites' zum Lesen nicht aktiver Tabs — wird bei der ersten Nutzung angefordert."
+    "message": "KI führt einen Aufruf pro Tab aus und kann langsam sein. Beim ersten Einsatz fragt Batch nur nach den aufgelisteten Tab-Websites und dem aktuellen KI-Anbieter."
   },
   "batchPermDenied": {
-    "message": "Berechtigung verweigert — AI-Funktionen benötigen Zugriff auf alle Websites, um Tab-Inhalte zu lesen."
+    "message": "Die aufgelisteten Website-Berechtigungen wurden nicht erteilt. Batch-KI wurde nicht gestartet."
+  },
+  "batchPermConfirm": {
+    "message": "Batch-KI benötigt für diesen Lauf Zugriff auf diese $COUNT$ Websites:",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchPermProvider": {
+    "message": "$PROVIDER$ (KI-Anbieter): $ORIGIN$",
+    "placeholders": {
+      "provider": { "content": "$1" },
+      "origin": { "content": "$2" }
+    }
+  },
+  "batchPermGrant": {
+    "message": "Zugriff erlauben und starten"
   },
   "secAiProvider": {
     "message": "AI Anbieter"
@@ -1860,13 +1887,13 @@
     "message": "API-Schlüssel werden verschleiert (nicht verschlüsselt) und über chrome.storage.sync synchronisiert. Teilen Sie Ihre Einstellungs-Exportdateien nicht."
   },
   "batchPermLabel": {
-    "message": "Host-Berechtigungen:"
+    "message": "Veraltete Berechtigung für alle Websites:"
   },
   "batchRevokeBtn": {
-    "message": "Zugriff auf alle Websites widerrufen"
+    "message": "Veralteten Zugriff auf alle Websites widerrufen"
   },
   "batchRevokeHint": {
-    "message": "Nur erforderlich, wenn Sie die KI-Massenextraktion aktiviert haben, aber die Erweiterung nicht mehr auf alle Seiten zugreifen soll."
+    "message": "Ältere Versionen konnten Zugriff auf jede Website gewähren. Neue Batch-Läufe fragen nur nach den aufgelisteten Websites; diese Schaltfläche entfernt die alte breite Berechtigung."
   },
   "batchRevokeSuccess": {
     "message": "Widerrufen"
@@ -1875,7 +1902,7 @@
     "message": "widerrufen"
   },
   "batchPermNone": {
-    "message": "Derzeit ist kein Zugriff auf alle Websites gewährt"
+    "message": "Kein veralteter Zugriff auf alle Websites gewährt"
   },
   "batchRevokeFailed": {
     "message": "Fehlgeschlagen"
@@ -2231,7 +2258,7 @@
     "message": "Vorschauseite KI"
   },
   "previewAiSectionHint": {
-    "message": "Erklärung von Auswahlen, Seitenbefragung und Volltext-Übersetzung auf der Markdown-Vorschauseite. Verwendet den oben konfigurierten KI-Anbieter und -Schlüssel; jede Anfrage wird vom Benutzer ausgelöst, nichts läuft im Hintergrund."
+    "message": "Auswahl erklären, Seite fragen und Volltextübersetzung in der Markdown-Vorschau werden vom Benutzer aufgerufen und verwenden den oben konfigurierten KI-Anbieter und -Schlüssel. Wenn der optionale Schnellüberblick über die wichtigsten Punkte aktiviert ist, kann er beim Öffnen der Markdown-Vorschau ausgeführt werden; nichts läuft als verborgene Hintergrundaufgabe."
   },
   "previewAiEnabled": {
     "message": "KI-Funktionen auf der Vorschauseite aktivieren"
@@ -2578,7 +2605,7 @@
     "message": "Sendet ein JSON-Payload {title, url, date, tags, markdown} per POST an deinen Endpunkt. Ein von dir gesetzter Authorization-Wert wird unverändert gesendet (z. B. Bearer <token> oder Token <key>), sodass jedes Auth-Schema funktioniert. Für n8n, Make, Zapier, Readwise oder jeden selbst gehosteten Empfänger — hier ist kein Konto nötig."
   },
   "mdTargetWebhookHttpWarn": {
-    "message": "Dieser Endpunkt verwendet HTTP statt HTTPS – der Authorization-Wert wird im Klartext gesendet. Für localhost/LAN unbedenklich; im öffentlichen Internet vermeiden."
+    "message": "Blockiert: Verwenden Sie HTTPS oder HTTP nur für localhost, 127.0.0.1 oder [::1]. LAN-/öffentliches HTTP, ungültige URLs und URLs mit Zugangsdaten werden nicht gesendet."
   },
   "hlColorQuote": { "message": "Zitat" },
   "hlColorDefinition": { "message": "Begriffsdefinition" },

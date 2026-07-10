@@ -8,7 +8,10 @@ body { font-family: monospace; padding: 16px; max-width: 900px; }
 <body>
 <h1>isStaleCacheEntry() tests</h1>
 <div id="results"></div>
+<script src="../i18n.js"></script>
 <script src="../shared.js"></script>
+<script src="../ai.js"></script>
+<script src="../jina.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -45,8 +48,80 @@ check("save coercion keeps 0 as 0 (not 60)", coerce("0") === 0);
 check("save coercion keeps blank as 60", coerce("") === 60);
 check("save coercion clamps 99999 to 10080", coerce("99999") === 10080);
 
-const summary = document.createElement("h2");
-summary.textContent = `Results: ${pass} pass, ${fail} fail`;
-root.insertBefore(summary, root.firstChild);
+async function acheck(name, fn) {
+  try { await fn(); check(name, true); }
+  catch (e) { console.error(name, e); check(name, false); }
+}
+
+(async function () {
+  const realChrome = window.chrome;
+  const realFetch = window.fetch;
+  try {
+    await acheck("Jina cache hit needs neither permission check nor fetch", async () => {
+      let checks = 0, fetches = 0;
+      const url = "https://example.com/cached";
+      const key = `jina_md_${url}`;
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: { local: { get: async () => ({ [key]: { result: { markdown: "cached" }, timestamp: Date.now() } }) } },
+        permissions: { contains: async () => { checks++; return false; } },
+      };
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      const result = await fetchJinaMarkdown(url, { cacheDuration: 60 });
+      if (!result.fromCache || result.markdown !== "cached" || checks !== 0 || fetches !== 0) throw new Error("cache-first contract failed");
+    });
+
+    await acheck("Jina cache miss checks exact permission before one fetch", async () => {
+      let checked = null, fetches = 0;
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        storage: { local: { get: async () => ({}) } },
+        permissions: { contains: async (spec) => { checked = spec.origins; return true; } },
+      };
+      window.fetch = async () => {
+        fetches++;
+        return { ok: true, json: async () => ({ data: { content: "fresh", url: "https://example.com/fresh" } }) };
+      };
+      const result = await fetchJinaMarkdown("https://example.com/fresh", { cacheDuration: 0 });
+      if (checked?.[0] !== PBP_JINA_ORIGIN_PATTERN || fetches !== 1 || result.fromCache || result.markdown !== "fresh") throw new Error("miss gate failed");
+    });
+
+    await acheck("Jina false, throwing, or missing permission state returns host_permission with zero fetch", async () => {
+      let fetches = 0;
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      for (const mode of ["false", "throw", "missing"]) {
+        const permissions = mode === "missing" ? {} : { contains: async () => {
+          if (mode === "throw") throw new Error("unavailable");
+          return false;
+        } };
+        window.chrome = {
+          runtime: { id: "test-extension" },
+          storage: { local: { get: async () => ({}) } },
+          permissions,
+        };
+        const result = await fetchJinaMarkdown("https://example.com/denied", { cacheDuration: 0 });
+        if (result.error !== "host_permission" || result.code !== "host_permission") throw new Error(mode + ": wrong result");
+      }
+      if (fetches !== 0) throw new Error("permission failure fetched");
+    });
+
+    await acheck("non-extension test context can exercise a Jina cache miss", async () => {
+      let fetches = 0;
+      window.chrome = { storage: { local: { get: async () => ({}) } } };
+      window.fetch = async () => {
+        fetches++;
+        return { ok: true, json: async () => ({ data: { content: "test" } }) };
+      };
+      const result = await fetchJinaMarkdown("https://example.com/test", { cacheDuration: 0 });
+      if (result.error || result.markdown !== "test" || fetches !== 1) throw new Error("non-extension compatibility failed");
+    });
+  } finally {
+    window.chrome = realChrome;
+    window.fetch = realFetch;
+    const summary = document.createElement("h2");
+    summary.textContent = `Results: ${pass} pass, ${fail} fail`;
+    root.insertBefore(summary, root.firstChild);
+  }
+})();
 </script>
 </body></html>

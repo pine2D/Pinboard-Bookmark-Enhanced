@@ -2,6 +2,67 @@
 // Pinboard Bookmark Enhanced - Tab Set, Batch Save & Tag Presets
 // ============================================================
 
+let batchAiPermissionPending = null;
+
+function batchAiPermissionOrigins(validTabs, s) {
+  const origins = validTabs.map(tab => new URL(tab.url).origin + "/*");
+  const providerOrigin = _aiTargetOriginPattern(s);
+  if (providerOrigin) origins.push(providerOrigin);
+  return [...new Set(origins)];
+}
+
+function batchAiPermissionRows(origins, s) {
+  const providerOrigin = _aiTargetOriginPattern(s);
+  const provider = s.aiProvider || "gemini";
+  const providerKey = "prov" + provider[0].toUpperCase() + provider.slice(1);
+  const translated = t(providerKey);
+  const providerName = translated === providerKey ? provider : translated;
+  return origins.map(pattern => {
+    const origin = pattern.replace(/\/\*$/, "");
+    return pattern === providerOrigin ? t("batchPermProvider", providerName, origin) : origin;
+  });
+}
+
+function showBatchAiPermission(origins, s) {
+  const panel = $id("batch-permission");
+  const title = $id("batch-permission-title");
+  const list = $id("batch-permission-list");
+  if (!panel || !title || !list) return;
+  title.textContent = t("batchPermConfirm", String(origins.length));
+  list.replaceChildren(...batchAiPermissionRows(origins, s).map(text => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    return item;
+  }));
+  panel.classList.remove("hidden");
+  $id("batch-permission-grant")?.focus();
+}
+
+function hideBatchAiPermission() {
+  $id("batch-permission")?.classList.add("hidden");
+  const grant = $id("batch-permission-grant");
+  const cancel = $id("batch-permission-cancel");
+  if (grant) grant.disabled = false;
+  if (cancel) cancel.disabled = false;
+}
+
+function restoreBatchButton(batchBtn) {
+  setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
+  batchBtn.disabled = false;
+}
+
+async function dispatchBatchSave(snapshot, batchBtn) {
+  const resp = await chrome.runtime.sendMessage({ action: "startBatchSave", tabs: snapshot });
+  if (resp && resp.status === "busy") {
+    showStatus("status-msg", t("batchRunningBg"), "success");
+    restoreBatchButton(batchBtn);
+    return;
+  }
+  const progress = $id("batch-progress");
+  if (progress) progress.classList.remove("hidden");
+  setBtnIcon(batchBtn, "pin", t("batchProgress", "0", String(snapshot.length), "0", "0"));
+}
+
 // ---- Tab Set & Batch Bookmark Save ----
 function setupTabSet() {
   const btn = $id("save-tabset-btn");
@@ -58,6 +119,48 @@ function setupTabSet() {
 
   const batchBtn = $id("batch-bookmark-btn");
   if (!batchBtn) return;
+  const grantBtn = $id("batch-permission-grant");
+  const cancelBtn = $id("batch-permission-cancel");
+
+  grantBtn?.addEventListener("click", async () => {
+    const pending = batchAiPermissionPending;
+    if (!pending) return;
+    grantBtn.disabled = true;
+    if (cancelBtn) cancelBtn.disabled = true;
+    try {
+      const granted = await chrome.permissions.request({ origins: pending.origins });
+      if (!granted) {
+        showStatus("status-msg", t("batchPermDenied"), "error");
+        grantBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
+        return;
+      }
+      batchAiPermissionPending = null;
+      hideBatchAiPermission();
+      await dispatchBatchSave(pending.tabs, batchBtn);
+      const progress = $id("batch-progress");
+      if (progress && !progress.classList.contains("hidden")) progress.focus();
+      else batchBtn.focus();
+    } catch (e) {
+      showStatus("status-msg", t("batchFailed", e.message), "error");
+      grantBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+      if (!batchAiPermissionPending) {
+        const progress = $id("batch-progress");
+        if (progress) progress.classList.add("hidden");
+        restoreBatchButton(batchBtn);
+        batchBtn.focus();
+      }
+    }
+  });
+
+  cancelBtn?.addEventListener("click", () => {
+    batchAiPermissionPending = null;
+    hideBatchAiPermission();
+    restoreBatchButton(batchBtn);
+    batchBtn.focus();
+  });
+
   batchBtn.addEventListener("click", async () => {
     // Re-entry guard: a batch may already be running in the background (popup closed/reopened).
     try {
@@ -90,39 +193,17 @@ function setupTabSet() {
 
       const useAiTags = settings.batchAiTags && hasAIKey(settings);
       const useAiSummary = settings.batchAiSummary && hasAIKey(settings);
-      // Host permission for non-active-tab extraction MUST be requested here (user gesture);
-      // once granted it persists and the SW can use it for background-tab scripting.
+      const snapshot = validTabs.map(tab => ({ id: tab.id, title: tab.title || tab.url, url: tab.url, incognito: !!tab.incognito }));
       if (useAiTags || useAiSummary) {
-        const hasPermission = await chrome.permissions.contains({ origins: ["*://*/*"] });
-        if (!hasPermission) {
-          const granted = await chrome.permissions.request({ origins: ["*://*/*"] });
-          if (!granted) {
-            showStatus("status-msg", t("batchPermDenied"), "error");
-            setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
-            return;
-          }
+        const origins = batchAiPermissionOrigins(validTabs, settings);
+        if (!(await chrome.permissions.contains({ origins }))) {
+          batchAiPermissionPending = { tabs: snapshot, origins };
+          showBatchAiPermission(origins, settings);
+          setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
+          return;
         }
       }
-
-      // Snapshot tabs and hand off to the SW; the loop now runs in the background.
-      const snapshot = validTabs.map(tab => ({ id: tab.id, title: tab.title || tab.url, url: tab.url, incognito: !!tab.incognito }));
-      // No .catch here: a sendMessage rejection (dead SW channel) must propagate to
-      // the outer catch so the button is re-enabled and the progress bar hidden —
-      // swallowing it to null would leave the UI stuck disabled until popup close.
-      const resp = await chrome.runtime.sendMessage({ action: "startBatchSave", tabs: snapshot });
-      if (resp && resp.status === "busy") {
-        // A batch started between our re-entry check and this dispatch; don't start a
-        // second one. Re-enable our button — the running batch's heartbeat will drive
-        // the progress UI via wireBatchProgress.
-        showStatus("status-msg", t("batchRunningBg"), "success");
-        setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
-        batchBtn.disabled = false;
-        return;
-      }
-      const progress = $id("batch-progress");
-      if (progress) progress.classList.remove("hidden");
-      setBtnIcon(batchBtn, "pin", t("batchProgress", "0", String(snapshot.length), "0", "0"));
-      // From here, renderBatchProgress (wired via storage.onChanged) drives the UI.
+      await dispatchBatchSave(snapshot, batchBtn);
     } catch (e) {
       showStatus("status-msg", t("batchFailed", e.message), "error");
       const progress = $id("batch-progress");

@@ -478,6 +478,19 @@ function pbpAiResolveModelOverride(s) {
   return m || undefined;
 }
 
+// A permission prompt is only legal from a real user gesture. Error UIs call this
+// directly from their existing Retry/Regenerate click; the callback is untouched
+// until the exact provider origin is granted, so denial leaves state and caches alone.
+async function pbpAiRetryWithPermission(error, settings, retry) {
+  if (error && error.code === "host_permission") {
+    let granted = false;
+    try { granted = await requestAIHostPermissions(settings); } catch (_) {}
+    if (!granted) return false;
+  }
+  await retry();
+  return true;
+}
+
 // ---- IDB persistence: thin wrappers over ai-cache.js (pbpAiCacheGet/Set).
 // ONE aggregated entry per article per (lang, model) so the 200-entry LRU
 // is not flooded by per-block writes. Entry shape: {key, result, ts}.

@@ -133,13 +133,21 @@
       <button id="batch-bookmark-btn" class="qbtn" data-i18n-title="batchSaveTitle"><span class="btn-ic" data-ic="pin"></span><span data-i18n="batchSaveBtn">Batch Save</span></button>
       <button id="jina-md-btn" class="qbtn" title="" data-i18n-title="jinaMarkdownBtn"><span class="btn-ic" data-ic="doc"></span><span class="jina-md-label" data-i18n="jinaMarkdownBtn">Markdown</span></button>
     </div>
+    <section id="batch-permission" class="batch-permission hidden" aria-labelledby="batch-permission-title">
+      <p id="batch-permission-title" class="batch-permission-title"></p>
+      <ul id="batch-permission-list" class="batch-permission-list"></ul>
+      <div class="batch-permission-actions">
+        <button type="button" id="batch-permission-grant" data-i18n="batchPermGrant">Grant access and start</button>
+        <button type="button" id="batch-permission-cancel" data-i18n="cancel">Cancel</button>
+      </div>
+    </section>
     <div id="md-actions-strip" class="md-strip hidden" aria-live="polite">
       <button type="button" id="md-strip-copy" class="md-strip-btn"><span class="btn-ic" data-ic="copy"></span><span data-i18n="mdCopy">Copy</span></button>
       <button type="button" id="md-strip-preview" class="md-strip-btn"><span class="btn-ic" data-ic="eye"></span><span data-i18n="mdStripPreview">Preview</span></button>
       <button type="button" id="md-strip-dl" class="md-strip-btn" aria-label="Download .md" data-i18n-aria="mdStripDownloadMd"><span class="btn-ic" data-ic="download"></span><span data-i18n="mdStripDownloadMd">Download .md</span></button>
       <button type="button" id="md-strip-obsidian" class="md-strip-btn" aria-label="Send to Obsidian" data-i18n-aria="mdStripObsidian"><span class="btn-ic" data-ic="obsidian"></span><span data-i18n="mdStripObsidian">Obsidian</span></button>
     </div>
-    <div id="batch-progress" class="batch-progress hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div id="batch-progress" class="batch-progress hidden" role="progressbar" tabindex="-1" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
       <div id="batch-progress-fill" class="batch-progress-fill"></div>
       <span id="batch-progress-text" class="batch-progress-text"></span>
     </div>

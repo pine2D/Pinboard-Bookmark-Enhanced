@@ -299,12 +299,15 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "No access to $HOST$ — open Settings > AI and click Test to grant it",
+    "message": "No access to $HOST$ — grant access and retry.",
     "placeholders": {
       "host": {
         "content": "$1"
       }
     }
+  },
+  "aiGrantRetry": {
+    "message": "Grant and retry"
   },
   "aiErrorModelNotFoundHint": {
     "message": "Visit Settings > AI to select an available model"
@@ -668,6 +671,14 @@
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" saved.",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "bgTitleSavedAiSkipped": {
+    "message": "\"$TITLE$\" saved. AI did not run; grant access via Settings > AI > Test.",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -1062,10 +1073,26 @@
     "message": "Skip already bookmarked URLs"
   },
   "batchAiHint": {
-    "message": "AI features will be slow (separate AI call per tab + 3s rate limit). Requires \"Access all websites\" permission to read non-active tabs — prompted on first use."
+    "message": "AI runs one call per tab and may be slow. On first use, Batch asks only for the listed tab sites and current AI provider."
   },
   "batchPermDenied": {
-    "message": "Permission denied — AI features need access to all websites to read tab content."
+    "message": "The listed site permissions were not granted. Batch AI was not started."
+  },
+  "batchPermConfirm": {
+    "message": "Batch AI needs access to these $COUNT$ sites for this run:",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchPermProvider": {
+    "message": "$PROVIDER$ (AI provider): $ORIGIN$",
+    "placeholders": {
+      "provider": { "content": "$1" },
+      "origin": { "content": "$2" }
+    }
+  },
+  "batchPermGrant": {
+    "message": "Grant access and start"
   },
   "secAiProvider": {
     "message": "AI Provider"
@@ -1860,13 +1887,13 @@
     "message": "API keys are obfuscated (not encrypted) and sync via chrome.storage.sync. Do not share your settings export files."
   },
   "batchPermLabel": {
-    "message": "Host permissions:"
+    "message": "Legacy all-sites permission:"
   },
   "batchRevokeBtn": {
-    "message": "Revoke all-sites access"
+    "message": "Revoke legacy all-sites access"
   },
   "batchRevokeHint": {
-    "message": "Only needed if you enabled batch AI extraction but no longer want the extension to access all pages for content."
+    "message": "Older versions could grant access to every site. New Batch runs request only the listed sites; this button removes the legacy broad grant."
   },
   "batchRevokeSuccess": {
     "message": "Revoked"
@@ -1875,7 +1902,7 @@
     "message": "revoked"
   },
   "batchPermNone": {
-    "message": "No all-sites access is currently granted"
+    "message": "No legacy all-sites access is granted"
   },
   "batchRevokeFailed": {
     "message": "Failed"
@@ -2231,7 +2258,7 @@
     "message": "Preview Page AI"
   },
   "previewAiSectionHint": {
-    "message": "Explain selection, ask the page, and full-text translation on the Markdown preview page. Uses the AI provider and key configured above; every request is user-invoked, nothing runs in the background."
+    "message": "Explain selection, Ask, and full-text translation on the Markdown preview page are user-invoked and use the AI provider and key configured above. If the opt-in key-points skim is enabled, it may run when Markdown preview opens; nothing runs as a hidden background task."
   },
   "previewAiEnabled": {
     "message": "Enable AI features on the preview page"
@@ -2572,7 +2599,7 @@
     "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. Any Authorization value you set is sent verbatim (e.g. Bearer <token> or Token <key>), so any auth scheme works. For n8n, Make, Zapier, Readwise, or any self-hosted receiver — no account needed here."
   },
   "mdTargetWebhookHttpWarn": {
-    "message": "This endpoint uses HTTP, not HTTPS — the Authorization value is sent in plaintext. Fine for localhost/LAN; avoid on the public internet."
+    "message": "Blocked: use HTTPS, or HTTP only for localhost, 127.0.0.1, or [::1]. LAN/public HTTP, malformed URLs, and URLs containing credentials are not sent."
   },
   "hlColorQuote": { "message": "Quote" },
   "hlColorDefinition": { "message": "Definition" },

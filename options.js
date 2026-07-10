@@ -1,3 +1,38 @@
+function pbpExactOriginPermissionSnapshot(origins) {
+  const exact = [];
+  for (const pattern of Array.isArray(origins) ? origins : []) {
+    try {
+      const url = new URL(pattern);
+      if ((url.protocol === "https:" || url.protocol === "http:") &&
+          url.hostname && !url.hostname.includes("*") &&
+          !url.username && !url.password && url.pathname === "/*" &&
+          !url.search && !url.hash && !exact.includes(pattern)) exact.push(pattern);
+    } catch (_) {}
+  }
+  return exact;
+}
+
+async function pbpRevokeLegacyAllSitesPermission(permissionApi) {
+  const wildcard = "*://*/*";
+  const granted = await permissionApi.getAll();
+  const snapshot = pbpExactOriginPermissionSnapshot(granted && granted.origins);
+  await permissionApi.remove({ origins: [wildcard] });
+  if (snapshot.length) {
+    try { await permissionApi.request({ origins: snapshot }); } catch (_) {}
+  }
+
+  const missing = [];
+  for (const origin of snapshot) {
+    try {
+      if (!(await permissionApi.contains({ origins: [origin] }))) missing.push(origin);
+    } catch (_) { missing.push(origin); }
+  }
+  let wildcardAbsent = false;
+  try { wildcardAbsent = !(await permissionApi.contains({ origins: [wildcard] })); } catch (_) {}
+  if (!wildcardAbsent) missing.push(wildcard);
+  return { ok: wildcardAbsent && missing.length === 0, missing, wildcardAbsent };
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   initI18n();
   applyI18n();
@@ -426,9 +461,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (s.placeholder) inp.placeholder = s.placeholder;
         wrap.appendChild(lab); wrap.appendChild(inp);
         card.appendChild(wrap);
-        // Webhook URL: warn (never block — self-hosted/LAN http is a
-        // legitimate opt-in target) when the Authorization header would ride
-        // in plaintext (audit #31).
+        // Mirror the runtime endpoint policy while the user edits the URL.
         if (id === "webhook" && s.key === "url") {
           const warn = document.createElement("p");
           warn.className = "hint hint-warn";
@@ -474,10 +507,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           try {
             const granted = await chrome.permissions.request({ origins: [row.origin] });
             if (!granted) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestPerm"); return; }
-          } catch (_) {}
+          } catch (_) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestPerm"); return; }
           try {
             const pr = row.precheckRequest({ port }, token);
-            const resp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body });
+            const resp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body, redirect: "error" });
             if (resp.status === 401) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestBadToken"); }
             else if (!resp.ok) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestDown"); }
             else { testStatus.classList.add("ok"); testStatus.textContent = t("mdSendTestOk"); }
@@ -1098,67 +1131,47 @@ document.addEventListener("DOMContentLoaded", async () => {
     e.preventDefault();
     const btn = e.currentTarget;
     const orig = btn.textContent;
+    const statusEl = $id("batch-perm-status");
+    btn.disabled = true;
     try {
-      const revoked = await chrome.permissions.remove({ origins: ["*://*/*"] });
-      if (revoked) {
+      const result = await pbpRevokeLegacyAllSitesPermission(chrome.permissions);
+      if (result.ok) {
         btn.textContent = t("batchRevokeSuccess");
-        if ($id("batch-perm-status")) $id("batch-perm-status").textContent = t("batchPermRevoked");
-        btn.disabled = true;
+        if (statusEl) statusEl.textContent = t("batchPermRevoked");
         setTimeout(() => { btn.textContent = orig; }, 2000);
       } else {
-        if ($id("batch-perm-status")) $id("batch-perm-status").textContent = t("batchPermNone");
-        btn.disabled = true;
+        btn.textContent = t("batchRevokeFailed");
+        if (statusEl) statusEl.textContent = t("batchRevokeFailed") + ": " + result.missing.join(", ");
+        btn.disabled = result.wildcardAbsent;
         setTimeout(() => { btn.textContent = orig; }, 2000);
       }
     } catch (err) {
       console.error("revoke permission failed:", err);
       btn.textContent = t("batchRevokeFailed");
+      if (statusEl) statusEl.textContent = t("batchRevokeFailed") + ": " + ((err && err.message) || "permissions");
+      btn.disabled = false;
       setTimeout(() => { btn.textContent = orig; }, 2000);
     }
   });
 
   // ---- Wayback: check permission on load ----
   (async () => {
-    try {
-      const has = await chrome.permissions.contains({ origins: ["https://web.archive.org/*"] });
-      const statusEl = $id("wayback-perm-status");
-      if (!has && s.waybackArchiveEnabled) {
-        const toggle = $id("opt-wayback-enabled");
-        if (toggle) toggle.checked = false;
-        s.waybackArchiveEnabled = false;
-        try { await (await getSettingsStorage()).set({ waybackArchiveEnabled: false }); } catch (_) {}
-        if (statusEl) statusEl.textContent = t("waybackPermDenied");
-      }
-    } catch (_) {}
+    if (!s.waybackArchiveEnabled) return;
+    let has = false;
+    try { has = await chrome.permissions.contains({ origins: ["https://web.archive.org/*"] }); } catch (_) {}
+    const statusEl = $id("wayback-perm-status");
+    if (!has && statusEl) statusEl.textContent = t("waybackPermDenied");
   })();
 
   // ---- Wayback: toggle permission on opt-wayback-enabled change ----
   $id("opt-wayback-enabled")?.addEventListener("change", async (e) => {
     const enabled = e.target.checked;
     const statusEl = $id("wayback-perm-status");
-    if (enabled) {
-      try {
-        const granted = await chrome.permissions.request({ origins: ["https://web.archive.org/*"] });
-        if (!granted) {
-          e.target.checked = false;
-          // Programmatic .checked changes fire no 'change' event; re-dispatch so the
-          // global auto-save persists the reverted (false) state via the normal path
-          // (which picks the correct storage area). Re-entering this listener is safe:
-          // it only acts when checked === true. Any transient true the debounced save
-          // may have written mid-dialog is overwritten by this final false save.
-          e.target.dispatchEvent(new Event("change", { bubbles: true }));
-          if (statusEl) statusEl.textContent = t("waybackPermDenied");
-          return;
-        }
-        if (statusEl) statusEl.textContent = "";
-      } catch (err) {
-        console.error("wayback permission request failed:", err);
-        e.target.checked = false;
-        // Same re-dispatch as the deny branch — ensures storage reflects false.
-        e.target.dispatchEvent(new Event("change", { bubbles: true }));
-        if (statusEl) statusEl.textContent = t("waybackPermDenied");
-      }
-    }
+    if (!enabled) { if (statusEl) statusEl.textContent = ""; return; }
+    let granted = false;
+    try { granted = await chrome.permissions.request({ origins: ["https://web.archive.org/*"] }); }
+    catch (err) { console.error("wayback permission request failed:", err); }
+    if (statusEl) statusEl.textContent = granted ? "" : t("waybackPermDenied");
   });
 
   // ---- Wayback: clear the archive log (display only; keeps the _waybackAttempts
@@ -1168,10 +1181,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     await renderWaybackLog();
   });
 
-  // ---- WebDAV: http:// advisory warning ----
-  // Reuses pbpWebhookHttpWarn (export-targets.js, already loaded by options.html):
-  // Basic auth also rides the Authorization header, so the same plaintext-
-  // credentials risk applies to a WebDAV URL as to a webhook URL.
+  // ---- WebDAV: blocked endpoint warning ----
+  // Reuse the same form hint as Webhook so both inputs mirror the shared
+  // endpoint acceptance policy.
   (() => {
     const inp = $id("opt-webdav-url");
     const warn = $id("webdav-http-warn");
@@ -1200,29 +1212,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   // safe to call on every click.
   async function _pbpWebdavRequestPermission(baseUrl) {
     const origin = (typeof pbpWebdavOrigin === "function") ? pbpWebdavOrigin(baseUrl) : null;
-    if (!origin) return false;
-    try { return await chrome.permissions.request({ origins: [origin] }); } catch (_) { return false; }
+    if (!origin) return null;
+    try { return (await chrome.permissions.request({ origins: [origin] })) === true; } catch (_) { return false; }
+  }
+
+  function _pbpWebdavPermissionError(granted) {
+    return granted === true ? "" : granted === null ? "mdTargetWebhookHttpWarn" : "webdavPermDenied";
   }
 
   $id("opt-webdav-autopush")?.addEventListener("change", async (e) => {
     if (e.target.value === "off") return;
     const statusEl = $id("webdav-status");
     const cfg = _pbpWebdavCfgFromForm();
-    const fail = (msgKey) => {
-      e.target.value = "off";
-      e.target.dispatchEvent(new Event("change", { bubbles: true }));
-      if (statusEl) {
-        setStatusIcon(statusEl, false, t(msgKey));
-        statusEl.style.color = "#c00";
-      }
-    };
-    if (!cfg.baseUrl || !(typeof pbpWebdavOrigin === "function" && pbpWebdavOrigin(cfg.baseUrl))) {
-      fail("webdavTestUnreachable");
-      return;
-    }
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
-    if (!granted) fail("webdavPermDenied");
-    else if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
+    const errorKey = _pbpWebdavPermissionError(granted);
+    if (errorKey && statusEl) {
+      setStatusIcon(statusEl, false, t(errorKey));
+      statusEl.style.color = "#c00";
+    } else if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
   });
 
   // ---- WebDAV: render the persisted last-push status on page load ----
@@ -1236,6 +1243,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         setStatusIcon(statusEl, true, t("webdavPushOk", when));
       } else if (webdavLastPush.error === "perm") {
         setStatusIcon(statusEl, false, t("webdavPermDenied"));
+      } else if (webdavLastPush.error === "insecure") {
+        setStatusIcon(statusEl, false, t("mdTargetWebhookHttpWarn"));
       } else if (webdavLastPush.error === "not-writable") {
         setStatusIcon(statusEl, false, webdavLastPush.status ? t("webdavPushFail", "http-" + webdavLastPush.status) : t("webdavPushNotWritable"));
       } else if (webdavLastPush.error === "not-found") {
@@ -1250,12 +1259,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("webdav-test-btn")?.addEventListener("click", async () => {
     const statusEl = $id("webdav-status");
     const cfg = _pbpWebdavCfgFromForm();
-    if (!cfg.baseUrl || !statusEl) return;
+    if (!statusEl) return;
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
-    if (!granted) {
-      setStatusIcon(statusEl, false, t("webdavPermDenied"));
+    const errorKey = _pbpWebdavPermissionError(granted);
+    if (errorKey) {
+      setStatusIcon(statusEl, false, t(errorKey));
       statusEl.style.color = "#c00";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       return;
@@ -1274,12 +1284,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("webdav-push-btn")?.addEventListener("click", async () => {
     const statusEl = $id("webdav-status");
     const cfg = _pbpWebdavCfgFromForm();
-    if (!cfg.baseUrl || !statusEl) return;
+    if (!statusEl) return;
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
-    if (!granted) {
-      setStatusIcon(statusEl, false, t("webdavPermDenied"));
+    const errorKey = _pbpWebdavPermissionError(granted);
+    if (errorKey) {
+      setStatusIcon(statusEl, false, t(errorKey));
       statusEl.style.color = "#c00";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       return;
@@ -1302,12 +1313,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("webdav-pull-btn")?.addEventListener("click", async () => {
     const statusEl = $id("webdav-status");
     const cfg = _pbpWebdavCfgFromForm();
-    if (!cfg.baseUrl || !statusEl) return;
+    if (!statusEl) return;
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
-    if (!granted) {
-      setStatusIcon(statusEl, false, t("webdavPermDenied"));
+    const errorKey = _pbpWebdavPermissionError(granted);
+    if (errorKey) {
+      setStatusIcon(statusEl, false, t(errorKey));
       statusEl.style.color = "#c00";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       return;
@@ -1984,18 +1996,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  $id("tag-gov-ai-btn")?.addEventListener("click", async () => {
+  let tagGovAiPendingSettings = null;
+
+  async function runTagGovAi(sNow) {
     const btn = $id("tag-gov-ai-btn");
     const statusEl = $id("tag-gov-ai-status");
-
-    // Re-read settings fresh (like getTagGovToken does): the page-load snapshot `s`
-    // is never written back by saveAll(), so a key/provider configured THIS session
-    // (paste key on the AI tab, come back here) was invisible until a full reload —
-    // and a provider switch would fire the request at the OLD provider/key/model.
-    let sNow = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
-    sNow = await pbpApplySecretOverlay(sNow);
-    deobfuscateSettings(sNow);
-
     if (!hasAIKey(sNow)) {
       if (statusEl) {
         setStatusIcon(statusEl, false, t("tagGovAiNoKey"));
@@ -2005,7 +2010,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    const origLabel = btn.textContent;
+    let grantRetry = false;
     btn.disabled = true;
     btn.textContent = t("tagGovAiRunning");
     if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
@@ -2033,15 +2038,54 @@ document.addEventListener("DOMContentLoaded", async () => {
       let msg = err.name === "AbortError" ? t("testTimeout") : err.message;
       if (err?.code === "model_not_found") {
         msg = t("aiErrorModelNotFound", sNow.aiProvider) + " " + t("aiErrorModelNotFoundHint");
+      } else if (err?.code === "host_permission" && $id("opt-ai-provider")?.value === sNow.aiProvider) {
+        tagGovAiPendingSettings = { ...sNow };
+        grantRetry = true;
       }
       if (statusEl) {
         setStatusIcon(statusEl, false, msg);
         statusEl.style.color = "#c00";
-        setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+        if (!grantRetry) setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       }
     } finally {
       btn.disabled = false;
-      btn.textContent = origLabel;
+      btn.textContent = grantRetry ? t("aiGrantRetry") : t("tagGovAiBtn");
+    }
+  }
+
+  $id("opt-ai-provider")?.addEventListener("change", () => {
+    tagGovAiPendingSettings = null;
+    const btn = $id("tag-gov-ai-btn");
+    const statusEl = $id("tag-gov-ai-status");
+    if (btn && !btn.disabled) btn.textContent = t("tagGovAiBtn");
+    if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
+  });
+
+  $id("tag-gov-ai-btn")?.addEventListener("click", async (event) => {
+    const btn = event.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const pending = tagGovAiPendingSettings;
+      if (pending && $id("opt-ai-provider")?.value === pending.aiProvider) {
+        const granted = await requestAIHostPermissions(pending);
+        if (!granted || tagGovAiPendingSettings !== pending) return;
+        tagGovAiPendingSettings = null;
+        await runTagGovAi(pending);
+        return;
+      }
+      tagGovAiPendingSettings = null;
+
+      // Keep one live form snapshot through call, permission failure, and retry.
+      const live = pbpLiveAiSettingsSnapshot($id("opt-ai-provider")?.value || "gemini");
+      let sNow = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
+      sNow = await pbpApplySecretOverlay(sNow);
+      deobfuscateSettings(sNow);
+      if ($id("opt-ai-provider")?.value !== live.aiProvider) return;
+      sNow = { ...sNow, ...live };
+      await runTagGovAi(sNow);
+    } finally {
+      btn.disabled = false;
     }
   });
 

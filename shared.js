@@ -11,6 +11,7 @@ const ADAPTIVE_THEME_MAP = {
 const TEXTAREA_MIN_HEIGHT = 54;
 const TEXTAREA_MAX_HEIGHT = 300;
 const TAG_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const PBP_JINA_ORIGIN_PATTERN = "https://r.jina.ai/*";
 // Inline SVG icons — replace emoji/color-glyphs that trigger a 1-3s Segoe UI Emoji
 // font-load stall on Windows high-DPI Chrome (DirectWrite system-font enumeration,
 // cached process-wide after first paint). currentColor = inherits theme text color.
@@ -105,6 +106,36 @@ function deobfuscateKey(val) {
     try { val = decodeURIComponent(escape(atob(val.substring(4)))); } catch (_) { return val; }
   }
   return val;
+}
+
+// Returns the exact Chrome host-permission pattern for a network endpoint.
+// Plain HTTP is accepted only for the three literal loopback host spellings;
+// URL() normalizes alternate IPv4/IPv6 forms, so inspect the raw authority too.
+function pbpEndpointOriginPattern(raw) {
+  try {
+    const text = String(raw == null ? "" : raw).trim();
+    const u = new URL(text);
+    const authority = text.match(/^https?:\/\/([^/?#]*)(?:[/?#]|$)/i);
+    if ((u.protocol !== "https:" && u.protocol !== "http:") || !authority || authority[1].includes("@") ||
+        /(?:\*|%2a)/i.test(authority[1]) || /(?:\*|%2a)/i.test(u.hostname) || u.username || u.password) return null;
+    if (u.protocol === "http:") {
+      if (!/^(?:(?:localhost|127\.0\.0\.1)(?::\d+)?|\[::1\](?::\d+)?)$/.test(authority[1])) return null;
+    }
+    return u.origin + "/*";
+  } catch (_) {
+    return null;
+  }
+}
+
+function pbpIsAllowedPinboardApiUrl(raw) {
+  try {
+    const u = new URL(String(raw == null ? "" : raw));
+    return pbpEndpointOriginPattern(raw) === "https://api.pinboard.in/*"
+      && !u.port
+      && u.pathname.startsWith("/v1/");
+  } catch (_) {
+    return false;
+  }
 }
 
 function pbpOptionsUrl(panel) {

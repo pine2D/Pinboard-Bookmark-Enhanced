@@ -17,6 +17,7 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../i18n.js"></script>
 <script src="../shared.js"></script>
 <script src="../ai.js"></script>
+<script src="../options-connectivity.js"></script>
 
 <script>
 let PASS = 0, FAIL = 0;
@@ -192,5 +193,249 @@ suite("parseAICombined", () => {
     assert(threw, "throws on empty result");
   });
 });
+
+const AI_ORIGIN_CASES = [
+  [{ aiProvider: "gemini" }, "https://generativelanguage.googleapis.com/*"],
+  [{ aiProvider: "openai" }, "https://api.openai.com/*"],
+  [{ aiProvider: "claude" }, "https://api.anthropic.com/*"],
+  [{ aiProvider: "deepseek" }, "https://api.deepseek.com/*"],
+  [{ aiProvider: "qwen" }, "https://dashscope.aliyuncs.com/*"],
+  [{ aiProvider: "minimax" }, "https://api.minimaxi.com/*"],
+  [{ aiProvider: "openrouter" }, "https://openrouter.ai/*"],
+  [{ aiProvider: "groq" }, "https://api.groq.com/*"],
+  [{ aiProvider: "mistral" }, "https://api.mistral.ai/*"],
+  [{ aiProvider: "cohere" }, "https://api.cohere.ai/*"],
+  [{ aiProvider: "siliconflow" }, "https://api.siliconflow.cn/*"],
+  [{ aiProvider: "zhipu" }, "https://open.bigmodel.cn/*"],
+  [{ aiProvider: "kimi" }, "https://api.moonshot.cn/*"],
+  [{ aiProvider: "ollama" }, "http://localhost:11434/*"],
+  [{ aiProvider: "custom", customBaseUrl: "https://proxy.example/v1" }, "https://proxy.example/*"],
+];
+
+suite("endpoint origin policy", () => {
+  test("normalizes HTTPS to an exact origin pattern", () => {
+    assertEq(pbpEndpointOriginPattern(" https://Example.COM:443/v1 "), "https://example.com/*", "normalized HTTPS");
+  });
+  test("allows only literal loopback authorities over HTTP", () => {
+    assertEq(pbpEndpointOriginPattern("http://localhost:11434/api"), "http://localhost:11434/*", "localhost");
+    assertEq(pbpEndpointOriginPattern("http://127.0.0.1:8080/"), "http://127.0.0.1:8080/*", "IPv4 loopback");
+    assertEq(pbpEndpointOriginPattern("http://[::1]:8080/"), "http://[::1]:8080/*", "IPv6 loopback");
+  });
+  test("rejects LAN and public HTTP", () => {
+    ["http://192.168.1.2/api", "http://10.0.0.2/", "http://example.com/"].forEach((url) =>
+      assertEq(pbpEndpointOriginPattern(url), null, url));
+  });
+  test("rejects normalized aliases of loopback", () => {
+    ["http://LOCALHOST/", "http://localhost./", "http://127.1/", "http://2130706433/", "http://[0:0:0:0:0:0:0:1]/"].forEach((url) =>
+      assertEq(pbpEndpointOriginPattern(url), null, url));
+  });
+  test("rejects credentials, unsupported schemes, and malformed input", () => {
+    ["https://user:pass@example.com/", "https://@example.com/", "http://user@localhost/", "ftp://example.com/", "not a url", ""].forEach((url) =>
+      assertEq(pbpEndpointOriginPattern(url), null, url));
+  });
+  test("rejects literal and percent-normalized wildcard hosts", () => {
+    ["https://*.example.com/v1", "https://%2a.example.com/v1", "https://%2A.example.com/v1"].forEach((url) =>
+      assertEq(pbpEndpointOriginPattern(url), null, url));
+  });
+  test("all 15 AI providers resolve to the origin actually fetched", () => {
+    AI_ORIGIN_CASES.forEach(([settings, expected]) =>
+      assertEq(_aiTargetOriginPattern(settings), expected, settings.aiProvider));
+    assertEq(_aiTargetOriginPattern({ aiProvider: "openai", openaiBaseUrl: "https://azure.example:8443/openai" }), "https://azure.example:8443/*", "OpenAI override");
+    assertEq(_aiTargetOriginPattern({ aiProvider: "ollama", ollamaBaseUrl: "http://127.0.0.1:11435" }), "http://127.0.0.1:11435/*", "Ollama override");
+  });
+  test("origin collector normalizes, deduplicates, and rejects invalid extras", () => {
+    assertEq(_aiRequiredOriginPatterns({ aiProvider: "gemini" }, ["https://r.jina.ai/*", "https://r.jina.ai/v1"]).join(","),
+      "https://generativelanguage.googleapis.com/*,https://r.jina.ai/*", "deduped origins");
+    let caught = null;
+    try { _aiRequiredOriginPatterns({ aiProvider: "gemini" }, ["*://*/*"]); } catch (e) { caught = e; }
+    assert(caught && caught.code === "endpoint_invalid", "invalid additional pattern rejected");
+  });
+});
+</script>
+
+<script>
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "AI endpoint network gate";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  const realFetch = window.fetch;
+  const realChrome = window.chrome;
+  try {
+    await atest("invalid custom endpoint fails before fetch", async () => {
+      let fetches = 0;
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      window.chrome = { runtime: { id: "test-extension" }, i18n: { getMessage: () => "" }, permissions: { contains: async () => true } };
+      let caught = null;
+      try { await callAI({ aiProvider: "custom", customBaseUrl: "http://192.168.1.2", customApiKey: "k", customModel: "m" }, "x"); }
+      catch (e) { caught = e; }
+      assert(caught && caught.code === "endpoint_invalid", "expected endpoint_invalid");
+      assertEq(fetches, 0, "zero fetches");
+    });
+
+    await atest("wildcard custom endpoints fail before any permission call or fetch", async () => {
+      let permissionCalls = 0, fetches = 0;
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        i18n: { getMessage: () => "" },
+        permissions: {
+          contains: async () => { permissionCalls++; return true; },
+          request: async () => { permissionCalls++; return true; },
+        },
+      };
+      for (const base of ["https://*.example.com/v1", "https://%2a.example.com/v1"]) {
+        let caught = null;
+        try { await callAI({ aiProvider: "custom", customBaseUrl: base, customApiKey: "k", customModel: "m" }, "x"); }
+        catch (e) { caught = e; }
+        assert(caught && caught.code === "endpoint_invalid", base + ": expected endpoint_invalid");
+        caught = null;
+        try { await requestAIHostPermissions({ aiProvider: "custom", customBaseUrl: base }); }
+        catch (e) { caught = e; }
+        assert(caught && caught.code === "endpoint_invalid", base + ": grant helper accepted wildcard");
+      }
+      assertEq(permissionCalls, 0, "zero permission calls");
+      assertEq(fetches, 0, "zero fetches");
+    });
+
+    await atest("permissions.contains false or failure is fail-closed before fetch", async () => {
+      let fetches = 0;
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      for (const mode of ["false", "throw"]) {
+        window.chrome = {
+          runtime: { id: "test-extension" },
+          i18n: { getMessage: () => "permission denied" },
+          permissions: { contains: async () => {
+            if (mode === "throw") throw new Error("API unavailable");
+            return false;
+          } },
+        };
+        let caught = null;
+        try { await callAI({ aiProvider: "custom", customBaseUrl: "https://proxy.example/v1", customApiKey: "k", customModel: "m" }, "x"); }
+        catch (e) { caught = e; }
+        assert(caught && caught.code === "host_permission", mode + ": expected host_permission");
+      }
+      assertEq(fetches, 0, "zero fetches");
+    });
+
+    await atest("extension context missing permissions API is fail-closed before fetch", async () => {
+      let fetches = 0;
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      for (const permissions of [undefined, {}]) {
+        window.chrome = {
+          runtime: { id: "test-extension" },
+          i18n: { getMessage: () => "permission denied" },
+          permissions,
+        };
+        let caught = null;
+        try { await callAI({ aiProvider: "custom", customBaseUrl: "https://proxy.example/v1", customApiKey: "k", customModel: "m" }, "x"); }
+        catch (e) { caught = e; }
+        assert(caught && caught.code === "host_permission", "expected host_permission when API is missing");
+      }
+      assertEq(fetches, 0, "zero fetches");
+    });
+
+    await atest("all providers and both dispatchers use the contains-only gate", async () => {
+      let fetches = 0, checks = 0;
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        i18n: { getMessage: () => "permission denied" },
+        permissions: { contains: async () => { checks++; return false; } },
+      };
+      for (const [settings] of AI_ORIGIN_CASES) {
+        let caught = null;
+        try { await callAI(settings, "x"); } catch (e) { caught = e; }
+        assert(caught && caught.code === "host_permission", settings.aiProvider + ": expected host_permission");
+      }
+      let streamCaught = null;
+      try { await callAIStream({ aiProvider: "gemini" }, "x", {}, () => {}); } catch (e) { streamCaught = e; }
+      assert(streamCaught && streamCaught.code === "host_permission", "stream expected host_permission");
+      assertEq(checks, 16, "one contains check per call");
+      assertEq(fetches, 0, "zero fetches");
+    });
+
+    await atest("grant helper requests deduplicated exact origins in one call", async () => {
+      let requested = null;
+      window.chrome = { permissions: { request: (spec) => { requested = spec.origins; return Promise.resolve(true); } } };
+      const granted = await requestAIHostPermissions({ aiProvider: "gemini" }, ["https://r.jina.ai/*", "https://r.jina.ai/v1"]);
+      assert(granted, "grant result");
+      assertEq(requested.join(","), "https://generativelanguage.googleapis.com/*,https://r.jina.ai/*", "requested origins");
+    });
+
+    await atest("grant helper returns false when request is unavailable or fails", async () => {
+      for (const request of [undefined, () => { throw new Error("sync"); }, () => Promise.reject(new Error("async"))]) {
+        window.chrome = { permissions: request ? { request } : {} };
+        assertEq(await requestAIHostPermissions({ aiProvider: "openai" }), false, "failed request");
+      }
+    });
+
+    await atest("Options Test with no API key requests no host permission", async () => {
+      let requests = 0;
+      const fixture = document.createElement("div");
+      fixture.innerHTML = '<button id="test-gemini"></button><span id="test-gemini-status"></span>' +
+        '<input id="opt-pinboard-token"><span id="token-format-warn"></span>';
+      document.body.appendChild(fixture);
+      window.chrome = {
+        i18n: { getMessage: (key) => key },
+        permissions: { request: async () => { requests++; return true; } },
+      };
+      setupApiTests();
+      document.getElementById("test-gemini").click();
+      await Promise.resolve();
+      assertEq(requests, 0, "permission requests");
+      assert(document.getElementById("test-gemini-status").textContent.includes("testNoApiKey"), "no-key status");
+      fixture.remove();
+    });
+
+    await atest("live AI settings snapshot preserves the selected unsaved endpoint", async () => {
+      const fixture = document.createElement("div");
+      fixture.innerHTML = '<input id="opt-custom-key" value=" live-key ">' +
+        '<input id="opt-custom-model" value=" live-model ">' +
+        '<input id="opt-custom-baseurl" value=" https://live.example/v1 ">';
+      document.body.appendChild(fixture);
+      const snapshot = pbpLiveAiSettingsSnapshot("custom");
+      assertEq(snapshot.aiProvider, "custom", "provider");
+      assertEq(snapshot.customApiKey, "live-key", "key");
+      assertEq(snapshot.customModel, "live-model", "model");
+      assertEq(snapshot.customBaseUrl, "https://live.example/v1", "base URL");
+      fixture.remove();
+    });
+
+    await atest("non-extension test contexts skip the permission gate", async () => {
+      window.chrome = undefined;
+      await _ensureAIHostPermission({ aiProvider: "custom", customBaseUrl: "https://proxy.example/v1" });
+      let checks = 0;
+      window.chrome = { permissions: { contains: async () => { checks++; return false; } } };
+      await _ensureAIHostPermission({ aiProvider: "custom", customBaseUrl: "https://proxy.example/v1" });
+      assertEq(checks, 0, "contains not called without runtime.id");
+    });
+
+    await atest("non-stream and stream AI fetches reject redirects", async () => {
+      const redirects = [];
+      window.fetch = async (_url, init) => {
+        redirects.push(init && init.redirect);
+        return redirects.length === 1
+          ? { ok: true }
+          : new Response("x", { status: 200 });
+      };
+      await fetchWithTimeout("https://example.test/non-stream");
+      await _pbpStreamRead("https://example.test/stream", {}, {}, "API", () => "");
+      assertEq(redirects.join(","), "error,error", "redirect modes");
+    });
+  } finally {
+    window.fetch = realFetch;
+    window.chrome = realChrome;
+  }
+})();
 </script>
 </body></html>

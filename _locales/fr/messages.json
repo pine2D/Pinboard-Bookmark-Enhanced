@@ -299,12 +299,15 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "Pas d'accès à $HOST$ — ouvrez Paramètres > IA et cliquez sur Tester pour l'autoriser",
+    "message": "Pas d'accès à $HOST$ — autorisez l'accès, puis réessayez.",
     "placeholders": {
       "host": {
         "content": "$1"
       }
     }
+  },
+  "aiGrantRetry": {
+    "message": "Autoriser et réessayer"
   },
   "aiErrorModelNotFoundHint": {
     "message": "Allez dans Paramètres > IA et choisissez un modèle disponible"
@@ -668,6 +671,14 @@
   },
   "bgTitleSaved": {
     "message": "« $TITLE$ » enregistré.",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "bgTitleSavedAiSkipped": {
+    "message": "« $TITLE$ » enregistré. L'IA n'a pas été exécutée ; autorisez l'accès via Paramètres > IA > Tester.",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -1062,10 +1073,26 @@
     "message": "Ignorer les URL déjà enregistrées"
   },
   "batchAiHint": {
-    "message": "Les fonctionnalités IA seront lentes (appel IA par onglet + 3 s entre les sauvegardes). Requiert l'autorisation d'accès à tous les sites pour lire les onglets non actifs — demandée lors de la première utilisation."
+    "message": "L'IA effectue un appel par onglet et peut être lente. À la première utilisation, Batch ne demande que les sites listés et le fournisseur IA actuel."
   },
   "batchPermDenied": {
-    "message": "Autorisation refusée — les fonctionnalités IA nécessitent l'accès à tous les sites web pour lire le contenu des onglets."
+    "message": "Les autorisations des sites listés n'ont pas été accordées. L'IA Batch n'a pas démarré."
+  },
+  "batchPermConfirm": {
+    "message": "L'IA Batch doit accéder à ces $COUNT$ sites pour cette exécution :",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchPermProvider": {
+    "message": "$PROVIDER$ (fournisseur d'IA) : $ORIGIN$",
+    "placeholders": {
+      "provider": { "content": "$1" },
+      "origin": { "content": "$2" }
+    }
+  },
+  "batchPermGrant": {
+    "message": "Autoriser et démarrer"
   },
   "secAiProvider": {
     "message": "Fournisseur IA"
@@ -1860,13 +1887,13 @@
     "message": "Les clés API sont masquées (pas chiffrées) et synchronisées via chrome.storage.sync. Ne partagez pas vos fichiers d'export de paramètres."
   },
   "batchPermLabel": {
-    "message": "Permissions d'hôte :"
+    "message": "Ancienne autorisation tous sites :"
   },
   "batchRevokeBtn": {
-    "message": "Révoquer l'accès à tous les sites"
+    "message": "Révoquer l'ancien accès tous sites"
   },
   "batchRevokeHint": {
-    "message": "Utile uniquement si vous avez activé l'extraction AI en masse mais ne souhaitez plus que l'extension accède à toutes les pages."
+    "message": "Les anciennes versions pouvaient accéder à tous les sites. Les nouveaux Batch ne demandent que les sites listés ; ce bouton supprime l'ancienne autorisation étendue."
   },
   "batchRevokeSuccess": {
     "message": "Révoqué"
@@ -1875,7 +1902,7 @@
     "message": "révoqué"
   },
   "batchPermNone": {
-    "message": "Aucun accès à tous les sites n'est actuellement accordé"
+    "message": "Aucun ancien accès tous sites n'est accordé"
   },
   "batchRevokeFailed": {
     "message": "Échec"
@@ -2231,7 +2258,7 @@
     "message": "IA page de prévisualisation"
   },
   "previewAiSectionHint": {
-    "message": "Expliquer une sélection, interroger la page et traduire le texte intégral sur la page de prévisualisation Markdown. Utilise le fournisseur IA et la clé configurés ci-dessus ; chaque requête est déclenchée par l'utilisateur, rien ne s'exécute en arrière-plan."
+    "message": "L'explication d'une sélection, les questions à la page et la traduction intégrale dans l'aperçu Markdown sont lancées par l'utilisateur et utilisent le fournisseur IA et la clé configurés ci-dessus. Si l'aperçu facultatif des points clés est activé, il peut s'exécuter à l'ouverture de l'aperçu Markdown ; rien ne s'exécute comme tâche masquée en arrière-plan."
   },
   "previewAiEnabled": {
     "message": "Activer les fonctionnalités IA sur la page de prévisualisation"
@@ -2578,7 +2605,7 @@
     "message": "Envoie une requête POST avec une charge utile JSON {title, url, date, tags, markdown} vers votre point de terminaison. Toute valeur Authorization que vous définissez est envoyée telle quelle (p. ex. Bearer <token> ou Token <key>), donc n'importe quel schéma d'authentification fonctionne. Pour n8n, Make, Zapier, Readwise ou tout récepteur auto-hébergé — aucun compte requis ici."
   },
   "mdTargetWebhookHttpWarn": {
-    "message": "Ce point de terminaison utilise HTTP, pas HTTPS — la valeur Authorization est envoyée en clair. Sans risque pour localhost/réseau local ; à éviter sur Internet public."
+    "message": "Bloqué : utilisez HTTPS, ou HTTP uniquement pour localhost, 127.0.0.1 ou [::1]. Les URL HTTP sur réseau local/public, non valides ou contenant des identifiants ne sont pas envoyées."
   },
   "hlColorQuote": { "message": "Citation" },
   "hlColorDefinition": { "message": "Définition" },

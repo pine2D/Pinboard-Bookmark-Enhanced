@@ -24,7 +24,7 @@ function renderEmptyState(message) {
 // engine-switch control already uses — see the pending-extraction branch below). Bare
 // renderEmptyState stays reserved for genuinely nothing-to-do states (no preview data /
 // no content at all), where there is nothing to retry or switch.
-function renderErrorState(message, retryFn) {
+function renderErrorState(message, retryFn, permissionRequired) {
   const view = document.getElementById("rendered-view");
   if (view) {
     view.removeAttribute("aria-busy");
@@ -37,13 +37,28 @@ function renderErrorState(message, retryFn) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "action-btn";
-      btn.textContent = t("askErrRetry"); // reuse the existing "Retry" i18n key (used by md-ask.js's own error/retry buttons on this same page)
-      btn.addEventListener("click", retryFn, { once: true });
+      btn.textContent = t(permissionRequired ? "aiGrantRetry" : "askErrRetry");
+      btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try { await retryFn(); } catch (_) {}
+        finally { btn.disabled = false; }
+      });
       wrap.appendChild(btn);
     }
     view.replaceChildren(wrap);
   }
   document.body.classList.remove("md-empty"); // undo renderLoadingState's rail-hide so the engine-switch badge stays reachable
+}
+
+// Jina extraction runs in the Service Worker, which cannot prompt. This helper is
+// called only from a retrying user click after the worker reported host_permission.
+async function pbpRequestJinaHostPermission() {
+  try {
+    return (await chrome.permissions.request({ origins: [PBP_JINA_ORIGIN_PATTERN] })) === true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function renderLoadingState(message, note) {
@@ -516,6 +531,7 @@ function pbpApplyColorScheme(mode) {
     const code = r && r.error;
     if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
     if (code === "empty") return t("mdPreviewNoContent");
+    if (code === "host_permission") return t("aiErrorHostPermission", "https://r.jina.ai");
     // "network" covers both this file's own sendMessage-throw catches (below,
     // and the engine-switch handler further down) and jina.js's fetch-TypeError
     // classification relayed unchanged through background.js — otherwise every
@@ -555,6 +571,18 @@ function pbpApplyColorScheme(mode) {
     // reextractMarkdown message, never a separate channel.
     let attemptedEngine = info.engine;
     let inFlight = false;
+    async function retryExtract(engine, failure) {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        if (engine === "jina" && failure && failure.error === "host_permission") {
+          if (!await pbpRequestJinaHostPermission()) return;
+        }
+      } finally {
+        inFlight = false;
+      }
+      await attemptExtract(engine);
+    }
     async function attemptExtract(engine) {
       inFlight = true;
       attemptedEngine = engine;
@@ -571,7 +599,11 @@ function pbpApplyColorScheme(mode) {
       } catch (_) { pr = { ok: false, error: "network" }; }
       inFlight = false;
       if (pr && pr.ok) { location.reload(); return; }
-      renderErrorState(friendlyEngineErr(pr), () => attemptExtract(attemptedEngine));
+      renderErrorState(
+        friendlyEngineErr(pr),
+        () => retryExtract(attemptedEngine, pr),
+        pr && pr.error === "host_permission"
+      );
       applyAvailability(attemptedEngine);
     }
     if (sourceEl) {
@@ -750,6 +782,7 @@ function pbpApplyColorScheme(mode) {
   }
   const curEngine = source === "jina" ? "jina" : "local";
   let switching = false;
+  let jinaPermissionMissing = false;
 
   if (sourceEl) {
     applyAvailability(curEngine);
@@ -760,6 +793,15 @@ function pbpApplyColorScheme(mode) {
         switching = true;
         sourceEl.setAttribute("aria-busy", "true");
         sourceEl.querySelectorAll(".src-seg").forEach((s) => { s.disabled = true; });
+        if (e === "jina" && jinaPermissionMissing) {
+          if (!await pbpRequestJinaHostPermission()) {
+            switching = false;
+            sourceEl.removeAttribute("aria-busy");
+            applyAvailability(curEngine);
+            return;
+          }
+          jinaPermissionMissing = false;
+        }
         seg.classList.add("loading");
         setEngineStatus(t("mdEngineExtracting", engineLabel(e)), false);
         let r;
@@ -771,6 +813,7 @@ function pbpApplyColorScheme(mode) {
           });
         } catch (_) { r = { ok: false, error: "network" }; }
         if (r && r.ok) { location.reload(); return; }
+        if (e === "jina" && r && r.error === "host_permission") jinaPermissionMissing = true;
         // failure: keep current content, restore the control
         switching = false;
         sourceEl.removeAttribute("aria-busy");
@@ -1266,24 +1309,24 @@ function pbpApplyColorScheme(mode) {
       try {                                 // (the "mdSending" label is the affordance;
         const row = PBP_EXPORT_TARGETS[id]; // not disabling keeps the restored focus, F8)
         setPrimary(id);
+        const cfg = et[id] || {};
+        // First await in the direct click chain: chrome.permissions.request()
+        // must run while the user gesture is still active.
+        await pbpRequestTargetPermission(id, cfg);
         await pbpSetLastTarget(id);
+        const meta = buildMeta();
         const _exp = buildExportOpts();
-        const _sendBody = composeExport(getViewMarkdown(), buildMeta(), { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights, hlView: _exp.hlView }); // H5 (spec 1.6): send-to honors the exported view's tri-state too
+        const _sendBody = composeExport(getViewMarkdown(), meta, { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights, hlView: _exp.hlView }); // H5 (spec 1.6): send-to honors the exported view's tri-state too
         primary.classList.add("sending");
         primaryLabel.textContent = t("mdSending");
         let res;
         try {
-          res = await pbpSendToTarget(id, { meta: buildMeta(), rawBody: _sendBody, cfg: et[id] });
+          res = await pbpSendToTarget(id, { meta, rawBody: _sendBody, cfg });
         } catch (_) {
           res = { ok: false, fellBack: false, error: "" };
         }
         primary.classList.remove("sending");
         setPrimary(id);
-        // Non-local http webhook: the Authorization header rides in plaintext
-        // (audit #31). Advisory only — never blocks the send (self-hosted/LAN
-        // receivers are a legitimate opt-in target).
-        const httpWarn = id === "webhook" && typeof pbpWebhookHttpWarn === "function"
-          && pbpWebhookHttpWarn((et[id] && et[id].url) || "");
         if (res.ok && !res.fellBack) {
           // token-api (gist/webhook) has a real HTTP receipt -- text unchanged.
           // url-scheme (obsidian) has no receipt: the OS may have silently
@@ -1294,8 +1337,7 @@ function pbpApplyColorScheme(mode) {
             showSendStatus(t("mdSentUrlScheme").replace("{name}", row.label), false);
           } else {
             flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label));        // short -> button
-            if (httpWarn) showSendStatus(t("mdTargetWebhookHttpWarn"), false);
-            else if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url); // + clickable link
+            if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url); // + clickable link
           }
         } else if (res.error === "open-blocked") {
           showSendStatus(t("mdSendOpenBlocked"), true);
@@ -1305,6 +1347,8 @@ function pbpApplyColorScheme(mode) {
           showSendStatus(t("mdSendNeedsSetup"), false);
         } else if (res.error === "api-perm") {
           showSendStatus(t("mdSendApiPerm"), true);
+        } else if (res.error === "api-insecure") {
+          showSendStatus(t("mdTargetWebhookHttpWarn"), true);
         } else if (res.error === "api-down") {
           showSendStatus(t("mdSendApiDown"), true);
         } else if (res.error === "api-token") {

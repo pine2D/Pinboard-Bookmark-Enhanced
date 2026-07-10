@@ -2,6 +2,21 @@
 // Pinboard Bookmark Enhanced - Jina Reader API Integration
 // ============================================================
 
+async function _ensureJinaHostPermission() {
+  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) return;
+  let has = false;
+  try {
+    if (chrome.permissions && chrome.permissions.contains) {
+      has = (await chrome.permissions.contains({ origins: [PBP_JINA_ORIGIN_PATTERN] })) === true;
+    }
+  } catch (_) {}
+  if (!has) {
+    const err = new Error("Jina host permission required");
+    err.code = "host_permission";
+    throw err;
+  }
+}
+
 // ---- Jina Reader API: fetch page as Markdown ----
 async function fetchJinaMarkdown(url, options = {}) {
   const { apiKey, forceRefresh, cacheDuration } = options;
@@ -21,11 +36,11 @@ async function fetchJinaMarkdown(url, options = {}) {
     } catch (_) {}
   }
 
-  // Build request headers
-  const headers = { Accept: "application/json" };
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
   try {
+    // Cache stays readable after a grant is revoked; only a network miss needs access.
+    await _ensureJinaHostPermission();
+    const headers = { Accept: "application/json" };
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     const res = await fetchWithTimeout(`https://r.jina.ai/${url}`, { headers }, 30000);
     if (!res.ok) {
       return {
@@ -58,6 +73,9 @@ async function fetchJinaMarkdown(url, options = {}) {
 
     return { ...result, fromCache: false };
   } catch (e) {
+    if (e && e.code === "host_permission") {
+      return { error: "host_permission", code: "host_permission", fallback: true };
+    }
     // Chrome throws a bare TypeError("Failed to fetch") for network failures
     // (offline, DNS, connection refused) — distinct from the HTTP-status branch
     // above (a real response, just non-2xx). Collapse it to the "network" code,

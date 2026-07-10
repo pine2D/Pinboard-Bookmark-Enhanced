@@ -248,14 +248,14 @@
           <div class="fg"><label><input type="checkbox" id="batch-skip-existing" /> <span data-i18n="batchSkipExisting">Skip already bookmarked URLs</span></label></div>
           <div class="fg"><label><input type="checkbox" id="batch-ai-tags" /> <span data-i18n="batchAiTags">Auto-generate AI tags for each tab</span></label></div>
           <div class="fg"><label><input type="checkbox" id="batch-ai-summary" /> <span data-i18n="batchAiSummary">Auto-generate AI summary for each tab</span></label></div>
-          <p class="hint hint-warn" data-i18n="batchAiHint">AI features will be slow (separate AI call per tab + 3s rate limit). Requires "Access all websites" permission to read non-active tabs — prompted on first use.</p>
+          <p class="hint hint-warn" data-i18n="batchAiHint">AI runs one call per tab and may be slow. On first use, Batch asks only for the listed tab sites and current AI provider.</p>
           <div class="fg" style="margin-top:10px">
             <div style="display:flex;gap:8px;align-items:center;">
-              <span data-i18n="batchPermLabel">Host permissions:</span>
+              <span data-i18n="batchPermLabel">Legacy all-sites permission:</span>
               <span id="batch-perm-status" style="font-size:11px;color:#666;"></span>
             </div>
-            <button class="btn btn-sm" id="batch-revoke-perm" style="margin-top:6px;" data-i18n="batchRevokeBtn">Revoke all-sites access</button>
-            <p class="hint" data-i18n="batchRevokeHint">Only needed if you enabled batch AI extraction but no longer want the extension to access all pages for content.</p>
+            <button class="btn btn-sm" id="batch-revoke-perm" style="margin-top:6px;" data-i18n="batchRevokeBtn">Revoke legacy all-sites access</button>
+            <p class="hint" data-i18n="batchRevokeHint">Older versions could grant access to every site. New Batch runs request only the listed sites; this button removes the legacy broad grant.</p>
           </div>
         </div>
       </div>

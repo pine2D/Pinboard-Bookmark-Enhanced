@@ -77,10 +77,21 @@ async function enrichPageTextIfJina() {
       apiKey: jinaKey,
       cacheDuration: settings.aiCacheDuration
     });
+    if (result.code === "host_permission") {
+      const origins = _aiRequiredOriginPatterns(settings, [PBP_JINA_ORIGIN_PATTERN]);
+      const hosts = origins
+        .map(pattern => pattern.replace(/\/\*$/, "")).join(", ");
+      const err = new Error(t("aiErrorHostPermission", hosts));
+      err.code = "host_permission";
+      err.permissionStage = "extracting";
+      err.permissionOrigins = origins;
+      throw err;
+    }
     if (!result.error && result.markdown) {
       pageInfo.pageText = markdownToPlainText(result.markdown);
     }
   } catch (e) {
+    if (e?.code === "host_permission") throw e;
     console.warn("Jina content enrichment failed, using local content:", e.message);
   }
 }
@@ -95,6 +106,7 @@ const AI_BQ_REGEX = _AI_BQ_REGEX_SHARED;
 // ---- Setup AI feature listeners ----
 // ---- AI Error Card ----
 let _aiErrorLastOp = null; // "summary" | "tags"
+let _aiErrorLastPermission = null;
 
 // Fallback provider order: stable list, current provider gets skipped.
 const AI_PROVIDER_ORDER = [
@@ -121,6 +133,11 @@ function pickFallbackProvider(s) {
 
 function showAIError(op, err) {
   _aiErrorLastOp = op;
+  _aiErrorLastPermission = err?.code === "host_permission" ? {
+    settings: { ...settings },
+    stage: err.permissionStage,
+    origins: [...(err.permissionOrigins || _aiRequiredOriginPatterns(settings))],
+  } : null;
   const card = $id("ai-error-card");
   if (!card) return;
   const providerKey = (settings.aiProvider || "openai");
@@ -163,23 +180,50 @@ function showAIError(op, err) {
     }
   }
 
+  const retryBtn = $id("ai-error-retry");
+  if (retryBtn) retryBtn.textContent = t(err?.code === "host_permission" ? "aiGrantRetry" : "aiErrorRetry");
+
   card.classList.remove("hidden");
 }
 
 function hideAIError() {
   const card = $id("ai-error-card");
   if (card) card.classList.add("hidden");
+  const retryBtn = $id("ai-error-retry");
+  if (retryBtn) retryBtn.textContent = t("aiErrorRetry");
   _aiErrorLastOp = null;
+  _aiErrorLastPermission = null;
 }
 
 function setupAIFeatures() {
   // Wire error card controls once
   $id("ai-error-dismiss")?.addEventListener("click", (e) => { e.preventDefault(); hideAIError(); });
-  $id("ai-error-retry")?.addEventListener("click", () => {
-    const op = _aiErrorLastOp;
-    hideAIError();
-    if (op === "tags") doAITags(true);
-    else if (op === "summary") doAISummary(true);
+  $id("ai-error-retry")?.addEventListener("click", async (event) => {
+    const retryBtn = event.currentTarget;
+    if (retryBtn.disabled) return;
+    retryBtn.disabled = true;
+    try {
+      const op = _aiErrorLastOp;
+      const recovery = _aiErrorLastPermission;
+      if (!op) return;
+      if (recovery) {
+        const providerOrigin = _aiTargetOriginPattern(recovery.settings);
+        const extraOrigins = recovery.origins.filter(origin => origin !== providerOrigin);
+        const granted = await requestAIHostPermissions(recovery.settings, extraOrigins);
+        if (!granted) return;
+      }
+      hideAIError();
+      const originalProvider = settings.aiProvider;
+      if (recovery) settings.aiProvider = recovery.settings.aiProvider;
+      try {
+        if (op === "tags") await doAITags(true);
+        else if (op === "summary") await doAISummary(true);
+      } finally {
+        settings.aiProvider = originalProvider;
+      }
+    } finally {
+      retryBtn.disabled = false;
+    }
   });
   $id("ai-error-fallback")?.addEventListener("click", async (e) => {
     const next = e.currentTarget.dataset.provider;
@@ -379,6 +423,10 @@ async function doAISummary(forceRefresh) {
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
   } catch (e) {
+    if (e?.code === "host_permission" && !e.permissionOrigins) {
+      e.permissionStage = "calling";
+      e.permissionOrigins = _aiRequiredOriginPatterns(settings);
+    }
     showAIError("summary", e);
     if (forceRefresh) showSummaryActions(false);
   } finally {
@@ -478,6 +526,10 @@ async function doAITags(forceRefresh) {
       showStatus("status-msg", t("aiTagsRegenerated"), "success");
     }
   } catch (e) {
+    if (e?.code === "host_permission" && !e.permissionOrigins) {
+      e.permissionStage = "calling";
+      e.permissionOrigins = _aiRequiredOriginPatterns(settings);
+    }
     container.textContent = "";
     container.classList.add("muted");
     showAIError("tags", e);

@@ -1624,6 +1624,22 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
     ok(r.done === 1 && r.total === 4, "partial: " + JSON.stringify(r));
   });
 
+  await atest("host permission pauses the whole queue without per-block failures", async () => {
+    const err = new Error("permission needed");
+    err.code = "host_permission";
+    let failed = 0, singles = 0;
+    const r = await pbpTrRunQueue({
+      batches: [segs([1, 2, 3])],
+      requestBatch: async () => { throw err; },
+      requestSingle: async () => { singles++; return null; },
+      onFill: () => { throw new Error("no fill expected"); },
+      onBlockFail: () => { failed++; }, onProgress: () => {}
+    });
+    ok(r.permissionError === err, "permission error not preserved");
+    ok(r.done === 0 && r.failed.length === 0 && failed === 0 && singles === 0,
+      "permission failure fragmented into block retries: " + JSON.stringify(r));
+  });
+
   const sum = document.createElement("div");
   sum.id = "tr-queue-summary";
   sum.className = "case " + (qfail ? "fail" : "pass");
@@ -4754,5 +4770,121 @@ suite("skim status line", () => {
     }
   });
 });
+</script>
+<script>
+// ============ Batch 3: permission recovery gate (async) ============
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "AI permission retry gate";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  const realRequest = window.requestAIHostPermissions;
+  const permissionError = new Error("permission needed");
+  permissionError.code = "host_permission";
+  try {
+    await atest("permission request is first and retry waits for grant", async () => {
+      const events = [];
+      let resolveGrant;
+      window.requestAIHostPermissions = () => {
+        events.push("request");
+        return new Promise((resolve) => { resolveGrant = resolve; });
+      };
+      const pending = pbpAiRetryWithPermission(permissionError, { aiProvider: "gemini" }, async () => {
+        events.push("retry");
+      });
+      await Promise.resolve();
+      if (events.join(",") !== "request") throw new Error("retry ran before grant: " + events.join(","));
+      resolveGrant(true);
+      if (!await pending) throw new Error("granted retry reported false");
+      if (events.join(",") !== "request,retry") throw new Error("wrong order: " + events.join(","));
+    });
+
+    await atest("permission denial performs no retry work", async () => {
+      let retries = 0;
+      window.requestAIHostPermissions = async () => false;
+      const ok = await pbpAiRetryWithPermission(permissionError, {}, () => { retries++; });
+      if (ok || retries) throw new Error("denial reached retry callback");
+    });
+
+    await atest("permission request throw performs no retry work", async () => {
+      let retries = 0;
+      window.requestAIHostPermissions = () => { throw new Error("permissions unavailable"); };
+      const ok = await pbpAiRetryWithPermission(permissionError, {}, () => { retries++; });
+      if (ok || retries) throw new Error("throw reached retry callback");
+    });
+
+    await atest("ordinary errors retry without requesting permission", async () => {
+      let requests = 0, retries = 0;
+      window.requestAIHostPermissions = async () => { requests++; return true; };
+      const ok = await pbpAiRetryWithPermission(new Error("network"), {}, () => { retries++; });
+      if (!ok || requests !== 0 || retries !== 1) throw new Error("ordinary retry was permission-gated");
+    });
+
+    function retryAllFixture() {
+      const wrap = document.createElement("div");
+      wrap.innerHTML = '<button id="tr-retry-all"><span>retry all</span></button>' +
+        '<button class="pb-tr-err" data-pb-tr-err="1"><span>retry</span></button>' +
+        '<button class="pb-tr-err" data-pb-tr-err="2"><span>retry</span></button>';
+      document.body.appendChild(wrap);
+      return wrap;
+    }
+    function retryAllState(error) {
+      return {
+        s: { aiProvider: "gemini", geminiApiKey: "k", translateGlossary: "" },
+        target: { name: "Simplified Chinese", code: "zh-CN" },
+        title: "T", url: "https://a.test/x", modelKey: "m", trMd: {},
+        work: [1, 2].map((n) => ({ n, hash: "h" + n, shielded: { text: "hello world" } })),
+        permissionError: error
+      };
+    }
+
+    await atest("retry-all denial requests once and skips every failed block", async () => {
+      const realStream = window.callAIStream;
+      const wrap = retryAllFixture();
+      let requests = 0, calls = 0;
+      window.requestAIHostPermissions = async () => { requests++; return false; };
+      window.callAIStream = async () => { calls++; throw new Error("must not run"); };
+      try {
+        await _pbpTrRetryAllFailed(retryAllState(permissionError));
+        if (requests !== 1 || calls !== 0) throw new Error("requests=" + requests + ", calls=" + calls);
+        if (wrap.querySelectorAll(".pb-tr-err").length !== 2) throw new Error("denial consumed a retry pill");
+      } finally {
+        window.callAIStream = realStream;
+        wrap.remove();
+      }
+    });
+
+    await atest("retry-all grants once then stops at the first renewed permission error", async () => {
+      const realStream = window.callAIStream;
+      const wrap = retryAllFixture();
+      const renewed = new Error("permission revoked");
+      renewed.code = "host_permission";
+      let requests = 0, calls = 0;
+      window.requestAIHostPermissions = async () => { requests++; return true; };
+      window.callAIStream = async () => { calls++; throw renewed; };
+      const st = retryAllState(permissionError);
+      try {
+        await _pbpTrRetryAllFailed(st);
+        if (requests !== 1 || calls !== 1) throw new Error("requests=" + requests + ", calls=" + calls);
+        if (st.permissionError !== renewed) throw new Error("renewed permission error not retained");
+        if (wrap.querySelectorAll(".pb-tr-err").length !== 2) throw new Error("later pills were consumed");
+      } finally {
+        window.callAIStream = realStream;
+        wrap.remove();
+      }
+    });
+  } finally {
+    window.requestAIHostPermissions = realRequest;
+  }
+})();
 </script>
 </body></html>

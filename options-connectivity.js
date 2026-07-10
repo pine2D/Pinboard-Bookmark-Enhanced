@@ -5,8 +5,29 @@
 // Self-contained: depends only on globals (callAI, hasAIKey, t, $id, chrome).
 // ============================================================
 
-function setupApiTests() {
+function pbpLiveAiSettingsSnapshot(provider) {
   function getOptVal(id, fallback) { return $id(id)?.value?.trim() || fallback || ""; }
+  return {
+    aiProvider: provider,
+    geminiApiKey: getOptVal("opt-gemini-key"), geminiModel: getOptVal("opt-gemini-model", "gemini-2.5-flash-lite"),
+    openaiApiKey: getOptVal("opt-openai-key"), openaiModel: getOptVal("opt-openai-model", "gpt-5.4-nano"), openaiBaseUrl: getOptVal("opt-openai-baseurl", "https://api.openai.com/v1"),
+    claudeApiKey: getOptVal("opt-claude-key"), claudeModel: getOptVal("opt-claude-model", "claude-haiku-4-5"),
+    deepseekApiKey: getOptVal("opt-deepseek-key"), deepseekModel: getOptVal("opt-deepseek-model", "deepseek-v4-flash"),
+    qwenApiKey: getOptVal("opt-qwen-key"), qwenModel: getOptVal("opt-qwen-model", "qwen-flash"),
+    minimaxApiKey: getOptVal("opt-minimax-key"), minimaxModel: getOptVal("opt-minimax-model", "MiniMax-M2"),
+    openrouterApiKey: getOptVal("opt-openrouter-key"), openrouterModel: getOptVal("opt-openrouter-model", "meta-llama/llama-4-scout:free"),
+    ollamaBaseUrl: getOptVal("opt-ollama-baseurl", "http://localhost:11434"), ollamaModel: getOptVal("opt-ollama-model", "llama3.2"),
+    groqApiKey: getOptVal("opt-groq-key"), groqModel: getOptVal("opt-groq-model", "llama-3.1-8b-instant"),
+    mistralApiKey: getOptVal("opt-mistral-key"), mistralModel: getOptVal("opt-mistral-model", "mistral-small-latest"),
+    cohereApiKey: getOptVal("opt-cohere-key"), cohereModel: getOptVal("opt-cohere-model", "command-r7b-12-2024"),
+    siliconflowApiKey: getOptVal("opt-siliconflow-key"), siliconflowModel: getOptVal("opt-siliconflow-model", "Qwen/Qwen3-8B"),
+    zhipuApiKey: getOptVal("opt-zhipu-key"), zhipuModel: getOptVal("opt-zhipu-model", "glm-4.7-flash"),
+    kimiApiKey: getOptVal("opt-kimi-key"), kimiModel: getOptVal("opt-kimi-model", "kimi-k2.6"),
+    customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
+  };
+}
+
+function setupApiTests() {
 
   async function testAIProvider(provider) {
     const statusEl = $id(`test-${provider}-status`);
@@ -14,44 +35,36 @@ function setupApiTests() {
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
 
-    const cs = {
-      aiProvider: provider,
-      geminiApiKey: getOptVal("opt-gemini-key"), geminiModel: getOptVal("opt-gemini-model", "gemini-2.5-flash-lite"),
-      openaiApiKey: getOptVal("opt-openai-key"), openaiModel: getOptVal("opt-openai-model", "gpt-5.4-nano"), openaiBaseUrl: getOptVal("opt-openai-baseurl", "https://api.openai.com/v1"),
-      claudeApiKey: getOptVal("opt-claude-key"), claudeModel: getOptVal("opt-claude-model", "claude-haiku-4-5"),
-      deepseekApiKey: getOptVal("opt-deepseek-key"), deepseekModel: getOptVal("opt-deepseek-model", "deepseek-v4-flash"),
-      qwenApiKey: getOptVal("opt-qwen-key"), qwenModel: getOptVal("opt-qwen-model", "qwen-flash"),
-      minimaxApiKey: getOptVal("opt-minimax-key"), minimaxModel: getOptVal("opt-minimax-model", "MiniMax-M2"),
-      openrouterApiKey: getOptVal("opt-openrouter-key"), openrouterModel: getOptVal("opt-openrouter-model", "meta-llama/llama-4-scout:free"),
-      ollamaBaseUrl: getOptVal("opt-ollama-baseurl", "http://localhost:11434"), ollamaModel: getOptVal("opt-ollama-model", "llama3.2"),
-      groqApiKey: getOptVal("opt-groq-key"), groqModel: getOptVal("opt-groq-model", "llama-3.1-8b-instant"),
-      mistralApiKey: getOptVal("opt-mistral-key"), mistralModel: getOptVal("opt-mistral-model", "mistral-small-latest"),
-      cohereApiKey: getOptVal("opt-cohere-key"), cohereModel: getOptVal("opt-cohere-model", "command-r7b-12-2024"),
-      siliconflowApiKey: getOptVal("opt-siliconflow-key"), siliconflowModel: getOptVal("opt-siliconflow-model", "Qwen/Qwen3-8B"),
-      zhipuApiKey: getOptVal("opt-zhipu-key"), zhipuModel: getOptVal("opt-zhipu-model", "glm-4.7-flash"),
-      kimiApiKey: getOptVal("opt-kimi-key"), kimiModel: getOptVal("opt-kimi-model", "kimi-k2.6"),
-      customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
-    };
+    const cs = pbpLiveAiSettingsSnapshot(provider);
 
-    // Endpoints outside the built-in host list (custom, an openai/ollama base-URL
-    // override, a remote Ollama) need a host grant. This click is a user gesture, so
-    // request the narrow origin now — a subset of the declared optional *://*/*
-    // permission. request() resolves true with no prompt if already granted, so it is
-    // safe to call on every Test. The background quick-save path can't prompt itself.
-    const originPattern = (typeof _aiTargetOriginPattern === "function") ? _aiTargetOriginPattern(cs) : null;
-    if (originPattern && chrome.permissions && chrome.permissions.request) {
-      let granted = false;
-      try { granted = await chrome.permissions.request({ origins: [originPattern] }); } catch (_) {}
-      if (!granted) {
-        setStatusIcon(statusEl, false, t("aiErrorHostPermission", originPattern.replace(/\/\*$/, "")));
-        statusEl.style.color = "#c00";
-        setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
-        return;
-      }
+    if (!hasAIKey(cs)) {
+      setStatusIcon(statusEl, false, t("testNoApiKey"));
+      statusEl.style.color = "#c00";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      return;
+    }
+
+    // Test is a direct user gesture: request only this provider's exact origin before
+    // calling it. Automatic/background paths stay contains-only and never prompt.
+    let originPattern = null;
+    let granted = false;
+    try {
+      originPattern = _aiTargetOriginPattern(cs);
+      granted = await requestAIHostPermissions(cs);
+    } catch (err) {
+      setStatusIcon(statusEl, false, err?.message || t("networkError"));
+      statusEl.style.color = "#c00";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      return;
+    }
+    if (!granted) {
+      setStatusIcon(statusEl, false, t("aiErrorHostPermission", originPattern.replace(/\/\*$/, "")));
+      statusEl.style.color = "#c00";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      return;
     }
 
     try {
-      if (!hasAIKey(cs)) throw new Error(t("testNoApiKey"));
       const result = await callAI(cs, "Reply with just the word: OK");
 
       setStatusIcon(statusEl, true, t("testConnected", (result || "OK").substring(0, 20)));

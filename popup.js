@@ -6,9 +6,9 @@
 // Override pinboardFetch to route through background service worker.
 // This prevents Chrome's native credentials dialog when Pinboard returns 401.
 // (function declarations on window are writable, so reassignment works)
-pinboardFetch = function(url, options) {
+pinboardFetch = function(url) {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ type: "pinboard_api_call", url, options: options || null })
+    chrome.runtime.sendMessage({ type: "pinboard_api_call", url })
       .then(resp => {
         if (!resp) { reject(new Error("no background response")); return; }
         if (resp.status === 401) {
@@ -406,13 +406,10 @@ async function showMain(token) {
     _archiveUserTouched = true;
     if (e.target.checked) {
       try {
-        const has = await chrome.permissions.contains({ origins: ["https://web.archive.org/*"] });
-        if (!has) {
-          const granted = await chrome.permissions.request({ origins: ["https://web.archive.org/*"] });
-          if (!granted) {
-            e.target.checked = false;
-            showStatus("status-msg", t("waybackPermDenied"), "error");
-          }
+        const granted = await chrome.permissions.request({ origins: ["https://web.archive.org/*"] });
+        if (!granted) {
+          e.target.checked = false;
+          showStatus("status-msg", t("waybackPermDenied"), "error");
         }
       } catch (_) {
         e.target.checked = false;
@@ -529,6 +526,7 @@ async function htmlToMarkdownAsync(html, opts) {
   // ---- Markdown export button ----
   const jinaMdBtn = $id("jina-md-btn");
   if (jinaMdBtn) {
+    let jinaGrantPending = false;
     jinaMdBtn.title = settings.aiContentSource === "jina" ? t("jinaMarkdownTitleJina") : t("jinaMarkdownTitle");
     // Disable on non-http pages
     const currentUrl = $id("url-input")?.value || "";
@@ -540,10 +538,23 @@ async function htmlToMarkdownAsync(html, opts) {
       if (jinaMdBtn.disabled) return;
       const url = $id("url-input").value;
       if (!url) return;
+      jinaMdBtn.disabled = true;
+
+      if (jinaGrantPending) {
+        let granted = false;
+        try {
+          granted = await chrome.permissions.request({ origins: [PBP_JINA_ORIGIN_PATTERN] });
+        } catch (_) {}
+        if (!granted) {
+          showStatus("status-msg", t("aiErrorHostPermission", PBP_JINA_ORIGIN_PATTERN.replace(/\/\*$/, "")), "error");
+          jinaMdBtn.disabled = false;
+          return;
+        }
+        jinaGrantPending = false;
+      }
 
       const origLabel = t("jinaMarkdownBtn");
       setBtnIcon(jinaMdBtn, "doc", t("jinaConverting"));
-      jinaMdBtn.disabled = true;
 
       let result;
       if (settings.aiContentSource === "jina") {
@@ -556,6 +567,14 @@ async function htmlToMarkdownAsync(html, opts) {
       }
 
       if (result.error) {
+        if (result.code === "host_permission") {
+          jinaGrantPending = true;
+          setBtnIcon(jinaMdBtn, "doc", t("aiGrantRetry"));
+          jinaMdBtn.title = t("aiErrorHostPermission", PBP_JINA_ORIGIN_PATTERN.replace(/\/\*$/, ""));
+          jinaMdBtn.disabled = false;
+          showStatus("status-msg", jinaMdBtn.title, "error");
+          return;
+        }
         jinaMdBtn.innerHTML = PBP_ICONS.cross + " " + t("jinaFailed");
         jinaMdBtn.title = result.error;
         // Persistent, specific status — so the user can tell API-key vs other failures

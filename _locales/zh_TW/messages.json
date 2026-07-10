@@ -299,12 +299,15 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "無法存取 $HOST$ — 請在 設定 > AI 中按一下「測試」以授予存取權限",
+    "message": "無法存取 $HOST$ — 請授權並重試。",
     "placeholders": {
       "host": {
         "content": "$1"
       }
     }
+  },
+  "aiGrantRetry": {
+    "message": "授權並重試"
   },
   "aiErrorModelNotFoundHint": {
     "message": "前往設定 > AI，選擇一個可用的模型"
@@ -668,6 +671,14 @@
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" 已儲存。",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "bgTitleSavedAiSkipped": {
+    "message": "\"$TITLE$\" 已儲存。AI 未執行；請前往「設定 > AI > 測試」授權。",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -1062,10 +1073,26 @@
     "message": "跳過已收藏的網址"
   },
   "batchAiHint": {
-    "message": "AI 功能會比較慢（每個分頁單獨調用 AI + 儲存間隔 3 秒）。需要「存取所有網站」權限以讀取非當前分頁內容，首次使用時會彈出授權。"
+    "message": "AI 會為每個分頁單獨調用，可能較慢。首次使用時，批次儲存只會申請清單中的分頁網站和目前 AI 服務商權限。"
   },
   "batchPermDenied": {
-    "message": "權限被拒絕——AI 功能需要存取所有網站以讀取分頁內容。"
+    "message": "未獲得清單中的網站權限，批次 AI 未啟動。"
+  },
+  "batchPermConfirm": {
+    "message": "本次批次 AI 需要存取以下 $COUNT$ 個網站：",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchPermProvider": {
+    "message": "$PROVIDER$（AI 服務供應商）：$ORIGIN$",
+    "placeholders": {
+      "provider": { "content": "$1" },
+      "origin": { "content": "$2" }
+    }
+  },
+  "batchPermGrant": {
+    "message": "授權並開始"
   },
   "secAiProvider": {
     "message": "AI 服務商"
@@ -1860,13 +1887,13 @@
     "message": "API 金鑰已混淆（非加密），並透過 chrome.storage.sync 同步。請勿分享您的設定匯出檔案。"
   },
   "batchPermLabel": {
-    "message": "主機權限："
+    "message": "舊版所有網站權限："
   },
   "batchRevokeBtn": {
-    "message": "撤銷所有網站存取權限"
+    "message": "撤銷舊版所有網站權限"
   },
   "batchRevokeHint": {
-    "message": "僅在您啟用了批量 AI 內容擷取但不再希望擴充功能存取所有頁面時使用。"
+    "message": "舊版本可能授予所有網站權限。新版批次儲存只申請清單中的網站；此按鈕用於移除舊版廣泛權限。"
   },
   "batchRevokeSuccess": {
     "message": "已撤銷"
@@ -1875,7 +1902,7 @@
     "message": "已撤銷"
   },
   "batchPermNone": {
-    "message": "目前未授予所有網站存取權限"
+    "message": "目前未授予舊版所有網站權限"
   },
   "batchRevokeFailed": {
     "message": "失敗"
@@ -2231,7 +2258,7 @@
     "message": "預覽頁 AI"
   },
   "previewAiSectionHint": {
-    "message": "在 Markdown 預覽頁提供劃詞解釋、全文問答與全文翻譯。使用上方設定的 AI 提供商與 Key；所有請求均由你主動觸發，不會在背景執行。"
+    "message": "Markdown 預覽頁的劃詞解釋、全文問答與全文翻譯均由你主動使用，並使用上方設定的 AI 提供商與 Key。若啟用選用的 AI 重點速覽，它可能會在 Markdown 預覽開啟時執行；所有功能都不會以隱藏的背景工作形式執行。"
   },
   "previewAiEnabled": {
     "message": "在預覽頁啟用 AI 功能"
@@ -2578,7 +2605,7 @@
     "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填寫的 Authorization 值會原樣傳送（例如 Bearer <token> 或 Token <key>），因此支援任何驗證方式。可搭配 n8n、Make、Zapier、Readwise 或任何自架接收端使用 — 無需在此註冊帳號。"
   },
   "mdTargetWebhookHttpWarn": {
-    "message": "該位址使用 HTTP 而非 HTTPS——Authorization 值會以明文傳送。區域網路／本機位址沒問題，公網位址請避免。"
+    "message": "已封鎖：請使用 HTTPS；HTTP 僅允許 localhost、127.0.0.1 或 [::1]。區域網路／公網 HTTP、無效網址及含帳號密碼的網址不會傳送。"
   },
   "hlColorQuote": { "message": "金句" },
   "hlColorDefinition": { "message": "定義" },

@@ -299,12 +299,15 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "$HOST$ にアクセスできません — 設定 > AI で「テスト」をクリックして許可してください",
+    "message": "$HOST$ にアクセスできません — アクセスを許可して再試行してください。",
     "placeholders": {
       "host": {
         "content": "$1"
       }
     }
+  },
+  "aiGrantRetry": {
+    "message": "許可して再試行"
   },
   "aiErrorModelNotFoundHint": {
     "message": "設定 > AI を開いて、利用可能なモデルを選択してください"
@@ -668,6 +671,14 @@
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" を保存しました。",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "bgTitleSavedAiSkipped": {
+    "message": "\"$TITLE$\" を保存しました。AI は実行されませんでした。「設定 > AI > テスト」でアクセスを許可してください。",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -1062,10 +1073,26 @@
     "message": "既にブックマーク済みの URL をスキップ"
   },
   "batchAiHint": {
-    "message": "AI 機能は時間がかかります（タブごとに個別の AI 呼び出し + 保存間隔 3 秒）。非アクティブタブの内容を読み取るため「すべてのウェブサイトへのアクセス」権限が必要です（初回使用時に許可を求められます）。"
+    "message": "AI はタブごとに 1 回呼び出されるため、時間がかかる場合があります。初回のみ、一覧のタブサイトと現在の AI プロバイダーへの権限を求めます。"
   },
   "batchPermDenied": {
-    "message": "権限が拒否されました — AI 機能はタブの内容を読み取るためにすべてのウェブサイトへのアクセスが必要です。"
+    "message": "一覧のサイト権限が付与されなかったため、Batch AI は開始されませんでした。"
+  },
+  "batchPermConfirm": {
+    "message": "今回の Batch AI は次の $COUNT$ 件のサイトへアクセスします：",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "batchPermProvider": {
+    "message": "$PROVIDER$（AI プロバイダー）：$ORIGIN$",
+    "placeholders": {
+      "provider": { "content": "$1" },
+      "origin": { "content": "$2" }
+    }
+  },
+  "batchPermGrant": {
+    "message": "許可して開始"
   },
   "secAiProvider": {
     "message": "AI プロバイダー"
@@ -1860,13 +1887,13 @@
     "message": "API キーは難読化（暗号化ではない）されており、chrome.storage.sync で同期されます。設定エクスポートファイルを共有しないでください。"
   },
   "batchPermLabel": {
-    "message": "ホスト権限："
+    "message": "旧バージョンの全サイト権限："
   },
   "batchRevokeBtn": {
-    "message": "全サイトアクセスを取り消す"
+    "message": "旧バージョンの全サイト権限を取り消す"
   },
   "batchRevokeHint": {
-    "message": "一括 AI コンテンツ抽出を有効にしたが、拡張機能によるすべてのページへのアクセスが不要になった場合にのみ使用してください。"
+    "message": "旧バージョンでは全サイト権限が付与される場合がありました。新しい Batch は一覧のサイトだけを要求します。このボタンで旧権限を削除できます。"
   },
   "batchRevokeSuccess": {
     "message": "取り消しました"
@@ -1875,7 +1902,7 @@
     "message": "取り消し済み"
   },
   "batchPermNone": {
-    "message": "現在、全サイトへのアクセス権は付与されていません"
+    "message": "旧バージョンの全サイト権限は付与されていません"
   },
   "batchRevokeFailed": {
     "message": "失敗"
@@ -2231,7 +2258,7 @@
     "message": "プレビューページ AI"
   },
   "previewAiSectionHint": {
-    "message": "Markdown プレビューページで選択テキストの説明、ページへの質問、全文翻訳を提供します。上記で設定した AI プロバイダーとキーを使用し、すべてのリクエストはユーザーが明示的に実行します。バックグラウンドでは何も実行されません。"
+    "message": "Markdown プレビューの選択範囲の解説、ページへの質問、全文翻訳はユーザーが実行し、上記で設定した AI プロバイダーとキーを使用します。オプトインの要点スキムを有効にすると、Markdown プレビューを開いたときに実行される場合があります。非表示のバックグラウンドタスクとして実行される機能はありません。"
   },
   "previewAiEnabled": {
     "message": "プレビューページで AI 機能を有効にする"
@@ -2578,7 +2605,7 @@
     "message": "JSON ペイロード {title, url, date, tags, markdown} をエンドポイントに POST します。設定した Authorization 値はそのまま送信されるため（例：Bearer <token> や Token <key>）、あらゆる認証方式に対応します。n8n、Make、Zapier、Readwise、または任意の自己ホスト型レシーバーで利用できます — ここでのアカウント登録は不要です。"
   },
   "mdTargetWebhookHttpWarn": {
-    "message": "このエンドポイントは HTTPS ではなく HTTP を使用しています — Authorization の値は平文で送信されます。localhost や LAN なら問題ありませんが、公開インターネット上では避けてください。"
+    "message": "ブロックしました。HTTPS、または localhost、127.0.0.1、[::1] に限り HTTP を使用してください。LAN／公開 HTTP、不正な URL、認証情報を含む URL は送信されません。"
   },
   "hlColorQuote": { "message": "引用" },
   "hlColorDefinition": { "message": "定義" },

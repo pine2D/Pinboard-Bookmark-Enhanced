@@ -41,7 +41,7 @@ After installing, click the toolbar icon → paste your [Pinboard API token](htt
 
 ## Privacy
 
-No tracking, no analytics, no telemetry. All data is stored on your device via `chrome.storage`; if you turn on settings sync, your settings (not your saved bookmarks) sync across your devices via Chrome's account sync. AI requests fire **only** when you explicitly trigger an AI action — AI tags/summary, page Q&A, translation, selection explain, or the opt-in key-points skim — and go directly to the provider you configured. Extension pages enforce a strict Content-Security-Policy (no remote code). Full policy: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+No tracking, no analytics, no telemetry. All data is stored on your device via `chrome.storage`; if you turn on settings sync, your settings (not your saved bookmarks) sync across your devices via Chrome's account sync. AI requests are sent **only** through features you enable or invoke — AI tags/summary, page Q&A, translation, selection explain, or the opt-in key-points skim — and go directly to the provider you configured. At install time, only Pinboard access is granted; AI, Jina, Batch-selected sites, and optional export, archive, and backup destinations request only the exact site permission when you use the corresponding action. Custom network endpoints must use HTTPS; HTTP is allowed only for `localhost`, `127.0.0.1`, and `[::1]`. Extension pages enforce a strict Content-Security-Policy (no remote code). Full policy: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## License
 

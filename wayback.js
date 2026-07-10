@@ -151,13 +151,11 @@ async function pbpWaybackArchive(url, settings, opts) {
     try {
       const hasPermission = await chrome.permissions.contains({ origins: ["https://web.archive.org/*"] });
       if (!hasPermission) {
-        if (enabled && typeof getSettingsStorage === "function") {
-          try { await (await getSettingsStorage()).set({ waybackArchiveEnabled: false }); } catch (_) {}
-        }
         await _pbpWaybackLog(url, "permDenied");
         return;
       }
     } catch (_) {
+      await _pbpWaybackLog(url, "permDenied");
       return;
     }
 

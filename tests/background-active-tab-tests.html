@@ -9,6 +9,7 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <body>
 <h1>Background Active Tab Tests</h1>
 <div id="results"></div>
+<script src="../shared.js"></script>
 <script>
 function assert(condition, message) {
   if (!condition) throw new Error(message || "assertion failed");
@@ -56,9 +57,291 @@ function buildHarness(source, queryTabs, bookmarkResult = true) {
   return { api, calls, wait: () => scheduledWork };
 }
 
+function buildProxyHarness(source) {
+  const start = source.indexOf('if (message.type === "pinboard_api_call")');
+  const end = source.indexOf('if (message.type === "retry_offline_item"', start);
+  assert(start >= 0 && end > start, "Pinboard proxy branch not found");
+  const branch = source.slice(start, end);
+  const runBranch = new Function("message", "sendResponse", "pinboardFetch", "pbpIsAllowedPinboardApiUrl", branch);
+  return {
+    branch,
+    async invoke(message) {
+      const calls = { fetch: [], responses: [] };
+      const returned = runBranch(
+        message,
+        (response) => calls.responses.push(response),
+        (...args) => {
+          calls.fetch.push(args);
+          return Promise.resolve({ ok: true, status: 200, text: async () => "{}" });
+        },
+        pbpIsAllowedPinboardApiUrl
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { branch, calls, returned };
+    }
+  };
+}
+
+function buildLegacyPermissionMigrationHarness(source, chrome) {
+  const start = source.indexOf("const PBP_LEGACY_WILDCARD_CLEANUP_KEY");
+  const end = source.indexOf("pbpMigrateLegacyWildcardPermission().catch", start);
+  assert(start >= 0 && end > start, "legacy wildcard migration not found");
+  return new Function("chrome", source.slice(start, end) +
+    "; return { key: PBP_LEGACY_WILDCARD_CLEANUP_KEY, run: pbpMigrateLegacyWildcardPermission };")(chrome);
+}
+
+function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch = {}, hasKey = true) {
+  const start = source.indexOf("async function saveFromBackground");
+  const end = source.indexOf("// Helper: resolve prefix-specific settings", start);
+  assert(start >= 0 && end > start, "background save function not found");
+  const notifications = [];
+  const intents = [];
+  const settings = {
+    pinboardToken: "token", bgSaveMode: "merge", aiProvider: "openai",
+    aiCacheDuration: 60, aiContentSource: "local", aiTagSeparator: "space",
+    _aiTags: true, _aiSummary: true, _autoNotes: false, _blockquote: false,
+    customTagPrompt: "", customSummaryPrompt: "", ...settingsPatch,
+  };
+  const extractionCalls = [];
+  const dependencies = {
+    loadSettings: async () => settings,
+    pbpEffectivePrivate: () => false,
+    showNotification: (...args) => notifications.push(args),
+    pbpSaveFailure: (reason) => ({ status: "failed", reason }),
+    getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return { pageText: "article body" }; },
+    buildAutoNotes: () => "",
+    hasAIKey: () => hasKey,
+    getAICache: async (_url, kind) => cached[kind] ?? null,
+    callAI,
+    buildCombinedPrompt: () => "combined",
+    parseAICombined: () => ({ tags: ["combined-tag"], summary: "combined-summary" }),
+    setAICache: async () => {},
+    escapeForExtended: (value) => value,
+    buildTagPrompt: () => "tags",
+    refineTags: (tags) => tags,
+    parseAITags: (value) => value,
+    AI_TAG_CAP: 12,
+    buildSummaryPrompt: () => "summary",
+    submitSaveIntent: async (intent) => { intents.push(intent); return { status: "saved", mutation: "updated" }; },
+    processOfflineQueue: () => Promise.resolve(),
+    t: (key, value) => `${key}:${value || ""}`,
+  };
+  const names = Object.keys(dependencies);
+  const make = new Function(...names, source.slice(start, end) + "; return saveFromBackground;");
+  return {
+    save: make(...names.map((name) => dependencies[name])),
+    notifications,
+    intents,
+    extractionCalls,
+  };
+}
+
 async function run() {
-  const source = await (await fetch("../background.js")).text();
+  const [source, popupSource] = await Promise.all([
+    fetch("../background.js").then((response) => response.text()),
+    fetch("../popup.js").then((response) => response.text()),
+  ]);
   const url = "https://example.com/article";
+
+  await test("Pinboard proxy allowlist accepts only the v1 API origin", () => {
+    assert(pbpIsAllowedPinboardApiUrl("https://api.pinboard.in/v1/posts/get?format=json"), "valid v1 URL rejected");
+    assert(pbpIsAllowedPinboardApiUrl("https://api.pinboard.in:443/v1/tags/get"), "explicit default port rejected");
+  });
+
+  await test("Pinboard proxy allowlist rejects URL credentials", () => {
+    assert(!pbpIsAllowedPinboardApiUrl("https://user:pass@api.pinboard.in/v1/posts/get"), "credentials accepted");
+    assert(!pbpIsAllowedPinboardApiUrl("https://@api.pinboard.in/v1/posts/get"), "empty userinfo accepted");
+  });
+
+  await test("Pinboard proxy allowlist rejects non-default ports", () => {
+    assert(!pbpIsAllowedPinboardApiUrl("https://api.pinboard.in:444/v1/posts/get"), "non-default port accepted");
+  });
+
+  await test("Pinboard proxy allowlist rejects lookalike hosts", () => {
+    assert(!pbpIsAllowedPinboardApiUrl("https://api.pinboard.in.evil.test/v1/posts/get"), "suffix lookalike accepted");
+    assert(!pbpIsAllowedPinboardApiUrl("https://api-pinboard.in/v1/posts/get"), "hyphen lookalike accepted");
+  });
+
+  await test("Pinboard proxy allowlist rejects paths outside /v1/", () => {
+    assert(!pbpIsAllowedPinboardApiUrl("https://api.pinboard.in/v1"), "bare /v1 accepted");
+    assert(!pbpIsAllowedPinboardApiUrl("https://api.pinboard.in/v10/posts/get"), "/v10 lookalike accepted");
+  });
+
+  await test("Pinboard proxy allowlist rejects non-HTTPS URLs", () => {
+    assert(!pbpIsAllowedPinboardApiUrl("http://api.pinboard.in/v1/posts/get"), "HTTP accepted");
+  });
+
+  await test("Pinboard proxy allowlist rejects malformed and relative URLs", () => {
+    assert(!pbpIsAllowedPinboardApiUrl("not a url"), "malformed URL accepted");
+    assert(!pbpIsAllowedPinboardApiUrl("/v1/posts/get"), "relative URL accepted");
+  });
+
+  await test("Pinboard proxy branch rejects invalid targets with zero fetch", async () => {
+    const h = buildProxyHarness(source);
+    const result = await h.invoke({ type: "pinboard_api_call", url: "https://evil.test/v1/posts/get" });
+    assert(result.returned === true, "async message channel not retained");
+    assert(result.calls.fetch.length === 0, "invalid target reached pinboardFetch");
+    assert(result.calls.responses[0]?.error === "invalid_pinboard_api_url", "bounded rejection missing");
+  });
+
+  await test("Pinboard proxy branch forwards only an allowed URL and no caller options", async () => {
+    const h = buildProxyHarness(source);
+    const result = await h.invoke({
+      type: "pinboard_api_call",
+      url: "https://api.pinboard.in/v1/posts/get?format=json",
+      options: { method: "POST", headers: { Authorization: "attacker" } },
+    });
+    assert(result.calls.fetch.length === 1 && result.calls.fetch[0].length === 1, "caller options reached pinboardFetch");
+    assert(result.branch.includes("pbpIsAllowedPinboardApiUrl(message.url)"), "branch does not call allowlist helper");
+    assert(!result.branch.includes("message.options"), "branch still reads message.options");
+    const override = popupSource.slice(popupSource.indexOf("pinboardFetch = function"), popupSource.indexOf("let currentTags"));
+    assert(!override.includes("options"), "Popup proxy still sends options");
+  });
+
+  await test("legacy wildcard migration marker makes cleanup one-time", async () => {
+    let permissionCalls = 0, writes = 0;
+    const chrome = {
+      storage: { local: {
+        get: async () => ({ _legacyWildcardCleanupV1: true }),
+        set: async () => { writes++; },
+      } },
+      permissions: { contains: async () => { permissionCalls++; return true; }, remove: async () => true },
+    };
+    await buildLegacyPermissionMigrationHarness(source, chrome).run();
+    assert(permissionCalls === 0 && writes === 0, "completed migration touched permissions or storage");
+  });
+
+  await test("profiles without a wildcard keep existing exact grants and record cleanup", async () => {
+    let removes = 0, marker = null, exactActive = true;
+    const chrome = {
+      storage: { local: {
+        get: async () => ({}),
+        set: async (value) => { marker = value; },
+      } },
+      permissions: { contains: async () => false, remove: async () => { removes++; exactActive = false; return true; } },
+    };
+    const h = buildLegacyPermissionMigrationHarness(source, chrome);
+    await h.run();
+    assert(removes === 0 && exactActive && marker?.[h.key] === true,
+      "no-wildcard profile removed an existing exact grant or failed to settle");
+  });
+
+  await test("legacy wildcard cleanup marks only a verified removal", async () => {
+    for (const removalWorks of [true, false]) {
+      let active = true, marker = null, removes = 0;
+      const chrome = {
+        storage: { local: {
+          get: async () => ({}),
+          set: async (value) => { marker = value; },
+        } },
+        permissions: {
+          contains: async () => active,
+          remove: async () => { removes++; if (removalWorks) active = false; return removalWorks; },
+        },
+      };
+      const h = buildLegacyPermissionMigrationHarness(source, chrome);
+      await h.run();
+      assert(removes === 1, "active legacy wildcard was not removed");
+      assert((marker?.[h.key] === true) === removalWorks, "migration marked an unverified removal");
+    }
+  });
+
+  await test("legacy wildcard cleanup does not mark a thrown removal", async () => {
+    let marker = null;
+    const chrome = {
+      storage: { local: {
+        get: async () => ({}),
+        set: async (value) => { marker = value; },
+      } },
+      permissions: {
+        contains: async () => true,
+        remove: async () => { throw new Error("permissions unavailable"); },
+      },
+    };
+    const h = buildLegacyPermissionMigrationHarness(source, chrome);
+    let threw = false;
+    try { await h.run(); } catch (_) { threw = true; }
+    assert(threw && marker === null, "failed removal wrote a completion marker");
+  });
+
+  await test("background save keeps the extraction fast path when AI is disabled", async () => {
+    const h = buildBackgroundSaveHarness(source, async () => "unused", {}, { _aiTags: false, _aiSummary: false });
+    await h.save({
+      url, title: "Article", tab: { id: 7 }, settingsOverrides: {},
+      toread: false, notifyId: "qs", notifyTitle: "Saved", notifyCategory: "quickSave",
+    });
+    assert(h.extractionCalls.length === 1 && h.extractionCalls[0].length === 1,
+      "no-AI save injected the full extractor");
+  });
+
+  await test("background save keeps the extraction fast path when AI has no key", async () => {
+    const h = buildBackgroundSaveHarness(source, async () => "unused", {}, {}, false);
+    await h.save({
+      url, title: "Article", tab: { id: 7 }, settingsOverrides: {},
+      toread: false, notifyId: "qs", notifyTitle: "Saved", notifyCategory: "quickSave",
+    });
+    assert(h.extractionCalls.length === 1 && h.extractionCalls[0].length === 1,
+      "keyless AI save injected the full extractor");
+  });
+
+  await test("Quick Save and Read Later AI settings both request Defuddle extraction", async () => {
+    const resolverStart = source.indexOf("function resolvePrefixSettings");
+    const resolverEnd = source.indexOf("// B4: write current tab data", resolverStart);
+    const resolvePrefix = new Function(source.slice(resolverStart, resolverEnd) + "; return resolvePrefixSettings;")();
+    for (const prefix of ["qs", "rl"]) {
+      const configured = { [prefix + "AiTags"]: prefix === "qs", [prefix + "AiSummary"]: prefix === "rl" };
+      const h = buildBackgroundSaveHarness(source, async () => "ai-result", {}, { _aiTags: false, _aiSummary: false });
+      await h.save({
+        url, title: "Article", tab: { id: 7 }, settingsOverrides: resolvePrefix(configured, prefix),
+        toread: prefix === "rl", notifyId: prefix, notifyTitle: "Saved", notifyCategory: "quickSave",
+      });
+      assert(h.extractionCalls.length === 1 && h.extractionCalls[0][0] === 7 &&
+        h.extractionCalls[0][1]?.withDefuddle === true, prefix + " AI branch did not request Defuddle");
+    }
+  });
+
+  await test("background save skips duplicate fallback calls after host-permission failure", async () => {
+    let calls = 0;
+    const hostError = Object.assign(new Error("permission required"), { code: "host_permission" });
+    const h = buildBackgroundSaveHarness(source, async () => { calls++; throw hostError; });
+    const result = await h.save({
+      url, title: "Article", tab: { id: 7 }, settingsOverrides: {},
+      toread: false, notifyId: "qs", notifyTitle: "Saved", notifyCategory: "quickSave",
+    });
+    assert(result.status === "saved", "bookmark was not saved");
+    assert(calls === 1, "combined host failure fell through to separate AI calls");
+    assert(h.intents.length === 1 && h.intents[0].tags === "" && h.intents[0].notes === "", "partial AI output leaked into the bookmark");
+    assert(h.notifications[0]?.[2] === "bgTitleSavedAiSkipped:Article", "saved-without-AI notification missing");
+  });
+
+  await test("background save keeps the existing non-permission AI fallback", async () => {
+    let calls = 0;
+    const h = buildBackgroundSaveHarness(source, async (_settings, prompt) => {
+      calls++;
+      if (prompt === "combined") throw new Error("bad combined payload");
+      return prompt === "tags" ? ["ai-tag"] : "AI summary";
+    });
+    const result = await h.save({
+      url, title: "Article", tab: { id: 7 }, settingsOverrides: {},
+      toread: false, notifyId: "qs", notifyTitle: "Saved", notifyCategory: "quickSave",
+    });
+    assert(result.status === "saved" && calls === 3, "non-permission combined error no longer falls back to two calls");
+    assert(h.intents[0].tags === "ai-tag" && h.intents[0].notes.includes("AI summary"), "fallback AI results were not saved");
+    assert(h.notifications[0]?.[2] === "bgTitleSaved:Article", "ordinary success notification changed");
+  });
+
+  await test("background host-permission failure keeps already cached AI output", async () => {
+    let calls = 0;
+    const hostError = Object.assign(new Error("permission required"), { code: "host_permission" });
+    const h = buildBackgroundSaveHarness(source, async () => { calls++; throw hostError; }, { tags: ["cached-tag"] });
+    await h.save({
+      url, title: "Article", tab: { id: 7 }, settingsOverrides: {},
+      toread: false, notifyId: "qs", notifyTitle: "Saved", notifyCategory: "quickSave",
+    });
+    assert(calls === 1, "cache-preserving recovery made an extra AI call");
+    assert(h.intents[0].tags === "cached-tag", "cached AI tags were discarded");
+    assert(h.notifications[0]?.[2] === "bgTitleSavedAiSkipped:Article", "missing grant guidance after cache-only recovery");
+  });
 
   await test("activated and updated listeners share the guarded scheduler", () => {
     const activated = source.match(/chrome\.tabs\.onActivated\.addListener\([\s\S]*?\n}\);/)[0];

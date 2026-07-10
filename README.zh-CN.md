@@ -41,7 +41,7 @@
 
 ## 隐私
 
-零追踪、零分析、零遥测。所有数据默认通过 `chrome.storage` 保存在你的本机；若开启设置同步，你的设置（不含书签内容）会通过 Chrome 账号在你的设备间同步。AI 请求**仅**在你主动触发某个 AI 操作时才会发出——AI 标签/摘要、页面问答、翻译、选中段落解读，或可选启用的 AI 要点摘要——并直接发送到你配置的服务商。扩展页面强制执行严格的内容安全策略（Content-Security-Policy，禁止远程代码）。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
+零追踪、零分析、零遥测。所有数据默认通过 `chrome.storage` 保存在你的本机；若开启设置同步，你的设置（不含书签内容）会通过 Chrome 账号在你的设备间同步。AI 请求**仅**通过你启用或调用的功能发出——AI 标签/摘要、页面问答、翻译、选中段落解读，或可选启用的 AI 要点摘要——并直接发送到你配置的服务商。安装时仅授予 Pinboard 访问权限；AI、Jina、批量操作中选定的站点，以及可选的导出、归档和备份目的地，只会在你执行相应操作时申请当前精确站点权限。自定义网络端点必须使用 HTTPS；HTTP 仅允许用于 `localhost`、`127.0.0.1` 和 `[::1]`。扩展页面强制执行严格的内容安全策略（Content-Security-Policy，禁止远程代码）。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
 ## 许可证
 

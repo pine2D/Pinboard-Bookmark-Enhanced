@@ -290,8 +290,9 @@ const PBP_TR_BACKOFF_MS = [2000, 8000, 32000];
 //                   inject [1,1,1]); sleep?: default setTimeout promise
 //   }
 // Resolution invariants: resolves (never rejects) -- every non-filled block is
-// either in `failed` or still pending because `stopped` is true. The ratio
-// gate (pbpTrLengthRatioOk) runs on every fill, batch AND single.
+// either in `failed`, still pending because `stopped` is true, or held for one
+// permission recovery when `permissionError` is set. The ratio gate
+// (pbpTrLengthRatioOk) runs on every fill, batch AND single.
 async function pbpTrRunQueue(plan) {
   const batches = plan.batches || [];
   const conc = plan.concurrency || 2;
@@ -307,6 +308,8 @@ async function pbpTrRunQueue(plan) {
   const downgrade = [];   // [{id, text}] -> single-block retry phase
   let slow = false;       // any 429 seen -> drain pool to 1 worker
   let next = 0;           // next batch index to claim
+  let permissionError = null;
+  const halted = () => aborted() || !!permissionError;
 
   const fill = (id, text) => {
     if (filled.has(id)) return;
@@ -334,12 +337,13 @@ async function pbpTrRunQueue(plan) {
       // ratio-failed items stay unfilled -> picked up by the missing diff below
     };
     for (let attempt = 0; ; attempt++) {
-      if (aborted()) return;
+      if (halted()) return;
       try {
         await plan.requestBatch(batch, onItem);
         break; // stream completed; missing-id diff below
       } catch (e) {
         if (aborted()) return;
+        if (e && e.code === "host_permission") { permissionError = e; return; }
         if (_pbpTrIs429(e) && attempt < backoff.length) {
           slow = true;                                     // 2 -> 1 worker
           await sleep(backoff[attempt]);
@@ -356,7 +360,7 @@ async function pbpTrRunQueue(plan) {
 
   async function worker(index) {
     while (true) {
-      if (aborted()) return;
+      if (halted()) return;
       if (slow && index > 0) return;                       // pool 2 -> 1 after a 429
       const i = next++;
       if (i >= batches.length) return;
@@ -371,7 +375,7 @@ async function pbpTrRunQueue(plan) {
   // Downgrade phase: sequential single-block re-request, ONE attempt each
   // (spec: retry once, don't grind the same prompt repeatedly).
   while (downgrade.length) {
-    if (aborted()) break;
+    if (halted()) break;
     const seg = downgrade.shift();
     if (!seg || filled.has(seg.id)) continue;
     try {
@@ -380,11 +384,12 @@ async function pbpTrRunQueue(plan) {
       else fail(seg.id, "invalid single-block translation");
     } catch (e) {
       if (aborted()) break;
+      if (e && e.code === "host_permission") { permissionError = e; break; }
       fail(seg.id, e && e.message);
     }
   }
 
-  return { done, total, failed, stopped: aborted() };
+  return { done, total, failed, stopped: aborted(), permissionError };
 }
 
 // ============================================================
@@ -621,7 +626,8 @@ async function pbpTrInit(detail) {
                                     // last view (e.g. "translated") is what V returns to.
     running: false,
     ctrl: null,
-    glossaryHits: Object.create(null)
+    glossaryHits: Object.create(null),
+    permissionError: null
   };
   // Cheap pre-gate + cost estimate WITHOUT Turndown: any non-pre block carrying text is
   // a translation candidate; sum its textContent length as the rough char count for the
@@ -1064,6 +1070,11 @@ async function _pbpTrStart(st) {
   if (st.running) return;
   st.running = true;                       // claim the run synchronously so a double-click during
                                            // the rAF-chunked st.work build can't start two runs
+  if (st.permissionError) {
+    const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
+    if (!recovered) { st.running = false; return; }
+    st.permissionError = null;
+  }
   if (st.workReady) await st.workReady;    // ensure the deferred st.work build finished
   _pbpTrApplySkips(st);                    // T3: re-detect every run -- target may have changed since init/last run
   const pending = st.work.filter((w) => !(w.n in st.trMd));
@@ -1160,7 +1171,7 @@ async function _pbpTrStart(st) {
       });
     }
   }
-  await pbpTrRunQueue({
+  const queueResult = await pbpTrRunQueue({
     batches: pbpTrPackBatches(segs),
     requestBatch, requestSingle, signal: st.ctrl.signal,
     onFill: (id, text) => {
@@ -1205,14 +1216,24 @@ async function _pbpTrStart(st) {
       if (headProg) headProg.textContent = "(" + d + "/" + tt + ")";
     }
   });
+  if (Object.keys(newly).length) {
+    try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, newly); } catch (_) {}
+  }
+  if (queueResult.permissionError) {
+    st.running = false;
+    st.permissionError = queueResult.permissionError;
+    const headProg = document.querySelector("#tr-section .rail-sec-progress");
+    if (headProg) headProg.textContent = "";
+    _pbpTrSetStatus(st, "partial");
+    const prog = document.getElementById("tr-progress");
+    if (prog) prog.textContent = queueResult.permissionError.message || t("aiErrorRetry");
+    return;
+  }
   st.running = false;
   // Rail accordion: clear the mini progress unconditionally at run end
   // (done/partial/stopped alike) so a later collapse never shows a stale count.
   const headProgEnd = document.querySelector("#tr-section .rail-sec-progress");
   if (headProgEnd) headProgEnd.textContent = "";
-  if (Object.keys(newly).length) {
-    try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, newly); } catch (_) {}
-  }
   // A target-language change arrived mid-run (deferred by the onChanged listener). The
   // old-language results are now cached under the OLD st.target.code above; apply the
   // change (Task 7: resets filled state + re-arms the button for the new language) and
@@ -1397,6 +1418,14 @@ async function _pbpTrRetryBlock(st, w, btn) {
   if (st.running) return;   // a batch run owns the queue + cache; don't fire a concurrent single-block request
   if (btn.disabled) return;
   btn.disabled = true;
+  const label = btn.querySelector("span");
+  if (st.permissionError) {
+    if (label) label.textContent = t("aiGrantRetry");
+    const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
+    if (!recovered) { btn.disabled = false; return; }
+    st.permissionError = null;
+    if (label) label.textContent = t("trRetryBlock");
+  }
   // Fresh controller: the run-level st.ctrl may already be aborted (Stop /
   // pagehide on the main run), and reusing it would abort this retry instantly.
   // Wire pagehide so a retry started after the run still cancels on unload.
@@ -1428,6 +1457,8 @@ async function _pbpTrRetryBlock(st, w, btn) {
     _pbpTrShowViewToggle(st);
     if (st.work.every((x) => x.n in st.trMd)) _pbpTrSetStatus(st, "done");
   } catch (e) {
+    if (e && e.code === "host_permission") st.permissionError = e;
+    if (label) label.textContent = t(e && e.code === "host_permission" ? "aiGrantRetry" : "trRetryBlock");
     btn.disabled = false;
     btn.title = t("trBlockFailed") + " - " + String((e && e.message) || "");
     btn.setAttribute("aria-label", btn.title);
@@ -1460,6 +1491,7 @@ function _pbpTrSyncRetryAll() {
 async function _pbpTrRetryAllFailed(st) {
   if (st.running) return;   // batch run in progress: retrying now races the queue + cache get-merge-put
   const all = document.getElementById("tr-retry-all");
+  const allLabel = all && all.querySelector("span");
   if (all) {
     // Disabling the focused button drops focus to <body> (audit md-translate.js:1000);
     // tr-progress is already visible whenever retry-all is (both follow a "translating"
@@ -1471,12 +1503,23 @@ async function _pbpTrRetryAllFailed(st) {
     all.disabled = true;
   }
   const pills = Array.from(document.querySelectorAll(".pb-tr-err"));
-  for (const btn of pills) {
-    const n = Number(btn.dataset.pbTrErr);
-    const w = st.work.find((x) => x.n === n);
-    if (w) await _pbpTrRetryBlock(st, w, btn);
+  let canRetry = true;
+  if (st.permissionError) {
+    if (allLabel) allLabel.textContent = t("aiGrantRetry");
+    const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
+    if (recovered) st.permissionError = null;
+    else canRetry = false;
+  }
+  if (canRetry) {
+    for (const btn of pills) {
+      const n = Number(btn.dataset.pbTrErr);
+      const w = st.work.find((x) => x.n === n);
+      if (w) await _pbpTrRetryBlock(st, w, btn);
+      if (st.permissionError) break;
+    }
   }
   _pbpTrSyncRetryAll();
+  if (allLabel) allLabel.textContent = t(st.permissionError ? "aiGrantRetry" : "trRetryAllFailed");
   // If some blocks still failed, the button is shown again but was disabled at entry;
   // re-arm it so the user can run retry-all again. (Kept disabled DURING the run above
   // to prevent concurrent re-clicks.)
@@ -1502,7 +1545,7 @@ function _pbpTrSetStatus(st, status) {
     if (document.activeElement === btn) stop.focus();
     btn.disabled = true;
   } else if (status === "partial") {
-    label.textContent = t("trContinue");
+    label.textContent = t(st.permissionError ? "aiGrantRetry" : "trContinue");
     btn.disabled = false;
     btn.hidden = false;
     stop.hidden = true;

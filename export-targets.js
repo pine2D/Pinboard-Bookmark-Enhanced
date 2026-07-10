@@ -1,8 +1,8 @@
 // ============================================================
 // Pinboard Bookmark Enhanced — Export Targets registry (PURE)
 // No DOM / chrome / fetch. Loaded by md-preview.html, options.html, tests.
-// Depends only on md-convert.js globals (applyFrontmatter, buildObsidianUri,
-// safeFilename), which load before this file everywhere it is used.
+// Depends on md-convert.js globals (applyFrontmatter, buildObsidianUri,
+// safeFilename) and shared.js (pbpEndpointOriginPattern).
 // ============================================================
 
 // Safe ceiling for a custom-scheme URI handed to the OS protocol launcher.
@@ -35,23 +35,10 @@ function pbpBuildFileBody(id, meta, rawBody) {
 // Is the assembled URI too long to hand to the OS protocol launcher?
 function pbpUriTooLong(uri) { return String(uri || "").length > PBP_URI_BUDGET; }
 
-// Should this webhook URL get an http-not-encrypted warning? webhook.origin
-// has no scheme check, so a user-supplied http:// endpoint would carry the
-// full Authorization header value in plaintext (audit #31). Local/self-hosted
-// receivers are a legitimate opt-in use case (manifest already grants
-// *://*/* for exactly this) and must NOT be flagged — this is advisory only,
-// never a hard block.
+// Show the configuration warning for any endpoint the runtime will block.
 function pbpWebhookHttpWarn(url) {
-  let u;
-  try { u = new URL(String(url || "")); } catch (_) { return false; }
-  if (u.protocol !== "http:") return false;
-  const h = u.hostname;
-  // URL#hostname returns IPv6 literals WITH brackets ("[::1]"), never bare "::1".
-  if (h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]") return false;
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return false;
-  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return false;
-  if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return false;
-  return true;
+  const raw = String(url || "").trim();
+  return !!raw && !pbpEndpointOriginPattern(raw);
 }
 
 // Inline SVG icons (no emoji — font-fallback rule). 16px line icons.
@@ -147,7 +134,7 @@ const PBP_EXPORT_TARGETS = {
     mechanism: "token-api",
     frontmatter: "strip",          // bare markdown rides the envelope's `markdown` field
     origin(cfg) {
-      try { return new URL((cfg && cfg.url) || "").origin + "/*"; } catch (_) { return null; }
+      return pbpEndpointOriginPattern((cfg && cfg.url) || "");
     },
     parseSuccess(resp) { return !!(resp && resp.ok); },
     buildRequest(meta, body, cfg, token) {
