@@ -77,18 +77,27 @@ await suite("offline queue", async () => {
   await test("missing current and legacy tokens resolve to empty", () => {
     assert(pbpResolveOfflineQueueToken("", "") === "", "missing credentials stay empty");
   });
-  await test("offline sender stops before network work when no token is available", async () => {
-    const source = await (await fetch("../background.js")).text();
-    const start = source.indexOf("async function sendOfflineItem");
-    const end = source.indexOf("function drainOfflineQueueIds", start);
-    const sender = source.slice(start, end);
-    const guard = sender.indexOf("if (!token) return false;");
-    const firstNetworkWork = Math.min(
-      sender.indexOf("fetchExistingBookmark"),
-      sender.indexOf("pinboardFetch")
-    );
-    assert(start >= 0 && end > start, "offline sender not found");
-    assert(guard >= 0 && firstNetworkWork > guard, "empty-token guard does not precede network work");
+  await test("failed delivery remains queued and is not acknowledged as success", async () => {
+    let queue = [{ queueId: "a", url: "https://a.com" }];
+    let successes = 0;
+    const outcomes = await pbpDrainOfflineQueue(["a"], {
+      getItem: (queueId) => queue.find((item) => item.queueId === queueId) || null,
+      sendItem: () => ({ result: { status: "failed", reason: "not_logged_in" } }),
+      removeItem: (queueId) => { queue = pbpOfflineQueueReduce(queue, { kind: "remove", queueId }); },
+      onSuccess: () => { successes++; },
+    });
+    assert(outcomes.length === 1 && !outcomes[0].acknowledged, "failed result is reported without acknowledgement");
+    assert(queue.length === 1 && queue[0].queueId === "a", "failed item remains queued");
+    assert(successes === 0, "failed delivery triggers no success callback");
+
+    const skipped = await pbpDrainOfflineQueue(["a"], {
+      getItem: (queueId) => queue.find((item) => item.queueId === queueId) || null,
+      sendItem: () => ({ result: { status: "skipped" } }),
+      removeItem: (queueId) => { queue = pbpOfflineQueueReduce(queue, { kind: "remove", queueId }); },
+      onSuccess: () => { successes++; },
+    });
+    assert(skipped[0].acknowledged && queue.length === 0, "skipped result is durably acknowledged");
+    assert(successes === 1, "skipped acknowledgement runs its post-commit callback");
   });
   await test("concurrent enqueue survives acknowledgement of a snapshot item", () => {
     const current = pbpOfflineQueueReduce(Q(), { kind: "enqueue", item: { queueId: "d", url: "https://d.com" } });
@@ -171,7 +180,7 @@ await suite("offline queue", async () => {
     queue = pbpOfflineQueueReduce(queue, { kind: "enqueue", item: { queueId: "b", url: "https://b.com" } });
     releaseSend();
     const completed = await drain;
-    assert(completed.length === 1 && completed[0].queueId === "a", "sent item completed");
+    assert(completed.length === 1 && completed[0].item.queueId === "a" && completed[0].acknowledged, "sent item completed");
     assert(queue.length === 1 && queue[0].queueId === "b", "concurrent enqueue preserved");
   });
 

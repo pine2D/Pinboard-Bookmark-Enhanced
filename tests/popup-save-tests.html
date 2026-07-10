@@ -10,6 +10,7 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <h1>Popup Save Tests</h1>
 <div id="results"></div>
 <script src="../shared.js"></script>
+<script src="../wayback.js"></script>
 <script>
 function test(name, fn) {
   const div = document.createElement("div");
@@ -25,20 +26,34 @@ function test(name, fn) {
   document.getElementById("results").appendChild(div);
 }
 
+async function testAsync(name, fn) {
+  const div = document.createElement("div");
+  div.className = "case";
+  try {
+    await fn();
+    div.classList.add("pass");
+    div.textContent = "PASS " + name;
+  } catch (error) {
+    div.classList.add("fail");
+    div.textContent = "FAIL " + name + "\n  " + error.message;
+  }
+  document.getElementById("results").appendChild(div);
+}
+
 function assert(condition, message) {
   if (!condition) throw new Error(message || "assertion failed");
 }
 
 const URL = "https://example.com/article";
 
-test("missing exact URL permits create with replace=false", () => {
+test("missing exact URL maps to create", () => {
   const result = pbpPopupSavePolicy({ lookupStatus: "missing", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: false });
-  assert(result.allow && result.replace === false && result.reason === "create");
+  assert(result.allow && result.mode === "create" && !("replace" in result));
 });
 
-test("reviewed loaded existing bookmark permits replace=true", () => {
+test("reviewed loaded existing bookmark maps to update", () => {
   const result = pbpPopupSavePolicy({ lookupStatus: "found", lookupUrl: URL, currentUrl: URL, formLoaded: true, reviewedAtClick: true });
-  assert(result.allow && result.replace === true && result.reason === "update");
+  assert(result.allow && result.mode === "update" && !("replace" in result));
 });
 
 test("pending lookup blocks save", () => {
@@ -46,9 +61,9 @@ test("pending lookup blocks save", () => {
   assert(!result.allow && result.reason === "lookup_pending");
 });
 
-test("failed lookup blocks save", () => {
+test("exact failed lookup maps to fail-safe merge", () => {
   const result = pbpPopupSavePolicy({ lookupStatus: "failed", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: false });
-  assert(!result.allow && result.reason === "lookup_failed");
+  assert(result.allow && result.mode === "merge" && !("replace" in result));
 });
 
 test("idle lookup blocks save", () => {
@@ -93,26 +108,422 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
 (async () => {
   try {
-    const source = await (await fetch("../popup.js")).text();
-    test("submit rereads one owned form snapshot after save policy approval", () => {
-      const start = source.indexOf("function setupSubmit(token)");
-      const end = source.indexOf("// ===================== Edit From Recent", start);
-      const submit = source.slice(start, end);
-      const policyIndex = submit.indexOf("const savePolicy = pbpPopupSavePolicy");
-      const snapshotIndex = submit.indexOf('url: $id("url-input").value.trim()', policyIndex);
-      const ownershipIndex = submit.indexOf("saveUrl !== url", snapshotIndex);
-      const uriIndex = submit.indexOf("const apiUrl = buildPostsAddUri", ownershipIndex);
-      const snapshot = submit.slice(snapshotIndex, ownershipIndex);
-      assert(start >= 0 && end > start && policyIndex >= 0, "submit policy path not found");
-      assert(snapshotIndex > policyIndex && ownershipIndex > snapshotIndex && uriIndex > ownershipIndex, "snapshot ordering changed");
+    const [source, backgroundSource] = await Promise.all([
+      fetch("../popup.js").then((response) => response.text()),
+      fetch("../background.js").then((response) => response.text()),
+    ]);
+    const start = source.indexOf("function setupSubmit(token)");
+    const handlerEnd = source.indexOf('  document.addEventListener("keydown"', start);
+    const setupEnd = source.indexOf("// ===================== Edit From Recent", start);
+    const submit = source.slice(start, handlerEnd);
+    const policyIndex = submit.indexOf("const savePolicy = pbpPopupSavePolicy");
+    const snapshotIndex = submit.indexOf('url: $id("url-input").value.trim()', policyIndex);
+    const ownershipIndex = submit.indexOf("saveUrl !== url", snapshotIndex);
+    const intentIndex = submit.indexOf("const intent = {", ownershipIndex);
+    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent })', intentIndex);
+    const snapshot = submit.slice(snapshotIndex, ownershipIndex);
+    const intentBlock = submit.slice(intentIndex, sendIndex);
+    const tagHelperStart = source.indexOf("function pbpRebasePopupTags(");
+    const tagHelperEnd = source.indexOf("// Wayback per-save toggle", tagHelperStart);
+    const tagHelperSource = source.slice(tagHelperStart, tagHelperEnd);
+    const resetStart = source.indexOf("async function resetPinboardSession()");
+    const resetEnd = source.indexOf("// ===================== URL Clean Helpers", resetStart);
+    const resetSource = source.slice(resetStart, resetEnd);
+    const lookupStart = source.indexOf("async function checkExistingBookmark(");
+    const lookupEnd = source.indexOf("// ===================== Submit / Delete", lookupStart);
+    const lookupSource = source.slice(lookupStart, lookupEnd);
+    const setupSource = source.slice(start, setupEnd);
+    const rebasePopupTags = new Function("unionTags", `${tagHelperSource}\nreturn pbpRebasePopupTags;`)(unionTags);
+
+    function createElementStub(initial = {}) {
+      const listeners = {};
+      const classes = new Set(initial.classes || []);
+      const element = {
+        value: "", checked: false, disabled: false, textContent: "", removed: false,
+        children: [],
+        classList: {
+          add: (...names) => names.forEach((name) => classes.add(name)),
+          remove: (...names) => names.forEach((name) => classes.delete(name)),
+          contains: (name) => classes.has(name),
+          toggle: (name, force) => {
+            const add = force === undefined ? !classes.has(name) : force;
+            if (add) classes.add(name); else classes.delete(name);
+            return add;
+          },
+        },
+        addEventListener(type, listener) { (listeners[type] ||= []).push(listener); },
+        querySelector() { return null; },
+        setAttribute() {},
+        appendChild(child) { this.children.push(child); },
+        remove() { this.removed = true; },
+        _listeners: listeners,
+      };
+      Object.assign(element, initial);
+      return element;
+    }
+
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false } = {}) {
+      const elements = {
+        "submit-btn": createElementStub(),
+        "delete-btn": createElementStub({ classes: ["hidden"] }),
+        "url-input": createElementStub({ value: URL }),
+        "title-input": createElementStub({ value: "Submitted title" }),
+        "description-input": createElementStub({ value: "Submitted notes" }),
+        "private-check": createElementStub({ checked: false }),
+        "readlater-check": createElementStub({ checked: false }),
+        "archive-check": createElementStub({ checked: archiveRequested }),
+        "tags-input": createElementStub(),
+        "status-msg": createElementStub(),
+      };
+      const currentTags = ["One", "Two"];
+      const fieldDirtyFlags = { "title-input": true, "description-input": true, "private-check": true, "readlater-check": true };
+      const bookmarkLookup = { status: lookupFailed ? "failed" : "missing", url: URL, generation: 1, promise: null, formLoaded: false };
+      const settings = {
+        pinboardToken: "token",
+        optAutoCloseAfterSave: true,
+        waybackArchiveEnabled: archiveRequested,
+        waybackSkipPrivate: true,
+      };
+      const messages = [];
+      const statuses = [];
+      const timers = [];
+      const bars = [];
+      const checkCalls = [];
+      const savedTagCalls = [];
+      const syncRemovals = [];
+      const localRemovals = [];
+      const authEvents = [];
+      const reloadTokenValues = [];
+      let queueRefreshes = 0;
+      let closeCalls = 0;
+      let reloadCalls = 0;
+      let nextTimerId = 1;
+      let resolveSave;
+      let resolveWayback;
+      const saveResponse = new Promise((resolve) => { resolveSave = resolve; });
+      const waybackResponse = new Promise((resolve) => { resolveWayback = resolve; });
+
+      const chromeStub = {
+        runtime: {
+          sendMessage(message) {
+            if (message.type !== "save_intent") throw new Error("unexpected runtime message: " + message.type);
+            messages.push(message);
+            return saveResponse;
+          },
+        },
+        storage: {
+          local: {
+            async get() { return deferWayback ? waybackResponse : {}; },
+            async remove(key) { localRemovals.push(key); authEvents.push("local-remove"); },
+          },
+        },
+      };
+      const windowStub = {
+        PPOffline: { async refresh() { queueRefreshes++; } },
+        close() { closeCalls++; },
+        location: { reload() { reloadTokenValues.push(settings.pinboardToken); authEvents.push("reload"); reloadCalls++; } },
+      };
+      const documentStub = {
+        body: { appendChild(element) { bars.push(element); } },
+        addEventListener() {},
+        querySelector() { return null; },
+        createTextNode(text) { return { textContent: text }; },
+        createElement() { return createElementStub(); },
+      };
+      const setTimeoutStub = (callback, delay) => {
+        const timer = { id: nextTimerId++, callback, delay, cancelled: false };
+        timers.push(timer);
+        return timer.id;
+      };
+      const clearTimeoutStub = (id) => {
+        const timer = timers.find((candidate) => candidate.id === id);
+        if (timer) timer.cancelled = true;
+      };
+      const checkExistingBookmark = (...args) => {
+        checkCalls.push(args);
+        bookmarkLookup.generation++;
+        bookmarkLookup.status = lookupFailed ? "failed" : "pending";
+        bookmarkLookup.url = args[1];
+        bookmarkLookup.formLoaded = false;
+        return Promise.resolve({ status: lookupFailed ? "failed" : "found", url: args[1] });
+      };
+      const getSettingsStorage = async () => ({
+        async remove(key) { syncRemovals.push(key); authEvents.push("settings-remove"); },
+      });
+      const dependencies = {
+        $id: (id) => (elements[id] ||= createElementStub()),
+        t: (key) => key,
+        clearTimeout: clearTimeoutStub,
+        setTimeout: setTimeoutStub,
+        showStatus: (...args) => statuses.push(args),
+        updateCharCount() {},
+        pbpPopupSavePolicy,
+        fieldDirtyFlags,
+        bookmarkLookup,
+        existingBookmark: null,
+        currentTags,
+        _archiveUserTouched: archiveUserTouched,
+        settings,
+        chrome: chromeStub,
+        window: windowStub,
+        document: documentStub,
+        getSettingsStorage,
+        saveLastUsedTags: (tags) => savedTagCalls.push(tags.slice()),
+        checkExistingBookmark,
+        pbpWaybackShouldArchive,
+        pbpWaybackShouldAttempt: () => true,
+        POSTS_ADD_URI_BUDGET,
+      };
+      const names = Object.keys(dependencies);
+      const factory = new Function(...names, `${resetSource}\n${setupSource}\nreturn setupSubmit;`);
+      const setupSubmit = factory(...names.map((name) => dependencies[name]));
+      setupSubmit("token");
+      const click = elements["submit-btn"]._listeners.click[0];
+      return {
+        elements, currentTags, fieldDirtyFlags, bookmarkLookup, settings, messages, statuses, timers, bars,
+        checkCalls, savedTagCalls, syncRemovals, localRemovals, authEvents, reloadTokenValues,
+        click, resolveSave, resolveWayback,
+        queueRefreshes: () => queueRefreshes,
+        closeCalls: () => closeCalls,
+        reloadCalls: () => reloadCalls,
+      };
+    }
+
+    test("unchanged submitted tags retain the existing union behavior", () => {
+      const result = rebasePopupTags("ServerOnly Alpha", ["Alpha", "Beta"], ["Alpha", "Beta"]);
+      assert(JSON.stringify(result) === JSON.stringify(["ServerOnly", "Alpha", "Beta"]), result.join(" "));
+    });
+
+    test("tag rebase preserves server-only tags and applies live remove, reorder, case, and add", () => {
+      const result = rebasePopupTags(
+        "Alpha Beta Gamma ServerOnly",
+        ["Alpha", "Beta", "Gamma"],
+        ["gamma", "ALPHA", "New"]
+      );
+      assert(JSON.stringify(result) === JSON.stringify(["ServerOnly", "gamma", "ALPHA", "New"]), result.join(" "));
+    });
+
+    test("fresh bookmark lookup wires the submitted tag baseline into the rebase helper", () => {
+      assert(lookupSource.includes("Array.isArray(submittedTags)"), "lookup does not detect the submitted tag baseline");
+      assert(lookupSource.includes("pbpRebasePopupTags(existingBookmark.tags || \"\", submittedTags, currentTags)"), "lookup bypasses the production rebase helper");
+    });
+
+    await testAsync("real submit callback keeps queued separate from saved side effects", async () => {
+      const harness = createSubmitHarness();
+      const pending = harness.click();
+      assert(harness.messages.length === 1, "save_intent was not sent");
+      harness.resolveSave({ status: "queued", queueId: "q1" });
+      await pending;
+      assert(harness.queueRefreshes() === 1, "queue bar was not refreshed");
+      assert(harness.savedTagCalls.length === 0, "queued saved last-used tags");
+      assert(harness.timers.every((timer) => timer.delay !== 1800), "queued created an auto-close timer");
+      assert(harness.closeCalls() === 0, "queued closed the Popup");
+      assert(JSON.stringify(harness.statuses.at(-1)) === JSON.stringify(["status-msg", "offlineQueued", "info"]), "queued did not leave the info status visible");
+      assert(!harness.elements["submit-btn"].classList.contains("save-error"), "queued fell through into the error state");
+      assert(!harness.elements["submit-btn"].classList.contains("saved-success"), "queued entered the saved state");
+    });
+
+    await testAsync("real submit callback awaits Wayback snapshot before save_intent", async () => {
+      const harness = createSubmitHarness({ archiveRequested: true, deferWayback: true });
+      const pending = harness.click();
+      assert(harness.messages.length === 0, "save_intent raced ahead of the Wayback snapshot");
+      harness.resolveWayback({ _waybackAttempts: {} });
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      assert(harness.messages.length === 1, "save_intent did not start after the Wayback snapshot");
+      harness.resolveSave({ status: "queued", queueId: "q-wayback" });
+      await pending;
+    });
+
+    await testAsync("untouched failed lookup leaves archive policy to the final merged bookmark", async () => {
+      const harness = createSubmitHarness({ archiveRequested: true, lookupFailed: true });
+      const pending = harness.click();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      assert(harness.messages.length === 1, "merge save_intent was not sent");
+      assert(harness.messages[0].intent.mode === "merge", "failed lookup did not use merge mode");
+      assert(harness.messages[0].intent.archive === undefined, "automatic archive choice became a privacy-bypassing override");
+      harness.resolveSave({ status: "saved", mutation: "updated" });
+      await pending;
+      assert(!harness.elements["status-msg"].children.some((child) => child.className === "wayback-indicator"), "unknown merged privacy showed an optimistic archive indicator");
+    });
+
+    await testAsync("manual archive true and false remain explicit overrides", async () => {
+      for (const archiveRequested of [true, false]) {
+        const harness = createSubmitHarness({ archiveRequested, archiveUserTouched: true });
+        const pending = harness.click();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        assert(harness.messages[0].intent.archive === archiveRequested, `manual ${archiveRequested} override was lost`);
+        harness.resolveSave({ status: "saved", mutation: "created" });
+        await pending;
+        const indicatorShown = harness.elements["status-msg"].children.some((child) => child.className === "wayback-indicator");
+        assert(indicatorShown === archiveRequested, `manual ${archiveRequested} indicator disagrees with the submitted override`);
+      }
+    });
+
+    await testAsync("real submit callback preserves edits made while save is pending", async () => {
+      const mutations = [
+        ["title", (harness) => { harness.elements["title-input"].value = "Edited title"; }],
+        ["notes", (harness) => { harness.elements["description-input"].value = "Edited notes"; }],
+        ["private", (harness) => { harness.elements["private-check"].checked = true; }],
+        ["read-later", (harness) => { harness.elements["readlater-check"].checked = true; }],
+        ["archive", (harness) => { harness.elements["archive-check"].checked = true; }],
+        ["tags", (harness) => { harness.currentTags.splice(0, harness.currentTags.length, "Two", "New"); }],
+        ["tag draft", (harness) => { harness.elements["tags-input"].value = "Uncommitted"; }],
+      ];
+      for (const [label, mutate] of mutations) {
+        const harness = createSubmitHarness();
+        const pending = harness.click();
+        mutate(harness);
+        harness.resolveSave({ status: "saved", mutation: "created" });
+        await pending;
+        assert(JSON.stringify(harness.checkCalls[0][4]) === JSON.stringify(["One", "Two"]), `${label}: force-fresh baseline changed`);
+        assert(harness.timers.every((timer) => timer.delay !== 1800), `${label}: in-flight edit created an auto-close timer`);
+        assert(harness.closeCalls() === 0, `${label}: in-flight edit closed the Popup`);
+      }
+    });
+
+    await testAsync("real auto-close callback rechecks edits made after timer creation", async () => {
+      const mutations = [
+        ["title", (harness) => { harness.elements["title-input"].value = "Edited title"; }],
+        ["notes", (harness) => { harness.elements["description-input"].value = "Edited notes"; }],
+        ["private", (harness) => { harness.elements["private-check"].checked = true; }],
+        ["read-later", (harness) => { harness.elements["readlater-check"].checked = true; }],
+        ["archive", (harness) => { harness.elements["archive-check"].checked = true; }],
+        ["tags", (harness) => { harness.currentTags.push("Later"); }],
+        ["tag draft", (harness) => { harness.elements["tags-input"].value = "Uncommitted"; }],
+      ];
+      for (const [label, mutate] of mutations) {
+        const harness = createSubmitHarness();
+        const pending = harness.click();
+        harness.resolveSave({ status: "saved", mutation: "created" });
+        await pending;
+        const timer = harness.timers.find((candidate) => candidate.delay === 1800);
+        assert(timer, `${label}: unchanged saved form did not create the auto-close timer`);
+        mutate(harness);
+        timer.callback();
+        assert(harness.closeCalls() === 0, `${label}: timer closed despite later edit`);
+        assert(harness.bars[0]?.removed === true, `${label}: cancelled auto-close bar was not removed`);
+      }
+    });
+
+    await testAsync("stale URL cannot suppress not_logged_in session reset", async () => {
+      const harness = createSubmitHarness();
+      const pending = harness.click();
+      harness.elements["url-input"].value = "https://stale.example";
+      harness.resolveSave({ status: "failed", reason: "not_logged_in" });
+      await pending;
+      assert(JSON.stringify(harness.syncRemovals) === JSON.stringify(["pinboardToken"]), "settings token was not cleared");
+      assert(JSON.stringify(harness.localRemovals) === JSON.stringify(["pinboardToken"]), "local token was not cleared");
+      assert(harness.settings.pinboardToken === "", "in-memory token was not cleared");
+      assert(harness.reloadCalls() === 1, "session reset did not reload the Popup");
+      assert(harness.authEvents.join("|") === "settings-remove|local-remove|reload", "session reset order changed: " + harness.authEvents.join("|"));
+      assert(JSON.stringify(harness.reloadTokenValues) === JSON.stringify([""]), "reload happened before the in-memory token was cleared");
+    });
+
+    test("submit rereads one owned form snapshot into save_intent", () => {
+      assert(start >= 0 && handlerEnd > start && policyIndex >= 0, "submit policy path not found");
+      assert(snapshotIndex > policyIndex && ownershipIndex > snapshotIndex && intentIndex > ownershipIndex && sendIndex > intentIndex, "snapshot-to-intent ordering changed");
       for (const field of ["title-input", "description-input", "private-check", "readlater-check", "archive-check"]) {
         assert(snapshot.includes(`$id("${field}")`), `${field} is not in the final snapshot`);
       }
       assert(snapshot.includes("currentTags.slice()"), "tags are not copied into the final snapshot");
-      assert(submit.slice(uriIndex, submit.indexOf("if (apiUrl.length", uriIndex)).includes("url: saveUrl"), "request does not use the final URL");
+      for (const field of ["mode: savePolicy.mode", "url: saveUrl", "title", "notes: extended", 'tags: tags.join(" ")', "private: isPrivate", "toread: isReadLater"]) {
+        assert(intentBlock.includes(field), `intent is missing ${field}`);
+      }
+      assert(intentBlock.includes("archive: _archiveUserTouched ? archiveRequested : undefined"), "automatic archive choice is still sent as an override");
+    });
+
+    test("submit no longer builds or sends posts/add directly", () => {
+      assert(!submit.includes("buildPostsAddUri"), "Popup submit still builds a posts/add URI");
+      assert(!submit.includes("/posts/add"), "Popup submit still names posts/add");
+      assert(!submit.includes("pinboardFetch("), "Popup submit still performs direct Pinboard delivery");
+    });
+
+    test("update forwards only the exact loaded server time", () => {
+      const timeStart = submit.indexOf('if (savePolicy.mode === "update")', intentIndex);
+      const timeBlock = submit.slice(timeStart, submit.indexOf("let attemptsStored", timeStart));
+      assert(timeStart > intentIndex && timeBlock.includes("intent.time = existingBookmark?.time"), "update time is not forwarded from the loaded bookmark");
+      assert(!submit.includes("new Date().toISOString"), "Popup still invents a bookmark time");
+      assert(!submit.includes("existingTimeAtSave"), "legacy synthetic-time fallback remains");
+    });
+
+    test("queued refreshes the queue bar without saved side effects", () => {
+      const queuedStart = submit.indexOf('if (result.status === "queued")');
+      const queuedEnd = submit.indexOf('if (result.status === "skipped"', queuedStart);
+      const queued = submit.slice(queuedStart, queuedEnd);
+      assert(queued.includes('t("offlineQueued", "1")') && queued.includes("window.PPOffline.refresh()"), "queued UI or queue refresh missing");
+      assert(queued.includes('setSubmitState("idle")'), "queued submit does not leave loading state");
+      for (const forbidden of ["saveLastUsedTags", 'setSubmitState("success")', "optAutoCloseAfterSave", "pbpWaybackShouldAttempt", "checkExistingBookmark"] ) {
+        assert(!queued.includes(forbidden), `queued path contains saved side effect ${forbidden}`);
+      }
+    });
+
+    test("submitted fields reset before delivery without erasing in-flight edits later", () => {
+      const savedStart = submit.indexOf('if (result.status === "saved")');
+      const savedEnd = submit.indexOf('if (result.status === "failed" && result.reason === "too_long")', savedStart);
+      const saved = submit.slice(savedStart, savedEnd);
+      const elseStart = saved.indexOf("} else {");
+      const freshIndex = saved.indexOf("checkExistingBookmark(token, url, null, true, tags)", elseStart);
+      const autoCloseGeneration = saved.indexOf("const autoCloseGeneration = bookmarkLookup.generation", freshIndex);
+      const dirtyResetIndex = submit.indexOf("Object.keys(fieldDirtyFlags).forEach", intentIndex);
+      assert(saved.includes('if (savePolicy.mode === "update")'), "update/create result split missing");
+      assert(dirtyResetIndex > intentIndex && dirtyResetIndex < sendIndex, "submitted dirty baseline is not reset before delivery");
+      assert(!submit.slice(sendIndex, savedEnd).includes("Object.keys(fieldDirtyFlags).forEach"), "a result path can erase edits made while delivery is pending");
+      assert(freshIndex > elseStart, "create/merge does not force a fresh lookup");
+      assert(saved.includes("checkExistingBookmark(token, url, null, true, tags)"), "force-fresh does not carry the submitted tag baseline");
+      assert(autoCloseGeneration > freshIndex, "auto-close captures the stale pre-refresh generation");
+      assert(!saved.includes("new Date("), "saved path synthesizes a time");
+    });
+
+    test("conflict refreshes the form and auth failure restores login", () => {
+      const conflictStart = submit.indexOf('if (result.status === "skipped"');
+      const conflictEnd = submit.indexOf('if (result.status === "saved")', conflictStart);
+      const conflict = submit.slice(conflictStart, conflictEnd);
+      const authStart = submit.indexOf('result.reason === "not_logged_in"');
+      const ownershipAfterSend = submit.indexOf("bookmarkLookup.generation !== lookupGenerationAtSave", authStart);
+      const authEnd = ownershipAfterSend;
+      const auth = submit.slice(authStart, authEnd);
+      assert(conflict.includes('result.reason === "conflict"') && conflict.includes("checkExistingBookmark(token, url, null, true, tags)"), "skipped/conflict refresh path missing");
+      assert(conflict.includes('t("editingExisting")'), "conflict does not repopulate for a reviewed update");
+      assert(auth.includes("await resetPinboardSession()"), "auth failure does not use the shared session reset");
+      assert(authStart < ownershipAfterSend, "auth failure is suppressed by stale form ownership");
+    });
+
+    test("Wayback attempt state is captured before delivery and rendered only after saved", () => {
+      const attemptsIndex = submit.indexOf("let attemptsStored", intentIndex);
+      const savedStart = submit.indexOf('if (result.status === "saved")', sendIndex);
+      const savedEnd = submit.indexOf('if (result.status === "failed"', savedStart);
+      assert(attemptsIndex < sendIndex, "Wayback attempt snapshot starts after delivery");
+      assert(submit.slice(attemptsIndex, sendIndex).includes("await chrome.storage.local.get"), "Wayback attempt snapshot is not complete before delivery");
+      assert(submit.slice(attemptsIndex, sendIndex).includes("bookmarkLookup.generation !== lookupGenerationAtSave"), "snapshot await is not followed by an ownership check");
+      assert(submit.slice(savedStart, savedEnd).includes("pbpWaybackShouldAttempt"), "saved indicator missing");
+      assert(submit.slice(intentIndex, sendIndex).includes('savePolicy.mode !== "merge"'), "automatic merge can still show an archive indicator with unknown privacy");
+      assert(submit.slice(intentIndex, sendIndex).includes("pbpWaybackShouldArchive({"), "indicator duplicates the archive privacy policy");
+      assert(!submit.slice(sendIndex, savedStart).includes("pbpWaybackShouldAttempt"), "non-saved path renders Wayback indicator");
+    });
+
+    test("bookmark_saved compatibility message and handler are removed", () => {
+      assert(!source.includes('type: "bookmark_saved"'), "Popup still sends bookmark_saved");
+      assert(!backgroundSource.includes('message.type === "bookmark_saved"'), "Service Worker still handles bookmark_saved");
+    });
+
+    test("malformed save responses enter the recoverable error state", () => {
+      const malformedIndex = submit.indexOf('typeof result.status !== "string"');
+      const catchIndex = submit.indexOf("} catch (e) {", malformedIndex);
+      const recoveryIndex = submit.indexOf("submitErrorResetTimer = setTimeout", catchIndex);
+      assert(malformedIndex > sendIndex && catchIndex > malformedIndex, "malformed result guard missing");
+      assert(submit.slice(catchIndex, recoveryIndex).includes('setSubmitState("error")'), "message rejection does not show an error");
+      assert(recoveryIndex > catchIndex, "error state does not auto-recover");
+    });
+
+    test("both Pinboard 401 paths share reset-and-reload behavior", () => {
+      const fetch401 = source.slice(source.indexOf("pinboardFetch = function"), source.indexOf("let currentTags"));
+      assert(fetch401.includes("resetPinboardSession()") && !fetch401.includes("showLogin()"), "pinboardFetch 401 still mutates the live view");
+      assert(resetSource.includes('getSettingsStorage()).remove("pinboardToken")'), "session reset does not clear settings storage");
+      assert(resetSource.includes('chrome.storage.local.remove("pinboardToken")'), "session reset does not clear local storage");
+      assert(resetSource.includes('settings.pinboardToken = ""') && resetSource.includes("window.location.reload()"), "session reset does not clear memory and reload");
     });
   } catch (error) {
-    test("submit rereads one owned form snapshot after save policy approval", () => { throw error; });
+    test("popup submit source contracts load", () => { throw error; });
   }
 })();
 </script>

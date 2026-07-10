@@ -1,137 +1,164 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Batch Dedup Tests</title>
+<html><head><meta charset="UTF-8"><title>Batch Progress Tests</title>
 <style>
 body { font-family: monospace; padding: 16px; max-width: 900px; }
 .case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
 .pass { color: #0a0; }
 .fail { color: #c00; font-weight: bold; }
-h2 { margin-top: 24px; }
 </style></head>
 <body>
-<h1>Batch dedup data-integrity tests</h1>
-<h2>A1: computeSavedUrlSet — cache only done URLs</h2>
-<div id="results-a1"></div>
+<h1>Batch progress and liveness tests</h1>
+<div id="results"></div>
 <script src="../shared.js"></script>
 <script>
-async function run(rootId, cases) {
-  const root = document.getElementById(rootId);
-  for (const c of cases) {
-    let ok, got;
-    try { got = await c.fn(); ok = c.check(got); }
-    catch (e) { got = "THREW: " + e.message; ok = false; }
-    const div = document.createElement("div");
-    div.className = "case " + (ok ? "pass" : "fail");
-    div.textContent = `${ok ? "PASS" : "FAIL"}  ${c.name}\n   got: ${JSON.stringify(got)}${ok ? "" : `\n   expected: ${c.expected}`}`;
-    root.appendChild(div);
-  }
+async function test(name, fn) {
+  let ok = true;
+  let detail = "";
+  try { await fn(); }
+  catch (e) { ok = false; detail = "\n  " + e.message; }
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "PASS" : "FAIL"} ${name}${detail}`;
+  document.getElementById("results").appendChild(div);
 }
 
-// A1: only URLs that actually returned result_code==="done" enter the cache.
-run("results-a1", [
-  {
-    name: "saved subset unions into existing; failed/tooLong excluded",
-    fn: () => {
-      const existing = new Set(["https://pre.example/"]);
-      // simulate loop: a=done, b=failed, c=tooLong(never attempted), d=done
-      const savedUrls = ["https://a.example/", "https://d.example/"];
-      return [...computeSavedUrlSet(existing, savedUrls)].sort();
-    },
-    check: (got) => JSON.stringify(got) === JSON.stringify(
-      ["https://a.example/", "https://d.example/", "https://pre.example/"]),
-    expected: '["https://a.example/","https://d.example/","https://pre.example/"]'
-  },
-  {
-    name: "no saved URLs -> existing unchanged",
-    fn: () => [...computeSavedUrlSet(new Set(["https://pre.example/"]), [])].sort(),
-    check: (got) => JSON.stringify(got) === JSON.stringify(["https://pre.example/"]),
-    expected: '["https://pre.example/"]'
-  },
-  {
-    name: "does not mutate the input set",
-    fn: () => {
-      const existing = new Set(["https://pre.example/"]);
-      computeSavedUrlSet(existing, ["https://a.example/"]);
-      return [...existing];
-    },
-    check: (got) => JSON.stringify(got) === JSON.stringify(["https://pre.example/"]),
-    expected: '["https://pre.example/"]'
-  }
-]);
-
-// A2: a thrown/failed existing-URL fetch must NOT collapse to empty-set
-// (which, with batchSkipExisting on, re-saves every tab with replace=yes and
-// clobbers existing bookmarks). It must yield the null/per-tab fallback signal.
-const a2root = document.createElement("div");
-a2root.innerHTML = '<h2>A2: fetch failure -> per-tab fallback, never empty set</h2><div id="results-a2"></div>';
-document.body.insertBefore(a2root, document.querySelector("script"));
-
-async function fetchExistingWith(fetchImpl) {
-  const previousChrome = globalThis.chrome;
-  const previousFetch = pinboardFetch;
-  try {
-    globalThis.chrome = {
-      storage: { local: { get: async () => ({}), set: async () => {} } }
-    };
-    pinboardFetch = fetchImpl;
-    return await fetchExistingUrlSet("test-token");
-  } finally {
-    globalThis.chrome = previousChrome;
-    pinboardFetch = previousFetch;
-  }
+function assert(condition, message) {
+  if (!condition) throw new Error(message || "assertion failed");
 }
 
-run("results-a2", [
-  {
-    name: "transient fetch failure -> null (per-tab fallback), NOT empty Set",
-    fn: () => fetchExistingWith(async () => { throw new Error("network failed"); }),
-    check: (got) => got === null,
-    expected: "null"
-  },
-  {
-    name: "response JSON failure -> null (per-tab fallback), NOT empty Set",
-    fn: () => fetchExistingWith(async () => ({
-      json: async () => { throw new SyntaxError("invalid JSON"); }
-    })),
-    check: (got) => got === null,
-    expected: "null"
-  }
-]);
-</script>
+function equal(actual, expected, message) {
+  if (actual !== expected) throw new Error(`${message || "values differ"}: ${actual} !== ${expected}`);
+}
 
-<h2>A3: batchIsRunning — liveness with stale heartbeat</h2>
-<div id="results-a3"></div>
-<script>
-run("results-a3", [
-  {
-    name: "running + fresh ts -> true",
-    fn: () => batchIsRunning({ running: true, done: false, ts: 1000 }, 1500, 120000),
-    check: (got) => got === true,
-    expected: "true"
-  },
-  {
-    name: "running but stale ts (> ttl) -> false",
-    fn: () => batchIsRunning({ running: true, done: false, ts: 1000 }, 200000, 120000),
-    check: (got) => got === false,
-    expected: "false"
-  },
-  {
-    name: "done -> false even if ts fresh",
-    fn: () => batchIsRunning({ running: true, done: true, ts: 1000 }, 1500, 120000),
-    check: (got) => got === false,
-    expected: "false"
-  },
-  {
-    name: "null/undefined progress -> false",
-    fn: () => batchIsRunning(undefined, 1500, 120000),
-    check: (got) => got === false,
-    expected: "false"
-  },
-  {
-    name: "missing ttl falls back to BATCH_STALE_TTL (fresh) -> true",
-    fn: () => batchIsRunning({ running: true, done: false, ts: 1000 }, 1000 + 119000),
-    check: (got) => got === true,
-    expected: "true"
-  }
-]);
+let popupBatchSource;
+async function getPopupBatchProgressSource() {
+  if (popupBatchSource) return popupBatchSource;
+  const source = await (await fetch("../popup-batch.js")).text();
+  const start = source.indexOf("function renderBatchProgress");
+  const end = source.indexOf("// ---- Tag Presets ----", start);
+  assert(start >= 0 && end > start, "batch progress source block not found");
+  popupBatchSource = source.slice(start, end);
+  return popupBatchSource;
+}
+
+function fakeElement() {
+  const classes = new Set(["hidden"]);
+  return {
+    disabled: false,
+    innerHTML: "",
+    style: {},
+    attributes: {},
+    classList: {
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name),
+      contains: (name) => classes.has(name),
+    },
+    setAttribute(name, value) { this.attributes[name] = value; },
+  };
+}
+
+async function createUiHarness(storedProgress, now) {
+  const elements = {
+    "batch-bookmark-btn": fakeElement(),
+    "batch-progress": fakeElement(),
+    "batch-progress-fill": fakeElement(),
+    "batch-progress-text": fakeElement(),
+  };
+  const statuses = [];
+  const chromeStub = {
+    storage: {
+      onChanged: { addListener: () => {} },
+      local: { get: async () => ({ batch_progress: storedProgress }) },
+    },
+  };
+  const source = await getPopupBatchProgressSource();
+  const factory = new Function(
+    "$id", "PBP_ICONS", "t", "showStatus", "setBtnIcon", "setTimeout",
+    "chrome", "batchIsRunning", "BATCH_STALE_TTL", "Date",
+    source + "\nreturn { renderBatchProgress, wireBatchProgress };"
+  );
+  const api = factory(
+    (id) => elements[id] || null,
+    PBP_ICONS,
+    (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
+    (id, message, kind) => statuses.push({ id, message, kind }),
+    (button, _icon, label) => { button.label = label; },
+    () => 0,
+    chromeStub,
+    batchIsRunning,
+    BATCH_STALE_TTL,
+    { now: () => now }
+  );
+  return { ...api, elements, statuses };
+}
+
+(async () => {
+  await test("running + fresh ts -> true", () => {
+    equal(batchIsRunning({ running: true, done: false, ts: 1000 }, 1500, 120000), true);
+  });
+
+  await test("running but stale ts -> false", () => {
+    equal(batchIsRunning({ running: true, done: false, ts: 1000 }, 200000, 120000), false);
+  });
+
+  await test("done -> false even if ts fresh", () => {
+    equal(batchIsRunning({ running: true, done: true, ts: 1000 }, 1500, 120000), false);
+  });
+
+  await test("missing progress -> false", () => {
+    equal(batchIsRunning(undefined, 1500, 120000), false);
+  });
+
+  await test("missing ttl uses BATCH_STALE_TTL", () => {
+    equal(batchIsRunning({ running: true, done: false, ts: 1000 }, 120000), true);
+  });
+
+  await test("running progress renders queued count", async () => {
+    const h = await createUiHarness(null, 5000);
+    h.renderBatchProgress({ running: true, done: false, total: 4, i: 2, saved: 1, queued: 1, failed: 0 });
+    assert(h.elements["batch-progress-text"].innerHTML.includes("offlineQueued:1"), "queued count missing from running view");
+    equal(h.elements["batch-bookmark-btn"].disabled, true);
+  });
+
+  await test("all-queued completion is informational", async () => {
+    const h = await createUiHarness(null, 5000);
+    h.renderBatchProgress({ running: false, done: true, total: 2, saved: 0, queued: 2, failed: 0, skipped: 0, tooLong: 0 });
+    equal(h.statuses[0].kind, "info");
+    assert(h.statuses[0].message.includes("offlineQueued:2"), "queued count missing from completion status");
+  });
+
+  await test("all-skipped completion is informational", async () => {
+    const h = await createUiHarness(null, 5000);
+    h.renderBatchProgress({ running: false, done: true, total: 3, saved: 0, queued: 0, failed: 0, skipped: 3, tooLong: 0 });
+    equal(h.statuses[0].kind, "info");
+    assert(h.statuses[0].message.includes("batchSkipped:3"), "skipped count missing from completion status");
+  });
+
+  await test("actual item failure renders error", async () => {
+    const h = await createUiHarness(null, 5000);
+    h.renderBatchProgress({ running: false, done: true, total: 2, saved: 1, queued: 0, failed: 1, skipped: 0, tooLong: 0 });
+    equal(h.statuses[0].kind, "error");
+    const oversized = await createUiHarness(null, 5000);
+    oversized.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, queued: 0, failed: 0, skipped: 0, tooLong: 1 });
+    equal(oversized.statuses[0].kind, "error", "oversized item is a failed outcome");
+  });
+
+  await test("reopen restores fresh running/done progress but ignores stale done", async () => {
+    const freshRunning = await createUiHarness({ running: true, done: false, total: 3, i: 1, queued: 1, ts: 4500 }, 5000);
+    freshRunning.wireBatchProgress();
+    await Promise.resolve(); await Promise.resolve();
+    assert(freshRunning.elements["batch-progress-text"].innerHTML.includes("offlineQueued:1"), "fresh running progress not restored");
+
+    const freshDone = await createUiHarness({ running: false, done: true, total: 2, saved: 0, queued: 2, failed: 0, ts: 4500 }, 5000);
+    freshDone.wireBatchProgress();
+    await Promise.resolve(); await Promise.resolve();
+    equal(freshDone.statuses[0].kind, "info", "fresh completion not restored");
+
+    const staleDone = await createUiHarness({ running: false, done: true, total: 2, saved: 0, queued: 2, failed: 0, ts: 1 }, 200000);
+    staleDone.wireBatchProgress();
+    await Promise.resolve(); await Promise.resolve();
+    equal(staleDone.statuses.length, 0, "stale completion should stay hidden");
+  });
+})();
 </script>
 </body></html>

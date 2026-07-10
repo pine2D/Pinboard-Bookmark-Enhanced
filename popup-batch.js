@@ -146,16 +146,22 @@ function renderBatchProgress(p) {
   const pct = total ? Math.round((cur / total) * 100) : 0;
   if (progress) { progress.classList.remove("hidden"); progress.setAttribute("aria-valuenow", String(pct)); }
   if (fill) fill.style.width = pct + "%";
-  // saved/failed/aiFailed are integers -> safe to interpolate; SVG icons avoid emoji font fallback.
-  if (ptext) ptext.innerHTML = `${cur}/${total}  <span class="status-ic ok">${PBP_ICONS.check}</span>${p.saved || 0}  <span class="status-ic bad">${PBP_ICONS.cross}</span>${p.failed || 0}${p.aiFailed ? `  AI<span class="status-ic bad">${PBP_ICONS.cross}</span>${p.aiFailed}` : ""}`;
+  // Counts are integers -> safe to interpolate; SVG icons avoid emoji font fallback.
+  const queuedMsg = p.queued > 0 ? `  ${t("offlineQueued", String(p.queued))}` : "";
+  if (ptext) ptext.innerHTML = `${cur}/${total}  <span class="status-ic ok">${PBP_ICONS.check}</span>${p.saved || 0}  <span class="status-ic bad">${PBP_ICONS.cross}</span>${p.failed || 0}${queuedMsg}${p.aiFailed ? `  AI<span class="status-ic bad">${PBP_ICONS.cross}</span>${p.aiFailed}` : ""}`;
   if (!batchBtn) return;
   if (p.done) {
     const skipMsg = p.skipped > 0 ? t("batchSkipped", String(p.skipped)) : "";
     const tooLongMsg = p.tooLong > 0 ? t("batchTooLong", String(p.tooLong)) : "";
+    const queuedDoneMsg = p.queued > 0 ? ` · ${t("offlineQueued", String(p.queued))}` : "";
     const aiWarnMsg = p.aiFailed > 0 ? ` (AI failed: ${p.aiFailed})` : "";
     if (p.error === "not_logged_in") showStatus("status-msg", t("batchNotLoggedIn"), "error");
     else if (p.error) showStatus("status-msg", t("batchFailed", p.error), "error");
-    else showStatus("status-msg", t("batchDone", String(p.saved || 0), String(p.failed || 0)) + skipMsg + tooLongMsg + aiWarnMsg, (p.saved || 0) > 0 ? "success" : "error");
+    else {
+      const hasFailure = (p.failed || 0) > 0 || (p.tooLong || 0) > 0;
+      const kind = hasFailure ? "error" : (p.saved || 0) > 0 ? "success" : "info";
+      showStatus("status-msg", t("batchDone", String(p.saved || 0), String(p.failed || 0)) + skipMsg + tooLongMsg + queuedDoneMsg + aiWarnMsg, kind);
+    }
     setBtnIcon(batchBtn, "pin", t("batchSavedCount", String(p.saved || 0)));
     setTimeout(() => {
       if (progress) progress.classList.add("hidden");
@@ -172,9 +178,12 @@ function wireBatchProgress() {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.batch_progress) renderBatchProgress(changes.batch_progress.newValue);
   });
-  // Reopen restore: if a batch is mid-flight, show it immediately.
+  // Reopen restore: show a fresh running batch or a completion that happened
+  // while the Popup was closed. The existing hide timer prevents a sticky panel.
   chrome.storage.local.get("batch_progress").then(({ batch_progress: bp }) => {
-    if (batchIsRunning(bp, Date.now(), BATCH_STALE_TTL)) renderBatchProgress(bp);
+    const now = Date.now();
+    const freshDone = bp?.done && (now - (bp.ts || 0)) < BATCH_STALE_TTL;
+    if (batchIsRunning(bp, now, BATCH_STALE_TTL) || freshDone) renderBatchProgress(bp);
   }).catch(() => {});
 }
 

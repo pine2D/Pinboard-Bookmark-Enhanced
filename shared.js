@@ -384,16 +384,16 @@ function _executePinboardFetch(url, options, resolve, reject) {
 const POSTS_ADD_URI_BUDGET = 3900;
 
 function pbpPopupSavePolicy({ lookupStatus, lookupUrl, currentUrl, formLoaded, reviewedAtClick }) {
-  if (lookupUrl !== currentUrl) return { allow: false, replace: false, reason: "url_mismatch" };
-  if (lookupStatus === "missing") return { allow: true, replace: false, reason: "create" };
+  if (lookupUrl !== currentUrl) return { allow: false, reason: "url_mismatch" };
+  if (lookupStatus === "missing") return { allow: true, mode: "create" };
   if (lookupStatus === "found") {
     return formLoaded && reviewedAtClick
-      ? { allow: true, replace: true, reason: "update" }
-      : { allow: false, replace: false, reason: "review_required" };
+      ? { allow: true, mode: "update" }
+      : { allow: false, reason: "review_required" };
   }
-  if (lookupStatus === "pending") return { allow: false, replace: false, reason: "lookup_pending" };
-  if (lookupStatus === "failed") return { allow: false, replace: false, reason: "lookup_failed" };
-  return { allow: false, replace: false, reason: "lookup_idle" };
+  if (lookupStatus === "failed") return { allow: true, mode: "merge" };
+  if (lookupStatus === "pending") return { allow: false, reason: "lookup_pending" };
+  return { allow: false, reason: "lookup_idle" };
 }
 
 function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", shared, toread, dt, replace = true }) {
@@ -410,14 +410,63 @@ function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", sh
   return uri;
 }
 
-// ---- Batch dedup: union ONLY the URLs that actually saved (result_code==="done")
-// into the existing-URL set before caching. Caching tabs that FAILED / were tooLong /
-// threw would mark them "already saved" and silently skip them on re-run for the
-// 30-min cache TTL. Returns a NEW set (does not mutate `existingUrls`).
-function computeSavedUrlSet(existingUrls, savedUrls) {
-  const out = new Set(existingUrls);
-  for (const u of (savedUrls || [])) out.add(u);
-  return out;
+// Resolve save semantics without I/O. Callers must validate the intent first and
+// provide a fresh lookup for merge/skip modes.
+function pbpResolveSavePlan(intent, lookup) {
+  const incoming = {
+    url: intent?.url || "",
+    title: intent?.title || "",
+    notes: intent?.notes || "",
+    tags: intent?.tags || "",
+    private: intent?.private === true,
+    toread: intent?.toread === true,
+    archive: typeof intent?.archive === "boolean" ? intent.archive : undefined,
+    time: typeof intent?.time === "string" && intent.time ? intent.time : undefined,
+  };
+  const send = (fields, replace, mutation) => ({ action: "send", fields, replace, mutation });
+
+  if (intent?.mode === "create") return send(incoming, false, "created");
+  if (intent?.mode === "update") return send(incoming, true, "updated");
+  if (intent?.mode === "overwrite") return send(incoming, true, "unknown");
+  if (intent?.mode !== "merge" && intent?.mode !== "skip") {
+    return { action: "failed", result: { status: "failed", reason: "invalid" } };
+  }
+
+  if (!lookup || lookup.lookupFailed) {
+    const result = { status: "failed", reason: lookup?.reason || "lookup" };
+    if (Number.isInteger(lookup?.httpStatus)) result.httpStatus = lookup.httpStatus;
+    return { action: "failed", result, retryable: !lookup || !!lookup.retryable };
+  }
+  if (!lookup.exists) return send({ ...incoming, time: undefined }, false, "created");
+  if (intent.mode === "skip") return { action: "skip", fields: { url: incoming.url } };
+  if (!lookup.post || typeof lookup.post !== "object") {
+    return { action: "failed", result: { status: "failed", reason: "lookup" }, retryable: true };
+  }
+
+  const post = lookup.post;
+  const canonical = typeof post.description === "string"
+    && typeof post.extended === "string"
+    && typeof post.tags === "string"
+    && (post.shared === "yes" || post.shared === "no")
+    && (post.toread === "yes" || post.toread === "no")
+    && typeof post.time === "string" && post.time.length > 0;
+  if (!canonical) {
+    return { action: "failed", result: { status: "failed", reason: "lookup" }, retryable: true };
+  }
+  const existing = {
+    url: incoming.url,
+    title: post.description,
+    notes: post.extended,
+    tags: post.tags,
+    private: post.shared === "no",
+    toread: post.toread === "yes",
+    archive: incoming.archive,
+    time: post.time,
+  };
+
+  existing.tags = unionTags(existing.tags, incoming.tags);
+  if (incoming.toread) existing.toread = true;
+  return send(existing, true, "updated");
 }
 
 // ---- Batch background-run liveness ----
@@ -428,42 +477,6 @@ const BATCH_STALE_TTL = 120000; // 120s, ~ one slow single-tab AI call
 function batchIsRunning(progress, now, ttl) {
   if (!progress || !progress.running || progress.done) return false;
   return (now - (progress.ts || 0)) < (ttl || BATCH_STALE_TTL);
-}
-
-// ---- Existing URL Set Cache (for batch dedup) ----
-// Lives in shared.js so it resolves in either context; currently called only from
-// the SW (handleBatchSave), but kept context-agnostic for the popup too.
-// In the popup, pinboardFetch is popup.js's proxy override (routes through the SW);
-// in the SW it is shared.js's real fetch wrapper. Both return a .json()-capable
-// Response-like object, so this function resolves correctly in either context.
-async function fetchExistingUrlSet(token) {
-  const cacheKey = "cached_existing_urls";
-  try {
-    const cached = await chrome.storage.local.get(cacheKey);
-    if (cached[cacheKey]) {
-      const { urls, timestamp } = cached[cacheKey];
-      if (Date.now() - timestamp < 30 * 60 * 1000) {
-        return new Set(urls);
-      }
-    }
-  } catch (_) {}
-  try {
-    const recentData = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${token}&format=json&results=1000&meta=no`)).json();
-    if (Array.isArray(recentData) && recentData.length >= 1000) {
-      // D2 Phase 4: likely > 5000 bookmarks; skip-existing falls back to per-tab
-      // posts/get inside the batch loop to avoid false-not-existing for older bookmarks.
-      console.log("[batch] account likely > 5000 bookmarks, skip-existing falls back to per-tab posts/get");
-      return null;
-    }
-    const urls = recentData.map(p => p.href);
-    await chrome.storage.local.set({ [cacheKey]: { urls, timestamp: Date.now() } });
-    return new Set(urls);
-  } catch (_) {
-    // Fetch / .json() failed transiently. Do NOT return an empty Set — that is
-    // indistinguishable from a zero-bookmark account and would re-save every tab
-    // with replace=yes, clobbering existing bookmarks. Signal per-tab fallback.
-    return null;
-  }
 }
 
 // ---- C2-6: reclaimable storage.local cache management ----
@@ -477,7 +490,7 @@ async function fetchExistingUrlSet(token) {
 // credentials. A key is deleted ONLY if it matches a category below.
 const PBP_RECLAIM_CATEGORIES = {
   jina: { keys: [], prefixes: ["jina_md_"] },                       // Jina page extract cache (usually the largest)
-  urls: { keys: ["cached_existing_urls"], prefixes: [] },           // bookmark URL set (re-fetched)
+  urls: { keys: ["cached_existing_urls"], prefixes: [] },           // legacy bookmark URL set residue
   tags: { keys: ["cached_user_tags"], prefixes: ["cached_suggest_"] }, // tag autocomplete caches
   misc: { keys: ["_waybackLog", "_waybackAttempts", "pbp_ai_usage", "pbpThinkReject"], prefixes: [] }, // archive log + AI usage + think-reject memo
 };
@@ -736,15 +749,25 @@ function pbpResolveOfflineQueueToken(currentToken, legacyStoredToken) {
 }
 
 async function pbpDrainOfflineQueue(queueIds, { getItem, sendItem, removeItem, onSuccess }) {
-  const completed = [];
+  const outcomes = [];
   for (const queueId of queueIds) {
     const item = await getItem(queueId);
-    if (!item || !await sendItem(item)) continue;
+    if (!item) continue;
+    const delivered = await sendItem(item);
+    const result = delivered?.result || delivered;
+    if (result !== true && result?.status !== "saved" && result?.status !== "skipped") {
+      outcomes.push({ item, result, acknowledged: false });
+      continue;
+    }
     await removeItem(queueId);
-    if (onSuccess) await onSuccess(item);
-    completed.push(item);
+    if (onSuccess) await onSuccess(item, delivered);
+    outcomes.push({
+      item,
+      result: result === true ? { status: "saved", mutation: "unknown" } : result,
+      acknowledged: true,
+    });
   }
-  return completed;
+  return outcomes;
 }
 
 // ---- Prime SETTINGS_DEFAULTS into storage (one-time fix for popup boot lag) ----

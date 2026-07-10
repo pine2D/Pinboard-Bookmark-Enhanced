@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Save Pipeline Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+h2 { margin-top: 24px; font-size: 16px; }
+.suite { margin: 12px 0; padding: 8px; border-left: 3px solid #ccc; }
+.case { padding: 4px 8px; margin: 4px 0; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<h1>Unified Save Pipeline Tests</h1>
+<div id="results"></div>
+<script src="../shared.js"></script>
+<script>
+async function test(name, fn) {
+  try {
+    await fn();
+    const div = document.createElement("div"); div.className = "case pass";
+    div.textContent = "PASS " + name; document.getElementById("results").appendChild(div);
+  } catch (e) {
+    const div = document.createElement("div"); div.className = "case fail";
+    div.textContent = "FAIL " + name + "\n  " + e.message; document.getElementById("results").appendChild(div);
+  }
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+function equal(actual, expected, msg) {
+  if (actual !== expected) throw new Error((msg || "values differ") + `: ${actual} !== ${expected}`);
+}
+async function suite(name, fn) {
+  const div = document.createElement("div"); div.className = "suite";
+  const h = document.createElement("h2"); h.textContent = name; div.appendChild(h);
+  const results = document.getElementById("results"); const savedAppend = results.appendChild;
+  results.appendChild = function(el) { if (el.className?.includes("case")) div.appendChild(el); else savedAppend.call(results, el); };
+  await fn(); results.appendChild = savedAppend; results.appendChild(div);
+}
+
+const BASE_INTENT = Object.freeze({
+  mode: "create",
+  url: "https://example.com/article",
+  title: "New title",
+  notes: "New notes",
+  tags: "new-tag",
+  private: false,
+});
+
+function intent(overrides) { return { ...BASE_INTENT, ...(overrides || {}) }; }
+function response(status, data, parseFails) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => {
+      if (parseFails) throw new Error("not json");
+      return data;
+    },
+  };
+}
+
+let backgroundSource;
+let coreSource;
+let backgroundSaveSource;
+let batchSaveSource;
+async function getBackgroundSource() {
+  if (!backgroundSource) backgroundSource = await (await fetch("../background.js")).text();
+  return backgroundSource;
+}
+async function getCoreSource() {
+  if (coreSource) return coreSource;
+  const source = await getBackgroundSource();
+  const start = source.indexOf("const PBP_SAVE_MODES");
+  const end = source.indexOf("// ---- P1: Shared save function ----", start);
+  assert(start >= 0 && end > start, "unified pipeline source block not found");
+  coreSource = source.slice(start, end);
+  return coreSource;
+}
+
+async function getBackgroundSaveSource() {
+  if (backgroundSaveSource) return backgroundSaveSource;
+  const source = await getBackgroundSource();
+  const start = source.indexOf("async function saveFromBackground");
+  const end = source.indexOf("// Helper: resolve prefix-specific settings", start);
+  assert(start >= 0 && end > start, "background save preparation source not found");
+  backgroundSaveSource = source.slice(start, end);
+  return backgroundSaveSource;
+}
+
+async function getBatchSaveSource() {
+  if (batchSaveSource) return batchSaveSource;
+  const source = await getBackgroundSource();
+  const start = source.indexOf("async function handleBatchSave");
+  const end = source.indexOf("// ===================== Tab Set", start);
+  assert(start >= 0 && end > start, "batch save source not found");
+  batchSaveSource = source.slice(start, end);
+  return batchSaveSource;
+}
+
+async function createHarness(options) {
+  const opts = options || {};
+  const storageData = { offlineQueue: (opts.queue || []).map((item) => ({ ...item })) };
+  const events = [];
+  const fetchCalls = [];
+  const waybackCalls = [];
+  const iconCalls = [];
+  const badgeCalls = [];
+  const statusCache = new Map(opts.cacheEntries || []);
+  const settings = {
+    pinboardToken: "current-token",
+    offlineQueueEnabled: true,
+    bgSaveMode: "merge",
+    ...(opts.settings || {}),
+  };
+  const chromeStub = {
+    storage: {
+      local: {
+        get: async (key) => {
+          if (typeof key === "string") return { [key]: storageData[key] };
+          return { ...storageData };
+        },
+        set: async (values) => {
+          if (opts.failStorageSet) throw new Error("storage unavailable");
+          Object.assign(storageData, values);
+          events.push("storage:set");
+        },
+      },
+    },
+    tabs: { query: async () => opts.activeTab ? [opts.activeTab] : [] },
+  };
+  const pinboardFetchStub = async (url) => {
+    fetchCalls.push(url);
+    if (!opts.pinboardFetch) throw new Error("unexpected Pinboard request");
+    return opts.pinboardFetch(url, fetchCalls);
+  };
+  const waybackStub = (url, loadedSettings, archiveOptions) => {
+    waybackCalls.push({ url, settings: loadedSettings, options: archiveOptions });
+    events.push("wayback");
+    if (opts.waybackThrows) throw new Error("wayback unavailable");
+    return Promise.resolve();
+  };
+  const deps = {
+    chrome: chromeStub,
+    pinboardFetch: pinboardFetchStub,
+    statusCache,
+    cleanupStatusCache: () => {},
+    loadSettings: async () => settings,
+    setIcon: (tabId, bookmarked) => iconCalls.push({ tabId, bookmarked }),
+    updateBadge: () => { badgeCalls.push(true); return Promise.resolve(); },
+    pbpWaybackArchive: waybackStub,
+    pbpSameBookmark,
+    pbpCreateRecoveringTail,
+    pbpOfflineQueueReduce,
+    pbpResolveOfflineQueueToken,
+    pbpDrainOfflineQueue,
+    pbpResolveSavePlan,
+    buildPostsAddUri,
+    POSTS_ADD_URI_BUDGET,
+  };
+  const source = await getCoreSource();
+  const factory = new Function(...Object.keys(deps), source + `
+    return {
+      validateSaveIntent, fetchExistingBookmark, deliverSaveIntent,
+      submitSaveIntent, submitPopupSaveIntent, sendOfflineItem,
+      drainOfflineQueueIds, readOfflineQueueWithIds, retryOfflineItem,
+      normalizeOfflineSaveIntent, applySaveResultSideEffects
+    };
+  `);
+  return {
+    ...factory(...Object.values(deps)),
+    storageData, settings, events, fetchCalls, waybackCalls, iconCalls, badgeCalls, statusCache,
+  };
+}
+
+async function createBackgroundSaveHarness(options) {
+  const opts = options || {};
+  const cachedSettings = opts.cachedSettings || {
+    pinboardToken: "old-token",
+    bgSaveMode: "merge",
+    optPrivateDefault: false,
+    optPrivateIncognito: true,
+    _defaultTags: "base-tag",
+    _autoNotes: false,
+    _blockquote: false,
+    _aiTags: false,
+    _aiSummary: false,
+  };
+  const settingsSequence = opts.settingsSequence || [cachedSettings];
+  const notifications = [];
+  const intents = [];
+  const aiSnapshots = [];
+  let loadCount = 0;
+  let drainCalls = 0;
+  const result = opts.result || { status: "queued", queueId: "q1" };
+  const deps = {
+    loadSettings: opts.loadSettings || (async () => settingsSequence[Math.min(loadCount++, settingsSequence.length - 1)]),
+    pbpEffectivePrivate: (settings, ctx) => !!(
+      settings.optPrivateDefault || (settings.optPrivateIncognito && ctx?.incognito)
+    ),
+    pbpSaveFailure: (reason) => ({ status: "failed", reason }),
+    showNotification: (...args) => notifications.push(args),
+    t: (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
+    getPageInfoFromTab: opts.getPageInfoFromTab || (async () => {
+      if (opts.onGetPageInfo) opts.onGetPageInfo(cachedSettings);
+      return null;
+    }),
+    buildAutoNotes: () => "",
+    hasAIKey: (settings) => {
+      aiSnapshots.push({
+        defaultTags: settings._defaultTags,
+        aiTags: settings._aiTags,
+        aiSummary: settings._aiSummary,
+      });
+      return false;
+    },
+    submitSaveIntent: async (prepared) => {
+      intents.push(prepared);
+      return result;
+    },
+    processOfflineQueue: () => { drainCalls++; return Promise.resolve(); },
+    POSTS_ADD_URI_BUDGET,
+  };
+  const source = await getBackgroundSaveSource();
+  const factory = new Function(...Object.keys(deps), source + "\nreturn saveFromBackground;");
+  return {
+    saveFromBackground: factory(...Object.values(deps)),
+    cachedSettings,
+    notifications,
+    intents,
+    aiSnapshots,
+    get drainCalls() { return drainCalls; },
+  };
+}
+
+async function createBatchSaveHarness(options) {
+  const opts = options || {};
+  const settings = {
+    pinboardToken: "token",
+    optBatchTagEnabled: true,
+    optBatchTag: "Batch Tag",
+    batchAiTags: false,
+    batchAiSummary: false,
+    optRespectTagCase: false,
+    batchSkipExisting: false,
+    optPrivateDefault: false,
+    optPrivateIncognito: true,
+    optReadlaterDefault: false,
+    waybackArchiveBatch: false,
+    ...(opts.settings || {}),
+  };
+  const intents = [];
+  const progress = [];
+  const notifications = [];
+  const badgeCalls = [];
+  const outcomes = opts.outcomes || [{ status: "saved", mutation: "created" }];
+  let outcomeIndex = 0;
+  const deps = {
+    _writeBatchProgress: async (value) => progress.push({ ...value }),
+    loadSettings: async () => settings,
+    showNotification: (...args) => notifications.push(args),
+    t: (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
+    hasAIKey: () => false,
+    chrome: { storage: { local: { get: async () => ({}) } } },
+    buildTagCaseMap: () => ({}),
+    pbpEffectivePrivate: (loaded, ctx) => !!(
+      loaded.optPrivateDefault || (loaded.optPrivateIncognito && ctx?.incognito)
+    ),
+    submitSaveIntent: async (prepared, deliveryOptions) => {
+      intents.push({ prepared, deliveryOptions });
+      if (opts.submitSaveIntent) return opts.submitSaveIntent(prepared, deliveryOptions, intents.length - 1);
+      const outcome = outcomes[Math.min(outcomeIndex++, outcomes.length - 1)];
+      if (outcome instanceof Error) throw outcome;
+      return outcome;
+    },
+    updateBadge: () => {
+      badgeCalls.push(true);
+      return opts.updateBadge ? opts.updateBadge() : Promise.resolve();
+    },
+  };
+  const source = await getBatchSaveSource();
+  const factory = new Function(...Object.keys(deps), `let _batchRunning = false;\n${source}\nreturn handleBatchSave;`);
+  return {
+    handleBatchSave: factory(...Object.values(deps)),
+    intents,
+    progress,
+    notifications,
+    badgeCalls,
+  };
+}
+
+function batchTabs(count) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    title: `Tab ${i + 1}`,
+    url: `https://batch.example/${i + 1}`,
+    incognito: i === 0,
+  }));
+}
+
+function runBackgroundSave(harness, overrides) {
+  return harness.saveFromBackground({
+    url: BASE_INTENT.url,
+    title: BASE_INTENT.title,
+    tab: { id: 9, url: BASE_INTENT.url, incognito: false },
+    settingsOverrides: null,
+    toread: false,
+    notifyId: "qs",
+    notifyTitle: "Quick saved",
+    notifyCategory: "quickSave",
+    ...(overrides || {}),
+  });
+}
+
+(async () => {
+await suite("unified save pipeline", async () => {
+  await test("resolver creates with replace=no and materializes read-later false", () => {
+    const plan = pbpResolveSavePlan(intent(), null);
+    equal(plan.action, "send");
+    equal(plan.replace, false);
+    equal(plan.mutation, "created");
+    equal(plan.fields.toread, false);
+    assert(plan.fields.time === undefined, "create must not invent dt");
+  });
+
+  await test("resolver merge preserves full existing metadata and only promotes read-later", () => {
+    const lookup = { exists: true, post: {
+      description: "Existing title", extended: "Existing notes", tags: "Alpha shared",
+      shared: "no", toread: "yes", time: "2024-01-02T03:04:05Z",
+    } };
+    const plan = pbpResolveSavePlan(intent({ mode: "merge", tags: "alpha New", private: false, toread: false }), lookup);
+    equal(plan.replace, true);
+    equal(plan.mutation, "updated");
+    equal(plan.fields.title, "Existing title");
+    equal(plan.fields.notes, "Existing notes");
+    equal(plan.fields.tags, "Alpha shared New");
+    equal(plan.fields.private, true);
+    equal(plan.fields.toread, true);
+    equal(plan.fields.time, "2024-01-02T03:04:05Z");
+    const promoted = pbpResolveSavePlan(intent({ mode: "merge", toread: true }), {
+      exists: true, post: {
+        description: "", extended: "", tags: "", shared: "yes", toread: "no", time: "known-time",
+      },
+    });
+    equal(promoted.fields.toread, true, "incoming true promotes read-later");
+  });
+
+  await test("resolver skip avoids writes and merge-missing discards untrusted time", () => {
+    const skipped = pbpResolveSavePlan(intent({ mode: "skip" }), {
+      exists: true, post: { description: "Old", shared: "yes", toread: "no", time: "old-time" },
+    });
+    equal(skipped.action, "skip");
+    const missing = pbpResolveSavePlan(intent({ mode: "merge", time: "caller-time" }), { exists: false });
+    equal(missing.action, "send");
+    equal(missing.replace, false);
+    assert(missing.fields.time === undefined, "missing merge must not forward caller dt");
+  });
+
+  await test("resolver update and overwrite keep exact prepared fields", () => {
+    const updated = pbpResolveSavePlan(intent({ mode: "update", private: true, toread: false, time: "server-time" }), null);
+    equal(updated.replace, true);
+    equal(updated.mutation, "updated");
+    equal(updated.fields.notes, "New notes");
+    equal(updated.fields.private, true);
+    equal(updated.fields.time, "server-time");
+    const overwritten = pbpResolveSavePlan(intent({ mode: "overwrite", time: "known-time" }), null);
+    equal(overwritten.replace, true);
+    equal(overwritten.mutation, "unknown");
+    equal(overwritten.fields.time, "known-time");
+  });
+
+  await test("popup boundary accepts only create/update/merge with safe time rules", async () => {
+    const h = await createHarness();
+    equal((await h.submitPopupSaveIntent(intent({ mode: "skip" }))).reason, "invalid");
+    equal((await h.submitPopupSaveIntent(intent({ mode: "create", time: "fake" }))).reason, "invalid");
+    equal((await h.submitPopupSaveIntent(intent({ mode: "update" }))).reason, "invalid");
+    equal(h.fetchCalls.length, 0, "invalid popup intents make no request");
+  });
+
+  await test("save_intent listener preserves the Chrome 110 async response contract", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf('if (message.type === "save_intent")');
+    const end = source.indexOf('if (message.type === "archive_url"', start);
+    const branch = source.slice(start, end);
+    assert(start >= 0 && end > start, "save_intent branch not found");
+    assert(branch.includes("submitPopupSaveIntent(message.intent)"), "message uses the guarded popup boundary");
+    assert(branch.includes(".then(sendResponse)"), "public result is sent directly");
+    assert(branch.includes("return true;"), "listener keeps the response channel open");
+    assert(!branch.includes("persisted") && !branch.includes("retryable"), "private envelope does not cross the message boundary");
+  });
+
+  await test("delivery create emits explicit replace, shared, and read-later values", async () => {
+    let addParams;
+    const h = await createHarness({ pinboardFetch: async (url) => {
+      addParams = new URL(url).searchParams;
+      return response(200, { result_code: "done" });
+    } });
+    const delivered = await h.deliverSaveIntent(intent(), h.settings);
+    equal(delivered.result.status, "saved");
+    equal(delivered.result.mutation, "created");
+    equal(addParams.get("replace"), "no");
+    equal(addParams.get("shared"), "yes");
+    equal(addParams.get("toread"), "no");
+    equal(addParams.has("dt"), false);
+
+    let updateParams;
+    const updateHarness = await createHarness({ pinboardFetch: async (url) => {
+      updateParams = new URL(url).searchParams;
+      return response(200, { result_code: "done" });
+    } });
+    const updated = await updateHarness.deliverSaveIntent(
+      intent({ mode: "update", time: "loaded-server-time" }),
+      updateHarness.settings
+    );
+    equal(updated.result.mutation, "updated");
+    equal(updateParams.get("replace"), "yes");
+    equal(updateParams.get("dt"), "loaded-server-time", "update forwards the exact loaded dt");
+  });
+
+  await test("delivery ignores stale cache and merges from the fresh server post", async () => {
+    let addParams;
+    const stale = { posts: [{ description: "Stale", tags: "stale", shared: "yes", toread: "no" }], timestamp: Date.now() };
+    const h = await createHarness({
+      cacheEntries: [[BASE_INTENT.url, stale]],
+      pinboardFetch: async (url) => {
+        if (url.includes("/posts/get?")) return response(200, { posts: [{
+          description: "Fresh", extended: "Fresh notes", tags: "fresh", shared: "no",
+          toread: "yes", time: "fresh-time",
+        }] });
+        addParams = new URL(url).searchParams;
+        return response(200, { result_code: "done" });
+      },
+    });
+    const delivered = await h.deliverSaveIntent(intent({ mode: "merge" }), h.settings);
+    equal(delivered.result.status, "saved");
+    equal(h.fetchCalls.length, 2);
+    equal(addParams.get("description"), "Fresh");
+    equal(addParams.get("extended"), "Fresh notes");
+    equal(addParams.get("tags"), "fresh new-tag");
+    equal(addParams.get("shared"), "no");
+    equal(addParams.get("toread"), "yes");
+    equal(addParams.get("dt"), "fresh-time");
+  });
+
+  await test("merge lookup failure sends no posts/add request", async () => {
+    const h = await createHarness({ pinboardFetch: async () => { throw new TypeError("offline"); } });
+    const delivered = await h.deliverSaveIntent(intent({ mode: "merge" }), h.settings);
+    equal(delivered.result.status, "failed");
+    equal(delivered.result.reason, "lookup");
+    equal(h.fetchCalls.length, 1, "only fresh lookup attempted");
+    const malformed = await createHarness({ pinboardFetch: async () => response(200, { result_code: "weird" }) });
+    const malformedResult = await malformed.deliverSaveIntent(intent({ mode: "merge" }), malformed.settings);
+    equal(malformedResult.result.reason, "lookup");
+    equal(malformed.fetchCalls.length, 1, "malformed lookup must not fall through to add");
+  });
+
+  await test("incomplete canonical merge fails closed and submit queues without writing", async () => {
+    const incompletePost = {
+      description: "Existing", extended: "Notes", tags: "old", shared: "yes", toread: "no",
+    };
+    const plan = pbpResolveSavePlan(intent({ mode: "merge" }), { exists: true, post: incompletePost });
+    equal(plan.action, "failed");
+    equal(plan.result.reason, "lookup");
+    equal(plan.retryable, true);
+
+    const h = await createHarness({ pinboardFetch: async () => response(200, { posts: [incompletePost] }) });
+    const result = await h.submitSaveIntent(intent({ mode: "merge" }));
+    equal(result.status, "queued");
+    equal(h.fetchCalls.length, 1, "incomplete canonical post triggers only posts/get");
+    equal(h.storageData.offlineQueue.length, 1);
+    equal(h.storageData.offlineQueue[0].mode, "merge");
+  });
+
+  await test("merge network and 503 lookup failures queue after only the fresh read", async () => {
+    const cases = [
+      async () => { throw new TypeError("offline"); },
+      async () => response(503, null, true),
+    ];
+    for (const pinboardFetch of cases) {
+      const h = await createHarness({ pinboardFetch });
+      const result = await h.submitSaveIntent(intent({ mode: "merge" }));
+      equal(result.status, "queued");
+      equal(h.fetchCalls.length, 1, "retryable lookup must not attempt posts/add");
+      equal(h.storageData.offlineQueue.length, 1);
+    }
+  });
+
+  await test("skip existing returns the public skipped shape without save or Wayback", async () => {
+    const h = await createHarness({ pinboardFetch: async () => response(200, { posts: [{ shared: "yes", toread: "no" }] }) });
+    const result = await h.submitSaveIntent(intent({ mode: "skip" }));
+    equal(JSON.stringify(result), JSON.stringify({ status: "skipped" }));
+    equal(h.fetchCalls.length, 1);
+    equal(h.waybackCalls.length, 0);
+    equal(h.badgeCalls.length, 0);
+    equal(h.statusCache.get(BASE_INTENT.url)?.bookmarked, true);
+  });
+
+  await test("saved refreshes badge and the matching active-tab icon even when read-later is false", async () => {
+    const h = await createHarness({
+      activeTab: { id: 7, url: BASE_INTENT.url },
+      pinboardFetch: async () => response(200, { result_code: "done" }),
+    });
+    const result = await h.submitSaveIntent(intent({ toread: false }));
+    equal(result.status, "saved");
+    equal(h.badgeCalls.length, 1, "all non-deferred saves refresh badge state");
+    equal(h.iconCalls.length, 1);
+    equal(h.iconCalls[0].tabId, 7);
+    equal(h.iconCalls[0].bookmarked, true);
+  });
+
+  await test("merge performs one fresh conflict recovery", async () => {
+    let phase = 0;
+    let retryParams;
+    const h = await createHarness({ pinboardFetch: async (url) => {
+      if (url.includes("/posts/get?")) {
+        phase++;
+        return phase === 1
+          ? response(200, { posts: [] })
+          : response(200, { posts: [{ description: "Raced", extended: "Keep", tags: "server", shared: "yes", toread: "no", time: "race-time" }] });
+      }
+      if (phase === 1) return response(200, { result_code: "item already exists" });
+      retryParams = new URL(url).searchParams;
+      return response(200, { result_code: "done" });
+    } });
+    const delivered = await h.deliverSaveIntent(intent({ mode: "merge" }), h.settings);
+    equal(delivered.result.status, "saved");
+    equal(h.fetchCalls.length, 4);
+    equal(retryParams.get("replace"), "yes");
+    equal(retryParams.get("description"), "Raced");
+    equal(retryParams.get("tags"), "server new-tag");
+  });
+
+  await test("concurrent merges serialize the complete lookup-to-write transaction", async () => {
+    let post = { description: "Base", extended: "", tags: "base", shared: "yes", toread: "no", time: "same-time" };
+    const order = [];
+    const h = await createHarness({ pinboardFetch: async (url) => {
+      if (url.includes("/posts/get?")) {
+        order.push("get:" + post.tags);
+        return response(200, { posts: [{ ...post }] });
+      }
+      const params = new URL(url).searchParams;
+      order.push("add:" + params.get("tags"));
+      post = {
+        description: params.get("description"), extended: params.get("extended"), tags: params.get("tags"),
+        shared: params.get("shared"), toread: params.get("toread"), time: params.get("dt"),
+      };
+      return response(200, { result_code: "done" });
+    } });
+    const [first, second] = await Promise.all([
+      h.submitSaveIntent(intent({ mode: "merge", tags: "one" })),
+      h.submitSaveIntent(intent({ mode: "merge", tags: "two" })),
+    ]);
+    equal(first.status, "saved"); equal(second.status, "saved");
+    equal(post.tags, "base one two");
+    equal(order.join("|"), "get:base|add:base one|get:base one|add:base one two");
+  });
+
+  await test("URI budget failure performs no Pinboard request", async () => {
+    const h = await createHarness();
+    const delivered = await h.deliverSaveIntent(intent({ notes: "x".repeat(POSTS_ADD_URI_BUDGET) }), h.settings);
+    equal(delivered.result.reason, "too_long");
+    assert(/^\d+$/.test(delivered.result.detail), "URI length detail must be numeric");
+    assert(Number(delivered.result.detail) > POSTS_ADD_URI_BUDGET, "URI length detail must report the measured overage");
+    equal(h.fetchCalls.length, 0);
+  });
+
+  await test("429 and 5xx queue even when the response body is not JSON", async () => {
+    for (const status of [429, 503]) {
+      const h = await createHarness({ pinboardFetch: async () => response(status, null, true) });
+      const result = await h.submitSaveIntent(intent({ mode: "overwrite" }));
+      equal(result.status, "queued", `HTTP ${status} should queue`);
+      equal(h.storageData.offlineQueue.length, 1);
+      equal(h.storageData.offlineQueue[0].mode, "overwrite");
+    }
+  });
+
+  await test("401 and other 4xx failures do not queue", async () => {
+    for (const status of [401, 400]) {
+      const h = await createHarness({ pinboardFetch: async () => response(status, null, true) });
+      const result = await h.submitSaveIntent(intent({ mode: "overwrite" }));
+      equal(result.status, "failed");
+      equal(result.reason, status === 401 ? "not_logged_in" : "http");
+      equal(h.storageData.offlineQueue.length, 0);
+    }
+  });
+
+  await test("network-failed create is durably queued as merge without credentials", async () => {
+    const h = await createHarness({ pinboardFetch: async () => { throw new TypeError("offline"); } });
+    const result = await h.submitSaveIntent(intent({ archive: true }));
+    equal(result.status, "queued");
+    const queued = h.storageData.offlineQueue[0];
+    equal(queued.queueId, result.queueId);
+    equal(queued.mode, "merge");
+    equal(queued.archive, true);
+    assert(!("token" in queued), "queue must not persist credentials");
+    equal(h.events.includes("storage:set"), true, "queued is returned after storage set");
+    equal(h.waybackCalls.length, 0, "queued is not treated as saved");
+  });
+
+  await test("queue storage rejection returns failed/storage", async () => {
+    const h = await createHarness({
+      failStorageSet: true,
+      pinboardFetch: async () => { throw new TypeError("offline"); },
+    });
+    const result = await h.submitSaveIntent(intent());
+    equal(result.status, "failed");
+    equal(result.reason, "storage");
+    equal(h.storageData.offlineQueue.length, 0);
+  });
+
+  await test("empty current token sends no request and does not duplicate queued work", async () => {
+    const h = await createHarness({ settings: { pinboardToken: "" } });
+    const result = await h.submitSaveIntent(intent());
+    equal(result.status, "failed");
+    equal(result.reason, "not_logged_in");
+    equal(h.fetchCalls.length, 0);
+    equal(h.storageData.offlineQueue.length, 0);
+
+    const queuedItem = { queueId: "q1", ...intent({ mode: "overwrite" }) };
+    const replay = await createHarness({ queue: [queuedItem], settings: { pinboardToken: "" } });
+    const outcomes = await replay.drainOfflineQueueIds(["q1"]);
+    equal(outcomes[0].acknowledged, false);
+    equal(outcomes[0].result.reason, "not_logged_in");
+    equal(replay.fetchCalls.length, 0);
+    equal(replay.storageData.offlineQueue.length, 1, "queued work remains for a future token");
+  });
+
+  await test("Wayback receives final persisted privacy from the fresh bookmark", async () => {
+    const h = await createHarness({ pinboardFetch: async (url) => {
+      if (url.includes("/posts/get?")) return response(200, { posts: [{
+        description: "Private", extended: "", tags: "old", shared: "no", toread: "no", time: "private-time",
+      }] });
+      return response(200, { result_code: "done" });
+    } });
+    const result = await h.submitSaveIntent(intent({ mode: "merge", private: false }));
+    equal(result.status, "saved");
+    equal(h.waybackCalls.length, 1);
+    equal(h.waybackCalls[0].options.isPrivate, true);
+    equal(h.waybackCalls[0].options.override, undefined);
+  });
+
+  await test("legacy replay uses fallback token and applies side effects only after durable ack", async () => {
+    let addParams;
+    const queued = {
+      queueId: "legacy-1", url: BASE_INTENT.url, title: "Legacy", notes: "Note", tags: "tag",
+      private: false, toread: false, token: obfuscateKey("legacy-token"),
+    };
+    const h = await createHarness({
+      queue: [queued],
+      settings: { pinboardToken: "", bgSaveMode: "overwrite" },
+      pinboardFetch: async (url) => {
+        addParams = new URL(url).searchParams;
+        return response(200, { result_code: "done" });
+      },
+    });
+    equal(h.normalizeOfflineSaveIntent({ mode: "skip" }, { bgSaveMode: "overwrite" }).mode, "skip", "stored mode beats current setting");
+    const outcomes = await h.drainOfflineQueueIds(["legacy-1"]);
+    equal(outcomes[0].acknowledged, true);
+    equal(outcomes[0].result.status, "saved");
+    equal(h.storageData.offlineQueue.length, 0);
+    equal(addParams.get("auth_token"), "legacy-token");
+    assert(h.events.indexOf("storage:set") < h.events.indexOf("wayback"), "side effect waits for durable removal");
+  });
+
+  await test("side-effect failure never requeues an accepted save", async () => {
+    const h = await createHarness({
+      waybackThrows: true,
+      pinboardFetch: async () => response(200, { result_code: "done" }),
+    });
+    const result = await h.submitSaveIntent(intent());
+    equal(result.status, "saved");
+    equal(h.storageData.offlineQueue.length, 0);
+  });
+
+  await test("background Quick and Read Later prepare snapshotted mode, privacy, and read-later intents", async () => {
+    const productionSource = await getBackgroundSaveSource();
+    for (const legacyCall of ["fetchExistingBookmark(", "buildPostsAddUri(", "pinboardFetch(", "enqueueOfflineSave(", "pbpWaybackArchive(", "updateBadge(", "setIcon("]) {
+      assert(!productionSource.includes(legacyCall), `legacy delivery call remains: ${legacyCall}`);
+    }
+    const quick = await createBackgroundSaveHarness({
+      cachedSettings: {
+        pinboardToken: "token", bgSaveMode: "skip", optPrivateDefault: false,
+        optPrivateIncognito: true, _defaultTags: "quick-tag", _aiTags: false, _aiSummary: false,
+      },
+      onGetPageInfo: (settings) => {
+        settings.bgSaveMode = "overwrite";
+        settings.optPrivateIncognito = false;
+      },
+    });
+    await runBackgroundSave(quick, { tab: { id: 9, url: BASE_INTENT.url, incognito: true } });
+    equal(quick.intents[0].mode, "skip");
+    equal(quick.intents[0].private, true);
+    equal(quick.intents[0].toread, undefined);
+    equal(quick.intents[0].archive, undefined);
+    equal(quick.intents[0].tags, "quick-tag");
+
+    const readLater = await createBackgroundSaveHarness({ cachedSettings: {
+      pinboardToken: "token", bgSaveMode: "overwrite", optPrivateDefault: false,
+      optPrivateIncognito: false, _defaultTags: "", _aiTags: false, _aiSummary: false,
+    } });
+    await runBackgroundSave(readLater, { toread: true, notifyId: "rl", notifyCategory: "readLater" });
+    equal(readLater.intents[0].mode, "overwrite");
+    equal(readLater.intents[0].private, false);
+    equal(readLater.intents[0].toread, true);
+  });
+
+  await test("concurrent background preparations isolate prefix settings from the shared cache", async () => {
+    const cachedSettings = {
+      pinboardToken: "token", bgSaveMode: "merge", optPrivateDefault: false,
+      optPrivateIncognito: false, _defaultTags: "base-tag", _aiTags: false, _aiSummary: false,
+    };
+    let pageInfoCalls = 0;
+    let releaseFirst;
+    let markFirstEntered;
+    const firstEntered = new Promise((resolve) => { markFirstEntered = resolve; });
+    const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+    const h = await createBackgroundSaveHarness({
+      cachedSettings,
+      getPageInfoFromTab: async () => {
+        pageInfoCalls++;
+        if (pageInfoCalls === 1) {
+          markFirstEntered();
+          await firstGate;
+        }
+        return { pageText: "body" };
+      },
+    });
+    const quick = runBackgroundSave(h, {
+      settingsOverrides: { _defaultTags: "quick-tag", _aiTags: true, _aiSummary: false },
+    });
+    await firstEntered;
+    const read = runBackgroundSave(h, {
+      toread: true,
+      settingsOverrides: { _defaultTags: "read-tag", _aiTags: false, _aiSummary: true },
+    });
+    await read;
+    releaseFirst();
+    await quick;
+
+    equal(cachedSettings._defaultTags, "base-tag");
+    equal(cachedSettings._aiTags, false);
+    equal(cachedSettings._aiSummary, false);
+    assert(h.intents.some((prepared) => prepared.tags === "quick-tag" && prepared.toread === undefined), "Quick snapshot preserved");
+    assert(h.intents.some((prepared) => prepared.tags === "read-tag" && prepared.toread === true), "Read Later snapshot preserved");
+    assert(h.aiSnapshots.some((snapshot) => snapshot.defaultTags === "quick-tag" && snapshot.aiTags && !snapshot.aiSummary), "Quick AI flags isolated");
+    assert(h.aiSnapshots.some((snapshot) => snapshot.defaultTags === "read-tag" && !snapshot.aiTags && snapshot.aiSummary), "Read Later AI flags isolated");
+  });
+
+  await test("only confirmed creation receives Undo with the post-AI token", async () => {
+    const beforeAi = {
+      pinboardToken: "old-token", bgSaveMode: "merge", optPrivateDefault: false,
+      optPrivateIncognito: false, _defaultTags: "", _aiTags: false, _aiSummary: false,
+    };
+    const atSave = { ...beforeAi, pinboardToken: "current-token" };
+    const created = await createBackgroundSaveHarness({
+      settingsSequence: [beforeAi, atSave],
+      result: { status: "saved", mutation: "created" },
+    });
+    const createdResult = await runBackgroundSave(created);
+    equal(createdResult.mutation, "created");
+    equal(created.notifications[0][4].token, "current-token");
+    equal(created.drainCalls, 1);
+
+    let reads = 0;
+    const undoReadFailure = await createBackgroundSaveHarness({
+      loadSettings: async () => {
+        reads++;
+        if (reads > 1) throw new Error("storage unavailable");
+        return beforeAi;
+      },
+      result: { status: "saved", mutation: "created" },
+    });
+    const accepted = await runBackgroundSave(undoReadFailure);
+    equal(accepted.status, "saved");
+    equal(undoReadFailure.notifications[0][4], undefined, "Undo read failure does not downgrade saved result");
+
+    for (const mutation of ["updated", "unknown"]) {
+      const h = await createBackgroundSaveHarness({ result: { status: "saved", mutation } });
+      await runBackgroundSave(h);
+      equal(h.notifications[0][4], undefined, `${mutation} must not expose destructive Undo`);
+      equal(h.drainCalls, 1, "saved result keeps opportunistic drain");
+    }
+  });
+
+  await test("queued background save notifies without success or opportunistic drain", async () => {
+    const h = await createBackgroundSaveHarness({ result: { status: "queued", queueId: "q1" } });
+    const result = await runBackgroundSave(h);
+    equal(result.status, "queued");
+    equal(h.notifications.length, 1);
+    equal(h.notifications[0][0], "qs-queued");
+    equal(h.notifications[0][1], "bgQueuedOffline");
+    equal(h.drainCalls, 0);
+  });
+
+  await test("skipped background save notifies without success or opportunistic drain", async () => {
+    const h = await createBackgroundSaveHarness({ result: { status: "skipped" } });
+    const result = await runBackgroundSave(h);
+    equal(result.status, "skipped");
+    equal(h.notifications.length, 1);
+    equal(h.notifications[0][0], "qs-skipped");
+    equal(h.notifications[0][1], "bgSkippedTitle");
+    equal(h.drainCalls, 0);
+  });
+
+  await test("failed background saves reuse the existing failure notification mappings", async () => {
+    const cases = [
+      [{ status: "failed", reason: "not_logged_in" }, "bgNotLoggedIn", "bgSetToken"],
+      [{ status: "failed", reason: "too_long", detail: "4001" }, "bgSaveFailed", "uriTooLong:4001:3900"],
+      [{ status: "failed", reason: "lookup" }, "bgNetworkError", "pinboardErrorOffline"],
+      [{ status: "failed", reason: "api", detail: "bad response" }, "bgSaveFailed", "bad response"],
+    ];
+    for (const [failure, expectedTitle, expectedMessage] of cases) {
+      const h = await createBackgroundSaveHarness({ result: failure });
+      const result = await runBackgroundSave(h);
+      equal(result.reason, failure.reason);
+      equal(h.notifications[0][0], "qs-error");
+      equal(h.notifications[0][1], expectedTitle);
+      equal(h.notifications[0][2], expectedMessage);
+      equal(h.drainCalls, 0);
+    }
+
+    const noToken = await createBackgroundSaveHarness({ cachedSettings: {
+      pinboardToken: "", bgSaveMode: "merge", optPrivateDefault: false,
+      optPrivateIncognito: false, _defaultTags: "", _aiTags: false, _aiSummary: false,
+    } });
+    const early = await runBackgroundSave(noToken);
+    equal(early.reason, "not_logged_in");
+    equal(noToken.intents.length, 0, "missing token stops before submit");
+    equal(noToken.notifications[0][1], "bgNotLoggedIn");
+  });
+
+  await test("Batch delegates mixed outcomes to unified intents and aggregates once", async () => {
+    const productionSource = await getBatchSaveSource();
+    for (const legacyCall of [
+      "buildPostsAddUri(", "pinboardFetch(", "statusCache", "pbpWaybackArchive(",
+      "fetchExistingUrlSet(", "computeSavedUrlSet(", "cached_existing_urls",
+    ]) {
+      assert(!productionSource.includes(legacyCall), `legacy Batch delivery remains: ${legacyCall}`);
+    }
+
+    const h = await createBatchSaveHarness({ outcomes: [
+      { status: "saved", mutation: "created" },
+      { status: "queued", queueId: "q1" },
+      { status: "skipped" },
+      { status: "failed", reason: "too_long" },
+      { status: "failed", reason: "api" },
+    ] });
+    await h.handleBatchSave(batchTabs(5));
+
+    equal(h.intents.length, 5);
+    assert(h.intents.every((call) => call.prepared.mode === "merge"), "default Batch mode must be merge");
+    assert(h.intents.every((call) => call.prepared.toread === undefined), "disabled read-later must stay undefined");
+    assert(h.intents.every((call) => call.prepared.archive === false), "disabled Batch Wayback must be explicit false");
+    assert(h.intents.every((call) => call.deliveryOptions.deferBadge === true), "each Batch delivery must defer badge refresh");
+    equal(h.intents[0].prepared.private, true, "incognito privacy snapshot lost");
+    equal(h.intents[0].prepared.tags, "Batch-Tag");
+
+    const done = h.progress[h.progress.length - 1];
+    equal(done.saved, 1); equal(done.queued, 1); equal(done.skipped, 1);
+    equal(done.failed, 1); equal(done.tooLong, 1);
+    equal(h.badgeCalls.length, 1, "saved Batch refreshes badge once after the loop");
+    equal(h.notifications.length, 1);
+    equal(h.notifications[0][1], "bgBatchSaved");
+    assert(h.notifications[0][2].includes("offlineQueued:1"), "mixed notification omits queued count");
+    assert(h.notifications[0][2].includes("batchTaggedSuffix:Batch-Tag"), "Batch tag suffix missing");
+  });
+
+  await test("Batch completion waits for its single deferred badge refresh", async () => {
+    let markBadgeStarted;
+    let releaseBadge;
+    const badgeStarted = new Promise((resolve) => { markBadgeStarted = resolve; });
+    const badgeGate = new Promise((resolve) => { releaseBadge = resolve; });
+    const h = await createBatchSaveHarness({
+      outcomes: [{ status: "saved", mutation: "created" }],
+      updateBadge: () => { markBadgeStarted(); return badgeGate; },
+    });
+
+    let resolved = false;
+    const pending = h.handleBatchSave(batchTabs(1)).then(() => { resolved = true; });
+    await badgeStarted;
+    await Promise.resolve();
+    equal(h.badgeCalls.length, 1, "badge refresh must be invoked exactly once");
+    equal(resolved, false, "Batch resolved before badge refresh settled");
+    assert(!h.progress.some((entry) => entry.done), "final progress was written before badge refresh settled");
+
+    releaseBadge();
+    await pending;
+    equal(resolved, true);
+    equal(h.badgeCalls.length, 1);
+    equal(h.progress[h.progress.length - 1].done, true);
+  });
+
+  await test("Batch skip/read-later/archive settings map exactly without success side effects", async () => {
+    const h = await createBatchSaveHarness({
+      settings: { batchSkipExisting: true, optReadlaterDefault: true, waybackArchiveBatch: true },
+      outcomes: [{ status: "skipped" }],
+    });
+    await h.handleBatchSave(batchTabs(1));
+    equal(h.intents[0].prepared.mode, "skip");
+    equal(h.intents[0].prepared.toread, true);
+    equal(h.intents[0].prepared.archive, undefined);
+    equal(h.progress[h.progress.length - 1].skipped, 1);
+    equal(h.badgeCalls.length, 0);
+    equal(h.notifications.length, 0, "all-skipped Batch must not masquerade as saved");
+  });
+
+  await test("Batch isolates a thrown tab delivery and continues", async () => {
+    const h = await createBatchSaveHarness({ outcomes: [
+      new Error("one tab failed"),
+      { status: "saved", mutation: "created" },
+    ] });
+    await h.handleBatchSave(batchTabs(2));
+    equal(h.intents.length, 2, "later tabs must still run");
+    const done = h.progress[h.progress.length - 1];
+    equal(done.failed, 1);
+    equal(done.saved, 1);
+    equal(h.badgeCalls.length, 1);
+  });
+
+  await test("all-queued Batch notifies acceptance without badge refresh", async () => {
+    const h = await createBatchSaveHarness({
+      outcomes: [{ status: "queued", queueId: "q1" }, { status: "queued", queueId: "q2" }],
+    });
+    await h.handleBatchSave(batchTabs(2));
+    const done = h.progress[h.progress.length - 1];
+    equal(done.queued, 2);
+    equal(done.failed, 0);
+    equal(h.badgeCalls.length, 0);
+    equal(h.notifications.length, 1);
+    equal(h.notifications[0][1], "bgQueuedOffline");
+    assert(h.notifications[0][2].includes("batchDone:0:0"), "all-queued notification lacks completion summary");
+    assert(h.notifications[0][2].includes("offlineQueued:2"), "all-queued notification lacks queued count");
+  });
+});
+})();
+</script>
+</body></html>

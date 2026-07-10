@@ -231,26 +231,174 @@ async function updateBadge() {
   }
 }
 
-// ---- F3: Offline queue ----
+// ---- Unified save pipeline + offline queue ----
 
-// Read an existing bookmark's current tags + note for the merge-don't-clobber path.
-// Prefers a FRESH statusCache entry (same TTL as checkBookmarked); falls back to a
-// posts/get read when the cache is missing or stale. Returns "" fields on any failure.
-async function fetchExistingBookmark(url, token) {
-  const cached = statusCache.get(url);
-  if (cached?.posts?.length > 0 && !isStaleCacheEntry(cached, Date.now(), CACHE_TTL)) {
-    return { exists: true, tags: cached.posts[0].tags || "", extended: cached.posts[0].extended || "" };
+const PBP_SAVE_MODES = new Set(["create", "update", "merge", "skip", "overwrite"]);
+const PBP_POPUP_SAVE_MODES = new Set(["create", "update", "merge"]);
+
+function pbpSaveFailure(reason, { detail, httpStatus } = {}) {
+  const result = { status: "failed", reason };
+  if (detail) {
+    result.detail = String(detail)
+      .replace(/auth_token=[^&\s]+/gi, "auth_token=[redacted]")
+      .slice(0, 160);
   }
+  if (Number.isInteger(httpStatus)) result.httpStatus = httpStatus;
+  return result;
+}
+
+function validateSaveIntent(intent) {
+  if (!intent || typeof intent !== "object" || Array.isArray(intent)) return pbpSaveFailure("invalid");
+  if (!PBP_SAVE_MODES.has(intent.mode)) return pbpSaveFailure("invalid");
+  if (typeof intent.url !== "string" || typeof intent.title !== "string"
+      || typeof intent.notes !== "string" || typeof intent.tags !== "string"
+      || typeof intent.private !== "boolean") return pbpSaveFailure("invalid");
+  try {
+    const parsed = new URL(intent.url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return pbpSaveFailure("invalid");
+  } catch (_) {
+    return pbpSaveFailure("invalid");
+  }
+  if (intent.toread !== undefined && typeof intent.toread !== "boolean") return pbpSaveFailure("invalid");
+  if (intent.archive !== undefined && typeof intent.archive !== "boolean") return pbpSaveFailure("invalid");
+  if (intent.time !== undefined && (typeof intent.time !== "string" || !intent.time)) return pbpSaveFailure("invalid");
+  if (intent.mode === "update" && !intent.time) return pbpSaveFailure("invalid");
+  if (intent.mode === "create" && intent.time !== undefined) return pbpSaveFailure("invalid");
+  return null;
+}
+
+// Delivery-time merge/skip decisions always use a fresh read. statusCache remains
+// a presentation cache and is refreshed only after a successful lookup.
+async function fetchExistingBookmark(url, token) {
   try {
     const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
-    if (!resp.ok) return { exists: false, lookupFailed: true, tags: "", extended: "" };
+    if (!resp.ok) {
+      const httpStatus = Number.isInteger(resp.status) ? resp.status : undefined;
+      const reason = httpStatus === 401 || httpStatus === 403 ? "not_logged_in" : "http";
+      return {
+        exists: false,
+        lookupFailed: true,
+        reason,
+        httpStatus,
+        retryable: httpStatus === 429 || httpStatus >= 500,
+      };
+    }
     const data = await resp.json();
-    const posts = data.posts || [];
+    if (!Array.isArray(data?.posts)) {
+      return {
+        exists: false,
+        lookupFailed: true,
+        reason: "lookup",
+        retryable: true,
+      };
+    }
+    const posts = data.posts;
     const exists = posts.length > 0;
-    const post = posts[0];
-    return { exists, tags: post?.tags || "", extended: post?.extended || "" };
+    const post = exists ? posts[0] : null;
+    statusCache.set(url, { bookmarked: exists, timestamp: Date.now(), posts });
+    cleanupStatusCache();
+    return {
+      exists,
+      lookupFailed: false,
+      post,
+    };
   } catch (_) {
-    return { exists: false, lookupFailed: true, tags: "", extended: "" };
+    return {
+      exists: false,
+      lookupFailed: true,
+      reason: "lookup",
+      retryable: true,
+    };
+  }
+}
+
+async function pbpSendResolvedPlan(plan, settings) {
+  const apiUrl = buildPostsAddUri({
+    token: settings.pinboardToken,
+    url: plan.fields.url,
+    title: plan.fields.title,
+    extended: plan.fields.notes,
+    tags: plan.fields.tags,
+    shared: plan.fields.private ? "no" : "yes",
+    toread: plan.fields.toread ? "yes" : "no",
+    dt: plan.fields.time,
+    replace: plan.replace,
+  });
+  if (apiUrl.length > POSTS_ADD_URI_BUDGET) {
+    return { result: pbpSaveFailure("too_long", { detail: String(apiUrl.length) }), persisted: null, retryable: false };
+  }
+
+  let resp;
+  try {
+    resp = await pinboardFetch(apiUrl);
+  } catch (_) {
+    return { result: pbpSaveFailure("network"), persisted: null, retryable: true };
+  }
+
+  const httpStatus = Number.isInteger(resp.status) ? resp.status : undefined;
+  if (httpStatus === 409 || httpStatus === 412) {
+    return { result: pbpSaveFailure("conflict", { httpStatus }), persisted: null, retryable: false };
+  }
+  if (resp.ok === false) {
+    if (httpStatus === 401 || httpStatus === 403) {
+      return { result: pbpSaveFailure("not_logged_in", { httpStatus }), persisted: null, retryable: false };
+    }
+    if (httpStatus === 414) {
+      return { result: pbpSaveFailure("too_long", { detail: String(apiUrl.length), httpStatus }), persisted: null, retryable: false };
+    }
+    return {
+      result: pbpSaveFailure("http", { httpStatus }),
+      persisted: null,
+      retryable: httpStatus === 429 || httpStatus >= 500,
+    };
+  }
+
+  let data = null;
+  try { data = await resp.json(); } catch (_) { /* classified below */ }
+  const code = typeof data?.result_code === "string" ? data.result_code : "";
+  if (code === "done") {
+    return {
+      result: { status: "saved", mutation: plan.mutation },
+      persisted: { ...plan.fields },
+      retryable: false,
+    };
+  }
+  if (/already\s+exists/i.test(code)) {
+    return { result: pbpSaveFailure("conflict", { httpStatus }), persisted: null, retryable: false };
+  }
+  return {
+    result: pbpSaveFailure("api", { detail: code || "invalid_response", httpStatus }),
+    persisted: null,
+    retryable: false,
+  };
+}
+
+async function deliverSaveIntent(intent, settings) {
+  const invalid = validateSaveIntent(intent);
+  if (invalid) return { result: invalid, persisted: null, retryable: false };
+  if (!settings?.pinboardToken) {
+    return { result: pbpSaveFailure("not_logged_in"), persisted: null, retryable: false };
+  }
+
+  let recoveredConflict = false;
+  while (true) {
+    let lookup = null;
+    if (intent.mode === "merge" || intent.mode === "skip") {
+      lookup = await fetchExistingBookmark(intent.url, settings.pinboardToken);
+    }
+    const plan = pbpResolveSavePlan(intent, lookup);
+    if (plan.action === "failed") {
+      return { result: plan.result, persisted: null, retryable: !!plan.retryable || !!lookup?.retryable };
+    }
+    if (plan.action === "skip") {
+      return { result: { status: "skipped" }, persisted: plan.fields, retryable: false };
+    }
+
+    const delivered = await pbpSendResolvedPlan(plan, settings);
+    if (delivered.result.reason !== "conflict"
+        || recoveredConflict
+        || (intent.mode !== "merge" && intent.mode !== "skip")) return delivered;
+    recoveredConflict = true;
   }
 }
 
@@ -286,54 +434,116 @@ async function readOfflineQueueWithIds() {
 async function enqueueOfflineSave(params) {
   const queueId = newOfflineQueueId();
   await mutateOfflineQueue({ kind: "enqueue", item: { ...params, queuedAt: Date.now(), queueId } });
+  return queueId;
 }
 
-async function sendOfflineItem(item, settings) {
-  const token = pbpResolveOfflineQueueToken(settings?.pinboardToken, item.token);
-  if (!token) return false;
-  let finalTags = item.tags;
-  let existingExtended = "";
+function normalizeOfflineSaveIntent(item, settings) {
+  const hasStoredMode = Object.prototype.hasOwnProperty.call(item || {}, "mode");
+  const legacyMode = settings?.bgSaveMode === "skip" || settings?.bgSaveMode === "overwrite"
+    ? settings.bgSaveMode
+    : "merge";
+  return {
+    mode: hasStoredMode ? item.mode : legacyMode,
+    url: typeof item?.url === "string" ? item.url : "",
+    title: typeof item?.title === "string" ? item.title : "",
+    notes: typeof item?.notes === "string" ? item.notes : "",
+    tags: typeof item?.tags === "string" ? item.tags : "",
+    private: item?.private === true,
+    toread: item?.toread === true || item?.toread === "yes",
+    archive: typeof item?.archive === "boolean" ? item.archive : undefined,
+    time: typeof item?.time === "string" && item.time ? item.time : undefined,
+  };
+}
 
-  // bgSaveMode tri-state: merge | skip | overwrite
-  if (settings?.bgSaveMode === "skip" || settings?.bgSaveMode === "merge") {
-    try {
-      const existing = await fetchExistingBookmark(item.url, token);
-      if (existing.lookupFailed) {
-        // Network/API failure: degrade to merge (never lose a save)
-        if (existing.tags) finalTags = unionTags(existing.tags, item.tags);
-        existingExtended = existing.extended;
-      } else if (settings.bgSaveMode === "skip" && existing.exists) {
-        // Skip mode: bookmark exists, dequeue without saving
-        return true;
-      } else {
-        // Merge mode or skip with non-existent: proceed with merge
-        if (existing.tags) finalTags = unionTags(existing.tags, item.tags);
-        existingExtended = existing.extended;
-      }
-    } catch (_) {
-      // Fetch error: proceed with original tags
-    }
+// pinboardFetch serializes request starts, not the lookup-to-write transaction.
+// This tail protects that complete transaction for both live saves and replay.
+const runSaveDeliveryTransaction = pbpCreateRecoveringTail();
+
+async function applySaveResultSideEffects(envelope, settings, { deferBadge = false } = {}) {
+  const { result, persisted } = envelope || {};
+  if (!persisted || (result?.status !== "saved" && result?.status !== "skipped")) return;
+
+  try {
+    const cachedPosts = result.status === "skipped" ? statusCache.get(persisted.url)?.posts : undefined;
+    statusCache.set(persisted.url, {
+      bookmarked: true,
+      timestamp: Date.now(),
+      ...(cachedPosts ? { posts: cachedPosts } : {}),
+    });
+    cleanupStatusCache();
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id && pbpSameBookmark(tab.url, persisted.url)) setIcon(tab.id, true);
+  } catch (_) { /* status/icon are best-effort */ }
+
+  if (result.status !== "saved") return;
+  if (!deferBadge) {
+    try { Promise.resolve(updateBadge()).catch(() => {}); } catch (_) {}
   }
-  // overwrite mode: no read, use tags as-is
-
-  // buildPostsAddUri defaults replace=true (replace=yes)
-  const apiUrl = buildPostsAddUri({
-    token,
-    url: item.url,
-    title: item.title,
-    // item.notes / notes is system-filled (meta description or AI summary), never
-    // user-cleared, so falling back to the existing note can't erase an intentional blank.
-    extended: item.notes || existingExtended,
-    tags: finalTags,
-    toread: item.toread ? "yes" : undefined,
-    shared: item.private ? "no" : "yes",
-  });
-  const resp = await pinboardFetch(apiUrl);
-  const data = await resp.json();
-  return data.result_code === "done";
+  try {
+    Promise.resolve(pbpWaybackArchive(persisted.url, settings, {
+      isPrivate: persisted.private === true,
+      override: persisted.archive,
+    })).catch(() => {});
+  } catch (_) { /* accepted save is never requeued for a side-effect failure */ }
 }
 
-function drainOfflineQueueIds(queueIds, settings) {
+function queueRecordFromSaveIntent(intent) {
+  return {
+    mode: intent.mode === "create" ? "merge" : intent.mode,
+    url: intent.url,
+    title: intent.title,
+    notes: intent.notes,
+    tags: intent.tags,
+    private: intent.private,
+    toread: intent.toread,
+    archive: intent.archive,
+    time: intent.time,
+  };
+}
+
+function submitSaveIntent(intent, { deferBadge = false } = {}) {
+  return runSaveDeliveryTransaction(async () => {
+    let settings;
+    try { settings = await loadSettings(); }
+    catch (_) { return pbpSaveFailure("internal"); }
+
+    let envelope;
+    try { envelope = await deliverSaveIntent(intent, settings); }
+    catch (_) { return pbpSaveFailure("internal"); }
+
+    if (envelope.result.status === "saved" || envelope.result.status === "skipped") {
+      await applySaveResultSideEffects(envelope, settings, { deferBadge });
+      return envelope.result;
+    }
+    if (!envelope.retryable || !settings.offlineQueueEnabled) return envelope.result;
+
+    try {
+      const queueId = await enqueueOfflineSave(queueRecordFromSaveIntent(intent));
+      return { status: "queued", queueId };
+    } catch (_) {
+      return pbpSaveFailure("storage");
+    }
+  });
+}
+
+function sendOfflineItem(item) {
+  return runSaveDeliveryTransaction(async () => {
+    let settings;
+    try { settings = await loadSettings(); }
+    catch (_) {
+      return { result: pbpSaveFailure("internal"), persisted: null, retryable: false, settings: {} };
+    }
+    const token = pbpResolveOfflineQueueToken(settings.pinboardToken, item?.token);
+    const deliverySettings = token === settings.pinboardToken ? settings : { ...settings, pinboardToken: token };
+    const intent = normalizeOfflineSaveIntent(item, settings);
+    let envelope;
+    try { envelope = await deliverSaveIntent(intent, deliverySettings); }
+    catch (_) { envelope = { result: pbpSaveFailure("internal"), persisted: null, retryable: false }; }
+    return { ...envelope, settings: deliverySettings };
+  });
+}
+
+function drainOfflineQueueIds(queueIds) {
   return pbpDrainOfflineQueue(queueIds, {
     getItem: (queueId) => runOfflineQueueWrite(async () => {
       const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
@@ -341,12 +551,9 @@ function drainOfflineQueueIds(queueIds, settings) {
         ? offlineQueue.find((item) => item?.queueId === queueId) || null
         : null;
     }),
-    sendItem: (item) => sendOfflineItem(item, settings),
+    sendItem: (item) => sendOfflineItem(item),
     removeItem: (queueId) => mutateOfflineQueue({ kind: "remove", queueId }),
-    onSuccess: (item) => {
-      statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
-      pbpWaybackArchive(item.url, settings, { isPrivate: !!item.private }).catch(() => {});
-    },
+    onSuccess: (_item, delivered) => applySaveResultSideEffects(delivered, delivered.settings),
   });
 }
 
@@ -357,8 +564,7 @@ function processOfflineQueue() {
   const operation = runOfflineQueueConsumer(async () => {
     const snapshot = await readOfflineQueueWithIds();
     if (!snapshot.length) return;
-    const settings = await loadSettings();
-    await drainOfflineQueueIds(snapshot.map((item) => item?.queueId).filter(Boolean), settings);
+    await drainOfflineQueueIds(snapshot.map((item) => item?.queueId).filter(Boolean));
   });
   const drain = operation.finally(() => {
     if (_offlineQueueDrain === drain) _offlineQueueDrain = null;
@@ -368,24 +574,46 @@ function processOfflineQueue() {
 }
 
 function retryOfflineItem(queueId) {
-  if (!queueId || typeof queueId !== "string") return Promise.resolve(false);
+  if (!queueId || typeof queueId !== "string") {
+    return Promise.resolve({ ok: false, result: pbpSaveFailure("invalid") });
+  }
   return runOfflineQueueConsumer(async () => {
-    await readOfflineQueueWithIds();
-    const settings = await loadSettings();
-    const completed = await drainOfflineQueueIds([queueId], settings);
-    return completed.length === 1;
+    try {
+      await readOfflineQueueWithIds();
+      const outcomes = await drainOfflineQueueIds([queueId]);
+      const outcome = outcomes[0];
+      return outcome
+        ? { ok: outcome.acknowledged, result: outcome.result }
+        : { ok: false, result: pbpSaveFailure("invalid") };
+    } catch (_) {
+      return { ok: false, result: pbpSaveFailure("storage") };
+    }
   });
+}
+
+function submitPopupSaveIntent(intent) {
+  if (!intent || !PBP_POPUP_SAVE_MODES.has(intent.mode)) {
+    return Promise.resolve(pbpSaveFailure("invalid"));
+  }
+  if (intent.mode === "update" && !intent.time) {
+    return Promise.resolve(pbpSaveFailure("invalid"));
+  }
+  if (intent.mode === "create" && intent.time !== undefined) {
+    return Promise.resolve(pbpSaveFailure("invalid"));
+  }
+  return submitSaveIntent(intent);
 }
 
 // ---- P1: Shared save function ----
 async function saveFromBackground({ url, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
-  const s = await loadSettings();
-  // Apply settings overrides (prefix-resolved keys)
-  if (settingsOverrides) Object.assign(s, settingsOverrides);
+  const loadedSettings = await loadSettings();
+  const s = { ...loadedSettings, ...(settingsOverrides || {}) };
+  const mode = s.bgSaveMode === "skip" || s.bgSaveMode === "overwrite" ? s.bgSaveMode : "merge";
+  const isPrivate = pbpEffectivePrivate(s, { incognito: tab?.incognito });
 
   if (!s.pinboardToken) {
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
-    return;
+    return pbpSaveFailure("not_logged_in");
   }
 
   // Extract page info if tab available
@@ -487,89 +715,58 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     }
   }
 
-  // Save bookmark via pinboardFetch (rate-limited)
-  let tagsStr = tags.join(" ");
-  let existingExtended = "";
-
-  // bgSaveMode tri-state: merge | skip | overwrite
-  if (s.bgSaveMode === "skip" || s.bgSaveMode === "merge") {
-    try {
-      const existing = await fetchExistingBookmark(url, s.pinboardToken);
-      if (existing.lookupFailed) {
-        // Network/API failure: degrade to merge (never lose a save)
-        if (existing.tags) tagsStr = unionTags(existing.tags, tagsStr);
-        existingExtended = existing.extended;
-      } else if (s.bgSaveMode === "skip" && existing.exists) {
-        // Skip mode: bookmark exists, do not save
-        showNotification(notifyId + "-skipped", t("bgSkippedTitle"), t("bgSkippedExists"), notifyCategory);
-        statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
-        return;
-      } else {
-        // Merge mode or skip with non-existent: proceed with merge
-        if (existing.tags) tagsStr = unionTags(existing.tags, tagsStr);
-        existingExtended = existing.extended;
-      }
-    } catch (_) {
-      // Fetch error: proceed with original tags
-    }
-  }
-  // overwrite mode: no read, use tags/extended as-is
-
-  const isPrivate = pbpEffectivePrivate(s, { incognito: tab?.incognito });
-  const apiUrl = buildPostsAddUri({
-    token: s.pinboardToken,
+  const result = await submitSaveIntent({
+    mode,
     url,
     title,
-    // item.notes / notes is system-filled (meta description or AI summary), never
-    // user-cleared, so falling back to the existing note can't erase an intentional blank.
-    extended: notes || existingExtended,
-    tags: tagsStr,
-    toread: toread ? "yes" : undefined,
-    shared: isPrivate ? "no" : "yes",
+    notes,
+    tags: tags.join(" "),
+    private: isPrivate,
+    toread: toread === true ? true : undefined,
+    archive: undefined,
   });
 
-  // Quick-save has no UI to trim the note, so gate on the URI budget before sending.
-  // Otherwise an oversize request 414s — resp.json() then throws into a vague "Invalid
-  // response (HTTP 414)" notice, the bookmark is silently lost, and (worse) auto AI
-  // summaries appended above can push notes over without the user realising. Fail fast
-  // with the same clear message the popup shows. (Gating here also keeps oversize items
-  // out of the offline queue, where they would 414-loop forever.)
-  if (apiUrl.length > POSTS_ADD_URI_BUDGET) {
-    showNotification(notifyId + "-error", t("bgSaveFailed"), t("uriTooLong", String(apiUrl.length), String(POSTS_ADD_URI_BUDGET)), "error");
-    return;
-  }
-
-  try {
-    const resp = await pinboardFetch(apiUrl);
-    let data;
-    try { data = await resp.json(); } catch (parseErr) {
-      showNotification(notifyId + "-error", t("bgSaveFailed"), `Invalid response (HTTP ${resp.status})`, "error");
-      return;
-    }
-
-    if (data.result_code === "done") {
-      statusCache.set(url, { bookmarked: true, timestamp: Date.now() });
-      if (tab?.id) setIcon(tab.id, true);
-      showNotification(notifyId + "-saved", notifyTitle, t("bgTitleSaved", title.substring(0, 60)), notifyCategory, { url, token: s.pinboardToken });
-      processOfflineQueue().catch(() => {});
-      if (toread) updateBadge().catch(() => {});
-      pbpWaybackArchive(url, s, { isPrivate }).catch(() => {});
-    } else {
-      showNotification(notifyId + "-error", t("bgSaveFailed"), data.result_code || "Unknown error", "error");
-    }
-  } catch (e) {
-    // Network/timeout error — queue for offline retry if enabled
-    if (s.offlineQueueEnabled) {
+  if (result.status === "saved") {
+    let undoInfo;
+    if (result.mutation === "created") {
       try {
-        await enqueueOfflineSave({ url, title, notes, tags: tagsStr, toread: !!toread, private: isPrivate });
-        showNotification(notifyId + "-queued", t("bgQueuedOffline"), t("bgTitleQueued", title.substring(0, 60)), notifyCategory);
-      } catch (storageError) {
-        showNotification(notifyId + "-error", t("bgSaveFailed"), storageError?.message || String(storageError), "error");
-      }
-    } else {
-      showNotification(notifyId + "-error", t("bgNetworkError"), e.message, "error");
+        const currentSettings = await loadSettings();
+        if (currentSettings.pinboardToken) undoInfo = { url, token: currentSettings.pinboardToken };
+      } catch (_) { /* saved result remains successful when Undo setup cannot read settings */ }
     }
+    showNotification(
+      notifyId + "-saved",
+      notifyTitle,
+      t("bgTitleSaved", title.substring(0, 60)),
+      notifyCategory,
+      undoInfo
+    );
+    processOfflineQueue().catch(() => {});
+    return result;
   }
+  if (result.status === "queued") {
+    showNotification(notifyId + "-queued", t("bgQueuedOffline"), t("bgTitleQueued", title.substring(0, 60)), notifyCategory);
+    return result;
+  }
+  if (result.status === "skipped") {
+    showNotification(notifyId + "-skipped", t("bgSkippedTitle"), t("bgSkippedExists"), notifyCategory);
+    return result;
+  }
+  if (result.reason === "not_logged_in") {
+    showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
+  } else if (result.reason === "too_long") {
+    showNotification(
+      notifyId + "-error",
+      t("bgSaveFailed"),
+      t("uriTooLong", result.detail || "?", String(POSTS_ADD_URI_BUDGET)),
+      "error"
+    );
+  } else if (result.reason === "network" || result.reason === "lookup") {
+    showNotification(notifyId + "-error", t("bgNetworkError"), result.detail || t("pinboardErrorOffline"), "error");
+  } else {
+    showNotification(notifyId + "-error", t("bgSaveFailed"), result.detail || result.reason || "Unknown error", "error");
+  }
+  return result;
 }
 
 // Helper: resolve prefix-specific settings to internal keys
@@ -934,16 +1131,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "bookmark_saved" && message.url) {
-    statusCache.set(message.url, { bookmarked: true, timestamp: Date.now() });
-    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-      if (tab?.id && pbpSameBookmark(tab.url, message.url)) setIcon(tab.id, true);
-    }).catch(() => {});
-    // Update badge if toread bookmark was saved
-    if (message.toread) updateBadge().catch(() => {});
-    // Archive to Wayback Machine
-    loadSettings().then((s) => pbpWaybackArchive(message.url, s, { isPrivate: message.private === true, override: message.archive })).catch(() => {});
-    sendResponse({ ok: true });
+  if (message.type === "save_intent") {
+    submitPopupSaveIntent(message.intent)
+      .then(sendResponse)
+      .catch(() => sendResponse(pbpSaveFailure("internal")));
     return true;
   }
 
@@ -987,8 +1178,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "retry_offline_item" && typeof message.queueId === "string") {
     retryOfflineItem(message.queueId)
-      .then((ok) => sendResponse({ ok }))
-      .catch(() => sendResponse({ ok: false }));
+      .then(({ ok, result }) => sendResponse({ ok, result }))
+      .catch(() => sendResponse({ ok: false, result: pbpSaveFailure("internal") }));
     return true;
   }
 
@@ -1044,7 +1235,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Same checkBookmarked()/statusCache the toolbar icon uses (X2: badge = one
     // cache, one source of truth). checkBookmarked()'s TTL-hit branch can return
     // bookmarked:true from a cache entry that was populated WITHOUT .posts (see
-    // bookmark_saved / quick-save / batch-save / skip-mode / offline-queue call
+    // save pipeline / quick-save / batch-save / skip-mode / offline-queue call
     // sites) — so the boolean alone isn't enough to read tags/shared/toread from.
     // Mirror get_bookmark_data's guard (background.js:845-846: require
     // cached.posts, not just cached.bookmarked) and force one fresh posts/get
@@ -1086,8 +1277,8 @@ async function handleBatchSave(tabs) {
   if (_batchRunning) return;            // one batch per SW lifetime (popup also guards)
   _batchRunning = true;
   const total = tabs.length;
-  let saved = 0, failed = 0, aiFailed = 0, skipped = 0, tooLong = 0;
-  const base = () => ({ total, i: 0, saved, failed, aiFailed, skipped, tooLong });
+  let saved = 0, queued = 0, failed = 0, aiFailed = 0, skipped = 0, tooLong = 0;
+  const base = () => ({ total, i: 0, saved, queued, failed, aiFailed, skipped, tooLong });
   await _writeBatchProgress({ running: true, done: false, error: null, ...base() });
 
   try {
@@ -1115,28 +1306,9 @@ async function handleBatchSave(tabs) {
       } catch (_) { /* no cache -> map stays empty, resolveTagCase returns tag as-is */ }
     }
 
-    // Dedup set
-    let existingUrls = new Set();
-    let existingPerTabFallback = false;
-    const savedUrls = [];
-    if (s.batchSkipExisting) {
-      const result = await fetchExistingUrlSet(s.pinboardToken);
-      if (result === null) existingPerTabFallback = true;
-      else existingUrls = result;
-    }
-
     for (let i = 0; i < tabs.length; i++) {
       const tab = tabs[i];
-      await _writeBatchProgress({ running: true, done: false, error: null, total, i, saved, failed, aiFailed, skipped, tooLong });
-
-      if (s.batchSkipExisting) {
-        let isExisting = existingUrls.has(tab.url);
-        if (existingPerTabFallback) {
-          try { const ex = await fetchExistingBookmark(tab.url, s.pinboardToken); if (ex.exists) isExisting = true; }
-          catch (_) {}
-        }
-        if (isExisting) { skipped++; continue; }
-      }
+      await _writeBatchProgress({ running: true, done: false, error: null, total, i, saved, queued, failed, aiFailed, skipped, tooLong });
 
       try {
         let tags = [...baseTags];
@@ -1203,40 +1375,38 @@ async function handleBatchSave(tabs) {
 
         const dedupedTags = [...new Set(tags.map(tg => tg.toLowerCase()))].map(lower => tags.find(tg => tg.toLowerCase() === lower));
         const isPrivate = pbpEffectivePrivate(s, { incognito: tab.incognito });
-        const apiUrl = buildPostsAddUri({
-          token: s.pinboardToken,
+        const result = await submitSaveIntent({
+          mode: s.batchSkipExisting ? "skip" : "merge",
           url: tab.url,
           title: tab.title || tab.url,
-          extended: notes,
+          notes,
           tags: dedupedTags.join(" "),
-          shared: isPrivate ? "no" : "yes",
-          toread: s.optReadlaterDefault ? "yes" : undefined,
-        });
-        if (apiUrl.length > POSTS_ADD_URI_BUDGET) { console.warn(`[batch] skipping oversize URI (${apiUrl.length}/${POSTS_ADD_URI_BUDGET}):`, tab.url); tooLong++; continue; }
-        const data = await (await pinboardFetch(apiUrl)).json();
-        if (data.result_code === "done") {
-          saved++;
-          savedUrls.push(tab.url);
-          statusCache.set(tab.url, { bookmarked: true, timestamp: Date.now() }); // icon reflects batch save
-          if (s.waybackArchiveEnabled && s.waybackArchiveBatch) {
-            pbpWaybackArchive(tab.url, s, { isPrivate }).catch(() => {}); // direct call; gating internal
-          }
-        } else failed++;
+          private: isPrivate,
+          toread: s.optReadlaterDefault ? true : undefined,
+          archive: s.waybackArchiveBatch ? undefined : false,
+        }, { deferBadge: true });
+        if (result.status === "saved") saved++;
+        else if (result.status === "queued") queued++;
+        else if (result.status === "skipped") skipped++;
+        else if (result.reason === "too_long") tooLong++;
+        else failed++;
       } catch (_) { failed++; }
     }
 
-    if (saved > 0) {
-      existingUrls = computeSavedUrlSet(existingUrls, savedUrls);
-      try { await chrome.storage.local.set({ cached_existing_urls: { urls: [...existingUrls], timestamp: Date.now() } }); } catch (_) {}
-    }
+    if (saved > 0) await updateBadge().catch(() => {});
 
-    await _writeBatchProgress({ running: false, done: true, error: null, total, i: total, saved, failed, aiFailed, skipped, tooLong });
+    await _writeBatchProgress({ running: false, done: true, error: null, total, i: total, saved, queued, failed, aiFailed, skipped, tooLong });
     const tagsSuffix = baseTags.length ? t("batchTaggedSuffix", baseTags.join(", ")) : "";
-    // Only notify when something actually saved (matches the old popup gate); an
-    // all-skipped/all-failed run should not toast "Saved 0 bookmarks".
-    if (saved > 0) showNotification("batch-saved", t("bgBatchSaved"), t("batchSavedNotify", String(saved), tagsSuffix), "batchSave");
+    const skippedMsg = skipped > 0 ? t("batchSkipped", String(skipped)) : "";
+    const tooLongMsg = tooLong > 0 ? t("batchTooLong", String(tooLong)) : "";
+    const queuedMsg = queued > 0 ? ` · ${t("offlineQueued", String(queued))}` : "";
+    if (saved > 0 || queued > 0) {
+      const title = saved > 0 ? t("bgBatchSaved") : t("bgQueuedOffline");
+      const message = t("batchDone", String(saved), String(failed)) + skippedMsg + tooLongMsg + queuedMsg + tagsSuffix;
+      showNotification("batch-saved", title, message, "batchSave");
+    }
   } catch (e) {
-    await _writeBatchProgress({ running: false, done: true, error: e.message, total, i: total, saved, failed, aiFailed, skipped, tooLong });
+    await _writeBatchProgress({ running: false, done: true, error: e.message, total, i: total, saved, queued, failed, aiFailed, skipped, tooLong });
     showNotification("batch-error", t("bgBatchSaved"), e.message, "error");
   } finally {
     _batchRunning = false;

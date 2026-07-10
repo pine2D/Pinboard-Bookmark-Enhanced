@@ -13,11 +13,7 @@ pinboardFetch = function(url, options) {
         if (!resp) { reject(new Error("no background response")); return; }
         if (resp.status === 401) {
           // Invalid token — redirect to login instead of letting Chrome show the auth dialog
-          (async () => {
-            try { await (await getSettingsStorage()).remove("pinboardToken"); } catch (_) {}
-            try { await chrome.storage.local.remove("pinboardToken"); } catch (_) {}
-          })();
-          showLogin();
+          resetPinboardSession();
           // Return a dummy resolved response so call sites don't also throw
           resolve({ ok: false, status: 401, json: () => Promise.resolve({}), text: () => Promise.resolve("") });
           return;
@@ -44,6 +40,17 @@ let bookmarkLookup = { status: "idle", url: "", generation: 0, promise: null, fo
 // lookup never clobbers in-progress input. Resets naturally on each popup open
 // (fresh document). Declared top-level so checkExistingBookmark() can read it.
 const fieldDirtyFlags = { "title-input": false, "description-input": false, "private-check": false, "readlater-check": false };
+
+function pbpRebasePopupTags(serverTags, submittedTags, liveTags) {
+  const baseline = Array.isArray(submittedTags) ? submittedTags : [];
+  const current = Array.isArray(liveTags) ? liveTags : [];
+  const unchanged = baseline.length === current.length && baseline.every((tag, index) => tag === current[index]);
+  if (unchanged) return unionTags(serverTags, current.join(" ")).split(/\s+/).filter(Boolean);
+
+  const controlled = new Set([...baseline, ...current].map((tag) => String(tag).toLowerCase()));
+  const serverOnly = String(serverTags || "").split(/\s+/).filter((tag) => tag && !controlled.has(tag.toLowerCase()));
+  return unionTags(serverOnly.join(" "), current.join(" ")).split(/\s+/).filter(Boolean);
+}
 
 // Wayback per-save toggle: defaults to the auto-decision and tracks the private
 // checkbox until the user manually overrides it (then it sticks).
@@ -102,6 +109,13 @@ function invalidateBookmarkLookup() {
 
 let acIndex = -1;
 let settings = {};
+
+async function resetPinboardSession() {
+  try { await (await getSettingsStorage()).remove("pinboardToken"); } catch (_) {}
+  try { await chrome.storage.local.remove("pinboardToken"); } catch (_) {}
+  settings.pinboardToken = "";
+  window.location.reload();
+}
 
 // ===================== URL Clean Helpers (B4) =====================
 // urlClean is loaded as part of SETTINGS_DEFAULTS — no separate storage hit needed.
@@ -788,7 +802,7 @@ async function htmlToMarkdownAsync(html, opts) {
 // prefetch (optional): { prefetchUrl, prefetchPromise } — a get_bookmark_data lookup
 // kicked off in parallel from showMain. Used only when prefetchUrl matches the url we
 // actually need (else a stale prefetch would mislead). Misses fall back to a live fetch.
-async function checkExistingBookmark(token, url, prefetch, forceFresh = false) {
+async function checkExistingBookmark(token, url, prefetch, forceFresh = false, submittedTags) {
   const lookupUrl = String(url || "").trim();
   // Clear any optimistic first-paint mirror before the source-of-truth lookup.
   // A found result restores the edit UI; missing/failed results leave it cleared.
@@ -829,7 +843,9 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false) {
         if (shouldUpdateField("private-check")) $id("private-check").checked = existingBookmark.shared === "no";
         recomputeArchiveCheck();
         if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
-        currentTags = unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
+        currentTags = Array.isArray(submittedTags)
+          ? pbpRebasePopupTags(existingBookmark.tags || "", submittedTags, currentTags)
+          : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
         renderTags();
         $id("submit-btn").textContent = t("update");
         $id("delete-btn").classList.remove("hidden");
@@ -999,56 +1015,108 @@ function setupSubmit(token) {
         setSubmitState("idle");
         return;
       }
-      const existingTimeAtSave = existingBookmark?.href === saveUrl ? existingBookmark.time : "";
-      const apiUrl = buildPostsAddUri({
-        token,
+      const intent = {
+        mode: savePolicy.mode,
         url: saveUrl,
         title,
-        extended,
+        notes: extended,
         tags: tags.join(" "),
-        shared: isPrivate ? "no" : "yes",
-        toread: isReadLater ? "yes" : "no",
-        replace: savePolicy.replace,
-      });
-      if (apiUrl.length > POSTS_ADD_URI_BUDGET) {
-        showStatus("status-msg", t("uriTooLong", String(apiUrl.length), String(POSTS_ADD_URI_BUDGET)), "error");
+        private: isPrivate,
+        toread: isReadLater,
+        archive: _archiveUserTouched ? archiveRequested : undefined,
+      };
+      if (savePolicy.mode === "update") {
+        intent.time = existingBookmark?.time;
+      }
+      const formMatchesSubmitted = () => (
+        $id("title-input").value === title
+        && $id("description-input").value === extended
+        && $id("private-check").checked === isPrivate
+        && $id("readlater-check").checked === isReadLater
+        && $id("archive-check").checked === archiveRequested
+        && $id("tags-input").value.trim() === ""
+        && currentTags.length === tags.length
+        && currentTags.every((tag, index) => tag === tags[index])
+      );
+      Object.keys(fieldDirtyFlags).forEach((id) => { fieldDirtyFlags[id] = false; });
+
+      const archiveIndicatorRequested = (savePolicy.mode !== "merge" || intent.archive !== undefined)
+        && pbpWaybackShouldArchive({
+          enabled: settings.waybackArchiveEnabled === true,
+          skipPrivate: settings.waybackSkipPrivate !== false,
+          isPrivate,
+          force: false,
+          override: intent.archive,
+        });
+      let attemptsStored = {};
+      if (archiveIndicatorRequested) {
+        try { attemptsStored = await chrome.storage.local.get("_waybackAttempts"); } catch (_) {}
+      }
+      if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
+        if (ownsSubmitUi()) setSubmitState("idle");
+        return;
+      }
+      const result = await chrome.runtime.sendMessage({ type: "save_intent", intent });
+      if (!result || typeof result !== "object" || typeof result.status !== "string") {
+        throw new Error("invalid save response");
+      }
+      if (result.status === "failed" && result.reason === "not_logged_in") {
+        await resetPinboardSession();
+        return;
+      }
+      if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
+        if (ownsSubmitUi()) setSubmitState("idle");
+        return;
+      }
+
+      if (result.status === "queued") {
+        showStatus("status-msg", t("offlineQueued", "1"), "info");
+        setSubmitState("idle");
+        try { if (window.PPOffline) await window.PPOffline.refresh(); } catch (_) {}
+        return;
+      }
+
+      if (result.status === "skipped" || (result.status === "failed" && result.reason === "conflict")) {
+        const conflictLookupPromise = checkExistingBookmark(token, url, null, true, tags);
+        const conflictLookupGeneration = bookmarkLookup.generation;
+        const conflictLookup = await conflictLookupPromise;
+        if (!ownsSubmitUi()) return;
+        if (bookmarkLookup.generation !== conflictLookupGeneration || bookmarkLookup.url !== url || $id("url-input").value.trim() !== url) {
+          setSubmitState("idle");
+          return;
+        }
+        if (conflictLookup.status === "found") {
+          showStatus("status-msg", t("editingExisting"), "info");
+          setSubmitState("idle");
+          return;
+        }
+        showStatus("status-msg", t("networkError"), "error");
         setSubmitState("error");
         submitErrorResetTimer = setTimeout(() => { if (btn.classList.contains("save-error")) setSubmitState("idle"); }, 3000);
         return;
       }
-      const resp = await pinboardFetch(apiUrl);
-      if (!resp.ok) {
-        if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
-          if (ownsSubmitUi()) setSubmitState("idle");
-          return;
-        }
-        let bodyText = "";
-        try { bodyText = (await resp.text()).slice(0, 120); } catch (_) {}
-        if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
-          if (ownsSubmitUi()) setSubmitState("idle");
-          return;
-        }
-        showStatus("status-msg", `HTTP ${resp.status}${bodyText ? ": " + bodyText : ""}`, "error");
-        setSubmitState("error");
-        submitErrorResetTimer = setTimeout(() => { if (btn.classList.contains("save-error")) setSubmitState("idle"); }, 3000);
-        return;
-      }
-      const data = await resp.json();
-      if (data.result_code === "done") {
+
+      if (result.status === "saved") {
         if (typeof saveLastUsedTags === "function") saveLastUsedTags(tags);
-        // Read _waybackAttempts BEFORE sending bookmark_saved (SW will stamp it after)
-        let _waybackAttemptsSnap = {};
-        try { _waybackAttemptsSnap = (await chrome.storage.local.get("_waybackAttempts"))._waybackAttempts || {}; } catch (_) {}
-        chrome.runtime.sendMessage({ type: "bookmark_saved", url: url, toread: isReadLater, private: isPrivate, archive: archiveRequested });
-        if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
-          if (ownsSubmitUi()) setSubmitState("idle");
-          return;
+        if (savePolicy.mode === "update") {
+          existingBookmark = {
+            href: url,
+            description: title,
+            extended,
+            tags: tags.join(" "),
+            shared: isPrivate ? "no" : "yes",
+            toread: isReadLater ? "yes" : "no",
+            time: intent.time,
+          };
+        } else {
+          checkExistingBookmark(token, url, null, true, tags);
         }
         showStatus("status-msg", t("bookmarkSaved"), "success");
         setSubmitState("success");
         // Optimistic archive indicator (cosmetic only, never blocks save or auto-close)
         try {
-          if (archiveRequested && typeof pbpWaybackShouldAttempt === "function" && pbpWaybackShouldAttempt(_waybackAttemptsSnap, url, Date.now())) {
+          const attempts = attemptsStored?._waybackAttempts || {};
+          if (archiveIndicatorRequested && typeof pbpWaybackShouldAttempt === "function" && pbpWaybackShouldAttempt(attempts, url, Date.now())) {
             const statusEl = $id("status-msg");
             if (statusEl) {
               const indicator = document.createElement("span");
@@ -1059,37 +1127,7 @@ function setupSubmit(token) {
             }
           }
         } catch (_) {}
-        // Persist "just-saved" state only if this request still owns the current URL.
-        if (bookmarkLookup.generation === lookupGenerationAtSave && $id("url-input").value.trim() === url) {
-          const generation = bookmarkLookup.generation + 1;
-          existingBookmark = {
-            href: url,
-            description: title,
-            extended,
-            tags: tags.join(" "),
-            shared: isPrivate ? "no" : "yes",
-            toread: isReadLater ? "yes" : "no",
-            time: existingTimeAtSave || new Date().toISOString(),
-          };
-          bookmarkLookup = { status: "found", url, generation, promise: null, formLoaded: true };
-          $id("submit-btn").textContent = t("update");
-          $id("delete-btn").classList.remove("hidden");
-          const bannerEl = $id("existing-banner");
-          if (bannerEl) {
-            const cancelEl = bannerEl.querySelector(".edit-cancel");
-            let info = t("editingExisting");
-            const parts = [t("offlineJustNow")];
-            const tc = tags.length;
-            if (tc > 0) parts.push(tc > 1 ? t("tagCountPlural", String(tc)) : t("tagCount", String(tc)));
-            info += " (" + parts.join(", ") + ")";
-            bannerEl.textContent = info;
-            if (cancelEl) { bannerEl.appendChild(document.createTextNode(" ")); bannerEl.appendChild(cancelEl); }
-            bannerEl.classList.remove("hidden");
-            bannerEl.classList.add("just-saved");
-            setTimeout(() => bannerEl.classList.remove("just-saved"), 2000);
-          }
-        }
-        if (settings.optAutoCloseAfterSave) {
+        if (settings.optAutoCloseAfterSave && formMatchesSubmitted()) {
           const autoCloseGeneration = bookmarkLookup.generation;
           const bar = document.createElement("div");
           bar.className = "auto-close-bar";
@@ -1100,7 +1138,8 @@ function setupSubmit(token) {
             if (ownsSubmitUi()
                 && bookmarkLookup.generation === autoCloseGeneration
                 && bookmarkLookup.url === url
-                && $id("url-input").value.trim() === url) {
+                && $id("url-input").value.trim() === url
+                && formMatchesSubmitted()) {
               window.close();
             } else {
               bar.remove();
@@ -1115,34 +1154,16 @@ function setupSubmit(token) {
         setTimeout(() => { if (btn.classList.contains("saved-success")) setSubmitState("idle"); }, 1200);
         return;
       }
-      if (data.result_code === "item already exists" && savePolicy.replace === false) {
-        if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
-          if (ownsSubmitUi()) setSubmitState("idle");
-          return;
-        }
-        const conflictLookupPromise = checkExistingBookmark(token, url, null, true);
-        const conflictLookupGeneration = bookmarkLookup.generation;
-        const conflictLookup = await conflictLookupPromise;
-        if (!ownsSubmitUi()) return;
-        if (bookmarkLookup.generation !== conflictLookupGeneration || bookmarkLookup.url !== url || $id("url-input").value.trim() !== url) {
-          setSubmitState("idle");
-          return;
-        }
-        if (conflictLookup.status === "found") {
-          showStatus("status-msg", t("editingExisting"), "info");
-          setSubmitState("idle");
-          return;
-        }
-        showStatus("status-msg", conflictLookup.status === "failed" ? t("networkError") : `Error: ${data.result_code}`, "error");
-        setSubmitState("error");
-        submitErrorResetTimer = setTimeout(() => { if (btn.classList.contains("save-error")) setSubmitState("idle"); }, 3000);
-        return;
+
+      if (result.status === "failed" && result.reason === "too_long") {
+        showStatus("status-msg", t("uriTooLong", String(result.detail || ""), String(POSTS_ADD_URI_BUDGET)), "error");
+      } else if (result.status === "failed" && result.reason === "http" && result.httpStatus) {
+        showStatus("status-msg", `HTTP ${result.httpStatus}`, "error");
+      } else if (result.status === "failed" && result.reason === "api" && result.detail) {
+        showStatus("status-msg", `Error: ${result.detail}`, "error");
+      } else {
+        showStatus("status-msg", t("networkError"), "error");
       }
-      if (!ownsSubmitUi() || (lookupGenerationAtSave !== null && (bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url))) {
-        if (ownsSubmitUi()) setSubmitState("idle");
-        return;
-      }
-      showStatus("status-msg", `Error: ${data.result_code}`, "error");
       setSubmitState("error");
     } catch (e) {
       if (!ownsSubmitUi() || (lookupGenerationAtSave !== null && (bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url))) {
