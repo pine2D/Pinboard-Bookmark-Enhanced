@@ -13,11 +13,11 @@ h2 { margin-top: 24px; }
 <div id="results-a1"></div>
 <script src="../shared.js"></script>
 <script>
-function run(rootId, cases) {
+async function run(rootId, cases) {
   const root = document.getElementById(rootId);
   for (const c of cases) {
     let ok, got;
-    try { got = c.fn(); ok = c.check(got); }
+    try { got = await c.fn(); ok = c.check(got); }
     catch (e) { got = "THREW: " + e.message; ok = false; }
     const div = document.createElement("div");
     div.className = "case " + (ok ? "pass" : "fail");
@@ -64,22 +64,36 @@ run("results-a1", [
 const a2root = document.createElement("div");
 a2root.innerHTML = '<h2>A2: fetch failure -> per-tab fallback, never empty set</h2><div id="results-a2"></div>';
 document.body.insertBefore(a2root, document.querySelector("script"));
+
+async function fetchExistingWith(fetchImpl) {
+  const previousChrome = globalThis.chrome;
+  const previousFetch = pinboardFetch;
+  try {
+    globalThis.chrome = {
+      storage: { local: { get: async () => ({}), set: async () => {} } }
+    };
+    pinboardFetch = fetchImpl;
+    return await fetchExistingUrlSet("test-token");
+  } finally {
+    globalThis.chrome = previousChrome;
+    pinboardFetch = previousFetch;
+  }
+}
+
 run("results-a2", [
   {
     name: "transient fetch failure -> null (per-tab fallback), NOT empty Set",
-    fn: () => batchExistingResultOnError(),
+    fn: () => fetchExistingWith(async () => { throw new Error("network failed"); }),
     check: (got) => got === null,
     expected: "null"
   },
   {
-    name: "null is distinguishable from an empty result set",
-    fn: () => {
-      const r = batchExistingResultOnError();
-      // caller does `if (result === null) fallback; else existingUrls = result`
-      return r === null ? "fallback" : ("set:" + (r instanceof Set ? r.size : "?"));
-    },
-    check: (got) => got === "fallback",
-    expected: '"fallback"'
+    name: "response JSON failure -> null (per-tab fallback), NOT empty Set",
+    fn: () => fetchExistingWith(async () => ({
+      json: async () => { throw new SyntaxError("invalid JSON"); }
+    })),
+    check: (got) => got === null,
+    expected: "null"
   }
 ]);
 </script>

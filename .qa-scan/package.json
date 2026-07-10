@@ -1,0 +1,8 @@
+{
+  "name": "pb-qa-scan",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.59.1"
+  }
+}

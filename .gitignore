@@ -1,7 +1,10 @@
 .agents/
 .playwright-mcp/
 release/
-.qa-scan/
+.qa-scan/*
+!.qa-scan/package.json
+!.qa-scan/package-lock.json
+!.qa-scan/run-test.mjs
 
 # Claude Code local state
 .claude/settings.local.json

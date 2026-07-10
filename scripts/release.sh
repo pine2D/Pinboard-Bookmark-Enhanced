@@ -1,6 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  printf '%s\n' \
+    "Usage: scripts/release.sh [options]" \
+    "" \
+    "Options:" \
+    "  --build-only    Build and smoke-test the ZIP without publishing or syncing" \
+    "  --overwrite     Replace a local ZIP or release asset only; tags stay immutable" \
+    "  --docs-ok       Skip the docs freshness gate" \
+    "  --skip-smoke    Skip ZIP install smoke (release-script debugging only)" \
+    "  --no-overwrite  Deprecated no-op; immutable-by-default is now enforced" \
+    "  -h, --help      Show this help"
+}
+
+BUILD_ONLY=0
+OVERWRITE=0
+DOCS_OK=0
+SKIP_SMOKE=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --build-only) BUILD_ONLY=1 ;;
+    --overwrite) OVERWRITE=1 ;;
+    --docs-ok) DOCS_OK=1 ;;
+    --skip-smoke) SKIP_SMOKE=1 ;;
+    --no-overwrite)
+      echo "  [release] WARN: --no-overwrite is deprecated; releases are immutable by default." >&2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "  [release] Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
 REPO_ROOT=$(git rev-parse --show-toplevel)
 MANIFEST="${REPO_ROOT}/manifest.json"
 RELEASE_DIR="${REPO_ROOT}/release"
@@ -17,18 +57,142 @@ echo ""
 echo "  ZIP : ${ZIP_PATH}"
 echo ""
 
+# ---- Step 0: Publish preflight ----
+# Build-only deliberately skips this entire networked section.
+
+HEAD_SHA=$(git rev-parse HEAD)
+REPO_FULL=""
+LOCAL_TAG_EXISTS=0
+LOCAL_TAG_SHA=""
+REMOTE_TAG_EXISTS=0
+REMOTE_TAG_SHA=""
+RELEASE_EXISTS=0
+
+remote_tag_commit() {
+  local refs
+  if ! refs=$(git ls-remote origin "refs/tags/${TAG}" "refs/tags/${TAG}^{}"); then
+    return 2
+  fi
+  if [ -z "${refs}" ]; then
+    return 1
+  fi
+  printf '%s\n' "${refs}" | awk '
+    $2 ~ /\^\{\}$/ { peeled = $1 }
+    $2 !~ /\^\{\}$/ { direct = $1 }
+    END { print peeled ? peeled : direct }
+  '
+}
+
+if [ "${BUILD_ONLY}" -eq 0 ]; then
+  if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+    echo "  ABORT: working tree is not clean (including untracked, non-ignored files)." >&2
+    exit 1
+  fi
+
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "  ABORT: gh CLI is required for publication." >&2
+    exit 1
+  fi
+  if ! gh auth status >/dev/null 2>&1; then
+    echo "  ABORT: gh is not authenticated. Run: gh auth login" >&2
+    exit 1
+  fi
+
+  CURRENT_BRANCH=$(git branch --show-current)
+  UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
+  if [ "${CURRENT_BRANCH}" != "main" ] || [ "${UPSTREAM}" != "origin/main" ]; then
+    echo "  ABORT: publication requires main tracking origin/main." >&2
+    echo "         current branch: ${CURRENT_BRANCH:-<detached>}; upstream: ${UPSTREAM:-<none>}" >&2
+    exit 1
+  fi
+
+  if ! REMOTE_MAIN_REFS=$(git ls-remote origin refs/heads/main); then
+    echo "  ABORT: could not verify origin/main." >&2
+    exit 1
+  fi
+  REMOTE_MAIN_SHA=$(printf '%s\n' "${REMOTE_MAIN_REFS}" | awk '$2 == "refs/heads/main" { print $1; exit }')
+  if [ -z "${REMOTE_MAIN_SHA}" ] || [ "${REMOTE_MAIN_SHA}" != "${HEAD_SHA}" ]; then
+    echo "  ABORT: current HEAD is not published at origin/main." >&2
+    echo "         HEAD: ${HEAD_SHA}" >&2
+    echo "  origin/main: ${REMOTE_MAIN_SHA:-<missing>}" >&2
+    exit 1
+  fi
+
+  if ! REPO_FULL=$(gh repo view --json nameWithOwner --jq .nameWithOwner); then
+    echo "  ABORT: could not resolve the GitHub repository." >&2
+    exit 1
+  fi
+
+  if git show-ref --verify --quiet "refs/tags/${TAG}"; then
+    LOCAL_TAG_EXISTS=1
+    LOCAL_TAG_SHA=$(git rev-parse "${TAG}^{commit}")
+  fi
+
+  if REMOTE_TAG_SHA=$(remote_tag_commit); then
+    REMOTE_TAG_EXISTS=1
+  else
+    REMOTE_TAG_STATUS=$?
+    if [ "${REMOTE_TAG_STATUS}" -eq 2 ]; then
+      echo "  ABORT: could not verify remote tag ${TAG}." >&2
+      exit 1
+    fi
+    REMOTE_TAG_SHA=""
+  fi
+
+  if RELEASE_STATE=$(gh api "repos/${REPO_FULL}/releases/tags/${TAG}" \
+    --jq 'if .draft then "draft" elif .prerelease then "prerelease" else "published" end' 2>&1); then
+    RELEASE_EXISTS=1
+    if [ "${RELEASE_STATE}" != "published" ]; then
+      echo "  ABORT: Release ${TAG} is ${RELEASE_STATE}; draft/prerelease overwrite is not supported." >&2
+      exit 1
+    fi
+  elif ! printf '%s\n' "${RELEASE_STATE}" | grep -q 'HTTP 404'; then
+    echo "  ABORT: could not verify GitHub Release ${TAG}." >&2
+    printf '%s\n' "${RELEASE_STATE}" >&2
+    exit 1
+  fi
+
+  if [ "${LOCAL_TAG_EXISTS}" -eq 1 ] || [ "${REMOTE_TAG_EXISTS}" -eq 1 ] || [ "${RELEASE_EXISTS}" -eq 1 ]; then
+    if [ "${OVERWRITE}" -eq 0 ]; then
+      echo "  ABORT: ${TAG} already exists as a local tag, remote tag, or GitHub Release." >&2
+      echo "         Bump the version, or use --overwrite only to replace same-commit assets." >&2
+      exit 1
+    fi
+    if [ "${LOCAL_TAG_EXISTS}" -eq 1 ] && [ "${LOCAL_TAG_SHA}" != "${HEAD_SHA}" ]; then
+      echo "  ABORT: local tag ${TAG} points to ${LOCAL_TAG_SHA}, not HEAD ${HEAD_SHA}." >&2
+      echo "         Tags are immutable; bump the version." >&2
+      exit 1
+    fi
+    if [ "${REMOTE_TAG_EXISTS}" -eq 1 ] && [ "${REMOTE_TAG_SHA}" != "${HEAD_SHA}" ]; then
+      echo "  ABORT: remote tag ${TAG} points to ${REMOTE_TAG_SHA}, not HEAD ${HEAD_SHA}." >&2
+      echo "         Tags are immutable; bump the version." >&2
+      exit 1
+    fi
+    if [ "${RELEASE_EXISTS}" -eq 1 ] && [ "${REMOTE_TAG_EXISTS}" -eq 0 ]; then
+      echo "  ABORT: Release ${TAG} has no verifiable remote tag." >&2
+      echo "         Refusing to overwrite an ambiguous release." >&2
+      exit 1
+    fi
+  fi
+fi
+
 # ---- Step 0: Docs freshness gate ----
 #
 # A release that ships features must not leave user-facing docs behind.
 # If the range since the previous tag contains feat commits while README.md,
 # CLAUDE.md, and docs/privacy.md are ALL untouched, abort. After verifying
 # the docs are genuinely current, re-run with --docs-ok to proceed.
-if [[ " $* " == *" --docs-ok "* ]]; then
+if [ "${BUILD_ONLY}" -eq 1 ]; then
+  echo "  --build-only: skipping publication docs gate"
+elif [ "${DOCS_OK}" -eq 1 ]; then
   echo "  --docs-ok: skipping docs freshness gate"
 else
   # gh release create tags the REMOTE only -- sync local tags first or this
   # gate (and the changelog's PREV_TAG below) would measure from a stale tag.
-  git fetch --tags --quiet origin 2>/dev/null || true
+  if ! git fetch --tags --quiet origin; then
+    echo "  ABORT: could not refresh release tags for the docs gate." >&2
+    exit 1
+  fi
   DOCS_PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1) || true
   if [ -n "${DOCS_PREV_TAG}" ]; then
     FEAT_COUNT=$(git log "${DOCS_PREV_TAG}..HEAD" --pretty=format:%s --no-merges | grep -c "^feat" || true)
@@ -67,8 +231,13 @@ fi
 mkdir -p "${RELEASE_DIR}"
 
 if [ -f "${ZIP_PATH}" ]; then
-  echo "  Removing existing ${ZIP_NAME}"
-  rm "${ZIP_PATH}"
+  if [ "${OVERWRITE}" -eq 0 ]; then
+    echo "  ABORT: local artifact already exists: ${ZIP_PATH}" >&2
+    echo "         Use --overwrite to delete and rebuild this ZIP explicitly." >&2
+    exit 1
+  fi
+  echo "  --overwrite: removing existing ${ZIP_NAME}"
+  rm -- "${ZIP_PATH}"
 fi
 
 cd "${REPO_ROOT}"
@@ -167,7 +336,7 @@ echo ""
 #
 # Skip with --skip-smoke (e.g. when iterating on the release script itself).
 
-if [[ " $* " == *" --skip-smoke "* ]]; then
+if [ "${SKIP_SMOKE}" -eq 1 ]; then
   echo "  --skip-smoke: skipping zip-install-smoke test"
 else
   echo "  Smoke-testing ZIP..."
@@ -181,32 +350,8 @@ else
   echo ""
 fi
 
-# ---- Step 1.6: Mirror runtime into the local unpacked-extension folder ----
-# Keeps the Windows-Chrome "Load unpacked" folder in sync with each release.
-# Non-fatal: a sync failure must never block the GitHub release.
-
-if [ -f "${REPO_ROOT}/scripts/sync-runtime.sh" ]; then
-  echo "  Syncing runtime to local extension folder..."
-  bash "${REPO_ROOT}/scripts/sync-runtime.sh" --zip "${ZIP_PATH}" \
-    || echo "  [release] WARN: runtime sync failed (continuing with release)"
-  echo ""
-fi
-
-# ---- Step 2: Check gh CLI ----
-
-if ! command -v gh &>/dev/null; then
-  echo "  gh CLI not found. ZIP is ready at:"
-  echo "    ${ZIP_PATH}"
-  echo ""
-  echo "  Install gh: https://cli.github.com"
-  exit 0
-fi
-
-if ! gh auth status &>/dev/null; then
-  echo "  gh not authenticated. ZIP is ready at:"
-  echo "    ${ZIP_PATH}"
-  echo ""
-  echo "  Run: gh auth login"
+if [ "${BUILD_ONLY}" -eq 1 ]; then
+  echo "  Build-only complete: ZIP validated; 未发布、未同步。"
   exit 0
 fi
 
@@ -218,7 +363,7 @@ PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1) || tr
 
 if [ -z "${PREV_TAG}" ]; then
   # No local tags — fetch the latest release tag from GitHub
-  PREV_TAG=$(gh release list --limit 5 --json tagName --jq '.[].tagName' 2>/dev/null \
+  PREV_TAG=$(gh release list --repo "${REPO_FULL}" --limit 5 --json tagName --jq '.[].tagName' 2>/dev/null \
     | grep -v "^${TAG}$" | head -1) || true
 fi
 
@@ -299,30 +444,7 @@ PYEOF
 
 echo ""
 
-# ---- Step 4: Handle existing release ----
-
-if gh release view "${TAG}" &>/dev/null; then
-  echo "  Release ${TAG} already exists."
-  # Non-interactive: auto-overwrite. Use --no-overwrite flag to prevent.
-  if [ "${1:-}" = "--no-overwrite" ]; then
-    echo "  --no-overwrite specified. Aborted."
-    exit 0
-  fi
-  # Interactive terminal: ask for confirmation
-  if [ -t 0 ]; then
-    read -r -p "  Overwrite? (y/N) " CONFIRM
-    if [ "${CONFIRM}" != "y" ] && [ "${CONFIRM}" != "Y" ]; then
-      echo "  Aborted."
-      exit 0
-    fi
-  else
-    echo "  Non-interactive mode: overwriting."
-  fi
-  gh release delete "${TAG}" --yes --cleanup-tag
-  echo "  Old release deleted."
-fi
-
-# ---- Step 5: Create GitHub release ----
+# ---- Step 4: Publish or update GitHub release ----
 
 NOTES="## What's Changed
 
@@ -335,25 +457,75 @@ ${CHANGELOG}
 3. Open \`chrome://extensions/\`, enable **Developer mode**
 4. Click **Load unpacked**, select the unzipped folder"
 
-gh release create "${TAG}" \
-  "${ZIP_PATH}" \
-  --title "${TAG}" \
-  --notes "${NOTES}" \
-  --latest
+if [ "${RELEASE_EXISTS}" -eq 1 ]; then
+  echo "  Updating same-commit Release ${TAG} without changing its tag..."
+  gh release upload "${TAG}" "${ZIP_PATH}" --clobber --repo "${REPO_FULL}"
+  gh release edit "${TAG}" \
+    --repo "${REPO_FULL}" \
+    --title "${TAG}" \
+    --notes "${NOTES}" \
+    --latest
+elif [ "${REMOTE_TAG_EXISTS}" -eq 1 ]; then
+  echo "  Creating Release ${TAG} from the existing verified tag..."
+  gh release create "${TAG}" \
+    "${ZIP_PATH}" \
+    --repo "${REPO_FULL}" \
+    --verify-tag \
+    --title "${TAG}" \
+    --notes "${NOTES}" \
+    --latest
+else
+  gh release create "${TAG}" \
+    "${ZIP_PATH}" \
+    --repo "${REPO_FULL}" \
+    --target "${HEAD_SHA}" \
+    --title "${TAG}" \
+    --notes "${NOTES}" \
+    --latest
+fi
+
+if ! PUBLISHED_TAG_SHA=$(remote_tag_commit); then
+  echo "  ABORT: release command completed, but remote tag ${TAG} could not be verified." >&2
+  exit 1
+fi
+if [ "${PUBLISHED_TAG_SHA}" != "${HEAD_SHA}" ]; then
+  echo "  ABORT: published tag ${TAG} resolves to ${PUBLISHED_TAG_SHA}, expected ${HEAD_SHA}." >&2
+  echo "         Runtime sync was not performed." >&2
+  exit 1
+fi
 
 echo ""
 echo "  Release published: ${TAG}"
-echo "  https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/releases/tag/${TAG}"
+echo "  https://github.com/${REPO_FULL}/releases/tag/${TAG}"
+echo "  Remote tag verified: ${PUBLISHED_TAG_SHA}"
 echo ""
 
-# ---- Step 4: Purge GitHub camo cache so README shields.io badge updates immediately ----
-REPO_FULL=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+# ---- Step 5: Mirror the verified public release into the local runtime ----
+
+if [ -f "${REPO_ROOT}/scripts/sync-runtime.sh" ]; then
+  echo "  Syncing verified release to local extension folder..."
+  bash "${REPO_ROOT}/scripts/sync-runtime.sh" --zip "${ZIP_PATH}" \
+    || echo "  [release] WARN: runtime sync failed (public release remains valid)"
+  echo ""
+fi
+
+# ---- Step 6: Purge GitHub camo cache so README shields.io badge updates immediately ----
 README_URL="https://github.com/${REPO_FULL}"
-CAMO_URL=$(curl -sL "${README_URL}" | grep -oE 'https://camo\.githubusercontent\.com/[^"]*' \
-  | grep -E 'release%2F|release/' | head -1)
-if [ -n "${CAMO_URL}" ]; then
-  STATUS=$(curl -s -X PURGE -o /dev/null -w "%{http_code}" "${CAMO_URL}")
-  echo "  Camo cache PURGE → HTTP ${STATUS} (badge refreshes within seconds)"
+if README_HTML=$(curl -fsSL "${README_URL}"); then
+  CAMO_URL=$(printf '%s\n' "${README_HTML}" \
+    | grep -oE 'https://camo\.githubusercontent\.com/[^"]*' \
+    | grep -E 'release%2F|release/' \
+    | head -1 || true)
+  if [ -z "${CAMO_URL}" ]; then
+    echo "  (no camo URL detected for version badge — skipping purge)"
+  elif STATUS=$(curl -sS -X PURGE -o /dev/null -w "%{http_code}" "${CAMO_URL}"); then
+    case "${STATUS}" in
+      2??) echo "  Camo cache PURGE → HTTP ${STATUS} (badge refreshes within seconds)" ;;
+      *) echo "  [release] WARN: camo PURGE returned HTTP ${STATUS}; release remains published." >&2 ;;
+    esac
+  else
+    echo "  [release] WARN: camo PURGE request failed; release remains published." >&2
+  fi
 else
-  echo "  (no camo URL detected for version badge — skipping purge)"
+  echo "  [release] WARN: could not read GitHub README for camo lookup; skipping purge." >&2
 fi
