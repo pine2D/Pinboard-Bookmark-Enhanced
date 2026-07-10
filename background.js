@@ -68,10 +68,9 @@ async function getCachedToken() {
 }
 
 // ---- P3: Debounce + dedup for tab switch ----
-// P2.7: Per-tab debounce bucket — previously a single shared timer meant a
-// background tab's completion could be cancelled by an unrelated tab-switch,
-// leaving the background tab's icon state stale. Per-tab timers decouple them.
-// _pendingChecks below handles network-layer dedup, so extra scheduling is cheap.
+// P2.7: Per-tab debounce bucket keeps unrelated tab events from cancelling the
+// focused tab's refresh. Execution-time focus checks below discard background tabs.
+// _pendingChecks handles network-layer dedup, so extra scheduling is cheap.
 const _checkDebounceTimers = new Map(); // tabId -> timeoutId
 function _scheduleTabCheck(tabId, fn, delay) {
   const prev = _checkDebounceTimers.get(tabId);
@@ -83,7 +82,7 @@ function _scheduleTabCheck(tabId, fn, delay) {
 }
 const _pendingChecks = new Map(); // url -> Promise
 
-async function debouncedCheck(tabId, url) {
+async function debouncedCheck(url) {
   if (!url || !url.startsWith("http")) {
     return;
   }
@@ -97,15 +96,12 @@ async function debouncedCheck(tabId, url) {
   }
   // Dedup: if same URL is already being checked, reuse promise
   if (_pendingChecks.has(url)) {
-    const bookmarked = await _pendingChecks.get(url);
-    setIcon(tabId, bookmarked);
-    return;
+    return _pendingChecks.get(url);
   }
   const promise = checkBookmarked(url);
   _pendingChecks.set(url, promise);
   try {
-    const bookmarked = await promise;
-    setIcon(tabId, bookmarked);
+    return await promise;
   } finally {
     _pendingChecks.delete(url);
   }
@@ -260,24 +256,41 @@ async function fetchExistingBookmark(url, token) {
 
 // Serialize ALL offlineQueue writes through one promise chain so concurrent handlers
 // (enqueue / process / retry / popup remove+clear messages) never lose updates.
-let _offlineQueueWrite = Promise.resolve();
+const runOfflineQueueWrite = pbpCreateRecoveringTail();
 function mutateOfflineQueue(action) {
-  _offlineQueueWrite = _offlineQueueWrite.then(async () => {
+  return runOfflineQueueWrite(async () => {
     const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
     const next = pbpOfflineQueueReduce(offlineQueue, action);
     await chrome.storage.local.set({ offlineQueue: next });
     return next;
-  }).catch(() => {});
-  return _offlineQueueWrite;
+  });
+}
+
+function newOfflineQueueId() {
+  return Date.now() + "-" + Math.random().toString(36).slice(2, 9);
+}
+
+async function readOfflineQueueWithIds() {
+  return runOfflineQueueWrite(async () => {
+    let { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
+    if (!Array.isArray(offlineQueue)) offlineQueue = [];
+    if (offlineQueue.some((item) => item && typeof item === "object" && !item.queueId)) {
+      const next = pbpOfflineQueueReduce(offlineQueue, { kind: "ensure_ids", prefix: newOfflineQueueId() });
+      await chrome.storage.local.set({ offlineQueue: next });
+      ({ offlineQueue = [] } = await chrome.storage.local.get("offlineQueue"));
+    }
+    return Array.isArray(offlineQueue) ? offlineQueue : [];
+  });
 }
 
 async function enqueueOfflineSave(params) {
-  const queueId = Date.now() + "-" + Math.random().toString(36).slice(2, 9);
+  const queueId = newOfflineQueueId();
   await mutateOfflineQueue({ kind: "enqueue", item: { ...params, queuedAt: Date.now(), queueId } });
 }
 
 async function sendOfflineItem(item, settings) {
-  const token = deobfuscateKey(item.token);
+  const token = pbpResolveOfflineQueueToken(settings?.pinboardToken, item.token);
+  if (!token) return false;
   let finalTags = item.tags;
   let existingExtended = "";
 
@@ -320,46 +333,48 @@ async function sendOfflineItem(item, settings) {
   return data.result_code === "done";
 }
 
-async function processOfflineQueue() {
-  const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
-  if (!offlineQueue.length) return;
-  const s = await loadSettings();
-  const remaining = [];
-  for (const item of offlineQueue) {
-    try {
-      if (await sendOfflineItem(item, s)) {
-        statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
-        pbpWaybackArchive(item.url, s, { isPrivate: !!item.private }).catch(() => {});
-      } else {
-        remaining.push(item); // keep for retry
-      }
-    } catch (_) {
-      // Network still down — re-enqueue for next online event; not logged
-      // because this is the expected steady-state path for offline mode
-      remaining.push(item);
-    }
-  }
-  await mutateOfflineQueue({ kind: "replace", remaining });
+function drainOfflineQueueIds(queueIds, settings) {
+  return pbpDrainOfflineQueue(queueIds, {
+    getItem: (queueId) => runOfflineQueueWrite(async () => {
+      const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
+      return Array.isArray(offlineQueue)
+        ? offlineQueue.find((item) => item?.queueId === queueId) || null
+        : null;
+    }),
+    sendItem: (item) => sendOfflineItem(item, settings),
+    removeItem: (queueId) => mutateOfflineQueue({ kind: "remove", queueId }),
+    onSuccess: (item) => {
+      statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
+      pbpWaybackArchive(item.url, settings, { isPrivate: !!item.private }).catch(() => {});
+    },
+  });
 }
 
-async function retryOfflineItem(queueId) {
-  const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
-  if (!queueId || typeof queueId !== "string") return false;
-  const idx = offlineQueue.findIndex(item => item.queueId === queueId);
-  if (idx < 0) return false;
-  const item = offlineQueue[idx];
-  try {
-    const s = await loadSettings();
-    const ok = await sendOfflineItem(item, s);
-    if (!ok) return false;
-    await mutateOfflineQueue({ kind: "remove", queueId });
-    statusCache.set(item.url, { bookmarked: true, timestamp: Date.now() });
-    pbpWaybackArchive(item.url, s, { isPrivate: !!item.private }).catch(() => {});
-    return true;
-  } catch (_) {
-    // Single-item retry failure: caller treats `false` as "still queued"
-    return false;
-  }
+const runOfflineQueueConsumer = pbpCreateRecoveringTail();
+let _offlineQueueDrain = null;
+function processOfflineQueue() {
+  if (_offlineQueueDrain) return _offlineQueueDrain;
+  const operation = runOfflineQueueConsumer(async () => {
+    const snapshot = await readOfflineQueueWithIds();
+    if (!snapshot.length) return;
+    const settings = await loadSettings();
+    await drainOfflineQueueIds(snapshot.map((item) => item?.queueId).filter(Boolean), settings);
+  });
+  const drain = operation.finally(() => {
+    if (_offlineQueueDrain === drain) _offlineQueueDrain = null;
+  });
+  _offlineQueueDrain = drain;
+  return drain;
+}
+
+function retryOfflineItem(queueId) {
+  if (!queueId || typeof queueId !== "string") return Promise.resolve(false);
+  return runOfflineQueueConsumer(async () => {
+    await readOfflineQueueWithIds();
+    const settings = await loadSettings();
+    const completed = await drainOfflineQueueIds([queueId], settings);
+    return completed.length === 1;
+  });
 }
 
 // ---- P1: Shared save function ----
@@ -545,8 +560,12 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   } catch (e) {
     // Network/timeout error — queue for offline retry if enabled
     if (s.offlineQueueEnabled) {
-      await enqueueOfflineSave({ url, title, notes, tags: tagsStr, toread: !!toread, private: isPrivate, token: obfuscateKey(s.pinboardToken) });
-      showNotification(notifyId + "-queued", t("bgQueuedOffline"), t("bgTitleQueued", title.substring(0, 60)), notifyCategory);
+      try {
+        await enqueueOfflineSave({ url, title, notes, tags: tagsStr, toread: !!toread, private: isPrivate });
+        showNotification(notifyId + "-queued", t("bgQueuedOffline"), t("bgTitleQueued", title.substring(0, 60)), notifyCategory);
+      } catch (storageError) {
+        showNotification(notifyId + "-error", t("bgSaveFailed"), storageError?.message || String(storageError), "error");
+      }
     } else {
       showNotification(notifyId + "-error", t("bgNetworkError"), e.message, "error");
     }
@@ -579,30 +598,50 @@ async function _writeCurrentTabMirror(tabId, url, title) {
   } catch (_) {}
 }
 
-// ---- 标签页激活/更新时刷新图标 (P3: debounced + deduped) ----
-chrome.tabs.onActivated.addListener(({ tabId }) => {
-  noteActivity();
+async function _getFocusedActiveTab(expectedTabId, expectedUrl) {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (tab?.id !== expectedTabId) return null;
+  if (typeof expectedUrl === "string" && tab.url !== expectedUrl) return null;
+  if (!tab.url || (!tab.url.startsWith("http://") && !tab.url.startsWith("https://"))) return null;
+  return tab;
+}
+
+function _scheduleCurrentTabRefresh(tabId, expectedUrl) {
   _scheduleTabCheck(tabId, async () => {
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === tabId && tab.url) {
-        await debouncedCheck(tabId, tab.url);
-        await _writeCurrentTabMirror(tabId, tab.url, tab.title);
-      }
+      const tab = await _getFocusedActiveTab(tabId, expectedUrl);
+      if (!tab) return;
+
+      noteActivity();
+      const bookmarked = await debouncedCheck(tab.url);
+
+      // The tab may have navigated or lost focus while the API request was in flight.
+      const currentTab = await _getFocusedActiveTab(tab.id, tab.url);
+      if (!currentTab) return;
+      if (typeof bookmarked === "boolean") setIcon(currentTab.id, bookmarked);
+      await _writeCurrentTabMirror(currentTab.id, currentTab.url, currentTab.title);
     } catch (_) {
       // Tab closed/replaced between event and query — expected race, skip
     }
   }, 150);
+}
+
+// ---- 标签页激活/更新时刷新图标 (P3: debounced + deduped) ----
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  _scheduleCurrentTabRefresh(tabId);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url && tab.url.startsWith("http")) {
-    noteActivity();
-    _scheduleTabCheck(tabId, () => {
-      debouncedCheck(tabId, tab.url).catch(() => {});
-      _writeCurrentTabMirror(tabId, tab.url, tab.title).catch(() => {});
-    }, 150);
+    _scheduleCurrentTabRefresh(tabId, tab.url);
   }
+});
+
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  chrome.tabs.query({ active: true, windowId }).then(([tab]) => {
+    if (tab?.id) _scheduleCurrentTabRefresh(tab.id, tab.url);
+  }).catch(() => {});
 });
 
 // P2.7: Clean up per-tab timer when tab closes to prevent Map leak on long sessions.
@@ -885,6 +924,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else {
       sendResponse({ posts: null });
     }
+    return true;
+  }
+
+  if (message.type === "get_offline_queue") {
+    readOfflineQueueWithIds()
+      .then((queue) => sendResponse({ ok: true, queue }))
+      .catch(() => sendResponse({ ok: false, queue: [] }));
     return true;
   }
 

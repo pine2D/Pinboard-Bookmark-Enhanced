@@ -13,8 +13,8 @@ h2 { margin-top: 24px; font-size: 16px; }
 <div id="results"></div>
 <script src="../shared.js"></script>
 <script>
-function test(name, fn) {
-  try { fn();
+async function test(name, fn) {
+  try { await fn();
     const div = document.createElement("div"); div.className = "case pass";
     div.textContent = "PASS " + name; document.getElementById("results").appendChild(div);
   } catch (e) {
@@ -23,12 +23,12 @@ function test(name, fn) {
   }
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
-function suite(name, fn) {
+async function suite(name, fn) {
   const div = document.createElement("div"); div.className = "suite";
   const h = document.createElement("h2"); h.textContent = name; div.appendChild(h);
   const results = document.getElementById("results"); const savedAppend = results.appendChild;
   results.appendChild = function(el) { if (el.className?.includes("case")) div.appendChild(el); else savedAppend.call(results, el); };
-  fn(); results.appendChild = savedAppend; results.appendChild(div);
+  await fn(); results.appendChild = savedAppend; results.appendChild(div);
 }
 
 const Q = () => ([
@@ -37,43 +37,183 @@ const Q = () => ([
   { queueId: "c", url: "https://c.com" },
 ]);
 
-suite("pbpOfflineQueueReduce", () => {
-  test("remove drops only the matching queueId", () => {
+(async () => {
+await suite("offline queue", async () => {
+  await test("remove drops only the matching queueId", () => {
     const out = pbpOfflineQueueReduce(Q(), { kind: "remove", queueId: "b" });
     assert(out.length === 2, "should drop one");
     assert(!out.some(i => i.queueId === "b"), "b removed");
     assert(out[0].queueId === "a" && out[1].queueId === "c", "order preserved");
   });
-  test("remove of unknown id is a no-op (new array, same contents)", () => {
+  await test("remove of unknown id is a no-op (new array, same contents)", () => {
     const input = Q();
     const out = pbpOfflineQueueReduce(input, { kind: "remove", queueId: "zzz" });
     assert(out.length === 3, "nothing dropped");
     assert(out !== input, "returns a NEW array, never mutates input");
   });
-  test("clear returns empty array", () => {
+  await test("clear returns empty array", () => {
     assert(pbpOfflineQueueReduce(Q(), { kind: "clear" }).length === 0, "cleared");
   });
-  test("enqueue appends item", () => {
+  await test("enqueue appends item", () => {
     const out = pbpOfflineQueueReduce(Q(), { kind: "enqueue", item: { queueId: "d", url: "https://d.com" } });
     assert(out.length === 4 && out[3].queueId === "d", "appended at tail");
   });
-  test("enqueue does not duplicate an existing queueId", () => {
+  await test("enqueue does not duplicate an existing queueId", () => {
     const out = pbpOfflineQueueReduce(Q(), { kind: "enqueue", item: { queueId: "a", url: "https://a.com" } });
     assert(out.length === 3, "no duplicate for same queueId");
   });
-  test("replace swaps the whole array (processOfflineQueue remaining set)", () => {
-    const out = pbpOfflineQueueReduce(Q(), { kind: "replace", remaining: [{ queueId: "c", url: "https://c.com" }] });
-    assert(out.length === 1 && out[0].queueId === "c", "replaced with remaining");
+  await test("new queue payload does not persist credentials", () => {
+    const out = pbpOfflineQueueReduce([], { kind: "enqueue", item: { queueId: "a", url: "https://a.com", token: "secret" } });
+    assert(out.length === 1 && !("token" in out[0]), "new item strips token");
   });
-  test("does not mutate its input (clear)", () => {
+  await test("current settings token takes priority over a legacy queued token", () => {
+    const token = pbpResolveOfflineQueueToken("current-token", obfuscateKey("legacy-token"));
+    assert(token === "current-token", "current token selected");
+  });
+  await test("legacy queued token remains a fallback when current settings token is missing", () => {
+    const token = pbpResolveOfflineQueueToken("", obfuscateKey("legacy-token"));
+    assert(token === "legacy-token", "legacy token decoded as fallback");
+  });
+  await test("missing current and legacy tokens resolve to empty", () => {
+    assert(pbpResolveOfflineQueueToken("", "") === "", "missing credentials stay empty");
+  });
+  await test("offline sender stops before network work when no token is available", async () => {
+    const source = await (await fetch("../background.js")).text();
+    const start = source.indexOf("async function sendOfflineItem");
+    const end = source.indexOf("function drainOfflineQueueIds", start);
+    const sender = source.slice(start, end);
+    const guard = sender.indexOf("if (!token) return false;");
+    const firstNetworkWork = Math.min(
+      sender.indexOf("fetchExistingBookmark"),
+      sender.indexOf("pinboardFetch")
+    );
+    assert(start >= 0 && end > start, "offline sender not found");
+    assert(guard >= 0 && firstNetworkWork > guard, "empty-token guard does not precede network work");
+  });
+  await test("concurrent enqueue survives acknowledgement of a snapshot item", () => {
+    const current = pbpOfflineQueueReduce(Q(), { kind: "enqueue", item: { queueId: "d", url: "https://d.com" } });
+    const out = pbpOfflineQueueReduce(current, { kind: "remove", queueId: "a" });
+    assert(out.length === 3, "only acknowledged item removed");
+    assert(out.some(i => i.queueId === "d"), "concurrent enqueue preserved");
+  });
+  await test("clear/remove followed by stale acknowledgement cannot restore items", () => {
+    const cleared = pbpOfflineQueueReduce(Q(), { kind: "clear" });
+    assert(pbpOfflineQueueReduce(cleared, { kind: "remove", queueId: "a" }).length === 0, "clear remains empty");
+    const removed = pbpOfflineQueueReduce(Q(), { kind: "remove", queueId: "b" });
+    const staleAck = pbpOfflineQueueReduce(removed, { kind: "remove", queueId: "b" });
+    assert(staleAck.length === 2 && !staleAck.some(i => i.queueId === "b"), "removed item stays removed");
+  });
+  await test("ensure_ids preserves order and fields with unique deterministic IDs", () => {
+    const input = [
+      { queueId: "existing", url: "https://a.com" },
+      { url: "https://b.com", title: "B", queuedAt: 10 },
+      { url: "https://c.com", tags: "one two" },
+    ];
+    const before = JSON.stringify(input);
+    const out = pbpOfflineQueueReduce(input, { kind: "ensure_ids", prefix: "legacy" });
+    assert(out.map(i => i.url).join(",") === input.map(i => i.url).join(","), "order preserved");
+    assert(out[0].queueId === "existing", "existing ID preserved");
+    assert(out[1].queueId === "legacy-1" && out[2].queueId === "legacy-2", "deterministic suffixes assigned");
+    assert(new Set(out.map(i => i.queueId)).size === 3, "IDs unique");
+    assert(out[1].title === "B" && out[1].queuedAt === 10 && out[2].tags === "one two", "fields preserved");
+    assert(JSON.stringify(input) === before && out !== input, "input not mutated");
+  });
+  await test("replace action no longer replaces the queue", () => {
+    const out = pbpOfflineQueueReduce(Q(), { kind: "replace", remaining: [{ queueId: "c", url: "https://c.com" }] });
+    assert(out.length === 3 && out[0].queueId === "a", "unknown action is a no-op");
+  });
+  await test("does not mutate its input (clear)", () => {
     const input = Q();
     pbpOfflineQueueReduce(input, { kind: "clear" });
     assert(input.length === 3, "input untouched");
   });
-  test("null/garbage queue treated as empty", () => {
+  await test("null/garbage queue treated as empty", () => {
     assert(pbpOfflineQueueReduce(null, { kind: "clear" }).length === 0, "null -> []");
     assert(pbpOfflineQueueReduce(undefined, { kind: "enqueue", item: { queueId: "x" } }).length === 1, "undefined -> [item]");
   });
+
+  await test("recovering tail propagates rejection then runs the next task without overlap", async () => {
+    const run = pbpCreateRecoveringTail();
+    let active = 0;
+    let maxActive = 0;
+    const first = run(async () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active--;
+      throw new Error("expected");
+    });
+    const second = run(async () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      active--;
+      return "ok";
+    });
+    const [firstResult, secondResult] = await Promise.allSettled([first, second]);
+    assert(firstResult.status === "rejected", "current caller receives rejection");
+    assert(secondResult.status === "fulfilled" && secondResult.value === "ok", "tail recovers for next task");
+    assert(maxActive === 1, "tasks never overlap");
+  });
+
+  await test("pending send acknowledgement preserves a concurrently enqueued item", async () => {
+    let queue = [{ queueId: "a", url: "https://a.com" }];
+    let releaseSend;
+    let markStarted;
+    const started = new Promise((resolve) => { markStarted = resolve; });
+    const sendGate = new Promise((resolve) => { releaseSend = resolve; });
+    const drain = pbpDrainOfflineQueue(["a"], {
+      getItem: (queueId) => queue.find((item) => item.queueId === queueId) || null,
+      sendItem: async () => { markStarted(); await sendGate; return true; },
+      removeItem: (queueId) => { queue = pbpOfflineQueueReduce(queue, { kind: "remove", queueId }); },
+      onSuccess: () => {},
+    });
+    await started;
+    queue = pbpOfflineQueueReduce(queue, { kind: "enqueue", item: { queueId: "b", url: "https://b.com" } });
+    releaseSend();
+    const completed = await drain;
+    assert(completed.length === 1 && completed[0].queueId === "a", "sent item completed");
+    assert(queue.length === 1 && queue[0].queueId === "b", "concurrent enqueue preserved");
+  });
+
+  await test("cleared or removed items are not sent or revived", async () => {
+    let queue = Q();
+    let sends = 0;
+    let removals = 0;
+    const options = {
+      getItem: (queueId) => queue.find((item) => item.queueId === queueId) || null,
+      sendItem: () => { sends++; return true; },
+      removeItem: (queueId) => { removals++; queue = pbpOfflineQueueReduce(queue, { kind: "remove", queueId }); },
+      onSuccess: () => {},
+    };
+    queue = pbpOfflineQueueReduce(queue, { kind: "clear" });
+    await pbpDrainOfflineQueue(["a"], options);
+    assert(sends === 0 && removals === 0 && queue.length === 0, "clear cancels not-yet-started item");
+
+    queue = pbpOfflineQueueReduce(Q(), { kind: "remove", queueId: "b" });
+    await pbpDrainOfflineQueue(["b"], options);
+    assert(sends === 0 && removals === 0, "remove cancels not-yet-started item");
+    assert(queue.length === 2 && !queue.some((item) => item.queueId === "b"), "removed item not revived");
+  });
+
+  await test("acknowledgement failure rejects without success callback or item loss", async () => {
+    const queue = [{ queueId: "a", url: "https://a.com" }];
+    let successes = 0;
+    let rejected = false;
+    try {
+      await pbpDrainOfflineQueue(["a"], {
+        getItem: (queueId) => queue.find((item) => item.queueId === queueId) || null,
+        sendItem: () => true,
+        removeItem: async () => { throw new Error("storage failed"); },
+        onSuccess: () => { successes++; },
+      });
+    } catch (_) {
+      rejected = true;
+    }
+    assert(rejected, "acknowledgement failure propagated");
+    assert(successes === 0, "success callback waits for durable acknowledgement");
+    assert(queue.length === 1 && queue[0].queueId === "a", "item remains queued");
+  });
 });
+})();
 </script>
 </body></html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Background Active Tab Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 4px 8px; margin: 4px 0; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<h1>Background Active Tab Tests</h1>
+<div id="results"></div>
+<script>
+function assert(condition, message) {
+  if (!condition) throw new Error(message || "assertion failed");
+}
+
+async function test(name, fn) {
+  const div = document.createElement("div");
+  div.className = "case";
+  try {
+    await fn();
+    div.classList.add("pass");
+    div.textContent = "PASS " + name;
+  } catch (error) {
+    div.classList.add("fail");
+    div.textContent = "FAIL " + name + "\n  " + error.message;
+  }
+  document.getElementById("results").appendChild(div);
+}
+
+function buildHarness(source, queryTabs, bookmarkResult = true) {
+  const start = source.indexOf("async function _getFocusedActiveTab");
+  const end = source.indexOf("// ---- \u6807\u7b7e\u9875\u6fc0\u6d3b/\u66f4\u65b0\u65f6\u5237\u65b0\u56fe\u6807", start);
+  assert(start >= 0 && end > start, "active-tab refresh helpers not found");
+
+  const calls = { queries: [], schedule: [], activity: 0, checks: [], icons: [], mirrors: [] };
+  let scheduledWork = Promise.resolve();
+  const chrome = { tabs: { query: async (query) => {
+    calls.queries.push(query);
+    return [queryTabs.shift()];
+  } } };
+  const schedule = (tabId, fn, delay) => {
+    calls.schedule.push({ tabId, delay });
+    scheduledWork = fn();
+  };
+  const noteActivity = () => { calls.activity++; };
+  const debouncedCheck = async (url) => { calls.checks.push(url); return bookmarkResult; };
+  const setIcon = (tabId, bookmarked) => { calls.icons.push({ tabId, bookmarked }); };
+  const writeMirror = async (...args) => { calls.mirrors.push(args); };
+
+  const make = new Function(
+    "chrome", "_scheduleTabCheck", "noteActivity", "debouncedCheck", "setIcon", "_writeCurrentTabMirror",
+    source.slice(start, end) + "; return { _getFocusedActiveTab, _scheduleCurrentTabRefresh };"
+  );
+  const api = make(chrome, schedule, noteActivity, debouncedCheck, setIcon, writeMirror);
+  return { api, calls, wait: () => scheduledWork };
+}
+
+async function run() {
+  const source = await (await fetch("../background.js")).text();
+  const url = "https://example.com/article";
+
+  await test("activated and updated listeners share the guarded scheduler", () => {
+    const activated = source.match(/chrome\.tabs\.onActivated\.addListener\([\s\S]*?\n}\);/)[0];
+    const updated = source.match(/chrome\.tabs\.onUpdated\.addListener\([\s\S]*?\n}\);/)[0];
+    assert(activated.includes("_scheduleCurrentTabRefresh(tabId)"), "activated listener bypasses scheduler");
+    assert(updated.includes("_scheduleCurrentTabRefresh(tabId, tab.url)"), "updated listener bypasses scheduler");
+    assert(!/noteActivity|debouncedCheck|_writeCurrentTabMirror/.test(activated + updated), "listener performs unguarded work");
+  });
+
+  await test("window focus listener ignores WINDOW_ID_NONE and enters the same scheduler", () => {
+    const listener = source.match(/chrome\.windows\.onFocusChanged\.addListener\([\s\S]*?\n}\);/)[0];
+    assert(listener.includes("chrome.windows.WINDOW_ID_NONE"), "WINDOW_ID_NONE is not ignored");
+    assert(/query\(\{ active: true, windowId \}\)/.test(listener), "focused window is not queried");
+    assert(listener.includes("_scheduleCurrentTabRefresh(tab.id, tab.url)"), "focus listener bypasses scheduler");
+  });
+
+  await test("current focused HTTP tab is checked and applied once", async () => {
+    const tab = { id: 7, url, title: "Article" };
+    const h = buildHarness(source, [{ ...tab }, { ...tab }]);
+    h.api._scheduleCurrentTabRefresh(7, url);
+    await h.wait();
+    assert(h.calls.schedule.length === 1 && h.calls.schedule[0].delay === 150, "refresh was not debounced once");
+    assert(h.calls.queries.length === 2 && h.calls.queries.every((q) => q.active && q.lastFocusedWindow), "focus was not checked twice");
+    assert(h.calls.activity === 1 && h.calls.checks.length === 1, "status lookup count is wrong");
+    assert(h.calls.icons.length === 1 && h.calls.icons[0].tabId === 7, "icon was not applied");
+    assert(h.calls.mirrors.length === 1 && h.calls.mirrors[0][1] === url, "mirror was not applied");
+  });
+
+  await test("background tab is rejected before activity, lookup, and mirror", async () => {
+    const h = buildHarness(source, [{ id: 8, url, title: "Other" }]);
+    h.api._scheduleCurrentTabRefresh(7, url);
+    await h.wait();
+    assert(h.calls.activity === 0 && h.calls.checks.length === 0, "background tab triggered lookup");
+    assert(h.calls.icons.length === 0 && h.calls.mirrors.length === 0, "background tab changed state");
+  });
+
+  await test("stale update URL is rejected before activity and lookup", async () => {
+    const h = buildHarness(source, [{ id: 7, url, title: "New URL" }]);
+    h.api._scheduleCurrentTabRefresh(7, "https://example.com/old");
+    await h.wait();
+    assert(h.calls.activity === 0 && h.calls.checks.length === 0, "stale URL triggered lookup");
+  });
+
+  await test("non-HTTP active tab is rejected before activity and lookup", async () => {
+    const h = buildHarness(source, [{ id: 7, url: "chrome://settings", title: "Settings" }]);
+    h.api._scheduleCurrentTabRefresh(7);
+    await h.wait();
+    assert(h.calls.activity === 0 && h.calls.checks.length === 0, "non-HTTP URL triggered lookup");
+  });
+
+  await test("navigation during lookup cannot apply icon or mirror", async () => {
+    const h = buildHarness(source, [
+      { id: 7, url, title: "Article" },
+      { id: 7, url: "https://example.com/next", title: "Next" },
+    ]);
+    h.api._scheduleCurrentTabRefresh(7, url);
+    await h.wait();
+    assert(h.calls.checks.length === 1, "initial current tab was not checked");
+    assert(h.calls.icons.length === 0 && h.calls.mirrors.length === 0, "stale URL result was applied");
+  });
+
+  await test("tab switch during lookup cannot apply icon or mirror", async () => {
+    const h = buildHarness(source, [
+      { id: 7, url, title: "Article" },
+      { id: 8, url, title: "Other tab" },
+    ]);
+    h.api._scheduleCurrentTabRefresh(7, url);
+    await h.wait();
+    assert(h.calls.icons.length === 0 && h.calls.mirrors.length === 0, "inactive tab result was applied");
+  });
+
+  await test("disabled bookmark status skips icon but still refreshes current-tab mirror", async () => {
+    const tab = { id: 7, url, title: "Article" };
+    const h = buildHarness(source, [{ ...tab }, { ...tab }], null);
+    h.api._scheduleCurrentTabRefresh(7, url);
+    await h.wait();
+    assert(h.calls.icons.length === 0, "disabled status changed icon");
+    assert(h.calls.mirrors.length === 1, "current-tab mirror was skipped");
+  });
+}
+run();
+</script>
+</body></html>

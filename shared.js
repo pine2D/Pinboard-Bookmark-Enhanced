@@ -382,6 +382,20 @@ function _executePinboardFetch(url, options, resolve, reject) {
 // the URI-bound API). Every save path (popup, batch, background) and the live char counter use
 // buildPostsAddUri below, so the measured length equals what is actually sent.
 const POSTS_ADD_URI_BUDGET = 3900;
+
+function pbpPopupSavePolicy({ lookupStatus, lookupUrl, currentUrl, formLoaded, reviewedAtClick }) {
+  if (lookupUrl !== currentUrl) return { allow: false, replace: false, reason: "url_mismatch" };
+  if (lookupStatus === "missing") return { allow: true, replace: false, reason: "create" };
+  if (lookupStatus === "found") {
+    return formLoaded && reviewedAtClick
+      ? { allow: true, replace: true, reason: "update" }
+      : { allow: false, replace: false, reason: "review_required" };
+  }
+  if (lookupStatus === "pending") return { allow: false, replace: false, reason: "lookup_pending" };
+  if (lookupStatus === "failed") return { allow: false, replace: false, reason: "lookup_failed" };
+  return { allow: false, replace: false, reason: "lookup_idle" };
+}
+
 function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", shared, toread, dt, replace = true }) {
   const enc = encodeURIComponent;
   let uri = `https://api.pinboard.in/v1/posts/add?auth_token=${token}&format=json`;
@@ -392,7 +406,7 @@ function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", sh
   if (shared !== undefined) uri += `&shared=${shared}`;
   if (toread !== undefined) uri += `&toread=${toread}`;
   if (dt) uri += `&dt=${enc(dt)}`; // preserve original timestamp when re-saving an existing bookmark
-  if (replace) uri += `&replace=yes`;
+  uri += `&replace=${replace ? "yes" : "no"}`;
   return uri;
 }
 
@@ -681,7 +695,7 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
 // ---- Single-writer reducer for offlineQueue ----
 // Pure function — returns a NEW array, never mutates input.
 // background.js is the only writer; popup sends messages instead of touching storage.
-// Centralises the 5 previously-unsynchronised read-modify-writes into one testable reducer.
+// Centralises the previously-unsynchronised read-modify-writes into one testable reducer.
 function pbpOfflineQueueReduce(queue, action) {
   const q = Array.isArray(queue) ? queue : [];
   if (!action || typeof action !== "object") return q.slice();
@@ -690,15 +704,47 @@ function pbpOfflineQueueReduce(queue, action) {
       return [];
     case "remove":
       return q.filter((it) => it && it.queueId !== action.queueId);
-    case "enqueue":
+    case "enqueue": {
       if (!action.item) return q.slice();
       if (q.some((it) => it && it.queueId === action.item.queueId)) return q.slice();
-      return [...q, action.item];
-    case "replace":
-      return Array.isArray(action.remaining) ? action.remaining.slice() : q.slice();
+      const item = { ...action.item };
+      delete item.token;
+      return [...q, item];
+    }
+    case "ensure_ids":
+      if (!action.prefix) return q.slice();
+      return q.map((it, index) =>
+        it && typeof it === "object" && !it.queueId
+          ? { ...it, queueId: `${action.prefix}-${index}` }
+          : it);
     default:
       return q.slice();
   }
+}
+
+function pbpCreateRecoveringTail() {
+  let tail = Promise.resolve();
+  return (task) => {
+    const operation = tail.then(task);
+    tail = operation.catch(() => {});
+    return operation;
+  };
+}
+
+function pbpResolveOfflineQueueToken(currentToken, legacyStoredToken) {
+  return currentToken || deobfuscateKey(legacyStoredToken);
+}
+
+async function pbpDrainOfflineQueue(queueIds, { getItem, sendItem, removeItem, onSuccess }) {
+  const completed = [];
+  for (const queueId of queueIds) {
+    const item = await getItem(queueId);
+    if (!item || !await sendItem(item)) continue;
+    await removeItem(queueId);
+    if (onSuccess) await onSuccess(item);
+    completed.push(item);
+  }
+  return completed;
 }
 
 // ---- Prime SETTINGS_DEFAULTS into storage (one-time fix for popup boot lag) ----

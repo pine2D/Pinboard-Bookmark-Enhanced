@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Popup Save Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 4px 8px; margin: 4px 0; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<h1>Popup Save Tests</h1>
+<div id="results"></div>
+<script src="../shared.js"></script>
+<script>
+function test(name, fn) {
+  const div = document.createElement("div");
+  div.className = "case";
+  try {
+    fn();
+    div.classList.add("pass");
+    div.textContent = "PASS " + name;
+  } catch (error) {
+    div.classList.add("fail");
+    div.textContent = "FAIL " + name + "\n  " + error.message;
+  }
+  document.getElementById("results").appendChild(div);
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message || "assertion failed");
+}
+
+const URL = "https://example.com/article";
+
+test("missing exact URL permits create with replace=false", () => {
+  const result = pbpPopupSavePolicy({ lookupStatus: "missing", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: false });
+  assert(result.allow && result.replace === false && result.reason === "create");
+});
+
+test("reviewed loaded existing bookmark permits replace=true", () => {
+  const result = pbpPopupSavePolicy({ lookupStatus: "found", lookupUrl: URL, currentUrl: URL, formLoaded: true, reviewedAtClick: true });
+  assert(result.allow && result.replace === true && result.reason === "update");
+});
+
+test("pending lookup blocks save", () => {
+  const result = pbpPopupSavePolicy({ lookupStatus: "pending", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: false });
+  assert(!result.allow && result.reason === "lookup_pending");
+});
+
+test("failed lookup blocks save", () => {
+  const result = pbpPopupSavePolicy({ lookupStatus: "failed", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: false });
+  assert(!result.allow && result.reason === "lookup_failed");
+});
+
+test("idle lookup blocks save", () => {
+  const result = pbpPopupSavePolicy({ lookupStatus: "idle", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: false });
+  assert(!result.allow && result.reason === "lookup_idle");
+});
+
+test("missing result for another URL blocks save", () => {
+  const result = pbpPopupSavePolicy({ lookupStatus: "missing", lookupUrl: "https://old.example", currentUrl: URL, formLoaded: false, reviewedAtClick: false });
+  assert(!result.allow && result.reason === "url_mismatch");
+});
+
+test("found result for another URL blocks save", () => {
+  const result = pbpPopupSavePolicy({ lookupStatus: "found", lookupUrl: "https://old.example", currentUrl: URL, formLoaded: true, reviewedAtClick: true });
+  assert(!result.allow && result.reason === "url_mismatch");
+});
+
+test("found bookmark that was not loaded blocks save", () => {
+  const result = pbpPopupSavePolicy({ lookupStatus: "found", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: true });
+  assert(!result.allow && result.reason === "review_required");
+});
+
+test("bookmark discovered after click requires a second reviewed click", () => {
+  const result = pbpPopupSavePolicy({ lookupStatus: "found", lookupUrl: URL, currentUrl: URL, formLoaded: true, reviewedAtClick: false });
+  assert(!result.allow && result.reason === "review_required");
+});
+
+test("posts/add create URI sends replace=no", () => {
+  const uri = buildPostsAddUri({ token: "t", url: URL, replace: false });
+  assert(uri.includes("&replace=no") && !uri.includes("&replace=yes"));
+});
+
+test("posts/add reviewed update URI sends replace=yes", () => {
+  const uri = buildPostsAddUri({ token: "t", url: URL, replace: true });
+  assert(uri.includes("&replace=yes") && !uri.includes("&replace=no"));
+});
+
+test("posts/add default remains replace=yes for existing callers", () => {
+  const uri = buildPostsAddUri({ token: "t", url: URL });
+  assert(uri.includes("&replace=yes") && !uri.includes("&replace=no"));
+});
+
+(async () => {
+  try {
+    const source = await (await fetch("../popup.js")).text();
+    test("submit rereads one owned form snapshot after save policy approval", () => {
+      const start = source.indexOf("function setupSubmit(token)");
+      const end = source.indexOf("// ===================== Edit From Recent", start);
+      const submit = source.slice(start, end);
+      const policyIndex = submit.indexOf("const savePolicy = pbpPopupSavePolicy");
+      const snapshotIndex = submit.indexOf('url: $id("url-input").value.trim()', policyIndex);
+      const ownershipIndex = submit.indexOf("saveUrl !== url", snapshotIndex);
+      const uriIndex = submit.indexOf("const apiUrl = buildPostsAddUri", ownershipIndex);
+      const snapshot = submit.slice(snapshotIndex, ownershipIndex);
+      assert(start >= 0 && end > start && policyIndex >= 0, "submit policy path not found");
+      assert(snapshotIndex > policyIndex && ownershipIndex > snapshotIndex && uriIndex > ownershipIndex, "snapshot ordering changed");
+      for (const field of ["title-input", "description-input", "private-check", "readlater-check", "archive-check"]) {
+        assert(snapshot.includes(`$id("${field}")`), `${field} is not in the final snapshot`);
+      }
+      assert(snapshot.includes("currentTags.slice()"), "tags are not copied into the final snapshot");
+      assert(submit.slice(uriIndex, submit.indexOf("if (apiUrl.length", uriIndex)).includes("url: saveUrl"), "request does not use the final URL");
+    });
+  } catch (error) {
+    test("submit rereads one owned form snapshot after save policy approval", () => { throw error; });
+  }
+})();
+</script>
+</body></html>

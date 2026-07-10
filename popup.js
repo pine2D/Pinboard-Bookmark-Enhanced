@@ -39,6 +39,7 @@ let allUserTagCounts = {};
 let tagCaseMap = {};
 let pageInfo = {};
 let existingBookmark = null;
+let bookmarkLookup = { status: "idle", url: "", generation: 0, promise: null, formLoaded: false };
 // P2: track which form fields the user has edited so the async existing-bookmark
 // lookup never clobbers in-progress input. Resets naturally on each popup open
 // (fresh document). Declared top-level so checkExistingBookmark() can read it.
@@ -68,6 +69,37 @@ function shouldUpdateField(fieldId) {
   return !fieldDirtyFlags[fieldId];
 }
 
+function invalidateBookmarkLookup() {
+  bookmarkLookup = {
+    status: "idle",
+    url: "",
+    generation: bookmarkLookup.generation + 1,
+    promise: null,
+    formLoaded: false,
+  };
+  existingBookmark = null;
+  const banner = $id("existing-banner");
+  if (banner) {
+    banner.textContent = "";
+    banner.classList.add("hidden");
+    banner.classList.remove("just-saved");
+    delete banner.dataset.mirror;
+  }
+  try { localStorage.removeItem("pp-last-tab"); } catch (_) {}
+  const deleteBtn = $id("delete-btn");
+  if (deleteBtn) {
+    deleteBtn.querySelector(".del-confirm-popover")?.remove();
+    deleteBtn.disabled = false;
+    deleteBtn.classList.remove("loading");
+    deleteBtn.textContent = t("delete");
+    deleteBtn.classList.add("hidden");
+  }
+  const submitBtn = $id("submit-btn");
+  if (submitBtn && !submitBtn.classList.contains("loading") && !submitBtn.classList.contains("saved-success") && !submitBtn.classList.contains("save-error")) {
+    submitBtn.textContent = t("submit");
+  }
+}
+
 let acIndex = -1;
 let settings = {};
 
@@ -95,6 +127,7 @@ function _renderCleanHint({ removedCount, original }) {
   link.addEventListener("click", (e) => {
     e.preventDefault();
     $id("url-input").value = original;
+    $id("url-input").dispatchEvent(new Event("input", { bubbles: true }));
     hint.classList.add("hidden");
   });
   hint.appendChild(label); hint.appendChild(sep); hint.appendChild(link);
@@ -298,10 +331,10 @@ async function showMain(token) {
   }
 
   $id("url-input").addEventListener("input", () => {
+    invalidateBookmarkLookup();
     const val = $id("url-input").value.trim();
     const bad = !val || (!val.startsWith("http://") && !val.startsWith("https://"));
     $id("url-warning").classList.toggle("hidden", !bad);
-    $id("submit-btn").disabled = bad;
     updateCharCount();
   });
   $id("title-input").addEventListener("input", updateCharCount);
@@ -755,79 +788,101 @@ async function htmlToMarkdownAsync(html, opts) {
 // prefetch (optional): { prefetchUrl, prefetchPromise } — a get_bookmark_data lookup
 // kicked off in parallel from showMain. Used only when prefetchUrl matches the url we
 // actually need (else a stale prefetch would mislead). Misses fall back to a live fetch.
-async function checkExistingBookmark(token, url, prefetch) {
-  try {
-    let data;
+async function checkExistingBookmark(token, url, prefetch, forceFresh = false) {
+  const lookupUrl = String(url || "").trim();
+  // Clear any optimistic first-paint mirror before the source-of-truth lookup.
+  // A found result restores the edit UI; missing/failed results leave it cleared.
+  invalidateBookmarkLookup();
+  const generation = bookmarkLookup.generation;
+  bookmarkLookup = { status: "pending", url: lookupUrl, generation, promise: null, formLoaded: false };
+
+  const promise = (async () => {
     try {
-      let cached;
-      if (prefetch && prefetch.prefetchUrl === url && prefetch.prefetchPromise) {
-        cached = await prefetch.prefetchPromise;
-      } else {
-        cached = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url });
+      let data;
+      if (!forceFresh) {
+        try {
+          let cached;
+          if (prefetch && prefetch.prefetchUrl === lookupUrl && prefetch.prefetchPromise) {
+            cached = await prefetch.prefetchPromise;
+          } else {
+            cached = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url: lookupUrl });
+          }
+          if (cached?.posts) data = { posts: cached.posts };
+        } catch (_) {}
       }
-      if (cached?.posts) data = { posts: cached.posts };
-    } catch (_) {}
-    if (!data) {
-      const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?url=${enc(url)}&auth_token=${token}&format=json`);
-      if (resp.status === 401) return; // pinboardFetch already redirected to login
-      if (resp.status === 0) return;   // network unreachable (offline / blocked / proxy) — the SW
-                                       // proxy returns status 0 on a failed fetch. Skip the
-                                       // existing-bookmark lookup silently; saving still works
-                                       // (offline queue) and surfacing a red "HTTP 0" is just noise.
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      data = await resp.json();
-    }
-    if (data.posts?.length > 0) {
-      existingBookmark = data.posts[0];
-      if (shouldUpdateField("title-input")) $id("title-input").value = existingBookmark.description;
-      if (shouldUpdateField("description-input")) $id("description-input").value = existingBookmark.extended;
-      if (shouldUpdateField("private-check")) $id("private-check").checked = existingBookmark.shared === "no";
-      recomputeArchiveCheck();
-      if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
-      // Don't clobber tags the user already started entering (chips in currentTags
-      // or text mid-typed in #tags-input) — mirrors the per-field guard above.
-      if (currentTags.length === 0 && !$id("tags-input")?.value.trim()) {
-        currentTags = [];
+      if (!data) {
+        const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?url=${enc(lookupUrl)}&auth_token=${token}&format=json`);
+        if (resp.status === 401) throw new Error("HTTP 401"); // pinboardFetch already redirected to login
+        if (resp.status === 0) throw new Error("HTTP 0");
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        data = await resp.json();
+      }
+
+      if (bookmarkLookup.generation !== generation || bookmarkLookup.url !== lookupUrl || $id("url-input").value.trim() !== lookupUrl) {
+        return { status: "stale", url: lookupUrl };
+      }
+
+      if (data.posts?.length > 0) {
+        existingBookmark = data.posts[0];
+        if (shouldUpdateField("title-input")) $id("title-input").value = existingBookmark.description;
+        if (shouldUpdateField("description-input")) $id("description-input").value = existingBookmark.extended;
+        if (shouldUpdateField("private-check")) $id("private-check").checked = existingBookmark.shared === "no";
+        recomputeArchiveCheck();
+        if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
+        currentTags = unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
         renderTags();
-        if (existingBookmark.tags?.trim()) existingBookmark.tags.split(" ").filter(Boolean).forEach((t) => { if (t.trim()) addTag(t.trim()); });
-      }
-      $id("submit-btn").textContent = t("update");
-      $id("delete-btn").classList.remove("hidden");
-      updateCharCount();
-      setTimeout(() => autoResizeTextarea($id("description-input")), 50);
-      const banner = $id("existing-banner");
-      const timeStr = existingBookmark.time;
-      if (banner) {
-        let info = t("editingExisting");
-        const parts = [];
-        if (timeStr) {
-          const d = new Date(timeStr);
-          parts.push(t("savedOnDate", d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })));
+        $id("submit-btn").textContent = t("update");
+        $id("delete-btn").classList.remove("hidden");
+        updateCharCount();
+        setTimeout(() => autoResizeTextarea($id("description-input")), 50);
+        const banner = $id("existing-banner");
+        const timeStr = existingBookmark.time;
+        if (banner) {
+          let info = t("editingExisting");
+          const parts = [];
+          if (timeStr) {
+            const d = new Date(timeStr);
+            parts.push(t("savedOnDate", d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })));
+          }
+          const tagCount = existingBookmark.tags?.trim() ? existingBookmark.tags.trim().split(/\s+/).length : 0;
+          if (tagCount > 0) parts.push(tagCount > 1 ? t("tagCountPlural", String(tagCount)) : t("tagCount", String(tagCount)));
+          if (parts.length) info += " (" + parts.join(", ") + ")";
+          banner.textContent = info;
+          banner.classList.remove("hidden");
         }
-        const tagCount = existingBookmark.tags?.trim() ? existingBookmark.tags.trim().split(/\s+/).length : 0;
-        if (tagCount > 0) parts.push(tagCount > 1 ? t("tagCountPlural", String(tagCount)) : t("tagCount", String(tagCount)));
-        if (parts.length) info += " (" + parts.join(", ") + ")";
-        banner.textContent = info;
-        banner.classList.remove("hidden");
+        bookmarkLookup = { status: "found", url: lookupUrl, generation, promise: null, formLoaded: true };
+      } else {
+        existingBookmark = null;
+        bookmarkLookup = { status: "missing", url: lookupUrl, generation, promise: null, formLoaded: false };
       }
+
+      // B4: Write tab mirror for next popup boot. Stores public-on-pinboard data only.
+      try {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (bookmarkLookup.generation === generation && bookmarkLookup.url === lookupUrl && $id("url-input").value.trim() === lookupUrl && activeTab?.url) {
+          const banner = document.getElementById("existing-banner");
+          const mirror = {
+            tabId: activeTab.id,
+            url: $id("url-input").value || activeTab.url,
+            title: $id("title-input").value || activeTab.title || "",
+            bannerText: (banner && !banner.classList.contains("hidden")) ? (banner.textContent || "") : "",
+            ts: Date.now()
+          };
+          localStorage.setItem("pp-last-tab", JSON.stringify(mirror));
+        }
+      } catch (_) {}
+      return { status: bookmarkLookup.status, url: lookupUrl };
+    } catch (e) {
+      if (bookmarkLookup.generation === generation && bookmarkLookup.url === lookupUrl && $id("url-input").value.trim() === lookupUrl) {
+        bookmarkLookup = { status: "failed", url: lookupUrl, generation, promise: null, formLoaded: false };
+        console.error("user info banner error:", e);
+        return { status: "failed", url: lookupUrl };
+      }
+      return { status: "stale", url: lookupUrl };
     }
-  } catch (e) { console.error("user info banner error:", e); }
-  // B4: Write tab mirror for next popup boot.
-  // Stores public-on-pinboard data (url/title/tags) only — no tokens or keys.
-  try {
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (activeTab && activeTab.url) {
-      const banner = document.getElementById("existing-banner");
-      const mirror = {
-        tabId: activeTab.id,
-        url: $id("url-input").value || activeTab.url,
-        title: $id("title-input").value || activeTab.title || "",
-        bannerText: (banner && !banner.classList.contains("hidden")) ? (banner.textContent || "") : "",
-        ts: Date.now()
-      };
-      localStorage.setItem("pp-last-tab", JSON.stringify(mirror));
-    }
-  } catch (_) {}
+  })();
+  bookmarkLookup.promise = promise;
+  return promise;
 }
 
 // ===================== Submit / Delete =====================
@@ -836,8 +891,8 @@ function setupSubmit(token) {
 
   // Submit state machine: idle -> loading -> success -> idle / loading -> error -> idle (user retry resets)
   const btn = $id("submit-btn");
-  let submitOriginalText = btn.textContent;
   let submitErrorResetTimer = null;
+  let submitAttemptSeq = 0;
 
   function setSubmitState(state, label) {
     btn.classList.remove("loading", "saved-success", "save-error");
@@ -855,34 +910,105 @@ function setupSubmit(token) {
       btn.textContent = label || t("saveRetry");
     } else { // idle
       btn.disabled = false;
-      btn.textContent = submitOriginalText;
+      const currentUrl = $id("url-input").value.trim();
+      btn.textContent = bookmarkLookup.status === "found" && bookmarkLookup.url === currentUrl && bookmarkLookup.formLoaded
+        ? t("update")
+        : t("submit");
+      updateCharCount();
     }
   }
 
   $id("submit-btn").addEventListener("click", async () => {
-    // Snapshot current label as "idle text" unless we're in a transient state
-    if (!btn.classList.contains("saved-success") && !btn.classList.contains("save-error") && !btn.classList.contains("loading")) {
-      submitOriginalText = btn.textContent;
-    }
+    const submitAttempt = ++submitAttemptSeq;
+    const ownsSubmitUi = () => submitAttempt === submitAttemptSeq;
+    const url = $id("url-input").value.trim();
+    const reviewedAtClick = bookmarkLookup.status === "found"
+      && bookmarkLookup.url === url
+      && bookmarkLookup.formLoaded;
     clearTimeout(submitErrorResetTimer);
     setSubmitState("loading");
 
-    const url = $id("url-input").value;
-    const title = $id("title-input").value;
-    if (!url || !title) {
+    if (!url || !$id("title-input").value) {
       showStatus("status-msg", t("urlAndTitleRequired"), "error");
       setSubmitState("idle");
       return;
     }
+    let lookupGenerationAtSave = null;
     try {
+      const lookupMatches = bookmarkLookup.url === url;
+      let lookupGenerationAtWait = bookmarkLookup.generation;
+      if (bookmarkLookup.status === "pending" && lookupMatches && bookmarkLookup.promise) {
+        await bookmarkLookup.promise;
+      } else if (!lookupMatches || bookmarkLookup.status === "idle" || bookmarkLookup.status === "failed" || (bookmarkLookup.status === "pending" && !bookmarkLookup.promise)) {
+        const lookupPromise = checkExistingBookmark(token, url);
+        lookupGenerationAtWait = bookmarkLookup.generation;
+        await lookupPromise;
+      }
+      if (!ownsSubmitUi()) return;
+      if (bookmarkLookup.generation !== lookupGenerationAtWait || bookmarkLookup.url !== url || $id("url-input").value.trim() !== url) {
+        setSubmitState("idle");
+        return;
+      }
+
+      const savePolicy = pbpPopupSavePolicy({
+        lookupStatus: bookmarkLookup.status,
+        lookupUrl: bookmarkLookup.url,
+        currentUrl: url,
+        formLoaded: bookmarkLookup.formLoaded,
+        reviewedAtClick,
+      });
+      if (!savePolicy.allow) {
+        if (savePolicy.reason === "review_required") {
+          showStatus("status-msg", t("editingExisting"), "info");
+          setSubmitState("idle");
+        } else {
+          showStatus("status-msg", t("networkError"), "error");
+          setSubmitState("error");
+          submitErrorResetTimer = setTimeout(() => { if (btn.classList.contains("save-error")) setSubmitState("idle"); }, 3000);
+        }
+        return;
+      }
+
+      lookupGenerationAtSave = bookmarkLookup.generation;
+      const {
+        url: saveUrl,
+        title,
+        extended,
+        tags,
+        isPrivate,
+        isReadLater,
+        archiveRequested,
+      } = {
+        url: $id("url-input").value.trim(),
+        title: $id("title-input").value,
+        extended: $id("description-input").value,
+        tags: currentTags.slice(),
+        isPrivate: $id("private-check").checked,
+        isReadLater: $id("readlater-check").checked,
+        archiveRequested: $id("archive-check").checked,
+      };
+      if (!ownsSubmitUi()
+          || bookmarkLookup.generation !== lookupGenerationAtSave
+          || bookmarkLookup.url !== saveUrl
+          || saveUrl !== url) {
+        setSubmitState("idle");
+        return;
+      }
+      if (!saveUrl || !title) {
+        showStatus("status-msg", t("urlAndTitleRequired"), "error");
+        setSubmitState("idle");
+        return;
+      }
+      const existingTimeAtSave = existingBookmark?.href === saveUrl ? existingBookmark.time : "";
       const apiUrl = buildPostsAddUri({
         token,
-        url,
+        url: saveUrl,
         title,
-        extended: $id("description-input").value,
-        tags: currentTags.join(" "),
-        shared: $id("private-check").checked ? "no" : "yes",
-        toread: $id("readlater-check").checked ? "yes" : "no",
+        extended,
+        tags: tags.join(" "),
+        shared: isPrivate ? "no" : "yes",
+        toread: isReadLater ? "yes" : "no",
+        replace: savePolicy.replace,
       });
       if (apiUrl.length > POSTS_ADD_URI_BUDGET) {
         showStatus("status-msg", t("uriTooLong", String(apiUrl.length), String(POSTS_ADD_URI_BUDGET)), "error");
@@ -892,8 +1018,16 @@ function setupSubmit(token) {
       }
       const resp = await pinboardFetch(apiUrl);
       if (!resp.ok) {
+        if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
+          if (ownsSubmitUi()) setSubmitState("idle");
+          return;
+        }
         let bodyText = "";
         try { bodyText = (await resp.text()).slice(0, 120); } catch (_) {}
+        if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
+          if (ownsSubmitUi()) setSubmitState("idle");
+          return;
+        }
         showStatus("status-msg", `HTTP ${resp.status}${bodyText ? ": " + bodyText : ""}`, "error");
         setSubmitState("error");
         submitErrorResetTimer = setTimeout(() => { if (btn.classList.contains("save-error")) setSubmitState("idle"); }, 3000);
@@ -901,16 +1035,20 @@ function setupSubmit(token) {
       }
       const data = await resp.json();
       if (data.result_code === "done") {
-        showStatus("status-msg", t("bookmarkSaved"), "success");
-        setSubmitState("success");
-        if (typeof saveLastUsedTags === "function") saveLastUsedTags(currentTags);
+        if (typeof saveLastUsedTags === "function") saveLastUsedTags(tags);
         // Read _waybackAttempts BEFORE sending bookmark_saved (SW will stamp it after)
         let _waybackAttemptsSnap = {};
         try { _waybackAttemptsSnap = (await chrome.storage.local.get("_waybackAttempts"))._waybackAttempts || {}; } catch (_) {}
-        chrome.runtime.sendMessage({ type: "bookmark_saved", url: url, toread: $id("readlater-check").checked, private: $id("private-check").checked, archive: $id("archive-check").checked });
+        chrome.runtime.sendMessage({ type: "bookmark_saved", url: url, toread: isReadLater, private: isPrivate, archive: archiveRequested });
+        if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
+          if (ownsSubmitUi()) setSubmitState("idle");
+          return;
+        }
+        showStatus("status-msg", t("bookmarkSaved"), "success");
+        setSubmitState("success");
         // Optimistic archive indicator (cosmetic only, never blocks save or auto-close)
         try {
-          if ($id("archive-check").checked && typeof pbpWaybackShouldAttempt === "function" && pbpWaybackShouldAttempt(_waybackAttemptsSnap, url, Date.now())) {
+          if (archiveRequested && typeof pbpWaybackShouldAttempt === "function" && pbpWaybackShouldAttempt(_waybackAttemptsSnap, url, Date.now())) {
             const statusEl = $id("status-msg");
             if (statusEl) {
               const indicator = document.createElement("span");
@@ -921,38 +1059,53 @@ function setupSubmit(token) {
             }
           }
         } catch (_) {}
-        // Persist "just-saved" state: upgrade banner to reflect current bookmark
-        existingBookmark = {
-          href: url,
-          description: title,
-          extended: $id("description-input").value,
-          tags: currentTags.join(" "),
-          shared: $id("private-check").checked ? "no" : "yes",
-          toread: $id("readlater-check").checked ? "yes" : "no",
-          time: new Date().toISOString(),
-        };
-        $id("submit-btn").textContent = t("update");
-        $id("delete-btn").classList.remove("hidden");
-        const bannerEl = $id("existing-banner");
-        if (bannerEl) {
-          const cancelEl = bannerEl.querySelector(".edit-cancel");
-          let info = t("editingExisting");
-          const parts = [t("offlineJustNow")];
-          const tc = currentTags.length;
-          if (tc > 0) parts.push(tc > 1 ? t("tagCountPlural", String(tc)) : t("tagCount", String(tc)));
-          info += " (" + parts.join(", ") + ")";
-          bannerEl.textContent = info;
-          if (cancelEl) { bannerEl.appendChild(document.createTextNode(" ")); bannerEl.appendChild(cancelEl); }
-          bannerEl.classList.remove("hidden");
-          bannerEl.classList.add("just-saved");
-          setTimeout(() => bannerEl.classList.remove("just-saved"), 2000);
+        // Persist "just-saved" state only if this request still owns the current URL.
+        if (bookmarkLookup.generation === lookupGenerationAtSave && $id("url-input").value.trim() === url) {
+          const generation = bookmarkLookup.generation + 1;
+          existingBookmark = {
+            href: url,
+            description: title,
+            extended,
+            tags: tags.join(" "),
+            shared: isPrivate ? "no" : "yes",
+            toread: isReadLater ? "yes" : "no",
+            time: existingTimeAtSave || new Date().toISOString(),
+          };
+          bookmarkLookup = { status: "found", url, generation, promise: null, formLoaded: true };
+          $id("submit-btn").textContent = t("update");
+          $id("delete-btn").classList.remove("hidden");
+          const bannerEl = $id("existing-banner");
+          if (bannerEl) {
+            const cancelEl = bannerEl.querySelector(".edit-cancel");
+            let info = t("editingExisting");
+            const parts = [t("offlineJustNow")];
+            const tc = tags.length;
+            if (tc > 0) parts.push(tc > 1 ? t("tagCountPlural", String(tc)) : t("tagCount", String(tc)));
+            info += " (" + parts.join(", ") + ")";
+            bannerEl.textContent = info;
+            if (cancelEl) { bannerEl.appendChild(document.createTextNode(" ")); bannerEl.appendChild(cancelEl); }
+            bannerEl.classList.remove("hidden");
+            bannerEl.classList.add("just-saved");
+            setTimeout(() => bannerEl.classList.remove("just-saved"), 2000);
+          }
         }
         if (settings.optAutoCloseAfterSave) {
+          const autoCloseGeneration = bookmarkLookup.generation;
           const bar = document.createElement("div");
           bar.className = "auto-close-bar";
           bar.setAttribute("aria-hidden", "true");
           document.body.appendChild(bar);
-          autoCloseTimer = setTimeout(() => window.close(), 1800);
+          autoCloseTimer = setTimeout(() => {
+            autoCloseTimer = null;
+            if (ownsSubmitUi()
+                && bookmarkLookup.generation === autoCloseGeneration
+                && bookmarkLookup.url === url
+                && $id("url-input").value.trim() === url) {
+              window.close();
+            } else {
+              bar.remove();
+            }
+          }, 1800);
           document.addEventListener("mousedown", () => {
             clearTimeout(autoCloseTimer);
             autoCloseTimer = null;
@@ -962,9 +1115,40 @@ function setupSubmit(token) {
         setTimeout(() => { if (btn.classList.contains("saved-success")) setSubmitState("idle"); }, 1200);
         return;
       }
+      if (data.result_code === "item already exists" && savePolicy.replace === false) {
+        if (!ownsSubmitUi() || bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url) {
+          if (ownsSubmitUi()) setSubmitState("idle");
+          return;
+        }
+        const conflictLookupPromise = checkExistingBookmark(token, url, null, true);
+        const conflictLookupGeneration = bookmarkLookup.generation;
+        const conflictLookup = await conflictLookupPromise;
+        if (!ownsSubmitUi()) return;
+        if (bookmarkLookup.generation !== conflictLookupGeneration || bookmarkLookup.url !== url || $id("url-input").value.trim() !== url) {
+          setSubmitState("idle");
+          return;
+        }
+        if (conflictLookup.status === "found") {
+          showStatus("status-msg", t("editingExisting"), "info");
+          setSubmitState("idle");
+          return;
+        }
+        showStatus("status-msg", conflictLookup.status === "failed" ? t("networkError") : `Error: ${data.result_code}`, "error");
+        setSubmitState("error");
+        submitErrorResetTimer = setTimeout(() => { if (btn.classList.contains("save-error")) setSubmitState("idle"); }, 3000);
+        return;
+      }
+      if (!ownsSubmitUi() || (lookupGenerationAtSave !== null && (bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url))) {
+        if (ownsSubmitUi()) setSubmitState("idle");
+        return;
+      }
       showStatus("status-msg", `Error: ${data.result_code}`, "error");
       setSubmitState("error");
     } catch (e) {
+      if (!ownsSubmitUi() || (lookupGenerationAtSave !== null && (bookmarkLookup.generation !== lookupGenerationAtSave || $id("url-input").value.trim() !== url))) {
+        if (ownsSubmitUi()) setSubmitState("idle");
+        return;
+      }
       showStatus("status-msg", t("networkError"), "error");
       setSubmitState("error");
     }
@@ -1008,6 +1192,14 @@ function setupSubmit(token) {
   $id("delete-btn").addEventListener("click", () => {
     const delBtn = $id("delete-btn");
     if (delBtn.querySelector(".del-confirm-popover")) return;
+    const deleteUrl = $id("url-input").value.trim();
+    if (bookmarkLookup.status !== "found" || bookmarkLookup.url !== deleteUrl || !bookmarkLookup.formLoaded) return;
+    const deleteGeneration = bookmarkLookup.generation;
+    const ownsDeleteForm = () => bookmarkLookup.generation === deleteGeneration
+      && bookmarkLookup.status === "found"
+      && bookmarkLookup.url === deleteUrl
+      && bookmarkLookup.formLoaded
+      && $id("url-input").value.trim() === deleteUrl;
 
     const pop = document.createElement("div");
     pop.className = "del-confirm-popover";
@@ -1029,18 +1221,24 @@ function setupSubmit(token) {
 
     yes.addEventListener("click", async () => {
       dismiss();
+      if (!ownsDeleteForm()) return;
       const delOrig = delBtn.textContent;
       delBtn.disabled = true; delBtn.classList.add("loading"); delBtn.textContent = t("deleting");
-      const url = $id("url-input").value;
       try {
-        const data = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(url)}&auth_token=${token}&format=json`)).json();
-        if (data.result_code === "done" || data.result_code === "item not found") {
+        const data = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(deleteUrl)}&auth_token=${token}&format=json`)).json();
+        const deleted = data.result_code === "done" || data.result_code === "item not found";
+        if (deleted) chrome.runtime.sendMessage({ type: "bookmark_deleted", url: deleteUrl });
+        if (!ownsDeleteForm()) return;
+        if (deleted) {
           showStatus("status-msg", t("deleted"), "success");
-          chrome.runtime.sendMessage({ type: "bookmark_deleted", url: url });
-          setTimeout(() => window.close(), 800);
+          setTimeout(() => { if (ownsDeleteForm()) window.close(); }, 800);
         } else showStatus("status-msg", `Error: ${data.result_code}`, "error");
-      } catch (e) { showStatus("status-msg", t("networkError"), "error"); }
-      delBtn.disabled = false; delBtn.classList.remove("loading"); delBtn.textContent = delOrig;
+      } catch (e) {
+        if (ownsDeleteForm()) showStatus("status-msg", t("networkError"), "error");
+      }
+      if (ownsDeleteForm()) {
+        delBtn.disabled = false; delBtn.classList.remove("loading"); delBtn.textContent = delOrig;
+      }
     });
   });
 }
@@ -1048,7 +1246,8 @@ function setupSubmit(token) {
 // ===================== Edit From Recent =====================
 async function loadBookmarkForEdit(url, token) {
   // Reset current form state
-  existingBookmark = null;
+  invalidateBookmarkLookup();
+  Object.keys(fieldDirtyFlags).forEach((id) => { fieldDirtyFlags[id] = false; });
   currentTags = [];
   renderTags();
   $id("url-input").value = url;
@@ -1061,7 +1260,12 @@ async function loadBookmarkForEdit(url, token) {
   // Mark edit mode so banner shows cancel affordance
   document.body.dataset.editMode = "1";
   // Reuse existing-bookmark path which will populate the form from posts/get
-  await checkExistingBookmark(token, url);
+  const lookup = await checkExistingBookmark(token, url);
+  if (lookup.status !== "found") {
+    delete document.body.dataset.editMode;
+    if (lookup.status === "failed") showStatus("status-msg", t("networkError"), "error");
+    return;
+  }
   // Append cancel affordance to banner using safe DOM APIs (no innerHTML)
   const banner = $id("existing-banner");
   if (banner && !banner.querySelector(".edit-cancel")) {
@@ -1188,10 +1392,13 @@ async function showOfflineQueueStatus() {
       yesText: t("clear"),
       noText: t("cancel"),
       onConfirm: async () => {
-        await new Promise((resolve) => {
-          chrome.runtime.sendMessage({ type: "clear_offline_queue" }, () => resolve());
+        const ok = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: "clear_offline_queue" }, (resp) => {
+            resolve(!!(resp && resp.ok));
+          });
         });
-        bar.classList.add("hidden");
+        if (window.PPOffline) await window.PPOffline.refresh();
+        else if (ok) bar.classList.add("hidden");
       },
     });
   });
@@ -1237,7 +1444,7 @@ function updateCharCount() {
   const url = $id("url-input").value.trim();
   const urlBad = !url || (!url.startsWith("http://") && !url.startsWith("https://"));
   const sub = $id("submit-btn");
-  sub.disabled = urlBad || over;
+  if (!sub.classList.contains("loading")) sub.disabled = urlBad || over;
   sub.title = over ? t("submitUriTooLong") : urlBad ? t("urlCannotSave") : "";
 }
 function showElement(id, text) { const el = $id(id); el.textContent = text; el.classList.remove("hidden"); }

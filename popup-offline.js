@@ -20,6 +20,13 @@
   }
 
   async function getQueue() {
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: "get_offline_queue" }, (resp) => {
+        if (chrome.runtime.lastError) { resolve(null); return; }
+        resolve(resp);
+      });
+    });
+    if (response?.ok && Array.isArray(response.queue)) return response.queue;
     const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
     return offlineQueue;
   }
@@ -153,10 +160,13 @@
   }
 
   async function onRemove(queueId) {
-    await new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: "remove_offline_item", queueId }, () => resolve());
+    const ok = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: "remove_offline_item", queueId }, (resp) => {
+        resolve(!!(resp && resp.ok));
+      });
     });
     await refreshBar();
+    return ok;
   }
 
   async function toggle(ev) {
