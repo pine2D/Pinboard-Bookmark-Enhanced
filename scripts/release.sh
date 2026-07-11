@@ -732,7 +732,20 @@ else
 fi
 
 if [ "${RELEASE_EXISTS}" -eq 0 ]; then
-  if ! refresh_release; then
+  RELEASE_CREATED=0
+  for attempt in 1 2 3 4 5; do
+    if refresh_release; then
+      RELEASE_CREATED=1
+      break
+    else
+      RELEASE_LOOKUP_STATUS=$?
+    fi
+    if [ "${RELEASE_LOOKUP_STATUS}" -eq 2 ]; then
+      break
+    fi
+    [ "${attempt}" -eq 5 ] || sleep 2
+  done
+  if [ "${RELEASE_CREATED}" -ne 1 ]; then
     echo "  ABORT: draft ${TAG} was created but could not be resolved by tag." >&2
     exit 1
   fi
