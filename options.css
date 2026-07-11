@@ -115,8 +115,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
    used to be slow too, but the emoji→SVG fix removed the per-panel stall, so both
    open AND switch are now fast. */
 .panel { background: #fff; border: 1px solid #ccc; display: none; }
-.panel.active { grid-column: 2; grid-row: 2; display: block; padding: 16px; border-width: 1px; border-radius: var(--opt-radius-md); animation: panelFadeIn 0.18s ease; }
-@keyframes panelFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+.panel.active { grid-column: 2; grid-row: 2; display: block; padding: 16px; border-width: 1px; border-radius: var(--opt-radius-md); }
 
 /* ---- Form groups ---- */
 .fg { margin-bottom: 10px; }
