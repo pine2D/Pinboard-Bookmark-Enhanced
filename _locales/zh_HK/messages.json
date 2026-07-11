@@ -702,6 +702,9 @@
   "optTitle": {
     "message": "Pinboard 書籤增強 — 設定"
   },
+  "settingsCategory": {
+    "message": "設定分類"
+  },
   "optAutoSave": {
     "message": "自動儲存已啟用"
   },
@@ -906,6 +909,9 @@
   },
   "importInvalid": {
     "message": "檔案格式無效"
+  },
+  "importApplyFailed": {
+    "message": "匯入未能完成；部分設定可能已經變更，請檢查後再試"
   },
   "importSettingsTitle": {
     "message": "從 JSON 檔案匯入設定"
@@ -1718,7 +1724,7 @@
     "message": "僅儲存到本機（同步配額已滿）"
   },
   "optSaveFailed": {
-    "message": "儲存失敗 — 設定內容過大，無法同步"
+    "message": "儲存未能完成；部分其他設定可能已儲存，請檢查後再試"
   },
   "confirm": {
     "message": "確認"
@@ -1884,7 +1890,7 @@
     "message": "寫入剪貼簿失敗——筆記未建立，請重試。"
   },
   "apiKeySecurityHint": {
-    "message": "API 金鑰已混淆（非加密），並透過 chrome.storage.sync 同步。請勿分享您的設定匯出檔案。"
+    "message": "API 金鑰預設只儲存在本機。只有在你明確啟用金鑰同步後，才會透過 Chrome Sync 同步。金鑰只經過混淆處理，並未加密。"
   },
   "batchPermLabel": {
     "message": "舊版所有網站權限："

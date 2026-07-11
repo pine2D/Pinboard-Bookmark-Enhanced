@@ -702,6 +702,9 @@
   "optTitle": {
     "message": "Pinboard Bookmark Enhanced — Settings"
   },
+  "settingsCategory": {
+    "message": "Settings category"
+  },
   "optAutoSave": {
     "message": "auto-save enabled"
   },
@@ -906,6 +909,9 @@
   },
   "importInvalid": {
     "message": "Invalid file"
+  },
+  "importApplyFailed": {
+    "message": "Import could not be completed; some settings may already have changed. Review them and try again."
   },
   "importSettingsTitle": {
     "message": "Import settings from JSON file"
@@ -1688,7 +1694,7 @@
     "message": "Saved locally (sync quota full)"
   },
   "optSaveFailed": {
-    "message": "Save failed — settings too large to sync"
+    "message": "Save could not be completed; some other settings may already have been saved. Review them and try again."
   },
   "confirm": {
     "message": "Confirm"
@@ -1884,7 +1890,7 @@
     "message": "Couldn't copy to clipboard — the note wasn't created. Try again."
   },
   "apiKeySecurityHint": {
-    "message": "API keys are obfuscated (not encrypted) and sync via chrome.storage.sync. Do not share your settings export files."
+    "message": "API keys are stored only on this device by default. They sync through Chrome Sync only after you explicitly enable key syncing. Keys are obfuscated, not encrypted."
   },
   "batchPermLabel": {
     "message": "Legacy all-sites permission:"

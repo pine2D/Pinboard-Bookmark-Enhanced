@@ -12,7 +12,10 @@
     <div class="header-bar" data-i18n="appName">Pinboard Bookmark Enhanced</div>
     <div class="login-body">
       <p><span data-i18n="loginPrompt">Enter your API token from</span> <a href="https://pinboard.in/settings/password" target="_blank" rel="noopener"><span data-i18n="settingsPassword">settings/password</span></a></p>
-      <input type="text" id="token-input" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" />
+      <div class="secret-field">
+        <input type="password" id="token-input" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" aria-label="API token" data-i18n-aria="labelApiToken" autocomplete="off" spellcheck="false" />
+        <button type="button" class="key-toggle" data-target="token-input" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
+      </div>
       <button id="login-btn" data-i18n="login">Login</button>
       <p id="login-error" class="error-text hidden"></p>
     </div>
@@ -32,13 +35,13 @@
       <div class="row">
         <span class="label" data-i18n="labelUrl">URL</span>
         <div class="field">
-          <input type="text" id="url-input" aria-label="Bookmark URL" />
+          <input type="text" id="url-input" aria-label="Bookmark URL" data-i18n-aria="labelUrl" />
           <div id="url-clean-hint" class="url-clean-hint hidden" aria-live="polite"></div>
         </div>
       </div>
       <div class="row">
         <span class="label" data-i18n="labelTitle">Title</span>
-        <div class="field"><input type="text" id="title-input" aria-label="Bookmark title" /></div>
+        <div class="field"><input type="text" id="title-input" aria-label="Bookmark title" data-i18n-aria="labelTitle" /></div>
       </div>
       <div class="row">
         <span class="label top" data-i18n="labelNotes">Notes</span>
@@ -56,9 +59,9 @@
         <div class="field">
           <div class="tags-input-wrap">
             <div id="tags-display" class="tags-display"></div>
-            <input type="text" id="tags-input" autocomplete="off" spellcheck="false" aria-label="Add tags" data-i18n-aria="placeholderAddTags" />
+            <input type="text" id="tags-input" role="combobox" aria-autocomplete="list" aria-controls="tags-autocomplete" aria-expanded="false" autocomplete="off" spellcheck="false" aria-label="Add tags" data-i18n-aria="placeholderAddTags" />
           </div>
-          <div id="tags-autocomplete" class="autocomplete-dropdown hidden"></div>
+          <div id="tags-autocomplete" class="autocomplete-dropdown hidden" role="listbox"></div>
           <div class="tag-actions-row">
             <button type="button" id="tags-copy-all" class="clear-all-link hidden" data-i18n="copyAllTags" data-i18n-title="copyAllTagsTitle">Copy</button>
             <button type="button" id="tags-clear-all" class="clear-all-link hidden" data-i18n="clearAll">Clear all</button>
@@ -75,7 +78,7 @@
       <div id="suggest-row" class="row hidden">
         <span class="label top" data-i18n="labelSuggest">Suggest</span>
         <div class="field">
-          <div id="pinboard-suggest-tags" class="suggest-area" aria-busy="true" aria-label="Loading suggested tags"><span class="tag-skel" style="width:48px"></span><span class="tag-skel" style="width:64px"></span><span class="tag-skel" style="width:42px"></span><span class="tag-skel" style="width:56px"></span></div>
+          <div id="pinboard-suggest-tags" class="suggest-area" aria-busy="true" aria-label="Suggested tags" data-i18n-aria="labelSuggest"><span class="tag-skel" style="width:48px"></span><span class="tag-skel" style="width:64px"></span><span class="tag-skel" style="width:42px"></span><span class="tag-skel" style="width:56px"></span></div>
         </div>
       </div>
       <div class="row">
@@ -147,7 +150,7 @@
       <button type="button" id="md-strip-dl" class="md-strip-btn" aria-label="Download .md" data-i18n-aria="mdStripDownloadMd"><span class="btn-ic" data-ic="download"></span><span data-i18n="mdStripDownloadMd">Download .md</span></button>
       <button type="button" id="md-strip-obsidian" class="md-strip-btn" aria-label="Send to Obsidian" data-i18n-aria="mdStripObsidian"><span class="btn-ic" data-ic="obsidian"></span><span data-i18n="mdStripObsidian">Obsidian</span></button>
     </div>
-    <div id="batch-progress" class="batch-progress hidden" role="progressbar" tabindex="-1" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div id="batch-progress" class="batch-progress hidden" role="progressbar" tabindex="-1" aria-label="Batch save progress" data-i18n-aria="batchSaveTitle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0/0 (0/0)">
       <div id="batch-progress-fill" class="batch-progress-fill"></div>
       <span id="batch-progress-text" class="batch-progress-text"></span>
     </div>

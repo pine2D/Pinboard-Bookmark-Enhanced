@@ -1328,8 +1328,9 @@ async function handleBatchSave(tabs) {
   if (_batchRunning) return;            // one batch per SW lifetime (popup also guards)
   _batchRunning = true;
   const total = tabs.length;
+  let processed = 0;
   let saved = 0, queued = 0, failed = 0, aiFailed = 0, skipped = 0, tooLong = 0;
-  const base = () => ({ total, i: 0, saved, queued, failed, aiFailed, skipped, tooLong });
+  const base = () => ({ total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong });
   await _writeBatchProgress({ running: true, done: false, error: null, ...base() });
 
   try {
@@ -1359,7 +1360,6 @@ async function handleBatchSave(tabs) {
 
     for (let i = 0; i < tabs.length; i++) {
       const tab = tabs[i];
-      await _writeBatchProgress({ running: true, done: false, error: null, total, i, saved, queued, failed, aiFailed, skipped, tooLong });
 
       try {
         let tags = [...baseTags];
@@ -1441,12 +1441,15 @@ async function handleBatchSave(tabs) {
         else if (result.status === "skipped") skipped++;
         else if (result.reason === "too_long") tooLong++;
         else failed++;
-      } catch (_) { failed++; }
+      } catch (_) { failed++; } finally {
+        processed = i + 1;
+        await _writeBatchProgress({ running: true, done: false, error: null, ...base() });
+      }
     }
 
     if (saved > 0) await updateBadge().catch(() => {});
 
-    await _writeBatchProgress({ running: false, done: true, error: null, total, i: total, saved, queued, failed, aiFailed, skipped, tooLong });
+    await _writeBatchProgress({ running: false, done: true, error: null, ...base() });
     const tagsSuffix = baseTags.length ? t("batchTaggedSuffix", baseTags.join(", ")) : "";
     const skippedMsg = skipped > 0 ? t("batchSkipped", String(skipped)) : "";
     const tooLongMsg = tooLong > 0 ? t("batchTooLong", String(tooLong)) : "";
@@ -1457,7 +1460,7 @@ async function handleBatchSave(tabs) {
       showNotification("batch-saved", title, message, "batchSave");
     }
   } catch (e) {
-    await _writeBatchProgress({ running: false, done: true, error: e.message, total, i: total, saved, queued, failed, aiFailed, skipped, tooLong });
+    await _writeBatchProgress({ running: false, done: true, error: e.message, ...base() });
     showNotification("batch-error", t("bgBatchSaved"), e.message, "error");
   } finally {
     _batchRunning = false;

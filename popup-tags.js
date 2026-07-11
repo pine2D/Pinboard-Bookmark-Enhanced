@@ -8,6 +8,7 @@ async function fetchPinboardSuggestTags(token, url) {
   const cacheKey = "cached_suggest_" + url;
   const SUGGEST_TTL = 10 * 60 * 1000; // 10 minutes
 
+  try {
   let data;
   try {
     const stored = await chrome.storage.local.get(cacheKey);
@@ -110,6 +111,9 @@ async function fetchPinboardSuggestTags(token, url) {
     container.textContent = t("suggestFailed", e.message || String(e));
     container.classList.add("muted");
   }
+  } finally {
+    container.setAttribute("aria-busy", "false");
+  }
 }
 
 // ---- Fetch All User Tags (with local cache) ----
@@ -183,13 +187,24 @@ function setupTagsInput() {
   const input = $id("tags-input");
   const dropdown = $id("tags-autocomplete");
   let acDebounceTimer = null;
+  function closeAutocomplete() {
+    dropdown.classList.add("hidden");
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+    acIndex = -1;
+  }
+  function openAutocomplete() {
+    dropdown.classList.remove("hidden");
+    input.setAttribute("aria-expanded", "true");
+  }
   input.addEventListener("input", () => {
     clearTimeout(acDebounceTimer);
     acDebounceTimer = setTimeout(handleTagInput, 120);
   });
   function handleTagInput() {
     const val = input.value.trim().toLowerCase(); acIndex = -1;
-    if (!val) { dropdown.classList.add("hidden"); return; }
+    input.removeAttribute("aria-activedescendant");
+    if (!val) { closeAutocomplete(); return; }
     const matches = allUserTags.filter((t) =>
       t.toLowerCase().includes(val) &&
       !currentTags.some((ct) => ct.toLowerCase() === t.toLowerCase())
@@ -203,19 +218,26 @@ function setupTagsInput() {
       dropdown.innerHTML = "";
       const hint = document.createElement("div");
       hint.className = "ac-item ac-new-hint";
+      hint.id = "tags-ac-option-0";
+      hint.setAttribute("role", "option");
+      hint.setAttribute("aria-selected", "false");
       hint.dataset.tag = input.value.trim();
       const icon = document.createElement("span"); icon.className = "ac-new-icon"; icon.textContent = "+ ";
       hint.appendChild(icon); hint.appendChild(document.createTextNode(input.value.trim()));
-      hint.addEventListener("click", () => { addTag(input.value.trim()); input.value = ""; dropdown.classList.add("hidden"); input.focus(); });
+      hint.addEventListener("click", () => { addTag(input.value.trim()); input.value = ""; closeAutocomplete(); input.focus(); });
       dropdown.appendChild(hint);
-      dropdown.classList.remove("hidden");
+      openAutocomplete();
       return;
     }
     dropdown.innerHTML = "";
     const scrollEl = document.createElement("div");
     scrollEl.className = "ac-scroll";
-    matches.forEach((tag) => {
+    scrollEl.setAttribute("role", "presentation");
+    matches.forEach((tag, index) => {
       const item = document.createElement("div"); item.className = "ac-item";
+      item.id = `tags-ac-option-${index}`;
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", "false");
       item.dataset.tag = tag;
       item.textContent = tag;
       const count = allUserTagCounts[tag];
@@ -225,12 +247,13 @@ function setupTagsInput() {
         countSpan.textContent = `(${count})`;
         item.appendChild(countSpan);
       }
-      item.addEventListener("click", () => { addTag(tag); input.value = ""; dropdown.classList.add("hidden"); input.focus(); });
+      item.addEventListener("click", () => { addTag(tag); input.value = ""; closeAutocomplete(); input.focus(); });
       scrollEl.appendChild(item);
     });
     dropdown.appendChild(scrollEl);
     const footer = document.createElement("div");
     footer.className = "ac-hint-footer";
+    footer.setAttribute("aria-hidden", "true");
     const kEnter = document.createElement("kbd"); kEnter.textContent = "Enter";
     const kTab = document.createElement("kbd"); kTab.textContent = "Tab";
     const kSpace = document.createElement("kbd"); kSpace.textContent = "Space";
@@ -241,7 +264,7 @@ function setupTagsInput() {
     footer.appendChild(kSpace);
     footer.appendChild(document.createTextNode(" " + t("tagsHintNew")));
     dropdown.appendChild(footer);
-    dropdown.classList.remove("hidden");
+    openAutocomplete();
   }
   input.addEventListener("paste", (e) => {
     e.preventDefault();
@@ -249,15 +272,15 @@ function setupTagsInput() {
     if (text) {
       text.split(/[,\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => addTag(t));
       input.value = "";
-      dropdown.classList.add("hidden");
+      closeAutocomplete();
     }
   });
   input.addEventListener("keydown", (e) => {
     const items = dropdown.querySelectorAll(".ac-item");
-    if (e.key === "ArrowDown") { e.preventDefault(); acIndex = acIndex >= items.length - 1 ? 0 : acIndex + 1; updateAc(items); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); acIndex = acIndex <= 0 ? items.length - 1 : acIndex - 1; updateAc(items); }
+    const acVisible = !dropdown.classList.contains("hidden") && items.length > 0;
+    if (e.key === "ArrowDown" && acVisible) { e.preventDefault(); acIndex = acIndex >= items.length - 1 ? 0 : acIndex + 1; updateAc(items, input); }
+    else if (e.key === "ArrowUp" && acVisible) { e.preventDefault(); acIndex = acIndex <= 0 ? items.length - 1 : acIndex - 1; updateAc(items, input); }
     else if (e.key === "Enter" || e.key === "Tab") {
-      const acVisible = !dropdown.classList.contains("hidden") && items.length > 0;
       const hasPending = input.value.trim().length > 0;
       if (e.key === "Tab" && !acVisible && !hasPending) return;
       e.preventDefault();
@@ -268,13 +291,13 @@ function setupTagsInput() {
       } else if (hasPending) {
         input.value.trim().split(/[\s,]+/).filter(Boolean).forEach((t) => addTag(t));
       }
-      input.value = ""; dropdown.classList.add("hidden");
+      input.value = ""; closeAutocomplete();
     } else if (e.key === " " || e.key === "," || e.key === "，") {
       const v = input.value.replace(/[,，]/g, "").trim();
-      if (v) { e.preventDefault(); addTag(v); input.value = ""; dropdown.classList.add("hidden"); }
+      if (v) { e.preventDefault(); addTag(v); input.value = ""; closeAutocomplete(); }
       else if (e.key !== " ") e.preventDefault();
     } else if (e.key === "Backspace" && !input.value && currentTags.length) { removeTag(currentTags[currentTags.length - 1]); }
-    else if (e.key === "Escape") { dropdown.classList.add("hidden"); }
+    else if (e.key === "Escape") { closeAutocomplete(); }
   });
   // Dropping a dragged tag past the last chip lands on this flex-grow input.
   // Guard it so native DnD never inserts the index; move the tag to the end instead.
@@ -290,7 +313,7 @@ function setupTagsInput() {
     }
   });
   document.addEventListener("click", (e) => {
-    if (!e.target.closest(".tags-input-wrap") && !e.target.closest(".autocomplete-dropdown")) dropdown.classList.add("hidden");
+    if (!e.target.closest(".tags-input-wrap") && !e.target.closest(".autocomplete-dropdown")) closeAutocomplete();
   });
   $id("tags-clear-all")?.addEventListener("click", (e) => {
     e.preventDefault();
@@ -364,7 +387,19 @@ function saveLastUsedTags(tags) {
   try { chrome.storage.local.set({ lastUsedTags: snapshot }).catch(() => {}); } catch (_) {}
 }
 
-function updateAc(items) { items.forEach((el, i) => el.classList.toggle("selected", i === acIndex)); }
+function updateAc(items, input) {
+  items.forEach((el, i) => {
+    const selected = i === acIndex;
+    el.classList.toggle("selected", selected);
+    el.setAttribute("aria-selected", String(selected));
+  });
+  const active = items[acIndex];
+  if (active) {
+    input.setAttribute("aria-activedescendant", active.id);
+    active.scrollIntoView({ block: "nearest" });
+  }
+  else input.removeAttribute("aria-activedescendant");
+}
 
 let _newlyAddedTag = null;
 let _dragReorderFromIdx = null;

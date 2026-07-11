@@ -223,9 +223,13 @@ function renderBatchProgress(p) {
   const fill = $id("batch-progress-fill");
   const ptext = $id("batch-progress-text");
   const total = p.total || 0;
-  const cur = p.done ? total : (p.i || 0);
+  const cur = Math.min(total, Math.max(0, Number(p.i) || 0));
   const pct = total ? Math.round((cur / total) * 100) : 0;
-  if (progress) { progress.classList.remove("hidden"); progress.setAttribute("aria-valuenow", String(pct)); }
+  if (progress) {
+    progress.classList.remove("hidden");
+    progress.setAttribute("aria-valuenow", String(pct));
+    progress.setAttribute("aria-valuetext", t("batchProgress", String(cur), String(total), String(p.saved || 0), String(p.failed || 0)));
+  }
   if (fill) fill.style.width = pct + "%";
   // Counts are integers -> safe to interpolate; SVG icons avoid emoji font fallback.
   const queuedMsg = p.queued > 0 ? `  ${t("offlineQueued", String(p.queued))}` : "";
@@ -245,9 +249,11 @@ function renderBatchProgress(p) {
     }
     setBtnIcon(batchBtn, "pin", t("batchSavedCount", String(p.saved || 0)));
     setTimeout(() => {
+      const restoreFocus = !!progress && document.activeElement === progress;
       if (progress) progress.classList.add("hidden");
       setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
       batchBtn.disabled = false;
+      if (restoreFocus) batchBtn.focus();
     }, 1500);
   } else {
     batchBtn.disabled = true;
@@ -283,13 +289,16 @@ function setupTagPresets() {
   if (!presets.length) return;
   presetsRow.classList.remove("hidden");
   presets.forEach(p => {
-    const btn = document.createElement("span");
+    const btn = document.createElement("button");
+    btn.type = "button";
     btn.className = "preset-btn";
     btn.textContent = p.name;
     btn.title = p.tags.join(", ");
     btn.addEventListener("click", () => {
       p.tags.forEach(tag => addTag(tag));
       btn.classList.add("used");
+      btn.disabled = true;
+      $id("tags-input")?.focus();
     });
     container.appendChild(btn);
   });

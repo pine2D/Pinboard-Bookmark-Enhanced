@@ -966,7 +966,7 @@ function _pbpTrAddGlossaryHits(st, glossary) {
 // ponytail: passes s from the onChanged event to bypass the memoized stale promise.
 async function _pbpTrApplyTargetLang(st, s) {
   s = s || await pbpAiGetSettings();
-  // ponytail: uiLangToBCP47 lives in md-preview.js (not in test env); falls back to "" which
+  // ponytail: uiLangToBCP47 lives in i18n.js; isolated test harnesses may omit it, so ""
   // is fine since "auto" is the only code that reads uiLang, and tests pass an explicit code.
   const uiLang = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : "";
   const prevCode = st.target && st.target.code;

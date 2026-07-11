@@ -702,6 +702,9 @@
   "optTitle": {
     "message": "Pinboard 书签增强 — 设置"
   },
+  "settingsCategory": {
+    "message": "设置分类"
+  },
   "optAutoSave": {
     "message": "自动保存已启用"
   },
@@ -906,6 +909,9 @@
   },
   "importInvalid": {
     "message": "文件格式无效"
+  },
+  "importApplyFailed": {
+    "message": "导入未能完成；部分设置可能已经更改，请检查后重试"
   },
   "importSettingsTitle": {
     "message": "从 JSON 文件导入设置"
@@ -1718,7 +1724,7 @@
     "message": "仅保存到本机（同步配额已满）"
   },
   "optSaveFailed": {
-    "message": "保存失败 — 设置内容过大，无法同步"
+    "message": "保存未能完成；部分其他设置可能已保存，请检查后重试"
   },
   "confirm": {
     "message": "确认"
@@ -1884,7 +1890,7 @@
     "message": "写入剪贴板失败——笔记未创建，请重试。"
   },
   "apiKeySecurityHint": {
-    "message": "API 密钥已混淆（非加密），并通过 chrome.storage.sync 同步。请勿分享您的设置导出文件。"
+    "message": "API 密钥默认仅存储在本机。只有在您明确启用密钥同步后，它们才会通过 Chrome Sync 同步。密钥仅经过混淆处理，并未加密。"
   },
   "batchPermLabel": {
     "message": "旧版所有站点权限："

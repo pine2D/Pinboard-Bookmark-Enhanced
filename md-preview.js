@@ -85,22 +85,6 @@ function renderLoadingState(message, note) {
   document.body.classList.add("md-empty");
 }
 
-// Map the active UI locale (manual-override mirror, else the browser UI language) to a
-// BCP-47 tag for <html lang>, so the rail/UI chrome renders in the locale's font via :lang().
-function uiLangToBCP47() {
-  let l = null;
-  try { l = (typeof localStorage !== "undefined") ? localStorage.getItem("pp-i18n-lang") : null; } catch (_) {}
-  if (!l || l === "auto") {
-    try { l = chrome.i18n.getUILanguage(); } catch (_) { l = "en"; }
-  }
-  l = (l || "en").replace(/_/g, "-").toLowerCase();
-  if (l === "zh-hk" || l === "zh-tw" || l.startsWith("zh-hant")) return "zh-Hant";
-  if (l === "zh-cn" || l === "zh-sg" || l === "zh" || l.startsWith("zh-hans")) return "zh-Hans";
-  if (l.startsWith("ja")) return "ja";
-  if (l.startsWith("ko")) return "ko";
-  return l.split("-")[0]; // en / de / fr / pl / ru
-}
-
 // Heuristic detection of the ARTICLE's script from its text, so #rendered-view gets a
 // lang attribute and :lang() picks the correct CJK font (a Simplified-only stack draws
 // Traditional text with wrong glyph forms). Zero-dependency; samples the head of the text.
@@ -448,7 +432,6 @@ function pbpApplyColorScheme(mode) {
 (async function () {
   initI18n();
   applyI18n();
-  document.documentElement.lang = uiLangToBCP47(); // UI-locale font for the rail/UI chrome
   // file://-safe bailout: tests/md-ai-tests.html loads this whole file (deferred
   // scripts, no extension context) to reach pbpRailCollapseState/pbpRailCollapsible
   // below -- neither needs anything past this point. Mirrors the same typeof-chrome
@@ -834,6 +817,7 @@ function pbpApplyColorScheme(mode) {
   document.title = `${title || "Markdown"} — ${t("mdStripPreview")}`;
 
   // Reading stats (header) — computed from canonical Markdown
+  let queueReadingStats = null;
   const statsEl = document.getElementById("reading-stats");
   if (statsEl) {
     const stats = readingStats(getMarkdown());
@@ -853,7 +837,7 @@ function pbpApplyColorScheme(mode) {
       statTick = true;
       requestAnimationFrame(renderStats);
     };
-    renderStats();
+    queueReadingStats = queueStats;
     window.addEventListener("scroll", queueStats, { passive: true });
     window.addEventListener("resize", queueStats);
   }
@@ -876,6 +860,10 @@ function pbpApplyColorScheme(mode) {
   // direction CSS mirrors along with the text (renderedView is fresh DOM per
   // page load — no stale dir from a prior render to clear on the LTR path).
   if (_articleLang === "ar" || _articleLang === "he") renderedView.dir = "rtl";
+  if (queueReadingStats) {
+    queueReadingStats(); // first measurement runs in rAF, after article injection/layout
+    if (typeof ResizeObserver === "function") new ResizeObserver(queueReadingStats).observe(renderedView);
+  }
   // Syntax highlighting is OFF the critical first-paint path: the article paints
   // immediately, then — only if it actually contains code — highlight.js is lazy-loaded
   // and applied after paint (rAF). Avoids blocking the page on a 122KB compile + a
@@ -940,6 +928,7 @@ function pbpApplyColorScheme(mode) {
       const headEl = renderedView.querySelector("#" + cssEscape(a.dataset.slug));
       if (!headEl) return;
       const target = trOnlyScrollTarget(headEl);
+      pbpFocusArticleTarget(target);
       if (target !== headEl) {
         e.preventDefault();
         target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1526,6 +1515,7 @@ function setupDrawer() {
   const toggle = document.getElementById("rail-toggle");
   const scrim = document.getElementById("rail-scrim");
   const rail = document.getElementById("rail");
+  const main = document.querySelector("main");
   if (!toggle || !scrim || !rail) return;
   let lastFocus = null;
   const focusables = () => Array.from(
@@ -1540,10 +1530,12 @@ function setupDrawer() {
       lastFocus = document.activeElement;
       rail.setAttribute("role", "dialog");
       rail.setAttribute("aria-modal", "true");
-      (document.getElementById("btn-rendered") || rail).focus();
+      if (main) main.inert = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (isOpen()) (document.getElementById("btn-rendered") || rail).focus();
+      }));
     } else {
-      rail.removeAttribute("role");
-      rail.removeAttribute("aria-modal");
+      pbpRailDrawerClose();
       if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
       else toggle.focus();
     }
@@ -1560,6 +1552,9 @@ function setupDrawer() {
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
+  });
+  window.matchMedia("(max-width: 1000px)").addEventListener("change", (e) => {
+    if (!e.matches) pbpRailDrawerClose();
   });
 }
 
@@ -1584,17 +1579,26 @@ function setupDrawer() {
 // _pbpZenEnter) already handles its own focus target for the zen-entry
 // case.
 function pbpRailDrawerClose() {
-  if (!document.body.classList.contains("rail-open")) return;
   document.body.classList.remove("rail-open");
   const toggle = document.getElementById("rail-toggle");
   const scrim = document.getElementById("rail-scrim");
   const rail = document.getElementById("rail");
+  const main = document.querySelector("main");
   if (toggle) toggle.setAttribute("aria-expanded", "false");
   if (scrim) scrim.hidden = true;
   if (rail) {
     rail.removeAttribute("role");
     rail.removeAttribute("aria-modal");
   }
+  if (main) main.inert = false;
+}
+
+// Drawer-originated jumps must not leave focus inside hidden controls.
+function pbpFocusArticleTarget(target) {
+  if (!target) return;
+  pbpRailDrawerClose();
+  if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
+  target.focus({ preventScroll: true });
 }
 
 // In tr-only mode, a translated ORIGINAL heading is display:none (md-preview.css:890

@@ -33,6 +33,33 @@ async function pbpRevokeLegacyAllSitesPermission(permissionApi) {
   return { ok: wildcardAbsent && missing.length === 0, missing, wildcardAbsent };
 }
 
+// Persist overlay CSS without touching UI state. Callers own the one status
+// message shown to the user; import callers can still observe genuine errors.
+async function saveOverlayWithFallback(value) {
+  pbpAssertOverlaySize(value);
+  const ssl = (typeof globalThis !== "undefined" && globalThis.__pbpTestSyncSetLarge)
+    ? globalThis.__pbpTestSyncSetLarge : syncSetLarge;
+  try {
+    await ssl("customOverlayCSS", value);
+    await chrome.storage.sync.set({ optOverlayInLocal: false });
+    await chrome.storage.local.remove("customOverlayCSS_localFallback");
+    return { fellBackToLocal: false };
+  } catch (e) {
+    if (!/QUOTA|quota/i.test(e && e.message || "")) throw e;
+    await chrome.storage.local.set({ customOverlayCSS_localFallback: value });
+    await chrome.storage.sync.set({ optOverlayInLocal: true });
+    return { fellBackToLocal: true };
+  }
+}
+
+function _tagGovSetProgress(value) {
+  const percent = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+  const fill = $id("tag-gov-progress-fill");
+  const bar = $id("tag-gov-progress-bar");
+  if (fill) fill.style.width = percent + "%";
+  if (bar) bar.setAttribute("aria-valuenow", String(percent));
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   initI18n();
   applyI18n();
@@ -122,10 +149,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         _tagGovProblems.length = 0;
         _tagGovProblems.push(...(lr.problems || []));
         const card = $id("tag-gov-progress");
-        const fillEl = $id("tag-gov-progress-fill");
         const pt = $id("tag-gov-progress-text");
         if (card) card.classList.remove("hidden");
-        if (fillEl) fillEl.style.width = "100%";
+        _tagGovSetProgress(100);
         if (pt) {
           pt.textContent = t("tagGovLastRun", new Date(lr.ts).toLocaleString()) + " "
             + t("tagGovDoneSummary", String(lr.ok), String(lr.fail))
@@ -157,12 +183,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- Tab switching ----
   const _tabBtns = [...document.querySelectorAll(".tab-btn")];
+  const mobileTabSelect = $id("mobile-tab-select");
   function activateTab(btn) {
     _tabBtns.forEach((b) => { b.classList.remove("active"); b.setAttribute("aria-selected", "false"); b.tabIndex = -1; });
     document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
     btn.setAttribute("aria-selected", "true");
     btn.tabIndex = 0;
+    if (mobileTabSelect) mobileTabSelect.value = btn.dataset.panel;
     $id(`panel-${btn.dataset.panel}`).classList.add("active");
     // W3: lazy-init expensive per-panel rendering on first view.
     if (btn.dataset.panel === "appearance") _initAppearancePanel();
@@ -183,6 +211,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       activateTab(_tabBtns[n]);
       _tabBtns[n].focus();
     });
+  });
+  mobileTabSelect?.addEventListener("change", () => {
+    const btn = document.querySelector(`.tab-btn[data-panel="${mobileTabSelect.value}"]`);
+    if (btn) activateTab(btn);
   });
 
   // Restore active tab after language switch
@@ -615,7 +647,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // export-targets has no static fields; reset = re-render with defaults (all disabled).
         // Must run BEFORE saveAll() so collectExportTargets() sees cleared cards, not stale ones.
         if (panel === "markdown") renderExportTargets({});
-        saveAll();
+        saveAllSafely();
         if (typeof def.after === "function") def.after();
         syncTranslateLangCustomState();
       },
@@ -652,21 +684,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (key) pbpAccSet(key, isOpen);
   });
 
-  // ---- API key show/hide toggle ----
-  // SVG (not emoji) — emoji here triggered a 1-3s Segoe UI Emoji font-load stall
-  // when the AI panel first rendered on Windows high-DPI. Set initial icon from JS
-  // so the static HTML eye glyph never reaches layout.
-  document.querySelectorAll(".key-toggle").forEach(btn => {
-    btn.innerHTML = PBP_ICONS.eye;
-    btn.addEventListener("click", () => {
-      const input = $id(btn.dataset.target);
-      if (input) {
-        const isPassword = input.type === "password";
-        input.type = isPassword ? "text" : "password";
-        btn.innerHTML = isPassword ? PBP_ICONS.eyeOff : PBP_ICONS.eye;
-      }
-    });
-  });
+  setupSecretToggles();
 
   // ---- All settings with defaults (from shared.js) ----
   await pbpMigrateSecretsToLocal();
@@ -678,8 +696,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Runs once per profile (guarded by _migrationV2), then stays dormant. Silently converts
   // un-migrated profiles so their old custom CSS keeps rendering; the one-time "upgraded"
   // banner + 7-day undo it used to show were removed once all undo windows had expired.
-  const OVERLAY_BYTE_LIMIT = 50 * 1024;
-
   // The v2 theme-storage migration's one-time "upgraded" banner + 7-day undo were
   // removed (every undo window had long expired). Reclaim their now-dead local keys.
   chrome.storage.local.remove(["_migrationBackup", "_migrationBannerDismissed"]).catch(() => {});
@@ -729,8 +745,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         newOverlay = matchesPreset ? "" : oldCSS;
       }
       try {
-        // Cap overlay at 50KB; oversize → throw to skip migration (rare)
-        if (newOverlay.length > OVERLAY_BYTE_LIMIT) {
+        // Cap synced overlay at 50 KB; oversize data stays available locally.
+        if (pbpOverlayByteLength(newOverlay) > OVERLAY_BYTE_LIMIT) {
           await chrome.storage.local.set({ customOverlayCSS_localFallback: newOverlay });
           await chrome.storage.sync.set({ optOverlayInLocal: true });
         } else {
@@ -1106,11 +1122,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Reset prompt buttons ----
   $id("reset-tag-prompt").addEventListener("click", () => {
     $id("opt-custom-tag-prompt").value = DEFAULT_TAG_PROMPT;
-    saveAll();
+    saveAllSafely();
   });
   $id("reset-summary-prompt").addEventListener("click", () => {
     $id("opt-custom-summary-prompt").value = DEFAULT_SUMMARY_PROMPT;
-    saveAll();
+    saveAllSafely();
   });
 
   // ---- Batch: revoke all-sites permission ----
@@ -1348,7 +1364,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       await pbpApplyBackupPayload(res.data, { exportableKeys: EXPORTABLE_KEYS, saveOverlayWithFallback });
     } catch (err) {
       console.error("[webdav-pull] apply failed", err);
-      setStatusIcon(statusEl, false, t("webdavPullInvalid"));
+      setStatusIcon(statusEl, false, t("importApplyFailed"));
       statusEl.style.color = "#c00";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       return;
@@ -1529,72 +1545,38 @@ document.addEventListener("DOMContentLoaded", async () => {
         return { popupWidth: popupWidthToSave };
       })()
     };
-    const res = await persistSettings(data);
-    // Save customOverlayCSS with quota-aware fallback (sync → local on QUOTA_BYTES)
-    await saveOverlayWithFallback($id("opt-custom-css").value);
-    if (res.ok && res.fellBackToLocal) {
-      // A large prompt key (>8KB) exceeded the sync quota and fell back to local
-      // storage — it won't sync to other devices. Surface it the same way
-      // saveOverlayWithFallback does for the overlay, instead of a silent "saved"
-      // flash that hides the degraded sync (F4).
-      const status = $id("auto-save-status");
-      if (status) {
-        status.textContent = t("optSavedLocally") || "Saved locally (sync quota full)";
-        status.classList.add("saved");
-        clearTimeout(status._timer);
-        status._timer = setTimeout(() => {
-          status.textContent = t("optAutoSave"); status.classList.remove("saved");
-        }, 4000);
+    try {
+      const overlayValue = $id("opt-custom-css").value;
+      pbpAssertOverlaySize(overlayValue);
+      const res = await persistSettings(data);
+      if (!res.ok) throw res.error || new Error("settings save failed");
+      const overlay = await saveOverlayWithFallback(overlayValue);
+      if (res.fellBackToLocal || overlay.fellBackToLocal) {
+        flashAutoSave("optSavedLocally", "Saved locally (sync quota full)", 4000);
+      } else {
+        flashAutoSave();
       }
-    } else if (res.ok) {
-      flashAutoSave();
-    } else {
-      const status = $id("auto-save-status");
-      if (status) {
-        setStatusIcon(status, false, t("optSaveFailed") || "Save failed — settings too large to sync");
-        status.classList.remove("saved");
-        clearTimeout(status._timer);
-        status._timer = setTimeout(() => {
-          status.textContent = t("optAutoSave"); status.classList.remove("saved");
-        }, 4000);
-      }
+      return { ok: true, fellBackToLocal: res.fellBackToLocal || overlay.fellBackToLocal };
+    } catch (error) {
+      return reportAutoSaveFailure(error);
     }
   }
 
-  // Quota-aware overlay save. On sync QUOTA_BYTES, write to local + flag,
-  // so the content script and other devices know overlay isn't synced.
-  async function saveOverlayWithFallback(value) {
-    if (value.length > OVERLAY_BYTE_LIMIT) {
-      // UI-side counter blocks before this; final guard
-      console.warn("[overlay] exceeds 50KB cap, refusing save");
-      return;
-    }
-    try {
-      await syncSetLarge("customOverlayCSS", value);
-      await chrome.storage.sync.set({ optOverlayInLocal: false });
-      await chrome.storage.local.remove("customOverlayCSS_localFallback");
-    } catch (e) {
-      const msg = e && e.message ? e.message : String(e);
-      if (/QUOTA|quota/i.test(msg)) {
-        await chrome.storage.local.set({ customOverlayCSS_localFallback: value });
-        await chrome.storage.sync.set({ optOverlayInLocal: true });
-        const status = $id("auto-save-status");
-        if (status) {
-          status.textContent = t("overlayQuotaFallback") || "CSS saved locally (sync quota full)";
-          status.classList.add("saved");
-          setTimeout(() => { status.textContent = t("optAutoSave"); status.classList.remove("saved"); }, 4000);
-        }
-      } else {
-        throw e;
-      }
-    }
+  function reportAutoSaveFailure(error) {
+    console.error("[options] save failed", error);
+    flashAutoSave("optSaveFailed", "Save did not complete; some settings may already have been saved", 4000, false);
+    return { ok: false, error };
+  }
+
+  function saveAllSafely() {
+    void saveAll().catch(reportAutoSaveFailure);
   }
 
   // Debounced auto-save: triggers 500ms after last change
   let saveTimer = null;
   function scheduleAutoSave() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(saveAll, 500);
+    saveTimer = setTimeout(saveAllSafely, 500);
   }
 
   // Listen on all form inputs for auto-save
@@ -1610,15 +1592,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll('.panel input[type="radio"]').forEach(el => {
     el.addEventListener("change", scheduleAutoSave);
   });
-  function flashAutoSave() {
+  function flashAutoSave(key = "optAutoSaved", fallback = "Saved", delay = 1500, ok = true) {
     const el = $id("auto-save-status");
-    setStatusIcon(el, true, t("optAutoSaved"));
-    el.classList.add("saved");
+    if (!el) return;
+    setStatusIcon(el, ok, t(key) || fallback);
+    el.classList.toggle("saved", ok);
     clearTimeout(el._timer);
     el._timer = setTimeout(() => {
       el.textContent = t("optAutoSave");
       el.classList.remove("saved");
-    }, 1500);
+    }, delay);
   }
 
   // ---- Export/Import: see options-backup.js ----
@@ -1714,12 +1697,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const ta = $id("opt-custom-css");
     const counter = $id("overlay-byte-counter");
     if (!ta || !counter) return;
-    const bytes = new Blob([ta.value]).size;
+    const bytes = pbpOverlayByteLength(ta.value);
     const pct = bytes / OVERLAY_BYTE_LIMIT;
     counter.textContent = `${formatBytes(bytes)} / 50 KB`;
-    counter.classList.toggle("warn", pct >= 0.8 && pct < 1);
-    counter.classList.toggle("over", pct >= 1);
-    ta.classList.toggle("over-limit", pct >= 1);
+    counter.classList.toggle("warn", pct >= 0.8 && bytes <= OVERLAY_BYTE_LIMIT);
+    counter.classList.toggle("over", bytes > OVERLAY_BYTE_LIMIT);
+    ta.classList.toggle("over-limit", bytes > OVERLAY_BYTE_LIMIT);
   }
   function formatBytes(b) {
     if (b < 1024) return `${b} B`;
@@ -2155,6 +2138,7 @@ let _tagGovSnapshotDownloaded = false;
 
 async function ensureTagSnapshot() {
   if (_tagGovSnapshotDownloaded) return true;
+  _tagGovSetProgress(0);
   const progressText = $id("tag-gov-progress-text");
   const progress = $id("tag-gov-progress");
   try {
@@ -2598,6 +2582,7 @@ async function _runTagGovBatch(ops) {
     return { ok: 0, fail: 0, aborted: true };
   }
   if (!ops || ops.length === 0) return { ok: 0, fail: 0, aborted: false };
+  _tagGovSetProgress(0);
   const token = await getTagGovToken();
   if (!token) {
     const pt = $id("tag-gov-progress-text");
@@ -2613,7 +2598,6 @@ async function _runTagGovBatch(ops) {
   }
 
   const progress = $id("tag-gov-progress");
-  const fill = $id("tag-gov-progress-fill");
   const ptext = $id("tag-gov-progress-text");
   // Visibility from any scroll position is handled by CSS — #tag-gov-progress is
   // position:sticky at the viewport bottom, so no scroll jump is needed here.
@@ -2634,7 +2618,7 @@ async function _runTagGovBatch(ops) {
     // (i + 1) / ops.length formula filled the bar at the START of each op — a
     // single-op batch showed 100% from the first second while 30 bookmarks were
     // still being re-saved.
-    if (fill) fill.style.width = Math.round((i / ops.length) * 100) + "%";
+    _tagGovSetProgress((i / ops.length) * 100);
     const opLine =
       t("tagGovOpLabel", String(i + 1), String(ops.length)) + " " +
       "<span class=\"status-ic ok\">" + PBP_ICONS.check + "</span>" + ok + " " +
@@ -2650,9 +2634,7 @@ async function _runTagGovBatch(ops) {
       try {
         const res = await retagBookmarksViaResave(token, op.old, op.new, (done, total) => {
           if (total <= 0) return;
-          if (fill) {
-            fill.style.width = Math.round(((i + done / total) / ops.length) * 100) + "%";
-          }
+          _tagGovSetProgress(((i + done / total) / ops.length) * 100);
           if (ptext) {
             // Live ETA from the REAL bookmark total — the confirm-time estimate came
             // from possibly-stale cached counts. Upcoming ops add one posts/all each.
@@ -2728,7 +2710,7 @@ async function _runTagGovBatch(ops) {
     }
   }
 
-  if (fill && !aborted && !cancelled) fill.style.width = "100%";
+  if (!aborted && !cancelled) _tagGovSetProgress(100);
   const cancelledBehind = (aborted || cancelled) ? _tagGovUnfinishedBatches - 1 : 0;
   if (aborted || cancelled) {
     _tagGovDrainCount = cancelledBehind;

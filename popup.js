@@ -136,21 +136,25 @@ function _renderCleanHint({ removedCount, original }) {
   label.textContent = t("urlCleanedN").replace("{n}", removedCount);
   const sep = document.createElement("span");
   sep.textContent = "·";
-  const link = document.createElement("a");
-  link.textContent = t("urlShowOriginal");
-  link.addEventListener("click", (e) => {
-    e.preventDefault();
-    $id("url-input").value = original;
-    $id("url-input").dispatchEvent(new Event("input", { bubbles: true }));
+  const undo = document.createElement("button");
+  undo.type = "button";
+  undo.className = "url-clean-undo";
+  undo.textContent = t("urlShowOriginal");
+  undo.addEventListener("click", () => {
+    const urlInput = $id("url-input");
+    urlInput.value = original;
+    urlInput.dispatchEvent(new Event("input", { bubbles: true }));
     hint.classList.add("hidden");
+    urlInput.focus();
   });
-  hint.appendChild(label); hint.appendChild(sep); hint.appendChild(link);
+  hint.appendChild(label); hint.appendChild(sep); hint.appendChild(undo);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll(".btn-ic[data-ic]").forEach(s => { s.innerHTML = PBP_ICONS[s.dataset.ic] || ""; });
   initI18n();
   applyI18n();
+  setupSecretToggles();
 
   // B4: validate tab-data mirror against chrome.storage.session._currentTab
   // (set by SW on tab change). If mismatched (tabId or ts > 60s), clear prefill.

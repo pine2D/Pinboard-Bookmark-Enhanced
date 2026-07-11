@@ -253,7 +253,7 @@ async function createBatchSaveHarness(options) {
   let outcomeIndex = 0;
   const deps = {
     _writeBatchProgress: async (value) => progress.push({ ...value }),
-    loadSettings: async () => settings,
+    loadSettings: opts.loadSettings || (async () => settings),
     showNotification: (...args) => notifications.push(args),
     t: (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
     hasAIKey: () => false,
@@ -852,6 +852,8 @@ await suite("unified save pipeline", async () => {
     equal(h.intents[0].prepared.tags, "Batch-Tag");
 
     const done = h.progress[h.progress.length - 1];
+    equal(h.progress.filter((entry) => !entry.done).map((entry) => entry.i).join(","), "0,1,2,3,4,5");
+    equal(done.i, 5);
     equal(done.saved, 1); equal(done.queued, 1); equal(done.skipped, 1);
     equal(done.failed, 1); equal(done.tooLong, 1);
     equal(h.badgeCalls.length, 1, "saved Batch refreshes badge once after the loop");
@@ -859,6 +861,14 @@ await suite("unified save pipeline", async () => {
     equal(h.notifications[0][1], "bgBatchSaved");
     assert(h.notifications[0][2].includes("offlineQueued:1"), "mixed notification omits queued count");
     assert(h.notifications[0][2].includes("batchTaggedSuffix:Batch-Tag"), "Batch tag suffix missing");
+
+    const noToken = await createBatchSaveHarness({ settings: { pinboardToken: "" } });
+    await noToken.handleBatchSave(batchTabs(3));
+    equal(noToken.progress[noToken.progress.length - 1].i, 0, "missing token falsely processed every tab");
+
+    const loadFailed = await createBatchSaveHarness({ loadSettings: async () => { throw new Error("settings unavailable"); } });
+    await loadFailed.handleBatchSave(batchTabs(3));
+    equal(loadFailed.progress[loadFailed.progress.length - 1].i, 0, "settings failure falsely processed every tab");
   });
 
   await test("Batch completion waits for its single deferred badge refresh", async () => {

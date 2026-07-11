@@ -123,6 +123,21 @@ function t(key, ...args) {
   return msg || key;
 }
 
+// Map the active UI locale to the BCP-47 tag used by <html lang> and :lang().
+function uiLangToBCP47() {
+  let lang = null;
+  try { lang = localStorage.getItem("pp-i18n-lang"); } catch (_) {}
+  if (!lang || lang === "auto") {
+    try { lang = chrome.i18n.getUILanguage(); } catch (_) { lang = "en"; }
+  }
+  lang = (lang || "en").replace(/_/g, "-").toLowerCase();
+  if (lang === "zh-hk" || lang === "zh-tw" || lang.startsWith("zh-hant")) return "zh-Hant";
+  if (lang === "zh-cn" || lang === "zh-sg" || lang === "zh" || lang.startsWith("zh-hans")) return "zh-Hans";
+  if (lang.startsWith("ja")) return "ja";
+  if (lang.startsWith("ko")) return "ko";
+  return lang.split("-")[0];
+}
+
 /**
  * Apply translations to all elements with data-i18n attributes.
  * Supports:
@@ -140,6 +155,7 @@ function applyI18n(root) {
   // SW cold start (caught at the _refreshI18nAsync warn), spamming chrome://extensions errors.
   if (typeof document === "undefined") return;
   root = root || document;
+  document.documentElement.lang = uiLangToBCP47();
 
   // P1.5: Merged 4 separate querySelectorAll passes into 1 DOM walk.
   root.querySelectorAll("[data-i18n],[data-i18n-placeholder],[data-i18n-title],[data-i18n-aria]").forEach(el => {

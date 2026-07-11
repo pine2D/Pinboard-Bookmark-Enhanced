@@ -836,6 +836,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 @media (max-width: 1000px) {
   main { margin-left: 0; padding: 64px 20px 80px; }
   .rail-toggle { display: inline-flex; }
+  .rail-ident { padding-left: 44px; }
   .rail {
     transform: translateX(-100%);
     visibility: hidden;

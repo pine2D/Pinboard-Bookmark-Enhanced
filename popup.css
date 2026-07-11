@@ -122,6 +122,13 @@ html[data-section="login"] .quick-actions { display: none !important; }
 }
 .login-body input:focus { outline: none; border-color: #4477bb; background: #fff; }
 .login-body input:focus-visible { box-shadow: 0 0 0 2px rgba(68,119,187,0.2); }
+.login-body .secret-field { position: relative; }
+.login-body .secret-field input { padding-right: 30px; }
+.login-body .key-toggle {
+  position: absolute; right: 3px; top: 2px;
+  padding: 3px; border: 0; background: none; color: #666;
+}
+.login-body .key-toggle svg { display: block; }
 .login-body button { padding: 3px 14px; font-size: 12px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
 .login-body button:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
 .error-text { color: #c00; font-size: 11px; margin-top: 4px; }
@@ -227,6 +234,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
   padding: 1px 6px;
   margin-right: 5px;
   font-size: 11px;
+  font-family: inherit;
   color: #2255aa;
   background: #eef2ff;
   border: 1px solid #c0d0f0;
@@ -378,7 +386,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   box-shadow: 0 1px 0 rgba(0,0,0,0.04); vertical-align: baseline;
 }
 .submit-hint { color: #767676; font-size: 10px; margin-left: auto; align-self: center; }
-.kb-hint { color: #999; font-size: 10px; align-self: center; }
+.kb-hint { color: #666; font-size: 10px; align-self: center; }
 #ai-summary-hint { margin-left: auto; margin-right: 6px; }
 #ai-tags-hint { margin-right: 6px; }
 
@@ -997,13 +1005,18 @@ html.dark .submit-bar button.loading::before, html.dark .action-link.loading::be
   color: var(--pp-ok-fg);
   display: flex; gap: 6px; align-items: center;
 }
-.url-clean-hint a {
+.url-clean-hint .url-clean-undo {
+  border: 0;
+  padding: 0;
+  background: none;
+  font-family: inherit;
   color: var(--pp-fg-hint);
   text-decoration: underline;
   cursor: pointer;
   font-size: 10px;
 }
-.url-clean-hint a:hover { color: var(--pp-fg); }
+.url-clean-hint .url-clean-undo:hover { color: var(--pp-fg); }
+.url-clean-hint .url-clean-undo:focus-visible { outline: 2px solid var(--pp-accent); outline-offset: 1px; }
 
 /* ===================== Auto-Close Countdown (B7) ===================== */
 .auto-close-bar {
@@ -1634,6 +1647,8 @@ html[data-theme] .login-body input:focus { border-color: var(--pp-accent); backg
 html[data-theme] .login-body input:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 25%, transparent); }
 html[data-theme] .login-body button { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-fg); }
 html[data-theme] .login-body button:hover { background: var(--pp-input-focus-bg); }
+html[data-theme] .login-body .key-toggle { background: transparent; border: 0; color: var(--pp-fg-hint); }
+html[data-theme] .login-body .key-toggle:hover { background: transparent; color: var(--pp-fg); }
 html[data-theme] .field > input[type="text"], html[data-theme] .field > textarea {
   background: var(--pp-input-bg); border-color: var(--pp-border); color: var(--pp-fg);
 }

@@ -10,20 +10,40 @@
   <div class="container">
     <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced — Settings</span> <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span></h1>
 
-    <div class="tabs" role="tablist" aria-orientation="vertical">
-      <button class="tab-btn active" id="tab-general" data-panel="general" role="tab" aria-selected="true" aria-controls="panel-general" data-i18n="tabGeneral">General</button>
-      <button class="tab-btn" id="tab-popup" data-panel="popup" role="tab" aria-selected="false" aria-controls="panel-popup" data-i18n="tabPopup">Popup</button>
-      <button class="tab-btn" id="tab-bookmarks" data-panel="bookmarks" role="tab" aria-selected="false" aria-controls="panel-bookmarks" data-i18n="tabBookmarks">Bookmarks</button>
-      <button class="tab-btn" id="tab-ai" data-panel="ai" role="tab" aria-selected="false" aria-controls="panel-ai" data-i18n="tabAI">AI Providers</button>
-      <button class="tab-btn" id="tab-ai-behavior" data-panel="ai-behavior" role="tab" aria-selected="false" aria-controls="panel-ai-behavior" data-i18n="tabAiBehavior">AI Behavior</button>
-      <button class="tab-btn" id="tab-reader" data-panel="reader" role="tab" aria-selected="false" aria-controls="panel-reader" data-i18n="tabReader">Reader</button>
-      <button class="tab-btn" id="tab-notes" data-panel="notes" role="tab" aria-selected="false" aria-controls="panel-notes" data-i18n="tabNotes">Notes</button>
-      <button class="tab-btn" id="tab-markdown" data-panel="markdown" role="tab" aria-selected="false" aria-controls="panel-markdown" data-i18n="tabMarkdown">Export</button>
-      <button class="tab-btn" id="tab-quick" data-panel="quick" role="tab" aria-selected="false" aria-controls="panel-quick" data-i18n="tabQuickActions">Quick Actions</button>
-      <button class="tab-btn" id="tab-tags" data-panel="tags" role="tab" aria-selected="false" aria-controls="panel-tags" data-i18n="tabTags">Tags</button>
-      <button class="tab-btn" id="tab-archive" data-panel="archive" role="tab" aria-selected="false" aria-controls="panel-archive" data-i18n="tabArchive">Archive</button>
-      <button class="tab-btn" id="tab-appearance" data-panel="appearance" role="tab" aria-selected="false" aria-controls="panel-appearance" data-i18n="tabAppearance">Appearance</button>
-      <button class="tab-btn" id="tab-storage" data-panel="storage" role="tab" aria-selected="false" aria-controls="panel-storage" data-i18n="tabStorage">Storage</button>
+    <div class="options-nav">
+      <div class="mobile-tab-picker">
+        <label for="mobile-tab-select" data-i18n="settingsCategory">Settings category</label>
+        <select id="mobile-tab-select">
+          <option value="general" data-i18n="tabGeneral">General</option>
+          <option value="popup" data-i18n="tabPopup">Popup</option>
+          <option value="bookmarks" data-i18n="tabBookmarks">Bookmarks</option>
+          <option value="ai" data-i18n="tabAI">AI Providers</option>
+          <option value="ai-behavior" data-i18n="tabAiBehavior">AI Behavior</option>
+          <option value="reader" data-i18n="tabReader">Reader</option>
+          <option value="notes" data-i18n="tabNotes">Notes</option>
+          <option value="markdown" data-i18n="tabMarkdown">Export</option>
+          <option value="quick" data-i18n="tabQuickActions">Quick Actions</option>
+          <option value="tags" data-i18n="tabTags">Tags</option>
+          <option value="archive" data-i18n="tabArchive">Archive</option>
+          <option value="appearance" data-i18n="tabAppearance">Appearance</option>
+          <option value="storage" data-i18n="tabStorage">Storage</option>
+        </select>
+      </div>
+      <div class="tabs" role="tablist" aria-orientation="vertical">
+        <button class="tab-btn active" id="tab-general" data-panel="general" role="tab" aria-selected="true" aria-controls="panel-general" data-i18n="tabGeneral">General</button>
+        <button class="tab-btn" id="tab-popup" data-panel="popup" role="tab" aria-selected="false" aria-controls="panel-popup" data-i18n="tabPopup">Popup</button>
+        <button class="tab-btn" id="tab-bookmarks" data-panel="bookmarks" role="tab" aria-selected="false" aria-controls="panel-bookmarks" data-i18n="tabBookmarks">Bookmarks</button>
+        <button class="tab-btn" id="tab-ai" data-panel="ai" role="tab" aria-selected="false" aria-controls="panel-ai" data-i18n="tabAI">AI Providers</button>
+        <button class="tab-btn" id="tab-ai-behavior" data-panel="ai-behavior" role="tab" aria-selected="false" aria-controls="panel-ai-behavior" data-i18n="tabAiBehavior">AI Behavior</button>
+        <button class="tab-btn" id="tab-reader" data-panel="reader" role="tab" aria-selected="false" aria-controls="panel-reader" data-i18n="tabReader">Reader</button>
+        <button class="tab-btn" id="tab-notes" data-panel="notes" role="tab" aria-selected="false" aria-controls="panel-notes" data-i18n="tabNotes">Notes</button>
+        <button class="tab-btn" id="tab-markdown" data-panel="markdown" role="tab" aria-selected="false" aria-controls="panel-markdown" data-i18n="tabMarkdown">Export</button>
+        <button class="tab-btn" id="tab-quick" data-panel="quick" role="tab" aria-selected="false" aria-controls="panel-quick" data-i18n="tabQuickActions">Quick Actions</button>
+        <button class="tab-btn" id="tab-tags" data-panel="tags" role="tab" aria-selected="false" aria-controls="panel-tags" data-i18n="tabTags">Tags</button>
+        <button class="tab-btn" id="tab-archive" data-panel="archive" role="tab" aria-selected="false" aria-controls="panel-archive" data-i18n="tabArchive">Archive</button>
+        <button class="tab-btn" id="tab-appearance" data-panel="appearance" role="tab" aria-selected="false" aria-controls="panel-appearance" data-i18n="tabAppearance">Appearance</button>
+        <button class="tab-btn" id="tab-storage" data-panel="storage" role="tab" aria-selected="false" aria-controls="panel-storage" data-i18n="tabStorage">Storage</button>
+      </div>
       <button class="reset-tab-btn" id="reset-panel-btn" title="Reset current tab settings to defaults" data-i18n="resetTabBtn" data-i18n-title="resetTabTitle">Reset This Tab</button>
     </div>
 
@@ -32,7 +52,8 @@
       <div class="section-title" data-i18n="secPinboardAccount">Pinboard Account</div>
       <div class="fg">
         <label class="bl" for="opt-pinboard-token" data-i18n="labelApiToken">API Token</label>
-        <input type="text" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" autocomplete="off" spellcheck="false" />
+        <input type="password" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" autocomplete="off" spellcheck="false" />
+        <button type="button" class="key-toggle" data-target="opt-pinboard-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
         <span id="token-format-warn" class="field-warn" data-i18n="loginInvalidFormat">Invalid format. Use username:TOKEN</span>
         <p class="hint"><span data-i18n="hintApiToken">From</span> <a href="https://pinboard.in/settings/password" target="_blank" rel="noopener">pinboard.in/settings/password</a></p>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
@@ -41,7 +62,7 @@
         </div>
       </div>
       <div class="divider"></div>
-      <div class="section-title" data-i18n="secLanguage">Language</div>
+      <label class="section-title" for="opt-lang" data-i18n="secLanguage">Language</label>
       <div class="fg">
         <select id="opt-lang">
           <option value="auto" data-i18n="langAuto">Auto (follow browser)</option>
@@ -70,11 +91,9 @@
       <p class="hint" data-i18n="backupIncludeHighlightsHint">Includes page URLs, titles, selected text, notes, colors, and timestamps in manual and WebDAV backups. API keys are still never included.</p>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="btn" id="export-settings" data-i18n="exportSettings">Export Settings</button>
-        <label class="btn" style="cursor:pointer;" title="Import settings from JSON file" data-i18n-title="importSettingsTitle">
-          <span data-i18n="importSettings">Import Settings</span>
-          <input type="file" id="import-settings-file" accept=".json" style="display:none;" />
-        </label>
-        <span class="save-status" id="import-status"></span>
+        <button type="button" class="btn" id="import-settings" title="Import settings from JSON file" data-i18n="importSettings" data-i18n-title="importSettingsTitle">Import Settings</button>
+        <input type="file" id="import-settings-file" accept=".json" hidden />
+        <span class="save-status" id="import-status" role="status" aria-live="polite"></span>
       </div>
       <p class="hint" data-i18n="webdavHint">Back up your settings to a WebDAV server you control (e.g. Nextcloud). Never includes API keys.</p>
       <div class="fg"><label class="bl" data-i18n="webdavUrlLabel">Server URL</label><input type="text" id="opt-webdav-url" placeholder="https://dav.example.com/backups/" autocomplete="off" spellcheck="false" /></div>
@@ -263,7 +282,7 @@
 
     <!-- Tab 5: AI -->
     <div id="panel-ai" class="panel" role="tabpanel" aria-labelledby="tab-ai">
-      <div class="section-title" data-i18n="secAiProvider">AI Provider</div>
+      <label class="section-title" for="opt-ai-provider" data-i18n="secAiProvider">AI Provider</label>
       <div class="fg">
         <select id="opt-ai-provider">
           <option value="gemini" data-i18n="provGemini">Google Gemini</option>
@@ -284,7 +303,7 @@
         </select>
       </div>
 
-      <p class="hint" data-i18n="apiKeySecurityHint">API keys are obfuscated (not encrypted) and sync via chrome.storage.sync. Do not share your settings export files.</p>
+      <p class="hint" data-i18n="apiKeySecurityHint">API keys stay on this device by default. They sync only after you enable key syncing, and are obfuscated rather than encrypted.</p>
 
       <details class="free-tier-help">
         <summary data-i18n="freeTierTitle">Which providers offer free API access?</summary>
@@ -555,7 +574,7 @@
       </div>
 
       <div class="fg">
-        <label class="bl" data-i18n="translateTargetLangLabel">Translation target language</label>
+        <label class="bl" id="translate-target-lang-label" for="translate-target-lang" data-i18n="translateTargetLangLabel">Translation target language</label>
         <select id="translate-target-lang">
           <option value="auto" data-i18n="translateLangAuto">Auto (follow interface language)</option>
           <option value="zh-Hans">简体中文</option>
@@ -579,7 +598,7 @@
           <option value="id">Bahasa Indonesia</option>
           <option value="custom" data-i18n="translateLangCustom">Custom…</option>
         </select>
-        <input type="text" id="translate-target-lang-custom" class="hidden" style="margin-top:6px;" placeholder="Any language name, e.g. Latin, Classical Chinese" data-i18n-placeholder="translateLangCustomPlaceholder" autocomplete="off" spellcheck="false" />
+        <input type="text" id="translate-target-lang-custom" class="hidden" style="margin-top:6px;" aria-labelledby="translate-target-lang-label" placeholder="Any language name, e.g. Latin, Classical Chinese" data-i18n-placeholder="translateLangCustomPlaceholder" autocomplete="off" spellcheck="false" />
       </div>
 
       <div class="fg">
@@ -687,11 +706,11 @@
         <button class="btn btn-sm tag-gov-delete-btn" id="tag-gov-delete-selected" data-i18n="tagGovDeleteSelected">Delete Selected</button>
       </details>
       <div id="tag-gov-progress" class="hidden" style="margin-top:10px;">
-        <div class="progress-bar">
+        <div id="tag-gov-progress-bar" class="progress-bar" role="progressbar" aria-labelledby="tag-gov-progress-text" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div id="tag-gov-progress-fill" class="progress-fill"></div>
         </div>
         <div class="tag-gov-progress-foot">
-          <div id="tag-gov-progress-text"></div>
+          <div id="tag-gov-progress-text" role="status" aria-live="polite"></div>
           <button id="tag-gov-progress-btn" class="btn btn-sm" type="button" hidden></button>
         </div>
       </div>
@@ -733,7 +752,7 @@
 
     <!-- Tab 6: Appearance -->
     <div id="panel-appearance" class="panel" role="tabpanel" aria-labelledby="tab-appearance">
-      <div class="section-title" data-i18n="secTheme">Theme</div>
+      <label class="section-title" for="opt-theme" data-i18n="secTheme">Theme</label>
       <div class="fg">
         <select id="opt-theme">
           <option value="auto" data-i18n="themeAuto">Auto (follow system)</option>

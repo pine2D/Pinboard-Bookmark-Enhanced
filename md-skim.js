@@ -428,7 +428,13 @@ async function _pbpSkimRegen() {
     const stale = document.getElementById("skim-stale");
     if (stale) stale.hidden = true;
     const body = document.getElementById("skim-body");
-    if (body) body.replaceChildren();
+    if (body) {
+      if (body.contains(document.activeElement)) {
+        body.tabIndex = -1;
+        body.focus();
+      }
+      body.replaceChildren();
+    }
     await _pbpSkimRun();
   } finally {
     st.running = false;

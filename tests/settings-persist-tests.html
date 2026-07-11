@@ -8,8 +8,13 @@ body { font-family: monospace; padding: 16px; max-width: 900px; }
 <body>
 <h1>Settings persistence robustness tests</h1>
 <div id="results"></div>
+<script>
+// Load options.js helpers without booting the full settings page in this fixture.
+document.addEventListener("DOMContentLoaded", (event) => event.stopImmediatePropagation(), { once: true });
+</script>
 <script src="../shared.js"></script>
 <script src="../options-backup.js"></script>
+<script src="../options.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -440,7 +445,7 @@ async function run() {
     }
     const wrap = document.createElement("div");
     try {
-      wrap.innerHTML = '<button id="export-settings" type="button"></button><input id="import-settings-file" type="file"><span id="import-status"></span><input id="opt-backup-include-highlights" type="checkbox">';
+      wrap.innerHTML = '<button id="export-settings" type="button"></button><button id="import-settings" type="button"></button><input id="import-settings-file" type="file"><span id="import-status"></span><input id="opt-backup-include-highlights" type="checkbox">';
       document.body.appendChild(wrap);
       document.getElementById("opt-backup-include-highlights").checked = false;
       _settingsStorageCache = null;
@@ -457,6 +462,10 @@ async function run() {
         exportableKeys: Object.keys(SETTINGS_DEFAULTS).filter((k) => !API_KEY_FIELDS.includes(k)),
         saveOverlayWithFallback: () => Promise.resolve(),
       });
+      let importPickerOpened = false;
+      document.getElementById("import-settings-file").click = () => { importPickerOpened = true; };
+      document.getElementById("import-settings").click();
+      check("E7 import button opens the hidden native file picker", importPickerOpened);
       document.getElementById("export-settings").click();
       await new Promise((resolve) => setTimeout(resolve, 0));
       const exported = JSON.parse(await exportedBlob.text());
@@ -511,6 +520,140 @@ async function run() {
         /history\.replaceState\(null,\s*"",\s*"#" \+ btn\.dataset\.panel\)/.test(optionsJs));
     } finally {
       globalThis.chrome = prevChromeE8;
+    }
+  })();
+
+  // ---------- E9: custom CSS byte limit + truthful fallback/error outcomes ----------
+  await (async () => {
+    const prevChromeE9 = globalThis.chrome;
+    const prevStorageE9 = globalThis.__pbpTestStorage;
+    const prevLargeE9 = globalThis.__pbpTestSyncSetLarge;
+    const prevCacheE9 = _settingsStorageCache;
+    const syncWrites = [], localWrites = [], localRemoves = [], largeWrites = [];
+    let settingsWrites = 0;
+    let largeError = null;
+    try {
+      globalThis.chrome = {
+        storage: {
+          sync: {
+            set: (data) => { syncWrites.push(data); return Promise.resolve(); },
+            get: () => Promise.resolve({}),
+            remove: () => Promise.resolve(),
+          },
+          local: {
+            get: (defaults) => Promise.resolve(Object.assign({}, defaults, { optSyncEnabled: false, syncApiKeys: false })),
+            set: (data) => { localWrites.push(data); return Promise.resolve(); },
+            remove: (keys) => { localRemoves.push(keys); return Promise.resolve(); },
+          },
+          onChanged: { addListener() {} },
+        },
+      };
+      globalThis.__pbpTestStorage = {
+        set: () => { settingsWrites++; return Promise.resolve(); },
+        get: () => Promise.resolve({}),
+      };
+      globalThis.__pbpTestSyncSetLarge = (key, value) => {
+        largeWrites.push({ key, value });
+        return largeError ? Promise.reject(largeError) : Promise.resolve();
+      };
+      _settingsStorageCache = null;
+
+      check("E9 byte length counts UTF-8 bytes, not JS code units",
+        pbpOverlayByteLength("a中") === 4 && pbpOverlayByteLength("😀") === 4);
+
+      const exactLimit = "x".repeat(OVERLAY_BYTE_LIMIT);
+      const normal = await saveOverlayWithFallback(exactLimit);
+      check("E9 exact 50 KB is accepted and reported as synced",
+        normal.fellBackToLocal === false && largeWrites.at(-1).value === exactLimit);
+      check("E9 synced overlay clears the local-fallback flag",
+        syncWrites.at(-1).optOverlayInLocal === false);
+      check("E9 synced overlay removes stale fallback data",
+        localRemoves.at(-1) === "customOverlayCSS_localFallback");
+
+      const callsBeforeOversize = largeWrites.length;
+      let oversizeError = null;
+      try { await saveOverlayWithFallback("中".repeat(Math.floor(OVERLAY_BYTE_LIMIT / 3) + 1)); }
+      catch (error) { oversizeError = error; }
+      check("E9 multi-byte CSS over 50 KB rejects visibly",
+        oversizeError instanceof RangeError && /UTF-8/.test(oversizeError.message));
+      check("E9 over-limit CSS is rejected before any storage write",
+        largeWrites.length === callsBeforeOversize);
+
+      const settingsBeforeOversizeImport = settingsWrites;
+      let oversizeImportError = null;
+      try {
+        await pbpApplyBackupPayload(
+          { _schemaVersion: 2, optTheme: "dark", customOverlayCSS: "中".repeat(Math.floor(OVERLAY_BYTE_LIMIT / 3) + 1) },
+          { exportableKeys: ["optTheme"], saveOverlayWithFallback }
+        );
+      } catch (error) { oversizeImportError = error; }
+      check("E9 over-limit backup CSS is rejected before importing other settings",
+        oversizeImportError instanceof RangeError && settingsWrites === settingsBeforeOversizeImport);
+
+      largeError = new Error("QUOTA_BYTES quota exceeded");
+      const quota = await saveOverlayWithFallback("quota-css");
+      check("E9 quota fallback is returned to the sole UI status owner",
+        quota.fellBackToLocal === true);
+      check("E9 quota fallback persists CSS locally and records the flag",
+        localWrites.at(-1).customOverlayCSS_localFallback === "quota-css" &&
+        syncWrites.at(-1).optOverlayInLocal === true);
+
+      const fallbackWrites = localWrites.length;
+      largeError = new Error("storage unavailable");
+      let genuineError = null;
+      try { await saveOverlayWithFallback("broken-css"); }
+      catch (error) { genuineError = error; }
+      check("E9 non-quota storage failure rejects without claiming fallback",
+        genuineError === largeError && localWrites.length === fallbackWrites);
+
+      let importError = null;
+      try {
+        await pbpApplyBackupPayload(
+          { _schemaVersion: 2, optTheme: "light", customOverlayCSS: "import-css" },
+          { exportableKeys: ["optTheme"], saveOverlayWithFallback: () => Promise.reject(largeError) }
+        );
+      } catch (error) { importError = error; }
+      check("E9 backup import still observes a genuine overlay failure", importError === largeError);
+      check("E9 genuine overlay failure occurs only after ordinary settings were persisted",
+        settingsWrites === settingsBeforeOversizeImport + 1);
+
+      const optionsSource = await (await fetch("../options.js")).text();
+      const helperSource = optionsSource.slice(
+        optionsSource.indexOf("async function saveOverlayWithFallback"),
+        optionsSource.indexOf('document.addEventListener("DOMContentLoaded"')
+      );
+      check("E9 overlay persistence helper never writes UI status", !helperSource.includes("auto-save-status"));
+      check("E9 saveAll converts rejected persistence into a visible resolved failure",
+        /catch \(error\) \{\s*return reportAutoSaveFailure\(error\)/.test(optionsSource) &&
+        /void saveAll\(\)\.catch\(reportAutoSaveFailure\)/.test(optionsSource));
+    } finally {
+      globalThis.chrome = prevChromeE9;
+      globalThis.__pbpTestStorage = prevStorageE9;
+      globalThis.__pbpTestSyncSetLarge = prevLargeE9;
+      _settingsStorageCache = prevCacheE9;
+    }
+  })();
+
+  // ---------- E10: tag-governance visual and ARIA progress stay in lockstep ----------
+  (() => {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = '<div id="tag-gov-progress-bar" aria-valuenow="0"><div id="tag-gov-progress-fill"></div></div>';
+    document.body.appendChild(wrap);
+    try {
+      _tagGovSetProgress(33.4);
+      check("E10 progress rounds visual width and aria-valuenow together",
+        document.getElementById("tag-gov-progress-fill").style.width === "33%" &&
+        document.getElementById("tag-gov-progress-bar").getAttribute("aria-valuenow") === "33");
+      _tagGovSetProgress(-4);
+      check("E10 progress clamps negative values to zero",
+        document.getElementById("tag-gov-progress-fill").style.width === "0%" &&
+        document.getElementById("tag-gov-progress-bar").getAttribute("aria-valuenow") === "0");
+      _tagGovSetProgress(140);
+      check("E10 progress clamps oversized values to 100",
+        document.getElementById("tag-gov-progress-fill").style.width === "100%" &&
+        document.getElementById("tag-gov-progress-bar").getAttribute("aria-valuenow") === "100");
+    } finally {
+      wrap.remove();
     }
   })();
 

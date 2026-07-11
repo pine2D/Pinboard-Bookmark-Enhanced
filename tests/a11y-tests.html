@@ -6,6 +6,7 @@
 <div id="results"></div>
 <div id="fixture" style="display:none"></div>
 <script src="../shared.js"></script>
+<script src="../i18n.js"></script>
 <script>
 function pass(n){const d=document.createElement("div");d.className="case pass";d.textContent="OK "+n;results.appendChild(d);}
 function fail(n,m){const d=document.createElement("div");d.className="case fail";d.textContent="X "+n+" :: "+m;results.appendChild(d);}
@@ -155,16 +156,87 @@ function buildRecentControl(kind){
   test("G6: confirm popover has dialog semantics",()=>{
     anchor.focus();
     showConfirmPopover(anchor, { msg: "Sure?" });
-    const pop = anchor.querySelector(".confirm-popover");
+    const pop = document.body.querySelector(".confirm-popover");
     assert(pop, "popover missing");
+    assert(!anchor.contains(pop), "popover nested inside button");
     assert(pop.getAttribute("role") === "dialog", "role=" + pop.getAttribute("role"));
     assert(pop.getAttribute("aria-modal") === "false", "aria-modal=" + pop.getAttribute("aria-modal"));
     assert(pop.getAttribute("aria-label"), "missing aria-label");
   });
   test("G6: confirm popover restores focus to opener",()=>{
-    anchor.querySelector(".confirm-no").click();
+    document.body.querySelector(".confirm-no").click();
     assert(document.activeElement === anchor, "focus not restored");
   });
+  test("G6: Escape cancels and restores focus",()=>{
+    let cancelled = false;
+    anchor.focus();
+    showConfirmPopover(anchor, { msg: "Sure?", onCancel: () => { cancelled = true; } });
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    assert(!document.body.querySelector(".confirm-popover"), "popover remained after Escape");
+    assert(cancelled, "onCancel was not called");
+    assert(document.activeElement === anchor, "Escape did not restore focus");
+  });
+  test("G6: Escape does not reach competing document handlers",()=>{
+    let escaped = false;
+    const competingHandler = () => { escaped = true; };
+    document.addEventListener("keydown", competingHandler);
+    showConfirmPopover(anchor, { msg: "Sure?" });
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    document.removeEventListener("keydown", competingHandler);
+    assert(!escaped, "Escape reached a later document handler");
+  });
+  test("G6: opening a second confirm replaces the first",()=>{
+    const second = document.createElement("button");
+    second.type = "button";
+    second.textContent = "Archive";
+    wrap.appendChild(second);
+    showConfirmPopover(anchor, { msg: "Old" });
+    second.focus();
+    showConfirmPopover(second, { msg: "Latest" });
+    const pops = document.body.querySelectorAll(".confirm-popover");
+    assert(pops.length === 1, "multiple confirm popovers remain");
+    assert(pops[0].getAttribute("aria-label") === "Latest", "latest confirm was not retained");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    assert(!document.body.querySelector(".confirm-popover"), "latest confirm remained after Escape");
+    assert(document.activeElement === second, "latest confirm did not restore its opener");
+  });
+  test("G6: synchronous confirm errors are contained",()=>{
+    let logged = false;
+    const originalError = console.error;
+    console.error = () => { logged = true; };
+    anchor.focus();
+    showConfirmPopover(anchor, { msg: "Sure?", onConfirm: () => { throw new Error("boom"); } });
+    document.body.querySelector(".confirm-yes").click();
+    console.error = originalError;
+    assert(logged, "confirm error escaped its handler");
+    assert(document.activeElement === anchor, "confirm did not restore focus");
+  });
 })();
+
+test("G7: applyI18n synchronizes the document language",()=>{
+  const previous = localStorage.getItem("pp-i18n-lang");
+  localStorage.setItem("pp-i18n-lang", "zh-TW");
+  applyI18n(document.createElement("div"));
+  assert(document.documentElement.lang === "zh-Hant", "lang=" + document.documentElement.lang);
+  if (previous === null) localStorage.removeItem("pp-i18n-lang");
+  else localStorage.setItem("pp-i18n-lang", previous);
+});
+
+test("G8: secret toggle masks and reveals without losing its name",()=>{
+  const input = document.createElement("input");
+  input.id = "g8-secret";
+  input.type = "password";
+  const button = document.createElement("button");
+  button.className = "key-toggle";
+  button.dataset.target = input.id;
+  button.setAttribute("aria-label", "Show or hide secret");
+  document.body.append(input, button);
+  setupSecretToggles(document);
+  button.click();
+  assert(input.type === "text" && button.getAttribute("aria-pressed") === "true", "secret not revealed");
+  button.click();
+  assert(input.type === "password" && button.getAttribute("aria-pressed") === "false", "secret not masked");
+  assert(button.getAttribute("aria-label"), "toggle lost accessible name");
+});
 </script>
 </body></html>

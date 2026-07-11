@@ -230,12 +230,15 @@ function _pbpAskSetOpen(open) {
   const panel = _pbpAskBuildPanel();
   if (!panel) return;
   if (open) {
+    const drawerWasOpen = document.body.classList.contains("rail-open");
+    const ae = document.activeElement;
+    if (drawerWasOpen) pbpRailDrawerClose();
     if (_pbpAskRailHandle) _pbpAskRailHandle.expand(true); // ask entry activation -> auto-expand (temp; no-op visually, see design note)
     // Remember who opened us so we can hand focus back on close (non-modal,
     // so this is focus-RETURN only, not a trap). Skip if focus is already
     // inside the panel (e.g. re-open while open).
-    const ae = document.activeElement;
-    if (ae && ae !== document.body && !panel.contains(ae)) _pbpAskState.opener = ae;
+    const opener = drawerWasOpen ? document.getElementById("rail-toggle") : ae;
+    if (opener && opener !== document.body && !panel.contains(opener)) _pbpAskState.opener = opener;
   }
   document.body.classList.toggle("ask-open", open);
   // First-ever open: _pbpAskBuildPanel just appendChild'd the panel in this
@@ -256,7 +259,14 @@ function _pbpAskSetOpen(open) {
     if (ta) ta.focus();
   } else {
     const op = _pbpAskState.opener;
-    if (op && typeof op.focus === "function" && document.contains(op)) op.focus();
+    const isVisible = (el) => {
+      if (!el || typeof el.focus !== "function" || !document.contains(el)) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 &&
+        rect.top < window.innerHeight && rect.left < window.innerWidth;
+    };
+    const focusTarget = [op, document.getElementById("ask-open"), document.getElementById("rail-toggle")].find(isVisible);
+    if (focusTarget) focusTarget.focus();
     _pbpAskState.opener = null;
   }
 }
@@ -536,6 +546,10 @@ function _pbpAskErrorUi(aEl, error, question) {
     if (_pbpAskState && _pbpAskState.running) return;
     pbpAiRetryWithPermission(error, _pbpAskState && _pbpAskState.s, () => {
       if (_pbpAskState && _pbpAskState.running) return;
+      if (aEl.contains(document.activeElement)) {
+        aEl.tabIndex = -1;
+        aEl.focus();
+      }
       aEl.replaceChildren();
       aEl.classList.add("streaming");
       aEl.setAttribute("aria-busy", "true");
@@ -878,6 +892,7 @@ function _pbpAskJump(chip) {
   // was peeked back open (.pb-show-orig) now jumps to the visible ORIGINAL
   // instead of its (hidden) translated sibling -- the only case that changes.
   let target = (typeof trOnlyScrollTarget === "function") ? trOnlyScrollTarget(orig) : orig;
+  pbpFocusArticleTarget(target);
   target.scrollIntoView({ block: "center", behavior: "smooth" });
   let range = null;
   // Verified offsets index the ORIGINAL block's textContent (translation
@@ -1091,6 +1106,10 @@ function _pbpAskRegenerate(el) {
   const st = _pbpAskState;
   if (!st || st.running || !el || !el.dataset.askQuestion) return;
   const oldNodes = Array.from(el.childNodes);
+  if (el.contains(document.activeElement)) {
+    el.tabIndex = -1;
+    el.focus();
+  }
   el.replaceChildren();
   el.classList.add("streaming");
   el.setAttribute("aria-busy", "true");
@@ -1147,12 +1166,14 @@ function _pbpAskShowClearConfirm() {
   strip.appendChild(yes);
   strip.appendChild(no);
   thread.parentNode.insertBefore(strip, thread);
+  const clearBtn = document.getElementById("ask-clear");
+  const input = document.getElementById("ask-input");
   let cleared = false;
   yes.addEventListener("click", async () => {
     if (cleared) return;
     cleared = true;
+    if (input) input.focus();
     strip.remove();
-    const clearBtn = document.getElementById("ask-clear");
     if (clearBtn) clearBtn.hidden = true;
     // Route through Task 12's clear path: it restores the empty-state hint
     // + starter chips AND erases ask_<url> — keeping ONE owner for the
@@ -1164,7 +1185,11 @@ function _pbpAskShowClearConfirm() {
       try { await pbpAskHistSet(_pbpAskHistUrl, []); } catch (_) {}
     }
   });
-  no.addEventListener("click", () => strip.remove());
+  no.addEventListener("click", () => {
+    if (clearBtn) clearBtn.focus();
+    else if (input) input.focus();
+    strip.remove();
+  });
   no.focus(); // safe default: initial focus away from the destructive action
 }
 
@@ -1423,7 +1448,7 @@ function pbpExplainSentenceAround(text, start, end) {
 }
 
 // ---- Explain: answer language = the READER's UI language ----
-// Maps uiLangToBCP47() (md-preview.js) output to a human language name for
+// Maps uiLangToBCP47() (i18n.js) output to a human language name for
 // the prompt. The 9 supported UI locales; anything else answers in English.
 const PBP_EXPLAIN_LANG_NAMES = {
   "zh-Hans": "Simplified Chinese",
@@ -1777,6 +1802,10 @@ async function _pbpExplainRun(cap, ctx, pop) {
   save.textContent = t("explainSaveNote");
   _pbpExplainSaveTarget = cap.itemId ? { itemId: cap.itemId } : { range: cap.range };
   // Skeleton: 3 shimmer lines + an SR-only loading announcement.
+  if (body.contains(document.activeElement)) {
+    body.tabIndex = -1;
+    body.focus();
+  }
   body.setAttribute("aria-busy", "true");
   body.replaceChildren();
   for (let i = 0; i < 3; i++) {

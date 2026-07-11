@@ -1614,6 +1614,7 @@ function _pbpHlNotebookJump(item) {
     if (!trEl) return;
     // .pb-tr is display:none in the pure original view -> silent no-op (spec 1.4).
     if (!document.body.classList.contains("tr-bilingual") && !document.body.classList.contains("tr-only")) return;
+    pbpFocusArticleTarget(trEl);
     trEl.scrollIntoView({ block: "center", behavior: "smooth" });
     const entry = _pbpHlState.ranges[item.id];
     const range = (entry && entry.range) || (() => { const r = document.createRange(); r.selectNode(trEl); return r; })();
@@ -1623,6 +1624,7 @@ function _pbpHlNotebookJump(item) {
   const blockEl = pbpAiBlockEl(item.n);
   if (!blockEl) return;
   if (document.body.classList.contains("tr-only") && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig")) return; // spec 2.3: silent no-op
+  pbpFocusArticleTarget(blockEl);
   blockEl.scrollIntoView({ block: "center", behavior: "smooth" });
   const entry = _pbpHlState.ranges[item.id];
   const range = (entry && entry.range) || (() => { const r = document.createRange(); r.selectNode(blockEl); return r; })();

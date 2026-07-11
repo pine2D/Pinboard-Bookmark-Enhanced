@@ -17,6 +17,7 @@ const sharedJs = read("shared.js");
 const jinaJs = read("jina.js");
 const mdAiCoreJs = read("md-ai-core.js");
 const mdAskJs = read("md-ask.js");
+const mdHighlightJs = read("md-highlight.js");
 const mdSkimJs = read("md-skim.js");
 const mdTranslateJs = read("md-translate.js");
 const popupJs = read("popup.js");
@@ -28,6 +29,54 @@ const optionsCss = read("options.css");
 const optionsJs = read("options.js");
 check(optionsJs.includes('webdavLastPush.error === "insecure"') && optionsJs.includes('t("mdTargetWebhookHttpWarn")'), "persisted insecure WebDAV status lacks endpoint guidance");
 const popupTagsJs = read("popup-tags.js");
+
+const optionsTabs = optionsHtml.slice(optionsHtml.indexOf('<div class="tabs"'), optionsHtml.indexOf('</div>', optionsHtml.indexOf('<div class="tabs"')) + 6);
+check(!optionsTabs.includes('id="reset-panel-btn"') && /id="mobile-tab-select"/.test(optionsHtml),
+  "options.html: reset action remains inside tablist or mobile category select is missing");
+check(/mobileTabSelect\.value = btn\.dataset\.panel/.test(optionsJs) &&
+  /mobileTabSelect\?\.addEventListener\("change"/.test(optionsJs),
+  "options.js: desktop tabs and mobile category select can drift");
+check(/result && typeof result\.catch === "function"\) result\.catch\(reportConfirmError\)/.test(sharedJs),
+  "shared.js: asynchronous confirm failures can become unhandled rejections");
+check(/<input type="password" id="token-input"/.test(popupHtml) && /data-target="token-input"/.test(popupHtml),
+  "popup.html: Pinboard token is not masked with a reveal control");
+check(/<input type="password" id="opt-pinboard-token"/.test(optionsHtml) && /data-target="opt-pinboard-token"/.test(optionsHtml),
+  "options.html: Pinboard token is not masked with a reveal control");
+check(/<button[^>]+id="import-settings"/.test(optionsHtml) && /id="import-status"[^>]+role="status"/.test(optionsHtml),
+  "options.html: settings import is not a keyboard button with live status");
+for (const [id, label] of [["opt-lang", "secLanguage"], ["opt-ai-provider", "secAiProvider"], ["opt-theme", "secTheme"]]) {
+  check(new RegExp(`<label[^>]+for="${id}"[^>]+data-i18n="${label}"`).test(optionsHtml),
+    `options.html: ${id} lacks its visible label`);
+}
+check(/id="translate-target-lang-custom"[^>]+aria-labelledby="translate-target-lang-label"/.test(optionsHtml),
+  "options.html: custom translation language lacks an accessible name");
+check(/id="tag-gov-progress-bar"[^>]+role="progressbar"[^>]+aria-labelledby="tag-gov-progress-text"[^>]+aria-valuenow="0"/.test(optionsHtml) &&
+  /id="tag-gov-progress-text"[^>]+role="status"[^>]+aria-live="polite"/.test(optionsHtml),
+  "options.html: tag governance progress lacks its accessible name/value or live status");
+const tagGovProgressHelper = optionsJs.slice(
+  optionsJs.indexOf("function _tagGovSetProgress(value)"),
+  optionsJs.indexOf('document.addEventListener("click",', optionsJs.indexOf("function _tagGovSetProgress(value)"))
+);
+check(/fill\.style\.width = percent \+ "%"/.test(tagGovProgressHelper) &&
+  /bar\.setAttribute\("aria-valuenow", String\(percent\)\)/.test(tagGovProgressHelper) &&
+  !optionsJs.replace(tagGovProgressHelper, "").includes('$id("tag-gov-progress-fill")'),
+  "options.js: tag governance visual and ARIA progress can drift");
+check(/id="tags-input"[^>]+role="combobox"[^>]+aria-controls="tags-autocomplete"[^>]+aria-expanded="false"/.test(popupHtml) &&
+  /id="tags-autocomplete"[^>]+role="listbox"/.test(popupHtml),
+  "popup.html: tag autocomplete lacks combobox/listbox semantics");
+check(/setAttribute\("role", "option"\)/.test(popupTagsJs) &&
+  /aria-activedescendant/.test(popupTagsJs) && /aria-selected/.test(popupTagsJs) &&
+  /scrollIntoView\(\{ block: "nearest" \}\)/.test(popupTagsJs),
+  "popup-tags.js: tag options do not expose active selection semantics");
+check(/finally\s*\{\s*container\.setAttribute\("aria-busy", "false"\)/.test(popupTagsJs),
+  "popup-tags.js: suggested tags remain permanently busy after completion");
+check(/const btn = document\.createElement\("button"\);[\s\S]{0,80}btn\.type = "button";[\s\S]{0,100}btn\.className = "preset-btn";/.test(popupBatchJs),
+  "popup-batch.js: tag presets are not native buttons");
+check(/btn\.disabled = true;\s*\$id\("tags-input"\)\?\.focus\(\)/.test(popupBatchJs),
+  "popup-batch.js: used tag preset drops focus on a disabled button");
+const cleanHint = popupJs.slice(popupJs.indexOf("function _renderCleanHint"), popupJs.indexOf('document.addEventListener("DOMContentLoaded"'));
+check(cleanHint.indexOf('hint.classList.add("hidden")') < cleanHint.indexOf("urlInput.focus()"),
+  "popup.js: URL-clean undo hides its focused button without returning focus");
 
 check(manifest.host_permissions.join(",") === "https://api.pinboard.in/*,https://pinboard.in/*",
   "manifest.json: required hosts are not limited to core Pinboard access");
@@ -262,7 +311,9 @@ check(/function pbpLiveAiSettingsSnapshot\(provider\)/.test(optionsConnectivityJ
   "Options connectivity and tag governance do not share one live provider form snapshot");
 
 check(/@media \(max-width: 720px\)[\s\S]*\.container\s*{[\s\S]*grid-template-columns:\s*1fr/.test(optionsCss), "options.css: missing mobile one-column container rule");
-check(/@media \(max-width: 720px\)[\s\S]*\.tabs\s*{[\s\S]*position:\s*static/.test(optionsCss), "options.css: missing mobile static tabs rule");
+check(/@media \(max-width: 720px\)[\s\S]*\.options-nav\s*{[\s\S]*position:\s*static/.test(optionsCss) &&
+  /@media \(max-width: 720px\)[\s\S]*\.tabs\s*{\s*display:\s*none/.test(optionsCss),
+  "options.css: mobile category select does not replace the desktop tablist");
 
 check(/const el = document\.createElement\("button"\);[\s\S]{0,240}el\.className = "stag";/.test(popupTagsJs), "popup-tags.js: suggested tag is not a button");
 check(/const aa = document\.createElement\("button"\);[\s\S]{0,240}aa\.className = "add-all-link";/.test(popupTagsJs), "popup-tags.js: add-all is not a button");
@@ -287,6 +338,61 @@ check(!/\bconfirm\s*\(/.test(popupBatchJs) && !popupBatchJs.includes("BATCH_PERM
   "popup-batch.js: native confirm, truncated disclosure, or broad wildcard remains");
 check(/\.batch-permission-list\s*\{[\s\S]*?max-height:\s*92px;[\s\S]*?overflow:\s*auto;/.test(popupCss),
   "popup.css: complete Batch permission list is not bounded with scrolling");
+
+check(/<aside\b(?=[^>]*id="rail")(?=[^>]*aria-labelledby="preview-title")[^>]*>/.test(mdHtml),
+  "md-preview.html: mobile drawer is not labelled by the document title");
+const drawerSetupStart = mdPreviewJs.indexOf("function setupDrawer()");
+const drawerSetupEnd = mdPreviewJs.indexOf("function pbpRailDrawerClose()", drawerSetupStart);
+const drawerSetup = mdPreviewJs.slice(drawerSetupStart, drawerSetupEnd);
+const drawerCloseEnd = mdPreviewJs.indexOf("function pbpFocusArticleTarget", drawerSetupEnd);
+const drawerClose = mdPreviewJs.slice(drawerSetupEnd, drawerCloseEnd);
+check(drawerSetupStart >= 0 && drawerSetup.includes("main.inert = true") &&
+  drawerSetup.includes('rail.setAttribute("aria-modal", "true")') &&
+  drawerSetup.includes("requestAnimationFrame(() =>") &&
+  drawerSetup.includes('(document.getElementById("btn-rendered") || rail).focus()') &&
+  drawerSetup.includes('window.matchMedia("(max-width: 1000px)").addEventListener("change"') &&
+  drawerSetup.includes("if (!e.matches) pbpRailDrawerClose()"),
+"md-preview.js: drawer open/breakpoint state does not manage modal inertness");
+check(drawerClose.includes('document.body.classList.remove("rail-open")') &&
+  drawerClose.includes("scrim.hidden = true") && drawerClose.includes('rail.removeAttribute("aria-modal")') &&
+  drawerClose.includes("main.inert = false"),
+"md-preview.js: shared drawer close does not clear every modal state");
+const focusTargetEnd = mdPreviewJs.indexOf("// In tr-only mode", drawerCloseEnd);
+const focusTarget = mdPreviewJs.slice(drawerCloseEnd, focusTargetEnd);
+check(focusTarget.includes("pbpRailDrawerClose()") && focusTarget.includes("target.focus({ preventScroll: true })") &&
+  mdPreviewJs.includes("pbpFocusArticleTarget(target);") &&
+  mdAskJs.includes("pbpFocusArticleTarget(target);") &&
+  (mdHighlightJs.match(/pbpFocusArticleTarget\(/g) || []).length >= 2,
+"md-preview: TOC, Ask citations, and Notebook do not share visible-target focus recovery");
+
+const askOpen = mdAskJs.slice(mdAskJs.indexOf("function _pbpAskSetOpen"), mdAskJs.indexOf("// Clear:", mdAskJs.indexOf("function _pbpAskSetOpen")));
+check(askOpen.includes("drawerWasOpen") && askOpen.includes("pbpRailDrawerClose()") &&
+  askOpen.includes('document.getElementById("rail-toggle")') && askOpen.includes("getBoundingClientRect()") &&
+  askOpen.includes('document.getElementById("ask-open")') && askOpen.includes(".find(isVisible)"),
+"md-ask.js: opening Ask from the drawer leaves a hidden opener/focus target");
+const askError = mdAskJs.slice(mdAskJs.indexOf("function _pbpAskErrorUi"), mdAskJs.indexOf("// Core runner", mdAskJs.indexOf("function _pbpAskErrorUi")));
+check(askError.indexOf("aEl.focus()") >= 0 && askError.indexOf("aEl.focus()") < askError.indexOf("aEl.replaceChildren()"),
+  "md-ask.js: Ask retry removes its focused button before focus handoff");
+const askClear = mdAskJs.slice(mdAskJs.indexOf("function _pbpAskShowClearConfirm"), mdAskJs.indexOf("// ---- Restore persisted", mdAskJs.indexOf("function _pbpAskShowClearConfirm")));
+check(askClear.indexOf("input.focus()") < askClear.indexOf("strip.remove()") &&
+  askClear.indexOf("clearBtn.focus()") < askClear.lastIndexOf("strip.remove()"),
+"md-ask.js: clear confirmation removes the focused action before focus handoff");
+const askRegenerate = mdAskJs.slice(mdAskJs.indexOf("function _pbpAskRegenerate"), mdAskJs.indexOf("// ---- Clear:", mdAskJs.indexOf("function _pbpAskRegenerate")));
+check(askRegenerate.indexOf("el.focus()") >= 0 && askRegenerate.indexOf("el.focus()") < askRegenerate.indexOf("el.replaceChildren()"),
+  "md-ask.js: regenerate removes its focused button before focus handoff");
+const skimRegenFocus = mdSkimJs.slice(mdSkimJs.indexOf("async function _pbpSkimRegen"), mdSkimJs.indexOf("// Init hookup", mdSkimJs.indexOf("async function _pbpSkimRegen")));
+check(skimRegenFocus.indexOf("body.focus()") >= 0 && skimRegenFocus.indexOf("body.focus()") < skimRegenFocus.indexOf("body.replaceChildren()"),
+  "md-skim.js: retry removes its focused button before focus handoff");
+const explainRun = mdAskJs.slice(mdAskJs.indexOf("async function _pbpExplainRun"), mdAskJs.indexOf("// ---- Explain: open", mdAskJs.indexOf("async function _pbpExplainRun")));
+check(explainRun.indexOf("body.focus()") >= 0 && explainRun.indexOf("body.focus()") < explainRun.indexOf("body.replaceChildren()"),
+  "md-ask.js: Explain retry removes its focused button before focus handoff");
+
+const articleInject = mdPreviewJs.indexOf("renderedView.innerHTML = renderedHtml");
+const firstProgressQueue = mdPreviewJs.indexOf("queueReadingStats();", articleInject);
+check(articleInject >= 0 && firstProgressQueue > articleInject &&
+  !mdPreviewJs.slice(mdPreviewJs.indexOf("// Reading stats"), articleInject).includes("renderStats();") &&
+  mdPreviewJs.includes("new ResizeObserver(queueReadingStats).observe(renderedView)"),
+"md-preview.js: reading progress is measured before article layout or not refreshed after layout changes");
 
 if (fail.length) {
   console.error(fail.join("\n"));

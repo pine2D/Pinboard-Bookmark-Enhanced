@@ -702,6 +702,9 @@
   "optTitle": {
     "message": "Pinboard Bookmark Enhanced — Ustawienia"
   },
+  "settingsCategory": {
+    "message": "Kategoria ustawień"
+  },
   "optAutoSave": {
     "message": "automatyczny zapis włączony"
   },
@@ -906,6 +909,9 @@
   },
   "importInvalid": {
     "message": "Nieprawidłowy plik"
+  },
+  "importApplyFailed": {
+    "message": "Nie udało się ukończyć importu; niektóre ustawienia mogły już zostać zmienione. Sprawdź je i spróbuj ponownie."
   },
   "importSettingsTitle": {
     "message": "Importuj ustawienia z pliku JSON"
@@ -1718,7 +1724,7 @@
     "message": "Zapisano lokalnie (limit synchronizacji pełny)"
   },
   "optSaveFailed": {
-    "message": "Zapis nie powiódł się — ustawienia zbyt duże do synchronizacji"
+    "message": "Nie udało się ukończyć zapisywania; niektóre pozostałe ustawienia mogły już zostać zapisane. Sprawdź je i spróbuj ponownie."
   },
   "confirm": {
     "message": "Potwierdź"
@@ -1884,7 +1890,7 @@
     "message": "Nie udało się skopiować do schowka — notatka nie została utworzona. Spróbuj ponownie."
   },
   "apiKeySecurityHint": {
-    "message": "Klucze API są zaciemnione (nie szyfrowane) i synchronizowane przez chrome.storage.sync. Nie udostępniaj plików eksportu ustawień."
+    "message": "Klucze API są domyślnie przechowywane tylko na tym urządzeniu. Są synchronizowane przez Chrome Sync dopiero po wyraźnym włączeniu synchronizacji kluczy. Klucze są jedynie zaciemniane, a nie szyfrowane."
   },
   "batchPermLabel": {
     "message": "Starsze uprawnienie do wszystkich witryn:"

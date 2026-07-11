@@ -702,6 +702,9 @@
   "optTitle": {
     "message": "Pinboard Bookmark Enhanced — 設定"
   },
+  "settingsCategory": {
+    "message": "設定カテゴリ"
+  },
   "optAutoSave": {
     "message": "自動保存が有効です"
   },
@@ -906,6 +909,9 @@
   },
   "importInvalid": {
     "message": "無効なファイル"
+  },
+  "importApplyFailed": {
+    "message": "インポートを完了できませんでした。一部の設定はすでに変更されている可能性があります。内容を確認してから再試行してください。"
   },
   "importSettingsTitle": {
     "message": "JSONファイルから設定をインポート"
@@ -1718,7 +1724,7 @@
     "message": "ローカルに保存しました（同期容量が満杯）"
   },
   "optSaveFailed": {
-    "message": "保存に失敗しました — 設定が同期できるサイズを超えています"
+    "message": "保存を完了できませんでした。その他の設定の一部はすでに保存されている可能性があります。内容を確認してから再試行してください。"
   },
   "confirm": {
     "message": "確認"
@@ -1884,7 +1890,7 @@
     "message": "クリップボードへの書き込みに失敗しました — ノートは作成されていません。もう一度お試しください。"
   },
   "apiKeySecurityHint": {
-    "message": "API キーは難読化（暗号化ではない）されており、chrome.storage.sync で同期されます。設定エクスポートファイルを共有しないでください。"
+    "message": "API キーはデフォルトではこの端末にのみ保存されます。キーの同期を明示的に有効にした場合に限り、Chrome Sync 経由で同期されます。キーは難読化されるだけで、暗号化はされません。"
   },
   "batchPermLabel": {
     "message": "旧バージョンの全サイト権限："

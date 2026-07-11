@@ -26,7 +26,7 @@ const CLEANUP_TIMEOUT_MS = 5000;
 // rows carrying a pass/fail/skip class. Update the count when adding/removing
 // assertions; an unregistered suite is rejected instead of guessed complete.
 const EXPECTED_RESULTS = Object.freeze({
-  "tests/a11y-tests.html": 25,
+  "tests/a11y-tests.html": 31,
   "tests/ai-tags-tests.html": 43,
   "tests/background-active-tab-tests.html": 28,
   "tests/batch-dedup-tests.html": 24,
@@ -45,7 +45,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/popup-save-tests.html": 32,
   "tests/save-pipeline-tests.html": 35,
   "tests/settings-cache-invalidate-tests.html": 7,
-  "tests/settings-persist-tests.html": 89,
+  "tests/settings-persist-tests.html": 107,
   "tests/tag-gov-layout-tests.html": 6,
   "tests/tag-gov-reserve-tests.html": 2,
   "tests/tag-gov-tests.html": 61,

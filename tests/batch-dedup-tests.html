@@ -190,13 +190,17 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
 }
 
 async function createUiHarness(storedProgress, now) {
+  const documentStub = { activeElement: null };
   const elements = {
     "batch-bookmark-btn": fakeElement(),
     "batch-progress": fakeElement(),
     "batch-progress-fill": fakeElement(),
     "batch-progress-text": fakeElement(),
   };
+  elements["batch-bookmark-btn"].focus = function () { this.focused = true; documentStub.activeElement = this; };
+  elements["batch-progress"].focus = function () { this.focused = true; documentStub.activeElement = this; };
   const statuses = [];
+  let timer = null;
   const chromeStub = {
     storage: {
       onChanged: { addListener: () => {} },
@@ -206,7 +210,7 @@ async function createUiHarness(storedProgress, now) {
   const source = await getPopupBatchProgressSource();
   const factory = new Function(
     "$id", "PBP_ICONS", "t", "showStatus", "setBtnIcon", "setTimeout",
-    "chrome", "batchIsRunning", "BATCH_STALE_TTL", "Date",
+    "chrome", "batchIsRunning", "BATCH_STALE_TTL", "Date", "document",
     source + "\nreturn { renderBatchProgress, wireBatchProgress };"
   );
   const api = factory(
@@ -215,13 +219,14 @@ async function createUiHarness(storedProgress, now) {
     (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
     (id, message, kind) => statuses.push({ id, message, kind }),
     (button, _icon, label) => { button.label = label; },
-    () => 0,
+    (callback) => { timer = callback; return 0; },
     chromeStub,
     batchIsRunning,
     BATCH_STALE_TTL,
-    { now: () => now }
+    { now: () => now },
+    documentStub
   );
-  return { ...api, elements, statuses };
+  return { ...api, elements, statuses, runTimer: () => timer?.() };
 }
 
 (async () => {
@@ -379,6 +384,8 @@ async function createUiHarness(storedProgress, now) {
     equal(panel.getAttribute("aria-labelledby"), "batch-permission-title");
     assert(doc.getElementById("batch-permission-list")?.tagName === "UL", "origins are not a semantic list");
     equal(progress?.getAttribute("tabindex"), "-1", "progress cannot receive focus after Grant");
+    equal(progress?.getAttribute("role"), "progressbar");
+    equal(progress?.getAttribute("data-i18n-aria"), "batchSaveTitle", "progress has no localized accessible name");
     for (const id of ["batch-permission-grant", "batch-permission-cancel"]) {
       equal(doc.getElementById(id)?.getAttribute("type"), "button", id + " is not a real button");
     }
@@ -409,6 +416,8 @@ async function createUiHarness(storedProgress, now) {
     const h = await createUiHarness(null, 5000);
     h.renderBatchProgress({ running: true, done: false, total: 4, i: 2, saved: 1, queued: 1, failed: 0 });
     assert(h.elements["batch-progress-text"].innerHTML.includes("offlineQueued:1"), "queued count missing from running view");
+    equal(h.elements["batch-progress"].attributes["aria-valuenow"], "50");
+    equal(h.elements["batch-progress"].attributes["aria-valuetext"], "batchProgress:2:4:1:0");
     equal(h.elements["batch-bookmark-btn"].disabled, true);
   });
 
@@ -433,6 +442,14 @@ async function createUiHarness(storedProgress, now) {
     const oversized = await createUiHarness(null, 5000);
     oversized.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, queued: 0, failed: 0, skipped: 0, tooLong: 1 });
     equal(oversized.statuses[0].kind, "error", "oversized item is a failed outcome");
+
+    const early = await createUiHarness(null, 5000);
+    early.elements["batch-progress"].focus();
+    early.renderBatchProgress({ running: false, done: true, total: 3, i: 0, saved: 0, queued: 0, failed: 0, error: "not_logged_in" });
+    equal(early.elements["batch-progress"].attributes["aria-valuenow"], "0", "terminal state falsely rendered 100%");
+    assert(early.elements["batch-progress-text"].innerHTML.startsWith("0/3"), "terminal state lost the processed count");
+    early.runTimer();
+    equal(early.elements["batch-bookmark-btn"].focused, true, "hidden progress kept keyboard focus");
   });
 
   await test("reopen restores fresh running/done progress but ignores stale done", async () => {

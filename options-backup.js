@@ -26,6 +26,7 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
   const safeData = Object.fromEntries(
     Object.entries(rest).filter(([k]) => exportableKeys.includes(k))
   );
+  if (schemaVersion >= 2 && customOverlayCSS !== undefined) pbpAssertOverlaySize(customOverlayCSS);
   const settingsStorage = await getSettingsStorage();
   if (safeData.exportTargets) {
     // Export/webdav-push strips nested secrets, so a raw key-set here would
@@ -91,6 +92,8 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
 }
 
 function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
+  $id("import-settings").addEventListener("click", () => $id("import-settings-file").click());
+
   $id("export-settings").addEventListener("click", async () => {
     const raw = await (await getSettingsStorage()).get(exportableKeys);
     const exportData = Object.fromEntries(
@@ -142,9 +145,11 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
   $id("import-settings-file").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    let parsed = false;
     try {
       const text = await file.text();
       const data = JSON.parse(text);
+      parsed = true;
       const themesStatusKey = await pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback });
       const status = $id("import-status");
       setStatusIcon(status, themesStatusKey === "importPartial" ? false : true, t(themesStatusKey));
@@ -152,7 +157,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
     } catch (err) {
       console.error("[import] failed", err);
       const status = $id("import-status");
-      setStatusIcon(status, false, t("importInvalid"));
+      setStatusIcon(status, false, t(parsed ? "importApplyFailed" : "importInvalid"));
       status.style.color = "#c00";
       setTimeout(() => { status.textContent = ""; status.style.color = ""; }, 3000);
     }

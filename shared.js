@@ -11,6 +11,7 @@ const ADAPTIVE_THEME_MAP = {
 const TEXTAREA_MIN_HEIGHT = 54;
 const TEXTAREA_MAX_HEIGHT = 300;
 const TAG_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const OVERLAY_BYTE_LIMIT = 50 * 1024;
 const PBP_JINA_ORIGIN_PATTERN = "https://r.jina.ai/*";
 // Inline SVG icons — replace emoji/color-glyphs that trigger a 1-3s Segoe UI Emoji
 // font-load stall on Windows high-DPI Chrome (DirectWrite system-font enumeration,
@@ -55,6 +56,33 @@ function setBtnIcon(btn, iconKey, label) {
   btn.innerHTML = '<span class="btn-ic">' + svg + '</span><span>' + "" + '</span>';
   // label set via textContent on the label span to avoid any HTML injection
   btn.lastElementChild.textContent = label != null ? String(label) : "";
+}
+
+function setupSecretToggles(root) {
+  (root || document).querySelectorAll(".key-toggle").forEach((btn) => {
+    if (btn.dataset.secretToggleReady === "1") return;
+    btn.dataset.secretToggleReady = "1";
+    btn.innerHTML = PBP_ICONS.eye;
+    btn.setAttribute("aria-pressed", "false");
+    btn.addEventListener("click", () => {
+      const input = $id(btn.dataset.target);
+      if (!input) return;
+      const reveal = input.type === "password";
+      input.type = reveal ? "text" : "password";
+      btn.innerHTML = reveal ? PBP_ICONS.eyeOff : PBP_ICONS.eye;
+      btn.setAttribute("aria-pressed", String(reveal));
+    });
+  });
+}
+
+function pbpOverlayByteLength(value) {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function pbpAssertOverlaySize(value) {
+  if (pbpOverlayByteLength(value) > OVERLAY_BYTE_LIMIT) {
+    throw new RangeError("Custom CSS exceeds the 50 KB UTF-8 limit");
+  }
 }
 
 // Escape HTML entities for safe embedding in <blockquote>. Pure string ops so it
@@ -1078,13 +1106,18 @@ function $id(id) {
   return el;
 }
 
-// Render an inline .confirm-popover anchored inside `anchor`.
+let _activeConfirmPopover = null;
+
+// Render a .confirm-popover beside `anchor`, portaled to <body> so buttons are
+// never nested inside an interactive anchor.
 // Caller supplies pre-translated strings via { msg, yesText, noText }.
-// Popover self-dismisses on Escape / Cancel / Confirm; de-dupes if already open.
+// Popover self-dismisses on Escape / Cancel / Confirm; only one can be open.
 function showConfirmPopover(anchor, opts) {
-  if (!anchor || anchor.querySelector(".confirm-popover")) return;
+  if (!anchor) return;
+  if (_activeConfirmPopover?.anchor === anchor && _activeConfirmPopover.pop.isConnected) return;
   const { msg, yesText, noText, onConfirm, onCancel } = opts || {};
   const opener = document.activeElement;
+  _activeConfirmPopover?.dismiss({ restoreFocus: false });
   const pop = document.createElement("div");
   pop.className = "confirm-popover";
   pop.setAttribute("role", "dialog");
@@ -1102,20 +1135,61 @@ function showConfirmPopover(anchor, opts) {
   no.className = "confirm-no";
   no.textContent = noText || "Cancel";
   pop.append(m, yes, no);
-  anchor.appendChild(pop);
+  document.body.appendChild(pop);
 
-  function dismiss() {
+  const anchorRect = anchor.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  const gap = 4;
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+  const left = Math.max(gap, Math.min(anchorRect.right - popRect.width, viewportWidth - popRect.width - gap));
+  const below = anchorRect.bottom + gap;
+  const top = below + popRect.height <= viewportHeight - gap
+    ? below
+    : Math.max(gap, anchorRect.top - popRect.height - gap);
+  Object.assign(pop.style, {
+    position: "fixed",
+    left: `${Math.round(left)}px`,
+    top: `${Math.round(top)}px`,
+    right: "auto",
+    bottom: "auto",
+  });
+
+  function dismiss({ restoreFocus = true } = {}) {
     pop.remove();
-    document.removeEventListener("keydown", onKey);
-    if (opener && opener.isConnected && typeof opener.focus === "function") opener.focus();
+    if (_activeConfirmPopover?.pop === pop) _activeConfirmPopover = null;
+    document.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("resize", dismiss);
+    window.removeEventListener("scroll", dismiss, true);
+    if (restoreFocus && opener && opener.isConnected && typeof opener.focus === "function") opener.focus();
   }
   function onKey(ev) {
-    if (ev.key === "Escape") { dismiss(); if (onCancel) onCancel(); }
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      dismiss();
+      if (onCancel) onCancel();
+    }
+  }
+  function reportConfirmError(error) {
+    console.error("[confirm] action failed", error);
   }
   pop.addEventListener("click", (e) => e.stopPropagation());
   no.addEventListener("click", () => { dismiss(); if (onCancel) onCancel(); });
-  yes.addEventListener("click", () => { dismiss(); if (onConfirm) onConfirm(); });
-  document.addEventListener("keydown", onKey);
+  yes.addEventListener("click", () => {
+    dismiss();
+    if (!onConfirm) return;
+    try {
+      const result = onConfirm();
+      if (result && typeof result.catch === "function") result.catch(reportConfirmError);
+    } catch (error) {
+      reportConfirmError(error);
+    }
+  });
+  _activeConfirmPopover = { anchor, pop, dismiss };
+  document.addEventListener("keydown", onKey, true);
+  window.addEventListener("resize", dismiss);
+  window.addEventListener("scroll", dismiss, true);
   no.focus();
 }
 
