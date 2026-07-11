@@ -1168,22 +1168,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- Apply options page theme based on Pinboard theme preset ----
   function applyOptionsPageTheme(presetKey, themeMode) {
-    const prefersDark = themeMode === "dark" ||
-      (themeMode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (ADAPTIVE_THEME_MAP[presetKey]) {
-      const [light, dark] = ADAPTIVE_THEME_MAP[presetKey];
-      document.documentElement.dataset.theme = prefersDark ? dark : light;
-    } else if (presetKey) {
-      document.documentElement.dataset.theme = presetKey;
-    } else if (prefersDark) {
-      document.documentElement.dataset.theme = "flexoki-dark";
-    } else {
-      delete document.documentElement.dataset.theme;
-    }
+    pbpApplyOptionsEarlyTheme(themeMode, presetKey);
   }
   // Track active preset key — schema v2: themePresetKey is authoritative
   let currentPresetKey = s.themePresetKey || "";
   applyOptionsPageTheme(currentPresetKey, s.optTheme);
+  pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey);
+  document.documentElement.dataset.optionsReady = "1";
 
   // Language change: save immediately and reload to apply
   $id("opt-lang").addEventListener("change", async () => {
@@ -1662,6 +1653,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       pbpAssertOverlaySize(overlayValue);
       const res = await persistSettings(data);
       if (!res.ok) throw res.error || new Error("settings save failed");
+      pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey);
       const overlay = await saveOverlayWithFallback(overlayValue);
       if (res.fellBackToLocal || overlay.fellBackToLocal) {
         flashAutoSave("optSavedLocally", "Saved locally (sync quota full)", 4000);

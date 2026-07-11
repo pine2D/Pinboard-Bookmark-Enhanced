@@ -44,12 +44,14 @@ body { font-family: "Helvetica Neue", Verdana, "PingFang SC", "Hiragino Sans GB"
    higher specificity.) */
 button, input, select { font-family: inherit; }
 .container {
+  visibility: hidden;
   max-width: 900px; margin: 0 auto; padding: 24px 16px;
   display: grid;
   grid-template-columns: minmax(160px, max-content) minmax(0, 1fr);
   column-gap: 24px;
   align-items: start;
 }
+html[data-options-ready] .container { visibility: visible; }
 /* LOAD-BEARING: h1 must span both columns. The floated .auto-save-hint relies on
    the full width; without this it collapses into the ~160px sidebar column. */
 .container > h1 { grid-column: 1 / -1; }

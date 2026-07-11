@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { runInNewContext } from "node:vm";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
@@ -27,6 +28,7 @@ const popupCss = read("popup.css");
 const optionsConnectivityJs = read("options-connectivity.js");
 const optionsCss = read("options.css");
 const optionsJs = read("options.js");
+const optionsThemeEarlyJs = read("options-theme-early.js");
 check(optionsJs.includes('webdavLastPush.error === "insecure"') && optionsJs.includes('t("mdTargetWebhookHttpWarn")'), "persisted insecure WebDAV status lacks endpoint guidance");
 const popupTagsJs = read("popup-tags.js");
 
@@ -314,6 +316,80 @@ check(/@media \(max-width: 720px\)[\s\S]*\.container\s*{[\s\S]*grid-template-col
 check(/@media \(max-width: 720px\)[\s\S]*\.options-nav\s*{[\s\S]*position:\s*static/.test(optionsCss) &&
   /@media \(max-width: 720px\)[\s\S]*\.tabs\s*{\s*display:\s*none/.test(optionsCss),
   "options.css: mobile category select does not replace the desktop tablist");
+
+function runOptionsEarly({ mode = "auto", preset = "", dark = false, chrome } = {}) {
+  const root = { dataset: { theme: "stale" } };
+  const values = new Map([["pp-theme", mode], ["pp-theme-preset", preset]]);
+  const timers = [];
+  const context = {
+    document: { documentElement: root, addEventListener() {}, getElementById() { return null; } },
+    window: { matchMedia: () => ({ matches: dark }) },
+    localStorage: {
+      getItem: key => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, String(value)),
+    },
+    setTimeout: (fn, ms) => timers.push({ fn, ms }),
+  };
+  if (chrome) context.chrome = chrome;
+  runInNewContext(optionsThemeEarlyJs, context);
+  return { root, values, timers };
+}
+
+for (const [preset, expected] of [["flexoki", "flexoki-dark"], ["solarized", "solarized-dark"], ["catppuccin", "catppuccin-mocha"]]) {
+  const run = runOptionsEarly({ mode: "auto", preset, dark: true });
+  check(run.root.dataset.theme === expected, `options-theme-early.js: ${preset} did not follow dark matchMedia without chrome`);
+}
+for (const preset of ["__proto__", "constructor"]) {
+  const run = runOptionsEarly({ mode: "dark", preset });
+  check(run.root.dataset.theme === preset, `options-theme-early.js: inherited key ${preset} interrupted theme bootstrap`);
+}
+const earlyLight = runOptionsEarly({ mode: "light", dark: true });
+check(!("theme" in earlyLight.root.dataset),
+  "options-theme-early.js: light/no-preset did not clear a stale theme without chrome");
+check(earlyLight.timers.length === 1 && earlyLight.timers[0].ms === 3000, "options-theme-early.js: 3s fail-open timer is missing");
+earlyLight.timers[0]?.fn();
+check(earlyLight.root.dataset.optionsReady === "fallback", "options-theme-early.js: fail-open did not release the gate");
+const earlyReady = runOptionsEarly();
+earlyReady.root.dataset.optionsReady = "1";
+earlyReady.timers[0]?.fn();
+check(earlyReady.root.dataset.optionsReady === "1", "options-theme-early.js: fail-open overwrote authoritative readiness");
+
+const sourceLocal = { get: defaults => Promise.resolve("optSyncEnabled" in defaults
+  ? { optSyncEnabled: false } : { optTheme: "light", themePresetKey: "" }) };
+const corrected = runOptionsEarly({ mode: "dark", preset: "dracula", chrome: { storage: { local: sourceLocal } } });
+await new Promise(resolve => setImmediate(resolve));
+check(corrected.values.get("pp-theme") === "light" && corrected.values.get("pp-theme-preset") === "" &&
+  !("theme" in corrected.root.dataset), "options-theme-early.js: authoritative storage did not correct mirror and theme");
+
+const optionsHead = optionsHtml.slice(optionsHtml.indexOf("<head>"), optionsHtml.indexOf("</head>"));
+const optionsEarlyTag = '<script src="options-theme-early.js"></script>';
+check(optionsHead.indexOf(optionsEarlyTag) >= 0 &&
+  optionsHead.indexOf(optionsEarlyTag) < optionsHead.indexOf('<link rel="stylesheet" href="options.css">') &&
+  (optionsHtml.match(/options-theme-early\.js/g) || []).length === 1,
+  "options.html: theme bootstrap is not one synchronous head script before options.css");
+check(/\.container\s*{[\s\S]{0,100}visibility:\s*hidden/.test(optionsCss) &&
+  /html\[data-options-ready\]\s+\.container\s*{\s*visibility:\s*visible/.test(optionsCss),
+  "options.css: stable first-frame gate is missing");
+function inOrder(source, ...parts) {
+  let cursor = -1;
+  return parts.every(part => (cursor = source.indexOf(part, cursor + 1)) >= 0);
+}
+const optionsThemeApplyStart = optionsJs.indexOf("function applyOptionsPageTheme");
+const optionsThemeApplyEnd = optionsJs.indexOf("// Track active preset key", optionsThemeApplyStart);
+const optionsThemeApply = optionsJs.slice(optionsThemeApplyStart, optionsThemeApplyEnd);
+check(optionsThemeApply.includes("pbpApplyOptionsEarlyTheme(themeMode, presetKey)") &&
+  !optionsThemeApply.includes("pbpStoreOptionsThemeMirror"),
+  "options.js: visual theme apply also mutates the persisted mirror");
+check(inOrder(optionsJs,
+  "Object.entries(fieldMap)", "el.value = val", "Object.entries(checkMap)", "el.checked = val",
+  "syncKeysToggle.checked = syncApiKeys", "applyOptionsPageTheme(currentPresetKey, s.optTheme);",
+  "pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey);",
+  'document.documentElement.dataset.optionsReady = "1";', "// Language change"),
+  "options.js: General values, authoritative theme/mirror, and ready gate are out of order");
+check(inOrder(optionsJs, "const res = await persistSettings(data);", "if (!res.ok)",
+  "pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey);",
+  "const overlay = await saveOverlayWithFallback(overlayValue);"),
+  "options.js: theme mirror is updated before settings persistence succeeds or after overlay work");
 
 check(/const el = document\.createElement\("button"\);[\s\S]{0,240}el\.className = "stag";/.test(popupTagsJs), "popup-tags.js: suggested tag is not a button");
 check(/const aa = document\.createElement\("button"\);[\s\S]{0,240}aa\.className = "add-all-link";/.test(popupTagsJs), "popup-tags.js: add-all is not a button");

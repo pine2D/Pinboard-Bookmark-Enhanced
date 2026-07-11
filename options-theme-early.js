@@ -1,3 +1,47 @@
+// Synchronous theme mirror + stable first-frame gate. chrome.storage remains
+// authoritative and corrects the mirror asynchronously below.
+const PBP_OPTIONS_ADAPTIVE_MAP = {
+  flexoki: ["flexoki-light", "flexoki-dark"],
+  solarized: ["solarized-light", "solarized-dark"],
+  catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
+};
+
+const _optionsRoot = document.documentElement;
+setTimeout(() => {
+  if (!_optionsRoot.dataset.optionsReady) _optionsRoot.dataset.optionsReady = "fallback";
+}, 3000);
+
+function pbpApplyOptionsEarlyTheme(mode, presetKey) {
+  delete _optionsRoot.dataset.theme;
+  const prefersDark = mode === "dark" ||
+    (mode === "auto" && typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+  if (Object.prototype.hasOwnProperty.call(PBP_OPTIONS_ADAPTIVE_MAP, presetKey)) {
+    const [light, dark] = PBP_OPTIONS_ADAPTIVE_MAP[presetKey];
+    _optionsRoot.dataset.theme = prefersDark ? dark : light;
+  } else if (presetKey) {
+    _optionsRoot.dataset.theme = presetKey;
+  } else if (prefersDark) {
+    _optionsRoot.dataset.theme = "flexoki-dark";
+  }
+}
+
+function pbpStoreOptionsThemeMirror(mode, presetKey) {
+  try {
+    localStorage.setItem("pp-theme", mode || "auto");
+    localStorage.setItem("pp-theme-preset", presetKey || "");
+  } catch (_) {}
+}
+
+let _optionsMirrorMode = "auto";
+let _optionsMirrorPreset = "";
+try {
+  _optionsMirrorMode = localStorage.getItem("pp-theme") || "auto";
+  _optionsMirrorPreset = localStorage.getItem("pp-theme-preset") || "";
+} catch (_) {}
+pbpApplyOptionsEarlyTheme(_optionsMirrorMode, _optionsMirrorPreset);
+
 // ---- Mirror prefill: high-frequency UI fields ----
 // Synchronously apply cached field values from localStorage so the form
 // doesn't visibly jump from empty → populated. Async path below still
@@ -33,22 +77,15 @@ try {
   }
 } catch (_) {}
 
-// Apply theme early to prevent flash (MV3 requires external script, no inline)
-// shared.js not yet loaded here — inline storage selector
-chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {
-  return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
-    .get({ optTheme: "auto", themePresetKey: "" });
-}).then(s => {
-  const prefersDark = s.optTheme === "dark" ||
-    (s.optTheme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-
-  if (s.themePresetKey === "flexoki") {
-    // Flexoki Adaptive: pick light or dark based on user preference
-    document.documentElement.dataset.theme = prefersDark ? "flexoki-dark" : "flexoki-light";
-  } else if (s.themePresetKey) {
-    document.documentElement.dataset.theme = s.themePresetKey;
-  } else if (prefersDark) {
-    // No preset selected — fall back to Flexoki Dark for dark mode preference
-    document.documentElement.dataset.theme = "flexoki-dark";
-  }
-});
+// Async source-of-truth read — corrects and seeds the mirror for future opens.
+if (typeof chrome !== "undefined" && chrome.storage?.local) {
+  chrome.storage.local.get({ optSyncEnabled: false }).then(({ optSyncEnabled }) => {
+    return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
+      .get({ optTheme: "auto", themePresetKey: "" });
+  }).then(s => {
+    const mode = s.optTheme || "auto";
+    const presetKey = s.themePresetKey || "";
+    pbpStoreOptionsThemeMirror(mode, presetKey);
+    pbpApplyOptionsEarlyTheme(mode, presetKey);
+  }).catch(() => { /* storage unavailable: localStorage mirror already applied */ });
+}
