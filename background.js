@@ -200,15 +200,29 @@ async function debouncedCheck(url) {
 // ---- Load settings with deobfuscation (module-level cache, invalidated on storage.onChanged) ----
 let _settingsCache = null;
 let _settingsCacheGeneration = 0;
+let _settingsCachePending = null;
 async function loadSettings() {
-  if (_settingsCache) return _settingsCache;
   while (true) {
+    if (_settingsCache) return _settingsCache;
     const generation = _settingsCacheGeneration;
-    const s = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
-    deobfuscateSettings(s);
-    if (generation !== _settingsCacheGeneration) continue;
-    _settingsCache = s;
-    return s;
+    if (!_settingsCachePending || _settingsCachePending.generation !== generation) {
+      const promise = pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS).then((settings) => {
+        deobfuscateSettings(settings);
+        return settings;
+      });
+      _settingsCachePending = { generation, promise };
+    }
+    const pending = _settingsCachePending;
+    try {
+      const settings = await pending.promise;
+      if (generation !== _settingsCacheGeneration) continue;
+      _settingsCache = settings;
+      return settings;
+    } catch (error) {
+      if (generation === _settingsCacheGeneration) throw error;
+    } finally {
+      if (_settingsCachePending === pending) _settingsCachePending = null;
+    }
   }
 }
 function invalidateSettingsCache() {
@@ -1157,9 +1171,6 @@ pbpMigrateLegacyWildcardPermission().catch(() => {});
 // existing storage-warm alarm below so a mid-session syncApiKeys-off toggle
 // and any stray reintroduction of a secret into sync gets swept within 5 minutes.
 pbpMigrateSecretsToLocal().catch(() => {});
-// Rewrite legacy queued credentials to non-secret account bindings as soon as
-// this worker boots; the same serialized path also runs for every queue read.
-readOfflineQueueWithIds().catch(() => {});
 
 async function syncPrewarmTagsAlarm() {
   const s = await loadSettings();
@@ -1334,6 +1345,7 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === "install" || reason === "update") {
     _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
+    readOfflineQueueWithIds().catch(() => {});
   }
 });
 

@@ -1052,21 +1052,30 @@ await suite("unified save pipeline", async () => {
     equal(h.storageData.offlineQueue.length, 1, "explicit retry failure must retain the item");
   });
 
-  await test("startup and keepalive alarm drains retain another account's queue", async () => {
+  await test("offline queue migration stays lazy at worker eval and runs on every queue entry point", async () => {
     const source = await getBackgroundSource();
     const alarmBlock = source.slice(source.indexOf('if (alarm.name === "keepalive")'), source.indexOf('if (alarm.name === "prewarm-tags")'));
     const startupBlock = source.slice(source.indexOf("chrome.runtime.onStartup.addListener"), source.indexOf("chrome.runtime.onInstalled.addListener"));
+    const installBlock = source.slice(source.indexOf("chrome.runtime.onInstalled.addListener"), source.indexOf("chrome.runtime.onMessage.addListener"));
+    const getBlock = source.slice(source.indexOf('if (message.type === "get_offline_queue")'), source.indexOf('if (message.type === "save_intent")'));
+    equal(source.split("\n").filter((line) => line === "readOfflineQueueWithIds().catch(() => {});").length, 0,
+      "ordinary worker evaluation must not proactively read offlineQueue");
     assert(alarmBlock.includes("processOfflineQueue()"), "keepalive alarm no longer drains through the guarded path");
     assert(startupBlock.includes("processOfflineQueue()"), "startup no longer drains through the guarded path");
+    assert(installBlock.includes('reason === "install" || reason === "update"') && installBlock.includes("readOfflineQueueWithIds()"),
+      "install/update no longer performs the one-time queue migration");
+    assert(getBlock.includes("readOfflineQueueWithIds()"), "get_offline_queue no longer migrates before returning data");
 
     const h = await createHarness({
-      queue: [{ queueId: "account-a", account: "alice", ...intent({ mode: "overwrite" }) }],
+      queue: [{ queueId: "account-a", token: obfuscateKey("alice:legacy-token"), ...intent({ mode: "overwrite" }) }],
       settings: { pinboardToken: "bob:current-token" },
     });
     await h.processOfflineQueue();
     await h.processOfflineQueue();
     equal(h.fetchCalls.length, 0, "automatic drains must not send across accounts");
     equal(h.storageData.offlineQueue.length, 1, "automatic drain failure must retain the item");
+    equal(h.storageData.offlineQueue[0].account, "alice", "automatic drain must preserve legacy queue ownership");
+    assert(!("token" in h.storageData.offlineQueue[0]), "automatic drain must purge the durable legacy credential");
   });
 
   await test("side-effect failure never requeues an accepted save", async () => {

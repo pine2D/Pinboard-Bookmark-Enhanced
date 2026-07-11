@@ -816,30 +816,113 @@ async function run() {
     const start = backgroundSource.indexOf("let _settingsCache = null;");
     const end = backgroundSource.indexOf("// F7: Track recent saves", start);
     const cacheSource = backgroundSource.slice(start, end);
-    let reads = 0;
-    let releaseFirst;
-    let firstStartedResolve;
-    const firstStarted = new Promise((resolve) => { firstStartedResolve = resolve; });
-    const reader = () => {
-      reads++;
-      if (reads === 1) {
-        firstStartedResolve();
-        return new Promise((resolve) => { releaseFirst = () => resolve({ pinboardToken: obfuscateKey("alice:old") }); });
-      }
-      return Promise.resolve({ pinboardToken: obfuscateKey("alice:new") });
-    };
     const factory = new Function("SETTINGS_DEFAULTS", "pbpReadSettingsWithSecrets", "deobfuscateSettings",
       `${cacheSource}\nreturn { loadSettings, invalidateSettingsCache, cached: () => _settingsCache };`);
-    const cache = factory(SETTINGS_DEFAULTS, reader, deobfuscateSettings);
-    const pending = cache.loadSettings();
-    await firstStarted;
-    cache.invalidateSettingsCache();
-    releaseFirst();
-    const current = await pending;
-    const cached = await cache.loadSettings();
-    check("E4 background settings cache: invalidation during a pending read cannot republish stale credentials",
-      reads === 2 && current.pinboardToken === "alice:new" && cached.pinboardToken === "alice:new" && cache.cached() === cached &&
-      backgroundSource.includes("changes.optSyncEnabled") && backgroundSource.includes("invalidatePinboardAuthState()"));
+
+    let reads = 0;
+    const releases = [];
+    const concurrentCache = factory(SETTINGS_DEFAULTS, () => {
+      reads++;
+      return new Promise((resolve) => { releases.push(resolve); });
+    }, deobfuscateSettings);
+    const concurrentA = concurrentCache.loadSettings();
+    const concurrentB = concurrentCache.loadSettings();
+    await Promise.resolve();
+    releases.forEach((resolve) => resolve({ pinboardToken: obfuscateKey("alice:one") }));
+    const [concurrentValueA, concurrentValueB] = await Promise.all([concurrentA, concurrentB]);
+    check("E4 background settings cache: concurrent callers share one read",
+      reads === 1 && concurrentValueA === concurrentValueB && concurrentCache.cached() === concurrentValueA);
+
+    reads = 0;
+    let releaseStale;
+    const invalidatedCache = factory(SETTINGS_DEFAULTS, () => {
+      reads++;
+      if (reads === 1) {
+        return new Promise((resolve) => { releaseStale = () => resolve({ pinboardToken: obfuscateKey("alice:old") }); });
+      }
+      return Promise.resolve({ pinboardToken: obfuscateKey("alice:new") });
+    }, deobfuscateSettings);
+    const invalidatedA = invalidatedCache.loadSettings();
+    const invalidatedB = invalidatedCache.loadSettings();
+    invalidatedCache.invalidateSettingsCache();
+    releaseStale();
+    const [freshA, freshB] = await Promise.all([invalidatedA, invalidatedB]);
+    const cached = await invalidatedCache.loadSettings();
+    check("E4 background settings cache: pending invalidation causes exactly one fresh reread for every caller",
+      reads === 2 && freshA.pinboardToken === "alice:new" && freshB === freshA && cached === freshA &&
+      invalidatedCache.cached() === freshA && backgroundSource.includes("changes.optSyncEnabled") &&
+      backgroundSource.includes("invalidatePinboardAuthState()"));
+
+    reads = 0;
+    const firstError = new Error("settings unavailable");
+    const retryCache = factory(SETTINGS_DEFAULTS, () => {
+      reads++;
+      return reads === 1
+        ? Promise.reject(firstError)
+        : Promise.resolve({ pinboardToken: obfuscateKey("alice:retry") });
+    }, deobfuscateSettings);
+    let rejectedWith = null;
+    try { await retryCache.loadSettings(); } catch (error) { rejectedWith = error; }
+    const retried = await retryCache.loadSettings();
+    check("E4 background settings cache: rejected read clears singleflight for retry",
+      rejectedWith === firstError && reads === 2 && retried.pinboardToken === "alice:retry" && retryCache.cached() === retried);
+
+    reads = 0;
+    let releaseLateValue;
+    const lateValueCache = factory(SETTINGS_DEFAULTS, () => {
+      reads++;
+      if (reads === 1) {
+        return new Promise((resolve) => { releaseLateValue = () => resolve({ pinboardToken: obfuscateKey("alice:old") }); });
+      }
+      return Promise.resolve({ pinboardToken: obfuscateKey("alice:fresh-first") });
+    }, deobfuscateSettings);
+    const lateValueWaiter = lateValueCache.loadSettings();
+    lateValueCache.invalidateSettingsCache();
+    const freshFirst = await lateValueCache.loadSettings();
+    releaseLateValue();
+    const lateValueJoined = await lateValueWaiter;
+    check("E4 background settings cache: late stale value cannot replace a completed fresh generation",
+      reads === 2 && freshFirst.pinboardToken === "alice:fresh-first" &&
+      lateValueJoined === freshFirst && lateValueCache.cached() === freshFirst);
+
+    reads = 0;
+    let rejectLateRead;
+    let releaseFreshRead;
+    const lateRejectCache = factory(SETTINGS_DEFAULTS, () => {
+      reads++;
+      if (reads === 1) return new Promise((_, reject) => { rejectLateRead = reject; });
+      if (reads === 2) {
+        return new Promise((resolve) => {
+          releaseFreshRead = () => resolve({ pinboardToken: obfuscateKey("alice:fresh-pending") });
+        });
+      }
+      return Promise.resolve({ pinboardToken: obfuscateKey("alice:unexpected-extra-read") });
+    }, deobfuscateSettings);
+    const lateRejectA = lateRejectCache.loadSettings();
+    const lateRejectB = lateRejectCache.loadSettings();
+    lateRejectCache.invalidateSettingsCache();
+    const pendingFresh = lateRejectCache.loadSettings();
+    const lateRejectOutcome = Promise.all([pendingFresh, lateRejectA, lateRejectB])
+      .then((values) => ({ values }), (error) => ({ error }));
+    let unhandledReason = null;
+    const onUnhandledRejection = (event) => {
+      unhandledReason = event.reason;
+      event.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    rejectLateRead(new Error("stale generation failed"));
+    await Promise.resolve();
+    await Promise.resolve();
+    releaseFreshRead();
+    const lateRejectResult = await lateRejectOutcome;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    const lateRejectValues = lateRejectResult.values || [];
+    check("E4 background settings cache: late stale rejection joins and cannot clear the fresh pending entry",
+      !lateRejectResult.error && !unhandledReason && reads === 2 && lateRejectValues.length === 3 &&
+      lateRejectValues.every((value) => value === lateRejectValues[0]) &&
+      lateRejectValues[0]?.pinboardToken === "alice:fresh-pending" && lateRejectCache.cached() === lateRejectValues[0]);
+
     const mdAiSource = await fetch("../md-ai-core.js").then((response) => response.text());
     check("E4 md AI cache: storage changes invalidate the memoized settings promise",
       mdAiSource.includes("chrome.storage.onChanged.addListener") &&
