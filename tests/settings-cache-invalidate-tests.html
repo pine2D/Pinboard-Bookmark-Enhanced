@@ -49,6 +49,10 @@ suite("pbpSettingsKeysChanged", () => {
   test("a real setting (tagSyncMode) DOES count", () => {
     assert(pbpSettingsKeysChanged({ tagSyncMode: { newValue: "fresh" } }) === true, "tagSyncMode is a real setting");
   });
+  test("syncApiKeys and optSyncEnabled routing changes DO count", () => {
+    assert(pbpSettingsKeysChanged({ syncApiKeys: { newValue: true } }) === true, "syncApiKeys must invalidate readers");
+    assert(pbpSettingsKeysChanged({ optSyncEnabled: { newValue: true } }) === true, "storage source switch must invalidate readers");
+  });
   test("a mixed batch with one real key counts", () => {
     assert(pbpSettingsKeysChanged({ _pbRateLimitTs: {}, waybackArchiveEnabled: { newValue: true } }) === true, "any real key triggers");
   });

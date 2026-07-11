@@ -1320,13 +1320,12 @@ let _pbpExplainPage = { url: "", title: "" };
 let _pbpExplainSettings = null;
 let _pbpExplainTrigger = "icon"; // live value; the in-popover gear updates it
 
-// Persist the explain trigger to the same area options.js writes (sync when
-// optSyncEnabled, else local). A sync-area write can reject on quota/throttle;
-// the in-memory _pbpExplainTrigger already took effect, so swallow it rather
-// than surface an unhandled rejection from the radio change handler.
+// Persist through the shared atomic settings writer. The in-memory trigger has
+// already taken effect, so a storage failure remains non-blocking here.
 async function _pbpExplainPersistTrigger(value) {
   try {
-    await (await pbpAiSettingsArea()).set({ selectionTrigger: value });
+    const result = await persistSettings({ selectionTrigger: value });
+    if (!result.ok) throw result.error || new Error("settings write failed");
   } catch (_) { /* quota/throttle: in-memory switch already applied */ }
 }
 

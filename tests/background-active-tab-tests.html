@@ -62,19 +62,29 @@ function buildProxyHarness(source) {
   const end = source.indexOf('if (message.type === "retry_offline_item"', start);
   assert(start >= 0 && end > start, "Pinboard proxy branch not found");
   const branch = source.slice(start, end);
-  const runBranch = new Function("message", "sendResponse", "pinboardFetch", "pbpIsAllowedPinboardApiUrl", branch);
+  const runBranch = new Function(
+    "message", "sendResponse", "pinboardFetch", "pinboardFetchImmediate",
+    "pbpIsAllowedPinboardApiUrl", "getCurrentPinboardAuth",
+    "pbpAuthorizePinboardApiUrl", "pbpPinboardAuthIsCurrent", branch
+  );
   return {
     branch,
     async invoke(message) {
       const calls = { fetch: [], responses: [] };
+      const fetchStub = (...args) => {
+        calls.fetch.push(args);
+        return Promise.resolve({ ok: true, status: 200, text: async () => "{}" });
+      };
+      const auth = { token: "alice:new", account: "alice", epoch: 1 };
       const returned = runBranch(
         message,
         (response) => calls.responses.push(response),
-        (...args) => {
-          calls.fetch.push(args);
-          return Promise.resolve({ ok: true, status: 200, text: async () => "{}" });
-        },
-        pbpIsAllowedPinboardApiUrl
+        fetchStub,
+        fetchStub,
+        pbpIsAllowedPinboardApiUrl,
+        async () => auth,
+        pbpAuthorizePinboardApiUrl,
+        (candidate) => candidate === auth
       );
       await new Promise((resolve) => setTimeout(resolve, 0));
       return { branch, calls, returned };
@@ -104,6 +114,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
   };
   const extractionCalls = [];
   const dependencies = {
+    getCurrentPinboardAuth: async () => ({ token: "alice:token", account: "alice", epoch: 1 }),
     loadSettings: async () => settings,
     pbpEffectivePrivate: () => false,
     showNotification: (...args) => notifications.push(args),
@@ -188,7 +199,7 @@ async function run() {
     const h = buildProxyHarness(source);
     const result = await h.invoke({
       type: "pinboard_api_call",
-      url: "https://api.pinboard.in/v1/posts/get?format=json",
+      url: "https://api.pinboard.in/v1/posts/get?auth_token=alice%3Aold&format=json",
       options: { method: "POST", headers: { Authorization: "attacker" } },
     });
     assert(result.calls.fetch.length === 1 && result.calls.fetch[0].length === 1, "caller options reached pinboardFetch");
@@ -270,7 +281,7 @@ async function run() {
       url, title: "Article", tab: { id: 7 }, settingsOverrides: {},
       toread: false, notifyId: "qs", notifyTitle: "Saved", notifyCategory: "quickSave",
     });
-    assert(h.extractionCalls.length === 1 && h.extractionCalls[0].length === 1,
+    assert(h.extractionCalls.length === 1 && h.extractionCalls[0][1]?.expectedUrl === url && !h.extractionCalls[0][1]?.withDefuddle,
       "no-AI save injected the full extractor");
   });
 
@@ -280,7 +291,7 @@ async function run() {
       url, title: "Article", tab: { id: 7 }, settingsOverrides: {},
       toread: false, notifyId: "qs", notifyTitle: "Saved", notifyCategory: "quickSave",
     });
-    assert(h.extractionCalls.length === 1 && h.extractionCalls[0].length === 1,
+    assert(h.extractionCalls.length === 1 && h.extractionCalls[0][1]?.expectedUrl === url && !h.extractionCalls[0][1]?.withDefuddle,
       "keyless AI save injected the full extractor");
   });
 
@@ -296,7 +307,8 @@ async function run() {
         toread: prefix === "rl", notifyId: prefix, notifyTitle: "Saved", notifyCategory: "quickSave",
       });
       assert(h.extractionCalls.length === 1 && h.extractionCalls[0][0] === 7 &&
-        h.extractionCalls[0][1]?.withDefuddle === true, prefix + " AI branch did not request Defuddle");
+        h.extractionCalls[0][1]?.withDefuddle === true && h.extractionCalls[0][1]?.expectedUrl === url,
+        prefix + " AI branch did not bind Defuddle extraction to the saved URL");
     }
   });
 

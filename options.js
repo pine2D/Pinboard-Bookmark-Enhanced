@@ -52,7 +52,20 @@ async function saveOverlayWithFallback(value) {
   }
 }
 
-function _tagGovSetProgress(value) {
+let _tagGovVisibleAccount = "";
+
+function _tagGovUiOwned(account) {
+  const card = $id("tag-gov-progress");
+  return !!account && _tagGovVisibleAccount === account && card?.dataset.account === account;
+}
+
+function _tagGovClaimProgress(account) {
+  const card = $id("tag-gov-progress");
+  if (card && account && _tagGovVisibleAccount === account) card.dataset.account = account;
+}
+
+function _tagGovSetProgress(value, expectedAccount = "") {
+  if (expectedAccount && !_tagGovUiOwned(expectedAccount)) return;
   const percent = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
   const fill = $id("tag-gov-progress-fill");
   const bar = $id("tag-gov-progress-bar");
@@ -117,6 +130,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function _initTagGovPanel() {
     if (_tagGovInited) return;
     _tagGovInited = true;
+    const initialAuth = await getTagGovAuth();
+    _tagGovVisibleAccount = initialAuth?.account || "";
     const overview = $id("tag-gov-overview");
     // Bind Refresh UNCONDITIONALLY before the first load: when the initial
     // loadTagCounts failed (no token yet, offline), the gated binding left a dead
@@ -126,8 +141,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const refreshBtn = overview ? overview.querySelector("#tag-gov-refresh") : null;
     if (refreshBtn) refreshBtn.addEventListener("click", async () => {
       refreshBtn.disabled = true;
-      await chrome.storage.local.remove("_tagGovAiGroups");
-      const fresh = await loadTagCounts(true);
+      const auth = await getTagGovAuth();
+      if (!auth) { refreshBtn.disabled = false; return; }
+      const aiKey = pbpAccountStorageKey("_tagGovAiGroups", auth.account);
+      await chrome.storage.local.set({ [aiKey]: { account: auth.account, groups: [], ts: Date.now() } });
+      const fresh = await loadTagCounts(true, auth.account);
       if (fresh) updateTagGovOverview(fresh);
       else _tagGovShowLoadFailed();
       await renderTagGov();
@@ -143,22 +161,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Restore the last run's outcome if it left anything needing attention —
     // all-ok runs are not resurrected (no nagging).
     if (_tagGovUnfinishedBatches === 0) {
-      const lr = (await chrome.storage.local.get({ _tagGovLastRun: null }))._tagGovLastRun;
+      const auth = await getTagGovAuth();
+      const lastRunKey = pbpAccountStorageKey("_tagGovLastRun", auth?.account);
+      const storedLastRun = lastRunKey ? (await chrome.storage.local.get(lastRunKey))[lastRunKey] : null;
+      if (auth && !(await getTagGovAuth(auth.account))) return;
+      const lr = _tagGovOwned(storedLastRun, auth?.account);
       if (lr && (lr.fail > 0 || lr.skipped > 0 || (lr.problems && lr.problems.length))) {
         await getTagGovToken(); // seed _tagGovUser so restored delete rows render t:-page links
         _tagGovProblems.length = 0;
         _tagGovProblems.push(...(lr.problems || []));
         const card = $id("tag-gov-progress");
         const pt = $id("tag-gov-progress-text");
+        _tagGovClaimProgress(auth.account);
         if (card) card.classList.remove("hidden");
-        _tagGovSetProgress(100);
+        _tagGovSetProgress(100, auth.account);
         if (pt) {
           pt.textContent = t("tagGovLastRun", new Date(lr.ts).toLocaleString()) + " "
             + t("tagGovDoneSummary", String(lr.ok), String(lr.fail))
             + (lr.skipped > 0 ? " · " + t("tagGovSkippedSummary", String(lr.skipped)) : "");
         }
-        _tagGovSetProgressBtn("dismiss");
-        renderTagGovProblems();
+        _tagGovSetProgressBtn("dismiss", auth.account);
+        renderTagGovProblems(auth.account);
       }
     }
 
@@ -180,6 +203,57 @@ document.addEventListener("DOMContentLoaded", async () => {
     await renderTagGov();
     await renderLowCountTags();
   }
+
+  let _tagGovAccountReloadTail = Promise.resolve();
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (!_tagGovInited || (area !== "sync" && area !== "local")
+        || !(changes.pinboardToken || changes.syncApiKeys || changes.optSyncEnabled)) return;
+    _tagGovAccountReloadTail = _tagGovAccountReloadTail.then(async () => {
+      let state;
+      try {
+        state = await pbpReadSecretSyncState({ includeGlobalWhenSyncOff: true, persistInferredState: false });
+      } catch (_) {
+        state = null;
+      }
+      if (state && !pbpAuthStorageChangeIsRelevant(changes, area, state)) return;
+      const auth = state ? await getTagGovAuth() : null;
+      const nextAccount = auth?.account || "";
+      if (nextAccount === _tagGovVisibleAccount) return;
+      _tagGovVisibleAccount = nextAccount;
+      if (_tagGovUnfinishedBatches === 0) _tagGovProblems.length = 0;
+      _tagGovUser = auth?.account || "";
+      $id("tag-gov-groups")?.replaceChildren();
+      $id("tag-gov-lowcount-list")?.replaceChildren();
+      $id("tag-gov-problems")?.replaceChildren();
+      const progress = $id("tag-gov-progress");
+      if (progress) {
+        progress.classList.add("hidden");
+        delete progress.dataset.account;
+      }
+      $id("tag-gov-bundles-warn")?.querySelector("a")?.remove();
+      if (!auth) {
+        _tagGovShowLoadFailed();
+        return;
+      }
+      const counts = await loadTagCounts(false, auth.account);
+      if (_tagGovVisibleAccount !== auth.account || !(await getTagGovAuth(auth.account))) return;
+      if (counts) updateTagGovOverview(counts);
+      else _tagGovShowLoadFailed();
+      await renderTagGov();
+      await renderLowCountTags();
+      if (_tagGovVisibleAccount !== auth.account) return;
+      const warn = $id("tag-gov-bundles-warn");
+      if (warn && !warn.querySelector("a")) {
+        const a = document.createElement("a");
+        a.href = "https://pinboard.in/u:" + encodeURIComponent(auth.account) + "/bundles/";
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = "pinboard.in/u:" + auth.account + "/bundles/";
+        warn.appendChild(document.createTextNode(" "));
+        warn.appendChild(a);
+      }
+    }).catch(() => {});
+  });
 
   // ---- Tab switching ----
   const _tabBtns = [...document.querySelectorAll(".tab-btn")];
@@ -688,8 +762,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- All settings with defaults (from shared.js) ----
   await pbpMigrateSecretsToLocal();
-  let s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
-  s = await pbpApplySecretOverlay(s); // MUST run before deobfuscateSettings (see shared.js note)
+  let s = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
   deobfuscateSettings(s);
 
   // ---- Schema v2 migration: split customCSS into themePresetKey + customOverlayCSS ----
@@ -963,15 +1036,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("opt-urlclean-custom").value = (urlClean.customParams || []).join("\n");
   $id("opt-urlclean-exclude").value = (urlClean.excludeParams || []).join("\n");
 
-  // ---- Load sync toggle (stored in local, not in settings storage) ----
-  const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
+  // optSyncEnabled is device-local; syncApiKeys is one Chrome-account-wide
+  // marker because the credentials themselves share chrome.storage.sync.
+  let initialSyncState;
+  try {
+    initialSyncState = await pbpReadSecretSyncState({
+      includeGlobalWhenSyncOff: true,
+      persistInferredState: false,
+    });
+  } catch (_) {
+    const localState = await chrome.storage.local.get({ optSyncEnabled: false });
+    initialSyncState = { optSyncEnabled: !!localState.optSyncEnabled, syncApiKeys: false };
+  }
+  const { optSyncEnabled, syncApiKeys } = initialSyncState;
   const syncToggle = $id("opt-sync-enabled");
   if (syncToggle) syncToggle.checked = optSyncEnabled;
 
-  // ---- syncApiKeys (batch (4)): local-only meta-setting, same precedent as
-  // optSyncEnabled -- NOT in SETTINGS_DEFAULTS, NOT in backup export, disabled
-  // (grayed) whenever sync itself is off. Default unchecked (keys stay local).
-  const { syncApiKeys } = await chrome.storage.local.get({ syncApiKeys: false });
+  // The account-wide key toggle remains disabled on a device whose ordinary
+  // settings sync is off; that device keeps using its local credential copy.
   const syncKeysToggle = $id("opt-sync-api-keys");
   if (syncKeysToggle) {
     syncKeysToggle.checked = syncApiKeys;
@@ -985,40 +1067,58 @@ document.addEventListener("DOMContentLoaded", async () => {
     const oldStorage = enabling ? chrome.storage.local : chrome.storage.sync;
     const newStorage = enabling ? chrome.storage.sync : chrome.storage.local;
     try {
-      // 1. Migrate regular settings
-      const data = await oldStorage.get(Object.keys(SETTINGS_DEFAULTS));
-      // syncApiKeys secret routing (batch (4)): when ENABLING sync (local -> sync)
-      // and the user has NOT opted API keys into sync, strip the 18
-      // API_KEY_FIELDS + exportTargets tokens out of what's headed to sync and
-      // keep the full copy local. Disabling (sync -> local): `data` is read from
-      // SYNC via an array-form get, so when routing was already active the
-      // API_KEY_FIELDS were never in sync -- simply absent from `data`.
-      // `newStorage.set(data)` into local is safe only because
-      // chrome.storage.set() MERGES rather than replaces: pre-existing local
-      // secrets survive by omission, not by an explicit copy.
-      if (enabling) {
-        const { syncApiKeys } = await chrome.storage.local.get({ syncApiKeys: false });
-        if (!syncApiKeys) {
-          const { main, secrets } = pbpSplitSecretBatch(data);
-          if (Object.keys(secrets).length) await chrome.storage.local.set(secrets);
-          await newStorage.set(main);
-        } else {
-          await newStorage.set(data);
+      await pbpWithSecretStorageLock(async () => {
+        const fresh = await pbpReadSecretSyncStateUnlocked({ includeGlobalWhenSyncOff: true });
+        if (!!fresh.optSyncEnabled === enabling) return;
+        try {
+          // 1. Migrate regular settings
+          const data = await oldStorage.get(Object.keys(SETTINGS_DEFAULTS));
+          // Keep the ordinary-settings migration from overwriting whichever
+          // side currently owns the full credential/export-target snapshot.
+          if (enabling) {
+            if (!fresh.syncApiKeys) {
+              const { main, secrets } = pbpSplitSecretBatch(data);
+              if (Object.keys(secrets).length) await chrome.storage.local.set(secrets);
+              await newStorage.set(main);
+            } else {
+              // Global key sync is already on. Local credentials can be stale;
+              // publish only ordinary settings and keep cloud secrets/targets.
+              const { main } = pbpSplitSecretBatch(data);
+              delete main.exportTargets;
+              await newStorage.set(main);
+            }
+          } else {
+            if (fresh.syncApiKeys) {
+              // Cloud is current while keys-on; copy its full snapshot down so
+              // this sync-off device can continue locally without cloud reads.
+              await newStorage.set(data);
+            } else {
+              // Local already owns the full secret target object. Do not replace
+              // it with the stripped main-area copy from sync.
+              const { main } = pbpSplitSecretBatch(data);
+              delete main.exportTargets;
+              await newStorage.set(main);
+            }
+          }
+          // 2. Migrate customOverlayCSS (large value) — read from old, then switch pref, then write to new
+          const customOverlayCSS = await syncGetLarge("customOverlayCSS", "");
+          const savedThemes = await syncGetLarge("savedThemes", []);
+          await chrome.storage.local.set({ optSyncEnabled: enabling });
+          _settingsStorageCache = newStorage;
+          await syncSetLarge("customOverlayCSS", customOverlayCSS);
+          await syncSetLarge("savedThemes", savedThemes);
+        } catch (e) {
+          await chrome.storage.local.set({ optSyncEnabled: !enabling });
+          _settingsStorageCache = oldStorage;
+          throw e;
         }
-      } else {
-        await newStorage.set(data);
-      }
-      // 2. Migrate customOverlayCSS (large value) — read from old, then switch pref, then write to new
-      const customOverlayCSS = await syncGetLarge("customOverlayCSS", "");
-      const savedThemes = await syncGetLarge("savedThemes", []);
-      await chrome.storage.local.set({ optSyncEnabled: enabling });
-      await syncSetLarge("customOverlayCSS", customOverlayCSS);
-      await syncSetLarge("savedThemes", savedThemes);
+      });
     } catch (e) {
       // Migration failed — revert toggle and abort
       console.error("sync migration failed:", e);
-      syncToggle.checked = !enabling;
-      await chrome.storage.local.set({ optSyncEnabled: !enabling });
+      const actual = await chrome.storage.local.get({ optSyncEnabled: !enabling }).catch(() => ({ optSyncEnabled: !enabling }));
+      syncToggle.checked = !!actual.optSyncEnabled;
+      if (syncKeysToggle) syncKeysToggle.disabled = !actual.optSyncEnabled;
       const errEl = $id("opt-sync-error");
       if (errEl) {
         errEl.textContent = t("syncMigrationFailed") || "Sync migration failed. Please try again or reduce custom CSS size.";
@@ -1036,21 +1136,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // syncApiKeys toggle: on = copy local secrets up to sync (opt back into cloud
-  // keys, full exportTargets incl. token -- this IS opting in); off = scrub sync
-  // back down, reusing the exact same idempotent routine SW boot runs.
+  // keys, full exportTargets incl. token -- this IS opting in); off = first copy
+  // the current sync truth down, then flip the flag and scrub sync.
   syncKeysToggle?.addEventListener("change", async () => {
     const enabling = syncKeysToggle.checked;
     try {
       if (enabling) {
         await pbpEnableSyncApiKeys();
       } else {
-        await chrome.storage.local.set({ syncApiKeys: false });
-        await pbpMigrateSecretsToLocal();
+        await pbpDisableSyncApiKeys();
       }
+      const actual = await pbpReadSecretSyncState({ includeGlobalWhenSyncOff: true });
+      syncKeysToggle.checked = !!actual.syncApiKeys;
+      syncKeysToggle.disabled = !actual.optSyncEnabled;
     } catch (e) {
       console.error("syncApiKeys toggle failed:", e);
-      syncKeysToggle.checked = !enabling;
-      await chrome.storage.local.set({ syncApiKeys: !enabling }).catch(() => {});
+      // Reflect the authoritative account-wide marker; never infer a rollback
+      // from the stale checkbox direction.
+      const actual = await pbpReadSecretSyncState({ includeGlobalWhenSyncOff: true })
+        .catch(() => ({ optSyncEnabled: true, syncApiKeys: !enabling }));
+      syncKeysToggle.checked = !!actual.syncApiKeys;
+      syncKeysToggle.disabled = !actual.optSyncEnabled;
+      const errEl = $id("opt-sync-error");
+      if (errEl) {
+        errEl.textContent = t("syncMigrationFailed") || "Sync migration failed. Please try again.";
+        errEl.classList.remove("hidden");
+        setTimeout(() => errEl.classList.add("hidden"), 8000);
+      }
     }
   });
 
@@ -1931,6 +2043,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Tag governance event listeners ----
   $id("tag-gov-reset-ignored")?.addEventListener("click", async (e) => {
     e.preventDefault();
+    const startAuth = await getTagGovAuth();
+    if (!startAuth) return;
     // Anchor to the positioned <small> wrapper, NOT inside the <a href="#"> itself:
     // a popover nested in the anchor makes its buttons activate the link (the
     // popover only stopPropagation()s, it can't cancel the anchor's default), so
@@ -1940,16 +2054,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       yesText: t("reset"),
       noText: t("cancel"),
       onConfirm: async () => {
-        await chrome.storage.local.remove("_tagGovIgnored");
+        const auth = await getTagGovAuth(startAuth.account);
+        if (!auth) return;
+        const ignoredKey = pbpAccountStorageKey("_tagGovIgnored", auth.account);
+        await chrome.storage.local.set({ [ignoredKey]: { account: auth.account, ids: [] } });
         await renderTagGov();
       }
     });
   });
 
   $id("tag-gov-delete-selected")?.addEventListener("click", async () => {
-    const selected = Array.from(
-      document.querySelectorAll(".tag-gov-lowcount-checkbox:checked")
-    ).map(el => el.value);
+    const selectedBoxes = Array.from(document.querySelectorAll(".tag-gov-lowcount-checkbox:checked"));
+    const selected = selectedBoxes.map(el => el.value);
+    const selectedAccounts = new Set(selectedBoxes.map(el => el.dataset.account).filter(Boolean));
+    if (selectedAccounts.size !== 1) return;
+    const expectedAccount = selectedAccounts.values().next().value;
     if (!selected.length) return;
     const btn = $id("tag-gov-delete-selected");
     const shown = selected.slice(0, 10).join(", ") + (selected.length > 10 ? ", +" + (selected.length - 10) + " more" : "");
@@ -1960,17 +2079,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       yesText: t("tagGovDeleteSelected"),
       noText: t("cancel"),
       onConfirm: async () => {
+        if (!(await getTagGovAuth(expectedAccount))) return;
         const delTags = selected.map(tg => tg.toLowerCase());
         if (delTags.some(tg => _tagGovActiveTags.has(tg))) return;
         delTags.forEach(tg => _tagGovActiveTags.add(tg)); // reserve BEFORE await (atomic check+reserve)
         if (btn) btn.disabled = true;
-        if (!(await ensureTagSnapshot())) {
+        if (!(await ensureTagSnapshot(expectedAccount))) {
           delTags.forEach(tg => _tagGovActiveTags.delete(tg)); // roll back reservation on snapshot failure
           if (btn) btn.disabled = false;
           return;
         }
         try {
-          await runTagGovOps(selected.map(tag => ({ op: "delete", tag })));
+          await runTagGovOps(selected.map(tag => ({ op: "delete", tag })), expectedAccount);
         } finally {
           delTags.forEach(tg => _tagGovActiveTags.delete(tg));
           if (btn) btn.disabled = false;
@@ -1999,7 +2119,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
 
     try {
-      const counts = await loadTagCounts(false);
+      const auth = await getTagGovAuth(sNow._tagGovExpectedAccount || "");
+      if (!auth) throw new Error("account_changed");
+      const counts = await loadTagCounts(false, auth.account);
       if (!counts) throw new Error("Failed to load tag counts");
 
       const prompt = pbpTagGovBuildAiPrompt(counts, 1500);
@@ -2007,11 +2129,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       // DeepSeek reasoner) burn output budget on reasoning first — the default
       // 1024-token cap came back as an empty response from both. 4096 is accepted
       // by every supported provider.
-      const raw = await getOrCreateInflight("taggov|" + sNow.aiProvider, () => callAI(sNow, prompt, { maxTokens: 4096 }));
+      const raw = await getOrCreateInflight("taggov|" + auth.account + "|" + sNow.aiProvider, () => callAI(sNow, prompt, { maxTokens: 4096 }));
 
       const aiGroups = pbpTagGovParseAiResponse(raw, counts);
 
-      await chrome.storage.local.set({ _tagGovAiGroups: { groups: aiGroups, ts: Date.now() } });
+      if (!(await getTagGovAuth(auth.account))) throw new Error("account_changed");
+      const aiKey = pbpAccountStorageKey("_tagGovAiGroups", auth.account);
+      await chrome.storage.local.set({ [aiKey]: { account: auth.account, groups: aiGroups, ts: Date.now() } });
       await renderTagGov();
 
       if (statusEl && aiGroups.length === 0) {
@@ -2022,7 +2146,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (err?.code === "model_not_found") {
         msg = t("aiErrorModelNotFound", sNow.aiProvider) + " " + t("aiErrorModelNotFoundHint");
       } else if (err?.code === "host_permission" && $id("opt-ai-provider")?.value === sNow.aiProvider) {
-        tagGovAiPendingSettings = { ...sNow };
+        tagGovAiPendingSettings = { ...sNow, _tagGovExpectedAccount: sNow._tagGovExpectedAccount };
         grantRetry = true;
       }
       if (statusEl) {
@@ -2053,6 +2177,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (pending && $id("opt-ai-provider")?.value === pending.aiProvider) {
         const granted = await requestAIHostPermissions(pending);
         if (!granted || tagGovAiPendingSettings !== pending) return;
+        if (!(await getTagGovAuth(pending._tagGovExpectedAccount))) return;
         tagGovAiPendingSettings = null;
         await runTagGovAi(pending);
         return;
@@ -2061,11 +2186,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Keep one live form snapshot through call, permission failure, and retry.
       const live = pbpLiveAiSettingsSnapshot($id("opt-ai-provider")?.value || "gemini");
-      let sNow = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
-      sNow = await pbpApplySecretOverlay(sNow);
+      let sNow = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
       deobfuscateSettings(sNow);
       if ($id("opt-ai-provider")?.value !== live.aiProvider) return;
-      sNow = { ...sNow, ...live };
+      sNow = { ...sNow, ...live, _tagGovExpectedAccount: pbpPinboardAccountFromToken(sNow.pinboardToken) };
       await runTagGovAi(sNow);
     } finally {
       btn.disabled = false;
@@ -2120,10 +2244,9 @@ function _tagGovShowLoadFailed() {
 // Returns the deobfuscated Pinboard token, or "" if not set / on error.
 async function getTagGovToken() {
   try {
-    let s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
-    s = await pbpApplySecretOverlay(s);
+    let s = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
     const token = deobfuscateKey(s.pinboardToken) || "";
-    if (token) _tagGovUser = token.split(":")[0] || _tagGovUser;
+    _tagGovUser = token ? token.split(":")[0] || "" : "";
     return token;
   } catch (e) {
     console.error("[tag-gov] getTagGovToken failed:", e);
@@ -2131,34 +2254,56 @@ async function getTagGovToken() {
   }
 }
 
+function _tagGovOwned(entry, account) {
+  return account && entry && typeof entry === "object" && !Array.isArray(entry)
+    && entry.account === account ? entry : null;
+}
+
+async function getTagGovAuth(expectedAccount = "") {
+  const token = await getTagGovToken();
+  const account = pbpPinboardAccountFromToken(token);
+  if (!token || !account || (expectedAccount && account !== expectedAccount)) return null;
+  return { token, account };
+}
+
+async function requireTagGovAuth(expectedAccount) {
+  const auth = await getTagGovAuth(expectedAccount);
+  if (auth) return auth;
+  const error = new Error("account_changed");
+  error.code = "account_changed";
+  throw error;
+}
+
 // Once per options-page session: download a tags/get snapshot before any destructive op.
 // Returns true if the snapshot was already downloaded this session or was just successfully
 // downloaded. Returns false (and shows an error in #tag-gov-progress-text) on any failure.
-let _tagGovSnapshotDownloaded = false;
+let _tagGovSnapshotAccount = "";
 
-async function ensureTagSnapshot() {
-  if (_tagGovSnapshotDownloaded) return true;
-  _tagGovSetProgress(0);
+async function ensureTagSnapshot(expectedAccount) {
+  if (expectedAccount && _tagGovSnapshotAccount === expectedAccount) return true;
+  _tagGovClaimProgress(expectedAccount);
+  _tagGovSetProgress(0, expectedAccount);
   const progressText = $id("tag-gov-progress-text");
   const progress = $id("tag-gov-progress");
   try {
-    const token = await getTagGovToken();
-    if (!token) {
-      if (progress) progress.classList.remove("hidden");
-      if (progressText) progressText.textContent = t("tagGovSnapshotFailed");
-      _tagGovSetProgressBtn("dismiss"); // failure card must be closable on a fresh page
+    const auth = await getTagGovAuth(expectedAccount);
+    if (!auth) {
+      if (_tagGovUiOwned(expectedAccount) && progress) progress.classList.remove("hidden");
+      if (_tagGovUiOwned(expectedAccount) && progressText) progressText.textContent = t("tagGovSnapshotFailed");
+      _tagGovSetProgressBtn("dismiss", expectedAccount); // failure card must be closable on a fresh page
       return false;
     }
     const resp = await pinboardFetch(
-      `https://api.pinboard.in/v1/tags/get?auth_token=${encodeURIComponent(token)}&format=json`
+      `https://api.pinboard.in/v1/tags/get?auth_token=${encodeURIComponent(auth.token)}&format=json`
     );
     if (!resp || !resp.ok) {
-      if (progress) progress.classList.remove("hidden");
-      if (progressText) progressText.textContent = t("tagGovSnapshotFailed");
-      _tagGovSetProgressBtn("dismiss"); // failure card must be closable on a fresh page
+      if (_tagGovUiOwned(expectedAccount) && progress) progress.classList.remove("hidden");
+      if (_tagGovUiOwned(expectedAccount) && progressText) progressText.textContent = t("tagGovSnapshotFailed");
+      _tagGovSetProgressBtn("dismiss", expectedAccount); // failure card must be closable on a fresh page
       return false;
     }
     const counts = await resp.json();
+    if (!(await getTagGovAuth(auth.account))) return false;
     const now = new Date();
     const pad = (n, w = 2) => String(n).padStart(w, "0");
     const yyyymmdd = pad(now.getFullYear(), 4) + pad(now.getMonth() + 1) + pad(now.getDate());
@@ -2174,18 +2319,18 @@ async function ensureTagSnapshot() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    _tagGovSnapshotDownloaded = true;
+    _tagGovSnapshotAccount = auth.account;
     // Don't stomp a running batch's progress line with the snapshot note.
     if (_tagGovUnfinishedBatches === 0) {
-      if (progress) progress.classList.remove("hidden");
-      if (progressText) progressText.textContent = t("tagGovSnapshotSaved");
+      if (_tagGovUiOwned(expectedAccount) && progress) progress.classList.remove("hidden");
+      if (_tagGovUiOwned(expectedAccount) && progressText) progressText.textContent = t("tagGovSnapshotSaved");
     }
     return true;
   } catch (e) {
-    console.error("[tag-gov] ensureTagSnapshot failed:", e);
-    if (progress) progress.classList.remove("hidden");
-    if (progressText) progressText.textContent = t("tagGovSnapshotFailed");
-    _tagGovSetProgressBtn("dismiss"); // failure card must be closable on a fresh page
+    if (e?.code !== "account_changed") console.error("[tag-gov] ensureTagSnapshot failed:", e);
+    if (_tagGovUiOwned(expectedAccount) && progress) progress.classList.remove("hidden");
+    if (_tagGovUiOwned(expectedAccount) && progressText) progressText.textContent = t("tagGovSnapshotFailed");
+    _tagGovSetProgressBtn("dismiss", expectedAccount); // failure card must be closable on a fresh page
     return false;
   }
 }
@@ -2195,7 +2340,7 @@ function formatTagGovEst(seconds) {
   return seconds < 90 ? Math.ceil(seconds) + "s" : Math.ceil(seconds / 60) + " min";
 }
 
-async function confirmMergeGroup(group, canonical, anchorEl) {
+async function confirmMergeGroup(group, canonical, anchorEl, expectedAccount) {
   if (!group || !group.members || group.members.length === 0) return;
   const plan = pbpTagGovBuildPlan(group.members, canonical);
   if (plan.length === 0) return;
@@ -2219,19 +2364,20 @@ async function confirmMergeGroup(group, canonical, anchorEl) {
     yesText: t("tagGovMerge"),
     noText: t("cancel"),
     onConfirm: async () => {
+      if (!(await getTagGovAuth(expectedAccount))) return;
       // Refuse overlapping plans (same group clicked twice, or a sibling group
       // sharing a tag) instead of burning another rate-limited posts/all slot.
       const planTags = [];
       for (const pop of plan) planTags.push(pop.old.toLowerCase(), pop.new.toLowerCase());
       if (planTags.some(tg => _tagGovActiveTags.has(tg))) return;
       planTags.forEach(tg => _tagGovActiveTags.add(tg)); // reserve BEFORE await (atomic check+reserve)
-      if (!(await ensureTagSnapshot())) {
+      if (!(await ensureTagSnapshot(expectedAccount))) {
         planTags.forEach(tg => _tagGovActiveTags.delete(tg)); // roll back reservation on snapshot failure
         return;
       }
       _tagGovMarkRowQueued(anchor.closest(".tag-gov-group-row"));
       try {
-        await runTagGovOps(plan);
+        await runTagGovOps(plan, expectedAccount);
       } finally {
         planTags.forEach(tg => _tagGovActiveTags.delete(tg));
       }
@@ -2248,19 +2394,20 @@ async function confirmMergeGroup(group, canonical, anchorEl) {
 // once its use count reaches zero. Deliberately NO tags/delete afterwards: if any re-save
 // was skipped or failed, deleting would strip the old tag with no new tag present (data loss).
 // Each network call flows through the shared 3.1s pinboardFetch queue.
-async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
+async function retagBookmarksViaResave(expectedAccount, oldTag, newTag, onProgress) {
   const enc = encodeURIComponent;
   // The 10s retry sleeps used to be a frozen screen — tell the user what is happening.
   const setWaitNote = () => {
     const pt = $id("tag-gov-progress-text");
     if (pt) pt.textContent = t("tagGovRateLimitWait");
   };
-  const listUrl = `https://api.pinboard.in/v1/posts/all?tag=${enc(oldTag)}&meta=no&format=json&auth_token=${enc(token)}`;
+  const listUrl = (token) => `https://api.pinboard.in/v1/posts/all?tag=${enc(oldTag)}&meta=no&format=json&auth_token=${enc(token)}`;
   // pinboardFetch REJECTS on network failure or its 30s timeout — without this catch
   // the rejection escaped to the op-level handler as an anonymous fail with no row.
   let resp;
   try {
-    resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
+    let auth = await requireTagGovAuth(expectedAccount);
+    resp = await pinboardFetch(listUrl(auth.token), { timeoutMs: 30000 });
     if (resp.status === 429) {
       setWaitNote();
       await new Promise(r => setTimeout(r, TAG_GOV_LIST_RETRY_WAIT_MS));
@@ -2269,10 +2416,12 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
       if (_tagGovCancelRequested) {
         return { total: 0, saved: 0, failed: 0, skipped: 0, problems: [], cancelled: true };
       }
-      resp = await pinboardFetch(listUrl, { timeoutMs: 30000 });
+      auth = await requireTagGovAuth(expectedAccount);
+      resp = await pinboardFetch(listUrl(auth.token), { timeoutMs: 30000 });
       if (resp.status === 429) return { total: 0, saved: 0, failed: 0, skipped: 0, problems: [], aborted: true };
     }
   } catch (e) {
+    if (e?.code === "account_changed") throw e;
     return { total: 0, saved: 0, failed: 1, skipped: 0,
       problems: [{ url: "", title: "", kind: "failed", reason: "posts/all: " + (e?.name || "network error") }], aborted: false };
   }
@@ -2282,7 +2431,9 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
     return { total: 0, saved: 0, failed: 1, skipped: 0,
       problems: [{ url: "", title: "", kind: "failed", reason: "posts/all HTTP " + resp.status }], aborted: false };
   }
+  await requireTagGovAuth(expectedAccount);
   const posts = await resp.json();
+  await requireTagGovAuth(expectedAccount);
   if (!Array.isArray(posts)) {
     return { total: 0, saved: 0, failed: 1, skipped: 0,
       problems: [{ url: "", title: "", kind: "failed", reason: "posts/all: unexpected response" }], aborted: false };
@@ -2295,6 +2446,7 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
     if (_tagGovCancelRequested) {
       return { total: posts.length, saved, failed, skipped, problems, cancelled: true };
     }
+    const auth = await requireTagGovAuth(expectedAccount);
     if (onProgress) onProgress(i, posts.length);
     const post = posts[i];
     if (!post || !post.href) {
@@ -2313,7 +2465,7 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
       if (!seen.has(key)) { seen.add(key); next.push(replaced); }
     }
     const uri = buildPostsAddUri({
-      token,
+      token: auth.token,
       url: post.href,
       title: post.description || post.href,
       extended: post.extended || "",
@@ -2336,7 +2488,18 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
         if (_tagGovCancelRequested) {
           return { total: posts.length, saved, failed, skipped, problems, cancelled: true };
         }
-        r = await pinboardFetch(uri);
+        const retryAuth = await requireTagGovAuth(expectedAccount);
+        const retryUri = buildPostsAddUri({
+          token: retryAuth.token,
+          url: post.href,
+          title: post.description || post.href,
+          extended: post.extended || "",
+          tags: next.join(" "),
+          shared: post.shared,
+          toread: post.toread,
+          dt: post.time
+        });
+        r = await pinboardFetch(retryUri);
         if (r.status === 429) {
           // A persistent 429 on one bookmark is likely a transient cross-context
           // collision (popup/background share the rate budget) — record it and move
@@ -2359,6 +2522,7 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
         problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: String(data.result_code || "unknown") });
       }
     } catch (e) {
+      if (e?.code === "account_changed") throw e;
       console.error("[tag-gov] retag re-save failed:", post.href, e);
       failed++;
       problems.push({ url: post.href, title: post.description || post.href, kind: "failed", reason: e?.name || "network error" });
@@ -2375,6 +2539,7 @@ async function retagBookmarksViaResave(token, oldTag, newTag, onProgress) {
 // the UI and the ok/fail bookkeeping too.
 let _tagGovBatchChain = Promise.resolve();
 let _tagGovUnfinishedBatches = 0;
+let _tagGovRunAccount = "";
 // Number of queued batches to drop after an abort/stop: exactly the batches that
 // were waiting at that moment (they would keep hammering an API that just told us
 // to stop, and their op lines would overwrite the abort explanation). A NEW batch
@@ -2386,7 +2551,8 @@ let _tagGovCancelRequested = false;
 
 // The single button on the progress card: "Stop" while a run is active, "Dismiss"
 // once the queue drains (the sticky card otherwise pins to the viewport forever).
-function _tagGovSetProgressBtn(mode) {
+function _tagGovSetProgressBtn(mode, expectedAccount = "") {
+  if (expectedAccount && !_tagGovUiOwned(expectedAccount)) return;
   const btn = $id("tag-gov-progress-btn");
   if (!btn) return;
   btn.dataset.mode = mode;
@@ -2398,18 +2564,22 @@ function _tagGovSetProgressBtn(mode) {
 document.addEventListener("click", (ev) => {
   const btn = ev.target instanceof Element && ev.target.closest("#tag-gov-progress-btn");
   if (!btn) return;
+  const card = $id("tag-gov-progress");
+  const owner = card?.dataset.account || "";
+  if (!owner || !_tagGovUiOwned(owner)) return;
   if (btn.dataset.mode === "stop") {
     _tagGovCancelRequested = true;
     btn.disabled = true; // takes effect at the next per-bookmark checkpoint
   } else {
-    const card = $id("tag-gov-progress");
     if (card) card.classList.add("hidden");
     // The attention list is a sibling of the card — dismiss both, or it stays
     // orphaned on screen with no way to clear it.
     _tagGovProblems.length = 0;
-    renderTagGovProblems();
+    renderTagGovProblems(owner);
     // Dismiss = acknowledged: drop the persisted record so it stops reappearing.
-    try { chrome.storage.local.remove("_tagGovLastRun"); } catch (_) {}
+    getTagGovAuth(owner).then((auth) => {
+      if (auth) return chrome.storage.local.remove(pbpAccountStorageKey("_tagGovLastRun", owner));
+    }).catch(() => {});
   }
 });
 // Bookmarks that need manual attention, accumulated across the queued batches of one
@@ -2441,7 +2611,8 @@ const _tagGovRunTotals = { ok: 0, fail: 0, skipped: 0 };
 
 // Render the manual-attention list under the progress row: failed re-saves and
 // skipped over-budget bookmarks, each linking to pinboard's edit form for that URL.
-function renderTagGovProblems() {
+function renderTagGovProblems(expectedAccount = "") {
+  if (expectedAccount && !_tagGovUiOwned(expectedAccount)) return;
   const box = $id("tag-gov-problems");
   if (!box) return;
   box.replaceChildren();
@@ -2502,8 +2673,22 @@ function _tagGovSetTabBusy(busy) {
   if (btn) btn.classList.toggle("tab-busy", busy);
 }
 
-function runTagGovOps(ops) {
+function _tagGovWithAccountLock(account, work) {
+  const locks = typeof navigator !== "undefined" && navigator.locks;
+  return locks && typeof locks.request === "function"
+    ? locks.request("pbp-tag-gov-" + account, work)
+    : Promise.resolve().then(work);
+}
+
+async function runTagGovOps(ops, expectedAccount = "") {
+  const auth = await getTagGovAuth(expectedAccount);
+  if (!auth) return { ok: 0, fail: 0, aborted: true, reason: "account_changed" };
+  if (_tagGovUnfinishedBatches > 0 && _tagGovRunAccount !== auth.account) {
+    return { ok: 0, fail: 0, aborted: true, reason: "account_changed" };
+  }
   if (_tagGovUnfinishedBatches === 0) {
+    _tagGovRunAccount = auth.account;
+    _tagGovClaimProgress(auth.account);
     _tagGovSetTabBusy(true);
     // fresh run: reset the cross-batch accumulators
     _tagGovProblems.length = 0;
@@ -2515,13 +2700,14 @@ function runTagGovOps(ops) {
   }
   _tagGovUnfinishedBatches++;
   const run = _tagGovBatchChain.then(() =>
-    _runTagGovBatch(ops).finally(() => {
+    _tagGovWithAccountLock(auth.account, () => _runTagGovBatch(ops, auth.account)).finally(() => {
       _tagGovUnfinishedBatches--;
       if (_tagGovUnfinishedBatches === 0) {
+        _tagGovRunAccount = "";
         _tagGovSetTabBusy(false);
         // Backstop for a batch that threw before reaching the tail: never leave
         // the card stuck on a dead "Stop" button.
-        _tagGovSetProgressBtn("dismiss");
+        _tagGovSetProgressBtn("dismiss", auth.account);
       }
     })
   );
@@ -2545,12 +2731,14 @@ window.addEventListener("beforeunload", (e) => {
 // MUST re-freeze them on user-triggered re-renders (ignore/refresh/AI) mid-run.
 let _tagGovIsTailRender = false;
 
-async function _tagGovTailRefresh() {
-  _tagGovSetProgressBtn("dismiss");
+async function _tagGovTailRefresh(expectedAccount) {
+  _tagGovSetProgressBtn("dismiss", expectedAccount);
   // Persist the run outcome: the summary and attention list were DOM-only and
   // vanished if the page closed before the user came back to look at them.
   try {
-    await chrome.storage.local.set({ _tagGovLastRun: {
+    const lastRunKey = pbpAccountStorageKey("_tagGovLastRun", expectedAccount);
+    await chrome.storage.local.set({ [lastRunKey]: {
+      account: expectedAccount,
       ts: Date.now(),
       ok: _tagGovRunTotals.ok,
       fail: _tagGovRunTotals.fail,
@@ -2558,7 +2746,9 @@ async function _tagGovTailRefresh() {
       problems: _tagGovProblems.slice(0, TAG_GOV_PROBLEMS_CAP)
     } });
   } catch (_) {}
-  const fresh = await loadTagCounts(true);
+  if (!(await getTagGovAuth(expectedAccount))) return;
+  const fresh = await loadTagCounts(true, expectedAccount);
+  if (!(await getTagGovAuth(expectedAccount))) return;
   if (fresh) updateTagGovOverview(fresh);
   _tagGovIsTailRender = true;
   try {
@@ -2569,7 +2759,7 @@ async function _tagGovTailRefresh() {
   }
 }
 
-async function _runTagGovBatch(ops) {
+async function _runTagGovBatch(ops, expectedAccount) {
   if (_tagGovDrainCount > 0) {
     // Queued behind an aborted/stopped batch: drop without touching the progress
     // line (it shows the abort explanation), but still refresh the panel at drain.
@@ -2578,32 +2768,31 @@ async function _runTagGovBatch(ops) {
     // window must NOT inherit the stale cancel flag (it would die at its first
     // checkpoint with zero ops executed, shown as "Stopped" the user never asked for).
     if (_tagGovDrainCount === 0) _tagGovCancelRequested = false;
-    if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh();
+    if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh(expectedAccount);
     return { ok: 0, fail: 0, aborted: true };
   }
   if (!ops || ops.length === 0) return { ok: 0, fail: 0, aborted: false };
-  _tagGovSetProgress(0);
-  const token = await getTagGovToken();
-  if (!token) {
+  _tagGovClaimProgress(expectedAccount);
+  _tagGovSetProgress(0, expectedAccount);
+  const runAuth = await getTagGovAuth(expectedAccount);
+  if (!runAuth) {
     const pt = $id("tag-gov-progress-text");
     const pg = $id("tag-gov-progress");
-    if (pg) pg.classList.remove("hidden");
-    if (pt) pt.textContent = t("pinboardErrorAuth");
-    _tagGovSetProgressBtn("dismiss");
-    // Keep the run bookkeeping consistent with the normal path: count the failures
-    // and still run the drain-time tail (persist + refresh) when last in the queue.
-    _tagGovRunTotals.fail += ops.length;
-    if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh();
-    return { ok: 0, fail: ops.length, aborted: false };
+    if (_tagGovUiOwned(expectedAccount) && pg) pg.classList.remove("hidden");
+    if (_tagGovUiOwned(expectedAccount) && pt) pt.textContent = t("pinboardErrorAuth");
+    _tagGovSetProgressBtn("dismiss", expectedAccount);
+    // Account changes cancel the captured plan; they are not operation failures.
+    if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh(expectedAccount);
+    return { ok: 0, fail: 0, aborted: true, reason: "account_changed" };
   }
 
   const progress = $id("tag-gov-progress");
   const ptext = $id("tag-gov-progress-text");
   // Visibility from any scroll position is handled by CSS — #tag-gov-progress is
   // position:sticky at the viewport bottom, so no scroll jump is needed here.
-  if (progress) progress.classList.remove("hidden");
+  if (_tagGovUiOwned(expectedAccount) && progress) progress.classList.remove("hidden");
 
-  _tagGovSetProgressBtn("stop");
+  _tagGovSetProgressBtn("stop", expectedAccount);
 
   let ok = 0, fail = 0, aborted = false, cancelled = false, skippedTotal = 0;
   const enc = encodeURIComponent;
@@ -2613,12 +2802,14 @@ async function _runTagGovBatch(ops) {
       cancelled = true;
       break;
     }
+    try { await requireTagGovAuth(expectedAccount); }
+    catch (_) { aborted = true; break; }
     const op = ops[i];
     // Bar = completed ops + fractional progress inside the current op. The old
     // (i + 1) / ops.length formula filled the bar at the START of each op — a
     // single-op batch showed 100% from the first second while 30 bookmarks were
     // still being re-saved.
-    _tagGovSetProgress((i / ops.length) * 100);
+    _tagGovSetProgress((i / ops.length) * 100, expectedAccount);
     const opLine =
       t("tagGovOpLabel", String(i + 1), String(ops.length)) + " " +
       "<span class=\"status-ic ok\">" + PBP_ICONS.check + "</span>" + ok + " " +
@@ -2627,15 +2818,15 @@ async function _runTagGovBatch(ops) {
       const waiting = _tagGovUnfinishedBatches - 1; // batches queued behind this one
       return waiting > 0 ? " · " + t("tagGovQueuedBatches", String(waiting)) : "";
     };
-    if (ptext) ptext.innerHTML = opLine + queueSuffix();
+    if (_tagGovUiOwned(expectedAccount) && ptext) ptext.innerHTML = opLine + queueSuffix();
 
     if (op.op === "rename") {
       // tags/rename is broken server-side -- re-tag each bookmark instead (see helper above).
       try {
-        const res = await retagBookmarksViaResave(token, op.old, op.new, (done, total) => {
+        const res = await retagBookmarksViaResave(expectedAccount, op.old, op.new, (done, total) => {
           if (total <= 0) return;
-          _tagGovSetProgress(((i + done / total) / ops.length) * 100);
-          if (ptext) {
+          _tagGovSetProgress(((i + done / total) / ops.length) * 100, expectedAccount);
+          if (_tagGovUiOwned(expectedAccount) && ptext) {
             // Live ETA from the REAL bookmark total — the confirm-time estimate came
             // from possibly-stale cached counts. Upcoming ops add one posts/all each.
             const remainSec = (total - done) * 3.2 + (ops.length - i - 1) * 3.2;
@@ -2664,6 +2855,7 @@ async function _runTagGovBatch(ops) {
           fail++;
         }
       } catch (e) {
+        if (e?.code === "account_changed") { aborted = true; break; }
         console.error("[tag-gov] op failed:", op, e);
         fail++;
       }
@@ -2674,23 +2866,26 @@ async function _runTagGovBatch(ops) {
       fail++;
       continue;
     }
-    const opUrl = `https://api.pinboard.in/v1/tags/delete?tag=${enc(op.tag)}&auth_token=${enc(token)}&format=json`;
-
     try {
+      let auth = await requireTagGovAuth(expectedAccount);
+      let opUrl = `https://api.pinboard.in/v1/tags/delete?tag=${enc(op.tag)}&auth_token=${enc(auth.token)}&format=json`;
       let resp = await pinboardFetch(opUrl);
       if (resp.status === 429) {
-        if (ptext) ptext.textContent = t("tagGovRateLimitWait");
+        if (_tagGovUiOwned(expectedAccount) && ptext) ptext.textContent = t("tagGovRateLimitWait");
         await new Promise(r => setTimeout(r, TAG_GOV_RETRY_WAIT_MS));
         if (_tagGovCancelRequested) {
           cancelled = true;
           break;
         }
+        auth = await requireTagGovAuth(expectedAccount);
+        opUrl = `https://api.pinboard.in/v1/tags/delete?tag=${enc(op.tag)}&auth_token=${enc(auth.token)}&format=json`;
         resp = await pinboardFetch(opUrl);
         if (resp.status === 429) {
           aborted = true;
           break;
         }
       }
+      await requireTagGovAuth(expectedAccount);
       if (!resp.ok) {
         fail++;
         _tagGovProblems.push({ kind: "failed", tag: op.tag, reason: "HTTP " + resp.status });
@@ -2704,13 +2899,14 @@ async function _runTagGovBatch(ops) {
         _tagGovProblems.push({ kind: "failed", tag: op.tag, reason: String(data.result || "unknown") });
       }
     } catch (e) {
+      if (e?.code === "account_changed") { aborted = true; break; }
       console.error("[tag-gov] op failed:", op, e);
       fail++;
       _tagGovProblems.push({ kind: "failed", tag: op.tag, reason: e?.name || "network error" });
     }
   }
 
-  if (!aborted && !cancelled) _tagGovSetProgress(100);
+  if (!aborted && !cancelled) _tagGovSetProgress(100, expectedAccount);
   const cancelledBehind = (aborted || cancelled) ? _tagGovUnfinishedBatches - 1 : 0;
   if (aborted || cancelled) {
     _tagGovDrainCount = cancelledBehind;
@@ -2723,7 +2919,7 @@ async function _runTagGovBatch(ops) {
   _tagGovRunTotals.fail += fail;
   _tagGovRunTotals.skipped += skippedTotal;
 
-  if (ptext) {
+  if (_tagGovUiOwned(expectedAccount) && ptext) {
     const behindNote = cancelledBehind > 0 ? " · " + t("tagGovQueuedCancelled", String(cancelledBehind)) : "";
     ptext.textContent = cancelled
       ? t("tagGovStopped") + behindNote
@@ -2746,7 +2942,7 @@ async function _runTagGovBatch(ops) {
       ptext.appendChild(seeBelow);
     }
   }
-  renderTagGovProblems();
+  renderTagGovProblems(expectedAccount);
 
   // Refresh detection/UI only when this is the last batch in the queue: a mid-queue
   // renderTagGov() rebuilt the group rows under the user (resetting a canonical radio
@@ -2754,47 +2950,52 @@ async function _runTagGovBatch(ops) {
   // forced tags/get per batch. The old pre-purge of cached_user_tags was redundant —
   // loadTagCounts(true) bypasses and rewrites the cache itself — and cleared popup
   // autocomplete's cache whenever the refetch failed.
-  if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh();
+  if (_tagGovUnfinishedBatches === 1) await _tagGovTailRefresh(expectedAccount);
 
   return { ok, fail, aborted, cancelled };
 }
 
-async function loadTagCounts(forceFresh = false) {
+async function loadTagCounts(forceFresh = false, expectedAccount = "") {
   try {
+    const startAuth = await getTagGovAuth(expectedAccount);
+    if (!startAuth) return null;
     if (!forceFresh) {
       const cached = await chrome.storage.local.get({ cached_user_tags: null });
-      if (cached.cached_user_tags) {
-        const { counts, timestamp } = cached.cached_user_tags;
+      const entry = _tagGovOwned(cached.cached_user_tags, startAuth.account);
+      if (entry) {
+        const { counts, timestamp } = entry;
         if (Date.now() - timestamp < TAG_CACHE_TTL) {
+          if (!(await getTagGovAuth(startAuth.account))) return null;
           return counts || null;
         }
       }
     }
-    const token = await getTagGovToken();
-    if (!token) return null;
-    const url = `https://api.pinboard.in/v1/tags/get?auth_token=${encodeURIComponent(token)}&format=json`;
+    let auth = startAuth;
+    const url = (token) => `https://api.pinboard.in/v1/tags/get?auth_token=${encodeURIComponent(token)}&format=json`;
     // tags/get on a slow pinboard day exceeds the default 15s timeout (seen in the
     // field: AbortError and Failed-to-fetch back-to-back) — allow 30s and retry once
     // through the queue before declaring failure to the panel.
     let resp;
     try {
-      resp = await pinboardFetch(url, { timeoutMs: 30000 });
+      resp = await pinboardFetch(url(auth.token), { timeoutMs: 30000 });
     } catch (e) {
       console.warn("[tag-gov] tags/get failed, retrying once:", e?.name || e);
-      resp = await pinboardFetch(url, { timeoutMs: 30000 });
+      auth = await requireTagGovAuth(startAuth.account);
+      resp = await pinboardFetch(url(auth.token), { timeoutMs: 30000 });
     }
     if (!resp || !resp.ok) return null;
     const counts = await resp.json();
     if (!counts || typeof counts !== "object") return null;
+    if (!(await getTagGovAuth(startAuth.account))) return null;
     await chrome.storage.local.set({
-      cached_user_tags: { counts, timestamp: Date.now() }
+      cached_user_tags: { account: startAuth.account, counts, timestamp: Date.now() }
     });
     return counts;
   } catch (e) {
     // Expected failure mode (slow/unreachable API) and already surfaced in the UI —
     // warn, not error: unpacked extensions list console.error on chrome://extensions,
     // which should stay reserved for real defects.
-    console.warn("[tag-gov] loadTagCounts failed:", e);
+    if (e?.code !== "account_changed") console.warn("[tag-gov] loadTagCounts failed:", e);
     return null;
   }
 }
@@ -2802,16 +3003,17 @@ async function loadTagCounts(forceFresh = false) {
 async function renderTagGov() {
   const container = $id("tag-gov-groups");
   if (!container) return;
+  const auth = await getTagGovAuth();
+  if (!auth) { container.replaceChildren(); return; }
 
   // Do NOT empty the container before the awaits below: a paint during the async gap
   // collapses the panel height, Chrome clamps the scroll offset, and the page visibly
   // jumps to the top. Build the new content first, then swap atomically at the end.
-  const stored = await chrome.storage.local.get({
-    cached_user_tags: null,
-    _tagGovIgnored: [],
-    _tagGovAiGroups: { groups: [] }
-  });
-  const tagCounts = stored.cached_user_tags && stored.cached_user_tags.counts;
+  const ignoredKey = pbpAccountStorageKey("_tagGovIgnored", auth.account);
+  const aiKey = pbpAccountStorageKey("_tagGovAiGroups", auth.account);
+  const stored = await chrome.storage.local.get(["cached_user_tags", ignoredKey, aiKey]);
+  if (!(await getTagGovAuth(auth.account))) return;
+  const tagCounts = _tagGovOwned(stored.cached_user_tags, auth.account)?.counts;
 
   if (!tagCounts) {
     const empty = document.createElement("div");
@@ -2821,13 +3023,13 @@ async function renderTagGov() {
     return;
   }
 
-  const ignoredList = stored._tagGovIgnored || [];
+  const ignoredList = _tagGovOwned(stored[ignoredKey], auth.account)?.ids || [];
   // AI groups are a stored snapshot and never expire on their own. After a merge the
   // heuristic groups self-heal (rebuilt from fresh counts) but stale AI groups would
   // keep showing vanished members — worse, an AI group whose canonical was itself
   // just merged away would re-create that tag if merged. Filter members against the
   // live counts, refresh their counts, and drop groups left with fewer than 2 members.
-  const aiGroups = ((stored._tagGovAiGroups && stored._tagGovAiGroups.groups) || [])
+  const aiGroups = ((_tagGovOwned(stored[aiKey], auth.account)?.groups) || [])
     .map(g => ({
       ...g,
       members: (g.members || [])
@@ -2903,7 +3105,7 @@ async function renderTagGov() {
     mergeBtn.addEventListener("click", () => {
       const selected = row.querySelector("input[type=\"radio\"]:checked");
       const canonical = selected ? selected.value : group.suggestedCanonical;
-      if (typeof confirmMergeGroup === "function") confirmMergeGroup(group, canonical, mergeBtn);
+      if (typeof confirmMergeGroup === "function") confirmMergeGroup(group, canonical, mergeBtn, auth.account);
     });
     btnGroup.appendChild(mergeBtn);
 
@@ -2911,13 +3113,16 @@ async function renderTagGov() {
     ignoreBtn.className = "btn btn-sm";
     ignoreBtn.textContent = t("tagGovIgnore");
     ignoreBtn.addEventListener("click", async () => {
-      const result2 = await chrome.storage.local.get({ _tagGovIgnored: [] });
-      const list = result2._tagGovIgnored || [];
-      if (!list.includes(group.id)) {
+      await _tagGovWithAccountLock(auth.account, async () => {
+        if (!(await getTagGovAuth(auth.account))) return;
+        const result2 = await chrome.storage.local.get(ignoredKey);
+        const list = (_tagGovOwned(result2[ignoredKey], auth.account)?.ids || []).slice();
+        if (list.includes(group.id)) return;
         list.push(group.id);
-        await chrome.storage.local.set({ _tagGovIgnored: list });
-        await renderTagGov();
-      }
+        if (!(await getTagGovAuth(auth.account))) return;
+        await chrome.storage.local.set({ [ignoredKey]: { account: auth.account, ids: list } });
+      });
+      if (await getTagGovAuth(auth.account)) await renderTagGov();
     });
     btnGroup.appendChild(ignoreBtn);
 
@@ -2942,11 +3147,14 @@ async function renderTagGov() {
 async function renderLowCountTags() {
   const listContainer = $id("tag-gov-lowcount-list");
   if (!listContainer) return;
+  const auth = await getTagGovAuth();
+  if (!auth) { listContainer.replaceChildren(); return; }
 
   // Same scroll-jump guard as renderTagGov: never leave the container empty across
   // an await — build first, swap atomically.
   const cached = await chrome.storage.local.get({ cached_user_tags: null });
-  const counts = cached.cached_user_tags && cached.cached_user_tags.counts;
+  if (!(await getTagGovAuth(auth.account))) return;
+  const counts = _tagGovOwned(cached.cached_user_tags, auth.account)?.counts;
   if (!counts) {
     listContainer.replaceChildren();
     return;
@@ -2972,6 +3180,7 @@ async function renderLowCountTags() {
     checkbox.type = "checkbox";
     checkbox.className = "tag-gov-lowcount-checkbox";
     checkbox.value = item.tag;
+    checkbox.dataset.account = auth.account;
     checkbox.addEventListener("click", (e) => {
       // The browser already toggled this checkbox before the click handler runs,
       // so checkbox.checked is the new state and the range follows it. The anchor

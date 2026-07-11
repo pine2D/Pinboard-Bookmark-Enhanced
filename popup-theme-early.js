@@ -35,9 +35,10 @@ const PBP_POPUP_ADAPTIVE_MAP = {
   }
 })();
 
-// B4: tab data prefill — populate url-input / title-input / existing-banner
+// B4: tab data prefill — populate only public URL/title fields.
 //     synchronously from the last-known tab. popup.js will validate against
 //     chrome.storage.session asynchronously and clear stale prefill if mismatched.
+//     Account-specific bookmark state is always resolved by the background lookup.
 (function applyTabMirror() {
   const _TAB_MIRROR_TTL_MS = 10 * 60 * 1000;
   try {
@@ -50,14 +51,6 @@ const PBP_POPUP_ADAPTIVE_MAP = {
       const ti = document.getElementById("title-input");
       if (u && !u.value) u.value = m.url;
       if (ti && !ti.value) ti.value = m.title || "";
-      if (m.bannerText) {
-        const banner = document.getElementById("existing-banner");
-        if (banner) {
-          banner.textContent = m.bannerText;
-          banner.classList.remove("hidden");
-          banner.dataset.mirror = "1";
-        }
-      }
     }, { once: true });
   } catch (_) {}
 })();

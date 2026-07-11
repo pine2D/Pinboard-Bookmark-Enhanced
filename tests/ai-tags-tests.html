@@ -271,6 +271,64 @@ suite("endpoint origin policy", () => {
   const realFetch = window.fetch;
   const realChrome = window.chrome;
   try {
+    await atest("summary cache is account-scoped and survives same-account token rotation", async () => {
+      const realCacheGet = window.pbpAiCacheGet;
+      const realCacheSet = window.pbpAiCacheSet;
+      const realCacheDelete = window.pbpAiCacheDelete;
+      const entries = new Map();
+      window.pbpAiCacheGet = async (key) => entries.get(key) || null;
+      window.pbpAiCacheSet = async (key, result, ts) => { entries.set(key, { key, result, ts }); };
+      window.pbpAiCacheDelete = async (key) => { entries.delete(key); };
+      try {
+        const url = "https://summary-scope.example/article";
+        await setAICache(url, "summary", "Alice summary", 60, "local", "alice");
+        assertEq(await getAICache(url, "summary", 60, "local", "bob"), null, "Bob miss");
+        assertEq(await getAICache(url, "summary", 60, "local", "alice"), "Alice summary", "same account rotation hit");
+        entries.set(`ai_cache_summary_local_${url}`, { result: "legacy", ts: Date.now() });
+        assertEq(await getAICache(url, "summary", 60, "local"), null, "ownerless legacy miss");
+      } finally {
+        window.pbpAiCacheGet = realCacheGet;
+        window.pbpAiCacheSet = realCacheSet;
+        window.pbpAiCacheDelete = realCacheDelete;
+      }
+    });
+
+    await atest("page extraction rejects navigation between tab check and script execution", async () => {
+      const expectedUrl = "https://example.test/old";
+      let liveUrl = expectedUrl;
+      let bodyExtractions = 0;
+      window.chrome = {
+        runtime: { lastError: null },
+        tabs: { get: (_tabId, callback) => callback({ url: liveUrl, title: "Article" }) },
+        scripting: { executeScript: (args, callback) => {
+          if (args.files) {
+            liveUrl = "https://example.test/new";
+            callback([{}]);
+            return;
+          }
+          bodyExtractions++;
+          callback([{ result: { url: liveUrl, pageText: "wrong page" } }]);
+        } },
+      };
+      const result = await getPageInfoFromTab(7, { withDefuddle: true, expectedUrl });
+      assertEq(result, null, "navigation result");
+      assertEq(bodyExtractions, 0, "body extraction count");
+
+      liveUrl = expectedUrl;
+      window.chrome.scripting.executeScript = (args, callback) => {
+        if (args.files) {
+          callback([{}]);
+          return;
+        }
+        bodyExtractions++;
+        liveUrl = "https://example.test/new";
+        callback([{ result: { url: expectedUrl, pageText: "stale page" } }]);
+      };
+      const lateResult = await getPageInfoFromTab(7, { withDefuddle: true, expectedUrl });
+      assertEq(lateResult, null, "post-extraction live navigation result");
+      assertEq(bodyExtractions, 1, "late body extraction count");
+    });
+
     await atest("invalid custom endpoint fails before fetch", async () => {
       let fetches = 0;
       window.fetch = async () => { fetches++; throw new Error("must not fetch"); };

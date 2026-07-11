@@ -108,9 +108,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
 (async () => {
   try {
-    const [source, backgroundSource] = await Promise.all([
+    const [source, backgroundSource, popupAiSource] = await Promise.all([
       fetch("../popup.js").then((response) => response.text()),
       fetch("../background.js").then((response) => response.text()),
+      fetch("../popup-ai.js").then((response) => response.text()),
     ]);
     const start = source.indexOf("function setupSubmit(token)");
     const handlerEnd = source.indexOf('  document.addEventListener("keydown"', start);
@@ -120,7 +121,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const snapshotIndex = submit.indexOf('url: $id("url-input").value.trim()', policyIndex);
     const ownershipIndex = submit.indexOf("saveUrl !== url", snapshotIndex);
     const intentIndex = submit.indexOf("const intent = {", ownershipIndex);
-    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent })', intentIndex);
+    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount })', intentIndex);
     const snapshot = submit.slice(snapshotIndex, ownershipIndex);
     const intentBlock = submit.slice(intentIndex, sendIndex);
     const tagHelperStart = source.indexOf("function pbpRebasePopupTags(");
@@ -129,6 +130,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const resetStart = source.indexOf("async function resetPinboardSession()");
     const resetEnd = source.indexOf("// ===================== URL Clean Helpers", resetStart);
     const resetSource = source.slice(resetStart, resetEnd);
+    const logoutStart = source.indexOf('$id("logout-link").addEventListener');
+    const logoutEnd = source.indexOf("// ===================== Login", logoutStart);
+    const logoutSource = source.slice(logoutStart, logoutEnd);
     const lookupStart = source.indexOf("async function checkExistingBookmark(");
     const lookupEnd = source.indexOf("// ===================== Submit / Delete", lookupStart);
     const lookupSource = source.slice(lookupStart, lookupEnd);
@@ -155,6 +159,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         querySelector() { return null; },
         setAttribute() {},
         appendChild(child) { this.children.push(child); },
+        replaceChildren(...children) { this.children = children; },
         remove() { this.removed = true; },
         _listeners: listeners,
       };
@@ -179,7 +184,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const fieldDirtyFlags = { "title-input": true, "description-input": true, "private-check": true, "readlater-check": true };
       const bookmarkLookup = { status: lookupFailed ? "failed" : "missing", url: URL, generation: 1, promise: null, formLoaded: false };
       const settings = {
-        pinboardToken: "token",
+        pinboardToken: "alice:token",
         optAutoCloseAfterSave: true,
         waybackArchiveEnabled: archiveRequested,
         waybackSkipPrivate: true,
@@ -191,7 +196,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const checkCalls = [];
       const savedTagCalls = [];
       const syncRemovals = [];
-      const localRemovals = [];
+      const localTokenWrites = [];
       const authEvents = [];
       const reloadTokenValues = [];
       let queueRefreshes = 0;
@@ -214,7 +219,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         storage: {
           local: {
             async get() { return deferWayback ? waybackResponse : {}; },
-            async remove(key) { localRemovals.push(key); authEvents.push("local-remove"); },
+            async set(data) { localTokenWrites.push(data); authEvents.push("local-tombstone"); },
           },
         },
       };
@@ -250,6 +255,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const getSettingsStorage = async () => ({
         async remove(key) { syncRemovals.push(key); authEvents.push("settings-remove"); },
       });
+      const persistSettings = async (data) => {
+        localTokenWrites.push(data);
+        authEvents.push("persist-empty");
+        return { ok: true };
+      };
       const dependencies = {
         $id: (id) => (elements[id] ||= createElementStub()),
         t: (key) => key,
@@ -268,6 +278,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
         window: windowStub,
         document: documentStub,
         getSettingsStorage,
+        persistSettings,
+        invalidateBookmarkLookup() {},
+        pbpPinboardAccountFromToken,
         saveLastUsedTags: (tags) => savedTagCalls.push(tags.slice()),
         checkExistingBookmark,
         pbpWaybackShouldArchive,
@@ -277,11 +290,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const names = Object.keys(dependencies);
       const factory = new Function(...names, `${resetSource}\n${setupSource}\nreturn setupSubmit;`);
       const setupSubmit = factory(...names.map((name) => dependencies[name]));
-      setupSubmit("token");
+      setupSubmit("alice:token");
       const click = elements["submit-btn"]._listeners.click[0];
       return {
         elements, currentTags, fieldDirtyFlags, bookmarkLookup, settings, messages, statuses, timers, bars,
-        checkCalls, savedTagCalls, syncRemovals, localRemovals, authEvents, reloadTokenValues,
+        checkCalls, savedTagCalls, syncRemovals, localTokenWrites, authEvents, reloadTokenValues,
         click, resolveSave, resolveWayback,
         queueRefreshes: () => queueRefreshes,
         closeCalls: () => closeCalls,
@@ -411,11 +424,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       harness.elements["url-input"].value = "https://stale.example";
       harness.resolveSave({ status: "failed", reason: "not_logged_in" });
       await pending;
-      assert(JSON.stringify(harness.syncRemovals) === JSON.stringify(["pinboardToken"]), "settings token was not cleared");
-      assert(JSON.stringify(harness.localRemovals) === JSON.stringify(["pinboardToken"]), "local token was not cleared");
+      assert(harness.syncRemovals.length === 0, "session reset bypassed unified persistence");
+      assert(JSON.stringify(harness.localTokenWrites) === JSON.stringify([{ pinboardToken: "" }]), "empty token was not persisted");
       assert(harness.settings.pinboardToken === "", "in-memory token was not cleared");
       assert(harness.reloadCalls() === 1, "session reset did not reload the Popup");
-      assert(harness.authEvents.join("|") === "settings-remove|local-remove|reload", "session reset order changed: " + harness.authEvents.join("|"));
+      assert(harness.authEvents.join("|") === "persist-empty|reload", "session reset order changed: " + harness.authEvents.join("|"));
       assert(JSON.stringify(harness.reloadTokenValues) === JSON.stringify([""]), "reload happened before the in-memory token was cleared");
     });
 
@@ -506,6 +519,48 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!backgroundSource.includes('message.type === "bookmark_saved"'), "Service Worker still handles bookmark_saved");
     });
 
+    await testAsync("popup summary cache, render, and inflight work are session-account scoped", async () => {
+      const fetchStart = popupAiSource.indexOf("async function fetchAIArtifacts");
+      const fetchEnd = popupAiSource.indexOf("// ---- AI Summary core logic", fetchStart);
+      assert(fetchStart >= 0 && fetchEnd > fetchStart, "fetchAIArtifacts source not found");
+      const keys = [];
+      let currentAccount = "alice";
+      const make = new Function(
+        "pageInfo", "settings", "pbpPopupAiAccountIsCurrent", "getOrCreateInflight",
+        "$id", "callAI", "buildSummaryPrompt",
+        popupAiSource.slice(fetchStart, fetchEnd) + "; return fetchAIArtifacts;"
+      );
+      const fetchArtifact = make(
+        { url: URL, pageText: "body" },
+        { aiProvider: "openai", aiCacheDuration: 60, aiContentSource: "local" },
+        (account) => account === currentAccount,
+        (key, factory) => { keys.push(key); return Promise.resolve().then(factory); },
+        () => ({ value: "" }),
+        async () => "summary",
+        () => "prompt"
+      );
+      assert(await fetchArtifact("summary", true, "alice") === "summary", "Alice summary missing");
+      currentAccount = "bob";
+      assert(await fetchArtifact("summary", true, "bob") === "summary", "Bob summary missing");
+      assert(keys.join("|") === `alice|openai|summary|${URL}|bob|openai|summary|${URL}`,
+        "summary inflight key is not owner-scoped: " + keys.join("|"));
+
+      const setupAi = popupAiSource.slice(popupAiSource.indexOf("function setupAIFeatures()"), popupAiSource.indexOf("// ---- Insert or replace AI summary"));
+      const doSummary = popupAiSource.slice(popupAiSource.indexOf("async function doAISummary"), popupAiSource.indexOf("// ---- Show regenerate"));
+      const doTags = popupAiSource.slice(popupAiSource.indexOf("async function doAITags"), popupAiSource.indexOf("function renderAITags"));
+      assert(setupAi.includes("restoreAccount") && setupAi.includes("pbpPopupAiAccountIsCurrent(restoreAccount)"),
+        "cached summary restore lacks owner recheck");
+      assert(doSummary.includes('getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource, account)') &&
+        doSummary.includes('setAICache(pageInfo.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource, account)'),
+        "doAISummary cache calls lack owner");
+      assert((doSummary.match(/pbpPopupAiAccountIsCurrent\(account\)/g) || []).length >= 5,
+        "doAISummary does not guard every late UI/cache commit");
+      assert(doTags.includes('} catch (e) {\n    if (!pbpPopupAiAccountIsCurrent(account)) return;'),
+        "doAITags stale error UI is not owner-guarded");
+      assert(doTags.includes("if (btn && pbpPopupAiAccountIsCurrent(account))"),
+        "doAITags stale progress cleanup is not owner-guarded");
+    });
+
     test("malformed save responses enter the recoverable error state", () => {
       const malformedIndex = submit.indexOf('typeof result.status !== "string"');
       const catchIndex = submit.indexOf("} catch (e) {", malformedIndex);
@@ -515,11 +570,43 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(recoveryIndex > catchIndex, "error state does not auto-recover");
     });
 
+    await testAsync("validated login does not enter memory when credential persistence fails", async () => {
+      const loginSource = source.slice(source.indexOf('$id("login-btn").addEventListener'), source.indexOf("// ===================== Main"));
+      let loginHandler;
+      let mainCalls = 0;
+      const errors = [];
+      const loginButton = { disabled: false, addEventListener: (_type, fn) => { loginHandler = fn; } };
+      const tokenInput = { value: "alice:test-token" };
+      const loginSettings = { pinboardToken: "" };
+      const deps = {
+        $id: (id) => id === "login-btn" ? loginButton : tokenInput,
+        showElement: (...args) => errors.push(args),
+        t: (key) => key,
+        chrome: {
+          runtime: {
+            lastError: null,
+            sendMessage: (_message, callback) => callback({ ok: true }),
+          },
+        },
+        persistSettings: async () => ({ ok: false, error: new Error("storage unavailable") }),
+        obfuscateKey,
+        settings: loginSettings,
+        showMain: () => { mainCalls++; },
+      };
+      new Function(...Object.keys(deps), loginSource)(...Object.values(deps));
+      await loginHandler({ currentTarget: loginButton });
+      assert(mainCalls === 0 && loginSettings.pinboardToken === "", "failed persistence still entered the authenticated UI");
+      assert(errors.some((args) => args[0] === "login-error" && args[1] === "networkError"), "persistence failure was not surfaced on login");
+    });
+
     test("both Pinboard 401 paths share reset-and-reload behavior", () => {
-      const fetch401 = source.slice(source.indexOf("pinboardFetch = function"), source.indexOf("let currentTags"));
+      const fetch401 = source.slice(source.indexOf("function _pbpProxyPinboardFetch"), source.indexOf("let currentTags"));
+      const loginSource = source.slice(source.indexOf('$id("login-btn").addEventListener'), source.indexOf("// ===================== Main"));
       assert(fetch401.includes("resetPinboardSession()") && !fetch401.includes("showLogin()"), "pinboardFetch 401 still mutates the live view");
-      assert(resetSource.includes('getSettingsStorage()).remove("pinboardToken")'), "session reset does not clear settings storage");
-      assert(resetSource.includes('chrome.storage.local.remove("pinboardToken")'), "session reset does not clear local storage");
+      assert(resetSource.includes('persistSettings({ pinboardToken: "" })') && resetSource.includes("if (!result.ok) return false"), "session reset bypasses or ignores unified persistence");
+      assert(logoutSource.includes('persistSettings({ pinboardToken: "" })') && logoutSource.includes("if (!result.ok) return"), "logout bypasses or ignores unified persistence");
+      assert(!resetSource.includes("storage.local") && !logoutSource.includes("storage.local"), "token clear still hand-routes a storage area");
+      assert(loginSource.includes("const saved = await persistSettings") && loginSource.indexOf("if (!saved.ok)") < loginSource.indexOf("settings.pinboardToken = token"), "login enters memory before persistence succeeds");
       assert(resetSource.includes('settings.pinboardToken = ""') && resetSource.includes("window.location.reload()"), "session reset does not clear memory and reload");
     });
   } catch (error) {

@@ -1411,16 +1411,16 @@
     "message": "Synchronisation"
   },
   "optSyncEnabled": {
-    "message": "Synchroniser les paramètres entre appareils via Google"
+    "message": "Utiliser Chrome Sync pour les paramètres de cet appareil"
   },
   "optSyncHint": {
-    "message": "Quand activé, les paramètres se synchronisent entre les installations de Chrome connectées au même compte Google."
+    "message": "Ce choix est propre à cet appareil. Activez-le séparément sur chaque appareil qui doit utiliser les paramètres de votre compte Google."
   },
   "syncApiKeysLabel": {
-    "message": "Synchroniser aussi les clés API"
+    "message": "Synchroniser les identifiants pour ce compte Google"
   },
   "syncApiKeysHint": {
-    "message": "Si activé, vos clés API sont aussi synchronisées via votre compte Google (simplement obfusquées, pas chiffrées). Désactivé par défaut — les clés restent uniquement sur cet appareil. À activer seulement si vous faites confiance à tous les appareils connectés à ce compte."
+    "message": "Il s'agit d'un choix unique à l'échelle du compte, mais seuls les appareils où la synchronisation des paramètres est activée y participent ; les autres continuent d'utiliser leurs identifiants locaux. Il est désactivé par défaut pour les nouveaux utilisateurs. Si une mise à niveau trouve déjà des identifiants non vides dans Chrome Sync, il reste activé afin d'éviter toute perte de données. Les clés API, jetons, mots de passe et identifiants d'exportation synchronisés sont obfusqués, pas chiffrés."
   },
   "qlPopularTitle": {
     "message": "Populaire"
@@ -1890,7 +1890,7 @@
     "message": "Échec de la copie dans le presse-papiers — la note n'a pas été créée. Réessayez."
   },
   "apiKeySecurityHint": {
-    "message": "Par défaut, les clés API sont stockées uniquement sur cet appareil. Elles ne sont synchronisées via Chrome Sync que si vous activez explicitement la synchronisation des clés. Les clés sont obfusquées, mais pas chiffrées."
+    "message": "Pour les nouveaux utilisateurs, les identifiants restent par défaut sur cet appareil. Des identifiants cloud existants peuvent maintenir la synchronisation du compte après une mise à niveau. Seuls les appareils où la synchronisation des paramètres est activée y participent ; les identifiants synchronisés sont obfusqués, pas chiffrés."
   },
   "batchPermLabel": {
     "message": "Ancienne autorisation tous sites :"

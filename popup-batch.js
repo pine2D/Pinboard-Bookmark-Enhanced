@@ -4,6 +4,12 @@
 
 let batchAiPermissionPending = null;
 
+async function readBatchAccount() {
+  const raw = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+  const token = deobfuscateKey(raw.pinboardToken) || "";
+  return { token, account: pbpPinboardAccountFromToken(token) };
+}
+
 function batchAiPermissionOrigins(validTabs, s) {
   const origins = validTabs.map(tab => new URL(tab.url).origin + "/*");
   const providerOrigin = _aiTargetOriginPattern(s);
@@ -51,8 +57,13 @@ function restoreBatchButton(batchBtn) {
   batchBtn.disabled = false;
 }
 
-async function dispatchBatchSave(snapshot, batchBtn) {
-  const resp = await chrome.runtime.sendMessage({ action: "startBatchSave", tabs: snapshot });
+async function dispatchBatchSave(snapshot, batchBtn, account) {
+  const resp = await chrome.runtime.sendMessage({ action: "startBatchSave", tabs: snapshot, account });
+  if (resp && resp.status === "account_changed") {
+    showStatus("status-msg", t("pinboardErrorAuth"), "error");
+    restoreBatchButton(batchBtn);
+    return;
+  }
   if (resp && resp.status === "busy") {
     showStatus("status-msg", t("batchRunningBg"), "success");
     restoreBatchButton(batchBtn);
@@ -135,9 +146,18 @@ function setupTabSet() {
         if (cancelBtn) cancelBtn.disabled = false;
         return;
       }
+      const current = await readBatchAccount();
+      if (!current.account || current.account !== pending.account) {
+        batchAiPermissionPending = null;
+        hideBatchAiPermission();
+        showStatus("status-msg", t("pinboardErrorAuth"), "error");
+        restoreBatchButton(batchBtn);
+        batchBtn.focus();
+        return;
+      }
       batchAiPermissionPending = null;
       hideBatchAiPermission();
-      await dispatchBatchSave(pending.tabs, batchBtn);
+      await dispatchBatchSave(pending.tabs, batchBtn, pending.account);
       const progress = $id("batch-progress");
       if (progress && !progress.classList.contains("hidden")) progress.focus();
       else batchBtn.focus();
@@ -162,27 +182,25 @@ function setupTabSet() {
   });
 
   batchBtn.addEventListener("click", async () => {
-    // Re-entry guard: a batch may already be running in the background (popup closed/reopened).
     try {
-      const { batch_progress: bp } = await chrome.storage.local.get("batch_progress");
-      if (batchIsRunning(bp, Date.now(), BATCH_STALE_TTL)) {
-        showStatus("status-msg", t("batchRunningBg"), "success");
-        renderBatchProgress(bp);
-        return;
-      }
-    } catch (_) {}
-
-    batchBtn.disabled = true;
-    setBtnIcon(batchBtn, "pin", t("batchSaving"));
-    try {
-      let rawToken = await (await getSettingsStorage()).get("pinboardToken");
-      rawToken = await pbpApplySecretOverlay(rawToken);
-      const pinboardToken = deobfuscateKey(rawToken.pinboardToken);
-      if (!pinboardToken) {
+      const startAuth = await readBatchAccount();
+      if (!startAuth.token || !startAuth.account) {
         showStatus("status-msg", t("batchNotLoggedIn"), "error");
-        setBtnIcon(batchBtn, "pin", t("batchSaveBtn")); batchBtn.disabled = false;
         return;
       }
+      // Re-entry guard is account-scoped: account B never renders or blocks on
+      // account A's background progress record.
+      try {
+        const { batch_progress: bp } = await chrome.storage.local.get("batch_progress");
+        if (bp?.account === startAuth.account && batchIsRunning(bp, Date.now(), BATCH_STALE_TTL)) {
+          showStatus("status-msg", t("batchRunningBg"), "success");
+          renderBatchProgress(bp, startAuth.account);
+          return;
+        }
+      } catch (_) {}
+
+      batchBtn.disabled = true;
+      setBtnIcon(batchBtn, "pin", t("batchSaving"));
       const tabs = await chrome.tabs.query({ currentWindow: true });
       const validTabs = tabs.filter(tab => tab.url && (tab.url.startsWith("http://") || tab.url.startsWith("https://")));
       if (!validTabs.length) {
@@ -197,13 +215,17 @@ function setupTabSet() {
       if (useAiTags || useAiSummary) {
         const origins = batchAiPermissionOrigins(validTabs, settings);
         if (!(await chrome.permissions.contains({ origins }))) {
-          batchAiPermissionPending = { tabs: snapshot, origins };
+          const current = await readBatchAccount();
+          if (current.account !== startAuth.account) throw new Error("account_changed");
+          batchAiPermissionPending = { tabs: snapshot, origins, account: startAuth.account };
           showBatchAiPermission(origins, settings);
           setBtnIcon(batchBtn, "pin", t("batchSaveBtn"));
           return;
         }
       }
-      await dispatchBatchSave(snapshot, batchBtn);
+      const current = await readBatchAccount();
+      if (current.account !== startAuth.account) throw new Error("account_changed");
+      await dispatchBatchSave(snapshot, batchBtn, startAuth.account);
     } catch (e) {
       showStatus("status-msg", t("batchFailed", e.message), "error");
       const progress = $id("batch-progress");
@@ -216,8 +238,9 @@ function setupTabSet() {
 }
 
 // ---- Background batch progress (driven by storage.local.batch_progress) ----
-function renderBatchProgress(p) {
+function renderBatchProgress(p, currentAccount) {
   if (!p) return;
+  if (!currentAccount || p.account !== currentAccount) return;
   const batchBtn = $id("batch-bookmark-btn");
   const progress = $id("batch-progress");
   const fill = $id("batch-progress-fill");
@@ -241,6 +264,7 @@ function renderBatchProgress(p) {
     const queuedDoneMsg = p.queued > 0 ? ` · ${t("offlineQueued", String(p.queued))}` : "";
     const aiWarnMsg = p.aiFailed > 0 ? ` (AI failed: ${p.aiFailed})` : "";
     if (p.error === "not_logged_in") showStatus("status-msg", t("batchNotLoggedIn"), "error");
+    else if (p.error === "account_changed") showStatus("status-msg", t("pinboardErrorAuth"), "error");
     else if (p.error) showStatus("status-msg", t("batchFailed", p.error), "error");
     else {
       const hasFailure = (p.failed || 0) > 0 || (p.tooLong || 0) > 0;
@@ -263,14 +287,20 @@ function renderBatchProgress(p) {
 
 function wireBatchProgress() {
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.batch_progress) renderBatchProgress(changes.batch_progress.newValue);
+    if (area === "local" && changes.batch_progress) {
+      readBatchAccount().then(({ account }) => {
+        if (account) renderBatchProgress(changes.batch_progress.newValue, account);
+      }).catch(() => {});
+    }
   });
   // Reopen restore: show a fresh running batch or a completion that happened
   // while the Popup was closed. The existing hide timer prevents a sticky panel.
-  chrome.storage.local.get("batch_progress").then(({ batch_progress: bp }) => {
+  Promise.all([chrome.storage.local.get("batch_progress"), readBatchAccount()]).then(([{ batch_progress: bp }, { account }]) => {
     const now = Date.now();
     const freshDone = bp?.done && (now - (bp.ts || 0)) < BATCH_STALE_TTL;
-    if (batchIsRunning(bp, now, BATCH_STALE_TTL) || freshDone) renderBatchProgress(bp);
+    if (bp?.account === account && (batchIsRunning(bp, now, BATCH_STALE_TTL) || freshDone)) {
+      renderBatchProgress(bp, account);
+    }
   }).catch(() => {});
 }
 

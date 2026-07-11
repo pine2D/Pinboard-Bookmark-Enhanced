@@ -440,28 +440,20 @@ function pbpAiFuzzyFind(needle, haystack) {
 }
 
 // ---- Settings (md-preview page) ----
-// Same area-resolution pattern as md-preview.js: optSyncEnabled lives in
-// storage.local and decides whether settings are in sync or local. Reading
-// chrome.storage.sync directly would miss every sync-off (default) user.
-// Memoized: md-preview is a short-lived single-render page.
-let _pbpAiAreaPromise = null;
+// Memoized for a short-lived preview, invalidated on any real settings change.
 let _pbpAiSettingsPromise = null;
 
-function pbpAiSettingsArea() {
-  if (!_pbpAiAreaPromise) {
-    _pbpAiAreaPromise = (typeof window !== "undefined" && window.pbpSettingsArea)
-      ? Promise.resolve(window.pbpSettingsArea)
-      : chrome.storage.local.get({ optSyncEnabled: false })
-          .then(function (r) { return r.optSyncEnabled ? chrome.storage.sync : chrome.storage.local; });
-  }
-  return _pbpAiAreaPromise;
+if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "sync" && area !== "local") return;
+    if (pbpSettingsKeysChanged(changes)) _pbpAiSettingsPromise = null;
+    if (changes.optSyncEnabled) _pbpAiSettingsPromise = null;
+  });
 }
 
 function pbpAiGetSettings() {
   if (!_pbpAiSettingsPromise) {
-    _pbpAiSettingsPromise = pbpAiSettingsArea()
-      .then((area) => area.get(SETTINGS_DEFAULTS))
-      .then((s) => pbpApplySecretOverlay(s)) // MUST run before deobfuscateSettings (see shared.js note)
+    _pbpAiSettingsPromise = pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS)
       .then((s) => deobfuscateSettings(s));
   }
   return _pbpAiSettingsPromise;
@@ -496,24 +488,29 @@ async function pbpAiRetryWithPermission(error, settings, retry) {
 // is not flooded by per-block writes. Entry shape: {key, result, ts}.
 const PBP_ASK_HIST_MAX = 20;
 
-function _pbpTrCacheKey(url, lang, model) {
-  return "tr_" + lang + "_" + model + "_" + pbpAiHash(String(url || ""));
+function _pbpTrOwnerScope(account) {
+  return account ? "acct_" + encodeURIComponent(String(account)) : "ownerless";
+}
+function _pbpTrCacheKey(url, lang, model, account) {
+  return "tr_" + _pbpTrOwnerScope(account) + "_" + lang + "_" + model + "_" + pbpAiHash(String(url || ""));
 }
 function _pbpAskHistKey(url) { return "ask_" + pbpAiHash(String(url || "")); }
-function _pbpTrViewKey(url) { return "trview_" + pbpAiHash(String(url || "")); }
+function _pbpTrViewKey(url, account) {
+  return "trview_" + _pbpTrOwnerScope(account) + "_" + pbpAiHash(String(url || ""));
+}
 function _pbpAskHistTrim(arr) {
   return Array.isArray(arr) ? arr.slice(-PBP_ASK_HIST_MAX) : [];
 }
 
-async function pbpTrCacheGet(url, lang, model) {
-  const entry = await pbpAiCacheGet(_pbpTrCacheKey(url, lang, model));
+async function pbpTrCacheGet(url, lang, model, account) {
+  const entry = await pbpAiCacheGet(_pbpTrCacheKey(url, lang, model, account));
   const r = entry && entry.result;
   if (!r || typeof r !== "object" || !r.blocks || typeof r.blocks !== "object") return null;
   return { blocks: r.blocks };
 }
 
-async function pbpTrCacheSet(url, lang, model, blocksMap) {
-  const key = _pbpTrCacheKey(url, lang, model);
+async function pbpTrCacheSet(url, lang, model, blocksMap, account) {
+  const key = _pbpTrCacheKey(url, lang, model, account);
   const prev = await pbpAiCacheGet(key);
   const prevBlocks = (prev && prev.result && prev.result.blocks
     && typeof prev.result.blocks === "object") ? prev.result.blocks : {};
@@ -521,19 +518,19 @@ async function pbpTrCacheSet(url, lang, model, blocksMap) {
   await pbpAiCacheSet(key, { blocks: merged }, Date.now());
 }
 
-// Auto-extracted terminology cache (spec T1): one entry per article per (lang, model),
+// Auto-extracted terminology cache (spec T1): one entry per account/article/(lang, model),
 // parallel to the translation cache. Entry shape: {key, result:{terms:{...}}, ts}.
-function _pbpTrGlossaryCacheKey(url, lang, model) {
-  return "gloss_" + lang + "_" + model + "_" + pbpAiHash(String(url || ""));
+function _pbpTrGlossaryCacheKey(url, lang, model, account) {
+  return "gloss_" + _pbpTrOwnerScope(account) + "_" + lang + "_" + model + "_" + pbpAiHash(String(url || ""));
 }
-async function pbpTrGlossaryCacheGet(url, lang, model) {
-  const entry = await pbpAiCacheGet(_pbpTrGlossaryCacheKey(url, lang, model));
+async function pbpTrGlossaryCacheGet(url, lang, model, account) {
+  const entry = await pbpAiCacheGet(_pbpTrGlossaryCacheKey(url, lang, model, account));
   const r = entry && entry.result;
   if (!r || typeof r !== "object" || !r.terms || typeof r.terms !== "object") return null;
   return r.terms;
 }
-async function pbpTrGlossaryCacheSet(url, lang, model, terms) {
-  await pbpAiCacheSet(_pbpTrGlossaryCacheKey(url, lang, model), { terms: terms || {} }, Date.now());
+async function pbpTrGlossaryCacheSet(url, lang, model, terms, account) {
+  await pbpAiCacheSet(_pbpTrGlossaryCacheKey(url, lang, model, account), { terms: terms || {} }, Date.now());
 }
 
 async function pbpAskHistGet(url) {
@@ -571,15 +568,15 @@ async function pbpAskHistReplaceLast(url, round) {
   });
 }
 
-async function pbpTrViewGet(url) {
-  const entry = await pbpAiCacheGet(_pbpTrViewKey(url));
+async function pbpTrViewGet(url, account) {
+  const entry = await pbpAiCacheGet(_pbpTrViewKey(url, account));
   const r = entry && entry.result;
   if (!r || typeof r !== "object" || typeof r.mode !== "string") return null;
   return { mode: r.mode, lang: String(r.lang || "") };
 }
 
-async function pbpTrViewSet(url, state) {
-  await pbpAiCacheSet(_pbpTrViewKey(url), {
+async function pbpTrViewSet(url, state, account) {
+  await pbpAiCacheSet(_pbpTrViewKey(url, account), {
     mode: String((state && state.mode) || "original"),
     lang: String((state && state.lang) || "")
   }, Date.now());

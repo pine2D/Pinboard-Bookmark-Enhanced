@@ -27,15 +27,13 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
     Object.entries(rest).filter(([k]) => exportableKeys.includes(k))
   );
   if (schemaVersion >= 2 && customOverlayCSS !== undefined) pbpAssertOverlaySize(customOverlayCSS);
-  const settingsStorage = await getSettingsStorage();
   if (safeData.exportTargets) {
     // Export/webdav-push strips nested secrets, so a raw key-set here would
     // blast away live tokens (github PAT, webhook Authorization) with the
     // secret-less backup copy. Merge per target onto what's already stored
     // so untouched secret fields survive; only the backed-up (non-secret)
     // fields actually update.
-    let curRead = await settingsStorage.get({ exportTargets: {} });
-    curRead = await pbpApplySecretOverlay(curRead);
+    const curRead = await pbpReadSettingsWithSecrets({ exportTargets: {} });
     const current = curRead.exportTargets || {};
     const merged = Object.assign({}, current);
     for (const [tid, cfg] of Object.entries(safeData.exportTargets)) {
@@ -95,7 +93,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
   $id("import-settings").addEventListener("click", () => $id("import-settings-file").click());
 
   $id("export-settings").addEventListener("click", async () => {
-    const raw = await (await getSettingsStorage()).get(exportableKeys);
+    const raw = await pbpReadSettingsWithSecrets(exportableKeys);
     const exportData = Object.fromEntries(
       Object.entries(raw).filter(([, v]) => v !== undefined)
     );

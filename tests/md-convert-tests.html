@@ -110,6 +110,18 @@ function assertEq(actual, expected, label) {
   check("renderMarkdown strips img onerror", /<img/i.test(s) && !/onerror/i.test(s), s);
 })();
 (() => {
+  const html = renderMarkdown('<img src="https://cdn.example.com/image.png" referrerpolicy="unsafe-url" alt="diagram">');
+  check("renderMarkdown forces no-referrer on retained remote images",
+    /src="https:\/\/cdn\.example\.com\/image\.png"/.test(html) &&
+    /referrerpolicy="no-referrer"/.test(html) && !/unsafe-url/.test(html), html);
+})();
+(() => {
+  const s = norm(renderMarkdown('<svg><image href="https://cdn.example.com/svg.png"></image></svg><image href="https://cdn.example.com/orphan.png"><video poster="https://cdn.example.com/poster.png"><source src="https://cdn.example.com/movie.mp4"></video><div style="background-image:url(https://cdn.example.com/style.png)" background="https://cdn.example.com/legacy.png">safe text</div>'));
+  check("raw SVG and media subresources cannot bypass image no-referrer policy",
+    s.includes("safe text") &&
+    !/<svg|<image|<video|<source|style=|background=|poster=|cdn\.example\.com/i.test(s), s);
+})();
+(() => {
   const s = norm(renderMarkdown("[x](javascript:alert(1))"));
   check("renderMarkdown neutralizes javascript: link", !/javascript:/i.test(s), s);
 })();

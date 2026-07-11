@@ -1411,16 +1411,16 @@
     "message": "Data Sync"
   },
   "optSyncEnabled": {
-    "message": "Sync settings across devices via Google account"
+    "message": "Use Chrome Sync for settings on this device"
   },
   "optSyncHint": {
-    "message": "When enabled, settings sync across Chrome installations signed into the same Google account."
+    "message": "This choice is device-specific. Enable it separately on each device that should use settings from your Google account."
   },
   "syncApiKeysLabel": {
-    "message": "Also sync API keys"
+    "message": "Sync credentials for this Google account"
   },
   "syncApiKeysHint": {
-    "message": "Sends your API keys through your Google account too (obfuscated, not encrypted). Off by default — keys stay on this device only. Enable only if you trust every device signed into this account."
+    "message": "This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted."
   },
   "qlPopularTitle": {
     "message": "Popular"
@@ -1890,7 +1890,7 @@
     "message": "Couldn't copy to clipboard — the note wasn't created. Try again."
   },
   "apiKeySecurityHint": {
-    "message": "API keys are stored only on this device by default. They sync through Chrome Sync only after you explicitly enable key syncing. Keys are obfuscated, not encrypted."
+    "message": "New users keep credentials on this device by default. Existing cloud credentials may keep account-wide sync on after upgrade. Only devices with settings sync enabled participate; synced credentials are obfuscated, not encrypted."
   },
   "batchPermLabel": {
     "message": "Legacy all-sites permission:"

@@ -7,6 +7,14 @@ const AI_STAGE_TIMERS = new Map();
 const AI_STAGE_STARTED = new Map();
 const AI_BUTTON_BASE_TEXT = new Map();
 
+function pbpPopupAiAccount() {
+  return pbpPinboardAccountFromToken(settings?.pinboardToken);
+}
+
+function pbpPopupAiAccountIsCurrent(account) {
+  return !!account && pbpPopupAiAccount() === account;
+}
+
 function setAiProgress(buttonId, { provider, stage }) {
   const btn = $id(buttonId);
   if (!btn) return;
@@ -63,7 +71,7 @@ async function ensurePageText() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) return;
-    const info = await getPageInfoFromTab(tab.id, { withDefuddle: true });
+    const info = await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: pageInfo.url });
     if (info?.pageText) pageInfo.pageText = info.pageText;
   } catch (_) { /* tab gone / inject failed — pageText stays empty, caller will surface aiNoContent */ }
 }
@@ -257,8 +265,10 @@ function setupAIFeatures() {
   // description doesn't already contain a summary. For existing bookmarks,
   // checkExistingBookmark (popup.js) restores the user's saved `extended` — we
   // must not race it (lost summary) or append on top (duplicate summary).
-  getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource).then(cached => {
-    if (cached && pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
+  const restoreAccount = pbpPopupAiAccount();
+  getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource, restoreAccount).then(cached => {
+    if (cached && pbpPopupAiAccountIsCurrent(restoreAccount)
+        && pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
       upsertSummary(cached);
       showSummaryActions(true);
     }
@@ -334,18 +344,19 @@ function finalizeAITags(rawTags) {
 // If the OTHER artifact is also missing, issue ONE combined call and cache the other
 // half so its later click is an instant, zero-extra-body-token cache hit. forceRefresh
 // (regenerate) always does a single dedicated call. Combined failure -> single fallback.
-async function fetchAIArtifacts(kind, forceRefresh) {
+async function fetchAIArtifacts(kind, forceRefresh, account) {
   const url = pageInfo.url;
   const provider = settings.aiProvider;
   const otherKind = kind === "summary" ? "tags" : "summary";
-  const combinedKey = `${provider}|combined|${url}`;
+  const combinedKey = `${account}|${provider}|combined|${url}`;
+  if (!pbpPopupAiAccountIsCurrent(account)) return null;
 
   const callSingle = () => {
     if (kind === "summary") {
-      return getOrCreateInflight(`${provider}|summary|${url}`, () =>
+      return getOrCreateInflight(`${account}|${provider}|summary|${url}`, () =>
         callAI(settings, buildSummaryPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value)));
     }
-    return getOrCreateInflight(`${provider}|tags|${url}`, async () => {
+    return getOrCreateInflight(`${account}|${provider}|tags|${url}`, async () => {
       const resp = await callAI(settings, buildTagPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
       return finalizeAITags(refineTags(parseAITags(resp, settings.aiTagSeparator), { cap: AI_TAG_CAP, separator: settings.aiTagSeparator }));
     });
@@ -363,12 +374,14 @@ async function fetchAIArtifacts(kind, forceRefresh) {
   if (_inflightAI.has(combinedKey)) {
     try {
       const both = await _inflightAI.get(combinedKey);
+      if (!pbpPopupAiAccountIsCurrent(account)) return null;
       if (both) return kind === "tags" ? finalizeAITags(both.tags) : both.summary;
     } catch (_) { /* combined in-flight failed; fall through */ }
   }
 
   // If the other half is already cached, only the requested half is missing.
-  const otherCached = await getAICache(url, otherKind, settings.aiCacheDuration, settings.aiContentSource);
+  const otherCached = await getAICache(url, otherKind, settings.aiCacheDuration, settings.aiContentSource, account);
+  if (!pbpPopupAiAccountIsCurrent(account)) return null;
   if (otherCached != null) return callSingle();
 
   // Opportunistic combined call.
@@ -381,26 +394,35 @@ async function fetchAIArtifacts(kind, forceRefresh) {
   } catch (e) {
     both = null;
   }
+  if (!pbpPopupAiAccountIsCurrent(account)) return null;
   if (!both) return callSingle();
 
   // Cache the OTHER half so its later click is instant + free.
   if (otherKind === "tags") {
-    await setAICache(url, "tags", finalizeAITags(both.tags), settings.aiCacheDuration, settings.aiContentSource);
+    if (pbpPopupAiAccountIsCurrent(account)) {
+      await setAICache(url, "tags", finalizeAITags(both.tags), settings.aiCacheDuration, settings.aiContentSource, account);
+    }
   } else {
-    await setAICache(url, "summary", both.summary, settings.aiCacheDuration, settings.aiContentSource);
+    if (pbpPopupAiAccountIsCurrent(account)) {
+      await setAICache(url, "summary", both.summary, settings.aiCacheDuration, settings.aiContentSource, account);
+    }
   }
-  return kind === "tags" ? finalizeAITags(both.tags) : both.summary;
+  return pbpPopupAiAccountIsCurrent(account)
+    ? (kind === "tags" ? finalizeAITags(both.tags) : both.summary)
+    : null;
 }
 
 // ---- AI Summary core logic ----
 async function doAISummary(forceRefresh) {
   const btn = $id("ai-summary-btn");
+  const account = pbpPopupAiAccount();
+  if (!account) return;
   if (!hasAIKey(settings)) { showSetKeyError(); return; }
   hideAIError();
 
   if (!forceRefresh) {
-    const cached = await getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource);
-    if (cached) {
+    const cached = await getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource, account);
+    if (cached && pbpPopupAiAccountIsCurrent(account)) {
       upsertSummary(cached);
       showSummaryActions(true);
       return;
@@ -414,15 +436,19 @@ async function doAISummary(forceRefresh) {
   try {
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "extracting" });
     await ensurePageText();
+    if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "calling" });
-    const summary = await fetchAIArtifacts("summary", forceRefresh);
+    const summary = await fetchAIArtifacts("summary", forceRefresh, account);
+    if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "parsing" });
-    await setAICache(pageInfo.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource);
+    await setAICache(pageInfo.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource, account);
+    if (!pbpPopupAiAccountIsCurrent(account)) return;
     upsertSummary(summary);
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
   } catch (e) {
+    if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (e?.code === "host_permission" && !e.permissionOrigins) {
       e.permissionStage = "calling";
       e.permissionOrigins = _aiRequiredOriginPatterns(settings);
@@ -430,7 +456,7 @@ async function doAISummary(forceRefresh) {
     showAIError("summary", e);
     if (forceRefresh) showSummaryActions(false);
   } finally {
-    if (showProgressOnBtn) {
+    if (showProgressOnBtn && pbpPopupAiAccountIsCurrent(account)) {
       clearAiProgress("ai-summary-btn");
       btn.classList.remove("loading");
     }
@@ -494,13 +520,15 @@ function showSummaryActions(fromCache) {
 async function doAITags(forceRefresh) {
   const btn = $id("ai-tags-btn");
   const container = $id("ai-suggest-tags");
+  const account = pbpPopupAiAccount();
+  if (!account) return;
   hideAIError();
 
   if (!hasAIKey(settings)) { showSetKeyError(); return; }
 
   if (!forceRefresh) {
-    const cached = await getAICache(pageInfo.url, "tags", settings.aiCacheDuration, settings.aiContentSource);
-    if (cached) {
+    const cached = await getAICache(pageInfo.url, "tags", settings.aiCacheDuration, settings.aiContentSource, account);
+    if (cached && pbpPopupAiAccountIsCurrent(account)) {
       renderAITags(cached, true);
       return;
     }
@@ -516,16 +544,20 @@ async function doAITags(forceRefresh) {
   try {
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "extracting" });
     await ensurePageText();
+    if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "calling" });
-    const tags = await fetchAIArtifacts("tags", forceRefresh);
+    const tags = await fetchAIArtifacts("tags", forceRefresh, account);
+    if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "parsing" });
-    await setAICache(pageInfo.url, "tags", tags, settings.aiCacheDuration, settings.aiContentSource);
+    await setAICache(pageInfo.url, "tags", tags, settings.aiCacheDuration, settings.aiContentSource, account);
+    if (!pbpPopupAiAccountIsCurrent(account)) return;
     renderAITags(tags, false);
     if (forceRefresh) {
       showStatus("status-msg", t("aiTagsRegenerated"), "success");
     }
   } catch (e) {
+    if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (e?.code === "host_permission" && !e.permissionOrigins) {
       e.permissionStage = "calling";
       e.permissionOrigins = _aiRequiredOriginPatterns(settings);
@@ -534,7 +566,7 @@ async function doAITags(forceRefresh) {
     container.classList.add("muted");
     showAIError("tags", e);
   } finally {
-    if (btn) {
+    if (btn && pbpPopupAiAccountIsCurrent(account)) {
       clearAiProgress("ai-tags-btn");
       btn.classList.remove("loading");
     }

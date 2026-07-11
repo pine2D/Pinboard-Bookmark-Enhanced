@@ -6,9 +6,9 @@
 // Override pinboardFetch to route through background service worker.
 // This prevents Chrome's native credentials dialog when Pinboard returns 401.
 // (function declarations on window are writable, so reassignment works)
-pinboardFetch = function(url) {
+function _pbpProxyPinboardFetch(url, immediate) {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ type: "pinboard_api_call", url })
+    chrome.runtime.sendMessage({ type: "pinboard_api_call", url, immediate: immediate === true })
       .then(resp => {
         if (!resp) { reject(new Error("no background response")); return; }
         if (resp.status === 401) {
@@ -27,6 +27,14 @@ pinboardFetch = function(url) {
       })
       .catch(reject);
   });
+}
+
+pinboardFetch = function(url) {
+  return _pbpProxyPinboardFetch(url, false);
+};
+
+pinboardFetchImmediate = function(url) {
+  return _pbpProxyPinboardFetch(url, true);
 };
 
 let currentTags = [];
@@ -90,7 +98,6 @@ function invalidateBookmarkLookup() {
     banner.textContent = "";
     banner.classList.add("hidden");
     banner.classList.remove("just-saved");
-    delete banner.dataset.mirror;
   }
   try { localStorage.removeItem("pp-last-tab"); } catch (_) {}
   const deleteBtn = $id("delete-btn");
@@ -111,10 +118,16 @@ let acIndex = -1;
 let settings = {};
 
 async function resetPinboardSession() {
-  try { await (await getSettingsStorage()).remove("pinboardToken"); } catch (_) {}
-  try { await chrome.storage.local.remove("pinboardToken"); } catch (_) {}
+  try {
+    const result = await persistSettings({ pinboardToken: "" });
+    if (!result.ok) return false;
+  } catch (_) { return false; }
   settings.pinboardToken = "";
+  invalidateBookmarkLookup();
+  const recent = $id("recent-bookmarks");
+  if (recent) { recent.replaceChildren(); recent.classList.add("hidden"); }
   window.location.reload();
+  return true;
 }
 
 // ===================== URL Clean Helpers (B4) =====================
@@ -166,18 +179,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!mirrorFresh || !activeTab || _currentTab?.tabId !== activeTab.id) {
       const u = document.getElementById("url-input");
       const ti = document.getElementById("title-input");
-      const banner = document.getElementById("existing-banner");
       if (u && !document.activeElement?.isSameNode(u)) u.value = "";
       if (ti && !document.activeElement?.isSameNode(ti)) ti.value = "";
-      if (banner && banner.dataset.mirror === "1") {
-        banner.classList.add("hidden");
-        delete banner.dataset.mirror;
-      }
     }
   } catch (_) {}
 
-  settings = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
-  settings = await pbpApplySecretOverlay(settings);
+  settings = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
   deobfuscateSettings(settings);
 
   // Apply theme: preset-based data-theme (if enabled), or fallback to generic .dark
@@ -211,11 +218,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("logout-link").addEventListener("click", async (e) => {
     e.preventDefault();
     if (!confirm(t("confirmLogout"))) return;
-    await (await getSettingsStorage()).remove("pinboardToken");
-    await chrome.storage.local.remove("pinboardToken").catch(() => {});
+    const result = await persistSettings({ pinboardToken: "" });
+    if (!result.ok) return;
     settings.pinboardToken = "";
-    $id("main-section").classList.add("hidden");
-    showLogin();
+    invalidateBookmarkLookup();
+    const recent = $id("recent-bookmarks");
+    if (recent) { recent.replaceChildren(); recent.classList.add("hidden"); }
+    window.location.reload();
   });
 });
 
@@ -229,9 +238,16 @@ function showLogin() {
   if (qa) qa.classList.add("hidden");
 }
 // Login listener — bound once outside showLogin() to avoid duplicate listeners
-$id("login-btn").addEventListener("click", async () => {
+$id("login-btn").addEventListener("click", async (event) => {
+  const loginBtn = event.currentTarget;
+  if (loginBtn.disabled) return;
+  loginBtn.disabled = true;
   const token = $id("token-input").value.trim();
-  if (!token || !token.includes(":")) { showElement("login-error", t("loginInvalidFormat")); return; }
+  if (!token || !token.includes(":")) {
+    showElement("login-error", t("loginInvalidFormat"));
+    loginBtn.disabled = false;
+    return;
+  }
   try {
     const res = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ type: "test_pinboard_token", token }, (resp) => {
@@ -239,9 +255,16 @@ $id("login-btn").addEventListener("click", async () => {
         resolve(resp);
       });
     });
-    if (res.ok) { await persistSettings({ pinboardToken: obfuscateKey(token) }); settings.pinboardToken = token; showMain(token); }
-    else showElement("login-error", t("loginFailed"));
+    if (res.ok) {
+      const saved = await persistSettings({ pinboardToken: obfuscateKey(token) });
+      if (!saved.ok) { showElement("login-error", t("networkError")); return; }
+      settings.pinboardToken = token;
+      const recent = $id("recent-bookmarks");
+      if (recent) { recent.replaceChildren(); recent.classList.add("hidden"); }
+      showMain(token);
+    } else showElement("login-error", t("loginFailed"));
   } catch (e) { showElement("login-error", t("networkError")); }
+  finally { loginBtn.disabled = false; }
 });
 
 // ===================== Main =====================
@@ -253,6 +276,7 @@ async function showMain(token) {
   const qa = document.querySelector(".quick-actions");
   if (qa) qa.classList.remove("hidden");
   const username = token.split(":")[0];
+  const sessionAccount = pbpPinboardAccountFromToken(token);
   const userInfo = $id("user-info");
   userInfo.innerHTML = "";
   const pbLink = document.createElement("a");
@@ -305,12 +329,12 @@ async function showMain(token) {
   }
   // Kick off page-info extraction AND the bookmark cache lookup in parallel — both depend
   // only on `tab` (already obtained). Awaiting them sequentially wastes overlap potential.
-  // Bookmark prefetch is keyed on tab.url (best-effort); if pageInfo later resolves to a
-  // different URL, checkExistingBookmark falls back to a fresh fetch.
-  const _pageInfoPromise = tab ? getPageInfoFromTab(tab.id) : Promise.resolve(null);
+  // Bind extraction and bookmark prefetch to the same URL so a mid-open navigation cannot
+  // pair content from the new page with the old bookmark request.
+  const _pageInfoPromise = tab ? getPageInfoFromTab(tab.id, { expectedUrl: tab.url || "" }) : Promise.resolve(null);
   const _bookmarkPrefetchUrl = tab?.url || "";
   const _bookmarkPrefetchPromise = _bookmarkPrefetchUrl
-    ? chrome.runtime.sendMessage({ type: "get_bookmark_data", url: _bookmarkPrefetchUrl }).catch(() => null)
+    ? chrome.runtime.sendMessage({ type: "get_bookmark_data", url: _bookmarkPrefetchUrl, account: sessionAccount }).catch(() => null)
     : Promise.resolve(null);
   if (!tab) {
     pageInfo = { url: "", title: "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
@@ -665,7 +689,9 @@ async function htmlToMarkdownAsync(html, opts) {
               title: result.title || $id("title-input")?.value || "",
               url: result.url || url,
               baseUrl: result.url || url,
+              account: sessionAccount,
               tags: Array.isArray(currentTags) ? currentTags.slice() : [],
+              description: $id("description-input")?.value || "",
               tokens: result.tokens || 0,
               hasApiKey: !!result._hasApiKey,
               source: settings.aiContentSource || "local",
@@ -839,11 +865,13 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
       if (!forceFresh) {
         try {
           let cached;
+          const lookupAccount = pbpPinboardAccountFromToken(token);
           if (prefetch && prefetch.prefetchUrl === lookupUrl && prefetch.prefetchPromise) {
             cached = await prefetch.prefetchPromise;
           } else {
-            cached = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url: lookupUrl });
+            cached = await chrome.runtime.sendMessage({ type: "get_bookmark_data", url: lookupUrl, account: lookupAccount });
           }
+          if (cached?.account !== lookupAccount) cached = null;
           if (cached?.posts) data = { posts: cached.posts };
         } catch (_) {}
       }
@@ -895,16 +923,15 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         bookmarkLookup = { status: "missing", url: lookupUrl, generation, promise: null, formLoaded: false };
       }
 
-      // B4: Write tab mirror for next popup boot. Stores public-on-pinboard data only.
+      // B4: Write only public page identity for next-popup prefill. Existing-bookmark
+      // state is account-specific and must come from the guarded background lookup.
       try {
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (bookmarkLookup.generation === generation && bookmarkLookup.url === lookupUrl && $id("url-input").value.trim() === lookupUrl && activeTab?.url) {
-          const banner = document.getElementById("existing-banner");
           const mirror = {
             tabId: activeTab.id,
             url: $id("url-input").value || activeTab.url,
             title: $id("title-input").value || activeTab.title || "",
-            bannerText: (banner && !banner.classList.contains("hidden")) ? (banner.textContent || "") : "",
             ts: Date.now()
           };
           localStorage.setItem("pp-last-tab", JSON.stringify(mirror));
@@ -930,6 +957,9 @@ function setupSubmit(token) {
 
   // Submit state machine: idle -> loading -> success -> idle / loading -> error -> idle (user retry resets)
   const btn = $id("submit-btn");
+  if (btn._pbpSubmitBound) return;
+  btn._pbpSubmitBound = true;
+  const submitAccount = pbpPinboardAccountFromToken(token);
   let submitErrorResetTimer = null;
   let submitAttemptSeq = 0;
 
@@ -1079,7 +1109,7 @@ function setupSubmit(token) {
         if (ownsSubmitUi()) setSubmitState("idle");
         return;
       }
-      const result = await chrome.runtime.sendMessage({ type: "save_intent", intent });
+      const result = await chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount });
       if (!result || typeof result !== "object" || typeof result.status !== "string") {
         throw new Error("invalid save response");
       }
@@ -1120,7 +1150,7 @@ function setupSubmit(token) {
       }
 
       if (result.status === "saved") {
-        if (typeof saveLastUsedTags === "function") saveLastUsedTags(tags);
+        if (typeof saveLastUsedTags === "function") saveLastUsedTags(tags, submitAccount);
         if (savePolicy.mode === "update") {
           existingBookmark = {
             href: url,
@@ -1184,6 +1214,8 @@ function setupSubmit(token) {
         showStatus("status-msg", `HTTP ${result.httpStatus}`, "error");
       } else if (result.status === "failed" && result.reason === "api" && result.detail) {
         showStatus("status-msg", `Error: ${result.detail}`, "error");
+      } else if (result.status === "failed" && result.reason === "account_changed") {
+        showStatus("status-msg", t("pinboardErrorAuth"), "error");
       } else {
         showStatus("status-msg", t("networkError"), "error");
       }
@@ -1271,7 +1303,7 @@ function setupSubmit(token) {
       try {
         const data = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(deleteUrl)}&auth_token=${token}&format=json`)).json();
         const deleted = data.result_code === "done" || data.result_code === "item not found";
-        if (deleted) chrome.runtime.sendMessage({ type: "bookmark_deleted", url: deleteUrl });
+        if (deleted) chrome.runtime.sendMessage({ type: "bookmark_deleted", url: deleteUrl, account: submitAccount });
         if (!ownsDeleteForm()) return;
         if (deleted) {
           showStatus("status-msg", t("deleted"), "success");
@@ -1338,6 +1370,7 @@ function exitEditMode() {
 // ===================== Recent Bookmarks =====================
 async function fetchRecentBookmarks(token) {
   const container = $id("recent-bookmarks");
+  const account = pbpPinboardAccountFromToken(token);
   if (!container) return;
   try {
     const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/recent?auth_token=${token}&format=json&count=5`);
@@ -1395,7 +1428,7 @@ async function fetchRecentBookmarks(token) {
           const data = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(p.href)}&auth_token=${token}&format=json`)).json();
           if (data.result_code === "done" || data.result_code === "item not found") {
             row.remove();
-            chrome.runtime.sendMessage({ type: "bookmark_deleted", url: p.href });
+            chrome.runtime.sendMessage({ type: "bookmark_deleted", url: p.href, account });
           }
         } catch (_) {}
       };

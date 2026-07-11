@@ -28,9 +28,10 @@ async function getPageInfoFromTab(tabId, opts = {}) {
   // (which only needs url/title/selectedText/metaDescription). Default off saves 50-200ms
   // per popup open for users not invoking AI right away. AI/batch paths pass {withDefuddle: true}.
   const withDefuddle = !!opts.withDefuddle;
+  const expectedUrl = typeof opts.expectedUrl === "string" ? opts.expectedUrl : null;
   try {
     const tab = await _cbTabsGet(tabId);
-    if (!tab) return null;
+    if (!tab || (expectedUrl !== null && tab.url !== expectedUrl)) return null;
     const url = tab.url || "";
     if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("file://")) {
       return { url, title: tab.title || "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
@@ -39,6 +40,8 @@ async function getPageInfoFromTab(tabId, opts = {}) {
     if (withDefuddle) {
       // Inject Defuddle library first (ignore failure — e.g. tab closed mid-inject)
       await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
+      const injectedTab = await _cbTabsGet(tabId);
+      if (!injectedTab || (expectedUrl !== null && injectedTab.url !== expectedUrl)) return null;
     }
 
     const results = await _cbExecuteScript({
@@ -122,7 +125,14 @@ async function getPageInfoFromTab(tabId, opts = {}) {
         return info;
       }
     });
-    if (results?.[0]?.result) return results[0].result;
+    const info = results?.[0]?.result;
+    if (info && (expectedUrl === null || info.url === expectedUrl)) {
+      if (expectedUrl !== null) {
+        const extractedTab = await _cbTabsGet(tabId);
+        if (!extractedTab || extractedTab.url !== expectedUrl) return null;
+      }
+      return info;
+    }
   } catch (e) { console.warn("getPageInfoFromTab failed:", e.message); }
   return null;
 }
@@ -960,11 +970,18 @@ function getOrCreateInflight(key, factory) {
 }
 
 // ---- AI cache helpers ----
-function getCacheKey(url, type, source) { return `ai_cache_${type}_${source || "local"}_${url}`; }
+function getCacheKey(url, type, source, account) {
+  if (type === "tags" || type === "summary") {
+    if (!account) return "";
+    return `ai_cache_${type}_${source || "local"}_${encodeURIComponent(account)}_${url}`;
+  }
+  return `ai_cache_${type}_${source || "local"}_${url}`;
+}
 
 
-async function getAICache(url, type, cacheDuration, source) {
-  const key = getCacheKey(url, type, source);
+async function getAICache(url, type, cacheDuration, source, account) {
+  const key = getCacheKey(url, type, source, account);
+  if (!key) return null;
   const dur = resolveCacheMs(cacheDuration);
   if (dur === 0) return null;   // 0 now reachable: cache disabled, never read
 
@@ -979,9 +996,10 @@ async function getAICache(url, type, cacheDuration, source) {
   return entry.result;
 }
 
-async function setAICache(url, type, result, cacheDuration, source) {
+async function setAICache(url, type, result, cacheDuration, source, account) {
   if (resolveCacheMs(cacheDuration) === 0) return;   // disabled: never write
-  const key = getCacheKey(url, type, source);
+  const key = getCacheKey(url, type, source, account);
+  if (!key) return;
   const timestamp = Date.now();
 
   // IDB path (sole AI-cache backend)

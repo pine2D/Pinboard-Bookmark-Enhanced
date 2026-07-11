@@ -87,6 +87,47 @@ async function run() {
   check("E3 themePresetKey NOT forced into sync", synced.themePresetKey === undefined);
   globalThis.chrome = prevChrome;
 
+  // ---------- E3b: routing-active prime never writes secret defaults to sync ----------
+  await (async () => {
+    const prevPrimeChrome = globalThis.chrome;
+    const prevPrimeCache = _settingsStorageCache;
+    const primeWrites = [];
+    globalThis.chrome = {
+      storage: {
+        local: { get: async () => ({ optSyncEnabled: true }), remove: async () => {} },
+        sync: {
+          get: async (keys) => typeof keys === "string" ? { syncApiKeys: false } : {},
+          set: async (data) => { primeWrites.push(data); },
+        },
+      },
+    };
+    _settingsStorageCache = null;
+    await primeSettings();
+    const primed = primeWrites[0] || {};
+    check("E3b prime: routing-active sync write excludes all API key defaults and exportTargets",
+      API_KEY_FIELDS.every((key) => !(key in primed)) && !("exportTargets" in primed));
+    check("E3b prime: routing-active sync write still primes ordinary settings",
+      Object.prototype.hasOwnProperty.call(primed, "optTheme"));
+
+    primeWrites.length = 0;
+    globalThis.chrome = {
+      storage: {
+        local: { get: async () => ({ optSyncEnabled: true }), remove: async () => {} },
+        sync: {
+          get: async (keys) => typeof keys === "string" ? { syncApiKeys: true } : {},
+          set: async (data) => { primeWrites.push(data); },
+        },
+      },
+    };
+    await primeSettings();
+    const keysOnPrime = primeWrites[0] || {};
+    check("E3b prime: keys-on sync area never primes missing secret defaults",
+      Object.prototype.hasOwnProperty.call(keysOnPrime, "optTheme") &&
+      API_KEY_FIELDS.every((key) => !(key in keysOnPrime)) && !("exportTargets" in keysOnPrime));
+    globalThis.chrome = prevPrimeChrome;
+    _settingsStorageCache = prevPrimeCache;
+  })();
+
   // ---------- E4: syncApiKeys secret routing (pure helpers) ----------
 
   // -- pbpSecretRoutingActive --
@@ -94,6 +135,160 @@ async function run() {
   check("E4 routing inactive: sync off + keys off", pbpSecretRoutingActive(false, false) === false);
   check("E4 routing inactive: sync on + keys on", pbpSecretRoutingActive(true, true) === false);
   check("E4 routing inactive: sync off + keys on", pbpSecretRoutingActive(false, true) === false);
+
+  // -- effective Pinboard credential event routing --
+  check("E4 auth events: sync-off listens only to local token changes",
+    pbpAuthStorageChangeIsRelevant({ pinboardToken: {} }, "local", { optSyncEnabled: false, syncApiKeys: true }) &&
+    !pbpAuthStorageChangeIsRelevant({ pinboardToken: {} }, "sync", { optSyncEnabled: false, syncApiKeys: true }));
+  check("E4 auth events: sync-on keys-local ignores cloud token residue",
+    pbpAuthStorageChangeIsRelevant({ pinboardToken: {} }, "local", { optSyncEnabled: true, syncApiKeys: false }) &&
+    !pbpAuthStorageChangeIsRelevant({ pinboardToken: {} }, "sync", { optSyncEnabled: true, syncApiKeys: false }));
+  check("E4 auth events: sync-on keys-cloud ignores local token residue",
+    pbpAuthStorageChangeIsRelevant({ pinboardToken: {} }, "sync", { optSyncEnabled: true, syncApiKeys: true }) &&
+    !pbpAuthStorageChangeIsRelevant({ pinboardToken: {} }, "local", { optSyncEnabled: true, syncApiKeys: true }));
+  check("E4 auth events: only the cloud syncApiKeys marker can reroute synced settings",
+    pbpAuthStorageChangeIsRelevant({ syncApiKeys: {} }, "sync", { optSyncEnabled: true, syncApiKeys: false }) &&
+    !pbpAuthStorageChangeIsRelevant({ syncApiKeys: {} }, "local", { optSyncEnabled: true, syncApiKeys: false }));
+  check("E4 auth events: local optSyncEnabled always reroutes the effective account",
+    pbpAuthStorageChangeIsRelevant({ optSyncEnabled: {} }, "local", { optSyncEnabled: true, syncApiKeys: false }));
+
+  // -- account-wide marker initialization / sync-off isolation --
+  await (async () => {
+    const previousChrome = globalThis.chrome;
+    const previousSettingsCache = _settingsStorageCache;
+    const previousTestStorage = globalThis.__pbpTestStorage;
+    const previousTestLarge = globalThis.__pbpTestSyncSetLarge;
+    delete globalThis.__pbpTestStorage;
+    delete globalThis.__pbpTestSyncSetLarge;
+    const installState = (localBacking, syncBacking, failures = {}) => {
+      const metrics = { syncReads: 0, syncWrites: 0, localWrites: 0 };
+      const get = (backing, keys) => {
+        if (Array.isArray(keys)) {
+          const out = {}; keys.forEach((key) => { if (key in backing) out[key] = backing[key]; }); return out;
+        }
+        if (typeof keys === "string") return keys in backing ? { [keys]: backing[keys] } : {};
+        const out = Object.assign({}, keys || {});
+        Object.keys(keys || {}).forEach((key) => { if (key in backing) out[key] = backing[key]; });
+        return out;
+      };
+      globalThis.chrome = {
+        storage: {
+          local: {
+            get: async (keys) => get(localBacking, keys),
+            set: async (data) => { metrics.localWrites++; Object.assign(localBacking, data); },
+            remove: async (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete localBacking[key]); },
+          },
+          sync: {
+            get: async (keys) => {
+              metrics.syncReads++;
+              if (failures.syncGet) throw new Error("sync get failed");
+              return get(syncBacking, keys);
+            },
+            set: async (data) => {
+              metrics.syncWrites++;
+              if (failures.syncSet) throw new Error("sync set failed");
+              Object.assign(syncBacking, data);
+            },
+          },
+        },
+      };
+      return metrics;
+    };
+
+    try {
+      let local = { optSyncEnabled: true, syncApiKeys: true };
+      let sync = { syncApiKeys: false, openaiApiKey: "obf:cloud" };
+      installState(local, sync);
+      let state = await pbpReadSecretSyncState();
+      check("E4 sync state: existing boolean marker is authoritative and clears legacy local marker",
+        state.syncApiKeys === false && !("syncApiKeys" in local) && sync.openaiApiKey === "obf:cloud");
+
+      local = { optSyncEnabled: true };
+      sync = { openaiApiKey: "obf:cloud-key" };
+      installState(local, sync);
+      state = await pbpReadSecretSyncState();
+      check("E4 sync state: missing marker plus non-empty cloud API key initializes true",
+        state.syncApiKeys === true && sync.syncApiKeys === true && sync.openaiApiKey === "obf:cloud-key");
+
+      local = { optSyncEnabled: true };
+      sync = { exportTargets: { github: { token: "obf:cloud-target" } } };
+      installState(local, sync);
+      state = await pbpReadSecretSyncState();
+      check("E4 sync state: missing marker plus cloud target token initializes true",
+        state.syncApiKeys === true && sync.syncApiKeys === true && sync.exportTargets.github.token === "obf:cloud-target");
+
+      local = {
+        optSyncEnabled: true, syncApiKeys: true, openaiApiKey: "obf:legacy-local",
+        exportTargets: { github: { token: "obf:legacy-target" } },
+      };
+      sync = {};
+      installState(local, sync);
+      state = await pbpReadSecretSyncState();
+      check("E4 sync state: legacy local opt-in atomically publishes its complete local credentials",
+        state.syncApiKeys === true && !("syncApiKeys" in local) && sync.syncApiKeys === true &&
+        sync.openaiApiKey === "obf:legacy-local" && sync.exportTargets.github.token === "obf:legacy-target");
+
+      local = { optSyncEnabled: true };
+      sync = {};
+      installState(local, sync);
+      state = await pbpReadSecretSyncState();
+      check("E4 sync state: wholly empty legacy state initializes false", state.syncApiKeys === false && sync.syncApiKeys === false);
+
+      local = { optSyncEnabled: false, openaiApiKey: "obf:local" };
+      sync = { syncApiKeys: true, openaiApiKey: "obf:cloud" };
+      const offMetrics = installState(local, sync, { syncGet: true });
+      state = await pbpReadSecretSyncState();
+      check("E4 sync state: default sync-off read performs zero sync access",
+        state.optSyncEnabled === false && state.syncApiKeys === false && offMetrics.syncReads === 0 && offMetrics.syncWrites === 0);
+
+      local = { optSyncEnabled: false };
+      sync = { syncApiKeys: true };
+      const joinMetrics = installState(local, sync);
+      state = await pbpReadSecretSyncState({ includeGlobalWhenSyncOff: true });
+      check("E4 sync state: explicit join reads the existing global marker",
+        state.optSyncEnabled === false && state.syncApiKeys === true && joinMetrics.syncReads === 1);
+
+      local = { optSyncEnabled: false };
+      sync = {};
+      const readOnlyMetrics = installState(local, sync);
+      state = await pbpReadSecretSyncState({ includeGlobalWhenSyncOff: true, persistInferredState: false });
+      check("E4 sync state: read-only Options probe never initializes a missing marker",
+        state.syncApiKeys === false && readOnlyMetrics.syncReads === 2 && readOnlyMetrics.syncWrites === 0);
+
+      local = { optSyncEnabled: true };
+      sync = {};
+      installState(local, sync, { syncGet: true });
+      let rejected = false;
+      try { await pbpReadSecretSyncState(); } catch (_) { rejected = true; }
+      check("E4 sync state: marker read failure propagates", rejected);
+
+      installState(local, sync, { syncSet: true });
+      rejected = false;
+      try { await pbpReadSecretSyncState(); } catch (_) { rejected = true; }
+      check("E4 sync state: marker initialization write failure propagates", rejected);
+
+      local = { optSyncEnabled: false };
+      sync = { syncApiKeys: true, openaiApiKey: "obf:cloud" };
+      const persistMetrics = installState(local, sync, { syncGet: true });
+      const persisted = await persistSettings({ optTheme: "nord", openaiApiKey: "obf:local-only" });
+      check("E4 persistSettings: sync-off production save succeeds with zero sync access",
+        persisted.ok === true && persistMetrics.syncReads === 0 && persistMetrics.syncWrites === 0 &&
+        local.openaiApiKey === "obf:local-only" && local.optTheme === "nord");
+
+      local = { optSyncEnabled: true };
+      sync = { syncApiKeys: true, optTheme: "nord" };
+      installState(local, sync);
+      _settingsStorageCache = chrome.storage.local;
+      const atomicRead = await pbpReadSettingsWithSecrets({ optTheme: "auto" });
+      check("E4 atomic settings read refreshes the main-area cache",
+        atomicRead.optTheme === "nord" && _settingsStorageCache === chrome.storage.sync);
+    } finally {
+      globalThis.chrome = previousChrome;
+      _settingsStorageCache = previousSettingsCache;
+      globalThis.__pbpTestStorage = previousTestStorage;
+      globalThis.__pbpTestSyncSetLarge = previousTestLarge;
+    }
+  })();
 
   // -- pbpStripExportTargetTokens --
   const etsIn = {
@@ -171,6 +366,65 @@ async function run() {
   check("E4 overlay: null localVals returns s copy unchanged", pbpOverlaySecrets({ a: 1 }, null).a === 1);
   check("E4 overlay: undefined localVals returns s copy unchanged", pbpOverlaySecrets({ a: 1 }, undefined).a === 1);
 
+  // -- pbpPlanSecretMigration: sync residue may fill gaps, never roll local back --
+  const newerLocalPlan = pbpPlanSecretMigration(
+    { geminiApiKey: "obf:stale-sync" },
+    { geminiApiKey: "obf:newer-local" },
+  );
+  check("E4 migration plan: stale sync key never overwrites a newer local own-property",
+    newerLocalPlan.syncKeys.includes("geminiApiKey") && !("geminiApiKey" in newerLocalPlan.localPayload));
+  const clearedLocalPlan = pbpPlanSecretMigration(
+    { geminiApiKey: "obf:stale-sync" },
+    { geminiApiKey: "" },
+  );
+  check("E4 migration plan: present-but-empty local key blocks stale sync resurrection",
+    !("geminiApiKey" in clearedLocalPlan.localPayload));
+
+  const localFullTargets = { github: { enabled: true, token: "obf:new-token", repo: "new" } };
+  const strippedTargetPlan = pbpPlanSecretMigration(
+    { exportTargets: { github: { enabled: false, repo: "stale" } } },
+    { exportTargets: localFullTargets },
+  );
+  check("E4 migration plan: stripped sync exportTargets is not treated as secret residue",
+    strippedTargetPlan === null);
+  const staleFullTargetPlan = pbpPlanSecretMigration(
+    { exportTargets: {
+      github: { enabled: false, token: "obf:old-token", repo: "stale" },
+      webhook: { enabled: true, token: "obf:deleted-target" },
+    } },
+    { exportTargets: localFullTargets },
+  );
+  check("E4 migration plan: stale full exportTargets neither overwrites a local token nor revives a deleted target",
+    !("exportTargets" in staleFullTargetPlan.localPayload) && staleFullTargetPlan.scrubExportTargets === true);
+  const clearedTargetPlan = pbpPlanSecretMigration(
+    { exportTargets: { github: { token: "obf:old-token" } } },
+    { exportTargets: { github: { token: "" } } },
+  );
+  check("E4 migration plan: present-but-empty local target token blocks stale sync resurrection",
+    !("exportTargets" in clearedTargetPlan.localPayload));
+
+  const recoverTargetPlan = pbpPlanSecretMigration(
+    { exportTargets: {
+      github: { enabled: true, token: "obf:recover", repo: "stale" },
+      webhook: { enabled: true, token: "obf:deleted-target" },
+    } },
+    { exportTargets: { github: { enabled: false, repo: "local" } } },
+  );
+  check("E4 migration plan: existing target may recover only its missing token",
+    recoverTargetPlan.localPayload.exportTargets.github.token === "obf:recover" &&
+    recoverTargetPlan.localPayload.exportTargets.github.enabled === false &&
+    recoverTargetPlan.localPayload.exportTargets.github.repo === "local" &&
+    !("webhook" in recoverTargetPlan.localPayload.exportTargets));
+
+  const firstMigrationPlan = pbpPlanSecretMigration(
+    { jinaApiKey: "obf:first-key", exportTargets: { github: { enabled: true, token: "obf:first-token" } } },
+    {},
+  );
+  check("E4 migration plan: missing local API key is eligible for first migration",
+    firstMigrationPlan.localPayload.jinaApiKey === "obf:first-key");
+  check("E4 migration plan: wholly missing local exportTargets accepts the full sync copy",
+    firstMigrationPlan.localPayload.exportTargets.github.token === "obf:first-token");
+
   // -- pbpApplySecretOverlay: chrome undefined -> degrades to input, no throw.
   // MUST be awaited: without await, this IIFE's continuation (restoring
   // globalThis.chrome) fires mid-flight inside the next test's own two-step
@@ -187,7 +441,7 @@ async function run() {
   // -- pbpApplySecretOverlay: routing active -> real overlay from a stubbed chrome.storage.local --
   await (async () => {
     const prevChromeE4b = globalThis.chrome;
-    const localBacking = { optSyncEnabled: true, syncApiKeys: false, geminiApiKey: "obf:fromlocal" };
+    const localBacking = { optSyncEnabled: true, geminiApiKey: "obf:fromlocal" };
     globalThis.chrome = {
       storage: {
         local: { get: (keys) => {
@@ -197,7 +451,8 @@ async function run() {
           const out = Object.assign({}, keys);
           Object.keys(keys).forEach((k) => { if (k in localBacking) out[k] = localBacking[k]; });
           return Promise.resolve(out);
-        } },
+        }, remove: () => Promise.resolve() },
+        sync: { get: () => Promise.resolve({ syncApiKeys: false }), set: () => Promise.resolve() },
       },
     };
     const active = await pbpApplySecretOverlay({ geminiApiKey: "obf:stale-sync-value", optTheme: "nord" });
@@ -206,15 +461,81 @@ async function run() {
     globalThis.chrome = prevChromeE4b;
   })();
 
+  await (async () => {
+    const previousChrome = globalThis.chrome;
+    const local = { optSyncEnabled: true };
+    const sync = {
+      syncApiKeys: false,
+      pinboardToken: "obf:stale-pinboard",
+      openaiApiKey: "obf:stale-openai",
+      exportTargets: { github: { enabled: true, token: "obf:stale-target" } },
+    };
+    const get = (backing, keys) => {
+      if (Array.isArray(keys)) { const out = {}; keys.forEach((key) => { if (key in backing) out[key] = backing[key]; }); return out; }
+      if (typeof keys === "string") return keys in backing ? { [keys]: backing[keys] } : {};
+      const out = Object.assign({}, keys || {}); Object.keys(keys || {}).forEach((key) => { if (key in backing) out[key] = backing[key]; }); return out;
+    };
+    globalThis.chrome = { storage: {
+      local: { get: async (keys) => get(local, keys), remove: async () => {} },
+      sync: { get: async (keys) => get(sync, keys), set: async (data) => Object.assign(sync, data) },
+    } };
+    try {
+      const partial = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+      check("E4 atomic settings read: partial token query clears residue without adding other API fields",
+        partial.pinboardToken === "" && !("openaiApiKey" in partial));
+      const targetOnly = await pbpReadSettingsWithSecrets({ exportTargets: {} });
+      check("E4 atomic settings read: missing local target strips stale sync token",
+        targetOnly.exportTargets.github.enabled === true && !("token" in targetOnly.exportTargets.github));
+      local.pinboardToken = "obf:local-current";
+      const restored = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+      check("E4 atomic settings read: requested local own secret restores over cleared residue",
+        restored.pinboardToken === "obf:local-current" && !("openaiApiKey" in restored));
+    } finally {
+      globalThis.chrome = previousChrome;
+    }
+  })();
+
   // -- pbpApplySecretOverlay: routing inactive (syncApiKeys:true) -> untouched --
   await (async () => {
     const prevChromeE4c = globalThis.chrome;
     globalThis.chrome = {
-      storage: { local: { get: () => Promise.resolve({ optSyncEnabled: true, syncApiKeys: true }) } },
+      storage: {
+        local: { get: () => Promise.resolve({ optSyncEnabled: true }), remove: () => Promise.resolve() },
+        sync: { get: () => Promise.resolve({ syncApiKeys: true }), set: () => Promise.resolve() },
+      },
     };
     const untouched = await pbpApplySecretOverlay({ geminiApiKey: "obf:should-stay" });
     check("E4 pbpApplySecretOverlay: keys-on -> not overlaid (byte-identical passthrough)", untouched.geminiApiKey === "obf:should-stay");
     globalThis.chrome = prevChromeE4c;
+  })();
+
+  // -- pbpApplySecretOverlay: unknown/failed local routing reads fail closed --
+  await (async () => {
+    const previousChrome = globalThis.chrome;
+    const stale = {
+      optTheme: "nord", geminiApiKey: "obf:stale",
+      exportTargets: { github: { enabled: true, token: "obf:stale-target" } },
+    };
+    try {
+      globalThis.chrome = { storage: { local: { get: () => Promise.reject(new Error("flags unavailable")) } } };
+      const unknown = await pbpApplySecretOverlay(stale);
+      check("E4 pbpApplySecretOverlay: unknown routing state clears stale sync credentials",
+        unknown.optTheme === "nord" && unknown.geminiApiKey === "" &&
+        !("token" in unknown.exportTargets.github));
+
+      let reads = 0;
+      globalThis.chrome = { storage: { local: { get: () => {
+        reads++;
+        return reads === 1
+          ? Promise.resolve({ optSyncEnabled: true })
+          : Promise.reject(new Error("local secrets unavailable"));
+      } }, sync: { get: () => Promise.resolve({ syncApiKeys: false }), set: () => Promise.resolve() } } };
+      const activeFailure = await pbpApplySecretOverlay(stale);
+      check("E4 pbpApplySecretOverlay: routing-active local read failure cannot revive sync residue",
+        activeFailure.geminiApiKey === "" && !("token" in activeFailure.exportTargets.github));
+    } finally {
+      globalThis.chrome = previousChrome;
+    }
   })();
 
   // ---------- E4 (cont'd): persistSettings() end-to-end routing ----------
@@ -237,6 +558,7 @@ async function run() {
     let syncSet = null;
     globalThis.__pbpTestStorage = { set: (d) => { syncSet = d; return Promise.resolve(); }, get: () => Promise.resolve({}) };
     globalThis.__pbpTestSyncSetLarge = () => Promise.resolve();
+
     const r = await persistSettings({
       optTheme: "nord",
       geminiApiKey: "obf:realgem",
@@ -293,16 +615,249 @@ async function run() {
     delete globalThis.__pbpTestSyncSetLarge;
   })();
 
+  // An unreadable routing state must never reuse a cached sync area for an
+  // unfiltered secret write.
+  await (async () => {
+    const previousChrome = globalThis.chrome;
+    const previousCache = _settingsStorageCache;
+    let writes = 0;
+    try {
+      const sync = { get: () => Promise.resolve({}), set: () => { writes++; return Promise.resolve(); } };
+      globalThis.chrome = {
+        storage: {
+          local: {
+            get: () => Promise.reject(new Error("flags unavailable")),
+            set: () => { writes++; return Promise.resolve(); },
+          },
+          sync,
+        },
+      };
+      _settingsStorageCache = sync;
+      const result = await persistSettings({ openaiApiKey: "obf:must-not-leak", optTheme: "nord" });
+      check("E4 persistSettings: routing flag read failure is fail-closed with zero writes",
+        result.ok === false && writes === 0);
+    } finally {
+      globalThis.chrome = previousChrome;
+      _settingsStorageCache = previousCache;
+    }
+  })();
+
+  // ---------- E4 (cont'd): explicit keys-on -> keys-off transition ----------
+  await (async () => {
+    const previousChrome = globalThis.chrome;
+    const area = (backing) => ({
+      get: async (keys) => {
+        if (Array.isArray(keys)) {
+          const out = {};
+          keys.forEach((key) => { if (key in backing) out[key] = backing[key]; });
+          return out;
+        }
+        if (typeof keys === "string") return keys in backing ? { [keys]: backing[keys] } : {};
+        const out = Object.assign({}, keys || {});
+        Object.keys(keys || {}).forEach((key) => { if (key in backing) out[key] = backing[key]; });
+        return out;
+      },
+      set: async (data) => { Object.assign(backing, data); },
+      remove: async (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete backing[key]); },
+    });
+    const install = (local, sync) => {
+      globalThis.chrome = { storage: { local: area(local), sync: area(sync) } };
+      return globalThis.chrome.storage;
+    };
+
+    try {
+      const local = {
+        optSyncEnabled: true, openaiApiKey: "obf:old",
+        exportTargets: { github: { enabled: false, token: "obf:old-target", repo: "old" } },
+      };
+      const sync = {
+        syncApiKeys: true,
+        openaiApiKey: "obf:new",
+        exportTargets: { github: { enabled: true, token: "obf:new-target", repo: "new" } },
+      };
+      install(local, sync);
+      await pbpDisableSyncApiKeys();
+      check("E4 keys-off: current sync API key replaces stale local", local.openaiApiKey === "obf:new");
+      check("E4 keys-off: current full export target replaces stale local config/token",
+        local.exportTargets.github.enabled === true && local.exportTargets.github.repo === "new" &&
+        local.exportTargets.github.token === "obf:new-target");
+      check("E4 keys-off: flag flips only after copy and sync is scrubbed",
+        sync.syncApiKeys === false && sync.openaiApiKey === "" &&
+        sync.exportTargets.github.repo === "new" && !("token" in sync.exportTargets.github));
+
+      const duplicateLocal = {
+        optSyncEnabled: true, openaiApiKey: "obf:stale-local",
+        exportTargets: { github: { token: "obf:stale-local-target" } },
+      };
+      const duplicateSync = {
+        syncApiKeys: true,
+        openaiApiKey: "obf:fresh-sync",
+        exportTargets: { github: { token: "obf:fresh-sync-target" } },
+      };
+      install(duplicateLocal, duplicateSync);
+      const duplicateBefore = JSON.stringify(duplicateSync);
+      await pbpEnableSyncApiKeys();
+      check("E4 keys-on: stale duplicate enable cannot overwrite current sync truth",
+        JSON.stringify(duplicateSync) === duplicateBefore);
+
+      const syncOffLocal = { optSyncEnabled: false, openaiApiKey: "obf:local-only" };
+      const syncOffSync = { syncApiKeys: true, openaiApiKey: "obf:cloud" };
+      install(syncOffLocal, syncOffSync);
+      const syncOffBefore = JSON.stringify(syncOffSync);
+      await pbpEnableSyncApiKeys();
+      check("E4 keys-on: fresh sync-off state performs zero sync writes",
+        JSON.stringify(syncOffSync) === syncOffBefore);
+
+      const disabledSettingsLocal = { optSyncEnabled: false, openaiApiKey: "obf:local-current" };
+      const disabledSettingsSync = {
+        syncApiKeys: true,
+        openaiApiKey: "obf:old-cloud",
+        exportTargets: { github: { enabled: true, token: "obf:old-cloud-target" } },
+      };
+      install(disabledSettingsLocal, disabledSettingsSync);
+      const disabledSettingsBefore = JSON.stringify(disabledSettingsSync);
+      await pbpDisableSyncApiKeys();
+      check("E4 keys-off: sync-off device neither reads nor scrubs cloud credentials",
+        disabledSettingsLocal.openaiApiKey === "obf:local-current" &&
+        JSON.stringify(disabledSettingsSync) === disabledSettingsBefore);
+
+      const scrubLocal = { optSyncEnabled: true, openaiApiKey: "obf:old" };
+      const scrubSync = {
+        syncApiKeys: true,
+        openaiApiKey: "obf:current",
+        exportTargets: { github: { enabled: true, token: "obf:current-target" } },
+      };
+      const scrubStorage = install(scrubLocal, scrubSync);
+      const scrubSet = scrubStorage.sync.set;
+      scrubStorage.sync.set = (data) => data.syncApiKeys === false
+        ? Promise.reject(new Error("sync scrub failed"))
+        : scrubSet(data);
+      let scrubRejected = false;
+      try { await pbpDisableSyncApiKeys(); } catch (_) { scrubRejected = true; }
+      check("E4 keys-off: scrub failure is reported without rolling back the safe local flag/source",
+        scrubRejected && scrubLocal.openaiApiKey === "obf:current" &&
+        scrubSync.syncApiKeys === true && scrubSync.openaiApiKey === "obf:current");
+
+      const failedLocal = { optSyncEnabled: true, openaiApiKey: "obf:old" };
+      const failedSync = { syncApiKeys: true, openaiApiKey: "obf:new" };
+      const failedStorage = install(failedLocal, failedSync);
+      const originalLocalSet = failedStorage.local.set;
+      failedStorage.local.set = (data) => "openaiApiKey" in data
+        ? Promise.reject(new Error("local write failed"))
+        : originalLocalSet(data);
+      let rejected = false;
+      try { await pbpDisableSyncApiKeys(); } catch (_) { rejected = true; }
+      check("E4 keys-off: failed local copy leaves flag true and sync source untouched",
+        rejected && failedSync.syncApiKeys === true && failedSync.openaiApiKey === "obf:new");
+
+      const enableFirstLocal = {
+        optSyncEnabled: true, claudeApiKey: "obf:current",
+        exportTargets: { github: { enabled: true, token: "obf:current-target" } },
+      };
+      const enableFirstSync = { syncApiKeys: false };
+      const enableFirstStorage = install(enableFirstLocal, enableFirstSync);
+      const baseSyncSet = enableFirstStorage.sync.set;
+      let releaseEnable;
+      let enableStartedResolve;
+      const enableStarted = new Promise((resolve) => { enableStartedResolve = resolve; });
+      let holdFirstSyncSet = true;
+      enableFirstStorage.sync.set = (data) => {
+        if (!holdFirstSyncSet) return baseSyncSet(data);
+        holdFirstSyncSet = false;
+        return new Promise((resolve) => {
+          releaseEnable = () => { Object.assign(enableFirstSync, data); resolve(); };
+          enableStartedResolve();
+        });
+      };
+      const enabling = pbpEnableSyncApiKeys();
+      await enableStarted;
+      const disablingAfter = pbpDisableSyncApiKeys();
+      releaseEnable();
+      await Promise.all([enabling, disablingAfter]);
+      check("E4 keys toggle lock: later disable wins without stale rollback",
+        enableFirstLocal.claudeApiKey === "obf:current" && enableFirstSync.syncApiKeys === false &&
+        enableFirstSync.claudeApiKey === "" && !("token" in enableFirstSync.exportTargets.github));
+
+      const disableFirstLocal = { optSyncEnabled: true, openaiApiKey: "obf:old" };
+      const disableFirstSync = {
+        syncApiKeys: true,
+        openaiApiKey: "obf:newest",
+        exportTargets: { github: { enabled: true, token: "obf:newest-target" } },
+      };
+      const disableFirstStorage = install(disableFirstLocal, disableFirstSync);
+      const baseLocalSet = disableFirstStorage.local.set;
+      let releaseDisable;
+      let disableStartedResolve;
+      const disableStarted = new Promise((resolve) => { disableStartedResolve = resolve; });
+      let holdFirstLocalPayload = true;
+      disableFirstStorage.local.set = (data) => {
+        if (!holdFirstLocalPayload || !("openaiApiKey" in data)) return baseLocalSet(data);
+        holdFirstLocalPayload = false;
+        return new Promise((resolve) => {
+          releaseDisable = () => { Object.assign(disableFirstLocal, data); resolve(); };
+          disableStartedResolve();
+        });
+      };
+      const disabling = pbpDisableSyncApiKeys();
+      await disableStarted;
+      const enablingAfter = pbpEnableSyncApiKeys();
+      releaseDisable();
+      await Promise.all([disabling, enablingAfter]);
+      check("E4 keys toggle lock: later enable republishes the copied current truth",
+        disableFirstSync.syncApiKeys === true && disableFirstSync.openaiApiKey === "obf:newest" &&
+        disableFirstSync.exportTargets.github.token === "obf:newest-target");
+    } finally {
+      globalThis.chrome = previousChrome;
+    }
+  })();
+
+  await (async () => {
+    const backgroundSource = await fetch("../background.js").then((response) => response.text());
+    const start = backgroundSource.indexOf("let _settingsCache = null;");
+    const end = backgroundSource.indexOf("// F7: Track recent saves", start);
+    const cacheSource = backgroundSource.slice(start, end);
+    let reads = 0;
+    let releaseFirst;
+    let firstStartedResolve;
+    const firstStarted = new Promise((resolve) => { firstStartedResolve = resolve; });
+    const reader = () => {
+      reads++;
+      if (reads === 1) {
+        firstStartedResolve();
+        return new Promise((resolve) => { releaseFirst = () => resolve({ pinboardToken: obfuscateKey("alice:old") }); });
+      }
+      return Promise.resolve({ pinboardToken: obfuscateKey("alice:new") });
+    };
+    const factory = new Function("SETTINGS_DEFAULTS", "pbpReadSettingsWithSecrets", "deobfuscateSettings",
+      `${cacheSource}\nreturn { loadSettings, invalidateSettingsCache, cached: () => _settingsCache };`);
+    const cache = factory(SETTINGS_DEFAULTS, reader, deobfuscateSettings);
+    const pending = cache.loadSettings();
+    await firstStarted;
+    cache.invalidateSettingsCache();
+    releaseFirst();
+    const current = await pending;
+    const cached = await cache.loadSettings();
+    check("E4 background settings cache: invalidation during a pending read cannot republish stale credentials",
+      reads === 2 && current.pinboardToken === "alice:new" && cached.pinboardToken === "alice:new" && cache.cached() === cached &&
+      backgroundSource.includes("changes.optSyncEnabled") && backgroundSource.includes("invalidatePinboardAuthState()"));
+    const mdAiSource = await fetch("../md-ai-core.js").then((response) => response.text());
+    check("E4 md AI cache: storage changes invalidate the memoized settings promise",
+      mdAiSource.includes("chrome.storage.onChanged.addListener") &&
+      mdAiSource.includes("pbpSettingsKeysChanged(changes)") &&
+      mdAiSource.includes("_pbpAiSettingsPromise = null"));
+  })();
+
   // ---------- E5: three-state matrix + migration idempotency ----------
   await (async () => {
-    const syncArea = {};
-    const localArea = { optSyncEnabled: true, syncApiKeys: false };
+    const syncArea = { syncApiKeys: false };
+    const localArea = { optSyncEnabled: true };
     globalThis.chrome = {
       storage: {
         sync: {
           get: (keys) => {
             const out = {};
-            (Array.isArray(keys) ? keys : Object.keys(keys || {})).forEach((k) => { if (k in syncArea) out[k] = syncArea[k]; });
+            const wanted = typeof keys === "string" ? [keys] : (Array.isArray(keys) ? keys : Object.keys(keys || {}));
+            wanted.forEach((k) => { if (k in syncArea) out[k] = syncArea[k]; });
             return Promise.resolve(out);
           },
           set: (d) => { Object.assign(syncArea, d); return Promise.resolve(); },
@@ -314,6 +869,7 @@ async function run() {
             const out = Object.assign({}, keys); Object.keys(keys || {}).forEach((k) => { if (k in localArea) out[k] = localArea[k]; }); return Promise.resolve(out);
           },
           set: (d) => { Object.assign(localArea, d); return Promise.resolve(); },
+          remove: (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((k) => delete localArea[k]); return Promise.resolve(); },
         },
       },
     };
@@ -323,6 +879,29 @@ async function run() {
     };
     globalThis.__pbpTestSyncSetLarge = () => Promise.resolve();
 
+    function holdNextSecretRead() {
+      const originalGet = globalThis.chrome.storage.local.get;
+      let releaseRead;
+      let startedResolve;
+      let held = false;
+      const started = new Promise((resolve) => { startedResolve = resolve; });
+      globalThis.chrome.storage.local.get = (keys) => {
+        if (!held && Array.isArray(keys)) {
+          held = true;
+          return originalGet(keys).then((snapshot) => new Promise((resolve) => {
+            releaseRead = () => resolve(snapshot);
+            startedResolve();
+          }));
+        }
+        return originalGet(keys);
+      };
+      return {
+        started,
+        release: () => releaseRead(),
+        restore: () => { globalThis.chrome.storage.local.get = originalGet; },
+      };
+    }
+
     await persistSettings({ optTheme: "nord", geminiApiKey: "obf:g1", pinboardToken: "obf:p1", exportTargets: { github: { token: "obf:t1", enabled: true } } });
     check("E5 default-state: sync area has NO API_KEY_FIELDS after saveAll", API_KEY_FIELDS.every((k) => !(k in syncArea)));
     // Parenthesized member-access-then-fallback BEFORE the `in` check: `in`
@@ -331,41 +910,325 @@ async function run() {
     check("E5 default-state: sync exportTargets has no token", !("token" in ((syncArea.exportTargets || {}).github || {})));
     check("E5 default-state: local has the real secrets", localArea.geminiApiKey === "obf:g1" && localArea.pinboardToken === "obf:p1");
 
-    // Migration idempotency: seed sync with a stale leftover secret, run migration twice.
+    // A stale sync copy is source-only: existing local truth wins, then sync is scrubbed.
     syncArea.geminiApiKey = "obf:STALE";
     await pbpMigrateSecretsToLocal();
-    check("E5 migration: stale sync secret moved to local", localArea.geminiApiKey === "obf:STALE");
-    check("E5 migration: stale sync secret removed from sync", !("geminiApiKey" in syncArea) || syncArea.geminiApiKey === undefined);
+    check("E5 migration: stale sync secret does not overwrite newer local", localArea.geminiApiKey === "obf:g1");
+    check("E5 migration: stale sync secret tombstoned in sync", syncArea.geminiApiKey === "");
     const localAreaSnapshot = JSON.stringify(localArea);
     await pbpMigrateSecretsToLocal(); // second run: must be a no-op (idempotent)
     check("E5 migration: second run is a no-op (idempotent)", JSON.stringify(localArea) === localAreaSnapshot);
 
-    // pbpMigrateSecretsToLocal: must write the local secret payload BEFORE removing from sync.
-    syncArea.geminiApiKey = "obf:STALE";
+    // An explicit local clear is also truth and must never resurrect a stale key.
+    localArea.geminiApiKey = "";
+    syncArea.geminiApiKey = "obf:STALE-AFTER-CLEAR";
+    await pbpMigrateSecretsToLocal();
+    check("E5 migration: local cleared empty remains empty while stale sync is scrubbed",
+      localArea.geminiApiKey === "" && syncArea.geminiApiKey === "");
+
+    // Stripped/full sync exportTargets cannot erase or overwrite local truth.
+    syncArea.exportTargets = { github: { enabled: false, repo: "stale-stripped" } };
+    const localTargetsBeforeStrip = JSON.stringify(localArea.exportTargets);
+    await pbpMigrateSecretsToLocal();
+    check("E5 migration: stripped sync exportTargets leaves local token/config untouched",
+      JSON.stringify(localArea.exportTargets) === localTargetsBeforeStrip);
+    syncArea.exportTargets = {
+      github: { enabled: false, token: "obf:stale-target", repo: "stale-full" },
+      webhook: { enabled: true, token: "obf:deleted-target" },
+    };
+    await pbpMigrateSecretsToLocal();
+    check("E5 migration: full stale exportTargets neither overwrites token/config nor revives deleted target",
+      localArea.exportTargets.github.token === "obf:t1" && localArea.exportTargets.github.enabled === true &&
+      !("webhook" in localArea.exportTargets));
+    check("E5 migration: full stale exportTargets is scrubbed in sync",
+      !("token" in syncArea.exportTargets.github) && !("token" in syncArea.exportTargets.webhook));
+
+    // An existing local target may recover only a locally missing token.
+    localArea.exportTargets = { github: { enabled: false, repo: "local" } };
+    syncArea.exportTargets = {
+      github: { enabled: true, token: "obf:recover", repo: "stale" },
+      webhook: { enabled: true, token: "obf:deleted-target" },
+    };
+    await pbpMigrateSecretsToLocal();
+    check("E5 migration: target recovery fills only missing token and preserves deletion/config",
+      localArea.exportTargets.github.token === "obf:recover" && localArea.exportTargets.github.enabled === false &&
+      localArea.exportTargets.github.repo === "local" && !("webhook" in localArea.exportTargets));
+
+    // Missing local data is migrated before either sync scrub operation.
+    delete localArea.jinaApiKey;
+    delete localArea.exportTargets;
+    syncArea.jinaApiKey = "obf:first-key";
+    syncArea.exportTargets = { github: { enabled: true, token: "obf:first-token", repo: "r" } };
     const migrateOrder = [];
     const realLocalSetM = globalThis.chrome.storage.local.set;
-    globalThis.chrome.storage.local.set = (d) => { if ("geminiApiKey" in d) migrateOrder.push("local"); return realLocalSetM(d); };
+    globalThis.chrome.storage.local.set = (d) => {
+      if ("jinaApiKey" in d || "exportTargets" in d) migrateOrder.push("local");
+      return realLocalSetM(d);
+    };
+    const realSyncSetM = globalThis.chrome.storage.sync.set;
+    globalThis.chrome.storage.sync.set = (d) => { migrateOrder.push("strip"); return realSyncSetM(d); };
     const realSyncRemoveM = globalThis.chrome.storage.sync.remove;
     globalThis.chrome.storage.sync.remove = (keys) => { migrateOrder.push("remove"); return realSyncRemoveM(keys); };
     await pbpMigrateSecretsToLocal();
-    check("E5 pbpMigrateSecretsToLocal: writes local payload BEFORE removing from sync",
-      migrateOrder.indexOf("local") < migrateOrder.indexOf("remove"));
+    check("E5 migration: wholly missing local secrets receive the first full sync copy",
+      localArea.jinaApiKey === "obf:first-key" && localArea.exportTargets.github.token === "obf:first-token");
+    check("E5 migration: local payload is confirmed before every sync scrub",
+      migrateOrder.indexOf("local") < migrateOrder.indexOf("strip") &&
+      !migrateOrder.includes("remove"));
+    check("E5 migration: first-copy source is scrubbed only after local succeeds",
+      syncArea.jinaApiKey === "" && !("token" in syncArea.exportTargets.github));
     globalThis.chrome.storage.local.set = realLocalSetM;
+    globalThis.chrome.storage.sync.set = realSyncSetM;
     globalThis.chrome.storage.sync.remove = realSyncRemoveM;
 
-    // pbpEnableSyncApiKeys: must write sync BEFORE flipping the flag.
+    // A rejected local write leaves every sync source untouched.
+    delete localArea.openaiApiKey;
+    syncArea.openaiApiKey = "obf:retry-source";
+    let scrubAfterFailedWrite = 0;
+    globalThis.chrome.storage.local.set = (d) => {
+      if ("openaiApiKey" in d) return Promise.reject(new Error("local write failed"));
+      return realLocalSetM(d);
+    };
+    globalThis.chrome.storage.sync.set = (d) => { scrubAfterFailedWrite++; return realSyncSetM(d); };
+    globalThis.chrome.storage.sync.remove = (keys) => { scrubAfterFailedWrite++; return realSyncRemoveM(keys); };
+    await pbpMigrateSecretsToLocal();
+    check("E5 migration: failed local write retains the sync source and leaves local missing",
+      syncArea.openaiApiKey === "obf:retry-source" && !("openaiApiKey" in localArea));
+    check("E5 migration: failed local write performs no sync scrub", scrubAfterFailedWrite === 0);
+    globalThis.chrome.storage.local.set = realLocalSetM;
+    globalThis.chrome.storage.sync.set = realSyncSetM;
+    globalThis.chrome.storage.sync.remove = realSyncRemoveM;
+    delete syncArea.openaiApiKey;
+
+    // The origin-scoped lock prevents a held migration snapshot from winning
+    // over a concurrent settings save from another extension page.
+    delete localArea.claudeApiKey;
+    syncArea.claudeApiKey = "obf:stale-concurrent";
+    const saveRace = holdNextSecretRead();
+    const heldMigration = pbpMigrateSecretsToLocal();
+    await saveRace.started;
+    const concurrentSave = persistSettings({ claudeApiKey: "obf:newer-concurrent" });
+    await Promise.resolve();
+    saveRace.release();
+    await Promise.all([heldMigration, concurrentSave]);
+    saveRace.restore();
+    check("E5 migration lock: concurrent settings save remains the final local truth",
+      localArea.claudeApiKey === "obf:newer-concurrent" && syncArea.claudeApiKey === "");
+
+    // The same lock makes keys-on atomic relative to cleanup: migration either
+    // finishes first, or observes syncApiKeys=true and leaves sync untouched.
+    syncArea.syncApiKeys = false;
+    localArea.mistralApiKey = "obf:current-for-sync";
+    syncArea.mistralApiKey = "obf:stale-before-enable";
+    const enableRace = holdNextSecretRead();
+    const heldBeforeEnable = pbpMigrateSecretsToLocal();
+    await enableRace.started;
+    const concurrentEnable = pbpEnableSyncApiKeys();
+    await Promise.resolve();
+    enableRace.release();
+    await Promise.all([heldBeforeEnable, concurrentEnable]);
+    enableRace.restore();
+    check("E5 migration lock: concurrent keys-on leaves flag and synced secret consistent",
+      syncArea.syncApiKeys === true && syncArea.mistralApiKey === "obf:current-for-sync");
+    syncArea.syncApiKeys = false;
+
+    // Keep the entire persist transaction locked: if its stripped main write is
+    // paused, keys-on must run after it and restore the full local target token.
+    const realTestStorage = globalThis.__pbpTestStorage;
+    let releaseMainWrite;
+    let mainWriteStartedResolve;
+    const mainWriteStarted = new Promise((resolve) => { mainWriteStartedResolve = resolve; });
+    globalThis.__pbpTestStorage = {
+      ...realTestStorage,
+      set: (d) => new Promise((resolve) => {
+        releaseMainWrite = () => { Object.assign(syncArea, d); resolve(); };
+        mainWriteStartedResolve();
+      }),
+    };
+    const heldPersist = persistSettings({ exportTargets: { github: { enabled: true, token: "obf:atomic-token" } } });
+    await mainWriteStarted;
+    const enableDuringMainWrite = pbpEnableSyncApiKeys();
+    await Promise.resolve();
+    releaseMainWrite();
+    await Promise.all([heldPersist, enableDuringMainWrite]);
+    globalThis.__pbpTestStorage = realTestStorage;
+    check("E5 persist lock: keys-on cannot be followed by a stale stripped main write",
+      syncArea.syncApiKeys === true && syncArea.exportTargets.github.token === "obf:atomic-token");
+    syncArea.syncApiKeys = false;
+
+    // pbpEnableSyncApiKeys: marker and complete payload publish atomically.
     const writeOrder = [];
     const realSyncSet = globalThis.chrome.storage.sync.set;
     globalThis.chrome.storage.sync.set = (d) => { writeOrder.push("sync"); return realSyncSet(d); };
-    const realLocalSet = globalThis.chrome.storage.local.set;
-    globalThis.chrome.storage.local.set = (d) => { if ("syncApiKeys" in d) writeOrder.push("flag"); return realLocalSet(d); };
     await pbpEnableSyncApiKeys();
-    check("E5 pbpEnableSyncApiKeys: writes sync BEFORE flipping the flag (C4 ordering)",
-      writeOrder.indexOf("sync") < writeOrder.indexOf("flag"));
-    check("E5 pbpEnableSyncApiKeys: flag ends up true", localArea.syncApiKeys === true);
-    check("E5 pbpEnableSyncApiKeys: secrets landed in sync", syncArea.geminiApiKey === "obf:STALE" && syncArea.pinboardToken === "obf:p1");
+    check("E5 pbpEnableSyncApiKeys: publishes marker and payload in one sync write",
+      writeOrder.length === 1 && syncArea.syncApiKeys === true);
+    check("E5 pbpEnableSyncApiKeys: flag ends up true", syncArea.syncApiKeys === true);
+    check("E5 pbpEnableSyncApiKeys: current local secrets landed in sync", syncArea.geminiApiKey === "" && syncArea.pinboardToken === "obf:p1");
     globalThis.chrome.storage.sync.set = realSyncSet;
-    globalThis.chrome.storage.local.set = realLocalSet;
+
+    // Storage selection belongs inside the same lock. A queued persist must
+    // observe the completed sync->local transition, not retain the old area.
+    const savedTestStorageForAreaRace = globalThis.__pbpTestStorage;
+    delete globalThis.__pbpTestStorage;
+    localArea.optSyncEnabled = true;
+    syncArea.syncApiKeys = true;
+    delete localArea.cohereApiKey;
+    delete syncArea.cohereApiKey;
+    _settingsStorageCache = null;
+    let releaseAreaTransition;
+    let areaTransitionStartedResolve;
+    const areaTransitionStarted = new Promise((resolve) => { areaTransitionStartedResolve = resolve; });
+    const areaTransition = pbpWithSecretStorageLock(async () => {
+      areaTransitionStartedResolve();
+      await new Promise((resolve) => { releaseAreaTransition = resolve; });
+      localArea.optSyncEnabled = false;
+      _settingsStorageCache = globalThis.chrome.storage.local;
+    });
+    await areaTransitionStarted;
+    const queuedAreaPersist = persistSettings({ cohereApiKey: "obf:post-transition" });
+    await Promise.resolve();
+    await Promise.resolve();
+    releaseAreaTransition();
+    await Promise.all([areaTransition, queuedAreaPersist]);
+    check("E5 persist lock: queued save reselects storage after sync-to-local transition",
+      localArea.cohereApiKey === "obf:post-transition" && !("cohereApiKey" in syncArea));
+    globalThis.__pbpTestStorage = savedTestStorageForAreaRace;
+    localArea.optSyncEnabled = true;
+    syncArea.syncApiKeys = true;
+
+    // Drive the real Options sync-toggle handler: its paused stripped write
+    // must retain the lock until keys-on can restore the full local target.
+    const optionsSource = await fetch("../options.js").then((response) => response.text());
+    const syncHandlerStart = optionsSource.indexOf('syncToggle?.addEventListener("change", async () => {');
+    const syncHandlerEnd = optionsSource.indexOf("  // syncApiKeys toggle:", syncHandlerStart);
+    const syncHandlerSource = optionsSource.slice(syncHandlerStart, syncHandlerEnd);
+    const keysHandlerStart = optionsSource.indexOf('syncKeysToggle?.addEventListener("change", async () => {', syncHandlerEnd);
+    const keysHandlerEnd = optionsSource.indexOf("  // ---- Apply options page theme", keysHandlerStart);
+    const keysHandlerSource = optionsSource.slice(keysHandlerStart, keysHandlerEnd);
+    check("E5 Options handlers: settings migration is fully locked and disable uses the authoritative transition helper",
+      syncHandlerSource.indexOf("await pbpWithSecretStorageLock") < syncHandlerSource.indexOf("oldStorage.get") &&
+      syncHandlerSource.indexOf('syncSetLarge("savedThemes"') > syncHandlerSource.indexOf("await pbpWithSecretStorageLock") &&
+      keysHandlerSource.includes("pbpDisableSyncApiKeys()") &&
+      keysHandlerSource.includes("pbpReadSecretSyncState(") &&
+      !keysHandlerSource.includes("storage.local.set({ syncApiKeys: false })"));
+
+    const handlerLocal = {
+      optSyncEnabled: false,
+      exportTargets: { github: { enabled: true, token: "obf:handler-token" } },
+    };
+    const handlerSync = { syncApiKeys: false };
+    const area = (backing) => ({
+      get: async (keys) => {
+        if (Array.isArray(keys)) {
+          const out = {};
+          keys.forEach((key) => { if (key in backing) out[key] = backing[key]; });
+          return out;
+        }
+        if (typeof keys === "string") return keys in backing ? { [keys]: backing[keys] } : {};
+        const out = Object.assign({}, keys || {});
+        Object.keys(keys || {}).forEach((key) => { if (key in backing) out[key] = backing[key]; });
+        return out;
+      },
+      set: async (data) => { Object.assign(backing, data); },
+      remove: async (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete backing[key]); },
+    });
+    const handlerChrome = { storage: { local: area(handlerLocal), sync: area(handlerSync) } };
+    let releaseHandlerMain;
+    let handlerMainStartedResolve;
+    let firstHandlerSyncSet = true;
+    const handlerMainStarted = new Promise((resolve) => { handlerMainStartedResolve = resolve; });
+    const baseHandlerSyncSet = handlerChrome.storage.sync.set;
+    handlerChrome.storage.sync.set = (data) => {
+      if (!firstHandlerSyncSet) return baseHandlerSyncSet(data);
+      firstHandlerSyncSet = false;
+      return new Promise((resolve) => {
+        releaseHandlerMain = () => { Object.assign(handlerSync, data); resolve(); };
+        handlerMainStartedResolve();
+      });
+    };
+    const previousHandlerChrome = globalThis.chrome;
+    globalThis.chrome = handlerChrome;
+    let syncChangeHandler;
+    const syncToggleStub = { checked: true, addEventListener: (_type, fn) => { syncChangeHandler = fn; } };
+    const handlerDeps = {
+      syncToggle: syncToggleStub,
+      syncKeysToggle: { disabled: true },
+      chrome: handlerChrome,
+      SETTINGS_DEFAULTS,
+      pbpWithSecretStorageLock,
+      pbpReadSecretSyncStateUnlocked,
+      pbpSplitSecretBatch,
+      syncGetLarge: async (key) => key === "savedThemes" ? [] : "",
+      syncSetLarge: async () => {},
+      $id: () => null,
+      t: (key) => key,
+      document: { body: { style: {} }, querySelector: () => ({ dataset: { panel: "general" } }) },
+      sessionStorage: { setItem() {} },
+      setTimeout: () => 0,
+      location: { reload() {} },
+      console,
+    };
+    new Function(...Object.keys(handlerDeps), syncHandlerSource)(...Object.values(handlerDeps));
+    const heldOptionsMigration = syncChangeHandler();
+    await handlerMainStarted;
+    const enableDuringOptionsMigration = pbpEnableSyncApiKeys();
+    await Promise.resolve();
+    releaseHandlerMain();
+    await Promise.all([heldOptionsMigration, enableDuringOptionsMigration]);
+    check("E5 Options handler lock: keys-on wins after the real stripped migration write",
+      handlerSync.syncApiKeys === true && handlerSync.exportTargets.github.token === "obf:handler-token");
+
+    const joinLocal = {
+      optSyncEnabled: false, optTheme: "local-theme", openaiApiKey: "obf:stale-local",
+      exportTargets: { github: { enabled: false, token: "obf:stale-local-target", repo: "local" } },
+    };
+    const joinSync = {
+      syncApiKeys: true, openaiApiKey: "obf:cloud-current",
+      exportTargets: { github: { enabled: true, token: "obf:cloud-target", repo: "cloud" } },
+    };
+    const joinChrome = { storage: { local: area(joinLocal), sync: area(joinSync) } };
+    const cloudSecretsBeforeJoin = JSON.stringify({
+      openaiApiKey: joinSync.openaiApiKey,
+      exportTargets: joinSync.exportTargets,
+    });
+    let joinHandler;
+    const joinDeps = {
+      ...handlerDeps,
+      syncToggle: { checked: true, addEventListener: (_type, fn) => { joinHandler = fn; } },
+      syncKeysToggle: { disabled: true },
+      chrome: joinChrome,
+    };
+    globalThis.chrome = joinChrome;
+    new Function(...Object.keys(joinDeps), syncHandlerSource)(...Object.values(joinDeps));
+    await joinHandler();
+    check("E5 Options handler: joining existing global keys-on preserves cloud secrets byte-identically",
+      joinLocal.optSyncEnabled === true && cloudSecretsBeforeJoin === JSON.stringify({
+        openaiApiKey: joinSync.openaiApiKey,
+        exportTargets: joinSync.exportTargets,
+      }));
+
+    const staleLocal = { optSyncEnabled: true, optTheme: "stale-local" };
+    const staleSync = { optSyncEnabled: true, syncApiKeys: false, optTheme: "fresh-sync" };
+    const staleChrome = { storage: { local: area(staleLocal), sync: area(staleSync) } };
+    let staleWrites = 0;
+    const staleLocalSet = staleChrome.storage.local.set;
+    staleChrome.storage.local.set = (data) => { staleWrites++; return staleLocalSet(data); };
+    const staleSyncSet = staleChrome.storage.sync.set;
+    staleChrome.storage.sync.set = (data) => { staleWrites++; return staleSyncSet(data); };
+    let staleSyncChangeHandler;
+    const staleDeps = {
+      ...handlerDeps,
+      syncToggle: { checked: true, addEventListener: (_type, fn) => { staleSyncChangeHandler = fn; } },
+      syncKeysToggle: { disabled: false },
+      chrome: staleChrome,
+    };
+    globalThis.chrome = staleChrome;
+    new Function(...Object.keys(staleDeps), syncHandlerSource)(...Object.values(staleDeps));
+    await staleSyncChangeHandler();
+    check("E5 Options handler: stale duplicate sync-enable is a zero-write no-op",
+      staleWrites === 0 && staleSync.optTheme === "fresh-sync");
+    globalThis.chrome = previousHandlerChrome;
 
     delete globalThis.__pbpTestStorage;
     delete globalThis.__pbpTestSyncSetLarge;
@@ -467,12 +1330,17 @@ async function run() {
       document.getElementById("import-settings").click();
       check("E7 import button opens the hidden native file picker", importPickerOpened);
       document.getElementById("export-settings").click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      for (let i = 0; i < 20 && !exportedBlob; i++) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      if (!exportedBlob) throw new Error("settings export did not produce a Blob");
       const exported = JSON.parse(await exportedBlob.text());
       check("E7 manual export: live unchecked checkbox serializes backupIncludeHighlights=false",
         exported.backupIncludeHighlights === false);
       check("E7 manual export: live unchecked checkbox omits _highlights",
         !("_highlights" in exported));
+      check("E7 manual export: atomic partial read never adds top-level API key fields",
+        API_KEY_FIELDS.every((key) => !(key in exported)));
     } finally {
       globalThis.chrome = prevChromeE7;
       URL.createObjectURL = prevCreateObjectURL;
@@ -637,8 +1505,10 @@ async function run() {
   // ---------- E10: tag-governance visual and ARIA progress stay in lockstep ----------
   (() => {
     const wrap = document.createElement("div");
-    wrap.innerHTML = '<div id="tag-gov-progress-bar" aria-valuenow="0"><div id="tag-gov-progress-fill"></div></div>';
+    wrap.innerHTML = '<div id="tag-gov-progress"><button id="tag-gov-progress-btn" data-mode="dismiss"></button>' +
+      '<div id="tag-gov-progress-bar" aria-valuenow="0"><div id="tag-gov-progress-fill"></div></div></div>';
     document.body.appendChild(wrap);
+    const previousVisibleAccount = _tagGovVisibleAccount;
     try {
       _tagGovSetProgress(33.4);
       check("E10 progress rounds visual width and aria-valuenow together",
@@ -652,7 +1522,20 @@ async function run() {
       check("E10 progress clamps oversized values to 100",
         document.getElementById("tag-gov-progress-fill").style.width === "100%" &&
         document.getElementById("tag-gov-progress-bar").getAttribute("aria-valuenow") === "100");
+
+      _tagGovVisibleAccount = "alice";
+      _tagGovClaimProgress("alice");
+      _tagGovSetProgress(37, "alice");
+      _tagGovVisibleAccount = "bob";
+      _tagGovSetProgress(88, "alice");
+      check("E10 old account batch cannot overwrite the visible account progress",
+        document.getElementById("tag-gov-progress-fill").style.width === "37%");
+
+      document.getElementById("tag-gov-progress-btn").click();
+      check("E10 dismiss ignores a progress card owned by another account",
+        !document.getElementById("tag-gov-progress").classList.contains("hidden"));
     } finally {
+      _tagGovVisibleAccount = previousVisibleAccount;
       wrap.remove();
     }
   })();

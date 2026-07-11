@@ -54,8 +54,8 @@ check(/id="tag-gov-progress-bar"[^>]+role="progressbar"[^>]+aria-labelledby="tag
   /id="tag-gov-progress-text"[^>]+role="status"[^>]+aria-live="polite"/.test(optionsHtml),
   "options.html: tag governance progress lacks its accessible name/value or live status");
 const tagGovProgressHelper = optionsJs.slice(
-  optionsJs.indexOf("function _tagGovSetProgress(value)"),
-  optionsJs.indexOf('document.addEventListener("click",', optionsJs.indexOf("function _tagGovSetProgress(value)"))
+  optionsJs.indexOf("function _tagGovSetProgress(value"),
+  optionsJs.indexOf('document.addEventListener("click",', optionsJs.indexOf("function _tagGovSetProgress(value"))
 );
 check(/fill\.style\.width = percent \+ "%"/.test(tagGovProgressHelper) &&
   /bar\.setAttribute\("aria-valuenow", String\(percent\)\)/.test(tagGovProgressHelper) &&
@@ -307,7 +307,7 @@ check(/function pbpLiveAiSettingsSnapshot\(provider\)/.test(optionsConnectivityJ
   /const cs = pbpLiveAiSettingsSnapshot\(provider\);/.test(optionsConnectivityJs) &&
   (optionsConnectivityJs.match(/geminiApiKey: getOptVal/g) || []).length === 1 &&
   tagGovClick.indexOf("const live = pbpLiveAiSettingsSnapshot") < tagGovClick.indexOf("let sNow = await") &&
-  tagGovClick.includes("sNow = { ...sNow, ...live }"),
+  tagGovClick.includes("sNow = { ...sNow, ...live"),
   "Options connectivity and tag governance do not share one live provider form snapshot");
 
 check(/@media \(max-width: 720px\)[\s\S]*\.container\s*{[\s\S]*grid-template-columns:\s*1fr/.test(optionsCss), "options.css: missing mobile one-column container rule");

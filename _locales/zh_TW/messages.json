@@ -1411,16 +1411,16 @@
     "message": "資料同步"
   },
   "optSyncEnabled": {
-    "message": "透過 Google 帳戶跨裝置同步設定"
+    "message": "在此裝置上使用 Chrome Sync 同步設定"
   },
   "optSyncHint": {
-    "message": "開啟後，設定將在登入同一 Google 帳戶的所有 Chrome 之間同步。"
+    "message": "此選項僅對目前裝置生效。每台需要使用 Google 帳戶中設定的裝置都必須分別開啟。"
   },
   "syncApiKeysLabel": {
-    "message": "同時同步 API 金鑰"
+    "message": "透過此 Google 帳戶同步憑證"
   },
   "syncApiKeysHint": {
-    "message": "開啟後 API 金鑰也會透過 Google 帳戶同步（僅作混淆儲存，非加密）。預設關閉，金鑰只留在本機；開啟前請確認信任所有登入該帳戶的裝置。"
+    "message": "這是帳號層級的單一選項，但只有開啟設定同步的裝置才會參與；其他裝置會繼續使用本機憑證。新使用者預設關閉。若升級時 Chrome Sync 已有非空憑證，為避免資料遺失會保持開啟。同步的 API 金鑰、權杖、密碼與匯出憑證僅經過混淆處理，並未加密。"
   },
   "qlPopularTitle": {
     "message": "熱門"
@@ -1890,7 +1890,7 @@
     "message": "寫入剪貼簿失敗——筆記未建立，請重試。"
   },
   "apiKeySecurityHint": {
-    "message": "API 金鑰預設只儲存在本機。只有在你明確啟用金鑰同步後，才會透過 Chrome Sync 同步。金鑰僅經過混淆處理，並未加密。"
+    "message": "新使用者的憑證預設只儲存在本機；舊有雲端憑證可能使帳號層級同步在升級後保持開啟。只有開啟設定同步的裝置才會參與；同步憑證僅經過混淆處理，並未加密。"
   },
   "batchPermLabel": {
     "message": "舊版所有網站權限："

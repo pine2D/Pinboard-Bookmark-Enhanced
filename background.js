@@ -49,6 +49,35 @@ async function _decodeIconSet(pathMap) {
 const statusCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
 const MAX_CACHE_SIZE = 500;
+let _pinboardAuthEpoch = 0;
+
+function pbpCapturePinboardAuth(token) {
+  return {
+    account: pbpPinboardAccountFromToken(token),
+    epoch: _pinboardAuthEpoch,
+  };
+}
+
+function pbpPinboardAuthEpoch() {
+  return _pinboardAuthEpoch;
+}
+
+function pbpPinboardAuthIsCurrent(auth) {
+  return !!auth?.account && auth.epoch === _pinboardAuthEpoch;
+}
+
+function pbpStatusCacheGet(url, auth) {
+  if (!pbpPinboardAuthIsCurrent(auth)) return null;
+  const cached = statusCache.get(url);
+  return cached?.account === auth.account ? cached : null;
+}
+
+function pbpStatusCacheSet(url, auth, value) {
+  if (!pbpPinboardAuthIsCurrent(auth)) return false;
+  statusCache.set(url, { ...value, account: auth.account });
+  cleanupStatusCache();
+  return true;
+}
 
 function cleanupStatusCache() {
   if (statusCache.size <= MAX_CACHE_SIZE) return;
@@ -67,6 +96,15 @@ async function getCachedToken() {
   return _cachedToken;
 }
 
+async function getCurrentPinboardAuth() {
+  while (true) {
+    const epoch = _pinboardAuthEpoch;
+    const token = await getCachedToken();
+    if (epoch !== _pinboardAuthEpoch) continue;
+    return { token: token || "", account: pbpPinboardAccountFromToken(token), epoch };
+  }
+}
+
 // ---- P3: Debounce + dedup for tab switch ----
 // P2.7: Per-tab debounce bucket keeps unrelated tab events from cancelling the
 // focused tab's refresh. Execution-time focus checks below discard background tabs.
@@ -80,7 +118,57 @@ function _scheduleTabCheck(tabId, fn, delay) {
     fn();
   }, delay));
 }
-const _pendingChecks = new Map(); // url -> Promise
+const _pendingChecks = new Map(); // auth epoch + URL -> Promise
+
+function invalidatePinboardAuthState() {
+  _pinboardAuthEpoch++;
+  const epoch = _pinboardAuthEpoch;
+  _cachedToken = null;
+  statusCache.clear();
+  _pendingChecks.clear();
+  _lastIconState.clear();
+  try { Promise.resolve(chrome.storage.session.remove("_currentTab")).catch(() => {}); } catch (_) {}
+  chrome.tabs.query({}).then((tabs) => {
+    if (epoch !== _pinboardAuthEpoch) return;
+    for (const tab of tabs) {
+      if (typeof tab?.id === "number") setIcon(tab.id, false);
+      if (tab?.active && tab.url?.startsWith("http")) _scheduleCurrentTabRefresh(tab.id, tab.url);
+    }
+  }).catch(() => {});
+  chrome.action.setBadgeText({ text: "" });
+  updateBadge().catch(() => {});
+}
+
+let _authChangeTail = Promise.resolve();
+function scheduleEffectiveAuthRefresh(changes, area) {
+  if (!(changes.pinboardToken || changes.syncApiKeys || changes.optSyncEnabled)) return;
+  _authChangeTail = _authChangeTail.then(async () => {
+    let state;
+    try {
+      state = await pbpReadSecretSyncState({ includeGlobalWhenSyncOff: true, persistInferredState: false });
+    } catch (_) {
+      invalidatePinboardAuthState();
+      return;
+    }
+    if (!pbpAuthStorageChangeIsRelevant(changes, area, state)) return;
+    let freshToken;
+    try {
+      const raw = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
+      freshToken = deobfuscateKey(raw.pinboardToken) || "";
+    } catch (_) {
+      invalidatePinboardAuthState();
+      return;
+    }
+    if (_cachedToken === null) {
+      // A restarted worker has no in-memory baseline, while the browser can still
+      // display the previous worker's badge/icon. A relevant credential event is
+      // therefore an unknown-to-changed transition and must fail closed.
+      invalidatePinboardAuthState();
+      return;
+    }
+    if (freshToken !== _cachedToken) invalidatePinboardAuthState();
+  }).catch(() => invalidatePinboardAuthState());
+}
 
 async function debouncedCheck(url) {
   if (!url || !url.startsWith("http")) {
@@ -94,33 +182,53 @@ async function debouncedCheck(url) {
     // Storage unavailable — fall through to default behavior (check enabled)
     console.warn("[bookmark-status] settings read failed:", e?.message || e);
   }
-  // Dedup: if same URL is already being checked, reuse promise
-  if (_pendingChecks.has(url)) {
-    return _pendingChecks.get(url);
+  // Dedup only within one auth epoch. An older request may still settle after
+  // logout/account switch, but its cache write is rejected by the epoch guard.
+  const pendingKey = _pinboardAuthEpoch + "\n" + url;
+  if (_pendingChecks.has(pendingKey)) {
+    return _pendingChecks.get(pendingKey);
   }
   const promise = checkBookmarked(url);
-  _pendingChecks.set(url, promise);
+  _pendingChecks.set(pendingKey, promise);
   try {
     return await promise;
   } finally {
-    _pendingChecks.delete(url);
+    if (_pendingChecks.get(pendingKey) === promise) _pendingChecks.delete(pendingKey);
   }
 }
 
 // ---- Load settings with deobfuscation (module-level cache, invalidated on storage.onChanged) ----
 let _settingsCache = null;
+let _settingsCacheGeneration = 0;
 async function loadSettings() {
   if (_settingsCache) return _settingsCache;
-  let s = await (await getSettingsStorage()).get(SETTINGS_DEFAULTS);
-  s = await pbpApplySecretOverlay(s); // MUST run before deobfuscateSettings (see shared.js note)
-  deobfuscateSettings(s);
-  _settingsCache = s;
-  return s;
+  while (true) {
+    const generation = _settingsCacheGeneration;
+    const s = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+    deobfuscateSettings(s);
+    if (generation !== _settingsCacheGeneration) continue;
+    _settingsCache = s;
+    return s;
+  }
 }
-function invalidateSettingsCache() { _settingsCache = null; }
+function invalidateSettingsCache() {
+  _settingsCacheGeneration++;
+  _settingsCache = null;
+}
 
 // F7: Track recent saves for undo via notification button
-const _recentSaves = new Map(); // notificationId -> { url, token }
+const _recentSaves = new Map(); // notificationId -> { url, account }
+
+async function pbpReadFreshPinboardAuthForAccount(account) {
+  while (true) {
+    const epoch = pbpPinboardAuthEpoch();
+    const raw = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
+    const token = deobfuscateKey(raw.pinboardToken) || "";
+    if (epoch !== pbpPinboardAuthEpoch()) continue;
+    const auth = { token, account: pbpPinboardAccountFromToken(token), epoch };
+    return auth.account && auth.account === account ? auth : null;
+  }
+}
 
 // ---- Show Chrome notification (with category filter) ----
 async function showNotification(id, title, message, category, undoInfo) {
@@ -155,15 +263,17 @@ chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
   if (!info) return;
   _recentSaves.delete(notifId);
   try {
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${info.token}&url=${encodeURIComponent(info.url)}&format=json`);
+    const auth = await pbpReadFreshPinboardAuthForAccount(info.account);
+    if (!auth || !pbpPinboardAuthIsCurrent(auth)) return;
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${auth.token}&url=${encodeURIComponent(info.url)}&format=json`);
     const data = await resp.json();
     if (data.result_code === "done") {
-      statusCache.set(info.url, { bookmarked: false, timestamp: Date.now() });
+      pbpStatusCacheSet(info.url, auth, { bookmarked: false, timestamp: Date.now() });
       showNotification("undo-done", t("bgUndone"), t("bgBookmarkRemoved"));
     }
   } catch (e) {
     // Undo path failure — user expects feedback, log so it's debuggable
-    console.warn("[undo] bookmark removal failed:", e?.message || e);
+    if (e?.code !== "account_changed") console.warn("[undo] bookmark removal failed:", e?.message || e);
   }
 });
 
@@ -192,23 +302,26 @@ function setIcon(tabId, bookmarked) {
 }
 
 // ---- 检查 URL 是否已收藏 (uses cached token, direct fetch for latency) ----
-async function checkBookmarked(url) {
-  const cached = statusCache.get(url);
+async function checkBookmarked(url, capturedAuth = null) {
+  const auth = capturedAuth || await getCurrentPinboardAuth();
+  if (!auth.token || !auth.account) return false;
+  if (capturedAuth && !pbpPinboardAuthIsCurrent(auth)) return false;
+  const cached = pbpStatusCacheGet(url, auth);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.bookmarked;
   try {
-    const token = await getCachedToken();
-    if (!token) return false;
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
     if (!resp.ok) return false;
     const data = await resp.json();
     const posts = data.posts || [];
     const bookmarked = posts.length > 0;
-    statusCache.set(url, { bookmarked, timestamp: Date.now(), posts });
-    cleanupStatusCache();
-    return bookmarked;
+    return pbpStatusCacheSet(url, auth, { bookmarked, timestamp: Date.now(), posts })
+      ? bookmarked
+      : false;
   } catch (e) {
     // "Failed to fetch" is expected on network loss or API downtime — only warn for unexpected errors
-    if (!(e instanceof TypeError && /failed to fetch/i.test(e.message))) console.warn("checkBookmarked error:", e);
+    if (e?.code !== "account_changed" && !(e instanceof TypeError && /failed to fetch/i.test(e.message))) {
+      console.warn("checkBookmarked error:", e);
+    }
     return false;
   }
 }
@@ -216,13 +329,15 @@ async function checkBookmarked(url) {
 // ---- Badge: unread count ----
 async function updateBadge() {
   const s = await loadSettings();
-  if (!s.optShowBadge || !s.pinboardToken) {
+  const auth = await getCurrentPinboardAuth();
+  if (!s.optShowBadge || !auth.token) {
     chrome.action.setBadgeText({ text: "" });
     return;
   }
   try {
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${s.pinboardToken}&format=json&toread=yes&results=100&meta=no`);
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${auth.token}&format=json&toread=yes&results=100&meta=no`);
     const data = await resp.json();
+    if (!pbpPinboardAuthIsCurrent(auth)) return;
     const count = Array.isArray(data) ? data.length : 0;
     chrome.action.setBadgeText({ text: count > 0 ? String(count > 99 ? "99+" : count) : "" });
     chrome.action.setBadgeBackgroundColor({ color: "#4477bb" });
@@ -269,7 +384,7 @@ function validateSaveIntent(intent) {
 
 // Delivery-time merge/skip decisions always use a fresh read. statusCache remains
 // a presentation cache and is refreshed only after a successful lookup.
-async function fetchExistingBookmark(url, token) {
+async function fetchExistingBookmark(url, token, auth = pbpCapturePinboardAuth(token)) {
   try {
     const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
     if (!resp.ok) {
@@ -295,14 +410,16 @@ async function fetchExistingBookmark(url, token) {
     const posts = data.posts;
     const exists = posts.length > 0;
     const post = exists ? posts[0] : null;
-    statusCache.set(url, { bookmarked: exists, timestamp: Date.now(), posts });
-    cleanupStatusCache();
+    pbpStatusCacheSet(url, auth, { bookmarked: exists, timestamp: Date.now(), posts });
     return {
       exists,
       lookupFailed: false,
       post,
     };
-  } catch (_) {
+  } catch (error) {
+    if (error?.code === "account_changed") {
+      return { exists: false, lookupFailed: true, reason: "account_changed", retryable: false };
+    }
     return {
       exists: false,
       lookupFailed: true,
@@ -331,7 +448,10 @@ async function pbpSendResolvedPlan(plan, settings) {
   let resp;
   try {
     resp = await pinboardFetch(apiUrl);
-  } catch (_) {
+  } catch (error) {
+    if (error?.code === "account_changed") {
+      return { result: pbpSaveFailure("account_changed"), persisted: null, retryable: false };
+    }
     return { result: pbpSaveFailure("network"), persisted: null, retryable: true };
   }
 
@@ -373,7 +493,7 @@ async function pbpSendResolvedPlan(plan, settings) {
   };
 }
 
-async function deliverSaveIntent(intent, settings) {
+async function deliverSaveIntent(intent, settings, auth = pbpCapturePinboardAuth(settings?.pinboardToken)) {
   const invalid = validateSaveIntent(intent);
   if (invalid) return { result: invalid, persisted: null, retryable: false };
   if (!settings?.pinboardToken) {
@@ -382,9 +502,15 @@ async function deliverSaveIntent(intent, settings) {
 
   let recoveredConflict = false;
   while (true) {
+    if (!pbpPinboardAuthIsCurrent(auth)) {
+      return { result: pbpSaveFailure("account_changed"), persisted: null, retryable: false };
+    }
     let lookup = null;
     if (intent.mode === "merge" || intent.mode === "skip") {
-      lookup = await fetchExistingBookmark(intent.url, settings.pinboardToken);
+      lookup = await fetchExistingBookmark(intent.url, settings.pinboardToken, auth);
+    }
+    if (!pbpPinboardAuthIsCurrent(auth)) {
+      return { result: pbpSaveFailure("account_changed"), persisted: null, retryable: false };
     }
     const plan = pbpResolveSavePlan(intent, lookup);
     if (plan.action === "failed") {
@@ -422,10 +548,27 @@ async function readOfflineQueueWithIds() {
   return runOfflineQueueWrite(async () => {
     let { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
     if (!Array.isArray(offlineQueue)) offlineQueue = [];
-    if (offlineQueue.some((item) => item && typeof item === "object" && !item.queueId)) {
-      const next = pbpOfflineQueueReduce(offlineQueue, { kind: "ensure_ids", prefix: newOfflineQueueId() });
+    const prefix = newOfflineQueueId();
+    let changed = false;
+    const next = offlineQueue.map((item, index) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return item;
+      let migrated = item;
+      if (!item.queueId) {
+        migrated = { ...migrated, queueId: `${prefix}-${index}` };
+        changed = true;
+      }
+      if (Object.prototype.hasOwnProperty.call(item, "token")) {
+        const storedAccount = typeof item.account === "string" ? item.account : "";
+        const account = storedAccount || pbpPinboardAccountFromToken(item.token);
+        migrated = { ...migrated, ...(account ? { account } : {}) };
+        delete migrated.token;
+        changed = true;
+      }
+      return migrated;
+    });
+    if (changed) {
       await chrome.storage.local.set({ offlineQueue: next });
-      ({ offlineQueue = [] } = await chrome.storage.local.get("offlineQueue"));
+      offlineQueue = next;
     }
     return Array.isArray(offlineQueue) ? offlineQueue : [];
   });
@@ -459,20 +602,26 @@ function normalizeOfflineSaveIntent(item, settings) {
 // This tail protects that complete transaction for both live saves and replay.
 const runSaveDeliveryTransaction = pbpCreateRecoveringTail();
 
-async function applySaveResultSideEffects(envelope, settings, { deferBadge = false } = {}) {
+async function applySaveResultSideEffects(envelope, settings, {
+  deferBadge = false,
+  auth = pbpCapturePinboardAuth(settings?.pinboardToken),
+} = {}) {
   const { result, persisted } = envelope || {};
   if (!persisted || (result?.status !== "saved" && result?.status !== "skipped")) return;
 
   try {
-    const cachedPosts = result.status === "skipped" ? statusCache.get(persisted.url)?.posts : undefined;
-    statusCache.set(persisted.url, {
+    const cachedPosts = result.status === "skipped" ? pbpStatusCacheGet(persisted.url, auth)?.posts : undefined;
+    const cacheUpdated = pbpStatusCacheSet(persisted.url, auth, {
       bookmarked: true,
       timestamp: Date.now(),
       ...(cachedPosts ? { posts: cachedPosts } : {}),
     });
-    cleanupStatusCache();
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id && pbpSameBookmark(tab.url, persisted.url)) setIcon(tab.id, true);
+    if (cacheUpdated) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (pbpPinboardAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, persisted.url)) {
+        setIcon(tab.id, true);
+      }
+    }
   } catch (_) { /* status/icon are best-effort */ }
 
   if (result.status !== "saved") return;
@@ -487,8 +636,9 @@ async function applySaveResultSideEffects(envelope, settings, { deferBadge = fal
   } catch (_) { /* accepted save is never requeued for a side-effect failure */ }
 }
 
-function queueRecordFromSaveIntent(intent) {
+function queueRecordFromSaveIntent(intent, token) {
   return {
+    account: pbpPinboardAccountFromToken(token),
     mode: intent.mode === "create" ? "merge" : intent.mode,
     url: intent.url,
     title: intent.title,
@@ -501,24 +651,38 @@ function queueRecordFromSaveIntent(intent) {
   };
 }
 
-function submitSaveIntent(intent, { deferBadge = false } = {}) {
+function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "" } = {}) {
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
     catch (_) { return pbpSaveFailure("internal"); }
+    let deliveryAuth;
+    try { deliveryAuth = await getCurrentPinboardAuth(); }
+    catch (_) { return pbpSaveFailure("internal"); }
+    const deliveryAccount = pbpPinboardAccountFromToken(settings.pinboardToken);
+    if (!deliveryAuth.token) return pbpSaveFailure("not_logged_in");
+    if (expectedAccount && deliveryAuth.account !== expectedAccount) {
+      return pbpSaveFailure("account_changed");
+    }
+    if (settings.pinboardToken && deliveryAuth.account !== deliveryAccount) {
+      return pbpSaveFailure("internal");
+    }
+    const deliverySettings = { ...settings, pinboardToken: deliveryAuth.token };
 
     let envelope;
-    try { envelope = await deliverSaveIntent(intent, settings); }
+    try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth); }
     catch (_) { return pbpSaveFailure("internal"); }
 
     if (envelope.result.status === "saved" || envelope.result.status === "skipped") {
-      await applySaveResultSideEffects(envelope, settings, { deferBadge });
-      return envelope.result;
+      await applySaveResultSideEffects(envelope, deliverySettings, { deferBadge, auth: deliveryAuth });
+      return envelope.result.status === "saved" && envelope.result.mutation === "created"
+        ? { ...envelope.result, account: deliveryAuth.account }
+        : envelope.result;
     }
-    if (!envelope.retryable || !settings.offlineQueueEnabled) return envelope.result;
+    if (!envelope.retryable || !deliverySettings.offlineQueueEnabled) return envelope.result;
 
     try {
-      const queueId = await enqueueOfflineSave(queueRecordFromSaveIntent(intent));
+      const queueId = await enqueueOfflineSave(queueRecordFromSaveIntent(intent, deliverySettings.pinboardToken));
       return { status: "queued", queueId };
     } catch (_) {
       return pbpSaveFailure("storage");
@@ -533,13 +697,22 @@ function sendOfflineItem(item) {
     catch (_) {
       return { result: pbpSaveFailure("internal"), persisted: null, retryable: false, settings: {} };
     }
-    const token = pbpResolveOfflineQueueToken(settings.pinboardToken, item?.token);
-    const deliverySettings = token === settings.pinboardToken ? settings : { ...settings, pinboardToken: token };
+    let deliveryAuth;
+    try { deliveryAuth = await getCurrentPinboardAuth(); }
+    catch (_) {
+      return { result: pbpSaveFailure("internal"), persisted: null, retryable: false, settings };
+    }
+    const token = pbpResolveOfflineQueueToken(deliveryAuth.token, item);
+    if (!token) {
+      const reason = deliveryAuth.token ? "account_mismatch" : "not_logged_in";
+      return { result: pbpSaveFailure(reason), persisted: null, retryable: false, settings };
+    }
+    const deliverySettings = { ...settings, pinboardToken: token };
     const intent = normalizeOfflineSaveIntent(item, settings);
     let envelope;
-    try { envelope = await deliverSaveIntent(intent, deliverySettings); }
+    try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth); }
     catch (_) { envelope = { result: pbpSaveFailure("internal"), persisted: null, retryable: false }; }
-    return { ...envelope, settings: deliverySettings };
+    return { ...envelope, settings: deliverySettings, auth: deliveryAuth };
   });
 }
 
@@ -553,7 +726,7 @@ function drainOfflineQueueIds(queueIds) {
     }),
     sendItem: (item) => sendOfflineItem(item),
     removeItem: (queueId) => mutateOfflineQueue({ kind: "remove", queueId }),
-    onSuccess: (_item, delivered) => applySaveResultSideEffects(delivered, delivered.settings),
+    onSuccess: (_item, delivered) => applySaveResultSideEffects(delivered, delivered.settings, { auth: delivered.auth }),
   });
 }
 
@@ -591,7 +764,10 @@ function retryOfflineItem(queueId) {
   });
 }
 
-function submitPopupSaveIntent(intent) {
+function submitPopupSaveIntent(intent, expectedAccount) {
+  if (!expectedAccount || typeof expectedAccount !== "string") {
+    return Promise.resolve(pbpSaveFailure("account_changed"));
+  }
   if (!intent || !PBP_POPUP_SAVE_MODES.has(intent.mode)) {
     return Promise.resolve(pbpSaveFailure("invalid"));
   }
@@ -601,28 +777,28 @@ function submitPopupSaveIntent(intent) {
   if (intent.mode === "create" && intent.time !== undefined) {
     return Promise.resolve(pbpSaveFailure("invalid"));
   }
-  return submitSaveIntent(intent);
+  return submitSaveIntent(intent, { expectedAccount });
 }
 
 // ---- P1: Shared save function ----
 async function saveFromBackground({ url, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
-  const loadedSettings = await loadSettings();
-  const s = { ...loadedSettings, ...(settingsOverrides || {}) };
-  const mode = s.bgSaveMode === "skip" || s.bgSaveMode === "overwrite" ? s.bgSaveMode : "merge";
-  const isPrivate = pbpEffectivePrivate(s, { incognito: tab?.incognito });
-
-  if (!s.pinboardToken) {
+  const startAuth = await getCurrentPinboardAuth();
+  if (!startAuth.token) {
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
     return pbpSaveFailure("not_logged_in");
   }
+  const loadedSettings = await loadSettings();
+  const s = { ...loadedSettings, ...(settingsOverrides || {}), pinboardToken: startAuth.token };
+  const mode = s.bgSaveMode === "skip" || s.bgSaveMode === "overwrite" ? s.bgSaveMode : "merge";
+  const isPrivate = pbpEffectivePrivate(s, { incognito: tab?.incognito });
 
   // Extract page info if tab available
   let pageInfo = null;
   if (tab?.id) {
     try {
       pageInfo = (s._aiTags || s._aiSummary) && hasAIKey(s)
-        ? await getPageInfoFromTab(tab.id, { withDefuddle: true })
-        : await getPageInfoFromTab(tab.id);
+        ? await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: url })
+        : await getPageInfoFromTab(tab.id, { expectedUrl: url });
     } catch (_) { /* content script may not be injected yet — proceed with empty pageInfo */ }
   }
 
@@ -656,8 +832,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   if (pageInfo?.pageText && hasAIKey(s) && s._aiTags && s._aiSummary
       && !s.customTagPrompt?.trim() && !s.customSummaryPrompt?.trim()) {
     try {
-      const tCached = combinedCachedTags = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource);
-      const sCached = combinedCachedSummary = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource);
+      const tCached = combinedCachedTags = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource, startAuth.account);
+      const sCached = combinedCachedSummary = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource, startAuth.account);
       let aiTags, summary;
       if (tCached && sCached) {
         aiTags = tCached; summary = sCached;
@@ -665,8 +841,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
         const resp = await callAI(s, buildCombinedPrompt(s, title, url, pageInfo.pageText, notes, []));
         const parsed = parseAICombined(resp, s.aiTagSeparator);
         aiTags = parsed.tags; summary = parsed.summary;
-        await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
-        await setAICache(url, "summary", summary, s.aiCacheDuration, s.aiContentSource);
+        await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource, startAuth.account);
+        await setAICache(url, "summary", summary, s.aiCacheDuration, s.aiContentSource, startAuth.account);
       }
       tags = [...tags, ...aiTags];
       if (summary) {
@@ -694,12 +870,12 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       aiPromises.push(
         (async () => {
           try {
-            const cached = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource);
+            const cached = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource, startAuth.account);
             if (cached) return { type: "tags", result: cached };
             const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
             const resp = await callAI(s, prompt);
             const aiTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
-            await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
+            await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource, startAuth.account);
             return { type: "tags", result: aiTags };
           } catch (e) {
             if (e?.code === "host_permission") aiHostPermissionMissing = true;
@@ -713,11 +889,11 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       aiPromises.push(
         (async () => {
           try {
-            const cached = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource);
+            const cached = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource, startAuth.account);
             if (cached) return { type: "summary", result: cached };
             const prompt = buildSummaryPrompt(s, title, url, pageInfo.pageText, notes);
             const summary = await callAI(s, prompt);
-            await setAICache(url, "summary", summary, s.aiCacheDuration, s.aiContentSource);
+            await setAICache(url, "summary", summary, s.aiCacheDuration, s.aiContentSource, startAuth.account);
             return { type: "summary", result: summary };
           } catch (e) {
             if (e?.code === "host_permission") aiHostPermissionMissing = true;
@@ -749,16 +925,12 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     private: isPrivate,
     toread: toread === true ? true : undefined,
     archive: undefined,
-  });
+  }, { expectedAccount: startAuth.account });
 
   if (result.status === "saved") {
-    let undoInfo;
-    if (result.mutation === "created") {
-      try {
-        const currentSettings = await loadSettings();
-        if (currentSettings.pinboardToken) undoInfo = { url, token: currentSettings.pinboardToken };
-      } catch (_) { /* saved result remains successful when Undo setup cannot read settings */ }
-    }
+    const undoInfo = result.mutation === "created" && result.account
+      ? { url, account: result.account }
+      : undefined;
     showNotification(
       notifyId + "-saved",
       notifyTitle,
@@ -788,6 +960,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     );
   } else if (result.reason === "network" || result.reason === "lookup") {
     showNotification(notifyId + "-error", t("bgNetworkError"), result.detail || t("pinboardErrorOffline"), "error");
+  } else if (result.reason === "account_changed") {
+    showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("pinboardErrorAuth"), "error");
   } else {
     showNotification(notifyId + "-error", t("bgSaveFailed"), result.detail || result.reason || "Unknown error", "error");
   }
@@ -811,12 +985,14 @@ async function _writeCurrentTabMirror(tabId, url, title) {
     try { await chrome.storage.session.remove("_currentTab"); } catch (_) {}
     return;
   }
-  const cached = statusCache.get(url);
+  const auth = await getCurrentPinboardAuth();
+  const cached = pbpStatusCacheGet(url, auth);
   const posts = (cached && Date.now() - cached.timestamp < CACHE_TTL) ? (cached.posts || null) : null;
   try {
     await chrome.storage.session.set({
-      _currentTab: { tabId, url, title: title || "", posts, ts: Date.now() }
+      _currentTab: { tabId, url, title: title || "", posts, account: auth.account, ts: Date.now() }
     });
+    if (!pbpPinboardAuthIsCurrent(auth)) await chrome.storage.session.remove("_currentTab");
   } catch (_) {}
 }
 
@@ -981,6 +1157,9 @@ pbpMigrateLegacyWildcardPermission().catch(() => {});
 // existing storage-warm alarm below so a mid-session syncApiKeys-off toggle
 // and any stray reintroduction of a secret into sync gets swept within 5 minutes.
 pbpMigrateSecretsToLocal().catch(() => {});
+// Rewrite legacy queued credentials to non-secret account bindings as soon as
+// this worker boots; the same serialized path also runs for every queue read.
+readOfflineQueueWithIds().catch(() => {});
 
 async function syncPrewarmTagsAlarm() {
   const s = await loadSettings();
@@ -1011,20 +1190,21 @@ async function syncWebdavPushAlarm() {
 }
 
 async function prewarmTagsNow() {
-  const s = await loadSettings();
-  if (!s.pinboardToken) return;
+  const auth = await getCurrentPinboardAuth();
+  if (!auth.token) return;
   try {
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${s.pinboardToken}&format=json`);
+    const resp = await pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${auth.token}&format=json`);
     if (!resp.ok) return;
     const data = await resp.json();
+    if (!pbpPinboardAuthIsCurrent(auth)) return;
     // Store only the count map + timestamp; the popup rebuilds the sorted tag list
     // from counts on read (deterministic), so storing the array too is dead weight.
     await chrome.storage.local.set({
-      cached_user_tags: { counts: data, timestamp: Date.now() }
+      cached_user_tags: { account: auth.account, counts: data, timestamp: Date.now() }
     });
   } catch (e) {
     // Tag cache write failure: stale data hurts autocomplete UX, log it
-    console.warn("[tag-cache] write failed:", e?.message || e);
+    if (e?.code !== "account_changed") console.warn("[tag-cache] write failed:", e?.message || e);
   }
 }
 
@@ -1054,6 +1234,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // React to settings change: toggle the prewarm alarm on/off (settings live in sync or local based on optSyncEnabled)
 chrome.storage.onChanged.addListener((changes, area) => {
   if ((area === "sync" || area === "local") && pbpSettingsKeysChanged(changes)) invalidateSettingsCache();
+  if (area === "sync" || area === "local") scheduleEffectiveAuthRefresh(changes, area);
   if ((area === "sync" || area === "local") && (changes.tagSyncMode || changes.pinboardToken)) {
     syncPrewarmTagsAlarm().catch(() => {});
   }
@@ -1162,12 +1343,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   noteActivity(); // using the popup keeps the SW warm for the next open
 
   if (message.type === "get_bookmark_data" && message.url) {
-    const cached = statusCache.get(message.url);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts) {
-      sendResponse({ posts: cached.posts });
-    } else {
-      sendResponse({ posts: null });
-    }
+    getCurrentPinboardAuth().then((auth) => {
+      if (!message.account || message.account !== auth.account) {
+        sendResponse({ posts: null, account: "" });
+        return;
+      }
+      const cached = pbpStatusCacheGet(message.url, auth);
+      sendResponse({
+        posts: cached && Date.now() - cached.timestamp < CACHE_TTL && cached.posts
+          ? cached.posts
+          : null,
+        account: auth.account,
+      });
+    }).catch(() => sendResponse({ posts: null, account: "" }));
     return true;
   }
 
@@ -1179,7 +1367,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "save_intent") {
-    submitPopupSaveIntent(message.intent)
+    submitPopupSaveIntent(message.intent, message.account)
       .then(sendResponse)
       .catch(() => sendResponse(pbpSaveFailure("internal")));
     return true;
@@ -1191,11 +1379,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "bookmark_deleted" && message.url) {
-    statusCache.set(message.url, { bookmarked: false, timestamp: Date.now() });
-    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-      if (tab?.id && pbpSameBookmark(tab.url, message.url)) setIcon(tab.id, false);
-    }).catch(() => {});
-    sendResponse({ ok: true });
+    getCurrentPinboardAuth().then(async (auth) => {
+      if (!message.account || message.account !== auth.account) {
+        sendResponse({ ok: false });
+        return;
+      }
+      const updated = pbpStatusCacheSet(message.url, auth, { bookmarked: false, timestamp: Date.now() });
+      if (updated) {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (pbpPinboardAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, message.url)) {
+          setIcon(tab.id, false);
+        }
+      }
+      sendResponse({ ok: updated });
+    }).catch(() => sendResponse({ ok: false }));
     return true;
   }
 
@@ -1207,8 +1404,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === "startBatchSave" && Array.isArray(message.tabs)) {
     if (_batchRunning) { sendResponse({ status: "busy" }); return true; }
-    handleBatchSave(message.tabs);   // fire-and-forget; keeps SW alive via in-flight fetches
-    sendResponse({ status: "started" });
+    _batchRunning = true; // reserve synchronously before the first auth await
+    getCurrentPinboardAuth().then((auth) => {
+      if (!message.account || auth.account !== message.account) {
+        _batchRunning = false;
+        sendResponse({ status: "account_changed" });
+        return;
+      }
+      handleBatchSave(message.tabs, message.account, true).catch(() => {}); // fire-and-forget; keeps SW alive via in-flight fetches
+      sendResponse({ status: "started", account: message.account });
+    }).catch(() => {
+      _batchRunning = false;
+      sendResponse({ status: "account_changed" });
+    });
     return true;
   }
 
@@ -1218,12 +1426,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: false, status: 0, text: "", error: "invalid_pinboard_api_url" });
       return true;
     }
-    pinboardFetch(message.url)
-      .then(async res => {
+    getCurrentPinboardAuth().then(async (auth) => {
+      const authorizedUrl = pbpAuthorizePinboardApiUrl(message.url, auth.token);
+      if (!authorizedUrl) {
+        sendResponse({ ok: false, status: 0, text: "", error: "account_changed" });
+        return;
+      }
+      const immediate = message.immediate === true
+        && new URL(authorizedUrl).pathname === "/v1/posts/suggest";
+      const res = immediate
+        ? await pinboardFetchImmediate(authorizedUrl, { timeoutMs: 8000 })
+        : await pinboardFetch(authorizedUrl);
         const text = await res.text();
+        if (!pbpPinboardAuthIsCurrent(auth)) {
+          sendResponse({ ok: false, status: 0, text: "", error: "account_changed" });
+          return;
+        }
         sendResponse({ ok: res.ok, status: res.status, text });
       })
-      .catch(err => sendResponse({ ok: false, status: 0, text: "", error: err.message }));
+      .catch(err => sendResponse({ ok: false, status: 0, text: "", error: err.code || err.message }));
     return true;
   }
 
@@ -1258,7 +1479,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "reextractMarkdown") {
-    const { tabId, url, engine, tags, description, k } = message;
+    const { tabId, url, engine, k } = message;
     if (!url || (engine !== "local" && engine !== "jina")) {
       sendResponse({ ok: false, error: "bad_request" }); return true;
     }
@@ -1266,18 +1487,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // fresh payload from the SAME slot it owns. No k = pre-update tab → fall
     // back to the legacy global key.
     const key = k ? "md_preview_data_" + k : "md_preview_data";
-    extractForPreview({ tabId, url, engine })
-      .then(out => {
-        if (out.error) { sendResponse({ ok: false, error: out.error }); return; }
-        return chrome.storage.local.set({
-          [key]: {
-            ...out, baseUrl: out.url || url, tabId,
-            tags: Array.isArray(tags) ? tags : [],
-            description: typeof description === "string" ? description : "",
-            ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
-          }
-        }).then(() => sendResponse({ ok: true }));
-      })
+    (async () => {
+      const stored = (await chrome.storage.local.get(key))[key];
+      if (!stored || stored.url !== url || stored.tabId !== tabId) {
+        sendResponse({ ok: false, error: "bad_request" });
+        return;
+      }
+      // The storage slot is the preview's immutable ownership record. Message
+      // fields are mutable and must never be allowed to replace account metadata.
+      const owner = {
+        account: typeof stored.account === "string" ? stored.account : "",
+        tags: Array.isArray(stored.tags) ? stored.tags.slice() : [],
+        description: typeof stored.description === "string" ? stored.description : "",
+      };
+      const out = await extractForPreview({ tabId, url, engine });
+      if (out.error) { sendResponse({ ok: false, error: out.error }); return; }
+      const latest = (await chrome.storage.local.get(key))[key];
+      if (!latest || latest.url !== url || latest.tabId !== tabId
+          || (typeof latest.account === "string" ? latest.account : "") !== owner.account) {
+        sendResponse({ ok: false, error: "account_changed" });
+        return;
+      }
+      await chrome.storage.local.set({
+        [key]: {
+          ...out, baseUrl: out.url || url, tabId,
+          account: owner.account,
+          tags: owner.tags,
+          description: owner.description,
+          ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
+        }
+      });
+      sendResponse({ ok: true });
+    })()
       .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;
   }
@@ -1293,22 +1534,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // lookup when .posts is missing, same shape as fetchExistingBookmark
     // (background.js:242). Any failure collapses to bookmarked:false.
     const url = message.url;
-    checkBookmarked(url)
-      .then(async (bookmarked) => {
-        if (!bookmarked) { sendResponse({ bookmarked: false }); return; }
-        let post = statusCache.get(url)?.posts?.[0];
+    (async () => {
+        const auth = await getCurrentPinboardAuth();
+        if (!message.account || message.account !== auth.account) {
+          sendResponse({ bookmarked: false, account: "" });
+          return;
+        }
+        const bookmarked = await checkBookmarked(url, auth);
+        if (!pbpPinboardAuthIsCurrent(auth)) {
+          sendResponse({ bookmarked: false, account: "" });
+          return;
+        }
+        if (!bookmarked) { sendResponse({ bookmarked: false, account: auth.account }); return; }
+        let post = pbpStatusCacheGet(url, auth)?.posts?.[0];
         if (!post) {
-          const token = await getCachedToken();
-          if (!token) { sendResponse({ bookmarked: false }); return; }
-          const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
+          if (!auth.token) { sendResponse({ bookmarked: false, account: auth.account }); return; }
+          const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
           const posts = resp.ok ? (await resp.json()).posts || [] : [];
-          statusCache.set(url, { bookmarked: posts.length > 0, timestamp: Date.now(), posts });
+          if (!pbpPinboardAuthIsCurrent(auth)) {
+            sendResponse({ bookmarked: false, account: "" });
+            return;
+          }
+          if (!pbpStatusCacheSet(url, auth, { bookmarked: posts.length > 0, timestamp: Date.now(), posts })) {
+            sendResponse({ bookmarked: false, account: "" }); return;
+          }
           post = posts[0];
         }
-        if (!post) { sendResponse({ bookmarked: false }); return; }
-        sendResponse({ bookmarked: true, tags: post.tags || "", shared: post.shared, toread: post.toread });
-      })
-      .catch(() => sendResponse({ bookmarked: false }));
+        if (!post) { sendResponse({ bookmarked: false, account: auth.account }); return; }
+        sendResponse({ bookmarked: true, tags: post.tags || "", shared: post.shared, toread: post.toread, account: auth.account });
+      })()
+      .catch(() => sendResponse({ bookmarked: false, account: "" }));
     return true;
   }
 });
@@ -1324,17 +1579,41 @@ async function _writeBatchProgress(p) {
   catch (_) { /* storage transient failure — progress UI degrades, batch continues */ }
 }
 
-async function handleBatchSave(tabs) {
-  if (_batchRunning) return;            // one batch per SW lifetime (popup also guards)
-  _batchRunning = true;
+function handleBatchSave(tabs, expectedAccount = "", reserved = false) {
+  if (!reserved) {
+    if (_batchRunning) return Promise.resolve();
+    _batchRunning = true;
+  }
+  return _runBatchSave(tabs, expectedAccount).finally(() => { _batchRunning = false; });
+}
+
+async function _runBatchSave(tabs, expectedAccount) {
+  const startAuth = await getCurrentPinboardAuth();
+  const account = expectedAccount || startAuth.account;
+  if (!startAuth.token || !account || startAuth.account !== account) {
+    _batchRunning = false;
+    return;
+  }
   const total = tabs.length;
   let processed = 0;
   let saved = 0, queued = 0, failed = 0, aiFailed = 0, skipped = 0, tooLong = 0;
-  const base = () => ({ total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong });
+  const base = () => ({ account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong });
+  const requireAccount = async () => {
+    const auth = await getCurrentPinboardAuth();
+    if (auth.account !== account) {
+      const error = new Error("account_changed");
+      error.code = "account_changed";
+      throw error;
+    }
+    return auth;
+  };
   await _writeBatchProgress({ running: true, done: false, error: null, ...base() });
 
   try {
-    const s = await loadSettings();
+    await requireAccount();
+    const loadedSettings = await loadSettings();
+    const currentAuth = await requireAccount();
+    const s = { ...loadedSettings, pinboardToken: currentAuth.token };
     if (!s.pinboardToken) {
       await _writeBatchProgress({ running: false, done: true, error: "not_logged_in", ...base() });
       showNotification("batch-error", t("bgBatchSaved"), t("bgNotLoggedIn"), "error");
@@ -1353,7 +1632,8 @@ async function handleBatchSave(tabs) {
     if (s.optRespectTagCase) {
       try {
         const cached = await chrome.storage.local.get("cached_user_tags");
-        const counts = cached?.cached_user_tags?.counts;
+        const entry = cached?.cached_user_tags;
+        const counts = entry?.account === account ? entry.counts : null;
         if (counts) tagCaseMap = buildTagCaseMap(counts);
       } catch (_) { /* no cache -> map stays empty, resolveTagCase returns tag as-is */ }
     }
@@ -1362,19 +1642,21 @@ async function handleBatchSave(tabs) {
       const tab = tabs[i];
 
       try {
+        await requireAccount();
         let tags = [...baseTags];
         let notes = "";
 
         if (useAiTags || useAiSummary) {
           let pageInfo = null;
-          try { pageInfo = await getPageInfoFromTab(tab.id, { withDefuddle: true }); }
+          try { pageInfo = await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: tab.url }); }
           catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
+          await requireAccount();
           if (pageInfo?.pageText) {
             let combinedHandled = false;
             if (useAiTags && useAiSummary && !s.customTagPrompt?.trim() && !s.customSummaryPrompt?.trim()) {
               try {
-                const tCached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource);
-                const sCached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource);
+                const tCached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource, account);
+                const sCached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource, account);
                 let aiTags, summary;
                 if (tCached && sCached) { aiTags = tCached; summary = sCached; }
                 else {
@@ -1382,8 +1664,8 @@ async function handleBatchSave(tabs) {
                   const parsed = parseAICombined(resp, s.aiTagSeparator);
                   aiTags = s.optRespectTagCase ? parsed.tags.map(tg => resolveTagCase(tg, tagCaseMap)) : parsed.tags;
                   summary = parsed.summary;
-                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
-                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, s.aiContentSource);
+                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource, account);
+                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account);
                 }
                 tags = [...tags, ...aiTags];
                 if (summary) notes = `[AI Summary]\n<blockquote>${escapeForExtended(summary)}</blockquote>`;
@@ -1394,23 +1676,23 @@ async function handleBatchSave(tabs) {
               const aiJobs = [];
               if (useAiTags) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource);
+                  const cached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource, account);
                   if (cached) return { type: "tags", result: cached };
                   const prompt = buildTagPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", []);
                   const resp = await callAI(s, prompt);
                   const rawTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
                   const aiTags = s.optRespectTagCase ? rawTags.map(tg => resolveTagCase(tg, tagCaseMap)) : rawTags;
-                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource);
+                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource, account);
                   return { type: "tags", result: aiTags };
                 } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
               })());
               if (useAiSummary) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource);
+                  const cached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource, account);
                   if (cached) return { type: "summary", result: cached };
                   const prompt = buildSummaryPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "");
                   const summary = await callAI(s, prompt);
-                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, s.aiContentSource);
+                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account);
                   return { type: "summary", result: summary };
                 } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
               })());
@@ -1426,6 +1708,7 @@ async function handleBatchSave(tabs) {
 
         const dedupedTags = [...new Set(tags.map(tg => tg.toLowerCase()))].map(lower => tags.find(tg => tg.toLowerCase() === lower));
         const isPrivate = pbpEffectivePrivate(s, { incognito: tab.incognito });
+        await requireAccount();
         const result = await submitSaveIntent({
           mode: s.batchSkipExisting ? "skip" : "merge",
           url: tab.url,
@@ -1435,13 +1718,21 @@ async function handleBatchSave(tabs) {
           private: isPrivate,
           toread: s.optReadlaterDefault ? true : undefined,
           archive: s.waybackArchiveBatch ? undefined : false,
-        }, { deferBadge: true });
+        }, { deferBadge: true, expectedAccount: account });
+        if (result.reason === "account_changed") {
+          const error = new Error("account_changed");
+          error.code = "account_changed";
+          throw error;
+        }
         if (result.status === "saved") saved++;
         else if (result.status === "queued") queued++;
         else if (result.status === "skipped") skipped++;
         else if (result.reason === "too_long") tooLong++;
         else failed++;
-      } catch (_) { failed++; } finally {
+      } catch (e) {
+        if (e?.code === "account_changed") throw e;
+        failed++;
+      } finally {
         processed = i + 1;
         await _writeBatchProgress({ running: true, done: false, error: null, ...base() });
       }
@@ -1461,7 +1752,7 @@ async function handleBatchSave(tabs) {
     }
   } catch (e) {
     await _writeBatchProgress({ running: false, done: true, error: e.message, ...base() });
-    showNotification("batch-error", t("bgBatchSaved"), e.message, "error");
+    if (e?.code !== "account_changed") showNotification("batch-error", t("bgBatchSaved"), e.message, "error");
   } finally {
     _batchRunning = false;
   }
@@ -1493,10 +1784,10 @@ async function handleSaveTabSet(tabsData) {
 
 // ---- Storage change listener ----
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.pinboardToken) _cachedToken = null;
   if (changes.optShowBadge) {
-    if (changes.optShowBadge.newValue) updateBadge().catch(() => {});
-    else chrome.action.setBadgeText({ text: "" });
+    // The event can come from an inactive storage area. Resolve the effective
+    // setting instead of trusting this area's candidate value.
+    updateBadge().catch(() => {});
   }
 });
 
@@ -1563,11 +1854,10 @@ async function extractForPreview({ tabId, url, engine }) {
     // Fresh read — do NOT use loadSettings() (its _settingsCache can be stale
     // when the user edits settings while the SW is warm). getSettingsStorage()
     // returns RAW (obfuscated) settings, so deobfuscate the key exactly once.
-    let raw = await (await getSettingsStorage()).get({
+    const raw = await pbpReadSettingsWithSecrets({
       jinaApiKey: SETTINGS_DEFAULTS.jinaApiKey,
       aiCacheDuration: SETTINGS_DEFAULTS.aiCacheDuration
     });
-    raw = await pbpApplySecretOverlay(raw);
     const key = raw.jinaApiKey ? deobfuscateKey(raw.jinaApiKey) : "";
     const r = await fetchJinaMarkdown(url, { apiKey: key, cacheDuration: raw.aiCacheDuration });
     if (r.error) return { error: r.error };
@@ -1627,7 +1917,10 @@ async function openMarkdownPreviewFromShortcut() {
   // Open the preview INSTANTLY with a pending placeholder so the shortcut feels
   // responsive; the preview page drives extraction via reextractMarkdown (the same
   // path as the in-preview toggle). Follow the aiContentSource setting (fresh read).
-  const raw = await (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource });
+  const [raw, auth] = await Promise.all([
+    (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource }),
+    getCurrentPinboardAuth().catch(() => ({ account: "" })),
+  ]);
   const engine = raw.aiContentSource === "jina" ? "jina" : "local";
   // Per-open token key so two shortcut opens (or a shortcut + a popup Preview)
   // never share one storage slot and clobber each other before their tabs read.
@@ -1637,7 +1930,7 @@ async function openMarkdownPreviewFromShortcut() {
       ["md_preview_data_" + k]: {
         pending: true, engine, source: engine,
         tabId: tab.id, url: tab.url, baseUrl: tab.url, title: tab.title || "",
-        tags: [], description: "", ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
+        account: auth.account || "", tags: [], description: "", ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
       }
     });
     await chrome.tabs.create({ url: "md-preview.html?k=" + k });

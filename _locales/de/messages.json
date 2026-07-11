@@ -1411,16 +1411,16 @@
     "message": "Datensynchronisierung"
   },
   "optSyncEnabled": {
-    "message": "Einstellungen geräteübergreifend über Google-Konto synchronisieren"
+    "message": "Chrome Sync für Einstellungen auf diesem Gerät verwenden"
   },
   "optSyncHint": {
-    "message": "Bei Aktivierung werden Einstellungen zwischen Chrome-Installationen mit demselben Google-Konto synchronisiert."
+    "message": "Diese Auswahl gilt nur für dieses Gerät. Aktiviere sie separat auf jedem Gerät, das Einstellungen aus deinem Google-Konto verwenden soll."
   },
   "syncApiKeysLabel": {
-    "message": "API-Schlüssel ebenfalls synchronisieren"
+    "message": "Zugangsdaten für dieses Google-Konto synchronisieren"
   },
   "syncApiKeysHint": {
-    "message": "Bei Aktivierung werden auch Ihre API-Schlüssel über Ihr Google-Konto synchronisiert (nur verschleiert, nicht verschlüsselt). Standardmäßig deaktiviert — Schlüssel bleiben nur auf diesem Gerät. Nur aktivieren, wenn Sie allen mit diesem Konto verbundenen Geräten vertrauen."
+    "message": "Dies ist eine kontoweite Auswahl, aber nur Geräte mit aktivierter Einstellungssynchronisierung nehmen teil; andere Geräte verwenden weiterhin lokale Zugangsdaten. Bei neuen Nutzern ist sie standardmäßig deaktiviert. Findet ein Upgrade bereits nicht leere Zugangsdaten in Chrome Sync, bleibt sie zur Vermeidung von Datenverlust aktiviert. Synchronisierte API-Schlüssel, Tokens, Passwörter und Export-Zugangsdaten sind nur verschleiert, nicht verschlüsselt."
   },
   "qlPopularTitle": {
     "message": "Beliebt"
@@ -1890,7 +1890,7 @@
     "message": "Kopieren in die Zwischenablage fehlgeschlagen — die Notiz wurde nicht erstellt. Bitte erneut versuchen."
   },
   "apiKeySecurityHint": {
-    "message": "API-Schlüssel werden standardmäßig nur auf diesem Gerät gespeichert. Sie werden erst über Chrome Sync synchronisiert, nachdem Sie die Schlüsselsynchronisierung ausdrücklich aktiviert haben. Die Schlüssel werden lediglich verschleiert, nicht verschlüsselt."
+    "message": "Bei neuen Nutzern bleiben Zugangsdaten standardmäßig auf diesem Gerät. Vorhandene Cloud-Zugangsdaten können die kontoweite Synchronisierung nach einem Upgrade aktiviert halten. Nur Geräte mit aktivierter Einstellungssynchronisierung nehmen teil; synchronisierte Zugangsdaten sind nur verschleiert, nicht verschlüsselt."
   },
   "batchPermLabel": {
     "message": "Veraltete Berechtigung für alle Websites:"

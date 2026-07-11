@@ -154,9 +154,9 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
   const source = await getPopupBatchSetupSource();
   const factory = new Function(
     "$id", "t", "setBtnIcon", "chrome", "showStatus", "batchIsRunning",
-    "BATCH_STALE_TTL", "getSettingsStorage", "pbpApplySecretOverlay",
+    "BATCH_STALE_TTL", "getSettingsStorage", "pbpApplySecretOverlay", "pbpReadSettingsWithSecrets",
     "deobfuscateKey", "settings", "hasAIKey", "wireBatchProgress", "setTimeout",
-    "_aiTargetOriginPattern", "document",
+    "_aiTargetOriginPattern", "pbpPinboardAccountFromToken", "document",
     source + "\nreturn { setupTabSet, getPending: () => batchAiPermissionPending };"
   );
   const api = factory(
@@ -169,12 +169,14 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
     BATCH_STALE_TTL,
     async () => ({ get: async () => ({ pinboardToken: "token" }) }),
     async (value) => value,
+    async () => ({ pinboardToken: "alice:token" }),
     (value) => value,
     { aiProvider: "openai", batchAiTags: ai, batchAiSummary: false },
     () => true,
     () => {},
     () => 0,
     () => "https://api.example/*",
+    pbpPinboardAccountFromToken,
     document
   );
   api.setupTabSet();
@@ -190,6 +192,7 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
 }
 
 async function createUiHarness(storedProgress, now) {
+  if (storedProgress) storedProgress = { account: "alice", ...storedProgress };
   const documentStub = { activeElement: null };
   const elements = {
     "batch-bookmark-btn": fakeElement(),
@@ -210,7 +213,7 @@ async function createUiHarness(storedProgress, now) {
   const source = await getPopupBatchProgressSource();
   const factory = new Function(
     "$id", "PBP_ICONS", "t", "showStatus", "setBtnIcon", "setTimeout",
-    "chrome", "batchIsRunning", "BATCH_STALE_TTL", "Date", "document",
+    "chrome", "batchIsRunning", "BATCH_STALE_TTL", "Date", "document", "readBatchAccount",
     source + "\nreturn { renderBatchProgress, wireBatchProgress };"
   );
   const api = factory(
@@ -224,9 +227,14 @@ async function createUiHarness(storedProgress, now) {
     batchIsRunning,
     BATCH_STALE_TTL,
     { now: () => now },
-    documentStub
+    documentStub,
+    async () => ({ token: "alice:token", account: "alice" })
   );
-  return { ...api, elements, statuses, runTimer: () => timer?.() };
+  return {
+    ...api,
+    renderBatchProgress: (progress) => api.renderBatchProgress({ account: "alice", ...progress }, "alice"),
+    elements, statuses, runTimer: () => timer?.()
+  };
 }
 
 (async () => {

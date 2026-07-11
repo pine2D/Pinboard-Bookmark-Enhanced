@@ -79,10 +79,10 @@
       </div>
       <div class="divider"></div>
       <div class="section-title" data-i18n="secSync">Data Sync</div>
-      <div class="fg"><label><input type="checkbox" id="opt-sync-enabled" /> <span data-i18n="optSyncEnabled">Sync settings across devices via Google account</span></label></div>
-      <p class="hint" data-i18n="optSyncHint">When enabled, settings sync across Chrome installations signed into the same Google account.</p>
-      <div class="fg"><label><input type="checkbox" id="opt-sync-api-keys" /> <span data-i18n="syncApiKeysLabel">Also sync API keys</span></label></div>
-      <p class="hint" data-i18n="syncApiKeysHint">Sends your API keys through your Google account too (obfuscated, not encrypted). Off by default — keys stay on this device only. Enable only if you trust every device signed into this account.</p>
+      <div class="fg"><label><input type="checkbox" id="opt-sync-enabled" /> <span data-i18n="optSyncEnabled">Use Chrome Sync for settings on this device</span></label></div>
+      <p class="hint" data-i18n="optSyncHint">This choice is device-specific. Enable it separately on each device that should use settings from your Google account.</p>
+      <div class="fg"><label><input type="checkbox" id="opt-sync-api-keys" /> <span data-i18n="syncApiKeysLabel">Sync credentials for this Google account</span></label></div>
+      <p class="hint" data-i18n="syncApiKeysHint">This is one account-wide choice, but only devices with settings sync enabled participate; other devices keep using local credentials. New users start off. If an upgrade finds non-empty credentials already in Chrome Sync, it stays on to avoid data loss. Synced API keys, tokens, passwords, and export credentials are obfuscated, not encrypted.</p>
       <p id="opt-sync-error" class="opt-error hidden" role="alert"></p>
       <div class="divider"></div>
       <div class="section-title" data-i18n="secBackupRestore">Backup &amp; Sync</div>
@@ -303,7 +303,7 @@
         </select>
       </div>
 
-      <p class="hint" data-i18n="apiKeySecurityHint">API keys stay on this device by default. They sync only after you enable key syncing, and are obfuscated rather than encrypted.</p>
+      <p class="hint" data-i18n="apiKeySecurityHint">New users keep credentials on this device by default. Existing cloud credentials may keep account-wide sync on after upgrade. Only devices with settings sync enabled participate; synced credentials are obfuscated, not encrypted.</p>
 
       <details class="free-tier-help">
         <summary data-i18n="freeTierTitle">Which providers offer free API access?</summary>

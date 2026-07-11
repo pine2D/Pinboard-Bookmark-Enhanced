@@ -93,7 +93,8 @@
       meta.className = "offline-queue-meta";
       let host = "";
       try { host = new URL(item.url).hostname.replace(/^www\./, ""); } catch (_) {}
-      meta.textContent = [host, relTime(item.queuedAt)].filter(Boolean).join(" · ");
+      const account = pbpOfflineQueueAccount(item);
+      meta.textContent = [account ? `@${account}` : "", host, relTime(item.queuedAt)].filter(Boolean).join(" · ");
 
       body.appendChild(title);
       body.appendChild(meta);

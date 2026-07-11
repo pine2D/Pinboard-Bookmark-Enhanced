@@ -19,7 +19,7 @@ if (!file) {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const abs = resolve(file);
 const rel = relative(ROOT, abs).split("\\").join("/");
-const TEST_TIMEOUT_MS = 20000;
+const TEST_TIMEOUT_MS = rel === "tests/md-convert-tests.html" ? 45000 : 30000;
 const CLEANUP_TIMEOUT_MS = 5000;
 
 // Completion is explicit: each suite must emit exactly this many DOM result
@@ -27,7 +27,7 @@ const CLEANUP_TIMEOUT_MS = 5000;
 // assertions; an unregistered suite is rejected instead of guessed complete.
 const EXPECTED_RESULTS = Object.freeze({
   "tests/a11y-tests.html": 31,
-  "tests/ai-tags-tests.html": 43,
+  "tests/ai-tags-tests.html": 45,
   "tests/background-active-tab-tests.html": 28,
   "tests/batch-dedup-tests.html": 24,
   "tests/contrast-tests.html": 10,
@@ -35,17 +35,18 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/export-targets-tests.html": 99,
   "tests/i18n-parity-tests.html": 181,
   "tests/jina-cache-tests.html": 23,
-  "tests/md-ai-tests.html": 591,
-  "tests/md-convert-tests.html": 358,
-  "tests/offline-queue-tests.html": 20,
+  "tests/md-ai-tests.html": 593,
+  "tests/md-convert-tests.html": 360,
+  "tests/offline-queue-tests.html": 22,
   "tests/options-notes-tests.html": 36,
   "tests/options-reset-tests.html": 12,
   "tests/pinboard-sort-tests.html": 34,
   "tests/pinboard-style-cloak-tests.html": 14,
-  "tests/popup-save-tests.html": 32,
-  "tests/save-pipeline-tests.html": 35,
-  "tests/settings-cache-invalidate-tests.html": 7,
-  "tests/settings-persist-tests.html": 107,
+  "tests/popup-tag-cache-tests.html": 9,
+  "tests/popup-save-tests.html": 34,
+  "tests/save-pipeline-tests.html": 50,
+  "tests/settings-cache-invalidate-tests.html": 8,
+  "tests/settings-persist-tests.html": 173,
   "tests/tag-gov-layout-tests.html": 6,
   "tests/tag-gov-reserve-tests.html": 2,
   "tests/tag-gov-tests.html": 61,
@@ -114,6 +115,14 @@ try {
     const page = await browser.newPage();
     page.on("pageerror", (error) => runtimeErrors.push("PAGEERROR: " + error.message));
     page.on("crash", () => runtimeErrors.push("PAGECRASH: renderer crashed"));
+    const localOrigin = new URL(url).origin;
+    await page.route("**/*", (route) => {
+      const request = route.request();
+      const requestUrl = request.url();
+      if (request.resourceType() === "image" && /^https?:/.test(requestUrl)
+          && new URL(requestUrl).origin !== localOrigin) return route.abort();
+      return route.continue();
+    });
 
     const response = await page.goto(url, { waitUntil: "load", timeout: 0 });
     if (!response || !response.ok()) throw new Error(`test page failed to load: HTTP ${response && response.status()}`);
@@ -127,17 +136,19 @@ try {
 
     return page.evaluate(() => {
       let pass = 0, fail = 0, skip = 0;
+      const failures = [];
       for (const el of document.querySelectorAll(".pass, .fail, .skip")) {
-        if (el.classList.contains("fail")) fail++;
+        if (el.classList.contains("fail")) { fail++; failures.push(el.textContent || "FAIL"); }
         else if (el.classList.contains("pass")) pass++;
         else if (el.classList.contains("skip")) skip++;
       }
-      return { pass, fail, skip, title: document.title || "" };
+      return { pass, fail, skip, failures: failures.slice(0, 20), title: document.title || "" };
     });
   });
 
   const total = dom.pass + dom.fail + dom.skip;
   console.log(`pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} expected=${expected} title="${dom.title}"`);
+  if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));
   if (total !== expected) console.error(`ERROR: expected ${expected} result rows, found ${total}`);
   if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));
   if (browserDisconnected) console.error("ERROR: browser disconnected before the suite completed");

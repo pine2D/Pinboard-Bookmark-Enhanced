@@ -60,6 +60,7 @@ let backgroundSource;
 let coreSource;
 let backgroundSaveSource;
 let batchSaveSource;
+let undoSource;
 async function getBackgroundSource() {
   if (!backgroundSource) backgroundSource = await (await fetch("../background.js")).text();
   return backgroundSource;
@@ -87,11 +88,62 @@ async function getBackgroundSaveSource() {
 async function getBatchSaveSource() {
   if (batchSaveSource) return batchSaveSource;
   const source = await getBackgroundSource();
-  const start = source.indexOf("async function handleBatchSave");
+  const start = source.indexOf("function handleBatchSave");
   const end = source.indexOf("// ===================== Tab Set", start);
   assert(start >= 0 && end > start, "batch save source not found");
   batchSaveSource = source.slice(start, end);
   return batchSaveSource;
+}
+
+async function getUndoSource() {
+  if (undoSource) return undoSource;
+  const source = await getBackgroundSource();
+  const start = source.indexOf("const _recentSaves");
+  const end = source.indexOf("// ---- 设置图标", start);
+  assert(start >= 0 && end > start, "Undo notification source not found");
+  undoSource = source.slice(start, end);
+  return undoSource;
+}
+
+async function createStatusCacheHarness(initialToken, initialFetch) {
+  const source = await getBackgroundSource();
+  const cacheStart = source.indexOf("// URL 状态缓存");
+  const cacheEnd = source.indexOf("// ---- P2: Cached token", cacheStart);
+  const checkStart = source.indexOf("async function checkBookmarked");
+  const checkEnd = source.indexOf("// ---- Badge:", checkStart);
+  const branchStart = source.indexOf('if (message.type === "get_bookmark_data"');
+  const branchEnd = source.indexOf('if (message.type === "get_offline_queue"', branchStart);
+  assert(cacheStart >= 0 && cacheEnd > cacheStart && checkStart >= 0 && checkEnd > checkStart,
+    "account-scoped status cache source not found");
+  assert(branchStart >= 0 && branchEnd > branchStart, "bookmark-data branch not found");
+
+  const factory = new Function("initialToken", "initialFetch", "pbpPinboardAccountFromToken", "console", `
+    ${source.slice(cacheStart, cacheEnd)}
+    let currentToken = initialToken;
+    let fetchHandler = initialFetch;
+    const pinboardFetch = (...args) => fetchHandler(...args);
+    async function getCurrentPinboardAuth() {
+      return { token: currentToken || "", account: pbpPinboardAccountFromToken(currentToken), epoch: _pinboardAuthEpoch };
+    }
+    ${source.slice(checkStart, checkEnd)}
+    function invokeBookmarkData(message, sendResponse) {
+      ${source.slice(branchStart, branchEnd)}
+      throw new Error("unhandled message");
+    }
+    return {
+      checkBookmarked,
+      invokeBookmarkData,
+      rawCache: statusCache,
+      setAuth(token) {
+        _pinboardAuthEpoch++;
+        currentToken = token;
+        statusCache.clear();
+      },
+      seedRaw(url, account, value) { statusCache.set(url, { ...value, account }); },
+      setFetch(fn) { fetchHandler = fn; },
+    };
+  `);
+  return factory(initialToken, initialFetch, pbpPinboardAccountFromToken, console);
 }
 
 async function createHarness(options) {
@@ -104,10 +156,26 @@ async function createHarness(options) {
   const badgeCalls = [];
   const statusCache = new Map(opts.cacheEntries || []);
   const settings = {
-    pinboardToken: "current-token",
+    pinboardToken: "alice:current-token",
     offlineQueueEnabled: true,
     bgSaveMode: "merge",
     ...(opts.settings || {}),
+  };
+  const authState = {
+    token: Object.prototype.hasOwnProperty.call(opts, "currentToken") ? opts.currentToken : settings.pinboardToken,
+    epoch: 0,
+  };
+  const captureAuth = (token) => ({ account: pbpPinboardAccountFromToken(token), epoch: authState.epoch });
+  const authIsCurrent = (auth) => !!auth?.account && auth.epoch === authState.epoch;
+  const statusCacheGet = (url, auth) => {
+    if (!authIsCurrent(auth)) return null;
+    const cached = statusCache.get(url);
+    return cached?.account === auth.account ? cached : null;
+  };
+  const statusCacheSet = (url, auth, value) => {
+    if (!authIsCurrent(auth)) return false;
+    statusCache.set(url, { ...value, account: auth.account });
+    return true;
   };
   const chromeStub = {
     storage: {
@@ -148,11 +216,22 @@ async function createHarness(options) {
     pbpSameBookmark,
     pbpCreateRecoveringTail,
     pbpOfflineQueueReduce,
+    pbpPinboardAccountFromToken,
+    pbpOfflineQueueAccount,
     pbpResolveOfflineQueueToken,
     pbpDrainOfflineQueue,
     pbpResolveSavePlan,
     buildPostsAddUri,
     POSTS_ADD_URI_BUDGET,
+    pbpCapturePinboardAuth: captureAuth,
+    pbpPinboardAuthIsCurrent: authIsCurrent,
+    pbpStatusCacheGet: statusCacheGet,
+    pbpStatusCacheSet: statusCacheSet,
+    getCurrentPinboardAuth: async () => ({
+      token: authState.token || "",
+      account: pbpPinboardAccountFromToken(authState.token),
+      epoch: authState.epoch,
+    }),
   };
   const source = await getCoreSource();
   const factory = new Function(...Object.keys(deps), source + `
@@ -160,19 +239,19 @@ async function createHarness(options) {
       validateSaveIntent, fetchExistingBookmark, deliverSaveIntent,
       submitSaveIntent, submitPopupSaveIntent, sendOfflineItem,
       drainOfflineQueueIds, readOfflineQueueWithIds, retryOfflineItem,
-      normalizeOfflineSaveIntent, applySaveResultSideEffects
+      normalizeOfflineSaveIntent, applySaveResultSideEffects, processOfflineQueue
     };
   `);
   return {
     ...factory(...Object.values(deps)),
-    storageData, settings, events, fetchCalls, waybackCalls, iconCalls, badgeCalls, statusCache,
+    storageData, settings, authState, events, fetchCalls, waybackCalls, iconCalls, badgeCalls, statusCache,
   };
 }
 
 async function createBackgroundSaveHarness(options) {
   const opts = options || {};
   const cachedSettings = opts.cachedSettings || {
-    pinboardToken: "old-token",
+    pinboardToken: "alice:old-token",
     bgSaveMode: "merge",
     optPrivateDefault: false,
     optPrivateIncognito: true,
@@ -215,6 +294,11 @@ async function createBackgroundSaveHarness(options) {
       return result;
     },
     processOfflineQueue: () => { drainCalls++; return Promise.resolve(); },
+    getCurrentPinboardAuth: async () => ({
+      token: cachedSettings.pinboardToken,
+      account: pbpPinboardAccountFromToken(cachedSettings.pinboardToken),
+      epoch: 0,
+    }),
     POSTS_ADD_URI_BUDGET,
   };
   const source = await getBackgroundSaveSource();
@@ -232,7 +316,7 @@ async function createBackgroundSaveHarness(options) {
 async function createBatchSaveHarness(options) {
   const opts = options || {};
   const settings = {
-    pinboardToken: "token",
+    pinboardToken: "alice:token",
     optBatchTagEnabled: true,
     optBatchTag: "Batch Tag",
     batchAiTags: false,
@@ -254,6 +338,7 @@ async function createBatchSaveHarness(options) {
   const deps = {
     _writeBatchProgress: async (value) => progress.push({ ...value }),
     loadSettings: opts.loadSettings || (async () => settings),
+    getCurrentPinboardAuth: async () => ({ token: settings.pinboardToken, account: "alice", epoch: 0 }),
     showNotification: (...args) => notifications.push(args),
     t: (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
     hasAIKey: () => false,
@@ -352,6 +437,206 @@ await suite("unified save pipeline", async () => {
     assert(missing.fields.time === undefined, "missing merge must not forward caller dt");
   });
 
+  await test("cached bookmark data is account-scoped after an account switch", async () => {
+    const h = await createStatusCacheHarness("alice:old", async () => {
+      throw new Error("unexpected fetch");
+    });
+    h.seedRaw(BASE_INTENT.url, "alice", {
+      bookmarked: true,
+      timestamp: Date.now(),
+      posts: [{ description: "Alice private notes" }],
+    });
+    h.setAuth("bob:new");
+    // Model an old response that somehow survives clearing; the read guard must
+    // still reject it for the new account.
+    h.seedRaw(BASE_INTENT.url, "alice", {
+      bookmarked: true,
+      timestamp: Date.now(),
+      posts: [{ description: "Alice private notes" }],
+    });
+    const result = await new Promise((resolve) => {
+      const retained = h.invokeBookmarkData(
+        { type: "get_bookmark_data", url: BASE_INTENT.url, account: "bob" },
+        resolve
+      );
+      equal(retained, true, "async message channel not retained");
+    });
+    equal(result.posts, null, "account B received account A cached post data");
+    equal(result.account, "bob", "matching account response lost its owner");
+    const mismatch = await new Promise((resolve) => {
+      h.invokeBookmarkData({ type: "get_bookmark_data", url: BASE_INTENT.url, account: "alice" }, resolve);
+    });
+    equal(mismatch.account, "", "mismatch response leaked the current account name");
+  });
+
+  await test("an account-A check resolving after switch cannot refill the cache", async () => {
+    let releaseFetch;
+    let fetchStartedResolve;
+    const fetchStarted = new Promise((resolve) => { fetchStartedResolve = resolve; });
+    const h = await createStatusCacheHarness("alice:old", async () => {
+      fetchStartedResolve();
+      return new Promise((resolve) => { releaseFetch = () => resolve(response(200, {
+        posts: [{ description: "Alice private notes" }],
+      })); });
+    });
+    const pending = h.checkBookmarked(BASE_INTENT.url);
+    await fetchStarted;
+    h.setAuth("bob:new");
+    releaseFetch();
+    equal(await pending, false, "stale account check returned account A status");
+    equal(h.rawCache.has(BASE_INTENT.url), false, "stale account response refilled the cleared cache");
+  });
+
+  await test("queued Pinboard dispatch rejects switch/logout and rewrites same-account rotation", async () => {
+    const sharedSource = await (await fetch("../shared.js")).text();
+    const start = sharedSource.indexOf("const _pinboardQueue = [];");
+    const end = sharedSource.indexOf("// ---- Pinboard posts/add URI builder", start);
+    assert(start >= 0 && end > start, "Pinboard queue source not found");
+    async function dispatch(currentToken, queuedToken) {
+      const fetchCalls = [];
+      const chrome = { storage: { local: {
+        get: async () => ({ _pbRateLimitTs: 0 }),
+        set: async () => {},
+      } } };
+      const factory = new Function(
+        "chrome", "pbpReadSettingsWithSecrets", "SETTINGS_DEFAULTS",
+        "pbpAuthorizePinboardApiUrl", "deobfuscateKey", "fetch",
+        sharedSource.slice(start, end) + "; return pinboardFetch;"
+      );
+      const queuedFetch = factory(
+        chrome,
+        async () => ({ pinboardToken: obfuscateKey(currentToken) }),
+        SETTINGS_DEFAULTS,
+        pbpAuthorizePinboardApiUrl,
+        deobfuscateKey,
+        async (requestUrl) => { fetchCalls.push(requestUrl); return response(200, {}); }
+      );
+      let error = null;
+      try {
+        await queuedFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${encodeURIComponent(queuedToken)}&format=json`);
+      } catch (e) { error = e; }
+      return { fetchCalls, error };
+    }
+    const switched = await dispatch("bob:new", "alice:old");
+    equal(switched.error?.code, "account_changed");
+    equal(switched.fetchCalls.length, 0, "account switch reached fetch");
+    const loggedOut = await dispatch("", "alice:old");
+    equal(loggedOut.error?.code, "account_changed");
+    equal(loggedOut.fetchCalls.length, 0, "logout reached fetch");
+    const rotated = await dispatch("alice:new", "alice:old");
+    equal(rotated.fetchCalls.length, 1, "same-account rotation was cancelled");
+    equal(new URL(rotated.fetchCalls[0]).searchParams.get("auth_token"), "alice:new");
+  });
+
+  await test("preview re-extraction preserves immutable opener owner, tags, and description", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf('if (message.type === "reextractMarkdown")');
+    const end = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"', start);
+    assert(start >= 0 && end > start, "reextract branch not found");
+    const key = "md_preview_data_owner-test";
+    let slot = {
+      pending: true, url: BASE_INTENT.url, tabId: 7,
+      account: "alice", tags: ["Tag-A", "two words"], description: "A notes\nline 2",
+    };
+    const chrome = { storage: { local: {
+      get: async () => ({ [key]: slot }),
+      set: async (values) => { slot = values[key]; },
+    } } };
+    const factory = new Function("chrome", "extractForPreview", `
+      return function invoke(message, sendResponse) { ${source.slice(start, end)} };
+    `);
+    const invoke = factory(chrome, async ({ engine }) => ({
+      source: engine, markdown: "# rebuilt", contentHtml: "", title: "Rebuilt", url: BASE_INTENT.url,
+    }));
+    const malicious = {
+      type: "reextractMarkdown", url: BASE_INTENT.url, tabId: 7, engine: "jina", k: "owner-test",
+      account: "bob", tags: ["Bob-secret"], description: "Bob notes",
+    };
+    const result = await new Promise((resolve) => {
+      equal(invoke(malicious, resolve), true, "async reextract channel not retained");
+    });
+    equal(result.ok, true);
+    equal(slot.account, "alice");
+    equal(JSON.stringify(slot.tags), JSON.stringify(["Tag-A", "two words"]));
+    equal(slot.description, "A notes\nline 2");
+  });
+
+  await test("preview bookmark lookup never crosses from captured account A into B", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"');
+    const end = source.indexOf("\n});", start);
+    assert(start >= 0 && end > start, "preview bookmark branch not found");
+    const authA = { token: "alice:old", account: "alice", epoch: 1 };
+    let current = authA;
+    let checks = 0;
+    const factory = new Function(
+      "getCurrentPinboardAuth", "pbpPinboardAuthIsCurrent", "checkBookmarked",
+      "pbpStatusCacheGet", "pbpStatusCacheSet", "pinboardFetch", "chrome", `
+        return function invoke(message, sendResponse) { ${source.slice(start, end)} };
+      `
+    );
+    const invoke = factory(
+      async () => { current = { token: "bob:new", account: "bob", epoch: 2 }; return authA; },
+      (candidate) => candidate === current,
+      async (_url, captured) => { checks++; return captured === current; },
+      () => null,
+      () => false,
+      async () => { throw new Error("cross-account fetch"); },
+      { storage: { local: {} } }
+    );
+    const stale = await new Promise((resolve) => invoke({
+      type: "mdPreviewBookmarkInfo", url: BASE_INTENT.url, account: "alice",
+    }, resolve));
+    equal(checks, 1, "captured lookup was not invoked once");
+    equal(stale.bookmarked, false);
+    equal(stale.account, "", "stale preview learned the new account");
+
+    checks = 0;
+    const legacy = await new Promise((resolve) => invoke({
+      type: "mdPreviewBookmarkInfo", url: BASE_INTENT.url, account: "",
+    }, resolve));
+    equal(checks, 0, "ownerless legacy preview performed a Pinboard lookup");
+    equal(legacy.account, "");
+  });
+
+  await test("preview opener and restore payloads carry account, tags, and description", async () => {
+    const [popupSource, previewSource, source] = await Promise.all([
+      fetch("../popup.js").then((r) => r.text()),
+      fetch("../md-preview.js").then((r) => r.text()),
+      getBackgroundSource(),
+    ]);
+    const popupPayload = popupSource.slice(popupSource.indexOf("const openPreview"), popupSource.indexOf("const downloadMd"));
+    assert(popupPayload.includes("account: sessionAccount"), "popup preview payload has no owner");
+    assert(popupPayload.includes('description: $id("description-input")?.value || ""'), "popup preview drops notes");
+    assert(previewSource.includes("account: previewAccount, tags, description, ts: Date.now()"), "restore record drops owner metadata");
+    assert(previewSource.includes("if (url && previewAccount)"), "ownerless preview still requests bookmark data");
+    const shortcut = source.slice(source.indexOf("async function openMarkdownPreviewFromShortcut"));
+    assert(shortcut.includes('account: auth.account || ""'), "shortcut preview payload has no owner field");
+  });
+
+  await test("concurrent Batch start messages reserve exactly one run before auth resolves", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf('if (message.action === "startBatchSave"');
+    const end = source.indexOf('if (message.type === "pinboard_api_call"', start);
+    assert(start >= 0 && end > start, "Batch message branch not found");
+    let releaseAuth;
+    const auth = new Promise((resolve) => { releaseAuth = resolve; });
+    let starts = 0;
+    const factory = new Function("getCurrentPinboardAuth", "handleBatchSave", `
+      let _batchRunning = false;
+      return function invoke(message, sendResponse) { ${source.slice(start, end)} };
+    `);
+    const invoke = factory(() => auth, async () => { starts++; });
+    const responses = [];
+    equal(invoke({ action: "startBatchSave", tabs: [{}], account: "alice" }, (r) => responses.push(r)), true);
+    equal(invoke({ action: "startBatchSave", tabs: [{}], account: "alice" }, (r) => responses.push(r)), true);
+    equal(responses[0]?.status, "busy", "second start was not rejected synchronously");
+    releaseAuth({ token: "alice:key", account: "alice", epoch: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    equal(starts, 1, "deferred auth launched more than one Batch run");
+    equal(responses.filter((r) => r.status === "started").length, 1);
+  });
+
   await test("resolver update and overwrite keep exact prepared fields", () => {
     const updated = pbpResolveSavePlan(intent({ mode: "update", private: true, toread: false, time: "server-time" }), null);
     equal(updated.replace, true);
@@ -367,10 +652,45 @@ await suite("unified save pipeline", async () => {
 
   await test("popup boundary accepts only create/update/merge with safe time rules", async () => {
     const h = await createHarness();
-    equal((await h.submitPopupSaveIntent(intent({ mode: "skip" }))).reason, "invalid");
-    equal((await h.submitPopupSaveIntent(intent({ mode: "create", time: "fake" }))).reason, "invalid");
-    equal((await h.submitPopupSaveIntent(intent({ mode: "update" }))).reason, "invalid");
+    equal((await h.submitPopupSaveIntent(intent({ mode: "skip" }), "alice")).reason, "invalid");
+    equal((await h.submitPopupSaveIntent(intent({ mode: "create", time: "fake" }), "alice")).reason, "invalid");
+    equal((await h.submitPopupSaveIntent(intent({ mode: "update" }), "alice")).reason, "invalid");
+    equal((await h.submitPopupSaveIntent(intent(), "")).reason, "account_changed");
     equal(h.fetchCalls.length, 0, "invalid popup intents make no request");
+  });
+
+  await test("delivery uses the current same-account token and rejects logout or account switch", async () => {
+    const rotated = await createHarness({
+      settings: { pinboardToken: "alice:old" },
+      currentToken: "alice:new",
+      pinboardFetch: async () => response(200, { result_code: "done" }),
+    });
+    equal((await rotated.submitSaveIntent(intent())).status, "saved");
+    equal(new URL(rotated.fetchCalls[0]).searchParams.get("auth_token"), "alice:new",
+      "same-account rotation used the stale settings token");
+
+    const replay = await createHarness({
+      settings: { pinboardToken: "alice:old" },
+      currentToken: "alice:new",
+      pinboardFetch: async () => response(200, { result_code: "done" }),
+    });
+    equal((await replay.sendOfflineItem({ account: "alice", ...intent({ mode: "overwrite" }) })).result.status, "saved");
+    equal(new URL(replay.fetchCalls[0]).searchParams.get("auth_token"), "alice:new",
+      "offline replay used the stale settings token after rotation");
+
+    const switched = await createHarness({
+      settings: { pinboardToken: "alice:old" },
+      currentToken: "bob:new",
+    });
+    equal((await switched.submitSaveIntent(intent())).status, "failed");
+    equal(switched.fetchCalls.length, 0, "account switch sent a request with stale credentials");
+
+    const loggedOut = await createHarness({
+      settings: { pinboardToken: "alice:old" },
+      currentToken: "",
+    });
+    equal((await loggedOut.submitSaveIntent(intent())).reason, "not_logged_in");
+    equal(loggedOut.fetchCalls.length, 0, "logout sent a request with stale credentials");
   });
 
   await test("save_intent listener preserves the Chrome 110 async response contract", async () => {
@@ -379,10 +699,20 @@ await suite("unified save pipeline", async () => {
     const end = source.indexOf('if (message.type === "archive_url"', start);
     const branch = source.slice(start, end);
     assert(start >= 0 && end > start, "save_intent branch not found");
-    assert(branch.includes("submitPopupSaveIntent(message.intent)"), "message uses the guarded popup boundary");
+    assert(branch.includes("submitPopupSaveIntent(message.intent, message.account)"), "message uses the guarded popup boundary");
     assert(branch.includes(".then(sendResponse)"), "public result is sent directly");
     assert(branch.includes("return true;"), "listener keeps the response channel open");
     assert(!branch.includes("persisted") && !branch.includes("retryable"), "private envelope does not cross the message boundary");
+  });
+
+  await test("background Quick, Read Later, and Batch summary caches always carry captured account", async () => {
+    const source = await getBackgroundSource();
+    const summaryCalls = source.match(/(?:get|set)AICache\([^\n]*"summary"[^\n]*\)/g) || [];
+    equal(summaryCalls.length, 8, "unexpected production summary cache call count");
+    assert(summaryCalls.slice(0, 4).every((call) => call.includes("startAuth.account")),
+      "Quick/Read Later summary cache lost captured account");
+    assert(summaryCalls.slice(4).every((call) => /, account\)$/.test(call)),
+      "Batch summary cache lost batch account");
   });
 
   await test("delivery create emits explicit replace, shared, and read-later values", async () => {
@@ -588,6 +918,7 @@ await suite("unified save pipeline", async () => {
     equal(queued.queueId, result.queueId);
     equal(queued.mode, "merge");
     equal(queued.archive, true);
+    equal(queued.account, "alice");
     assert(!("token" in queued), "queue must not persist credentials");
     equal(h.events.includes("storage:set"), true, "queued is returned after storage set");
     equal(h.waybackCalls.length, 0, "queued is not treated as saved");
@@ -635,15 +966,46 @@ await suite("unified save pipeline", async () => {
     equal(h.waybackCalls[0].options.override, undefined);
   });
 
-  await test("legacy replay uses fallback token and applies side effects only after durable ack", async () => {
-    let addParams;
+  await test("account switch fails closed without sending or removing queued work", async () => {
     const queued = {
-      queueId: "legacy-1", url: BASE_INTENT.url, title: "Legacy", notes: "Note", tags: "tag",
-      private: false, toread: false, token: obfuscateKey("legacy-token"),
+      queueId: "account-a", account: "alice", ...intent({ mode: "overwrite" }),
     };
     const h = await createHarness({
       queue: [queued],
-      settings: { pinboardToken: "", bgSaveMode: "overwrite" },
+      settings: { pinboardToken: "bob:current-token" },
+    });
+    const outcomes = await h.drainOfflineQueueIds(["account-a"]);
+    equal(outcomes[0].acknowledged, false);
+    equal(outcomes[0].result.reason, "account_mismatch");
+    equal(h.fetchCalls.length, 0, "cross-account replay must not reach Pinboard");
+    equal(h.storageData.offlineQueue.length, 1, "failed replay remains queued");
+  });
+
+  await test("rotated token for the same account replays with the current token", async () => {
+    let addParams;
+    const h = await createHarness({
+      queue: [{ queueId: "rotated", account: "alice", ...intent({ mode: "overwrite" }) }],
+      settings: { pinboardToken: "alice:new-token" },
+      pinboardFetch: async (url) => {
+        addParams = new URL(url).searchParams;
+        return response(200, { result_code: "done" });
+      },
+    });
+    const outcomes = await h.drainOfflineQueueIds(["rotated"]);
+    equal(outcomes[0].acknowledged, true);
+    equal(addParams.get("auth_token"), "alice:new-token");
+    equal(h.storageData.offlineQueue.length, 0);
+  });
+
+  await test("legacy replay derives its account and uses only the matching current token", async () => {
+    let addParams;
+    const queued = {
+      queueId: "legacy-1", url: BASE_INTENT.url, title: "Legacy", notes: "Note", tags: "tag",
+      private: false, toread: false, token: obfuscateKey("alice:legacy-token"),
+    };
+    const h = await createHarness({
+      queue: [queued],
+      settings: { pinboardToken: "alice:new-token", bgSaveMode: "overwrite" },
       pinboardFetch: async (url) => {
         addParams = new URL(url).searchParams;
         return response(200, { result_code: "done" });
@@ -654,8 +1016,57 @@ await suite("unified save pipeline", async () => {
     equal(outcomes[0].acknowledged, true);
     equal(outcomes[0].result.status, "saved");
     equal(h.storageData.offlineQueue.length, 0);
-    equal(addParams.get("auth_token"), "legacy-token");
+    equal(addParams.get("auth_token"), "alice:new-token");
     assert(h.events.indexOf("storage:set") < h.events.indexOf("wayback"), "side effect waits for durable removal");
+  });
+
+  await test("logout keeps legacy queued work without sending its old token", async () => {
+    const queued = {
+      queueId: "legacy-logout", url: BASE_INTENT.url, title: "Legacy", notes: "Note", tags: "tag",
+      private: false, toread: false, token: obfuscateKey("alice:legacy-token"),
+    };
+    const h = await createHarness({ queue: [queued], settings: { pinboardToken: "" } });
+    const result = await h.retryOfflineItem("legacy-logout");
+    equal(result.ok, false);
+    equal(result.result.reason, "not_logged_in");
+    equal(h.fetchCalls.length, 0, "logout must not send the legacy queued credential");
+    equal(h.storageData.offlineQueue.length, 1, "failed retry must remain unacknowledged and queued");
+    equal(h.storageData.offlineQueue[0].account, "alice", "legacy ownership is preserved as a non-secret binding");
+    assert(!("token" in h.storageData.offlineQueue[0]), "legacy credential must be removed from durable queue storage");
+
+    const mismatch = await createHarness({ queue: [queued], settings: { pinboardToken: "bob:current-token" } });
+    const mismatchResult = await mismatch.retryOfflineItem("legacy-logout");
+    equal(mismatchResult.result.reason, "account_mismatch");
+    equal(mismatch.fetchCalls.length, 0, "mismatch must not send the legacy queued credential");
+    equal(mismatch.storageData.offlineQueue[0].account, "alice");
+    assert(!("token" in mismatch.storageData.offlineQueue[0]), "mismatch path must also purge the durable legacy credential");
+  });
+
+  await test("tokenless unbound legacy work remains queued after manual retry", async () => {
+    const queued = { queueId: "unbound", ...intent({ mode: "overwrite" }) };
+    const h = await createHarness({ queue: [queued], settings: { pinboardToken: "alice:current-token" } });
+    const result = await h.retryOfflineItem("unbound");
+    equal(result.ok, false);
+    equal(result.result.reason, "account_mismatch");
+    equal(h.fetchCalls.length, 0);
+    equal(h.storageData.offlineQueue.length, 1, "explicit retry failure must retain the item");
+  });
+
+  await test("startup and keepalive alarm drains retain another account's queue", async () => {
+    const source = await getBackgroundSource();
+    const alarmBlock = source.slice(source.indexOf('if (alarm.name === "keepalive")'), source.indexOf('if (alarm.name === "prewarm-tags")'));
+    const startupBlock = source.slice(source.indexOf("chrome.runtime.onStartup.addListener"), source.indexOf("chrome.runtime.onInstalled.addListener"));
+    assert(alarmBlock.includes("processOfflineQueue()"), "keepalive alarm no longer drains through the guarded path");
+    assert(startupBlock.includes("processOfflineQueue()"), "startup no longer drains through the guarded path");
+
+    const h = await createHarness({
+      queue: [{ queueId: "account-a", account: "alice", ...intent({ mode: "overwrite" }) }],
+      settings: { pinboardToken: "bob:current-token" },
+    });
+    await h.processOfflineQueue();
+    await h.processOfflineQueue();
+    equal(h.fetchCalls.length, 0, "automatic drains must not send across accounts");
+    equal(h.storageData.offlineQueue.length, 1, "automatic drain failure must retain the item");
   });
 
   await test("side-effect failure never requeues an accepted save", async () => {
@@ -742,7 +1153,7 @@ await suite("unified save pipeline", async () => {
     assert(h.aiSnapshots.some((snapshot) => snapshot.defaultTags === "read-tag" && !snapshot.aiTags && snapshot.aiSummary), "Read Later AI flags isolated");
   });
 
-  await test("only confirmed creation receives Undo with the post-AI token", async () => {
+  await test("only confirmed creation receives Undo bound to the captured save account", async () => {
     const beforeAi = {
       pinboardToken: "old-token", bgSaveMode: "merge", optPrivateDefault: false,
       optPrivateIncognito: false, _defaultTags: "", _aiTags: false, _aiSummary: false,
@@ -750,11 +1161,12 @@ await suite("unified save pipeline", async () => {
     const atSave = { ...beforeAi, pinboardToken: "current-token" };
     const created = await createBackgroundSaveHarness({
       settingsSequence: [beforeAi, atSave],
-      result: { status: "saved", mutation: "created" },
+      result: { status: "saved", mutation: "created", account: "alice" },
     });
     const createdResult = await runBackgroundSave(created);
     equal(createdResult.mutation, "created");
-    equal(created.notifications[0][4].token, "current-token");
+    equal(created.notifications[0][4].account, "alice");
+    assert(!("token" in created.notifications[0][4]), "Undo metadata must not retain a raw token");
     equal(created.drainCalls, 1);
 
     let reads = 0;
@@ -776,6 +1188,100 @@ await suite("unified save pipeline", async () => {
       equal(h.notifications[0][4], undefined, `${mutation} must not expose destructive Undo`);
       equal(h.drainCalls, 1, "saved result keeps opportunistic drain");
     }
+  });
+
+  await test("Undo rereads the current token, rejects logout/account switch, and accepts same-account rotation", async () => {
+    let releaseSave;
+    let saveStartedResolve;
+    const saveStarted = new Promise((resolve) => { saveStartedResolve = resolve; });
+    const h = await createHarness({
+      settings: { pinboardToken: "alice:at-save" },
+      pinboardFetch: async () => {
+        saveStartedResolve();
+        await new Promise((resolve) => { releaseSave = resolve; });
+        return response(200, { result_code: "done" });
+      },
+    });
+    const pending = h.submitSaveIntent(intent());
+    await saveStarted;
+    h.settings.pinboardToken = "bob:after-save";
+    releaseSave();
+    const captured = await pending;
+    equal(captured.account, "alice", "pending save must retain its delivery account");
+
+    let clickHandler;
+    let currentToken = "";
+    let authEpoch = 0;
+    let switchDuringRead = false;
+    const deleteCalls = [];
+    const notificationChrome = {
+      notifications: {
+        onButtonClicked: { addListener(fn) { clickHandler = fn; } },
+        create() {},
+      },
+    };
+    const deps = {
+      chrome: notificationChrome,
+      SETTINGS_DEFAULTS,
+      pbpReadSettingsWithSecrets: async () => {
+        const tokenAtRead = currentToken;
+        if (switchDuringRead) {
+          switchDuringRead = false;
+          authEpoch++;
+          currentToken = "bob:after-race";
+        }
+        return { pinboardToken: tokenAtRead ? obfuscateKey(tokenAtRead) : "" };
+      },
+      deobfuscateKey,
+      pbpResolveOfflineQueueToken,
+      pbpPinboardAccountFromToken,
+      pbpPinboardAuthEpoch: () => authEpoch,
+      pbpPinboardAuthIsCurrent: (auth) => !!auth?.account && auth.epoch === authEpoch,
+      pinboardFetch: async (url) => {
+        deleteCalls.push(url);
+        return { json: async () => ({ result_code: "done" }) };
+      },
+      getSettingsStorage: async () => ({ get: async (defaults) => defaults }),
+      statusCache: new Map(),
+      pbpCapturePinboardAuth: (token) => ({ account: pbpPinboardAccountFromToken(token), epoch: authEpoch }),
+      pbpStatusCacheSet: (url, auth, value) => {
+        if (!auth?.account || auth.epoch !== authEpoch) return false;
+        deps.statusCache.set(url, { ...value, account: auth.account });
+        return true;
+      },
+      t: (key) => key,
+      setTimeout: () => 0,
+      console,
+    };
+    const source = await getUndoSource();
+    const factory = new Function(...Object.keys(deps), `${source}\nreturn { recent: _recentSaves };`);
+    const { recent } = factory(...Object.values(deps));
+
+    recent.set("logout", { url: BASE_INTENT.url, account: "alice" });
+    authEpoch++;
+    currentToken = "";
+    await clickHandler("logout", 0);
+    equal(deleteCalls.length, 0, "logout must not reuse an Undo credential");
+
+    recent.set("switched", { url: BASE_INTENT.url, account: captured.account });
+    authEpoch++;
+    currentToken = "bob:current";
+    await clickHandler("switched", 0);
+    equal(deleteCalls.length, 0, "account switch must not delete the prior account bookmark");
+
+    recent.set("switch-during-read", { url: BASE_INTENT.url, account: "alice" });
+    authEpoch++;
+    currentToken = "alice:stale-read";
+    switchDuringRead = true;
+    await clickHandler("switch-during-read", 0);
+    equal(deleteCalls.length, 0, "account switch during the fresh read reused its stale token");
+
+    recent.set("rotated", { url: BASE_INTENT.url, account: "alice" });
+    authEpoch++;
+    currentToken = "alice:rotated";
+    await clickHandler("rotated", 0);
+    equal(deleteCalls.length, 1, "same-account token rotation should keep Undo usable");
+    equal(new URL(deleteCalls[0]).searchParams.get("auth_token"), "alice:rotated");
   });
 
   await test("queued background save notifies without success or opportunistic drain", async () => {
@@ -852,6 +1358,7 @@ await suite("unified save pipeline", async () => {
     equal(h.intents[0].prepared.tags, "Batch-Tag");
 
     const done = h.progress[h.progress.length - 1];
+    assert(done, "missing Batch progress: " + JSON.stringify(h.progress));
     equal(h.progress.filter((entry) => !entry.done).map((entry) => entry.i).join(","), "0,1,2,3,4,5");
     equal(done.i, 5);
     equal(done.saved, 1); equal(done.queued, 1); equal(done.skipped, 1);
@@ -864,7 +1371,7 @@ await suite("unified save pipeline", async () => {
 
     const noToken = await createBatchSaveHarness({ settings: { pinboardToken: "" } });
     await noToken.handleBatchSave(batchTabs(3));
-    equal(noToken.progress[noToken.progress.length - 1].i, 0, "missing token falsely processed every tab");
+    equal(noToken.progress.length, 0, "missing token created accountless Batch progress");
 
     const loadFailed = await createBatchSaveHarness({ loadSettings: async () => { throw new Error("settings unavailable"); } });
     await loadFailed.handleBatchSave(batchTabs(3));

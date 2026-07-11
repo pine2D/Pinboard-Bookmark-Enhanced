@@ -63,19 +63,33 @@ await suite("offline queue", async () => {
     assert(out.length === 3, "no duplicate for same queueId");
   });
   await test("new queue payload does not persist credentials", () => {
-    const out = pbpOfflineQueueReduce([], { kind: "enqueue", item: { queueId: "a", url: "https://a.com", token: "secret" } });
+    const out = pbpOfflineQueueReduce([], { kind: "enqueue", item: { queueId: "a", account: "alice", url: "https://a.com", token: "secret" } });
     assert(out.length === 1 && !("token" in out[0]), "new item strips token");
+    assert(out[0].account === "alice", "non-secret account binding preserved");
   });
-  await test("current settings token takes priority over a legacy queued token", () => {
-    const token = pbpResolveOfflineQueueToken("current-token", obfuscateKey("legacy-token"));
-    assert(token === "current-token", "current token selected");
+  await test("account helper extracts the username from raw and obfuscated tokens", () => {
+    assert(pbpPinboardAccountFromToken("alice:current-token") === "alice", "raw token account extracted");
+    assert(pbpPinboardAccountFromToken(obfuscateKey("alice:legacy-token")) === "alice", "legacy token account extracted");
+    assert(pbpPinboardAccountFromToken("missing-separator") === "", "malformed token fails closed");
   });
-  await test("legacy queued token remains a fallback when current settings token is missing", () => {
-    const token = pbpResolveOfflineQueueToken("", obfuscateKey("legacy-token"));
-    assert(token === "legacy-token", "legacy token decoded as fallback");
+  await test("rotated token replays only for the bound account", () => {
+    const item = { account: "alice" };
+    assert(pbpResolveOfflineQueueToken("alice:new-token", item) === "alice:new-token", "same-account current token selected");
+    assert(pbpResolveOfflineQueueToken("bob:new-token", item) === "", "different account rejected");
   });
-  await test("missing current and legacy tokens resolve to empty", () => {
-    assert(pbpResolveOfflineQueueToken("", "") === "", "missing credentials stay empty");
+  await test("legacy token identifies its account but is never used for cross-account replay", () => {
+    const item = { token: obfuscateKey("alice:legacy-token") };
+    assert(pbpOfflineQueueAccount(item) === "alice", "legacy account derived");
+    assert(pbpResolveOfflineQueueToken("alice:new-token", item) === "alice:new-token", "same-account rotation uses current token");
+    assert(pbpResolveOfflineQueueToken("bob:new-token", item) === "", "legacy token cannot bypass current account");
+  });
+  await test("logout never falls back to a legacy queued token", () => {
+    const item = { token: obfuscateKey("alice:legacy-token") };
+    assert(pbpResolveOfflineQueueToken("", item) === "", "missing current token fails closed");
+  });
+  await test("tokenless unbound records always fail closed", () => {
+    assert(pbpResolveOfflineQueueToken("alice:current-token", {}) === "", "unbound record rejected");
+    assert(pbpResolveOfflineQueueToken("", {}) === "", "missing credentials stay empty");
   });
   await test("failed delivery remains queued and is not acknowledged as success", async () => {
     let queue = [{ queueId: "a", url: "https://a.com" }];

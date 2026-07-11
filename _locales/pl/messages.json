@@ -1411,16 +1411,16 @@
     "message": "Synchronizacja danych"
   },
   "optSyncEnabled": {
-    "message": "Synchronizuj ustawienia między urządzeniami przez Google"
+    "message": "Używaj Chrome Sync do ustawień na tym urządzeniu"
   },
   "optSyncHint": {
-    "message": "Po włączeniu ustawienia synchronizują się między instalacjami Chrome zalogowanymi na to samo konto Google."
+    "message": "Ten wybór dotyczy tylko tego urządzenia. Włącz go osobno na każdym urządzeniu, które ma używać ustawień z Twojego konta Google."
   },
   "syncApiKeysLabel": {
-    "message": "Synchronizuj też klucze API"
+    "message": "Synchronizuj dane uwierzytelniające dla tego konta Google"
   },
   "syncApiKeysHint": {
-    "message": "Po włączeniu klucze API również będą synchronizowane przez konto Google (tylko zaciemnione, nie zaszyfrowane). Domyślnie wyłączone — klucze pozostają tylko na tym urządzeniu. Włącz tylko, jeśli ufasz wszystkim urządzeniom zalogowanym na to konto."
+    "message": "To jeden wybór dla całego konta, ale uczestniczą w nim tylko urządzenia z włączoną synchronizacją ustawień; pozostałe nadal używają lokalnych danych uwierzytelniających. Dla nowych użytkowników jest domyślnie wyłączony. Jeśli aktualizacja znajdzie w Chrome Sync istniejące niepuste dane uwierzytelniające, pozostaje włączony, aby uniknąć utraty danych. Synchronizowane klucze API, tokeny, hasła i dane uwierzytelniające eksportu są jedynie zaciemnione, a nie zaszyfrowane."
   },
   "qlPopularTitle": {
     "message": "Popularne"
@@ -1890,7 +1890,7 @@
     "message": "Nie udało się skopiować do schowka — notatka nie została utworzona. Spróbuj ponownie."
   },
   "apiKeySecurityHint": {
-    "message": "Klucze API są domyślnie przechowywane tylko na tym urządzeniu. Są synchronizowane przez Chrome Sync dopiero po wyraźnym włączeniu synchronizacji kluczy. Klucze są jedynie zaciemniane, a nie szyfrowane."
+    "message": "Dla nowych użytkowników dane uwierzytelniające pozostają domyślnie na tym urządzeniu. Istniejące dane w chmurze mogą utrzymać synchronizację konta po aktualizacji. Uczestniczą w niej tylko urządzenia z włączoną synchronizacją ustawień; synchronizowane dane są jedynie zaciemnione, a nie zaszyfrowane."
   },
   "batchPermLabel": {
     "message": "Starsze uprawnienie do wszystkich witryn:"

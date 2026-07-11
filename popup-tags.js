@@ -2,26 +2,55 @@
 // Pinboard Bookmark Enhanced - Tag Input & Autocomplete
 // ============================================================
 
+function pbpPopupTagCacheEntry(entry, token) {
+  const account = pbpPinboardAccountFromToken(token);
+  return account && entry && typeof entry === "object" && !Array.isArray(entry)
+    && entry.account === account
+    ? entry
+    : null;
+}
+
+function pbpPopupTagCacheEnvelope(token, payload) {
+  const account = pbpPinboardAccountFromToken(token);
+  return account ? { ...payload, account } : null;
+}
+
+function pbpPopupTagAccountIsCurrent(account) {
+  const token = typeof settings === "object" && settings ? settings.pinboardToken : "";
+  return !!account && pbpPinboardAccountFromToken(token) === account;
+}
+
 // ---- Suggest Tags (Pinboard API) ----
 async function fetchPinboardSuggestTags(token, url) {
   const container = $id("pinboard-suggest-tags");
   const cacheKey = "cached_suggest_" + url;
   const SUGGEST_TTL = 10 * 60 * 1000; // 10 minutes
+  const account = pbpPinboardAccountFromToken(token);
+
+  if (!account || !pbpPopupTagAccountIsCurrent(account)) {
+    container.setAttribute("aria-busy", "false");
+    return;
+  }
+  container.replaceChildren();
 
   try {
   let data;
   try {
     const stored = await chrome.storage.local.get(cacheKey);
-    if (stored[cacheKey] && Date.now() - stored[cacheKey].timestamp < SUGGEST_TTL) {
-      data = stored[cacheKey].data;
+    if (!pbpPopupTagAccountIsCurrent(account)) return;
+    const entry = pbpPopupTagCacheEntry(stored[cacheKey], token);
+    if (entry && Date.now() - entry.timestamp < SUGGEST_TTL) {
+      data = entry.data;
     }
   } catch (_) {}
 
+  if (!pbpPopupTagAccountIsCurrent(account)) return;
   if (!data) {
     try {
       // Suggest is non-critical read-only; bypass rate-limit queue so it fires immediately
       // on popup open instead of waiting 3.1s+ behind fetchAllUserTags. 429 is handled.
       const resp = await pinboardFetchImmediate(`https://api.pinboard.in/v1/posts/suggest?url=${enc(url)}&auth_token=${token}&format=json`, { timeoutMs: 8000 });
+      if (!pbpPopupTagAccountIsCurrent(account)) return;
       if (!resp.ok) {
         // Auth and rate-limit failures are actionable — show specific guidance
         if (resp.status === 401 || resp.status === 403) { container.textContent = t("pinboardErrorAuth"); container.classList.add("muted"); return; }
@@ -32,8 +61,11 @@ async function fetchPinboardSuggestTags(token, url) {
         return;
       }
       data = await resp.json();
-      chrome.storage.local.set({ [cacheKey]: { data, timestamp: Date.now() } }).catch(() => {});
+      if (!pbpPopupTagAccountIsCurrent(account)) return;
+      const entry = pbpPopupTagCacheEnvelope(token, { data, timestamp: Date.now() });
+      if (entry) chrome.storage.local.set({ [cacheKey]: entry }).catch(() => {});
     } catch (e) {
+      if (!pbpPopupTagAccountIsCurrent(account)) return;
       // Network-level errors for the suggest endpoint typically mean Pinboard can't process
       // this URL, not that the user's network is broken — surface the same neutral message.
       container.textContent = t("emptyTagSuggestions");
@@ -43,6 +75,7 @@ async function fetchPinboardSuggestTags(token, url) {
   }
 
   try {
+    if (!pbpPopupTagAccountIsCurrent(account)) return;
     while (container.firstChild) container.removeChild(container.firstChild);
     const popular = data[0]?.popular || [];
     const recommended = data[1]?.recommended || [];
@@ -107,6 +140,7 @@ async function fetchPinboardSuggestTags(token, url) {
       if (addAllSuggest) { addAllSuggest.innerHTML = PBP_ICONS.check; addAllSuggest.disabled = true; addAllSuggest.style.color = "#080"; }
     });
   } catch (e) {
+    if (!pbpPopupTagAccountIsCurrent(account)) return;
     console.error("suggest tags error:", e);
     container.textContent = t("suggestFailed", e.message || String(e));
     container.classList.add("muted");
@@ -129,9 +163,16 @@ function applyTagData(counts) {
 // but with a staleness ceiling: if the alarm clearly hasn't run (cache older than
 // this), fall through to a one-shot fetch so tags can't be stuck stale forever.
 const PREWARM_STALE_CEILING = 2 * 60 * 60 * 1000; // 2 hours
+let _popupUserTagAccount = "";
 
 async function fetchAllUserTags(token) {
   const cacheKey = "cached_user_tags";
+  const account = pbpPinboardAccountFromToken(token);
+  if (!account || !pbpPopupTagAccountIsCurrent(account)) return;
+  if (_popupUserTagAccount !== account) {
+    applyTagData({});
+    _popupUserTagAccount = account;
+  }
   // Sync mode: "cached" (default, TTL-based) / "fresh" (bypass cache) / "prewarmed" (cache-first; alarm refreshes)
   const mode = (settings && settings.tagSyncMode) || "cached";
 
@@ -139,7 +180,8 @@ async function fetchAllUserTags(token) {
   if (mode !== "fresh") {
     try {
       const cached = await chrome.storage.local.get(cacheKey);
-      const entry = cached[cacheKey];
+      if (!pbpPopupTagAccountIsCurrent(account)) return;
+      const entry = pbpPopupTagCacheEntry(cached[cacheKey], token);
       if (entry && entry.counts) {
         const age = Date.now() - (entry.timestamp || 0);
         const usable = mode === "prewarmed"
@@ -154,18 +196,23 @@ async function fetchAllUserTags(token) {
     // No usable cache (missing / expired / prewarmed-but-too-stale): fetch once so UI is usable
   }
 
+  if (!pbpPopupTagAccountIsCurrent(account)) return;
   // Fetch from Pinboard (fresh, or cached-expired, or prewarmed-stale/missing)
   try {
     const resp = await pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${token}&format=json`);
+    if (!pbpPopupTagAccountIsCurrent(account)) return;
     if (resp.status === 401) return; // pinboardFetch already redirected to login
     if (!resp.ok) {
       showTagSyncError(classifyPinboardError(resp));
       return;
     }
     const data = await resp.json();
+    if (!pbpPopupTagAccountIsCurrent(account)) return;
     applyTagData(data);
-    await chrome.storage.local.set({ [cacheKey]: { counts: allUserTagCounts, timestamp: Date.now() } });
+    const entry = pbpPopupTagCacheEnvelope(token, { counts: allUserTagCounts, timestamp: Date.now() });
+    if (entry) await chrome.storage.local.set({ [cacheKey]: entry });
   } catch (e) {
+    if (!pbpPopupTagAccountIsCurrent(account)) return;
     console.error("user-tag sync failed:", e);
     showTagSyncError(classifyPinboardError(e));
   }
@@ -351,10 +398,18 @@ function setupTagsInput() {
 let _lastUsedTagsCache = [];
 
 async function loadLastUsedTags() {
+  const token = typeof settings === "object" && settings ? settings.pinboardToken : "";
+  const account = pbpPinboardAccountFromToken(token);
+  _lastUsedTagsCache = [];
+  renderLastUsedHint();
+  if (!account) return;
   try {
-    const { lastUsedTags } = await chrome.storage.local.get("lastUsedTags");
-    if (Array.isArray(lastUsedTags) && lastUsedTags.length) {
-      _lastUsedTagsCache = lastUsedTags;
+    const key = pbpAccountStorageKey("lastUsedTags", account);
+    const stored = await chrome.storage.local.get(key);
+    if (!pbpPopupTagAccountIsCurrent(account)) return;
+    const entry = pbpPopupTagCacheEntry(stored[key], token);
+    if (Array.isArray(entry?.tags) && entry.tags.length) {
+      _lastUsedTagsCache = entry.tags.slice();
       renderLastUsedHint();
     }
   } catch (_) {}
@@ -364,6 +419,7 @@ function renderLastUsedHint() {
   const el = $id("tags-last-used");
   if (!el) return;
   if (!_lastUsedTagsCache.length || currentTags.length > 0) {
+    delete el.dataset.tags;
     el.classList.add("hidden");
     return;
   }
@@ -380,11 +436,16 @@ function renderLastUsedHint() {
   el.classList.remove("hidden");
 }
 
-function saveLastUsedTags(tags) {
+function saveLastUsedTags(tags, expectedAccount = "") {
   if (!Array.isArray(tags) || !tags.length) return;
+  const token = typeof settings === "object" && settings ? settings.pinboardToken : "";
+  if (expectedAccount && pbpPinboardAccountFromToken(token) !== expectedAccount) return;
   const snapshot = tags.slice();
+  const entry = pbpPopupTagCacheEnvelope(token, { tags: snapshot });
+  if (!entry) return;
+  const key = pbpAccountStorageKey("lastUsedTags", entry.account);
   _lastUsedTagsCache = snapshot;
-  try { chrome.storage.local.set({ lastUsedTags: snapshot }).catch(() => {}); } catch (_) {}
+  try { chrome.storage.local.set({ [key]: entry }).catch(() => {}); } catch (_) {}
 }
 
 function updateAc(items, input) {

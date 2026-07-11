@@ -1411,16 +1411,16 @@
     "message": "数据同步"
   },
   "optSyncEnabled": {
-    "message": "通过 Google 账户跨设备同步设置"
+    "message": "在此设备上通过 Chrome Sync 同步设置"
   },
   "optSyncHint": {
-    "message": "开启后，设置将在登录同一 Google 账户的所有 Chrome 之间同步。"
+    "message": "此开关仅对当前设备生效。需要使用 Google 账户中设置的设备必须分别开启。"
   },
   "syncApiKeysLabel": {
-    "message": "同时同步 API 密钥"
+    "message": "通过此 Google 账户同步凭据"
   },
   "syncApiKeysHint": {
-    "message": "开启后 API 密钥也会经由 Google 账户同步（仅做混淆存储，非加密）。默认关闭，密钥只留在本机；开启前请确认信任所有登录该账户的设备。"
+    "message": "这是一个账号级选项，但只有开启设置同步的设备才会参与；其他设备继续使用本地凭据。新用户默认关闭。若升级时 Chrome Sync 已有非空凭据，为避免数据丢失会保持开启。同步的 API 密钥、令牌、密码和导出凭据仅做混淆存储，并未加密。"
   },
   "qlPopularTitle": {
     "message": "热门"
@@ -1890,7 +1890,7 @@
     "message": "写入剪贴板失败——笔记未创建，请重试。"
   },
   "apiKeySecurityHint": {
-    "message": "API 密钥默认仅存储在本机。只有在您明确启用密钥同步后，它们才会通过 Chrome Sync 同步。密钥仅经过混淆处理，并未加密。"
+    "message": "新用户的凭据默认只保存在本机；旧云端凭据可能使账号级同步在升级后保持开启。只有开启设置同步的设备才会参与；同步凭据仅经过混淆处理，并未加密。"
   },
   "batchPermLabel": {
     "message": "旧版所有站点权限："

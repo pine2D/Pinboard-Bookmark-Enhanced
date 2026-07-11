@@ -304,6 +304,11 @@ function _ensurePurifyHook() {
         node.setAttribute("rel", "noopener noreferrer");
       }
     }
+    if (node.tagName === "IMG") {
+      node.removeAttribute("href"); // HTML parser can coerce a raw SVG <image> into IMG[href]
+      node.removeAttribute("xlink:href");
+      node.setAttribute("referrerpolicy", "no-referrer");
+    }
     // Any checkbox that survived the hook above must never be interactive.
     if (node.tagName === "INPUT") node.setAttribute("disabled", "");
     // D1-1: ADD_ATTR:["id"] exists only so heading slugs (TOC anchors) survive.
@@ -340,7 +345,12 @@ function renderMarkdown(md) {
   return DOMPurify.sanitize(rawHtml, {
     // Keep heading slug ids for TOC anchors; allow GFM task-list checkboxes.
     ADD_ATTR: ["id", "target", "rel"],
-    ADD_TAGS: ["input"]
+    ADD_TAGS: ["input"],
+    // Only ordinary IMG elements have an enforceable no-referrer policy here.
+    // Drop raw remote-capable media/SVG containers instead of allowing an
+    // undisclosed subresource request through <image>, poster, or <source>.
+    FORBID_TAGS: ["svg", "image", "video", "audio", "source", "track"],
+    FORBID_ATTR: ["style", "background", "poster"]
   });
 }
 

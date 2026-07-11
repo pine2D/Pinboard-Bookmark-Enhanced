@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Popup Tag Cache Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 900px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; }
+.fail { color: #c00; font-weight: bold; }
+</style></head>
+<body>
+<h1>Popup tag cache account isolation tests</h1>
+<div id="results"></div>
+<script>let settings = { pinboardToken: "alice:token" };</script>
+<script src="../shared.js"></script>
+<script src="../popup-tags.js"></script>
+<script>
+function test(name, fn) {
+  let ok = true;
+  let detail = "";
+  try { fn(); }
+  catch (error) { ok = false; detail = "\n  " + error.message; }
+  const row = document.createElement("div");
+  row.className = "case " + (ok ? "pass" : "fail");
+  row.textContent = `${ok ? "PASS" : "FAIL"} ${name}${detail}`;
+  document.getElementById("results").appendChild(row);
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message || "assertion failed");
+}
+
+test("same-account entry is accepted", () => {
+  const entry = { account: "alice", counts: { js: 2 }, timestamp: 1 };
+  assert(pbpPopupTagCacheEntry(entry, "alice:token") === entry);
+});
+
+test("different-account entry is rejected", () => {
+  const entry = { account: "alice", counts: { private: 1 }, timestamp: 1 };
+  assert(pbpPopupTagCacheEntry(entry, "bob:token") === null);
+});
+
+test("legacy user-tag entry without account is rejected", () => {
+  assert(pbpPopupTagCacheEntry({ counts: { old: 1 }, timestamp: 1 }, "alice:token") === null);
+});
+
+test("legacy last-used tag array is rejected", () => {
+  assert(pbpPopupTagCacheEntry(["old-tag"], "alice:token") === null);
+});
+
+test("malformed or missing token fails closed", () => {
+  const entry = { account: "alice", tags: ["one"] };
+  assert(pbpPopupTagCacheEntry(entry, "missing-separator") === null);
+  assert(pbpPopupTagCacheEnvelope("", { tags: ["one"] }) === null);
+});
+
+test("obfuscated current token resolves the same account", () => {
+  const entry = { account: "alice", data: [{ popular: ["js"] }] };
+  assert(pbpPopupTagCacheEntry(entry, obfuscateKey("alice:secret")) === entry);
+});
+
+test("cache envelope binds user tags and suggestions to token account", () => {
+  const counts = { js: 3 };
+  const data = [{ popular: ["js"] }];
+  const userTags = pbpPopupTagCacheEnvelope("alice:token", { counts, timestamp: 10 });
+  const suggest = pbpPopupTagCacheEnvelope("alice:token", { data, timestamp: 20 });
+  assert(userTags.account === "alice" && userTags.counts === counts && userTags.timestamp === 10);
+  assert(suggest.account === "alice" && suggest.data === data && suggest.timestamp === 20);
+});
+
+test("cache envelope binds last-used tags and cannot be account-spoofed", () => {
+  const entry = pbpPopupTagCacheEnvelope("alice:token", { account: "mallory", tags: ["one", "two"] });
+  assert(entry.account === "alice");
+  assert(entry.tags.join(" ") === "one two");
+});
+
+test("in-memory result guard follows the live popup account", () => {
+  settings.pinboardToken = "alice:new-token";
+  assert(pbpPopupTagAccountIsCurrent("alice"));
+  settings.pinboardToken = "bob:token";
+  assert(!pbpPopupTagAccountIsCurrent("alice"));
+  assert(pbpPopupTagAccountIsCurrent("bob"));
+});
+</script>
+</body></html>

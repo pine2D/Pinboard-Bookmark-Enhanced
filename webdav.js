@@ -162,9 +162,7 @@ async function pbpWebdavProbeWritable(cfg) {
 // doesn't hand in a live-DOM override). webdavPass is deobfuscated here so
 // callers never see the obf: wrapper.
 async function _pbpWebdavCfg() {
-  const storage = await getSettingsStorage();
-  let s = await storage.get({ webdavUrl: "", webdavUser: "", webdavPass: "" });
-  s = await pbpApplySecretOverlay(s); // MUST run before deobfuscateKey (shared.js convention)
+  const s = await pbpReadSettingsWithSecrets({ webdavUrl: "", webdavUser: "", webdavPass: "" });
   return { baseUrl: s.webdavUrl || "", user: s.webdavUser || "", pass: deobfuscateKey(s.webdavPass || "") };
 }
 
@@ -201,9 +199,7 @@ async function pbpWebdavPush(cfgOverride) {
       await chrome.storage.local.set({ webdavLastPush: result });
       return result;
     }
-    const storage = await getSettingsStorage();
-    let settings = await storage.get(SETTINGS_DEFAULTS);
-    settings = await pbpApplySecretOverlay(settings);
+    const settings = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
     deobfuscateSettings(settings);
     if (Object.prototype.hasOwnProperty.call(cfg, "includeHighlights")) {
       settings.backupIncludeHighlights = cfg.includeHighlights !== false;

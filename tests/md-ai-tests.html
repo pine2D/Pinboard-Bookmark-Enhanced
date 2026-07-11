@@ -947,13 +947,23 @@ suite("pbpAiAvailable / pbpAiResolveModelOverride", () => {
 
 // ============ Task 6: IDB key conventions + ask-history cap ============
 suite("md-ai IDB key conventions", () => {
-  test("tr_ key = tr_<lang>_<model>_<urlHash>", () => {
-    const k = _pbpTrCacheKey("https://a.test/x", "zh-CN", "gemini-2.5-flash-lite");
-    assert(k === "tr_zh-CN_gemini-2.5-flash-lite_" + pbpAiHash("https://a.test/x"), "got: " + k);
+  test("tr_ key includes the account owner namespace", () => {
+    const k = _pbpTrCacheKey("https://a.test/x", "zh-CN", "gemini-2.5-flash-lite", "alice");
+    assert(k === "tr_acct_alice_zh-CN_gemini-2.5-flash-lite_" + pbpAiHash("https://a.test/x"), "got: " + k);
   });
-  test("ask_/trview_ keys hash the url", () => {
+  test("ask_ stays URL-scoped while trview_ includes the owner namespace", () => {
     assert(_pbpAskHistKey("https://a.test/x") === "ask_" + pbpAiHash("https://a.test/x"), "ask key");
-    assert(_pbpTrViewKey("https://a.test/x") === "trview_" + pbpAiHash("https://a.test/x"), "trview key");
+    assert(_pbpTrViewKey("https://a.test/x", "alice") === "trview_acct_alice_" + pbpAiHash("https://a.test/x"), "trview key");
+    assert(_pbpTrViewKey("https://a.test/x", "") === "trview_ownerless_" + pbpAiHash("https://a.test/x"), "ownerless trview key");
+    assert(_pbpTrGlossaryCacheKey("https://a.test/x", "zh-CN", "gemini", "alice") === "gloss_acct_alice_zh-CN_gemini_" + pbpAiHash("https://a.test/x"), "glossary key");
+  });
+  test("translate state passes immutable owner to summary and translation caches", () => {
+    const init = pbpTrInit.toString();
+    const start = _pbpTrStart.toString();
+    assert(init.includes('account: String((detail && detail.account) || "")'), "render detail owner not captured");
+    assert(start.includes('getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account)'), "summary context owner missing");
+    assert(start.includes("pbpTrCacheSet(st.url, st.target.code, st.modelKey, newly, st.account)"), "translation write owner missing");
+    assert(_pbpTrEnsureGlossary.toString().includes("pbpTrGlossaryCacheGet(st.url, st.target.code, st.modelKey, st.account)"), "glossary owner missing");
   });
   test("ask history trimmed to last 20, oldest dropped", () => {
     const arr = [];
@@ -1040,6 +1050,34 @@ suite("md-ai IDB key conventions", () => {
     assertEq(hist.length, 3, "mismatched last appends instead");
     assertEq(hist[2].q, "q3", "new round appended");
   });
+  await atest("translation, glossary, and view caches isolate A, B, ownerless, and legacy namespaces", async () => {
+    const url = "https://translate-scope.example/" + Date.now() + "_" + Math.random();
+    const lang = "zh-CN", model = "gemini:test", hash = pbpAiHash(url);
+    await pbpAiCacheSet("tr_" + lang + "_" + model + "_" + hash, { blocks: { legacy: "old" } }, Date.now());
+    await pbpAiCacheSet("gloss_" + lang + "_" + model + "_" + hash, { terms: { legacy: "old" } }, Date.now());
+    await pbpAiCacheSet("trview_" + hash, { mode: "translated", lang }, Date.now());
+    assertEq(await pbpTrCacheGet(url, lang, model, ""), null, "ownerless must miss legacy translation");
+    assertEq(await pbpTrGlossaryCacheGet(url, lang, model, ""), null, "ownerless must miss legacy glossary");
+    assertEq(await pbpTrViewGet(url, ""), null, "ownerless must miss legacy view");
+
+    await pbpTrCacheSet(url, lang, model, { a: "Alice" }, "alice");
+    assertEq(await pbpTrCacheGet(url, lang, model, "bob"), null, "Bob translation miss");
+    assertEq((await pbpTrCacheGet(url, lang, model, "alice")).blocks.a, "Alice", "Alice translation hit");
+    await pbpTrCacheSet(url, lang, model, { o: "Ownerless" }, "");
+    assertEq((await pbpTrCacheGet(url, lang, model, "")).blocks.o, "Ownerless", "ownerless new namespace hit");
+
+    await pbpTrGlossaryCacheSet(url, lang, model, { term: "Alice" }, "alice");
+    assertEq(await pbpTrGlossaryCacheGet(url, lang, model, "bob"), null, "Bob glossary miss");
+    assertEq((await pbpTrGlossaryCacheGet(url, lang, model, "alice")).term, "Alice", "Alice glossary hit");
+    await pbpTrGlossaryCacheSet(url, lang, model, { term: "Ownerless" }, "");
+    assertEq((await pbpTrGlossaryCacheGet(url, lang, model, "")).term, "Ownerless", "ownerless new glossary hit");
+
+    await pbpTrViewSet(url, { mode: "bilingual", lang }, "alice");
+    assertEq(await pbpTrViewGet(url, "bob"), null, "Bob view miss");
+    assertEq((await pbpTrViewGet(url, "alice")).mode, "bilingual", "Alice view hit");
+    await pbpTrViewSet(url, { mode: "translated", lang }, "");
+    assertEq((await pbpTrViewGet(url, "")).mode, "translated", "ownerless new view hit");
+  });
 })();
 </script>
 
@@ -1065,23 +1103,20 @@ suite("md-ai IDB key conventions", () => {
     div.textContent = "SKIP _pbpExplainPersistTrigger (not loaded)";
     host.appendChild(div); SKIP++; return;
   }
-  await atest("resolves even when storage .set rejects (sync quota)", async () => {
-    const prev = window.pbpSettingsArea;
+  await atest("resolves even when persistSettings reports a sync quota failure", async () => {
+    const prev = window.persistSettings;
     let calledWith = null;
-    window.pbpSettingsArea = { set(o) { calledWith = o; return Promise.reject(new Error("quota exceeded")); } };
-    // Reset memo so pbpAiSettingsArea() picks up our stub (plain <script>, no module boundary)
-    if (typeof _pbpAiAreaPromise !== "undefined") _pbpAiAreaPromise = null;
+    window.persistSettings = async (o) => { calledWith = o; return { ok: false, error: new Error("quota exceeded") }; };
     try { await _pbpExplainPersistTrigger("hotkey"); }
-    finally { window.pbpSettingsArea = prev; _pbpAiAreaPromise = null; }
+    finally { window.persistSettings = prev; }
     assert(calledWith && calledWith.selectionTrigger === "hotkey", "wrote selectionTrigger");
   });
-  await atest("resolves and writes value on healthy area", async () => {
-    const prev = window.pbpSettingsArea;
+  await atest("resolves and writes value through healthy persistSettings", async () => {
+    const prev = window.persistSettings;
     let calledWith = null;
-    window.pbpSettingsArea = { set(o) { calledWith = o; return Promise.resolve(); } };
-    if (typeof _pbpAiAreaPromise !== "undefined") _pbpAiAreaPromise = null;
+    window.persistSettings = async (o) => { calledWith = o; return { ok: true }; };
     try { await _pbpExplainPersistTrigger("off"); }
-    finally { window.pbpSettingsArea = prev; _pbpAiAreaPromise = null; }
+    finally { window.persistSettings = prev; }
     assert(calledWith.selectionTrigger === "off", "value persisted");
   });
 })();

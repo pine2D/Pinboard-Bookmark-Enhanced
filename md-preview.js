@@ -482,6 +482,7 @@ function pbpApplyColorScheme(mode) {
   const { contentHtml, title, url, tokens, source } = info;
   const srcTabId = info.tabId;
   const baseUrl = info.baseUrl || url || "";
+  const previewAccount = typeof info.account === "string" ? info.account : "";
   const tags = Array.isArray(info.tags) ? info.tags : [];
   const description = info.description || "";
   // X4: raw metadata transported by popup.js/background.js's widened
@@ -577,7 +578,8 @@ function pbpApplyColorScheme(mode) {
       let pr;
       try {
         pr = await chrome.runtime.sendMessage({
-          type: "reextractMarkdown", tabId: srcTabId, url, engine, tags, description: "", k
+          type: "reextractMarkdown", tabId: srcTabId, url, engine,
+          account: previewAccount, tags, description, k
         });
       } catch (_) { pr = { ok: false, error: "network" }; }
       inFlight = false;
@@ -618,7 +620,11 @@ function pbpApplyColorScheme(mode) {
   // degrades to the pre-existing behavior (empty state on the next reload).
   try {
     await chrome.storage.local.set({
-      [MP_KEY]: { restore: true, url, tabId: srcTabId, engine: source === "jina" ? "jina" : "local", tags, ts: Date.now() }
+      [MP_KEY]: {
+        restore: true, url, tabId: srcTabId,
+        engine: source === "jina" ? "jina" : "local",
+        account: previewAccount, tags, description, ts: Date.now()
+      }
     });
   } catch (_) { /* degrade to current behavior: next reload hits the empty state */ }
 
@@ -645,13 +651,9 @@ function pbpApplyColorScheme(mode) {
   // extraction above already succeeded and there's real content ready to render.
   let exportSettings = EXPORT_SETTINGS_DEFAULTS;
   try {
-    const { optSyncEnabled } = await chrome.storage.local.get({ optSyncEnabled: false });
-    const settingsArea = optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
-    window.pbpSettingsArea = settingsArea;
-    exportSettings = await settingsArea.get(EXPORT_SETTINGS_DEFAULTS);
-    exportSettings = await pbpApplySecretOverlay(exportSettings); // shared.js IS loaded here -- see html script tags
+    exportSettings = await pbpReadSettingsWithSecrets(EXPORT_SETTINGS_DEFAULTS);
   } catch (_) {
-    window.pbpSettingsArea = chrome.storage.local; // degrade: default area + defaults
+    // degrade to defaults; article rendering remains usable
   }
   const expFrontmatter = document.getElementById("exp-frontmatter");
   const expImagePolicy = document.getElementById("exp-image-policy");
@@ -751,9 +753,11 @@ function pbpApplyColorScheme(mode) {
   // path (offline/no token/exception) resolves to {bookmarked:false} in the
   // handler, so renderBookmarkBadge's model.show stays false and nothing
   // renders — no console noise, no visible error state.
-  if (url) {
-    chrome.runtime.sendMessage({ type: "mdPreviewBookmarkInfo", url })
-      .then((resp) => renderBookmarkBadge(resp, url))
+  if (url && previewAccount) {
+    chrome.runtime.sendMessage({ type: "mdPreviewBookmarkInfo", url, account: previewAccount })
+      .then((resp) => {
+        if (resp?.account === previewAccount) renderBookmarkBadge(resp, url);
+      })
       .catch(() => {});
   }
 
@@ -792,7 +796,7 @@ function pbpApplyColorScheme(mode) {
           r = await chrome.runtime.sendMessage({
             type: "reextractMarkdown",
             tabId: srcTabId, url: srcUrlForSwitch, engine: e,
-            tags, description, k
+            account: previewAccount, tags, description, k
           });
         } catch (_) { r = { ok: false, error: "network" }; }
         if (r && r.ok) { location.reload(); return; }
@@ -944,7 +948,7 @@ function pbpApplyColorScheme(mode) {
   // the cache-key source for tr_/ask_/trview_ entries (md_preview_data is
   // already removed from storage at this point; the page holds the markdown
   // in closure and md-ai reads text via the DOM blocks).
-  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title } }));
+  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, account: previewAccount } }));
 
   // Raw view populated lazily on first switch
 
@@ -1205,8 +1209,7 @@ function pbpApplyColorScheme(mode) {
     // Re-read the send-related settings fresh so an options change (fixed token,
     // enabled/disabled target, changed vault/folder) is reflected WITHOUT reopening the preview.
     try {
-      let _fresh = await settingsArea.get({ exportTargets: {}, obsidianEnabled: false, obsidianVault: "", obsidianFolder: "" });
-      _fresh = await pbpApplySecretOverlay(_fresh);
+      const _fresh = await pbpReadSettingsWithSecrets({ exportTargets: {}, obsidianEnabled: false, obsidianVault: "", obsidianFolder: "" });
       Object.assign(exportSettings, _fresh);
     } catch (_) {}
 
@@ -1418,7 +1421,7 @@ function pbpApplyColorScheme(mode) {
 
   await setupSendMenu();
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.exportTargets || changes.obsidianEnabled || changes.obsidianVault || changes.obsidianFolder) {
+    if (changes.syncApiKeys || changes.exportTargets || changes.obsidianEnabled || changes.obsidianVault || changes.obsidianFolder) {
       setupSendMenu();
     }
   });

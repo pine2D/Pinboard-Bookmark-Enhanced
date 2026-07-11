@@ -614,6 +614,7 @@ async function pbpTrInit(detail) {
     s,
     url: String((detail && detail.url) || ""),
     title: String((detail && detail.title) || ""),
+    account: String((detail && detail.account) || ""),
     target,
     modelKey: (s.aiProvider || "gemini") + ":" + (pbpAiResolveModelOverride(s) || "default"),
     work: [],                      // non-pre blocks: {n, md, hash, shielded:{text,slots}}
@@ -726,7 +727,7 @@ function _pbpTrBuildWork(st, cand) {
 // view; partial hit -> fill what we have, button says Continue. Runs after st.work built.
 async function _pbpTrProbeCache(st) {
   try {
-    const cached = await pbpTrCacheGet(st.url, st.target.code, st.modelKey);
+    const cached = await pbpTrCacheGet(st.url, st.target.code, st.modelKey, st.account);
     if (cached) {
       let hits = 0;
       for (const w of st.work) {
@@ -736,7 +737,7 @@ async function _pbpTrProbeCache(st) {
       if (hits === st.work.length) {
         _pbpTrSetStatus(st, "done");
         _pbpTrShowViewToggle(st);
-        const v = await pbpTrViewGet(st.url);
+        const v = await pbpTrViewGet(st.url, st.account);
         if (v && v.lang === st.target.code && (v.mode === "bilingual" || v.mode === "translated")) {
           _pbpTrSetMode(st, v.mode, false);
           if (st.railHandle) st.railHandle.expand(true); // restored to bilingual/translated -> auto-expand (temp)
@@ -1056,10 +1057,10 @@ async function _pbpTrEnsureGlossary(st) {
   if (!_pbpTrGlossaryWorthIt(st)) { st.glossary = pbpTrMergeGlossary(Object.create(null), user); return st.glossary; }
   let auto = null;
   try {
-    auto = await pbpTrGlossaryCacheGet(st.url, st.target.code, st.modelKey);
+    auto = await pbpTrGlossaryCacheGet(st.url, st.target.code, st.modelKey, st.account);
     if (!auto) {
       auto = await _pbpTrExtractGlossary(st);
-      if (auto) { try { await pbpTrGlossaryCacheSet(st.url, st.target.code, st.modelKey, auto); } catch (_) {} }
+      if (auto) { try { await pbpTrGlossaryCacheSet(st.url, st.target.code, st.modelKey, auto, st.account); } catch (_) {} }
     }
   } catch (_) { auto = null; }
   st.glossary = pbpTrMergeGlossary(auto || Object.create(null), user);
@@ -1101,7 +1102,7 @@ async function _pbpTrStart(st) {
   try {
     const activeSeg = document.querySelector("#source-badge .src-seg.active");
     const source = (activeSeg && activeSeg.getAttribute("data-engine") === "jina") ? "jina" : "local";
-    summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source)) || "";
+    summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account)) || "";
   } catch (_) {}
   const prog0 = document.getElementById("tr-progress");
   if (prog0) prog0.textContent = t("trExtracting");
@@ -1217,7 +1218,7 @@ async function _pbpTrStart(st) {
     }
   });
   if (Object.keys(newly).length) {
-    try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, newly); } catch (_) {}
+    try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, newly, st.account); } catch (_) {}
   }
   if (queueResult.permissionError) {
     st.running = false;
@@ -1251,7 +1252,7 @@ async function _pbpTrStart(st) {
   // start of the run; persist the FINAL mode (unless the user switched back to
   // Original mid-run, in which case there is nothing translated to remember).
   if (st.mode !== "original") {
-    pbpTrViewSet(st.url, { mode: st.mode, lang: st.target.code }).catch(() => {});
+    pbpTrViewSet(st.url, { mode: st.mode, lang: st.target.code }, st.account).catch(() => {});
   }
 }
 
@@ -1453,7 +1454,7 @@ async function _pbpTrRetryBlock(st, w, btn) {
     _pbpTrSyncRetryAll();
     const one = {};
     one[w.hash] = got;
-    try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, one); } catch (_) {}
+    try { await pbpTrCacheSet(st.url, st.target.code, st.modelKey, one, st.account); } catch (_) {}
     _pbpTrShowViewToggle(st);
     if (st.work.every((x) => x.n in st.trMd)) _pbpTrSetStatus(st, "done");
   } catch (e) {
@@ -1629,7 +1630,7 @@ function _pbpTrSetMode(st, mode, persist) {
       return { orig, tr: (tr && tr !== orig) ? tr : null };
     }));
   };
-  if (persist) pbpTrViewSet(st.url, { mode, lang: st.target.code }).catch(() => {});
+  if (persist) pbpTrViewSet(st.url, { mode, lang: st.target.code }, st.account).catch(() => {});
 }
 
 // TOC text swap (spec 4.4: translated-only view follows translated heading
