@@ -7,7 +7,7 @@ usage() {
     "" \
     "Options:" \
     "  --build-only    Build and smoke-test the ZIP without publishing or syncing" \
-    "  --overwrite     Replace a local ZIP or release asset only; tags stay immutable" \
+    "  --overwrite     Rebuild a local ZIP or resume an exact-HEAD draft; published releases stay immutable" \
     "  --docs-ok       Skip the docs freshness gate" \
     "  --skip-smoke    Skip ZIP install smoke (release-script debugging only)" \
     "  --no-overwrite  Deprecated no-op; immutable-by-default is now enforced" \
@@ -42,10 +42,10 @@ while [ "$#" -gt 0 ]; do
 done
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
-MANIFEST="${REPO_ROOT}/manifest.json"
 RELEASE_DIR="${REPO_ROOT}/release"
 
-VERSION=$(python3 -c "import json; print(json.load(open('${MANIFEST}'))['version'])")
+HEAD_SHA=$(git rev-parse HEAD)
+VERSION=$(git show "${HEAD_SHA}:manifest.json" | python3 -c 'import json, sys; print(json.load(sys.stdin)["version"])')
 TAG="v${VERSION}"
 ZIP_NAME="pinboard-bookmark-enhanced-v${VERSION}.zip"
 ZIP_PATH="${RELEASE_DIR}/${ZIP_NAME}"
@@ -60,13 +60,16 @@ echo ""
 # ---- Step 0: Publish preflight ----
 # Build-only deliberately skips this entire networked section.
 
-HEAD_SHA=$(git rev-parse HEAD)
 REPO_FULL=""
 LOCAL_TAG_EXISTS=0
 LOCAL_TAG_SHA=""
 REMOTE_TAG_EXISTS=0
 REMOTE_TAG_SHA=""
 RELEASE_EXISTS=0
+RELEASE_STATE=""
+RELEASE_TARGET=""
+RELEASE_ID=""
+PREV_TAG=""
 
 remote_tag_commit() {
   local refs
@@ -81,6 +84,47 @@ remote_tag_commit() {
     $2 !~ /\^\{\}$/ { direct = $1 }
     END { print peeled ? peeled : direct }
   '
+}
+
+version_gt() {
+  python3 - "$1" "$2" <<'PYEOF'
+import re, sys
+
+def parse(value):
+    if not re.fullmatch(r'\d+(?:\.\d+){1,3}', value):
+        raise ValueError(value)
+    parts = [int(part) for part in value.split('.')]
+    return tuple(parts + [0] * (4 - len(parts)))
+
+try:
+    current, previous = parse(sys.argv[1]), parse(sys.argv[2])
+except ValueError as exc:
+    print(f"invalid numeric release version: {exc.args[0]}", file=sys.stderr)
+    sys.exit(2)
+sys.exit(0 if current > previous else 1)
+PYEOF
+}
+
+refresh_release() {
+  local lookup matches
+  if ! lookup=$(gh api --paginate "repos/${REPO_FULL}/releases?per_page=100" \
+    --jq ".[] | select(.tag_name == \"${TAG}\") | [(if .draft then \"draft\" elif .prerelease then \"prerelease\" else \"published\" end), (.target_commitish // \"\"), (.id | tostring)] | @tsv"); then
+    return 2
+  fi
+  if [ -z "${lookup}" ]; then
+    RELEASE_EXISTS=0
+    RELEASE_STATE=""
+    RELEASE_TARGET=""
+    RELEASE_ID=""
+    return 1
+  fi
+  matches=$(printf '%s\n' "${lookup}" | awk 'NF { count++ } END { print count + 0 }')
+  if [ "${matches}" -ne 1 ]; then
+    return 2
+  fi
+  RELEASE_EXISTS=1
+  IFS=$'\t' read -r RELEASE_STATE RELEASE_TARGET RELEASE_ID <<< "${lookup}"
+  return 0
 }
 
 if [ "${BUILD_ONLY}" -eq 0 ]; then
@@ -123,6 +167,54 @@ if [ "${BUILD_ONLY}" -eq 0 ]; then
     exit 1
   fi
 
+  if ! PREV_TAG=$(gh release list \
+    --repo "${REPO_FULL}" \
+    --exclude-drafts \
+    --exclude-pre-releases \
+    --limit 100 \
+    --json tagName \
+    --jq "[.[] | select(.tagName != \"${TAG}\")][0].tagName // \"\""); then
+    echo "  ABORT: could not resolve the latest formal GitHub Release." >&2
+    exit 1
+  fi
+  if [ -n "${PREV_TAG}" ]; then
+    if ! git fetch --tags --quiet origin; then
+      echo "  ABORT: could not refresh release tags." >&2
+      exit 1
+    fi
+    if ! git rev-parse -q --verify "${PREV_TAG}^{commit}" >/dev/null 2>&1; then
+      echo "  ABORT: formal Release tag ${PREV_TAG} is not resolvable locally." >&2
+      exit 1
+    fi
+    if ! git merge-base --is-ancestor "${PREV_TAG}^{commit}" "${HEAD_SHA}"; then
+      echo "  ABORT: formal Release tag ${PREV_TAG} is not an ancestor of HEAD." >&2
+      exit 1
+    fi
+    if ! version_gt "${VERSION}" "${PREV_TAG#v}"; then
+      echo "  ABORT: manifest version ${VERSION} must be greater than formal Release ${PREV_TAG}." >&2
+      exit 1
+    fi
+  fi
+
+  if ! CI_RUN=$(gh run list \
+    --repo "${REPO_FULL}" \
+    --workflow "CI" \
+    --commit "${HEAD_SHA}" \
+    --limit 1 \
+    --json databaseId,headSha,status,conclusion \
+    --jq 'if length == 0 then "" else [.[0].headSha, .[0].status, (.[0].conclusion // ""), (.[0].databaseId | tostring)] | @tsv end'); then
+    echo "  ABORT: could not verify CI for ${HEAD_SHA}." >&2
+    exit 1
+  fi
+  IFS=$'\t' read -r CI_SHA CI_STATUS CI_CONCLUSION CI_ID <<< "${CI_RUN}"
+  if [ -z "${CI_SHA:-}" ] || [ "${CI_SHA}" != "${HEAD_SHA}" ] \
+    || [ "${CI_STATUS:-}" != "completed" ] || [ "${CI_CONCLUSION:-}" != "success" ]; then
+    echo "  ABORT: exact HEAD must have a completed, successful CI workflow." >&2
+    echo "         HEAD: ${HEAD_SHA}; run: ${CI_ID:-<none>}; status: ${CI_STATUS:-<none>}; conclusion: ${CI_CONCLUSION:-<none>}" >&2
+    exit 1
+  fi
+  echo "  CI gate OK (run ${CI_ID}, ${HEAD_SHA})"
+
   if git show-ref --verify --quiet "refs/tags/${TAG}"; then
     LOCAL_TAG_EXISTS=1
     LOCAL_TAG_SHA=$(git rev-parse "${TAG}^{commit}")
@@ -139,40 +231,51 @@ if [ "${BUILD_ONLY}" -eq 0 ]; then
     REMOTE_TAG_SHA=""
   fi
 
-  if RELEASE_STATE=$(gh api "repos/${REPO_FULL}/releases/tags/${TAG}" \
-    --jq 'if .draft then "draft" elif .prerelease then "prerelease" else "published" end' 2>&1); then
-    RELEASE_EXISTS=1
-    if [ "${RELEASE_STATE}" != "published" ]; then
-      echo "  ABORT: Release ${TAG} is ${RELEASE_STATE}; draft/prerelease overwrite is not supported." >&2
+  if refresh_release; then
+    if [ "${RELEASE_STATE}" = "prerelease" ]; then
+      echo "  ABORT: Release ${TAG} is a prerelease; conversion/overwrite is not supported." >&2
       exit 1
     fi
-  elif ! printf '%s\n' "${RELEASE_STATE}" | grep -q 'HTTP 404'; then
-    echo "  ABORT: could not verify GitHub Release ${TAG}." >&2
-    printf '%s\n' "${RELEASE_STATE}" >&2
-    exit 1
+  else
+    RELEASE_LOOKUP_STATUS=$?
+    if [ "${RELEASE_LOOKUP_STATUS}" -eq 2 ]; then
+      echo "  ABORT: could not verify GitHub Release ${TAG}." >&2
+      exit 1
+    fi
   fi
 
-  if [ "${LOCAL_TAG_EXISTS}" -eq 1 ] || [ "${REMOTE_TAG_EXISTS}" -eq 1 ] || [ "${RELEASE_EXISTS}" -eq 1 ]; then
-    if [ "${OVERWRITE}" -eq 0 ]; then
-      echo "  ABORT: ${TAG} already exists as a local tag, remote tag, or GitHub Release." >&2
-      echo "         Bump the version, or use --overwrite only to replace same-commit assets." >&2
-      exit 1
-    fi
-    if [ "${LOCAL_TAG_EXISTS}" -eq 1 ] && [ "${LOCAL_TAG_SHA}" != "${HEAD_SHA}" ]; then
-      echo "  ABORT: local tag ${TAG} points to ${LOCAL_TAG_SHA}, not HEAD ${HEAD_SHA}." >&2
-      echo "         Tags are immutable; bump the version." >&2
-      exit 1
-    fi
-    if [ "${REMOTE_TAG_EXISTS}" -eq 1 ] && [ "${REMOTE_TAG_SHA}" != "${HEAD_SHA}" ]; then
-      echo "  ABORT: remote tag ${TAG} points to ${REMOTE_TAG_SHA}, not HEAD ${HEAD_SHA}." >&2
-      echo "         Tags are immutable; bump the version." >&2
-      exit 1
-    fi
-    if [ "${RELEASE_EXISTS}" -eq 1 ] && [ "${REMOTE_TAG_EXISTS}" -eq 0 ]; then
-      echo "  ABORT: Release ${TAG} has no verifiable remote tag." >&2
-      echo "         Refusing to overwrite an ambiguous release." >&2
-      exit 1
-    fi
+  if [ "${LOCAL_TAG_EXISTS}" -eq 1 ] && [ "${LOCAL_TAG_SHA}" != "${HEAD_SHA}" ]; then
+    echo "  ABORT: local tag ${TAG} points to ${LOCAL_TAG_SHA}, not HEAD ${HEAD_SHA}." >&2
+    echo "         Tags are immutable; bump the version." >&2
+    exit 1
+  fi
+  if [ "${REMOTE_TAG_EXISTS}" -eq 1 ] && [ "${REMOTE_TAG_SHA}" != "${HEAD_SHA}" ]; then
+    echo "  ABORT: remote tag ${TAG} points to ${REMOTE_TAG_SHA}, not HEAD ${HEAD_SHA}." >&2
+    echo "         Tags are immutable; bump the version." >&2
+    exit 1
+  fi
+  if [ "${RELEASE_EXISTS}" -eq 1 ] && [ "${RELEASE_STATE}" = "draft" ] \
+    && [ "${REMOTE_TAG_EXISTS}" -eq 0 ] \
+    && [ "${RELEASE_TARGET}" != "${HEAD_SHA}" ]; then
+    echo "  ABORT: draft Release ${TAG} targets ${RELEASE_TARGET:-<none>}, not exact HEAD ${HEAD_SHA}." >&2
+    exit 1
+  fi
+  if [ "${RELEASE_EXISTS}" -eq 1 ] && [ "${RELEASE_STATE}" = "published" ] \
+    && [ "${REMOTE_TAG_EXISTS}" -eq 0 ]; then
+    echo "  ABORT: published Release ${TAG} has no verifiable remote tag." >&2
+    exit 1
+  fi
+  if [ "${RELEASE_EXISTS}" -eq 1 ] && [ "${RELEASE_STATE}" = "published" ]; then
+    echo "  ABORT: published Release ${TAG} is immutable; bump the version." >&2
+    exit 1
+  fi
+  if [ "${RELEASE_EXISTS}" -eq 1 ] && [ "${OVERWRITE}" -eq 0 ]; then
+    echo "  ABORT: ${TAG} already exists as an exact-HEAD draft Release." >&2
+    echo "         Use --overwrite to resume that verified draft." >&2
+    exit 1
+  fi
+  if [ "${REMOTE_TAG_EXISTS}" -eq 1 ] && [ "${RELEASE_EXISTS}" -eq 0 ]; then
+    echo "  Recovering ${TAG} from its verified same-commit remote tag."
   fi
 fi
 
@@ -187,19 +290,12 @@ if [ "${BUILD_ONLY}" -eq 1 ]; then
 elif [ "${DOCS_OK}" -eq 1 ]; then
   echo "  --docs-ok: skipping docs freshness gate"
 else
-  # gh release create tags the REMOTE only -- sync local tags first or this
-  # gate (and the changelog's PREV_TAG below) would measure from a stale tag.
-  if ! git fetch --tags --quiet origin; then
-    echo "  ABORT: could not refresh release tags for the docs gate." >&2
-    exit 1
-  fi
-  DOCS_PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1) || true
-  if [ -n "${DOCS_PREV_TAG}" ]; then
-    FEAT_COUNT=$(git log "${DOCS_PREV_TAG}..HEAD" --pretty=format:%s --no-merges | grep -c "^feat" || true)
-    DOCS_TOUCHED=$(git diff --name-only "${DOCS_PREV_TAG}..HEAD" -- README.md CLAUDE.md docs/privacy.md | wc -l)
+  if [ -n "${PREV_TAG}" ]; then
+    FEAT_COUNT=$(git log "${PREV_TAG}..${HEAD_SHA}" --pretty=format:%s --no-merges | grep -c "^feat" || true)
+    DOCS_TOUCHED=$(git diff --name-only "${PREV_TAG}..${HEAD_SHA}" -- README.md CLAUDE.md docs/privacy.md | wc -l)
     if [ "${FEAT_COUNT}" -gt 0 ] && [ "${DOCS_TOUCHED}" -eq 0 ]; then
       echo "  ABORT: docs freshness gate."
-      echo "  ${FEAT_COUNT} feat commit(s) since ${DOCS_PREV_TAG}, but README.md, CLAUDE.md and"
+      echo "  ${FEAT_COUNT} feat commit(s) since ${PREV_TAG}, but README.md, CLAUDE.md and"
       echo "  docs/privacy.md are all untouched in that range. Update user-facing docs"
       echo "  (README x9 locales / CLAUDE.md / privacy policy for new data flows),"
       echo "  or re-run with --docs-ok if they are genuinely current."
@@ -241,11 +337,12 @@ if [ -f "${ZIP_PATH}" ]; then
 fi
 
 cd "${REPO_ROOT}"
-python3 - "${ZIP_PATH}" "${VERSION}" <<'PYEOF'
-import sys, zipfile, pathlib, fnmatch, re, json
+python3 - "${ZIP_PATH}" "${VERSION}" "${HEAD_SHA}" <<'PYEOF'
+import fnmatch, json, pathlib, posixpath, re, subprocess, sys, zipfile
 
 zip_path = sys.argv[1]
 version  = sys.argv[2]
+snapshot = sys.argv[3]
 prefix   = f"pinboard-bookmark-enhanced-v{version}/"
 
 REPO = pathlib.Path('.')
@@ -270,53 +367,131 @@ def included_at_root(name: str) -> bool:
             return False
     return any(fnmatch.fnmatch(name, pat) for pat in TOP_LEVEL_PATTERNS)
 
-included = []
+def selected(path: str) -> bool:
+    parts = path.split('/')
+    return included_at_root(path) if len(parts) == 1 else parts[0] in INCLUDE_DIRS
+
+tree = subprocess.run(
+    ['git', 'ls-tree', '-r', '-z', snapshot],
+    check=True, capture_output=True,
+).stdout
+tracked = {}
+unsafe = []
+for record in tree.split(b'\0'):
+    if not record:
+        continue
+    metadata, raw_path = record.split(b'\t', 1)
+    mode, object_type, oid = metadata.decode('ascii').split()
+    path = raw_path.decode('utf-8')
+    if not selected(path):
+        continue
+    if object_type != 'blob' or mode == '120000':
+        unsafe.append(path)
+        continue
+    tracked[path] = (mode, oid)
+
+# Refuse ignored/untracked candidates instead of silently packaging machine-local files.
+worktree_candidates = set()
+for entry in REPO.iterdir():
+    if (entry.is_file() or entry.is_symlink()) and included_at_root(entry.name):
+        worktree_candidates.add(entry.name)
+for directory in INCLUDE_DIRS:
+    root = REPO / directory
+    if not root.exists():
+        continue
+    for entry in root.rglob('*'):
+        if entry.is_file() or entry.is_symlink():
+            worktree_candidates.add(entry.relative_to(REPO).as_posix())
+
+extras = sorted(worktree_candidates - set(tracked))
+if unsafe or extras:
+    print(f'  ERROR: release inputs must be regular files tracked by {snapshot}:', file=sys.stderr)
+    for path in sorted(unsafe + extras):
+        print(f'    - {path}', file=sys.stderr)
+    sys.exit(1)
+
+included = sorted(tracked)
+contents = {}
 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-    # Top-level files
-    for entry in sorted(REPO.iterdir()):
-        if entry.is_file() and included_at_root(entry.name):
-            zf.write(entry, prefix + entry.name)
-            included.append(entry.name)
-    # Recursive directories
-    for d in INCLUDE_DIRS:
-        p = REPO / d
-        if not p.exists():
-            print(f"  Warning: dir {d}/ not found, skipping")
-            continue
-        for f in sorted(p.rglob('*')):
-            if f.is_file() and '.DS_Store' not in f.name:
-                rel = str(f.relative_to(REPO))
-                zf.write(f, prefix + rel)
-                included.append(rel)
+    for path in included:
+        mode, oid = tracked[path]
+        data = subprocess.run(
+            ['git', 'cat-file', 'blob', oid],
+            check=True, capture_output=True,
+        ).stdout
+        contents[path] = data
+        info = zipfile.ZipInfo(prefix + path, date_time=(1980, 1, 1, 0, 0, 0))
+        info.create_system = 3
+        info.compress_type = zipfile.ZIP_DEFLATED
+        permissions = 0o755 if mode == '100755' else 0o644
+        info.external_attr = (0o100000 | permissions) << 16
+        zf.writestr(info, data)
 
 # Sanity check: every file referenced by manifest + included HTML must be present
-referenced = set()
-manifest = json.load(open('manifest.json'))
+referenced = {'md-preview.html', 'site-rules.js', 'vendor/defuddle.js'}
+manifest = json.loads(contents['manifest.json'])
+
+def add_reference(value, base=''):
+    if not isinstance(value, str) or value.startswith(('http:', 'https:', '//', 'data:', '#')):
+        return
+    value = value.split('#', 1)[0].split('?', 1)[0]
+    referenced.add(posixpath.normpath(posixpath.join(base, value)))
+
+def add_icons(value):
+    if isinstance(value, str):
+        add_reference(value)
+    elif isinstance(value, dict):
+        for path in value.values():
+            add_reference(path)
+
 if 'background' in manifest and 'service_worker' in manifest['background']:
-    referenced.add(manifest['background']['service_worker'])
+    add_reference(manifest['background']['service_worker'])
 for cs in manifest.get('content_scripts', []):
-    referenced.update(cs.get('js', []))
-    referenced.update(cs.get('css', []))
-if 'action' in manifest and 'default_popup' in manifest['action']:
-    referenced.add(manifest['action']['default_popup'])
+    for path in cs.get('js', []) + cs.get('css', []):
+        add_reference(path)
+for action_key in ('action', 'browser_action', 'page_action'):
+    action = manifest.get(action_key, {})
+    add_reference(action.get('default_popup'))
+    add_icons(action.get('default_icon'))
+add_icons(manifest.get('icons'))
 if 'options_page' in manifest:
-    referenced.add(manifest['options_page'])
+    add_reference(manifest['options_page'])
+add_reference(manifest.get('options_ui', {}).get('page'))
+add_reference(manifest.get('devtools_page'))
+add_reference(manifest.get('side_panel', {}).get('default_path'))
+for path in manifest.get('chrome_url_overrides', {}).values():
+    add_reference(path)
+for path in manifest.get('sandbox', {}).get('pages', []):
+    add_reference(path)
+for resource_group in manifest.get('web_accessible_resources', []):
+    for path in resource_group.get('resources', []):
+        add_reference(path)
+default_locale = manifest.get('default_locale')
+if default_locale:
+    add_reference(f'_locales/{default_locale}/messages.json')
+
+# Saved-state icons and these pages/scripts are loaded only through runtime JS.
+for size in (16, 32, 48, 128):
+    add_reference(f'icons/pin-saved-{size}.png')
 
 script_re = re.compile(r'<script[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
 link_re   = re.compile(r'<link[^>]+href=["\']([^"\']+)["\']', re.IGNORECASE)
 for html_name in [f for f in included if f.endswith('.html')]:
-    text = open(html_name, encoding='utf-8').read()
+    text = contents[html_name].decode('utf-8')
+    base = posixpath.dirname(html_name)
     for m in script_re.finditer(text):
-        ref = m.group(1)
-        if not ref.startswith(('http:', 'https:', '//')):
-            referenced.add(ref)
+        add_reference(m.group(1), base)
     for m in link_re.finditer(text):
-        ref = m.group(1)
-        if not ref.startswith(('http:', 'https:', '//')):
-            referenced.add(ref)
+        add_reference(m.group(1), base)
 
 included_set = set(included)
-missing = sorted(r for r in referenced if r not in included_set)
+missing = []
+for ref in sorted(referenced):
+    if any(char in ref for char in '*?['):
+        if not any(fnmatch.fnmatch(path, ref) for path in included):
+            missing.append(ref)
+    elif ref not in included_set:
+        missing.append(ref)
 if missing:
     print(f"  ERROR: referenced by manifest/HTML but missing from ZIP:", file=sys.stderr)
     for m in missing:
@@ -350,6 +525,11 @@ else
   echo ""
 fi
 
+EXPECTED_ZIP_SIZE=$(python3 -c 'import os, sys; print(os.path.getsize(sys.argv[1]))' "${ZIP_PATH}")
+EXPECTED_ZIP_DIGEST=$(python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "${ZIP_PATH}")
+echo "  Artifact frozen (${EXPECTED_ZIP_SIZE} bytes, sha256:${EXPECTED_ZIP_DIGEST})"
+echo ""
+
 if [ "${BUILD_ONLY}" -eq 1 ]; then
   echo "  Build-only complete: ZIP validated; 未发布、未同步。"
   exit 0
@@ -357,50 +537,39 @@ fi
 
 # ---- Step 3: Generate changelog ----
 
-# Try local tags first, then fall back to GitHub release tags
-PREV_TAG=""
-PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1) || true
-
-if [ -z "${PREV_TAG}" ]; then
-  # No local tags — fetch the latest release tag from GitHub
-  PREV_TAG=$(gh release list --repo "${REPO_FULL}" --limit 5 --json tagName --jq '.[].tagName' 2>/dev/null \
-    | grep -v "^${TAG}$" | head -1) || true
-fi
-
 if [ -n "${PREV_TAG}" ]; then
   echo "  Changelog: ${PREV_TAG}..${TAG}"
 else
   echo "  Changelog: last 20 commits (no previous tag found)"
 fi
 
-CHANGELOG=$(python3 - "${PREV_TAG}" <<'PYEOF'
+CHANGELOG=$(python3 - "${PREV_TAG}" "${HEAD_SHA}" <<'PYEOF'
 import sys, subprocess, re
 
 prev_tag = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else ""
+snapshot = sys.argv[2]
 
 if prev_tag:
     result = subprocess.run(
-        ["git", "log", f"{prev_tag}..HEAD", "--pretty=format:%s", "--no-merges"],
+        ["git", "log", f"{prev_tag}..{snapshot}", "--pretty=format:%s", "--no-merges"],
         capture_output=True, text=True
     )
-    # If the tag doesn't exist locally, fall back to recent commits
-    if result.returncode != 0:
-        result = subprocess.run(
-            ["git", "log", "--pretty=format:%s", "--no-merges", "-20"],
-            capture_output=True, text=True
-        )
 else:
     result = subprocess.run(
-        ["git", "log", "--pretty=format:%s", "--no-merges", "-20"],
+        ["git", "log", snapshot, "--pretty=format:%s", "--no-merges", "-20"],
         capture_output=True, text=True
     )
+
+if result.returncode != 0:
+    print(result.stderr.strip() or "git log failed", file=sys.stderr)
+    sys.exit(result.returncode)
 
 commits = [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
-# Skip release-infrastructure bookkeeping commits (auto-generated noise)
+# Skip release-infrastructure bookkeeping and internal maintenance noise.
 skip_patterns = [
     re.compile(r'^docs:\s*update version badge'),
-    re.compile(r'^chore:\s*sync manifest version'),
+    re.compile(r'^chore(?:\([^)]+\))?:'),
 ]
 commits = [c for c in commits if not any(p.match(c) for p in skip_patterns)]
 
@@ -410,18 +579,20 @@ groups = {
     "perf":     {"label": "Performance",    "items": []},
     "style":    {"label": "Styling",        "items": []},
     "refactor": {"label": "Improvements",   "items": []},
-    "chore":    {"label": "Maintenance",    "items": []},
     "docs":     {"label": "Documentation",  "items": []},
+    "security": {"label": "Security",       "items": []},
 }
-order = ["feat", "fix", "perf", "style", "refactor", "chore", "docs"]
+order = ["feat", "fix", "perf", "style", "refactor", "docs", "security"]
 
-pattern = re.compile(r'^(\w+)(?:\([^)]+\))?!?:\s*(.+)$')
+pattern = re.compile(r'^(\w+)(?:\(([^)]+)\))?!?:\s*(.+)$')
 
 for msg in commits:
     m = pattern.match(msg)
     if not m:
         continue
-    ctype, subject = m.group(1).lower(), m.group(2)
+    ctype, scope, subject = m.group(1).lower(), (m.group(2) or '').lower(), m.group(3)
+    if ctype == 'fix' and scope == 'security':
+        ctype = 'security'
     if ctype in groups:
         groups[ctype]["items"].append(subject)
 
@@ -457,34 +628,160 @@ ${CHANGELOG}
 3. Open \`chrome://extensions/\`, enable **Developer mode**
 4. Click **Load unpacked**, select the unzipped folder"
 
+verify_publish_snapshot() {
+  local current_head remote_refs remote_sha
+  current_head=$(git rev-parse HEAD)
+  if [ "${current_head}" != "${HEAD_SHA}" ] \
+    || [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+    echo "  ABORT: source changed after release preflight; restart the release." >&2
+    return 1
+  fi
+  if ! remote_refs=$(git ls-remote origin refs/heads/main); then
+    echo "  ABORT: could not re-verify origin/main before publication." >&2
+    return 1
+  fi
+  remote_sha=$(printf '%s\n' "${remote_refs}" | awk '$2 == "refs/heads/main" { print $1; exit }')
+  if [ "${remote_sha}" != "${HEAD_SHA}" ]; then
+    echo "  ABORT: origin/main changed after release preflight; restart the release." >&2
+    return 1
+  fi
+}
+
+verify_local_artifact() {
+  local size digest
+  size=$(python3 -c 'import os, sys; print(os.path.getsize(sys.argv[1]))' "${ZIP_PATH}")
+  digest=$(python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "${ZIP_PATH}")
+  if [ "${size}" != "${EXPECTED_ZIP_SIZE}" ] || [ "${digest}" != "${EXPECTED_ZIP_DIGEST}" ]; then
+    echo "  ABORT: ZIP changed after smoke test; restart the release." >&2
+    return 1
+  fi
+}
+
+verify_remote_tag_before_publish() {
+  local sha status
+  if sha=$(remote_tag_commit); then
+    if [ "${sha}" != "${HEAD_SHA}" ]; then
+      echo "  ABORT: remote tag ${TAG} changed before publication (${sha})." >&2
+      return 1
+    fi
+    return 0
+  else
+    status=$?
+  fi
+  if [ "${status}" -eq 2 ]; then
+    echo "  ABORT: could not re-verify remote tag ${TAG} before publication." >&2
+    return 1
+  fi
+  return 0
+}
+
+verify_release_asset() {
+  local attempt asset_meta
+  local asset_count="0" asset_state="<missing>" asset_size="0" asset_digest="<missing>"
+
+  for attempt in 1 2 3 4 5; do
+    if asset_meta=$(gh api "repos/${REPO_FULL}/releases/${RELEASE_ID}" \
+      --jq "[.assets[] | select(.name == \"${ZIP_NAME}\")] | [length, (.[0].state // \"<missing>\"), (.[0].size // 0), (.[0].digest // \"<missing>\")] | @tsv" 2>&1); then
+      IFS=$'\t' read -r asset_count asset_state asset_size asset_digest <<< "${asset_meta}"
+      asset_digest=${asset_digest#sha256:}
+      asset_digest=$(printf '%s' "${asset_digest}" | tr '[:upper:]' '[:lower:]')
+      if [ "${asset_count}" = "1" ] && [ "${asset_state}" = "uploaded" ] \
+        && [ "${asset_size}" = "${EXPECTED_ZIP_SIZE}" ] \
+        && [ "${asset_digest}" = "${EXPECTED_ZIP_DIGEST}" ]; then
+        echo "  Release asset verified (${EXPECTED_ZIP_SIZE} bytes, sha256:${EXPECTED_ZIP_DIGEST})"
+        return 0
+      fi
+    fi
+    [ "${attempt}" -eq 5 ] || sleep 2
+  done
+
+  echo "  ABORT: GitHub asset verification failed for ${ZIP_NAME}." >&2
+  echo "         expected: count=1 state=uploaded size=${EXPECTED_ZIP_SIZE} sha256:${EXPECTED_ZIP_DIGEST}" >&2
+  echo "         observed: count=${asset_count} state=${asset_state} size=${asset_size} digest=${asset_digest}" >&2
+  return 1
+}
+
+verify_publish_snapshot
+verify_local_artifact
+
 if [ "${RELEASE_EXISTS}" -eq 1 ]; then
-  echo "  Updating same-commit Release ${TAG} without changing its tag..."
-  gh release upload "${TAG}" "${ZIP_PATH}" --clobber --repo "${REPO_FULL}"
+  echo "  Resuming verified exact-HEAD draft Release ${TAG}..."
   gh release edit "${TAG}" \
     --repo "${REPO_FULL}" \
     --title "${TAG}" \
-    --notes "${NOTES}" \
-    --latest
+    --notes "${NOTES}"
 elif [ "${REMOTE_TAG_EXISTS}" -eq 1 ]; then
-  echo "  Creating Release ${TAG} from the existing verified tag..."
+  echo "  Creating draft Release ${TAG} from the existing verified tag..."
   gh release create "${TAG}" \
-    "${ZIP_PATH}" \
     --repo "${REPO_FULL}" \
     --verify-tag \
+    --target "${HEAD_SHA}" \
+    --draft \
     --title "${TAG}" \
-    --notes "${NOTES}" \
-    --latest
+    --notes "${NOTES}"
+  RELEASE_STATE="draft"
 else
+  echo "  Creating exact-HEAD draft Release ${TAG}..."
   gh release create "${TAG}" \
-    "${ZIP_PATH}" \
     --repo "${REPO_FULL}" \
     --target "${HEAD_SHA}" \
+    --draft \
     --title "${TAG}" \
-    --notes "${NOTES}" \
+    --notes "${NOTES}"
+  RELEASE_STATE="draft"
+fi
+
+if [ "${RELEASE_EXISTS}" -eq 0 ]; then
+  if ! refresh_release; then
+    echo "  ABORT: draft ${TAG} was created but could not be resolved by tag." >&2
+    exit 1
+  fi
+  if [ "${RELEASE_STATE}" != "draft" ] \
+    || { [ "${REMOTE_TAG_EXISTS}" -eq 0 ] && [ "${RELEASE_TARGET}" != "${HEAD_SHA}" ]; }; then
+    echo "  ABORT: new Release ${TAG} must remain a draft bound to exact HEAD ${HEAD_SHA}." >&2
+    echo "         observed state=${RELEASE_STATE:-<none>} target=${RELEASE_TARGET:-<none>}" >&2
+    exit 1
+  fi
+fi
+
+verify_local_artifact
+gh release upload "${TAG}" "${ZIP_PATH}" --clobber --repo "${REPO_FULL}"
+if ! verify_release_asset; then
+  [ "${RELEASE_STATE}" = "draft" ] \
+    && echo "         Draft retained for safe retry with --overwrite." >&2
+  exit 1
+fi
+
+if [ "${RELEASE_STATE}" = "draft" ]; then
+  echo "  Publishing verified draft ${TAG}..."
+  verify_publish_snapshot
+  verify_local_artifact
+  verify_remote_tag_before_publish
+  gh release edit "${TAG}" \
+    --repo "${REPO_FULL}" \
+    --draft=false \
     --latest
 fi
 
-if ! PUBLISHED_TAG_SHA=$(remote_tag_commit); then
+if ! FINAL_RELEASE_STATE=$(gh api "repos/${REPO_FULL}/releases/${RELEASE_ID}" \
+  --jq 'if .draft then "draft" elif .prerelease then "prerelease" else "published" end'); then
+  echo "  ABORT: release command completed, but Release ${TAG} could not be verified." >&2
+  exit 1
+fi
+if [ "${FINAL_RELEASE_STATE}" != "published" ]; then
+  echo "  ABORT: Release ${TAG} is ${FINAL_RELEASE_STATE}, expected published." >&2
+  exit 1
+fi
+
+PUBLISHED_TAG_SHA=""
+for attempt in 1 2 3 4 5; do
+  if PUBLISHED_TAG_SHA=$(remote_tag_commit); then
+    break
+  fi
+  PUBLISHED_TAG_SHA=""
+  [ "${attempt}" -eq 5 ] || sleep 2
+done
+if [ -z "${PUBLISHED_TAG_SHA}" ]; then
   echo "  ABORT: release command completed, but remote tag ${TAG} could not be verified." >&2
   exit 1
 fi

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // zip-install-smoke — extracts a release ZIP, installs it into a fresh
 // Playwright-bundled Chromium via --load-extension, then verifies basic
-// runtime health (SW registers, popup opens cleanly, options opens cleanly).
+// runtime health (SW registers; popup, options, and preview open cleanly).
 //
 // Designed to catch the bug class where the shipped ZIP is missing a file
 // that manifest/HTML references (e.g. SW importScripts 404, popup script
@@ -105,14 +105,13 @@ function cleanup() {
   }
 }
 
-// ---- Check 0: dynamically-injected vendor assets survived packaging ----
-// These aren't referenced by <script src>/<link href> in any HTML, so
-// release.sh's static HTML-tag sanity check can't see them — only a real
-// packaged-ZIP check catches an accidental vendor/ deletion. Two mechanisms:
-// md-preview.js createElement-injects the hljs/KaTeX assets; background.js
-// chrome.scripting.executeScript({files:["vendor/defuddle.js"]}) injects Defuddle.
-console.log('[zip-smoke] check 0: dynamically-injected vendor assets present...');
-const REQUIRED_VENDOR_FILES = [
+// ---- Check 0: dynamically-referenced runtime files survived packaging ----
+// These aren't all referenced by manifest/HTML tags, so release.sh's static
+// sanity check can't see them. Keep this explicit list beside the real ZIP test.
+console.log('[zip-smoke] check 0: dynamically-referenced runtime files present...');
+const REQUIRED_RUNTIME_FILES = [
+  'site-rules.js',
+  'vendor/turndown.js',
   'vendor/highlight.min.js',
   'vendor/hljs-github.min.css',
   'vendor/hljs-github-dark.min.css',
@@ -120,15 +119,23 @@ const REQUIRED_VENDOR_FILES = [
   'vendor/katex/katex.min.css',
   'vendor/katex/auto-render.min.js',
   'vendor/defuddle.js',
+  'icons/pin-default-16.png',
+  'icons/pin-default-32.png',
+  'icons/pin-default-48.png',
+  'icons/pin-default-128.png',
+  'icons/pin-saved-16.png',
+  'icons/pin-saved-32.png',
+  'icons/pin-saved-48.png',
+  'icons/pin-saved-128.png',
 ];
-const missingVendor = REQUIRED_VENDOR_FILES.filter(f => !existsSync(join(extPath, f)));
-if (missingVendor.length) {
-  console.error('[zip-smoke] FAIL: ZIP missing dynamically-injected vendor file(s):');
-  missingVendor.forEach(f => console.error(`    - ${f}`));
+const missingRuntime = REQUIRED_RUNTIME_FILES.filter(f => !existsSync(join(extPath, f)));
+if (missingRuntime.length) {
+  console.error('[zip-smoke] FAIL: ZIP missing dynamically-referenced runtime file(s):');
+  missingRuntime.forEach(f => console.error(`    - ${f}`));
   cleanup();
   process.exit(1);
 }
-console.log(`  present: ${REQUIRED_VENDOR_FILES.join(', ')}`);
+console.log(`  present: ${REQUIRED_RUNTIME_FILES.join(', ')}`);
 
 // ---- Launch fresh Chromium with extension ----
 console.log('[zip-smoke] launching Chromium with extension loaded...');
@@ -186,59 +193,52 @@ sw.on('console', msg => {
 // Brief wait so SW can finish boot (importScripts, alarm setup, etc.)
 await new Promise(r => setTimeout(r, 1500));
 
-// ---- Check 2: popup.html opens without pageerror ----
-console.log('[zip-smoke] check 2: popup.html opens...');
-const popupErrors = [];
-const popupPage = await ctx.newPage();
-popupPage.on('pageerror', e => popupErrors.push(e.message));
-popupPage.on('console', msg => {
-  if (msg.type() === 'error') consoleErrors.push({ scope: 'popup', text: msg.text() });
-});
-try {
-  await popupPage.goto(`chrome-extension://${extId}/popup.html`, { waitUntil: 'domcontentloaded', timeout: 10000 });
-  await new Promise(r => setTimeout(r, 1500));
-} catch (e) {
-  console.error(`  FAIL: popup.goto threw: ${e.message}`);
-  await ctx.close().catch(() => {});
-  cleanup();
-  process.exit(1);
+// ---- Checks 2-4: extension pages open without runtime/resource failures ----
+const extensionBase = `chrome-extension://${extId}/`;
+async function checkExtensionPage(number, name, waitMs) {
+  console.log(`[zip-smoke] check ${number}: ${name}.html opens...`);
+  const failures = [];
+  const page = await ctx.newPage();
+  let collecting = true;
+  page.on('pageerror', e => {
+    if (collecting) failures.push(`pageerror: ${e.message}`);
+  });
+  page.on('requestfailed', request => {
+    if (!collecting || !request.url().startsWith(extensionBase)) return;
+    failures.push(`request failed: ${request.url()} (${request.failure()?.errorText || 'unknown error'})`);
+  });
+  page.on('response', response => {
+    if (collecting && response.url().startsWith(extensionBase) && response.status() >= 400) {
+      failures.push(`extension resource HTTP ${response.status()}: ${response.url()}`);
+    }
+  });
+  page.on('console', msg => {
+    if (msg.type() === 'error') consoleErrors.push({ scope: name, text: msg.text() });
+  });
+  try {
+    await page.goto(`${extensionBase}${name}.html`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+    await new Promise(r => setTimeout(r, waitMs));
+  } catch (e) {
+    failures.push(`navigation failed: ${e.message}`);
+  }
+  collecting = false;
+  await page.close().catch(() => {});
+  if (failures.length) {
+    console.error(`  FAIL: ${name} raised ${failures.length} runtime/resource failure(s):`);
+    failures.forEach(e => console.error(`    - ${e}`));
+    return false;
+  }
+  console.log(`  ${name} OK`);
+  return true;
 }
-await popupPage.close();
-if (popupErrors.length) {
-  console.error(`  FAIL: popup raised ${popupErrors.length} pageerror(s):`);
-  popupErrors.forEach(e => console.error(`    - ${e}`));
-  await ctx.close().catch(() => {});
-  cleanup();
-  process.exit(1);
-}
-console.log('  popup OK');
 
-// ---- Check 3: options.html opens without pageerror ----
-console.log('[zip-smoke] check 3: options.html opens...');
-const optionsErrors = [];
-const optionsPage = await ctx.newPage();
-optionsPage.on('pageerror', e => optionsErrors.push(e.message));
-optionsPage.on('console', msg => {
-  if (msg.type() === 'error') consoleErrors.push({ scope: 'options', text: msg.text() });
-});
-try {
-  await optionsPage.goto(`chrome-extension://${extId}/options.html`, { waitUntil: 'domcontentloaded', timeout: 10000 });
-  await new Promise(r => setTimeout(r, 2000));
-} catch (e) {
-  console.error(`  FAIL: options.goto threw: ${e.message}`);
-  await ctx.close().catch(() => {});
-  cleanup();
-  process.exit(1);
+for (const check of [[2, 'popup', 1500], [3, 'options', 2000], [4, 'md-preview', 2000]]) {
+  if (!await checkExtensionPage(...check)) {
+    await ctx.close().catch(() => {});
+    cleanup();
+    process.exit(1);
+  }
 }
-await optionsPage.close();
-if (optionsErrors.length) {
-  console.error(`  FAIL: options raised ${optionsErrors.length} pageerror(s):`);
-  optionsErrors.forEach(e => console.error(`    - ${e}`));
-  await ctx.close().catch(() => {});
-  cleanup();
-  process.exit(1);
-}
-console.log('  options OK');
 
 // ---- Teardown ----
 await ctx.close().catch(() => {});

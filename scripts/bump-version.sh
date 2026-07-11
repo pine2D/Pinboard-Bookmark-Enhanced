@@ -21,11 +21,6 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 MANIFEST="${REPO_ROOT}/manifest.json"
 cd "${REPO_ROOT}"
 
-# Release tags are created on the remote by release.sh (gh release create) and are
-# frequently absent locally, which made `git log <tag>..HEAD` fail with exit 128.
-# Fetch tags first so the range resolves. Best-effort: offline / no-remote is fine.
-git fetch --tags --quiet 2>/dev/null || true
-
 DRY_RUN=0
 FORCE=""
 for arg in "$@"; do
@@ -38,26 +33,46 @@ for arg in "$@"; do
   esac
 done
 
-# Find the most recent release tag (prefer GitHub release tag, fall back to local)
-PREV_TAG=""
-if command -v gh &>/dev/null && gh auth status &>/dev/null; then
-  PREV_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+# The public Release, not the highest Git tag, is the versioning baseline. An
+# orphan/draft tag must never hide changes or make the result depend on local refs.
+if ! command -v gh >/dev/null 2>&1; then
+  echo "  ERROR: gh CLI is required to resolve the latest published Release." >&2
+  exit 1
 fi
-if [ -z "${PREV_TAG}" ]; then
-  PREV_TAG=$(git tag --sort=-version:refname | head -1 || true)
+if ! PREV_TAG=$(gh release view --json tagName --jq .tagName 2>/dev/null) || [ -z "${PREV_TAG}" ]; then
+  echo "  ERROR: could not resolve the latest published GitHub Release." >&2
+  exit 1
 fi
 
-if [ -z "${PREV_TAG}" ] || ! git rev-parse -q --verify "${PREV_TAG}^{commit}" >/dev/null 2>&1; then
-  if [ -n "${PREV_TAG}" ]; then
-    echo "  Release tag ${PREV_TAG} not resolvable locally (even after fetch). Scanning last 50 commits."
-  else
-    echo "  No previous release tag found. Will scan last 50 commits."
+# release.sh creates tags remotely; fetch only the authoritative base when it is
+# absent locally. Never fall back to an arbitrary tag or a truncated commit list.
+if ! git rev-parse -q --verify "${PREV_TAG}^{commit}" >/dev/null 2>&1; then
+  if ! git fetch --quiet origin "refs/tags/${PREV_TAG}:refs/tags/${PREV_TAG}"; then
+    echo "  ERROR: published Release tag ${PREV_TAG} is not resolvable locally." >&2
+    exit 1
   fi
-  RANGE_ARGS=(-50)
-else
-  echo "  Scanning commits since ${PREV_TAG}..HEAD"
-  RANGE_ARGS=("${PREV_TAG}..HEAD")
 fi
+if ! REMOTE_TAG_REFS=$(git ls-remote origin "refs/tags/${PREV_TAG}" "refs/tags/${PREV_TAG}^{}"); then
+  echo "  ERROR: could not verify published Release tag ${PREV_TAG} on origin." >&2
+  exit 1
+fi
+REMOTE_TAG_SHA=$(printf '%s\n' "${REMOTE_TAG_REFS}" | awk '
+  $2 ~ /\^\{\}$/ { peeled = $1 }
+  $2 !~ /\^\{\}$/ { direct = $1 }
+  END { print peeled ? peeled : direct }
+')
+LOCAL_TAG_SHA=$(git rev-parse "${PREV_TAG}^{commit}")
+if [ -z "${REMOTE_TAG_SHA}" ] || [ "${LOCAL_TAG_SHA}" != "${REMOTE_TAG_SHA}" ]; then
+  echo "  ERROR: local ${PREV_TAG} does not match the immutable origin tag." >&2
+  exit 1
+fi
+if ! git merge-base --is-ancestor "${PREV_TAG}^{commit}" HEAD; then
+  echo "  ERROR: published Release tag ${PREV_TAG} is not an ancestor of HEAD." >&2
+  exit 1
+fi
+
+echo "  Scanning commits since ${PREV_TAG}..HEAD"
+RANGE_ARGS=("${PREV_TAG}..HEAD")
 
 BUMP=$(python3 - "${FORCE}" "${RANGE_ARGS[@]}" <<'PYEOF'
 import sys, subprocess, re
@@ -69,29 +84,34 @@ result = subprocess.run(
     ["git", "log", "--pretty=format:%B%x1e", "--no-merges", *git_args],
     capture_output=True, text=True, check=False,
 )
+if result.returncode != 0:
+    print(result.stderr.strip() or "git log failed", file=sys.stderr)
+    raise SystemExit(result.returncode)
+
 messages = [m.strip() for m in result.stdout.split("\x1e") if m.strip()]
 
 bump = ""
-breaking = re.compile(r'(^|\n)BREAKING CHANGE')
-feat = re.compile(r'^feat(\([^)]+\))?!?:', re.MULTILINE)
-patch_kinds = re.compile(r'^(fix|refactor|perf)(\([^)]+\))?!?:', re.MULTILINE)
-bang = re.compile(r'^\w+(\([^)]+\))?!:', re.MULTILINE)
+breaking = re.compile(r'(^|\n)BREAKING(?: CHANGE|-CHANGE):')
+feat = re.compile(r'^feat(?:\([^)]+\))?:')
+patch_kinds = re.compile(r'^(?:fix|refactor|perf)(?:\([^)]+\))?:')
+bang = re.compile(r'^\w+(?:\([^)]+\))?!:')
 
 rank = {"": 0, "patch": 1, "minor": 2, "major": 3}
 
 for msg in messages:
-    if breaking.search(msg) or bang.search(msg):
+    subject = msg.splitlines()[0]
+    if breaking.search(msg) or bang.match(subject):
         cand = "major"
-    elif feat.search(msg):
+    elif feat.match(subject):
         cand = "minor"
-    elif patch_kinds.search(msg):
+    elif patch_kinds.match(subject):
         cand = "patch"
     else:
         continue
     if rank[cand] > rank[bump]:
         bump = cand
 
-if force:
+if force and rank[force] > rank[bump]:
     bump = force
 
 print(bump)
@@ -106,19 +126,26 @@ fi
 
 echo "  Bump type: ${BUMP}"
 
-NEW_VER=$(python3 - "${MANIFEST}" "${BUMP}" "${DRY_RUN}" <<'PYEOF'
+VERSION_RESULT=$(python3 - "${MANIFEST}" "${PREV_TAG}" "${BUMP}" "${DRY_RUN}" <<'PYEOF'
 import sys, json
 
-manifest_path, bump, dry = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+manifest_path, base_tag, bump, dry = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1"
 
 with open(manifest_path, 'r', encoding='utf-8') as f:
     data = json.load(f)
 
 current = data.get('version', '0.0')
-parts = current.split('.')
-major = int(parts[0]) if len(parts) > 0 else 0
-minor = int(parts[1]) if len(parts) > 1 else 0
-patch = int(parts[2]) if len(parts) > 2 else 0
+
+def parse_version(value, label):
+    raw = value[1:] if value.startswith('v') else value
+    parts = raw.split('.')
+    if len(parts) not in (2, 3) or any(not p.isdigit() for p in parts):
+        raise SystemExit(f"ERROR: invalid {label} version: {value}")
+    nums = tuple(int(p) for p in parts)
+    return nums + (0,) * (3 - len(nums))
+
+current_tuple = parse_version(current, 'manifest')
+major, minor, patch = parse_version(base_tag, 'Release tag')
 
 if bump == 'major':
     major += 1; minor = 0; patch = 0
@@ -130,17 +157,33 @@ else:
     patch += 1
     new_ver = f"{major}.{minor}.{patch}"
 
-print(f"  {current} → {new_ver}", file=sys.stderr)
+target_tuple = parse_version(new_ver, 'target')
+if current_tuple > target_tuple:
+    raise SystemExit(
+        f"ERROR: manifest {current} is newer than computed target {new_ver}; refusing to downgrade"
+    )
 
-if not dry:
+if current_tuple == target_tuple:
+    print(f"  {current} already matches target from {base_tag}", file=sys.stderr)
+else:
+    print(f"  {current} → {new_ver} (base {base_tag})", file=sys.stderr)
+
+if not dry and current_tuple < target_tuple:
     data['version'] = new_ver
     with open(manifest_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write('\n')
 
-print(new_ver)
+print(f"{new_ver}|{int(current_tuple < target_tuple)}")
 PYEOF
 )
+NEW_VER=${VERSION_RESULT%%|*}
+VERSION_CHANGED=${VERSION_RESULT##*|}
+
+if [ "${VERSION_CHANGED}" = "0" ]; then
+  echo "  Manifest already matches the computed target. Nothing to bump."
+  exit 0
+fi
 
 if [ "${DRY_RUN}" = "1" ]; then
   echo "  Dry run; manifest not modified."
@@ -148,7 +191,7 @@ if [ "${DRY_RUN}" = "1" ]; then
 fi
 
 git add "${MANIFEST}"
-git commit -m "chore: bump manifest to ${NEW_VER}"
+git commit --only -m "chore: bump manifest to ${NEW_VER}" -- "${MANIFEST}"
 
 echo ""
 echo "  Bumped to ${NEW_VER}. Next: scripts/release.sh"
