@@ -19,6 +19,7 @@ h2 { margin-top: 24px; }
 <script src="../vendor/katex/katex.min.js"></script>
 <script src="../vendor/katex/auto-render.min.js"></script>
 <script src="../md-convert.js?v=obs2"></script>
+<script src="../md-embed.js"></script>
 <script src="../site-rules.js?v=1"></script>
 <script src="../md-highlight.js"></script>
 <script>
@@ -1597,6 +1598,132 @@ section("site-rules: pbpNormalizeLazyImages");
     const r = applySiteRule(doc, "https://www.zhihu.com/question/659317023");
     assert(r && /src="https:\/\/pic\/a\.jpg"/.test(r.contentHtml || ""), "zhihu lazy image promoted: " + (r && r.contentHtml));
   })();
+</script>
+
+<script>
+section("md-embed: pbpEmbedScan / pbpEmbedRewrite / pbpEmbedBudget (pure layer)");
+
+// scan classification matrix
+(() => {
+  const mdImgs = [
+    "![a](https://cdn.example.com/a.png)",
+    "![b](/rel/b.jpg)",                       // relative -> baseUrl absolutized -> candidate
+    "![c](data:image/png;base64,AAAA)",       // inline kept as-is
+    "![d](blob:https://page/xyz)",            // blob -> blobs
+    "![e](http://insecure.example.com/e.gif)",// http -> kept
+    "```",
+    "![in-fence](https://x.example.com/f.png)", // fenced code -> not scanned
+    "```",
+  ].join("\n");
+  const scan = pbpEmbedScan(mdImgs, "https://page.example.com/post");
+  assertEq(scan.candidates.length, 2, "scan matrix: candidate count");
+  assertEq(scan.candidates[0], "https://cdn.example.com/a.png", "scan matrix: absolute candidate kept as-is");
+  assertEq(scan.candidates[1], "https://page.example.com/rel/b.jpg", "scan matrix: relative candidate absolutized against baseUrl");
+  assertEq(scan.blobs.length, 1, "scan matrix: blob URL classified into blobs");
+  assertEq(scan.kept.length, 1, "scan matrix: http (insecure) URL classified into kept");
+  assertEq(scan.origins.join(","), "https://cdn.example.com,https://page.example.com", "scan matrix: origins collected in candidate order");
+})();
+
+// upper-bound truncation (2 assertions)
+(() => {
+  const lines51 = [];
+  for (let i = 0; i < 51; i++) lines51.push(`![i${i}](https://cap.example.com/img${i}.png)`);
+  const s51 = pbpEmbedScan(lines51.join("\n"), "");
+  assert(s51.candidates.length === 50 && s51.kept.length === 1,
+    "maxImages caps candidates at 50; 51st image overflows into kept: " + JSON.stringify({ c: s51.candidates.length, k: s51.kept.length }));
+
+  const lines11 = [];
+  for (let i = 0; i < 11; i++) lines11.push(`![o${i}](https://origin${i}.example.com/x.png)`);
+  const s11 = pbpEmbedScan(lines11.join("\n"), "");
+  assert(s11.origins.length === 10 && s11.kept.length === 1,
+    "maxOrigins caps distinct origins at 10; 11th origin's image overflows into kept: " + JSON.stringify({ o: s11.origins.length, k: s11.kept.length }));
+})();
+
+// de-dup, order-preserving (1 assertion)
+(() => {
+  const md = "![a](https://dup.example.com/x.png)\n![a2](https://dup.example.com/x.png)";
+  const s = pbpEmbedScan(md, "");
+  assertEq(s.candidates.length, 1, "same URL referenced twice only appears once in candidates");
+})();
+
+// masking surface (Codex-P3): inline code span + escaped \![ must not drive scan/fetch (4 assertions)
+(() => {
+  const codeSpanLine = "Use `![x](https://evil.example.com/x.png)` in your code.";
+  const sCode = pbpEmbedScan(codeSpanLine, "");
+  assert(!sCode.candidates.includes("https://evil.example.com/x.png") && !sCode.origins.includes("https://evil.example.com"),
+    "inline code-span pseudo-image excluded from candidates/origins: " + JSON.stringify(sCode));
+
+  const escapedLine = "See \\![y](https://e2.example.com/y.png) literally.";
+  const sEsc = pbpEmbedScan(escapedLine, "");
+  assert(!sEsc.candidates.includes("https://e2.example.com/y.png"),
+    "escaped \\![ pseudo-image excluded from candidates: " + JSON.stringify(sEsc));
+
+  const rCode = pbpEmbedRewrite(codeSpanLine, { "https://evil.example.com/x.png": "REPLACED" }, "", pbpEmbedBudget(999999));
+  assertEq(rCode.md, codeSpanLine, "code-span pseudo-image left byte-for-byte untouched by rewrite");
+
+  const rEsc = pbpEmbedRewrite(escapedLine, { "https://e2.example.com/y.png": "REPLACED" }, "", pbpEmbedBudget(999999));
+  assertEq(rEsc.md, escapedLine, "escaped pseudo-image left byte-for-byte untouched by rewrite");
+})();
+
+// rewrite: dataURI substitution, blob->alt, fence untouched, map-absent URL kept as-is (4 assertions)
+(() => {
+  const mdData = "![a](https://cdn.example.com/a.png)";
+  const rData = pbpEmbedRewrite(mdData, { "https://cdn.example.com/a.png": "data:image/png;base64,ABCD" }, "", pbpEmbedBudget(999999));
+  assertEq(rData.md, "![a](data:image/png;base64,ABCD)", "candidate URL rewritten to data URI src");
+
+  const mdBlob = "![d](blob:https://page/xyz)";
+  const rBlob = pbpEmbedRewrite(mdBlob, { "blob:https://page/xyz": null }, "", pbpEmbedBudget(999999));
+  assertEq(rBlob.md, "d", "blob map value null degrades whole image to alt text");
+
+  const mdFence = "```\n![f](https://cdn.example.com/f.png)\n```";
+  const rFence = pbpEmbedRewrite(mdFence, { "https://cdn.example.com/f.png": "data:image/png;base64,X" }, "", pbpEmbedBudget(999999));
+  assertEq(rFence.md, mdFence, "fenced code block content is never rewritten");
+
+  const mdAbsent = "![g](https://cdn.example.com/g.png)";
+  const rAbsent = pbpEmbedRewrite(mdAbsent, {}, "", pbpEmbedBudget(999999));
+  assertEq(rAbsent.md, mdAbsent, "URL with no map entry is left as-is");
+})();
+
+// rewrite output budget (Codex-P2): same URL referenced 3x, budget only covers 2 replacements (2 assertions)
+(() => {
+  const url = "https://cdn.example.com/rep.png";
+  const repl = "data:image/png;base64,ZZZZ";
+  const md = ["![1](" + url + ")", "![2](" + url + ")", "![3](" + url + ")"].join("\n");
+  const replLen = ("![1](" + repl + ")").length; // same length for alt "1"/"2"/"3"
+  const budget = pbpEmbedBudget(replLen * 2); // exactly enough for 2 of the 3 references
+  const r = pbpEmbedRewrite(md, { [url]: repl }, "", budget);
+  const outLines = r.md.split("\n");
+  assert(outLines[0] === "![1](" + repl + ")" && outLines[1] === "![2](" + repl + ")" && outLines[2] === "![3](" + url + ")",
+    "budget exhausted after 2 replacements; 3rd occurrence keeps original URL: " + r.md);
+  assertEq(r.dropped, 1, "exactly one occurrence dropped once outBudget is exhausted");
+})();
+
+// budget primitive: accumulate-to-limit false + atomicity (3 assertions)
+(() => {
+  const b = pbpEmbedBudget(100);
+  assert(b.reserve(60) === true && b.used() === 60, "reserve within budget succeeds and accumulates in used()");
+  assert(b.reserve(50) === false, "reserve exceeding remaining budget returns false");
+  assertEq(b.used(), 60, "used() unchanged after a rejected reserve (atomic — no partial charge)");
+})();
+
+// budget primitive: table-driven boundary cases (8 assertions)
+(() => {
+  const cases = [
+    { n: 0, total: 100, pre: 0, expect: true, label: "reserve(0) succeeds as a no-op" },
+    { n: 100, total: 100, pre: 0, expect: true, label: "reserve(total) exactly fills the budget" },
+    { n: 101, total: 100, pre: 0, expect: false, label: "reserve(total+1) is rejected" },
+    { n: -1, total: 100, pre: 0, expect: false, label: "negative n is rejected" },
+    { n: NaN, total: 100, pre: 0, expect: false, label: "NaN is rejected" },
+    { n: Infinity, total: 100, pre: 0, expect: false, label: "Infinity is rejected" },
+    { n: 1, total: 100, pre: 100, expect: false, label: "any positive n rejected once budget is fully used" },
+    { n: 0.5, total: 1, pre: 0, expect: true, label: "fractional n within budget succeeds" },
+  ];
+  for (const c of cases) {
+    const bud = pbpEmbedBudget(c.total);
+    if (c.pre) bud.reserve(c.pre);
+    assertEq(bud.reserve(c.n), c.expect, c.label);
+  }
+})();
 </script>
 
 <script>
