@@ -35,8 +35,12 @@
     </div>
     <div class="rail-section" id="export-section">
       <div class="rail-label" data-i18n="mdExportSection">Export</div>
-      <label class="exp-opt"><input type="checkbox" id="exp-frontmatter" /> <span data-i18n="mdOptFrontmatter">Frontmatter</span></label>
-      <label class="exp-opt"><span data-i18n="mdOptImages">Images</span>
+      <div class="exp-toggles" role="group" aria-label="Export" data-i18n-aria="mdExportSection">
+        <button type="button" id="exp-frontmatter" class="action-btn exp-tgl" aria-pressed="true">Frontmatter</button>
+        <button type="button" id="exp-include-toc" class="action-btn exp-tgl" aria-pressed="false" data-i18n="mdTglToc">TOC</button>
+        <button type="button" id="exp-include-hl" class="action-btn exp-tgl" aria-pressed="true" data-i18n="mdTglHl">Highlights</button>
+      </div>
+      <label class="exp-img-row"><span data-i18n="mdOptImages">Images</span>
         <select id="exp-image-policy">
           <option value="keep" data-i18n="mdImgKeep">Keep</option>
           <option value="alt" data-i18n="mdImgAlt">Alt text</option>
@@ -44,8 +48,6 @@
           <option value="embed" data-i18n="mdImgEmbed">Embed (offline)</option>
         </select>
       </label>
-      <label class="exp-opt"><input type="checkbox" id="exp-include-toc" /> <span data-i18n="mdOptIncludeToc">Include TOC</span></label>
-      <label class="exp-opt"><input type="checkbox" id="exp-include-hl" checked /> <span data-i18n="mdOptIncludeHl">Include highlights</span></label>
       <div class="export-grid">
         <div class="export-fmt">
           <span class="fmt-name">Markdown</span>
@@ -69,8 +71,9 @@
         </div>
         <div class="export-fmt">
           <span class="fmt-name">EPUB</span>
-          <button id="btn-dl-epub" class="action-btn icon-only" title="Download EPUB (e-book)" data-i18n-title="mdDownloadEpubTitle" aria-label="Download .epub" data-i18n-aria="mdDownloadEpub">
+          <button id="btn-dl-epub" class="action-btn exp-fmt-span" title="Download EPUB (e-book)" data-i18n-title="mdDownloadEpubTitle" aria-label="Download .epub" data-i18n-aria="mdDownloadEpub">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span class="btn-label" data-i18n="mdDownload">Download</span>
           </button>
         </div>
       </div>

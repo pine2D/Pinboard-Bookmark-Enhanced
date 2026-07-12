@@ -1623,8 +1623,17 @@
   "mdOptIncludeHl": {
     "message": "ハイライトを含める"
   },
+  "mdTglToc": {
+    "message": "目次"
+  },
+  "mdTglHl": {
+    "message": "ハイライト"
+  },
   "mdCopy": {
     "message": "コピー"
+  },
+  "mdDownload": {
+    "message": "ダウンロード"
   },
   "mdCopyMarkdown": {
     "message": "Markdown をコピー"

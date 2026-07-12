@@ -1623,8 +1623,17 @@
   "mdOptIncludeHl": {
     "message": "包含標記"
   },
+  "mdTglToc": {
+    "message": "目錄"
+  },
+  "mdTglHl": {
+    "message": "標記"
+  },
   "mdCopy": {
     "message": "複製"
+  },
+  "mdDownload": {
+    "message": "下載"
   },
   "mdCopyMarkdown": {
     "message": "複製 Markdown"

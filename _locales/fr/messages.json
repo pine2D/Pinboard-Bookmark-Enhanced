@@ -1623,8 +1623,17 @@
   "mdOptIncludeHl": {
     "message": "Inclure les surlignages"
   },
+  "mdTglToc": {
+    "message": "TDM"
+  },
+  "mdTglHl": {
+    "message": "Surlignages"
+  },
   "mdCopy": {
     "message": "Copier"
+  },
+  "mdDownload": {
+    "message": "Télécharger"
   },
   "mdCopyMarkdown": {
     "message": "Copier le Markdown"

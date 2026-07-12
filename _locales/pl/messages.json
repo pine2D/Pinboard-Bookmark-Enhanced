@@ -1623,8 +1623,17 @@
   "mdOptIncludeHl": {
     "message": "Uwzględnij zaznaczenia"
   },
+  "mdTglToc": {
+    "message": "Spis treści"
+  },
+  "mdTglHl": {
+    "message": "Zaznaczenia"
+  },
   "mdCopy": {
     "message": "Kopiuj"
+  },
+  "mdDownload": {
+    "message": "Pobierz"
   },
   "mdCopyMarkdown": {
     "message": "Kopiuj Markdown"

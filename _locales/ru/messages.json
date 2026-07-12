@@ -1623,8 +1623,17 @@
   "mdOptIncludeHl": {
     "message": "Включать выделения"
   },
+  "mdTglToc": {
+    "message": "Оглавление"
+  },
+  "mdTglHl": {
+    "message": "Выделения"
+  },
   "mdCopy": {
     "message": "Копировать"
+  },
+  "mdDownload": {
+    "message": "Скачать"
   },
   "mdCopyMarkdown": {
     "message": "Копировать Markdown"

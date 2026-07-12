@@ -659,10 +659,22 @@ function pbpApplyColorScheme(mode) {
   const expImagePolicy = document.getElementById("exp-image-policy");
   const expIncludeToc = document.getElementById("exp-include-toc");
   const expIncludeHl = document.getElementById("exp-include-hl");
-  if (expFrontmatter) expFrontmatter.checked = !!exportSettings.mdExportFrontmatter;
+  // exp-frontmatter/-include-toc/-include-hl are real <button aria-pressed>
+  // toggles now (rail redesign spec sec.1/4), not checkboxes -- pbpExpTglOn
+  // reads the pressed state, pbpExpTglSet writes it. Same session-only
+  // scope as the checkboxes they replace: initialized once from
+  // exportSettings here, flipped by the click handlers below, never
+  // persisted back to storage (persistence lives in options.js's own
+  // opt-md-* checkboxes, a separate id space).
+  function pbpExpTglOn(el) { return !!el && el.getAttribute("aria-pressed") === "true"; }
+  function pbpExpTglSet(el, on) { if (el) el.setAttribute("aria-pressed", on ? "true" : "false"); }
+  pbpExpTglSet(expFrontmatter, !!exportSettings.mdExportFrontmatter);
   if (expImagePolicy) expImagePolicy.value = exportSettings.mdExportImagePolicy || "keep";
-  if (expIncludeToc) expIncludeToc.checked = !!exportSettings.mdExportIncludeToc;
-  if (expIncludeHl) expIncludeHl.checked = !!exportSettings.mdExportIncludeHighlights;
+  pbpExpTglSet(expIncludeToc, !!exportSettings.mdExportIncludeToc);
+  pbpExpTglSet(expIncludeHl, !!exportSettings.mdExportIncludeHighlights);
+  for (const tgl of [expFrontmatter, expIncludeToc, expIncludeHl]) {
+    tgl?.addEventListener("click", () => pbpExpTglSet(tgl, !pbpExpTglOn(tgl)));
+  }
 
   function pad2(n) { return n < 10 ? "0" + n : "" + n; }
   function todayIso() {
@@ -706,19 +718,19 @@ function pbpApplyColorScheme(mode) {
   }
   function buildExportOpts() {
     return {
-      frontmatter: expFrontmatter ? expFrontmatter.checked : !!exportSettings.mdExportFrontmatter,
+      frontmatter: expFrontmatter ? pbpExpTglOn(expFrontmatter) : !!exportSettings.mdExportFrontmatter,
       imagePolicy: expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep"),
-      includeToc: expIncludeToc ? expIncludeToc.checked : !!exportSettings.mdExportIncludeToc,
+      includeToc: expIncludeToc ? pbpExpTglOn(expIncludeToc) : !!exportSettings.mdExportIncludeToc,
       // Same gate as the live-preview KaTeX pass below (info.math) — composeStyledHtml
       // only attempts renderMathInElement when this is true (audit E3 gap).
       math: !!info.math,
       // H2 export (md-highlight.js, loaded after this file — guarded because
       // buildExportOpts() only runs from click handlers, long after every deferred
       // script has executed; the typeof check just protects against md-highlight.js
-      // failing to load at all). Unchecking exp-include-hl drops BOTH the inline
+      // failing to load at all). Unpressing exp-include-hl drops BOTH the inline
       // ==marks== and the "## Highlights" section (composeExport already skips
       // both for an empty array).
-      highlights: (expIncludeHl ? expIncludeHl.checked : !!exportSettings.mdExportIncludeHighlights)
+      highlights: (expIncludeHl ? pbpExpTglOn(expIncludeHl) : !!exportSettings.mdExportIncludeHighlights)
         ? ((typeof pbpHlCurrentItems === "function") ? pbpHlCurrentItems() : [])
         : [],
       // H5 (spec 1.6): which translation view the highlights are exported for,

@@ -1623,8 +1623,17 @@
   "mdOptIncludeHl": {
     "message": "包含高亮"
   },
+  "mdTglToc": {
+    "message": "目录"
+  },
+  "mdTglHl": {
+    "message": "高亮"
+  },
   "mdCopy": {
     "message": "复制"
+  },
+  "mdDownload": {
+    "message": "下载"
   },
   "mdCopyMarkdown": {
     "message": "复制 Markdown"

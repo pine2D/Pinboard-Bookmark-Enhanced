@@ -790,21 +790,49 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   font-size: 12px; letter-spacing: 0.04em; text-transform: none; color: var(--fg-secondary);
   margin: 15px 0 8px; padding-top: 12px; border-top: 1px solid var(--border);
 }
-.rail .exp-opt {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+/* exp-toggles: the three boolean export options (frontmatter/toc/hl), real
+   <button aria-pressed> toggles -- not checkboxes (spec sec.0 control
+   vocabulary #2: "toggle button", real button + aria-pressed, no checkmark
+   glyph). Natural width + wrap so a long locale (e.g. German "Markierungen")
+   drops to a second line instead of truncating (Codex: wrap-not-truncate is
+   the deliberate overflow strategy). */
+.exp-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.exp-toggles .exp-tgl { flex: none; }
+/* Pressed state literally reuses .toggle-btn.active's declaration set
+   (md-preview.css ~:163) -- same --active-bg/--active-fg tokens, so the
+   dark-mode AA contrast already established for that control carries over
+   verbatim instead of inventing a new pair. */
+.exp-tgl[aria-pressed="true"] {
+  background: var(--active-bg);
+  color: var(--active-fg);
+  border-color: var(--active-bg);
+  font-weight: 600;
+}
+.exp-img-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
   padding: 4px 0; font-size: 13px; color: var(--fg-secondary); cursor: pointer;
 }
-.rail .exp-opt select {
+.exp-img-row select {
+  flex: 1;
   padding: 2px 6px; border: 1px solid var(--btn-border); border-radius: 5px;
   background: var(--btn-bg); color: var(--btn-fg); font-size: 13px; cursor: pointer;
 }
-.rail .exp-opt input[type="checkbox"] { cursor: pointer; }
-.export-grid { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
-.export-fmt { display: flex; align-items: center; gap: 6px; }
-.export-fmt .fmt-name { width: 64px; flex: none; font-size: 13px; color: var(--fg-secondary); }
-.export-fmt .action-btn { flex: 1; justify-content: center; }
-.export-fmt .action-btn.icon-only { flex: 0 0 auto; padding: 6px 9px; }
+/* Format grid: 3 columns (name / primary action / icon-only download).
+   .export-fmt keeps its div wrapper for markup readability but hands box
+   generation to .export-grid via display:contents -- its children (fmt-name
+   span + action-btn(s)) become the actual grid items, so the mixed
+   auto-placed (fmt-name) + explicit-column (.exp-fmt-span, EPUB row) items
+   land in the same row without a flattening rewrite. */
+.export-grid { margin-top: 10px; display: grid; grid-template-columns: 68px 1fr 40px; gap: 6px; align-items: stretch; }
+.export-fmt { display: contents; }
+.export-fmt .fmt-name { width: 68px; font-size: 13px; color: var(--fg-secondary); }
+.export-fmt .action-btn { justify-content: center; }
+.export-fmt .action-btn.icon-only { padding: 6px 9px; justify-content: center; }
 .export-fmt .action-btn.icon-only svg { margin: 0; }
+/* EPUB row: no icon-only twin (Codex: no fake copy button for a binary
+   format) -- its single download action spans the primary+icon columns and
+   carries a visible label instead of being icon-only. */
+.exp-fmt-span { grid-column: 2 / 4; justify-content: center; }
 
 /* TOC inside the rail (no longer a fixed gutter; the rail is fixed) */
 /* No inner max-height: the TOC is the rail's LAST section, so capping it buys

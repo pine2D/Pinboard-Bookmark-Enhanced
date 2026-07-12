@@ -1593,8 +1593,17 @@
   "mdOptIncludeHl": {
     "message": "Include highlights"
   },
+  "mdTglToc": {
+    "message": "TOC"
+  },
+  "mdTglHl": {
+    "message": "Highlights"
+  },
   "mdCopy": {
     "message": "Copy"
+  },
+  "mdDownload": {
+    "message": "Download"
   },
   "mdCopyMarkdown": {
     "message": "Copy Markdown"
