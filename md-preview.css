@@ -749,7 +749,12 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   width: 256px;
   display: flex;
   flex-direction: column;
-  padding: 20px 16px;
+  /* Right padding is 6px, not 16px: scrollbar-gutter reserves the 10px
+     track (global ::-webkit-scrollbar width, transparent unless scrolling)
+     which reads as empty space, so 6px padding + 10px gutter = 16px optical
+     inset -- matching the left side exactly instead of a lopsided 26px gap
+     (real-device feedback). If the global scrollbar width changes, rebalance. */
+  padding: 20px 6px 20px 16px;
   background: var(--surface);
   border-right: 1px solid var(--border);
   overflow-y: auto;
@@ -757,9 +762,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
      non-scrolling to scrolling and back, which without a reserved gutter
      changes the content box width and reflows every rail row (rail feedback
      round 2). scrollbar-gutter:stable reserves the track unconditionally so
-     the width never moves. padding is symmetric (20px 16px, both sides) so
-     the reserved gutter sits outside that padding rather than doubling it --
-     no padding-right adjustment needed. */
+     the width never moves. */
   scrollbar-gutter: stable;
   z-index: 20;
   transition: transform 200ms ease, visibility 0s;
