@@ -1724,6 +1724,29 @@ section("md-embed: pbpEmbedScan / pbpEmbedRewrite / pbpEmbedBudget (pure layer)"
     assertEq(bud.reserve(c.n), c.expect, c.label);
   }
 })();
+
+// masking placeholder collision (Critical fix): literal " M<n> " prose must never
+// be treated as a mask token — restore must not corrupt ordinary text.
+(() => {
+  const prose = "Apple M1 chip and M3 too";
+  assertEq(pbpEmbedRewrite(prose, {}, "", pbpEmbedBudget(999999)).md, prose,
+    "plain prose with literal M<n> words survives rewrite verbatim (empty map)");
+  assertEq(pbpEmbedRewrite(prose, { "https://cdn.example.com/a.png": "data:image/png;base64,AA" }, "", pbpEmbedBudget(999999)).md, prose,
+    "plain prose with literal M<n> words survives rewrite verbatim (non-empty map)");
+
+  const mixed = "Run `npm test` on the M0 build";
+  assertEq(pbpEmbedRewrite(mixed, {}, "", pbpEmbedBudget(999999)).md, mixed,
+    "line with a code span AND a literal M0 word: span restored, literal untouched");
+
+  const multi = "Mix `one` and `two` plus \\![esc](https://e3.example.com/z.png) end";
+  assertEq(pbpEmbedRewrite(multi, {}, "", pbpEmbedBudget(999999)).md, multi,
+    "multiple code spans + escaped \\![ on one line all restored verbatim");
+
+  const withImg = "M3 note ![a](https://cdn.example.com/a.png) and M7 tail";
+  assertEq(pbpEmbedRewrite(withImg, { "https://cdn.example.com/a.png": "data:image/png;base64,AA" }, "", pbpEmbedBudget(999999)).md,
+    "M3 note ![a](data:image/png;base64,AA) and M7 tail",
+    "real image rewritten while neighboring literal M<n> prose stays intact");
+})();
 </script>
 
 <script>

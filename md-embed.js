@@ -14,13 +14,15 @@ function _pbpEmbedLines(md, onLine) {
 }
 
 // Codex-P3: 行内 code span 与转义 \![ 内的伪图片语法不得进入扫描/重写——
-// 它们会驱动权限申请与联网抓取。掩蔽为占位符，处理后还原。
+// 它们会驱动权限申请与联网抓取。掩蔽为 NUL 定界占位符（\x00M<i>\x00），处理后还原。
+// NUL 在正常 markdown 行内不可能出现，与正文字面（如 " M3 "）天然无碰撞；
+// 万一恶意输入携带 NUL 形似 token，restore 的 fallback 只保留原样，绝不注入 "undefined"。
 function _pbpEmbedMasked(line, onLine) {
   const stash = [];
   const masked = line
-    .replace(/`[^`]*`/g, (m) => { stash.push(m); return " M" + (stash.length - 1) + " "; })
-    .replace(/\\!\[/g, (m) => { stash.push(m); return " M" + (stash.length - 1) + " "; });
-  return onLine(masked).replace(/ M(\d+) /g, (_, i) => stash[+i]);
+    .replace(/`[^`]*`/g, (m) => { stash.push(m); return "\x00M" + (stash.length - 1) + "\x00"; })
+    .replace(/\\!\[/g, (m) => { stash.push(m); return "\x00M" + (stash.length - 1) + "\x00"; });
+  return onLine(masked).replace(/\x00M(\d+)\x00/g, (match, i) => stash[+i] !== undefined ? stash[+i] : match);
 }
 
 function pbpEmbedScan(md, baseUrl) {
