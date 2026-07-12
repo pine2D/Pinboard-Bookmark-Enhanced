@@ -17,6 +17,9 @@
   "cmdMarkdownPreview": {
     "message": "Konwertuj stronę na podgląd Markdown (bez okna)"
   },
+  "cmdSaveTabSet": {
+    "message": "Zapisz wszystkie karty jako zestaw kart"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -66,6 +69,9 @@
   },
   "tagsHintNew": {
     "message": "nowy tag"
+  },
+  "kbdAltTagHint": {
+    "message": "Alt+1–9 aby dodać"
   },
   "lastUsedTagsLabel": {
     "message": "Ostatnie:"
@@ -360,10 +366,10 @@
     "message": "Popularne"
   },
   "saveTabsBtn": {
-    "message": "Zapisz karty"
+    "message": "Zapisz zestaw kart"
   },
   "batchSaveBtn": {
-    "message": "Zapisz zbiorczo"
+    "message": "Zapisz karty osobno"
   },
   "batchSaving": {
     "message": "Zapisywanie..."
@@ -1390,10 +1396,10 @@
     "message": "Nadpisz"
   },
   "saveTabsTitle": {
-    "message": "Zapisz wszystkie karty jako zestaw kart (wymaga logowania na pinboard.in)"
+    "message": "Zgrupuj wszystkie otwarte karty w jeden zestaw kart Pinboard (wymaga logowania na pinboard.in)"
   },
   "batchSaveTitle": {
-    "message": "Zapisz każdą otwartą kartę jako osobną zakładkę"
+    "message": "Zapisz każdą otwartą kartę jako osobną zakładkę (opcjonalnie tagi/podsumowanie AI)"
   },
   "qlSetsTitle": {
     "message": "Zestawy kart"

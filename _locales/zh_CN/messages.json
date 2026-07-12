@@ -17,6 +17,9 @@
   "cmdMarkdownPreview": {
     "message": "将页面转为 Markdown 预览（无弹窗）"
   },
+  "cmdSaveTabSet": {
+    "message": "将所有标签页保存为标签集"
+  },
   "appName": {
     "message": "Pinboard 书签增强"
   },
@@ -66,6 +69,9 @@
   },
   "tagsHintNew": {
     "message": "新建标签"
+  },
+  "kbdAltTagHint": {
+    "message": "Alt+1–9 添加"
   },
   "lastUsedTagsLabel": {
     "message": "上次："
@@ -360,10 +366,10 @@
     "message": "热门"
   },
   "saveTabsBtn": {
-    "message": "保存标签页"
+    "message": "保存标签集"
   },
   "batchSaveBtn": {
-    "message": "批量保存"
+    "message": "逐个收藏标签页"
   },
   "batchSaving": {
     "message": "保存中..."
@@ -1390,10 +1396,10 @@
     "message": "覆盖"
   },
   "saveTabsTitle": {
-    "message": "将所有打开的标签页保存为标签集（需登录 pinboard.in）"
+    "message": "将所有打开的标签页暂存为一个 Pinboard 标签集（需登录 pinboard.in）"
   },
   "batchSaveTitle": {
-    "message": "将每个打开的标签页分别保存为独立书签"
+    "message": "将每个打开的标签页分别收藏为独立书签（可选 AI 标签与摘要）"
   },
   "qlSetsTitle": {
     "message": "标签集"

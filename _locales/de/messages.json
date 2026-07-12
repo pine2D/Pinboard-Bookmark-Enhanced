@@ -17,6 +17,9 @@
   "cmdMarkdownPreview": {
     "message": "Seite als Markdown-Vorschau öffnen (ohne Popup)"
   },
+  "cmdSaveTabSet": {
+    "message": "Alle Tabs als Tab-Set speichern"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -66,6 +69,9 @@
   },
   "tagsHintNew": {
     "message": "neues Tag"
+  },
+  "kbdAltTagHint": {
+    "message": "Alt+1–9 zum Hinzufügen"
   },
   "lastUsedTagsLabel": {
     "message": "Zuletzt:"
@@ -360,10 +366,10 @@
     "message": "Beliebt"
   },
   "saveTabsBtn": {
-    "message": "Tabs speichern"
+    "message": "Tab-Set speichern"
   },
   "batchSaveBtn": {
-    "message": "Stapelspeicherung"
+    "message": "Tabs einzeln speichern"
   },
   "batchSaving": {
     "message": "Speichern..."
@@ -1390,10 +1396,10 @@
     "message": "Überschreiben"
   },
   "saveTabsTitle": {
-    "message": "Alle offenen Tabs als Tab-Set speichern (pinboard.in-Anmeldung erforderlich)"
+    "message": "Alle offenen Tabs zu einem einzigen Pinboard-Tab-Set zusammenfassen (pinboard.in-Anmeldung erforderlich)"
   },
   "batchSaveTitle": {
-    "message": "Jeden offenen Tab als einzelnes Lesezeichen speichern"
+    "message": "Jeden offenen Tab einzeln als eigenes Lesezeichen speichern (optional mit KI-Tags/Zusammenfassung)"
   },
   "qlSetsTitle": {
     "message": "Tab-Sets"

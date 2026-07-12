@@ -17,6 +17,9 @@
   "cmdMarkdownPreview": {
     "message": "Convert page to Markdown preview (no popup)"
   },
+  "cmdSaveTabSet": {
+    "message": "Save all tabs as a Tab Set"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -66,6 +69,9 @@
   },
   "tagsHintNew": {
     "message": "new tag"
+  },
+  "kbdAltTagHint": {
+    "message": "Alt+1–9 to add"
   },
   "lastUsedTagsLabel": {
     "message": "Last used:"
@@ -360,10 +366,10 @@
     "message": "Popular"
   },
   "saveTabsBtn": {
-    "message": "Save Tabs"
+    "message": "Save Tab Set"
   },
   "batchSaveBtn": {
-    "message": "Batch Save"
+    "message": "Bookmark All Tabs"
   },
   "batchSaving": {
     "message": "Saving..."
@@ -1390,10 +1396,10 @@
     "message": "Overwrite"
   },
   "saveTabsTitle": {
-    "message": "Save all open tabs as a tab set (requires pinboard.in login)"
+    "message": "Stage all open tabs as one Pinboard tab set (requires pinboard.in login)"
   },
   "batchSaveTitle": {
-    "message": "Save each open tab as an individual bookmark"
+    "message": "Bookmark every open tab individually (optional AI tags & summary)"
   },
   "qlSetsTitle": {
     "message": "Tab Sets"

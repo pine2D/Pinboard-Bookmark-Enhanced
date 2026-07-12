@@ -1966,6 +1966,22 @@ chrome.commands.onCommand.addListener(async (command) => {
     await openMarkdownPreviewFromShortcut();
     return;
   }
+  if (command === "save_tabset") {
+    try {
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      const tabsData = tabs
+        .filter(t => t.url && /^https?:/i.test(t.url))
+        .map(t => ({ title: t.title || t.url, url: t.url }));
+      if (!tabsData.length) {
+        showNotification("tabset-error", t("bgTabSetFailed"), t("batchNoValidTabs"), "error");
+        return;
+      }
+      await handleSaveTabSet(tabsData);
+    } catch (e) {
+      showNotification("tabset-error", t("bgTabSetFailed"), e.message, "error");
+    }
+    return;
+  }
   const commandConfig = {
     read_later: { prefix: "rl", toread: true, notifyId: "rl", notifyTitle: () => t("bgReadLater"), notifyCategory: "readLater", errorTitle: () => t("bgReadLaterFailed") },
     quick_save: { prefix: "qs", toread: false, notifyId: "qs", notifyTitle: () => t("bgQuickSaved"), notifyCategory: "quickSave", errorTitle: () => t("bgQuickSaveFailed") },

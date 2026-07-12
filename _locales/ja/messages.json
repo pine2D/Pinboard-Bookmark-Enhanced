@@ -17,6 +17,9 @@
   "cmdMarkdownPreview": {
     "message": "ページを Markdown プレビューに変換（ポップアップなし）"
   },
+  "cmdSaveTabSet": {
+    "message": "全タブをタブセットとして保存"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -66,6 +69,9 @@
   },
   "tagsHintNew": {
     "message": "新規作成"
+  },
+  "kbdAltTagHint": {
+    "message": "Alt+1–9 で追加"
   },
   "lastUsedTagsLabel": {
     "message": "前回："
@@ -360,10 +366,10 @@
     "message": "人気"
   },
   "saveTabsBtn": {
-    "message": "タブを保存"
+    "message": "タブセットを保存"
   },
   "batchSaveBtn": {
-    "message": "一括保存"
+    "message": "各タブを個別に保存"
   },
   "batchSaving": {
     "message": "保存中..."
@@ -1390,10 +1396,10 @@
     "message": "上書き"
   },
   "saveTabsTitle": {
-    "message": "開いている全タブをタブセットとして保存（pinboard.in へのログインが必要）"
+    "message": "開いている全タブを 1 つの Pinboard タブセットとしてまとめて保存（pinboard.in へのログインが必要）"
   },
   "batchSaveTitle": {
-    "message": "開いている各タブを個別のブックマークとして保存"
+    "message": "開いている各タブを個別のブックマークとして保存（AI タグ・要約はオプション）"
   },
   "qlSetsTitle": {
     "message": "タブセット"

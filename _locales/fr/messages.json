@@ -17,6 +17,9 @@
   "cmdMarkdownPreview": {
     "message": "Convertir la page en aperçu Markdown (sans popup)"
   },
+  "cmdSaveTabSet": {
+    "message": "Enregistrer tous les onglets comme un ensemble d'onglets"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -66,6 +69,9 @@
   },
   "tagsHintNew": {
     "message": "nouveau tag"
+  },
+  "kbdAltTagHint": {
+    "message": "Alt+1–9 pour ajouter"
   },
   "lastUsedTagsLabel": {
     "message": "Dernière :"
@@ -360,10 +366,10 @@
     "message": "Populaire"
   },
   "saveTabsBtn": {
-    "message": "Enregistrer les onglets"
+    "message": "Enregistrer l'ensemble d'onglets"
   },
   "batchSaveBtn": {
-    "message": "Enregistrement groupé"
+    "message": "Marquer chaque onglet"
   },
   "batchSaving": {
     "message": "Enregistrement..."
@@ -1390,10 +1396,10 @@
     "message": "Écraser"
   },
   "saveTabsTitle": {
-    "message": "Enregistrer tous les onglets ouverts comme un ensemble d'onglets (nécessite une connexion à pinboard.in)"
+    "message": "Regrouper tous les onglets ouverts en un seul ensemble d'onglets Pinboard (nécessite une connexion à pinboard.in)"
   },
   "batchSaveTitle": {
-    "message": "Enregistrer chaque onglet ouvert comme un signet individuel"
+    "message": "Marquer chaque onglet ouvert comme un signet individuel (tags/résumé IA en option)"
   },
   "qlSetsTitle": {
     "message": "Ensembles d'onglets"

@@ -17,6 +17,9 @@
   "cmdMarkdownPreview": {
     "message": "Преобразовать страницу в предпросмотр Markdown (без окна)"
   },
+  "cmdSaveTabSet": {
+    "message": "Сохранить все вкладки как набор вкладок"
+  },
   "appName": {
     "message": "Pinboard Bookmark Enhanced"
   },
@@ -66,6 +69,9 @@
   },
   "tagsHintNew": {
     "message": "новый тег"
+  },
+  "kbdAltTagHint": {
+    "message": "Alt+1–9 для добавления"
   },
   "lastUsedTagsLabel": {
     "message": "Недавние:"
@@ -360,10 +366,10 @@
     "message": "популярные"
   },
   "saveTabsBtn": {
-    "message": "Сохранить вкладки"
+    "message": "Сохранить набор вкладок"
   },
   "batchSaveBtn": {
-    "message": "Пакетное сохранение"
+    "message": "Каждую вкладку отдельно"
   },
   "batchSaving": {
     "message": "Сохранение..."
@@ -1390,10 +1396,10 @@
     "message": "Перезаписать"
   },
   "saveTabsTitle": {
-    "message": "Сохранить все открытые вкладки как набор (требуется вход в pinboard.in)"
+    "message": "Объединить все открытые вкладки в один набор вкладок Pinboard (требуется вход в pinboard.in)"
   },
   "batchSaveTitle": {
-    "message": "Сохранить каждую открытую вкладку как отдельную закладку"
+    "message": "Сохранить каждую открытую вкладку как отдельную закладку (по желанию — теги/сводка ИИ)"
   },
   "qlSetsTitle": {
     "message": "Наборы вкладок"

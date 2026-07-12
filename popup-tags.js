@@ -87,6 +87,7 @@ async function fetchPinboardSuggestTags(token, url) {
 
     const resolveTag = (t) => (settings.optRespectTagCase && tagCaseMap) ? resolveTagCase(t, tagCaseMap) : t;
 
+    let kbHintShown = false;
     function buildSuggestGroup(label, tags, addAllId) {
       const g = document.createElement("div");
       g.className = "suggest-group";
@@ -94,6 +95,15 @@ async function fetchPinboardSuggestTags(token, url) {
       lbl.className = "group-label";
       lbl.textContent = label;
       g.appendChild(lbl);
+      // Surface the Alt+1..9 chip accelerator once, next to the first group's label
+      // (buildSuggestGroup only runs for a non-empty group, so a chip always exists here)
+      if (!kbHintShown) {
+        kbHintShown = true;
+        const hint = document.createElement("span");
+        hint.className = "kb-hint";
+        hint.textContent = t("kbdAltTagHint");
+        g.appendChild(hint);
+      }
       // Resolve tags then sort: matched (by count desc) first, unmatched keep original order
       const resolvedTags = tags.map(t => resolveTag(t));
       resolvedTags.sort((a, b) => {

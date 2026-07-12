@@ -93,6 +93,9 @@
         "mac": "MacCtrl+Shift+M"
       },
       "description": "__MSG_cmdMarkdownPreview__"
+    },
+    "save_tabset": {
+      "description": "__MSG_cmdSaveTabSet__"
     }
   }
 }

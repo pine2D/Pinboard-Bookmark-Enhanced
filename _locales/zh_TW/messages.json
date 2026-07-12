@@ -17,6 +17,9 @@
   "cmdMarkdownPreview": {
     "message": "將頁面轉為 Markdown 預覽（無彈出式視窗）"
   },
+  "cmdSaveTabSet": {
+    "message": "將所有分頁儲存為標籤集"
+  },
   "appName": {
     "message": "Pinboard 書籤強化"
   },
@@ -66,6 +69,9 @@
   },
   "tagsHintNew": {
     "message": "新增標籤"
+  },
+  "kbdAltTagHint": {
+    "message": "Alt+1–9 加入"
   },
   "lastUsedTagsLabel": {
     "message": "上次："
@@ -360,10 +366,10 @@
     "message": "熱門"
   },
   "saveTabsBtn": {
-    "message": "儲存分頁"
+    "message": "儲存標籤集"
   },
   "batchSaveBtn": {
-    "message": "批量儲存"
+    "message": "逐個收藏分頁"
   },
   "batchSaving": {
     "message": "儲存中..."
@@ -1390,10 +1396,10 @@
     "message": "覆蓋"
   },
   "saveTabsTitle": {
-    "message": "將所有開啟的分頁儲存為標籤集（需登入 pinboard.in）"
+    "message": "將所有開啟的分頁暫存為一個 Pinboard 標籤集（需登入 pinboard.in）"
   },
   "batchSaveTitle": {
-    "message": "將每個開啟的分頁分別儲存為獨立書籤"
+    "message": "將每個開啟的分頁分別收藏為獨立書籤（可選 AI 標籤與摘要）"
   },
   "qlSetsTitle": {
     "message": "標籤集"
