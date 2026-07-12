@@ -831,7 +831,7 @@ await suite("unified save pipeline", async () => {
     equal(h.badgeCalls.length, 1, "all non-deferred saves refresh badge state");
     equal(h.iconCalls.length, 1);
     equal(h.iconCalls[0].tabId, 7);
-    equal(h.iconCalls[0].bookmarked, true);
+    equal(h.iconCalls[0].bookmarked, "saved"); // tri-state: setIcon now takes "default"|"saved"|"toread"
   });
 
   await test("merge performs one fresh conflict recovery", async () => {

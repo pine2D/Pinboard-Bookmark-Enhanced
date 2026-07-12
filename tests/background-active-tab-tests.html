@@ -46,14 +46,20 @@ function buildHarness(source, queryTabs, bookmarkResult = true) {
   };
   const noteActivity = () => { calls.activity++; };
   const debouncedCheck = async (url) => { calls.checks.push(url); return bookmarkResult; };
-  const setIcon = (tabId, bookmarked) => { calls.icons.push({ tabId, bookmarked }); };
+  const setIcon = (tabId, state) => { calls.icons.push({ tabId, state }); };
   const writeMirror = async (...args) => { calls.mirrors.push(args); };
+  // _scheduleCurrentTabRefresh re-derives auth + cache to compute the tri-state icon
+  // (Task 2); iconStateFor itself is a real global via the shared.js <script> tag above.
+  const getCurrentPinboardAuth = async () => ({ token: "t", account: "alice", epoch: 1 });
+  const pbpStatusCacheGet = (url, auth) => ({ bookmarked: bookmarkResult === true });
 
   const make = new Function(
     "chrome", "_scheduleTabCheck", "noteActivity", "debouncedCheck", "setIcon", "_writeCurrentTabMirror",
+    "getCurrentPinboardAuth", "pbpStatusCacheGet",
     source.slice(start, end) + "; return { _getFocusedActiveTab, _scheduleCurrentTabRefresh };"
   );
-  const api = make(chrome, schedule, noteActivity, debouncedCheck, setIcon, writeMirror);
+  const api = make(chrome, schedule, noteActivity, debouncedCheck, setIcon, writeMirror,
+    getCurrentPinboardAuth, pbpStatusCacheGet);
   return { api, calls, wait: () => scheduledWork };
 }
 

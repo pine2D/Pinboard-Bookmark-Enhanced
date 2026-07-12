@@ -16,6 +16,11 @@ const ICONS_BOOKMARKED = {
   16: "icons/pin-saved-16.png", 32: "icons/pin-saved-32.png",
   48: "icons/pin-saved-48.png", 128: "icons/pin-saved-128.png"
 };
+const ICONS_TOREAD = {
+  16: "icons/pin-toread-16.png", 32: "icons/pin-toread-32.png",
+  48: "icons/pin-toread-48.png", 128: "icons/pin-toread-128.png"
+};
+const ICON_PATHS = { default: ICONS_DEFAULT, saved: ICONS_BOOKMARKED, toread: ICONS_TOREAD };
 
 // setIcon with a path: map makes Chrome RE-FETCH all 4 PNGs from disk on every
 // call. Combined with tabs.onUpdated re-firing "complete" repeatedly (and the
@@ -23,7 +28,7 @@ const ICONS_BOOKMARKED = {
 // stream of pin-default-*.png requests that dragged page loads (the options page
 // showed DOMContentLoaded ~2.4s). Decode each icon to ImageData ONCE at startup so
 // setIcon never touches the network; setIcon falls back to path: until ready.
-const _iconImageData = { default: null, bookmarked: null };
+const _iconImageData = { default: null, saved: null };
 async function _decodeIconSet(pathMap) {
   const out = {};
   for (const size of Object.keys(pathMap)) {
@@ -39,9 +44,10 @@ async function _decodeIconSet(pathMap) {
 }
 (async () => {
   try {
-    const [def, bm] = await Promise.all([_decodeIconSet(ICONS_DEFAULT), _decodeIconSet(ICONS_BOOKMARKED)]);
+    const [def, bm, tr] = await Promise.all([_decodeIconSet(ICONS_DEFAULT), _decodeIconSet(ICONS_BOOKMARKED), _decodeIconSet(ICONS_TOREAD)]);
     _iconImageData.default = def;
-    _iconImageData.bookmarked = bm;
+    _iconImageData.saved = bm;
+    _iconImageData.toread = tr;
   } catch (_) { /* decode failed — setIcon keeps using the path: fallback */ }
 })();
 
@@ -131,7 +137,7 @@ function invalidatePinboardAuthState() {
   chrome.tabs.query({}).then((tabs) => {
     if (epoch !== _pinboardAuthEpoch) return;
     for (const tab of tabs) {
-      if (typeof tab?.id === "number") setIcon(tab.id, false);
+      if (typeof tab?.id === "number") setIcon(tab.id, "default");
       if (tab?.active && tab.url?.startsWith("http")) _scheduleCurrentTabRefresh(tab.id, tab.url);
     }
   }).catch(() => {});
@@ -298,19 +304,20 @@ chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
 // check fires in the same microtask the promise settles, before user code runs.
 // Symptoms otherwise: "Unchecked runtime.lastError: No tab with id: X"
 // with Context: Unknown and Stack: :0 (anonymous function).
-const _lastIconState = new Map(); // tabId -> last bookmarked bool set (dedup)
-function setIcon(tabId, bookmarked) {
+const _lastIconState = new Map(); // tabId -> last state string set (dedup)
+function setIcon(tabId, state) {
   if (typeof tabId !== "number" || tabId < 0) return;
+  if (typeof state === "boolean") state = state ? "saved" : "default"; // legacy guard
   // Dedup: skip if this tab's icon is already in the desired state. A tab that
   // re-fires onUpdated "complete" repeatedly would otherwise re-set the same icon
   // over and over — this guard eliminates that storm regardless of trigger frequency.
-  if (_lastIconState.get(tabId) === bookmarked) return;
-  _lastIconState.set(tabId, bookmarked);
+  if (_lastIconState.get(tabId) === state) return;
+  _lastIconState.set(tabId, state);
   try {
-    const cached = bookmarked ? _iconImageData.bookmarked : _iconImageData.default;
+    const cached = _iconImageData[state];
     const details = cached
-      ? { tabId, imageData: cached }                                   // in-memory, zero network
-      : { tabId, path: bookmarked ? ICONS_BOOKMARKED : ICONS_DEFAULT }; // fallback until decoded
+      ? { tabId, imageData: cached }                              // in-memory, zero network
+      : { tabId, path: ICON_PATHS[state] || ICONS_DEFAULT };       // fallback until decoded
     chrome.action.setIcon(details, () => { void chrome.runtime.lastError; /* consume to mark handled */ });
   } catch (_) { /* synchronous throw on invalid args — ignore */ }
 }
@@ -628,12 +635,13 @@ async function applySaveResultSideEffects(envelope, settings, {
     const cacheUpdated = pbpStatusCacheSet(persisted.url, auth, {
       bookmarked: true,
       timestamp: Date.now(),
+      toreadHint: persisted.toread === true,           // display stub — posts only ever come from a real posts/get response
       ...(cachedPosts ? { posts: cachedPosts } : {}),
     });
     if (cacheUpdated) {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (pbpPinboardAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, persisted.url)) {
-        setIcon(tab.id, true);
+        setIcon(tab.id, iconStateFor(pbpStatusCacheGet(persisted.url, auth)));
       }
     }
   } catch (_) { /* status/icon are best-effort */ }
@@ -1030,7 +1038,12 @@ function _scheduleCurrentTabRefresh(tabId, expectedUrl) {
       // The tab may have navigated or lost focus while the API request was in flight.
       const currentTab = await _getFocusedActiveTab(tab.id, tab.url);
       if (!currentTab) return;
-      if (typeof bookmarked === "boolean") setIcon(currentTab.id, bookmarked);
+      if (typeof bookmarked === "boolean") {
+        // checkBookmarked (via debouncedCheck) just wrote the cache entry; re-derive
+        // the current auth to read it back atomically (same account/epoch).
+        const auth = await getCurrentPinboardAuth();
+        setIcon(currentTab.id, iconStateFor(pbpStatusCacheGet(currentTab.url, auth)));
+      }
       await _writeCurrentTabMirror(currentTab.id, currentTab.url, currentTab.title);
     } catch (_) {
       // Tab closed/replaced between event and query — expected race, skip
@@ -1400,7 +1413,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (updated) {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (pbpPinboardAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, message.url)) {
-          setIcon(tab.id, false);
+          setIcon(tab.id, "default");
         }
       }
       sendResponse({ ok: updated });
