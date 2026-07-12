@@ -753,6 +753,14 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   background: var(--surface);
   border-right: 1px solid var(--border);
   overflow-y: auto;
+  /* Long TOC / translate sections collapsing or expanding flip this from
+     non-scrolling to scrolling and back, which without a reserved gutter
+     changes the content box width and reflows every rail row (rail feedback
+     round 2). scrollbar-gutter:stable reserves the track unconditionally so
+     the width never moves. padding is symmetric (20px 16px, both sides) so
+     the reserved gutter sits outside that padding rather than doubling it --
+     no padding-right adjustment needed. */
+  scrollbar-gutter: stable;
   z-index: 20;
   transition: transform 200ms ease, visibility 0s;
 }
@@ -818,11 +826,33 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   display: flex; align-items: center; gap: 8px; margin-top: 8px;
   padding: 4px 0; font-size: 13px; color: var(--fg-secondary); cursor: pointer;
 }
+/* Restyled to match the .action-btn family (rail feedback round 2) -- was
+   plain UA select chrome, visually orphaned next to the action-btn/toggle-btn
+   controls that make up the rest of the rail. appearance:none removes the
+   native arrow/caret, which we redraw as an inline SVG data-URI chevron
+   (longhand background-image/repeat/position so a themed override that only
+   sets background-color still keeps the chevron, same technique as
+   options.css's .fg select). Stroke color is a fixed neutral gray, not a
+   theme token -- it needs to read at low contrast against both --btn-bg
+   branches (13 themes x light/dark) and no existing var() is guaranteed
+   legible on all of them; #8a94a0 is picked to sit around 3:1 on both.
+   :root already sets color-scheme:light dark (md-preview.css ~:11), which
+   the select inherits, so the dark-mode option-list popup already uses the
+   dark UA form-control palette without any extra rule here. */
 .exp-img-row select {
   flex: 1;
-  padding: 2px 6px; border: 1px solid var(--btn-border); border-radius: 5px;
-  background: var(--btn-bg); color: var(--btn-fg); font-size: 13px; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  padding: 6px 24px 6px 14px;
+  border: 1px solid var(--btn-border); border-radius: 7px;
+  background-color: var(--btn-bg); color: var(--btn-fg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a94a0' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  font-size: 13px; cursor: pointer;
+  transition: all 150ms ease;
 }
+.exp-img-row select:hover { background-color: var(--btn-hover); border-color: var(--border); }
+.exp-img-row select:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 /* Format grid: 3 columns (name / primary action / icon-only download).
    .export-fmt keeps its div wrapper for markup readability but hands box
    generation to .export-grid via display:contents -- its children (fmt-name
@@ -887,7 +917,13 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .rail-sec-count { flex: none; color: var(--fg-muted); }
 .rail-sec-progress { flex: none; display: none; color: var(--fg-muted); }
 .rail-collapsed .rail-sec-head .rail-sec-progress { display: inline; }
-.rail-collapsed > *:not(.rail-sec-head) { display: none; }
+/* !important: this collapse rule is (0,2,0) specificity, but several rail
+   section rules scope through an ID (e.g. #tr-section .tr-row / .tr-target,
+   (1,1,0)) which outspecifies it — those rows stayed visible through a
+   collapsed section without this. !important keeps "collapsed hides
+   everything but the header" true regardless of what ID-scoped display rule
+   a current or future rail section adds. */
+.rail-collapsed > *:not(.rail-sec-head) { display: none !important; }
 
 /* Drawer toggle (hamburger) + scrim — shown only in narrow mode */
 .rail-toggle {
