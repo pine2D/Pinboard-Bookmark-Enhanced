@@ -20,6 +20,7 @@ h2 { margin-top: 24px; }
 <script src="../vendor/katex/auto-render.min.js"></script>
 <script src="../md-convert.js?v=obs2"></script>
 <script src="../md-embed.js"></script>
+<script src="../md-epub.js"></script>
 <script src="../site-rules.js?v=1"></script>
 <script src="../md-highlight.js"></script>
 <script>
@@ -1747,6 +1748,96 @@ section("md-embed: pbpEmbedScan / pbpEmbedRewrite / pbpEmbedBudget (pure layer)"
     "M3 note ![a](data:image/png;base64,AA) and M7 tail",
     "real image rewritten while neighboring literal M<n> prose stays intact");
 })();
+</script>
+
+<script>
+section("md-epub: pbpCrc32 / pbpZipStore / pbpEpubContentOpf / pbpEpubNavXhtml / pbpEpubXmlEscape (pure layer)");
+
+// CRC32 known vectors (2 assertions)
+(() => {
+  assertEq(pbpCrc32(new TextEncoder().encode("123456789")), 0xCBF43926, "CRC32('123456789') matches known IEEE 802.3 test vector");
+  assertEq(pbpCrc32(new Uint8Array(0)), 0, "CRC32 of empty bytes is 0");
+})();
+
+// ZIP structure: 2-entry pack -> reverse-assert local header fields (3 assertions)
+const _pbpZipTestBytes = { mt: new TextEncoder().encode("application/epub+zip"), ci: new TextEncoder().encode("<x/>") };
+const _pbpZipTest = pbpZipStore([
+  { name: "mimetype", data: _pbpZipTestBytes.mt },
+  { name: "META-INF/container.xml", data: _pbpZipTestBytes.ci },
+]);
+(() => {
+  const dv = new DataView(_pbpZipTest.buffer);
+  assertEq(dv.getUint32(0, true), 0x04034b50, "first local file header signature is PK\\x03\\x04");
+  assertEq(dv.getUint16(8, true), 0, "compression method 0 = stored");
+  assertEq(new TextDecoder().decode(_pbpZipTest.slice(30, 38)), "mimetype", "first entry's stored name is 'mimetype' (entries[0] contract)");
+})();
+
+// EOCD locate + central directory count + offset consistency (3 assertions)
+(() => {
+  const dv = new DataView(_pbpZipTest.buffer);
+  const eocdOff = _pbpZipTest.length - 22; // fixed-size EOCD record, no archive comment
+  assertEq(dv.getUint32(eocdOff, true), 0x06054b50, "EOCD signature located at zip.length-22");
+  assertEq(dv.getUint16(eocdOff + 8, true), 2, "EOCD total central-directory entry count matches the 2 entries packed");
+  const cdSize = dv.getUint32(eocdOff + 12, true);
+  const cdOffset = dv.getUint32(eocdOff + 16, true);
+  assertEq(cdOffset + cdSize, eocdOff, "central directory offset + size lands exactly at EOCD start");
+})();
+
+// mimetype entry's stored CRC matches pbpCrc32(data) independently (1 assertion)
+(() => {
+  const dv = new DataView(_pbpZipTest.buffer);
+  assertEq(dv.getUint32(14, true), pbpCrc32(_pbpZipTestBytes.mt), "mimetype local-header CRC field equals pbpCrc32(mimetype bytes)");
+})();
+
+// OPF: required fields, escaping, no-author omission, identifier determinism (6 assertions)
+(() => {
+  const meta = { title: 'My <Title> & "Quote\'s"', url: "https://e.com/a", clipped: "2026-01-02", lang: "en" };
+  const opf = pbpEpubContentOpf(meta, [{ id: "content", href: "content.xhtml", mediaType: "application/xhtml+xml" }]);
+  assert(opf.includes("<dc:title>My &lt;Title&gt; &amp; &quot;Quote&apos;s&quot;</dc:title>"),
+    "dc:title carries the escaped title text: " + opf);
+  assert(opf.includes("<dc:source>https://e.com/a</dc:source>"), "dc:source carries the url: " + opf);
+  assert(opf.includes("<dc:date>2026-01-02</dc:date>"), "dc:date falls back to meta.clipped when meta.date is absent: " + opf);
+  assert(opf.includes('<meta property="dcterms:modified">2026-01-02T00:00:00Z</meta>'),
+    "dcterms:modified = clipped + T00:00:00Z: " + opf);
+
+  const opfNoAuthor = pbpEpubContentOpf({ title: "T", url: "https://e.com/b", clipped: "2026-01-03" }, []);
+  assert(!/<dc:creator>/.test(opfNoAuthor), "dc:creator tag is omitted entirely when meta.author is absent: " + opfNoAuthor);
+
+  const ident = "urn:pbp:" + pbpCrc32(new TextEncoder().encode("https://e.com/b")).toString(16);
+  const opfNoAuthor2 = pbpEpubContentOpf({ title: "T", url: "https://e.com/b", clipped: "2026-01-03" }, []);
+  assert(opfNoAuthor.includes(`<dc:identifier id="pub-id">${ident}</dc:identifier>`) && opfNoAuthor === opfNoAuthor2,
+    "dc:identifier is urn:pbp:+crc32(url).toString(16) and identical output for identical input (deterministic): " + opfNoAuthor);
+})();
+
+// nav: heading anchors, XML escaping, empty-headings fallback (4 assertions)
+(() => {
+  const nav = pbpEpubNavXhtml([{ id: "sec-1", text: "Intro" }, { id: "sec-2", text: "More" }], "My Doc");
+  assert(nav.includes('<a href="content.xhtml#sec-1">Intro</a>') && nav.includes('<a href="content.xhtml#sec-2">More</a>'),
+    "each heading renders an anchor list item pointing at content.xhtml#<id>: " + nav);
+
+  const navEsc = pbpEpubNavXhtml([{ id: 'a&b', text: "<X> & \"Y\"" }], "T");
+  assert(navEsc.includes('href="content.xhtml#a&amp;b"') && navEsc.includes(">&lt;X&gt; &amp; &quot;Y&quot;<"),
+    "heading id and text are both XML-escaped: " + navEsc);
+
+  const navEmptyTitled = pbpEpubNavXhtml([], "My Doc");
+  const liCount = (navEmptyTitled.match(/<li>/g) || []).length;
+  assertEq(liCount, 1, "empty headings array falls back to a single <li> entry");
+  assert(navEmptyTitled.includes('<a href="content.xhtml">My Doc</a>'),
+    "fallback li has no #id fragment and uses fallbackTitle as its text: " + navEmptyTitled);
+
+  const navEmptyNoTitle = pbpEpubNavXhtml([], undefined);
+  assert(navEmptyNoTitle.includes('<a href="content.xhtml">Content</a>') && navEmptyNoTitle.includes("<title>Contents</title>"),
+    "with no fallbackTitle: li falls back to 'Content', <title> falls back to 'Contents' (distinct defaults, verbatim): " + navEmptyNoTitle);
+})();
+
+// xmlEscape: table-driven, all five reserved XML characters (5 assertions)
+[
+  ["&", "&amp;"],
+  ["<", "&lt;"],
+  [">", "&gt;"],
+  ['"', "&quot;"],
+  ["'", "&apos;"],
+].forEach(([ch, esc]) => assertEq(pbpEpubXmlEscape(ch), esc, `pbpEpubXmlEscape(${JSON.stringify(ch)}) -> ${esc}`));
 </script>
 
 <script>
