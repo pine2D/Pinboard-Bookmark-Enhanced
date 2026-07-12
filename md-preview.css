@@ -3,64 +3,82 @@
    ============================================================ */
 
 :root {
-  /* Slate palette -- document-optimized. Single light-dark() definition
-     per token (Chrome 123+); color-scheme tells the UA which branch to
-     resolve and also themes native form controls / scrollbar chrome.
-     The old separate @media (prefers-color-scheme: dark) { :root {...} }
-     override block is gone -- every token below carries both values. */
+  /* A "warm-neutral reading" palette -- document-optimized. Single
+     light-dark() definition per token (Chrome 123+); color-scheme tells
+     the UA which branch to resolve and also themes native form controls /
+     scrollbar chrome. The old separate @media (prefers-color-scheme: dark)
+     { :root {...} } override block is gone -- every token below carries
+     both values. Dark branch replaced the old blue-leaning Slate palette
+     (#0f172a family) with candidate A from docs/superpowers/
+     2026-07-13-dark-palette-research-codex.md (bg #1C1B1A / fg #CECDC3,
+     body-text contrast 10.8:1) -- same base color options.css already
+     ships as its no-preset dark fallback (html[data-theme="flexoki-dark"],
+     options.css ~:533-538), so the two surfaces are now visually unified
+     by coincidence-turned-decision rather than by a shared stylesheet.
+     Light branch is untouched by this pass. */
   color-scheme: light dark;
-  --bg: light-dark(#f8fafc, #0f172a);
-  --fg: light-dark(#0f172a, #e2e8f0);
-  --fg-secondary: light-dark(#475569, #94a3b8);
-  --fg-muted: light-dark(#5b6878, #8a98ab);
-  --border: light-dark(#e2e8f0, #1e293b);
-  --border-light: light-dark(#f1f5f9, #1e293b);
-  --code-bg: light-dark(#f1f5f9, #1e293b);
-  --code-fg: light-dark(#334155, #cbd5e1);
-  --link: light-dark(#2563eb, #60a5fa);
-  --link-hover: light-dark(#1d4ed8, #93bbfd);
-  --badge-bg: light-dark(#e0f2fe, #1e3a5f);
-  --badge-fg: light-dark(#0369a1, #7dd3fc);
-  --btn-bg: light-dark(#ffffff, #1e293b);
-  --btn-border: light-dark(#e2e8f0, #334155);
-  --btn-hover: light-dark(#f1f5f9, #334155);
-  --btn-fg: light-dark(#334155, #cbd5e1);
-  --active-bg: light-dark(#0f172a, #e2e8f0);
-  --active-fg: light-dark(#f8fafc, #0f172a);
-  --success: light-dark(#16a34a, #22c55e);
-  --bq-border: light-dark(#2563eb, #3b82f6);
-  --bq-bg: light-dark(#f0f9ff, #172554);
-  --bq-fg: light-dark(#1e3a5f, #bfdbfe);
-  --table-stripe: light-dark(#f8fafc, #1e293b);
-  --selection: light-dark(#bfdbfe, #1e3a5f);
-  --surface: light-dark(#ffffff, #1e293b);
-  --danger: light-dark(#dc2626, #f87171);
-  /* D8-7: hljs-github-dark's own designed bg (#0d1117) is darker/more
-     contrast than --surface's dark value (#1e293b) -- kept as its own
-     token (not derived from --surface) so #rendered-view pre never
-     regresses that contrast fix. Was a screen-only @media dark override;
-     light-dark() makes it unconditional -- print still forces the light
-     branch via :root's print color-scheme (see the print block below),
-     same mechanism as every other token, so nothing extra is needed here. */
-  --pre-bg: light-dark(#ffffff, #0d1117);
+  --bg: light-dark(#f8fafc, #1C1B1A);
+  --fg: light-dark(#0f172a, #CECDC3);
+  --fg-secondary: light-dark(#475569, #A6A49F);
+  --fg-muted: light-dark(#5b6878, #8C8A85);
+  --border: light-dark(#e2e8f0, #403E3C);
+  --border-light: light-dark(#f1f5f9, #343331);
+  --code-bg: light-dark(#f1f5f9, #282726);
+  --code-fg: light-dark(#334155, #C8C6BC);
+  --link: light-dark(#2563eb, #6095C5);
+  --link-hover: light-dark(#1d4ed8, #7AAEDB);
+  --badge-bg: light-dark(#e0f2fe, #263542);
+  --badge-fg: light-dark(#0369a1, #8DB9DD);
+  --btn-bg: light-dark(#ffffff, #282726);
+  --btn-border: light-dark(#e2e8f0, #403E3C);
+  --btn-hover: light-dark(#f1f5f9, #343331);
+  --btn-fg: light-dark(#334155, #C8C6BC);
+  --active-bg: light-dark(#0f172a, #CECDC3);
+  --active-fg: light-dark(#f8fafc, #1C1B1A);
+  --success: light-dark(#16a34a, #87A85F);
+  --bq-border: light-dark(#2563eb, #6095C5);
+  --bq-bg: light-dark(#f0f9ff, #22282D);
+  --bq-fg: light-dark(#1e3a5f, #B9CAD6);
+  --table-stripe: light-dark(#f8fafc, #22211F);
+  --selection: light-dark(#bfdbfe, #324B61);
+  --surface: light-dark(#ffffff, #282726);
+  --danger: light-dark(#dc2626, #D9827C);
+  /* D8-7: --pre-bg is intentionally darker than --surface's dark value so
+     the code-block container reads as a step below panel-level surfaces.
+     Under the old Slate palette this was tuned to literally equal
+     hljs-github-dark's own designed bg (#0d1117); the A palette swap uses
+     A's own warm-dark pre-bg (#161513) instead -- still darker/more-
+     contrast than --surface (#282726), preserving the hierarchy, just no
+     longer numerically identical to hljs's cool-toned #0d1117. That's
+     fine: hljs's own `.hljs{background:#0d1117}` never actually paints --
+     `#rendered-view pre code.hljs` below overrides it to `transparent`
+     with higher selector specificity (no !important needed), so --pre-bg
+     is the only background that renders and there's no cold/warm seam.
+     Was a screen-only @media dark override; light-dark() makes it
+     unconditional -- print still forces the light branch via :root's
+     print color-scheme (see the print block below), same mechanism as
+     every other token, so nothing extra is needed here. */
+  --pre-bg: light-dark(#ffffff, #161513);
   /* Jump flash + user highlights (md-ask.js / md-highlight.js): CSS Custom
      Highlight API backgrounds. Dark variants desaturate each -- was 2
      separate @media (prefers-color-scheme: dark) blocks, now single
-     tokens. */
-  --hl-flash: light-dark(rgba(250, 204, 21, 0.5), rgba(202, 138, 4, 0.45));
-  --hl-1: light-dark(rgba(250, 204, 21, 0.45), rgba(202, 138, 4, 0.4));
-  --hl-2: light-dark(rgba(74, 222, 128, 0.4), rgba(21, 128, 61, 0.4));
-  --hl-3: light-dark(rgba(96, 165, 250, 0.4), rgba(29, 78, 216, 0.4));
-  --hl-4: light-dark(rgba(248, 113, 113, 0.4), rgba(185, 28, 28, 0.4));
-  --hl-5: light-dark(rgba(192, 132, 252, 0.4), rgba(126, 34, 206, 0.4));
+     tokens. Dark values follow the A palette's five-hue set (hl-4 is
+     pink, not the old saturated red, so it doesn't read as a danger/
+     error state -- research doc sec.1.4). */
+  --hl-flash: light-dark(rgba(250, 204, 21, 0.5), #D9A44173);
+  --hl-1: light-dark(rgba(250, 204, 21, 0.45), #D9A44159);
+  --hl-2: light-dark(rgba(74, 222, 128, 0.4), #5E9C6959);
+  --hl-3: light-dark(rgba(96, 165, 250, 0.4), #5689B659);
+  --hl-4: light-dark(rgba(248, 113, 113, 0.4), #B86F8C59);
+  --hl-5: light-dark(rgba(192, 132, 252, 0.4), #8B72AF59);
   /* R4 in-document search (md-reader.js): a low-saturation NEUTRAL tint
      distinct from every saturated user-highlight hue above (yellow/
-     green/blue/red/purple) and from --hl-flash's yellow, so all three
+     green/blue/pink/purple) and from --hl-flash's yellow, so all three
      stay visually distinguishable in both color schemes (spec sec.6.3).
      -current is one step deeper/teal so the active match still reads as
      "the same family, emphasized" rather than an unrelated new hue. */
-  --hl-search: light-dark(rgba(100, 116, 139, 0.32), rgba(148, 163, 184, 0.3));
-  --hl-search-current: light-dark(rgba(20, 184, 166, 0.5), rgba(45, 212, 191, 0.42));
+  --hl-search: light-dark(rgba(100, 116, 139, 0.32), #8C8A854D);
+  --hl-search-current: light-dark(rgba(20, 184, 166, 0.5), #4E9E936B);
   /* Per-script font stacks — DRY building blocks for the :lang() rules below.
      Latin head first (handles en/de/fr/pl/ru + Latin in CJK articles), then the
      script-preferred Han/Kana/Hangul families, then a covering fallback. */
@@ -665,7 +683,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 /* White text on --success failed AA at 13px (light 3.3:1, dark 2.3:1 — v2.87
    popup progress bar hit the same green-bg/white-text trap). A fixed dark-green
    foreground clears 4.5:1 against BOTH --success values (light #16a34a: 4.89:1,
-   dark #22c55e: 7.08:1), so no per-mode override is needed. */
+   dark #87a85f: ~6.0:1), so no per-mode override is needed. */
 .action-btn.copied {
   background: var(--success);
   color: #04270f;
@@ -986,7 +1004,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   .rail, .rail-toggle, .rail-scrim, #zen-bar { display: none; }
   main { margin-left: 0; max-width: 100%; padding: 0; }
   /* Deliberate pure white/black (not --bg/--fg, which are near-white
-     #f8fafc / near-black #0f172a by design) -- an intentional ink-saving
+     #f8fafc / warm near-black #1C1B1A by design) -- an intentional ink-saving
      choice, independent of the token system. */
   body { background: white; color: black; }
 }
