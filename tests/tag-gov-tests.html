@@ -397,6 +397,19 @@ suite("pbpTagGovParseAiResponse", () => {
     const groups = pbpTagGovParseAiResponse(text, counts);
     assert(groups.length === 0, "dot-tag member disqualifies");
   });
+
+  test("null array element is skipped, not fatal (BUG-2)", () => {
+    const text = `[{"members":["python","pyton"],"canonical":"python","reason":"typo"}, null]`;
+    const counts = { python: 100, pyton: 5 };
+    const groups = pbpTagGovParseAiResponse(text, counts);
+    assert(groups.length === 1, "valid group survives a trailing null element instead of aborting the whole batch");
+    assert(groups[0].suggestedCanonical === "python", "the valid group is intact");
+  });
+
+  test("array of only null/primitives -> empty, no throw (BUG-2)", () => {
+    const groups = pbpTagGovParseAiResponse(`[null, 5, "x", true]`, { python: 100 });
+    assert(groups.length === 0, "non-object elements are all skipped without throwing");
+  });
 });
 
 // ============ pbpTagGovLowCountTags ============

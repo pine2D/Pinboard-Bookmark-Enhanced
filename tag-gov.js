@@ -326,6 +326,10 @@ function pbpTagGovParseAiResponse(text, counts) {
   if (!Array.isArray(parsed)) return [];
 
   for (const item of parsed) {
+    // A JSON array may hold null/primitives; a bare item.members deref on those
+    // would throw and discard the entire batch (incl. already-valid groups),
+    // violating the documented drop-malformed-groups contract. Skip non-objects.
+    if (!item || typeof item !== "object") continue;
     if (!Array.isArray(item.members) || item.members.length < 2 || !item.members.every((m) => typeof m === "string")) continue;
     if (item.members.some(m => m.startsWith("."))) continue;
     if (!item.canonical || item.members.indexOf(item.canonical) === -1) continue;

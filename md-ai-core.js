@@ -510,12 +510,16 @@ async function pbpTrCacheGet(url, lang, model, account) {
 }
 
 async function pbpTrCacheSet(url, lang, model, blocksMap, account) {
+  // Atomic merge (mirrors pbpAskHistAppend): a plain get-then-put lets two
+  // preview tabs on the same URL/lang/model race and silently drop one tab's
+  // freshly-translated (and paid-for) blocks. Routing the read-merge-write
+  // through pbpAiCacheAppend puts it in ONE readwrite IDB transaction, which
+  // IndexedDB serializes across tabs/connections.
   const key = _pbpTrCacheKey(url, lang, model, account);
-  const prev = await pbpAiCacheGet(key);
-  const prevBlocks = (prev && prev.result && prev.result.blocks
-    && typeof prev.result.blocks === "object") ? prev.result.blocks : {};
-  const merged = Object.assign({}, prevBlocks, blocksMap || {});
-  await pbpAiCacheSet(key, { blocks: merged }, Date.now());
+  await pbpAiCacheAppend(key, (prev) => {
+    const prevBlocks = (prev && prev.blocks && typeof prev.blocks === "object") ? prev.blocks : {};
+    return { blocks: Object.assign({}, prevBlocks, blocksMap || {}) };
+  }, Date.now());
 }
 
 // Auto-extracted terminology cache (spec T1): one entry per account/article/(lang, model),
