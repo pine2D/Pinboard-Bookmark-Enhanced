@@ -20,8 +20,8 @@
 - **快速同批次儲存** — 唔使開彈出視窗，撳一下快捷鍵就直接儲存頁面（或者標記為*稍後閱讀*）；又或者批次儲存所有開咗嘅分頁，每個分頁獨立 AI 加標籤、即時顯示進度，仲可以打包成一個分頁集（亦可綁定專屬嘅快捷鍵）；離線草稿會留喺本機佇列，重新連線後自動重試儲存到 Pinboard
 - **AI 標籤同摘要** — 自備 API key 接入 13 家主流 LLM 服務商，或者任何 OpenAI 相容端點；送畀 AI 嘅係去除咗廣告、選單、側欄之後嘅乾淨正文
 - **標籤工具** — 由你自己嘅標籤、Pinboard 建議標籤同一撳即用嘅標籤預設提供自動完成；仲有一個治理面板，可以揪出重複同低使用次數嘅標籤（啟發式判斷 + 按需 AI 聚類），再分批限速合併，過程即時顯示進度
-- **快速連結同狀態** — 一撳即去你嘅未讀、Network、Notes 同熱門頁面；目前頁如果已經收藏咗，工具列圖示會自動切換狀態
-- **當前頁轉 Markdown** — 將目前網頁轉為乾淨嘅 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可以複製或者下載做 `.md` 或者帶樣式嘅 `.html`，可以調整 frontmatter（包括作者、發佈日期、網站、封面圖同字數）、圖片處理同目錄，或者直接匯出去 [Obsidian](https://obsidian.md)、GitHub Gist，或者任何 webhook（同 Readwise 相容）。網站感知抽取會令問答、社交貼文同論壇串保持易讀（知乎、Hacker News、Stack Overflow、X/Twitter、…）；後端可揀 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或者 [Jina Reader](https://jina.ai/reader)（雲端）
+- **快速連結同狀態** — 一撳即去你嘅未讀、Network、Notes 同熱門頁面；工具列圖示會即刻顯示目前頁未儲存、已收藏，或者已收藏兼標咗*稍後閱讀*
+- **當前頁轉 Markdown** — 將目前網頁轉為乾淨嘅 Markdown，內建預覽（渲染/原始碼切換、目錄、閱讀統計）；可以複製或者下載做 `.md`、帶樣式嘅 `.html`，或者單篇 `.epub`（Kindle / Kobo / KOReader 睇得），可以調整 frontmatter（包括作者、發佈日期、網站、封面圖同字數）、圖片處理（保留、移除或者內嵌做離線可讀）同目錄，或者直接匯出去 [Obsidian](https://obsidian.md)、GitHub Gist，或者任何 webhook（同 Readwise 相容）。網站感知抽取會令問答、社交貼文同論壇串保持易讀（知乎、Hacker News、Stack Overflow、X/Twitter、…）；後端可揀 [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown)（本機）或者 [Jina Reader](https://jina.ai/reader)（雲端）
 - **向頁面提問同翻譯** — 喺嗰個 Markdown 預覽入面，你可以直接提問並串流取得答案，附帶可核實嘅引註、撳一下即跳去原文；亦可以就任何選取段落做行內解釋或翻譯（仲可以將答案存為筆記），或者用自訂詞彙表將成版翻譯，並提供即時 token 用量同原文／雙語／譯文三種檢視
 - **閱讀工具** — 用五種顏色 highlight 文字並加筆記，重新渲染或者翻譯之後都會保留低；喺 Notebook 面板瀏覽所有 highlight；搜尋文章內文（`/`，仲支援 regex——你自己嘅筆記都搜得到）；就地睇返註腳內容；自動記返你上次睇到邊度；開啟專注模式，減少畫面干擾；或者加開一個預設關閉、opt-in 嘅 AI 重點摘要；撳 `?` 就可以睇晒完整快捷鍵清單
 - **自動存檔** — 可選擇將每次儲存一併存入 Internet Archive 嘅 [Wayback Machine](https://web.archive.org)（附存檔記錄同重試），就算原網頁日後失效都仲搵得返
