@@ -682,6 +682,23 @@ function pbpCleanHighlightBackup(highlights) {
   return out;
 }
 
+// Backup highlights are keyed by URL only (pbp_hl_<url>) with no account
+// dimension, so a backup restored on a device logged into a DIFFERENT Pinboard
+// account would merge the first account's reading notes into the second's.
+// Backups now carry a non-secret _highlightsOwner (the exporting account) and
+// apply re-checks it here. Missing owner (legacy backup, or export with no
+// account) => allow, to stay backward compatible. Not logged in on restore
+// (no current account) => allow: there is no cross-account boundary to violate.
+// accountResolved=false means the current account could NOT be read (transient
+// storage/lock error): fail CLOSED when the backup names a specific owner, so a
+// storage hiccup can't silently leak account A's notes onto account B.
+function pbpHighlightBackupOwnerAllowed(backupOwner, currentAccount, accountResolved = true) {
+  if (!backupOwner) return true;
+  if (!accountResolved) return false;
+  if (!currentAccount) return true;
+  return backupOwner === currentAccount;
+}
+
 function pbpKeyMatchesCategory(key, def) {
   // Reject non-defs (incl. inherited props like PBP_RECLAIM_CATEGORIES["__proto__"],
   // which resolves to Object.prototype — truthy but with no keys/prefixes arrays).

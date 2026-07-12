@@ -79,7 +79,18 @@ function pbpWebdavBuildPayload(settings, meta, extra) {
     if (Object.prototype.hasOwnProperty.call(s, k)) payload[k] = s[k];
   });
   if (payload.exportTargets) payload.exportTargets = pbpStripExportTargetTokens(payload.exportTargets);
-  if (s.backupIncludeHighlights !== false && extra.highlights) payload._highlights = extra.highlights;
+  // customOverlayCSS + savedThemes are NOT SETTINGS_DEFAULTS keys (stored chunked
+  // via syncSetLarge), so the whitelist above never picks them up. The caller reads
+  // them and hands them in, mirroring options-backup.js's file export, so a WebDAV
+  // restore carries the user's custom theme instead of silently dropping it.
+  if (extra.overlay) payload.customOverlayCSS = extra.overlay;
+  if (Array.isArray(extra.savedThemes) && extra.savedThemes.length) payload.savedThemes = extra.savedThemes;
+  if (s.backupIncludeHighlights !== false && extra.highlights) {
+    payload._highlights = extra.highlights;
+    // Non-secret owner (Pinboard username) so a restore onto a different account
+    // can refuse to merge this account's reading notes. See pbpHighlightBackupOwnerAllowed.
+    if (extra.highlightsOwner) payload._highlightsOwner = extra.highlightsOwner;
+  }
   payload._schemaVersion = 2;
   payload._webdav = { pushedAt: meta.pushedAt, appVersion: meta.appVersion };
   return payload;
@@ -205,11 +216,24 @@ async function pbpWebdavPush(cfgOverride) {
       settings.backupIncludeHighlights = cfg.includeHighlights !== false;
     }
     const meta = { pushedAt: new Date().toISOString(), appVersion: chrome.runtime.getManifest().version };
+    // customOverlayCSS + savedThemes live outside SETTINGS_DEFAULTS (chunked via
+    // syncSetLarge), so read them explicitly and mirror options-backup.js's export
+    // overlay source selection (sync large blob, or local fallback when optOverlayInLocal).
+    let overlay = "";
+    try {
+      const flags = await chrome.storage.sync.get({ optOverlayInLocal: false });
+      overlay = flags.optOverlayInLocal
+        ? (await chrome.storage.local.get({ customOverlayCSS_localFallback: "" })).customOverlayCSS_localFallback
+        : await syncGetLarge("customOverlayCSS", "");
+    } catch (_) {}
+    let savedThemes = [];
+    try { savedThemes = await syncGetLarge("savedThemes", []); } catch (_) {}
     let highlights = null;
     if (settings.backupIncludeHighlights !== false) {
       try { highlights = pbpBuildHighlightBackup(await chrome.storage.local.get(null)); } catch (_) {}
     }
-    const payload = pbpWebdavBuildPayload(settings, meta, { highlights });
+    const owner = pbpPinboardAccountFromToken(settings.pinboardToken);
+    const payload = pbpWebdavBuildPayload(settings, meta, { highlights, highlightsOwner: owner, overlay, savedThemes });
     const resp = await _pbpWebdavFetch("push", cfg, { body: JSON.stringify(payload) });
     let error = resp.ok ? undefined : ("http-" + resp.status);
     const status = resp.ok ? undefined : resp.status;

@@ -120,6 +120,43 @@ section("pbpWebdavBuildPayload — optional highlights");
   assert(!payloadWithoutHl._highlights, "highlight backup omitted when disabled");
 }
 
+section("pbpWebdavBuildPayload — custom themes + savedThemes (BUG-1) & highlight owner (SEC-1)");
+{
+  const s = Object.assign({}, SETTINGS_DEFAULTS, { backupIncludeHighlights: true });
+  const payload = pbpWebdavBuildPayload(s, { pushedAt: "t", appVersion: "v" }, {
+    highlights: { pbp_hl_x: { v: 1, url: "https://x.test", title: "X", items: [] } },
+    highlightsOwner: "alice",
+    overlay: "body{color:red}",
+    savedThemes: [{ key: "mine", css: "x" }],
+  });
+  assertEq(payload.customOverlayCSS, "body{color:red}", "custom overlay CSS rides the WebDAV payload (BUG-1)");
+  assert(Array.isArray(payload.savedThemes) && payload.savedThemes[0].key === "mine", "savedThemes ride the WebDAV payload (BUG-1)");
+  assertEq(payload._highlightsOwner, "alice", "highlight backup carries the non-secret owner account (SEC-1)");
+
+  const noExtra = pbpWebdavBuildPayload(s, { pushedAt: "t", appVersion: "v" },
+    { highlights: { pbp_hl_x: { v: 1, url: "https://x.test", title: "X", items: [] } } });
+  assert(!("customOverlayCSS" in noExtra), "no overlay extra -> no customOverlayCSS key");
+  assert(!("savedThemes" in noExtra), "no savedThemes extra -> no savedThemes key");
+  assert(!("_highlightsOwner" in noExtra), "no owner -> no _highlightsOwner key (legacy-compatible)");
+
+  const emptyExtra = pbpWebdavBuildPayload(s, { pushedAt: "t", appVersion: "v" }, { overlay: "", savedThemes: [] });
+  assert(!("customOverlayCSS" in emptyExtra), "empty overlay string is omitted (no noise key)");
+  assert(!("savedThemes" in emptyExtra), "empty savedThemes array is omitted");
+}
+
+section("pbpHighlightBackupOwnerAllowed (SEC-1 pure gate)");
+{
+  assert(pbpHighlightBackupOwnerAllowed("alice", "alice") === true, "same account -> allowed");
+  assert(pbpHighlightBackupOwnerAllowed("alice", "bob") === false, "different account -> blocked (cross-account leak prevented)");
+  assert(pbpHighlightBackupOwnerAllowed("", "bob") === true, "no backup owner (legacy backup) -> allowed, backward compatible");
+  assert(pbpHighlightBackupOwnerAllowed(undefined, "bob") === true, "undefined owner -> allowed");
+  assert(pbpHighlightBackupOwnerAllowed("alice", "") === true, "not logged in (no current account) -> allowed, no cross-account boundary");
+  // Fail-closed when the current account could not be resolved (storage/lock error).
+  assert(pbpHighlightBackupOwnerAllowed("alice", "", false) === false, "unresolved account + known foreign owner -> blocked (fail closed)");
+  assert(pbpHighlightBackupOwnerAllowed("", "", false) === true, "unresolved account + legacy/ownerless backup -> still allowed");
+  assert(pbpHighlightBackupOwnerAllowed("alice", "alice", false) === false, "unresolved account never trusts a passed-in account -> blocked");
+}
+
 section("pbpWebdavBuildRequest");
 {
   const cfg = { baseUrl: "https://dav.example.com/backups", user: "bob", pass: "secret" };
@@ -205,6 +242,9 @@ async function runChromeLayerTests() {
     optSyncEnabled: false,
     backupIncludeHighlights: true,
     webdavUrl: "https://dav.example.com/backups/",
+    customOverlayCSS: "body{color:blue}",
+    savedThemes: [{ key: "t1", css: "x" }],
+    pinboardToken: "alice:DEADBEEF00",
     pbp_hl_good: { v: 1, url: "https://x.test", title: "X", items: [{ id: "a", n: 1, quote: "q", color: 1 }] },
     pbp_hl_last_color: 4,
   });
@@ -254,6 +294,18 @@ async function runChromeLayerTests() {
       puts[0] && !("_highlights" in puts[0]));
     check("live includeHighlights=false is serialized into pushed settings",
       puts[0] && puts[0].backupIncludeHighlights === false);
+    check("push payload carries customOverlayCSS read from storage (BUG-1)",
+      puts[0] && puts[0].customOverlayCSS === "body{color:blue}");
+    check("push payload carries savedThemes read from storage (BUG-1)",
+      puts[0] && Array.isArray(puts[0].savedThemes) && puts[0].savedThemes[0] && puts[0].savedThemes[0].key === "t1");
+    const withHlPush = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: true });
+    const hlPut = puts[puts.length - 1];
+    check("push with highlights includes _highlights (BUG-1 regression guard)",
+      withHlPush.ok && hlPut._highlights && hlPut._highlights.pbp_hl_good);
+    check("push with highlights carries non-secret _highlightsOwner from token (SEC-1)",
+      hlPut._highlightsOwner === "alice");
+    check("push never leaks the pinboardToken into the payload (SEC-1 belt)",
+      !("pinboardToken" in hlPut));
     globalThis.fetch = () => Promise.resolve({ ok: false, status: 404 });
     const missing = await pbpWebdavPush({ baseUrl: "https://dav.example.com/missing/", user: "", pass: "", includeHighlights: false });
     check("push 404 maps to not-found instead of raw http-404", missing.error === "not-found");

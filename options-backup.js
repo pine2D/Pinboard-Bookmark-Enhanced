@@ -83,8 +83,21 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
     }
   }
   if (_highlights && typeof _highlights === "object") {
-    const cleanedHighlights = pbpCleanHighlightBackup(_highlights);
-    if (Object.keys(cleanedHighlights).length) await chrome.storage.local.set(cleanedHighlights);
+    // Cross-account guard: refuse to merge one account's reading notes into a
+    // device logged into a different Pinboard account. pbp_hl_<url> keys have no
+    // account dimension, so this owner check is the only barrier. Legacy backups
+    // (no owner) and not-logged-in restores pass through unchanged.
+    let currentAccount = "";
+    let accountResolved = false;
+    try {
+      const sec = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+      currentAccount = pbpPinboardAccountFromToken(sec.pinboardToken);
+      accountResolved = true;
+    } catch (_) {}
+    if (pbpHighlightBackupOwnerAllowed(data._highlightsOwner, currentAccount, accountResolved)) {
+      const cleanedHighlights = pbpCleanHighlightBackup(_highlights);
+      if (Object.keys(cleanedHighlights).length) await chrome.storage.local.set(cleanedHighlights);
+    }
   }
   return themesStatusKey;
 }
@@ -130,7 +143,17 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
       try {
         const allLocal = await chrome.storage.local.get(null);
         const highlights = pbpBuildHighlightBackup(allLocal);
-        if (highlights) exportData._highlights = highlights;
+        if (highlights) {
+          exportData._highlights = highlights;
+          // Tag with the exporting Pinboard account (non-secret username) so a
+          // restore onto a different account can refuse to merge these notes.
+          // Read the token directly — exportableKeys excludes secrets.
+          try {
+            const sec = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+            const owner = pbpPinboardAccountFromToken(sec.pinboardToken);
+            if (owner) exportData._highlightsOwner = owner;
+          } catch (_) {}
+        }
       } catch (_) {}
     }
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
