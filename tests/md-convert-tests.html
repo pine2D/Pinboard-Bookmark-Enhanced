@@ -1868,7 +1868,116 @@ const _pbpZipTest = pbpZipStore([
 </script>
 
 <script>
-document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
-document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
+section("md-epub: pbpBuildEpub (Task 6 RUNTIME integration)");
+
+// Reverse-parse a stored-only zip straight from its bytes (independent of
+// pbpZipStore's own accumulator -- walks the central directory via the EOCD,
+// then each local file header via the CD record's byte-42 offset field, same
+// technique as the pure-layer "central directory walk" test above).
+function _pbpZipEntries(bytes) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eocdOff = bytes.length - 22;
+  const count = dv.getUint16(eocdOff + 8, true);
+  let rec = dv.getUint32(eocdOff + 16, true);
+  const dec = new TextDecoder();
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const nameLen = dv.getUint16(rec + 28, true);
+    const extraLen = dv.getUint16(rec + 30, true);
+    const commentLen = dv.getUint16(rec + 32, true);
+    const method = dv.getUint16(rec + 10, true);
+    const lhOff = dv.getUint32(rec + 42, true);
+    const lhNameLen = dv.getUint16(lhOff + 26, true);
+    const lhExtraLen = dv.getUint16(lhOff + 28, true);
+    const size = dv.getUint32(lhOff + 22, true);
+    const dataStart = lhOff + 30 + lhNameLen + lhExtraLen;
+    out.push({ name: dec.decode(bytes.slice(rec + 46, rec + 46 + nameLen)), method, data: bytes.slice(dataStart, dataStart + size) });
+    rec += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+
+// Async (Blob.arrayBuffer()) -- matches the webdav-tests.html convention: the
+// whole section runs inside one IIFE whose promise the trailing summary
+// script awaits, so #summary/#results only settle once every check() below
+// has actually run (no false-early "N passed" while assertions are pending).
+window._pbpEpubIntegrationDone = (async () => {
+  const meta = { title: "Test Article", url: "https://example.com/a", clipped: "2026-07-12", lang: "en" };
+
+  // Group A: no images -> mimetype first+stored, exactly the 5 required entries (5 assertions).
+  const zip1 = new Uint8Array(await pbpBuildEpub({ md: "## Intro\n\nHello world.", meta, images: new Map() }).arrayBuffer());
+  const dv1 = new DataView(zip1.buffer);
+  assertEq(dv1.getUint32(0, true), 0x04034b50, "pbpBuildEpub zip starts with a local file header signature");
+  assertEq(dv1.getUint16(8, true), 0, "pbpBuildEpub first entry (mimetype) uses stored (method 0)");
+  assertEq(new TextDecoder().decode(zip1.slice(30, 38)), "mimetype", "pbpBuildEpub first entry's name is literally 'mimetype'");
+  const names1 = _pbpZipEntries(zip1).map(e => e.name);
+  assertEq(JSON.stringify(names1),
+    JSON.stringify(["mimetype", "META-INF/container.xml", "OEBPS/content.opf", "OEBPS/nav.xhtml", "OEBPS/content.xhtml"]),
+    "pbpBuildEpub with no images produces exactly the 5 required entries, mimetype first: " + names1.join(", "));
+
+  // Group B: frontmatter + highlights forced off (spec F5) -> content.xhtml carries
+  // no YAML block and no literal "==" mark, even though highlights are non-empty
+  // (i.e. the "## Highlights" aggregation section IS present -- only the inline
+  // "==...==" mark and YAML frontmatter are suppressed). Mirrors the handler's own
+  // composeExport call in md-preview.js.
+  const hlItems = [{ quote: "important insight", color: 1 }];
+  const composedMd = composeExport("## Section\n\nSome important insight text here.", meta, {
+    frontmatter: false, highlightsInline: false, highlights: hlItems, imagePolicy: "keep"
+  });
+  const zip2 = new Uint8Array(await pbpBuildEpub({ md: composedMd, meta, images: new Map() }).arrayBuffer());
+  const contentXhtml2 = new TextDecoder().decode(_pbpZipEntries(zip2).find(e => e.name === "OEBPS/content.xhtml").data);
+  assert(!/^---$/m.test(contentXhtml2), "content.xhtml carries no YAML frontmatter '---' block: " + contentXhtml2.slice(0, 200));
+  assert(!contentXhtml2.includes("=="), "content.xhtml has no literal ==...== inline-highlight mark: " + contentXhtml2.slice(0, 200));
+
+  // Group C: heading id backfill (empty-slug punctuation heading + id-less raw HTML
+  // heading) + nav.xhtml anchors correspond 1:1, in order, to content.xhtml heading
+  // ids; both files parse as well-formed XHTML (7 assertions).
+  const headingMd = ["## !!!", "", "Punctuation-only heading paragraph.", "",
+    "<h3>Raw HTML Heading</h3>", "", "Raw HTML heading paragraph.", "",
+    "## Normal Heading", "", "Normal heading paragraph."].join("\n");
+  const zip3 = new Uint8Array(await pbpBuildEpub({ md: headingMd, meta, images: new Map() }).arrayBuffer());
+  const entries3 = _pbpZipEntries(zip3);
+  const contentXhtml3 = new TextDecoder().decode(entries3.find(e => e.name === "OEBPS/content.xhtml").data);
+  const navXhtml3 = new TextDecoder().decode(entries3.find(e => e.name === "OEBPS/nav.xhtml").data);
+  const parser = new DOMParser();
+  const contentDoc3 = parser.parseFromString(contentXhtml3, "application/xhtml+xml");
+  assertEq(contentDoc3.getElementsByTagName("parsererror").length, 0,
+    "content.xhtml parses as well-formed XHTML (no parsererror): " + contentXhtml3.slice(0, 300));
+  const navDoc3 = parser.parseFromString(navXhtml3, "application/xhtml+xml");
+  assertEq(navDoc3.getElementsByTagName("parsererror").length, 0,
+    "nav.xhtml parses as well-formed XHTML (no parsererror): " + navXhtml3.slice(0, 300));
+  const headingEls3 = [...contentDoc3.querySelectorAll("h2, h3, h4")];
+  assertEq(headingEls3.length, 3, "content.xhtml has all 3 headings (punctuation h2, raw-HTML h3, normal h2)");
+  const [hPunct, hRaw, hNormal] = headingEls3;
+  assert(!!hPunct && hPunct.id.startsWith("pbp-h-"),
+    "punctuation-only heading (slugify -> empty) gets a backfilled pbp-h-N id: " + (hPunct && hPunct.id));
+  assert(!!hRaw && hRaw.id.startsWith("pbp-h-"),
+    "raw-HTML heading (marked never assigns it an id) gets a backfilled pbp-h-N id: " + (hRaw && hRaw.id));
+  assert(!!hNormal && hNormal.id && !hNormal.id.startsWith("pbp-h-"),
+    "an ordinary heading keeps its natural slug id, not a backfilled one: " + (hNormal && hNormal.id));
+  const navHrefs3 = [...navDoc3.querySelectorAll("a")].map(a => a.getAttribute("href"));
+  const expectedHrefs3 = headingEls3.map(h => "content.xhtml#" + h.id);
+  assertEq(JSON.stringify(navHrefs3), JSON.stringify(expectedHrefs3),
+    "nav.xhtml anchors correspond 1:1, in order, to content.xhtml heading ids: " + navHrefs3.join(", "));
+
+  // Group D: images Map -> zip gets an images/ entry and the XHTML src is
+  // rewritten from the absolute URL to the relative images/ path (2 assertions).
+  const images4 = new Map([["https://cdn.example.com/pic.jpg", { mime: "image/jpeg", bytes: new Uint8Array([1, 2, 3, 4]) }]]);
+  const zip4 = new Uint8Array(await pbpBuildEpub({ md: "![alt text](https://cdn.example.com/pic.jpg)", meta, images: images4 }).arrayBuffer());
+  const entries4 = _pbpZipEntries(zip4);
+  assert(!!entries4.find(e => e.name === "OEBPS/images/img-0.jpg"),
+    "pbpBuildEpub zip contains an OEBPS/images/img-0.jpg entry for a fetched image: " + entries4.map(e => e.name).join(", "));
+  const contentXhtml4 = new TextDecoder().decode(entries4.find(e => e.name === "OEBPS/content.xhtml").data);
+  assert(contentXhtml4.includes('src="images/img-0.jpg"') && !contentXhtml4.includes("https://cdn.example.com/pic.jpg"),
+    "content.xhtml's <img> src is rewritten from the absolute URL to the relative images/ path: " + contentXhtml4);
+})();
+</script>
+
+<script>
+(async () => {
+  if (window._pbpEpubIntegrationDone) await window._pbpEpubIntegrationDone;
+  document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+  document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
+})();
 </script>
 </body></html>

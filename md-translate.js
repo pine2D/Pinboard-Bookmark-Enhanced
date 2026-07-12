@@ -566,6 +566,13 @@ const PBP_TR_BTN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 
 let _pbpTrState = null;
 
+// EPUB export (Task 6, md-preview.js): raw translateTargetLang setting behind
+// the current run's state, or "" when translation hasn't initialized / the
+// user left it on "auto" (auto substitutes the UI language at resolve time --
+// not a real target for dc:language, so the caller falls back to "und").
+window.pbpTrExportTargetLang = () => (_pbpTrState && _pbpTrState.s && _pbpTrState.s.translateTargetLang
+  && _pbpTrState.s.translateTargetLang !== "auto") ? _pbpTrState.s.translateTargetLang : "";
+
 // tr-only escape hatch: shared by the click and keydown delegated listeners
 // in pbpTrInit (audit md-translate.js:524). No-op outside tr-only mode.
 // Returns true iff it actually toggled the peek, so the keydown listener

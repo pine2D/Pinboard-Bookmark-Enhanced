@@ -111,3 +111,60 @@ function pbpEpubNavXhtml(headings, fallbackTitle) {
 `;
 }
 // ── end PURE SECTION ──
+// ── RUNTIME (DOM) ──
+// pbpBuildEpub({ md, meta, images }) -> Blob. Caller contract (md-preview.js):
+// `md` is the FINAL canonical markdown -- frontmatter/highlightsInline already
+// forced off by the caller's own composeExport call (dc:* metadata covers title/
+// author/date/etc, and marked doesn't parse "==...==" so an inline mark would
+// leak as literal text into the XHTML body, same reasoning as composeStyledHtml).
+// `images`: the fetched Map from resolveEmbed(..., {keepUrls:true}) (absUrl ->
+// {mime, bytes}), or empty/undefined when the export image policy isn't "embed".
+function pbpBuildEpub({ md, meta, images }) {
+  const host = document.createElement("div");
+  host.innerHTML = renderMarkdown(md);            // 单点 sanitize：唯一入口
+  // nav 数据源 = 渲染后 DOM 的真实 id（含 marked 的 -1/-2 去重），不是 buildToc slug。
+  // 选全部 h2-h4；缺 id / 空 id（纯标点标题 slugify 为空、raw HTML 标题无 id）
+  // 补写确定性 id 并写回 DOM——先写回再序列化，nav 锚点才真实存在。
+  const seenIds = new Set([...host.querySelectorAll("[id]")].map(el => el.id).filter(Boolean));
+  const headings = [...host.querySelectorAll("h2, h3, h4")].map((h, i) => {
+    if (!h.id) {
+      let id = "pbp-h-" + i;
+      while (seenIds.has(id)) id += "x";
+      h.id = id; seenIds.add(id);
+    }
+    return { id: h.id, text: h.textContent.trim() || h.id };
+  });
+  const enc = new TextEncoder();
+  const items = [
+    { id: "nav", href: "nav.xhtml", mediaType: "application/xhtml+xml", properties: "nav" },
+    { id: "content", href: "content.xhtml", mediaType: "application/xhtml+xml" },
+  ];
+  const imgEntries = [];
+  if (images && images.size) {
+    let n = 0;
+    for (const [absUrl, img] of images) {
+      const name = `images/img-${n}.${PBP_EMBED_MIME_EXT[img.mime] || "bin"}`;
+      host.querySelectorAll(`img[src="${CSS.escape(absUrl)}"]`)
+        .forEach(el => el.setAttribute("src", name));
+      items.push({ id: "img" + n, href: name, mediaType: img.mime });
+      imgEntries.push({ name: "OEBPS/" + name, data: img.bytes });
+      n++;
+    }
+  }
+  // host is an HTML-namespace <div> -- XMLSerializer stamps xmlns="…xhtml" on the
+  // root element; the strip regex tolerates that (and any other) attribute text.
+  const bodyXhtml = new XMLSerializer().serializeToString(host)
+    .replace(/^<div[^>]*>/, "").replace(/<\/div>$/, "");
+  const esc = pbpEpubXmlEscape;
+  const contentXhtml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>${esc(meta.title || "Untitled")}</title></head><body>\n<h1>${esc(meta.title || "Untitled")}</h1>\n${bodyXhtml}\n</body></html>\n`;
+  const zip = pbpZipStore([
+    { name: "mimetype", data: enc.encode("application/epub+zip") },   // 必须第一且 stored
+    { name: "META-INF/container.xml", data: enc.encode(pbpEpubContainerXml()) },
+    { name: "OEBPS/content.opf", data: enc.encode(pbpEpubContentOpf(meta, items)) },
+    { name: "OEBPS/nav.xhtml", data: enc.encode(pbpEpubNavXhtml(headings, meta.title)) },
+    { name: "OEBPS/content.xhtml", data: enc.encode(contentXhtml) },
+    ...imgEntries,
+  ]);
+  return new Blob([zip], { type: "application/epub+zip" });
+}
+// ── end RUNTIME ──

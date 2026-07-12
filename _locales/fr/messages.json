@@ -1644,6 +1644,12 @@
   "mdDownloadHtmlTitle": {
     "message": "Télécharger le fichier HTML"
   },
+  "mdDownloadEpub": {
+    "message": "Télécharger .epub"
+  },
+  "mdDownloadEpubTitle": {
+    "message": "Télécharger l'EPUB (livre numérique)"
+  },
   "mdTocContents": {
     "message": "Sommaire"
   },

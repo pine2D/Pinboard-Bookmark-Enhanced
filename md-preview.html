@@ -67,6 +67,12 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           </button>
         </div>
+        <div class="export-fmt">
+          <span class="fmt-name">EPUB</span>
+          <button id="btn-dl-epub" class="action-btn icon-only" title="Download EPUB (e-book)" data-i18n-title="mdDownloadEpubTitle" aria-label="Download .epub" data-i18n-aria="mdDownloadEpub">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+        </div>
       </div>
       <div id="export-note" class="export-note" aria-live="polite" hidden></div>
       <div class="send-split" id="send-split">
@@ -101,6 +107,7 @@
   <script defer src="vendor/purify.min.js"></script>
   <script defer src="md-convert.js"></script>
   <script defer src="md-embed.js"></script>
+  <script defer src="md-epub.js"></script>
   <script defer src="export-targets.js"></script>
   <script defer src="md-export-send.js"></script>
   <script defer src="i18n.js"></script>

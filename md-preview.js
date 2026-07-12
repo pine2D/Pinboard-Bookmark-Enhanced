@@ -759,9 +759,19 @@ function pbpApplyColorScheme(mode) {
   // -> async fetch -> rewrite on the RAW md. Returns rawMd (with data URIs
   // substituted where fetched), an "unembedded" count for the UI notice, and
   // the fetched Map (kept for parity with the runtime contract; unused here).
-  async function resolveEmbed(rawMd, meta) {
+  // opts.keepUrls (Task 6, EPUB): skip the data-URI rewrite for successfully
+  // fetched images -- pbpBuildEpub needs the original absolute URL still in the
+  // markdown (and in the returned `fetched` Map) so it can find the matching
+  // <img> via querySelector and rewrite it to a relative images/ path itself,
+  // adding a real zip entry. Blob URLs still degrade to alt text either way
+  // (dead outside the page regardless of export format). No separate note
+  // formula needed: pbpEmbedRewrite's outBudget is omitted in this mode, so
+  // rw.dropped is always 0 and the shared formula below already reduces to
+  // spec's keepUrls count (blobs + unfetched candidates + kept, no dropped).
+  async function resolveEmbed(rawMd, meta, opts) {
     const policy = expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep");
     if (policy !== "embed") return { md: rawMd, note: 0, fetched: new Map() };
+    const keepUrls = !!(opts && opts.keepUrls);
     const absMd = applyImagePolicy(rawMd, { policy: "keep", baseUrl: meta.url || "" }); // absolutize first
     const scan = pbpEmbedScan(absMd, meta.url || "");
     let granted = false;
@@ -771,8 +781,10 @@ function pbpApplyColorScheme(mode) {
     const fetched = granted ? await pbpEmbedFetchAll(scan.candidates) : new Map();
     const map = {};
     scan.blobs.forEach(u => { map[u] = null; });
-    fetched.forEach((v, u) => { map[u] = v.dataUri; });
-    const rw = pbpEmbedRewrite(absMd, map, meta.url || "", pbpEmbedBudget(PBP_EMBED_LIMITS.outputBytes));
+    if (!keepUrls) fetched.forEach((v, u) => { map[u] = v.dataUri; });
+    const rw = keepUrls
+      ? pbpEmbedRewrite(absMd, map, meta.url || "")
+      : pbpEmbedRewrite(absMd, map, meta.url || "", pbpEmbedBudget(PBP_EMBED_LIMITS.outputBytes));
     // Codex-P6: a blob URL replaced with alt text is also "not embedded as-is",
     // so it counts toward the notice alongside permission/fetch/budget misses.
     const note = scan.blobs.length + (scan.candidates.length - fetched.size) + scan.kept.length + rw.dropped;
@@ -1249,6 +1261,31 @@ function pbpApplyColorScheme(mode) {
     // YAML-prefixed buildExportMarkdown() rendered the YAML into the body as text.
     const doc = composeStyledHtml(emb.md, meta, { ...opts, imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy, hljsCss, katexCss });
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
+    if (emb.note > 0) showExportNote(t("mdEmbedPartial").replace("$COUNT$", emb.note));
+  });
+  document.getElementById("btn-dl-epub").addEventListener("click", async () => {
+    // First await in the direct click chain: resolveEmbed()'s chrome.permissions.request()
+    // must run while the user gesture is still active (same invariant as above).
+    // keepUrls:true (Task 6): successfully fetched images stay at their absolute
+    // URL in emb.md -- pbpBuildEpub finds them via <img src="abs"> and rewrites
+    // to a relative images/ path itself while adding the zip entry (emb.fetched).
+    const meta = buildMeta(), opts = buildExportOpts();
+    const emb = await resolveEmbed(getViewMarkdown(), meta, { keepUrls: true });
+    // Codex F5: EPUB gets its own composeExport call -- frontmatter/inline
+    // ==marks== don't belong in content.xhtml (dc:* metadata covers title/
+    // author/date/etc, and marked doesn't parse "==...==" so an inline mark
+    // would leak as literal text, same reasoning as composeStyledHtml above).
+    const md = composeExport(emb.md, meta, {
+      ...opts, frontmatter: false, highlightsInline: false,
+      imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy
+    });
+    // dc:language (spec §3): only meaningful once the reader is actually
+    // looking at a translated view; original/auto exports stay "und" (unknown)
+    // rather than guessing. md-translate.js loads after this file, hence the
+    // typeof guard on window.pbpTrExportTargetLang.
+    const inTrView = document.body.classList.contains("tr-only") || document.body.classList.contains("tr-bilingual");
+    meta.lang = (inTrView && typeof window.pbpTrExportTargetLang === "function" && window.pbpTrExportTargetLang()) || "und";
+    downloadFile(safeTitle + ".epub", pbpBuildEpub({ md, meta, images: emb.fetched }), "application/epub+zip");
     if (emb.note > 0) showExportNote(t("mdEmbedPartial").replace("$COUNT$", emb.note));
   });
 

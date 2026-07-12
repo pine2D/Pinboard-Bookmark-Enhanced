@@ -1644,6 +1644,12 @@
   "mdDownloadHtmlTitle": {
     "message": "下載 HTML 文件"
   },
+  "mdDownloadEpub": {
+    "message": "下載 .epub"
+  },
+  "mdDownloadEpubTitle": {
+    "message": "下載 EPUB（電子書）"
+  },
   "mdTocContents": {
     "message": "目錄"
   },
