@@ -17,7 +17,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 ## Features
 
 - **Smart capture** — auto-fills the title, URL, meta description, referrer, and any selected text, and strips tracking parameters (`utm_*`, `gclid`, `fbclid`, …) from the saved URL on capture or paste, with an aggressive mode and custom keep/remove lists
-- **Quick & batch save** — save the page (or as *read later*) from a keyboard shortcut without opening the popup, or batch-save every open tab with per-tab AI tagging, live progress, and a Tab Set bundle; offline drafts stay in a local queue and are retried to Pinboard when you reconnect
+- **Quick & batch save** — save the page (or as *read later*) from a keyboard shortcut without opening the popup, or batch-save every open tab with per-tab AI tagging, live progress, and a Tab Set bundle (also bindable to its own keyboard shortcut); offline drafts stay in a local queue and are retried to Pinboard when you reconnect
 - **AI tags & summaries** — bring your own key for 13 LLM providers or any OpenAI-compatible endpoint; the AI reads the cleaned article body with ads, menus, and sidebars stripped out
 - **Tag tools** — autocomplete from your own tags, Pinboard's suggested tags, and one-tap presets, plus a governance panel that surfaces duplicate and low-count tags (heuristic + on-demand AI clustering) and merges them in throttled batches with live progress
 - **Quick links & status** — one-tap to your Unread, Network, Notes, and Popular pages; the toolbar icon flips when the current page is already bookmarked
@@ -26,6 +26,7 @@ A Chrome extension that supercharges [Pinboard](https://pinboard.in) bookmarking
 - **Reader tools** — highlight in five colors with notes that survive re-renders and translation, browse highlights in a Notebook panel, search the article (`/`, optional regex — your notes match too), peek footnotes in place, pick up where you left off, go distraction-free with a focus mode, or add an opt-in AI key-points skim (off by default); press `?` for the full shortcut list
 - **Auto-archive** — optionally push every save to the Internet Archive's [Wayback Machine](https://web.archive.org), with an archive log and retry, so your links outlive link-rot
 - **Themeable `pinboard.in`** — 13 curated palettes (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …) plus a custom-CSS overlay that syncs across devices, an adjustable popup width, and sort-by-popularity on tag pages
+- **Settings backup** — export and import all your settings (and, optionally, your highlights) as a file, or auto-back-up to your own WebDAV server (e.g. Nextcloud), so your configuration and custom themes travel between machines
 - **9 languages** · configurable shortcuts · local-first storage · zero tracking
 
 ## Install
