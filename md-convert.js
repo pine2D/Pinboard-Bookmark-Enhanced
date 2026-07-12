@@ -650,7 +650,13 @@ function downloadFile(filename, content, mimeType) {
 // must explicitly re-pin every --x-* var back to its light value -- the print
 // block is a plain (unconditional) @media print, so its :root wins the cascade
 // over the dark-media :root at equal specificity by source order, whether or not
-// the viewer's OS is in dark mode.
+// the viewer's OS is in dark mode. The re-pin can't reach the injected hljsCss
+// though (composeStyledHtml appends the dark vendor sheet inside its own
+// @media (prefers-color-scheme:dark), which still matches when printing on a
+// dark-mode OS and paints literal token hexes, not --x-* vars) -- so the print
+// block also flattens pre/code/span to near-black text on transparent, same
+// trade as md-preview.css's H2b print rule: no syntax color on paper, but
+// guaranteed legibility.
 // .hljs-section dark override: same root cause as md-preview.css's M4 fix --
 // hljs-github-dark's own .hljs-section (#1f6feb) only clears 3.94:1 on this
 // palette's --x-pre-bg (#161513); `.export-doc pre .hljs-section` (3 classes)
@@ -687,7 +693,7 @@ html,body{margin:0;background:var(--x-bg)}
 .export-doc thead{background:var(--x-code-bg)}
 .export-doc tbody tr:nth-child(even){background:var(--x-stripe)}
 .export-doc hr{border:none;border-top:1px solid var(--x-bd);margin:2.5em 0}
-@media print{:root{--x-fg:#1a202c;--x-mut:#5a6473;--x-bd:#e2e8f0;--x-bdl:#eef2f7;--x-link:#2563eb;--x-code-bg:#f1f5f9;--x-code-fg:#334155;--x-bq-bd:#2563eb;--x-bq-bg:#f0f9ff;--x-bq-fg:#1e3a5f;--x-stripe:#f8fafc;--x-surface:#fff;--x-bg:#fff;--x-pre-bg:#fff}html,body{background:#fff}.export-doc{max-width:100%;padding:0}}
+@media print{:root{--x-fg:#1a202c;--x-mut:#5a6473;--x-bd:#e2e8f0;--x-bdl:#eef2f7;--x-link:#2563eb;--x-code-bg:#f1f5f9;--x-code-fg:#334155;--x-bq-bd:#2563eb;--x-bq-bg:#f0f9ff;--x-bq-fg:#1e3a5f;--x-stripe:#f8fafc;--x-surface:#fff;--x-bg:#fff;--x-pre-bg:#fff}html,body{background:#fff}.export-doc{max-width:100%;padding:0}.export-doc pre,.export-doc pre code,.export-doc pre span{color:#1f2328 !important;background:transparent !important}}
 `;
 
 // HTML-escape for text contexts (title, header fields).

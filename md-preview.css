@@ -1048,8 +1048,11 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
      reach them. The `span` half of this selector covers all of them in one
      shot: printing deliberately gives up syntax color entirely (every token
      span flattens to the same near-black), trading color-coding for
-     guaranteed readability on paper. */
-  #rendered-view pre code, #rendered-view pre code span { color: #1f2328 !important; }
+     guaranteed readability on paper. `background: transparent` rides along
+     for the same reason: .hljs-addition/.hljs-deletion carry their own
+     dark background-colors (#033a16/#67060c) in the dark vendor sheet,
+     which against the forced #1f2328 text would print at ~1.2:1. */
+  #rendered-view pre code, #rendered-view pre code span { color: #1f2328 !important; background: transparent !important; }
 }
 
 /* Raw view: the TOC navigates the rendered doc, which is hidden in Raw mode. */
@@ -1389,8 +1392,12 @@ body.md-empty main { margin-left: 0; }
    _pbpAskFlash. Only ONE background wins per overlapping run (CSS Custom
    Highlight spec has no compositing); the priority order is what makes
    that outcome deterministic instead of implicit registration order. */
-::highlight(pbp-search) { background-color: var(--hl-search); }
-::highlight(pbp-search-current) { background-color: var(--hl-search-current); }
+/* Same M3-b dark-only text flattening as the user highlights above -- search
+   tints have HIGHER priority than user highlights, so they'd otherwise be the
+   one place a link/.pb-tr span still kept its low-contrast color under a tint
+   (2.4-3.5:1 dark). currentColor = light branch byte-identical. */
+::highlight(pbp-search) { background-color: var(--hl-search); color: light-dark(currentColor, var(--fg)); }
+::highlight(pbp-search-current) { background-color: var(--hl-search-current); color: light-dark(currentColor, var(--fg)); }
 
 /* H5 block-level mirror bar (spec 1.5): a 3px left bar echoing the OTHER
    side's highlight color onto the paired block, so a highlight on one side is
