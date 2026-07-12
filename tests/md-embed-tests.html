@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>md-embed runtime tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; }
+.fail { color: #c00; font-weight: bold; }
+h2 { margin-top: 24px; }
+</style></head>
+<body>
+<h1>md-embed.js runtime tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+
+<script src="../md-embed.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond;
+  ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+function section(name) {
+  const h = document.createElement("h2");
+  h.textContent = name;
+  root.appendChild(h);
+}
+function assert(cond, detail) {
+  check(detail || String(cond), cond, detail);
+}
+function assertEq(actual, expected, label) {
+  const ok = actual === expected;
+  check(label || (String(expected) + " === " + String(actual)), ok,
+    ok ? "" : "expected " + JSON.stringify(expected) + " got " + JSON.stringify(actual));
+}
+
+// ---- fetch stub plumbing ----
+// Short limits (injected, never the PBP_EMBED_LIMITS production defaults) so
+// timeout/budget/MIME-reject paths are driven in milliseconds, not minutes.
+const SHORT_LIMITS = { maxImages: 50, maxOrigins: 10, perImageBytes: 64, totalBytes: 128, outputBytes: 4096, timeoutMs: 50, concurrency: 2 };
+
+let fetchCalls = [];
+function mkAbortError() {
+  try { return new DOMException("aborted", "AbortError"); }
+  catch (_) { const e = new Error("aborted"); e.name = "AbortError"; return e; }
+}
+function bytesOf(str) { return new TextEncoder().encode(str); }
+function expectedDataUri(mime, bytes) {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return "data:" + mime + ";base64," + btoa(bin);
+}
+// A reader whose read() resolves after chunkDelayMs with the next chunk, or
+// rejects with AbortError if the caller's signal fires first (mid-stream abort).
+function makeReader(chunks, signal, chunkDelayMs) {
+  let i = 0;
+  return {
+    read() {
+      return new Promise((resolve, reject) => {
+        if (signal && signal.aborted) return reject(mkAbortError());
+        let settled = false;
+        const onAbort = () => { if (settled) return; settled = true; clearTimeout(timer); reject(mkAbortError()); };
+        const timer = setTimeout(() => {
+          if (settled) return; settled = true;
+          if (signal) signal.removeEventListener("abort", onAbort);
+          if (i >= chunks.length) resolve({ done: true, value: undefined });
+          else resolve({ done: false, value: chunks[i++] });
+        }, chunkDelayMs || 0);
+        if (signal) signal.addEventListener("abort", onAbort, { once: true });
+      });
+    }
+  };
+}
+function fakeResponse({ ok = true, contentType, chunks = [], chunkDelayMs = 0, signal }) {
+  return {
+    ok,
+    headers: { get: (name) => (String(name).toLowerCase() === "content-type" ? (contentType ?? null) : null) },
+    body: { getReader: () => makeReader(chunks, signal, chunkDelayMs) }
+  };
+}
+// Fetch stub that never settles until the caller's AbortSignal fires — drives
+// the timeoutMs path when the abort happens before headers ever "arrive".
+function hangingFetch(url, opts) {
+  fetchCalls.push({ url, opts });
+  return new Promise((_, reject) => {
+    if (opts.signal.aborted) return reject(mkAbortError());
+    opts.signal.addEventListener("abort", () => reject(mkAbortError()), { once: true });
+  });
+}
+// Fetch stub driven by a per-URL config table.
+function tableFetch(table) {
+  return (url, opts) => {
+    fetchCalls.push({ url, opts });
+    const cfg = table[url];
+    if (!cfg) return Promise.reject(new Error("no stub configured for " + url));
+    if (cfg.networkThrow) return Promise.reject(cfg.networkThrow);
+    const respond = () => Promise.resolve(fakeResponse({ ...cfg, signal: opts.signal }));
+    return cfg.headDelayMs ? new Promise((res) => setTimeout(() => res(respond()), cfg.headDelayMs)) : respond();
+  };
+}
+
+(async () => {
+
+// ---- _pbpEmbedFetchOne: success path ----
+section("_pbpEmbedFetchOne success path");
+{
+  fetchCalls = [];
+  const png = bytesOf("PNGDATA");
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/a.png": { contentType: "image/png", chunks: [png] }
+  });
+  const budget = pbpEmbedBudget(SHORT_LIMITS.totalBytes);
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/a.png", budget, SHORT_LIMITS);
+  assert(got !== null, "successful fetch returns a result object");
+  if (got) {
+    assertEq(got.mime, "image/png", "mime is captured from content-type header");
+    assertEq(got.bytes.length, png.length, "bytes length matches streamed body");
+    assertEq(got.dataUri, expectedDataUri("image/png", png), "dataUri is exact base64 data: URI of the bytes");
+  }
+  assertEq(budget.used(), png.length, "budget.reserve() actually deducted the streamed byte count");
+  const call = fetchCalls[0];
+  assertEq(call.opts.credentials, "omit", "fetch called with credentials: omit");
+  assertEq(call.opts.cache, "force-cache", "fetch called with cache: force-cache");
+  assertEq(call.opts.redirect, "error", "fetch called with redirect: error");
+}
+
+// ---- _pbpEmbedFetchOne: content-type parsing (charset suffix + case) ----
+section("_pbpEmbedFetchOne content-type parsing");
+{
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/b.jpg": { contentType: "IMAGE/JPEG; charset=binary", chunks: [bytesOf("JPG")] }
+  });
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/b.jpg", pbpEmbedBudget(SHORT_LIMITS.totalBytes), SHORT_LIMITS);
+  assert(got !== null, "charset-suffixed, mixed-case content-type still resolves");
+  if (got) assertEq(got.mime, "image/jpeg", "mime is lowercased and stripped of the charset parameter");
+}
+
+// ---- _pbpEmbedFetchOne: MIME rejection ----
+section("_pbpEmbedFetchOne MIME rejection");
+{
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/page.html": { contentType: "text/html", chunks: [bytesOf("<html>")] },
+    "https://cdn.example.com/vector.svg": { contentType: "image/svg+xml", chunks: [bytesOf("<svg/>")] }
+  });
+  const gotHtml = await _pbpEmbedFetchOne("https://cdn.example.com/page.html", pbpEmbedBudget(SHORT_LIMITS.totalBytes), SHORT_LIMITS);
+  assertEq(gotHtml, null, "non-image content-type (text/html) is rejected");
+  const gotSvg = await _pbpEmbedFetchOne("https://cdn.example.com/vector.svg", pbpEmbedBudget(SHORT_LIMITS.totalBytes), SHORT_LIMITS);
+  assertEq(gotSvg, null, "image/svg+xml is rejected (not in PBP_EMBED_MIME_EXT allowlist)");
+}
+
+// ---- _pbpEmbedFetchOne: non-ok response ----
+section("_pbpEmbedFetchOne non-ok response");
+{
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/missing.png": { ok: false, contentType: "image/png", chunks: [bytesOf("x")] }
+  });
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/missing.png", pbpEmbedBudget(SHORT_LIMITS.totalBytes), SHORT_LIMITS);
+  assertEq(got, null, "resp.ok:false (e.g. 404) returns null without reading the body");
+}
+
+// ---- _pbpEmbedFetchOne: redirect degrade ----
+section("_pbpEmbedFetchOne redirect:error degrade");
+{
+  // Real Chrome fetch() rejects with a TypeError when redirect:"error" meets a
+  // 3xx. Simulate that network-level throw and confirm the catch(_) path
+  // degrades to null instead of propagating.
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/redirected.png": { networkThrow: new TypeError("Failed to fetch (redirect)") }
+  });
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/redirected.png", pbpEmbedBudget(SHORT_LIMITS.totalBytes), SHORT_LIMITS);
+  assertEq(got, null, "a redirect-triggered fetch() rejection degrades to null, not a throw");
+}
+
+// ---- _pbpEmbedFetchOne: per-image byte cap (streamed, ignores Content-Length) ----
+section("_pbpEmbedFetchOne perImageBytes cap");
+{
+  // 40 + 40 = 80 bytes, over SHORT_LIMITS.perImageBytes(64) on the 2nd chunk —
+  // this must be caught by the streamed running total, not any header.
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/big.png": { contentType: "image/png", chunks: [new Uint8Array(40), new Uint8Array(40)] }
+  });
+  const budget = pbpEmbedBudget(SHORT_LIMITS.totalBytes);
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/big.png", budget, SHORT_LIMITS);
+  assertEq(got, null, "streamed body exceeding perImageBytes aborts and returns null");
+  // The perImageBytes check short-circuits BEFORE budget.reserve() for the chunk
+  // that would tip the image over the per-image cap, so only the 1st (accepted)
+  // 40-byte chunk was ever reserved — there is no rollback of that first reserve.
+  assertEq(budget.used(), 40, "only the accepted 1st chunk (40 bytes) was reserved; the 2nd (over-cap) chunk never reached budget.reserve()");
+}
+
+// ---- _pbpEmbedFetchOne: shared budget exhaustion across sequential calls ----
+section("_pbpEmbedFetchOne totalBytes budget exhaustion");
+{
+  const table = {
+    "https://cdn.example.com/c1.png": { contentType: "image/png", chunks: [new Uint8Array(50)] },
+    "https://cdn.example.com/c2.png": { contentType: "image/png", chunks: [new Uint8Array(50)] },
+    "https://cdn.example.com/c3.png": { contentType: "image/png", chunks: [new Uint8Array(50)] }
+  };
+  globalThis.fetch = tableFetch(table);
+  const budget = pbpEmbedBudget(SHORT_LIMITS.totalBytes); // 128
+  const r1 = await _pbpEmbedFetchOne("https://cdn.example.com/c1.png", budget, SHORT_LIMITS);
+  const r2 = await _pbpEmbedFetchOne("https://cdn.example.com/c2.png", budget, SHORT_LIMITS);
+  const r3 = await _pbpEmbedFetchOne("https://cdn.example.com/c3.png", budget, SHORT_LIMITS);
+  assert(r1 !== null, "1st 50-byte image fits (budget 0->50 of 128)");
+  assert(r2 !== null, "2nd 50-byte image fits (budget 50->100 of 128)");
+  assertEq(r3, null, "3rd 50-byte image would push budget to 150 > 128 — rejected");
+}
+
+// ---- _pbpEmbedFetchOne: timeout abort (hang before headers) ----
+section("_pbpEmbedFetchOne timeout abort");
+{
+  globalThis.fetch = hangingFetch;
+  const start = Date.now();
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/slow.png", pbpEmbedBudget(SHORT_LIMITS.totalBytes), SHORT_LIMITS);
+  const elapsed = Date.now() - start;
+  assertEq(got, null, "a fetch() that never settles is aborted by timeoutMs and degrades to null");
+  assert(elapsed < 2000, "abort fired near timeoutMs(50ms), not the real production default(10s): elapsed=" + elapsed + "ms");
+}
+
+// ---- _pbpEmbedFetchOne: timeout abort mid-stream (headers arrive, body stalls) ----
+section("_pbpEmbedFetchOne timeout abort mid-stream");
+{
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/stall.png": { contentType: "image/png", chunks: [bytesOf("x"), bytesOf("y")], chunkDelayMs: 5000 }
+  });
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/stall.png", pbpEmbedBudget(SHORT_LIMITS.totalBytes), SHORT_LIMITS);
+  assertEq(got, null, "timeoutMs covers the whole body read, not just the initial fetch() — a stalled chunk read is also aborted");
+}
+
+// ---- pbpEmbedFetchAll: empty input short-circuits ----
+section("pbpEmbedFetchAll empty candidates");
+{
+  fetchCalls = [];
+  globalThis.fetch = tableFetch({});
+  const map = await pbpEmbedFetchAll([], SHORT_LIMITS);
+  assertEq(map.size, 0, "empty candidates list returns an empty Map");
+  assertEq(fetchCalls.length, 0, "no fetch() call is made for an empty candidate list");
+}
+
+// ---- pbpEmbedFetchAll: partial success (failed URLs absent from Map) ----
+section("pbpEmbedFetchAll partial failure");
+{
+  const table = {
+    "https://cdn.example.com/ok1.png": { contentType: "image/png", chunks: [bytesOf("1")] },
+    "https://cdn.example.com/bad-mime.png": { contentType: "text/plain", chunks: [bytesOf("2")] },
+    "https://cdn.example.com/ok2.png": { contentType: "image/webp", chunks: [bytesOf("3")] },
+    "https://cdn.example.com/404.png": { ok: false, contentType: "image/png", chunks: [bytesOf("4")] }
+  };
+  globalThis.fetch = tableFetch(table);
+  const map = await pbpEmbedFetchAll(Object.keys(table), SHORT_LIMITS);
+  assertEq(map.size, 2, "only the 2 valid image responses make it into the result Map");
+  assert(map.has("https://cdn.example.com/ok1.png"), "ok1.png (valid png) present in Map");
+  assert(map.has("https://cdn.example.com/ok2.png"), "ok2.png (valid webp) present in Map");
+  assert(!map.has("https://cdn.example.com/bad-mime.png"), "MIME-rejected URL absent from Map");
+  assert(!map.has("https://cdn.example.com/404.png"), "non-ok URL absent from Map");
+}
+
+// ---- pbpEmbedFetchAll: concurrency cap ----
+section("pbpEmbedFetchAll concurrency cap");
+{
+  const urls = Array.from({ length: 5 }, (_, i) => "https://cdn.example.com/n" + i + ".png");
+  let inFlight = 0, maxInFlight = 0;
+  globalThis.fetch = (url, opts) => {
+    inFlight++; maxInFlight = Math.max(maxInFlight, inFlight);
+    fetchCalls.push({ url, opts });
+    return new Promise((resolve) => setTimeout(() => {
+      inFlight--;
+      resolve(fakeResponse({ contentType: "image/png", chunks: [bytesOf("z")], signal: opts.signal }));
+    }, 15));
+  };
+  const limits = { ...SHORT_LIMITS, concurrency: 2, totalBytes: 4096 };
+  const map = await pbpEmbedFetchAll(urls, limits);
+  assertEq(map.size, urls.length, "all 5 candidates are eventually fetched despite the concurrency cap");
+  assert(maxInFlight <= 2, "observed max concurrent in-flight fetches (" + maxInFlight + ") respects limits.concurrency=2");
+}
+
+document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+document.getElementById("summary").style.color = fail ? "#c00" : "#0a0";
+})();
+</script>
+</body></html>

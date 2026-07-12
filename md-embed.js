@@ -81,4 +81,48 @@ function pbpEmbedBudget(totalBytes) {
     used() { return used; }
   };
 }
-// ── end PURE SECTION — RUNTIME SECTION (fetch/permissions, Task 4) appends below this line ──
+// ── end PURE SECTION ──
+// ── RUNTIME (chrome/fetch) ──
+// limits 参数注入（默认生产值）——tests/md-embed-tests.html 用短超时/小上限驱动超时与预算路径
+async function _pbpEmbedFetchOne(url, budget, limits = PBP_EMBED_LIMITS) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), limits.timeoutMs); // 罩住整个 body 读取
+  try {
+    const resp = await fetch(url, { signal: ctl.signal, credentials: "omit", cache: "force-cache", redirect: "error" });
+    if (!resp.ok) return null;
+    const mime = (resp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!(mime in PBP_EMBED_MIME_EXT)) return null;
+    const reader = resp.body.getReader();
+    const chunks = []; let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (size + value.length > limits.perImageBytes || !budget.reserve(value.length)) {
+        ctl.abort(); return null;   // 流式计数，不信 Content-Length（spec §2 F4）
+      }
+      size += value.length; chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let off = 0; for (const c of chunks) { bytes.set(c, off); off += c.length; }
+    const dataUri = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error);
+      fr.readAsDataURL(new Blob([bytes], { type: mime }));
+    });
+    return { dataUri, mime, bytes };
+  } catch (_) { return null; } finally { clearTimeout(timer); }
+}
+
+async function pbpEmbedFetchAll(candidates, limits = PBP_EMBED_LIMITS) {
+  const out = new Map();
+  if (!candidates.length) return out;
+  const budget = pbpEmbedBudget(limits.totalBytes);
+  const queue = candidates.slice();
+  await Promise.all(Array.from({ length: limits.concurrency }, async () => {
+    for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
+      const got = await _pbpEmbedFetchOne(url, budget, limits);
+      if (got) out.set(url, got);
+    }
+  }));
+  return out;
+}
