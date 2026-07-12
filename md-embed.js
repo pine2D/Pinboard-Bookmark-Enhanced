@@ -1,6 +1,6 @@
 // md-embed.js — export image embedding (spec 2026-07-12 §2).
 // ── PURE SECTION (no DOM/chrome/fetch; loaded by tests/md-convert-tests.html) ──
-const PBP_EMBED_LIMITS = { maxImages: 50, maxOrigins: 10, perImageBytes: 3 * 1024 * 1024, totalBytes: 25 * 1024 * 1024, outputBytes: 40 * 1024 * 1024, timeoutMs: 10000, concurrency: 4 };
+const PBP_EMBED_LIMITS = { maxImages: 50, maxOrigins: 10, perImageBytes: 3 * 1024 * 1024, totalBytes: 25 * 1024 * 1024, outputBytes: 40 * 1024 * 1024, timeoutMs: 10000, concurrency: 4, wantDataUri: true };
 const PBP_EMBED_MIME_EXT = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp" };
 // Same IMG regex + fence-skip as md-convert.js applyImagePolicy — keep in sync.
 const _PBP_EMBED_IMG = /!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
@@ -13,15 +13,20 @@ function _pbpEmbedLines(md, onLine) {
   }).join("\n");
 }
 
-// Codex-P3: 行内 code span 与转义 \![ 内的伪图片语法不得进入扫描/重写——
+// Codex-P3: 行内 code span、HTML 注释与转义 \![ 内的伪图片语法不得进入扫描/重写——
 // 它们会驱动权限申请与联网抓取。掩蔽为 NUL 定界占位符（\x00M<i>\x00），处理后还原。
-// NUL 在正常 markdown 行内不可能出现，与正文字面（如 " M3 "）天然无碰撞；
-// 万一恶意输入携带 NUL 形似 token，restore 的 fallback 只保留原样，绝不注入 "undefined"。
+// 顺序：注释先（可能跨多个反引号）、code span 次（多反引号 span 用相同数量反引号定界，
+// 行内非贪婪，双/三反引号 span 不再被单反引号正则穿透）、转义 \![ 最后。
+// NUL 在正常 markdown 行内不可能出现，与正文字面（如 " M3 "）天然无碰撞；输入中若携带
+// 字面 NUL 先剥离（HTML 管线里 NUL 本就会被替换成 U+FFFD，剥掉即根除碰撞面）。
+// 万一 stash 索引缺席（不应发生），restore 的 fallback 只保留占位符原样，绝不注入 "undefined"。
 function _pbpEmbedMasked(line, onLine) {
   const stash = [];
-  const masked = line
-    .replace(/`[^`]*`/g, (m) => { stash.push(m); return "\x00M" + (stash.length - 1) + "\x00"; })
-    .replace(/\\!\[/g, (m) => { stash.push(m); return "\x00M" + (stash.length - 1) + "\x00"; });
+  const stow = (m) => { stash.push(m); return "\x00M" + (stash.length - 1) + "\x00"; };
+  const masked = line.replace(/\x00/g, "")
+    .replace(/<!--[\s\S]*?-->/g, stow)
+    .replace(/(`+)[\s\S]*?\1/g, stow)
+    .replace(/\\!\[/g, stow);
   return onLine(masked).replace(/\x00M(\d+)\x00/g, (match, i) => stash[+i] !== undefined ? stash[+i] : match);
 }
 
@@ -104,6 +109,10 @@ async function _pbpEmbedFetchOne(url, budget, limits = PBP_EMBED_LIMITS) {
     }
     const bytes = new Uint8Array(size);
     let off = 0; for (const c of chunks) { bytes.set(c, off); off += c.length; }
+    // Codex-C4: EPUB (keepUrls) only needs {mime, bytes} — the data URI is never
+    // referenced, but building it doubles peak memory (base64 string ~4/3x bytes)
+    // for nothing. limits.wantDataUri === false skips the FileReader round-trip.
+    if (limits.wantDataUri === false) return { mime, bytes };
     const dataUri = await new Promise((res, rej) => {
       const fr = new FileReader();
       fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error);

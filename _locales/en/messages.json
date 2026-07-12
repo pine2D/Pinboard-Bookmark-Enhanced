@@ -1551,7 +1551,7 @@
     "message": "Embed (offline)"
   },
   "mdEmbedPartial": {
-    "message": "$COUNT$ image(s) not embedded (kept as links)",
+    "message": "$COUNT$ image(s) could not be embedded",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {

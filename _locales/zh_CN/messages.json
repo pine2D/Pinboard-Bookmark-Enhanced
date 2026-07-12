@@ -1551,7 +1551,7 @@
     "message": "内嵌（离线可读）"
   },
   "mdEmbedPartial": {
-    "message": "$COUNT$ 张图片未能内嵌（保留链接）",
+    "message": "$COUNT$ 张图片未能内嵌",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {

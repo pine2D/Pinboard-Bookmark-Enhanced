@@ -772,19 +772,26 @@ function pbpApplyColorScheme(mode) {
     const policy = expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep");
     if (policy !== "embed") return { md: rawMd, note: 0, fetched: new Map() };
     const keepUrls = !!(opts && opts.keepUrls);
-    const absMd = applyImagePolicy(rawMd, { policy: "keep", baseUrl: meta.url || "" }); // absolutize first
-    const scan = pbpEmbedScan(absMd, meta.url || "");
+    // Codex-C1a: no separate applyImagePolicy("keep") absolutize pass here --
+    // pbpEmbedScan/pbpEmbedRewrite each already absolutize relative src against
+    // baseUrl internally, AND (unlike applyImagePolicy) mask inline code spans/
+    // escaped \![ first. A pre-pass here would rewrite pseudo-image URLs sitting
+    // inside code spans before that masking ever ran.
+    const scan = pbpEmbedScan(rawMd, meta.url || "");
     let granted = false;
     if (scan.origins.length) {
       try { granted = await chrome.permissions.request({ origins: scan.origins.map(o => o + "/*") }); } catch (_) {}
     }
-    const fetched = granted ? await pbpEmbedFetchAll(scan.candidates) : new Map();
+    // Codex-C4: EPUB (keepUrls) never touches the data URI -- pbpBuildEpub reads
+    // {mime, bytes} straight off the fetched Map -- so skip building it (saves a
+    // base64 string, ~4/3x the image bytes, at peak memory for large image sets).
+    const fetched = granted ? await pbpEmbedFetchAll(scan.candidates, keepUrls ? { ...PBP_EMBED_LIMITS, wantDataUri: false } : undefined) : new Map();
     const map = {};
     scan.blobs.forEach(u => { map[u] = null; });
     if (!keepUrls) fetched.forEach((v, u) => { map[u] = v.dataUri; });
     const rw = keepUrls
-      ? pbpEmbedRewrite(absMd, map, meta.url || "")
-      : pbpEmbedRewrite(absMd, map, meta.url || "", pbpEmbedBudget(PBP_EMBED_LIMITS.outputBytes));
+      ? pbpEmbedRewrite(rawMd, map, meta.url || "")
+      : pbpEmbedRewrite(rawMd, map, meta.url || "", pbpEmbedBudget(PBP_EMBED_LIMITS.outputBytes));
     // Codex-P6: a blob URL replaced with alt text is also "not embedded as-is",
     // so it counts toward the notice alongside permission/fetch/budget misses.
     const note = scan.blobs.length + (scan.candidates.length - fetched.size) + scan.kept.length + rw.dropped;
@@ -1284,7 +1291,9 @@ function pbpApplyColorScheme(mode) {
     // rather than guessing. md-translate.js loads after this file, hence the
     // typeof guard on window.pbpTrExportTargetLang.
     const inTrView = document.body.classList.contains("tr-only") || document.body.classList.contains("tr-bilingual");
-    meta.lang = (inTrView && typeof window.pbpTrExportTargetLang === "function" && window.pbpTrExportTargetLang()) || "und";
+    // Codex-C3: pbpEpubLang canonicalizes to BCP-47 (or "und") -- the translate
+    // target can be a free-text label ("Classical Chinese") that isn't a legal tag.
+    meta.lang = pbpEpubLang((inTrView && typeof window.pbpTrExportTargetLang === "function" && window.pbpTrExportTargetLang()) || "und");
     downloadFile(safeTitle + ".epub", pbpBuildEpub({ md, meta, images: emb.fetched }), "application/epub+zip");
     if (emb.note > 0) showExportNote(t("mdEmbedPartial").replace("$COUNT$", emb.note));
   });

@@ -1551,7 +1551,7 @@
     "message": "Osadź (offline)"
   },
   "mdEmbedPartial": {
-    "message": "Nie osadzono $COUNT$ obrazów (zachowano linki)",
+    "message": "Nie osadzono $COUNT$ obrazów",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {

@@ -1551,7 +1551,7 @@
     "message": "埋め込み（オフライン対応）"
   },
   "mdEmbedPartial": {
-    "message": "$COUNT$ 枚の画像を埋め込めませんでした（リンクを保持）",
+    "message": "$COUNT$ 枚の画像を埋め込めませんでした",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {

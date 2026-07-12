@@ -62,6 +62,13 @@ function pbpEpubXmlEscape(s) {
     .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
+// Codex-C3: dc:language must be a legal BCP-47 tag or epubcheck fails. The
+// caller's candidate can be a free-text translation-target label (e.g. "Classical
+// Chinese") or empty -- canonicalize via Intl, falling back to "und" (unknown).
+function pbpEpubLang(candidate) {
+  try { return Intl.getCanonicalLocales(candidate)[0] || "und"; } catch (_) { return "und"; }
+}
+
 function pbpEpubContainerXml() {
   return '<?xml version="1.0" encoding="UTF-8"?>\n<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">\n  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>\n</container>\n';
 }
@@ -143,13 +150,25 @@ function pbpBuildEpub({ md, meta, images }) {
   if (images && images.size) {
     let n = 0;
     for (const [absUrl, img] of images) {
+      let matches = host.querySelectorAll(`img[src="${CSS.escape(absUrl)}"]`);
+      // Fable-A: marked encodeURI()s the href it emits, so a source URL with
+      // spaces/CJK characters lands percent-encoded in the DOM's src attribute
+      // even though `images` is keyed by the raw absolute URL -- retry encoded.
+      if (!matches.length) matches = host.querySelectorAll(`img[src="${CSS.escape(encodeURI(absUrl))}"]`);
+      if (!matches.length) continue; // no matching <img> left in the DOM -- skip, no orphan manifest/zip entry
       const name = `images/img-${n}.${PBP_EMBED_MIME_EXT[img.mime] || "bin"}`;
-      host.querySelectorAll(`img[src="${CSS.escape(absUrl)}"]`)
-        .forEach(el => el.setAttribute("src", name));
+      matches.forEach(el => el.setAttribute("src", name));
       items.push({ id: "img" + n, href: name, mediaType: img.mime });
       imgEntries.push({ name: "OEBPS/" + name, data: img.bytes });
       n++;
     }
+  }
+  // Codex-C2: any <img src="http(s)://..."> still left in the DOM (default
+  // "keep" policy, permission denied, or a partial embed failure) is a remote
+  // resource EPUB3 requires the content document to declare -- epubcheck fails
+  // without it.
+  if (host.querySelectorAll('img[src^="http"]').length) {
+    items.find(i => i.id === "content").properties = "remote-resources";
   }
   // host is an HTML-namespace <div> -- XMLSerializer stamps xmlns="…xhtml" on the
   // root element; the strip regex tolerates that (and any other) attribute text.

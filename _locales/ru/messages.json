@@ -1551,7 +1551,7 @@
     "message": "Встроить (офлайн)"
   },
   "mdEmbedPartial": {
-    "message": "$COUNT$ изобр. не встроено (ссылки сохранены)",
+    "message": "$COUNT$ изобр. не встроено",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {

@@ -1551,7 +1551,7 @@
     "message": "Einbetten (offline)"
   },
   "mdEmbedPartial": {
-    "message": "$COUNT$ Bild(er) nicht eingebettet (als Links behalten)",
+    "message": "$COUNT$ Bild(er) konnten nicht eingebettet werden",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {
