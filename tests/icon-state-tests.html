@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>iconStateFor Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; }
+.fail { color: #c00; font-weight: bold; }
+</style></head>
+<body>
+<h1>iconStateFor tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+
+<script src="../shared.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond;
+  ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+function assert(cond, detail) {
+  check(detail || String(cond), cond, detail);
+}
+function assertEq(actual, expected, label) {
+  const ok = actual === expected;
+  check(label || (String(expected) + " === " + String(actual)), ok,
+    ok ? "" : "expected " + JSON.stringify(expected) + " got " + JSON.stringify(actual));
+}
+
+// Test cases: [name, cached, expectedState]
+[
+  ["null cache",                null,                                                          "default"],
+  ["not bookmarked",            { bookmarked: false },                                         "default"],
+  ["bookmarked, no posts/hint", { bookmarked: true },                                          "saved"],
+  ["real post toread=yes",      { bookmarked: true, posts: [{ toread: "yes" }] },              "toread"],
+  ["real post toread=no",       { bookmarked: true, posts: [{ toread: "no" }] },               "saved"],
+  ["posts beat hint (no)",      { bookmarked: true, posts: [{ toread: "no" }], toreadHint: true },  "saved"],
+  ["posts beat hint (yes)",     { bookmarked: true, posts: [{ toread: "yes" }], toreadHint: false }, "toread"],
+  ["hint fallback true",        { bookmarked: true, toreadHint: true },                        "toread"],
+  ["hint fallback false",       { bookmarked: true, toreadHint: false },                       "saved"],
+  ["empty posts array→hint",    { bookmarked: true, posts: [], toreadHint: true },             "toread"],
+  ["hint ignored when unbookmarked", { bookmarked: false, toreadHint: true },                  "default"],
+].forEach(([name, cached, want]) =>
+  check("iconStateFor: " + name, iconStateFor(cached) === want, JSON.stringify(cached)));
+
+// Update summary
+document.getElementById("summary").textContent = `Results: ${pass} passed, ${fail} failed`;
+</script>
+</body></html>

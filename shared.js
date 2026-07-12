@@ -1737,3 +1737,16 @@ function pbpShouldRestoreCachedSummary(existing, descValue) {
   if (existing) return false;
   return !_AI_BQ_REGEX_SHARED.test(descValue || "");
 }
+
+// ===================== Toolbar icon tri-state (display only) =====================
+// Resolve the icon state ("default" | "saved" | "toread") from a statusCache entry.
+// cached = statusCache entry. Real posts/get data wins; toreadHint is the
+// save-path display stub (never synthesized into posts — popup edit-prefill
+// consumes real posts shape only).
+// Pure function; extracted here for testability (background.js uses it at runtime).
+function iconStateFor(cached) {
+  if (!cached || !cached.bookmarked) return "default";
+  const post = Array.isArray(cached.posts) ? cached.posts[0] : undefined;
+  if (post) return post.toread === "yes" ? "toread" : "saved";
+  return cached.toreadHint === true ? "toread" : "saved";
+}
