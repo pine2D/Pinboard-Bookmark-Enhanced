@@ -259,6 +259,35 @@ section("pbpEmbedFetchAll partial failure");
   assert(!map.has("https://cdn.example.com/404.png"), "non-ok URL absent from Map");
 }
 
+// ---- _pbpEmbedFetchOne: wantDataUri:false (Codex-C4, EPUB keepUrls path) ----
+section("_pbpEmbedFetchOne wantDataUri:false skips the data URI");
+{
+  const png = bytesOf("PNGDATA2");
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/nodata.png": { contentType: "image/png", chunks: [png] }
+  });
+  const limits = { ...SHORT_LIMITS, wantDataUri: false };
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/nodata.png", pbpEmbedBudget(limits.totalBytes), limits);
+  assert(got !== null, "fetch still succeeds with wantDataUri:false");
+  if (got) {
+    assert(!("dataUri" in got), "result has no dataUri field when wantDataUri:false");
+    assertEq(got.mime, "image/png", "mime is still captured");
+    assertEq(got.bytes.length, png.length, "bytes still populated and match the streamed body");
+  }
+}
+
+// ---- pbpEmbedFetchAll: propagates limits.wantDataUri:false to every fetch ----
+section("pbpEmbedFetchAll wantDataUri:false propagation");
+{
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/nodata2.png": { contentType: "image/png", chunks: [bytesOf("Z")] }
+  });
+  const map = await pbpEmbedFetchAll(["https://cdn.example.com/nodata2.png"], { ...SHORT_LIMITS, wantDataUri: false });
+  const entry = map.get("https://cdn.example.com/nodata2.png");
+  assert(!!entry, "candidate is still fetched and present in the result Map");
+  assert(entry && !("dataUri" in entry), "Map entry has no dataUri field when limits.wantDataUri:false");
+}
+
 // ---- pbpEmbedFetchAll: concurrency cap ----
 section("pbpEmbedFetchAll concurrency cap");
 {

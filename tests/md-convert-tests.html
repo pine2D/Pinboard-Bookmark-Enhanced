@@ -1748,6 +1748,34 @@ section("md-embed: pbpEmbedScan / pbpEmbedRewrite / pbpEmbedBudget (pure layer)"
     "M3 note ![a](data:image/png;base64,AA) and M7 tail",
     "real image rewritten while neighboring literal M<n> prose stays intact");
 })();
+
+// masking surface v2 (Codex-C1b): multi-backtick code spans and HTML comments
+// must also be masked -- the old single-backtick regex `[^`]*` was pierced by
+// a double-backtick span (it matched the empty "``" pairs instead of spanning
+// the whole thing), leaking the pseudo-image inside straight into candidates.
+// Also covers stripping a literal NUL that mimics the internal mask token
+// format, so an adversarial input can never be mistaken for a real stash ref.
+(() => {
+  const dblBacktick = "Use ``![x](https://evil.example.com/a.png)`` in prose.";
+  const sDbl = pbpEmbedScan(dblBacktick, "");
+  assert(!sDbl.candidates.includes("https://evil.example.com/a.png") && !sDbl.origins.includes("https://evil.example.com"),
+    "double-backtick code-span pseudo-image excluded from candidates/origins: " + JSON.stringify(sDbl));
+  const rDbl = pbpEmbedRewrite(dblBacktick, { "https://evil.example.com/a.png": "REPLACED" }, "", pbpEmbedBudget(999999));
+  assertEq(rDbl.md, dblBacktick, "double-backtick code-span pseudo-image left byte-for-byte untouched by rewrite");
+
+  const commentLine = "before <!-- ![y](https://e2.example.com/b.png) --> after";
+  const sComment = pbpEmbedScan(commentLine, "");
+  assert(!sComment.candidates.includes("https://e2.example.com/b.png"),
+    "HTML comment pseudo-image excluded from candidates: " + JSON.stringify(sComment));
+  const rComment = pbpEmbedRewrite(commentLine, { "https://e2.example.com/b.png": "REPLACED" }, "", pbpEmbedBudget(999999));
+  assertEq(rComment.md, commentLine, "HTML comment pseudo-image left byte-for-byte untouched by rewrite");
+
+  const nulLine = "before \x00M0\x00 after";
+  assert(nulLine.includes("\x00"), "sanity: test input actually carries a literal NUL byte");
+  const rNul = pbpEmbedRewrite(nulLine, {}, "", pbpEmbedBudget(999999));
+  assertEq(rNul.md, "before M0 after",
+    "literal NUL-delimited fake mask token is stripped before masking, never mistaken for a real stash reference, and the output carries no NUL");
+})();
 </script>
 
 <script>
@@ -1865,6 +1893,16 @@ const _pbpZipTest = pbpZipStore([
   ['"', "&quot;"],
   ["'", "&apos;"],
 ].forEach(([ch, esc]) => assertEq(pbpEpubXmlEscape(ch), esc, `pbpEpubXmlEscape(${JSON.stringify(ch)}) -> ${esc}`));
+
+// pbpEpubLang (Codex-C3): canonicalize to BCP-47, "und" for anything illegal --
+// a legal tag ("zh-CN"/"ja") round-trips, a free-text translate-target label
+// ("Classical Chinese") and an empty string both fall back to "und" (4 assertions).
+[
+  ["zh-CN", "zh-CN"],
+  ["ja", "ja"],
+  ["Classical Chinese", "und"],
+  ["", "und"],
+].forEach(([input, expected]) => assertEq(pbpEpubLang(input), expected, `pbpEpubLang(${JSON.stringify(input)}) -> ${expected}`));
 </script>
 
 <script>
@@ -1970,6 +2008,48 @@ window._pbpEpubIntegrationDone = (async () => {
   const contentXhtml4 = new TextDecoder().decode(entries4.find(e => e.name === "OEBPS/content.xhtml").data);
   assert(contentXhtml4.includes('src="images/img-0.jpg"') && !contentXhtml4.includes("https://cdn.example.com/pic.jpg"),
     "content.xhtml's <img> src is rewritten from the absolute URL to the relative images/ path: " + contentXhtml4);
+
+  // Group E: remote-resources (Codex-C2) -- an <img src="https://..."> left
+  // unembedded (default "keep" policy, permission denied, or a partial embed
+  // failure all reach pbpBuildEpub with `images` not covering that URL) means
+  // EPUB3 requires the content document be declared via manifest
+  // properties="remote-resources", or epubcheck fails (1 assertion).
+  const zip5 = new Uint8Array(await pbpBuildEpub({ md: "![alt](https://cdn.example.com/unfetched.png)", meta, images: new Map() }).arrayBuffer());
+  const opf5 = new TextDecoder().decode(_pbpZipEntries(zip5).find(e => e.name === "OEBPS/content.opf").data);
+  const contentItem5 = (opf5.match(/<item id="content"[^>]*\/>/) || [""])[0];
+  assert(contentItem5.includes('properties="remote-resources"'),
+    'content manifest item gets properties="remote-resources" when a remote <img> stays unembedded: ' + contentItem5);
+
+  // Group F: fully-embedded doc (Group D's images4 case) must NOT declare
+  // remote-resources -- no <img src="http..."> is left in the DOM (1 assertion).
+  const opf4 = new TextDecoder().decode(entries4.find(e => e.name === "OEBPS/content.opf").data);
+  assert(!opf4.includes("remote-resources"), "fully-embedded doc's manifest carries no remote-resources property: " + opf4);
+
+  // Group G: encodeURI fallback (Fable-A) -- marked encodeURI()s the href it
+  // renders, so a source URL containing non-ASCII characters lands percent-
+  // encoded in the DOM's src attribute even though `images` is keyed by the
+  // raw absolute URL. The exact-match querySelectorAll misses; the
+  // encodeURI(absUrl) retry must still find and rewrite it (2 assertions).
+  const cjkUrl = "https://cdn.example.com/中文图.jpg";
+  const images7 = new Map([[cjkUrl, { mime: "image/jpeg", bytes: new Uint8Array([9, 9]) }]]);
+  const zip7 = new Uint8Array(await pbpBuildEpub({ md: `![alt](${cjkUrl})`, meta, images: images7 }).arrayBuffer());
+  const entries7 = _pbpZipEntries(zip7);
+  assert(!!entries7.find(e => e.name === "OEBPS/images/img-0.jpg"),
+    "encodeURI-mismatched src still resolves via the encoded-URL fallback and gets a real zip entry: " + entries7.map(e => e.name).join(", "));
+  const contentXhtml7 = new TextDecoder().decode(entries7.find(e => e.name === "OEBPS/content.xhtml").data);
+  assert(contentXhtml7.includes('src="images/img-0.jpg"'),
+    "content.xhtml src is rewritten to the relative images/ path via the encodeURI fallback match: " + contentXhtml7);
+
+  // Group H: an images Map entry with no matching <img> in the DOM at all
+  // (neither the raw nor the encodeURI-encoded src) must be skipped entirely --
+  // no manifest item, no zip entry (an orphan zip entry fails epubcheck) (2 assertions).
+  const images8 = new Map([["https://cdn.example.com/never-referenced.png", { mime: "image/png", bytes: new Uint8Array([1]) }]]);
+  const zip8 = new Uint8Array(await pbpBuildEpub({ md: "no images here", meta, images: images8 }).arrayBuffer());
+  const entries8 = _pbpZipEntries(zip8);
+  assert(!entries8.find(e => e.name.startsWith("OEBPS/images/")),
+    "unmatched images Map entry produces no images/ zip entry: " + entries8.map(e => e.name).join(", "));
+  const opf8 = new TextDecoder().decode(entries8.find(e => e.name === "OEBPS/content.opf").data);
+  assert(!/id="img0"/.test(opf8), "unmatched images Map entry gets no manifest item either: " + opf8);
 })();
 </script>
 
