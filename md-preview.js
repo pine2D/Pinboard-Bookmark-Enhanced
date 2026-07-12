@@ -815,8 +815,37 @@ function pbpApplyColorScheme(mode) {
   previewTitleEl.textContent = title || t("mdPreviewUntitled");
   previewTitleEl.title = title || t("mdPreviewUntitled");
   const urlEl = document.getElementById("preview-url");
-  urlEl.textContent = url || "";
   urlEl.href = url || "#";
+  urlEl.textContent = "";
+  if (url) {
+    urlEl.title = url;
+    // Split hostname (bold) from the rest so a long path/query still reads
+    // as "example.com/…" once .preview-url's single-line ellipsis clips it.
+    // Built via DOM API (textContent/createElement), never innerHTML, since
+    // `url` is page-supplied data (sanitize discipline). Non-absolute/
+    // unparsable URLs (no scheme, "about:", etc.) fall back to plain text.
+    let host = "", rest = "";
+    try {
+      const u = new URL(url);
+      host = u.hostname;
+      const idx = host ? u.href.indexOf(host) : -1;
+      if (idx < 0) throw new Error("hostname not found in href");
+      rest = u.href.slice(idx + host.length);
+    } catch (_) {
+      host = "";
+    }
+    if (host) {
+      const hostSpan = document.createElement("span");
+      hostSpan.className = "url-host";
+      hostSpan.textContent = host;
+      urlEl.appendChild(hostSpan);
+      urlEl.appendChild(document.createTextNode(rest));
+    } else {
+      urlEl.textContent = url;
+    }
+  } else {
+    urlEl.removeAttribute("title");
+  }
 
   // X2: bookmarked badge. Fire-and-forget against the same checkBookmarked/
   // statusCache the toolbar icon uses (background.js) — never blocks first
@@ -905,7 +934,7 @@ function pbpApplyColorScheme(mode) {
       statTick = false;
       const doc = document.documentElement;
       const pct = readingProgressPercent(window.scrollY, window.innerHeight, doc.scrollHeight);
-      statsEl.textContent = `${statBase} · ${pct}%`;
+      statsEl.textContent = `${statBase} · ${t("mdStatsProgress").replace("$PCT$", pct + "%")}`;
     };
     const queueStats = () => {
       if (statTick) return;

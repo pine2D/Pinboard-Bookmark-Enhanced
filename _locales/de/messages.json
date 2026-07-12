@@ -1706,6 +1706,14 @@
       }
     }
   },
+  "mdStatsProgress": {
+    "message": "Fortschritt $PCT$",
+    "placeholders": {
+      "pct": {
+        "content": "$1"
+      }
+    }
+  },
   "mdBookmarkedBadge": {
     "message": "Gespeichert"
   },

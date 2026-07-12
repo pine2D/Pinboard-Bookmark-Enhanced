@@ -1706,6 +1706,14 @@
       }
     }
   },
+  "mdStatsProgress": {
+    "message": "进度 $PCT$",
+    "placeholders": {
+      "pct": {
+        "content": "$1"
+      }
+    }
+  },
   "mdBookmarkedBadge": {
     "message": "已收藏"
   },

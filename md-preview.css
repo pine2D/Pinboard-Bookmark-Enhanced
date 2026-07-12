@@ -170,8 +170,8 @@ button, input, select, textarea { font-family: inherit; }
 .source-badge {
   display: inline-flex;
   align-items: stretch;
-  border: 1px solid var(--border);
-  border-radius: 100px;
+  border: 1px solid var(--btn-border);
+  border-radius: 7px;
   overflow: hidden;
   background: var(--surface);
 }
@@ -187,8 +187,14 @@ button, input, select, textarea { font-family: inherit; }
   cursor: pointer;
   line-height: 1.6;
 }
-.src-seg + .src-seg { border-left: 1px solid var(--border); }
-.src-seg.active { color: var(--badge-fg); background: var(--badge-bg); cursor: default; }
+.src-seg:first-child { border-radius: 7px 0 0 7px; }
+.src-seg:last-child { border-radius: 0 7px 7px 0; }
+.src-seg + .src-seg { border-left: 1px solid var(--btn-border); }
+.src-seg.active { color: var(--active-fg); background: var(--active-bg); cursor: default; }
+.src-seg:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
 .src-seg:disabled,
 .src-seg[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
 .src-seg.loading {
@@ -700,19 +706,16 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   *, *::before, *::after { transition-duration: 0s !important; }
 }
 
-/* ---- Reading-stats badge (header) ---- */
-.stats-badge {
+/* ---- Reading-stats row (header) — plain text, not a pill (rail redesign
+   spec sec.3: demoted from .stats-badge so it reads as secondary metadata,
+   not another action control). No border/background; wraps instead of
+   forcing the rail to overflow horizontally. */
+.rail-stats {
   font-size: 12px;
-  font-weight: 500;
   color: var(--fg-secondary);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 3px 10px;
-  border-radius: 100px;
   letter-spacing: 0.01em;
-  white-space: nowrap;
 }
-.stats-badge:empty { display: none; }
+.rail-stats:empty { display: none; }
 
 
 /* ---- Code highlighting (highlight.js) ---- */
@@ -754,11 +757,14 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   transition: transform 200ms ease, visibility 0s;
 }
 .rail-ident h1 { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.rail-ident a { display: block; margin-top: 3px; font-size: 12px; color: var(--fg-muted); text-decoration: none; word-break: break-all; }
+.rail-ident a { display: block; margin-top: 3px; font-size: 12px; color: var(--fg-muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rail-ident a:hover { color: var(--link); }
+.rail-ident a .url-host { font-weight: 600; }
 /* X2: bookmarked badge — higher specificity than ".rail-ident a" above so it
-   doesn't inherit that rule's display:block/word-break:break-all (both wrong
-   for a pill-shaped badge). Reuses existing header tokens only. */
+   doesn't inherit that rule's display:block (wrong for a pill-shaped badge);
+   text-overflow:ellipsis IS inherited from the base rule (harmless — this
+   badge already clips with overflow:hidden below, ellipsis just improves
+   the clip). Reuses existing header tokens only. */
 .rail-ident a.bookmark-badge {
   display: inline-flex;
   align-items: center;
@@ -771,7 +777,6 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   color: var(--fg-muted);
   font-size: 11px;
   font-weight: 500;
-  word-break: normal;
   white-space: nowrap;
   max-width: 100%;
   overflow: hidden;
