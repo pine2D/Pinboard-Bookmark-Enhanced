@@ -1547,6 +1547,13 @@
   "mdImgStrip": {
     "message": "削除"
   },
+  "mdImgEmbed": {
+    "message": "埋め込み（オフライン対応）"
+  },
+  "mdEmbedPartial": {
+    "message": "$COUNT$ 枚の画像を埋め込めませんでした（リンクを保持）",
+    "placeholders": { "count": { "content": "$1" } }
+  },
   "mdSendObsidian": {
     "message": "Obsidian に送る"
   },

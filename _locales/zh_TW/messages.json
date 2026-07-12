@@ -1547,6 +1547,13 @@
   "mdImgStrip": {
     "message": "移除"
   },
+  "mdImgEmbed": {
+    "message": "內嵌（離線可讀）"
+  },
+  "mdEmbedPartial": {
+    "message": "$COUNT$ 張圖片未能內嵌（保留連結）",
+    "placeholders": { "count": { "content": "$1" } }
+  },
   "mdSendObsidian": {
     "message": "傳送到 Obsidian"
   },

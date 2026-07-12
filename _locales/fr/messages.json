@@ -1547,6 +1547,13 @@
   "mdImgStrip": {
     "message": "Supprimer"
   },
+  "mdImgEmbed": {
+    "message": "Intégrer (hors ligne)"
+  },
+  "mdEmbedPartial": {
+    "message": "$COUNT$ image(s) non intégrée(s) (liens conservés)",
+    "placeholders": { "count": { "content": "$1" } }
+  },
   "mdSendObsidian": {
     "message": "Envoyer vers Obsidian"
   },

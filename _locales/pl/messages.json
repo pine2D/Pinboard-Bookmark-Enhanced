@@ -1547,6 +1547,13 @@
   "mdImgStrip": {
     "message": "Usuń"
   },
+  "mdImgEmbed": {
+    "message": "Osadź (offline)"
+  },
+  "mdEmbedPartial": {
+    "message": "Nie osadzono $COUNT$ obrazów (zachowano linki)",
+    "placeholders": { "count": { "content": "$1" } }
+  },
   "mdSendObsidian": {
     "message": "Wyślij do Obsidian"
   },

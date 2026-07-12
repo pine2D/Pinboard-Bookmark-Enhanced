@@ -970,6 +970,15 @@ body.md-empty main { margin-left: 0; }
 .send-status a { color: var(--link); font-weight: 600; text-decoration: underline; white-space: nowrap; }
 .send-status a:hover { color: var(--link-hover); }
 .send-status[hidden] { display: none; }
+/* Embed-export partial-coverage notice (Task 4): informational only, no click
+   affordance -- unlike .send-status it self-hides via a timer, not a click. */
+.export-note {
+  margin-top: 6px; padding: 6px 10px;
+  font-size: 12px; line-height: 1.45; word-break: break-word;
+  color: var(--fg-secondary); background: var(--btn-bg);
+  border: 1px solid var(--border); border-radius: 6px;
+}
+.export-note[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

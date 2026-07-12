@@ -739,6 +739,46 @@ function pbpApplyColorScheme(mode) {
     return composeExport(getViewMarkdown(), buildMeta(), buildExportOpts());
   }
 
+  // Codex-P4: status-line helper for the export section (no existing export
+  // status affordance in this file to reuse) -- transient, self-hiding notice
+  // for partial embed coverage. Not used for hard errors (those still throw/
+  // degrade silently per the rest of the export pipeline).
+  function showExportNote(msg) {
+    const el = document.getElementById("export-note");
+    if (!el) return;
+    el.textContent = msg; el.hidden = !msg;
+    clearTimeout(el._t); el._t = setTimeout(() => { el.hidden = true; }, 6000);
+  }
+
+  // Embed image policy (Task 4): runs on the RAW view markdown, BEFORE either
+  // composeExport or composeStyledHtml -- each export format still calls its
+  // own compose function exactly once (Codex-P1). Only fires when the export
+  // image policy is "embed"; every other policy is a no-op pass-through so
+  // Copy MD/HTML and any other getViewMarkdown() caller are unaffected.
+  // Click (user gesture) -> synchronous scan -> synchronous permissions.request
+  // -> async fetch -> rewrite on the RAW md. Returns rawMd (with data URIs
+  // substituted where fetched), an "unembedded" count for the UI notice, and
+  // the fetched Map (kept for parity with the runtime contract; unused here).
+  async function resolveEmbed(rawMd, meta) {
+    const policy = expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep");
+    if (policy !== "embed") return { md: rawMd, note: 0, fetched: new Map() };
+    const absMd = applyImagePolicy(rawMd, { policy: "keep", baseUrl: meta.url || "" }); // absolutize first
+    const scan = pbpEmbedScan(absMd, meta.url || "");
+    let granted = false;
+    if (scan.origins.length) {
+      try { granted = await chrome.permissions.request({ origins: scan.origins.map(o => o + "/*") }); } catch (_) {}
+    }
+    const fetched = granted ? await pbpEmbedFetchAll(scan.candidates) : new Map();
+    const map = {};
+    scan.blobs.forEach(u => { map[u] = null; });
+    fetched.forEach((v, u) => { map[u] = v.dataUri; });
+    const rw = pbpEmbedRewrite(absMd, map, meta.url || "", pbpEmbedBudget(PBP_EMBED_LIMITS.outputBytes));
+    // Codex-P6: a blob URL replaced with alt text is also "not embedded as-is",
+    // so it counts toward the notice alongside permission/fetch/budget misses.
+    const note = scan.blobs.length + (scan.candidates.length - fetched.size) + scan.kept.length + rw.dropped;
+    return { md: rw.md, note, fetched };
+  }
+
   // Fill header
   const previewTitleEl = document.getElementById("preview-title");
   previewTitleEl.textContent = title || t("mdPreviewUntitled");
@@ -1180,10 +1220,25 @@ function pbpApplyColorScheme(mode) {
 
   // Download buttons
   const safeTitle = safeFilename(title);
-  document.getElementById("btn-dl-md").addEventListener("click", () => {
-    downloadFile(safeTitle + ".md", buildExportMarkdown(), "text/markdown;charset=utf-8");
+  document.getElementById("btn-dl-md").addEventListener("click", async () => {
+    // First await in the direct click chain: resolveEmbed()'s chrome.permissions.request()
+    // must run while the user gesture is still active (same invariant as Send-to below).
+    const meta = buildMeta(), opts = buildExportOpts();
+    const emb = await resolveEmbed(getViewMarkdown(), meta);
+    // imagePolicy is clamped to "keep" here -- the data URIs resolveEmbed already
+    // substituted have a scheme, so applyImagePolicy's "keep" pass absolutizes
+    // any remaining plain src and leaves data: URIs untouched (Codex-P1: one
+    // composeExport pass, no double transform of the export markdown).
+    const body = composeExport(emb.md, meta, { ...opts, imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy });
+    downloadFile(safeTitle + ".md", body, "text/markdown;charset=utf-8");
+    if (emb.note > 0) showExportNote(t("mdEmbedPartial").replace("$COUNT$", emb.note));
   });
   document.getElementById("btn-dl-html").addEventListener("click", async () => {
+    // First await in the direct click chain: resolveEmbed()'s chrome.permissions.request()
+    // must run while the user gesture is still active, so it runs before the
+    // (also-awaited, but not gesture-sensitive) hljs/katex CSS loads below.
+    const meta = buildMeta(), opts = buildExportOpts();
+    const emb = await resolveEmbed(getViewMarkdown(), meta);
     if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights the export
     const hljsCss = await loadHljsCss();
     if (info.math) await ensureKatex(); // so composeStyledHtml renders math (mirrors hljs above)
@@ -1192,8 +1247,9 @@ function pbpApplyColorScheme(mode) {
     // does, but pass RAW view markdown (getViewMarkdown, no YAML frontmatter):
     // composeStyledHtml turns frontmatter into a styled <header>. Passing the
     // YAML-prefixed buildExportMarkdown() rendered the YAML into the body as text.
-    const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss, katexCss });
+    const doc = composeStyledHtml(emb.md, meta, { ...opts, imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy, hljsCss, katexCss });
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
+    if (emb.note > 0) showExportNote(t("mdEmbedPartial").replace("$COUNT$", emb.note));
   });
 
   let _sendMenuCtl = null;
@@ -1308,7 +1364,10 @@ function pbpApplyColorScheme(mode) {
         await pbpSetLastTarget(id);
         const meta = buildMeta();
         const _exp = buildExportOpts();
-        const _sendBody = composeExport(getViewMarkdown(), meta, { frontmatter: false, imagePolicy: _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights, hlView: _exp.hlView }); // H5 (spec 1.6): send-to honors the exported view's tri-state too
+        // Send-to never runs resolveEmbed (no permission-gesture flow here) --
+        // "embed" clamps to "keep" so a plain absolute link is sent instead of
+        // a dangling literal "embed" policy string reaching applyImagePolicy.
+        const _sendBody = composeExport(getViewMarkdown(), meta, { frontmatter: false, imagePolicy: _exp.imagePolicy === "embed" ? "keep" : _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights, hlView: _exp.hlView }); // H5 (spec 1.6): send-to honors the exported view's tri-state too
         primary.classList.add("sending");
         primaryLabel.textContent = t("mdSending");
         let res;

@@ -41,6 +41,7 @@
           <option value="keep" data-i18n="mdImgKeep">Keep</option>
           <option value="alt" data-i18n="mdImgAlt">Alt text</option>
           <option value="strip" data-i18n="mdImgStrip">Remove</option>
+          <option value="embed" data-i18n="mdImgEmbed">Embed (offline)</option>
         </select>
       </label>
       <label class="exp-opt"><input type="checkbox" id="exp-include-toc" /> <span data-i18n="mdOptIncludeToc">Include TOC</span></label>
@@ -67,6 +68,7 @@
           </button>
         </div>
       </div>
+      <div id="export-note" class="export-note" aria-live="polite" hidden></div>
       <div class="send-split" id="send-split">
         <button id="send-primary" class="action-btn send-primary" type="button">
           <span class="send-ic" id="send-primary-ic" aria-hidden="true"></span>
@@ -98,6 +100,7 @@
   <script defer src="vendor/marked.min.js"></script>
   <script defer src="vendor/purify.min.js"></script>
   <script defer src="md-convert.js"></script>
+  <script defer src="md-embed.js"></script>
   <script defer src="export-targets.js"></script>
   <script defer src="md-export-send.js"></script>
   <script defer src="i18n.js"></script>
