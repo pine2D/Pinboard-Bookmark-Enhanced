@@ -68,7 +68,7 @@ function pbpEpubContainerXml() {
 
 function pbpEpubContentOpf(meta, items) {
   const esc = pbpEpubXmlEscape;
-  const ident = "urn:pbp:" + pbpCrc32(new TextEncoder().encode(meta.url || "")).toString(16);
+  const ident = "urn:pbp:" + pbpCrc32(new TextEncoder().encode(meta.url || "")).toString(16).padStart(8, "0");
   const manifest = items.map(i =>
     `<item id="${esc(i.id)}" href="${esc(i.href)}" media-type="${esc(i.mediaType)}"${i.properties ? ` properties="${esc(i.properties)}"` : ""}/>`).join("\n    ");
   return `<?xml version="1.0" encoding="UTF-8"?>

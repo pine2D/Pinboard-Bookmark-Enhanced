@@ -1789,6 +1789,33 @@ const _pbpZipTest = pbpZipStore([
   assertEq(dv.getUint32(14, true), pbpCrc32(_pbpZipTestBytes.mt), "mimetype local-header CRC field equals pbpCrc32(mimetype bytes)");
 })();
 
+// central directory walk: 3 entries, each CD record's byte-42 local-header offset
+// checked against HAND-COMPUTED literals (30 + namelen + datalen accumulated by hand,
+// NOT via the implementation's own accumulator — that would be tautological):
+//   "mimetype"(8)               + 20B data -> lh 58, offset   0
+//   "META-INF/container.xml"(22) + 4B data -> lh 56, offset  58
+//   "OEBPS/content.opf"(17)      + 6B data -> lh 53, offset 114
+// (7 assertions)
+(() => {
+  const enc = new TextEncoder();
+  const zip = pbpZipStore([
+    { name: "mimetype", data: enc.encode("application/epub+zip") },
+    { name: "META-INF/container.xml", data: enc.encode("<x/>") },
+    { name: "OEBPS/content.opf", data: enc.encode("<opf/>") },
+  ]);
+  const dv = new DataView(zip.buffer);
+  const eocdOff = zip.length - 22;
+  const expectedOffsets = [0, 58, 114];
+  let rec = dv.getUint32(eocdOff + 16, true); // cdStart from EOCD's central-directory-offset field
+  for (let i = 0; i < 3; i++) {
+    assertEq(dv.getUint32(rec, true), 0x02014b50, `CD record ${i}: signature is PK\\x01\\x02`);
+    assertEq(dv.getUint32(rec + 42, true), expectedOffsets[i],
+      `CD record ${i}: relative local-header offset field = hand-computed ${expectedOffsets[i]}`);
+    rec += 46 + dv.getUint16(rec + 28, true) + dv.getUint16(rec + 30, true) + dv.getUint16(rec + 32, true);
+  }
+  assertEq(rec, eocdOff, "stepping all 3 CD records via their namelen/extralen/commentlen fields lands exactly at EOCD");
+})();
+
 // OPF: required fields, escaping, no-author omission, identifier determinism (6 assertions)
 (() => {
   const meta = { title: 'My <Title> & "Quote\'s"', url: "https://e.com/a", clipped: "2026-01-02", lang: "en" };
@@ -1803,10 +1830,10 @@ const _pbpZipTest = pbpZipStore([
   const opfNoAuthor = pbpEpubContentOpf({ title: "T", url: "https://e.com/b", clipped: "2026-01-03" }, []);
   assert(!/<dc:creator>/.test(opfNoAuthor), "dc:creator tag is omitted entirely when meta.author is absent: " + opfNoAuthor);
 
-  const ident = "urn:pbp:" + pbpCrc32(new TextEncoder().encode("https://e.com/b")).toString(16);
+  const ident = "urn:pbp:" + pbpCrc32(new TextEncoder().encode("https://e.com/b")).toString(16).padStart(8, "0");
   const opfNoAuthor2 = pbpEpubContentOpf({ title: "T", url: "https://e.com/b", clipped: "2026-01-03" }, []);
   assert(opfNoAuthor.includes(`<dc:identifier id="pub-id">${ident}</dc:identifier>`) && opfNoAuthor === opfNoAuthor2,
-    "dc:identifier is urn:pbp:+crc32(url).toString(16) and identical output for identical input (deterministic): " + opfNoAuthor);
+    "dc:identifier is urn:pbp:+crc32(url) as fixed 8-digit hex and identical output for identical input (deterministic): " + opfNoAuthor);
 })();
 
 // nav: heading anchors, XML escaping, empty-headings fallback (4 assertions)
