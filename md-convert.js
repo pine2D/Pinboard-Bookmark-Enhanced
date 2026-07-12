@@ -641,9 +641,24 @@ function downloadFile(filename, content, mimeType) {
 // family as the old md-preview.css tokens, now mapped 1:1 by role (--x-bd/--x-bdl had
 // no exact prior match in the token table; mapped to --border/--border-light). Light
 // branch untouched.
+// --x-pre-bg: split out from --x-surface (dark-review H2a/M4) so the code-block
+// container can sit a step darker than panel-level surfaces, same relationship
+// as md-preview.css's --pre-bg vs --surface (see D8-7 comment there).
+// @media print reset: this file has no light-dark()/color-scheme mechanism (it
+// targets an offline, standalone .html opened outside this extension), so unlike
+// md-preview.css's single `color-scheme: light !important` switch, printing here
+// must explicitly re-pin every --x-* var back to its light value -- the print
+// block is a plain (unconditional) @media print, so its :root wins the cascade
+// over the dark-media :root at equal specificity by source order, whether or not
+// the viewer's OS is in dark mode.
+// .hljs-section dark override: same root cause as md-preview.css's M4 fix --
+// hljs-github-dark's own .hljs-section (#1f6feb) only clears 3.94:1 on this
+// palette's --x-pre-bg (#161513); `.export-doc pre .hljs-section` (3 classes)
+// outranks the vendor sheet's bare `.hljs-section` (1 class) regardless of which
+// <style> block ends up first in the exported document.
 const READER_CSS = `
-:root{--x-fg:#1a202c;--x-mut:#5a6473;--x-bd:#e2e8f0;--x-bdl:#eef2f7;--x-link:#2563eb;--x-code-bg:#f1f5f9;--x-code-fg:#334155;--x-bq-bd:#2563eb;--x-bq-bg:#f0f9ff;--x-bq-fg:#1e3a5f;--x-stripe:#f8fafc;--x-surface:#fff;--x-bg:#fff}
-@media (prefers-color-scheme:dark){:root{--x-fg:#CECDC3;--x-mut:#A6A49F;--x-bd:#403E3C;--x-bdl:#343331;--x-link:#6095C5;--x-code-bg:#282726;--x-code-fg:#C8C6BC;--x-bq-bd:#6095C5;--x-bq-bg:#22282D;--x-bq-fg:#B9CAD6;--x-stripe:#22211F;--x-surface:#282726;--x-bg:#1C1B1A}}
+:root{--x-fg:#1a202c;--x-mut:#5a6473;--x-bd:#e2e8f0;--x-bdl:#eef2f7;--x-link:#2563eb;--x-code-bg:#f1f5f9;--x-code-fg:#334155;--x-bq-bd:#2563eb;--x-bq-bg:#f0f9ff;--x-bq-fg:#1e3a5f;--x-stripe:#f8fafc;--x-surface:#fff;--x-bg:#fff;--x-pre-bg:#fff}
+@media (prefers-color-scheme:dark){:root{--x-fg:#CECDC3;--x-mut:#A6A49F;--x-bd:#403E3C;--x-bdl:#343331;--x-link:#6095C5;--x-code-bg:#282726;--x-code-fg:#C8C6BC;--x-bq-bd:#6095C5;--x-bq-bg:#22282D;--x-bq-fg:#B9CAD6;--x-stripe:#22211F;--x-surface:#282726;--x-bg:#1C1B1A;--x-pre-bg:#161513}.export-doc pre .hljs-section{color:#6cb6ff}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--x-bg)}
 .export-doc{max-width:760px;margin:0 auto;padding:48px 24px 96px;color:var(--x-fg);line-height:1.75;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased}
@@ -656,7 +671,7 @@ html,body{margin:0;background:var(--x-bg)}
 .export-doc p{margin:1em 0}
 .export-doc a{color:var(--x-link);text-decoration:underline;text-underline-offset:2px}
 .export-doc code{font-family:"SFMono-Regular","Cascadia Code",Consolas,"PingFang SC","Microsoft YaHei",monospace;background:var(--x-code-bg);color:var(--x-code-fg);padding:2px 7px;border-radius:4px;font-size:.875em}
-.export-doc pre{background:var(--x-surface);border:1px solid var(--x-bd);padding:20px 24px;border-radius:8px;overflow-x:auto;margin:1.5em 0;line-height:1.55}
+.export-doc pre{background:var(--x-pre-bg);border:1px solid var(--x-bd);padding:20px 24px;border-radius:8px;overflow-x:auto;margin:1.5em 0;line-height:1.55}
 .export-doc pre code{background:none;padding:0;border-radius:0;font-size:13px}
 .export-doc blockquote{border-left:3px solid var(--x-bq-bd);background:var(--x-bq-bg);color:var(--x-bq-fg);padding:12px 20px;margin:1.5em 0;border-radius:0 6px 6px 0}
 .export-doc blockquote p{margin:.4em 0}
@@ -672,7 +687,7 @@ html,body{margin:0;background:var(--x-bg)}
 .export-doc thead{background:var(--x-code-bg)}
 .export-doc tbody tr:nth-child(even){background:var(--x-stripe)}
 .export-doc hr{border:none;border-top:1px solid var(--x-bd);margin:2.5em 0}
-@media print{html,body{background:#fff}.export-doc{max-width:100%;padding:0}}
+@media print{:root{--x-fg:#1a202c;--x-mut:#5a6473;--x-bd:#e2e8f0;--x-bdl:#eef2f7;--x-link:#2563eb;--x-code-bg:#f1f5f9;--x-code-fg:#334155;--x-bq-bd:#2563eb;--x-bq-bg:#f0f9ff;--x-bq-fg:#1e3a5f;--x-stripe:#f8fafc;--x-surface:#fff;--x-bg:#fff;--x-pre-bg:#fff}html,body{background:#fff}.export-doc{max-width:100%;padding:0}}
 `;
 
 // HTML-escape for text contexts (title, header fields).

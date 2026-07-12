@@ -20,7 +20,10 @@
   --bg: light-dark(#f8fafc, #1C1B1A);
   --fg: light-dark(#0f172a, #CECDC3);
   --fg-secondary: light-dark(#475569, #A6A49F);
-  --fg-muted: light-dark(#5b6878, #8C8A85);
+  /* fg-muted dark value is calibrated against its strictest floor, --surface
+     (#282726, the panel bg it sits on in cards/rows) -- #92908B clears 4.67:1
+     there (old #8C8A85 was 4.32:1, under AA's 4.5 floor for a text color). */
+  --fg-muted: light-dark(#5b6878, #92908B);
   --border: light-dark(#e2e8f0, #403E3C);
   --border-light: light-dark(#f1f5f9, #343331);
   --code-bg: light-dark(#f1f5f9, #282726);
@@ -100,6 +103,18 @@
 html { font-size: 100%; } /* rem-based reading size honors the browser's default font */
 
 ::selection { background: var(--selection); }
+/* M3-a: a selected link inside the rendered doc kept its own --link color
+   over --selection's dark bg (#6095C5 on #324B61 = 2.85:1, fails AA). Pull
+   selected text to --fg in dark only -- selection is a transient interaction
+   state, so losing the link-blue tint while highlighted is an acceptable
+   trade for 5.68:1. `currentColor` is the light branch: ::selection is a
+   CSS Pseudo highlight-styling pseudo-element (same family as ::highlight()
+   below), where an unset/currentColor `color` falls back to the *selected
+   element's own* computed color per spec -- byte-identical to this rule
+   simply not existing, so light mode is untouched. light-dark() (not
+   `@media (prefers-color-scheme: dark)`) so it still tracks optTheme's
+   forced mode via the inline color-scheme style, not just the OS setting. */
+#rendered-view ::selection { color: light-dark(currentColor, var(--fg)); }
 
 /* ---- Scrollbars (document-wide: body's rightmost bar, rail, hl-list, pre) ----
    Transparent track so bars melt into --bg/--surface; the thumb is a neutral
@@ -749,6 +764,15 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   font-size: 13px;
   font-weight: 400;
 }
+/* M4: hljs-github-dark's .hljs-section (markdown headings inside a
+   highlighted code block) is #1f6feb -- tuned against that theme's own
+   #0d1117, only 3.94:1 on this palette's --pre-bg (#161513). Same
+   specificity trick as #rendered-view pre code.hljs above (ID + type +
+   class beats the vendor sheet's bare .hljs-section, no !important, wins
+   regardless of <link> load order). Light branch re-states the vendor
+   light sheet's own #005cc5 verbatim so light mode renders byte-identical
+   to not having this rule at all. */
+#rendered-view pre .hljs-section { color: light-dark(#005cc5, #6cb6ff); }
 
 /* ---- Left control rail ---- */
 /* transition here (transition-round) is the house pattern zen's
@@ -956,7 +980,10 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   box-shadow: 0 1px 3px rgba(15,23,42,0.12);
 }
 .rail-toggle svg { width: 18px; height: 18px; }
-.rail-scrim { position: fixed; inset: 0; z-index: 19; background: rgba(15,23,42,0.32); }
+/* L6: rgba(15,23,42,...) is Slate's cool-blue near-black, a residual from
+   the old palette -- the A palette's near-black is warm (#1C1B1A = 28,27,26).
+   Same alpha, light branch keeps the original literal. */
+.rail-scrim { position: fixed; inset: 0; z-index: 19; background: light-dark(rgba(15,23,42,0.32), rgba(28,27,26,0.32)); }
 .rail-scrim[hidden] { display: none; }
 
 /* ---- Responsive: collapse rail to an off-canvas drawer ---- */
@@ -1007,6 +1034,22 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
      #f8fafc / warm near-black #1C1B1A by design) -- an intentional ink-saving
      choice, independent of the token system. */
   body { background: white; color: black; }
+  /* H2b: forcing color-scheme:light above does NOT stop the dark hljs
+     stylesheet from painting. Its <link media> is a `prefers-color-scheme`
+     OS media-feature query (md-preview.html lines 8-9) -- orthogonal to the
+     `color-scheme` CSS property this block forces, and printing doesn't
+     change the OS setting. Worse, forced dark theme (pbpApplyColorScheme,
+     md-preview.js) rewrites the dark link's media to literal "all" so it
+     always matches, print included. Net effect: hljs-github-dark's own
+     `.hljs{color:#c9d1d9}` (near-white) can still be the active code-text
+     color while this block prints on white paper -- and every per-token
+     `.hljs-keyword`/`.hljs-string`/etc span inside is its OWN separate rule
+     in the vendor sheet, so pinning just the base .hljs class wouldn't
+     reach them. The `span` half of this selector covers all of them in one
+     shot: printing deliberately gives up syntax color entirely (every token
+     span flattens to the same near-black), trading color-coding for
+     guaranteed readability on paper. */
+  #rendered-view pre code, #rendered-view pre code span { color: #1f2328 !important; }
 }
 
 /* Raw view: the TOC navigates the rendered doc, which is hidden in Raw mode. */
@@ -1253,7 +1296,15 @@ body.md-empty main { margin-left: 0; }
   vertical-align: super;
   cursor: pointer;
 }
-.ask-chip:hover { background: var(--btn-hover); border-color: var(--link); }
+/* M3-c: inline citation chip text (--link, identity color) sat under
+   3.97:1 against --btn-hover's dark hover bg. light-dark(var(--link), ...)
+   -- not currentColor -- because this is a plain hover pseudo-CLASS on a
+   real element, not a highlight pseudo-element: currentColor here would
+   mean "inherit from the chip's DOM parent", not "fall back to .ask-chip's
+   own base rule". Referencing the same --link token for the light branch
+   keeps the resolved light value byte-identical to today (falls through to
+   the base rule); dark switches to --link-hover for 5.35:1. */
+.ask-chip:hover { background: var(--btn-hover); border-color: var(--link); color: light-dark(var(--link), var(--link-hover)); }
 .ask-chip:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 /* Verified marker: pure CSS dot (no glyph). */
 .ask-chip.verified::after {
@@ -1306,11 +1357,19 @@ body.md-empty main { margin-left: 0; }
 #ask-tip .ask-tip-status { color: var(--success); margin-top: 4px; font-weight: 600; }
 
 /* Jump flash: CSS Custom Highlight API (primary path). */
-::highlight(pbp-flash) { background-color: var(--hl-flash); }
+/* M3-b: same currentColor/light-dark technique as #rendered-view ::selection
+   above -- ::highlight() is in the same CSS Pseudo highlight-styling family
+   as ::selection, so `color: light-dark(currentColor, var(--fg))` leaves
+   light mode byte-identical (falls back to the underlying text's own
+   color) and only pulls dark-mode text to --fg, so a highlighted link or
+   .pb-tr secondary span reads at the full body-text contrast (>=5.2:1
+   against every --hl-*/--hl-flash flattened over --bg) instead of keeping
+   its own lower-contrast --link/--fg-secondary color under the tint. */
+::highlight(pbp-flash) { background-color: var(--hl-flash); color: light-dark(currentColor, var(--fg)); }
 /* Fallback when CSS.highlights is unavailable: flash the whole block. */
 .pb-flash-fallback { animation: pbp-flash-fade 1.6s ease-out; }
 @keyframes pbp-flash-fade {
-  0%, 35% { background-color: rgba(250, 204, 21, 0.5); }
+  0%, 35% { background-color: var(--hl-flash); }
   100% { background-color: transparent; }
 }
 
@@ -1318,11 +1377,11 @@ body.md-empty main { margin-left: 0; }
    mutation (D10 convention 3/6). Colors: 1 yellow=quote, 2 green=definition,
    3 blue=example, 4 red=doubt, 5 purple=todo. Dark variant desaturates
    each (same technique as ::highlight(pbp-flash) above). */
-::highlight(pbp-hl-1) { background-color: var(--hl-1); }
-::highlight(pbp-hl-2) { background-color: var(--hl-2); }
-::highlight(pbp-hl-3) { background-color: var(--hl-3); }
-::highlight(pbp-hl-4) { background-color: var(--hl-4); }
-::highlight(pbp-hl-5) { background-color: var(--hl-5); }
+::highlight(pbp-hl-1) { background-color: var(--hl-1); color: light-dark(currentColor, var(--fg)); }
+::highlight(pbp-hl-2) { background-color: var(--hl-2); color: light-dark(currentColor, var(--fg)); }
+::highlight(pbp-hl-3) { background-color: var(--hl-3); color: light-dark(currentColor, var(--fg)); }
+::highlight(pbp-hl-4) { background-color: var(--hl-4); color: light-dark(currentColor, var(--fg)); }
+::highlight(pbp-hl-5) { background-color: var(--hl-5); color: light-dark(currentColor, var(--fg)); }
 
 /* In-document search (md-reader.js, R4): explicit .priority is set in JS
    (search=1, current=2, pbp-flash=3, user pbp-hl-* default 0) -- see
@@ -1391,11 +1450,22 @@ body.tr-only #rendered-view [data-pb-hl-mirror="5"] { box-shadow: inset 3px 0 0 
   padding: 0;
   cursor: pointer;
 }
-.pb-hl-dot-1 { background: #facc15; }
-.pb-hl-dot-2 { background: #4ade80; }
-.pb-hl-dot-3 { background: #60a5fa; }
-.pb-hl-dot-4 { background: #f87171; }
-.pb-hl-dot-5 { background: #c084fc; }
+/* L5: these dot swatches were fixed single values shared across both color
+   schemes -- an identity-color legend, not a token, so it never followed
+   the palette swap above. dot-4's saturated red now visually disagrees with
+   its own highlight (--hl-4 is pink under the A palette); light-dark() only
+   changes the DARK branch to that same pink, plus a same-hue-family solid
+   for 1/2/3/5 (the alpha'd --hl-* values flattened wouldn't read right as
+   an opaque 18px swatch, so these are separate hand-picked solids, not
+   token refs). Light branch is the untouched original literal in every
+   case -- these are non-text UI (WCAG 1.4.11 non-text contrast, >=3:1
+   against the panel bg they sit on), not body copy, so the 4.5:1 text
+   floor doesn't apply; verified >=3.64:1 against --surface/--bg. */
+.pb-hl-dot-1 { background: light-dark(#facc15, #D9A441); }
+.pb-hl-dot-2 { background: light-dark(#4ade80, #5E9C69); }
+.pb-hl-dot-3 { background: light-dark(#60a5fa, #5689B6); }
+.pb-hl-dot-4 { background: light-dark(#f87171, #B86F8C); }
+.pb-hl-dot-5 { background: light-dark(#c084fc, #8B72AF); }
 .pb-hl-dot:hover, .pb-hl-dot:focus-visible { transform: scale(1.15); outline: 2px solid var(--link); outline-offset: 2px; }
 .pb-hl-note-btn {
   display: flex;
@@ -1782,11 +1852,12 @@ body.ask-open main { margin-right: 396px; }
   border: 2px solid transparent;
   cursor: pointer;
 }
-.hl-card-dot-1 { background: #f5c518; }
-.hl-card-dot-2 { background: #4caf50; }
-.hl-card-dot-3 { background: #3b82f6; }
-.hl-card-dot-4 { background: #ef4444; }
-.hl-card-dot-5 { background: #a855f7; }
+/* L5 (edit-card dots, same swatch-legend rationale as .pb-hl-dot above). */
+.hl-card-dot-1 { background: light-dark(#f5c518, #D9A441); }
+.hl-card-dot-2 { background: light-dark(#4caf50, #5E9C69); }
+.hl-card-dot-3 { background: light-dark(#3b82f6, #5689B6); }
+.hl-card-dot-4 { background: light-dark(#ef4444, #B86F8C); }
+.hl-card-dot-5 { background: light-dark(#a855f7, #8B72AF); }
 .hl-card-dot.active, .hl-card-dot:focus-visible { border-color: var(--fg); }
 .hl-card-ai { display: flex; gap: 6px; }
 .hl-card-ai[hidden] { display: none; }
@@ -1836,11 +1907,12 @@ body.ask-open main { margin-right: 396px; }
   border: 1px solid rgba(128, 128, 128, 0.45); /* neutral gray: visible on light AND dark schemes (slate-tinted borders vanish on dark) */
   cursor: pointer;
 }
-.hl-filter-dot-1 { background: #facc15; }
-.hl-filter-dot-2 { background: #4ade80; }
-.hl-filter-dot-3 { background: #60a5fa; }
-.hl-filter-dot-4 { background: #f87171; }
-.hl-filter-dot-5 { background: #c084fc; }
+/* L5 (filter-legend dots, same rationale as .pb-hl-dot above). */
+.hl-filter-dot-1 { background: light-dark(#facc15, #D9A441); }
+.hl-filter-dot-2 { background: light-dark(#4ade80, #5E9C69); }
+.hl-filter-dot-3 { background: light-dark(#60a5fa, #5689B6); }
+.hl-filter-dot-4 { background: light-dark(#f87171, #B86F8C); }
+.hl-filter-dot-5 { background: light-dark(#c084fc, #8B72AF); }
 .hl-filter-dot.off { opacity: 0.25; }
 .hl-filter-dot:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .hl-filter-empty { font-size: 13px; color: var(--fg-muted); margin: 4px 2px 8px; }
@@ -1869,11 +1941,12 @@ body.ask-open main { margin-right: 396px; }
 .hl-item-main:disabled { cursor: default; opacity: 0.5; }
 .hl-item-main:disabled:hover { background: none; }
 .hl-item-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.hl-item-dot-1 { background: #facc15; }
-.hl-item-dot-2 { background: #4ade80; }
-.hl-item-dot-3 { background: #60a5fa; }
-.hl-item-dot-4 { background: #f87171; }
-.hl-item-dot-5 { background: #c084fc; }
+/* L5 (Notebook-panel list dots, same rationale as .pb-hl-dot above). */
+.hl-item-dot-1 { background: light-dark(#facc15, #D9A441); }
+.hl-item-dot-2 { background: light-dark(#4ade80, #5E9C69); }
+.hl-item-dot-3 { background: light-dark(#60a5fa, #5689B6); }
+.hl-item-dot-4 { background: light-dark(#f87171, #B86F8C); }
+.hl-item-dot-5 { background: light-dark(#c084fc, #8B72AF); }
 .hl-item-quote {
   flex: 1 1 auto; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
