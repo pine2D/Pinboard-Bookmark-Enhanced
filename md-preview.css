@@ -401,6 +401,36 @@ body.zen #zen-bar { display: flex; }
   overflow-wrap: break-word; /* lang-agnostic guard for long de/ru compounds */
 }
 
+/* UX-d2: comfortable reading measure. .doc-body keeps its full 880px column
+   (pre/table/figure/img -- not listed -- stay full-width), but the flowing
+   TEXT blocks are capped to ~68ch; at the fluid font-size 880px yields
+   ~80-90 chars/line, past the comfortable ~66-72ch measure. `ch` tracks the
+   font-size (so the measure holds across zoom / the clamp()), and blocks
+   stay left-aligned inside the centered column so wide media just extends
+   right of the text edge. .pb-tr is the translated sibling (md-translate
+   inserts it as orig.afterend, so a top-level block's translation is a
+   direct #rendered-view child) -- capping it too keeps bilingual view's two
+   stacked columns the same width; forum-comment .pb-tr sits INSIDE its
+   (already-capped) blockquote so the direct-child `>` leaves it alone.
+   Scoped to body:not(.zen): zen's deliberate --zen-width cycle
+   (680/880/1080, ~:321) stays the sole measure control there, so this cap
+   composes with -- never fights -- the zen width button; on zen enter the
+   cap simply drops and blocks fill (and animate with) the .doc-body
+   max-width transition. */
+body:not(.zen) #rendered-view > p,
+body:not(.zen) #rendered-view > ul,
+body:not(.zen) #rendered-view > ol,
+body:not(.zen) #rendered-view > blockquote,
+body:not(.zen) #rendered-view > h1,
+body:not(.zen) #rendered-view > h2,
+body:not(.zen) #rendered-view > h3,
+body:not(.zen) #rendered-view > h4,
+body:not(.zen) #rendered-view > h5,
+body:not(.zen) #rendered-view > h6,
+body:not(.zen) #rendered-view > .pb-tr {
+  max-width: 68ch;
+}
+
 /* Headings */
 #rendered-view h1 {
   font-size: 2em;

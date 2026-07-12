@@ -1185,6 +1185,7 @@ function _pbpHlEnsureCard() {
 
   const note = document.createElement("textarea");
   note.className = "hl-card-note";
+  note.dir = "auto";
   note.rows = 3;
   note.addEventListener("blur", _pbpHlCommitNote);
   card.appendChild(note);

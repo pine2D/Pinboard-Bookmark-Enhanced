@@ -746,7 +746,13 @@ function composeStyledHtml(canonicalMd, meta, opts) {
     if (sub2.length) parts.push('<p class="doc-meta">' + sub2.join(" &middot; ") + "</p>");
     if (parts.length) header = '<header class="doc-header">' + parts.join("") + "</header>\n";
   }
-  return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n' +
+  // UX-i2: emit the article's detected language (and dir for RTL scripts) instead
+  // of a hardcoded lang="en", so the standalone export matches the live preview's
+  // #rendered-view lang/dir. detectArticleLang lives on the preview page (md-preview.js);
+  // typeof-guarded so the file:// test harness (loads md-convert.js alone) degrades to "en".
+  const lang = (typeof detectArticleLang === "function" && detectArticleLang(canonicalMd || "")) || "en";
+  const dir = (lang === "ar" || lang === "he" || lang === "fa") ? ' dir="rtl"' : "";
+  return '<!DOCTYPE html>\n<html lang="' + lang + '"' + dir + '>\n<head>\n<meta charset="UTF-8">\n' +
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
     "<title>" + _xmlEscape(meta.title || "Document") + "</title>\n<style>\n" +
     READER_CSS + (opts.hljsCss || "") + (opts.katexCss || "") + "\n</style>\n</head>\n<body>\n" +

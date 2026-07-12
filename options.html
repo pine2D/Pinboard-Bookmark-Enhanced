@@ -97,12 +97,12 @@
         <span class="save-status" id="import-status" role="status" aria-live="polite"></span>
       </div>
       <p class="hint" data-i18n="webdavHint">Back up your settings to a WebDAV server you control (e.g. Nextcloud). Never includes API keys.</p>
-      <div class="fg"><label class="bl" data-i18n="webdavUrlLabel">Server URL</label><input type="text" id="opt-webdav-url" placeholder="https://dav.example.com/backups/" autocomplete="off" spellcheck="false" /></div>
+      <div class="fg"><label class="bl" for="opt-webdav-url" data-i18n="webdavUrlLabel">Server URL</label><input type="text" id="opt-webdav-url" placeholder="https://dav.example.com/backups/" autocomplete="off" spellcheck="false" /></div>
       <p class="hint hint-warn" id="webdav-http-warn" hidden data-i18n="mdTargetWebhookHttpWarn"></p>
-      <div class="fg"><label class="bl" data-i18n="webdavUserLabel">Username (optional)</label><input type="text" id="opt-webdav-user" autocomplete="off" spellcheck="false" /></div>
-      <div class="fg"><label class="bl" data-i18n="webdavPassLabel">Password (optional)</label><input type="password" id="opt-webdav-pass" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="opt-webdav-pass" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></div>
+      <div class="fg"><label class="bl" for="opt-webdav-user" data-i18n="webdavUserLabel">Username (optional)</label><input type="text" id="opt-webdav-user" autocomplete="off" spellcheck="false" /></div>
+      <div class="fg"><label class="bl" for="opt-webdav-pass" data-i18n="webdavPassLabel">Password (optional)</label><input type="password" id="opt-webdav-pass" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="opt-webdav-pass" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></div>
       <div class="fg">
-        <label class="bl" data-i18n="webdavAutoPushLabel">Automatic push</label>
+        <label class="bl" for="opt-webdav-autopush" data-i18n="webdavAutoPushLabel">Automatic push</label>
         <select id="opt-webdav-autopush">
           <option value="off" data-i18n="webdavAutoPushOff">Off</option>
           <option value="hourly" data-i18n="webdavAutoPushHourly">Every hour</option>
@@ -141,8 +141,8 @@
       <div class="fg"><label><input type="checkbox" id="opt-check-bookmark-status" checked /> <span data-i18n="optCheckBookmarkStatus">Show bookmark status via icon (check if current page is saved)</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-auto-close" checked /> <span data-i18n="optAutoClose">Auto-close popup after save</span></label></div>
       <div class="fg"><label><input type="checkbox" id="offline-queue-enabled" /> <span data-i18n="optOfflineQueue">Enable offline save queue</span></label></div>
-      <div class="fg fg-stack">
-        <label class="bl" data-i18n="optPopupWidthTitle">Popup width</label>
+      <div class="fg fg-stack" role="group" aria-labelledby="popup-width-label">
+        <label class="bl" id="popup-width-label" data-i18n="optPopupWidthTitle">Popup width</label>
         <div><label><input type="radio" name="popup-width-preset" value="450" /> <span data-i18n="optPopupWidth450">Compact (450px)</span></label></div>
         <div><label><input type="radio" name="popup-width-preset" value="550" /> <span data-i18n="optPopupWidth550">Standard (550px)</span></label></div>
         <div><label><input type="radio" name="popup-width-preset" value="650" /> <span data-i18n="optPopupWidth650">Wide (650px)</span></label></div>
@@ -160,11 +160,11 @@
         <div><label><input type="checkbox" id="opt-urlclean-aggressive" /> <span data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref/si/igshid and similar</span></label></div>
       </div>
       <div class="fg" style="margin-top:8px">
-        <label class="bl" data-i18n="optUrlCleanCustom">Custom parameters (one per line, appended to default list)</label>
+        <label class="bl" for="opt-urlclean-custom" data-i18n="optUrlCleanCustom">Custom parameters (one per line, appended to default list)</label>
         <textarea id="opt-urlclean-custom" rows="3" style="width:100%" placeholder="utm_other&#10;custom_track_id&#10;_branch_referrer" data-i18n-placeholder="optUrlCleanCustomPlaceholder"></textarea>
       </div>
       <div class="fg" style="margin-top:8px">
-        <label class="bl" data-i18n="optUrlCleanExclude">Exclude parameters (one per line, never cleaned — e.g. keep affiliate tag=)</label>
+        <label class="bl" for="opt-urlclean-exclude" data-i18n="optUrlCleanExclude">Exclude parameters (one per line, never cleaned — e.g. keep affiliate tag=)</label>
         <textarea id="opt-urlclean-exclude" rows="3" style="width:100%" placeholder="tag&#10;ref&#10;si" data-i18n-placeholder="optUrlCleanExcludePlaceholder"></textarea>
       </div>
       <div class="divider"></div>
@@ -185,8 +185,8 @@
       <div class="fg"><label><input type="checkbox" id="opt-private-default" /> <span data-i18n="optPrivateDefault">Private by default</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-private-incognito" /> <span data-i18n="optPrivateIncognito">Private in Incognito</span></label></div>
       <div class="fg"><label><input type="checkbox" id="opt-readlater-default" /> <span data-i18n="optReadlaterDefault">Read Later by default</span></label></div>
-      <div class="fg fg-stack">
-        <label class="bl" data-i18n="optBgSaveMode">Background save mode</label>
+      <div class="fg fg-stack" role="group" aria-labelledby="bgsave-mode-label">
+        <label class="bl" id="bgsave-mode-label" data-i18n="optBgSaveMode">Background save mode</label>
         <div><label><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" /> <span data-i18n="optBgSaveModeMerge">Merge (default — combine new tags with existing)</span></label></div>
         <div><label><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" /> <span data-i18n="optBgSaveModeSkip">Skip (if URL already saved, do nothing)</span></label></div>
         <div><label><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" /> <span data-i18n="optBgSaveModeOverwrite">Overwrite (replace all tags, no merge)</span></label></div>
@@ -200,15 +200,15 @@
       <div class="divider"></div>
       <div class="section-title" data-i18n="secTags">Tags</div>
       <div class="fg"><label><input type="checkbox" id="opt-respect-tag-case" /> <span data-i18n="optRespectTagCase">Respect existing tag case (match most-used casing)</span></label></div>
-      <div class="fg fg-stack">
-        <label class="bl" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
+      <div class="fg fg-stack" role="group" aria-labelledby="tag-sync-label">
+        <label class="bl" id="tag-sync-label" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
         <div><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked /> <span data-i18n="tagSyncCached">Cached (default — refresh after 10 min)</span></label></div>
         <div><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" /> <span data-i18n="tagSyncFresh">Live (fetch on every popup — slower)</span></label></div>
         <div><label><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" /> <span data-i18n="tagSyncPrewarmed">Prewarmed (background fetch every 15 min — instant popup)</span></label></div>
         <p class="hint" data-i18n="tagSyncHint">Controls how your existing Pinboard tag cloud is pulled into the popup for autocomplete. Tags are read-only; nothing is uploaded back to Pinboard.</p>
       </div>
       <div class="fg">
-        <label class="bl" data-i18n="labelTagPresets">Tag Presets</label>
+        <label class="bl" for="opt-tag-presets" data-i18n="labelTagPresets">Tag Presets</label>
         <textarea id="opt-tag-presets" rows="4" placeholder="One preset per line:&#10;Work: project, review, report&#10;Dev: programming, tutorial, tool" data-i18n-placeholder="tagPresetsPlaceholder"></textarea>
         <p class="hint" data-i18n="tagPresetsHint">Format: <code>Name: tag1, tag2, tag3</code> — shown as quick-add buttons in popup.</p>
       </div>
@@ -227,7 +227,7 @@
           <div class="fg"><label><input type="checkbox" id="qs-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
           <div class="fg"><label><input type="checkbox" id="qs-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
           <div class="fg">
-            <label class="bl" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
+            <label class="bl" for="qs-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
             <input type="text" id="qs-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
           </div>
           <div class="fg"><label><input type="checkbox" id="qs-ai-tags" /> <span data-i18n="qsAiTags">Auto-generate AI tags</span></label></div>
@@ -245,7 +245,7 @@
           <div class="fg"><label><input type="checkbox" id="rl-auto-notes" checked /> <span data-i18n="qsAutoNotes">Auto-add page description to notes</span></label></div>
           <div class="fg"><label><input type="checkbox" id="rl-blockquote" checked /> <span data-i18n="qsBlockquote">Wrap selected text with blockquote</span></label></div>
           <div class="fg">
-            <label class="bl" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
+            <label class="bl" for="rl-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
             <input type="text" id="rl-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
           </div>
           <div class="fg"><label><input type="checkbox" id="rl-ai-tags" /> <span data-i18n="qsAiTags">Auto-generate AI tags</span></label></div>
@@ -261,7 +261,7 @@
           <p class="hint" data-i18n="batchHint">Save each open tab as an individual bookmark.</p>
           <div class="fg"><label><input type="checkbox" id="opt-batch-tag-enabled" checked /> <span data-i18n="batchAutoAddTags">Auto-add tags</span></label></div>
           <div class="fg">
-            <label class="bl" data-i18n="batchTagsLabel">Tags (comma-separated)</label>
+            <label class="bl" for="opt-batch-tag" data-i18n="batchTagsLabel">Tags (comma-separated)</label>
             <input type="text" id="opt-batch-tag" value="batch_saved" />
             <p class="hint" data-i18n="batchTagsHint">Multiple tags separated by commas. E.g. <code>batch_saved, research</code></p>
           </div>
@@ -331,8 +331,8 @@
       <!-- Gemini -->
       <div class="pf" id="fields-gemini">
         <h3 data-i18n="provGemini">Google Gemini</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-gemini-key" placeholder="AIzaSy…" /><button type="button" class="key-toggle" data-target="opt-gemini-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-gemini-model" value="gemini-2.5-flash-lite" /></div>
+        <div class="fg"><label class="bl" for="opt-gemini-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-gemini-key" placeholder="AIzaSy…" /><button type="button" class="key-toggle" data-target="opt-gemini-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-gemini-model" data-i18n="labelModel">Model</label><input type="text" id="opt-gemini-model" value="gemini-2.5-flash-lite" /></div>
         <button class="btn btn-sm" id="test-gemini" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-gemini-status"></span>
       </div>
@@ -340,9 +340,9 @@
       <!-- OpenAI -->
       <div class="pf hidden" id="fields-openai">
         <h3 data-i18n="provOpenai">OpenAI</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-openai-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-openai-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-openai-model" value="gpt-5.4-nano" /></div>
-        <div class="fg"><label class="bl" data-i18n="labelBaseUrl">Base URL</label><input type="text" id="opt-openai-baseurl" value="https://api.openai.com/v1" /><p class="hint" data-i18n="hintOpenAIBaseUrl">Change for proxy or compatible endpoint</p></div>
+        <div class="fg"><label class="bl" for="opt-openai-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-openai-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-openai-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-openai-model" data-i18n="labelModel">Model</label><input type="text" id="opt-openai-model" value="gpt-5.4-nano" /></div>
+        <div class="fg"><label class="bl" for="opt-openai-baseurl" data-i18n="labelBaseUrl">Base URL</label><input type="text" id="opt-openai-baseurl" value="https://api.openai.com/v1" /><p class="hint" data-i18n="hintOpenAIBaseUrl">Change for proxy or compatible endpoint</p></div>
         <button class="btn btn-sm" id="test-openai" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-openai-status"></span>
       </div>
@@ -350,8 +350,8 @@
       <!-- Claude -->
       <div class="pf hidden" id="fields-claude">
         <h3 data-i18n="provClaude">Anthropic Claude</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-claude-key" placeholder="sk-ant-…" /><button type="button" class="key-toggle" data-target="opt-claude-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-claude-model" value="claude-haiku-4-5" /><p class="hint" data-i18n="hintClaudeModel">e.g. claude-haiku-4-5-20251001, claude-sonnet-4-20250514</p></div>
+        <div class="fg"><label class="bl" for="opt-claude-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-claude-key" placeholder="sk-ant-…" /><button type="button" class="key-toggle" data-target="opt-claude-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-claude-model" data-i18n="labelModel">Model</label><input type="text" id="opt-claude-model" value="claude-haiku-4-5" /><p class="hint" data-i18n="hintClaudeModel">e.g. claude-haiku-4-5-20251001, claude-sonnet-4-20250514</p></div>
         <button class="btn btn-sm" id="test-claude" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-claude-status"></span>
       </div>
@@ -359,8 +359,8 @@
       <!-- DeepSeek -->
       <div class="pf hidden" id="fields-deepseek">
         <h3 data-i18n="provDeepseek">DeepSeek</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-deepseek-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-deepseek-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-v4-flash" /></div>
+        <div class="fg"><label class="bl" for="opt-deepseek-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-deepseek-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-deepseek-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://platform.deepseek.com/api_keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-deepseek-model" data-i18n="labelModel">Model</label><input type="text" id="opt-deepseek-model" value="deepseek-v4-flash" /></div>
         <button class="btn btn-sm" id="test-deepseek" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-deepseek-status"></span>
       </div>
@@ -368,8 +368,8 @@
       <!-- Qwen -->
       <div class="pf hidden" id="fields-qwen">
         <h3 data-i18n="provQwen">Qwen</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-qwen-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-qwen-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-qwen-model" value="qwen-flash" /></div>
+        <div class="fg"><label class="bl" for="opt-qwen-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-qwen-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-qwen-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-qwen-model" data-i18n="labelModel">Model</label><input type="text" id="opt-qwen-model" value="qwen-flash" /></div>
         <button class="btn btn-sm" id="test-qwen" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-qwen-status"></span>
       </div>
@@ -377,8 +377,8 @@
       <!-- MiniMax -->
       <div class="pf hidden" id="fields-minimax">
         <h3 data-i18n="provMinimax">MiniMax</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-minimax-key" /><button type="button" class="key-toggle" data-target="opt-minimax-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-M2" /></div>
+        <div class="fg"><label class="bl" for="opt-minimax-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-minimax-key" /><button type="button" class="key-toggle" data-target="opt-minimax-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://platform.minimaxi.com/" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-minimax-model" data-i18n="labelModel">Model</label><input type="text" id="opt-minimax-model" value="MiniMax-M2" /></div>
         <button class="btn btn-sm" id="test-minimax" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-minimax-status"></span>
       </div>
@@ -386,8 +386,8 @@
       <!-- OpenRouter -->
       <div class="pf hidden" id="fields-openrouter">
         <h3 data-i18n="provOpenrouter">OpenRouter</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-openrouter-key" placeholder="sk-or-…" /><button type="button" class="key-toggle" data-target="opt-openrouter-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://openrouter.ai/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a>. <span data-i18n="openrouterTagline">Access 100+ models from one API.</span></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-openrouter-model" value="meta-llama/llama-4-scout:free" /><p class="hint"><span data-i18n="browseModelsAt">Browse models at</span> <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a></p></div>
+        <div class="fg"><label class="bl" for="opt-openrouter-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-openrouter-key" placeholder="sk-or-…" /><button type="button" class="key-toggle" data-target="opt-openrouter-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://openrouter.ai/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a>. <span data-i18n="openrouterTagline">Access 100+ models from one API.</span></p></div>
+        <div class="fg"><label class="bl" for="opt-openrouter-model" data-i18n="labelModel">Model</label><input type="text" id="opt-openrouter-model" value="meta-llama/llama-4-scout:free" /><p class="hint"><span data-i18n="browseModelsAt">Browse models at</span> <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a></p></div>
         <button class="btn btn-sm" id="test-openrouter" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-openrouter-status"></span>
       </div>
@@ -395,8 +395,8 @@
       <!-- Groq -->
       <div class="pf hidden" id="fields-groq">
         <h3 data-i18n="provGroq">Groq</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-groq-key" placeholder="gsk_…" /><button type="button" class="key-toggle" data-target="opt-groq-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://console.groq.com/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-groq-model" value="llama-3.1-8b-instant" /></div>
+        <div class="fg"><label class="bl" for="opt-groq-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-groq-key" placeholder="gsk_…" /><button type="button" class="key-toggle" data-target="opt-groq-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://console.groq.com/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-groq-model" data-i18n="labelModel">Model</label><input type="text" id="opt-groq-model" value="llama-3.1-8b-instant" /></div>
         <button class="btn btn-sm" id="test-groq" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-groq-status"></span>
       </div>
@@ -404,8 +404,8 @@
       <!-- Mistral -->
       <div class="pf hidden" id="fields-mistral">
         <h3 data-i18n="provMistral">Mistral AI</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-mistral-key" /><button type="button" class="key-toggle" data-target="opt-mistral-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://console.mistral.ai/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-mistral-model" value="mistral-small-latest" /></div>
+        <div class="fg"><label class="bl" for="opt-mistral-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-mistral-key" /><button type="button" class="key-toggle" data-target="opt-mistral-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://console.mistral.ai/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-mistral-model" data-i18n="labelModel">Model</label><input type="text" id="opt-mistral-model" value="mistral-small-latest" /></div>
         <button class="btn btn-sm" id="test-mistral" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-mistral-status"></span>
       </div>
@@ -413,8 +413,8 @@
       <!-- Cohere -->
       <div class="pf hidden" id="fields-cohere">
         <h3 data-i18n="provCohere">Cohere</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-cohere-key" /><button type="button" class="key-toggle" data-target="opt-cohere-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://dashboard.cohere.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-cohere-model" value="command-r7b-12-2024" /></div>
+        <div class="fg"><label class="bl" for="opt-cohere-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-cohere-key" /><button type="button" class="key-toggle" data-target="opt-cohere-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://dashboard.cohere.com/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-cohere-model" data-i18n="labelModel">Model</label><input type="text" id="opt-cohere-model" value="command-r7b-12-2024" /></div>
         <button class="btn btn-sm" id="test-cohere" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-cohere-status"></span>
       </div>
@@ -422,8 +422,8 @@
       <!-- SiliconFlow -->
       <div class="pf hidden" id="fields-siliconflow">
         <h3 data-i18n="provSiliconflow">SiliconFlow</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-siliconflow-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-siliconflow-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://cloud.siliconflow.cn/account/ak" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-siliconflow-model" value="Qwen/Qwen3-8B" /></div>
+        <div class="fg"><label class="bl" for="opt-siliconflow-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-siliconflow-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-siliconflow-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://cloud.siliconflow.cn/account/ak" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-siliconflow-model" data-i18n="labelModel">Model</label><input type="text" id="opt-siliconflow-model" value="Qwen/Qwen3-8B" /></div>
         <button class="btn btn-sm" id="test-siliconflow" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-siliconflow-status"></span>
       </div>
@@ -431,8 +431,8 @@
       <!-- Zhipu -->
       <div class="pf hidden" id="fields-zhipu">
         <h3 data-i18n="provZhipu">Zhipu</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-zhipu-key" /><button type="button" class="key-toggle" data-target="opt-zhipu-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-zhipu-model" value="glm-4.7-flash" /><p class="hint" data-i18n="hintZhipuModel">e.g. glm-4.7-flash, glm-4-flash, glm-4-plus</p></div>
+        <div class="fg"><label class="bl" for="opt-zhipu-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-zhipu-key" /><button type="button" class="key-toggle" data-target="opt-zhipu-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-zhipu-model" data-i18n="labelModel">Model</label><input type="text" id="opt-zhipu-model" value="glm-4.7-flash" /><p class="hint" data-i18n="hintZhipuModel">e.g. glm-4.7-flash, glm-4-flash, glm-4-plus</p></div>
         <button class="btn btn-sm" id="test-zhipu" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-zhipu-status"></span>
       </div>
@@ -440,8 +440,8 @@
       <!-- Kimi -->
       <div class="pf hidden" id="fields-kimi">
         <h3 data-i18n="provKimi">Kimi</h3>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-kimi-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-kimi-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://platform.moonshot.cn/console/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-kimi-model" value="kimi-k2.6" /><p class="hint" data-i18n="hintKimiModel">e.g. kimi-k2.6, kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k</p></div>
+        <div class="fg"><label class="bl" for="opt-kimi-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-kimi-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-kimi-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://platform.moonshot.cn/console/api-keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+        <div class="fg"><label class="bl" for="opt-kimi-model" data-i18n="labelModel">Model</label><input type="text" id="opt-kimi-model" value="kimi-k2.6" /><p class="hint" data-i18n="hintKimiModel">e.g. kimi-k2.6, kimi-k2.5, moonshot-v1-32k, moonshot-v1-128k</p></div>
         <button class="btn btn-sm" id="test-kimi" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-kimi-status"></span>
       </div>
@@ -449,8 +449,8 @@
       <!-- Ollama -->
       <div class="pf hidden" id="fields-ollama">
         <h3 data-i18n="provOllama">Ollama (Local)</h3>
-        <div class="fg"><label class="bl" data-i18n="labelBaseUrl">Base URL</label><input type="text" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-ollama-model" value="llama3.2" /><p class="hint" data-i18n="hintOllamaModel">Run <code>ollama pull llama3.2</code> first</p></div>
+        <div class="fg"><label class="bl" for="opt-ollama-baseurl" data-i18n="labelBaseUrl">Base URL</label><input type="text" id="opt-ollama-baseurl" value="http://localhost:11434" /></div>
+        <div class="fg"><label class="bl" for="opt-ollama-model" data-i18n="labelModel">Model</label><input type="text" id="opt-ollama-model" value="llama3.2" /><p class="hint" data-i18n="hintOllamaModel">Run <code>ollama pull llama3.2</code> first</p></div>
         <button class="btn btn-sm" id="test-ollama" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-ollama-status"></span>
       </div>
@@ -458,10 +458,10 @@
       <!-- Custom -->
       <div class="pf hidden" id="fields-custom">
         <h3 data-i18n="provCustom">Custom OpenAI-compatible API</h3>
-        <div class="fg"><label class="bl" data-i18n="labelDisplayName">Display Name</label><input type="text" id="opt-custom-name" value="Custom" /></div>
-        <div class="fg"><label class="bl" data-i18n="labelBaseUrl">Base URL</label><input type="text" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /><p class="hint" data-i18n="hintCustomBaseUrl">Must support <code>/chat/completions</code> endpoint</p></div>
-        <div class="fg"><label class="bl" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-custom-key" /><button type="button" class="key-toggle" data-target="opt-custom-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint" data-i18n="hintCustomKey">Leave empty if not required</p></div>
-        <div class="fg"><label class="bl" data-i18n="labelModel">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
+        <div class="fg"><label class="bl" for="opt-custom-name" data-i18n="labelDisplayName">Display Name</label><input type="text" id="opt-custom-name" value="Custom" /></div>
+        <div class="fg"><label class="bl" for="opt-custom-baseurl" data-i18n="labelBaseUrl">Base URL</label><input type="text" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /><p class="hint" data-i18n="hintCustomBaseUrl">Must support <code>/chat/completions</code> endpoint</p></div>
+        <div class="fg"><label class="bl" for="opt-custom-key" data-i18n="labelApiKey">API Key</label><input type="password" id="opt-custom-key" /><button type="button" class="key-toggle" data-target="opt-custom-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint" data-i18n="hintCustomKey">Leave empty if not required</p></div>
+        <div class="fg"><label class="bl" for="opt-custom-model" data-i18n="labelModel">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
         <button class="btn btn-sm" id="test-custom" data-i18n="testConnection">Test Connection</button>
         <span class="save-status" id="test-custom-status"></span>
       </div>
@@ -469,7 +469,7 @@
       <div class="divider"></div>
       <div class="section-title" data-i18n="secJinaReader">Jina Reader</div>
       <div class="fg">
-        <label class="bl" data-i18n="jinaApiKeyLabel">API Key (optional)</label>
+        <label class="bl" for="opt-jina-key" data-i18n="jinaApiKeyLabel">API Key (optional)</label>
         <input type="password" id="opt-jina-key" placeholder="jina_xxxx (leave empty for free tier)" data-i18n-placeholder="jinaApiKeyPlaceholder" />
         <button type="button" class="key-toggle" data-target="opt-jina-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
         <p class="hint"><span data-i18n="jinaFreeTierHint">Free tier: 20 RPM. Add key for higher quota.</span> <a href="https://jina.ai/reader#pricing" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p>
@@ -493,7 +493,7 @@
       <div class="section-title" data-i18n="secAiBehavior">AI Behavior</div>
       <div class="fg"><label><input type="checkbox" id="opt-ai-auto-tags" /> <span data-i18n="optAiAutoTags">Auto-generate AI tags on popup open</span></label></div>
       <div class="fg">
-        <label class="bl" data-i18n="labelAiTagLang">AI Tag Language</label>
+        <label class="bl" for="opt-ai-tag-lang" data-i18n="labelAiTagLang">AI Tag Language</label>
         <select id="opt-ai-tag-lang">
           <option value="auto" data-i18n="aiLangAuto">Auto (same as content)</option>
           <option value="en" data-i18n="langEn">English</option>
@@ -509,7 +509,7 @@
         </select>
       </div>
       <div class="fg">
-        <label class="bl" data-i18n="labelAiSummaryLang">AI Summary Language</label>
+        <label class="bl" for="opt-ai-summary-lang" data-i18n="labelAiSummaryLang">AI Summary Language</label>
         <select id="opt-ai-summary-lang">
           <option value="auto" data-i18n="aiLangAuto">Auto (same as content)</option>
           <option value="en" data-i18n="langEn">English</option>
@@ -525,13 +525,13 @@
         </select>
       </div>
       <div class="fg">
-        <label class="bl" data-i18n="labelAiCache">AI Cache Duration (minutes)</label>
+        <label class="bl" for="opt-ai-cache-duration" data-i18n="labelAiCache">AI Cache Duration (minutes)</label>
         <input type="number" id="opt-ai-cache-duration" value="60" min="0" max="10080" step="15" />
         <p class="hint" data-i18n="aiCacheHint">Cached per URL, up to 200 entries (LRU). Set 0 to disable.</p>
       </div>
       <div class="fg">
         <div class="row-inline">
-          <label class="bl" data-i18n="labelTagSeparator">Multi-word tag separator</label>
+          <label class="bl" for="opt-ai-tag-separator" data-i18n="labelTagSeparator">Multi-word tag separator</label>
           <select id="opt-ai-tag-separator">
             <option value="-" data-i18n="sepHyphen">hyphen (machine-learning)</option>
             <option value="_" data-i18n="sepUnderscore">underscore (machine_learning)</option>
@@ -544,14 +544,14 @@
       <p class="hint" data-i18n="promptsHint">Customize the prompts sent to the AI. Use placeholders: <code>{{title}}</code> <code>{{url}}</code> <code>{{content}}</code> <code>{{description}}</code> <code>{{lang_instruction}}</code> <code>{{separator_instruction}}</code>. Leave empty to use defaults.</p>
 
       <div class="fg">
-        <label class="bl" data-i18n="labelTagPrompt">AI Tags Prompt</label>
+        <label class="bl" for="opt-custom-tag-prompt" data-i18n="labelTagPrompt">AI Tags Prompt</label>
         <textarea id="opt-custom-tag-prompt" rows="8"></textarea>
         <p class="hint" data-i18n="tagPromptHint">Leave empty to use the default prompt shown above. Must instruct AI to return <code>["tag1","tag2"]</code> format.</p>
         <button class="btn btn-sm" id="reset-tag-prompt" style="margin-top:4px" data-i18n="resetToDefault">Reset to default</button>
       </div>
 
       <div class="fg">
-        <label class="bl" data-i18n="labelSummaryPrompt">AI Summary Prompt</label>
+        <label class="bl" for="opt-custom-summary-prompt" data-i18n="labelSummaryPrompt">AI Summary Prompt</label>
         <textarea id="opt-custom-summary-prompt" rows="8"></textarea>
         <p class="hint" data-i18n="summaryPromptHint">Leave empty to use the default prompt shown above. Use <code>{{lang_instruction}}</code> for auto language.</p>
         <button class="btn btn-sm" id="reset-summary-prompt" style="margin-top:4px" data-i18n="resetToDefault">Reset to default</button>
@@ -569,7 +569,7 @@
       </div>
 
       <div class="fg">
-        <label class="bl" data-i18n="previewAiModelLabel">Model override (optional)</label>
+        <label class="bl" for="opt-preview-ai-model" data-i18n="previewAiModelLabel">Model override (optional)</label>
         <input type="text" id="opt-preview-ai-model" />
         <p class="hint" data-i18n="previewAiModelHint">Model name used only by preview-page AI features, on the same provider as above. Leave empty to use the provider's default model.</p>
       </div>
@@ -603,13 +603,13 @@
       </div>
 
       <div class="fg">
-        <label class="bl" data-i18n="translateGlossaryLabel">Translation glossary</label>
+        <label class="bl" for="opt-translate-glossary" data-i18n="translateGlossaryLabel">Translation glossary</label>
         <textarea id="opt-translate-glossary" rows="5" placeholder="LLM=Large Language Model&#10;Pinboard=" data-i18n-placeholder="translateGlossaryPlaceholder"></textarea>
         <p class="hint" data-i18n="translateGlossaryHint">One rule per line, in the form term=translation. Leave the right side empty to keep the term untranslated. Sent with every translation request.</p>
       </div>
 
       <div class="fg">
-        <label class="bl" data-i18n="selectionTriggerLabel">Explain-selection trigger</label>
+        <label class="bl" for="opt-selection-trigger" data-i18n="selectionTriggerLabel">Explain-selection trigger</label>
         <select id="opt-selection-trigger">
           <option value="icon" data-i18n="selectionTriggerIcon">Small button next to the selection</option>
           <option value="hotkey" data-i18n="selectionTriggerHotkey">Hotkey E only (no button)</option>
@@ -662,7 +662,7 @@
       <div class="fg"><label><input type="checkbox" id="opt-md-extended-meta" checked /> <span data-i18n="mdExportExtendedMeta">Include extended metadata (author, published, site, image, word count)</span></label></div>
       <p class="hint" data-i18n="mdExportExtendedMetaHint">Adds these fields to frontmatter, the HTML byline, and webhook payloads when available. Turn off for byte-identical legacy exports.</p>
       <div class="fg">
-        <label class="bl" data-i18n="mdExportImagePolicy">Image handling</label>
+        <label class="bl" for="opt-md-image-policy" data-i18n="mdExportImagePolicy">Image handling</label>
         <select id="opt-md-image-policy">
           <option value="keep" data-i18n="mdImagePolicyKeep">Keep images (absolutize relative links)</option>
           <option value="alt" data-i18n="mdImagePolicyAlt">Alt text only</option>
@@ -731,12 +731,12 @@
       <div class="fg"><label><input type="checkbox" id="opt-wayback-skip-private" /> <span data-i18n="waybackSkipPrivate">Never archive bookmarks you save as private</span></label></div>
       <div class="divider"></div>
       <div class="fg" style="margin-top:10px">
-        <label class="bl" data-i18n="optWaybackS3Key">archive.org S3 Access Key (optional)</label>
+        <label class="bl" for="opt-wayback-s3key" data-i18n="optWaybackS3Key">archive.org S3 Access Key (optional)</label>
         <input type="password" id="opt-wayback-s3key" data-i18n-placeholder="placeholderOptional" autocomplete="off" spellcheck="false" />
         <button type="button" class="key-toggle" data-target="opt-wayback-s3key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
       </div>
       <div class="fg">
-        <label class="bl" data-i18n="optWaybackS3Secret">archive.org S3 Secret (optional)</label>
+        <label class="bl" for="opt-wayback-s3secret" data-i18n="optWaybackS3Secret">archive.org S3 Secret (optional)</label>
         <input type="password" id="opt-wayback-s3secret" data-i18n-placeholder="placeholderOptional" autocomplete="off" spellcheck="false" />
         <button type="button" class="key-toggle" data-target="opt-wayback-s3secret" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button>
       </div>
@@ -769,7 +769,7 @@
       <div class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</div>
       <p class="hint" data-i18n="customStyleHint">Inject custom CSS into pinboard.in pages. Useful for changing fonts, colors, layout etc.</p>
       <div class="fg">
-        <label class="bl" data-i18n="labelCustomFont">Custom Font</label>
+        <label class="bl" for="opt-custom-font" data-i18n="labelCustomFont">Custom Font</label>
         <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans SC', 'Fira Code', sans-serif" data-i18n-placeholder="customFontPlaceholder" />
         <p class="hint" data-i18n="customFontHint">Applied to <code>body</code> on pinboard.in. Leave empty to keep default.</p>
       </div>
@@ -806,7 +806,7 @@
         <div id="saved-themes-list" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
       </div>
       <div class="fg">
-        <label class="bl" data-i18n="labelCustomCSSOverlay">Custom CSS Overlay</label>
+        <label class="bl" for="opt-custom-css" data-i18n="labelCustomCSSOverlay">Custom CSS Overlay</label>
         <p class="hint" data-i18n="customCSSOverlayHelp">Your CSS is appended on top of the selected preset. Leave empty to use the preset only; rules written here override the preset's rules of the same name.</p>
         <textarea id="opt-custom-css" rows="12" placeholder="/* Override rules go here */&#10;body { line-height: 1.6; }&#10;.bookmark_title { font-size: 14px; }" data-i18n-placeholder="customCSSPlaceholder"></textarea>
         <div class="overlay-meta-row">

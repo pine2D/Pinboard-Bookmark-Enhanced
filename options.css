@@ -170,6 +170,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: #4477bb; }
 .fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible { box-shadow: 0 0 0 3px rgba(68,119,187,0.15); }
 .fg input[type="checkbox"]:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 1px; box-shadow: none; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--opt-accent); }
 
 /* ---- Panel footer (e.g. General tab feedback link) ---- */
 .panel-foot { margin-top: 18px; padding-top: 12px; border-top: 1px solid #e8e8e8; font-size: 11px; text-align: center; }
@@ -188,16 +189,11 @@ html[data-theme] .panel-foot a:hover { color: var(--opt-accent); }
 .hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 
 /* ---- Markdown tab: keyboard shortcuts static list (Task 6, spec 5.3).
-   kbd chip font stack intentionally omits the literal-Han-script fallback
-   entry (a Chinese-character rendering of the same Microsoft YaHei name)
-   this file uses elsewhere (.hint code, just above) -- that entry is
-   pre-existing text this task does not touch, and spelling it out again
-   here would break this batch's own byte-scan iron rule (this comment is
-   NEW text in a non-_locales file, so it must stay 100% ASCII). The ASCII
-   "Microsoft YaHei"/"Noto Sans SC"/etc. entries already resolve the same
-   real fonts on Win/Mac/Linux, so no font coverage is lost. Named font
-   first, CJK named families before the generic `monospace` keyword (font
-   iron rule).
+   kbd chip font stack mirrors the other mono stacks in this file (.hint
+   code just above, .fg textarea): named Latin fonts first, then CJK named
+   families -- including the localized YaHei name -- before the generic
+   `monospace` keyword (font iron rule), so CJK glyphs never fall through
+   to the trailing generic (= Fixed-width CJK stall).
    Colors below are hardcoded light-mode literals + an html[data-theme]
    override, same two-layer convention .hint code above already uses in
    this file -- this is options.css's OWN token system (--opt-*), a
@@ -214,7 +210,7 @@ html[data-theme] .panel-foot a:hover { color: var(--opt-accent); }
   border-radius: var(--opt-radius-sm);
   background: #f5f5f0;
   color: #333;
-  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
+  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
   font-size: 11px;
 }
 html[data-theme] .kbd-help-chips kbd {
@@ -369,7 +365,15 @@ html[data-theme] .et-field select:focus-visible { box-shadow: 0 0 0 3px color-mi
 .theme-preset-btn { position: relative; }
 .theme-preset-btn:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 2px; }
 .theme-preset-btn.active,
-.saved-theme-btn.active { background: #4477bb; color: #fff; border-color: #3366aa; }
+.saved-theme-btn.active { background: #4477bb; color: #fff; border-color: #3366aa; font-weight: 600; }
+/* Selected preset gets a check tick drawn with borders (no emoji/dingbat char —
+   see font-fallback stall rule); extra left padding keeps it clear of the label. */
+.theme-preset-btn.active { padding-left: 20px; }
+.theme-preset-btn.active::after {
+  content: ""; position: absolute; left: 8px; top: 50%; margin-top: -5px;
+  width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
 
 /* ---- Saved theme buttons ---- */
 .saved-theme-wrap { position: relative; display: inline-flex; }
@@ -760,6 +764,7 @@ html[data-theme] .accordion-header:hover { color: var(--opt-accent); }
 html[data-theme] .accordion-section { border-color: var(--opt-border-section); }
 html[data-theme] .theme-preset-btn.active,
 html[data-theme] .saved-theme-btn.active { background: var(--opt-accent); border-color: var(--opt-accent); color: var(--opt-bg); }
+html[data-theme] .theme-preset-btn.active::after { border-color: var(--opt-bg); }
 html[data-theme] .saved-theme-del:focus-visible { outline-color: var(--opt-accent); }
 html[data-theme] .theme-group-label { color: var(--opt-fg-hint); }
 html[data-theme] .key-toggle { color: var(--opt-fg-hint); }
@@ -929,10 +934,6 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
     scroll-behavior: auto !important;
   }
 }
-
-/* ---- High-DPI Scaling ---- */
-@media (min-resolution: 144dpi) and (min-width: 1200px) { body { zoom: 1.12; } }
-@media (min-resolution: 192dpi) and (min-width: 1200px) { body { zoom: 1.22; } }
 
 /* ---- Wayback Log Viewer ---- */
 #wayback-log {

@@ -362,6 +362,10 @@ async function showMain(token) {
 
   const isUnsupportedUrl = !pageInfo.url || (!pageInfo.url.startsWith("http://") && !pageInfo.url.startsWith("https://"));
   if (isUnsupportedUrl) {
+    // Collapse the dead bookmark form into a coherent empty state: CSS hides
+    // every .form-body child except #url-warning, leaving the still-functional
+    // quick-actions bar (a sibling of #main-section) untouched.
+    $id("main-section").classList.add("unsupported-url");
     $id("url-warning").classList.remove("hidden");
     $id("url-input").value = "";
     $id("title-input").value = "";
