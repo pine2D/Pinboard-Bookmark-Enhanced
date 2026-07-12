@@ -258,6 +258,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Tab switching ----
   const _tabBtns = [...document.querySelectorAll(".tab-btn")];
   const mobileTabSelect = $id("mobile-tab-select");
+  // "Reset This Tab" only makes sense on panels that HAVE reset defaults —
+  // Storage is cache management with its own clear buttons, so the link is
+  // noise there (real-device feedback). PANEL_DEFAULTS is declared further
+  // down (TDZ at initial activation time), hence the late-bound ref: until
+  // it's assigned the button keeps its markup default (visible), and the
+  // assignment site below re-syncs for the initially active panel.
+  let _resetDefaultsRef = null;
+  function _syncResetBtnVisibility(panel) {
+    const b = $id("reset-panel-btn");
+    if (b && _resetDefaultsRef) b.hidden = !_resetDefaultsRef[panel];
+  }
   function activateTab(btn) {
     _tabBtns.forEach((b) => { b.classList.remove("active"); b.setAttribute("aria-selected", "false"); b.tabIndex = -1; });
     document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
@@ -266,6 +277,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     btn.tabIndex = 0;
     if (mobileTabSelect) mobileTabSelect.value = btn.dataset.panel;
     $id(`panel-${btn.dataset.panel}`).classList.add("active");
+    _syncResetBtnVisibility(btn.dataset.panel);
     // W3: lazy-init expensive per-panel rendering on first view.
     if (btn.dataset.panel === "appearance") _initAppearancePanel();
     if (btn.dataset.panel === "tags") _initTagGovPanel();
@@ -493,6 +505,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
   if (typeof window !== "undefined") window.__PBP_PANEL_DEFAULTS = PANEL_DEFAULTS;
+  // Late-bind for _syncResetBtnVisibility (declared before PANEL_DEFAULTS —
+  // see comment there), then re-sync the panel that was activated on load.
+  _resetDefaultsRef = PANEL_DEFAULTS;
+  { const _ab = document.querySelector(".tab-btn.active"); if (_ab) _syncResetBtnVisibility(_ab.dataset.panel); }
 
   // Gray out the Obsidian vault/folder inputs when the master toggle is off.
   // Safe to call on any page/panel (guards on element existence); programmatic
