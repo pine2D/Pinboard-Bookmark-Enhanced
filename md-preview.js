@@ -824,13 +824,18 @@ function pbpApplyColorScheme(mode) {
     // Built via DOM API (textContent/createElement), never innerHTML, since
     // `url` is page-supplied data (sanitize discipline). Non-absolute/
     // unparsable URLs (no scheme, "about:", etc.) fall back to plain text.
+    // Locate the parsed hostname in the ORIGINAL `url` string, not `u.href`
+    // (the normalized form punycode-encodes IDN hosts and percent-encodes
+    // the path) -- so the display keeps the user's original Unicode/encoding.
+    // Anything before the match (scheme, userinfo, etc.) is intentionally
+    // dropped; `title` already carries the full URL.
     let host = "", rest = "";
     try {
       const u = new URL(url);
+      const idx = u.hostname ? url.indexOf(u.hostname) : -1;
+      if (idx < 0) throw new Error("hostname not found in raw url");
       host = u.hostname;
-      const idx = host ? u.href.indexOf(host) : -1;
-      if (idx < 0) throw new Error("hostname not found in href");
-      rest = u.href.slice(idx + host.length);
+      rest = url.slice(idx + u.hostname.length);
     } catch (_) {
       host = "";
     }

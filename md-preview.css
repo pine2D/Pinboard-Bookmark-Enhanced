@@ -193,7 +193,7 @@ button, input, select, textarea { font-family: inherit; }
 .src-seg.active { color: var(--active-fg); background: var(--active-bg); cursor: default; }
 .src-seg:focus-visible {
   outline: 2px solid var(--link);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 .src-seg:disabled,
 .src-seg[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
@@ -803,15 +803,16 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    the deliberate overflow strategy). */
 .exp-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
 .exp-toggles .exp-tgl { flex: none; }
-/* Pressed state literally reuses .toggle-btn.active's declaration set
+/* Pressed state reuses .toggle-btn.active's color declarations
    (md-preview.css ~:163) -- same --active-bg/--active-fg tokens, so the
    dark-mode AA contrast already established for that control carries over
-   verbatim instead of inventing a new pair. */
+   instead of inventing a new pair. No font-weight bump here (unlike
+   .toggle-btn.active): these buttons wrap in a flex row, and the weight
+   change alone shifts line width enough to cause layout jitter on toggle. */
 .exp-tgl[aria-pressed="true"] {
   background: var(--active-bg);
   color: var(--active-fg);
   border-color: var(--active-bg);
-  font-weight: 600;
 }
 .exp-img-row {
   display: flex; align-items: center; gap: 8px; margin-top: 8px;
@@ -2035,8 +2036,11 @@ body.ask-open main { margin-right: 396px; }
    default align-items:stretch then keeps both buttons in a row equal
    height even when only one wraps to two lines. A transparent 1px border
    is reserved at rest (ghost button: invisible bg/border) so hover/
-   focus-visible painting var(--btn-border)/var(--btn-bg) causes no layout
-   shift -- hover state changing color is allowed (spec: hover != popup). */
+   focus-visible painting var(--btn-border)/var(--btn-hover) causes no layout
+   shift -- hover state changing color is allowed (spec: hover != popup).
+   Uses --btn-hover, not --btn-bg: --btn-bg is literally the same value as
+   --surface (the rail's own background), so painting --btn-bg here would
+   be a visible no-op. */
 .rail-bottom-row {
   display: flex;
   flex-wrap: wrap;
@@ -2058,7 +2062,7 @@ body.ask-open main { margin-right: 396px; }
 .rail-kbd-help-btn:hover, .rail-kbd-help-btn:focus-visible {
   color: var(--link);
   border-color: var(--btn-border);
-  background: var(--btn-bg);
+  background: var(--btn-hover);
 }
 .rail-kbd-help-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 

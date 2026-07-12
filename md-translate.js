@@ -1642,7 +1642,10 @@ function _pbpTrSetMode(st, mode, persist) {
 
 // TOC text swap (spec 4.4: translated-only view follows translated heading
 // text; anchors/ids never change). Originals stashed on the link, restored
-// on any other view.
+// on any other view. `title` (md-preview.js ~:1023 sets it equal to
+// textContent, recovering the full heading once CSS ellipsis-clips the
+// visible line) is kept in lockstep with textContent here too, or the
+// tooltip would keep showing the original heading after a translated swap.
 function _pbpTrSyncToc(st, mode) {
   document.querySelectorAll("#toc-list a[data-slug]").forEach((a) => {
     if (mode === "translated") {
@@ -1657,8 +1660,10 @@ function _pbpTrSyncToc(st, mode) {
       if (!txt) return;
       if (a.dataset.origText == null) a.dataset.origText = a.textContent;
       a.textContent = txt;
+      a.title = txt;
     } else if (a.dataset.origText != null) {
       a.textContent = a.dataset.origText;
+      a.title = a.dataset.origText;
     }
   });
 }
