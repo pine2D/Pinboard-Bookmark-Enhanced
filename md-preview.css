@@ -787,13 +787,13 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .bookmark-badge .bb-tags { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
 .bookmark-badge .bb-lock { display: inline-flex; flex: none; margin-left: 1px; }
 .bookmark-badge .bb-lock svg { width: 11px; height: 11px; display: block; }
-.rail-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 12px; }
+.rail-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 12px; }
 .rail .view-toggle { width: 100%; }
 .rail .view-toggle .toggle-btn { flex: 1; justify-content: center; }
 .rail-section { margin-top: 4px; }
 .rail-label {
   font-size: 12px; letter-spacing: 0.04em; text-transform: none; color: var(--fg-secondary);
-  margin: 15px 0 8px; padding-top: 12px; border-top: 1px solid var(--border);
+  margin: 12px 0 8px; padding-top: 12px; border-top: 1px solid var(--border);
 }
 /* exp-toggles: the three boolean export options (frontmatter/toc/hl), real
    <button aria-pressed> toggles -- not checkboxes (spec sec.0 control
@@ -828,7 +828,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    span + action-btn(s)) become the actual grid items, so the mixed
    auto-placed (fmt-name) + explicit-column (.exp-fmt-span, EPUB row) items
    land in the same row without a flattening rewrite. */
-.export-grid { margin-top: 10px; display: grid; grid-template-columns: 68px 1fr 40px; gap: 6px; align-items: stretch; }
+.export-grid { margin-top: 8px; display: grid; grid-template-columns: 68px 1fr 40px; gap: 6px; align-items: stretch; }
 .export-fmt { display: contents; }
 .export-fmt .fmt-name { width: 68px; font-size: 13px; color: var(--fg-secondary); }
 .export-fmt .action-btn { justify-content: center; }
@@ -849,21 +849,27 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .toc-list li { margin: 0; }
 .toc-list a {
   display: block; padding: 4px 10px; color: var(--fg-secondary); text-decoration: none;
-  border-left: 2px solid transparent; border-radius: 0 4px 4px 0; font-size: 15px; line-height: 1.6;
+  border-left: 2px solid transparent; border-radius: 0 4px 4px 0; font-size: 13px; line-height: 1.45;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 .toc-list a:hover { color: var(--fg); background: var(--border-light); }
 .toc-list a[data-level="2"] { padding-left: 10px; }
-.toc-list a[data-level="3"] { padding-left: 24px; font-size: 0.95em; }
-.toc-list a[data-level="4"] { padding-left: 38px; font-size: 0.9em; }
+.toc-list a[data-level="3"] { padding-left: 20px; font-size: 0.95em; }
+.toc-list a[data-level="4"] { padding-left: 30px; font-size: 0.9em; }
 .toc-list a.active { color: var(--link); border-left-color: var(--link); background: var(--border-light); font-weight: 600; }
 .toc-list a:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
 
 /* ---- Rail accordion header (spec 2026-07-04) ---- */
+/* margin-top 12 (spacing-rhythm pass, spec 2026-07-12 sec.1.7): matches
+   .rail-label's own 15->12 fix above -- both are the same "section header"
+   rhythm (this is what .rail-label becomes for a collapsible section via
+   pbpRailCollapsible), so leaving one at 15 while the other moved to 12
+   would put two adjacent rail headers (e.g. tr-section's plain .rail-label
+   next to TOC/Export's .rail-sec-head) visibly out of step. */
 .rail-sec-head {
   display: flex; align-items: center; gap: 6px; width: 100%;
-  margin: 15px 0 8px; padding: 12px 0 0; border: 0; border-top: 1px solid var(--border);
+  margin: 12px 0 8px; padding: 12px 0 0; border: 0; border-top: 1px solid var(--border);
   background: none; font: inherit; font-size: 12px; letter-spacing: 0.04em;
   color: var(--fg-secondary); cursor: pointer; text-align: left;
 }
@@ -2018,41 +2024,42 @@ body.ask-open main { margin-right: 396px; }
 }
 .kbd-help-desc { color: var(--fg-secondary); flex: 1 1 auto; }
 
-/* Rail-bottom unobtrusive entry ROW (spec sec.1.1/5.2, R2 batch): a shared
-   flex row appended as #rail's LAST child (after #toc) by
-   _pbpRailBottomRow -- holds every small rail-bottom text button. Was a
-   single full-width block button (_pbpKbdHelpInit alone); now two share
-   the row (kbd-help + zen entry), so .rail-kbd-help-btn itself switches
-   from block/width:100% to flex:1 so both halves stay equal width.
-   white-space/overflow/text-overflow (+ min-width:0, required for a flex
-   item to actually shrink below its content's intrinsic width instead of
-   just overflowing the row) added because translated button text varies
-   noticeably in length across locales (e.g. German's zenEnterBtn text is
-   visibly longer than its kbdHelpRailBtn row neighbor) -- without it, a
-   longer translation in one half wraps to two lines while its neighbor
-   stays on one, producing visibly uneven button heights in the same row;
-   truncating with an ellipsis keeps both halves the same single-line
-   height in every locale. */
+/* Rail-bottom unobtrusive entry ROW (spec sec.1.1/5.2, R2 batch; ghost-button
+   density pass spec 2026-07-12 sec.1.6): a shared flex row appended as
+   #rail's LAST child (after #toc) by _pbpRailBottomRow -- holds every small
+   rail-bottom text button. .rail-kbd-help-btn is shared by both buttons
+   (kbd-help + zen entry). flex-wrap on the row + flex:1 1 96px on each
+   button (rather than a truncating flex:1 + ellipsis) lets a long
+   translation (e.g. German's zenEnterBtn) wrap onto a second line instead
+   of clipping -- same wrap-not-truncate call as .exp-toggles above. Flex's
+   default align-items:stretch then keeps both buttons in a row equal
+   height even when only one wraps to two lines. A transparent 1px border
+   is reserved at rest (ghost button: invisible bg/border) so hover/
+   focus-visible painting var(--btn-border)/var(--btn-bg) causes no layout
+   shift -- hover state changing color is allowed (spec: hover != popup). */
 .rail-bottom-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
 }
 .rail-kbd-help-btn {
-  flex: 1;
+  flex: 1 1 96px;
   min-width: 0;
-  padding: 6px 4px 2px;
-  border: none;
-  background: none;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
   color: var(--fg-muted);
   font-size: 11.5px;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   cursor: pointer;
 }
-.rail-kbd-help-btn:hover { color: var(--link); }
+.rail-kbd-help-btn:hover, .rail-kbd-help-btn:focus-visible {
+  color: var(--link);
+  border-color: var(--btn-border);
+  background: var(--btn-bg);
+}
 .rail-kbd-help-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 
 /* ---- Skim / key-points layer (md-skim.js, spec docs/superpowers/

@@ -879,6 +879,7 @@ function _pbpKbdHelpInit() {
     btn.id = "rail-kbd-help-btn";
     btn.className = "rail-kbd-help-btn";
     btn.textContent = t("kbdHelpRailBtn");
+    btn.title = t("kbdHelpRailBtn"); // recovers full text if the ghost button still wraps/clips at extreme widths
     btn.addEventListener("click", () => _pbpKbdHelpOpen());
     row.appendChild(btn);
   }
@@ -1199,6 +1200,7 @@ function _pbpZenInit() {
     btn.id = "rail-zen-btn";
     btn.className = "rail-kbd-help-btn"; // spec sec.1.1: reuse the existing rail-bottom text-button visual, don't fork a near-duplicate rule
     btn.textContent = t("zenEnterBtn");
+    btn.title = t("zenEnterBtn"); // recovers full text if the ghost button still wraps/clips at extreme widths
     btn.addEventListener("click", () => _pbpZenEnter());
     row.appendChild(btn);
   }

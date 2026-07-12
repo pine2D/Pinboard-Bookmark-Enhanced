@@ -1015,6 +1015,7 @@ function pbpApplyColorScheme(mode) {
       const a = document.createElement("a");
       a.href = "#" + h.slug;
       a.textContent = h.text;
+      a.title = h.text; // full heading text -- CSS ellipsis-truncates the visible line (~:13px density), title recovers it
       a.dataset.level = String(h.level);
       a.dataset.slug = h.slug;
       li.appendChild(a);
