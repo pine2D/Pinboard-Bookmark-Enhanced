@@ -809,6 +809,15 @@ html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select
     padding: 4px;
     max-height: min(320px, calc(100dvh - 32px));
     overflow: auto;
+    /* The themed 10px scrollbar (html[data-theme] *::-webkit-scrollbar,
+       ~:881) can't reach in here: the picker is a pseudo-element, so the
+       universal descendant selector never matches it and a second
+       pseudo-element can't be chained on. The STANDARD properties do apply
+       directly and render ~the same thin profile as the 10px webkit custom
+       track textareas get -- without them the picker showed a fat UA
+       scrollbar next to the page's thin ones (user report). */
+    scrollbar-width: thin;
+    scrollbar-color: var(--opt-fg-muted, #999) var(--opt-panel, #fafafa);
   }
   .fg option, .et-field option, .mobile-tab-picker option {
     padding: 7px 9px;
