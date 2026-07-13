@@ -909,6 +909,7 @@ function _pbpKbdHelpInit() {
 // which the suppression window there exists to prevent). ----
 const PBP_ZEN_WIDTHS = [680, 880, 1080];
 let _pbpZenWidth = 880; // in-memory current width (px); loaded async below. Zen ON/OFF itself is never persisted (spec sec.1.1) -- only this width step is.
+let _pbpZenWidthTouched = false; // user cycled before the async load landed -> late read is stale, ignore it
 let _pbpZenBarEl = null;
 let _pbpZenFadeTimer = null;
 let _pbpZenInited = false;
@@ -1030,26 +1031,58 @@ function _pbpZenSettleAfterLayout(anchor) {
 // Width persistence: exact pbp_srch_regex shape (md-reader.js:565-575) --
 // chrome.storage.local.get with an inline default, both chrome/
 // chrome.storage typeof-guarded, read once here at init; written back
-// only from the cycle button below. An unrecognized stored value (e.g. a
+// only from the cycle buttons below. An unrecognized stored value (e.g. a
 // stale format from a future/rolled-back version) degrades to the 880
-// default rather than propagating garbage into --zen-width.
+// default rather than propagating garbage into --pbp-width. Unified-width
+// round: the stored value now drives BOTH modes (--pbp-width on .doc-body,
+// md-preview.css ~:292), so the callback must APPLY it, not just remember
+// it for a later zen entry -- the page first paints at the 880 fallback and
+// settles to the stored step here (one animated max-width transition; the
+// existing scroll-anchor settle keeps the reading position through it).
+// Storage key stays pbp_zen_width: it predates the unification and a rename
+// would orphan every existing user's saved step for zero benefit.
 function _pbpZenLoadWidth() {
   if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
   try {
     chrome.storage.local.get({ pbp_zen_width: 880 }, (res) => {
+      // The cycle buttons are clickable before this async read lands; a user
+      // interaction is fresher truth than the stored step it already
+      // overwrote, so a late arrival must not clobber it (Codex acceptance).
+      if (_pbpZenWidthTouched) return;
       _pbpZenWidth = (res && PBP_ZEN_WIDTHS.indexOf(res.pbp_zen_width) !== -1) ? res.pbp_zen_width : 880;
+      if (_pbpZenWidth !== 880) _pbpZenApplyWidth(); // 880 == CSS fallback: applying would only churn layout
+      else _pbpZenUpdateWidthBtn(); // still label the buttons with the resolved step
     });
   } catch (_) {}
 }
 
+// Single apply path shared by load + both cycle buttons: sets the
+// mode-independent --pbp-width, relabels every width control, and re-settles
+// the scroll anchor through the max-width transition.
+function _pbpZenApplyWidth() {
+  const anchor = _pbpZenCaptureAnchor();
+  document.body.style.setProperty("--pbp-width", _pbpZenWidth + "px");
+  _pbpZenUpdateWidthBtn();
+  _pbpZenSettleAfterLayout(anchor);
+}
+
 // Width button title/aria (spec sec.1.3: "simplest honest form") -- one
 // i18n key + the concatenated step value, not a 3-way translated string.
+// Updates BOTH entry points (zen bar icon button + rail text button); either
+// may not exist yet (bar is lazy, rail button only after _pbpZenInit).
 function _pbpZenUpdateWidthBtn() {
-  const btn = document.getElementById("zen-width-btn");
-  if (!btn) return;
   const label = t("zenWidthAria") + ": " + _pbpZenWidth + "px";
-  btn.setAttribute("aria-label", label);
-  btn.title = label;
+  const btn = document.getElementById("zen-width-btn");
+  if (btn) {
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+  }
+  const railBtn = document.getElementById("rail-width-btn");
+  if (railBtn) {
+    railBtn.textContent = _pbpZenWidth + "px";
+    railBtn.setAttribute("aria-label", label);
+    railBtn.title = label;
+  }
 }
 
 // Lazily builds the singleton #zen-bar (spec sec.1.3): NOT a popover -- no
@@ -1083,18 +1116,17 @@ function _pbpZenEnsureBar() {
   return bar;
 }
 
-// Width-cycle button click: 680 -> 880 -> 1080 -> 680 ..., persisted (spec
-// sec.1.2), reflows .doc-body's max-width and re-settles scroll like every
-// other zen layout change.
+// Width-cycle click (zen bar + rail button share this): 680 -> 880 -> 1080
+// -> 680 ..., persisted (spec sec.1.2), applied mode-independently via
+// _pbpZenApplyWidth. The .set() promise gets a .catch: storage failure must
+// stay silent-but-handled, not an unhandled rejection (Codex review).
 function _pbpZenCycleWidth() {
-  const anchor = _pbpZenCaptureAnchor();
+  _pbpZenWidthTouched = true; // see _pbpZenLoadWidth: a late storage read must not undo this click
   const idx = PBP_ZEN_WIDTHS.indexOf(_pbpZenWidth);
   _pbpZenWidth = PBP_ZEN_WIDTHS[(idx === -1 ? 0 : idx + 1) % PBP_ZEN_WIDTHS.length];
-  document.body.style.setProperty("--zen-width", _pbpZenWidth + "px");
-  _pbpZenUpdateWidthBtn();
-  _pbpZenSettleAfterLayout(anchor);
+  _pbpZenApplyWidth();
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    try { chrome.storage.local.set({ pbp_zen_width: _pbpZenWidth }); } catch (_) {}
+    try { chrome.storage.local.set({ pbp_zen_width: _pbpZenWidth }).catch(() => {}); } catch (_) {}
   }
 }
 
@@ -1145,7 +1177,8 @@ function _pbpZenEnter() {
   const anchor = _pbpZenCaptureAnchor();
   const ae = document.activeElement;
   const focusWasInRail = !!(ae && typeof ae.closest === "function" && ae.closest("#rail"));
-  document.body.style.setProperty("--zen-width", _pbpZenWidth + "px");
+  // No width write here: --pbp-width is mode-independent (set on load/cycle),
+  // so entering zen only hides chrome -- the column never resizes.
   document.body.classList.add("zen");
   if (typeof pbpRailDrawerClose === "function") pbpRailDrawerClose();
   _pbpZenEnsureBar();
@@ -1162,7 +1195,7 @@ function _pbpZenExit() {
   if (!document.body.classList.contains("zen")) return;
   const anchor = _pbpZenCaptureAnchor();
   document.body.classList.remove("zen");
-  document.body.style.removeProperty("--zen-width");
+  // --pbp-width deliberately survives exit (mode-independent width).
   _pbpZenSettleAfterLayout(anchor);
   _pbpZenDisarmFade();
 }
@@ -1203,6 +1236,19 @@ function _pbpZenInit() {
     btn.title = t("zenEnterBtn"); // recovers full text if the ghost button still wraps/clips at extreme widths
     btn.addEventListener("click", () => _pbpZenEnter());
     row.appendChild(btn);
+    // Unified-width round: with --pbp-width governing normal mode too, the
+    // width cycle needs an entry point OUTSIDE zen (the zen bar is the only
+    // other one) -- same rail-bottom text-button family as its neighbors.
+    // Label is the bare step value ("880px"); full text rides title/aria
+    // (set by _pbpZenUpdateWidthBtn, which also keeps it in sync with the
+    // zen bar's icon button).
+    const widthBtn = document.createElement("button");
+    widthBtn.type = "button";
+    widthBtn.id = "rail-width-btn";
+    widthBtn.className = "rail-kbd-help-btn";
+    widthBtn.addEventListener("click", _pbpZenCycleWidth);
+    row.appendChild(widthBtn);
+    _pbpZenUpdateWidthBtn();
   }
 }
 

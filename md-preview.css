@@ -286,16 +286,24 @@ main {
   padding: 48px 32px 96px;
   transition: margin-left 200ms ease, margin-right 200ms ease;
 }
-.doc-body { max-width: 880px; margin: 0 auto; min-width: 0; transition: max-width 200ms ease; }
+/* --pbp-width is the ONE content-width control for BOTH normal and zen
+   modes (unified-width round): a JS-driven custom property (three-step
+   680/880/1080 cycle, persisted in chrome.storage.local pbp_zen_width,
+   applied by md-reader.js on load and from the two width-cycle buttons).
+   It used to be zen-only (--zen-width) with normal mode hardcoded to
+   880px -- toggling zen then snapped the column between the two systems,
+   which the user called out. Print pins this back to 880px (print block
+   below) so paper output doesn't follow the screen width choice. */
+.doc-body { max-width: var(--pbp-width, 880px); margin: 0 auto; min-width: 0; transition: max-width 200ms ease; }
 
 /* ---- R2: Zen (focus) reading mode (md-reader.js, "z" hotkey / rail
    button, spec sec.1/4). body.zen hides #rail (+ its mobile drawer toggle
    and scrim -- see below) and lets .doc-body reclaim the width main's
-   margin-left used to reserve for it; --zen-width is a JS-driven custom
-   property (three-step 680/880/1080 cycle, persisted in
-   chrome.storage.local pbp_zen_width) so the width-cycle button can change
-   it without touching this stylesheet -- zen ON/OFF itself is NEVER
-   persisted (spec sec.1.1: always starts normal on a fresh preview open).
+   margin-left used to reserve for it; the width itself is the shared
+   --pbp-width above -- zen no longer carries its own width state, so
+   entering/exiting zen only moves the column (rail hide), never resizes
+   it. Zen ON/OFF itself is NEVER persisted (spec sec.1.1: always starts
+   normal on a fresh preview open); only the width step is (pbp_zen_width).
    ask-open's own `body.ask-open main { margin-right: 396px }` (below) is
    orthogonal -- margin-left and margin-right are independent properties,
    so a zen session opened while Ask is open keeps both simultaneously, no
@@ -357,7 +365,6 @@ body.zen .rail-toggle, body.zen .rail-scrim { display: none; }
    display:none either way, so the practical paint result is identical --
    this note only corrects the specificity math, not the behavior. */
 body.zen main { margin-left: 0; }
-body.zen .doc-body { max-width: var(--zen-width, 880px); }
 /* Skim bullets are meta content ABOUT the article (like the rail's
    tr/ask/hl panels), not part of the article body (like highlights) --
    hidden in zen to preserve its distraction-free intent, mirroring how
@@ -440,35 +447,14 @@ body.zen #zen-bar { display: flex; }
   overflow-wrap: break-word; /* lang-agnostic guard for long de/ru compounds */
 }
 
-/* UX-d2: comfortable reading measure. .doc-body keeps its full 880px column
-   (pre/table/figure/img -- not listed -- stay full-width), but the flowing
-   TEXT blocks are capped to ~68ch; at the fluid font-size 880px yields
-   ~80-90 chars/line, past the comfortable ~66-72ch measure. `ch` tracks the
-   font-size (so the measure holds across zoom / the clamp()), and blocks
-   stay left-aligned inside the centered column so wide media just extends
-   right of the text edge. .pb-tr is the translated sibling (md-translate
-   inserts it as orig.afterend, so a top-level block's translation is a
-   direct #rendered-view child) -- capping it too keeps bilingual view's two
-   stacked columns the same width; forum-comment .pb-tr sits INSIDE its
-   (already-capped) blockquote so the direct-child `>` leaves it alone.
-   Scoped to body:not(.zen): zen's deliberate --zen-width cycle
-   (680/880/1080, ~:321) stays the sole measure control there, so this cap
-   composes with -- never fights -- the zen width button; on zen enter the
-   cap simply drops and blocks fill (and animate with) the .doc-body
-   max-width transition. */
-body:not(.zen) #rendered-view > p,
-body:not(.zen) #rendered-view > ul,
-body:not(.zen) #rendered-view > ol,
-body:not(.zen) #rendered-view > blockquote,
-body:not(.zen) #rendered-view > h1,
-body:not(.zen) #rendered-view > h2,
-body:not(.zen) #rendered-view > h3,
-body:not(.zen) #rendered-view > h4,
-body:not(.zen) #rendered-view > h5,
-body:not(.zen) #rendered-view > h6,
-body:not(.zen) #rendered-view > .pb-tr {
-  max-width: 68ch;
-}
+/* Unified-width round: the old UX-d2 68ch text measure (normal mode capped
+   p/ul/ol/blockquote/h1-h6/.pb-tr to ~68ch while pre/table stayed at the
+   full 880px column) is deliberately GONE. With --pbp-width now governing
+   both modes, the 680/880/1080 step IS the line-length control -- a second,
+   invisible measure layer made text blocks end ~74px short of code blocks
+   and tables (user-reported as a bug, not read as typography), and made
+   normal mode and zen disagree about what a "column" is. A reader who wants
+   the ~68ch measure picks the 680px step; every element shares one edge. */
 
 /* Headings */
 #rendered-view h1 {
@@ -1071,6 +1057,10 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   :root { color-scheme: light !important; }
   .rail, .rail-toggle, .rail-scrim, #zen-bar { display: none; }
   main { margin-left: 0; max-width: 100%; padding: 0; }
+  /* Pin the column for paper: --pbp-width is a screen reading preference
+     (680/880/1080 cycle) and must not leak into print geometry -- a 1080px
+     screen choice would otherwise reflow the printed page. */
+  .doc-body { max-width: 880px; }
   /* Deliberate pure white/black (not --bg/--fg, which are near-white
      #f8fafc / warm near-black #1C1B1A by design) -- an intentional ink-saving
      choice, independent of the token system. */
