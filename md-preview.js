@@ -482,6 +482,19 @@ function pbpApplyColorScheme(mode) {
   const { contentHtml, title, url, tokens, source } = info;
   const srcTabId = info.tabId;
   const baseUrl = info.baseUrl || url || "";
+  // Immutable source-tab identity (hotlink round): `url`/`baseUrl` can be
+  // Jina's canonicalized d.url or (from the popup) an edited/tracker-stripped
+  // input value; only this field is guaranteed to be the tab's literal URL, so
+  // it alone is safe for the weak-handle guard and as the image-fix Referer
+  // origin. LEGACY payloads (written before this field existed) fall back to
+  // url: that reproduces the PRE-EXISTING behavior exactly -- a Jina-first
+  // legacy preview still can't switch back to local (the bug this field fixes
+  // going forward), but adopting the tab's CURRENT url instead would silently
+  // extract a different page if the user had navigated, which is the very
+  // thing the guard exists to prevent. Reloading such a preview does NOT heal
+  // it (the restore record carries this same fallback value forward); only
+  // opening a fresh preview from the popup/shortcut seeds the real tab URL.
+  const sourceTabUrl = (typeof info.sourceTabUrl === "string" && info.sourceTabUrl) || url || "";
   const previewAccount = typeof info.account === "string" ? info.account : "";
   const tags = Array.isArray(info.tags) ? info.tags : [];
   const description = info.description || "";
@@ -578,7 +591,7 @@ function pbpApplyColorScheme(mode) {
       let pr;
       try {
         pr = await chrome.runtime.sendMessage({
-          type: "reextractMarkdown", tabId: srcTabId, url, engine,
+          type: "reextractMarkdown", tabId: srcTabId, url, engine, sourceTabUrl,
           account: previewAccount, tags, description, k
         });
       } catch (_) { pr = { ok: false, error: "network" }; }
@@ -621,7 +634,7 @@ function pbpApplyColorScheme(mode) {
   try {
     await chrome.storage.local.set({
       [MP_KEY]: {
-        restore: true, url, tabId: srcTabId,
+        restore: true, url, tabId: srcTabId, sourceTabUrl,
         engine: source === "jina" ? "jina" : "local",
         account: previewAccount, tags, description, ts: Date.now()
       }
@@ -797,7 +810,23 @@ function pbpApplyColorScheme(mode) {
     // Codex-C4: EPUB (keepUrls) never touches the data URI -- pbpBuildEpub reads
     // {mime, bytes} straight off the fetched Map -- so skip building it (saves a
     // base64 string, ~4/3x the image bytes, at peak memory for large image sets).
-    const fetched = granted ? await pbpEmbedFetchAll(scan.candidates, keepUrls ? { ...PBP_EMBED_LIMITS, wantDataUri: false } : undefined) : new Map();
+    const embedLimits = keepUrls ? { ...PBP_EMBED_LIMITS, wantDataUri: false } : PBP_EMBED_LIMITS;
+    // ONE budget across both rounds (Codex review): the hotlink retry below
+    // must not get a fresh 25 MiB pool on top of round 1's.
+    const embedBudget = pbpEmbedBudget(embedLimits.totalBytes);
+    const fetched = granted ? await pbpEmbedFetchAll(scan.candidates, embedLimits, embedBudget) : new Map();
+    // Hotlink retry (hotlink round): images that failed the plain extension
+    // fetch get ONE more pass behind a tab-scoped Referer session rule --
+    // empty-Referer-rejecting CDNs (verified live: cdnfile.sspai.com) refuse
+    // the extension page's inherently referrerless requests, so an "embed"
+    // export silently shipped without images on such sites. Host permission
+    // was already granted above for exactly these origins; the rule rides it
+    // (declarativeNetRequestWithHostAccess) and is removed when the run ends.
+    if (granted && fetched.size < scan.candidates.length) {
+      const failedUrls = scan.candidates.filter((u) => !fetched.has(u));
+      const retried = await pbpImgFixWithReferer(failedUrls, sourceTabUrl || meta.url || "", embedLimits, embedBudget);
+      retried.forEach((v, u) => fetched.set(u, v));
+    }
     const map = {};
     scan.blobs.forEach(u => { map[u] = null; });
     if (!keepUrls) fetched.forEach((v, u) => { map[u] = v.dataUri; });
@@ -900,7 +929,7 @@ function pbpApplyColorScheme(mode) {
         try {
           r = await chrome.runtime.sendMessage({
             type: "reextractMarkdown",
-            tabId: srcTabId, url: srcUrlForSwitch, engine: e,
+            tabId: srcTabId, url: srcUrlForSwitch, engine: e, sourceTabUrl,
             account: previewAccount, tags, description, k
           });
         } catch (_) { r = { ok: false, error: "network" }; }
@@ -954,6 +983,225 @@ function pbpApplyColorScheme(mode) {
   // Single render path: canonical Markdown -> marked() -> DOMPurify -> innerHTML.
   // renderMarkdown() is now the lone sanitize point (XSS closed here).
   const renderedView = document.getElementById("rendered-view");
+
+  // ---- Hotlink-guard image fix (hotlink round; Codex-adjudicated design).
+  // Some CDNs reject EMPTY-Referer image requests (verified live on
+  // cdnfile.sspai.com; the opposite variant -- foreign referers blocked,
+  // empty allowed -- is what the preview's referrerpolicy=no-referrer
+  // correctly serves). An extension page can only send an empty Referer, so
+  // on such sites every image 403s. Recovery: capture-phase error listener
+  // (error doesn't bubble; attached BEFORE innerHTML so no error task can
+  // predate it) collects failed https URLs -> count-gated note with a Fix
+  // button -> the CLICK requests precise origins (first await in the gesture
+  // chain, same contract as resolveEmbed) -> pbpImgFixWithReferer (md-embed:
+  // tab-scoped DNR session rule sets Referer to the ARTICLE's origin, then
+  // the ordinary budgeted extension fetch) -> data-URI swap in the DOM only
+  // (canonical markdown and storage untouched). Origins the user already
+  // granted skip the button: contains()-gated auto-fix, per the CLAUDE.md
+  // rule that automatic paths may only ever CHECK permissions. A session
+  // url->dataUri cache makes re-renders (raw toggle, translation) swap
+  // instantly without refetching; one attempt per URL, so 404s/decode
+  // failures can't loop.
+  const imgFixCache = new Map();    // absUrl -> dataUri (session-lived)
+  const imgFixFailed = new Map();   // absUrl -> Set<img>: QUEUED, not yet sent
+  const imgFixInFlight = new Map(); // absUrl -> Set<img>: sent, awaiting the fetch
+  const imgFixTried = new Set();    // SETTLED (fixed, or given up on): never re-queued
+  const imgFixOriginsSeen = new Set(); // origins this page has already fixed against (maxOrigins cap)
+  // ONE page-level budget across every batch (Codex acceptance MEDIUM-2): a
+  // per-batch budget let a long lazy-loading article punch through totalBytes
+  // once per scroll batch. maxImages caps how many images a single page may
+  // pull this way; both mirror the export path's ceilings.
+  const imgFixBudget = pbpEmbedBudget(PBP_EMBED_LIMITS.totalBytes);
+  let imgFixAttempted = 0; // URLs actually sent to a fix run (ceiling accounting)
+  let imgFixFixed = 0;     // data URIs actually swapped in (what the note reports)
+  let imgFixStranded = 0;  // over-ceiling URLs this page will never attempt
+  let imgFixTimer = null;
+  let imgFixRunning = false;
+  let imgFixRerun = false; // a batch arrived DURING a run -> re-arm after it (never drop it)
+
+  // Per-URL admission against the page ceilings. NOT a global "capped" latch:
+  // one over-budget origin used to freeze the whole page, so a later lazy image
+  // from an origin that was already granted and counted got dropped too
+  // (confirm-review 3 MEDIUM). Rejected URLs are settled on the spot -- they
+  // never enter the queue, so the drain loop can't spin on unfixable work.
+  // imgFixAttempted already counts every in-flight URL (it is incremented when a
+  // batch is SENT), so only the still-QUEUED ones may be added here -- summing
+  // it with a queue that still held the in-flight URLs double-counted the live
+  // batch and could park the page at the ceiling with 30 images actually fixed
+  // (Codex confirm-review 4). imgFixFailed now holds queued URLs only; in-flight
+  // ones live in imgFixInFlight.
+  function imgFixAdmits(url) {
+    if (imgFixAttempted + imgFixFailed.size >= PBP_EMBED_LIMITS.maxImages) return false;
+    let o = "";
+    try { o = new URL(url).origin; } catch (_) { return false; }
+    if (imgFixOriginsSeen.has(o)) return true;
+    const pending = new Set();
+    for (const u of imgFixFailed.keys()) { try { pending.add(new URL(u).origin); } catch (_) {} }
+    pending.add(o);
+    const fresh = [...pending].filter((x) => !imgFixOriginsSeen.has(x)).length;
+    return imgFixOriginsSeen.size + fresh <= PBP_EMBED_LIMITS.maxOrigins;
+  }
+  const imgFixNote = document.getElementById("img-fix-note");
+  const imgFixBtn = document.getElementById("img-fix-btn");
+  const imgFixSourceOrigin = (() => {
+    try {
+      const p = new URL(sourceTabUrl || baseUrl);
+      return (p.protocol === "https:" || p.protocol === "http:") ? p.origin : "";
+    } catch (_) { return ""; }
+  })();
+  function imgFixApply(img, dataUri) {
+    img.dataset.pbpImgFixed = "1";
+    // Responsive attrs would let the browser re-pick a broken remote candidate
+    // over the fixed src (Codex review) -- the data URI is the whole image now.
+    img.removeAttribute("srcset");
+    img.removeAttribute("sizes");
+    img.classList.remove("pbp-img-broken");
+    img.src = dataUri;
+  }
+  function imgFixNoteRender() {
+    if (!imgFixNote) return;
+    const n = imgFixFailed.size;
+    if (!n) { imgFixNote.hidden = true; return; }
+    imgFixNote.querySelector(".img-fix-count").textContent = t("mdImgFixNote", String(n));
+    if (imgFixBtn) { imgFixBtn.hidden = false; imgFixBtn.textContent = t("mdImgFixBtn"); }
+    imgFixNote.hidden = false;
+  }
+  // batch: an explicit, already-permission-checked URL list (the auto path
+  // freezes what it verified). Without it the auto run re-read the whole queue
+  // AFTER awaiting permissions.contains, so an origin that arrived in between
+  // -- one the user never granted -- rode along in an automatic fetch, which
+  // the privacy policy says can never happen (Codex confirm-review 4 P1).
+  async function imgFixRun(viaGesture, batch) {
+    // A batch that lands mid-run must not be dropped: remember it and re-arm
+    // once this run drains, instead of returning into a state where nothing
+    // re-schedules and the note claims "fixed N/N" while newer images stay
+    // broken.
+    if (imgFixRunning) { imgFixRerun = true; return; }
+    if (!imgFixSourceOrigin) return;
+    let urls = (batch || [...imgFixFailed.keys()]).filter((u) => imgFixFailed.has(u));
+    if (!urls.length) return;
+    imgFixRunning = true;
+    if (imgFixBtn) imgFixBtn.disabled = true;
+    let ok = 0;
+    try {
+      const origins = [...new Set(urls.map((u) => { try { return new URL(u).origin; } catch (_) { return ""; } }).filter(Boolean))];
+      if (viaGesture) {
+        let granted = false;
+        // First await in the direct click chain (same contract as resolveEmbed).
+        try { granted = await chrome.permissions.request({ origins: origins.map((o) => o + "/*") }); } catch (_) {}
+        if (!granted) return;
+      }
+      origins.forEach((o) => imgFixOriginsSeen.add(o));
+      // Move QUEUED -> IN-FLIGHT. The queue must not keep these (imgFixAdmits
+      // would then count them twice against maxImages, since imgFixAttempted
+      // already does), and a late-arriving <img> for the same URL has to be
+      // able to join the live set rather than be turned away as "settled"
+      // (Codex confirm-review 4, both P2s). imgFixTried is only stamped when
+      // the run SETTLES the URL, below -- never at dispatch.
+      urls.forEach((u) => {
+        const set = imgFixFailed.get(u) || new Set();
+        const live = imgFixInFlight.get(u);
+        if (live) set.forEach((img) => live.add(img));
+        else imgFixInFlight.set(u, set);
+        imgFixFailed.delete(u);
+      });
+      imgFixAttempted += urls.length;
+      const fetched = await pbpImgFixWithReferer(urls, imgFixSourceOrigin, PBP_EMBED_LIMITS, imgFixBudget);
+      urls.forEach((u) => {
+        const v = fetched.get(u);
+        const set = imgFixInFlight.get(u) || new Set(); // may have grown during the fetch
+        if (v && v.dataUri) {
+          ok++;
+          imgFixCache.set(u, v.dataUri);
+          set.forEach((img) => imgFixApply(img, v.dataUri));
+        }
+        imgFixInFlight.delete(u);
+        imgFixTried.add(u); // settled either way: fixed, or given up on
+      });
+      imgFixFixed += ok;
+    } finally {
+      imgFixRunning = false;
+      if (imgFixBtn) imgFixBtn.disabled = false;
+      if (imgFixRerun || imgFixFailed.size) {
+        // New arrivals (errors that landed mid-run): drain them in a follow-up
+        // pass rather than stranding them. Over-cap items are never left in the
+        // queue (settled above), so this cannot spin against unfixable work.
+        imgFixRerun = false;
+        clearTimeout(imgFixTimer);
+        imgFixTimer = setTimeout(imgFixAutoCheck, 300);
+      } else if (urls.length || imgFixStranded) {
+        imgFixNoteSettle();
+      }
+    }
+  }
+
+  // Final note state: counts are REAL outcomes. imgFixFixed counts data URIs
+  // actually swapped in, never attempts -- the capped branch used to print the
+  // ATTEMPTED count as "fixed", so 50 failed attempts read as "50/60 fixed"
+  // (Codex confirm-review 2). All settled and all fixed -> note disappears.
+  function imgFixNoteSettle() {
+    if (!imgFixNote) return;
+    const total = imgFixAttempted + imgFixStranded;
+    if (!total || imgFixFixed === total) { imgFixNote.hidden = true; return; }
+    imgFixNote.querySelector(".img-fix-count").textContent = t("mdImgFixPartial", String(imgFixFixed), String(total));
+    if (imgFixBtn) imgFixBtn.hidden = true;
+    imgFixNote.hidden = false;
+  }
+  async function imgFixAutoCheck() {
+    imgFixNoteRender();
+    if (!imgFixSourceOrigin || !imgFixFailed.size) return;
+    // FREEZE the batch before the first await: whatever lands in the queue while
+    // permissions.contains resolves has NOT been checked, and must not ride
+    // along in an automatic (no-prompt) fetch (Codex confirm-review 4 P1). It
+    // stays queued and gets its own pass -- behind the button if its origin is
+    // ungranted.
+    const batch = [...imgFixFailed.keys()];
+    const origins = [...new Set(batch.map((u) => { try { return new URL(u).origin; } catch (_) { return ""; } }).filter(Boolean))];
+    if (!origins.length) return;
+    for (const o of origins) {
+      const has = await chrome.permissions.contains({ origins: [o + "/*"] }).catch(() => false);
+      if (!has) return; // any ungranted origin -> stay behind the button (never auto-request)
+    }
+    imgFixRun(false, batch);
+  }
+  // The click also freezes its batch: chrome.permissions.request must be asked
+  // for exactly the origins the user is being shown, and the grant it returns
+  // must not be stretched to cover an origin that arrived while the prompt was
+  // open. Anything newer stays queued for its own pass.
+  if (imgFixBtn) imgFixBtn.addEventListener("click", () => { imgFixRun(true, [...imgFixFailed.keys()]); });
+  renderedView.addEventListener("error", (e) => {
+    const img = e.target;
+    if (!img || img.tagName !== "IMG" || img.dataset.pbpImgFixed) return;
+    const u = img.currentSrc || img.src || "";
+    if (!/^https:\/\//i.test(u)) return; // data:/blob:/http: not fixable through this channel
+    img.classList.add("pbp-img-broken");
+    const cached = imgFixCache.get(u);
+    if (cached) { imgFixApply(img, cached); return; }
+    // A fetch for this exact URL is already out: join its set so the result is
+    // applied to THIS node too. Checking imgFixTried first would have turned a
+    // second lazy <img> of the same image away for good (Codex confirm-review 4).
+    const live = imgFixInFlight.get(u);
+    if (live) { live.add(img); return; }
+    if (imgFixTried.has(u)) return; // already settled (fixed or given up on)
+    let set = imgFixFailed.get(u);
+    if (!set) {
+      // Per-URL ceiling check AT ENTRY: an image over the page's limits is
+      // settled here and never queued, so the drain loop only ever sees work it
+      // can actually do.
+      if (!imgFixAdmits(u)) {
+        imgFixTried.add(u);
+        imgFixStranded++;
+        imgFixNoteSettle();
+        return;
+      }
+      set = new Set();
+      imgFixFailed.set(u, set);
+    }
+    set.add(img);
+    clearTimeout(imgFixTimer);
+    imgFixTimer = setTimeout(imgFixAutoCheck, 400);
+  }, true);
+
   let renderedHtml = renderMarkdown(canonicalMarkdown);
   // Lazy-load images / async decode (sanitizer keeps these attributes).
   renderedHtml = renderedHtml.replace(/<img(?=\s)/gi, '<img loading="lazy" decoding="async"');

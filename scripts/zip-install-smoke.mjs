@@ -240,6 +240,89 @@ for (const check of [[2, 'popup', 1500], [3, 'options', 2000], [4, 'md-preview',
   }
 }
 
+// ---- Check 5: image-fix DNR session-rule ownership & lifecycle ----
+// The hotlink-guard Referer rules (md-embed.js -> background.js) are the one
+// subsystem the file:// test suites cannot reach: they need a real MV3 service
+// worker, real chrome.declarativeNetRequest, and real tab lifecycle. This is
+// the only harness in the repo with all three, so the invariants that a review
+// found broken twice live here (no network is required -- rules are inspected
+// through the API, never exercised against a live CDN):
+//   1. concurrent installs from two preview tabs get DISTINCT ids, each scoped
+//      to its own tab (a shared id let one tab void the other's live rule);
+//   2. a page can only remove its OWN tab's rules (cross-tab remove is a no-op);
+//   3. install is refused for a tab that is not showing a preview document
+//      (this is what keeps a rule off a tab that navigated to a normal site);
+//   4. every rule is pinned to this extension as the request initiator, so a
+//      page-originated request structurally cannot match it;
+//   5. leaving the preview page sweeps that tab's rules.
+console.log('[zip-smoke] check 5: image-fix DNR rule ownership/lifecycle...');
+const dnrFailures = [];
+try {
+  const listRules = () => sw.evaluate(async () => {
+    const rs = await chrome.declarativeNetRequest.getSessionRules();
+    return rs.filter(r => r.id >= 786001 && r.id <= 786999).map(r => ({
+      id: r.id,
+      tabIds: (r.condition && r.condition.tabIds) || [],
+      initiators: (r.condition && r.condition.initiatorDomains) || [],
+    }));
+  });
+  const install = (page, domain) => page.evaluate(d => chrome.runtime.sendMessage({
+    type: 'imgFixInstallReferer', domains: [d], origin: 'https://example.org',
+  }), domain);
+
+  const a = await ctx.newPage();
+  await a.goto(`${extensionBase}md-preview.html?k=smokeA`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+  const b = await ctx.newPage();
+  await b.goto(`${extensionBase}md-preview.html?k=smokeB`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+
+  const [ra, rb] = await Promise.all([install(a, 'img-a.invalid'), install(b, 'img-b.invalid')]);
+  if (!ra?.ok || !rb?.ok) dnrFailures.push(`install failed: ${JSON.stringify([ra, rb])}`);
+  const live = await listRules();
+  if (live.length !== 2) dnrFailures.push(`expected 2 live rules, got ${live.length}`);
+  if (new Set(live.map(r => r.id)).size !== 2) dnrFailures.push(`rule ids collided across tabs: ${live.map(r => r.id)}`);
+  if (new Set(live.map(r => String(r.tabIds))).size !== 2) dnrFailures.push('rules are not scoped to distinct tabs');
+  if (!live.every(r => r.initiators.includes(extId))) {
+    dnrFailures.push(`rules not pinned to the extension as initiator: ${JSON.stringify(live.map(r => r.initiators))}`);
+  }
+
+  // Cross-tab remove must be refused (tab A tries to drop tab B's rule).
+  await a.evaluate(id => chrome.runtime.sendMessage({ type: 'imgFixRemoveReferer', ruleIds: [id] }), rb.ruleId);
+  const afterCross = await listRules();
+  if (!afterCross.some(r => r.id === rb.ruleId)) dnrFailures.push('cross-tab remove deleted another tab\'s rule');
+
+  // Install must be refused for a tab that is not a preview document.
+  const normal = await ctx.newPage();
+  await normal.goto('about:blank', { timeout: 10000 });
+  const refused = await sw.evaluate(async () => {
+    const tabs = await chrome.tabs.query({});
+    const t = tabs.find(x => (x.url || '').startsWith('about:blank'));
+    if (!t) return 'no-blank-tab';
+    try {
+      await pbpImgFixInstallRule({ domains: ['img-c.invalid'], origin: 'https://example.org', tabId: t.id });
+      return 'INSTALLED';
+    } catch (e) { return `refused:${e.message}`; }
+  });
+  if (!String(refused).startsWith('refused:')) dnrFailures.push(`install on a non-preview tab was not refused (${refused})`);
+
+  // Leaving the preview page sweeps that tab's rules.
+  await b.goto('about:blank', { waitUntil: 'domcontentloaded', timeout: 10000 });
+  await new Promise(r => setTimeout(r, 1200));
+  const afterLeave = await listRules();
+  if (afterLeave.some(r => r.id === rb.ruleId)) dnrFailures.push('rule survived the preview tab navigating away');
+
+  await Promise.all([a.close().catch(() => {}), b.close().catch(() => {}), normal.close().catch(() => {})]);
+} catch (e) {
+  dnrFailures.push(`probe threw: ${e.message}`);
+}
+if (dnrFailures.length) {
+  console.error('  FAIL: image-fix DNR invariants broken:');
+  dnrFailures.forEach(f => console.error(`    - ${f}`));
+  await ctx.close().catch(() => {});
+  cleanup();
+  process.exit(1);
+}
+console.log('  image-fix DNR OK');
+
 // ---- Teardown ----
 await ctx.close().catch(() => {});
 cleanup();

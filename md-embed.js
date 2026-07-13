@@ -93,7 +93,17 @@ async function _pbpEmbedFetchOne(url, budget, limits = PBP_EMBED_LIMITS) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), limits.timeoutMs); // 罩住整个 body 读取
   try {
-    const resp = await fetch(url, { signal: ctl.signal, credentials: "omit", cache: "force-cache", redirect: "error" });
+    // cacheMode: normally "force-cache" (the images were just painted -- reuse
+    // the disk cache, no second download). The hotlink retry MUST override it
+    // to "reload": the failed <img> load already put a 403 for that exact URL
+    // in the HTTP cache, and force-cache happily replays that failure without
+    // ever hitting the network -- so the Referer rule would appear to do
+    // nothing (found in the real-extension E2E, not by reading the code).
+    const resp = await fetch(url, {
+      signal: ctl.signal, credentials: "omit",
+      cache: limits.cacheMode || "force-cache",
+      redirect: "error",
+    });
     if (!resp.ok) return null;
     const mime = (resp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
     if (!(mime in PBP_EMBED_MIME_EXT)) return null;
@@ -122,10 +132,15 @@ async function _pbpEmbedFetchOne(url, budget, limits = PBP_EMBED_LIMITS) {
   } catch (_) { return null; } finally { clearTimeout(timer); }
 }
 
-async function pbpEmbedFetchAll(candidates, limits = PBP_EMBED_LIMITS) {
+// sharedBudget (hotlink round): an optional caller-owned pbpEmbedBudget. The
+// two-round export flow (plain fetch, then a Referer-DNR retry of the failed
+// subset) must draw from ONE totalBytes pool -- letting each round build its
+// own would double the ceiling (Codex review). Omitted -> per-call budget,
+// exactly the old behavior (tests and single-round callers unchanged).
+async function pbpEmbedFetchAll(candidates, limits = PBP_EMBED_LIMITS, sharedBudget) {
   const out = new Map();
   if (!candidates.length) return out;
-  const budget = pbpEmbedBudget(limits.totalBytes);
+  const budget = sharedBudget || pbpEmbedBudget(limits.totalBytes);
   const queue = candidates.slice();
   await Promise.all(Array.from({ length: limits.concurrency }, async () => {
     for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
@@ -134,4 +149,108 @@ async function pbpEmbedFetchAll(candidates, limits = PBP_EMBED_LIMITS) {
     }
   }));
   return out;
+}
+
+// ---- Hotlink-guard Referer retry (hotlink round; Codex-adjudicated design).
+// Some image CDNs reject EMPTY-Referer requests outright (verified live on
+// cdnfile.sspai.com: any non-empty Referer passes, empty is refused) -- and an
+// extension page can only ever send an empty Referer (chrome-extension://
+// origins are never emitted as referrers, and the preview additionally forces
+// referrerpolicy=no-referrer, which is the CORRECT default for the opposite,
+// far more common "foreign referers blocked / empty allowed" variant). Header
+// spoofing from the page is impossible (Referer is a forbidden header), so the
+// fix is a SHORT-LIVED declarativeNetRequest session rule that sets Referer to
+// the article's own origin, scoped as narrowly as the API allows:
+//   - only the failed images' registrable domains (requestDomains),
+//   - only xmlhttprequest (the fetch below; never a blanket resource type),
+//   - only THIS preview tab (tabIds), so no other extension surface or page
+//     ever sees the rewrite,
+//   - a PRIVATE rule id per run (never a shared constant): two runs overlap
+//     routinely (the reading-view auto-fix and an export click, or two lazy-
+//     load batches), and with one shared id the second run's remove+add would
+//     silently void the first run's rule, then the first run's finally would
+//     delete the SECOND run's live rule (Codex acceptance HIGH-1),
+//   - removed in finally AND on pagehide AND by the background sweeper -- a
+//     session rule outlives the JS frame that created it, so `finally` alone
+//     cannot be the only cleanup (Codex acceptance HIGH-2): a tab closed or
+//     navigated mid-fetch would strand a rule that keeps rewriting Referer for
+//     whatever loads in that tab id next.
+// declarativeNetRequestWithHostAccess keys the whole thing to host access the
+// user already granted per-origin via chrome.permissions.request -- no
+// wildcard, no install-time warning, matching the CLAUDE.md network invariant.
+// Referer value is the page ORIGIN + "/", never the full path/query (privacy:
+// the CDN learns which site embedded it -- which it inherently knows -- not
+// which article).
+// Rule ids are allocated by the SERVICE WORKER, never by this page. DNR's rule
+// namespace is extension-GLOBAL while a page-local counter is not: two preview
+// tabs would both start at the range's first id, and the second one's
+// remove+add would void the first one's live rule (Codex confirm-review
+// HIGH-1 -- the single-page concurrency test missed this entirely). The SW is
+// the one serialized context that can hand out ids that are unique across
+// every preview tab, and it derives the rule's tabId from sender.tab (a page
+// cannot ask for a rule scoped to someone else's tab).
+const _pbpImgFixLiveRuleIds = new Set(); // ids this page owns right now (pagehide cleanup)
+
+function _pbpImgFixDomains(urls) {
+  const domains = new Set();
+  for (const u of urls) {
+    try {
+      const p = new URL(u);
+      if (p.protocol === "https:") domains.add(p.hostname);
+    } catch (_) {}
+  }
+  return [...domains];
+}
+
+// Last-ditch cleanup for rules this page still owns when it goes away mid-run
+// (close/navigate/discard). pagehide is the only unload event that fires
+// reliably on bfcache + tab close; the call is best-effort (the API is async
+// and the page may die first), which is exactly why background.js ALSO sweeps.
+// A fresh preview document drops whatever the PREVIOUS document in this tab
+// left behind. The one navigation Chrome never reports as a URL change is a
+// same-URL reload, so the SW's navigation sweep cannot see it -- this is that
+// case's cleanup (confirm-review 3). Fire-and-forget: a failure only leaves a
+// rule that the tab-close sweep will collect anyway.
+if (typeof window !== "undefined" && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+  try { chrome.runtime.sendMessage({ type: "imgFixResetTab" })?.catch?.(() => {}); } catch (_) {}
+}
+
+if (typeof window !== "undefined" && typeof chrome !== "undefined" && chrome.runtime) {
+  window.addEventListener("pagehide", () => {
+    if (!_pbpImgFixLiveRuleIds.size) return;
+    // Best-effort only (an async API in an unload handler may not land) -- the
+    // SW's own tabs.onRemoved / navigation sweeps are the actual guarantee.
+    try {
+      chrome.runtime.sendMessage({ type: "imgFixRemoveReferer", ruleIds: [..._pbpImgFixLiveRuleIds] })
+        ?.catch?.(() => {});
+    } catch (_) {}
+  });
+}
+
+async function pbpImgFixWithReferer(urls, refererOrigin, limits = PBP_EMBED_LIMITS, sharedBudget) {
+  const domains = _pbpImgFixDomains(urls);
+  let origin = "";
+  try {
+    const p = new URL(refererOrigin);
+    if (p.protocol === "https:" || p.protocol === "http:") origin = p.origin;
+  } catch (_) {}
+  if (!domains.length || !origin) return new Map();
+  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) return new Map();
+  // The SW allocates a globally-unique id AND derives the tab scope from
+  // sender.tab -- no tabId travels in this message. A failure here (no
+  // permission, no tab, SW gone) degrades to "not fixed", never throws.
+  let ruleId = null;
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: "imgFixInstallReferer", domains, origin });
+    if (!resp || !resp.ok || typeof resp.ruleId !== "number") return new Map();
+    ruleId = resp.ruleId;
+  } catch (_) { return new Map(); }
+  _pbpImgFixLiveRuleIds.add(ruleId);
+  try {
+    // cacheMode:"reload" is load-bearing here -- see _pbpEmbedFetchOne.
+    return await pbpEmbedFetchAll(urls, { ...limits, cacheMode: "reload" }, sharedBudget);
+  } finally {
+    _pbpImgFixLiveRuleIds.delete(ruleId);
+    try { await chrome.runtime.sendMessage({ type: "imgFixRemoveReferer", ruleIds: [ruleId] }); } catch (_) {}
+  }
 }

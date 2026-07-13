@@ -1055,7 +1055,9 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
      the dark palette (verified: Step 1.7's print-dark-forced-inline
      scenario). */
   :root { color-scheme: light !important; }
-  .rail, .rail-toggle, .rail-scrim, #zen-bar { display: none; }
+  /* .img-fix-note is UI chrome (a Fix button), not article content -- it must
+     never print (Codex confirm-review LOW). */
+  .rail, .rail-toggle, .rail-scrim, #zen-bar, .img-fix-note { display: none; }
   main { margin-left: 0; max-width: 100%; padding: 0; }
   /* Pin the column for paper: --pbp-width is a screen reading preference
      (680/880/1080 cycle) and must not leak into print geometry -- a 1080px
@@ -1153,6 +1155,31 @@ body.md-empty main { margin-left: 0; }
   border: 1px solid var(--border); border-radius: 6px;
 }
 .export-note[hidden] { display: none; }
+/* Hotlink-guard image fix (hotlink round): count-gated strip above the
+   article -- same quiet .export-note voice, plus one real button. Broken
+   images keep their box (dashed edge) so the reader sees WHERE the fix
+   applies instead of collapsed alt-text soup. */
+.img-fix-note {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 16px; padding: 8px 12px;
+  font-size: 13px; color: var(--fg-secondary);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+}
+.img-fix-note[hidden] { display: none; }
+.img-fix-btn {
+  padding: 4px 14px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--btn-border); border-radius: 7px;
+  background: var(--btn-bg); color: var(--btn-fg);
+}
+.img-fix-btn:hover { background: var(--btn-hover); }
+.img-fix-btn:disabled { opacity: 0.5; cursor: wait; }
+.img-fix-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.img-fix-btn[hidden] { display: none; }
+#rendered-view img.pbp-img-broken {
+  border: 1px dashed var(--border);
+  min-height: 48px; min-width: 120px;
+  background: var(--surface);
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -693,6 +693,13 @@ async function htmlToMarkdownAsync(html, opts) {
               title: result.title || $id("title-input")?.value || "",
               url: result.url || url,
               baseUrl: result.url || url,
+              // Immutable tab identity (hotlink round): the LIVE tab URL, not
+              // `url` -- that one comes from the editable url-input and may be
+              // tracker-stripped or hand-edited, so it can differ from what the
+              // tab actually shows and would fail the weak-handle guard on the
+              // next local re-extract (Codex acceptance HIGH-3). It is also the
+              // Referer origin source, which must be the real page.
+              sourceTabUrl: tab.url || url,
               account: sessionAccount,
               tags: Array.isArray(currentTags) ? currentTags.slice() : [],
               description: $id("description-input")?.value || "",

@@ -1074,7 +1074,192 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   const timer = _checkDebounceTimers.get(tabId);
   if (timer) { clearTimeout(timer); _checkDebounceTimers.delete(tabId); }
   _lastIconState.delete(tabId); // prevent Map leak over long sessions
+  pbpImgFixSweepRules(tabId);
 });
+
+// ---- Image-fix DNR session rules: SW is the sole owner (hotlink round) -----
+// md-preview pages ask the SW to install a tab-scoped Referer rule around each
+// image re-fetch (md-embed.js pbpImgFixWithReferer). The SW owns this end to
+// end for two reasons Codex's reviews made concrete:
+//   - Rule ids are EXTENSION-GLOBAL. A page-local counter had every preview tab
+//     starting at the same id, so a second tab's remove+add voided the first
+//     tab's live rule (confirm-review HIGH-1). Only a single serialized context
+//     can hand out ids that are unique across tabs; allocation below runs on a
+//     promise chain so two concurrent installs can never pick the same id.
+//   - A session rule outlives the page that wanted it. `finally` in the page
+//     cannot be the last word (tab closed/navigated/discarded mid-fetch), or a
+//     stranded rule would keep rewriting Referer for whatever loads in that tab
+//     id NEXT (acceptance HIGH-2). The sweeps below are the guarantee.
+// The rule's tab scope comes from sender.tab -- never from the message -- so a
+// page cannot request a rule aimed at another tab.
+const PBP_IMGFIX_RULE_MIN = 786001;
+const PBP_IMGFIX_RULE_MAX = 786999;
+
+// ONE serialized domain for EVERY rule mutation -- install, remove, sweep.
+// Serializing only allocation was not enough (confirm-review 2 BLOCKER/HIGH):
+//   - install racing a leave-sweep: the sweep read an empty rule set, finished,
+//     and THEN the install landed -- stranding a Referer rule on a tab that had
+//     already navigated to a normal website, which is exactly the traffic
+//     privacy.md promises never to touch;
+//   - remove racing anything: its read-owner-then-delete pair was not atomic,
+//     so a delayed remove could delete an id that had since been reallocated to
+//     a different preview tab.
+// Everything below therefore runs inside _imgFixQueue, and install additionally
+// re-validates INSIDE the critical section that the tab is still showing the
+// preview document it claimed -- a navigation that slipped in before the install
+// ran means the rule must never be created at all.
+let _imgFixQueue = Promise.resolve();
+const _imgFixTabDoc = new Map();    // tabId -> owner preview URL without its #fragment
+const _imgFixRuleOwner = new Map(); // ruleId -> owner preview URL (ABA guard on remove)
+
+function _imgFixSerialize(fn) {
+  const run = _imgFixQueue.then(fn);
+  _imgFixQueue = run.then(() => {}, () => {}); // a failure must not poison the queue
+  return run;
+}
+
+function _imgFixStripHash(u) {
+  const s = String(u || "");
+  const i = s.indexOf("#");
+  return i === -1 ? s : s.slice(0, i);
+}
+
+function _imgFixIsPreviewUrl(u) {
+  return typeof u === "string" && u.startsWith(chrome.runtime.getURL("md-preview.html"));
+}
+
+function _imgFixRuleIdsOf(rules, pred) {
+  return rules
+    .filter((r) => r.id >= PBP_IMGFIX_RULE_MIN && r.id <= PBP_IMGFIX_RULE_MAX)
+    .filter(pred)
+    .map((r) => r.id);
+}
+
+function _imgFixRuleTabs(r) {
+  return (r.condition && Array.isArray(r.condition.tabIds)) ? r.condition.tabIds : [];
+}
+
+// Install: re-validate the tab AND the exact document, pick the lowest free id,
+// add the rule -- all in one critical section, so no sweep can interleave.
+// initiatorDomains is the STRUCTURAL guarantee (confirm-review 3 HIGH):
+// requestDomains + xmlhttprequest + tabIds alone would also match a normal
+// website's XHR to the same CDN if that site somehow occupied this tab id
+// between the check and the rule taking effect. Pinning the initiator to this
+// extension's own id makes a page-originated request unable to match the rule
+// at all -- verified live: initiator=extension id -> rule applies (Referer set,
+// 200); initiator=any site -> rule does not apply (403, referrerless). The
+// navigation sweeps below remain as the resource-cleanup backstop.
+function pbpImgFixInstallRule({ domains, origin, tabId, docUrl }) {
+  return _imgFixSerialize(async () => {
+    // Live re-check (NOT the sender snapshot): if the tab navigated while this
+    // request queued, the asking page is gone and the rule must never exist.
+    const live = await chrome.tabs.get(tabId);
+    if (!live || !_imgFixIsPreviewUrl(live.url)) throw new Error("tab_not_preview");
+    const owner = _imgFixStripHash(docUrl || live.url);
+    // Same PREVIEW page is not enough -- it must be the same preview DOCUMENT
+    // (?k=A vs ?k=B), and a navigation already committed to somewhere else
+    // (pendingUrl) disqualifies it too.
+    if (_imgFixStripHash(live.url) !== owner) throw new Error("tab_not_preview");
+    if (live.pendingUrl && _imgFixStripHash(live.pendingUrl) !== owner) throw new Error("tab_navigating");
+    const rules = await chrome.declarativeNetRequest.getSessionRules();
+    const used = new Set(rules.map((r) => r.id));
+    let id = 0;
+    for (let i = PBP_IMGFIX_RULE_MIN; i <= PBP_IMGFIX_RULE_MAX; i++) {
+      if (!used.has(i)) { id = i; break; }
+    }
+    if (!id) throw new Error("imgfix_rule_pool_exhausted");
+    await chrome.declarativeNetRequest.updateSessionRules({
+      addRules: [{
+        id,
+        priority: 1,
+        condition: {
+          requestDomains: domains,
+          resourceTypes: ["xmlhttprequest"],
+          tabIds: [tabId],
+          initiatorDomains: [chrome.runtime.id], // only THIS extension's own requests
+        },
+        action: {
+          type: "modifyHeaders",
+          requestHeaders: [{ header: "referer", operation: "set", value: origin + "/" }],
+        },
+      }],
+    });
+    // Which preview DOCUMENT owns this tab's rules (a later same-document hash
+    // change must not sweep) and which document owns each rule id (an ABA
+    // guard: a late remove from a dying page must not delete a rule the NEXT
+    // document in the same tab was given the recycled id for).
+    _imgFixTabDoc.set(tabId, owner);
+    _imgFixRuleOwner.set(id, owner);
+    return id;
+  });
+}
+
+// Owner-checked AND atomic: read + delete share one critical section. Ownership
+// is (tab, document) -- the tab alone allowed the ABA above (confirm-review 3).
+function pbpImgFixRemoveRules(ruleIds, tabId, docUrl) {
+  return _imgFixSerialize(async () => {
+    const doc = _imgFixStripHash(docUrl || "");
+    const rules = await chrome.declarativeNetRequest.getSessionRules();
+    const mine = _imgFixRuleIdsOf(rules, (r) => {
+      if (!ruleIds.includes(r.id) || !_imgFixRuleTabs(r).includes(tabId)) return false;
+      const owner = _imgFixRuleOwner.get(r.id);
+      return !owner || !doc || owner === doc; // unknown owner (SW restarted) -> fall back to the tab check
+    });
+    if (mine.length) {
+      await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: mine });
+      mine.forEach((id) => _imgFixRuleOwner.delete(id));
+    }
+  });
+}
+
+// tabId given -> that tab's rules. No tabId (SW start) -> every rule whose tab
+// is gone OR is no longer showing a preview page: a blanket range wipe would
+// kill rules a live preview installed while the SW slept, but only checking
+// "tab exists" would leave a rule stranded on a tab that has since navigated to
+// a normal site (confirm-review 2).
+function pbpImgFixSweepRules(tabId) {
+  if (!chrome.declarativeNetRequest || !chrome.declarativeNetRequest.getSessionRules) return Promise.resolve();
+  return _imgFixSerialize(async () => {
+    const rules = await chrome.declarativeNetRequest.getSessionRules();
+    let ids;
+    if (tabId === undefined) {
+      const tabs = await chrome.tabs.query({});
+      const previewTabs = new Map(tabs.filter((t) => _imgFixIsPreviewUrl(t.url)).map((t) => [t.id, _imgFixStripHash(t.url)]));
+      // Re-seed the document-owner map from the live tabs. Without this, the
+      // first hash change after an SW restart would find an unknown owner and
+      // sweep a fix that is running perfectly fine (confirm-review 3).
+      previewTabs.forEach((doc, id) => { if (!_imgFixTabDoc.has(id)) _imgFixTabDoc.set(id, doc); });
+      ids = _imgFixRuleIdsOf(rules, (r) => {
+        const t = _imgFixRuleTabs(r);
+        return t.length > 0 && t.every((id) => !previewTabs.has(id));
+      });
+    } else {
+      ids = _imgFixRuleIdsOf(rules, (r) => _imgFixRuleTabs(r).includes(tabId));
+      _imgFixTabDoc.delete(tabId);
+    }
+    if (ids.length) {
+      await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: ids });
+      ids.forEach((id) => _imgFixRuleOwner.delete(id));
+    }
+  }).catch(() => { /* best-effort: a sweep failure must never break tab handling */ });
+}
+
+// A preview tab navigating AWAY is the leak: the tab id stays the same, so a
+// stranded rule would otherwise linger there. Same-DOCUMENT changes must NOT
+// sweep (every TOC click is a hash change) -- compared against the owning
+// document recorded at install time, so a real navigation to a different
+// preview document (?k=A -> ?k=B) still sweeps. Unknown owner sweeps: losing a
+// rule only makes a fix fail, keeping a wrong one is the problem. A same-URL
+// RELOAD never fires changeInfo.url at all -- that case is handled by the
+// preview page sweeping its own tab on load (imgFixResetTab below).
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (!changeInfo.url) return;
+  const owner = _imgFixTabDoc.get(tabId);
+  if (owner && _imgFixIsPreviewUrl(changeInfo.url) && _imgFixStripHash(changeInfo.url) === owner) return;
+  pbpImgFixSweepRules(tabId);
+});
+
+pbpImgFixSweepRules(); // SW start: drop rules whose tab is gone or no longer a preview; re-seed owners
 
 // ---- Activity-windowed keepalive ------------------------------------------
 // Keep the SW (and thus the extension renderer process) warm for a short window
@@ -1503,8 +1688,57 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // keep channel open for async response
   }
 
+  // ---- Image-fix Referer rules (hotlink round). Tab scope comes from
+  // sender.tab, never the message; the sender must be OUR preview page, so no
+  // other surface (content script, another extension page) can drive this.
+  // frameId === 0 (top-level document) on both handlers: a sub-frame that
+  // happened to load md-preview.html would otherwise satisfy the URL prefix
+  // check. The repo embeds no such frame today -- this is defense in depth.
+  if (message.type === "imgFixInstallReferer") {
+    const tabId = sender && sender.tab && sender.tab.id;
+    const fromPreview = !!(sender && sender.frameId === 0 && _imgFixIsPreviewUrl(sender.url));
+    const domains = Array.isArray(message.domains)
+      ? message.domains.filter((d) => typeof d === "string" && d && !/[/:*?]/.test(d)) : [];
+    let origin = "";
+    try {
+      const p = new URL(message.origin);
+      if (p.protocol === "https:" || p.protocol === "http:") origin = p.origin;
+    } catch (_) {}
+    if (typeof tabId !== "number" || !fromPreview || !domains.length || !origin) {
+      sendResponse({ ok: false, error: "bad_request" });
+      return true;
+    }
+    pbpImgFixInstallRule({ domains, origin, tabId, docUrl: sender.url })
+      .then((ruleId) => sendResponse({ ok: true, ruleId }))
+      .catch((e) => sendResponse({ ok: false, error: (e && e.message) || "install_failed" }));
+    return true;
+  }
+
+  if (message.type === "imgFixRemoveReferer") {
+    const tabId = sender && sender.tab && sender.tab.id;
+    const fromPreview = !!(sender && sender.frameId === 0 && _imgFixIsPreviewUrl(sender.url));
+    const ids = Array.isArray(message.ruleIds) ? message.ruleIds.filter((n) => typeof n === "number") : [];
+    if (typeof tabId !== "number" || !fromPreview || !ids.length) { sendResponse({ ok: false }); return true; }
+    pbpImgFixRemoveRules(ids, tabId, sender.url)
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
+  // A freshly loaded preview clears its OWN tab's leftovers. Covers the one
+  // navigation Chrome never reports as a URL change: a same-URL reload (F5 /
+  // Memory-Saver restore), after which the old document's rules would otherwise
+  // sit there until the tab closed (confirm-review 3).
+  if (message.type === "imgFixResetTab") {
+    const tabId = sender && sender.tab && sender.tab.id;
+    const fromPreview = !!(sender && sender.frameId === 0 && _imgFixIsPreviewUrl(sender.url));
+    if (typeof tabId !== "number" || !fromPreview) { sendResponse({ ok: false }); return true; }
+    pbpImgFixSweepRules(tabId).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+
   if (message.type === "reextractMarkdown") {
-    const { tabId, url, engine, k } = message;
+    const { tabId, url, engine, k, sourceTabUrl } = message;
     if (!url || (engine !== "local" && engine !== "jina")) {
       sendResponse({ ok: false, error: "bad_request" }); return true;
     }
@@ -1525,7 +1759,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         tags: Array.isArray(stored.tags) ? stored.tags.slice() : [],
         description: typeof stored.description === "string" ? stored.description : "",
       };
-      const out = await extractForPreview({ tabId, url, engine });
+      // sourceTabUrl is IMMUTABLE tab identity (hotlink round): prefer the
+      // slot's own record, else the message's, else the legacy url. It must
+      // survive every payload rewrite below, or one Jina pass (whose d.url
+      // overwrites `url`) would erase it and re-brick the local engine.
+      const tabUrl = (typeof stored.sourceTabUrl === "string" && stored.sourceTabUrl)
+        || (typeof sourceTabUrl === "string" && sourceTabUrl) || url;
+      const out = await extractForPreview({ tabId, url, engine, sourceTabUrl: tabUrl });
       if (out.error) { sendResponse({ ok: false, error: out.error }); return; }
       const latest = (await chrome.storage.local.get(key))[key];
       if (!latest || latest.url !== url || latest.tabId !== tabId
@@ -1535,7 +1775,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       await chrome.storage.local.set({
         [key]: {
-          ...out, baseUrl: out.url || url, tabId,
+          ...out, baseUrl: out.url || url, tabId, sourceTabUrl: tabUrl,
           account: owner.account,
           tags: owner.tags,
           description: owner.description,
@@ -1874,7 +2114,7 @@ function extractPageForMarkdown() {
 // opener and the in-preview engine toggle (reextractMarkdown). Returns the
 // md_preview_data payload fields (minus tags/description/tabId, added by caller)
 // or { error }. engine is "local" (Defuddle) or "jina".
-async function extractForPreview({ tabId, url, engine }) {
+async function extractForPreview({ tabId, url, engine, sourceTabUrl }) {
   if (engine === "jina") {
     // Fresh read — do NOT use loadSettings() (its _settingsCache can be stale
     // when the user edits settings while the SW is warm). getSettingsStorage()
@@ -1903,9 +2143,13 @@ async function extractForPreview({ tabId, url, engine }) {
   // Weak-handle guard: the stored tabId may now host a DIFFERENT page (user
   // navigated, or the id was reused). activeTab can persist across same-origin
   // navigation, so a successful inject could silently extract the wrong page.
+  // Compared against sourceTabUrl when present (hotlink round): `url` can be
+  // Jina's canonicalized d.url, which never equals the tab's literal URL --
+  // without the split, one Jina pass bricked the switch back to the local
+  // engine with a spurious tab_navigated (Codex review).
   try {
     const live = await chrome.tabs.get(tabId);
-    if (!live || !live.url || live.url !== url) return { error: "tab_navigated" };
+    if (!live || !live.url || live.url !== (sourceTabUrl || url)) return { error: "tab_navigated" };
   } catch (_) { return { error: "tab_unavailable" }; }
   // Defuddle is required; injection failure (tab closed / CSP / no permission) → degrade.
   const injected = await chrome.scripting
@@ -1954,7 +2198,7 @@ async function openMarkdownPreviewFromShortcut() {
     await chrome.storage.local.set({
       ["md_preview_data_" + k]: {
         pending: true, engine, source: engine,
-        tabId: tab.id, url: tab.url, baseUrl: tab.url, title: tab.title || "",
+        tabId: tab.id, url: tab.url, baseUrl: tab.url, sourceTabUrl: tab.url, title: tab.title || "",
         account: auth.account || "", tags: [], description: "", ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
       }
     });

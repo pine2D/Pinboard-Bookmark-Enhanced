@@ -11,7 +11,8 @@
     "scripting",
     "tabs",
     "notifications",
-    "alarms"
+    "alarms",
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
     "https://api.pinboard.in/*",
