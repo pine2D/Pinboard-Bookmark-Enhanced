@@ -1159,13 +1159,28 @@ body.md-empty main { margin-left: 0; }
    article -- same quiet .export-note voice, plus one real button. Broken
    images keep their box (dashed edge) so the reader sees WHERE the fix
    applies instead of collapsed alt-text soup. */
+/* STICKY, not just top-of-article: images are lazy, so most of them fail only
+   once the reader has scrolled well past the top -- a Fix button parked at the
+   article head is invisible exactly when it becomes relevant (user-reported:
+   "images still broken", while the note was sitting off-screen above). The
+   first fix needs a click (a permission prompt can only follow a user gesture),
+   so the affordance has to follow the reader. */
 .img-fix-note {
+  position: sticky; top: 8px; z-index: 5;
   display: flex; align-items: center; gap: 10px;
   margin: 0 0 16px; padding: 8px 12px;
   font-size: 13px; color: var(--fg-secondary);
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.10);
 }
 .img-fix-note[hidden] { display: none; }
+/* The button IS the point of the strip -- give it the accent, not the quiet
+   btn-bg it shared with every other control. */
+.img-fix-note .img-fix-btn {
+  background: var(--link); color: #fff; border-color: var(--link);
+  font-weight: 600;
+}
+.img-fix-note .img-fix-btn:hover { background: var(--link-hover); border-color: var(--link-hover); }
 .img-fix-btn {
   padding: 4px 14px; font-size: 12px; cursor: pointer;
   border: 1px solid var(--btn-border); border-radius: 7px;
