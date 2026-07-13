@@ -40,8 +40,23 @@ function assertEq(actual, expected, label) {
 
 // ---- fetch stub plumbing ----
 // Short limits (injected, never the PBP_EMBED_LIMITS production defaults) so
-// timeout/budget/MIME-reject paths are driven in milliseconds, not minutes.
-const SHORT_LIMITS = { maxImages: 50, maxOrigins: 10, perImageBytes: 64, totalBytes: 128, outputBytes: 4096, timeoutMs: 50, concurrency: 2 };
+// budget/MIME-reject paths are driven with tiny byte ceilings instead of the
+// production megabytes.
+//
+// timeoutMs must be UNREACHABLE here, not merely large. It used to be 50ms for
+// every test, including the ones whose stub resolves immediately -- but
+// timeoutMs is a wall clock, so on a loaded machine (a full verify.sh run has
+// several Chromium instances live) even an instant stub could cross 50ms and be
+// aborted, failing a budget assertion that has nothing to do with timeouts.
+// That was a real flake: "1st 50-byte image fits" went red once in a busy run
+// and passed 7/7 on a quiet one. A merely-generous value (5s) only widens the
+// window; 60s is past the runner's own 30s ceiling, so the suite fails on the
+// runner's timeout rather than on a bogus abort. The two tests that actually
+// EXERCISE the abort path use ABORT_LIMITS below.
+const SHORT_LIMITS = { maxImages: 50, maxOrigins: 10, perImageBytes: 64, totalBytes: 128, outputBytes: 4096, timeoutMs: 60000, concurrency: 2 };
+// Only for the abort tests: short enough to fire fast, and far below the 5000ms
+// stall the stub simulates, so the abort is what ends the read -- not the stub.
+const ABORT_LIMITS = { ...SHORT_LIMITS, timeoutMs: 50 };
 
 let fetchCalls = [];
 function mkAbortError() {
@@ -215,7 +230,7 @@ section("_pbpEmbedFetchOne timeout abort");
 {
   globalThis.fetch = hangingFetch;
   const start = Date.now();
-  const got = await _pbpEmbedFetchOne("https://cdn.example.com/slow.png", pbpEmbedBudget(SHORT_LIMITS.totalBytes), SHORT_LIMITS);
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/slow.png", pbpEmbedBudget(ABORT_LIMITS.totalBytes), ABORT_LIMITS);
   const elapsed = Date.now() - start;
   assertEq(got, null, "a fetch() that never settles is aborted by timeoutMs and degrades to null");
   assert(elapsed < 2000, "abort fired near timeoutMs(50ms), not the real production default(10s): elapsed=" + elapsed + "ms");
@@ -227,7 +242,7 @@ section("_pbpEmbedFetchOne timeout abort mid-stream");
   globalThis.fetch = tableFetch({
     "https://cdn.example.com/stall.png": { contentType: "image/png", chunks: [bytesOf("x"), bytesOf("y")], chunkDelayMs: 5000 }
   });
-  const got = await _pbpEmbedFetchOne("https://cdn.example.com/stall.png", pbpEmbedBudget(SHORT_LIMITS.totalBytes), SHORT_LIMITS);
+  const got = await _pbpEmbedFetchOne("https://cdn.example.com/stall.png", pbpEmbedBudget(ABORT_LIMITS.totalBytes), ABORT_LIMITS);
   assertEq(got, null, "timeoutMs covers the whole body read, not just the initial fetch() — a stalled chunk read is also aborted");
 }
 

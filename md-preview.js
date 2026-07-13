@@ -1042,29 +1042,191 @@ function pbpApplyColorScheme(mode) {
     return imgFixOriginsSeen.size + fresh <= PBP_EMBED_LIMITS.maxOrigins;
   }
   const imgFixNote = document.getElementById("img-fix-note");
-  const imgFixBtn = document.getElementById("img-fix-btn");
   const imgFixSourceOrigin = (() => {
     try {
       const p = new URL(sourceTabUrl || baseUrl);
       return (p.protocol === "https:" || p.protocol === "http:") ? p.origin : "";
     } catch (_) { return ""; }
   })();
-  function imgFixApply(img, dataUri) {
+  function imgFixApply(img, dataUri, url) {
     img.dataset.pbpImgFixed = "1";
     // Responsive attrs would let the browser re-pick a broken remote candidate
     // over the fixed src (Codex review) -- the data URI is the whole image now.
     img.removeAttribute("srcset");
     img.removeAttribute("sizes");
     img.classList.remove("pbp-img-broken");
+    // "Fetched" is not "renders": the fetch layer only checks HTTP status and
+    // MIME, so a truncated/corrupt payload would count as fixed while the image
+    // stays blank -- and its error would then be swallowed by the pbpImgFixed
+    // guard in the listener below (Codex confirm-review LOW). If the data URI
+    // fails to decode, undo the claim: the image goes back to broken, the URL
+    // is settled (no refetch loop), the bad data URI leaves the cache, and the
+    // success count gives the point back.
+    img.addEventListener("error", () => {
+      delete img.dataset.pbpImgFixed;
+      img.classList.add("pbp-img-broken");
+      if (url) { imgFixCache.delete(url); imgFixTried.add(url); }
+      imgFixFixed = Math.max(0, imgFixFixed - 1);
+      const b = imgFixBlockOf(img);
+      if (b) imgFixRowFor(b, img); // reappears, as "still unavailable"
+      imgFixNoteSettle();
+    }, { once: true });
     img.src = dataUri;
   }
+
+  // Anything the page re-renders under us (translation filling/clearing the
+  // .pb-tr layer, a retry rebuilding a block, the raw/rendered toggle) can
+  // DISCONNECT <img> nodes this machinery still tracks. Without a prune, the
+  // rows would point at nothing AND the queue would still carry those URLs --
+  // so a click would request permission, spend budget and fetch images that no
+  // longer exist on the page (Codex confirm-review MEDIUM). A debounced
+  // observer covers every such path, not just the three in md-translate.
+  function imgFixPrune() {
+    imgFixFailed.forEach((set, u) => {
+      set.forEach((img) => { if (!img.isConnected) set.delete(img); });
+      if (!set.size) imgFixFailed.delete(u); // not "tried": if it comes back, it may be fixable
+    });
+    imgFixInFlight.forEach((set) => {
+      set.forEach((img) => { if (!img.isConnected) set.delete(img); });
+      // The entry itself stays: its fetch is already out, and a node re-added
+      // during the flight still gets the result.
+    });
+    imgFixRowsSync();
+    imgFixNoteRender();
+  }
+  let imgFixPruneTimer = null;
+  if (typeof MutationObserver === "function") {
+    new MutationObserver(() => {
+      clearTimeout(imgFixPruneTimer);
+      imgFixPruneTimer = setTimeout(imgFixPrune, 200);
+    }).observe(renderedView, { childList: true, subtree: true });
+  }
+
+  // ---- In-place fix rows (design round, Codex-adjudicated).
+  // The affordance lives NEXT TO the broken image, not in a bar: a sticky bar
+  // covered the very text it floated over, and a bar pinned to the article head
+  // was already off-screen by the time lazy images failed -- which is exactly
+  // how this shipped broken ("images still don't show", while the notice sat
+  // above the viewport, dutifully counting). One row per LOGICAL BLOCK, never
+  // per <img>:
+  //   - the row is a sibling AFTER the block, never inside it, so its button
+  //     text can never leak into the block's textContent -> AI context, block
+  //     fingerprints, translation input, Turndown markdown;
+  //   - a <div> child of #rendered-view is a CONTAINER, not a block, for
+  //     pbpAiIndexBlocks (md-ai-core.js:14/19: only P/H1-6/UL/OL/BLOCKQUOTE/
+  //     TABLE/PRE count), and this one holds no block tags -- so block numbering
+  //     is untouched;
+  //   - translation inserts .pb-tr/.pb-tr-err with afterend(block), i.e. BEFORE
+  //     this row, and every sibling check there is classList-guarded -- so the
+  //     row is inert to that machinery and always ends up last in the group;
+  //   - N broken images in one paragraph -> ONE row, ONE tab stop.
+  // Copy is deliberately not "blocked by the site": the error listener sees any
+  // https image failure (404, network, decode), not a diagnosed hotlink block.
+  // block -> { row, msg, btn, imgs:Set<img> }. The row owns the exact <img>
+  // nodes it speaks for: inferring them from the DOM ("does this block still
+  // contain a broken image?") was wrong twice -- a TRANSLATED image lives in
+  // the block's .pb-tr sibling, not inside the block, and a top-level <img>
+  // fallback makes block === img, which querySelector never matches (Codex
+  // acceptance). State is derived from this set, never re-scanned.
+  const imgFixRows = new Map();
+  function imgFixBlockOf(img) {
+    // A .pb-tr (translated) block maps back to its ORIGINAL block, so the row
+    // never lands inside the translation layer.
+    const tr = img.closest(".pb-tr");
+    if (tr) {
+      const n = Number(tr.dataset.pbTr);
+      const orig = n && typeof pbpAiBlockEl === "function" ? pbpAiBlockEl(n) : null;
+      if (orig) return orig;
+    }
+    const block = img.closest("[data-pb]");
+    if (block) return block;
+    // Unindexed (raw <img> straight under #rendered-view): anchor on the image's
+    // own top-level ancestor so the row still lands next to it.
+    let el = img;
+    while (el.parentElement && el.parentElement !== renderedView) el = el.parentElement;
+    return el.parentElement === renderedView ? el : null;
+  }
+  function imgFixRowFor(block, img) {
+    let e = imgFixRows.get(block);
+    if (!e || !e.row.isConnected) {
+      const row = document.createElement("div");
+      row.className = "pbp-img-fix-ui";
+      const msg = document.createElement("span");
+      msg.className = "pbp-img-fix-msg";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "pbp-img-fix-btn";
+      btn.textContent = t("mdImgFixBtn");
+      row.append(msg, btn);
+      // After the block AND after any translation companions it already has --
+      // inserting between a block and its .pb-tr would break the sibling contract
+      // md-translate relies on (md-translate.js:1275-1283).
+      let anchor = block;
+      for (let s = anchor.nextElementSibling; s; s = s.nextElementSibling) {
+        if (!s.classList || !(s.classList.contains("pb-tr") || s.classList.contains("pb-tr-err"))) break;
+        anchor = s;
+      }
+      anchor.insertAdjacentElement("afterend", row);
+      e = { row, msg, btn, imgs: new Set() };
+      imgFixRows.set(block, e);
+    }
+    if (img) e.imgs.add(img);
+    imgFixRowState(block, e);
+    return e;
+  }
+  // Move focus off a node that is about to vanish, WITHOUT leaving a permanent
+  // tabindex behind and without aiming at a display:none target (tr-only hides
+  // the original block, and focus() on it silently no-ops -> focus falls to
+  // <body>). Pick the nearest VISIBLE sibling of the row, make it focusable for
+  // exactly as long as it holds focus, then clean the attribute up.
+  function imgFixMoveFocusOut(row) {
+    if (!row.contains(document.activeElement)) return;
+    let target = null;
+    for (let s = row.previousElementSibling; s; s = s.previousElementSibling) {
+      if (s.offsetParent !== null || s === renderedView) { target = s; break; }
+    }
+    target = target || renderedView;
+    const borrowed = !target.hasAttribute("tabindex");
+    if (borrowed) target.setAttribute("tabindex", "-1");
+    try { target.focus({ preventScroll: true }); } catch (_) {}
+    if (borrowed) {
+      target.addEventListener("blur", () => target.removeAttribute("tabindex"), { once: true });
+    }
+  }
+  // The row's state is a pure function of the <img> nodes it owns:
+  //   any still queued/in-flight -> offer the action (disabled while running)
+  //   all settled but still broken -> say so, drop the button (no dead click)
+  //   none broken any more -> the row is done
+  function imgFixRowState(block, e) {
+    e.imgs.forEach((img) => {
+      if (!img.isConnected || !img.classList.contains("pbp-img-broken")) e.imgs.delete(img);
+    });
+    if (!e.imgs.size) {
+      imgFixMoveFocusOut(e.row);
+      e.row.remove();
+      imgFixRows.delete(block);
+      return;
+    }
+    const actionable = [...e.imgs].some((img) => {
+      const u = img.currentSrc || img.src || "";
+      return imgFixFailed.has(u) || imgFixInFlight.has(u);
+    });
+    e.msg.textContent = actionable ? t("mdImgFixFailed") : t("mdImgFixUnfixable");
+    if (!actionable && e.btn.contains(document.activeElement)) imgFixMoveFocusOut(e.row);
+    e.btn.hidden = !actionable;           // never a button that would fire an empty batch
+    // aria-disabled, NOT the disabled property: disabling the very button the
+    // user just activated makes it unfocusable, and the focus falls to <body>
+    // mid-run (Chromium, verified). This keeps it focusable and inert, and the
+    // delegated handler below refuses to act on it.
+    e.btn.setAttribute("aria-disabled", String(imgFixRunning));
+  }
+  function imgFixRowsSync() {
+    [...imgFixRows.entries()].forEach(([block, e]) => imgFixRowState(block, e));
+  }
   function imgFixNoteRender() {
-    if (!imgFixNote) return;
+    if (!imgFixNote) return; // sr-only live region: announces, never paints
     const n = imgFixFailed.size;
-    if (!n) { imgFixNote.hidden = true; return; }
-    imgFixNote.querySelector(".img-fix-count").textContent = t("mdImgFixNote", String(n));
-    if (imgFixBtn) { imgFixBtn.hidden = false; imgFixBtn.textContent = t("mdImgFixBtn"); }
-    imgFixNote.hidden = false;
+    imgFixNote.textContent = n ? t("mdImgFixNote", String(n)) : "";
   }
   // batch: an explicit, already-permission-checked URL list (the auto path
   // freezes what it verified). Without it the auto run re-read the whole queue
@@ -1078,10 +1240,11 @@ function pbpApplyColorScheme(mode) {
     // broken.
     if (imgFixRunning) { imgFixRerun = true; return; }
     if (!imgFixSourceOrigin) return;
+    imgFixPrune(); // never ask permission for, or spend budget on, images the page has since dropped
     let urls = (batch || [...imgFixFailed.keys()]).filter((u) => imgFixFailed.has(u));
     if (!urls.length) return;
     imgFixRunning = true;
-    if (imgFixBtn) imgFixBtn.disabled = true;
+    imgFixRowsSync(); // every in-place button goes disabled for the whole run
     let ok = 0;
     try {
       const origins = [...new Set(urls.map((u) => { try { return new URL(u).origin; } catch (_) { return ""; } }).filter(Boolean))];
@@ -1113,7 +1276,7 @@ function pbpApplyColorScheme(mode) {
         if (v && v.dataUri) {
           ok++;
           imgFixCache.set(u, v.dataUri);
-          set.forEach((img) => imgFixApply(img, v.dataUri));
+          set.forEach((img) => imgFixApply(img, v.dataUri, u));
         }
         imgFixInFlight.delete(u);
         imgFixTried.add(u); // settled either way: fixed, or given up on
@@ -1121,7 +1284,7 @@ function pbpApplyColorScheme(mode) {
       imgFixFixed += ok;
     } finally {
       imgFixRunning = false;
-      if (imgFixBtn) imgFixBtn.disabled = false;
+      imgFixRowsSync();
       if (imgFixRerun || imgFixFailed.size) {
         // New arrivals (errors that landed mid-run): drain them in a follow-up
         // pass rather than stranding them. Over-cap items are never left in the
@@ -1135,20 +1298,17 @@ function pbpApplyColorScheme(mode) {
     }
   }
 
-  // Final note state: counts are REAL outcomes. imgFixFixed counts data URIs
-  // actually swapped in, never attempts -- the capped branch used to print the
-  // ATTEMPTED count as "fixed", so 50 failed attempts read as "50/60 fixed"
-  // (Codex confirm-review 2). All settled and all fixed -> note disappears.
+  // Final aggregate ANNOUNCEMENT (sr-only). Counts are real outcomes:
+  // imgFixFixed counts data URIs actually swapped in, never attempts. The unit
+  // is distinct image URLs, not <img> nodes (the same URL can appear twice).
   function imgFixNoteSettle() {
     if (!imgFixNote) return;
     const total = imgFixAttempted + imgFixStranded;
-    if (!total || imgFixFixed === total) { imgFixNote.hidden = true; return; }
-    imgFixNote.querySelector(".img-fix-count").textContent = t("mdImgFixPartial", String(imgFixFixed), String(total));
-    if (imgFixBtn) imgFixBtn.hidden = true;
-    imgFixNote.hidden = false;
+    imgFixNote.textContent = (!total || imgFixFixed === total)
+      ? "" : t("mdImgFixPartial", String(imgFixFixed), String(total));
   }
   async function imgFixAutoCheck() {
-    imgFixNoteRender();
+    imgFixPrune(); // renders the note too
     if (!imgFixSourceOrigin || !imgFixFailed.size) return;
     // FREEZE the batch before the first await: whatever lands in the queue while
     // permissions.contains resolves has NOT been checked, and must not ride
@@ -1164,11 +1324,17 @@ function pbpApplyColorScheme(mode) {
     }
     imgFixRun(false, batch);
   }
-  // The click also freezes its batch: chrome.permissions.request must be asked
-  // for exactly the origins the user is being shown, and the grant it returns
-  // must not be stretched to cover an origin that arrived while the prompt was
-  // open. Anything newer stays queued for its own pass.
-  if (imgFixBtn) imgFixBtn.addEventListener("click", () => { imgFixRun(true, [...imgFixFailed.keys()]); });
+  // One delegated handler for every in-place button (they come and go with the
+  // rows). Any of them fixes the WHOLE page -- one permission prompt, not one
+  // per image -- so the label says so ("try to fix this page's images").
+  // The click freezes its batch: chrome.permissions.request must ask for
+  // exactly the origins the user is being shown, and the grant it returns must
+  // not be stretched to cover an origin that arrived while the prompt was open.
+  renderedView.addEventListener("click", (e) => {
+    const btn = e.target.closest && e.target.closest(".pbp-img-fix-btn");
+    if (!btn || btn.getAttribute("aria-disabled") === "true") return;
+    imgFixRun(true, [...imgFixFailed.keys()]);
+  });
   renderedView.addEventListener("error", (e) => {
     const img = e.target;
     if (!img || img.tagName !== "IMG" || img.dataset.pbpImgFixed) return;
@@ -1176,13 +1342,19 @@ function pbpApplyColorScheme(mode) {
     if (!/^https:\/\//i.test(u)) return; // data:/blob:/http: not fixable through this channel
     img.classList.add("pbp-img-broken");
     const cached = imgFixCache.get(u);
-    if (cached) { imgFixApply(img, cached); return; }
+    if (cached) { imgFixApply(img, cached, u); return; }
+    // The row is created only AFTER the queue decision below, and always via
+    // imgFixRowFor(block, img) so it OWNS this node. Creating it up-front left a
+    // button that fired an empty batch for a URL that was never queued (already
+    // settled, or over the page ceiling) -- Codex acceptance.
+    const block = imgFixBlockOf(img);
+    const row = (b) => { if (b) imgFixRowFor(b, img); };
     // A fetch for this exact URL is already out: join its set so the result is
     // applied to THIS node too. Checking imgFixTried first would have turned a
     // second lazy <img> of the same image away for good (Codex confirm-review 4).
     const live = imgFixInFlight.get(u);
-    if (live) { live.add(img); return; }
-    if (imgFixTried.has(u)) return; // already settled (fixed or given up on)
+    if (live) { live.add(img); row(block); return; }
+    if (imgFixTried.has(u)) { row(block); return; } // settled and still broken -> row says so, no button
     let set = imgFixFailed.get(u);
     if (!set) {
       // Per-URL ceiling check AT ENTRY: an image over the page's limits is
@@ -1192,12 +1364,14 @@ function pbpApplyColorScheme(mode) {
         imgFixTried.add(u);
         imgFixStranded++;
         imgFixNoteSettle();
+        row(block); // honest: the image failed, and this page will not retry it
         return;
       }
       set = new Set();
       imgFixFailed.set(u, set);
     }
     set.add(img);
+    row(block);
     clearTimeout(imgFixTimer);
     imgFixTimer = setTimeout(imgFixAutoCheck, 400);
   }, true);

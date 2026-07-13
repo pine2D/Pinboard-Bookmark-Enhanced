@@ -522,6 +522,10 @@ function _pbpTrSerializeForumView(mode) {
   const clone = view.cloneNode(true);
   _pbpAiKatexPrepass(clone);
   clone.querySelectorAll(".pb-tr-err").forEach((e) => e.remove());
+  // Image-fix rows are UI, not content: this serializer walks the live DOM (not
+  // canonical markdown), so without this their button text would land in the
+  // exported forum markdown (Codex design review).
+  clone.querySelectorAll(".pbp-img-fix-ui").forEach((e) => e.remove());
   if (mode !== "bilingual") {
     clone.querySelectorAll("[data-pb-tr-done]").forEach((e) => e.remove());
   }

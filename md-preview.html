@@ -99,12 +99,12 @@
   </aside>
   <main>
     <div class="doc-body">
-      <!-- Hotlink-guard image fix (hotlink round): count-gated, hidden while
-           every image loads; text + button filled by md-preview.js i18n. -->
-      <div id="img-fix-note" class="img-fix-note" role="status" aria-live="polite" hidden>
-        <span class="img-fix-count"></span>
-        <button type="button" id="img-fix-btn" class="img-fix-btn" hidden></button>
-      </div>
+      <!-- Image-fix status: SCREEN-READER ONLY. The visible affordance is an
+           in-place row rendered after each block that holds a failed image
+           (md-preview.js) -- a sticky/fixed bar covered the text it sat over,
+           and a bar at the top of the article was off-screen by the time lazy
+           images actually failed. This element only announces the aggregate. -->
+      <div id="img-fix-note" class="sr-only" role="status" aria-live="polite"></div>
       <article id="rendered-view" class="content-view"></article>
       <pre id="raw-view" class="content-view hidden"></pre>
     </div>

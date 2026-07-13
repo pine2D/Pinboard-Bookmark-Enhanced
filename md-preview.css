@@ -1055,9 +1055,9 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
      the dark palette (verified: Step 1.7's print-dark-forced-inline
      scenario). */
   :root { color-scheme: light !important; }
-  /* .img-fix-note is UI chrome (a Fix button), not article content -- it must
-     never print (Codex confirm-review LOW). */
-  .rail, .rail-toggle, .rail-scrim, #zen-bar, .img-fix-note { display: none; }
+  /* The image-fix rows are UI chrome (a button), not article content -- they
+     must never print. #img-fix-note is sr-only and never paints anyway. */
+  .rail, .rail-toggle, .rail-scrim, #zen-bar, .pbp-img-fix-ui { display: none; }
   main { margin-left: 0; max-width: 100%; padding: 0; }
   /* Pin the column for paper: --pbp-width is a screen reading preference
      (680/880/1080 cycle) and must not leak into print geometry -- a 1080px
@@ -1159,40 +1159,40 @@ body.md-empty main { margin-left: 0; }
    article -- same quiet .export-note voice, plus one real button. Broken
    images keep their box (dashed edge) so the reader sees WHERE the fix
    applies instead of collapsed alt-text soup. */
-/* STICKY, not just top-of-article: images are lazy, so most of them fail only
-   once the reader has scrolled well past the top -- a Fix button parked at the
-   article head is invisible exactly when it becomes relevant (user-reported:
-   "images still broken", while the note was sitting off-screen above). The
-   first fix needs a click (a permission prompt can only follow a user gesture),
-   so the affordance has to follow the reader. */
-.img-fix-note {
-  position: sticky; top: 8px; z-index: 5;
-  display: flex; align-items: center; gap: 10px;
-  margin: 0 0 16px; padding: 8px 12px;
-  font-size: 13px; color: var(--fg-secondary);
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.10);
+/* In-place fix row (design round). Sits AFTER the block that holds a failed
+   image -- no sticky bar (it covered the text it floated over), no fixed toast
+   (mid-article text scrolls under a bottom bar, and on narrow screens the Ask
+   sheet already owns bottom:0). Quiet by default: the dashed image box is the
+   first signal, this line is the second, the text action is the third. No
+   shadow, no solid accent fill, no pill -- a white-on-accent button only
+   reaches ~3.2:1 on the dark palette, while accent-on-surface text is ~4.7:1.
+   Wraps instead of clipping, for the long DE/RU/FR strings. */
+.pbp-img-fix-ui {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
+  width: fit-content; max-width: 100%;
+  margin: -6px 0 18px; padding: 6px 8px;
+  font-size: 12.5px; line-height: 1.45; color: var(--fg-secondary);
+  background: var(--surface); border: 1px solid var(--border-light); border-radius: 6px;
 }
-.img-fix-note[hidden] { display: none; }
-/* The button IS the point of the strip -- give it the accent, not the quiet
-   btn-bg it shared with every other control. */
-.img-fix-note .img-fix-btn {
-  background: var(--link); color: #fff; border-color: var(--link);
-  font-weight: 600;
+.pbp-img-fix-btn {
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-weight: 600; color: var(--link);
+  text-decoration: underline; text-underline-offset: 3px;
 }
-.img-fix-note .img-fix-btn:hover { background: var(--link-hover); border-color: var(--link-hover); }
-.img-fix-btn {
-  padding: 4px 14px; font-size: 12px; cursor: pointer;
-  border: 1px solid var(--btn-border); border-radius: 7px;
-  background: var(--btn-bg); color: var(--btn-fg);
-}
-.img-fix-btn:hover { background: var(--btn-hover); }
-.img-fix-btn:disabled { opacity: 0.5; cursor: wait; }
-.img-fix-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-.img-fix-btn[hidden] { display: none; }
+.pbp-img-fix-btn:hover { color: var(--link-hover); }
+.pbp-img-fix-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 2px; }
+/* aria-disabled, not :disabled -- a disabled button cannot hold focus, and the
+   user's focus would drop to <body> the moment their own click starts the run. */
+.pbp-img-fix-btn[aria-disabled="true"] { color: var(--fg-muted); text-decoration: none; cursor: wait; }
+.pbp-img-fix-btn[hidden] { display: none; }
+/* The broken image keeps a placeholder box so the gap reads as "an image
+   belongs here" rather than as a rendering glitch: with no intrinsic size and
+   an empty alt (the common case), it otherwise collapses to a 1px dashed
+   sliver. The floor is modest on purpose -- a large min-width would inflate
+   small avatars into banners. */
 #rendered-view img.pbp-img-broken {
   border: 1px dashed var(--border);
-  min-height: 48px; min-width: 120px;
+  min-width: 88px; min-height: 56px;
   background: var(--surface);
 }
 
