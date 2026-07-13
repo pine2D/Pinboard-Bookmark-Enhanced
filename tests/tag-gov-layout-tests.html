@@ -88,7 +88,14 @@ test("export-target select uses the styled field treatment", () => {
   const cs = getComputedStyle(etSelect);
   const appearance = cs.appearance || cs.webkitAppearance;
   if (etSelect.offsetWidth < 600) throw new Error("expected full-width select, got " + etSelect.offsetWidth);
-  if (appearance !== "none") throw new Error("expected appearance:none, got " + appearance);
+  // Styled = anything but UA default chrome. Two valid values since the
+  // dropdown-design round: "base-select" on engines with customizable
+  // select (Chrome 135+, the @supports path -- in-page styled picker) and
+  // "none" on engines without it (the appearance:none fallback). Both keep
+  // the drawn CSS chevron asserted below.
+  if (appearance !== "none" && appearance !== "base-select") {
+    throw new Error("expected appearance none|base-select, got " + appearance);
+  }
   if (!cs.backgroundImage || cs.backgroundImage === "none") throw new Error("expected CSS chevron background");
 });
 

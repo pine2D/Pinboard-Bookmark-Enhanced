@@ -721,20 +721,114 @@ html[data-theme] .fg input:focus, html[data-theme] .fg select:focus, html[data-t
 html[data-theme] .fg input:focus-visible, html[data-theme] .fg select:focus-visible, html[data-theme] .fg textarea:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--opt-accent) 18%, transparent);
 }
-/* Dark-bg themes: lighter chevron stroke so the arrow reads against dark input fill. */
+/* Dark-bg themes: lighter chevron stroke so the arrow reads against dark input
+   fill. Covers all 8 color-scheme:dark presets (gruvbox-dark / rose-pine were
+   missing from this list -- pre-existing gap, closed in the dropdown-design
+   round) and the mobile tab picker (which gains the same drawn chevron below). */
 html[data-theme="nord-night"] .fg select,
 html[data-theme="terminal"] .fg select,
 html[data-theme="dracula"] .fg select,
 html[data-theme="flexoki-dark"] .fg select,
 html[data-theme="solarized-dark"] .fg select,
 html[data-theme="catppuccin-mocha"] .fg select,
+html[data-theme="gruvbox-dark"] .fg select,
+html[data-theme="rose-pine"] .fg select,
 html[data-theme="nord-night"] .et-field select,
 html[data-theme="terminal"] .et-field select,
 html[data-theme="dracula"] .et-field select,
 html[data-theme="flexoki-dark"] .et-field select,
 html[data-theme="solarized-dark"] .et-field select,
-html[data-theme="catppuccin-mocha"] .et-field select {
+html[data-theme="catppuccin-mocha"] .et-field select,
+html[data-theme="gruvbox-dark"] .et-field select,
+html[data-theme="rose-pine"] .et-field select,
+html[data-theme="nord-night"] .mobile-tab-picker select,
+html[data-theme="terminal"] .mobile-tab-picker select,
+html[data-theme="dracula"] .mobile-tab-picker select,
+html[data-theme="flexoki-dark"] .mobile-tab-picker select,
+html[data-theme="solarized-dark"] .mobile-tab-picker select,
+html[data-theme="catppuccin-mocha"] .mobile-tab-picker select,
+html[data-theme="gruvbox-dark"] .mobile-tab-picker select,
+html[data-theme="rose-pine"] .mobile-tab-picker select {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+
+/* ---- Select controls adopt the md-preview dropdown design (dropdown-design
+   round, user request). Two layers, matching md-preview.css .exp-img-row
+   select + its ::picker block (shipped bbd8eb1):
+   1. CLOSED control: rounded button-like surface (7px radius, roomier
+      padding, hover swaps the SURFACE not just the border) -- deliberately
+      distinct from the flat text inputs it used to be grouped with. Selects
+      are pick-one buttons, inputs are type-here fields; the two families
+      diverging is the point of the redesign. width:100% stays -- the rows
+      are single-column form rows, a shrink-to-content control would ragged
+      the column edge.
+   2. OPEN list (@supports block below): Chrome 135+ customizable select
+      renders the option popup in-page so it can carry the same surface /
+      border / radius / shadow / row-hover recipe as md-preview's .send-menu,
+      instead of the UA popup that ignores the theme tokens entirely.
+   Colors ride only the 17 tokens every one of the 14 data-theme presets
+   defines (+ :root literals for the no-preset light state); the no-preset
+   DARK state always resolves to data-theme="flexoki-dark"
+   (options-theme-early.js:25), so there is no unthemed-dark gap. */
+.fg select, .et-field select {
+  border-radius: 7px;
+  padding: 6px 26px 6px 14px;
+}
+.fg select:hover:not(:focus), .et-field select:hover:not(:focus) {
+  background-color: #f1f5f9;
+  border-color: #cdd1d6;
+}
+html[data-theme] .fg select, html[data-theme] .et-field select {
+  background-color: var(--opt-btn-bg);
+}
+html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select:hover:not(:focus) {
+  background-color: var(--opt-btn-hover);
+  border-color: var(--opt-input-border);
+}
+
+/* Customizable select (Chrome 135+): same opt-in pair + recipe as
+   md-preview.css's block (see rationale there -- checkmark hidden because
+   the UA glyph is a literal U+2713, the documented slow-font trap; picker
+   height also capped to the viewport for short windows / the 13-item mobile
+   tab list; focus outline inset so the picker's own scroll clipping can't
+   eat it). Checked row: accent-tinted surface + weight, NOT an inverted
+   accent pill -- options has no --active-bg/-fg pair and accent-as-surface
+   has no AA guarantee across the 14 presets. Unsupported engines drop the
+   invalid appearance value and keep the native popup -- degrade, don't
+   break. */
+@supports selector(::picker(select)) {
+  .fg select, .et-field select, .mobile-tab-picker select { appearance: base-select; }
+  .fg select::picker-icon, .et-field select::picker-icon, .mobile-tab-picker select::picker-icon { display: none; }
+  .fg select::picker(select), .et-field select::picker(select), .mobile-tab-picker select::picker(select) {
+    appearance: base-select;
+    margin-top: 4px;
+    background: var(--opt-bg, #fff);
+    border: 1px solid var(--opt-border, #ccc);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    padding: 4px;
+    max-height: min(320px, calc(100dvh - 32px));
+    overflow: auto;
+  }
+  .fg option, .et-field option, .mobile-tab-picker option {
+    padding: 7px 9px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .fg option:hover, .et-field option:hover, .mobile-tab-picker option:hover {
+    background: rgba(127,127,127,.14); /* theme-agnostic row hover, same value as md-preview's --row-hover fallback */
+  }
+  .fg option:focus-visible, .et-field option:focus-visible, .mobile-tab-picker option:focus-visible {
+    background: rgba(127,127,127,.14);
+    outline: 2px solid var(--opt-accent, #4477bb);
+    outline-offset: -2px;
+  }
+  .fg option::checkmark, .et-field option::checkmark, .mobile-tab-picker option::checkmark { display: none; }
+  .fg option:checked, .et-field option:checked, .mobile-tab-picker option:checked {
+    background: color-mix(in srgb, var(--opt-accent, #4477bb) 18%, transparent);
+    font-weight: 600;
+  }
 }
 html[data-theme] .hint { color: var(--opt-fg-hint); }
 html[data-theme] .hint a { color: var(--opt-accent); }
@@ -1417,12 +1511,32 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   .mobile-tab-picker select {
     width: 100%;
     min-height: 34px;
-    padding: 5px 8px;
+    padding: 6px 26px 6px 14px;
     border: 1px solid var(--opt-border, #cdd1d6);
-    border-radius: var(--opt-radius-sm);
-    background: var(--opt-input-bg, #fff);
+    /* Dropdown-design round: joins the .fg/.et-field select family (7px
+       radius, drawn chevron, btn-bg surface). It used to keep the UA arrow;
+       the @supports picker block above hides ::picker-icon for ALL selects,
+       so without its own drawn chevron this control would lose its arrow
+       entirely on Chrome 135+ (Codex review). Longhand background-*
+       properties, same reason as .fg select's comment. */
+    border-radius: 7px;
+    -webkit-appearance: none; appearance: none;
+    background-color: var(--opt-btn-bg, #fff);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
     color: var(--opt-fg, #333);
     font-size: 13px;
+    cursor: pointer;
+  }
+  .mobile-tab-picker select:hover:not(:focus) {
+    background-color: var(--opt-btn-hover, #f1f5f9);
+  }
+  /* Re-assert after the appearance:none above -- this @media block sits
+     LATER in the file than the global @supports opt-in, so without this the
+     none would win the cascade and silently fall back to the UA popup. */
+  @supports selector(::picker(select)) {
+    .mobile-tab-picker select { appearance: base-select; }
   }
   .mobile-tab-picker select:focus-visible {
     outline: 2px solid var(--opt-accent, #4477bb);
