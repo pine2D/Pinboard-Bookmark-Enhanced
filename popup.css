@@ -457,7 +457,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
 .submit-bar button:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
 #submit-btn {
   background: #4477bb; color: #fff; border-color: #3366aa; font-weight: bold;
-  flex: 1; padding: 7px 26px; min-height: 34px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  /* flex-basis 200px, shrinkable: a stable width at every popup width setting
+     (420-720px) instead of the old flex:1 fill -- a full-bleed primary button
+     dominates the widest layouts. Shrink stays allowed so the 420px edit state
+     (Update + Delete + hint in one row) compresses instead of overflowing;
+     never grows, so .submit-hint's margin-left:auto now really pushes it to
+     the row end. Left edge keeps the 72px field-alignment indent. */
+  flex: 0 1 200px; padding: 7px 26px; min-height: 34px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);
 }
 #submit-btn:hover {
   background: color-mix(in srgb, var(--pp-accent) 92%, #000);
