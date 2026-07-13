@@ -1548,16 +1548,21 @@ function showStatus(id, msg, kind) {
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function enc(s) { return encodeURIComponent(s); }
 
-// Alt+1~9 to add suggest/AI tags by index
+// Alt+1~9 adds the chip wearing that badge digit. The badge (data-alt-num,
+// assigned by pbpAssignAltNumBadges on list rebuild) is the single source of
+// truth, so the digit always matches what the user sees -- the old version
+// re-indexed the surviving :not(.used) chips per keypress, which made every
+// add shift all later digits off the visible order. e.repeat guard: a held
+// Alt+digit must not machine-gun tags (each add used to promote a new chip
+// into the same index). Used chips keep their badge but are skipped here;
+// syncSuggestTagStates (via addTag -> renderTags) marks every duplicate of
+// the added tag used, including the one just clicked.
 document.addEventListener("keydown", (e) => {
-  if (!e.altKey || e.ctrlKey || e.metaKey) return;
-  const n = parseInt(e.key);
-  if (n < 1 || n > 9 || isNaN(n)) return;
-  const allStags = [...document.querySelectorAll("#pinboard-suggest-tags .stag:not(.used), #ai-suggest-tags .stag:not(.used)")];
-  if (n <= allStags.length) {
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
+  if (!/^[1-9]$/.test(e.key)) return;
+  const el = document.querySelector(`.stag[data-alt-num="${e.key}"]:not(.used)`);
+  if (el) {
     e.preventDefault();
-    const el = allStags[n - 1];
     addTag(el.dataset.tag);
-    el.classList.add("used");
   }
 });

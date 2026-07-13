@@ -87,7 +87,6 @@ async function fetchPinboardSuggestTags(token, url) {
 
     const resolveTag = (t) => (settings.optRespectTagCase && tagCaseMap) ? resolveTagCase(t, tagCaseMap) : t;
 
-    let kbHintShown = false;
     function buildSuggestGroup(label, tags, addAllId) {
       const g = document.createElement("div");
       g.className = "suggest-group";
@@ -95,15 +94,9 @@ async function fetchPinboardSuggestTags(token, url) {
       lbl.className = "group-label";
       lbl.textContent = label;
       g.appendChild(lbl);
-      // Surface the Alt+1..9 chip accelerator once, next to the first group's label
-      // (buildSuggestGroup only runs for a non-empty group, so a chip always exists here)
-      if (!kbHintShown) {
-        kbHintShown = true;
-        const hint = document.createElement("span");
-        hint.className = "kb-hint";
-        hint.textContent = t("kbdAltTagHint");
-        g.appendChild(hint);
-      }
+      // Alt+1..9 hint now rides pbpAssignAltNumBadges (finally-block below):
+      // it must exist even when this function never runs (no suggestions but
+      // AI chips present), so it can't live here anymore.
       // Resolve tags then sort: matched (by count desc) first, unmatched keep original order
       const resolvedTags = tags.map(t => resolveTag(t));
       resolvedTags.sort((a, b) => {
@@ -157,6 +150,10 @@ async function fetchPinboardSuggestTags(token, url) {
   }
   } finally {
     container.setAttribute("aria-busy", "false");
+    // Every exit path (chips rendered, empty, auth/429/network error) re-slots
+    // Alt+N across both rows -- AI chips may already be on screen and must
+    // keep working digits + the hint even when suggest came back empty.
+    pbpAssignAltNumBadges();
   }
 }
 
@@ -556,4 +553,56 @@ function syncSuggestTagStates() {
     if (lowerTags.has(tag)) { el.classList.add("used"); el.disabled = true; }
     else { el.classList.remove("used"); el.disabled = false; }
   });
+}
+
+// Alt+1..9 slot assignment across BOTH chip rows (suggest, then AI, document
+// order). Called only when a chip list is REBUILT (suggest render / AI tags
+// render), never on add/remove: the old handler re-indexed the surviving
+// :not(.used) chips on every keypress, so each add shifted every later digit
+// and Alt+2 could land three chips away from the visibly-second one. Slots
+// are therefore STABLE within a render cycle -- a chip used mid-cycle keeps
+// its badge but goes disabled, it does not free its number for a neighbor.
+// Duplicate tag strings (the same tag can appear in both the popular and the
+// recommended API arrays) share one slot: adding either marks both used via
+// syncSuggestTagStates, so giving each its own digit would strand a dead slot.
+// The visible digit badge IS the mapping the keydown handler resolves
+// ([data-alt-num]), so what the user sees is what Alt+N does by construction.
+function pbpAssignAltNumBadges() {
+  syncSuggestTagStates(); // used-state must be settled BEFORE slots are handed out
+  const byTag = new Map(); // lowercase tag -> slot (duplicates share)
+  let next = 1;
+  document.querySelectorAll("#pinboard-suggest-tags .stag, #ai-suggest-tags .stag").forEach((el) => {
+    delete el.dataset.altNum;
+    el.removeAttribute("aria-keyshortcuts");
+    const old = el.querySelector(".stag-num");
+    if (old) old.remove();
+    const tag = (el.dataset.tag || "").toLowerCase();
+    let slot = byTag.get(tag);
+    if (slot === undefined) {
+      if (el.classList.contains("used") || next > 9) return; // used at render time gets no slot
+      slot = next++;
+      byTag.set(tag, slot);
+    }
+    el.dataset.altNum = String(slot);
+    el.setAttribute("aria-keyshortcuts", "Alt+" + slot);
+    const b = document.createElement("span");
+    b.className = "stag-num";
+    b.setAttribute("aria-hidden", "true");
+    b.textContent = String(slot);
+    el.prepend(b);
+  });
+  // One hint, riding whichever row actually holds numbered chips first -- the
+  // old version lived inside the first suggest group only, so "no suggestions
+  // but AI tags present" showed working Alt+N with zero affordance.
+  document.querySelectorAll(".alt-num-hint").forEach((h) => h.remove());
+  const first = document.querySelector(".stag[data-alt-num]");
+  if (!first) return;
+  const host = first.closest(".suggest-area");
+  if (!host) return;
+  const hint = document.createElement("span");
+  hint.className = "kb-hint alt-num-hint";
+  hint.textContent = t("kbdAltTagHint");
+  const groupLabel = host.querySelector(".suggest-group .group-label");
+  if (groupLabel) groupLabel.after(hint);
+  else host.prepend(hint);
 }

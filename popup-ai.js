@@ -564,6 +564,7 @@ async function doAITags(forceRefresh) {
     }
     container.textContent = "";
     container.classList.add("muted");
+    pbpAssignAltNumBadges(); // AI chips gone: re-slot so suggest-row digits/hint stay truthful
     showAIError("tags", e);
   } finally {
     if (btn && pbpPopupAiAccountIsCurrent(account)) {
@@ -580,13 +581,18 @@ function renderAITags(tags, fromCache) {
   if (!tags.length) {
     injectEmptyState(container, "spark", t("emptyAiTagsHint"));
     container.classList.add("muted");
+    pbpAssignAltNumBadges();
     return;
   }
 
   // Render in the model's specificity order (most defining first); do NOT reorder
   // owned tags to the front — that would bury a new defining tag like "ai_token_relay".
+  // Real <button>s like the suggest row's chips (popup-tags.js): AI chips share
+  // the .stag Alt+N pipeline, and syncSuggestTagStates sets .disabled, which
+  // only carries native semantics (focusability, AT state) on a button.
   tags.forEach((tag) => {
-    const el = document.createElement("span");
+    const el = document.createElement("button");
+    el.type = "button";
     el.className = "stag ai";
     el.dataset.tag = tag;
     el.appendChild(document.createTextNode(tag));
@@ -597,18 +603,21 @@ function renderAITags(tags, fromCache) {
       cs.textContent = ` (${count})`;
       el.appendChild(cs);
     }
-    el.addEventListener("click", () => { addTag(tag); el.classList.add("used"); });
+    el.addEventListener("click", () => { addTag(tag); el.classList.add("used"); el.disabled = true; });
     container.appendChild(el);
   });
 
-  const aa = document.createElement("span");
+  const aa = document.createElement("button");
+  aa.type = "button";
   aa.className = "add-all-link";
   aa.textContent = t("addAll");
+  aa.setAttribute("aria-label", t("addAll"));
   aa.addEventListener("click", () => {
     container.querySelectorAll(".stag:not(.used)").forEach((el) => { addTag(el.dataset.tag); el.classList.add("used"); });
-    aa.innerHTML = PBP_ICONS.check; aa.style.pointerEvents = "none"; aa.style.color = "#080";
+    aa.innerHTML = PBP_ICONS.check; aa.disabled = true; aa.style.color = "#080";
   });
   container.appendChild(aa);
+  pbpAssignAltNumBadges();
 
   if (fromCache) {
     const cachedTagSet = new Set(tags.map(t => t.toLowerCase()));
