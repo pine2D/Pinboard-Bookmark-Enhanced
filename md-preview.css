@@ -881,9 +881,10 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    theme token -- it needs to read at low contrast against both --btn-bg
    branches (13 themes x light/dark) and no existing var() is guaranteed
    legible on all of them; #8a94a0 is picked to sit around 3:1 on both.
-   :root already sets color-scheme:light dark (md-preview.css ~:11), which
-   the select inherits, so the dark-mode option-list popup already uses the
-   dark UA form-control palette without any extra rule here. */
+   The OPEN option list is a separate problem: the UA popup ignores the
+   page's light-dark() tokens (on Windows it can even follow the browser
+   theme against a forced-dark page) and can't be made to match .send-menu
+   -- the @supports block below opts it into in-page rendering instead. */
 .exp-img-row select {
   flex: 1;
   appearance: none; -webkit-appearance: none;
@@ -898,6 +899,46 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 }
 .exp-img-row select:hover { background-color: var(--btn-hover); border-color: var(--border); }
 .exp-img-row select:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+/* Customizable select (Chrome 135+): rail feedback round 2 unified only the
+   CLOSED control -- the open list stayed a native UA popup, visually foreign
+   next to .send-menu. appearance:base-select on both the control and
+   ::picker(select) is the spec's required opt-in pair; it moves the popup
+   into the page so the .send-menu recipe (same surface/border/shadow/radius
+   and row hover) applies verbatim. Engines without support drop the invalid
+   appearance value and never match this @supports, keeping today's native
+   popup -- degrade, don't break. ::picker-icon is hidden because the closed
+   control already draws its own data-URI chevron (above). ::checkmark is
+   hidden deliberately: its UA content is a text checkmark glyph (U+2713),
+   the same slow-font-fallback trap as any literal dingbat (CLAUDE.md font
+   section); checked state uses the --active-bg/--active-fg pair from
+   .exp-tgl[aria-pressed="true"] instead, and is declared after :hover so
+   the current choice keeps its inverted look while pointed at. */
+@supports selector(::picker(select)) {
+  .exp-img-row select { appearance: base-select; }
+  .exp-img-row select::picker-icon { display: none; }
+  .exp-img-row select::picker(select) {
+    appearance: base-select;
+    margin-top: 4px;
+    background: var(--bg, #fff);
+    border: 1px solid var(--border, #d8dee4);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    padding: 4px;
+    max-height: 320px;
+    overflow: auto;
+  }
+  .exp-img-row option {
+    padding: 7px 9px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .exp-img-row option:hover { background: var(--row-hover, rgba(127,127,127,.14)); }
+  .exp-img-row option:focus-visible { background: var(--row-hover, rgba(127,127,127,.14));
+    outline: 2px solid var(--link); outline-offset: -2px; }
+  .exp-img-row option::checkmark { display: none; }
+  .exp-img-row option:checked { background: var(--active-bg); color: var(--active-fg); }
+}
 /* Format grid: 3 columns (name / primary action / icon-only download).
    .export-fmt keeps its div wrapper for markup readability but hands box
    generation to .export-grid via display:contents -- its children (fmt-name
