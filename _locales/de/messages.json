@@ -2661,6 +2661,8 @@
   "hlSave": { "message": "Speichern" },
   "hlDelete": { "message": "Markierung löschen" },
   "hlDegraded": { "message": "Position verloren — der umliegende Text hat sich geändert, diese Markierung deckt jetzt den ganzen Absatz ab." },
+  "hlOrphanNote": { "message": "$COUNT$ Markierungen konnten im aktuellen Seiteninhalt nicht gefunden werden — Notizen bleiben erhalten.", "placeholders": { "count": { "content": "$1" } } },
+  "hlOrphanUnlocatable": { "message": "Diese Markierung ist im aktuellen Seiteninhalt nicht auffindbar." },
   "hlSectionTitle": { "message": "Markierungen" },
   "kbdHelpTitle": { "message": "Tastenkürzel" },
   "kbdHelpIntro": { "message": "Diese Tastenkürzel funktionieren auf der Markdown-Vorschauseite (nicht hier in den Einstellungen)." },

@@ -3736,6 +3736,92 @@ suiteIf("pbpHlLocate", "pbpHlLocate", () => {
     assertEq(pbpHlLocate("abc", { quote: "", prefix: "x", suffix: "y" }), null, "empty quote never matches");
   });
 });
+
+// ============ Anchoring round: global relocation (strict) ============
+suiteIf("pbpHlGlobalLocate", "pbpHlGlobalLocate", () => {
+  const B = (n, text) => ({ n, text });
+  test("unique cross-block hit -> accepted with its block n", () => {
+    const r = pbpHlGlobalLocate([B(1, "alpha beta"), B(2, "the quick fox"), B(3, "gamma")],
+      { quote: "quick", prefix: "the ", suffix: " fox" });
+    assert(r, "found");
+    assertEq(r.n, 2, "block n");
+    assertEq(r.start, 4, "start");
+    assertEq(r.end, 9, "end");
+  });
+  test("unique candidate accepted even with zero context corroboration", () => {
+    const r = pbpHlGlobalLocate([B(1, "aaa"), B(2, "unique-token bbb")],
+      { quote: "unique-token", prefix: "totally different", suffix: "context" });
+    assert(r, "found");
+    assertEq(r.n, 2, "block n");
+  });
+  test("repeated quote, equal context scores -> ambiguous -> null (never first-wins across blocks)", () => {
+    const r = pbpHlGlobalLocate([B(1, "cat sat"), B(2, "cat sat")],
+      { quote: "cat", prefix: "", suffix: " sat" });
+    assertEq(r, null, "tie rejected");
+  });
+  test("repeated quote, strictly best context score -> that candidate wins", () => {
+    const r = pbpHlGlobalLocate([B(1, "xx cat yy"), B(2, "AA cat BB")],
+      { quote: "cat", prefix: "AA ", suffix: " BB" });
+    assert(r, "found");
+    assertEq(r.n, 2, "context-best block");
+  });
+  test("old-n false hit loses to a strictly better-context hit elsewhere", () => {
+    // Simulates structural drift: block 3 now holds unrelated text that
+    // happens to contain the quote; the real text moved to block 4.
+    const item = { quote: "shared phrase", prefix: "REAL LEFT ", suffix: " REAL RIGHT" };
+    const r = pbpHlGlobalLocate([B(3, "noise shared phrase noise"), B(4, "REAL LEFT shared phrase REAL RIGHT")], item);
+    assert(r, "found");
+    assertEq(r.n, 4, "relocated to the context-matching block");
+  });
+  test("quote absent everywhere -> null", () => {
+    assertEq(pbpHlGlobalLocate([B(1, "aaa"), B(2, "bbb")], { quote: "zzz", prefix: "", suffix: "" }), null, "orphan");
+  });
+});
+
+suiteIf("pbpHlWsNormalize", "pbpHlWsNormalize", () => {
+  test("whitespace runs collapse to one space with an offset map back to the original", () => {
+    const { norm, map } = pbpHlWsNormalize("foo \n\t bar");
+    assertEq(norm, "foo bar", "collapsed");
+    assertEq(map[0], 0, "f maps to 0");
+    assertEq(map[3], 3, "collapsed space maps to first ws char");
+    assertEq(map[4], 7, "b maps past the run");
+  });
+  test("no whitespace -> identity mapping", () => {
+    const { norm, map } = pbpHlWsNormalize("abc");
+    assertEq(norm, "abc", "unchanged");
+    assertEq(map[2], 2, "identity");
+  });
+});
+
+suiteIf("pbpHlGlobalLocateNormalized", "pbpHlGlobalLocateNormalized", () => {
+  const B = (n, text) => ({ n, text });
+  test("quote saved with spaces matches text re-extracted with a newline; offsets are ORIGINAL", () => {
+    const r = pbpHlGlobalLocateNormalized([B(1, "aaa"), B(2, "xx foo\nbar yy")],
+      { quote: "foo bar", prefix: "xx ", suffix: " yy" });
+    assert(r, "found");
+    assertEq(r.n, 2, "block n");
+    assertEq(r.start, 3, "original start");
+    assertEq(r.end, 10, "original end (spans the newline)");
+  });
+  test("still strict: normalized tie -> null", () => {
+    const r = pbpHlGlobalLocateNormalized([B(1, "cat\nsat"), B(2, "cat sat")],
+      { quote: "cat sat", prefix: "", suffix: "" });
+    assertEq(r, null, "ambiguous after normalization");
+  });
+});
+
+suiteIf("pbpHlFpOfBlocks", "pbpHlFpOfBlocks", () => {
+  test("same pairs -> same fp; boundary split changes the fp (unlike newline-join)", () => {
+    const a = pbpHlFpOfBlocks([["P", "a\nb"]]);
+    const b = pbpHlFpOfBlocks([["P", "a"], ["P", "b"]]);
+    const a2 = pbpHlFpOfBlocks([["P", "a\nb"]]);
+    assertEq(a, a2, "deterministic");
+    assert(a !== b, "one merged block vs two split blocks must differ");
+  });
+  test("tag participates in identity", () => {
+    assert(pbpHlFpOfBlocks([["P", "x"]]) !== pbpHlFpOfBlocks([["H2", "x"]]), "tag matters");
+  });
+});
 </script>
 
 <script>
@@ -4368,6 +4454,79 @@ suiteIf("_pbpHlLocateTextFor", "_pbpHlLocateTextFor", () => {
     blockEl.textContent = "mutated-but-should-be-ignored";
     assertEq(_pbpHlLocateTextFor(blockEl, n), "original", "plain block path unchanged: frozen cache still wins");
     root.remove();
+  });
+});
+</script>
+<script>
+// ============ Anchoring round: pbpHlRestore drift lifecycle (DOM) ============
+// Simulates a structurally drifted page: legacy items (no fp) whose stored n
+// now points at unrelated content. Drives the REAL pbpHlRestore /
+// _pbpHlReanchorBlock against a live indexed view -- the integration seam the
+// pure pbpHlGlobalLocate suites above cannot reach (Codex acceptance).
+suiteIf("pbpHlRestore drift lifecycle", "pbpHlRestore", () => {
+  function hlDriftSetup() {
+    const root = document.createElement("div");
+    root.innerHTML = "<p>intro paragraph with plain stable text here</p>"
+      + "<p>NEWLY INSERTED AD PARAGRAPH totally new</p>"
+      + "<p>the migrating target sentence lives here now</p>";
+    document.body.appendChild(root);
+    pbpAiIndexBlocks(root);
+    const ns = pbpAiBlocks().map((b) => b.n);
+    _pbpHlState = {
+      url: "t", title: "t",
+      items: [
+        // clean legacy: quote still lives in its stored block
+        { id: "t_ok", n: ns[0], quote: "plain stable text", prefix: "paragraph with ", suffix: " here", color: 1, note: "", ts: 1 },
+        // drifted legacy: stored n is now the ad; the text moved one block down
+        { id: "t_move", n: ns[1], quote: "migrating target sentence", prefix: "the ", suffix: " lives", color: 2, note: "", ts: 2 },
+        // gone: quote nowhere on the page
+        { id: "t_gone", n: ns[1], quote: "vanished forever phrase", prefix: "xx ", suffix: " yy", color: 3, note: "", ts: 3 },
+      ],
+      ranges: Object.create(null), degraded: Object.create(null),
+      resolvedN: Object.create(null), orphans: Object.create(null),
+    };
+    return { root, ns };
+  }
+  function hlDriftTeardown(root) {
+    if (typeof CSS !== "undefined" && CSS.highlights) {
+      for (const c of [1, 2, 3, 4, 5]) CSS.highlights.delete("pbp-hl-" + c);
+    }
+    _pbpHlState = null;
+    root.remove();
+  }
+  test("restore relocates a drifted legacy item and orphans the unlocatable one; storage untouched", () => {
+    if (typeof Highlight !== "function") return; // runner is Chromium; guard mirrors pbpHlRestore's own
+    const { root, ns } = hlDriftSetup();
+    try {
+      pbpHlRestore();
+      assert(_pbpHlState.ranges.t_ok, "clean item painted");
+      assert(_pbpHlState.ranges.t_move, "drifted item painted");
+      assertEq(_pbpHlState.resolvedN.t_move, ns[2], "relocated to the block that actually holds the quote");
+      assert(!_pbpHlState.ranges.t_gone, "gone item not painted");
+      assert(_pbpHlState.orphans.t_gone, "gone item flagged orphan");
+      assertEq(Object.keys(_pbpHlState.degraded).length, 0, "no wrong-block whole-paragraph degrades");
+      assertEq(_pbpHlState.items.length, 3, "storage-side items untouched");
+      assertEq(_pbpHlState.items[1].n, ns[1], "relocation never written back to the item");
+    } finally { hlDriftTeardown(root); }
+  });
+  test("relocated Range's actual text is the quote (offset mapping end-to-end)", () => {
+    if (typeof Highlight !== "function") return;
+    const { root } = hlDriftSetup();
+    try {
+      pbpHlRestore();
+      assertEq(_pbpHlState.ranges.t_move.range.toString(), "migrating target sentence", "range text = quote");
+    } finally { hlDriftTeardown(root); }
+  });
+  test("block re-anchor pass never revives an orphan into a whole-block paint (HIGH-1)", () => {
+    if (typeof Highlight !== "function") return;
+    const { root, ns } = hlDriftSetup();
+    try {
+      pbpHlRestore();
+      _pbpHlReanchorBlock(ns[1]); // the orphan's stale n -- the exact revival path
+      assert(!_pbpHlState.ranges.t_gone, "orphan still unpainted after re-anchor");
+      assert(_pbpHlState.orphans.t_gone, "orphan verdict preserved");
+      assert(_pbpHlState.ranges.t_move, "relocated neighbor unaffected");
+    } finally { hlDriftTeardown(root); }
   });
 });
 </script>

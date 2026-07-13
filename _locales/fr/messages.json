@@ -2661,6 +2661,8 @@
   "hlSave": { "message": "Enregistrer" },
   "hlDelete": { "message": "Supprimer le surlignage" },
   "hlDegraded": { "message": "Position perdue — le texte environnant a changé, ce surlignage couvre désormais tout le paragraphe." },
+  "hlOrphanNote": { "message": "$COUNT$ surlignages n'ont pas pu être localisés dans le contenu actuel de la page — les notes sont conservées.", "placeholders": { "count": { "content": "$1" } } },
+  "hlOrphanUnlocatable": { "message": "Ce surlignage est introuvable dans le contenu actuel de la page." },
   "hlSectionTitle": { "message": "Surlignages" },
   "kbdHelpTitle": { "message": "Raccourcis clavier" },
   "kbdHelpIntro": { "message": "Ces raccourcis fonctionnent sur la page d'aperçu Markdown (pas ici dans les réglages)." },

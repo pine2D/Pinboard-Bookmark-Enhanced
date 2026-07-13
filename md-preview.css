@@ -1954,6 +1954,14 @@ body.ask-open main { margin-right: 396px; }
 .hl-filter-dot.off { opacity: 0.25; }
 .hl-filter-dot:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .hl-filter-empty { font-size: 13px; color: var(--fg-muted); margin: 4px 2px 8px; }
+/* Anchoring round: count-gated "N couldn't be located" note (hidden at 0)
+   + the orphan rows themselves. Orphan != dim: dim is "temporarily hidden
+   by the translation view" (recoverable this session), orphan is "the
+   page's content no longer contains this quote" -- dashed edge marks it as
+   detached, the note text stays fully readable (data outlives anchor). */
+.hl-orphan-note { font-size: 12px; color: var(--fg-muted); margin: 2px 2px 6px; }
+.hl-item-orphan { border-left: 2px dashed var(--border); padding-left: 6px; }
+.hl-item-orphan .hl-item-main { opacity: 0.55; }
 .hl-list { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto; }
 .hl-item {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;

@@ -2661,6 +2661,8 @@
   "hlSave": { "message": "Zapisz" },
   "hlDelete": { "message": "Usuń zaznaczenie" },
   "hlDegraded": { "message": "Pozycja utracona — otaczający tekst się zmienił, to zaznaczenie obejmuje teraz cały akapit." },
+  "hlOrphanNote": { "message": "$COUNT$ zaznaczeń nie udało się odnaleźć w bieżącej treści strony — notatki zostały zachowane.", "placeholders": { "count": { "content": "$1" } } },
+  "hlOrphanUnlocatable": { "message": "Tego zaznaczenia nie można odnaleźć w bieżącej treści strony." },
   "hlSectionTitle": { "message": "Zaznaczenia" },
   "kbdHelpTitle": { "message": "Skróty klawiszowe" },
   "kbdHelpIntro": { "message": "Te skróty działają na stronie podglądu Markdown (nie tutaj, w ustawieniach)." },

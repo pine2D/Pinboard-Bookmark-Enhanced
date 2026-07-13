@@ -2655,6 +2655,8 @@
   "hlSave": { "message": "Save" },
   "hlDelete": { "message": "Delete highlight" },
   "hlDegraded": { "message": "Position lost — the surrounding text changed, so this highlight now covers the whole paragraph." },
+  "hlOrphanNote": { "message": "$COUNT$ highlights could not be located in the current page content — notes are kept.", "placeholders": { "count": { "content": "$1" } } },
+  "hlOrphanUnlocatable": { "message": "This highlight can't be located in the current page content." },
   "hlSectionTitle": { "message": "Highlights" },
   "kbdHelpTitle": { "message": "Keyboard Shortcuts" },
   "kbdHelpIntro": { "message": "These shortcuts work on the Markdown preview page (not here in Settings)." },

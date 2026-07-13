@@ -79,6 +79,106 @@ function pbpHlLocate(blockText, item) {
   return { start: best, end: best + quote.length };
 }
 
+// ---- Content-drift relocation layer (anchoring round, pure/testable).
+// Restore used to trust item.n unconditionally: after the source page
+// drifts (a paragraph inserted shifts every later block's n), the quote
+// either vanished (silent skip), degraded to highlighting a WRONG whole
+// block, or -- worst -- exact-matched inside an unrelated block that
+// inherited the old n. The three functions below give restore a way to
+// re-find the quote ANYWHERE with strict acceptance rules instead. ----
+
+// Fingerprint of a block list as [[tag, text], ...] pairs. JSON-encoded
+// before hashing so block BOUNDARIES are part of the identity -- the ask
+// subsystem's pbpAiBlocksFingerprint joins texts with "\n", under which
+// one "a\nb" block and two "a"/"b" blocks collide, which is exactly the
+// structural change this fingerprint exists to detect (Codex review).
+// Depends on md-ai-core.js's pbpAiHash (the tests page loads both files).
+function pbpHlFpOfBlocks(pairs) {
+  if (typeof pbpAiHash !== "function") return "";
+  try { return pbpAiHash(JSON.stringify(Array.isArray(pairs) ? pairs : [])); } catch (_) { return ""; }
+}
+
+// Global EXACT relocation: search item.quote across every {n, text} block.
+// Strictness contract (Codex review): a lone candidate wins; multiple
+// candidates only if ONE has the strictly highest prefix/suffix context
+// score; any tie -> null (caller orphans). Unlike pbpHlLocate's in-block
+// tie-keeps-first (bounded ambiguity: the user's own block), first-wins
+// across arbitrary blocks would be a silent mis-anchor. Block distance to
+// the stored n is deliberately NOT a tie-breaker -- it manufactures false
+// confidence for short/repeated quotes anchoring to whichever twin sits
+// nearest.
+function pbpHlGlobalLocate(blocks, item) {
+  const quote = item && typeof item.quote === "string" ? item.quote : "";
+  if (!quote) return null;
+  const prefix = (item && typeof item.prefix === "string") ? item.prefix : "";
+  const suffix = (item && typeof item.suffix === "string") ? item.suffix : "";
+  const cands = [];
+  for (const b of (Array.isArray(blocks) ? blocks : [])) {
+    const text = (b && typeof b.text === "string") ? b.text : "";
+    let idx = text.indexOf(quote);
+    while (idx !== -1) {
+      const end = idx + quote.length;
+      cands.push({
+        n: b.n, start: idx, end,
+        score: _pbpHlCommonSuffixLen(text.slice(0, idx), prefix)
+          + _pbpHlCommonPrefixLen(text.slice(end), suffix),
+      });
+      if (cands.length > 200) return null; // pathological repetition (1-char quotes etc.): inherently ambiguous
+      idx = text.indexOf(quote, idx + 1);
+    }
+  }
+  if (!cands.length) return null;
+  if (cands.length === 1) return cands[0];
+  cands.sort((a, b) => b.score - a.score);
+  return cands[0].score > cands[1].score ? cands[0] : null;
+}
+
+// Whitespace-collapse normalizer with an offset map back into the original
+// string: norm[i] came from text[map[i]]. Runs of whitespace (any \s,
+// newlines included) collapse to one space so a quote saved as "foo bar"
+// still matches text re-extracted as "foo\nbar". Pure; the map is what
+// keeps the eventual Range on ORIGINAL offsets.
+function pbpHlWsNormalize(text) {
+  const t = typeof text === "string" ? text : "";
+  let norm = "";
+  const map = [];
+  let inWs = false;
+  for (let i = 0; i < t.length; i++) {
+    if (/\s/.test(t[i])) {
+      if (!inWs) { norm += " "; map.push(i); inWs = true; }
+    } else {
+      norm += t[i];
+      map.push(i);
+      inWs = false;
+    }
+  }
+  return { norm, map };
+}
+
+// Whitespace-normalized fallback for pbpHlGlobalLocate: same strict
+// acceptance rules, run over normalized text, hit mapped back to original
+// offsets. NOT skipped when the quote itself has no collapsible runs --
+// the BLOCK text may still differ from the quote only in whitespace shape
+// ("foo bar" vs "foo\nbar"), which is exactly the case this rescues.
+function pbpHlGlobalLocateNormalized(blocks, item) {
+  const qn = pbpHlWsNormalize(item && item.quote).norm;
+  if (!qn) return null;
+  const pn = pbpHlWsNormalize(item && item.prefix).norm;
+  const sn = pbpHlWsNormalize(item && item.suffix).norm;
+  const normBlocks = [];
+  const maps = new Map();
+  for (const b of (Array.isArray(blocks) ? blocks : [])) {
+    const { norm, map } = pbpHlWsNormalize(b && b.text);
+    normBlocks.push({ n: b.n, text: norm });
+    maps.set(b.n, map);
+  }
+  const hit = pbpHlGlobalLocate(normBlocks, { quote: qn, prefix: pn, suffix: sn });
+  if (!hit) return null;
+  const map = maps.get(hit.n);
+  if (!map || hit.end < 1 || hit.end > map.length) return null;
+  return { n: hit.n, start: map[hit.start], end: map[hit.end - 1] + 1 };
+}
+
 // ---- H5 translated-side paint gate (spec 1.3, pure/testable). An
 // original-side item (no side, or side !== "tr") is always eligible here --
 // its own block-existence check lives in the DOM layer. A translated-side
@@ -372,7 +472,39 @@ function _pbpHlToast(msg, btn) {
 
 // ---- Init + restore ----
 const PBP_HL_COLORS = [1, 2, 3, 4, 5];
-let _pbpHlState = null; // { url, title, items, ranges: {id -> {color, range}}, degraded: {id -> true} }
+// State shape: { url, title, items, ranges: {id -> {color, range}},
+// degraded: {id -> true}, resolvedN: {id -> n'}, orphans: {id -> true} }.
+// resolvedN/orphans are RUNTIME-ONLY re-anchoring results (anchoring
+// round): resolvedN records which block an item actually painted in this
+// render (usually item.n; different after global relocation), orphans
+// marks orig-side items whose quote could not be found anywhere. Item
+// STORAGE never learns about either -- writing a heuristic n' back would
+// destroy the original selector on the first mis-anchor (highlights are
+// permanent user data, see _pbpHlSave).
+let _pbpHlState = null;
+
+// Effective block for an item THIS render: the relocation result when one
+// exists, else the stored n. Every DOM consumer (jump/card/rect/observer
+// re-anchor) must resolve through this, or the paint lands in the new
+// block while clicks chase the old one.
+function _pbpHlEffN(item) {
+  const r = _pbpHlState && _pbpHlState.resolvedN;
+  const id = item && item.id;
+  return (r && id && r[id] != null) ? r[id] : (item ? item.n : 0);
+}
+
+// Fingerprint of the CURRENT render's block list, from the same frozen
+// pbpAiTextOf snapshots used at creation time (never live textContent --
+// hljs/KaTeX rewrites would make creation-fp and restore-fp of identical
+// content disagree). Computed once per restore pass / per creation batch.
+function _pbpHlCurrentFp() {
+  try {
+    return pbpHlFpOfBlocks(pbpAiBlocks().map((b) => {
+      const el = pbpAiBlockEl(b.n);
+      return [(el && el.tagName) || "", pbpAiTextOf(b.n)];
+    }));
+  } catch (_) { return ""; }
+}
 
 async function pbpHlInit(detail) {
   const view = document.getElementById("rendered-view");
@@ -389,7 +521,7 @@ async function pbpHlInit(detail) {
   const url = String((detail && detail.url) || "");
   const title = String((detail && detail.title) || "");
   const items = await _pbpHlLoad(url);
-  _pbpHlState = { url, title, items, ranges: Object.create(null), degraded: Object.create(null) };
+  _pbpHlState = { url, title, items, ranges: Object.create(null), degraded: Object.create(null), resolvedN: Object.create(null), orphans: Object.create(null) };
   pbpHlRestore();
   // Restored-from-storage highlights must surface the rail entry on first
   // paint too -- storage.local.get fires no onChanged, so without this call
@@ -443,32 +575,96 @@ function pbpHlRestore() {
   if (!_pbpHlState) return;
   _pbpHlState.ranges = Object.create(null);
   _pbpHlState.degraded = Object.create(null);
+  _pbpHlState.resolvedN = Object.create(null);
+  _pbpHlState.orphans = Object.create(null);
+  // Anchoring round: item.fp (creation-time block fingerprint) picks the
+  // orig-side path. fp EQUAL -> content unchanged, trust item.n exactly as
+  // before (0-hit still whole-block degrades: only the hljs-rewrite edge
+  // can cause it). fp DIFFERENT -> the page drifted; item.n is not
+  // trustworthy even when the quote happens to occur there (an unrelated
+  // block may have inherited the old n), so go straight to the strict
+  // global search. LEGACY (no fp) -> unknown drift: keep the old in-block
+  // behavior when it finds the quote (unchanged pages keep painting
+  // exactly as before this round), but a miss now falls through to the
+  // global search instead of mis-painting a whole possibly-wrong block.
+  // Global search failure = orphan (runtime flag; storage untouched,
+  // surfaced by the Notebook's count-gated note instead of vanishing).
+  const currentFp = _pbpHlCurrentFp();
+  let _origBlocks = null; // lazy: most restores never need the global pool
+  // Pool text via _pbpHlLocateTextFor, NOT bare pbpAiTextOf: a watched
+  // (hljs/KaTeX-rewritten) block's frozen snapshot can yield offsets that
+  // are valid against the LIVE tree but point at the wrong characters
+  // (Codex acceptance HIGH-2) -- same same-source rule the single-block
+  // paths already follow.
+  const origBlocks = () => _origBlocks
+    || (_origBlocks = pbpAiBlocks().map((b) => {
+      const el = pbpAiBlockEl(b.n);
+      return { n: b.n, text: el ? _pbpHlLocateTextFor(el, b.n) : "" };
+    }));
   const byColor = { 1: [], 2: [], 3: [], 4: [], 5: [] };
   for (const item of _pbpHlState.items) {
-    let blockEl, blockText;
+    let range = null;
+    let effN = item.n;
     const isTr = item.side === "tr";
     if (isTr) {
       // H5 restore (spec 1.3): resolve the .pb-tr sibling; paint gate = it
       // exists AND still displays item.lang. Otherwise the item is
       // Notebook-only (regray + lang badge, Task 2) -- no range, no paint,
-      // no error.
-      blockEl = document.querySelector('.pb-tr[data-pb-tr="' + item.n + '"]');
+      // no error, and NEVER an orphan (an absent/other-language tr layer is
+      // "not currently visible", not "lost"). Global relocation deliberately
+      // does not apply to the tr side: its blocks are per-render generated
+      // text keyed to source blocks, not durable content to re-find.
+      const blockEl = document.querySelector('.pb-tr[data-pb-tr="' + item.n + '"]');
       if (!blockEl || !pbpHlItemPaints(item, blockEl.dataset.pbTrLang || "")) continue;
-      blockText = blockEl.textContent || "";
+      // _pbpHlBuildRange degrades a 0-hit locate to the whole .pb-tr (spec 1.3).
+      range = _pbpHlBuildRange(item, blockEl, blockEl.textContent || "");
     } else {
-      blockEl = pbpAiBlockEl(item.n);
-      if (!blockEl) continue; // block gone (content drift) -- item silently absent from this render, storage untouched
-      blockText = _pbpHlLocateTextFor(blockEl, item.n);
+      const blockEl = pbpAiBlockEl(item.n);
+      const fpEqual = typeof item.fp === "string" && item.fp && item.fp === currentFp;
+      const legacy = !(typeof item.fp === "string" && item.fp);
+      if (blockEl && fpEqual) {
+        range = _pbpHlBuildRange(item, blockEl, _pbpHlLocateTextFor(blockEl, item.n));
+      } else {
+        if (blockEl && legacy) {
+          const loc = pbpHlLocate(_pbpHlLocateTextFor(blockEl, item.n), item);
+          if (loc) range = _pbpAskRangeFromOffsets(blockEl, loc.start, loc.end);
+        }
+        if (!range) {
+          const g = pbpHlGlobalLocate(origBlocks(), item) || pbpHlGlobalLocateNormalized(origBlocks(), item);
+          const gEl = g ? pbpAiBlockEl(g.n) : null;
+          if (gEl) {
+            effN = g.n;
+            range = _pbpAskRangeFromOffsets(gEl, g.start, g.end);
+            // Accept only a Range whose actual text IS the quote (compared
+            // whitespace-normalized, so normalized-path hits pass too): a
+            // rewrite landing between pool build and mapping can produce
+            // offsets that are in-bounds yet point at the wrong characters
+            // (Codex acceptance HIGH-2's verification half).
+            if (range && pbpHlWsNormalize(range.toString()).norm !== pbpHlWsNormalize(item.quote).norm) range = null;
+            if (!range) {
+              // Confident relocation but the live tree diverged from the
+              // frozen snapshot (hljs/KaTeX rewrite in the NEW block):
+              // whole-block degrade at the relocated position beats orphaning
+              // a hit the strict rules already accepted.
+              range = document.createRange();
+              range.selectNodeContents(gEl);
+              _pbpHlState.degraded[item.id] = true;
+            }
+          }
+        }
+        if (!range) {
+          _pbpHlState.orphans[item.id] = true;
+          continue;
+        }
+      }
     }
-    // _pbpHlBuildRange degrades a 0-hit locate to selectNodeContents(blockEl)
-    // -- for a tr item that is the whole .pb-tr Range (spec 1.3 tr degrade).
-    const range = _pbpHlBuildRange(item, blockEl, blockText);
     const col = (item.color >= 1 && item.color <= 5) ? item.color : 1;
     byColor[col].push(range);
     _pbpHlState.ranges[item.id] = { color: col, range };
-    // Only original blocks arm the hljs/KaTeX watcher; .pb-tr re-anchors via
-    // pbpHlReanchorTr (Step 6).
-    if (!isTr) _pbpHlArmBlockObserver(blockEl, item.n);
+    _pbpHlState.resolvedN[item.id] = effN;
+    // Only original blocks arm the hljs/KaTeX watcher (on the block the item
+    // actually painted in); .pb-tr re-anchors via pbpHlReanchorTr (Step 6).
+    if (!isTr) _pbpHlArmBlockObserver(pbpAiBlockEl(effN), effN);
   }
   for (const c of PBP_HL_COLORS) {
     if (byColor[c].length) CSS.highlights.set("pbp-hl-" + c, new Highlight(...byColor[c]));
@@ -503,7 +699,14 @@ function _pbpHlReanchorBlock(n) {
   if (!blockEl) return;
   const liveText = blockEl.textContent || ""; // NOT pbpAiTextOf(n): that cache may be frozen pre-hljs/KaTeX (spec 3)
   for (const item of _pbpHlState.items) {
-    if (item.n !== n) continue;
+    if (item.side === "tr" || _pbpHlEffN(item) !== n) continue; // effN: a relocated item belongs to the block it PAINTED in
+    // An orphan has NO resolvedN, so effN falls back to its stale item.n --
+    // which can equal this n when the old block still exists with unrelated
+    // content. Without this skip, _pbpHlBuildRange would degrade the orphan
+    // to a whole-block paint on that wrong block while the Notebook still
+    // says "couldn't be located" (Codex acceptance HIGH-1). Orphan verdicts
+    // are only revisited by a full pbpHlRestore, never by this local pass.
+    if (_pbpHlState.orphans[item.id]) continue;
     const prev = _pbpHlState.ranges[item.id];
     if (prev) {
       const h = CSS.highlights.get("pbp-hl-" + prev.color);
@@ -575,13 +778,14 @@ function _pbpHlReanchorTrBlock(n) {
       if (h) h.delete(prev.range);
       delete _pbpHlState.ranges[item.id];
     }
-    if (!trEl || !pbpHlItemPaints(item, lang)) { delete _pbpHlState.degraded[item.id]; continue; }
+    if (!trEl || !pbpHlItemPaints(item, lang)) { delete _pbpHlState.degraded[item.id]; delete _pbpHlState.resolvedN[item.id]; continue; }
     const range = _pbpHlBuildRange(item, trEl, liveText);
     const col = (item.color >= 1 && item.color <= 5) ? item.color : 1;
     let h = CSS.highlights.get("pbp-hl-" + col);
     if (!h) { h = new Highlight(); CSS.highlights.set("pbp-hl-" + col, h); }
     h.add(range);
     _pbpHlState.ranges[item.id] = { color: col, range };
+    _pbpHlState.resolvedN[item.id] = item.n;
   }
 }
 
@@ -619,6 +823,7 @@ function pbpHlTrLayerCleared() {
       }
       delete _pbpHlState.ranges[item.id];
       delete _pbpHlState.degraded[item.id];
+      delete _pbpHlState.resolvedN[item.id];
     }
     _pbpHlNotebookRender();
     if (typeof pbpHlSyncMirrorAll === "function") pbpHlSyncMirrorAll();
@@ -831,6 +1036,14 @@ async function _pbpHlCreateFromRange(range, color, btn) {
   if (!_pbpHlState) return [];
   const segments = _pbpHlSelectionSegments(range);
   const created = [];
+  // One fingerprint per creation batch (anchoring round): stamps every item
+  // of this multi-block selection with the SAME creation-time block-list
+  // identity, so restore can tell "page unchanged, trust n" from "page
+  // drifted, re-find the quote globally". Item-level (not record-level):
+  // highlights on one page accumulate across visits/page versions, and the
+  // record is rewritten whole on every save -- a record-level fp would be
+  // overwritten by each new batch and mislabel older items (Codex review).
+  const batchFp = _pbpHlCurrentFp();
   for (const seg of segments) {
     const offsets = _pbpHlOffsetsFromRange(seg.el, seg.range);
     if (!offsets) continue;
@@ -848,7 +1061,8 @@ async function _pbpHlCreateFromRange(range, color, btn) {
       suffix: sel.suffix,
       color,
       note: "",
-      ts: Date.now()
+      ts: Date.now(),
+      fp: batchFp
     };
     // H5 (spec 1.1): translated-side highlights carry side + the language of
     // the .pb-tr they were drawn in (read straight off the element, so it is
@@ -895,6 +1109,7 @@ function _pbpHlRegisterRange(item, range) {
   if (!h) { h = new Highlight(); CSS.highlights.set("pbp-hl-" + item.color, h); }
   h.add(range);
   _pbpHlState.ranges[item.id] = { color: item.color, range };
+  _pbpHlState.resolvedN[item.id] = item.n; // fresh creation: painted exactly where recorded
 }
 
 async function _pbpHlCreateFromSelection(color, btn) {
@@ -1218,7 +1433,7 @@ function _pbpHlEnsureCard() {
 // found (e.g. a stale item.n after re-extraction) so callers can bail
 // silently instead of opening at a garbage position.
 function _pbpHlItemRect(item) {
-  const blockEl = pbpAiBlockEl(item.n);
+  const blockEl = pbpAiBlockEl(_pbpHlEffN(item)); // effN: relocated items rect against the block they painted in
   if (!blockEl) return null;
   let rect = blockEl.getBoundingClientRect();
   const degraded = !!(_pbpHlState && _pbpHlState.degraded[item.id]);
@@ -1236,10 +1451,21 @@ function _pbpHlCardAiOpen(action) {
   if (!_pbpHlState || !_pbpHlCardItemId) return;
   const item = _pbpHlState.items.find((it) => it.id === _pbpHlCardItemId);
   if (!item) return;
+  if (_pbpHlState.orphans[item.id]) {
+    // No trustworthy host block -> no AI context to hand over. Unreachable
+    // by construction today (every card entry point already refuses
+    // orphans), but a silent dead button is the wrong failure mode if a
+    // future path opens the card anyway -- say why (Codex re-review).
+    _pbpHlToast(t("hlOrphanUnlocatable"));
+    return;
+  }
   const rect = _pbpHlItemRect(item);
   if (!rect) return;
   if (_pbpHlCard) { try { _pbpHlCard.hidePopover(); } catch (_) {} } // two auto popovers must not overlap
-  window.pbpExplainOpenForItem({ text: item.quote, n: item.n, itemId: item.id, rect, action });
+  // effN, not item.n: md-ask reads the host block AND its neighbors for
+  // context -- after relocation the stored n would feed the model an
+  // unrelated old paragraph (Codex acceptance MEDIUM).
+  window.pbpExplainOpenForItem({ text: item.quote, n: _pbpHlEffN(item), itemId: item.id, rect, action });
 }
 
 // Card "Ask" button -> window.pbpAskOpenPanel directly (typeof-guarded per
@@ -1280,7 +1506,14 @@ function _pbpHlOpenCard(id) {
   if (!_pbpHlState) return;
   const item = _pbpHlState.items.find((it) => it.id === id);
   if (!item) return;
-  const blockEl = pbpAiBlockEl(item.n);
+  // Orphan invariant: the card never opens for an unlocatable item. Its
+  // effN falls back to the stale item.n, whose block may still EXIST with
+  // unrelated content -- positioning a card there would look anchored while
+  // pointing at the wrong text. All entry points (text click: not painted;
+  // notebook row: disabled; create flow: never orphan) already agree; this
+  // guard makes it a hard invariant rather than an emergent one.
+  if (_pbpHlState.orphans[item.id]) return;
+  const blockEl = pbpAiBlockEl(_pbpHlEffN(item));
   if (!blockEl) return;
 
   const degraded = !!_pbpHlState.degraded[item.id];
@@ -1460,6 +1693,14 @@ function _pbpHlNotebookRender() {
   const model = pbpHlNotebookModel(items, _pbpHlColorFilter);
   _pbpHlNbEls.list.replaceChildren(...model.map(_pbpHlBuildItemEl));
   _pbpHlNbEls.emptyHint.hidden = !(items.length > 0 && model.length === 0);
+  // Orphan note (anchoring round): count-gated like Hypothesis's Orphans
+  // tab -- present exactly while orphans exist, gone when healthy, never a
+  // dismissible one-shot banner. TOTAL orphan count, independent of the
+  // color filter (the filter narrows the list, not the fact that notes
+  // failed to place).
+  const orphanCount = _pbpHlState ? Object.keys(_pbpHlState.orphans || {}).length : 0;
+  _pbpHlNbEls.orphanNote.hidden = orphanCount === 0;
+  _pbpHlNbEls.orphanNote.textContent = orphanCount ? t("hlOrphanNote", String(orphanCount)) : "";
 }
 
 // One-time DOM build: filter row + list + empty-filter hint + copy footer,
@@ -1493,6 +1734,11 @@ function _pbpHlBuildNotebookDom(rail) {
     return b;
   });
   sec.appendChild(filterRow);
+
+  const orphanNote = document.createElement("p");
+  orphanNote.className = "hl-orphan-note";
+  orphanNote.hidden = true;
+  sec.appendChild(orphanNote);
 
   const list = document.createElement("ul");
   list.className = "hl-list";
@@ -1535,14 +1781,15 @@ function _pbpHlBuildNotebookDom(rail) {
       })
     : null; // degrade: no collapsible header (file:// test harness has no #rail at all, never reaches here)
 
-  return { sec, list, filterBtns, emptyHint, copyBtn, handle };
+  return { sec, list, filterBtns, emptyHint, copyBtn, handle, orphanNote };
 }
 
 // One <li> per notebook entry (spec 2.1). textContent/title only for all
 // user text -- zero innerHTML for user data, same rule as the edit card.
 function _pbpHlBuildItemEl(m) {
   const full = _pbpHlState.items.find((it) => it.id === m.id);
-  const blockEl = full ? pbpAiBlockEl(full.n) : null;
+  const orphan = !!(full && _pbpHlState.orphans && _pbpHlState.orphans[full.id]);
+  const blockEl = full ? pbpAiBlockEl(_pbpHlEffN(full)) : null; // effN: a relocated item's row must jump to where it painted
   // tr-only escape hatch mirrors md-translate.js's own visibility rule
   // (body.tr-only + [data-pb-tr-done] hides the original unless .pb-show-orig
   // is toggled on -- md-preview.css:1045). Dim, don't disable: spec 2.3
@@ -1558,7 +1805,10 @@ function _pbpHlBuildItemEl(m) {
         && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig"));
 
   const li = document.createElement("li");
-  li.className = "hl-item" + (dimmed ? " hl-item-dim" : "");
+  // Orphan (quote unlocatable in the current content) is visually distinct
+  // from dim (temporarily hidden by the translation view): dashed edge +
+  // muted, note text still fully readable -- the data outlives the anchor.
+  li.className = "hl-item" + (dimmed ? " hl-item-dim" : "") + (orphan ? " hl-item-orphan" : "");
 
   const main = document.createElement("button");
   main.type = "button";
@@ -1579,8 +1829,12 @@ function _pbpHlBuildItemEl(m) {
     main.appendChild(badge);
   }
   main.title = full ? full.quote : m.excerpt;
-  if (!blockEl) {
-    main.disabled = true; // block gone (content drift): permanent for this render, native disabled is correct here
+  if (!blockEl || orphan) {
+    // Block gone OR quote unlocatable (orphan): both are permanent for this
+    // render. An orphan's stored n may still name an EXISTING block that now
+    // holds unrelated content -- jumping there would flash the wrong text,
+    // so the row disables rather than mislead.
+    main.disabled = true;
   } else {
     main.addEventListener("click", () => _pbpHlNotebookJump(full));
   }
@@ -1622,7 +1876,7 @@ function _pbpHlNotebookJump(item) {
     _pbpAskFlash(range, trEl);
     return;
   }
-  const blockEl = pbpAiBlockEl(item.n);
+  const blockEl = pbpAiBlockEl(_pbpHlEffN(item)); // effN: jump to where the highlight actually painted
   if (!blockEl) return;
   if (document.body.classList.contains("tr-only") && blockEl.hasAttribute("data-pb-tr-done") && !blockEl.classList.contains("pb-show-orig")) return; // spec 2.3: silent no-op
   pbpFocusArticleTarget(blockEl);

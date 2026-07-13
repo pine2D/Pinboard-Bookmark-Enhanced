@@ -2661,6 +2661,8 @@
   "hlSave": { "message": "保存" },
   "hlDelete": { "message": "ハイライトを削除" },
   "hlDegraded": { "message": "位置がずれました — 周囲のテキストが変更されたため、このハイライトは段落全体に適用されています。" },
+  "hlOrphanNote": { "message": "$COUNT$ 件のハイライトが現在のページ内容で見つかりませんでした（メモは保持されます）", "placeholders": { "count": { "content": "$1" } } },
+  "hlOrphanUnlocatable": { "message": "このハイライトは現在のページ内容で見つかりません。" },
   "hlSectionTitle": { "message": "ハイライト" },
   "kbdHelpTitle": { "message": "キーボードショートカット" },
   "kbdHelpIntro": { "message": "これらのショートカットは Markdown プレビュー画面でのみ有効です(この設定画面では動作しません)。" },
