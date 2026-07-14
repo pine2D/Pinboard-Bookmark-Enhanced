@@ -1548,10 +1548,17 @@
     "message": "移除"
   },
   "mdImgEmbed": {
-    "message": "内嵌（离线可读）"
+    "message": "内嵌（离线，仅下载）"
   },
   "mdEmbedPartial": {
     "message": "$COUNT$ 张图片未能内嵌",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "mdImgEmbedNotHere": {
+    "message": "内嵌仅对下载生效——本次导出保留图片链接。"
+  },
+  "mdImgBrokenNote": {
+    "message": "$COUNT$ 张图片在当前预览中加载失败，导出后可能仍无法显示；下载并选择「内嵌」可打包图片。",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {

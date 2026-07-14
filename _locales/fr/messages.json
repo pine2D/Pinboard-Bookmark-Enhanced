@@ -1548,10 +1548,17 @@
     "message": "Supprimer"
   },
   "mdImgEmbed": {
-    "message": "Intégrer (hors ligne)"
+    "message": "Intégrer (hors ligne, téléchargements uniquement)"
   },
   "mdEmbedPartial": {
     "message": "$COUNT$ image(s) non intégrée(s)",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "mdImgEmbedNotHere": {
+    "message": "L’intégration ne s’applique qu’aux téléchargements — cet export conserve les liens d’images."
+  },
+  "mdImgBrokenNote": {
+    "message": "$COUNT$ image(s) n’ont pas pu se charger dans cet aperçu et pourraient ne pas s’afficher après l’export ; « Intégrer » les emballe dans les téléchargements.",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {

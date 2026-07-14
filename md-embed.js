@@ -59,6 +59,25 @@ function pbpEmbedScan(md, baseUrl) {
   return { candidates, blobs, kept, origins };
 }
 
+// 导出诚实提示的计数器（方案A，Codex 终审版）：统计"读者已亲眼看着加载失败"的图片
+// 链接会有几条以 URL 形式留在 keep 类导出产物里。observed 存浏览器解析后的绝对 URL
+// （error 时刻的 img.currentSrc）；candidates 和 kept（超 50 图/10 origin 上限、非 https
+// 的条目）在 keep 导出里同样以链接形式出走，所以两个清单都算。只做正向证据——预览图片
+// 是 loading="lazy"，没滚到的图不会触发 error——返回 0 绝不代表"所有图片安全"。
+function pbpEmbedBrokenCount(md, baseUrl, observed) {
+  if (!observed || !observed.size) return 0;
+  const scan = pbpEmbedScan(md, baseUrl);
+  const hits = new Set();
+  for (const u of scan.candidates.concat(scan.kept)) {
+    let abs = u;
+    try { abs = new URL(u, baseUrl || undefined).href; } catch (_) {}
+    // marked 会对它输出的 href 做 encodeURI（见 md-epub.js 同款处理），浏览器侧
+    // 记录的 key 可能是 markdown 原文的编码变体，三种键形都试。
+    if (observed.has(u) || observed.has(abs) || observed.has(encodeURI(u))) hits.add(abs);
+  }
+  return hits.size;
+}
+
 // map: absUrl -> replacement src（data URI 或相对路径）；值为 null → 整图退化为 alt 文本。
 // outBudget: pbpEmbedBudget(PBP_EMBED_LIMITS.outputBytes) —— 每次替换按替换串长度记账（Codex-P2），
 // 预算耗尽的位置保留原样并计入 dropped。

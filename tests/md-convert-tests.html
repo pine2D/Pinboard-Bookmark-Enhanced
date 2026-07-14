@@ -1685,6 +1685,32 @@ section("md-embed: pbpEmbedScan / pbpEmbedRewrite / pbpEmbedBudget (pure layer)"
   assertEq(rAbsent.md, mdAbsent, "URL with no map entry is left as-is");
 })();
 
+// export honesty counter (plan A, Codex-adjudicated): pbpEmbedBrokenCount counts
+// observed-broken links that a keep export would ship as URLs (7 assertions)
+(() => {
+  const obs = new Set(["https://cdn.example.com/a.png"]);
+  assertEq(pbpEmbedBrokenCount("![a](https://cdn.example.com/a.png)", "", obs), 1,
+    "brokenCount: observed absolute candidate counted");
+  assertEq(pbpEmbedBrokenCount("![a](https://cdn.example.com/other.png)", "", obs), 0,
+    "brokenCount: unobserved URL not counted");
+  assertEq(pbpEmbedBrokenCount("![a](https://cdn.example.com/a.png)\n![b](https://cdn.example.com/a.png)", "", obs), 1,
+    "brokenCount: duplicate references count once");
+  assertEq(pbpEmbedBrokenCount("![r](/rel/a.png)", "https://cdn.example.com/post",
+    new Set(["https://cdn.example.com/rel/a.png"])), 1,
+    "brokenCount: relative src normalized against baseUrl before matching");
+  // the 51st image overflows into kept, but a keep export still ships it as a link
+  const capLines = [];
+  for (let i = 0; i < 51; i++) capLines.push(`![i${i}](https://cap.example.com/img${i}.png)`);
+  assertEq(pbpEmbedBrokenCount(capLines.join("\n"), "", new Set(["https://cap.example.com/img50.png"])), 1,
+    "brokenCount: over-maxImages (kept) URL still counted");
+  // marked encodeURI()s emitted hrefs — the browser-side key can be the encoded variant
+  assertEq(pbpEmbedBrokenCount("![u](https://cdn.example.com/图.png)", "",
+    new Set([encodeURI("https://cdn.example.com/图.png")])), 1,
+    "brokenCount: encodeURI variant of a non-ASCII URL matches");
+  assertEq(pbpEmbedBrokenCount("![a](https://cdn.example.com/a.png)", "", new Set()), 0,
+    "brokenCount: empty observed set counts zero");
+})();
+
 // rewrite output budget (Codex-P2): same URL referenced 3x, budget only covers 2 replacements (2 assertions)
 (() => {
   const url = "https://cdn.example.com/rep.png";

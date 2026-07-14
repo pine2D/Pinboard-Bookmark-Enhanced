@@ -1548,10 +1548,17 @@
     "message": "Remove"
   },
   "mdImgEmbed": {
-    "message": "Embed (offline)"
+    "message": "Embed (offline, downloads only)"
   },
   "mdEmbedPartial": {
     "message": "$COUNT$ image(s) could not be embedded",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "mdImgEmbedNotHere": {
+    "message": "Embed applies to downloads only — this export keeps image links."
+  },
+  "mdImgBrokenNote": {
+    "message": "$COUNT$ image link(s) failed to load in this preview and may not display after export; Embed packs images into downloads.",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {

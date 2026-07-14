@@ -761,7 +761,12 @@ function pbpApplyColorScheme(mode) {
     return viewMd || getMarkdown();
   }
   function buildExportMarkdown() {
-    return composeExport(getViewMarkdown(), buildMeta(), buildExportOpts());
+    const opts = buildExportOpts();
+    // Copy cannot embed (no resolveEmbed pass in its click chain): clamp
+    // explicitly like Send-to does instead of leaning on applyImagePolicy's
+    // incidental keep fall-through for unknown values (Codex, plan A).
+    if (opts.imagePolicy === "embed") opts.imagePolicy = "keep";
+    return composeExport(getViewMarkdown(), buildMeta(), opts);
   }
 
   // Codex-P4: status-line helper for the export section (no existing export
@@ -773,6 +778,32 @@ function pbpApplyColorScheme(mode) {
     if (!el) return;
     el.textContent = msg; el.hidden = !msg;
     clearTimeout(el._t); el._t = setTimeout(() => { el.hidden = true; }, 6000);
+  }
+
+  // Honest broken-image note (plan A, Codex-adjudicated): fires on any exit whose
+  // OUTPUT keeps image links -- policy "keep", or "embed" silently degrading to
+  // keep on an exit that cannot embed (Copy, Send-to; exitEmbeds=false). alt/strip
+  // ship no links, and the three Download exits do real embedding with their own
+  // partial note in resolveEmbed. Counting is positive evidence only: images are
+  // loading="lazy", so a link that never scrolled into view has fired no error
+  // yet -- hence "may not display", never a safety claim. And an error is any
+  // load failure (404, network, hotlink), so the copy never says "hotlink".
+  function imgFixExportNote(exitEmbeds) {
+    const policy = expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep");
+    const clamped = policy === "embed" && !exitEmbeds;
+    if (!clamped && policy !== "keep") return;
+    const msgs = [];
+    if (clamped) msgs.push(t("mdImgEmbedNotHere"));
+    const n = (typeof pbpEmbedBrokenCount === "function")
+      ? pbpEmbedBrokenCount(getViewMarkdown(), buildMeta().url || "", imgFixObserved)
+      : 0;
+    // Count rides t()'s substitution args, NOT a manual .replace: with a
+    // "placeholders" block in messages.json, chrome.i18n.getMessage (the t()
+    // fallback when no explicit UI language is picked) consumes $COUNT$
+    // BEFORE a manual replace could see it -- the number silently vanished.
+    // Same latent bug fixed at the mdEmbedPartial/mdStatsProgress call sites.
+    if (n > 0) msgs.push(t("mdImgBrokenNote", String(n)));
+    if (msgs.length) showExportNote(msgs.join(" ")); // ONE merged call -- a second showExportNote would overwrite the first
   }
 
   // Embed image policy (Task 4): runs on the RAW view markdown, BEFORE either
@@ -968,7 +999,7 @@ function pbpApplyColorScheme(mode) {
       statTick = false;
       const doc = document.documentElement;
       const pct = readingProgressPercent(window.scrollY, window.innerHeight, doc.scrollHeight);
-      statsEl.textContent = `${statBase} · ${t("mdStatsProgress").replace("$PCT$", pct + "%")}`;
+      statsEl.textContent = `${statBase} · ${t("mdStatsProgress", pct + "%")}`; // args through t(): chrome.i18n consumes $PCT$ before a manual replace could (see imgFixExportNote)
     };
     const queueStats = () => {
       if (statTick) return;
@@ -1006,6 +1037,7 @@ function pbpApplyColorScheme(mode) {
   const imgFixFailed = new Map();   // absUrl -> Set<img>: QUEUED, not yet sent
   const imgFixInFlight = new Map(); // absUrl -> Set<img>: sent, awaiting the fetch
   const imgFixTried = new Set();    // SETTLED (fixed, or given up on): never re-queued
+  const imgFixObserved = new Set(); // every https URL SEEN failing here, any cause (404/network/hotlink) — the export honesty note reads this; never pruned (a URL that failed once stays a risk signal for this document)
   const imgFixOriginsSeen = new Set(); // origins this page has already fixed against (maxOrigins cap)
   // ONE page-level budget across every batch (Codex acceptance MEDIUM-2): a
   // per-batch budget let a long lazy-loading article punch through totalBytes
@@ -1340,6 +1372,7 @@ function pbpApplyColorScheme(mode) {
     if (!img || img.tagName !== "IMG" || img.dataset.pbpImgFixed) return;
     const u = img.currentSrc || img.src || "";
     if (!/^https:\/\//i.test(u)) return; // data:/blob:/http: not fixable through this channel
+    imgFixObserved.add(u); // export honesty note: this link is now KNOWN to fail at least here
     img.classList.add("pbp-img-broken");
     const cached = imgFixCache.get(u);
     if (cached) { imgFixApply(img, cached, u); return; }
@@ -1683,6 +1716,7 @@ function pbpApplyColorScheme(mode) {
 
   // Copy buttons
   document.getElementById("btn-copy-md").addEventListener("click", async (e) => {
+    imgFixExportNote(false);
     await copyToClipboard(buildExportMarkdown(), e.currentTarget);
   });
   document.getElementById("btn-copy-html").addEventListener("click", async (e) => {
@@ -1691,6 +1725,7 @@ function pbpApplyColorScheme(mode) {
     // crosses real async boundaries (ensureHljs's script load, loadHljsCss's fetches)
     // before ever touching it. Same fix already applied to btn-copy-md.
     const btn = e.currentTarget;
+    imgFixExportNote(false);
     // Same content as the HTML download: a complete styled doc that follows the
     // original/bilingual/translation-only view (getViewMarkdown), copied as
     // text — symmetric with Copy MD == Download MD. (Was renderedView.innerHTML,
@@ -1702,13 +1737,16 @@ function pbpApplyColorScheme(mode) {
     const hljsCss = await loadHljsCss();
     if (info.math) await ensureKatex(); // so composeStyledHtml renders math (mirrors hljs above)
     const katexCss = info.math ? await loadKatexCss() : "";
-    const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ...buildExportOpts(), hljsCss, katexCss });
+    const _copyOpts = buildExportOpts();
+    // Copy cannot embed: clamp like buildExportMarkdown above (Codex, plan A).
+    const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ..._copyOpts, imagePolicy: _copyOpts.imagePolicy === "embed" ? "keep" : _copyOpts.imagePolicy, hljsCss, katexCss });
     await copyToClipboard(doc, btn);
   });
 
   // Download buttons
   const safeTitle = safeFilename(title);
   document.getElementById("btn-dl-md").addEventListener("click", async () => {
+    imgFixExportNote(true); // sync, before the gesture-sensitive await below
     // First await in the direct click chain: resolveEmbed()'s chrome.permissions.request()
     // must run while the user gesture is still active (same invariant as Send-to below).
     const meta = buildMeta(), opts = buildExportOpts();
@@ -1719,9 +1757,10 @@ function pbpApplyColorScheme(mode) {
     // composeExport pass, no double transform of the export markdown).
     const body = composeExport(emb.md, meta, { ...opts, imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy });
     downloadFile(safeTitle + ".md", body, "text/markdown;charset=utf-8");
-    if (emb.note > 0) showExportNote(t("mdEmbedPartial").replace("$COUNT$", emb.note));
+    if (emb.note > 0) showExportNote(t("mdEmbedPartial", String(emb.note))); // args through t() -- chrome.i18n consumes $COUNT$ before a manual replace could
   });
   document.getElementById("btn-dl-html").addEventListener("click", async () => {
+    imgFixExportNote(true);
     // First await in the direct click chain: resolveEmbed()'s chrome.permissions.request()
     // must run while the user gesture is still active, so it runs before the
     // (also-awaited, but not gesture-sensitive) hljs/katex CSS loads below.
@@ -1737,9 +1776,10 @@ function pbpApplyColorScheme(mode) {
     // YAML-prefixed buildExportMarkdown() rendered the YAML into the body as text.
     const doc = composeStyledHtml(emb.md, meta, { ...opts, imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy, hljsCss, katexCss });
     downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
-    if (emb.note > 0) showExportNote(t("mdEmbedPartial").replace("$COUNT$", emb.note));
+    if (emb.note > 0) showExportNote(t("mdEmbedPartial", String(emb.note))); // args through t() -- chrome.i18n consumes $COUNT$ before a manual replace could
   });
   document.getElementById("btn-dl-epub").addEventListener("click", async () => {
+    imgFixExportNote(true);
     // First await in the direct click chain: resolveEmbed()'s chrome.permissions.request()
     // must run while the user gesture is still active (same invariant as above).
     // keepUrls:true (Task 6): successfully fetched images stay at their absolute
@@ -1764,7 +1804,7 @@ function pbpApplyColorScheme(mode) {
     // target can be a free-text label ("Classical Chinese") that isn't a legal tag.
     meta.lang = pbpEpubLang((inTrView && typeof window.pbpTrExportTargetLang === "function" && window.pbpTrExportTargetLang()) || "und");
     downloadFile(safeTitle + ".epub", pbpBuildEpub({ md, meta, images: emb.fetched }), "application/epub+zip");
-    if (emb.note > 0) showExportNote(t("mdEmbedPartial").replace("$COUNT$", emb.note));
+    if (emb.note > 0) showExportNote(t("mdEmbedPartial", String(emb.note))); // args through t() -- chrome.i18n consumes $COUNT$ before a manual replace could
   });
 
   let _sendMenuCtl = null;
@@ -1879,6 +1919,7 @@ function pbpApplyColorScheme(mode) {
         await pbpSetLastTarget(id);
         const meta = buildMeta();
         const _exp = buildExportOpts();
+        imgFixExportNote(false);
         // Send-to never runs resolveEmbed (no permission-gesture flow here) --
         // "embed" clamps to "keep" so a plain absolute link is sent instead of
         // a dangling literal "embed" policy string reaching applyImagePolicy.

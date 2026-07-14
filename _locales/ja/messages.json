@@ -1548,10 +1548,17 @@
     "message": "削除"
   },
   "mdImgEmbed": {
-    "message": "埋め込み（オフライン対応）"
+    "message": "埋め込み（オフライン・ダウンロードのみ）"
   },
   "mdEmbedPartial": {
     "message": "$COUNT$ 枚の画像を埋め込めませんでした",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "mdImgEmbedNotHere": {
+    "message": "埋め込みはダウンロードでのみ有効です。この出力では画像リンクをそのまま保持します。"
+  },
+  "mdImgBrokenNote": {
+    "message": "$COUNT$ 枚の画像がプレビューで読み込めませんでした。エクスポート後も表示されない可能性があります。ダウンロードで「埋め込み」を選ぶと画像を同梱できます。",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {

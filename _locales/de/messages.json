@@ -1548,10 +1548,17 @@
     "message": "Entfernen"
   },
   "mdImgEmbed": {
-    "message": "Einbetten (offline)"
+    "message": "Einbetten (offline, nur Downloads)"
   },
   "mdEmbedPartial": {
     "message": "$COUNT$ Bild(er) konnten nicht eingebettet werden",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "mdImgEmbedNotHere": {
+    "message": "Einbetten gilt nur für Downloads — dieser Export behält Bildlinks."
+  },
+  "mdImgBrokenNote": {
+    "message": "$COUNT$ Bild(er) konnten in dieser Vorschau nicht geladen werden und werden nach dem Export möglicherweise nicht angezeigt; „Einbetten“ packt Bilder in Downloads.",
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdSendObsidian": {
