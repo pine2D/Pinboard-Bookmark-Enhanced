@@ -63,6 +63,11 @@
 
 body {
   width: var(--pp-popup-width, 550px); max-width: 100%;
+  /* At widths >=715px with page zoom above 1, Chrome can clamp the popup at
+     its 800 DIP ceiling, leaving a fractional CSS viewport whose rounded
+     scrollWidth exceeds clientWidth by one pixel. The body already shrinks
+     via max-width:100%, so there is no real horizontal content to scroll. */
+  overflow-x: hidden;
   /* CJK fonts named before `sans-serif` so Chinese/Japanese text uses a fast system font
      (YaHei/PingFang) instead of falling through to the profile's Standard font, which may be
      a large slow-to-shape custom family (first-render stall on hi-DPI). */
@@ -1631,13 +1636,10 @@ html[data-theme="gruvbox-dark"],
 html[data-theme="rose-pine"],
 html.dark { color-scheme: dark; }
 
-/* Themed scrollbars — light + dark themes share the same token contract,
- * mirroring the pinboard.in content script. track=bg2, thumb=fg-muted,
- * hover=accent. Webkit covers Chrome/Edge; scrollbar-color/-width covers Firefox. */
-html[data-theme] {
-  scrollbar-width: thin;
-  scrollbar-color: var(--pp-fg-muted) var(--pp-bg2);
-}
+/* Themed scrollbars — light + dark themes share the same token contract.
+ * Do not add scrollbar-width/scrollbar-color: in Chromium the standard
+ * properties disable these webkit customizations and can restore arrow
+ * buttons. This extension is Chromium-only, so no Firefox fallback is needed. */
 html[data-theme] ::-webkit-scrollbar,
 html[data-theme] textarea::-webkit-scrollbar { width: 10px; height: 10px; }
 html[data-theme] ::-webkit-scrollbar-track,
@@ -1648,11 +1650,6 @@ html[data-theme] ::-webkit-scrollbar-thumb:hover,
 html[data-theme] textarea::-webkit-scrollbar-thumb:hover { background: var(--pp-accent); }
 html[data-theme] ::-webkit-scrollbar-corner,
 html[data-theme] textarea::-webkit-scrollbar-corner { background: var(--pp-bg2); }
-html[data-theme] textarea {
-  scrollbar-width: thin;
-  scrollbar-color: var(--pp-fg-muted) var(--pp-bg2);
-}
-
 /* Shared popup themed rules */
 html[data-theme] { background: var(--pp-bg); }
 html[data-theme] body { background: var(--pp-bg); color: var(--pp-fg); }
