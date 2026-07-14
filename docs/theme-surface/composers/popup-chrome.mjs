@@ -29,7 +29,7 @@ function emitPp(ui) {
     "banner-bg", "banner-bd", "banner-fg", "warn-bg", "warn-bd", "warn-fg",
     "ok-bg", "ok-bd", "ok-fg", "offline-bg", "offline-bd", "offline-fg",
     "danger", "spinner-bg", "spinner-fg", "preset-bg", "preset-bd", "preset-fg",
-    "radius-md", "radius-lg", "radius-tag", "focus-bd", "focus-ring"]) {
+    "radius-md", "radius-lg", "radius-tag", "focus-bd", "focus-ring", "on-accent"]) {
     if (ui[k] != null) set(k, ui[k]);
   }
   // info-* are aliases of banner-* (no separate derivation)

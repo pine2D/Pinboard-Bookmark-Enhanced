@@ -485,18 +485,20 @@ html[data-theme="nord-night"] {
   --opt-tab: #3b4252;
   --opt-tab-active: #2e3440;
   --opt-fg: #d8dee9;
-  --opt-fg-muted: #81a1c1;
-  --opt-fg-hint: #939db2;
+  --opt-fg-muted: #9db7d1;
+  --opt-fg-hint: #aab2c4;
   --opt-accent: #88c0d0;
   --opt-save: #a3be8c;
   --opt-border: #434c5e;
   --opt-border-section: #434c5e;
   --opt-input-bg: #434c5e;
-  --opt-input-border: #434c5e;
-  --opt-btn-bg: #3b4252;
-  --opt-btn-hover: #3b4252;
+  --opt-input-border: #4c566a;
+  --opt-btn-bg: #434c5e;
+  --opt-btn-hover: #4c566a;
   --opt-pf-bg: #3b4252;
   --opt-code-bg: #3b4252;
+  --opt-danger: #de9fa5;
+  --opt-warn: #de9f89;
 }
 html[data-theme="terminal"] {
   --opt-bg: #0a0a0a;
@@ -549,11 +551,13 @@ html[data-theme="dracula"] {
   --opt-border: #44475a;
   --opt-border-section: #44475a;
   --opt-input-bg: #44475a;
-  --opt-input-border: #44475a;
-  --opt-btn-bg: #21222c;
-  --opt-btn-hover: #21222c;
+  --opt-input-border: #6272a4;
+  --opt-btn-bg: #343746;
+  --opt-btn-hover: #424450;
   --opt-pf-bg: #21222c;
   --opt-code-bg: #21222c;
+  --opt-danger: #ff5555;
+  --opt-warn: #ffb86c;
 }
 html[data-theme="flexoki-light"] {
   --opt-bg: #FFFCF0;
@@ -680,17 +684,19 @@ html[data-theme="gruvbox-dark"] {
   --opt-tab-active: #282828;
   --opt-fg: #ebdbb2;
   --opt-fg-muted: #a89984;
-  --opt-fg-hint: #9b8f85;
+  --opt-fg-hint: #aca093;
   --opt-accent: #83a598;
-  --opt-save: #539fa3;
+  --opt-save: #b8bb26;
   --opt-border: #504945;
   --opt-border-section: #504945;
   --opt-input-bg: #282828;
   --opt-input-border: #504945;
-  --opt-btn-bg: #3c3836;
-  --opt-btn-hover: #3c3836;
+  --opt-btn-bg: #504945;
+  --opt-btn-hover: #665c54;
   --opt-pf-bg: #3c3836;
   --opt-code-bg: #3c3836;
+  --opt-danger: #fd8265;
+  --opt-warn: #fe8019;
 }
 html[data-theme="rose-pine"] {
   --opt-bg: #191724;
@@ -705,11 +711,13 @@ html[data-theme="rose-pine"] {
   --opt-border: #26233a;
   --opt-border-section: #393552;
   --opt-input-bg: #26233a;
-  --opt-input-border: #26233a;
-  --opt-btn-bg: #1f1d2e;
-  --opt-btn-hover: #26233a;
+  --opt-input-border: #403d52;
+  --opt-btn-bg: #26233a;
+  --opt-btn-hover: #403d52;
   --opt-pf-bg: #1f1d2e;
   --opt-code-bg: #1f1d2e;
+  --opt-danger: #eb6f92;
+  --opt-warn: #f6c177;
 }
 html[data-theme="github-light"] {
   --opt-bg: #f6f8fa;
