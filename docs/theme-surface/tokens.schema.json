@@ -345,6 +345,30 @@
       }
     },
 
+    "ui": {
+      "type": "object",
+      "description": "Optional extension-UI token overrides applied AFTER _ui-derive's automatic derivation, per surface and mode. Values are emitted verbatim into the html[data-theme] block (--pp-*/--opt-*). Use for theme-specific refinements the palette derivation cannot express (e.g. Flexoki's official-scale status tints, per-theme radius steps).",
+      "additionalProperties": false,
+      "properties": {
+        "popup": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "light": { "type": "object", "additionalProperties": { "type": "string" } },
+            "dark":  { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "light": { "type": "object", "additionalProperties": { "type": "string" } },
+            "dark":  { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        }
+      }
+    },
+
     "overrides": {
       "type": "object",
       "description": "Escape hatch: surface-keyed CSS rule fragments emitted verbatim AFTER the composer output. Use sparingly for bespoke surfaces the composer cannot express. Keys MUST match a surface id in manifest.json.",

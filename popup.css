@@ -53,6 +53,10 @@
   --pp-radius-md: 8px;
   --pp-radius-lg: 10px;
   --pp-radius-full: 9999px;
+  /* Tag chip radius — its own token so themes can opt out of the pill shape
+     (Flexoki uses a 6px "type-block" per its print-like character) without
+     touching --pp-radius-full users (progress bar, avatars). */
+  --pp-radius-tag: var(--pp-radius-full);
 
   /* Shadow scale */
   --pp-shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
@@ -341,7 +345,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tags-display { display: contents; }
 .tag-item {
   display: inline-flex; align-items: center; background: var(--pp-tag-bg); color: var(--pp-tag-fg);
-  padding: 1px 8px; border-radius: var(--pp-radius-full); font-size: 11px; gap: 3px;
+  padding: 1px 8px; border-radius: var(--pp-radius-tag); font-size: 11px; gap: 3px;
   line-height: 18px; white-space: nowrap;
 }
 .tag-remove {
@@ -1248,36 +1252,39 @@ html[data-theme="flexoki-light"] {
   --pp-bg2: #F2F0E5;
   --pp-fg: #100F0F;
   --pp-fg-muted: #6f6e69;
-  --pp-fg-hint: #777467;
+  --pp-fg-hint: #6F6E69;
   --pp-link: #205EA6;
   --pp-accent: #205EA6;
-  --pp-accent2: #AD5097;
+  --pp-accent2: #5E409D;
   --pp-border: #E6E4D9;
   --pp-divider: #E6E4D9;
-  --pp-input-bg: #FFFCF0;
+  --pp-input-bg: #F2F0E5;
   --pp-input-focus-bg: #FFFCF0;
-  --pp-tag-bg: transparent;
-  --pp-tag-fg: #AD8301;
-  --pp-tag-hover: #F2F0E5;
+  --pp-tag-bg: #FAEEC6;
+  --pp-tag-fg: #664D01;
+  --pp-tag-hover: #F6E2A0;
   --pp-drop-hover: #F2F0E5;
-  --pp-banner-bg: #e4e9e7;
-  --pp-banner-bd: #82a4c7;
-  --pp-banner-fg: #205ea6;
-  --pp-warn-bg: #f5e4d8;
-  --pp-warn-bd: #d28a81;
-  --pp-warn-fg: #af3029;
-  --pp-ok-bg: #ededd5;
-  --pp-ok-bd: #a2ad6f;
-  --pp-ok-fg: #576d09;
-  --pp-offline-bg: #f9f1d6;
-  --pp-offline-bd: #c0ad72;
-  --pp-offline-fg: #86680e;
+  --pp-banner-bg: #E1ECEB;
+  --pp-banner-bd: #ABCFE2;
+  --pp-banner-fg: #205EA6;
+  --pp-warn-bg: #FFE1D5;
+  --pp-warn-bd: #FDB2A2;
+  --pp-warn-fg: #AF3029;
+  --pp-ok-bg: #EDEECF;
+  --pp-ok-bd: #CDD597;
+  --pp-ok-fg: #536907;
+  --pp-offline-bg: #FAEEC6;
+  --pp-offline-bd: #F1D67E;
+  --pp-offline-fg: #664D01;
   --pp-danger: #AF3029;
   --pp-spinner-bg: #E6E4D9;
   --pp-spinner-fg: #205EA6;
   --pp-preset-bg: #F2F0E5;
   --pp-preset-bd: #E6E4D9;
   --pp-preset-fg: #205EA6;
+  --pp-radius-md: 6px;
+  --pp-radius-lg: 8px;
+  --pp-radius-tag: 6px;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);
@@ -1286,37 +1293,40 @@ html[data-theme="flexoki-dark"] {
   --pp-bg: #1C1B1A;
   --pp-bg2: #282726;
   --pp-fg: #CECDC3;
-  --pp-fg-muted: #868480;
+  --pp-fg-muted: #9F9D96;
   --pp-fg-hint: #878580;
   --pp-link: #4385BE;
   --pp-accent: #4385BE;
-  --pp-accent2: #CE5D97;
+  --pp-accent2: #8B7EC8;
   --pp-border: #403E3C;
   --pp-divider: #343331;
   --pp-input-bg: #282726;
-  --pp-input-focus-bg: #383635;
-  --pp-tag-bg: transparent;
+  --pp-input-focus-bg: #343331;
+  --pp-tag-bg: #3A2D04;
   --pp-tag-fg: #D0A215;
-  --pp-tag-hover: #343331;
+  --pp-tag-hover: #503D02;
   --pp-drop-hover: #343331;
-  --pp-banner-bg: #232e38;
-  --pp-banner-bd: #426480;
-  --pp-banner-fg: #6199c8;
-  --pp-warn-bg: #3d2421;
-  --pp-warn-bd: #8c4c46;
-  --pp-warn-fg: #db736a;
-  --pp-ok-bg: #2f3220;
-  --pp-ok-bd: #5f692e;
-  --pp-ok-fg: #8ea13c;
-  --pp-offline-bg: #3c3319;
-  --pp-offline-bd: #866b17;
-  --pp-offline-fg: #d0a215;
+  --pp-banner-bg: #12253B;
+  --pp-banner-bd: #163B66;
+  --pp-banner-fg: #66A0C8;
+  --pp-warn-bg: #3E1715;
+  --pp-warn-bd: #6C201C;
+  --pp-warn-fg: #E8705F;
+  --pp-ok-bg: #252D09;
+  --pp-ok-bd: #3D4C07;
+  --pp-ok-fg: #A0AF54;
+  --pp-offline-bg: #3A2D04;
+  --pp-offline-bd: #664D01;
+  --pp-offline-fg: #DFB431;
   --pp-danger: #D14D41;
   --pp-spinner-bg: #403E3C;
   --pp-spinner-fg: #4385BE;
   --pp-preset-bg: #343331;
   --pp-preset-bd: #403E3C;
   --pp-preset-fg: #4385BE;
+  --pp-radius-md: 6px;
+  --pp-radius-lg: 8px;
+  --pp-radius-tag: 6px;
   --pp-info-bg: var(--pp-banner-bg);
   --pp-info-bd: var(--pp-banner-bd);
   --pp-info-fg: var(--pp-banner-fg);

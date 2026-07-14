@@ -557,17 +557,19 @@ html[data-theme="flexoki-light"] {
   --opt-tab-active: #FFFCF0;
   --opt-fg: #100F0F;
   --opt-fg-muted: #6f6e69;
-  --opt-fg-hint: #777467;
+  --opt-fg-hint: #6F6E69;
   --opt-accent: #205EA6;
-  --opt-save: #5f770a;
+  --opt-save: #536907;
   --opt-border: #E6E4D9;
   --opt-border-section: #E6E4D9;
   --opt-input-bg: #FFFCF0;
   --opt-input-border: #E6E4D9;
   --opt-btn-bg: #F2F0E5;
-  --opt-btn-hover: #F2F0E5;
-  --opt-pf-bg: #F2F0E5;
-  --opt-code-bg: #F2F0E5;
+  --opt-btn-hover: #E6E4D9;
+  --opt-pf-bg: #E6E4D9;
+  --opt-code-bg: #E6E4D9;
+  --opt-danger: #AF3029;
+  --opt-radius-lg: 8px;
 }
 html[data-theme="flexoki-dark"] {
   --opt-bg: #1C1B1A;
@@ -575,18 +577,20 @@ html[data-theme="flexoki-dark"] {
   --opt-tab: #282726;
   --opt-tab-active: #1C1B1A;
   --opt-fg: #CECDC3;
-  --opt-fg-muted: #868480;
+  --opt-fg-muted: #9F9D96;
   --opt-fg-hint: #878580;
   --opt-accent: #4385BE;
   --opt-save: #879a39;
   --opt-border: #403E3C;
   --opt-border-section: #343331;
-  --opt-input-bg: #282726;
+  --opt-input-bg: #343331;
   --opt-input-border: #403E3C;
-  --opt-btn-bg: #282726;
-  --opt-btn-hover: #343331;
-  --opt-pf-bg: #282726;
-  --opt-code-bg: #282726;
+  --opt-btn-bg: #343331;
+  --opt-btn-hover: #403E3C;
+  --opt-pf-bg: #1C1B1A;
+  --opt-code-bg: #1C1B1A;
+  --opt-danger: #E8705F;
+  --opt-radius-lg: 8px;
 }
 html[data-theme="solarized-light"] {
   --opt-bg: #fdf6e3;
@@ -740,7 +744,7 @@ html[data-theme] .tab-btn { color: var(--opt-fg-muted); }
 html[data-theme] .tab-btn:hover:not(.active) { color: var(--opt-fg); border-left-color: var(--opt-border); background: color-mix(in srgb, var(--opt-accent) 8%, transparent); }
 html[data-theme] .tab-btn.active { color: var(--opt-fg); border-left-color: var(--opt-accent, var(--opt-fg)); background: var(--opt-tab-active); }
 html[data-theme] .reset-tab-btn { color: var(--opt-fg-hint, var(--opt-fg-muted)); border-top-color: var(--opt-border-section, var(--opt-border)); }
-html[data-theme] .reset-tab-btn:hover { color: #e55; }
+html[data-theme] .reset-tab-btn:hover { color: var(--opt-danger, #e55); }
 html[data-theme] .panel { background: var(--opt-panel); border-color: var(--opt-border); }
 html[data-theme] .fg label { color: var(--opt-fg); }
 html[data-theme] .fg label.bl { color: var(--opt-fg-muted); }

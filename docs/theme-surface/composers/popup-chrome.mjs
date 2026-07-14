@@ -28,7 +28,8 @@ function emitPp(ui) {
     "border", "divider", "input-bg", "input-focus-bg", "tag-bg", "tag-fg", "tag-hover", "drop-hover",
     "banner-bg", "banner-bd", "banner-fg", "warn-bg", "warn-bd", "warn-fg",
     "ok-bg", "ok-bd", "ok-fg", "offline-bg", "offline-bd", "offline-fg",
-    "danger", "spinner-bg", "spinner-fg", "preset-bg", "preset-bd", "preset-fg"]) {
+    "danger", "spinner-bg", "spinner-fg", "preset-bg", "preset-bd", "preset-fg",
+    "radius-md", "radius-lg", "radius-tag"]) {
     if (ui[k] != null) set(k, ui[k]);
   }
   // info-* are aliases of banner-* (no separate derivation)
@@ -46,7 +47,9 @@ export function composePopupThemes(tokensByPilot) {
     if (!tk) throw new Error(`popup-chrome: missing pilot ${entry.pilot} for ${entry.id}`);
     const merged = entry.useDarkMode && tk.modes?.dark ? mergeTokens(tk, tk.modes.dark) : tk;
     const palette = expandPalette(merged.palette);
-    const ui = deriveUiColors(palette, entry.mode);
+    // Pilot-level ui overrides (tokens.json `ui.popup.<mode>`) win over derivation:
+    // theme-specific refinements the palette derivation cannot express.
+    const ui = { ...deriveUiColors(palette, entry.mode), ...(tk.ui?.popup?.[entry.mode] ?? {}) };
     blocks.push(`html[data-theme="${entry.id}"] {\n${emitPp(ui)}\n}`);
   }
   return blocks.join("\n");
