@@ -525,6 +525,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
 .quick-actions {
   margin-top: 10px;
   background: var(--pp-bg2);
+  /* Bottom buffer: on hi-DPI the body zoom (1.12/1.22) makes the content height
+     fractional and Chrome floors the popup window height, clipping the last 1-2px
+     — visible on the last row's rounded bottom borders (height sibling of the
+     714px fractional-width bug). Padding (not a child margin) so it can't
+     margin-collapse out of the container and it paints in the strip's own bg.
+     3px: the rounding clip is at most ~2px; anything more reads as dead space. */
+  padding-bottom: 3px;
 }
 .quick-actions .divider {
   border: none;
