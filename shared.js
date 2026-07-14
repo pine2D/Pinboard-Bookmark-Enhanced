@@ -1412,7 +1412,7 @@ function showConfirmPopover(anchor, opts) {
   if (_activeConfirmPopover?.anchor === anchor && _activeConfirmPopover.pop.isConnected) return;
   const { msg, yesText, noText, onConfirm, onCancel } = opts || {};
   const opener = document.activeElement;
-  _activeConfirmPopover?.dismiss({ restoreFocus: false });
+  _activeConfirmPopover?.dismiss({ restoreFocus: false, animate: false });
   const pop = document.createElement("div");
   pop.className = "confirm-popover";
   pop.setAttribute("role", "dialog");
@@ -1450,13 +1450,31 @@ function showConfirmPopover(anchor, opts) {
     bottom: "auto",
   });
 
-  function dismiss({ restoreFocus = true } = {}) {
-    pop.remove();
+  let dismissed = false;
+  function dismiss({ restoreFocus = true, animate = true } = {}) {
+    if (dismissed) return;
+    dismissed = true;
     if (_activeConfirmPopover?.pop === pop) _activeConfirmPopover = null;
     document.removeEventListener("keydown", onKey, true);
     window.removeEventListener("resize", dismiss);
     window.removeEventListener("scroll", dismiss, true);
     if (restoreFocus && opener && opener.isConnected && typeof opener.focus === "function") opener.focus();
+
+    const animateOut = animate
+      && document.documentElement.classList.contains("motion-ready")
+      && /\/options\.html$/.test(location.pathname)
+      && !(typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+    if (!animateOut) {
+      pop.remove();
+      return;
+    }
+    pop.inert = true;
+    pop.setAttribute("aria-hidden", "true");
+    pop.classList.add("is-closing");
+    const remove = () => pop.remove();
+    pop.addEventListener("transitionend", remove, { once: true });
+    const outMs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--motion-pop-out")) || 100;
+    setTimeout(remove, outMs + 50);
   }
   function onKey(ev) {
     if (ev.key === "Escape") {

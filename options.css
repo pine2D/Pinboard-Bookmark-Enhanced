@@ -4,6 +4,11 @@
 
 /* ---- Design tokens (default light mode; theme/dark blocks override) ---- */
 :root {
+  interpolate-size: allow-keywords;
+  --motion-collapse: 200ms;
+  --motion-pop: 140ms;
+  --motion-pop-out: 100ms;
+  --motion-ease: ease;
   --opt-radius-sm: 3px;
   --opt-radius-md: 6px;
   --opt-radius-lg: 10px;
@@ -336,14 +341,48 @@ html[data-theme] .et-field select:focus-visible { box-shadow: 0 0 0 3px color-mi
 }
 .accordion-section.open .accordion-arrow { transform: rotate(90deg); top: 2px; }
 .accordion-body {
-  display: none; padding: 0 0 12px 18px;
+  /* bottom padding lives on .open (and transitions with the height): with it on
+     the base rule, border-box height bottoms out at the 12px padding floor a
+     beat before display flips -- a visible end-of-close stall. */
+  display: none; height: 0; overflow: clip; padding: 0 0 0 18px;
   /* Layout isolation: the 3 Quick-Actions accordions ship open, so switching to
      that tab laid out all their bodies at once (~153ms at 4K, felt like ~1s with
      paint). contain:layout keeps each body's internal layout from joining the
      panel-wide reflow, dropping first-layout cost to ~0 without changing the UX. */
   contain: layout style;
 }
-.accordion-section.open .accordion-body { display: block; }
+.accordion-section.open .accordion-body { display: block; height: auto; padding-bottom: 12px; }
+/* .motion-toggle (set by options.js on user clicks only, dropped ~400ms later)
+   gates the transition AND the @starting-style entry: without it, every tab
+   switch re-renders the panel subtree and replays the grow-from-0 entry. */
+html.motion-ready .accordion-section.motion-toggle .accordion-body {
+  transition: height var(--motion-collapse) var(--motion-ease),
+              padding-bottom var(--motion-collapse) var(--motion-ease),
+              display var(--motion-collapse) allow-discrete;
+}
+html.motion-ready .accordion-section.motion-toggle.open .accordion-body {
+  @starting-style { height: 0; padding-bottom: 0; }
+}
+
+/* Native details uses the same disclosure motion as the custom accordions.
+   Older Chromium versions that lack ::details-content simply keep native
+   instant open/close behavior. */
+details::details-content {
+  height: 0;
+  overflow: clip;
+  content-visibility: hidden;
+}
+details[open]::details-content {
+  height: auto;
+  content-visibility: visible;
+}
+html.motion-ready details.motion-toggle::details-content {
+  transition: height var(--motion-collapse) var(--motion-ease),
+              content-visibility var(--motion-collapse) allow-discrete;
+}
+html.motion-ready details.motion-toggle[open]::details-content {
+  @starting-style { height: 0; }
+}
 
 /* ---- Auto-save indicator ---- */
 .auto-save-hint {
@@ -906,7 +945,19 @@ html[data-theme] textarea::-webkit-scrollbar-corner { background: var(--opt-pane
   padding: 5px 10px; font-size: 11px; color: #c00;
   background: #fff; border: 1px solid #ccc; border-radius: var(--opt-radius-sm);
   box-shadow: var(--opt-shadow-md);
-  animation: confirmFadeIn 0.12s ease;
+}
+html.motion-ready .confirm-popover {
+  opacity: 1;
+  translate: 0 0;
+  transition: opacity var(--motion-pop) var(--motion-ease),
+              translate var(--motion-pop) var(--motion-ease);
+  @starting-style { opacity: 0; translate: 0 -4px; }
+}
+html.motion-ready .confirm-popover.is-closing {
+  opacity: 0;
+  translate: 0 -4px;
+  pointer-events: none;
+  transition-duration: var(--motion-pop-out);
 }
 /* pre-line: the tag-gov messages embed a real newline (summary line + time estimate);
    under the old nowrap it collapsed to one ever-wider unwrappable line that could
@@ -920,8 +971,6 @@ html[data-theme] textarea::-webkit-scrollbar-corner { background: var(--opt-pane
 .confirm-popover .confirm-no { background: none; color: #666; border-color: #ccc; }
 .confirm-popover .confirm-no:hover { background: #eee; }
 .confirm-popover button:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 1px; }
-@keyframes confirmFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-
 html[data-theme] .confirm-popover { color: #e55; background: var(--opt-panel); border-color: var(--opt-border); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
 html[data-theme] .confirm-popover .confirm-yes { background: #e55; border-color: #c33; }
 html[data-theme] .confirm-popover .confirm-yes:hover { background: #c33; }

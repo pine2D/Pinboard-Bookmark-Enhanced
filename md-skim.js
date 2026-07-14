@@ -171,20 +171,37 @@ function _pbpSkimBuildSection(view) {
 // second "is it open" control to keep in sync). Default expanded
 // (get() default false = not collapsed).
 function _pbpSkimWireCollapse(sec, collapseBtn) {
-  const setCollapsed = (collapsed) => {
-    sec.classList.toggle("collapsed", collapsed);
+  // State lives in a variable, not the class: pbpFoldHeightAnimate defers the
+  // hiding class until the tween finishes, so reading classList mid-animation
+  // would see the OLD state and a quick second click would not reverse.
+  let isCollapsed = false;
+  let foldAnim = null;
+  // Same guard as pbpRailCollapsible's `overridden`: the storage restore is a
+  // real IPC round-trip, so a click landing before it resolves must not be
+  // silently reverted by the stale read.
+  let overridden = false;
+  const setCollapsed = (collapsed, animate) => {
+    isCollapsed = collapsed;
     collapseBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    const fold = (v) => sec.classList.toggle("collapsed", v);
+    if (typeof pbpFoldHeightAnimate === "function") { // md-preview.js; absent on file:// test loads
+      foldAnim = pbpFoldHeightAnimate(sec, collapsed, fold, foldAnim, !!animate);
+    } else {
+      fold(collapsed);
+    }
   };
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
     try {
       chrome.storage.local.get({ pbp_skim_collapsed: false }, (res) => {
-        setCollapsed(!!(res && res.pbp_skim_collapsed));
+        if (overridden) return;
+        setCollapsed(!!(res && res.pbp_skim_collapsed)); // restore: no animation
       });
     } catch (_) {}
   }
   collapseBtn.addEventListener("click", () => {
-    const collapsed = !sec.classList.contains("collapsed");
-    setCollapsed(collapsed);
+    overridden = true;
+    const collapsed = !isCollapsed;
+    setCollapsed(collapsed, true);
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
       try { chrome.storage.local.set({ pbp_skim_collapsed: collapsed }); } catch (_) {}
     }

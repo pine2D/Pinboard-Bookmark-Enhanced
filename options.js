@@ -54,6 +54,13 @@ async function saveOverlayWithFallback(value) {
 
 let _tagGovVisibleAccount = "";
 
+// Enable decorative transitions only after the initial page has painted.
+if (typeof requestAnimationFrame === "function") {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.documentElement.classList.add("motion-ready");
+  }));
+}
+
 function _tagGovUiOwned(account) {
   const card = $id("tag-gov-progress");
   return !!account && _tagGovVisibleAccount === account && card?.dataset.account === account;
@@ -762,17 +769,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       // st === undefined -> leave the HTML default (.open or not)
     });
   }
+  // Motion gate: only user-initiated toggles get the height transition.
+  // @starting-style replays its entry animation EVERY time the element goes
+  // from not-rendered to rendered -- and tab panels toggle display:none, so
+  // without this gate every tab switch replayed the accordions/details
+  // growing from 0. The marker outlives the 200ms transition, then drops.
+  function pbpMotionMark(el) {
+    clearTimeout(el._ppMotionT);
+    el.classList.add("motion-toggle");
+    el._ppMotionT = setTimeout(() => el.classList.remove("motion-toggle"), 400);
+  }
   // Event delegation handles both static and dynamically-created accordion headers.
   document.addEventListener("click", (e) => {
     const header = e.target.closest(".accordion-header");
     if (!header) return;
     const sec = header.closest(".accordion-section");
     if (!sec) return;
+    pbpMotionMark(sec); // before the class flip so the entry frame sees it
     const isOpen = sec.classList.toggle("open");
     header.setAttribute("aria-expanded", String(isOpen));
     const key = header.dataset.target;
     if (key) pbpAccSet(key, isOpen);
   });
+  // Same gate for native <details>: capture phase runs before the default
+  // toggle action renders ::details-content, so the marker is in place for
+  // the entry frame. Delegated -> also covers dynamically-created details.
+  document.addEventListener("click", (e) => {
+    const summary = e.target.closest("summary");
+    const det = summary && summary.closest("details");
+    if (det) pbpMotionMark(det);
+  }, true);
 
   setupSecretToggles();
 

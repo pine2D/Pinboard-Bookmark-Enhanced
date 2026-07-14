@@ -2,6 +2,13 @@
 // Markdown Preview Page
 // ============================================================
 
+// Enable decorative transitions only after the initial page has painted.
+if (typeof requestAnimationFrame === "function") {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.documentElement.classList.add("motion-ready");
+  }));
+}
+
 // Render the styled empty state and hide the rail so the page reads as
 // intentional (not a half-rendered document). textContent only — no innerHTML.
 function renderEmptyState(message) {
@@ -226,6 +233,62 @@ function renderBookmarkBadge(resp, url) {
 }
 
 // ============================================================
+// Measured-height fold animation, shared by the rail accordion and the skim
+// layer (md-skim.js loads after this file; it calls at runtime only).
+// setFolded(v) must toggle ONLY the hiding class. Both endpoints are MEASURED
+// from the real start/end states -- computing the collapsed target from
+// head-height + paddings drifted from the truth (the head's own margins were
+// missing), which snapped the box ~20px taller the instant the class landed.
+// During the tween the content stays visible and is clipped away; the hiding
+// class is applied on finish. Returns the Animation (pass it back as `prev`
+// so a rapid reversal cancels it and resumes from the painted frame), or
+// null when it fell back to an instant toggle (not motion-ready, reduced
+// motion, display:none subtree, or animate=false).
+// ============================================================
+function pbpFoldHeightAnimate(el, next, setFolded, prev, animate) {
+  const reduceMotion = typeof matchMedia === "function"
+    && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const canAnimate = !!animate && !!el.animate
+    && document.documentElement.classList.contains("motion-ready")
+    && el.isConnected && el.getClientRects().length > 0
+    && !reduceMotion;
+
+  if (!canAnimate) {
+    if (prev) prev.cancel();
+    setFolded(next);
+    el.style.removeProperty("height");
+    el.style.removeProperty("overflow");
+    return null;
+  }
+
+  // Capture the currently painted height before cancelling so a rapid
+  // reversal continues from the interrupted frame instead of jumping.
+  const currentHeight = el.getBoundingClientRect().height;
+  if (prev) prev.cancel();
+
+  el.style.removeProperty("height");
+  setFolded(next);
+  const endHeight = el.offsetHeight; // real end state, margins and all
+  setFolded(false);                  // content visible while the height tweens
+  el.style.height = currentHeight + "px";
+  el.style.overflow = "clip";
+
+  const cs = getComputedStyle(el);
+  const duration = parseFloat(cs.getPropertyValue("--motion-collapse")) || 200;
+  const easing = cs.getPropertyValue("--motion-ease").trim() || "ease";
+  const animation = el.animate(
+    [{ height: currentHeight + "px" }, { height: endHeight + "px" }],
+    { duration, easing }
+  );
+  animation.onfinish = () => {
+    setFolded(next);
+    el.style.removeProperty("height");
+    el.style.removeProperty("overflow");
+  };
+  return animation;
+}
+
+// ============================================================
 // Rail accordion (spec: docs/superpowers/specs/2026-07-04-md-preview-hl-
 // notebook-rail-design.md). pbpRailCollapseState is PURE (no DOM/chrome).
 // pbpRailCollapsible touches DOM + chrome.storage.local, but (like
@@ -302,20 +365,28 @@ function pbpRailCollapsible(sectionEl, key, opts) {
     && sectionEl.children[0] === opts.label;
   let collapsed = !!opts.defaultCollapsed;
   let headBtn = null;
+  let railAnimation = null;
   // Set true by a user click or an explicit expand()/collapse() call (e.g. Task 2's
   // cache-restore auto-expand). Once true, the async storage catch-up below never
   // applies its correction -- otherwise a toggle landing between install and the
   // chrome.storage.local.get() resolving gets silently reverted by a stale read.
   let overridden = false;
 
-  function applyDom(next) {
-    sectionEl.classList.toggle("rail-collapsed", next);
+  function applyDom(next, animate) {
     if (headBtn) headBtn.setAttribute("aria-expanded", next ? "false" : "true");
+    railAnimation = pbpFoldHeightAnimate(
+      sectionEl,
+      next,
+      (v) => sectionEl.classList.toggle("rail-collapsed", v),
+      railAnimation,
+      !!animate && !!headBtn
+    );
   }
 
-  function setState(next, persist) {
+  function setState(next, persist, animate) {
+    const changed = next !== collapsed;
     collapsed = next;
-    if (!headless) applyDom(next);
+    if (!headless) applyDom(next, changed && animate);
     if (persist) _pbpRailPersist(key, next);
   }
 
@@ -360,7 +431,7 @@ function pbpRailCollapsible(sectionEl, key, opts) {
     if (existingLabelEl) existingLabelEl.replaceWith(headBtn);
     else sectionEl.insertBefore(headBtn, sectionEl.firstChild);
 
-    headBtn.addEventListener("click", () => { overridden = true; setState(!collapsed, true); });
+    headBtn.addEventListener("click", () => { overridden = true; setState(!collapsed, true, true); });
 
     // Apply the default SYNCHRONOUSLY, before the async storage read below.
     // chrome.storage.local.get() is a real IPC round-trip in the extension
@@ -372,20 +443,20 @@ function pbpRailCollapsible(sectionEl, key, opts) {
     // stored override, or an override that matches the default) with zero
     // flash; only a genuinely different stored value causes the async
     // branch below to fix it up with one visible re-toggle.
-    applyDom(collapsed);
+    applyDom(collapsed, false);
   }
 
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(PBP_RAIL_STORAGE_KEY).then((r) => {
       if (overridden) return; // a click or expand()/collapse() already set the authoritative state -- don't fight it
       const merged = pbpRailCollapseState(r && r[PBP_RAIL_STORAGE_KEY], { [key]: !!opts.defaultCollapsed });
-      if (merged[key] !== collapsed) setState(merged[key], false);
+      if (merged[key] !== collapsed) setState(merged[key], false, true);
     }).catch(() => {});
   }
 
   return {
-    expand(temp) { overridden = true; setState(false, !temp); },
-    collapse() { overridden = true; setState(true, true); },
+    expand(temp) { overridden = true; setState(false, !temp, true); },
+    collapse() { overridden = true; setState(true, true, true); },
     isCollapsed() { return collapsed; },
   };
 }

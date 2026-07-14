@@ -3,6 +3,10 @@
    ============================================================ */
 
 :root {
+  --motion-collapse: 200ms;
+  --motion-pop: 140ms;
+  --motion-pop-out: 100ms;
+  --motion-ease: ease;
   /* A "warm-neutral reading" palette -- document-optimized. Single
      light-dark() definition per token (Chrome 123+); color-scheme tells
      the UA which branch to resolve and also themes native form controls /
@@ -1168,6 +1172,20 @@ body.md-empty main { margin-left: 0; }
   background: var(--bg, #fff); border: 1px solid var(--border, #d8dee4); border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 4px; max-height: 320px; overflow: auto; }
 .send-menu[hidden] { display: none; }
+html.motion-ready .send-menu {
+  opacity: 1;
+  translate: 0 0;
+  transition: opacity var(--motion-pop) var(--motion-ease),
+              translate var(--motion-pop) var(--motion-ease),
+              display var(--motion-pop) allow-discrete;
+  @starting-style { opacity: 0; translate: 0 -4px; }
+}
+html.motion-ready .send-menu[hidden] {
+  opacity: 0;
+  translate: 0 -4px;
+  pointer-events: none; /* stays rendered through the 100ms fade-out; must not eat clicks */
+  transition-duration: var(--motion-pop-out);
+}
 .send-mi { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px;
   background: none; border: 0; border-radius: 6px; font: inherit; color: inherit;
   text-align: left; cursor: pointer; }
@@ -1269,6 +1287,22 @@ body.md-empty main { margin-left: 0; }
   font-size: 14px;
 }
 #explain-pop:popover-open { display: flex; }
+html.motion-ready :is(#explain-pop, #typo-pop) {
+  opacity: 0;
+  translate: 0 -4px;
+  pointer-events: none; /* stays rendered through the close fade; must not eat clicks */
+  transition: opacity var(--motion-pop-out) var(--motion-ease),
+              translate var(--motion-pop-out) var(--motion-ease),
+              display var(--motion-pop-out) allow-discrete,
+              overlay var(--motion-pop-out) allow-discrete;
+}
+html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+  transition-duration: var(--motion-pop);
+  @starting-style { opacity: 0; translate: 0 -4px; }
+}
 #explain-pop button, #explain-pop input { font-family: inherit; }
 .xp-head {
   display: flex;
@@ -1389,6 +1423,21 @@ body.md-empty main { margin-left: 0; }
   font-size: 12px;
 }
 .xp-gear-menu[hidden] { display: none; }
+/* Same open/close motion as .send-menu (both are [hidden]-toggled dropdowns). */
+html.motion-ready .xp-gear-menu {
+  opacity: 1;
+  translate: 0 0;
+  transition: opacity var(--motion-pop) var(--motion-ease),
+              translate var(--motion-pop) var(--motion-ease),
+              display var(--motion-pop) allow-discrete;
+  @starting-style { opacity: 0; translate: 0 -4px; }
+}
+html.motion-ready .xp-gear-menu[hidden] {
+  opacity: 0;
+  translate: 0 -4px;
+  pointer-events: none; /* stays rendered through the 100ms fade-out; must not eat clicks */
+  transition-duration: var(--motion-pop-out);
+}
 .xp-gear-menu label {
   display: flex;
   align-items: center;
@@ -1568,6 +1617,22 @@ body.tr-only #rendered-view [data-pb-hl-mirror="5"] { box-shadow: inset 3px 0 0 
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
 }
 #pb-hl-bar:popover-open { display: flex; }
+html.motion-ready #pb-hl-bar {
+  opacity: 0;
+  translate: 0 -4px;
+  pointer-events: none; /* stays rendered through the close fade; must not eat clicks */
+  transition: opacity var(--motion-pop-out) var(--motion-ease),
+              translate var(--motion-pop-out) var(--motion-ease),
+              display var(--motion-pop-out) allow-discrete,
+              overlay var(--motion-pop-out) allow-discrete;
+}
+html.motion-ready #pb-hl-bar:popover-open {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+  transition-duration: var(--motion-pop-out);
+  @starting-style { opacity: 0; translate: 0 -4px; }
+}
 .pb-hl-dot {
   width: 18px;
   height: 18px;
@@ -2135,6 +2200,21 @@ body.ask-open main { margin-right: 396px; }
   font-size: 13px;
 }
 #fn-pop:popover-open { display: flex; }
+/* Position is measured immediately after showPopover(), so the footnote
+   overlay fades without translation to keep its anchor geometry stable. */
+html.motion-ready #fn-pop {
+  opacity: 0;
+  pointer-events: none; /* stays rendered through the close fade; must not eat clicks */
+  transition: opacity var(--motion-pop-out) var(--motion-ease),
+              display var(--motion-pop-out) allow-discrete,
+              overlay var(--motion-pop-out) allow-discrete;
+}
+html.motion-ready #fn-pop:popover-open {
+  opacity: 1;
+  pointer-events: auto;
+  transition-duration: var(--motion-pop);
+  @starting-style { opacity: 0; }
+}
 #fn-pop button { font-family: inherit; }
 .fn-pop-body {
   overflow-y: auto;
@@ -2273,6 +2353,23 @@ body.ask-open main { margin-right: 396px; }
   overflow-y: auto;
 }
 #kbd-help-pop:popover-open { display: flex; }
+/* Fade for the remaining popover family members (search "/", "?" help, and
+   the highlight note card). Opacity-only -- all three are measure-then-place
+   or keyboard-summoned; a translate would skew any post-showPopover
+   getBoundingClientRect the placing code takes. */
+html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card) {
+  opacity: 0;
+  pointer-events: none; /* stays rendered through the close fade; must not eat clicks */
+  transition: opacity var(--motion-pop-out) var(--motion-ease),
+              display var(--motion-pop-out) allow-discrete,
+              overlay var(--motion-pop-out) allow-discrete;
+}
+html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
+  opacity: 1;
+  pointer-events: auto;
+  transition-duration: var(--motion-pop);
+  @starting-style { opacity: 0; }
+}
 .kbd-help-title { font-weight: 600; font-size: 14px; }
 .kbd-help-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .kbd-help-row { display: flex; align-items: center; gap: 10px; }
@@ -2456,7 +2553,10 @@ body.ask-open main { margin-right: 396px; }
 .skim-ic:hover { background: var(--btn-hover); color: var(--fg); }
 .skim-ic:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .skim-ic svg { width: 15px; height: 15px; transition: transform 150ms ease; }
-#skim-section.collapsed #skim-collapse svg { transform: rotate(-90deg); }
+/* Keyed off aria-expanded (set immediately), not .collapsed: the fold
+   animation defers the class until the height tween finishes, and the arrow
+   must flip at click time like the rail triangles do. */
+#skim-collapse[aria-expanded="false"] svg { transform: rotate(-90deg); }
 @media (prefers-reduced-motion: reduce) {
   .skim-ic svg { transition: none; }
 }
