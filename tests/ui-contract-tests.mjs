@@ -565,6 +565,24 @@ check(!mdReaderJs.includes("function pbpTypoApplyVars") && !mdReaderJs.includes(
 check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code, kbd, samp\) \{\s*\n\s*text-autospace: no-autospace;/.test(mdCss),
   "md-preview.css: text-autospace code/pre exemption lost (autospace widens code glyph runs next to CJK)");
 
+// ---- A4: export reuse of the preview fix cache (Codex-adjudicated). Scoped
+// to the resolveEmbed function body, not the whole file. ----
+{
+  const embedFn = mdPreviewJs.slice(mdPreviewJs.indexOf("async function resolveEmbed"), mdPreviewJs.indexOf("// Fill header"));
+  // The partition is synchronous and sits BEFORE the permission prompt --
+  // chrome.permissions.request must stay the click chain's FIRST await, and a
+  // full cache hit must reach zero-prompt/zero-network without ever asking.
+  const partAt = embedFn.indexOf("pbpEmbedCacheEntryValid(");
+  const permAt = embedFn.indexOf("chrome.permissions.request");
+  check(partAt >= 0 && permAt >= 0 && partAt < permAt,
+    "md-preview.js: resolveEmbed cache partition missing or moved after the permission prompt (first-await gesture invariant)");
+  // The hotlink retry draws failures from the NETWORK list only: cache hits
+  // and budget-dropped entries must never reach the DNR retry round.
+  check(embedFn.includes("toFetch.filter((u) => !fetched.has(u))") &&
+    !embedFn.includes("scan.candidates.filter((u) => !fetched.has(u))"),
+    "md-preview.js: resolveEmbed retry round no longer scoped to the network list (cache/budget-dropped urls would refetch)");
+}
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);

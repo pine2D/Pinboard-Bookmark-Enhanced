@@ -845,10 +845,6 @@ function pbpApplyColorScheme(mode) {
     // escaped \![ first. A pre-pass here would rewrite pseudo-image URLs sitting
     // inside code spans before that masking ever ran.
     const scan = pbpEmbedScan(rawMd, meta.url || "");
-    let granted = false;
-    if (scan.origins.length) {
-      try { granted = await chrome.permissions.request({ origins: scan.origins.map(o => o + "/*") }); } catch (_) {}
-    }
     // Codex-C4: EPUB (keepUrls) never touches the data URI -- pbpBuildEpub reads
     // {mime, bytes} straight off the fetched Map -- so skip building it (saves a
     // base64 string, ~4/3x the image bytes, at peak memory for large image sets).
@@ -856,7 +852,39 @@ function pbpApplyColorScheme(mode) {
     // ONE budget across both rounds (Codex review): the hotlink retry below
     // must not get a fresh 25 MiB pool on top of round 1's.
     const embedBudget = pbpEmbedBudget(embedLimits.totalBytes);
-    const fetched = granted ? await pbpEmbedFetchAll(scan.candidates, embedLimits, embedBudget) : new Map();
+    // A4 (Codex-adjudicated): reuse images the preview's fix flow already
+    // fetched AND proved decodable, instead of re-downloading them (for the
+    // hotlink subset that meant a full DNR-rule round trip). Synchronous, so
+    // permissions.request below stays the click chain's FIRST await. Three-way
+    // split per candidate: valid entry + budget reserved -> hit; valid entry
+    // but the shared budget is exhausted -> DROPPED outright (refetching would
+    // just fail the same budget -- never send it to the network or the retry
+    // round); no/invalid entry -> network. Hits keyed by the SCAN url (the
+    // cache key may be an alias form); EPUB (keepUrls) needs raw bytes the
+    // cache doesn't hold, so it always fetches.
+    const hits = new Map();
+    let toFetch = scan.candidates;
+    if (!keepUrls && imgFixCache.size) {
+      toFetch = [];
+      for (const u of scan.candidates) {
+        const entry = imgFixCache.get(imgFixCacheKey(u));
+        if (typeof pbpEmbedCacheEntryValid === "function" && pbpEmbedCacheEntryValid(entry)) {
+          if (embedBudget.reserve(entry.byteLength)) hits.set(u, { dataUri: entry.dataUri, mime: entry.mime });
+          // else: dropped -- stays out of both lists, counts as unembedded in the note
+        } else {
+          toFetch.push(u);
+        }
+      }
+    }
+    // Only the origins we still have to FETCH need host access -- a full cache
+    // hit exports with zero prompts and zero network (the bytes are already in
+    // page memory; no new origin access happens).
+    const neededOrigins = [...new Set(toFetch.map((u) => { try { return new URL(u).origin; } catch (_) { return ""; } }).filter(Boolean))];
+    let granted = false;
+    if (neededOrigins.length) {
+      try { granted = await chrome.permissions.request({ origins: neededOrigins.map(o => o + "/*") }); } catch (_) {}
+    }
+    const fetched = granted ? await pbpEmbedFetchAll(toFetch, embedLimits, embedBudget) : new Map();
     // Hotlink retry (hotlink round): images that failed the plain extension
     // fetch get ONE more pass behind a tab-scoped Referer session rule --
     // empty-Referer-rejecting CDNs (verified live: cdnfile.sspai.com) refuse
@@ -864,11 +892,14 @@ function pbpApplyColorScheme(mode) {
     // export silently shipped without images on such sites. Host permission
     // was already granted above for exactly these origins; the rule rides it
     // (declarativeNetRequestWithHostAccess) and is removed when the run ends.
-    if (granted && fetched.size < scan.candidates.length) {
-      const failedUrls = scan.candidates.filter((u) => !fetched.has(u));
+    // failedUrls comes from toFetch, NOT scan.candidates: cache hits and
+    // budget-dropped entries must never reach the retry round (Codex must-fix).
+    if (granted && fetched.size < toFetch.length) {
+      const failedUrls = toFetch.filter((u) => !fetched.has(u));
       const retried = await pbpImgFixWithReferer(failedUrls, sourceTabUrl || meta.url || "", embedLimits, embedBudget);
       retried.forEach((v, u) => fetched.set(u, v));
     }
+    hits.forEach((v, u) => fetched.set(u, v)); // after the retry merge -- hits never look like failures
     const map = {};
     scan.blobs.forEach(u => { map[u] = null; });
     if (!keepUrls) fetched.forEach((v, u) => { map[u] = v.dataUri; });
@@ -1044,7 +1075,14 @@ function pbpApplyColorScheme(mode) {
   // url->dataUri cache makes re-renders (raw toggle, translation) swap
   // instantly without refetching; one attempt per URL, so 404s/decode
   // failures can't loop.
-  const imgFixCache = new Map();    // absUrl -> dataUri (session-lived)
+  // canonical absUrl -> { dataUri, mime, byteLength, decoded } (session-lived).
+  // Keys go through pbpEmbedCanonicalUrl so the export path (markdown-form
+  // URLs) can hit entries written from browser-form img.currentSrc (A4).
+  // byteLength is the raw fetch size (NOT the ~4/3x data URI string length) so
+  // resolveEmbed can charge reuse against its 25 MiB budget; decoded flips
+  // true only after a real <img> proves the data URI renders.
+  const imgFixCache = new Map();
+  const imgFixCacheKey = (u) => (typeof pbpEmbedCanonicalUrl === "function" ? pbpEmbedCanonicalUrl(u) : u);
   const imgFixFailed = new Map();   // absUrl -> Set<img>: QUEUED, not yet sent
   const imgFixInFlight = new Map(); // absUrl -> Set<img>: sent, awaiting the fetch
   const imgFixTried = new Set();    // SETTLED (fixed, or given up on): never re-queued
@@ -1091,13 +1129,19 @@ function pbpApplyColorScheme(mode) {
       return (p.protocol === "https:" || p.protocol === "http:") ? p.origin : "";
     } catch (_) { return ""; }
   })();
-  function imgFixApply(img, dataUri, url) {
+  function imgFixApply(img, entry, url) {
     img.dataset.pbpImgFixed = "1";
     // Responsive attrs would let the browser re-pick a broken remote candidate
     // over the fixed src (Codex review) -- the data URI is the whole image now.
     img.removeAttribute("srcset");
     img.removeAttribute("sizes");
     img.classList.remove("pbp-img-broken");
+    // decoded=true only once a real <img> proves the data URI renders (A4):
+    // ANY node succeeding is proof for the shared entry -- same data URI. The
+    // export path refuses undecoded entries, so a just-fixed image whose load
+    // hasn't fired yet simply refetches (safe, conservative). Listener sits
+    // BEFORE the src assignment: data URIs can decode synchronously.
+    img.addEventListener("load", () => { entry.decoded = true; }, { once: true });
     // "Fetched" is not "renders": the fetch layer only checks HTTP status and
     // MIME, so a truncated/corrupt payload would count as fixed while the image
     // stays blank -- and its error would then be swallowed by the pbpImgFixed
@@ -1108,13 +1152,13 @@ function pbpApplyColorScheme(mode) {
     img.addEventListener("error", () => {
       delete img.dataset.pbpImgFixed;
       img.classList.add("pbp-img-broken");
-      if (url) { imgFixCache.delete(url); imgFixTried.add(url); }
+      if (url) { imgFixCache.delete(imgFixCacheKey(url)); imgFixTried.add(url); }
       imgFixFixed = Math.max(0, imgFixFixed - 1);
       const b = imgFixBlockOf(img);
       if (b) imgFixRowFor(b, img); // reappears, as "still unavailable"
       imgFixNoteSettle();
     }, { once: true });
-    img.src = dataUri;
+    img.src = entry.dataUri;
   }
 
   // Anything the page re-renders under us (translation filling/clearing the
@@ -1318,8 +1362,12 @@ function pbpApplyColorScheme(mode) {
         const set = imgFixInFlight.get(u) || new Set(); // may have grown during the fetch
         if (v && v.dataUri) {
           ok++;
-          imgFixCache.set(u, v.dataUri);
-          set.forEach((img) => imgFixApply(img, v.dataUri, u));
+          // byteLength = raw fetch size off v.bytes (kept only as a number --
+          // holding the buffer would double peak memory for nothing);
+          // decoded flips in imgFixApply's load listener (A4).
+          const entry = { dataUri: v.dataUri, mime: v.mime, byteLength: v.bytes ? v.bytes.byteLength : NaN, decoded: false };
+          imgFixCache.set(imgFixCacheKey(u), entry);
+          set.forEach((img) => imgFixApply(img, entry, u));
         }
         imgFixInFlight.delete(u);
         imgFixTried.add(u); // settled either way: fixed, or given up on
@@ -1385,7 +1433,7 @@ function pbpApplyColorScheme(mode) {
     if (!/^https:\/\//i.test(u)) return; // data:/blob:/http: not fixable through this channel
     imgFixObserved.add(u); // export honesty note: this link is now KNOWN to fail at least here
     img.classList.add("pbp-img-broken");
-    const cached = imgFixCache.get(u);
+    const cached = imgFixCache.get(imgFixCacheKey(u));
     if (cached) { imgFixApply(img, cached, u); return; }
     // The row is created only AFTER the queue decision below, and always via
     // imgFixRowFor(block, img) so it OWNS this node. Creating it up-front left a

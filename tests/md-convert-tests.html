@@ -1685,6 +1685,28 @@ section("md-embed: pbpEmbedScan / pbpEmbedRewrite / pbpEmbedBudget (pure layer)"
   assertEq(rAbsent.md, mdAbsent, "URL with no map entry is left as-is");
 })();
 
+// A4: canonical URL key + preview-fix cache entry validity (9 assertions)
+(() => {
+  const c = pbpEmbedCanonicalUrl;
+  assertEq(c("https://cdn.example/图.png"), "https://cdn.example/%E5%9B%BE.png",
+    "canonical: raw CJK path percent-encoded to the browser form");
+  assertEq(c("https://cdn.example/%E5%9B%BE.png"), "https://cdn.example/%E5%9B%BE.png",
+    "canonical: already-encoded input is idempotent (no double-encoding)");
+  assertEq(c("https://a.example/b/../c.png"), "https://a.example/c.png",
+    "canonical: dot segments normalized");
+  assertEq(c("https://例子.example/图.png"), c("https://xn--fsqu00a.example/%E5%9B%BE.png"),
+    "canonical: IDN host converges on one punycoded form");
+  assertEq(c("https://[::1]/a.png"), "https://[::1]/a.png",
+    "canonical: bracketed IPv6 host degrades to the original value without throwing");
+  assert(!pbpEmbedCacheEntryValid(null), "entryValid: null rejected");
+  assert(!pbpEmbedCacheEntryValid({ dataUri: "data:image/png;base64,AA", byteLength: 5, decoded: false }),
+    "entryValid: undecoded entry rejected (no <img> has proven it renders)");
+  assert(!pbpEmbedCacheEntryValid({ dataUri: "data:image/png;base64,AA", byteLength: NaN, decoded: true }),
+    "entryValid: NaN byteLength rejected (cannot charge the export budget)");
+  assert(pbpEmbedCacheEntryValid({ dataUri: "data:image/png;base64,AA", mime: "image/png", byteLength: 5, decoded: true }),
+    "entryValid: decoded entry with a real size accepted");
+})();
+
 // export honesty counter (plan A, Codex-adjudicated): pbpEmbedBrokenCount counts
 // observed-broken links that a keep export would ship as URLs (7 assertions)
 (() => {

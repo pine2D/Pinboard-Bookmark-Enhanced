@@ -59,6 +59,25 @@ function pbpEmbedScan(md, baseUrl) {
   return { candidates, blobs, kept, origins };
 }
 
+// A4（预览修复缓存复用，Codex 裁决版）：canonical URL key。markdown 原文 src 与
+// 浏览器解析后的 img.currentSrc 是同一图片的两种字符串形（marked 会 encodeURI、
+// 浏览器会归一 ".." 并 punycode 化 IDN host）——缓存写入与查询两侧统一过这一个
+// 函数才可能命中。encodeURI 后把 %25 还原成 %（已编码的输入不被双编码，幂等），
+// 再经 URL 序列化归一。解析不了的（如 IPv6 方括号 host 被 encodeURI 破坏）原值
+// 兜底——两侧同函数同兜底，仍然一致。
+function pbpEmbedCanonicalUrl(u) {
+  try { return new URL(encodeURI(u).replace(/%25/g, "%")).href; } catch (_) { return u; }
+}
+
+// A4：预览修复缓存条目对导出是否可信。三态判定的"有效性"半边（decoded 由
+// <img> 的 load 事件证明过、data URI 与真实字节数俱在）；预算 reserve 由调用方
+// 单独做——reserve 失败不是 cache miss，是"共享预算已不足"，重抓只会同样失败，
+// 必须直接放弃该图而不是转入网络流（Codex 裁决必改 1）。
+function pbpEmbedCacheEntryValid(entry) {
+  return !!(entry && entry.decoded === true && typeof entry.dataUri === "string"
+    && entry.dataUri.startsWith("data:") && Number.isFinite(entry.byteLength) && entry.byteLength >= 0);
+}
+
 // 导出诚实提示的计数器（方案A，Codex 终审版）：统计"读者已亲眼看着加载失败"的图片
 // 链接会有几条以 URL 形式留在 keep 类导出产物里。observed 存浏览器解析后的绝对 URL
 // （error 时刻的 img.currentSrc）；candidates 和 kept（超 50 图/10 origin 上限、非 https
