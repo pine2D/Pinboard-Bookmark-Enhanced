@@ -449,17 +449,6 @@
       }
     }
   },
-  "batchSavedNotify": {
-    "message": "$COUNT$ 件のブックマークを保存しました$TAGS$。",
-    "placeholders": {
-      "count": {
-        "content": "$1"
-      },
-      "tags": {
-        "content": "$2"
-      }
-    }
-  },
   "batchTaggedSuffix": {
     "message": "（タグ：$TAGS$）",
     "placeholders": {

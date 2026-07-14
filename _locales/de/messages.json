@@ -449,17 +449,6 @@
       }
     }
   },
-  "batchSavedNotify": {
-    "message": "$COUNT$ Lesezeichen gespeichert$TAGS$.",
-    "placeholders": {
-      "count": {
-        "content": "$1"
-      },
-      "tags": {
-        "content": "$2"
-      }
-    }
-  },
   "batchTaggedSuffix": {
     "message": " (Tags: $TAGS$)",
     "placeholders": {

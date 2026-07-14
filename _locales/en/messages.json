@@ -449,17 +449,6 @@
       }
     }
   },
-  "batchSavedNotify": {
-    "message": "$COUNT$ bookmarks saved$TAGS$.",
-    "placeholders": {
-      "count": {
-        "content": "$1"
-      },
-      "tags": {
-        "content": "$2"
-      }
-    }
-  },
   "batchTaggedSuffix": {
     "message": " (tagged: $TAGS$)",
     "placeholders": {

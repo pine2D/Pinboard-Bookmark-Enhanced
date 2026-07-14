@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 
@@ -469,6 +469,42 @@ check(articleInject >= 0 && firstProgressQueue > articleInject &&
   !mdPreviewJs.slice(mdPreviewJs.indexOf("// Reading stats"), articleInject).includes("renderStats();") &&
   mdPreviewJs.includes("new ResizeObserver(queueReadingStats).observe(renderedView)"),
 "md-preview.js: reading progress is measured before article layout or not refreshed after layout changes");
+
+// i18n substitutions ride t()/getMessage() ARGS, never a manual replace on
+// the result: for any messages.json key carrying a "placeholders" block,
+// chrome.i18n.getMessage (the t() fallback in auto-language mode) consumes
+// $NAME$ placeholders BEFORE a manual replace could see them -- the value
+// silently rendered empty (mdEmbedPartial counts and the reading-progress
+// percent shipped blank for every auto-language user until 2026-07). The
+// pattern bans ANY literal $NAME$ manual replace/replaceAll in root JS
+// (Codex cross-audit: anchoring on the t(...) call missed nested-paren args,
+// a variable between call and replace, and replaceAll); $NAME$ syntax exists
+// only for i18n placeholders here, and the safe {name}-token replaces on
+// placeholder-less keys don't match.
+for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
+  const m = read(f).match(/\.replace(?:All)?\(\s*["'`]\$[A-Za-z_]\w*\$["'`]\s*,/);
+  check(!m, `${f}: literal $NAME$ manual replace -- pass substitutions as t() args instead -> ${m && m[0]}`);
+}
+// applyI18n (i18n.js) can never supply substitutions, so a placeholders key
+// wired to a data-i18n* attribute renders empty (auto mode) or as a literal
+// $NAME$ (manual language) -- the intersection must stay empty.
+// Plus a HEURISTIC dead-key smoke check: every placeholders key's string
+// literal must appear somewhere in root JS/HTML (batchSavedNotify survived
+// the batch-to-SW migration by a year). Heuristic by design: a comment can
+// satisfy it and it doesn't verify arg counts -- the runtime audit for that
+// was done by hand (Codex-verified, 2026-07); this just catches key deletions
+// and renames going stale.
+{
+  const enMessages = JSON.parse(read("_locales/en/messages.json"));
+  const phKeys = Object.entries(enMessages).filter(([, d]) => d && d.placeholders).map(([k]) => k);
+  const htmlSrc = readdirSync(root).filter((n) => n.endsWith(".html")).map(read).join("\n");
+  const allSrc = readdirSync(root).filter((n) => n.endsWith(".js")).map(read).join("\n") + htmlSrc;
+  for (const key of phKeys) {
+    check(!new RegExp(`data-i18n[a-z-]*="${key}"`).test(htmlSrc),
+      `md/popup/options HTML: placeholders key "${key}" bound via data-i18n* (applyI18n cannot pass substitutions)`);
+    check(allSrc.includes(`"${key}"`), `_locales/en: placeholders key "${key}" has no call site in any root JS/HTML (dead key across 9 locales?)`);
+  }
+}
 
 if (fail.length) {
   console.error(fail.join("\n"));

@@ -449,17 +449,6 @@
       }
     }
   },
-  "batchSavedNotify": {
-    "message": "已儲存 $COUNT$ 個書籤$TAGS$。",
-    "placeholders": {
-      "count": {
-        "content": "$1"
-      },
-      "tags": {
-        "content": "$2"
-      }
-    }
-  },
   "batchTaggedSuffix": {
     "message": "（標籤：$TAGS$）",
     "placeholders": {

@@ -449,17 +449,6 @@
       }
     }
   },
-  "batchSavedNotify": {
-    "message": "$COUNT$ signets enregistrés$TAGS$.",
-    "placeholders": {
-      "count": {
-        "content": "$1"
-      },
-      "tags": {
-        "content": "$2"
-      }
-    }
-  },
   "batchTaggedSuffix": {
     "message": " (tags : $TAGS$)",
     "placeholders": {
