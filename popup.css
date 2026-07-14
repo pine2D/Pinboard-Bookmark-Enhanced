@@ -24,6 +24,10 @@
   --pp-input-bd: transparent;
   --pp-on-accent: #ffffff;
   --pp-label-fg: #62676e;
+  /* Scrollbar thumb only — fg-muted is tuned for TEXT (5.2:1) and reads as a
+     harsh black bar on the soft-fill surfaces; this stays ≥3:1 vs the bg2
+     track (1.4.11 UI-component floor) without shouting. */
+  --pp-scrollbar-thumb: #818893;
   --pp-tag-bg: #e2eafa;
   --pp-tag-fg: #33589f;
   --pp-tag-hover: #d3e0f7;
@@ -935,6 +939,7 @@ html.dark {
   --pp-input-focus-bg: #2b2e35;
   --pp-on-accent: #10131a;
   --pp-label-fg: #a0a3aa;
+  --pp-scrollbar-thumb: #70747e; /* 3.4:1 vs bg2 track; fg-muted (6.3:1) is text-tier */
   --pp-tag-bg: #2a3550;
   --pp-tag-fg: #a9c3f2;
   --pp-tag-hover: #344060;
@@ -1595,20 +1600,28 @@ html[data-theme="gruvbox-dark"],
 html[data-theme="rose-pine"],
 html.dark { color-scheme: dark; }
 
-/* Themed scrollbars — light + dark themes share the same token contract.
+/* Scrollbars — ALL surfaces (default light, html.dark, and every preset theme)
+ * share the same token contract: track=bg2, thumb=fg-muted, hover=accent.
+ * Unscoped on purpose: the default surface previously had no webkit rules and
+ * fell back to the UA classic path — arrow buttons on Windows (the acbe621
+ * symptom, which that fix only covered for html[data-theme]). Webkit-custom
+ * scrollbars have no buttons unless ::-webkit-scrollbar-button is styled.
  * Do not add scrollbar-width/scrollbar-color: in Chromium the standard
  * properties disable these webkit customizations and can restore arrow
  * buttons. This extension is Chromium-only, so no Firefox fallback is needed. */
-html[data-theme] ::-webkit-scrollbar,
-html[data-theme] textarea::-webkit-scrollbar { width: 10px; height: 10px; }
-html[data-theme] ::-webkit-scrollbar-track,
-html[data-theme] textarea::-webkit-scrollbar-track { background: var(--pp-bg2); border-left: 1px solid var(--pp-border); }
-html[data-theme] ::-webkit-scrollbar-thumb,
-html[data-theme] textarea::-webkit-scrollbar-thumb { background: var(--pp-fg-muted); border: 2px solid var(--pp-bg2); border-radius: var(--pp-radius-md); }
-html[data-theme] ::-webkit-scrollbar-thumb:hover,
-html[data-theme] textarea::-webkit-scrollbar-thumb:hover { background: var(--pp-accent); }
-html[data-theme] ::-webkit-scrollbar-corner,
-html[data-theme] textarea::-webkit-scrollbar-corner { background: var(--pp-bg2); }
+::-webkit-scrollbar,
+textarea::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track,
+textarea::-webkit-scrollbar-track { background: var(--pp-bg2); border-left: 1px solid var(--pp-border); }
+/* Preset themes keep their audited thumb contract (fg-muted, ≥3:1 on all 14
+   per contrast-audit); the softer default-surface thumb is default-only. */
+html[data-theme] { --pp-scrollbar-thumb: var(--pp-fg-muted); }
+::-webkit-scrollbar-thumb,
+textarea::-webkit-scrollbar-thumb { background: var(--pp-scrollbar-thumb); border: 2px solid var(--pp-bg2); border-radius: var(--pp-radius-md); }
+::-webkit-scrollbar-thumb:hover,
+textarea::-webkit-scrollbar-thumb:hover { background: var(--pp-accent); }
+::-webkit-scrollbar-corner,
+textarea::-webkit-scrollbar-corner { background: var(--pp-bg2); }
 /* Shared popup themed rules */
 html[data-theme] { background: var(--pp-bg); }
 html[data-theme] body { background: var(--pp-bg); color: var(--pp-fg); }
