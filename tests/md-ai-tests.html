@@ -4662,6 +4662,46 @@ suiteIf("pbpFnHrefParse", "pbpFnHrefParse", () => {
 });
 </script>
 <script>
+// ============ Plan B: md-reader.js pbpTypoSanitize (typography tier sanitizer) ============
+suiteIf("pbpTypoSanitize", "pbpTypoSanitize", () => {
+  test("valid tiers pass through", () => {
+    const r = pbpTypoSanitize(2, -1);
+    assertEq(r.font, 2, "font tier 2");
+    assertEq(r.leading, -1, "leading tier -1");
+  });
+  test("boundary tiers accepted", () => {
+    const r = pbpTypoSanitize(-2, 1);
+    assertEq(r.font, -2, "font tier -2");
+    assertEq(r.leading, 1, "leading tier 1");
+  });
+  test("out-of-range numbers degrade to the default tier", () => {
+    const r = pbpTypoSanitize(99, -7);
+    assertEq(r.font, 0, "font 99 -> 0");
+    assertEq(r.leading, 0, "leading -7 -> 0");
+  });
+  test("non-number stored garbage degrades to the default tier", () => {
+    const r = pbpTypoSanitize("1", null);
+    assertEq(r.font, 0, "string '1' rejected (typeof gate)");
+    assertEq(r.leading, 0, "null rejected");
+  });
+  test("undefined (fresh install, key absent) degrades to the default tier", () => {
+    const r = pbpTypoSanitize(undefined, undefined);
+    assertEq(r.font, 0, "font default");
+    assertEq(r.leading, 0, "leading default");
+  });
+  test("fractional and NaN tiers degrade to the default tier", () => {
+    assertEq(pbpTypoSanitize(1.5, 0).font, 0, "1.5 rejected");
+    assertEq(pbpTypoSanitize(NaN, 0).font, 0, "NaN rejected");
+  });
+  test("tier maps expose exactly 5 font scales and 3 leadings", () => {
+    assertEq(Object.keys(PBP_TYPO_FONT_SCALES).length, 5, "5 font tiers");
+    assertEq(Object.keys(PBP_TYPO_LEADINGS).length, 3, "3 leading tiers");
+    assertEq(PBP_TYPO_FONT_SCALES["0"], 1, "default scale is 1");
+    assertEq(PBP_TYPO_LEADINGS["0"], 1.75, "default leading is the shipped 1.75");
+  });
+});
+</script>
+<script>
 // ============ R4: pbpSearchEnumerate (md-reader.js) ============
 suiteIf("pbpSearchEnumerate", "pbpSearchEnumerate", () => {
   test("empty query returns no matches", () => {

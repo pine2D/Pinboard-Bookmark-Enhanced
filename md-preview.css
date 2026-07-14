@@ -418,6 +418,10 @@ body.zen #zen-bar { display: flex; }
 .zen-btn:hover { background: var(--btn-hover); border-color: var(--border); }
 .zen-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .zen-btn svg { width: 13px; height: 13px; }
+/* "Aa" typography entry shares .zen-btn but is text, not an inline SVG --
+   plain Latin glyphs ride the named --latin stack (no emoji/dingbat, no
+   slow-font fallback risk per the CLAUDE.md font iron rule). */
+#zen-typo-btn { font-size: 11px; font-weight: 600; }
 
 .content-view.hidden { display: none; }
 
@@ -440,11 +444,36 @@ body.zen #zen-bar { display: flex; }
 }
 
 /* ---- Rendered View: Article Typography ---- */
+/* --pbp-font-scale / --pbp-prose-leading: reader typography tiers (plan B,
+   Codex-adjudicated). Same pattern as --pbp-width: JS (md-preview.js init,
+   BEFORE the first render, so no re-layout flash; md-reader.js "Aa" panel at
+   runtime) sets them as body inline custom properties, CSS consumes with a
+   fallback that IS today's shipped value. The scale multiplies the clamp()
+   rather than replacing it -- the rem+vw+zoom base stays authoritative.
+   Leading tiers (1.6/1.75/1.9) all sit inside the CJK 1.5-2.0 comfort band
+   (research round: square CJK glyphs have no ascender/descender air, so zh
+   wants more leading than Latin; the 1.75 default already serves both). The
+   leading var must cover the container AND p AND li -- p/li carried their own
+   hardcoded line-heights, and a tier that skipped them would only move the
+   gaps BETWEEN blocks (Codex must-fix 5). Headings/pre keep their own values. */
 #rendered-view {
   color: var(--fg);
-  font-size: clamp(1.0625rem, 1rem + 0.4vw, 1.375rem); /* 17px floor → ~22px on 4K; rem honors zoom */
-  line-height: 1.75;
+  font-size: calc(clamp(1.0625rem, 1rem + 0.4vw, 1.375rem) * var(--pbp-font-scale, 1)); /* 17px floor → ~22px on 4K; rem honors zoom */
+  line-height: var(--pbp-prose-leading, 1.75);
   overflow-wrap: break-word; /* lang-agnostic guard for long de/ru compounds */
+  /* Native CJK↔Latin inter-script spacing (盘古之白) -- insert-semantics only:
+     adds visual spacing where no whitespace exists, never doubles up next to
+     an author's manual space, never rewrites text (so a text search over the
+     "spaced" look still matches the unspaced source -- native property
+     semantics). Chromium 147 verified; unknown-property fallback is a no-op. */
+  text-autospace: normal;
+}
+/* Code keeps its character grid: with autospace inherited, `code` glyph runs
+   measurably widen next to CJK (Chromium 147 probe: 20.81px → 22.44px).
+   css-text-4's own default-stylesheet suggestion also exempts preformatted
+   text. Tables deliberately keep autospace (prose in cells benefits). */
+#rendered-view :is(pre, code, kbd, samp) {
+  text-autospace: no-autospace;
 }
 
 /* Unified-width round: the old UX-d2 68ch text measure (normal mode capped
@@ -457,6 +486,15 @@ body.zen #zen-bar { display: flex; }
    the ~68ch measure picks the 680px step; every element shares one edge. */
 
 /* Headings */
+/* Balanced heading wrap (plan B): multi-line headings stop stranding a lone
+   trailing word. Chromium only balances blocks ≤6 lines -- headings qualify
+   by nature; body text deliberately does NOT get text-wrap:pretty (CSSWG
+   marks it speed-for-quality, and content-visibility only shields off-screen
+   blocks, not a visible mega-paragraph). */
+#rendered-view h1, #rendered-view h2, #rendered-view h3,
+#rendered-view h4, #rendered-view h5, #rendered-view h6 {
+  text-wrap: balance;
+}
 #rendered-view h1 {
   font-size: 2em;
   font-weight: 700;
@@ -490,12 +528,17 @@ body.zen #zen-bar { display: flex; }
   font-weight: 600;
   margin: 1.2em 0 0.3em;
   color: var(--fg-secondary);
+  /* Pinned: headings stay independent of the prose leading tier (Codex
+     acceptance -- without this they'd inherit --pbp-prose-leading and stretch
+     to 1.9 at the relaxed tier while h1-h3 held their own values). 1.75 is
+     exactly what they inherited before the tier system existed. */
+  line-height: 1.75;
 }
 
 /* Paragraphs */
 #rendered-view p {
   margin: 1em 0;
-  line-height: 1.75;
+  line-height: var(--pbp-prose-leading, 1.75); /* follows the leading tier -- see the #rendered-view comment above */
 }
 
 /* Links */
@@ -637,7 +680,10 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 }
 #rendered-view li {
   margin: 0.35em 0;
-  line-height: 1.7;
+  /* Was a hardcoded 1.7 -- folded into the shared leading tier so lists move
+     with paragraphs (Codex must-fix 5); the default nudge 1.7→1.75 is the one
+     deliberate rendering change of that fold. */
+  line-height: var(--pbp-prose-leading, 1.75);
 }
 #rendered-view li::marker { color: var(--fg-muted); }
 
@@ -1834,6 +1880,11 @@ body.ask-open main { margin-right: 396px; }
   .pb-tr-err { display: none; }
   #kbd-help-pop { display: none; }
 }
+/* Open-popover print hides live at the END of this file -- equal (1,1,0)
+   specificity means SOURCE ORDER decides against each family's
+   ":popover-open { display: flex }" base rule, and several of those are
+   declared below this point. See the consolidated @media print block at the
+   bottom. */
 
 /* ---- Ask send pipeline: streaming caret, stop note, error + retry ---- */
 .ask-a.streaming::after {
@@ -2283,6 +2334,89 @@ body.ask-open main { margin-right: 396px; }
   background: var(--btn-hover);
 }
 .rail-kbd-help-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+
+/* ---- Reader typography panel ("Aa", md-reader.js, plan B). Same native
+   popover="auto" family as #fn-pop/#kbd-help-pop -- identical surface/border/
+   radius/shadow tokens, anchored next to its invoker (zen-bar "Aa" or the
+   rail-bottom "Aa") via the same measure-then-place + pbpTrPeekPopPos flow
+   #fn-pop uses. Click/keyboard-triggered only, never hover. ---- */
+#typo-pop {
+  position: fixed;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 232px;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.22);
+  font-size: 13px;
+}
+#typo-pop:popover-open { display: flex; }
+/* Label ABOVE its control, not beside it: a side-by-side row overflowed the
+   panel in every locale with long words (en "Relaxed" clipped, ru
+   "Межстрочный интервал" hopeless) -- vertical stacking makes the full panel
+   width available to the controls in all 9 locales. */
+.typo-row { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.typo-label { color: var(--fg-secondary); }
+.typo-steps { display: flex; align-items: center; gap: 6px; }
+.typo-step {
+  width: 26px;
+  height: 24px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.typo-step:hover { background: var(--btn-hover); }
+/* aria-disabled (not disabled): a real disabled attribute would drop focus to
+   <body> the instant the boundary tier is reached under the user's pointer --
+   same Chromium behavior the image-fix button already works around. */
+.typo-step[aria-disabled="true"] { color: var(--fg-muted); cursor: default; background: var(--btn-bg); }
+.typo-value {
+  flex: 1 1 auto;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.typo-seg { display: flex; gap: 4px; }
+.typo-seg-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 4px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+.typo-seg-btn:hover { background: var(--btn-hover); }
+.typo-seg-btn[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: var(--link); } /* same pressed vocabulary as .srch-regex */
+.typo-step:focus-visible, .typo-seg-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+/* UI chrome, never article content -- printing with the panel open must not
+   put it on paper (same rule every popover family here carries). The user's
+   font/leading tiers themselves DO print: they're reading preferences, not
+   screen geometry like --pbp-width (which print pins at 880). */
+/* Consolidated open-popover print hides -- MUST stay AFTER every popover
+   family's own ":popover-open { display: flex }" base rule in source order.
+   Those are (1,1,0);
+   a bare-id hide in the main @media print block is (1,0,0)
+   and loses, and an equal-specificity hide only wins by SOURCE ORDER (media queries add no
+   specificity -- same trap the main print block documents for
+   #ask-panel[hidden], and the base-select v2.92 GOTCHA). Printing with a
+   popover open put UI chrome on paper: Codex acceptance caught #typo-pop,
+   live probing confirmed #kbd-help-pop leaked identically, and
+   #explain-pop/#pb-hl-bar/#pb-hl-card had no print rule at all. */
+@media print {
+  #explain-pop:popover-open, #pb-hl-bar:popover-open, #pb-hl-card:popover-open,
+  #fn-pop:popover-open, #search-pop:popover-open, #kbd-help-pop:popover-open,
+  #typo-pop, #typo-pop:popover-open { display: none; }
+}
 
 /* ---- Skim / key-points layer (md-skim.js, spec docs/superpowers/
    specs/2026-07-07-skim-layer-design.md). #skim-section is the first

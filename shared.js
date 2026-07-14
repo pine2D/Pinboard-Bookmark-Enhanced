@@ -1750,3 +1750,38 @@ function iconStateFor(cached) {
   if (post) return post.toread === "yes" ? "toread" : "saved";
   return cached.toreadHint === true ? "toread" : "saved";
 }
+
+// ===================== Reader typography tiers (md-preview) =====================
+// Persisted as TIER IDS (pbp_font_tier -2..2 / pbp_leading_tier -1..1,
+// chrome.storage.local, per-device like pbp_zen_width), resolved to CSS values
+// only at apply time -- a stored value is never trusted into CSS. Font tiers
+// MULTIPLY #rendered-view's clamp() (relative scale keeps the rem+vw+zoom base
+// authoritative); leading tiers all sit inside the CJK 1.5-2.0 comfort band.
+// Lives HERE (not md-reader.js) because md-preview.js must apply the stored
+// tiers BEFORE its first render, and md-reader.js is a LATER defer script --
+// depending on it was a real load-order race (Codex acceptance: delaying
+// md-reader.js 1.8s shipped an unstyled render). shared.js precedes
+// md-preview.js in md-preview.html, so availability is structural, not timed.
+// The runtime "Aa" panel/persistence stay in md-reader.js. SW-safe:
+// definitions only, nothing here touches document at load time.
+const PBP_TYPO_FONT_SCALES = { "-2": 0.9, "-1": 0.95, "0": 1, "1": 1.1, "2": 1.2 };
+const PBP_TYPO_LEADINGS = { "-1": 1.6, "0": 1.75, "1": 1.9 };
+function pbpTypoSanitize(fontTier, leadingTier) {
+  const has = (map, v) => typeof v === "number" && Object.prototype.hasOwnProperty.call(map, String(v));
+  return {
+    font: has(PBP_TYPO_FONT_SCALES, fontTier) ? fontTier : 0,
+    leading: has(PBP_TYPO_LEADINGS, leadingTier) ? leadingTier : 0,
+  };
+}
+// Single apply path: sanitize -> body inline custom properties. Default tiers
+// REMOVE the property so the CSS fallback (the shipped value) stays the single
+// source of truth.
+function pbpTypoApplyVars(fontTier, leadingTier) {
+  const t2 = pbpTypoSanitize(fontTier, leadingTier);
+  const st = document.body.style;
+  if (t2.font === 0) st.removeProperty("--pbp-font-scale");
+  else st.setProperty("--pbp-font-scale", String(PBP_TYPO_FONT_SCALES[String(t2.font)]));
+  if (t2.leading === 0) st.removeProperty("--pbp-prose-leading");
+  else st.setProperty("--pbp-prose-leading", String(PBP_TYPO_LEADINGS[String(t2.leading)]));
+  return t2;
+}

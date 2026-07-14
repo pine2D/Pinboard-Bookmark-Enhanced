@@ -54,6 +54,13 @@ function pbpFnHrefParse(href) {
   return null;
 }
 
+// Reader typography tier maps/sanitizer/apply (PBP_TYPO_FONT_SCALES,
+// PBP_TYPO_LEADINGS, pbpTypoSanitize, pbpTypoApplyVars) live in shared.js, NOT
+// here: md-preview.js applies the stored tiers BEFORE its first render, and
+// this file is a LATER defer script -- defining them here was a real
+// load-order race (Codex acceptance). The runtime "Aa" panel below consumes
+// them as globals.
+
 // ---- R4: in-document search match enumeration (pure, no DOM) ----
 // Case-insensitive, non-overlapping consecutive occurrences of `query`
 // inside `text`, capped at `cap` results. Offsets are into `text` as-is
@@ -945,6 +952,11 @@ function _pbpZenScrollBlocks() {
 // zen toggle simply doesn't reposition scroll, an accepted simplification.
 function _pbpZenCaptureAnchor() {
   if (document.body.classList.contains("raw-active")) return null;
+  // At the very top, NO anchor is the right anchor: re-settling would
+  // scrollIntoView the first block and eat the article's top padding. A
+  // layout change at scrollY=0 should leave the reader at scrollY=0
+  // (Codex, plan B -- benefits width cycling and the typography tiers alike).
+  if (window.scrollY === 0) return null;
   const blocks = _pbpZenScrollBlocks();
   if (!blocks.length) return null;
   const rects = blocks.map((b) => (typeof trOnlyScrollTarget === "function" ? trOnlyScrollTarget(b.el) : b.el).getBoundingClientRect());
@@ -1101,6 +1113,18 @@ function _pbpZenEnsureBar() {
   widthBtn.addEventListener("click", _pbpZenCycleWidth);
   bar.appendChild(widthBtn);
 
+  // "Aa" typography entry (plan B): text, not an inline SVG -- plain Latin
+  // glyphs carry no emoji/dingbat slow-font risk (CLAUDE.md font iron rule).
+  const typoBtn = document.createElement("button");
+  typoBtn.type = "button";
+  typoBtn.id = "zen-typo-btn";
+  typoBtn.className = "zen-btn";
+  typoBtn.textContent = "Aa";
+  typoBtn.setAttribute("aria-label", t("typoPanelAria"));
+  typoBtn.title = t("typoPanelAria");
+  typoBtn.addEventListener("click", () => _pbpTypoToggle(typoBtn));
+  bar.appendChild(typoBtn);
+
   const exitBtn = document.createElement("button");
   exitBtn.type = "button";
   exitBtn.id = "zen-exit-btn";
@@ -1252,6 +1276,193 @@ function _pbpZenInit() {
   }
 }
 
+// ---- Reader typography runtime ("Aa" panel, plan B, Codex-adjudicated).
+// Pure maps + sanitizer live in the pure section above (pbpTypoSanitize);
+// the INITIAL application happens in md-preview.js before the first render
+// (the tiers ride the same storage read as the preview payload -- no extra
+// IPC, no re-layout flash). This section owns the runtime panel, the two
+// "Aa" entry points (zen bar + rail bottom), anchor-preserving re-layout,
+// and persistence. Storage contract mirrors pbp_zen_width exactly:
+// chrome.storage.local, per-device, touched-guard against stale async
+// reads. ----
+let _pbpTypoFont = 0;
+let _pbpTypoLeading = 0;
+let _pbpTypoTouched = false; // same stale-async-read guard as _pbpZenWidthTouched
+let _pbpTypoPopEl = null;
+let _pbpTypoInited = false;
+
+function _pbpTypoPersist() {
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
+  try { chrome.storage.local.set({ pbp_font_tier: _pbpTypoFont, pbp_leading_tier: _pbpTypoLeading }).catch(() => {}); } catch (_) {}
+}
+
+// Runtime tier change: capture the reading anchor, swap the vars, re-settle --
+// the same preserve-position contract width cycling honors (and via the
+// scrollY=0 guard in _pbpZenCaptureAnchor, a change at the top of the page
+// leaves the reader at the top). Settle is the SYNC single-shot
+// _pbpZenSettleAnchor, NOT _pbpZenSettleAfterLayout: that helper's 300ms
+// second phase exists for the width path's max-width TRANSITION, which
+// font-size/line-height changes don't have -- reusing it here yanked a user
+// who scrolled within those 300ms back to the pre-scroll anchor (Codex
+// acceptance, reproduced live: settle 1834 -> user scrolls 2600 -> dragged
+// back to 1834).
+function _pbpTypoSet(fontTier, leadingTier) {
+  _pbpTypoTouched = true;
+  const anchor = _pbpZenCaptureAnchor();
+  const t2 = pbpTypoApplyVars(fontTier, leadingTier);
+  _pbpTypoFont = t2.font;
+  _pbpTypoLeading = t2.leading;
+  _pbpTypoSyncPop();
+  _pbpZenSettleAnchor(anchor);
+  _pbpTypoPersist();
+}
+
+// Panel state -> DOM sync: percentage readout, stepper end-stops, leading
+// segment pressed states. aria-disabled, never the disabled attribute -- a
+// real disabled would drop focus to <body> the instant the boundary tier is
+// reached under the user's pointer (same Chromium behavior the image-fix
+// button already works around).
+function _pbpTypoSyncPop() {
+  if (!_pbpTypoPopEl) return;
+  const val = _pbpTypoPopEl.querySelector(".typo-value");
+  if (val) val.textContent = Math.round(PBP_TYPO_FONT_SCALES[String(_pbpTypoFont)] * 100) + "%";
+  const minus = _pbpTypoPopEl.querySelector("#typo-font-minus");
+  const plus = _pbpTypoPopEl.querySelector("#typo-font-plus");
+  if (minus) minus.setAttribute("aria-disabled", _pbpTypoFont <= -2 ? "true" : "false");
+  if (plus) plus.setAttribute("aria-disabled", _pbpTypoFont >= 2 ? "true" : "false");
+  _pbpTypoPopEl.querySelectorAll(".typo-seg-btn").forEach((b) => {
+    b.setAttribute("aria-pressed", Number(b.dataset.tier) === _pbpTypoLeading ? "true" : "false");
+  });
+}
+
+// Lazily builds the singleton #typo-pop: native popover="auto" (Esc +
+// light-dismiss for free), same family as #fn-pop/#kbd-help-pop. Two rows:
+// font-size stepper ("-" / readout / "+", ASCII only per the font iron rule)
+// and a three-way leading segment (aria-pressed toggles, .srch-regex
+// vocabulary).
+function _pbpTypoEnsurePop() {
+  if (_pbpTypoPopEl) return _pbpTypoPopEl;
+  const pop = document.createElement("div");
+  pop.id = "typo-pop";
+  pop.setAttribute("popover", "auto");
+  pop.setAttribute("aria-label", t("typoPanelAria"));
+
+  const fontRow = document.createElement("div");
+  fontRow.className = "typo-row";
+  const fontLabel = document.createElement("span");
+  fontLabel.className = "typo-label";
+  fontLabel.textContent = t("typoFontLabel");
+  fontRow.appendChild(fontLabel);
+  const steps = document.createElement("div");
+  steps.className = "typo-steps";
+  const minus = document.createElement("button");
+  minus.type = "button";
+  minus.id = "typo-font-minus";
+  minus.className = "typo-step";
+  minus.textContent = "-";
+  minus.setAttribute("aria-label", t("typoFontSmaller"));
+  minus.title = t("typoFontSmaller");
+  minus.addEventListener("click", () => { if (minus.getAttribute("aria-disabled") !== "true") _pbpTypoSet(_pbpTypoFont - 1, _pbpTypoLeading); });
+  const val = document.createElement("span");
+  val.className = "typo-value";
+  val.setAttribute("aria-live", "polite"); // readout announces the new tier for AT users
+  const plus = document.createElement("button");
+  plus.type = "button";
+  plus.id = "typo-font-plus";
+  plus.className = "typo-step";
+  plus.textContent = "+";
+  plus.setAttribute("aria-label", t("typoFontLarger"));
+  plus.title = t("typoFontLarger");
+  plus.addEventListener("click", () => { if (plus.getAttribute("aria-disabled") !== "true") _pbpTypoSet(_pbpTypoFont + 1, _pbpTypoLeading); });
+  steps.appendChild(minus);
+  steps.appendChild(val);
+  steps.appendChild(plus);
+  fontRow.appendChild(steps);
+  pop.appendChild(fontRow);
+
+  const leadRow = document.createElement("div");
+  leadRow.className = "typo-row";
+  const leadLabel = document.createElement("span");
+  leadLabel.className = "typo-label";
+  leadLabel.textContent = t("typoLeadingLabel");
+  leadRow.appendChild(leadLabel);
+  const seg = document.createElement("div");
+  seg.className = "typo-seg";
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", t("typoLeadingLabel"));
+  [[-1, "typoLeadingCompact"], [0, "typoLeadingNormal"], [1, "typoLeadingRelaxed"]].forEach(([tier, key]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "typo-seg-btn";
+    b.dataset.tier = String(tier);
+    b.textContent = t(key);
+    b.addEventListener("click", () => _pbpTypoSet(_pbpTypoFont, tier));
+    seg.appendChild(b);
+  });
+  leadRow.appendChild(seg);
+  pop.appendChild(leadRow);
+
+  document.body.appendChild(pop);
+  _pbpTypoPopEl = pop;
+  return pop;
+}
+
+// Open next to whichever "Aa" was clicked -- same mutual exclusion +
+// measure-then-place flow as _pbpFnOpenPop; clicking the same entry again
+// closes (toggle).
+function _pbpTypoToggle(anchorEl) {
+  const pop = _pbpTypoEnsurePop();
+  if (pop.matches(":popover-open")) { try { pop.hidePopover(); } catch (_) {} return; }
+  document.querySelectorAll(":popover-open").forEach((el) => {
+    if (el !== pop) { try { el.hidePopover(); } catch (_) {} }
+  });
+  _pbpTypoSyncPop();
+  const rect = anchorEl.getBoundingClientRect();
+  pop.showPopover();
+  pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - pop.offsetWidth - 8)) + "px";
+  const pos = (typeof pbpTrPeekPopPos === "function")
+    ? pbpTrPeekPopPos(rect, pop.offsetHeight, window.innerHeight)
+    : { top: rect.bottom + 8 };
+  pop.style.top = pos.top + "px";
+}
+
+function _pbpTypoInit() {
+  if (_pbpTypoInited) return;
+  _pbpTypoInited = true;
+  const stored = (typeof window !== "undefined" && window._pbpTypoStored) || null;
+  if (stored) {
+    // md-preview.js already read + applied these before the first render;
+    // this is just the in-memory mirror for the panel.
+    const t2 = pbpTypoSanitize(stored.font, stored.leading);
+    _pbpTypoFont = t2.font;
+    _pbpTypoLeading = t2.leading;
+  } else if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+    // Fallback (md-preview.js init died before its storage read): own async
+    // load with the same touched-guard as _pbpZenLoadWidth.
+    try {
+      chrome.storage.local.get({ pbp_font_tier: 0, pbp_leading_tier: 0 }, (res) => {
+        if (_pbpTypoTouched) return;
+        const t2 = pbpTypoApplyVars(res && res.pbp_font_tier, res && res.pbp_leading_tier);
+        _pbpTypoFont = t2.font;
+        _pbpTypoLeading = t2.leading;
+        _pbpTypoSyncPop();
+      });
+    } catch (_) {}
+  }
+  const row = _pbpRailBottomRow();
+  if (row) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "rail-typo-btn";
+    btn.className = "rail-kbd-help-btn"; // same rail-bottom text-button family as its neighbors
+    btn.textContent = "Aa";
+    btn.setAttribute("aria-label", t("typoPanelAria"));
+    btn.title = t("typoPanelAria");
+    btn.addEventListener("click", () => _pbpTypoToggle(btn));
+    row.appendChild(btn);
+  }
+}
+
 // ---- bootstrap: ONE shared "pbp:rendered" listener for every
 // md-reader.js feature (spec sec.8: R3 footnotes / R4 search / "?"
 // keyboard help all live in this one file). Later tasks extend this
@@ -1268,5 +1479,6 @@ if (typeof document !== "undefined") {
     try { _pbpSearchInit(); } catch (_) {}
     try { _pbpKbdHelpInit(); } catch (_) {}
     try { _pbpZenInit(); } catch (_) {}
+    try { _pbpTypoInit(); } catch (_) {}
   }, { once: true });
 }

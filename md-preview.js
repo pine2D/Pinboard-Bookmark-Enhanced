@@ -464,8 +464,19 @@ function pbpApplyColorScheme(mode) {
   // legacy global key so it still opens.
   const k = new URLSearchParams(location.search).get("k");
   const MP_KEY = k ? "md_preview_data_" + k : "md_preview_data";
-  // Read preview data from storage
-  const data = await chrome.storage.local.get(MP_KEY);
+  // Read preview data from storage. The reader typography tiers (plan B) ride
+  // this SAME read -- no extra IPC -- and are applied BEFORE the first render
+  // below, so a non-default tier never paints at the default and re-lays out.
+  // pbpTypoApplyVars lives in shared.js, which PRECEDES this file in
+  // md-preview.html -- availability is structural, not a load-order bet
+  // (defining it in the later md-reader.js was a real race: Codex acceptance
+  // delayed that script 1.8s and the render shipped unstyled). The typeof
+  // guard only covers shared.js failing to load at all. _pbpTypoStored hands
+  // the raw tiers to md-reader.js's _pbpTypoInit so it doesn't re-read
+  // storage.
+  const data = await chrome.storage.local.get([MP_KEY, "pbp_font_tier", "pbp_leading_tier"]);
+  window._pbpTypoStored = { font: data.pbp_font_tier, leading: data.pbp_leading_tier };
+  if (typeof pbpTypoApplyVars === "function") pbpTypoApplyVars(data.pbp_font_tier, data.pbp_leading_tier);
   const info = data[MP_KEY];
   if (!info) {
     renderEmptyState(t("mdPreviewEmpty"));
