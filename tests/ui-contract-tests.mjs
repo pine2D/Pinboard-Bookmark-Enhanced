@@ -506,6 +506,65 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   }
 }
 
+// ---- Reader typography invariants (plan B, the four defects Codex acceptance
+// reproduced live -- each check encodes one so it cannot silently return;
+// .qa-scan/typo-export-probe.mjs is the manual behavioral deep-probe, this is
+// the per-verify gate). ----
+const mdCss = read("md-preview.css");
+const mdReaderJs = read("md-reader.js");
+// (1) Load race: the tier maps/apply MUST live in shared.js (loaded before
+// md-preview.js), never in the later md-reader.js defer script; and the
+// pre-render read in md-preview.js must fetch the tier keys with the payload.
+check(sharedJs.includes("function pbpTypoApplyVars") && sharedJs.includes("PBP_TYPO_FONT_SCALES"),
+  "shared.js: typography tier maps/apply moved out (md-preview.js pre-render apply would race again)");
+check(!mdReaderJs.includes("function pbpTypoApplyVars") && !mdReaderJs.includes("PBP_TYPO_FONT_SCALES ="),
+  "md-reader.js: re-defines typography maps/apply (load-order race: it loads AFTER md-preview.js)");
+{
+  // Both indexes checked >= 0 explicitly: a DELETED apply call returns -1,
+  // and -1 < renderAt would sail through the bare comparison (Codex final
+  // review) -- the gate must catch removal, not just reordering.
+  const applyAt = mdPreviewJs.indexOf("pbpTypoApplyVars(");
+  const renderAt = mdPreviewJs.indexOf("renderedView.innerHTML = renderedHtml");
+  check(mdPreviewJs.includes('"pbp_font_tier", "pbp_leading_tier"]') &&
+    applyAt >= 0 && renderAt >= 0 && applyAt < renderAt,
+    "md-preview.js: typography tiers not applied before the first render (rode the MP_KEY read)");
+}
+// (2) Scroll grab: tier changes settle the anchor SYNCHRONOUSLY -- the 300ms
+// second phase belongs to the width path's max-width transition only.
+{
+  const typoSet = mdReaderJs.slice(mdReaderJs.indexOf("function _pbpTypoSet"), mdReaderJs.indexOf("function _pbpTypoSyncPop"));
+  check(typoSet.includes("_pbpZenSettleAnchor(anchor)") && !typoSet.includes("_pbpZenSettleAfterLayout"),
+    "md-reader.js: _pbpTypoSet uses the delayed two-phase settle (drags a user scroll back within 300ms)");
+  check(mdReaderJs.includes("if (window.scrollY === 0) return null;"),
+    "md-reader.js: _pbpZenCaptureAnchor lost the scrollY=0 guard (layout change at page top scrolls the reader)");
+}
+// (3) h4-h6 stay pinned while p/li follow the leading tier.
+{
+  // font-size anchor skips the h1-h6 text-wrap:balance rule, whose second
+  // line starts with the same "#rendered-view h4, ..." selector text.
+  check(/#rendered-view h4, #rendered-view h5, #rendered-view h6 \{[^}]*font-size: 1em;[^}]*line-height: 1\.75;/.test(mdCss),
+    "md-preview.css: h4-h6 lost their pinned line-height (they'd follow the prose leading tier)");
+  check((mdCss.match(/line-height: var\(--pbp-prose-leading, 1\.75\)/g) || []).length >= 3,
+    "md-preview.css: the prose leading var no longer covers container+p+li");
+}
+// (4) Print: the consolidated open-popover hide must sit AFTER every
+// ':popover-open { display: flex }' base rule (equal (1,1,0) specificity --
+// source order decides, media queries add none) and must cover every popover.
+{
+  const lastFlex = mdCss.lastIndexOf(":popover-open { display: flex; }");
+  const hideBlock = mdCss.indexOf("#explain-pop:popover-open, #pb-hl-bar:popover-open");
+  check(hideBlock > lastFlex && hideBlock !== -1,
+    "md-preview.css: consolidated print popover-hide block is missing or precedes a ':popover-open{display:flex}' base rule (open popovers print again)");
+  const popIds = [...mdCss.matchAll(/#([a-z-]+):popover-open \{ display: flex; \}/g)].map((m) => m[1]);
+  const hideRule = mdCss.slice(hideBlock, mdCss.indexOf("}", hideBlock));
+  for (const id of popIds) {
+    check(hideRule.includes(`#${id}:popover-open`), `md-preview.css: popover #${id} missing from the consolidated print hide (prints when open)`);
+  }
+}
+// text-autospace must keep exempting the character grid.
+check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code, kbd, samp\) \{\s*\n\s*text-autospace: no-autospace;/.test(mdCss),
+  "md-preview.css: text-autospace code/pre exemption lost (autospace widens code glyph runs next to CJK)");
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);
