@@ -19,6 +19,11 @@
   --opt-shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
   --opt-shadow-lg: 0 8px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
   --opt-shadow-focus: 0 0 0 2px color-mix(in srgb, var(--opt-accent, #4477bb) 25%, transparent);
+  /* Focus treatment — mirrors popup's --pp-focus-*: soft accent-tinted border
+     instead of a full-strength snap, wide faint ring. Resolves per theme via
+     --opt-accent/--opt-input-bg on <html>; override via pilot ui overrides. */
+  --opt-focus-bd: color-mix(in srgb, var(--opt-accent, #4477bb) 55%, var(--opt-input-bg, #fff));
+  --opt-focus-ring: 0 0 6px 1px color-mix(in srgb, var(--opt-accent, #4477bb) 45%, transparent);
 
   /* Color defaults — themes already define these in html[data-theme] blocks */
   --opt-accent: #4477bb;
@@ -172,8 +177,8 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
    This is why fixing only the Latin half left Bookmark/Appearance still stalling. */
 .fg textarea { resize: vertical; min-height: 80px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 11px; line-height: 1.5; }
 .fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus) { border-color: #9aa0a6; }
-.fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: #4477bb; }
-.fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible { box-shadow: 0 0 0 3px rgba(68,119,187,0.15); }
+.fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: var(--opt-focus-bd); }
+.fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible { box-shadow: var(--opt-focus-ring); }
 .fg input[type="checkbox"]:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 1px; box-shadow: none; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--opt-accent); }
 
@@ -295,10 +300,10 @@ html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--
 .et-field select:hover:not(:focus) { border-color: #9aa0a6; }
 .et-field input[type="text"]:focus,
 .et-field input[type="password"]:focus,
-.et-field select:focus { outline: none; border-color: #4477bb; }
+.et-field select:focus { outline: none; border-color: var(--opt-focus-bd); }
 .et-field input[type="text"]:focus-visible,
 .et-field input[type="password"]:focus-visible,
-.et-field select:focus-visible { box-shadow: 0 0 0 3px rgba(68,119,187,0.15); }
+.et-field select:focus-visible { box-shadow: var(--opt-focus-ring); }
 html[data-theme] .et-field input[type="text"],
 html[data-theme] .et-field input[type="password"],
 html[data-theme] .et-field select {
@@ -309,10 +314,10 @@ html[data-theme] .et-field input[type="password"]:hover:not(:focus),
 html[data-theme] .et-field select:hover:not(:focus) { border-color: var(--opt-fg-muted); }
 html[data-theme] .et-field input[type="text"]:focus,
 html[data-theme] .et-field input[type="password"]:focus,
-html[data-theme] .et-field select:focus { border-color: var(--opt-accent); }
+html[data-theme] .et-field select:focus { border-color: var(--opt-focus-bd); }
 html[data-theme] .et-field input[type="text"]:focus-visible,
 html[data-theme] .et-field input[type="password"]:focus-visible,
-html[data-theme] .et-field select:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--opt-accent) 18%, transparent); }
+html[data-theme] .et-field select:focus-visible { box-shadow: var(--opt-focus-ring); }
 
 /* ---- Accordion ---- */
 .accordion-section { border-bottom: 1px solid #e8e8e8; }
@@ -759,10 +764,10 @@ html[data-theme] .fg textarea:hover:not(:focus) {
   border-color: var(--opt-fg-muted);
 }
 html[data-theme] .fg input:focus, html[data-theme] .fg select:focus, html[data-theme] .fg textarea:focus {
-  border-color: var(--opt-accent);
+  border-color: var(--opt-focus-bd);
 }
 html[data-theme] .fg input:focus-visible, html[data-theme] .fg select:focus-visible, html[data-theme] .fg textarea:focus-visible {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--opt-accent) 18%, transparent);
+  box-shadow: var(--opt-focus-ring);
 }
 /* Dark-bg themes: lighter chevron stroke so the arrow reads against dark input
    fill. Covers all 8 color-scheme:dark presets (gruvbox-dark / rose-pine were

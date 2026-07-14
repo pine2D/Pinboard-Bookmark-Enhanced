@@ -22,6 +22,15 @@
   /* Resting input border (soft-fill = borderless; focus swaps to accent).
      Strict WCAG 1.4.11 fallback values: #8a919c light / #666b74 dark. */
   --pp-input-bd: transparent;
+  /* Focus treatment — one soft recipe shared by all 14 surfaces: the border
+     tints toward the accent instead of snapping to it at full strength, and
+     the halo is a blurred glow emanating FROM the border (no hard-edged ring:
+     a flat ring next to a stronger border reads as two disconnected lines).
+     Fades in via the inputs' existing 0.15s transition. Color flows through each theme's own --pp-accent (custom
+     properties resolve on <html>, where the theme blocks also live); a theme
+     needing different geometry overrides these via pilot ui overrides. */
+  --pp-focus-bd: color-mix(in srgb, var(--pp-accent) 55%, var(--pp-input-focus-bg));
+  --pp-focus-ring: 0 0 6px 1px color-mix(in srgb, var(--pp-accent) 45%, transparent);
   --pp-on-accent: #ffffff;
   --pp-label-fg: #62676e;
   /* Scrollbar thumb only — fg-muted is tuned for TEXT (5.2:1) and reads as a
@@ -140,8 +149,8 @@ html[data-section="login"] .quick-actions { display: none !important; }
   font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; margin-bottom: 6px; background: var(--pp-input-bg); color: var(--pp-fg);
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
-.login-body input:focus { outline: none; border-color: var(--pp-accent); background: var(--pp-input-focus-bg); }
-.login-body input:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 22%, transparent); }
+.login-body input:focus { outline: none; border-color: var(--pp-focus-bd); background: var(--pp-input-focus-bg); }
+.login-body input:focus-visible { box-shadow: var(--pp-focus-ring); }
 .login-body .secret-field { position: relative; }
 .login-body .secret-field input { padding-right: 30px; }
 .login-body .key-toggle {
@@ -285,10 +294,10 @@ html[data-section="login"] .quick-actions { display: none !important; }
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .field > input[type="text"]:focus, .field > textarea:focus {
-  outline: none; border-color: var(--pp-accent); background: var(--pp-input-focus-bg);
+  outline: none; border-color: var(--pp-focus-bd); background: var(--pp-input-focus-bg);
 }
 .field > input[type="text"]:focus-visible, .field > textarea:focus-visible {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 22%, transparent);
+  box-shadow: var(--pp-focus-ring);
 }
 .field > textarea {
   resize: vertical;
@@ -341,7 +350,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   cursor: text; background: var(--pp-input-bg);
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
-.tags-input-wrap:focus-within { border-color: var(--pp-accent); background: var(--pp-input-focus-bg); box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 22%, transparent); }
+.tags-input-wrap:focus-within { border-color: var(--pp-focus-bd); background: var(--pp-input-focus-bg); box-shadow: var(--pp-focus-ring); }
 .tags-display { display: contents; }
 .tag-item {
   display: inline-flex; align-items: center; background: var(--pp-tag-bg); color: var(--pp-tag-fg);
@@ -522,8 +531,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
   background: var(--pp-input-bg); color: var(--pp-fg);
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
-.search-field:focus { outline: none; border-color: var(--pp-accent); background: var(--pp-input-focus-bg); }
-.search-field:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 22%, transparent); }
+.search-field:focus { outline: none; border-color: var(--pp-focus-bd); background: var(--pp-input-focus-bg); }
+.search-field:focus-visible { box-shadow: var(--pp-focus-ring); }
 
 /* Quick Actions Bar */
 .quick-actions {
@@ -1649,8 +1658,8 @@ html[data-theme] .header-bar .header-link { color: var(--pp-fg-muted); }
 html[data-theme] .header-bar .header-link:hover { color: var(--pp-fg); }
 html[data-theme] .login-body p { color: var(--pp-fg); }
 html[data-theme] .login-body input { background: var(--pp-input-bg); border-color: var(--pp-border); color: var(--pp-fg); }
-html[data-theme] .login-body input:focus { border-color: var(--pp-accent); background: var(--pp-input-focus-bg); }
-html[data-theme] .login-body input:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 25%, transparent); }
+html[data-theme] .login-body input:focus { border-color: var(--pp-focus-bd); background: var(--pp-input-focus-bg); }
+html[data-theme] .login-body input:focus-visible { box-shadow: var(--pp-focus-ring); }
 html[data-theme] .login-body button { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-fg); }
 html[data-theme] .login-body button:hover { background: var(--pp-input-focus-bg); }
 html[data-theme] .login-body .key-toggle { background: transparent; border: 0; color: var(--pp-fg-hint); }
@@ -1659,13 +1668,13 @@ html[data-theme] .field > input[type="text"], html[data-theme] .field > textarea
   background: var(--pp-input-bg); border-color: var(--pp-border); color: var(--pp-fg);
 }
 html[data-theme] .field > input[type="text"]:focus, html[data-theme] .field > textarea:focus {
-  border-color: var(--pp-accent); background: var(--pp-input-focus-bg);
+  border-color: var(--pp-focus-bd); background: var(--pp-input-focus-bg);
 }
 html[data-theme] .field > input[type="text"]:focus-visible, html[data-theme] .field > textarea:focus-visible {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 25%, transparent);
+  box-shadow: var(--pp-focus-ring);
 }
 html[data-theme] .tags-input-wrap { background: var(--pp-input-bg); border-color: var(--pp-border); }
-html[data-theme] .tags-input-wrap:focus-within { border-color: var(--pp-accent); background: var(--pp-input-focus-bg); box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 25%, transparent); }
+html[data-theme] .tags-input-wrap:focus-within { border-color: var(--pp-focus-bd); background: var(--pp-input-focus-bg); box-shadow: var(--pp-focus-ring); }
 html[data-theme] .tags-input-wrap input { background: transparent; color: var(--pp-fg); }
 html[data-theme] .tag-item { background: var(--pp-tag-bg); color: var(--pp-tag-fg); }
 html[data-theme] .tag-item:hover { background: var(--pp-tag-hover, var(--pp-drop-hover)); }
@@ -1727,8 +1736,8 @@ html[data-theme] .preset-btn { color: var(--pp-preset-fg); background: var(--pp-
 html[data-theme] .preset-btn:hover { background: var(--pp-drop-hover); box-shadow: var(--pp-hover-shadow); }
 html[data-theme] .preset-btn.used { color: var(--pp-fg-hint); background: var(--pp-bg2); border-color: var(--pp-border); }
 html[data-theme] .search-field { background: var(--pp-input-bg); border-color: var(--pp-border); color: var(--pp-fg); }
-html[data-theme] .search-field:focus { border-color: var(--pp-accent); background: var(--pp-input-focus-bg); }
-html[data-theme] .search-field:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-accent) 25%, transparent); }
+html[data-theme] .search-field:focus { border-color: var(--pp-focus-bd); background: var(--pp-input-focus-bg); }
+html[data-theme] .search-field:focus-visible { box-shadow: var(--pp-focus-ring); }
 html[data-theme] .clear-all-link { color: var(--pp-fg-hint); }
 html[data-theme] .clear-all-link:hover { color: var(--pp-danger); }
 html[data-theme] #tags-copy-all:hover { color: var(--pp-accent); }
