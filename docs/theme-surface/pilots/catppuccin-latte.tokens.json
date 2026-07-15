@@ -90,7 +90,35 @@
   "ui": {
     "popup": {
       "light": {
-        "on-accent": "#ffffff"
+        "on-accent": "#ffffff",
+        "link": "#1a5ad8",
+        "banner-fg": "#1a5ad8",
+        "banner-bd": "#9bb9f5",
+        "warn-fg": "#c10e34",
+        "warn-bd": "#e397aa",
+        "ok-fg": "#2e731f",
+        "ok-bd": "#a9d1a4",
+        "offline-fg": "#8c5912",
+        "offline-bd": "#e9c99f",
+        "tag-fg": "#116e73",
+        "fg-muted": "#5c5f77",
+        "fg-hint": "#5c5f77",
+        "input-bg": "#e6e9ef",
+        "radius-sm": "6px",
+        "radius-md": "10px",
+        "radius-lg": "12px"
+      }
+    },
+    "options": {
+      "light": {
+        "fg-muted": "#5c5f77",
+        "fg-hint": "#5c5f77",
+        "accent": "#1a5ad8",
+        "btn-bg": "#eff1f5",
+        "tab": "#dce0e8",
+        "save": "#2e731f",
+        "danger": "#b90d32",
+        "warn": "#8c5912"
       }
     }
   }
