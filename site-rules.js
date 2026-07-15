@@ -338,7 +338,21 @@
     var parts = [];
     var topic = doc.querySelector(".topic_content");
     if (topic) parts.push(cleanBodyHtml(doc, topic.innerHTML));
-    doc.querySelectorAll(".subtle .topic_content").forEach(function (ap) { parts.push(cleanBodyHtml(doc, ap.innerHTML)); });
+    // 附言 (appendix) blocks: each .subtle is a separate OP addendum with its
+    // own .fade header ("第 N 条附言 · 时间"). They used to be dumped bare
+    // right after the main post, so multiple 附言 read as one undifferentiated
+    // body (user report 2026-07-15, /t/1226505). Promote each header to an
+    // <h3> — subordinate to the post, above the <h2> replies section; the preview
+    // TOC picks them up for free. Header text falls back to a counted label
+    // when .fade is missing; the relative time is capture-time, kept as-is.
+    doc.querySelectorAll(".subtle").forEach(function (ap, i) {
+      var body = ap.querySelector(".topic_content");
+      if (!body) return;
+      var head = ((ap.querySelector(".fade") || {}).textContent || "").replace(/\s+/g, " ").trim()
+        || ("附言 " + (i + 1));
+      parts.push("<h3>" + escapeHtml(head) + "</h3>");
+      parts.push(cleanBodyHtml(doc, body.innerHTML));
+    });
     var cells = doc.querySelectorAll('.cell[id^="r_"]');
     if (cells.length) {
       var replies = [];
