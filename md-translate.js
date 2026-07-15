@@ -48,6 +48,39 @@ const PBP_TR_SYSTEM = [
   "The optional title and summary fields are context only - do not translate or return them."
 ].join("\n");
 
+// ---- Target-language style packs (2026-07 quality round) ----
+// Compact per-language rewrite rules appended to the system prompt --
+// locale style guidance is the established industry lever against
+// translationese (Smartling "Style Rules for AI"; arXiv 2607.03160
+// showed theory-driven prompts help, over-instruction hurts, so packs
+// stay small). English wording: the least-surprising instruction
+// language across all providers. Packs are SUBORDINATE to the contract
+// rules (the appended clause says so) -- the placeholder-conservation
+// gate and JSON shape are untouched. Cost: ~60-100 input tokens per
+// batch; the (priced-heavier) output side is unchanged.
+const PBP_TR_STYLE_GENERIC = "Write as a skilled native editor of targetLanguage, not a literal translator: natural word order, the target language's own punctuation conventions, no source-language calques.";
+const PBP_TR_STYLE_PACKS = {
+  "zh-Hans": "Simplified Chinese: write like a native editor, not a literal translator. Match the source's register (\u4f60 by default for web prose); drop pronouns where natural Chinese would. Full-width punctuation \uff08\uff0c\u3002\uff1b\uff09 and one space between CJK and Latin/digits. No calqued idioms; minimal \u88ab-passives; strong verbs instead of \u8fdb\u884c/\u4f5c\u51fa+noun. Keep established English tech terms as-is.",
+  "zh-Hant": "Traditional Chinese (Taiwan conventions): rewrite as a native editor. Taiwan terminology (\u8edf\u9ad4\u3001\u7db2\u8def\u3001\u6ed1\u9f20), full-width punctuation, one space between CJK and Latin. No calques or Europeanized syntax; drop pronouns where natural.",
+  ja: "Japanese: consistent \u3067\u3059\u30fb\u307e\u3059 style for article prose. Prefer established Japanese terms over new katakana loans when both exist; split long attributive chains into natural clauses; use \u3001 and \u3002.",
+  ko: "Korean: consistent \ud569\ub2c8\ub2e4-style polite prose. Natural Korean word order and particles; prefer established Korean terms over unnecessary loanwords.",
+  de: "German: natural German syntax (verb-second, sentence frame), never the source word order. Established compounds instead of calqued noun strings; address the reader informally (du) only if the source is casual.",
+  fr: "French: natural French phrasing, no anglicized word order. French typography: non-breaking space before ; : ! ? and inside \u00ab guillemets \u00bb.",
+  es: "Spanish: natural word order with inverted opening marks \u00bf\u00a1 where required; prefer established Spanish terms over anglicisms.",
+  ru: "Russian: natural Russian syntax and case usage; lowercase \u0432\u044b; avoid calqued English passives and word order.",
+  pl: "Polish: natural Polish inflection and word order; avoid English calques; established Polish terminology over loan translations.",
+  en: "English: idiomatic, concise English; restructure sentences rather than mirroring the source syntax."
+};
+// code: st.target.code (dropdown ISO code or custom free text). Exact match,
+// then base-language prefix ("ja-JP" -> ja), then the generic pack (also the
+// custom-target path: free-text targets can't have a curated pack).
+function pbpTrStylePack(code) {
+  const c = String(code || "");
+  if (PBP_TR_STYLE_PACKS[c]) return PBP_TR_STYLE_PACKS[c];
+  const base = c.split("-")[0];
+  return PBP_TR_STYLE_PACKS[base] || PBP_TR_STYLE_GENERIC;
+}
+
 function pbpTrBuildPrompt(args) {
   const a = args || {};
   const payload = {
@@ -61,7 +94,11 @@ function pbpTrBuildPrompt(args) {
   payload.segments = Array.isArray(a.segments)
     ? a.segments.map(function (s) { return { id: s.id, text: s.text }; })
     : [];
-  return { system: PBP_TR_SYSTEM, prompt: JSON.stringify(payload) };
+  const style = pbpTrStylePack(a.targetCode);
+  return {
+    system: PBP_TR_SYSTEM + "\nTarget-language style (never overrides Rules 1-5): " + style,
+    prompt: JSON.stringify(payload)
+  };
 }
 
 // ---- Glossary parsing (options textarea, one "term=translation" per line;
@@ -1119,7 +1156,7 @@ async function _pbpTrStart(st) {
   if (prog0) prog0.textContent = t("trExtracting");
   await _pbpTrEnsureGlossary(st);
   const model = pbpAiResolveModelOverride(st.s);
-  const baseArgs = { targetLanguage: st.target.name, title: st.title, summary };
+  const baseArgs = { targetLanguage: st.target.name, targetCode: st.target.code, title: st.title, summary };
   const streamOpts = (charLen) => ({
     system: "", model, signal: st.ctrl.signal,
     temperature: 0.1, noThinking: true,

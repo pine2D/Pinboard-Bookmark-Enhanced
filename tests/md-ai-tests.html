@@ -1176,6 +1176,31 @@ suiteIf("pbpTrPackBatches", "pbpTrPackBatches", () => {
   });
 });
 
+suiteIf("pbpTrStylePack", "pbpTrStylePack", () => {
+  test("exact code gets its curated pack", () => {
+    assert(pbpTrStylePack("zh-Hans").indexOf("Simplified Chinese") === 0, "zh-Hans pack");
+    assert(pbpTrStylePack("ja").indexOf("Japanese") === 0, "ja pack");
+  });
+  test("base-language prefix falls through (ja-JP -> ja)", () => {
+    assertEq(pbpTrStylePack("ja-JP"), pbpTrStylePack("ja"), "prefix match");
+  });
+  test("custom free-text target gets the generic pack", () => {
+    assert(pbpTrStylePack("Classical Chinese").indexOf("skilled native editor") >= 0, "generic");
+    assertEq(pbpTrStylePack("Classical Chinese"), pbpTrStylePack("xx-YY"), "same generic");
+  });
+  test("system carries the pack SUBORDINATE to contract rules, stable across batches", () => {
+    const a = pbpTrBuildPrompt({ targetLanguage: "Simplified Chinese", targetCode: "zh-Hans", segments: [{ id: 1, text: "x" }] });
+    const b = pbpTrBuildPrompt({ targetLanguage: "Simplified Chinese", targetCode: "zh-Hans", segments: [] });
+    assert(a.system.indexOf("never overrides Rules 1-5") >= 0, "subordination clause");
+    assert(a.system.indexOf("Simplified Chinese: write like a native editor") >= 0, "pack present");
+    assertEq(a.system, b.system, "prefix-cache stable");
+  });
+  test("missing targetCode still yields a valid system (generic pack)", () => {
+    const r = pbpTrBuildPrompt({ targetLanguage: "x", segments: [] });
+    assert(r.system.indexOf("skilled native editor") >= 0, "generic fallback");
+  });
+});
+
 suiteIf("pbpTrBuildPrompt", "pbpTrBuildPrompt", () => {
   test("prompt is JSON with required keys, segments verbatim", () => {
     const r = pbpTrBuildPrompt({
