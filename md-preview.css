@@ -413,9 +413,15 @@ body.zen #skim-section { display: none; }
   border: 1px solid var(--btn-border);
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
-  transition: opacity 200ms ease;
+  transition: opacity 200ms ease, right 200ms ease;
 }
 body.zen #zen-bar { display: flex; }
+/* Ask panel open: the bar yields the panel's top-right corner (it sat on
+   the panel's copy/clear/close icons) and docks 12px left of the panel
+   edge (380px, #ask-panel width), riding the same 200ms ease as main's
+   396px push. Desktop only -- under the 1000px breakpoint the panel is a
+   BOTTOM sheet (media block below resets this) and print hides the bar. */
+body.ask-open #zen-bar { right: calc(380px + 12px); }
 /* Mouse-idle fade (spec sec.1.3): opacity/pointer-events only, never
    display/visibility, so #zen-bar:focus-within below can override a fade
    in progress without forcing a reflow. pointer-events:none while faded so
@@ -2063,6 +2069,7 @@ body.ask-open main { margin-right: 396px; }
 /* Narrow viewports: bottom sheet (same 1000px breakpoint as the rail drawer). */
 @media (max-width: 1000px) {
   body.ask-open main { margin-right: 0; }
+  body.ask-open #zen-bar { right: 12px; } /* bottom-sheet mode: no side dodge */
   #ask-panel {
     top: auto;
     left: 0; right: 0; bottom: 0;
