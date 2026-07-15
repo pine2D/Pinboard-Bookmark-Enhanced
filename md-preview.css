@@ -527,15 +527,33 @@ body.zen #zen-bar { display: flex; }
   line-height: 1.4;
 }
 
-#rendered-view h4, #rendered-view h5, #rendered-view h6 {
+/* h4-h6 (2026-07 voice round): three distinguishable levels instead of one
+   colour-demoted look-alike. h4 steps up in size AND returns to the main fg
+   (two axes vs h5); h6 drops to a small-caps label voice (uppercase is a
+   no-op for CJK, where 0.875em alone carries the demotion).
+   line-height stays pinned at 1.75 for all three -- independent of the prose
+   leading tier (Codex acceptance; see the old combined rule's rationale). */
+#rendered-view h4 {
+  font-size: 1.125em;
+  font-weight: 600;
+  margin: 1.4em 0 0.3em;
+  color: var(--fg);
+  line-height: 1.75;
+}
+#rendered-view h5 {
   font-size: 1em;
   font-weight: 600;
   margin: 1.2em 0 0.3em;
   color: var(--fg-secondary);
-  /* Pinned: headings stay independent of the prose leading tier (Codex
-     acceptance -- without this they'd inherit --pbp-prose-leading and stretch
-     to 1.9 at the relaxed tier while h1-h3 held their own values). 1.75 is
-     exactly what they inherited before the tier system existed. */
+  line-height: 1.75;
+}
+#rendered-view h6 {
+  font-size: 0.875em;
+  font-weight: 600;
+  margin: 1.2em 0 0.3em;
+  color: var(--fg-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   line-height: 1.75;
 }
 
@@ -588,7 +606,7 @@ body.zen #zen-bar { display: flex; }
 #rendered-view pre {
   background: var(--pre-bg);
   border: 1px solid var(--border);
-  padding: 20px 24px;
+  padding: 1.2em 1.4em; /* was 20px 24px; em per the inset policy (blockquote note) */
   border-radius: 8px;
   overflow-x: auto;
   margin: 1.5em 0;
@@ -598,15 +616,22 @@ body.zen #zen-bar { display: flex; }
   background: none;
   padding: 0;
   border-radius: 0;
-  font-size: 13px;
+  /* Scales with the prose (0.8em of the clamp+tier body size ≈ 13.6px at the
+     17px floor). Was a fixed 13px, which ignored BOTH the vw-clamp (22px body
+     on 4K -> code at 59% of prose, vs inline code's 87.5%) and the font-size
+     tier -- the one type voice the typography panel couldn't reach. */
+  font-size: 0.8em;
   color: var(--code-fg);
   font-weight: 400;
 }
 /* Blockquotes — top level keeps the accent bar + faint tint (nice for a single quote). */
 #rendered-view blockquote {
+  /* Inset policy (voice round): text-hugging insets are em (scale with the
+     clamp+tier size; 0.7em/1.2em ~= the old 12px/20px at the 17px floor);
+     hairline/structure (the 3px bar, borders, radii) stays fixed px. */
   border-left: 3px solid var(--bq-border);
   background: var(--bq-bg);
-  padding: 12px 20px;
+  padding: 0.7em 1.2em;
   margin: 1.5em 0;
   border-radius: 0 6px 6px 0;
   color: var(--bq-fg);
@@ -669,6 +694,24 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 #rendered-view .pb-comment-body { margin: 0; }
 
 /* Images */
+/* figure + figcaption (voice round): figures were riding the UA default
+   margin (1em 40px -- an unchosen 40px indent); captions rendered at full
+   body size, indistinguishable from prose. Caption = annotation voice:
+   0.875em secondary, snug 0.5em to its image (the figure's img drops its own
+   bottom margin so the pair reads as one unit), left-aligned like the images
+   themselves. No italics (degrades in CJK/bilingual). */
+#rendered-view figure {
+  margin: 1.5em 0;
+}
+#rendered-view figure img {
+  margin: 0;
+}
+#rendered-view figcaption {
+  font-size: 0.875em;
+  color: var(--fg-secondary);
+  margin-top: 0.5em;
+  line-height: 1.4;
+}
 #rendered-view img {
   max-width: 100%;
   height: auto;
@@ -703,7 +746,12 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 }
 #rendered-view thead { background: var(--code-bg); }
 #rendered-view th {
-  padding: 10px 16px;
+  /* Inset policy, compensated: padding-em resolves against EACH cell's own
+     font size (th = 0.9375em x 0.8125em ~= 12.95px, td ~= 15.94px at the 17px
+     floor), so th needs larger em values to keep the SAME physical inset as
+     td (~10px/16px). A uniform em pair across th/td -- the design sheet's
+     proposal -- would render the header row 22% tighter than the body. */
+  padding: 0.77em 1.24em;
   text-align: left;
   font-weight: 600;
   font-size: 0.8125em;
@@ -713,7 +761,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   border-bottom: 1px solid var(--border);
 }
 #rendered-view td {
-  padding: 10px 16px;
+  padding: 0.63em 1em; /* ~= 10px 16px at the 17px floor; see the th note */
   border-bottom: 1px solid var(--border-light);
 }
 #rendered-view tbody tr:last-child td { border-bottom: none; }
@@ -797,7 +845,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   padding: 0;
   overflow-x: visible;
   background: transparent;
-  font-size: 13px;
+  font-size: 0.8em;
   font-weight: 400;
 }
 /* M4: hljs-github-dark's .hljs-section (markdown headings inside a
@@ -1706,6 +1754,10 @@ html.motion-ready #pb-hl-bar:popover-open {
   font-size: 0.95em;
   margin: 0.35em 0 1em;
 }
+/* Compound-shrink guard: inline code inside the 0.95em translation block
+   would land at 0.95 x 0.875 = 0.83em -- past the 0.85 readable floor.
+   0.92em here restores ~body-code absolute size (0.95 x 0.92 = 0.874). */
+#rendered-view .pb-tr code { font-size: 0.92em; }
 body.tr-bilingual #rendered-view .pb-tr,
 body.tr-only #rendered-view .pb-tr { display: block; }
 #rendered-view .pb-tr > :first-child { margin-top: 0; }
