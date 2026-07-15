@@ -175,6 +175,20 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .login-body button:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
 .error-text { color: #c00; font-size: 11px; margin-top: var(--pp-sp-2); }
 
+/* ===================== Message-surface family =====================
+   Three shapes (2026-07 Claude Design round 2):
+   - strip: edge-glued bar (existing-banner / url-warning / offline-bar).
+     4px vertical inset, 1px border on the glued edge only, no radius.
+   - card: bordered block (feedback-card / batch-permission). 8px inset,
+     full 1px border, radius-md; floating cards add --pp-toast-shadow.
+   - inline: text-only (status-msg). *-fg colour swap, never bg/bd.
+   Payload text 11px; secondary controls 10px. Ghost button (.fc-btn) is
+   the card-family action standard.
+   Status-token semantics (names drifted historically — bind by colour,
+   don't "fix" the names): banner-*=blue info, ok-*=green success,
+   warn-*=RED error, offline-*=YELLOW warning.
+   auto-close-bar is a progress indicator, not part of this family. */
+
 /* ===================== Feedback Card (B2) ===================== */
 .feedback-card {
   display: flex; gap: var(--pp-sp-4); align-items: flex-start;
@@ -252,7 +266,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 
 /* URL Warning */
 .url-warning {
-  padding: var(--pp-sp-3) var(--pp-sp-5);
+  padding: var(--pp-sp-2) var(--pp-sp-5);
   background: var(--pp-warn-bg);
   border-bottom: 1px solid var(--pp-warn-bd);
   color: var(--pp-warn-fg);
@@ -672,13 +686,17 @@ html[data-theme] .batch-progress-text {
 html.dark .batch-progress { background: var(--pp-input-bg); border-color: var(--pp-input-bg); }
 html.dark .batch-progress-text { color: var(--pp-fg); mix-blend-mode: normal; filter: none; }
 
+/* Card-family member, YELLOW warning semantics (blocking authorization
+   prompt): binds the offline-* group — see the message-surface family note.
+   Token-bound, so the old html.dark / html[data-theme] literal branches
+   are gone; themes and dark mode flow through their own offline-* values. */
 .batch-permission {
-  margin: var(--pp-sp-3) var(--pp-sp-5);
+  margin: var(--pp-sp-3) var(--pp-sp-4);
   padding: var(--pp-sp-4) var(--pp-sp-4);
-  border: 1px solid #d4dae3;
-  border-radius: var(--pp-radius-sm);
-  background: #f5f7fa;
-  color: #333;
+  border: 1px solid var(--pp-offline-bd);
+  border-radius: var(--pp-radius-md);
+  background: var(--pp-offline-bg);
+  color: var(--pp-offline-fg);
 }
 .batch-permission-title { margin: 0 0 var(--pp-sp-2); font-size: 11px; font-weight: 600; }
 .batch-permission-list {
@@ -690,27 +708,11 @@ html.dark .batch-progress-text { color: var(--pp-fg); mix-blend-mode: normal; fi
   overflow-wrap: anywhere;
 }
 .batch-permission-actions { display: flex; gap: var(--pp-sp-3); margin-top: var(--pp-sp-3); }
-.batch-permission-actions button {
-  border: 1px solid #aeb8c5;
-  border-radius: var(--pp-radius-sm);
-  padding: var(--pp-sp-2) var(--pp-sp-4);
-  background: #fff;
-  color: #333;
-  font-family: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.4;
-  cursor: pointer;
-}
-.batch-permission-actions button:first-child { border-color: #4477bb; color: #225599; }
+/* Buttons are .fc-btn (ghost, family standard) in the markup; the primary
+   action is bolded, de-emphasis via order not colour. */
+.batch-permission-actions .fc-btn:first-child { font-weight: 600; }
 .batch-permission-actions button:disabled { opacity: 0.55; cursor: default; }
 .batch-permission-actions button:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 1px; }
-html.dark .batch-permission { background: #252525; border-color: #444; color: #ddd; }
-html.dark .batch-permission-actions button { background: #2a2a2a; border-color: #555; color: #ddd; }
-html.dark .batch-permission-actions button:first-child { border-color: #6699ff; color: #88aaff; }
-html[data-theme] .batch-permission { background: var(--pp-bg-soft, var(--pp-bg2)); border-color: var(--pp-border); color: var(--pp-fg); }
-html[data-theme] .batch-permission-actions button { background: var(--pp-bg2); border-color: var(--pp-border); color: var(--pp-fg); }
-html[data-theme] .batch-permission-actions button:first-child { border-color: var(--pp-accent); color: var(--pp-accent); }
 
 /* Cache hint & regenerate */
 .cache-hint {
