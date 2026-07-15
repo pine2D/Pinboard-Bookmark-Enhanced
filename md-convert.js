@@ -349,7 +349,20 @@ function renderMarkdown(md) {
     // Only ordinary IMG elements have an enforceable no-referrer policy here.
     // Drop raw remote-capable media/SVG containers instead of allowing an
     // undisclosed subresource request through <image>, poster, or <source>.
-    FORBID_TAGS: ["svg", "image", "video", "audio", "source", "track"],
+    // Form/interactive controls: DOMPurify's DEFAULT allow-list passes the
+    // whole family, so a literal "<select>" in article text rendered as a
+    // LIVE control in the reading surface (user repro 2026-07-15) — focus
+    // target, keyboard trap, tab-order pollution. The preview renders
+    // documents, not forms; drop the entire class (text content survives via
+    // KEEP_CONTENT, same as GitHub's renderer). <input> stays the one
+    // exception — the uponSanitizeElement hook above keeps only disabled
+    // GFM task-list checkboxes. <details>/<summary> stay: interactive but
+    // content-semantic (README collapsibles). <style> ELEMENTS are also in
+    // DOMPurify's default list — FORBID_ATTR only covers the attribute —
+    // and untrusted CSS would restyle the whole page; drop it too.
+    FORBID_TAGS: ["svg", "image", "video", "audio", "source", "track",
+      "form", "select", "option", "optgroup", "textarea", "button", "label",
+      "fieldset", "legend", "datalist", "output", "dialog", "style"],
     FORBID_ATTR: ["style", "background", "poster"]
   });
 }

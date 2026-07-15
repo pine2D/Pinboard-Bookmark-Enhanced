@@ -140,6 +140,34 @@ function assertEq(actual, expected, label) {
   check("renderMarkdown safe link gets target+rel", /rel="noopener noreferrer"/.test(s) && /target="_blank"/.test(s), s);
 })();
 
+// ---- Form controls / style element are dropped from the reading surface ----
+(() => {
+  const s = norm(renderMarkdown("窄屏时侧栏变 <select>,分组如何映射(optgroup?)"));
+  check("renderMarkdown drops a literal <select> instead of rendering a live control (2026-07-15 repro)",
+    !/<select/i.test(s) && /窄屏时侧栏变/.test(s) && /分组如何映射/.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown('<form action="https://evil"><fieldset><legend>L</legend><label>N<textarea>t</textarea></label><select><option>o1</option></select><button>go</button><output>42</output><dialog open>d</dialog></form>'));
+  check("renderMarkdown drops the whole form-control family but keeps text content",
+    !/<form|<fieldset|<legend|<label|<textarea|<select|<option|<button|<output|<dialog/i.test(s) &&
+    /o1/.test(s) && /go/.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown('x <style>#rendered-view{display:none}</style> y'));
+  check("renderMarkdown drops <style> ELEMENTS (FORBID_ATTR only covers the attribute)",
+    !/<style/i.test(s) && !/display:none/.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown('- [x] done task'));
+  check("GFM task-list checkbox still survives the form-control purge (disabled)",
+    /<input[^>]*type="checkbox"[^>]*disabled/i.test(s) || /<input[^>]*disabled[^>]*type="checkbox"/i.test(s), s);
+})();
+(() => {
+  const s = norm(renderMarkdown('<details><summary>more</summary>body</details>'));
+  check("details/summary stay (content-semantic collapsibles)",
+    /<details/i.test(s) && /<summary/i.test(s), s);
+})();
+
 // ---- D1-1/D1-2: sanitize hardening (id-clobber + input allowlist) ----
 (() => {
   const s = norm(renderMarkdown('before <input type="text" id="ask-input" value="x"> after'));
