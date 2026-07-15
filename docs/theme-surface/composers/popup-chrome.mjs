@@ -29,7 +29,7 @@ function emitPp(ui) {
     "banner-bg", "banner-bd", "banner-fg", "warn-bg", "warn-bd", "warn-fg",
     "ok-bg", "ok-bd", "ok-fg", "offline-bg", "offline-bd", "offline-fg",
     "danger", "spinner-bg", "spinner-fg", "preset-bg", "preset-bd", "preset-fg",
-    "radius-md", "radius-lg", "radius-tag", "focus-bd", "focus-ring", "on-accent"]) {
+    "radius-sm", "radius-md", "radius-lg", "radius-tag", "focus-bd", "focus-ring", "on-accent"]) {
     if (ui[k] != null) set(k, ui[k]);
   }
   // info-* are aliases of banner-* (no separate derivation)
@@ -49,7 +49,13 @@ export function composePopupThemes(tokensByPilot) {
     const palette = expandPalette(merged.palette);
     // Pilot-level ui overrides (tokens.json `ui.popup.<mode>`) win over derivation:
     // theme-specific refinements the palette derivation cannot express.
-    const ui = { ...deriveUiColors(palette, entry.mode), ...(tk.ui?.popup?.[entry.mode] ?? {}) };
+    const derived = deriveUiColors(palette, entry.mode);
+    // on-accent is emitted EXPLICITLY for every theme (default: the theme bg,
+    // the long-standing submit-button text derivation). It must not fall back
+    // through var() to :root's light-surface white: custom properties inherit,
+    // so a var(--pp-on-accent, ...) fallback in a shared rule is dead code —
+    // the exact mistake that turned every themed submit button white (2026-07).
+    const ui = { ...derived, "on-accent": derived.bg, ...(tk.ui?.popup?.[entry.mode] ?? {}) };
     blocks.push(`html[data-theme="${entry.id}"] {\n${emitPp(ui)}\n}`);
   }
   return blocks.join("\n");

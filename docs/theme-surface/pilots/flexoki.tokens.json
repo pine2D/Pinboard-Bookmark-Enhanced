@@ -165,7 +165,8 @@
         "offline-fg": "#DFB431",
         "radius-md": "6px",
         "radius-lg": "8px",
-        "radius-tag": "6px"
+        "radius-tag": "6px",
+        "on-accent": "#0d0f12"
       }
     },
     "options": {

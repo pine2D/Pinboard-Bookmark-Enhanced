@@ -140,6 +140,19 @@ function auditCssThemes(label, varPrefix, cssPath) {
       const ff = resolveColor(fS, bb);
       if (ff) console.log(check(label, theme, lbl, cr(ff, bb), 4.5));
     }
+    // Submit-button text (BLOCKING): --pp-on-accent is emitted per theme and is
+    // the ONLY sanctioned text color on the accent surface. This probe exists
+    // because a var() fallback made every themed submit button silently white
+    // (2026-07): nothing audited the rendered pairing until a user caught it
+    // on terminal's phosphor green.
+    if (varPrefix === "--pp") {
+      const onS = grab("on-accent"), accS = grab("accent");
+      if (onS && accS && accS.startsWith("#")) {
+        const accBg = hexRgb(accS);
+        const onF = resolveColor(onS, accBg);
+        if (onF) console.log(check(label, theme, "on-accent vs accent", cr(onF, accBg), 4.5));
+      }
+    }
     // Scrollbar thumb (uses fg-muted) against scrollbar track (uses panel for options, bg2 for popup).
     // Threshold 3:1 — UI components, not text.
     const trackKey = label === "options" ? "panel" : "bg2";
