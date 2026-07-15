@@ -1,6 +1,6 @@
 # Pinboard Theme Surface — Spec v1
 
-Author: wwj · Updated: 2026-04-14 · Version: 1.0.0
+Author: wwj · Updated: 2026-07-15 · Version: 1.1.0
 
 A three-layer architecture for Pinboard custom themes that separates **what a
 surface is** (manifest) from **what colors/spacing it uses** (tokens) from
@@ -154,7 +154,9 @@ A composer that wants to reuse another composer's work can do so — see
 ### Contrast guard (automated)
 
 Every theme passes `tools/contrast-audit.mjs`, which the `tools/sync-all.mjs`
-pipeline runs automatically as Step 4/4. The audit fails the run when a
+pipeline runs automatically (step 4 of its 8-step run: render-all,
+apply-tokens ×13, diff-all --strict, contrast-audit, css-region-audit,
+ui-token-coverage, layout-lint, url-lint). The audit fails the run when a
 token pair drops below WCAG AA — the failure modes that produced past
 regressions:
 
@@ -243,3 +245,37 @@ docs/theme-surface/
   be tokenized via `!important` override in the base layer.
 - **Hook** — a structural point where composers may restructure a surface
   (`layout_hook: true` in manifest).
+
+---
+
+## §9 · Addendum (2026-07): extension UI surfaces
+
+The factory no longer stops at pinboard.in. Two additional composers render
+each pilot's palette into the extension's own chrome:
+
+| Composer | Output | Region |
+|----------|--------|--------|
+| `composers/popup-chrome.mjs` | `--pp-*` custom properties | `@generated:ui-themes` in `popup.css` |
+| `composers/options-chrome.mjs` | `--opt-*` custom properties | `@generated:ui-themes` in `options.css` |
+
+Both derive their role colors from the pilot palette via
+`composers/_ui-derive.mjs`; a pilot may override any derived value through
+the `ui` field in its tokens file (`ui.popup.light/dark`,
+`ui.options.light/dark` — see NEW_THEME.md §ui). `tools/apply-ui-themes.mjs
+--write` regenerates the regions; sync-all runs it automatically.
+
+Two contracts learned the hard way (2026-07 regressions):
+
+- **`on-accent` is emitted explicitly for every theme.** A `var(--pp-on-accent,
+  fallback)` fallback in a shared rule is dead code — custom properties
+  inherit, so :root's light-surface value would always win. The composer
+  emits the token per theme (default: the theme bg) and
+  `contrast-audit.mjs` gates `on-accent` vs `accent` at AA.
+- **The `@generated:ui-themes` regions are composer-owned.** Hand edits are
+  caught by `tools/css-region-audit.mjs`, the same way `handedit-audit.mjs`
+  guards `pinboard-themes.js`.
+
+Spacing is deliberately OUTSIDE the factory: `--pp-sp-*` / `--opt-sp-*`
+(and the reader's `--prose-fs` family) are theme-invariant and live in each
+file's hand-maintained `:root` — no pilot may vary density per theme.
+

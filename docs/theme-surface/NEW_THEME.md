@@ -208,6 +208,31 @@ To regenerate popup + options themes on their own:
 node docs/theme-surface/tools/apply-ui-themes.mjs --write
 ```
 
+**Pilot `ui` overrides.** When the derived colors miss a theme's intent
+(the derivation is heuristic), override any emitted role per surface and
+mode in the tokens file — values win over `_ui-derive.mjs`:
+
+```jsonc
+"ui": {
+  "popup":   { "light": { "on-accent": "#001014", "radius-tag": "4px" },
+               "dark":  { "focus-ring": "0 0 0 2px #268bd280" } },
+  "options": { "light": { "danger": "#c5221f" } }
+}
+```
+
+Emittable popup keys include every `--pp-*` role plus `radius-sm/md/lg/tag`,
+`focus-bd`, `focus-ring`, and `on-accent`; the options composer accepts any
+`--opt-*` role. Two rules, both regression-tested:
+
+- **`on-accent` (submit-button text) is ALWAYS emitted explicitly** — never
+  rely on a `var()` fallback in shared rules (custom properties inherit, so
+  the fallback is dead code; this exact mistake once turned every themed
+  submit button white). `contrast-audit.mjs` gates `on-accent` vs `accent`
+  at AA 4.5, so a failing pair aborts sync-all.
+- **Spacing cannot be themed.** `--pp-sp-*` / `--opt-sp-*` are hand-
+  maintained, theme-invariant tokens outside the factory; `ui` overrides
+  that try to redefine them have no supported effect.
+
 Three gates guard the generated output:
 
 | Gate | What it checks |
