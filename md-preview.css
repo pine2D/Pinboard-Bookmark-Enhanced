@@ -139,6 +139,26 @@ html { font-size: 100%; } /* rem-based reading size honors the browser's default
 }
 ::-webkit-scrollbar-thumb:hover { background-color: rgba(128, 128, 128, 0.55); }
 
+/* Prose size, single source: the vw-clamp x the user font tier. Panels
+   that carry READING PAYLOAD (ask Q/A, skim points) ride this at 0.85 --
+   fixed 14px panels stalled at 64% of the 22px 4K prose and ignored the
+   font tier entirely (user report 2026-07-15), the same defect class as
+   the old fixed-13px pre code. Chrome stays on the fixed 4-tier scale.
+   Defined on BODY, not :root: the tier vars are inline styles on <body>
+   (pbpTypoApplyVars), and a custom property substitutes its inner var()s
+   where IT computes -- on :root it would never see the tier (probe-caught
+   regression during this very change). */
+body {
+  --prose-fs: calc(clamp(1.0625rem, 1rem + 0.4vw, 1.375rem) * var(--pbp-font-scale, 1));
+  /* 0.9: bisected on the real machine -- 0.85 read small, 1.0 read big.
+     The ask panel and skim section are payload-relative EM documents: their
+     titles/chips/meta size in em off this base (see #ask-panel), so the
+     whole surface breathes with the display and the typography tier while
+     keeping its internal hierarchy (a fixed-px 14 title under a 22px answer
+     read as INVERTED hierarchy -- the real complaint behind "chrome too
+     small"). */
+  --panel-payload-fs: calc(var(--prose-fs) * 0.9);
+}
 body {
   font-family: var(--latin), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-ko), var(--han-rest), sans-serif;
   background: var(--bg);
@@ -462,7 +482,7 @@ body.zen #zen-bar { display: flex; }
    gaps BETWEEN blocks (Codex must-fix 5). Headings/pre keep their own values. */
 #rendered-view {
   color: var(--fg);
-  font-size: calc(clamp(1.0625rem, 1rem + 0.4vw, 1.375rem) * var(--pbp-font-scale, 1)); /* 17px floor → ~22px on 4K; rem honors zoom */
+  font-size: var(--prose-fs); /* 17px floor → ~22px on 4K; rem honors zoom (see :root) */
   line-height: var(--pbp-prose-leading, 1.75);
   overflow-wrap: break-word; /* lang-agnostic guard for long de/ru compounds */
   /* Native CJK↔Latin inter-script spacing (盘古之白) -- insert-semantics only:
@@ -952,10 +972,17 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .rail-section { margin-top: 4px; }
 /* ---- Reader chrome contract (2026-07 Claude Design round 5) ----
    Type scale, 4 tiers shared by rail + ask/skim panels:
-     lg 14px (region titles, Q/A payload) - md 13px (primary interactive:
+     lg 14px (region titles) - md 13px (primary interactive:
      action-btn, TOC, errors) - sm 12px (secondary info, meta, inline micro
      actions) - xs 11px (badges, superscript cite chips, keycaps, group
      labels).
+   READING PAYLOAD surfaces (ask panel, skim section) are NOT chrome: each
+   is a payload-relative EM document -- the container's font-size is
+   --panel-payload-fs (prose clamp x tier x 0.9, defined on body) and the
+   interior hierarchy (title 1.05em, chips/meta 0.75-0.85em) sizes off it,
+   so the whole surface scales with the display and the typography tier
+   without inverting (a fixed 14px title under a payload-size answer did).
+   Cite superscript chips stay fixed 11px (badges, floor-safe).
    Button tiers: region-level actions = md (13px, 6px 12px inset, radius 6);
    content-attached micro actions = sm (12px, 4px 10px inset, radius 4).
    Group labels share the options sidebar's form language (uppercase, 0.5px
@@ -1892,6 +1919,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   flex-direction: column;
   gap: 12px;
   padding: 16px;
+  font-size: var(--panel-payload-fs); /* em base for the panel's own hierarchy */
   background: var(--surface);
   border-left: 1px solid var(--border);
   overflow: hidden;
@@ -1937,7 +1965,15 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 body.ask-open main { margin-right: 396px; }
 
 .ask-head { display: flex; align-items: center; gap: 6px; }
-.ask-head h2 { flex: 1; font-size: 14px; font-weight: 600; margin: 0; }
+.ask-head h2 { flex: 1; font-size: 1.05em; font-weight: 600; margin: 0; }
+/* Region buttons inside the panel follow the panel's em base, not the rail's
+   fixed md tier -- a 13px Send next to the payload-size input read tiny. */
+#ask-panel .action-btn { font-size: 0.85em; }
+/* Content-attached micro actions keep the sm step below region buttons --
+   they carry .action-btn too, so the panel-scope rule above would flatten
+   the two tiers without this heavier selector. */
+#ask-panel .ask-copy-btn, #ask-panel .ask-regenerate,
+#ask-panel .ask-retry, #ask-panel .ask-clear-btn { font-size: 0.8em; }
 .ask-ic {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; padding: 0;
@@ -1959,16 +1995,16 @@ body.ask-open main { margin-right: 396px; }
   gap: 8px;
   padding-right: 4px;
 }
-.ask-empty { font-size: 13px; color: var(--fg-muted); margin: 0; }
+.ask-empty { font-size: 0.85em; color: var(--fg-muted); margin: 0; }
 .ask-q {
-  font-weight: 600; font-size: 14px; color: var(--fg); margin-top: 8px;
+  font-weight: 600; font-size: var(--panel-payload-fs); color: var(--fg); margin-top: 8px;
   /* Scan anchor: long threads need a landmark stronger than bold-vs-regular;
      a bar adds it without another type size. */
   border-left: 2px solid var(--fg-muted);
   padding-left: 8px;
 }
 .ask-q:first-child { margin-top: 0; }
-.ask-a { font-size: 14px; line-height: 1.65; color: var(--fg); overflow-wrap: break-word; }
+.ask-a { font-size: var(--panel-payload-fs); line-height: 1.65; color: var(--fg); overflow-wrap: break-word; }
 .ask-a > :first-child { margin-top: 0; }
 .ask-a > :last-child { margin-bottom: 0; }
 
@@ -1988,7 +2024,7 @@ body.ask-open main { margin-right: 396px; }
   border-radius: 999px;
   background: transparent;
   color: var(--fg-secondary);
-  font-size: 12px;
+  font-size: 0.85em;
   font-weight: 400;
   line-height: 1.4;
   vertical-align: baseline;
@@ -2008,14 +2044,14 @@ body.ask-open main { margin-right: 396px; }
   background: var(--btn-bg);
   color: var(--fg);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--panel-payload-fs);
   line-height: 1.5;
 }
 #ask-input:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .ask-actions { display: flex; justify-content: flex-end; gap: 8px; }
 #ask-send svg { width: 14px; height: 14px; flex-shrink: 0; }
 
-#ask-meta { min-height: 16px; font-size: 11px; line-height: 1.5; color: var(--fg-muted); }
+#ask-meta { min-height: 16px; font-size: 0.75em; line-height: 1.5; color: var(--fg-muted); }
 
 /* Narrow viewports: bottom sheet (same 1000px breakpoint as the rail drawer). */
 @media (max-width: 1000px) {
@@ -2068,13 +2104,13 @@ body.ask-open main { margin-right: 396px; }
 }
 @keyframes pbp-ask-caret { 50% { opacity: 0; } }
 
-.ask-stopped { font-size: 12px; color: var(--fg-muted); margin: 6px 0 0; }
-.ask-err { font-size: 13px; color: var(--danger); margin: 0 0 6px; overflow-wrap: break-word; }
-.ask-retry { padding: 4px 10px; font-size: 12px; border-radius: 4px; }
+.ask-stopped { font-size: 0.8em; color: var(--fg-muted); margin: 6px 0 0; }
+.ask-err { font-size: 0.85em; color: var(--danger); margin: 0 0 6px; overflow-wrap: break-word; }
+.ask-retry { padding: 4px 10px; font-size: 0.8em; border-radius: 4px; }
 
 /* ---- Ask history chrome: restored note / clear confirm / answer copy ---- */
 .ask-restored {
-  font-size: 12px;
+  font-size: 0.8em;
   color: var(--fg-muted);
   margin: 0 0 8px;
 }
@@ -2085,7 +2121,7 @@ body.ask-open main { margin-right: 396px; }
   border-radius: 4px;
   background: var(--btn-bg);
   color: var(--fg-secondary);
-  font-size: 12px;
+  font-size: 0.8em;
   cursor: pointer;
   margin: 0 0 8px;
 }
@@ -2100,7 +2136,7 @@ body.ask-open main { margin-right: 396px; }
   border: 1px solid var(--danger);
   border-radius: 8px;
   background: var(--surface);
-  font-size: 13px;
+  font-size: 0.85em;
   color: var(--fg);
 }
 .ask-clear-confirm .ask-clear-msg { flex: 1 1 100%; }
@@ -2110,7 +2146,7 @@ body.ask-open main { margin-right: 396px; }
   margin-right: 6px;
   padding: 4px 10px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 0.8em;
 }
 .ask-copy-btn svg, .ask-regenerate svg { width: 13px; height: 13px; flex-shrink: 0; }
 
@@ -2636,12 +2672,12 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  font-size: 14px;
+  font-size: var(--panel-payload-fs);
   line-height: 1.55;
   color: var(--fg);
 }
 .skim-head { display: flex; align-items: center; gap: 6px; }
-.skim-head h2 { flex: 1; font-size: 14px; font-weight: 600; margin: 0; }
+.skim-head h2 { flex: 1; font-size: 1.05em; font-weight: 600; margin: 0; }
 #skim-stop[hidden] { display: none; }
 /* Icon-only header buttons -- same 28x28/border/hover/focus-visible
    token family as .ask-ic (md-preview.css ~:1442-1450), given its own
@@ -2668,20 +2704,20 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
 .skim-stale {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-top: 8px; padding: 6px 10px;
-  font-size: 12px; color: var(--fg-secondary);
+  font-size: 0.8em; color: var(--fg-secondary);
   background: var(--btn-bg); border: 1px solid var(--border);
   border-left: 3px solid var(--link); border-radius: 6px;
 }
 #skim-stale[hidden] { display: none; }
-.skim-stale-btn { padding: 3px 10px; font-size: 12px; }
+.skim-stale-btn { padding: 3px 10px; font-size: 0.8em; }
 #skim-body { margin-top: 8px; }
 #skim-body > :first-child { margin-top: 0; }
 #skim-body > :last-child { margin-bottom: 0; }
 #skim-body ul { margin: 0; padding-left: 1.3em; }
 #skim-body li { margin: 4px 0; }
-.skim-err { font-size: 13px; color: var(--danger); margin: 0 0 6px; overflow-wrap: break-word; }
-.skim-retry { padding: 3px 10px; font-size: 12px; }
-#skim-status, #skim-usage { margin-top: 8px; font-size: 12px; color: var(--fg-secondary); }
+.skim-err { font-size: 0.85em; color: var(--danger); margin: 0 0 6px; overflow-wrap: break-word; }
+.skim-retry { padding: 3px 10px; font-size: 0.8em; }
+#skim-status, #skim-usage { margin-top: 8px; font-size: 0.8em; color: var(--fg-secondary); }
 #skim-status[hidden], #skim-usage[hidden] { display: none; }
 /* Collapsed state (spec 1.2.1/1.3): CSS-only, storage-persisted via
    md-skim.js's _pbpSkimWireCollapse -- header row stays visible, the
