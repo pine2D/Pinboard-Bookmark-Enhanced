@@ -2035,9 +2035,16 @@ body.ask-open main { margin-right: 396px; }
 #ask-form { display: flex; flex-direction: column; gap: 8px; }
 #ask-input {
   width: 100%;
-  resize: vertical;
+  /* Auto-grow (chat-input convention: ChatGPT/Claude/Slack all grow-with-
+     content to a cap, then scroll INSIDE the field). field-sizing: content
+     is the zero-JS native path (Chrome 123+, already our floor via
+     light-dark()). Cap = 8 text lines in em so it scales with the payload
+     size (a fixed 160px was 8 lines at the 17px floor but only 5 on 4K);
+     the manual resize handle is dropped -- auto-sizing owns the height. */
+  field-sizing: content;
+  resize: none;
   min-height: 44px;
-  max-height: 160px;
+  max-height: calc(12em + 18px); /* 8 lines x 1.5 line-height + padding/border */
   padding: 8px 10px;
   border: 1px solid var(--btn-border);
   border-radius: 8px;
