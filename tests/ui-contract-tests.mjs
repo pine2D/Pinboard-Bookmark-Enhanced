@@ -540,10 +540,13 @@ check(!mdReaderJs.includes("function pbpTypoApplyVars") && !mdReaderJs.includes(
 }
 // (3) h4-h6 stay pinned while p/li follow the leading tier.
 {
-  // font-size anchor skips the h1-h6 text-wrap:balance rule, whose second
-  // line starts with the same "#rendered-view h4, ..." selector text.
-  check(/#rendered-view h4, #rendered-view h5, #rendered-view h6 \{[^}]*font-size: 1em;[^}]*line-height: 1\.75;/.test(mdCss),
-    "md-preview.css: h4-h6 lost their pinned line-height (they'd follow the prose leading tier)");
+  // Voice round 2026-07 split the combined h4-h6 rule into three (distinct
+  // sizes/colours); the PIN contract survives per-level: each heading rule
+  // must carry its own literal line-height so none follows the leading tier.
+  for (const h of ["h4", "h5", "h6"]) {
+    check(new RegExp("#rendered-view " + h + " \\{[^}]*line-height: 1\\.75;").test(mdCss),
+      "md-preview.css: " + h + " lost its pinned line-height (it would follow the prose leading tier)");
+  }
   check((mdCss.match(/line-height: var\(--pbp-prose-leading, 1\.75\)/g) || []).length >= 3,
     "md-preview.css: the prose leading var no longer covers container+p+li");
 }
