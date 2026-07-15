@@ -166,7 +166,7 @@ button, input, select, textarea { font-family: inherit; }
 
 /* ---- Buttons ---- */
 .action-btn, .toggle-btn {
-  padding: 6px 14px;
+  padding: 6px 12px;
   border: 1px solid var(--btn-border);
   border-radius: 6px;
   background: var(--btn-bg);
@@ -926,10 +926,55 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .bookmark-badge .bb-lock svg { width: 11px; height: 11px; display: block; }
 .rail-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 12px; }
 .rail .view-toggle { width: 100%; }
-.rail .view-toggle .toggle-btn { flex: 1; justify-content: center; }
+/* Segments must FIT the fixed 264px rail in verbose locales: flex:1 alone
+   can't shrink below nowrap text's min-content, so de/ru three-way labels
+   ("Zweisprachig" / "Двуязычный") pushed the group past the rail edge
+   (user report 2026-07-15). min-width:0 lets segments actually share the
+   row; labels wrap INSIDE their segment (wrap-not-truncate is the rail's
+   established overflow strategy -- see .exp-toggles), hyphenating long
+   single words (html lang is set per locale) with overflow-wrap:anywhere
+   as the no-dictionary fallback. */
+.rail .view-toggle .toggle-btn {
+  /* flex-basis AUTO, not 0: equal thirds forced even English "Translated"
+     (65px text) into a 75px segment and wrapped it. Content-based basis
+     keeps short-label locales on one natural line; only when the row
+     genuinely overflows (de/ru) do segments shrink and wrap. 8px side
+     inset (not the md-tier 12) buys the en/fr row its single line. */
+  flex: 1 1 auto; justify-content: center;
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+  white-space: normal;
+  text-align: center;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
 .rail-section { margin-top: 4px; }
+/* ---- Reader chrome contract (2026-07 Claude Design round 5) ----
+   Type scale, 4 tiers shared by rail + ask/skim panels:
+     lg 14px (region titles, Q/A payload) - md 13px (primary interactive:
+     action-btn, TOC, errors) - sm 12px (secondary info, meta, inline micro
+     actions) - xs 11px (badges, superscript cite chips, keycaps, group
+     labels).
+   Button tiers: region-level actions = md (13px, 6px 12px inset, radius 6);
+   content-attached micro actions = sm (12px, 4px 10px inset, radius 4).
+   Group labels share the options sidebar's form language (uppercase, 0.5px
+   tracking; 11px here vs 10px there - proportional to each surface's
+   chrome base).
+   OVERFLOW STRATEGY BY CONTROL TYPE (do not unify): segmented radio-style
+   controls (.view-toggle) keep ONE row and wrap/hyphenate INSIDE segments
+   (breaking a segment to a new line destroys the one-control gestalt;
+   de/ru users read dictionary hyphenation as normal orthography);
+   independent toggle chips (.exp-toggles) flow WHOLE buttons to the next
+   line and never break their text (chip-group convention; per-chip
+   identity costs nothing to reflow).
+   CITE-CHIP STATE SEMANTICS (do not "clean up"): .ask-chip's dashed border
+   means unverified; .verified flips it solid + green dot. The border is a
+   functional signal, not decoration - suggestion chips (#ask-chips) carry
+   the button form instead (transparent pill, solid 1px border). */
 .rail-label {
-  font-size: 12px; letter-spacing: 0.04em; text-transform: none; color: var(--fg-secondary);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--fg-secondary);
   margin: 12px 0 8px; padding-top: 12px; border-top: 1px solid var(--border);
 }
 /* exp-toggles: the three boolean export options (frontmatter/toc/hl), real
@@ -1071,7 +1116,8 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .rail-sec-head {
   display: flex; align-items: center; gap: 6px; width: 100%;
   margin: 12px 0 8px; padding: 12px 0 0; border: 0; border-top: 1px solid var(--border);
-  background: none; font: inherit; font-size: 12px; letter-spacing: 0.04em;
+  background: none; font: inherit; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.5px; text-transform: uppercase;
   color: var(--fg-secondary); cursor: pointer; text-align: left;
 }
 .rail-sec-head:hover { color: var(--fg); }
@@ -1844,7 +1890,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   width: 380px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 16px;
   background: var(--surface);
   border-left: 1px solid var(--border);
@@ -1891,7 +1937,7 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 body.ask-open main { margin-right: 396px; }
 
 .ask-head { display: flex; align-items: center; gap: 6px; }
-.ask-head h2 { flex: 1; font-size: 15px; font-weight: 600; margin: 0; }
+.ask-head h2 { flex: 1; font-size: 14px; font-weight: 600; margin: 0; }
 .ask-ic {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; padding: 0;
@@ -1914,7 +1960,13 @@ body.ask-open main { margin-right: 396px; }
   padding-right: 4px;
 }
 .ask-empty { font-size: 13px; color: var(--fg-muted); margin: 0; }
-.ask-q { font-weight: 600; font-size: 14px; color: var(--fg); margin-top: 8px; }
+.ask-q {
+  font-weight: 600; font-size: 14px; color: var(--fg); margin-top: 8px;
+  /* Scan anchor: long threads need a landmark stronger than bold-vs-regular;
+     a bar adds it without another type size. */
+  border-left: 2px solid var(--fg-muted);
+  padding-left: 8px;
+}
 .ask-q:first-child { margin-top: 0; }
 .ask-a { font-size: 14px; line-height: 1.65; color: var(--fg); overflow-wrap: break-word; }
 .ask-a > :first-child { margin-top: 0; }
@@ -1931,10 +1983,10 @@ body.ask-open main { margin-right: 396px; }
   min-width: 0;
   height: auto;
   margin: 0;
-  padding: 5px 10px;
+  padding: 4px 10px;
   border: 1px solid var(--btn-border);
   border-radius: 999px;
-  background: var(--btn-bg);
+  background: transparent;
   color: var(--fg-secondary);
   font-size: 12px;
   font-weight: 400;
@@ -2018,7 +2070,7 @@ body.ask-open main { margin-right: 396px; }
 
 .ask-stopped { font-size: 12px; color: var(--fg-muted); margin: 6px 0 0; }
 .ask-err { font-size: 13px; color: var(--danger); margin: 0 0 6px; overflow-wrap: break-word; }
-.ask-retry { padding: 3px 10px; font-size: 12px; }
+.ask-retry { padding: 4px 10px; font-size: 12px; border-radius: 4px; }
 
 /* ---- Ask history chrome: restored note / clear confirm / answer copy ---- */
 .ask-restored {
@@ -2028,9 +2080,9 @@ body.ask-open main { margin-right: 396px; }
 }
 .ask-clear-btn {
   align-self: flex-start;
-  padding: 3px 10px;
+  padding: 4px 10px;
   border: 1px solid var(--btn-border);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--btn-bg);
   color: var(--fg-secondary);
   font-size: 12px;
@@ -2056,7 +2108,8 @@ body.ask-open main { margin-right: 396px; }
 .ask-copy-btn, .ask-regenerate {
   margin-top: 8px;
   margin-right: 6px;
-  padding: 3px 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
   font-size: 12px;
 }
 .ask-copy-btn svg, .ask-regenerate svg { width: 13px; height: 13px; flex-shrink: 0; }
@@ -2438,7 +2491,7 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
      head -- reusing the page's existing --mono-latin/--han-* tokens
      (md-preview.css :root) rather than retyping a literal font stack. */
   font-family: var(--mono-latin), var(--han-tc), var(--han-sc), var(--han-ja), var(--han-ko), var(--han-rest), monospace;
-  font-size: 11.5px;
+  font-size: 11px; /* xs tier (keycap = micro label); was the half-step 11.5 */
   line-height: 1.5;
 }
 .kbd-help-desc { color: var(--fg-secondary); flex: 1 1 auto; }
@@ -2473,7 +2526,7 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
   border-radius: 6px;
   background: transparent;
   color: var(--fg-muted);
-  font-size: 11.5px;
+  font-size: 12px; /* sm tier; was the half-step 11.5 */
   text-align: center;
   cursor: pointer;
 }
@@ -2588,7 +2641,7 @@ html.motion-ready :is(#search-pop, #kbd-help-pop, #pb-hl-card):popover-open {
   color: var(--fg);
 }
 .skim-head { display: flex; align-items: center; gap: 6px; }
-.skim-head h2 { flex: 1; font-size: 15px; font-weight: 600; margin: 0; }
+.skim-head h2 { flex: 1; font-size: 14px; font-weight: 600; margin: 0; }
 #skim-stop[hidden] { display: none; }
 /* Icon-only header buttons -- same 28x28/border/hover/focus-visible
    token family as .ask-ic (md-preview.css ~:1442-1450), given its own

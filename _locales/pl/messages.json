@@ -2401,13 +2401,13 @@
     "message": "Kontynuuj tłumaczenie"
   },
   "trViewOriginal": {
-    "message": "Oryginał"
+    "message": "Ory­gi­nał"
   },
   "trViewBilingual": {
-    "message": "Dwujęzycznie"
+    "message": "Dwu­ję­zycz­nie"
   },
   "trViewTranslated": {
-    "message": "Tłumaczenie"
+    "message": "Tłu­ma­cze­nie"
   },
   "trEstCost": {
     "message": "Około ~$COUNT$ tokens · $MODEL$",
