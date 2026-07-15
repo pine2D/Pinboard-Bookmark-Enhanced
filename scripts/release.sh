@@ -282,9 +282,12 @@ fi
 # ---- Step 0: Docs freshness gate ----
 #
 # A release that ships features must not leave user-facing docs behind.
-# If the range since the previous tag contains feat commits while README.md,
-# CLAUDE.md, and docs/privacy.md are ALL untouched, abort. After verifying
-# the docs are genuinely current, re-run with --docs-ok to proceed.
+# If the range since the previous tag contains feat commits while EVERY
+# watched doc is untouched, abort. Watched set: README.md + its 8 locale
+# mirrors, CLAUDE.md, docs/privacy.md, docs/index.md (Pages front door),
+# and the theme-factory docs (docs/theme-surface/README.md + NEW_THEME.md
+# — must move whenever factory mechanics change). After verifying the docs
+# are genuinely current, re-run with --docs-ok to proceed.
 if [ "${BUILD_ONLY}" -eq 1 ]; then
   echo "  --build-only: skipping publication docs gate"
 elif [ "${DOCS_OK}" -eq 1 ]; then
@@ -292,13 +295,19 @@ elif [ "${DOCS_OK}" -eq 1 ]; then
 else
   if [ -n "${PREV_TAG}" ]; then
     FEAT_COUNT=$(git log "${PREV_TAG}..${HEAD_SHA}" --pretty=format:%s --no-merges | grep -c "^feat" || true)
-    DOCS_TOUCHED=$(git diff --name-only "${PREV_TAG}..${HEAD_SHA}" -- README.md CLAUDE.md docs/privacy.md | wc -l)
+    DOCS_TOUCHED=$(git diff --name-only "${PREV_TAG}..${HEAD_SHA}" -- \
+      README.md README.*.md CLAUDE.md docs/privacy.md docs/index.md \
+      docs/theme-surface/README.md docs/theme-surface/NEW_THEME.md | wc -l)
     if [ "${FEAT_COUNT}" -gt 0 ] && [ "${DOCS_TOUCHED}" -eq 0 ]; then
       echo "  ABORT: docs freshness gate."
-      echo "  ${FEAT_COUNT} feat commit(s) since ${PREV_TAG}, but README.md, CLAUDE.md and"
-      echo "  docs/privacy.md are all untouched in that range. Update user-facing docs"
-      echo "  (README x9 locales / CLAUDE.md / privacy policy for new data flows),"
-      echo "  or re-run with --docs-ok if they are genuinely current."
+      echo "  ${FEAT_COUNT} feat commit(s) since ${PREV_TAG}, but every watched doc is"
+      echo "  untouched in that range. Checklist before overriding:"
+      echo "    - README.md x9 locales   (user-facing features)"
+      echo "    - CLAUDE.md              (conventions / invariants / module map)"
+      echo "    - docs/privacy.md        (ANY new data exit: API, export target, AI surface)"
+      echo "    - docs/index.md          (Pages front door)"
+      echo "    - docs/theme-surface/README.md + NEW_THEME.md (factory mechanics)"
+      echo "  Update what applies, or re-run with --docs-ok if all are genuinely current."
       exit 1
     fi
     echo "  Docs gate OK (${FEAT_COUNT} feat commit(s); docs files touched: ${DOCS_TOUCHED})"

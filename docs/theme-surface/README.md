@@ -1,6 +1,6 @@
 # Pinboard Theme Surface — Spec v1
 
-Author: wwj · Updated: 2026-07-15 · Version: 1.1.0
+Updated: 2026-07-15 · Version: 1.1.0
 
 A three-layer architecture for Pinboard custom themes that separates **what a
 surface is** (manifest) from **what colors/spacing it uses** (tokens) from
