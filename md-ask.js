@@ -308,9 +308,25 @@ function _pbpAskOnSubmit() {
 
 // Init hookup: top-level listener registration only (no other side
 // effects; the tests page loads this file on file:// and never fires it).
+// Bounded retry (user report 2026-07-15): pbp:rendered fires ONCE per page
+// life, and a transient failure inside the single init run -- a cold
+// storage read returning empty settings (hasAIKey momentarily false), or
+// any swallowed throw -- used to leave the tab PERMANENTLY without the Ask
+// entry or hotkey (unreproducible afterwards, classic race). Success is
+// _pbpAskState being set (pbpAskInit's first act after its gates); two
+// spaced retries re-run the full gate chain, so a genuinely disabled AI
+// config just re-checks twice, silently, with no UI flash.
+function _pbpAskInitWithRetry(detail, attempt) {
+  attempt = attempt || 1;
+  pbpAskInit(detail).catch(() => {}).then(() => {
+    if (!_pbpAskState && attempt < 3) {
+      setTimeout(() => _pbpAskInitWithRetry(detail, attempt + 1), attempt * 1000);
+    }
+  });
+}
 if (typeof document !== "undefined") {
   document.addEventListener("pbp:rendered", (e) => {
-    pbpAskInit((e && e.detail) || {}).catch(() => {});
+    _pbpAskInitWithRetry((e && e.detail) || {});
   }, { once: true });
 }
 
