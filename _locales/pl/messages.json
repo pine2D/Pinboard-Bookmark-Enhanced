@@ -566,6 +566,21 @@
   "tabStorage": {
     "message": "Pamięć"
   },
+  "tabGroupSaving": {
+    "message": "Zapisywanie"
+  },
+  "tabGroupAI": {
+    "message": "AI"
+  },
+  "tabGroupReading": {
+    "message": "Czytanie"
+  },
+  "tabGroupTools": {
+    "message": "Narzędzia"
+  },
+  "tabGroupSystem": {
+    "message": "System"
+  },
   "secStorage": {
     "message": "Zarządzanie pamięcią"
   },

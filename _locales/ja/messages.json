@@ -566,6 +566,21 @@
   "tabStorage": {
     "message": "ストレージ"
   },
+  "tabGroupSaving": {
+    "message": "保存"
+  },
+  "tabGroupAI": {
+    "message": "AI"
+  },
+  "tabGroupReading": {
+    "message": "閲覧"
+  },
+  "tabGroupTools": {
+    "message": "ツール"
+  },
+  "tabGroupSystem": {
+    "message": "システム"
+  },
   "secStorage": {
     "message": "ストレージ管理"
   },

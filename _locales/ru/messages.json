@@ -566,6 +566,21 @@
   "tabStorage": {
     "message": "Хранилище"
   },
+  "tabGroupSaving": {
+    "message": "Сохранение"
+  },
+  "tabGroupAI": {
+    "message": "AI"
+  },
+  "tabGroupReading": {
+    "message": "Чтение"
+  },
+  "tabGroupTools": {
+    "message": "Инструменты"
+  },
+  "tabGroupSystem": {
+    "message": "Система"
+  },
   "secStorage": {
     "message": "Управление хранилищем"
   },

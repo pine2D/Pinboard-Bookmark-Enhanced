@@ -15,33 +15,48 @@
       <div class="mobile-tab-picker">
         <label for="mobile-tab-select" data-i18n="settingsCategory">Settings category</label>
         <select id="mobile-tab-select">
-          <option value="general" data-i18n="tabGeneral">General</option>
-          <option value="popup" data-i18n="tabPopup">Popup</option>
-          <option value="bookmarks" data-i18n="tabBookmarks">Bookmarks</option>
-          <option value="ai" data-i18n="tabAI">AI Providers</option>
-          <option value="ai-behavior" data-i18n="tabAiBehavior">AI Behavior</option>
-          <option value="reader" data-i18n="tabReader">Reader</option>
-          <option value="notes" data-i18n="tabNotes">Notes</option>
-          <option value="markdown" data-i18n="tabMarkdown">Export</option>
-          <option value="quick" data-i18n="tabQuickActions">Quick Actions</option>
-          <option value="tags" data-i18n="tabTags">Tags</option>
-          <option value="archive" data-i18n="tabArchive">Archive</option>
-          <option value="appearance" data-i18n="tabAppearance">Appearance</option>
-          <option value="storage" data-i18n="tabStorage">Storage</option>
+          <optgroup data-i18n-label="tabGroupSaving" label="Saving">
+              <option value="general" data-i18n="tabGeneral">General</option>
+              <option value="popup" data-i18n="tabPopup">Popup</option>
+              <option value="bookmarks" data-i18n="tabBookmarks">Bookmarks</option>
+              <option value="quick" data-i18n="tabQuickActions">Quick Actions</option>
+          </optgroup>
+          <optgroup data-i18n-label="tabGroupAI" label="AI">
+              <option value="ai" data-i18n="tabAI">AI Providers</option>
+              <option value="ai-behavior" data-i18n="tabAiBehavior">AI Behavior</option>
+          </optgroup>
+          <optgroup data-i18n-label="tabGroupReading" label="Reading">
+              <option value="reader" data-i18n="tabReader">Reader</option>
+              <option value="notes" data-i18n="tabNotes">Notes</option>
+              <option value="markdown" data-i18n="tabMarkdown">Export</option>
+          </optgroup>
+          <optgroup data-i18n-label="tabGroupTools" label="Tools">
+              <option value="tags" data-i18n="tabTags">Tags</option>
+              <option value="archive" data-i18n="tabArchive">Archive</option>
+          </optgroup>
+          <optgroup data-i18n-label="tabGroupSystem" label="System">
+              <option value="appearance" data-i18n="tabAppearance">Appearance</option>
+              <option value="storage" data-i18n="tabStorage">Storage</option>
+          </optgroup>
         </select>
       </div>
       <div class="tabs" role="tablist" aria-orientation="vertical">
+        <div class="tab-group-label" role="presentation" data-i18n="tabGroupSaving">Saving</div>
         <button class="tab-btn active" id="tab-general" data-panel="general" role="tab" aria-selected="true" aria-controls="panel-general" data-i18n="tabGeneral">General</button>
         <button class="tab-btn" id="tab-popup" data-panel="popup" role="tab" aria-selected="false" aria-controls="panel-popup" data-i18n="tabPopup">Popup</button>
         <button class="tab-btn" id="tab-bookmarks" data-panel="bookmarks" role="tab" aria-selected="false" aria-controls="panel-bookmarks" data-i18n="tabBookmarks">Bookmarks</button>
+        <button class="tab-btn" id="tab-quick" data-panel="quick" role="tab" aria-selected="false" aria-controls="panel-quick" data-i18n="tabQuickActions">Quick Actions</button>
+        <div class="tab-group-label" role="presentation" data-i18n="tabGroupAI">AI</div>
         <button class="tab-btn" id="tab-ai" data-panel="ai" role="tab" aria-selected="false" aria-controls="panel-ai" data-i18n="tabAI">AI Providers</button>
         <button class="tab-btn" id="tab-ai-behavior" data-panel="ai-behavior" role="tab" aria-selected="false" aria-controls="panel-ai-behavior" data-i18n="tabAiBehavior">AI Behavior</button>
+        <div class="tab-group-label" role="presentation" data-i18n="tabGroupReading">Reading</div>
         <button class="tab-btn" id="tab-reader" data-panel="reader" role="tab" aria-selected="false" aria-controls="panel-reader" data-i18n="tabReader">Reader</button>
         <button class="tab-btn" id="tab-notes" data-panel="notes" role="tab" aria-selected="false" aria-controls="panel-notes" data-i18n="tabNotes">Notes</button>
         <button class="tab-btn" id="tab-markdown" data-panel="markdown" role="tab" aria-selected="false" aria-controls="panel-markdown" data-i18n="tabMarkdown">Export</button>
-        <button class="tab-btn" id="tab-quick" data-panel="quick" role="tab" aria-selected="false" aria-controls="panel-quick" data-i18n="tabQuickActions">Quick Actions</button>
+        <div class="tab-group-label" role="presentation" data-i18n="tabGroupTools">Tools</div>
         <button class="tab-btn" id="tab-tags" data-panel="tags" role="tab" aria-selected="false" aria-controls="panel-tags" data-i18n="tabTags">Tags</button>
         <button class="tab-btn" id="tab-archive" data-panel="archive" role="tab" aria-selected="false" aria-controls="panel-archive" data-i18n="tabArchive">Archive</button>
+        <div class="tab-group-label" role="presentation" data-i18n="tabGroupSystem">System</div>
         <button class="tab-btn" id="tab-appearance" data-panel="appearance" role="tab" aria-selected="false" aria-controls="panel-appearance" data-i18n="tabAppearance">Appearance</button>
         <button class="tab-btn" id="tab-storage" data-panel="storage" role="tab" aria-selected="false" aria-controls="panel-storage" data-i18n="tabStorage">Storage</button>
       </div>

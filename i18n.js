@@ -145,6 +145,7 @@ function uiLangToBCP47() {
  *   data-i18n-placeholder="key"   → placeholder attribute
  *   data-i18n-title="key"         → title attribute
  *   data-i18n-aria="key"          → aria-label attribute
+ *   data-i18n-label="key"         → label attribute (optgroup)
  *
  * Note: All translations are applied as plain text (textContent)
  * to prevent XSS. No innerHTML injection is used.
@@ -158,7 +159,7 @@ function applyI18n(root) {
   document.documentElement.lang = uiLangToBCP47();
 
   // P1.5: Merged 4 separate querySelectorAll passes into 1 DOM walk.
-  root.querySelectorAll("[data-i18n],[data-i18n-placeholder],[data-i18n-title],[data-i18n-aria]").forEach(el => {
+  root.querySelectorAll("[data-i18n],[data-i18n-placeholder],[data-i18n-title],[data-i18n-aria],[data-i18n-label]").forEach(el => {
     const k1 = el.getAttribute("data-i18n");
     if (k1) el.textContent = t(k1);
     const k2 = el.getAttribute("data-i18n-placeholder");
@@ -167,5 +168,7 @@ function applyI18n(root) {
     if (k3) el.title = t(k3);
     const k4 = el.getAttribute("data-i18n-aria");
     if (k4) el.setAttribute("aria-label", t(k4));
+    const k5 = el.getAttribute("data-i18n-label");
+    if (k5) el.setAttribute("label", t(k5));
   });
 }

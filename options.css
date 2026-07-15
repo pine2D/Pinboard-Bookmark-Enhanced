@@ -94,6 +94,21 @@ h1 { font-size: 18px; color: #333; margin-bottom: var(--opt-sp-7); border-bottom
   display: flex; flex-direction: column; align-items: stretch;
   gap: var(--opt-sp-1);
 }
+/* Sidebar group labels (2026-07 IA round: 13 tabs -> 5 groups, ORIGINAL tab
+   order preserved — real-device feedback: reordering costs muscle memory more
+   than "logical" grouping earns; only quick moved into Saving by user call).
+   Pure visual layer: role=presentation, non-interactive; tab ids/switching
+   untouched. Left inset = tab padding + the tabs' 2px border-left so text
+   columns align. */
+.tab-group-label {
+  padding: var(--opt-sp-1) var(--opt-sp-5) var(--opt-sp-1) calc(var(--opt-sp-5) + 2px);
+  margin: var(--opt-sp-5) 0 var(--opt-sp-1);
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--opt-fg-hint, var(--opt-fg-muted, #666));
+  user-select: none; pointer-events: none;
+}
+.tab-group-label:first-child { margin-top: var(--opt-sp-1); }
 .tab-btn {
   text-align: left;
   border: none; border-left: 2px solid transparent;
@@ -803,7 +818,10 @@ html[data-theme] h1 { color: var(--opt-fg); border-color: var(--opt-border); }
 html[data-theme] .tab-btn { color: var(--opt-fg-muted); }
 html[data-theme] .tab-btn:hover:not(.active) { color: var(--opt-fg); border-left-color: var(--opt-border); background: color-mix(in srgb, var(--opt-accent) 8%, transparent); }
 html[data-theme] .tab-btn.active { color: var(--opt-fg); border-left-color: var(--opt-accent, var(--opt-fg)); background: var(--opt-tab-active); }
-html[data-theme] .reset-tab-btn { color: var(--opt-fg-hint, var(--opt-fg-muted)); border-top-color: var(--opt-border-section, var(--opt-border)); }
+/* border-left-color: the mobile layout swaps the divider edge (border-top: 0;
+   border-left: 1px) — theme both edges or narrow dark windows keep the light
+   #e0e0e0 hairline. Zero effect on desktop (border-left-width is 0 there). */
+html[data-theme] .reset-tab-btn { color: var(--opt-fg-hint, var(--opt-fg-muted)); border-top-color: var(--opt-border-section, var(--opt-border)); border-left-color: var(--opt-border-section, var(--opt-border)); }
 html[data-theme] .reset-tab-btn:hover { color: var(--opt-danger, #e55); }
 html[data-theme] .panel { background: var(--opt-panel); border-color: var(--opt-border); }
 html[data-theme] .fg label { color: var(--opt-fg); }

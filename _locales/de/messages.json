@@ -566,6 +566,21 @@
   "tabStorage": {
     "message": "Speicher"
   },
+  "tabGroupSaving": {
+    "message": "Speichern"
+  },
+  "tabGroupAI": {
+    "message": "AI"
+  },
+  "tabGroupReading": {
+    "message": "Lesen"
+  },
+  "tabGroupTools": {
+    "message": "Werkzeuge"
+  },
+  "tabGroupSystem": {
+    "message": "System"
+  },
   "secStorage": {
     "message": "Speicherverwaltung"
   },

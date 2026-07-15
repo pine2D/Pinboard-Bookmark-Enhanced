@@ -566,6 +566,21 @@
   "tabStorage": {
     "message": "存储"
   },
+  "tabGroupSaving": {
+    "message": "保存"
+  },
+  "tabGroupAI": {
+    "message": "AI"
+  },
+  "tabGroupReading": {
+    "message": "阅读"
+  },
+  "tabGroupTools": {
+    "message": "工具"
+  },
+  "tabGroupSystem": {
+    "message": "系统"
+  },
   "secStorage": {
     "message": "存储管理"
   },
