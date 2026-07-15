@@ -14,6 +14,22 @@
   --opt-radius-lg: 10px;
   --opt-radius-full: 9999px;
 
+  /* Spacing scale — 2026-07 density tokenization (Claude Design round 1).
+     Same 8-step scale as popup's --pp-sp-*; options binds its layout-level
+     semantics one step up (form rhythm 12 vs popup 8), control-level insets
+     match the popup so shared components read identically. Exempt structural
+     offsets stay literal: 26px select chevron reserve, the
+     .theme-preset-btn.active 20px / -5px check-tick pair, negative margins. */
+  --opt-sp-1: 2px;
+  --opt-sp-2: 4px;
+  --opt-sp-3: 6px;
+  --opt-sp-4: 8px;
+  --opt-sp-5: 12px;
+  --opt-sp-6: 16px;
+  --opt-sp-7: 24px;
+  /* Form-group vertical rhythm (.fg / .hint / helper blocks). */
+  --opt-rhythm: var(--opt-sp-5);
+
   --opt-shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --opt-shadow-sm: 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --opt-shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
@@ -55,17 +71,17 @@ body { font-family: "Helvetica Neue", Verdana, "PingFang SC", "Hiragino Sans GB"
 button, input, select { font-family: inherit; }
 .container {
   visibility: hidden;
-  max-width: 900px; margin: 0 auto; padding: 24px 16px;
+  max-width: 900px; margin: 0 auto; padding: var(--opt-sp-7) var(--opt-sp-6);
   display: grid;
   grid-template-columns: minmax(160px, max-content) minmax(0, 1fr);
-  column-gap: 24px;
+  column-gap: var(--opt-sp-7);
   align-items: start;
 }
 html[data-options-ready] .container { visibility: visible; }
 /* LOAD-BEARING: h1 must span both columns. The floated .auto-save-hint relies on
    the full width; without this it collapses into the ~160px sidebar column. */
 .container > h1 { grid-column: 1 / -1; }
-h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+h1 { font-size: 18px; color: #333; margin-bottom: var(--opt-sp-7); border-bottom: 1px solid #ccc; padding-bottom: var(--opt-sp-4); }
 
 /* ---- Tabs ---- */
 .options-nav {
@@ -76,14 +92,14 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .mobile-tab-picker { display: none; }
 .tabs {
   display: flex; flex-direction: column; align-items: stretch;
-  gap: 2px;
+  gap: var(--opt-sp-1);
 }
 .tab-btn {
   text-align: left;
   border: none; border-left: 2px solid transparent;
   border-radius: 0 var(--opt-radius-sm) var(--opt-radius-sm) 0;
   background: none; cursor: pointer;
-  padding: 7px 14px 7px 12px;
+  padding: var(--opt-sp-4) var(--opt-sp-5) var(--opt-sp-4) var(--opt-sp-5);
   font-size: 13px; color: #666;
   white-space: nowrap;
   transition: color 0.15s, border-color 0.15s, background-color 0.15s;
@@ -92,7 +108,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 .tab-btn:hover:not(.active) { color: #333; border-left-color: #bbb; background: rgba(0,0,0,0.03); }
 .tab-btn.active { color: #333; font-weight: bold; border-left-color: #333; background: rgba(0,0,0,0.05); }
 .reset-tab-btn {
-  margin: 14px 0 0 0; padding: 10px 12px 0;
+  margin: var(--opt-sp-6) 0 0 0; padding: var(--opt-sp-5) var(--opt-sp-5) 0;
   border: none; border-top: 1px solid #e0e0e0;
   background: none; cursor: pointer;
   text-align: left; font-size: 11px; color: #757575;
@@ -109,7 +125,7 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
   display: inline-block;
   width: 6px;
   height: 6px;
-  margin-left: 6px;
+  margin-left: var(--opt-sp-3);
   border-radius: 50%;
   background: var(--opt-accent, #4477bb);
   animation: tabBusyPulse 1.2s ease-in-out infinite;
@@ -127,28 +143,28 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
    used to be slow too, but the emoji→SVG fix removed the per-panel stall, so both
    open AND switch are now fast. */
 .panel { background: #fff; border: 1px solid #ccc; display: none; }
-.panel.active { grid-column: 2; grid-row: 2; display: block; padding: 16px; border-width: 1px; border-radius: var(--opt-radius-md); }
+.panel.active { grid-column: 2; grid-row: 2; display: block; padding: var(--opt-sp-6); border-width: 1px; border-radius: var(--opt-radius-md); }
 
 /* ---- Form groups ---- */
-.fg { margin-bottom: 10px; }
-.fg label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; margin-bottom: 4px; }
+.fg { margin-bottom: var(--opt-rhythm); }
+.fg label { display: flex; align-items: center; gap: var(--opt-sp-3); font-size: 13px; cursor: pointer; margin-bottom: var(--opt-sp-2); }
 /* Stacked sub-options. Three-tier spacing:
    - title (label.bl) → first option: 6px (group separation)
    - option ↔ option: 4px margin + 2px×2 label padding = ~8px visual
    - last option → hint: 6px (footer breathing)
    - rows containing an inline <input> (e.g. popup-width custom): a touch more
      vertical margin to balance the taller control. */
-.fg-stack > div { margin-bottom: 4px; }
+.fg-stack > div { margin-bottom: var(--opt-sp-2); }
 .fg-stack > div:last-child { margin-bottom: 0; }
-.fg-stack > div > label { padding: 2px 0; margin-bottom: 0; }
-.fg-stack > label.bl { margin-bottom: 6px; }
-.fg.fg-stack > .hint { margin-top: 6px; }
+.fg-stack > div > label { padding: var(--opt-sp-1) 0; margin-bottom: 0; }
+.fg-stack > label.bl { margin-bottom: var(--opt-sp-3); }
+.fg.fg-stack > .hint { margin-top: var(--opt-sp-3); }
 .fg-stack > div:has(input[type="number"]),
-.fg-stack > div:has(input[type="text"]) { margin-top: 4px; margin-bottom: 6px; }
-.fg-stack input[type="number"] { padding: 1px 6px; font-size: 12px; height: auto; line-height: 1.4; }
-.fg label.bl { display: block; font-weight: bold; margin-bottom: 4px; cursor: default; font-size: 12px; color: #555; }
+.fg-stack > div:has(input[type="text"]) { margin-top: var(--opt-sp-2); margin-bottom: var(--opt-sp-3); }
+.fg-stack input[type="number"] { padding: 1px var(--opt-sp-3); font-size: 12px; height: auto; line-height: 1.4; }
+.fg label.bl { display: block; font-weight: bold; margin-bottom: var(--opt-sp-2); cursor: default; font-size: 12px; color: #555; }
 .fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea {
-  width: 100%; padding: 4px 8px; border: 1px solid #cdd1d6;
+  width: 100%; padding: var(--opt-sp-2) var(--opt-sp-4); border: 1px solid #cdd1d6;
   background-color: #fff; font-size: 13px; font-family: inherit;
   -webkit-appearance: none; appearance: none; box-shadow: none;
   transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
@@ -183,8 +199,8 @@ h1 { font-size: 18px; color: #333; margin-bottom: 20px; border-bottom: 1px solid
 input[type="checkbox"], input[type="radio"] { accent-color: var(--opt-accent); }
 
 /* ---- Panel footer (e.g. General tab feedback link) ---- */
-.panel-foot { margin-top: 18px; padding-top: 12px; border-top: 1px solid #e8e8e8; font-size: 11px; text-align: center; }
-.panel-foot a { color: #666; text-decoration: none; transition: color 0.18s ease; display: inline-flex; align-items: center; gap: 4px; }
+.panel-foot { margin-top: var(--opt-sp-6); padding-top: var(--opt-sp-5); border-top: 1px solid #e8e8e8; font-size: 11px; text-align: center; }
+.panel-foot a { color: #666; text-decoration: none; transition: color 0.18s ease; display: inline-flex; align-items: center; gap: var(--opt-sp-2); }
 .panel-foot a:hover { color: var(--opt-accent, #4477bb); text-decoration: underline; }
 .panel-foot .ext-icon { width: 10px; height: 10px; flex-shrink: 0; }
 html[data-theme] .panel-foot { border-top-color: var(--opt-border-section, var(--opt-border)); }
@@ -192,11 +208,11 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
 html[data-theme] .panel-foot a:hover { color: var(--opt-accent); }
 
 /* ---- Common elements ---- */
-.hint { font-size: 11px; color: #757575; margin: 2px 0 10px; }
-.fg > .hint { margin: 2px 0 0; }   /* inside a form group: tight to its control; the group's own margin-bottom (10px) provides separation */
+.hint { font-size: 11px; color: #757575; margin: var(--opt-sp-1) 0 var(--opt-rhythm); }
+.fg > .hint { margin: var(--opt-sp-1) 0 0; }   /* inside a form group: tight to its control; the group's own margin-bottom (10px) provides separation */
 .fg + .hint { margin-top: -6px; }  /* a hint owned by the preceding group: pull close (net ~4px gap above, 10px below) */
 .hint a { color: #4477bb; }
-.hint code { background: #f0f0e8; padding: 1px 4px; font-size: 10px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
+.hint code { background: #f0f0e8; padding: 1px var(--opt-sp-2); font-size: 10px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 
 /* ---- Markdown tab: keyboard shortcuts static list (Task 6, spec 5.3).
    kbd chip font stack mirrors the other mono stacks in this file (.hint
@@ -209,13 +225,13 @@ html[data-theme] .panel-foot a:hover { color: var(--opt-accent); }
    this file -- this is options.css's OWN token system (--opt-*), a
    separate hand-maintained surface outside the theme factory and outside
    md-preview.css's light-dark() token system. */
-.kbd-help-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.kbd-help-row { display: flex; align-items: baseline; gap: 10px; font-size: 12px; }
+.kbd-help-list { list-style: none; margin: var(--opt-sp-4) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--opt-sp-3); }
+.kbd-help-row { display: flex; align-items: baseline; gap: var(--opt-sp-4); font-size: 12px; }
 .kbd-help-chips { flex: none; min-width: 70px; }
 .kbd-help-chips kbd {
   display: inline-block;
-  padding: 1px 6px;
-  margin-right: 2px;
+  padding: 1px var(--opt-sp-3);
+  margin-right: var(--opt-sp-1);
   border: 1px solid #cdd1d6;
   border-radius: var(--opt-radius-sm);
   background: #f5f5f0;
@@ -232,23 +248,23 @@ html[data-theme] .kbd-help-chips kbd {
   content: "";
   display: inline-block;
   width: 11px; height: 11px;
-  margin-right: 4px;
+  margin-right: var(--opt-sp-2);
   vertical-align: -2px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23c0840a' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M8 2 15 14H1Z'/%3E%3Cpath d='M8 6.5v3.5' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12' r='0.6' fill='%23c0840a' stroke='none'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-size: contain;
 }
-.free-tier-help { margin: 8px 0 14px; font-size: 12px; color: #555; }
-.free-tier-help summary { cursor: pointer; padding: 4px 0; color: #4477bb; user-select: none; }
+.free-tier-help { margin: var(--opt-sp-4) 0 var(--opt-rhythm); font-size: 12px; color: #555; }
+.free-tier-help summary { cursor: pointer; padding: var(--opt-sp-2) 0; color: #4477bb; user-select: none; }
 .free-tier-help summary:hover { text-decoration: underline; }
-.free-tier-help[open] summary { margin-bottom: 4px; }
-.free-tier-list { margin: 4px 0 6px; padding-left: 18px; line-height: 1.6; }
-.free-tier-list li { margin-bottom: 2px; }
+.free-tier-help[open] summary { margin-bottom: var(--opt-sp-2); }
+.free-tier-list { margin: var(--opt-sp-2) 0 var(--opt-sp-3); padding-left: var(--opt-sp-6); line-height: 1.6; }
+.free-tier-list li { margin-bottom: var(--opt-sp-1); }
 .free-tier-list strong { color: #333; }
 html[data-theme] .free-tier-help { color: var(--opt-text-muted, #888); }
 html[data-theme] .free-tier-list strong { color: var(--opt-text, #ddd); }
 html[data-theme] .free-tier-help summary { color: var(--opt-accent, #4477bb); }
-.opt-error { font-size: 12px; color: #c00; margin: 4px 0 8px; padding: 6px 10px; background: #fff0f0; border: 1px solid #f5c6c6; border-radius: var(--opt-radius-sm); }
+.opt-error { font-size: 12px; color: #c00; margin: var(--opt-sp-2) 0 var(--opt-sp-4); padding: var(--opt-sp-3) var(--opt-sp-4); background: #fff0f0; border: 1px solid #f5c6c6; border-radius: var(--opt-radius-sm); }
 .opt-error.hidden { display: none; }
 /* Generic utility (same convention as popup.css). options.css historically only had
    the two scoped variants above/below — bare class="hidden" elements (the tag-gov
@@ -256,34 +272,34 @@ html[data-theme] .free-tier-help summary { color: var(--opt-accent, #4477bb); }
    button appeared to do nothing. */
 .hidden { display: none !important; }
 html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--opt-danger-bg, rgba(220,80,80,0.08)); border-color: var(--opt-danger, #e55); }
-.divider { border-top: 1px solid #ddd; margin: 14px 0; }
-.btn { padding: 4px 16px; font-size: 12px; cursor: pointer; border: 1px solid #999; background: #f5f5f0; transition: background 0.15s, border-color 0.15s, transform 0.15s; }
+.divider { border-top: 1px solid #ddd; margin: var(--opt-sp-6) 0; }
+.btn { padding: var(--opt-sp-2) var(--opt-sp-6); font-size: 12px; cursor: pointer; border: 1px solid #999; background: #f5f5f0; transition: background 0.15s, border-color 0.15s, transform 0.15s; }
 .btn:hover:not(:disabled) { background: #eee; }
 .btn:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 2px; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-sm { padding: 2px 10px; font-size: 11px; }
-.save-status { font-size: 12px; color: #080; margin-left: 8px; }
-.field-warn { display:none; font-size: 12px; color: #b85c00; margin-top: 4px; }
+.btn-sm { padding: var(--opt-sp-1) var(--opt-sp-4); font-size: 11px; }
+.save-status { font-size: 12px; color: #080; margin-left: var(--opt-sp-4); }
+.field-warn { display:none; font-size: 12px; color: #b85c00; margin-top: var(--opt-sp-2); }
 .field-warn.visible { display: block; }
-.section-title { display: block; font-size: 13px; font-weight: bold; color: #444; margin-bottom: 8px; margin-top: 8px; }
+.section-title { display: block; font-size: 13px; font-weight: bold; color: #444; margin-bottom: var(--opt-sp-4); margin-top: var(--opt-sp-4); }
 
 /* ---- Provider fields ---- */
-.pf { margin-top: 8px; padding: 10px; background: #f9f9f6; border: 1px solid #e0e0d8; }
+.pf { margin-top: var(--opt-sp-4); padding: var(--opt-sp-5); background: #f9f9f6; border: 1px solid #e0e0d8; }
 .pf.hidden { display: none; }
-.pf h3 { font-size: 12px; color: #555; margin-bottom: 8px; font-weight: bold; }
+.pf h3 { font-size: 12px; color: #555; margin-bottom: var(--opt-sp-4); font-weight: bold; }
 
 /* ---- Markdown export targets (Send-to destination cards) ---- */
-.et-field { margin-top: 8px; }
-.et-onboarding { margin-top: 8px; font-size: 12px; color: #555; }
-.et-onboarding summary { cursor: pointer; padding: 4px 0; color: #4477bb; user-select: none; }
+.et-field { margin-top: var(--opt-sp-4); }
+.et-onboarding { margin-top: var(--opt-sp-4); font-size: 12px; color: #555; }
+.et-onboarding summary { cursor: pointer; padding: var(--opt-sp-2) 0; color: #4477bb; user-select: none; }
 .et-onboarding summary:hover { text-decoration: underline; }
-.et-onboarding[open] summary { margin-bottom: 4px; }
+.et-onboarding[open] summary { margin-bottom: var(--opt-sp-2); }
 .et-onboarding .hint { margin: 0; }
 /* ponytail: mirrors .fg input[type="text/password"] rules (lines above) for et-field context */
 .et-field input[type="text"],
 .et-field input[type="password"],
 .et-field select {
-  width: 100%; padding: 4px 8px; border: 1px solid #cdd1d6;
+  width: 100%; padding: var(--opt-sp-2) var(--opt-sp-4); border: 1px solid #cdd1d6;
   background-color: #fff; font-size: 13px; font-family: inherit;
   -webkit-appearance: none; appearance: none; box-shadow: none;
   transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
@@ -323,9 +339,9 @@ html[data-theme] .et-field select:focus-visible { box-shadow: var(--opt-focus-ri
 .accordion-section { border-bottom: 1px solid #e8e8e8; }
 .accordion-section:last-child { border-bottom: none; }
 .accordion-header {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: var(--opt-sp-3);
   width: 100%;
-  padding: 10px 0; cursor: pointer; font-size: 13px; font-weight: bold; color: #444;
+  padding: var(--opt-sp-5) 0; cursor: pointer; font-size: 13px; font-weight: bold; color: #444;
   border: 0; background: none; text-align: left;
   user-select: none; transition: color 0.15s;
 }
@@ -349,14 +365,14 @@ html[data-theme] .et-field select:focus-visible { box-shadow: var(--opt-focus-ri
   /* bottom padding lives on .open (and transitions with the height): with it on
      the base rule, border-box height bottoms out at the 12px padding floor a
      beat before display flips -- a visible end-of-close stall. */
-  display: none; height: 0; overflow: clip; padding: 0 0 0 18px;
+  display: none; height: 0; overflow: clip; padding: 0 0 0 var(--opt-sp-6);
   /* Layout isolation: the 3 Quick-Actions accordions ship open, so switching to
      that tab laid out all their bodies at once (~153ms at 4K, felt like ~1s with
      paint). contain:layout keeps each body's internal layout from joining the
      panel-wide reflow, dropping first-layout cost to ~0 without changing the UX. */
   contain: layout style;
 }
-.accordion-section.open .accordion-body { display: block; height: auto; padding-bottom: 12px; }
+.accordion-section.open .accordion-body { display: block; height: auto; padding-bottom: var(--opt-sp-5); }
 /* .motion-toggle (set by options.js on user clicks only, dropped ~400ms later)
    gates the transition AND the @starting-style entry: without it, every tab
    switch re-renders the panel subtree and replays the grow-from-0 entry. */
@@ -404,8 +420,8 @@ html.motion-ready details.motion-toggle[open]::details-content {
 }
 
 /* ---- Theme preset buttons ---- */
-.theme-presets-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
-.theme-group-label { font-size: 11px; color: #757575; text-transform: uppercase; letter-spacing: 0.05em; min-width: 60px; flex-shrink: 0; white-space: nowrap; padding-right: 6px; box-sizing: content-box; }
+.theme-presets-group { display: flex; gap: var(--opt-sp-3); flex-wrap: wrap; align-items: center; margin-bottom: var(--opt-sp-3); }
+.theme-group-label { font-size: 11px; color: #757575; text-transform: uppercase; letter-spacing: 0.05em; min-width: 60px; flex-shrink: 0; white-space: nowrap; padding-right: var(--opt-sp-3); box-sizing: content-box; }
 .theme-preset-btn { position: relative; }
 .theme-preset-btn:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 2px; }
 .theme-preset-btn.active,
@@ -425,7 +441,7 @@ html.motion-ready details.motion-toggle[open]::details-content {
   /* Kept in layout (not display:none) so keyboard tab reaches it; faded until
      the row is hovered / focus-within / the button itself is focused. */
   position: absolute; top: -6px; right: -6px;
-  min-width: 16px; height: 16px; padding: 0 2px;
+  min-width: 16px; height: 16px; padding: 0 var(--opt-sp-1);
   border-radius: 50%; background: #c00; color: #fff; border: none;
   font-size: 11px; line-height: 16px; text-align: center; cursor: pointer;
   opacity: 0; visibility: hidden;
@@ -441,7 +457,7 @@ html.motion-ready details.motion-toggle[open]::details-content {
 }
 
 /* ---- API key toggle ---- */
-.key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px 4px; color: #888; vertical-align: middle; }
+.key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: var(--opt-sp-1) var(--opt-sp-2); color: #888; vertical-align: middle; }
 .key-toggle svg { display: block; }
 /* Inline status icon (replaces ✓/✗ in test/save/import messages; the glyphs fall back to
    Segoe UI Emoji and stall on first paint at Windows hi-DPI). Inherits the status colour. */
@@ -859,7 +875,7 @@ html[data-theme="rose-pine"] .mobile-tab-picker select {
    (options-theme-early.js:25), so there is no unthemed-dark gap. */
 .fg select, .et-field select {
   border-radius: 7px;
-  padding: 6px 26px 6px 14px;
+  padding: var(--opt-sp-3) 26px var(--opt-sp-3) var(--opt-sp-5);
 }
 .fg select:hover:not(:focus), .et-field select:hover:not(:focus) {
   background-color: #f1f5f9;
@@ -888,12 +904,12 @@ html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select
   .fg select::picker-icon, .et-field select::picker-icon, .mobile-tab-picker select::picker-icon { display: none; }
   .fg select::picker(select), .et-field select::picker(select), .mobile-tab-picker select::picker(select) {
     appearance: base-select;
-    margin-top: 4px;
+    margin-top: var(--opt-sp-2);
     background: var(--opt-bg, #fff);
     border: 1px solid var(--opt-border, #ccc);
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0,0,0,.12);
-    padding: 4px;
+    padding: var(--opt-sp-2);
     max-height: min(320px, calc(100dvh - 32px));
     overflow: auto;
     /* The themed 10px scrollbar (html[data-theme] *::-webkit-scrollbar,
@@ -907,7 +923,7 @@ html[data-theme] .fg select:hover:not(:focus), html[data-theme] .et-field select
     scrollbar-color: var(--opt-fg-muted, #999) var(--opt-panel, #fafafa);
   }
   .fg option, .et-field option, .mobile-tab-picker option {
-    padding: 7px 9px;
+    padding: var(--opt-sp-4) var(--opt-sp-4);
     border-radius: 6px;
     font-size: 13px;
     cursor: pointer;
@@ -936,12 +952,12 @@ html[data-theme] .pf { background: var(--opt-pf-bg); border-color: var(--opt-bor
 html[data-theme] .pf h3 { color: var(--opt-fg-muted); }
 html[data-theme] .et-onboarding { color: var(--opt-fg-muted); }
 html[data-theme] .et-onboarding summary { color: var(--opt-accent); }
-.et-test { display: flex; align-items: center; gap: 10px; }
+.et-test { display: flex; align-items: center; gap: var(--opt-sp-4); }
 .et-test-status { font-size: 12px; }
 .et-test-status.ok { color: #1a7f37; }
 .et-test-status.err { color: #cf222e; }
 .et-test-status.warn { color: #9a6700; }
-.et-doc-link { display: inline-block; margin-top: 6px; }
+.et-doc-link { display: inline-block; margin-top: var(--opt-sp-3); }
 html[data-theme] .et-test-status.ok { color: var(--opt-save, #1a7f37); }
 html[data-theme] .et-test-status.err { color: var(--opt-danger, #cf222e); }
 html[data-theme] .et-test-status.warn { color: var(--opt-warn, #9a6700); }
@@ -987,10 +1003,10 @@ html[data-theme] textarea::-webkit-scrollbar-corner { background: var(--opt-pane
   position: absolute; left: 0; right: auto; top: auto; bottom: calc(100% + 4px); z-index: 10;
   width: max-content;   /* the anchor (reset link) is a narrow sidebar column; without this the
                            popover shrink-to-fits to that width and its row of buttons cramps */
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: var(--opt-sp-3);
   flex-wrap: wrap;       /* long tag lists: buttons drop to their own row */
   max-width: min(60ch, 78vw);
-  padding: 5px 10px; font-size: 11px; color: #c00;
+  padding: var(--opt-sp-2) var(--opt-sp-4); font-size: 11px; color: #c00;
   background: #fff; border: 1px solid #ccc; border-radius: var(--opt-radius-sm);
   box-shadow: var(--opt-shadow-md);
 }
@@ -1012,7 +1028,7 @@ html.motion-ready .confirm-popover.is-closing {
    run far past the viewport with a long member list. */
 .confirm-popover .confirm-msg { font-weight: bold; color: inherit; white-space: pre-line; }
 .confirm-popover button {
-  padding: 2px 10px; font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm); border: 1px solid;
+  padding: var(--opt-sp-1) var(--opt-sp-4); font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm); border: 1px solid;
 }
 .confirm-popover .confirm-yes { background: #c00; color: #fff; border-color: #a00; }
 .confirm-popover .confirm-yes:hover { background: #a00; }
@@ -1029,29 +1045,29 @@ html[data-theme] .confirm-popover .confirm-no:hover { background: var(--opt-btn-
 .save-theme-wrap { position: relative; display: inline-block; }
 .theme-name-popover {
   position: absolute; left: 0; top: calc(100% + 6px); z-index: 20;
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 10px 12px; min-width: 220px;
+  display: flex; flex-direction: column; gap: var(--opt-sp-3);
+  padding: var(--opt-sp-5) var(--opt-sp-5); min-width: 220px;
   background: #fff; border: 1px solid #ccc; border-radius: var(--opt-radius-sm);
   box-shadow: 0 2px 10px rgba(0,0,0,0.14);
   animation: confirmFadeIn 0.12s ease;
 }
 .theme-name-popover label { font-size: 12px; color: #555; margin: 0; }
 .theme-name-popover input[type="text"] {
-  font-size: 12px; padding: 3px 7px; border: 1px solid #ccc; border-radius: var(--opt-radius-sm); width: 100%; box-sizing: border-box;
+  font-size: 12px; padding: var(--opt-sp-2) var(--opt-sp-3); border: 1px solid #ccc; border-radius: var(--opt-radius-sm); width: 100%; box-sizing: border-box;
 }
 .theme-name-popover input[type="text"]:focus { outline: none; border-color: #4477bb; }
 .theme-name-popover input[type="text"]:focus-visible { box-shadow: 0 0 0 2px rgba(68,119,187,0.2); }
 .theme-name-popover .tnp-overwrite {
   font-size: 11px; color: #b85c00; margin: 0;
 }
-.theme-name-popover .tnp-actions { display: flex; gap: 6px; }
+.theme-name-popover .tnp-actions { display: flex; gap: var(--opt-sp-3); }
 .theme-name-popover .tnp-save {
-  padding: 2px 10px; font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm);
+  padding: var(--opt-sp-1) var(--opt-sp-4); font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm);
   background: #4477bb; color: #fff; border: 1px solid #2255aa;
 }
 .theme-name-popover .tnp-save:hover { background: #2255aa; }
 .theme-name-popover .tnp-cancel {
-  padding: 2px 10px; font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm);
+  padding: var(--opt-sp-1) var(--opt-sp-4); font-size: 11px; cursor: pointer; border-radius: var(--opt-radius-sm);
   background: none; color: #666; border: 1px solid #ccc;
 }
 .theme-name-popover .tnp-cancel:hover { background: #eee; }
@@ -1071,7 +1087,7 @@ html[data-theme="terminal"] body { font-family: "Courier New", Consolas, "PingFa
 html[data-theme="terminal"] .fg textarea { font-family: "Courier New", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 
 /* ---- Overlay byte counter ---- */
-.overlay-meta-row { margin-top: 6px; display: flex; justify-content: flex-end; }
+.overlay-meta-row { margin-top: var(--opt-sp-3); display: flex; justify-content: flex-end; }
 .overlay-byte-counter {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -1087,13 +1103,13 @@ html[data-theme] .overlay-byte-counter.over { color: #ff5050; }
 
 /* ---- Preset preview (collapsible read-only) ---- */
 .preset-preview-section {
-  margin-top: 14px;
+  margin-top: var(--opt-sp-6);
   border: 1px solid #ddd;
   border-radius: var(--opt-radius-md);
   overflow: hidden;
 }
 .preset-preview-section summary {
-  padding: 8px 12px;
+  padding: var(--opt-sp-4) var(--opt-sp-5);
   cursor: pointer;
   font-size: 12px;
   background: #fafafa;
@@ -1102,7 +1118,7 @@ html[data-theme] .overlay-byte-counter.over { color: #ff5050; }
 .preset-preview-section summary:hover { background: #f0f0f0; }
 .preset-preview-content {
   margin: 0;
-  padding: 10px 12px;
+  padding: var(--opt-sp-5) var(--opt-sp-5);
   max-height: 320px;
   overflow: auto;
   background: #f6f8fa;
@@ -1129,7 +1145,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 
 /* ---- Wayback Log Viewer ---- */
 #wayback-log {
-  margin-top: 6px;
+  margin-top: var(--opt-sp-3);
   border: 1px solid var(--opt-border, #ccc);
   border-radius: var(--opt-radius-sm, 3px);
   background: var(--opt-panel, #fafafa);
@@ -1138,14 +1154,14 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   overflow-y: auto;
 }
 .wayback-log-empty {
-  padding: 8px;
+  padding: var(--opt-sp-4);
   color: var(--opt-fg-muted, #666);
 }
 .wayback-log-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 72px minmax(0, 200px) 22px;
-  gap: 8px;
-  padding: 5px 8px;
+  gap: var(--opt-sp-4);
+  padding: var(--opt-sp-2) var(--opt-sp-4);
   border-bottom: 1px solid var(--opt-border, #ccc);
   align-items: center;
 }
@@ -1154,7 +1170,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--opt-sp-2);
   color: inherit;
   text-decoration: none;
 }
@@ -1182,7 +1198,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   background: none;
   border: none;
   cursor: pointer;
-  padding: 2px;
+  padding: var(--opt-sp-1);
   color: var(--opt-fg-muted, #888);
   line-height: 1;
   display: flex;
@@ -1195,11 +1211,11 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   display: block;
   font-size: 11px;
   color: var(--opt-fg-muted, #666);
-  margin: 2px 0 10px;
+  margin: var(--opt-sp-1) 0 var(--opt-rhythm);
 }
 .wayback-log-more > summary {
   cursor: pointer;
-  padding: 5px 8px;
+  padding: var(--opt-sp-2) var(--opt-sp-4);
   font-size: 11px;
   color: var(--opt-fg-muted, #666);
   list-style: none;
@@ -1212,7 +1228,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   height: 0;
   border: 4px solid transparent;
   border-left: 5px solid currentColor;
-  margin-right: 5px;
+  margin-right: var(--opt-sp-2);
   vertical-align: middle;
 }
 .wayback-log-more[open] > summary::before {
@@ -1224,7 +1240,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   border-top: 5px solid currentColor;
   border-bottom: none;
   border-left: 4px solid transparent;
-  margin-right: 5px;
+  margin-right: var(--opt-sp-2);
   vertical-align: middle;
 }
 
@@ -1232,14 +1248,14 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 #tag-gov-groups {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 8px;
+  gap: var(--opt-sp-4);
   align-items: start;        /* each card hugs its own height; no stretch to row max */
 }
 .tag-gov-group-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px;
+  gap: var(--opt-sp-3);
+  padding: var(--opt-sp-5);
   background: var(--opt-panel, #fafafa);
   border: 1px solid var(--opt-border, #ccc);
   border-radius: var(--opt-radius-sm, 3px);
@@ -1252,7 +1268,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   display: inline-block;
   font-size: 10px;
   font-weight: bold;
-  padding: 2px 6px;
+  padding: var(--opt-sp-1) var(--opt-sp-3);
   background: var(--opt-border, #e0e0e0);
   border-radius: var(--opt-radius-full, 9999px);
   width: fit-content;
@@ -1261,13 +1277,13 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 .tag-gov-members {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-left: 8px;
+  gap: var(--opt-sp-2);
+  margin-left: var(--opt-sp-4);
 }
 .tag-gov-members label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--opt-sp-3);
   font-size: 12px;
 }
 .tag-gov-members input[type="radio"] {
@@ -1277,20 +1293,20 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   font-size: 10px;
   color: var(--opt-fg-muted, #999);
   display: block;
-  margin-left: 8px;
+  margin-left: var(--opt-sp-4);
   font-style: italic;
 }
 .tag-gov-actions {
   display: flex;
-  gap: 6px;
-  margin-left: 8px;
+  gap: var(--opt-sp-3);
+  margin-left: var(--opt-sp-4);
 }
 .tag-gov-actions button { position: relative; }
 .tag-gov-lowcount-table {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 4px 12px;
-  margin-bottom: 8px;
+  gap: var(--opt-sp-2) var(--opt-sp-5);
+  margin-bottom: var(--opt-sp-4);
 }
 .tag-gov-lowcount-row {
   display: flex;
@@ -1303,7 +1319,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   overflow-wrap: anywhere; /* wrap very long tag names instead of overflowing the cell */
 }
 .tag-gov-lowcount-checkbox {
-  margin-right: 6px;
+  margin-right: var(--opt-sp-3);
 }
 /* Pinned to the viewport bottom while its natural position (end of the Tags panel)
    is below the fold, so batch progress is visible from any scroll position without
@@ -1316,7 +1332,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   background: var(--opt-panel, #fafafa);
   border: 1px solid var(--opt-border, #ccc);
   border-radius: var(--opt-radius-md, 6px);
-  padding: 8px 10px;
+  padding: var(--opt-sp-4) var(--opt-sp-4);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 .progress-bar {
@@ -1336,8 +1352,8 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  margin-top: 4px;
+  gap: var(--opt-sp-4);
+  margin-top: var(--opt-sp-2);
 }
 .tag-gov-progress-foot button {
   flex-shrink: 0;
@@ -1348,7 +1364,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   min-width: 0; /* allow flex shrink so a long token wraps instead of overflowing */
 }
 #tag-gov-problems {
-  margin-top: 8px;
+  margin-top: var(--opt-sp-4);
   font-size: 11px;
 }
 .tag-gov-row-queued {
@@ -1357,11 +1373,11 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 .tag-gov-queued-note {
   font-size: 11px;
   color: var(--opt-fg-muted, #666);
-  margin-left: 6px;
+  margin-left: var(--opt-sp-3);
 }
 .tag-gov-problems-title {
   color: var(--opt-fg-muted, #666);
-  margin-bottom: 2px;
+  margin-bottom: var(--opt-sp-1);
 }
 .tag-gov-problem-row {
   color: var(--opt-fg-muted, #666);
@@ -1373,14 +1389,14 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   color: #c00;
 }
 .tag-gov-warns {
-  margin-top: 12px;
+  margin-top: var(--opt-sp-5);
 }
 .tag-gov-delete-btn {
-  margin-top: 8px;
+  margin-top: var(--opt-sp-4);
   position: relative;
 }
 .tag-gov-reset-link {
-  margin-left: 8px;
+  margin-left: var(--opt-sp-4);
   position: relative;
 }
 
@@ -1389,12 +1405,12 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   display: grid;
   grid-template-columns: minmax(180px, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
-  margin: 8px 0 12px;
+  gap: var(--opt-sp-4);
+  margin: var(--opt-sp-4) 0 var(--opt-sp-5);
 }
 .notes-toolbar input[type="search"] {
   width: 100%;
-  padding: 4px 8px;
+  padding: var(--opt-sp-2) var(--opt-sp-4);
   border: 1px solid var(--opt-input-border);
   border-radius: var(--opt-radius-sm, 3px);
   background-color: var(--opt-input-bg);
@@ -1424,7 +1440,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 .notes-color-filters {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--opt-sp-4);
 }
 .notes-filter-dot {
   display: inline-flex;
@@ -1448,20 +1464,20 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 .notes-card {
   border: 1px solid var(--opt-border, #ccc);
   border-radius: var(--opt-radius-sm, 3px);
-  margin-bottom: 6px;
+  margin-bottom: var(--opt-sp-3);
   background: var(--opt-bg, #fff);
 }
 .notes-card-top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: var(--opt-sp-4);
+  padding: var(--opt-sp-3) var(--opt-sp-4);
 }
 .notes-card-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--opt-sp-4);
   min-width: 0;
   border: 0;
   padding: 0;
@@ -1483,7 +1499,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 }
 .notes-card-main {
   display: grid;
-  gap: 3px;
+  gap: var(--opt-sp-1);
   min-width: 0;
 }
 .notes-row-title {
@@ -1500,7 +1516,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 .notes-row-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--opt-sp-5);
   font-size: 11px;
   color: var(--opt-fg-muted, #666);
 }
@@ -1523,20 +1539,20 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 }
 .notes-card-body {
   border-top: 1px solid color-mix(in srgb, var(--opt-border, #ccc) 70%, transparent);
-  padding: 8px 10px 10px;
+  padding: var(--opt-sp-4) var(--opt-sp-5) var(--opt-sp-5);
 }
 .notes-unknown-hint {
   font-size: 11px;
   color: var(--opt-fg-muted, #666);
-  margin: 0 0 8px 0;
+  margin: 0 0 var(--opt-sp-4) 0;
 }
 .notes-items {
   display: grid;
-  gap: 8px;
+  gap: var(--opt-sp-4);
 }
 .notes-item {
   display: flex;
-  gap: 8px;
+  gap: var(--opt-sp-4);
   min-width: 0;
 }
 .note-dot {
@@ -1544,7 +1560,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-top: 4px;
+  margin-top: var(--opt-sp-2);
 }
 .note-dot.c1 { background: #facc15; }
 .note-dot.c2 { background: #4ade80; }
@@ -1563,23 +1579,23 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 }
 .notes-item-lang {
   display: inline-block;
-  margin-top: 3px;
+  margin-top: var(--opt-sp-1);
   color: var(--opt-fg-muted, #666);
   font-size: 11px;
 }
 .notes-item-note {
-  margin-top: 4px;
+  margin-top: var(--opt-sp-2);
   white-space: pre-wrap;
 }
 .notes-empty {
   font-size: 12px;
   color: var(--opt-fg-muted, #666);
-  padding: 12px 0;
+  padding: var(--opt-sp-5) 0;
 }
 @media (max-width: 720px) {
   .container {
     grid-template-columns: 1fr;
-    row-gap: 16px;
+    row-gap: var(--opt-sp-6);
   }
   .container > h1,
   .options-nav,
@@ -1594,14 +1610,14 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
     position: static;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
+    gap: var(--opt-sp-4);
     align-items: end;
   }
   .tabs { display: none; }
   .mobile-tab-picker { display: block; min-width: 0; }
   .mobile-tab-picker label {
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: var(--opt-sp-2);
     color: var(--opt-fg-muted, #555);
     font-size: 12px;
     font-weight: bold;
@@ -1609,7 +1625,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   .mobile-tab-picker select {
     width: 100%;
     min-height: 34px;
-    padding: 6px 26px 6px 14px;
+    padding: var(--opt-sp-3) 26px var(--opt-sp-3) var(--opt-sp-5);
     border: 1px solid var(--opt-border, #cdd1d6);
     /* Dropdown-design round: joins the .fg/.et-field select family (7px
        radius, drawn chevron, btn-bg surface). It used to keep the UA arrow;
@@ -1643,7 +1659,7 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   .reset-tab-btn {
     min-height: 34px;
     margin: 0;
-    padding: 7px 12px;
+    padding: var(--opt-sp-4) var(--opt-sp-5);
     border-top: 0;
     border-left: 1px solid #e0e0e0;
     white-space: nowrap;

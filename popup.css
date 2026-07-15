@@ -4,6 +4,19 @@
   /* === Default light-mode design tokens ===
      Theme overrides live in html.dark and html[data-theme] blocks below. */
 
+  /* Spacing scale — 2026-07 density tokenization (Claude Design round 1).
+     Theme-invariant, hand-maintained (NOT composer-emitted). Literal 0 and
+     1px hairlines stay unscaled. Structural offsets are exempt and stay
+     literal at their sites: 72px status-msg field indent, 30px secret-field
+     eye reserve, the 3px .quick-actions hi-DPI clip buffer. */
+  --pp-sp-1: 2px;  /* hairline: chip-internal gaps, micro nudges */
+  --pp-sp-2: 4px;  /* tight: chip-flow gap, label-control gaps, button v-inset */
+  --pp-sp-3: 6px;  /* snug inset: input/list-item insets */
+  --pp-sp-4: 8px;  /* base: control h-insets, sibling spacing, popup rhythm */
+  --pp-sp-5: 12px; /* block: field-group gaps, surface insets */
+  --pp-sp-6: 16px; /* section: block separation, panel insets */
+  --pp-sp-7: 24px; /* page: page-level whitespace */
+
   /* Surfaces — 2026-07 "Soft Fill" palette (Claude Design pilot, AA-verified).
      Status *-bd tokens alias their bg: soft-fill surfaces are borderless by
      default; preset themes keep visible borders via their own *-bd values. */
@@ -108,7 +121,7 @@ a:hover { text-decoration: underline; }
 /* Force text presentation for dual-presentation symbols (⚠ ▸ ▾ ✓ ✗ ↻ etc.) so
    they don't fall back to Segoe UI Emoji (1-3s first-render stall, Windows hi-DPI). */
 :root { font-variant-emoji: text; }
-.btn-ic { display: inline-flex; align-items: center; vertical-align: -3px; margin-right: 4px; }
+.btn-ic { display: inline-flex; align-items: center; vertical-align: -3px; margin-right: var(--pp-sp-2); }
 .btn-ic svg { display: block; }
 /* Inline status/marker SVG icons that replace ✓ ✗ ✕ ↻ glyphs (those fall back to
    Segoe UI Emoji and stall ~1.6s on first paint, Windows hi-DPI). currentColor inherits
@@ -130,7 +143,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 
 .header-bar {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 12px; background: var(--pp-bg2); border-bottom: 1px solid var(--pp-divider);
+  padding: var(--pp-sp-3) var(--pp-sp-5); background: var(--pp-bg2); border-bottom: 1px solid var(--pp-divider);
   font-size: 11px; color: var(--pp-fg-muted);
 }
 .header-bar a { color: var(--pp-fg-muted); font-size: 11px; }
@@ -142,11 +155,11 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .header-bar .header-link:focus-visible,
 .header-bar a:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; border-radius: var(--pp-radius-sm); }
 
-.login-body { padding: 14px 12px; }
-.login-body p { margin-bottom: 8px; font-size: 12px; color: var(--pp-fg); }
+.login-body { padding: var(--pp-sp-6) var(--pp-sp-5); }
+.login-body p { margin-bottom: var(--pp-sp-4); font-size: 12px; color: var(--pp-fg); }
 .login-body input {
-  width: 100%; padding: 4px 6px; border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md); font-size: 12px;
-  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; margin-bottom: 6px; background: var(--pp-input-bg); color: var(--pp-fg);
+  width: 100%; padding: var(--pp-sp-2) var(--pp-sp-3); border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md); font-size: 12px;
+  font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; margin-bottom: var(--pp-sp-3); background: var(--pp-input-bg); color: var(--pp-fg);
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .login-body input:focus { outline: none; border-color: var(--pp-focus-bd); background: var(--pp-input-focus-bg); }
@@ -155,17 +168,17 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .login-body .secret-field input { padding-right: 30px; }
 .login-body .key-toggle {
   position: absolute; right: 3px; top: 2px;
-  padding: 3px; border: 0; background: none; color: #666;
+  padding: var(--pp-sp-2); border: 0; background: none; color: #666;
 }
 .login-body .key-toggle svg { display: block; }
-.login-body button { padding: 3px 14px; font-size: 12px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.login-body button { padding: var(--pp-sp-2) var(--pp-sp-6); font-size: 12px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
 .login-body button:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
-.error-text { color: #c00; font-size: 11px; margin-top: 4px; }
+.error-text { color: #c00; font-size: 11px; margin-top: var(--pp-sp-2); }
 
 /* ===================== Feedback Card (B2) ===================== */
 .feedback-card {
-  display: flex; gap: 8px; align-items: flex-start;
-  margin: 6px 10px 0; padding: 8px 10px;
+  display: flex; gap: var(--pp-sp-4); align-items: flex-start;
+  margin: var(--pp-sp-3) var(--pp-sp-4) 0; padding: var(--pp-sp-4) var(--pp-sp-4);
   border: 1px solid var(--pp-border);
   border-radius: var(--pp-radius-md);
   font-size: 11px;
@@ -179,10 +192,10 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .feedback-card.dismissing { animation: fadeOut 0.12s ease forwards; }
 /* fc-icon is a flex item under .feedback-card{align-items:flex-start}, so vertical-align
    is inert; margin-top drops the SVG onto the first text line's optical center. */
-.fc-icon { font-size: 12px; line-height: 1.2; flex-shrink: 0; margin-top: 2px; }
+.fc-icon { font-size: 12px; line-height: 1.2; flex-shrink: 0; margin-top: var(--pp-sp-1); }
 .fc-body { flex: 1; min-width: 0; }
 .fc-title { font-weight: 600; }
-.fc-message { margin-top: 2px; word-break: break-word; }
+.fc-message { margin-top: var(--pp-sp-1); word-break: break-word; }
 /* Inline links inside a feedback message (e.g. the "settings" link in the
    no-AI-key prompt) inherit the card's variant colour so they stay on-theme
    across all popup themes (a fixed accent would fight the error semantics and
@@ -190,12 +203,12 @@ html[data-section="login"] .quick-actions { display: none !important; }
    At 11px an underline alone is a weak cue, so bold (matching .fc-title) +
    underline-offset make "clickable" unambiguous without recolouring. */
 .fc-message a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
-.model-not-found-hint { margin-top: 3px; font-size: 0.9em; opacity: 0.8; }
-.fc-actions { display: flex; gap: 8px; margin-top: 4px; align-items: center; }
+.model-not-found-hint { margin-top: var(--pp-sp-1); font-size: 0.9em; opacity: 0.8; }
+.fc-actions { display: flex; gap: var(--pp-sp-4); margin-top: var(--pp-sp-2); align-items: center; }
 .fc-btn {
   background: transparent; border: 1px solid currentColor;
   border-radius: var(--pp-radius-sm); color: inherit;
-  padding: 2px 10px; font-size: 11px; cursor: pointer; font-family: inherit;
+  padding: var(--pp-sp-1) var(--pp-sp-4); font-size: 11px; cursor: pointer; font-family: inherit;
   white-space: nowrap;
 }
 .fc-btn:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
@@ -203,15 +216,15 @@ html[data-section="login"] .quick-actions { display: none !important; }
    must inherit the card's foreground — which is AA against the card bg by construction.
    (Using --pp-fg-hint here, a main-bg grey, made "Details"/× unreadable on dark cards.)
    De-emphasis comes from smaller size + a subtle hover wash, not a different colour. */
-.fc-btn-secondary { border: 0; color: inherit; font-size: 10px; padding: 2px 6px; }
+.fc-btn-secondary { border: 0; color: inherit; font-size: 10px; padding: var(--pp-sp-1) var(--pp-sp-3); }
 .fc-btn-secondary:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
 .fc-dismiss {
   background: transparent; border: 0; color: inherit;
-  cursor: pointer; padding: 0 4px; font-size: 14px; line-height: 1; font-family: inherit;
+  cursor: pointer; padding: 0 var(--pp-sp-2); font-size: 14px; line-height: 1; font-family: inherit;
 }
 .fc-dismiss:hover { background: color-mix(in srgb, currentColor 18%, transparent); border-radius: var(--pp-radius-sm); }
 .fc-details {
-  margin-top: 6px; padding: 6px 8px;
+  margin-top: var(--pp-sp-3); padding: var(--pp-sp-3) var(--pp-sp-4);
   max-height: 120px; overflow: auto;
   background: rgba(0,0,0,0.04);
   font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 10px;
@@ -221,7 +234,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 
 /* Existing Bookmark Banner */
 .existing-banner {
-  padding: 5px 12px;
+  padding: var(--pp-sp-2) var(--pp-sp-5);
   background: var(--pp-banner-bg);
   border-bottom: 1px solid var(--pp-banner-bd);
   color: var(--pp-banner-fg);
@@ -239,7 +252,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
 
 /* URL Warning */
 .url-warning {
-  padding: 6px 12px;
+  padding: var(--pp-sp-3) var(--pp-sp-5);
   background: var(--pp-warn-bg);
   border-bottom: 1px solid var(--pp-warn-bd);
   color: var(--pp-warn-fg);
@@ -251,7 +264,7 @@ html[data-section="login"] .quick-actions { display: none !important; }
   content: "";
   display: inline-block;
   width: 11px; height: 11px;
-  margin-right: 4px;
+  margin-right: var(--pp-sp-2);
   vertical-align: -2px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23c0840a' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M8 2 15 14H1Z'/%3E%3Cpath d='M8 6.5v3.5' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12' r='0.6' fill='%23c0840a' stroke='none'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -261,8 +274,8 @@ html[data-section="login"] .quick-actions { display: none !important; }
 /* Tag Presets */
 .preset-btn {
   display: inline-block;
-  padding: 1px 6px;
-  margin-right: 5px;
+  padding: 1px var(--pp-sp-3);
+  margin-right: var(--pp-sp-2);
   font-size: 11px;
   font-family: inherit;
   color: var(--pp-link);
@@ -277,19 +290,19 @@ html[data-section="login"] .quick-actions { display: none !important; }
 .preset-btn:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 1px; }
 .preset-btn.used { color: #bbb; background: #f5f5f0; border-color: #ddd; pointer-events: none; }
 
-.form-body { padding: 8px 0 10px; }
+.form-body { padding: var(--pp-sp-4) 0 var(--pp-sp-4); }
 /* Unsupported-URL empty state: hide the dead form, keep only #url-warning
    (quick-actions live outside #main-section and stay functional). */
 #main-section.unsupported-url .form-body > *:not(#url-warning) { display: none; }
-.row { display: flex; padding: 4px 12px; gap: 8px; }
+.row { display: flex; padding: var(--pp-sp-2) var(--pp-sp-5); gap: var(--pp-sp-4); }
 .label {
   width: 52px; flex-shrink: 0; text-align: right;
-  font-weight: bold; font-size: 11px; color: var(--pp-label-fg); padding-top: 4px; line-height: 1.5;
+  font-weight: bold; font-size: 11px; color: var(--pp-label-fg); padding-top: var(--pp-sp-2); line-height: 1.5;
 }
-.label.top { padding-top: 4px; align-self: flex-start; }
+.label.top { padding-top: var(--pp-sp-2); align-self: flex-start; }
 .field { flex: 1; min-width: 0; }
 .field > input[type="text"], .field > textarea {
-  width: 100%; padding: 3px 6px; border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md);
+  width: 100%; padding: var(--pp-sp-2) var(--pp-sp-3); border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md);
   font-size: 12px; font-family: inherit; background: var(--pp-input-bg); color: var(--pp-fg);
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
@@ -307,13 +320,13 @@ html[data-section="login"] .quick-actions { display: none !important; }
   transition: height 0.15s ease;
 }
 
-.notes-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
+.notes-bar { display: flex; justify-content: space-between; align-items: center; margin-top: var(--pp-sp-1); }
 #desc-char-count { font-size: 10px; color: var(--pp-fg-hint); }
 #desc-char-count.over-limit { font-weight: 600; }
 /* Tag suggestion skeleton — opacity pulse on solid divider color. Gentler than the
    previous horizontal shimmer (which had a 14-unit luminance jump that read as harsh
    on dark backgrounds). var(--pp-divider) is theme-aware: every preset defines it. */
-.tag-skel { display: inline-block; height: 18px; margin: 0 4px 2px 0; border-radius: var(--pp-radius-lg); background: var(--pp-divider, #d8d8d8); animation: tagSkelPulse 1.6s ease-in-out infinite; vertical-align: middle; }
+.tag-skel { display: inline-block; height: 18px; margin: 0 var(--pp-sp-2) var(--pp-sp-1) 0; border-radius: var(--pp-radius-lg); background: var(--pp-divider, #d8d8d8); animation: tagSkelPulse 1.6s ease-in-out infinite; vertical-align: middle; }
 @keyframes tagSkelPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 /* Button-as-link reset: applied when these link-styled classes wrap a <button>
    (so middle-click/Cmd+click don't try to navigate to "#"). */
@@ -336,7 +349,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   border-top-color: #666;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
-  margin-right: 4px;
+  margin-right: var(--pp-sp-2);
   vertical-align: middle;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -345,8 +358,8 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 }
 
 .tags-input-wrap {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
-  border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md); padding: 2px 4px; min-height: 24px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--pp-sp-2);
+  border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md); padding: var(--pp-sp-1) var(--pp-sp-2); min-height: 24px;
   cursor: text; background: var(--pp-input-bg);
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
@@ -354,7 +367,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tags-display { display: contents; }
 .tag-item {
   display: inline-flex; align-items: center; background: var(--pp-tag-bg); color: var(--pp-tag-fg);
-  padding: 1px 8px; border-radius: var(--pp-radius-tag); font-size: 11px; gap: 3px;
+  padding: 1px var(--pp-sp-4); border-radius: var(--pp-radius-tag); font-size: 11px; gap: var(--pp-sp-1);
   line-height: 18px; white-space: nowrap;
 }
 .tag-remove {
@@ -378,7 +391,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tag-drag-handle {
   color: var(--pp-fg-hint); opacity: 0;
   transition: opacity 0.1s; cursor: grab;
-  width: 6px; height: 12px; margin-right: 2px; user-select: none;
+  width: 6px; height: 12px; margin-right: var(--pp-sp-1); user-select: none;
   display: inline-block; vertical-align: middle; flex-shrink: 0;
   background-image: radial-gradient(currentColor 40%, transparent 45%);
   background-size: 3px 4px; background-repeat: repeat;
@@ -388,7 +401,7 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .tag-item.dragging .tag-drag-handle { opacity: 0.8; cursor: grabbing; }
 @keyframes tagPopin { from { transform: scale(0.75); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .tags-input-wrap input {
-  border: none !important; outline: none; padding: 1px 2px;
+  border: none !important; outline: none; padding: 1px var(--pp-sp-1);
   font-size: 12px; flex: 1; min-width: 80px; background: transparent; font-family: inherit; color: var(--pp-fg);
 }
 
@@ -403,55 +416,55 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
   animation: dropdownOpen 0.10s ease-out;
 }
 .ac-scroll { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
-.ac-item { padding: 3px 6px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: space-between; }
+.ac-item { padding: var(--pp-sp-2) var(--pp-sp-3); cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: space-between; }
 .ac-item:hover, .ac-item.selected { background: var(--pp-drop-hover); }
-.ac-count { color: var(--pp-fg-hint); font-size: 10px; margin-left: 4px; flex-shrink: 0; }
+.ac-count { color: var(--pp-fg-hint); font-size: 10px; margin-left: var(--pp-sp-2); flex-shrink: 0; }
 .ac-new-hint { color: var(--pp-fg-hint); font-style: italic; cursor: pointer; }
 .ac-new-hint:hover { background: var(--pp-drop-hover); color: var(--pp-fg); font-style: normal; }
-.ac-new-icon { color: var(--pp-accent); font-style: normal; font-weight: bold; margin-right: 3px; }
+.ac-new-icon { color: var(--pp-accent); font-style: normal; font-weight: bold; margin-right: var(--pp-sp-1); }
 .ac-hint-footer {
   flex: 0 0 auto;
-  padding: 3px 6px; font-size: 10px; color: var(--pp-fg-hint); border-top: 1px solid var(--pp-divider);
+  padding: var(--pp-sp-1) var(--pp-sp-3); font-size: 10px; color: var(--pp-fg-hint); border-top: 1px solid var(--pp-divider);
   background: var(--pp-bg2); user-select: none; cursor: default; line-height: 1.4;
 }
 .ac-hint-footer kbd {
-  display: inline-block; padding: 0 4px; margin: 0 1px;
+  display: inline-block; padding: 0 var(--pp-sp-2); margin: 0 1px;
   font-family: SFMono-Regular, "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 9px;
   color: var(--pp-fg-muted); background: var(--pp-bg); border: 1px solid var(--pp-border); border-radius: 3px;
   box-shadow: 0 1px 0 rgba(0,0,0,0.04); vertical-align: baseline;
 }
 .submit-hint { color: var(--pp-fg-hint); font-size: 10px; margin-left: auto; align-self: center; }
 .kb-hint { color: var(--pp-fg-hint); font-size: 10px; align-self: center; }
-#ai-summary-hint { margin-left: auto; margin-right: 6px; }
+#ai-summary-hint { margin-left: auto; margin-right: var(--pp-sp-3); }
 
 .clear-all-link {
   font-size: 10px; color: var(--pp-fg-hint); cursor: pointer;
-  margin-top: 2px; display: block;
+  margin-top: var(--pp-sp-1); display: block;
 }
 .clear-all-link:hover { color: var(--pp-danger); text-decoration: underline; }
-.tag-actions-row { display: flex; gap: 10px; align-items: center; }
-.tag-actions-row .clear-all-link { margin-top: 2px; }
+.tag-actions-row { display: flex; gap: var(--pp-sp-4); align-items: center; }
+.tag-actions-row .clear-all-link { margin-top: var(--pp-sp-1); }
 #tags-copy-all:hover { color: var(--pp-link); text-decoration: underline; }
 .last-used-hint {
   display: block; width: 100%; border: 0; background: none; text-align: left; font-family: inherit;
   font-size: 10px; color: var(--pp-fg-hint); cursor: pointer;
-  margin-top: 2px; padding: 2px 0;
+  margin-top: var(--pp-sp-1); padding: var(--pp-sp-1) 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .last-used-hint:hover { color: var(--pp-link); }
 .last-used-hint:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
-.last-used-hint .lu-label { font-weight: bold; margin-right: 4px; }
+.last-used-hint .lu-label { font-weight: bold; margin-right: var(--pp-sp-2); }
 .last-used-hint .lu-tags { font-style: italic; }
 .tag-copied-flash { color: var(--pp-ok-fg, #2a8a2a) !important; }
 
 .suggest-area { line-height: 1.9; word-wrap: break-word; overflow-wrap: break-word; }
-.suggest-area.muted { padding-top: 2px; }
-.suggest-group { margin-bottom: 2px; }
+.suggest-area.muted { padding-top: var(--pp-sp-1); }
+.suggest-group { margin-bottom: var(--pp-sp-1); }
 .suggest-group:last-child { margin-bottom: 0; }
-.group-label { font-size: 10px; color: var(--pp-fg-hint); font-weight: bold; margin-right: 3px; }
+.group-label { font-size: 10px; color: var(--pp-fg-hint); font-weight: bold; margin-right: var(--pp-sp-2); }
 .stag {
   border: 0; background: none; padding: 0; font-family: inherit;
-  color: var(--pp-link); cursor: pointer; font-size: 12px; margin-right: 5px; white-space: nowrap;
+  color: var(--pp-link); cursor: pointer; font-size: 12px; margin-right: var(--pp-sp-2); white-space: nowrap;
 }
 .stag:hover { text-decoration: underline; }
 .stag.used { color: #bbb; text-decoration: line-through; pointer-events: none; }
@@ -462,26 +475,26 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
    :hover underline runs continuously under "tag (N)" instead of being broken by
    the margin gap. Scoped to .stag so the autocomplete dropdown's .ac-count
    (a flex item that relies on margin-left) is unaffected. */
-.stag .ac-count { margin-left: 0; padding-left: 4px; }
+.stag .ac-count { margin-left: 0; padding-left: var(--pp-sp-2); }
 /* Alt+N slot digit (pbpAssignAltNumBadges): the badge IS the keyboard mapping,
    so it must ride the chip itself. Inherits the chip's link color (all 3 theme
    layers) at reduced size; aria-hidden in JS -- the accessible equivalent is
    aria-keyshortcuts on the button. Hidden once used: a struck-through chip
    keeps its slot reserved but the digit no longer does anything. */
-.stag .stag-num { font-size: 9px; opacity: 0.7; padding-right: 3px; vertical-align: 1px; }
+.stag .stag-num { font-size: 9px; opacity: 0.7; padding-right: var(--pp-sp-1); vertical-align: 1px; }
 .stag.used .stag-num { visibility: hidden; }
 .add-all-link { border: 0; background: none; padding: 0; font-family: inherit; color: var(--pp-fg-hint); font-size: 11px; cursor: pointer; }
 .add-all-link:hover { text-decoration: underline; color: var(--pp-fg-muted); }
 .add-all-link:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 2px; }
 .muted { color: var(--pp-fg-hint); font-size: 11px; font-style: italic; }
 
-.bottom-bar { padding: 6px 12px 4px 72px; display: flex; gap: 16px; font-size: 12px; }
-.bottom-bar label { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+.bottom-bar { padding: var(--pp-sp-3) var(--pp-sp-5) var(--pp-sp-2) 72px; display: flex; gap: var(--pp-sp-6); font-size: 12px; }
+.bottom-bar label { display: inline-flex; align-items: center; gap: var(--pp-sp-2); cursor: pointer; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
 .bottom-bar input[type="checkbox"]:focus-visible { outline: 2px solid var(--pp-accent, #4477bb); outline-offset: 1px; }
-.submit-bar { padding: 4px 12px 6px 72px; display: flex; gap: 6px; }
+.submit-bar { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-3) 72px; display: flex; gap: var(--pp-sp-3); }
 .submit-bar button {
-  padding: 3px 18px; font-size: 12px; cursor: pointer;
+  padding: var(--pp-sp-2) var(--pp-sp-6); font-size: 12px; cursor: pointer;
   border: 1px solid var(--pp-border); background: var(--pp-bg); border-radius: var(--pp-radius-md);
   transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
@@ -492,7 +505,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
   /* Content-adaptive width (2a canvas feedback: the 200px-basis button read as
      visually intrusive). white-space pins two-glyph CJK labels ("保存") on one
      line. Left edge keeps the 72px field-alignment indent. */
-  flex: 0 0 auto; white-space: nowrap; padding: 5px 22px; min-height: 28px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  flex: 0 0 auto; white-space: nowrap; padding: var(--pp-sp-2) var(--pp-sp-7); min-height: 28px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);
 }
 #submit-btn:hover {
   background: color-mix(in srgb, var(--pp-accent) 92%, #000);
@@ -501,7 +514,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
 }
 #submit-btn:active { transform: translateY(0); box-shadow: none; }
 #submit-btn:disabled { background: #aaa; border-color: #999; transform: none; box-shadow: none; }
-.del-btn { position: relative; color: var(--pp-danger); border-color: var(--pp-danger) !important; white-space: nowrap; padding: 5px 14px; min-height: 28px; }
+.del-btn { position: relative; color: var(--pp-danger); border-color: var(--pp-danger) !important; white-space: nowrap; padding: var(--pp-sp-2) var(--pp-sp-6); min-height: 28px; }
 .del-btn:hover { background: #fee !important; }
 /* Anchor left:0 (extend right from the Delete button's left edge) — the button sits
    left-of-centre in the submit-bar, so the old right:0 made the popover extend left and
@@ -509,23 +522,23 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
 .del-confirm-popover {
   position: absolute; bottom: calc(100% + 5px); left: 0;
   background: #fff; border: 1px solid #ddd; border-radius: var(--pp-radius-sm);
-  padding: 5px 8px; font-size: 11px; white-space: nowrap;
-  display: flex; align-items: center; gap: 6px;
+  padding: var(--pp-sp-2) var(--pp-sp-4); font-size: 11px; white-space: nowrap;
+  display: flex; align-items: center; gap: var(--pp-sp-3);
   box-shadow: var(--pp-shadow-md); animation: popinScale 0.12s ease-out; z-index: 20;
 }
-.del-confirm-popover button { padding: 1px 10px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; background: #f5f5f0; }
+.del-confirm-popover button { padding: 1px var(--pp-sp-4); font-size: 11px; cursor: pointer; border: 1px solid #ccc; background: #f5f5f0; }
 .del-confirm-yes { color: #c00 !important; border-color: #c00 !important; }
 .del-confirm-yes:hover { background: #fee !important; }
 .del-confirm-no:hover { background: #eee; }
-.status-msg { padding: 3px 12px 4px 72px; font-size: 11px; }
+.status-msg { padding: var(--pp-sp-2) var(--pp-sp-5) var(--pp-sp-2) 72px; font-size: 11px; }
 .status-msg.success { color: var(--pp-ok-fg); }
 .status-msg.error { color: var(--pp-danger); }
 .wayback-indicator { font-size: 0.9em; opacity: 0.85; }
 
 /* Search Bar */
-.search-row { padding: 0 8px 6px; }
+.search-row { padding: 0 var(--pp-sp-4) var(--pp-sp-3); }
 .search-field {
-  width: 100%; padding: 4px 8px;
+  width: 100%; padding: var(--pp-sp-2) var(--pp-sp-4);
   border: 1px solid var(--pp-input-bd); border-radius: var(--pp-radius-md);
   font-size: 11px; font-family: inherit;
   background: var(--pp-input-bg); color: var(--pp-fg);
@@ -536,7 +549,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
 
 /* Quick Actions Bar */
 .quick-actions {
-  margin-top: 10px;
+  margin-top: var(--pp-sp-4);
   background: var(--pp-bg2);
   /* Bottom buffer: on hi-DPI the body zoom (1.12/1.22) makes the content height
      fractional and Chrome floors the popup window height, clipping the last 1-2px
@@ -549,21 +562,21 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
 .quick-actions .divider {
   border: none;
   border-top: 1px solid var(--pp-divider);
-  margin: 8px 0 0;
+  margin: var(--pp-sp-4) 0 0;
 }
 .quick-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
+  gap: var(--pp-sp-2);
 }
 .qbtn {
   flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 5px 4px;
+  gap: var(--pp-sp-1);
+  padding: var(--pp-sp-2) var(--pp-sp-2);
   font-size: 11px;
   color: var(--pp-fg-muted);
   background: var(--pp-bg);
@@ -609,7 +622,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pp-accent); }
   position: relative;
   /* symmetric 6px top/bottom so the bar isn't flush against the popup's bottom edge
      (.quick-actions has no bottom padding; this is the last visible element) */
-  margin: 6px 12px;
+  margin: var(--pp-sp-3) var(--pp-sp-5);
   height: 14px;
   background: var(--pp-input-bg);
   border: 1px solid var(--pp-input-bg);
@@ -660,27 +673,27 @@ html.dark .batch-progress { background: var(--pp-input-bg); border-color: var(--
 html.dark .batch-progress-text { color: var(--pp-fg); mix-blend-mode: normal; filter: none; }
 
 .batch-permission {
-  margin: 6px 12px;
-  padding: 7px 8px;
+  margin: var(--pp-sp-3) var(--pp-sp-5);
+  padding: var(--pp-sp-4) var(--pp-sp-4);
   border: 1px solid #d4dae3;
   border-radius: var(--pp-radius-sm);
   background: #f5f7fa;
   color: #333;
 }
-.batch-permission-title { margin: 0 0 5px; font-size: 11px; font-weight: 600; }
+.batch-permission-title { margin: 0 0 var(--pp-sp-2); font-size: 11px; font-weight: 600; }
 .batch-permission-list {
   max-height: 92px;
   margin: 0;
-  padding-left: 18px;
+  padding-left: var(--pp-sp-6);
   overflow: auto;
   font: 10px/1.45 "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
   overflow-wrap: anywhere;
 }
-.batch-permission-actions { display: flex; gap: 6px; margin-top: 6px; }
+.batch-permission-actions { display: flex; gap: var(--pp-sp-3); margin-top: var(--pp-sp-3); }
 .batch-permission-actions button {
   border: 1px solid #aeb8c5;
   border-radius: var(--pp-radius-sm);
-  padding: 3px 8px;
+  padding: var(--pp-sp-2) var(--pp-sp-4);
   background: #fff;
   color: #333;
   font-family: inherit;
@@ -704,13 +717,13 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
   font-size: 10px;
   color: var(--pp-fg-hint);
   font-style: italic;
-  margin-left: 4px;
+  margin-left: var(--pp-sp-2);
 }
 .regen-link {
   font-size: 11px;
   color: var(--pp-accent2);
   cursor: pointer;
-  margin-left: 6px;
+  margin-left: var(--pp-sp-3);
   white-space: nowrap;
 }
 .regen-link:hover {
@@ -723,8 +736,8 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
 }
 
 .regen-link + .regen-link {
-  margin-left: 2px;
-  padding-left: 8px;
+  margin-left: var(--pp-sp-1);
+  padding-left: var(--pp-sp-4);
   border-left: 1px solid #ddd;
 }
 
@@ -733,8 +746,8 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: var(--pp-sp-2);
+  padding: var(--pp-sp-3) var(--pp-sp-4);
   font-size: 11px;
 }
 .quick-links a {
@@ -755,7 +768,7 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 8px;
+  padding: var(--pp-sp-2) var(--pp-sp-4);
   background: var(--pp-offline-bg);
   border-top: 1px solid var(--pp-offline-bd);
   font-size: 11px;
@@ -780,7 +793,7 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
   flex: 1;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--pp-sp-2);
   color: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -795,15 +808,15 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
   font-size: 11px;
 }
 .offline-queue-empty {
-  padding: 8px;
+  padding: var(--pp-sp-4);
   text-align: center;
   color: #6b6b6b;
 }
 .offline-queue-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: var(--pp-sp-3);
+  padding: var(--pp-sp-2) var(--pp-sp-4);
   border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 .offline-queue-item:last-child { border-bottom: none; }
@@ -827,14 +840,14 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
 }
 .offline-queue-actions {
   display: flex;
-  gap: 4px;
+  gap: var(--pp-sp-2);
   flex-shrink: 0;
 }
 .offline-queue-actions button {
   background: transparent;
   border: 1px solid rgba(0,0,0,0.12);
   border-radius: var(--pp-radius-sm);
-  padding: 1px 6px;
+  padding: 1px var(--pp-sp-3);
   font-size: 11px;
   color: #666;
   cursor: pointer;
@@ -850,7 +863,7 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
 
 /* Recent Bookmarks */
 .recent-bm-area {
-  padding: 6px 8px 4px;
+  padding: var(--pp-sp-3) var(--pp-sp-4) var(--pp-sp-2);
   border-top: 1px solid #e8e8e8;
   font-size: 11px;
   line-height: 1.8;
@@ -859,12 +872,12 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
   color: var(--pp-fg-hint);
   font-size: 10px;
   font-weight: bold;
-  margin-bottom: 2px;
+  margin-bottom: var(--pp-sp-1);
 }
 .recent-bm-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--pp-sp-2);
 }
 .recent-bm-item {
   flex: 1;
@@ -882,7 +895,7 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
   color: #ccc;
   cursor: pointer;
   font-size: 10px;
-  padding: 0 2px;
+  padding: 0 var(--pp-sp-1);
   line-height: 1;
 }
 .recent-bm-del:hover { color: var(--pp-danger); }
@@ -891,15 +904,15 @@ html[data-theme] .batch-permission-actions button:first-child { border-color: va
   color: #aaa;
   cursor: pointer;
   font-size: 10px;
-  padding: 0 2px;
+  padding: 0 var(--pp-sp-1);
   line-height: 1;
   opacity: 0.7;
 }
 .recent-bm-edit:hover { opacity: 1; color: var(--pp-accent); }
 .edit-cancel {
   display: inline-block;
-  margin-left: 6px;
-  padding: 0 6px;
+  margin-left: var(--pp-sp-3);
+  padding: 0 var(--pp-sp-3);
   border-radius: var(--pp-radius-sm);
   background: rgba(0,0,0,0.08);
   color: #444;
@@ -1008,10 +1021,10 @@ html.dark .submit-bar button.loading::before, html.dark .action-link.loading::be
 
 /* ===================== URL Cleaned Hint (B4) ===================== */
 .url-clean-hint {
-  margin-top: 2px;
+  margin-top: var(--pp-sp-1);
   font-size: 10px;
   color: var(--pp-ok-fg);
-  display: flex; gap: 6px; align-items: center;
+  display: flex; gap: var(--pp-sp-3); align-items: center;
 }
 .url-clean-hint .url-clean-undo {
   border: 0;
@@ -1039,8 +1052,8 @@ body:hover .auto-close-bar { animation-play-state: paused; }
 
 /* ===================== Empty State (B8) ===================== */
 .empty-state {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 10px 0;
+  display: flex; flex-direction: column; align-items: center; gap: var(--pp-sp-2);
+  padding: var(--pp-sp-4) 0;
   color: var(--pp-fg-hint);
   font-size: 11px;
   text-align: center;
@@ -1836,15 +1849,15 @@ html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Cons
 /* ===================== Confirm Popover (shared helper) ===================== */
 .confirm-popover {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 10;
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 10px; font-size: 11px; color: var(--pp-danger); white-space: nowrap;
+  display: flex; align-items: center; gap: var(--pp-sp-3);
+  padding: var(--pp-sp-2) var(--pp-sp-4); font-size: 11px; color: var(--pp-danger); white-space: nowrap;
   background: var(--pp-bg); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-sm);
   box-shadow: var(--pp-shadow-md);
   animation: confirmFadeIn 0.12s ease;
 }
 .confirm-popover .confirm-msg { font-weight: bold; color: inherit; }
 .confirm-popover button {
-  padding: 2px 10px; font-size: 11px; cursor: pointer; border-radius: var(--pp-radius-sm); border: 1px solid;
+  padding: var(--pp-sp-1) var(--pp-sp-4); font-size: 11px; cursor: pointer; border-radius: var(--pp-radius-sm); border: 1px solid;
 }
 .confirm-popover .confirm-yes { background: var(--pp-danger); color: #fff; border-color: var(--pp-danger); }
 .confirm-popover .confirm-yes:hover { background: color-mix(in srgb, var(--pp-danger) 85%, #000); }
@@ -1893,9 +1906,9 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
-  gap: 4px;
-  margin-top: 6px;
-  padding: 6px 8px;
+  gap: var(--pp-sp-2);
+  margin-top: var(--pp-sp-3);
+  padding: var(--pp-sp-3) var(--pp-sp-4);
   background: var(--pp-bg2);
   border: 1px solid var(--pp-divider);
   border-radius: var(--pp-radius-md);
@@ -1907,8 +1920,8 @@ html[data-theme] .confirm-popover button:focus-visible { outline-color: var(--pp
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: var(--pp-sp-2);
+  padding: var(--pp-sp-2) var(--pp-sp-4);
   font-size: 11px;
   color: var(--pp-link);
   background: var(--pp-bg);
