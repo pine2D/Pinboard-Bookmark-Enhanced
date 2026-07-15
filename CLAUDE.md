@@ -132,6 +132,16 @@ git push origin main
 bash scripts/release.sh
 ```
 
+### 多语言文档文案规范（README ×9 / 用户可见文案）
+
+本地化 = **按目标语言重写,不是翻译**。铁律与依据(2026-07 READMEfeature 文案返工教训):
+
+1. **项目术语一致性最高优先**:动笔前先查 `_locales/<lang>/messages.json` 与既有 README——既定叫法:「**追踪**参数」(非跟踪)、「稍后阅读」「标签治理」「高亮/笔记」(非批注)、「存档」(Wayback)。UI 里叫什么,文档就叫什么。
+2. **中文**(微软 zh-CN 指南 + 阮一峰规范 + 排版指北):用「你」不用「您」;代词能省则省;禁逐词直译与欧化句式(「带走它」「链接不再腐烂」这类 calque 一律重写);一句一义,强动词(「找回」不是「有…可查」);全角标点,中英文之间空格;半正式语气,忌广告腔(「秒变」)与过俗口语(「揪出」)。
+3. **其他语种**:各按微软对应语种 Localization Style Guide 的语气与惯例重写(<https://learn.microsoft.com/en-us/globalization/reference/microsoft-style-guides>)。
+4. **README 面向潜在用户**:收益优先、一行一条、砍机制话术(实现细节留给设置页与 release notes);×9 locale 逐行镜像、同 commit 更新。
+5. 铺多语言文案时优先调用 `~/projects/skills` 的文档本地化 skill(如已建成)。
+
 ### 发版前文档核查（硬规则）
 
 每次发版前核查以下文档是否与新功能同步：**README.md（×9 locale 逐行镜像，同 commit 内更新）/ CLAUDE.md / docs/privacy.md（隐私政策）/ docs/index.md（Pages 门面）/ docs/theme-surface/README.md + NEW_THEME.md（theme factory 机制有变更时必须同步）**。新增任何数据出口（新 API 调用、新导出目标、新 AI 触发面）时，privacy.md 的 Network Requests / Permissions / Third-Party 三处必须同步披露。`release.sh` 内置硬门：自上个 tag 以来存在 feat commit 而上述文档全部未改动时直接中止（中止信息会打印逐项核查清单）；确认确实无需更新后可用 `--docs-ok` 显式跳过。privacy.md 与 index.md 经 GitHub Pages 自动部署（push 即生效），不依赖扩展发版。
