@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | **繁體中文** | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-全面強化 [Pinboard](https://pinboard.in) 書籤體驗的 Chrome 擴充功能：AI 智能標籤、自動摘要，以及全套可自訂主題介面。
+為 [Pinboard](https://pinboard.in) 打造的 Chrome 擴充功能：AI 標籤與摘要、內建閱讀器（支援翻譯與劃重點），以及 13 套網站佈景主題。
 
 > **說明：** 需要 Pinboard.in 帳號 —— [Pinboard](https://pinboard.in) 是一項獨立的**付費**書籤服務。本擴充功能是第三方用戶端，使用你自己的 Pinboard API token 連接到你既有的 Pinboard 帳號。本專案與 Pinboard 無任何隸屬、贊助或背書關係。你必須已擁有（或註冊）付費的 Pinboard.in 帳號才能使用本擴充功能。
 
@@ -17,30 +17,30 @@
 ## 功能特色
 
 ### 儲存
-- **一鍵儲存，自動填妥相關資訊** — 標題、描述與選取的文字自動填入，並移除 URL 中的追蹤參數
-- **快捷鍵直接儲存** — 不必開啟彈出視窗；也可以一次儲存所有開啟的分頁
-- **離線也能儲存** — 內容先進入本機佇列，重新連線後自動重試
+- **一鍵儲存，自動填妥相關資訊**：標題、描述與選取的文字自動填入，並移除 URL 中的追蹤參數
+- **快捷鍵直接儲存**：不必開啟彈出視窗；也可以一次儲存所有開啟的分頁
+- **離線也能儲存**：內容先進入本機佇列，重新連線後自動重試
 
 ### 標籤
-- **AI 產生標籤與摘要** — 讀取去除廣告、選單與側欄後的文章正文；自備 API key，支援 13 家服務商或任何 OpenAI 相容端點
-- **標籤自動補全** — 你的歷史標籤、Pinboard 建議標籤、一鍵預設
-- **標籤治理** — 找出重複與低使用次數的標籤，分批合併
+- **AI 產生標籤與摘要**：讀取去除廣告、選單與側欄後的文章正文；自備 API key，支援 13 家服務商或任何 OpenAI 相容端點
+- **標籤自動補全**：你的歷史標籤、Pinboard 建議標籤、一鍵預設
+- **標籤治理**：找出重複與低使用次數的標籤，分批合併
 
 ### 閱讀
-- **網頁變成清爽的閱讀器** — Markdown 檢視，內建目錄、全文搜尋、註腳速覽
-- **五色劃重點與筆記** — 重新渲染、翻譯、內容變動後依然保留
-- **整頁翻譯，或向文章提問** — 支援雙語對照；回答附帶引用，一按即跳回原文出處
-- **傳送或下載** — 傳送到 [Obsidian](https://obsidian.md)、GitHub Gist 或任何 webhook；也可下載為 `.md`、`.html`、`.epub`，在電子書閱讀器上閱讀
+- **網頁變成清爽的閱讀器**：Markdown 檢視，內建目錄、全文搜尋、註腳速覽
+- **五色劃重點與筆記**：重新渲染、翻譯、內容變動後依然保留
+- **整頁翻譯，或向文章提問**：支援雙語對照；回答附帶引用，一按即跳回原文出處
+- **傳送或下載**：傳送到 [Obsidian](https://obsidian.md)、GitHub Gist 或任何 webhook；也可下載為 `.md`、`.html`、`.epub`，在電子書閱讀器上閱讀
 
 ### 個人化
 - **13 套 pinboard.in 佈景主題**（Dracula、Nord、Catppuccin、Solarized 等），支援疊加自訂 CSS
-- **自動存檔到 [Wayback Machine](https://web.archive.org)** — 可選擇每次儲存時一併提交；原連結失效後仍找得回網頁
-- **設定備份** — 匯出為檔案，或自動備份到自己的 WebDAV
+- **自動存檔到 [Wayback Machine](https://web.archive.org)**：可選擇每次儲存時一併提交；原連結失效後仍找得回網頁
+- **設定備份**：匯出為檔案，或自動備份到自己的 WebDAV
 - **9 種語言**、可自訂快捷鍵、本機優先儲存、零追蹤
 
 ## 安裝
 
-**[→ 從 Chrome 線上應用程式商店安裝](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)** — 推薦
+**[→ 從 Chrome 線上應用程式商店安裝](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)**（推薦）
 
 或從 release ZIP 手動載入：
 1. 下載最新的 [release ZIP](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
@@ -55,4 +55,4 @@
 
 ## 授權
 
-MIT — 見 [LICENSE](LICENSE)。
+MIT，見 [LICENSE](LICENSE)。

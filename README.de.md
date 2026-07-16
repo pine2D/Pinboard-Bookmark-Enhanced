@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | **Deutsch** | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-Eine Chrome-Erweiterung, die [Pinboard](https://pinboard.in)-Lesezeichen mit KI-gestützten Tags, Zusammenfassungen und einer voll anpassbaren Oberfläche aufwertet.
+Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): AI-Tags und Zusammenfassungen, eine eingebaute Leseansicht mit Übersetzung und Markierungen sowie 13 Themes für die Website selbst.
 
 > **Hinweis:** Erfordert ein Pinboard.in-Konto — [Pinboard](https://pinboard.in) ist ein unabhängiger, **kostenpflichtiger** Lesezeichendienst. Diese Erweiterung ist ein Drittanbieter-Client, der sich mit deinem eigenen API-Token mit deinem bestehenden Pinboard-Konto verbindet. Sie ist nicht mit Pinboard verbunden, wird nicht von Pinboard gesponsert oder unterstützt. Zur Nutzung dieser Erweiterung musst du bereits ein kostenpflichtiges Pinboard.in-Konto besitzen (oder eines anlegen).
 
@@ -17,30 +17,30 @@ Eine Chrome-Erweiterung, die [Pinboard](https://pinboard.in)-Lesezeichen mit KI-
 ## Funktionen
 
 ### Speichern
-- **Ein Klick, alles ausgefüllt** — Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
-- **Per Tastenkürzel speichern** — ohne das Popup zu öffnen; auf Wunsch alle offenen Tabs auf einmal
-- **Funktioniert auch offline** — Speicherungen landen in einer lokalen Warteschlange und werden nach der Wiederverbindung erneut übertragen
+- **Ein Klick, alles ausgefüllt** – Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
+- **Per Tastenkürzel speichern** – ohne das Popup zu öffnen; auf Wunsch alle offenen Tabs auf einmal
+- **Funktioniert auch offline** – Speicherungen landen in einer lokalen Warteschlange und werden nach der Wiederverbindung erneut übertragen
 
 ### Tags
-- **AI-Tags und Zusammenfassung** — gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 13 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
-- **Autovervollständigung** — aus deinen Tags, Pinboards Vorschlägen und Ein-Klick-Voreinstellungen
-- **Tags aufräumen** — doppelte und selten genutzte Tags finden und in Stapeln zusammenführen
+- **AI-Tags und Zusammenfassung** – gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 13 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
+- **Autovervollständigung** – aus deinen Tags, Pinboards Vorschlägen und Ein-Klick-Voreinstellungen
+- **Tags aufräumen** – doppelte und selten genutzte Tags finden und in Stapeln zusammenführen
 
 ### Lesen
-- **Jede Seite wird zur Leseansicht** — Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau
-- **Markieren in fünf Farben, mit Notizen** — Markierungen und Notizen überstehen Neu-Rendern, Übersetzung und Änderungen an der Seite
-- **Seite übersetzen oder befragen** — Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle und springen direkt dorthin
-- **Senden oder herunterladen** — an [Obsidian](https://obsidian.md), ein GitHub Gist oder einen beliebigen Webhook senden; als `.md`, `.html` oder `.epub` für den E-Reader herunterladen
+- **Jede Seite wird zur Leseansicht** – Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau
+- **Markieren in fünf Farben, mit Notizen** – Markierungen und Notizen überstehen Neu-Rendern, Übersetzung und Änderungen an der Seite
+- **Seite übersetzen oder befragen** – Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle und springen direkt dorthin
+- **Senden oder herunterladen** – an [Obsidian](https://obsidian.md), ein GitHub Gist oder einen beliebigen Webhook senden; als `.md`, `.html` oder `.epub` für den E-Reader herunterladen
 
 ### Pinboard nach deinem Geschmack
 - **13 Themes für pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
-- **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren** — auf Wunsch bei jedem Speichern; Seiten bleiben erreichbar, auch wenn der Originallink tot ist
-- **Einstellungen sichern** — als Datei exportieren oder automatisch auf den eigenen WebDAV-Server
+- **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren** – auf Wunsch bei jedem Speichern; Seiten bleiben erreichbar, auch wenn der Originallink tot ist
+- **Einstellungen sichern** – als Datei exportieren oder automatisch auf den eigenen WebDAV-Server
 - **9 Sprachen** · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking
 
 ## Installation
 
-**[→ Im Chrome Web Store installieren](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)** — empfohlen
+**[→ Im Chrome Web Store installieren](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)** (empfohlen)
 
 Oder als entpackte Erweiterung aus einem Release-ZIP laden:
 1. Lade das neueste [Release-ZIP](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest) herunter
@@ -55,4 +55,4 @@ Kein Tracking, keine Analytik, keine Telemetrie. Für neue Nutzer werden Einstel
 
 ## Lizenz
 
-MIT — siehe [LICENSE](LICENSE).
+MIT. Siehe [LICENSE](LICENSE).

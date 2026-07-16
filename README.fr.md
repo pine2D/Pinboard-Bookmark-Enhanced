@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | **Français** | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-Une extension Chrome qui booste les signets [Pinboard](https://pinboard.in) avec tags et résumés par IA, et une interface entièrement personnalisable.
+Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résumés par IA, un mode lecture intégré avec traduction et surlignage, et 13 thèmes pour le site lui-même.
 
 > **Remarque :** Nécessite un compte Pinboard.in — [Pinboard](https://pinboard.in) (pinboard.in) est un service de signets indépendant et **payant**. Cette extension est un client tiers qui se connecte à votre compte Pinboard existant à l'aide de votre propre jeton API Pinboard. Elle n'est ni affiliée à Pinboard, ni sponsorisée ou approuvée par Pinboard. Vous devez déjà posséder (ou souscrire à) un compte Pinboard.in payant pour utiliser cette extension.
 
@@ -17,30 +17,30 @@ Une extension Chrome qui booste les signets [Pinboard](https://pinboard.in) avec
 ## Fonctionnalités
 
 ### Enregistrer
-- **Un clic, tout est rempli** — le titre, la description et le texte sélectionné sont repris, et les paramètres de suivi retirés de l'URL
-- **Enregistrement au raccourci clavier** — sans ouvrir la fenêtre ; ou enregistrez d'un coup tous les onglets ouverts
-- **Fonctionne hors ligne** — les enregistrements passent par une file locale et sont renvoyés au retour de la connexion
+- **Un clic, tout est rempli** : le titre, la description et le texte sélectionné sont repris, et les paramètres de suivi retirés de l'URL
+- **Enregistrement au raccourci clavier** : sans ouvrir la fenêtre ; ou enregistrez d'un coup tous les onglets ouverts
+- **Fonctionne hors ligne** : les enregistrements passent par une file locale et sont renvoyés au retour de la connexion
 
 ### Étiquettes
-- **Étiquettes et résumé par IA** — l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 13 fournisseurs ou tout point d'accès compatible OpenAI
-- **Autocomplétion** — à partir de vos étiquettes, des suggestions Pinboard et de préréglages en un clic
-- **Nettoyage des étiquettes** — repérez les doublons et les étiquettes peu utilisées, puis fusionnez-les par lots
+- **Étiquettes et résumé par IA** : l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 13 fournisseurs ou tout point d'accès compatible OpenAI
+- **Autocomplétion** : à partir de vos étiquettes, des suggestions Pinboard et de préréglages en un clic
+- **Nettoyage des étiquettes** : repérez les doublons et les étiquettes peu utilisées, puis fusionnez-les par lots
 
 ### Lecture
-- **Chaque page devient une lecture claire** — vue Markdown avec table des matières, recherche et aperçu des notes de bas de page
-- **Surlignage en cinq couleurs, avec notes** — surlignages et notes survivent aux nouveaux rendus, à la traduction et aux modifications de la page
-- **Traduisez la page ou posez-lui vos questions** — traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
-- **Envoyer ou télécharger** — vers [Obsidian](https://obsidian.md), un Gist GitHub ou n'importe quel webhook ; ou en `.md`, `.html`, `.epub` pour votre liseuse
+- **Chaque page devient une lecture claire** : vue Markdown avec table des matières, recherche et aperçu des notes de bas de page
+- **Surlignage en cinq couleurs, avec notes** : surlignages et notes survivent aux nouveaux rendus, à la traduction et aux modifications de la page
+- **Traduisez la page ou posez-lui vos questions** : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
+- **Envoyer ou télécharger** : vers [Obsidian](https://obsidian.md), un Gist GitHub ou n'importe quel webhook ; ou en `.md`, `.html`, `.epub` pour votre liseuse
 
 ### Personnalisation
 - **13 thèmes pour pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
-- **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** — à chaque enregistrement si vous le souhaitez ; les pages restent accessibles même quand le lien d'origine disparaît
-- **Sauvegarde des réglages** — export dans un fichier, ou sauvegarde automatique vers votre propre serveur WebDAV
+- **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** : à chaque enregistrement si vous le souhaitez ; les pages restent accessibles même quand le lien d'origine disparaît
+- **Sauvegarde des réglages** : export dans un fichier, ou sauvegarde automatique vers votre propre serveur WebDAV
 - **9 langues** · raccourcis configurables · stockage local en priorité · aucun pistage
 
 ## Installation
 
-**[→ Installer depuis le Chrome Web Store](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)** — recommandé
+**[→ Installer depuis le Chrome Web Store](https://chromewebstore.google.com/detail/pinboard-bookmark-enhance/pnjndmjhljjbdlbejeenkepdalokfooh)** (recommandé)
 
 Ou chargez une version décompressée depuis un ZIP de release :
 1. Téléchargez le dernier [ZIP de release](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
@@ -55,4 +55,4 @@ Aucun tracking, aucune analytique, aucune télémétrie. Pour les nouveaux utili
 
 ## Licence
 
-MIT — voir [LICENSE](LICENSE).
+MIT. Voir [LICENSE](LICENSE).
