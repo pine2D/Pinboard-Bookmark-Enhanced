@@ -45,6 +45,9 @@ git ls-files -- '*.js' '*.mjs' |
 echo "[ui-contract] checking static UI contracts"
 node "tests/ui-contract-tests.mjs"
 
+echo "[docs-lint] checking README x9 mirror + prose contracts"
+node "scripts/docs-lint.mjs"
+
 echo "[theme] checking generated theme integrity"
 node "docs/theme-surface/tools/diff-all.mjs" --strict
 node "docs/theme-surface/tools/token-coverage.mjs"

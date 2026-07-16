@@ -146,6 +146,8 @@ bash scripts/release.sh
 
 每次发版前核查以下文档是否与新功能同步：**README.md（×9 locale 逐行镜像，同 commit 内更新）/ CLAUDE.md / docs/privacy.md（隐私政策）/ docs/index.md（Pages 门面）/ docs/theme-surface/README.md + NEW_THEME.md（theme factory 机制有变更时必须同步）**。新增任何数据出口（新 API 调用、新导出目标、新 AI 触发面）时，privacy.md 的 Network Requests / Permissions / Third-Party 三处必须同步披露。`release.sh` 内置硬门：自上个 tag 以来存在 feat commit 而上述文档全部未改动时直接中止（中止信息会打印逐项核查清单）；确认确实无需更新后可用 `--docs-ok` 显式跳过。privacy.md 与 index.md 经 GitHub Pages 自动部署（push 即生效），不依赖扩展发版。
 
+**文案质量融入（2026-07）**：凡更新用户可见文案——多语言走 `content-l10n` skill；英文/中文散文按 `humanizer`/`humanizer-zh` 自查（破折号群、广告腔、三连套式、宣传性强化）。commit subject 是 release notes 的原料，同样适用。机械契约由 `scripts/docs-lint.mjs` 守护（verify.sh/CI 内）：README ×9 结构镜像、features 定界符策略（EN/CJK/de/fr 用冒号族，**pl/ru 保留母语破折号，勿"统一"**）、README.md 与 privacy.md 的英文散文破折号禁令。
+
 ### Release 打包规则（release.sh）
 
 `release.sh` 自动扫描 + sanity check，不再硬编码文件清单：
