@@ -1,0 +1,65 @@
+# CWS privacy-tab copy (paste-ready)
+
+> Canonical archive of the Chrome Web Store developer-dashboard privacy tab.
+> Update this file whenever the dashboard text changes, and re-check it against
+> docs/privacy.md whenever a release adds a data exit or permission.
+> Last synced: 2026-07-16 (fixes: exact-origins instead of all-sites wildcard
+> x2, alarms do trigger offline/WebDAV transmissions, quick-save-with-AI added
+> to scripting, Embed/Fix image origins added to hosts, storage credential-sync
+> condition tightened; de-AI pass: dropped pseudo-markdown ** headers).
+
+## Single purpose description (887/1000)
+
+Save, enrich, read, and export Pinboard bookmarks. The extension captures the page you choose, optionally extracts readable article content, generates AI tags, summaries, translations, or Ask-the-page answers with the provider you select, then saves or exports the result to destinations you configure.
+
+Workflow: toolbar or shortcut -> review the current page -> optional AI or Markdown preview/export -> save to Pinboard.
+
+Related features: AI tags/summaries, translation, Ask/Explain, key-points skim; batch save, offline queue, optional Wayback archiving; Send to Obsidian, GitHub Gist, or a webhook; WebDAV settings backup; tag autocomplete and cleanup; pinboard.in themes.
+
+Data: local-first. No developer servers, no analytics, no telemetry, no sale of data. Page URLs and content leave your device only when you take an action, and only to Pinboard or the service you configured.
+
+## activeTab justification (unchanged, accurate)
+
+Read the active tab's URL and title to pre-fill the bookmark form when you open the popup, and to scope content extraction to the tab you are acting on.
+
+## storage justification (tail sentence replaced)
+
+Persist settings, credentials, and local caches needed for the bookmark workflow: Pinboard token, AI provider keys, export-target tokens, WebDAV credentials, preferences, custom CSS/themes, bookmark-status cache, tag cache/tag-cleanup state, AI result cache, offline queue, Markdown preview data, highlights/notes, Wayback log, and backup state. Stored in chrome.storage.local by default; selected non-content settings sync via chrome.storage.sync only if you enable settings sync, and obfuscated credentials join only with the separate account-wide API-key sync option. Nothing is sent to any developer server.
+
+## scripting justification (612/1000)
+
+Inject the bundled Defuddle extractor (and optional per-site extraction rules) into the page to pull clean article text/HTML. This runs only on explicit user action: clicking AI tags or AI summary, quick-saving or batch-saving with AI enabled, or opening Markdown preview (button or Alt+Shift+M, including the in-preview engine toggle, Translate, Ask, and Explain). It never runs on popup open or passively. Batch save with AI first asks you to approve the exact origins of the selected tabs, listed in the prompt, so those non-active tabs can be read; the extension never requests an all-sites grant at runtime.
+
+## tabs justification (unchanged, accurate)
+
+Enumerate open tabs for batch save, and read tab titles/URLs for "save tab set" (which POSTs them to pinboard.in/tabs/save/ using your existing pinboard.in login cookie, then opens tabs/show for you to confirm). Also read the active tab's URL/title on tab switch or navigation to update the toolbar icon (bookmarked state) and pre-fill the popup.
+
+## notifications justification (unchanged, accurate)
+
+Show success/failure/queued feedback after save operations (quick-save, read-later, batch, tab-set, offline retry) and provide a 30-second Undo button that deletes the just-saved bookmark via the Pinboard API.
+
+## alarms justification (518/1000)
+
+Run recurring background tasks: keep the service worker warm during active use, re-prime the settings cache, expire the bookmark-status cache, retry the offline save queue, refresh the unread badge, optionally prewarm the Pinboard tag list, and run WebDAV backup pushes you have scheduled. Alarms themselves send nothing; a triggered task talks only to the service it belongs to (offline retries go to Pinboard, scheduled backups to your WebDAV server) and only while your configuration and permission grants allow it.
+
+## Host permission justification (~990/1000)
+
+Static hosts: api.pinboard.in and pinboard.in, for saving/fetching/managing bookmarks, pinboard.in themes and tag sorting, and cookie-based Save Tab Set. 13 user-selectable AI providers plus Jina Reader cover optional AI/extraction actions; each is contacted only when configured and only when you trigger the action. Optional hosts are requested at runtime as exact origins only: the selected tabs of a batch save, your custom OpenAI-compatible endpoint or non-loopback Ollama, GitHub Gist export, webhook export, WebDAV backup, web.archive.org for opt-in Wayback archiving, and the image origins needed when you choose the Embed (offline) export policy or click Fix on hotlink-blocked preview images. localhost/127.0.0.1 remain allowed for a local Ollama. The *://*/* manifest entry is only the declaration ceiling that lets Chrome offer these exact-origin prompts; the extension never requests that wildcard itself. Page content goes only to the service you selected, never to the developer.
+
+## declarativeNetRequestWithHostAccess justification (481/1000; field will appear on next submit)
+
+Set the Referer header (to the article page's origin only) on the extension's own image re-fetches during two user actions in Markdown preview: the Fix button for hotlink-blocked images, and the Embed (offline) export retry. Implemented as a temporary session rule scoped to the granted image origins, the fetch request type, and that single preview tab; the rule is removed when the run finishes. It grants no page access by itself and never touches other tabs' or sites' traffic.
+
+## Remote code
+
+No, I am not using remote code.
+
+## Data usage checkboxes (matches docs/privacy.md "Chrome Web Store data categories")
+
+Checked: Personally identifiable information / Authentication information / Web history / Website content.
+Unchecked: Health / Financial and payment / Personal communications / Location / User activity.
+All three certification boxes: checked.
+
+## Privacy policy URL
+
+https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html
