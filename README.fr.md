@@ -16,17 +16,26 @@ Une extension Chrome qui booste les signets [Pinboard](https://pinboard.in) avec
 
 ## Fonctionnalités
 
-- **Capture intelligente** — pré-remplit le titre, l'URL, la méta-description, le référent et le texte sélectionné, et supprime les paramètres de suivi (`utm_*`, `gclid`, `fbclid`, …) de l'URL enregistrée, que vous la capturiez ou la colliez, avec un mode agressif et des listes personnalisées d'éléments à conserver ou à retirer
-- **Sauvegarde rapide et groupée** — enregistrez la page (ou marquez-la *à lire plus tard*) d'un simple raccourci clavier, sans ouvrir la popup, ou sauvegardez d'un coup tous les onglets ouverts, avec un étiquetage IA propre à chaque onglet, une progression en temps réel et un regroupement en Tab Set (également associable à son propre raccourci clavier) ; les brouillons hors ligne restent dans une file locale et leur enregistrement dans Pinboard est retenté automatiquement au retour de la connexion
-- **Tags et résumés IA** — utilisez votre propre clé avec 13 fournisseurs de LLM ou n'importe quel point d'accès compatible OpenAI ; l'IA lit le corps de l'article épuré de ses publicités, menus et barres latérales
-- **Outils de tags** — autocomplétion à partir de vos propres tags, des tags suggérés par Pinboard et de préréglages applicables en un clic, ainsi qu'un panneau de gouvernance qui repère les tags en double ou peu utilisés (par heuristique et par regroupement IA à la demande) et les fusionne par lots échelonnés, avec progression en temps réel
-- **Liens rapides et statut** — accédez en un clic à vos pages Non lus, Réseau, Notes et Populaires ; l'icône de la barre d'outils indique en un coup d'œil si la page courante n'est pas enregistrée, déjà enregistrée, ou enregistrée *à lire plus tard*
-- **Page vers Markdown** — convertit la page courante en Markdown épuré, avec un aperçu intégré (affichage rendu ou source, table des matières, statistiques de lecture) ; copiez-la ou téléchargez-la en `.md`, en `.html` mis en forme, ou en `.epub` (article unique, lisible sur Kindle/Kobo/KOReader), ajustez le frontmatter (notamment l'auteur, la date de publication, le site, l'image de couverture et le nombre de mots), le traitement des images (conserver, supprimer, ou intégrer hors ligne) et la table des matières, ou envoyez-la directement dans [Obsidian](https://obsidian.md), un Gist GitHub, ou n'importe quel webhook (compatible Readwise). L'extraction adaptée à chaque site préserve la lisibilité des questions-réponses, des posts sociaux et des fils de discussion (Zhihu, Hacker News, Stack Overflow, X/Twitter, …) ; à vous de choisir [defuddle](https://github.com/kepano/defuddle) + [Turndown](https://github.com/mixmark-io/turndown) (en local) ou [Jina Reader](https://jina.ai/reader) (dans le cloud). Les images bloquées par la protection anti-hotlink d'un site sont détectées dans l'aperçu et restaurées en un clic. L’export vous avertit lorsque des liens d’images conservés sont déjà connus pour échouer — « Intégrer » emballe ce qu’il peut dans le fichier téléchargé et signale le reste.
-- **Interroger et traduire la page** — depuis cet aperçu Markdown, posez vos questions et recevez des réponses diffusées en continu, assorties de citations vérifiées qui renvoient à la source ; faites expliquer ou traduire sur place n'importe quel passage sélectionné (et conservez la réponse sous forme de note), ou traduisez la page entière à l'aide d'un glossaire personnalisé, avec suivi en temps réel de la consommation de tokens, au choix en affichage original, bilingue ou traduit
-- **Outils de lecture** — surlignez en cinq couleurs, avec des notes qui résistent aux nouveaux rendus, à la traduction et même aux changements du contenu de la page (le texte déplacé est retrouvé automatiquement ; s'il est introuvable, la note est conservée et signalée, jamais perdue), parcourez vos surlignages dans un panneau Carnet, recherchez dans l'article (`/`, regex en option — vos notes sont aussi prises en compte), prévisualisez les notes de bas de page sur place, reprenez la lecture là où vous l'aviez laissée, réglez la taille du texte et l’interligne dans le panneau Aa, choisissez votre largeur de lecture (680/880/1080 px), passez en mode concentration pour une lecture sans distraction, ou ajoutez un survol des points clés par IA, facultatif et désactivé par défaut ; appuyez sur `?` pour la liste complète des raccourcis
-- **Archivage automatique** — envoyez si vous le souhaitez chaque enregistrement vers la [Wayback Machine](https://web.archive.org) d'Internet Archive, avec journal d'archivage et nouvelle tentative en cas d'échec, pour que vos liens restent accessibles même si la page d'origine disparaît
-- **`pinboard.in` personnalisable** — 13 palettes soignées (Dracula · Nord · Catppuccin · Solarized · Flexoki · Gruvbox · …), auxquelles s'ajoutent une surcouche CSS personnalisée synchronisée entre vos appareils, une largeur de popup réglable et un tri par popularité sur les pages de tags
-- **Sauvegarde des paramètres** — exportez et importez tous vos paramètres (et, si vous le souhaitez, vos surlignages) dans un fichier, ou sauvegardez-les automatiquement sur votre propre serveur WebDAV (par exemple Nextcloud), pour que votre configuration et vos thèmes personnalisés vous suivent d'un appareil à l'autre
+### Enregistrer
+- **Un clic, tout est rempli** — le titre, la description et le texte sélectionné sont repris, et les paramètres de suivi retirés de l'URL
+- **Enregistrement au raccourci clavier** — sans ouvrir la fenêtre ; ou enregistrez d'un coup tous les onglets ouverts
+- **Fonctionne hors ligne** — les enregistrements passent par une file locale et sont renvoyés au retour de la connexion
+
+### Étiquettes
+- **Étiquettes et résumé par IA** — l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 13 fournisseurs ou tout point d'accès compatible OpenAI
+- **Autocomplétion** — à partir de vos étiquettes, des suggestions Pinboard et de préréglages en un clic
+- **Nettoyage des étiquettes** — repérez les doublons et les étiquettes peu utilisées, puis fusionnez-les par lots
+
+### Lecture
+- **Chaque page devient une lecture claire** — vue Markdown avec table des matières, recherche et aperçu des notes de bas de page
+- **Surlignage en cinq couleurs, avec notes** — surlignages et notes survivent aux nouveaux rendus, à la traduction et aux modifications de la page
+- **Traduisez la page ou posez-lui vos questions** — traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
+- **Envoyer ou télécharger** — vers [Obsidian](https://obsidian.md), un Gist GitHub ou n'importe quel webhook ; ou en `.md`, `.html`, `.epub` pour votre liseuse
+
+### Personnalisation
+- **13 thèmes pour pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
+- **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** — à chaque enregistrement si vous le souhaitez ; les pages restent accessibles même quand le lien d'origine disparaît
+- **Sauvegarde des réglages** — export dans un fichier, ou sauvegarde automatique vers votre propre serveur WebDAV
 - **9 langues** · raccourcis configurables · stockage local en priorité · aucun pistage
 
 ## Installation
