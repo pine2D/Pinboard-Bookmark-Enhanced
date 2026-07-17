@@ -103,13 +103,14 @@ function pbpWebdavEtagStateMatchesTarget(state, target, user) {
 function pbpWebdavAutoPushPeriod(settings) {
   const s = settings || {};
   // deobfuscateKey passes plaintext through and heals values a transitional
-  // build stored obf-wrapped. Half-configured Basic auth (username saved,
-  // password cleared/never stored) never schedules: every tick would 401 and
-  // rewrite webdavLastPush with the same error forever. A fully anonymous
-  // config (no username, no password) is a supported WebDAV share shape.
+  // build stored obf-wrapped. Half-configured Basic auth — either half alone
+  // (username without password OR password without username) — never
+  // schedules: every tick would 401 and rewrite webdavLastPush with the same
+  // error forever. A fully anonymous config (no username, no password) is a
+  // supported WebDAV share shape.
   const url = deobfuscateKey(s.webdavUrl || "");
   if (!url || !pbpWebdavOrigin(url)) return 0;
-  if (s.webdavUser && !s.webdavPass) return 0;
+  if (!!s.webdavUser !== !!s.webdavPass) return 0;
   if (s.webdavAutoPush === "daily") return 1440;
   if (s.webdavAutoPush === "hourly") return 60;
   return 0;
@@ -180,11 +181,13 @@ function pbpWebdavBuildRequest(kind, cfg) {
     headers["Content-Type"] = "application/json";
     if (pbpWebdavValidEtag(cfg.etag)) headers["If-Match"] = cfg.etag.trim();
     else if (cfg.known === true) headers["If-Match"] = "*";
-    // Unknown revision (first push from this device, upgrade from a pre-ETag
-    // build, or cleared local state): plain unconditional PUT, matching the
-    // pre-CAS releases. If-None-Match:* here would 412 forever against an
-    // existing remote file — the only unlock being a destructive Pull — while
-    // every LATER push still gets CAS protection from the remembered state.
+    else if (cfg.createOnly === true) headers["If-None-Match"] = "*";
+    // Unknown revision withOUT createOnly (a USER-GESTURE push): plain
+    // unconditional PUT, matching the pre-CAS releases — the click is the
+    // overwrite intent, and If-None-Match:* would 412 forever against an
+    // existing remote file with a destructive Pull as the only unlock.
+    // Scheduled pushes pass createOnly so automation can never blind-
+    // overwrite a backup this device has never seen (see pbpWebdavPush).
     return { url, method: "PUT", headers };
   }
   return { url, method: "GET", headers }; // "pull" | "test"
@@ -343,7 +346,31 @@ async function pbpWebdavPush(cfgOverride) {
     const payload = pbpWebdavBuildPayload(settings, meta, { highlights, highlightsOwner: owner, overlay, savedThemes });
     const expectedRevision = await pbpWebdavReadRevision(cfg);
     const conditionalCfg = Object.assign({}, cfg, expectedRevision);
-    const resp = await _pbpWebdavFetch("push", conditionalCfg, { body: JSON.stringify(payload) });
+    // A SCHEDULED push with no known revision must never blind-overwrite: a
+    // second device's alarm would silently clobber the first device's backup.
+    // Unknown-revision alarm pushes are create-only; a 412 then either seeds
+    // known-exists once for an upgrader that provably pushed from this device
+    // before (webdavLastPush.ok from a pre-ETag build), or surfaces as a
+    // conflict the user resolves with a manual push/pull. Manual pushes
+    // (cfgOverride from the options buttons) keep the unconditional pre-CAS
+    // behavior — the click is the overwrite intent.
+    const isScheduled = !cfgOverride;
+    if (isScheduled && expectedRevision.known !== true && !pbpWebdavValidEtag(expectedRevision.etag)) {
+      conditionalCfg.createOnly = true;
+    }
+    let resp = await _pbpWebdavFetch("push", conditionalCfg, { body: JSON.stringify(payload) });
+    if (resp.status === 412 && conditionalCfg.createOnly === true) {
+      let priorPushSucceeded = false;
+      try {
+        const { webdavLastPush } = await chrome.storage.local.get("webdavLastPush");
+        priorPushSucceeded = !!(webdavLastPush && webdavLastPush.ok === true);
+      } catch (_) {}
+      if (priorPushSucceeded) {
+        resp = await _pbpWebdavFetch("push",
+          Object.assign({}, cfg, { known: true, etag: "" }),
+          { body: JSON.stringify(payload) });
+      }
+    }
     if (resp.status === 412) {
       const result = { ts: Date.now(), ok: false, error: "conflict", status: 412 };
       await chrome.storage.local.set({ webdavLastPush: result });

@@ -54,6 +54,11 @@ if (_pbpHasTheme) {
     if (typeof fallback[fallbackKey] === "string") return fallback[fallbackKey];
     const record = fallback[fallbackKey];
     const isRecord = !!(record && record._pbpLargeFallback === 1 && typeof record.value === "string");
+    // Last-known rescue (mirrors shared.js): when a record exists but sync
+    // cannot be read cleanly — committed metadata whose chunks are missing,
+    // or a newer generation whose chunks have not propagated yet — fall back
+    // to the record's value rather than rendering unthemed.
+    const rescue = isRecord ? record.value : null;
     for (let attempt = 0; attempt < 2; attempt++) {
       const meta = await chrome.storage.sync.get(key);
       const stored = meta[key];
@@ -63,13 +68,14 @@ if (_pbpHasTheme) {
         const current = typeof generation === "string" ? generation : null;
         const base = Object.prototype.hasOwnProperty.call(record, "_base") ? record._base : current;
         if (current === base) return record.value;
-        // Stale record (another device committed a newer generation): sync wins.
+        // Stale record (another device committed a newer generation): sync
+        // wins when it reads; the rescue above covers the propagation gap.
       }
       if (typeof stored === "string") return stored;
       const count = Number(stored && stored._chunks);
       if (!Number.isInteger(count) || count < 1 || count > 512 ||
           (generation !== undefined && (typeof generation !== "string" || !/^[a-z0-9]+$/i.test(generation)))) {
-        return defaultValue;
+        return rescue === null ? defaultValue : rescue;
       }
       const prefix = generation ? `${key}_${generation}_` : `${key}_`;
       const chunkKeys = Array.from({ length: count }, (_, i) => `${prefix}${i}`);
@@ -78,10 +84,10 @@ if (_pbpHasTheme) {
         return chunkKeys.map((chunkKey) => chunks[chunkKey]).join("") || defaultValue;
       }
       // Missing chunks: a writer likely swapped generations mid-read — loop
-      // once for fresh metadata, then give up to the default (page renders
-      // unthemed for this load; the 400ms uncloak guard still applies).
+      // once for fresh metadata, then rescue/default (the 400ms uncloak
+      // guard still applies either way).
     }
-    return defaultValue;
+    return rescue === null ? defaultValue : rescue;
   }
 
   function uncloak() {

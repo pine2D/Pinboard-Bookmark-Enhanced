@@ -1177,9 +1177,16 @@ async function pbpResolveChunkedSettings(settings, storage, query) {
           await chrome.storage.local.remove(fallbackKey).catch(() => {});
           return committed.value;
         }
-        // "stale" — drop the record inside the lock (an unawaited remove could
-        // land after the lock and delete a NEWER record a writer just stored).
+        // "stale" — another device committed a newer generation. Confirm the
+        // replacement actually READS before destroying this device's last
+        // known value: sync propagates per item, so the new metadata can
+        // arrive before its chunks. The remove stays inside the lock (an
+        // unawaited remove could land after it and delete a NEWER record a
+        // writer just stored).
+        const replacement = await pbpReadChunkedSyncResult(key, stored, SETTINGS_DEFAULTS[key]);
+        if (!replacement.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback), SETTINGS_DEFAULTS[key]);
         await chrome.storage.local.remove(fallbackKey).catch(() => {});
+        return replacement.value;
       }
       return pbpReadChunkedSyncValue(key, stored, SETTINGS_DEFAULTS[key]);
     });
@@ -1268,9 +1275,15 @@ async function pbpSyncGetLargeUnlocked(key, defaultValue) {
       await chrome.storage.local.remove(fallbackKey).catch(() => {});
       return committed.value;
     }
-    // "stale" — another device committed a newer generation; drop the record
-    // inside the lock so the remove cannot race a writer's fresh fallback.
+    // "stale" — another device committed a newer generation. Confirm the
+    // replacement actually READS before destroying this device's last known
+    // value (sync propagates per item: metadata can arrive before chunks).
+    // The remove stays inside the lock so it cannot race a writer's fresh
+    // record.
+    const replacement = await pbpReadChunkedSyncResult(key, meta[key], defaultValue);
+    if (!replacement.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
     await chrome.storage.local.remove(fallbackKey).catch(() => {});
+    return replacement.value;
   }
   return pbpReadChunkedSyncValue(key, meta[key], defaultValue);
 }
@@ -1290,9 +1303,18 @@ const PBP_SYNC_BOOKKEEPING_KEYS = ["syncApiKeys", "_migrationV2", "optOverlayInL
 // SETTINGS_DEFAULTS (chunk metadata/chunks), and values equal to the defaults
 // (including "" credential tombstones) all count as noise: telling an
 // established single-device user that "the cloud already has settings" makes
-// Confirm silently discard every local setting.
+// Confirm silently discard every local setting. Theme CONTENT is the
+// exception: customOverlayCSS/savedThemes (and legacy customCSS) live outside
+// SETTINGS_DEFAULTS, but sync-off write paths never route them to sync, so
+// their presence is an unambiguous real-profile signal — without it a
+// theme-only profile is misjudged hollow and the overwrite migration deletes
+// the other device's theme. themePresetKey stays excluded: migrationV2 used
+// to write it from sync-off devices, so alone it proves nothing.
 function pbpCloudHasMeaningfulSyncSettings(cloud) {
   if (!cloud || typeof cloud !== "object") return false;
+  if (["customOverlayCSS", "savedThemes", "customCSS"].some((key) => cloud[key] !== undefined)) {
+    return true;
+  }
   return Object.keys(cloud).some((key) => {
     if (PBP_SYNC_BOOKKEEPING_KEYS.includes(key)) return false;
     if (!Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, key)) return false;
@@ -1501,6 +1523,11 @@ function pbpStripExportTargetTokens(ets) {
 // Migration-scrub variant: removes tokens only, leaving a legacy plaintext
 // webhook URL in the sync copy. See pbpPlanSecretMigration for why deleting
 // that URL account-wide would strand late-upgrading devices.
+// TODO(two-release cleanup): a dormant export-target config never rewrites
+// itself, so this residue can outlive its purpose. Once a release with the
+// local-fill logic has been out long enough that every device of an account
+// has its own copy, a later release should scrub the legacy sync URL in one
+// shot.
 function pbpStripExportTargetTokensOnly(ets) {
   const cleaned = {};
   if (!ets || typeof ets !== "object") return cleaned;
@@ -1780,7 +1807,18 @@ async function pbpMirrorSyncSecretsToLocalUnlocked() {
     if (typeof snapshot[key] === "string" && snapshot[key] !== "") mirror[key] = snapshot[key];
   });
   if (pbpExportTargetsHaveSecrets(snapshot.exportTargets)) {
-    mirror.exportTargets = snapshot.exportTargets;
+    // Merge, never replace: the cloud snapshot wins where it carries a value,
+    // but a credential only THIS device holds (a webhook the enabling device
+    // never configured) must survive — wholesale replacement is the exact
+    // "cloud void deletes the only real copy" destruction the flat fields
+    // above already guard against.
+    let localTargets;
+    try {
+      const local = await chrome.storage.local.get(["exportTargets"]);
+      localTargets = local.exportTargets;
+    } catch (_) {}
+    mirror.exportTargets = pbpMergeExportTargetSecrets(
+      snapshot.exportTargets, localTargets, { fillWins: false });
   }
   if (!Object.keys(mirror).length) return false;
   await chrome.storage.local.set(mirror);

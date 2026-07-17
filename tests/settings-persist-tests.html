@@ -382,13 +382,18 @@ async function run() {
         JSON.stringify(env.local.customSummaryPrompt_localFallback) === priorFallback &&
         await syncGetLarge("customSummaryPrompt", "") === "saved only on this device");
 
-      // Another device commits AFTER this device's fallback was stranded: the
-      // newer committed generation wins and the stale record is dropped, so
-      // that device's future updates are never shadowed (previously the
-      // stranded record won forever and cloud changes stayed invisible here).
-      env.sync["customSummaryPrompt_zzforeign_0"] = "newer value from another device";
+      // Another device commits AFTER this device's fallback was stranded.
+      // chrome.storage.sync propagates per ITEM: while only the metadata has
+      // arrived, the last-known fallback must survive — deleting it before
+      // the chunks land would flash factory defaults and invite an overwrite
+      // based on them.
       env.sync.customSummaryPrompt = { _chunks: 1, _generation: "zzforeign" };
-      check("E1b a newer foreign generation beats the stranded quota fallback",
+      check("E1b foreign metadata without its chunks keeps the last-known fallback value",
+        await syncGetLarge("customSummaryPrompt", "") === "saved only on this device");
+      check("E1b the record survives until the replacement is actually readable",
+        "customSummaryPrompt_localFallback" in env.local);
+      env.sync["customSummaryPrompt_zzforeign_0"] = "newer value from another device";
+      check("E1b a newer readable foreign generation beats the stranded quota fallback",
         await syncGetLarge("customSummaryPrompt", "") === "newer value from another device");
       check("E1b the stale fallback record is dropped so it cannot shadow future cloud updates",
         !("customSummaryPrompt_localFallback" in env.local));
@@ -658,6 +663,19 @@ async function run() {
   check("E4 strip: does not mutate input", etsIn.github.token === "obf:ghtok");
   check("E4 strip: null/undefined -> {}", Object.keys(pbpStripExportTargetTokens(null)).length === 0
     && Object.keys(pbpStripExportTargetTokens(undefined)).length === 0);
+
+  // -- pbpCloudHasMeaningfulSyncSettings (sync-enable conflict gate) --
+  check("E4 meaningful: bookkeeping residue + defaults + tombstones = hollow cloud",
+    !pbpCloudHasMeaningfulSyncSettings({
+      syncApiKeys: false, _migrationV2: true, optOverlayInLocal: false,
+      themePresetKey: "dracula", pinboardToken: "",
+    }));
+  check("E4 meaningful: one non-default ordinary setting marks a real profile",
+    pbpCloudHasMeaningfulSyncSettings({ optTheme: "dark" }));
+  check("E4 meaningful: theme content marks a real profile even when everything else is default",
+    pbpCloudHasMeaningfulSyncSettings({ customOverlayCSS: { _chunks: 2, _generation: "g1" } }) &&
+    pbpCloudHasMeaningfulSyncSettings({ savedThemes: "[]" }) &&
+    pbpCloudHasMeaningfulSyncSettings({ customCSS: "body{color:red}" }));
 
   // Routing still treats the webhook URL as a secret (strip/overlay above),
   // but marker INFERENCE must not: previous releases synced the URL as an
@@ -1475,6 +1493,24 @@ async function run() {
       localArea.pinboardToken === "obf:cloud-pinboard" && localArea.openaiApiKey === "obf:cloud-openai" &&
       localArea.exportTargets.webhook.url === "obf:cloud-url" &&
       localArea.exportTargets.webhook.token === "obf:cloud-auth");
+
+    // Regression (420f35d review): a keys-on snapshot published by a device
+    // that never configured some target must not wholesale-replace this
+    // device's local copy — the mirror merges, keeping credentials only THIS
+    // device holds.
+    localArea.exportTargets = {
+      webhook: { enabled: true, url: "obf:local-only-url", token: "obf:local-only-auth" },
+    };
+    Object.assign(syncArea, {
+      syncApiKeys: true,
+      exportTargets: { github: { enabled: true, token: "obf:cloud-gh" }, webhook: { enabled: true } },
+    });
+    await pbpMigrateSecretsToLocal();
+    check("E5 keys-on mirror merges instead of replacing: local-only webhook credentials survive",
+      localArea.exportTargets.github.token === "obf:cloud-gh" &&
+      localArea.exportTargets.webhook.url === "obf:local-only-url" &&
+      localArea.exportTargets.webhook.token === "obf:local-only-auth");
+    syncArea.syncApiKeys = false;
     delete localArea.pinboardToken;
     delete localArea.openaiApiKey;
     delete localArea.exportTargets;
@@ -2300,6 +2336,7 @@ async function run() {
     const syncWrites = [], localWrites = [], localRemoves = [], largeWrites = [];
     let settingsWrites = 0;
     let largeError = null;
+    let e9SyncOn = false; // flips the routed area to exercise both overlay paths
     try {
       globalThis.chrome = {
         storage: {
@@ -2309,7 +2346,7 @@ async function run() {
             remove: () => Promise.resolve(),
           },
           local: {
-            get: (defaults) => Promise.resolve(Object.assign({}, defaults, { optSyncEnabled: false, syncApiKeys: false })),
+            get: (defaults) => Promise.resolve(Object.assign({}, defaults, { optSyncEnabled: e9SyncOn, syncApiKeys: false })),
             set: (data) => { localWrites.push(data); return Promise.resolve(); },
             remove: (keys) => { localRemoves.push(keys); return Promise.resolve(); },
           },
@@ -2338,13 +2375,24 @@ async function run() {
       check("E9 synced overlay removes stale fallback data",
         localRemoves.at(-1) === "customOverlayCSS_localFallback");
 
-      const syncCallsBeforeOversize = largeWrites.length;
       const oversizeCss = "中".repeat(Math.floor(OVERLAY_BYTE_LIMIT / 3) + 1);
-      const oversizeResult = await saveOverlayWithFallback(oversizeCss);
-      check("E9 multi-byte CSS over 50 KB is preserved to the local fallback instead of throwing",
-        oversizeResult.fellBackToLocal === true &&
+      // Sync OFF: the 50 KB cap is a sync-area policy — the local area has no
+      // per-item limit and its readers never consult the fallback key, so the
+      // value must store through the NORMAL path.
+      const syncOffOversize = await saveOverlayWithFallback(oversizeCss);
+      check("E9 sync-off: over-limit CSS stores normally in the local area (fallback key would be invisible there)",
+        syncOffOversize.fellBackToLocal === false && largeWrites.at(-1).value === oversizeCss);
+
+      // Sync ON: the policy cap applies; the value is preserved to this
+      // device's local fallback instead of throwing.
+      e9SyncOn = true;
+      _settingsStorageCache = null;
+      const syncCallsBeforeOversize = largeWrites.length;
+      const syncOnOversize = await saveOverlayWithFallback(oversizeCss);
+      check("E9 sync-on: over-limit CSS is preserved to the device-local fallback instead of throwing",
+        syncOnOversize.fellBackToLocal === true &&
         localWrites.at(-1).customOverlayCSS_localFallback === oversizeCss);
-      check("E9 over-limit CSS never attempts the sync write",
+      check("E9 sync-on: over-limit CSS never attempts the sync write",
         largeWrites.length === syncCallsBeforeOversize);
       // The options FORM still rejects oversize input up front — only the
       // restore/import paths must preserve legacy data instead of refusing it.
@@ -2357,8 +2405,8 @@ async function run() {
         { _schemaVersion: 2, optTheme: "dark", customOverlayCSS: oversizeCss },
         { exportableKeys: ["optTheme"], saveOverlayWithFallback }
       );
-      check("E9 over-limit backup CSS imports with the rest of the settings (overlay lands in the local fallback)",
-        oversizeImport.statusKey === "importedReload" &&
+      check("E9 over-limit backup CSS imports but reports importPartial (overlay reached this device only)",
+        oversizeImport.statusKey === "importPartial" &&
         settingsWrites === settingsBeforeOversizeImport + 1 &&
         localWrites.at(-1).customOverlayCSS_localFallback === oversizeCss);
 
@@ -2368,6 +2416,16 @@ async function run() {
         quota.fellBackToLocal === true);
       check("E9 quota fallback stays local without a cross-device flag",
         localWrites.at(-1).customOverlayCSS_localFallback === "quota-css" && syncWrites.length === 0);
+
+      // A REAL syncSetLarge quota fallback already stored a freshness-stamped
+      // record; the helper must not overwrite it with a plain string (plain
+      // strings classify as permanently "fresh" and would shadow every future
+      // cloud commit — the exact class the _base machinery fixes).
+      largeError = Object.assign(new Error("QUOTA_BYTES quota exceeded"), { pbpFellBackToLocal: true });
+      const localWritesBeforeFlagged = localWrites.length;
+      const flaggedQuota = await saveOverlayWithFallback("flagged-css");
+      check("E9 a syncSetLarge-flagged quota fallback keeps its freshness record (no plain-string overwrite)",
+        flaggedQuota.fellBackToLocal === true && localWrites.length === localWritesBeforeFlagged);
 
       const fallbackWrites = localWrites.length;
       largeError = new Error("storage unavailable");
@@ -2395,6 +2453,14 @@ async function run() {
         optionsSource.indexOf('document.addEventListener("DOMContentLoaded"')
       );
       check("E9 overlay persistence helper never writes UI status", !helperSource.includes("auto-save-status"));
+      // Source contracts for the options-init migration fixes (that code runs
+      // only inside the real page bootstrap, so pin its load-bearing lines).
+      check("E9 migrationV2 treats only legacy customCSS as old data (a bare preset key must not trigger the erase path)",
+        optionsSource.includes("const hasOldData = !!oldCSS;"));
+      check("E9 migrationV2 done-flag is read from BOTH storage areas",
+        optionsSource.includes("localFlags._migrationV2 === true || syncFlags._migrationV2 === true"));
+      check("E9 stray preset adoption probes own-property so a user-chosen None is never resurrected",
+        optionsSource.includes('!("themePresetKey" in probe)'));
       check("E9 saveAll converts rejected persistence into a visible resolved failure",
         /catch \(error\) \{\s*return reportAutoSaveFailure\(error\)/.test(optionsSource) &&
         /pbpQueueOptionsSave\(autoSaveState, saveAll\)\.catch\(reportAutoSaveFailure\)/.test(optionsSource));

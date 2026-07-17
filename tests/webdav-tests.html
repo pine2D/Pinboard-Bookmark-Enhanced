@@ -85,6 +85,8 @@ assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "http://192.168.1.2/dav", webdavAu
   "blocked endpoint creates no automatic alarm");
 assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "https://dav.example.com/dav", webdavAutoPush: "hourly", webdavUser: "bob", webdavPass: "" }), 0,
   "username without a password never schedules — every tick would 401 forever");
+assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "https://dav.example.com/dav", webdavAutoPush: "hourly", webdavUser: "", webdavPass: "secret" }), 0,
+  "password without a username never schedules either (half-configured Basic auth)");
 assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "obf:" + btoa("https://dav.example.com/dav"), webdavAutoPush: "hourly" }), 60,
   "transitional obf-wrapped URL is healed before the origin gate");
 
@@ -200,6 +202,9 @@ section("pbpWebdavBuildRequest");
   assert(!("If-None-Match" in push.headers),
     "unknown revision pushes unconditionally — create-only If-None-Match would 412 forever against a pre-existing remote backup");
   assert(!("If-Match" in push.headers), "unknown revision push does not send If-Match");
+  const scheduledCreate = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { createOnly: true }));
+  assertEq(scheduledCreate.headers["If-None-Match"], "*",
+    "createOnly (scheduled unknown-revision) push sends If-None-Match:* so automation cannot blind-overwrite");
 
   const updatePush = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { etag: '"v1"' }));
   assertEq(updatePush.headers["If-Match"], '"v1"', "known remote revision is updated with If-Match");
@@ -576,6 +581,50 @@ async function runChromeLayerTests() {
     const weakReq = pbpWebdavBuildRequest("push", Object.assign({}, weakCfg, weakRevision));
     check("weak ETag is never echoed into If-Match and degrades to known-exists mode",
       weakRevision.known && weakRevision.etag === "" && weakReq.headers["If-Match"] === "*");
+
+    // Scheduled pushes (no cfgOverride: storage-sourced cfg) with an unknown
+    // revision are create-only; automation must never blind-overwrite a remote
+    // backup this device has never seen. A 412 seeds known-exists ONCE for an
+    // upgrader that provably pushed before (webdavLastPush.ok), otherwise it
+    // surfaces as a conflict for the user to resolve manually.
+    Object.assign(casLocal, {
+      webdavUrl: "https://dav.example.com/sched/",
+      webdavUser: "",
+      webdavPass: "",
+      optSyncEnabled: false,
+    });
+    delete casLocal[PBP_WEBDAV_ETAG_STATE_KEY];
+    delete casLocal.webdavLastPush;
+    const schedRequests = [];
+    globalThis.fetch = (_url, opts) => {
+      schedRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
+      if (opts.method === "PUT") {
+        if (opts.headers["If-None-Match"] === "*") {
+          return Promise.resolve({ ok: false, status: 412, headers: { get: () => null } });
+        }
+        return Promise.resolve({ ok: true, status: 200, headers: { get: () => '"sched-v1"' } });
+      }
+      throw new Error("unexpected scheduled request " + opts.method);
+    };
+    const schedFresh = await pbpWebdavPush();
+    const schedFreshPuts = schedRequests.filter((request) => request.method === "PUT");
+    check("scheduled unknown-revision push is create-only and reports conflict instead of overwriting",
+      !schedFresh.ok && schedFresh.error === "conflict" &&
+      schedFreshPuts.length === 1 && schedFreshPuts[0].headers["If-None-Match"] === "*");
+
+    schedRequests.length = 0;
+    casLocal.webdavLastPush = { ts: 1, ok: true };
+    const schedUpgrade = await pbpWebdavPush();
+    const schedUpgradePuts = schedRequests.filter((request) => request.method === "PUT");
+    check("scheduled 412 with a prior successful push (upgrader) retries once with If-Match:*",
+      schedUpgrade.ok && schedUpgradePuts.length === 2 &&
+      schedUpgradePuts[0].headers["If-None-Match"] === "*" &&
+      schedUpgradePuts[1].headers["If-Match"] === "*" &&
+      !("If-None-Match" in schedUpgradePuts[1].headers));
+    check("upgrader retry remembers the server ETag for future CAS pushes",
+      deobfuscateKey(casLocal[PBP_WEBDAV_ETAG_STATE_KEY].target) === pbpWebdavFileUrl("https://dav.example.com/sched/") &&
+      casLocal[PBP_WEBDAV_ETAG_STATE_KEY].etag === '"sched-v1"');
 
     globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, headers: { get: () => '"x"' }, json: async () => ({ _schemaVersion: 3 }) });
     const futureSchema = await pbpWebdavPull(casCfg);

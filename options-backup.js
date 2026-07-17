@@ -163,9 +163,17 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
   }
   const importRes = await persistSettings(safeData);
   if (!importRes.ok) throw importRes.error || new Error("settings import failed");
+  // Anything that only reached this device's local storage (sync quota, or an
+  // oversize overlay) must downgrade the status to importPartial — reporting
+  // a clean success makes a multi-device user delete the backup file
+  // believing the restore synced everywhere.
+  let fellBackToLocal = !!importRes.fellBackToLocal;
 
   if (schemaVersion >= 2) {
-    if (customOverlayCSS !== undefined) await saveOverlayWithFallback(customOverlayCSS);
+    if (customOverlayCSS !== undefined) {
+      const overlayRes = await saveOverlayWithFallback(customOverlayCSS);
+      fellBackToLocal = fellBackToLocal || !!(overlayRes && overlayRes.fellBackToLocal);
+    }
   } else {
     // v1 → v2: detect preset match, derive overlay
     const themes = typeof PINBOARD_THEMES === "object" && PINBOARD_THEMES ? PINBOARD_THEMES : {};
@@ -191,10 +199,11 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
       newOverlay = allowed.some(c => c && c.trim() === customCSS.trim()) ? "" : customCSS;
     }
     await (await getSettingsStorage()).set({ themePresetKey: resolvedKey || "" });
-    await saveOverlayWithFallback(newOverlay);
+    const overlayRes = await saveOverlayWithFallback(newOverlay);
+    fellBackToLocal = fellBackToLocal || !!(overlayRes && overlayRes.fellBackToLocal);
   }
 
-  let themesStatusKey = "importedReload";
+  let themesStatusKey = fellBackToLocal ? "importPartial" : "importedReload";
   if (importedThemes !== undefined) {
     try {
       await syncSetLarge("savedThemes", importedThemes);

@@ -38,12 +38,18 @@ async function pbpRevokeLegacyAllSitesPermission(permissionApi) {
 async function saveOverlayWithFallback(value) {
   const ssl = (typeof globalThis !== "undefined" && globalThis.__pbpTestSyncSetLarge)
     ? globalThis.__pbpTestSyncSetLarge : syncSetLarge;
-  // Oversize CSS (legacy themes/imports predating the 50 KB form gate) goes
-  // straight to this device's local fallback instead of throwing: the sync
-  // area has a policy cap, but a restore path must never refuse user data.
-  // The form path still rejects oversize input via pbpSaveOptionsSnapshot's
-  // assertOverlay before it ever reaches here.
-  if (pbpOverlayByteLength(value) > OVERLAY_BYTE_LIMIT) {
+  // Oversize CSS (legacy themes/imports predating the 50 KB form gate) must
+  // never be refused on a restore path — but the 50 KB cap is a SYNC-area
+  // policy. When settings sync is off, the local area stores the value
+  // directly (no per-item limit) and the local-route readers never consult
+  // the fallback key, so the fallback write would make the CSS invisible;
+  // fall through to the normal path there. The form path still rejects
+  // oversize input via pbpSaveOptionsSnapshot's assertOverlay.
+  if (pbpOverlayByteLength(value) > OVERLAY_BYTE_LIMIT &&
+      (await getSettingsStorage()) !== chrome.storage.local) {
+    // Deliberately a plain string, not a freshness record: this oversize CSS
+    // exists nowhere else, so it must never be auto-dropped in favor of a
+    // later foreign sync commit.
     await chrome.storage.local.set({ customOverlayCSS_localFallback: value });
     return { fellBackToLocal: true };
   }
@@ -53,7 +59,14 @@ async function saveOverlayWithFallback(value) {
     return { fellBackToLocal: false };
   } catch (e) {
     if (!(e && e.pbpFellBackToLocal) && !/QUOTA|quota/i.test(e && e.message || "")) throw e;
-    await chrome.storage.local.set({ customOverlayCSS_localFallback: value });
+    // When syncSetLarge itself fell back it already stored a freshness-
+    // stamped fallback record; rewriting it as a plain string would classify
+    // as permanently "fresh" and shadow every future cloud commit. Only the
+    // test seam (quota message without the marker) still stores the raw
+    // value directly.
+    if (!(e && e.pbpFellBackToLocal)) {
+      await chrome.storage.local.set({ customOverlayCSS_localFallback: value });
+    }
     return { fellBackToLocal: true };
   }
 }
@@ -874,21 +887,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     const settingsArea = await getSettingsStorage();
     if (settingsArea !== chrome.storage.sync && !s.themePresetKey) {
       try {
-        const stray = await chrome.storage.sync.get({ themePresetKey: "" });
-        if (typeof stray.themePresetKey === "string" && stray.themePresetKey) {
-          await settingsArea.set({ themePresetKey: stray.themePresetKey });
-          s.themePresetKey = stray.themePresetKey;
+        // Own-property probe: adopt only when this device NEVER stored the
+        // key. A user-chosen "None" persists an own "" — resurrecting the
+        // stray preset over that explicit choice would make None impossible
+        // to keep across options reopens.
+        const probe = await settingsArea.get("themePresetKey");
+        if (!("themePresetKey" in probe)) {
+          const stray = await chrome.storage.sync.get({ themePresetKey: "" });
+          if (typeof stray.themePresetKey === "string" && stray.themePresetKey) {
+            await settingsArea.set({ themePresetKey: stray.themePresetKey });
+            s.themePresetKey = stray.themePresetKey;
+          }
         }
       } catch (_) {}
     }
     let migrated = false;
     try {
-      const flags = await settingsArea.get({ _migrationV2: false });
-      migrated = flags._migrationV2 === true;
-      if (!migrated && settingsArea !== chrome.storage.sync) {
-        const legacyFlags = await chrome.storage.sync.get({ _migrationV2: false });
-        migrated = legacyFlags._migrationV2 === true;
-      }
+      // Read the done-flag from BOTH areas unconditionally: it may live in
+      // local (set while settings sync was off) or in sync (set while on, or
+      // by legacy builds), and the sync toggle does not carry it across. A
+      // one-way check re-ran the migration after an OFF->ON toggle, and its
+      // newOverlay="" write wiped the freshly synced overlay.
+      const [localFlags, syncFlags] = await Promise.all([
+        chrome.storage.local.get({ _migrationV2: false }),
+        chrome.storage.sync.get({ _migrationV2: false }),
+      ]);
+      migrated = localFlags._migrationV2 === true || syncFlags._migrationV2 === true;
     } catch (_) {}
     const oldCSSFromSync = await syncGetLarge("customCSS", "");
     let oldCSS = oldCSSFromSync;
@@ -897,7 +921,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (localOldCSS.customCSS) oldCSS = localOldCSS.customCSS;
     }
     const oldKeyForMigration = s.themePresetKey || "";
-    const hasOldData = !!oldCSS || !!oldKeyForMigration;
+    // v1 evidence is the legacy customCSS ONLY. A bare themePresetKey is v2
+    // state (any fresh user who picked a preset); counting it made this block
+    // re-run with oldCSS="" and the newOverlay="" write below ERASED the
+    // user's overlay on their next options open. When real v1 CSS exists the
+    // stored key still guides resolution; when it doesn't there is nothing to
+    // migrate.
+    const hasOldData = !!oldCSS;
     if (!migrated && hasOldData) {
       try {
         // A2 Phase 3: migration uses PINBOARD_THEMES so we must load it now.
@@ -933,15 +963,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         newOverlay = matchesPreset ? "" : oldCSS;
       }
       try {
-        // Cap synced overlay at 50 KB; oversize data stays available locally.
-        if (pbpOverlayByteLength(newOverlay) > OVERLAY_BYTE_LIMIT) {
+        // The 50 KB cap is a SYNC-area policy. When settings sync is off the
+        // local area stores the value directly (no per-item limit) and the
+        // local-route readers never consult the fallback key, so writing the
+        // fallback there would make the migrated CSS invisible.
+        if (settingsArea !== chrome.storage.local &&
+            pbpOverlayByteLength(newOverlay) > OVERLAY_BYTE_LIMIT) {
           await chrome.storage.local.set({ customOverlayCSS_localFallback: newOverlay });
         } else {
           await syncSetLarge("customOverlayCSS", newOverlay);
           await chrome.storage.local.remove("customOverlayCSS_localFallback");
         }
-        // Persist resolved preset key + done-flag in the ACTIVE settings area
-        // (sync only when settings sync is on) so readers actually see them.
+        // Persist resolved preset key in the ACTIVE settings area (sync only
+        // when settings sync is on) so readers actually see it.
         await settingsArea.set({ themePresetKey: resolvedKey || "" });
         // Cleanup old customCSS (sync chunks + local backup)
         const meta = await chrome.storage.sync.get("customCSS");
@@ -950,7 +984,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           await chrome.storage.sync.remove(["customCSS", ...oldChunks]);
         }
         await chrome.storage.local.remove("customCSS");
-        await settingsArea.set({ _migrationV2: true });
+        // Done-flag goes to LOCAL always (readable no matter how the sync
+        // toggle moves later) and additionally to sync when that is the
+        // active area; the read side above checks both.
+        await chrome.storage.local.set({ _migrationV2: true });
+        if (settingsArea === chrome.storage.sync) await settingsArea.set({ _migrationV2: true });
         // Update s.* with new schema for the rest of the page init
         s.themePresetKey = resolvedKey || "";
         s.customOverlayCSS = newOverlay;
