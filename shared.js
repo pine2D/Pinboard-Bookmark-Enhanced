@@ -707,7 +707,10 @@ function pbpSanitizeBackupThemes(value) {
     if (!pbpIsPlainRecord(theme) || typeof theme.name !== "string" || typeof theme.css !== "string") {
       throw pbpBackupValueError(`savedThemes[${index}]`);
     }
-    pbpAssertOverlaySize(theme.css);
+    // No size gate: legacy themes saved before the 50 KB form limit existed
+    // are still the user's data. Throwing here would kill every export and
+    // WebDAV push wholesale; the sync write path (syncSetLarge) already
+    // chunks large values and falls back to local storage on quota.
     return { name: theme.name, css: theme.css };
   });
 }
@@ -1022,8 +1025,12 @@ function pbpDecodeLargeValue(raw, defaultValue) {
   return pbpDecodeLargeResult(raw, defaultValue).value;
 }
 
-function pbpLargeFallbackRecord(value, generation) {
-  return { _pbpLargeFallback: 1, _generation: generation, value };
+// _base records the sync generation this fallback SUPERSEDED (null when the
+// key had no committed generation at write time). It lets readers tell "sync
+// has not moved since my failed write" (fallback is the newest value) apart
+// from "another device committed a newer generation afterwards" (cloud wins).
+function pbpLargeFallbackRecord(value, generation, baseGeneration = null) {
+  return { _pbpLargeFallback: 1, _generation: generation, _base: baseGeneration, value };
 }
 
 function pbpLargeFallbackValue(raw) {
@@ -1033,6 +1040,24 @@ function pbpLargeFallbackValue(raw) {
 function pbpLargeFallbackMatchesMeta(raw, stored) {
   return !!(raw && raw._pbpLargeFallback === 1 && typeof raw._generation === "string" &&
     stored && typeof stored === "object" && stored._generation === raw._generation);
+}
+
+// Classifies a quota-fallback record against the CURRENT sync metadata.
+//   "committed": the record's own write generation actually landed in sync
+//                (crash between commit and cleanup) — read the cloud value.
+//   "fresh":     sync still shows the generation the record was written
+//                against (or a legacy record with no _base) — the fallback is
+//                the newest value and must win.
+//   "stale":     sync moved to a THIRD generation: another device committed a
+//                newer value after this record was stranded. Cloud wins, and
+//                keeping the record would shadow every future cloud update.
+function pbpLargeFallbackFreshness(record, stored) {
+  if (pbpLargeFallbackMatchesMeta(record, stored)) return "committed";
+  if (!(record && record._pbpLargeFallback === 1)) return "fresh"; // legacy plain value
+  if (!Object.prototype.hasOwnProperty.call(record, "_base")) return "fresh";
+  const current = stored && typeof stored === "object" && typeof stored._generation === "string"
+    ? stored._generation : null;
+  return current === record._base ? "fresh" : "stale";
 }
 
 function pbpNewChunkGeneration() {
@@ -1129,20 +1154,34 @@ async function pbpResolveChunkedSettings(settings, storage, query) {
   }
   for (const key of requested) {
     out[key] = await pbpWithLargeStorageLock(key, async () => {
+      // Re-read the metadata INSIDE the lock: the row captured by the caller's
+      // bulk get() may predate a concurrent generation swap whose stale chunks
+      // are already deleted (same rule as pbpSyncGetLargeUnlocked).
+      let stored = out[key];
+      try {
+        const fresh = await storage.get(key);
+        stored = fresh[key];
+      } catch (_) {}
       const fallbackKey = pbpLargeFallbackKey(key);
       let fallbacks = {};
       try { fallbacks = await chrome.storage.local.get(fallbackKey); } catch (_) {}
       const fallback = fallbacks[fallbackKey];
-      const hasFallback = Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey);
-      const matchesMeta = hasFallback && pbpLargeFallbackMatchesMeta(fallback, out[key]);
-      if (hasFallback) {
-        if (!matchesMeta) return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback), SETTINGS_DEFAULTS[key]);
-        const committed = await pbpReadChunkedSyncResult(key, out[key], SETTINGS_DEFAULTS[key]);
-        if (!committed.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback), SETTINGS_DEFAULTS[key]);
-        chrome.storage.local.remove(fallbackKey).catch(() => {});
-        return committed.value;
+      if (Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) {
+        const freshness = pbpLargeFallbackFreshness(fallback, stored);
+        if (freshness === "fresh") {
+          return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback), SETTINGS_DEFAULTS[key]);
+        }
+        if (freshness === "committed") {
+          const committed = await pbpReadChunkedSyncResult(key, stored, SETTINGS_DEFAULTS[key]);
+          if (!committed.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback), SETTINGS_DEFAULTS[key]);
+          await chrome.storage.local.remove(fallbackKey).catch(() => {});
+          return committed.value;
+        }
+        // "stale" — drop the record inside the lock (an unawaited remove could
+        // land after the lock and delete a NEWER record a writer just stored).
+        await chrome.storage.local.remove(fallbackKey).catch(() => {});
       }
-      return pbpReadChunkedSyncValue(key, out[key], SETTINGS_DEFAULTS[key]);
+      return pbpReadChunkedSyncValue(key, stored, SETTINGS_DEFAULTS[key]);
     });
   }
   return out;
@@ -1169,12 +1208,15 @@ async function pbpSyncSetLargeUnlocked(key, value) {
     return;
   }
   const generation = pbpNewChunkGeneration();
+  const priorMeta = all[key];
+  const baseGeneration = priorMeta && typeof priorMeta === "object" && typeof priorMeta._generation === "string"
+    ? priorMeta._generation : null;
   let existingFallback = {};
   try { existingFallback = await chrome.storage.local.get(fallbackKey); } catch (_) {}
   const hadFallback = Object.prototype.hasOwnProperty.call(existingFallback, fallbackKey);
   const previousFallback = existingFallback[fallbackKey];
   if (hadFallback) {
-    await chrome.storage.local.set({ [fallbackKey]: pbpLargeFallbackRecord(value, generation) });
+    await chrome.storage.local.set({ [fallbackKey]: pbpLargeFallbackRecord(value, generation, baseGeneration) });
   }
   const chunks = pbpSplitSyncString(key, generation, str);
   const chunkData = {};
@@ -1186,7 +1228,7 @@ async function pbpSyncSetLargeUnlocked(key, value) {
   } catch (e) {
     await chrome.storage.sync.remove(newChunkKeys).catch(() => {});
     if (/QUOTA|quota/i.test(e && e.message || "")) {
-      await chrome.storage.local.set({ [fallbackKey]: pbpLargeFallbackRecord(value, generation) });
+      await chrome.storage.local.set({ [fallbackKey]: pbpLargeFallbackRecord(value, generation, baseGeneration) });
       try { e.pbpFellBackToLocal = true; } catch (_) {}
     } else if (hadFallback) {
       // The pre-write generation stamp protects a successful metadata commit
@@ -1216,20 +1258,47 @@ async function pbpSyncGetLargeUnlocked(key, defaultValue) {
   let fallback = {};
   try { fallback = await chrome.storage.local.get(fallbackKey); } catch (_) {}
   const meta = await chrome.storage.sync.get(key);
-  const hasFallback = Object.prototype.hasOwnProperty.call(fallback, fallbackKey);
-  const matchesMeta = hasFallback && pbpLargeFallbackMatchesMeta(fallback[fallbackKey], meta[key]);
-  if (hasFallback) {
-    if (!matchesMeta) return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback[fallbackKey]), defaultValue);
-    const committed = await pbpReadChunkedSyncResult(key, meta[key], defaultValue);
-    if (!committed.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback[fallbackKey]), defaultValue);
-    chrome.storage.local.remove(fallbackKey).catch(() => {});
-    return committed.value;
+  if (Object.prototype.hasOwnProperty.call(fallback, fallbackKey)) {
+    const record = fallback[fallbackKey];
+    const freshness = pbpLargeFallbackFreshness(record, meta[key]);
+    if (freshness === "fresh") return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+    if (freshness === "committed") {
+      const committed = await pbpReadChunkedSyncResult(key, meta[key], defaultValue);
+      if (!committed.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+      await chrome.storage.local.remove(fallbackKey).catch(() => {});
+      return committed.value;
+    }
+    // "stale" — another device committed a newer generation; drop the record
+    // inside the lock so the remove cannot race a writer's fresh fallback.
+    await chrome.storage.local.remove(fallbackKey).catch(() => {});
   }
   return pbpReadChunkedSyncValue(key, meta[key], defaultValue);
 }
 
 function syncGetLarge(key, defaultValue) {
   return pbpWithLargeStorageLock(key, () => pbpSyncGetLargeUnlocked(key, defaultValue));
+}
+
+// Keys that legacy releases wrote to chrome.storage.sync even while settings
+// sync was OFF (overlay bookkeeping, migrationV2's flag and its stray
+// themePresetKey), so their presence proves nothing about a real cloud
+// profile. Used by the sync-enable conflict check.
+const PBP_SYNC_BOOKKEEPING_KEYS = ["syncApiKeys", "_migrationV2", "optOverlayInLocal", "themePresetKey"];
+
+// True iff the sync area holds settings worth offering as "use cloud?" when a
+// device first enables settings sync. Bookkeeping keys, keys outside
+// SETTINGS_DEFAULTS (chunk metadata/chunks), and values equal to the defaults
+// (including "" credential tombstones) all count as noise: telling an
+// established single-device user that "the cloud already has settings" makes
+// Confirm silently discard every local setting.
+function pbpCloudHasMeaningfulSyncSettings(cloud) {
+  if (!cloud || typeof cloud !== "object") return false;
+  return Object.keys(cloud).some((key) => {
+    if (PBP_SYNC_BOOKKEEPING_KEYS.includes(key)) return false;
+    if (!Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, key)) return false;
+    try { return JSON.stringify(cloud[key]) !== JSON.stringify(SETTINGS_DEFAULTS[key]); }
+    catch (_) { return true; }
+  });
 }
 
 // Options keeps a form snapshot and persists only values the user actually
@@ -1313,7 +1382,12 @@ async function persistSettings(data) {
   }
 }
 
-const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","webdavUrl","webdavUser","webdavPass"];
+// webdavUrl/webdavUser are deliberately NOT here: they are a server address and
+// a username, not secrets, and previous releases synced them as ordinary
+// settings — reclassifying them would strand every other device of a
+// settings-sync account without a copy once migration scrubbed the cloud
+// value. Only webdavPass is credential-routed.
+const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","webdavPass"];
 
 function pbpExportTargetSecretKeys(targetId) {
   return targetId === "webhook" ? ["token", "url"] : ["token"];
@@ -1326,15 +1400,21 @@ function pbpExportTargetsHaveSecrets(targets) {
     pbpExportTargetSecretKeys(targetId).some((key) => typeof cfg[key] === "string" && cfg[key] !== ""));
 }
 
+// Tokens only. Used where a webhook URL must NOT count as secret evidence:
+// previous releases synced it as an ordinary setting, so its presence in a
+// pre-marker cloud proves nothing about the user opting into key sync.
+function pbpExportTargetsHaveTokens(targets) {
+  if (!targets || typeof targets !== "object" || Array.isArray(targets)) return false;
+  return Object.values(targets).some((cfg) =>
+    cfg && typeof cfg === "object" && !Array.isArray(cfg) &&
+    typeof cfg.token === "string" && cfg.token !== "");
+}
+
 function pbpSyncPayloadHasSecrets(payload) {
   if (!payload || typeof payload !== "object") return false;
-  // webdavUser follows URL/password routing to keep one Basic-auth tuple
-  // coherent, but a legacy synced username alone is not evidence that the user
-  // opted into syncing secrets. Otherwise marker inference could unexpectedly
-  // switch a pre-marker profile away from its local API keys.
-  if (API_KEY_FIELDS.some((key) => key !== "webdavUser" &&
+  if (API_KEY_FIELDS.some((key) =>
       typeof payload[key] === "string" && payload[key] !== "")) return true;
-  return pbpExportTargetsHaveSecrets(payload.exportTargets);
+  return pbpExportTargetsHaveTokens(payload.exportTargets);
 }
 
 // Must run under pbp-secret-storage. syncApiKeys is one Chrome-account-wide
@@ -1358,19 +1438,7 @@ async function pbpReadSecretSyncStateUnlocked({
     syncApiKeys = localFlags.syncApiKeys === true || cloudHasSecrets;
     if (persistInferredState && localFlags.syncApiKeys === true && !cloudHasSecrets) {
       const local = await chrome.storage.local.get(API_KEY_FIELDS.concat(["exportTargets"]));
-      const payload = { syncApiKeys: true };
-      API_KEY_FIELDS.forEach((key) => {
-        payload[key] = Object.prototype.hasOwnProperty.call(local, key)
-          ? local[key]
-          : (SETTINGS_DEFAULTS[key] || "");
-      });
-      const mainTargets = Object.prototype.hasOwnProperty.call(cloud, "exportTargets")
-        ? cloud.exportTargets
-        : (Object.prototype.hasOwnProperty.call(local, "exportTargets")
-          ? local.exportTargets
-          : (SETTINGS_DEFAULTS.exportTargets || {}));
-      payload.exportTargets = pbpMergeExportTargetCredentials(mainTargets, local.exportTargets);
-      await chrome.storage.sync.set(payload);
+      await chrome.storage.sync.set(pbpBuildKeysOnSnapshot(local, cloud));
     } else if (persistInferredState) {
       await chrome.storage.sync.set({ syncApiKeys });
     }
@@ -1426,6 +1494,19 @@ function pbpStripExportTargetTokens(ets) {
   for (const [tid, cfg] of Object.entries(ets)) {
     cleaned[tid] = Object.assign({}, cfg);
     pbpExportTargetSecretKeys(tid).forEach((key) => { delete cleaned[tid][key]; });
+  }
+  return cleaned;
+}
+
+// Migration-scrub variant: removes tokens only, leaving a legacy plaintext
+// webhook URL in the sync copy. See pbpPlanSecretMigration for why deleting
+// that URL account-wide would strand late-upgrading devices.
+function pbpStripExportTargetTokensOnly(ets) {
+  const cleaned = {};
+  if (!ets || typeof ets !== "object") return cleaned;
+  for (const [tid, cfg] of Object.entries(ets)) {
+    cleaned[tid] = Object.assign({}, cfg);
+    delete cleaned[tid].token;
   }
   return cleaned;
 }
@@ -1510,6 +1591,61 @@ function pbpMergeExportTargetCredentials(mainTargets, localTargets) {
   ).exportTargets;
 }
 
+// Merge two exportTargets values KEEPING base credentials (unlike
+// pbpMergeExportTargetCredentials, which strips them first). Base owns target
+// existence and ordinary fields; fill's non-empty secret fields land on top.
+// fillWins=true lets fill overwrite a non-empty base secret (keys-on enable:
+// this device is opting ITS credentials in); fillWins=false only fills slots
+// the base left empty/missing (keys-off copy-down: cloud is the truth, local
+// only rescues credentials the cloud copy never carried).
+function pbpMergeExportTargetSecrets(baseTargets, fillTargets, { fillWins = true } = {}) {
+  const merged = {};
+  if (baseTargets && typeof baseTargets === "object" && !Array.isArray(baseTargets)) {
+    for (const [tid, cfg] of Object.entries(baseTargets)) {
+      merged[tid] = cfg && typeof cfg === "object" && !Array.isArray(cfg) ? Object.assign({}, cfg) : cfg;
+    }
+  }
+  if (fillTargets && typeof fillTargets === "object" && !Array.isArray(fillTargets)) {
+    for (const [tid, cfg] of Object.entries(fillTargets)) {
+      if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) continue;
+      for (const secretKey of pbpExportTargetSecretKeys(tid)) {
+        const value = cfg[secretKey];
+        if (typeof value !== "string" || value === "") continue;
+        const base = merged[tid];
+        const baseIsRecord = base && typeof base === "object" && !Array.isArray(base);
+        if (!fillWins && baseIsRecord &&
+            typeof base[secretKey] === "string" && base[secretKey] !== "") continue;
+        merged[tid] = baseIsRecord ? Object.assign({}, base) : {};
+        merged[tid][secretKey] = value;
+      }
+    }
+  }
+  return merged;
+}
+
+// Builds the one account-wide keys-on snapshot (marker + full credential
+// payload in a single write). Local non-empty values win — the enabling
+// device is opting ITS credentials in — but a field this device never held
+// keeps the existing non-empty cloud value: publishing "" there would
+// tombstone a credential some other device still relies on, and a later
+// keys-off copy-down would spread that destruction to every device.
+function pbpBuildKeysOnSnapshot(local, cloud) {
+  const src = local && typeof local === "object" ? local : {};
+  const cld = cloud && typeof cloud === "object" ? cloud : {};
+  const payload = { syncApiKeys: true };
+  API_KEY_FIELDS.forEach((key) => {
+    const own = typeof src[key] === "string" ? src[key] : "";
+    const remote = typeof cld[key] === "string" ? cld[key] : "";
+    payload[key] = own !== "" ? own : remote;
+  });
+  const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+  const mainTargets = own(cld, "exportTargets")
+    ? cld.exportTargets
+    : (own(src, "exportTargets") ? src.exportTargets : (SETTINGS_DEFAULTS.exportTargets || {}));
+  payload.exportTargets = pbpMergeExportTargetSecrets(mainTargets, src.exportTargets, { fillWins: true });
+  return payload;
+}
+
 function pbpClearSecrets(s) {
   const out = Object.assign({}, s);
   API_KEY_FIELDS.forEach((key) => {
@@ -1581,15 +1717,23 @@ function pbpPlanSecretMigration(fromSync, localVals) {
   const syncKeys = API_KEY_FIELDS.filter((key) =>
     own(source, key) && typeof source[key] === "string" && source[key] !== "");
   const syncTargets = source.exportTargets;
-  const scrubExportTargets = pbpExportTargetsHaveSecrets(syncTargets);
-  if (!syncKeys.length && !scrubExportTargets) return null;
+  // Fill local from ANY secret field (token or webhook URL), but scrub only
+  // tokens out of sync. A legacy plaintext webhook URL was an ordinary synced
+  // setting in previous releases: deleting it before every device of the
+  // account has copied it locally strands late-upgrading devices with no URL
+  // at all. It is already on the account (no new exposure), and every NEW
+  // write strips it from the sync copy (pbpSplitSecretBatch), so the residue
+  // only ever shrinks.
+  const fillExportTargets = pbpExportTargetsHaveSecrets(syncTargets);
+  const scrubExportTargets = pbpExportTargetsHaveTokens(syncTargets);
+  if (!syncKeys.length && !fillExportTargets) return null;
 
   const localPayload = {};
   syncKeys.forEach((key) => {
     if (!own(local, key)) localPayload[key] = source[key];
   });
 
-  if (scrubExportTargets) {
+  if (fillExportTargets) {
     if (!own(local, "exportTargets")) {
       localPayload.exportTargets = syncTargets;
     } else {
@@ -1619,9 +1763,14 @@ function pbpPlanSecretMigration(fromSync, localVals) {
 // credential snapshot in local storage. If another device later turns the
 // account-wide marker off, that same sync write scrubs the cloud copy; without
 // this mirror every other device would switch to an empty local credential set.
-// Only non-empty fields are mirrored: this avoids copying a partially-arrived
-// keys-off scrub while its marker still appears true. A device that stayed
-// offline since the last credential change can retain only its older snapshot.
+// Only non-empty fields are mirrored, and a cloud "" NEVER deletes a local
+// copy. This is a deliberate trade-off: a "" under a true marker can be a
+// tombstone from a device that enabled key sync while holding nothing, and
+// propagating it would destroy the only real copy of a credential. The cost
+// is that a key revoked/cleared account-wide can survive in another device's
+// local store until re-entered there — stale credentials fail loudly (401)
+// and are recoverable; deleted ones are not. A device that stayed offline
+// since the last credential change likewise retains only its older snapshot.
 async function pbpMirrorSyncSecretsToLocalUnlocked() {
   const keys = ["syncApiKeys", ...API_KEY_FIELDS, "exportTargets"];
   const snapshot = await chrome.storage.sync.get(keys);
@@ -1665,10 +1814,15 @@ async function pbpMigrateSecretsToLocal() {
 
       // 2. ONLY after local is safe: publish one internally-consistent global
       // keys-off snapshot. Empty fields are tombstones, not credentials.
-      const scrub = { syncApiKeys: false };
-      plan.syncKeys.forEach((key) => { scrub[key] = ""; });
-      if (plan.scrubExportTargets) scrub.exportTargets = pbpStripExportTargetTokens(fromSync.exportTargets);
-      await chrome.storage.sync.set(scrub);
+      // A fill-only plan (legacy webhook URL copied local, nothing scrubbable)
+      // writes nothing to sync — repeating an identical scrub every boot and
+      // storage-warm tick would just burn sync write quota.
+      if (plan.syncKeys.length || plan.scrubExportTargets) {
+        const scrub = { syncApiKeys: false };
+        plan.syncKeys.forEach((key) => { scrub[key] = ""; });
+        if (plan.scrubExportTargets) scrub.exportTargets = pbpStripExportTargetTokensOnly(fromSync.exportTargets);
+        await chrome.storage.sync.set(scrub);
+      }
     });
   } catch (e) {
     // Best-effort and re-runnable. A local read/write failure occurs before any
@@ -1678,30 +1832,42 @@ async function pbpMigrateSecretsToLocal() {
 }
 
 // Explicit keys-on -> keys-off transition. While key sync is enabled, sync is
-// the current source of truth and local may be stale. Copy the complete current
-// sync snapshot down before flipping the routing flag; only then scrub sync.
+// the current source of truth and local may be stale — but only for values the
+// cloud actually HOLDS. A cloud "" can be a tombstone published by a device
+// that never held the credential; copying it down would permanently destroy
+// this device's only real copy, so empty cloud fields leave local untouched
+// (staleness is recoverable, destruction is not).
 async function pbpDisableSyncApiKeys() {
   await pbpWithSecretStorageLock(async () => {
     const flags = await pbpReadSecretSyncStateUnlocked();
     if (!flags.optSyncEnabled || !flags.syncApiKeys) return;
 
     const keys = API_KEY_FIELDS.concat(["exportTargets"]);
-    const fromSync = await chrome.storage.sync.get(keys);
-    const own = (key) => Object.prototype.hasOwnProperty.call(fromSync, key);
+    const [fromSync, localVals] = await Promise.all([
+      chrome.storage.sync.get(keys),
+      chrome.storage.local.get(keys),
+    ]);
     const localPayload = {};
     API_KEY_FIELDS.forEach((key) => {
-      localPayload[key] = own(key) ? fromSync[key] : (SETTINGS_DEFAULTS[key] || "");
+      if (typeof fromSync[key] === "string" && fromSync[key] !== "") localPayload[key] = fromSync[key];
     });
-    localPayload.exportTargets = own("exportTargets")
-      ? fromSync.exportTargets
-      : (SETTINGS_DEFAULTS.exportTargets || {});
+    const cloudTargets = fromSync.exportTargets;
+    if (cloudTargets && typeof cloudTargets === "object" && !Array.isArray(cloudTargets)) {
+      // Cloud owns target existence and ordinary fields; this device's
+      // non-empty credential fields survive where the cloud copy carries none.
+      localPayload.exportTargets = pbpMergeExportTargetSecrets(
+        cloudTargets, localVals.exportTargets, { fillWins: false });
+    }
 
-    // Confirm the complete current snapshot locally before atomically publishing
-    // the account-wide keys-off marker and empty credential tombstones.
-    await chrome.storage.local.set(localPayload);
+    // Confirm the snapshot locally before atomically publishing the
+    // account-wide keys-off marker and empty credential tombstones.
+    if (Object.keys(localPayload).length) await chrome.storage.local.set(localPayload);
+    const scrubTargets = localPayload.exportTargets ||
+      (localVals.exportTargets && typeof localVals.exportTargets === "object"
+        ? localVals.exportTargets : (SETTINGS_DEFAULTS.exportTargets || {}));
     const scrub = {
       syncApiKeys: false,
-      exportTargets: pbpStripExportTargetTokens(localPayload.exportTargets),
+      exportTargets: pbpStripExportTargetTokens(scrubTargets),
     };
     API_KEY_FIELDS.forEach((key) => { scrub[key] = ""; });
     await chrome.storage.sync.set(scrub);
@@ -1709,7 +1875,9 @@ async function pbpDisableSyncApiKeys() {
 }
 
 // Publish one complete account-wide keys-on snapshot so another device never
-// observes a true marker paired with a partial/old credential payload.
+// observes a true marker paired with a partial/old credential payload. The
+// snapshot builder preserves non-empty cloud values for fields this device
+// does not hold — see pbpBuildKeysOnSnapshot.
 async function pbpEnableSyncApiKeys() {
   await pbpWithSecretStorageLock(async () => {
     const flags = await pbpReadSecretSyncStateUnlocked();
@@ -1717,21 +1885,9 @@ async function pbpEnableSyncApiKeys() {
     const keys = API_KEY_FIELDS.concat(["exportTargets"]);
     const [local, cloud] = await Promise.all([
       chrome.storage.local.get(keys),
-      chrome.storage.sync.get("exportTargets"),
+      chrome.storage.sync.get(keys),
     ]);
-    const payload = { syncApiKeys: true };
-    API_KEY_FIELDS.forEach((key) => {
-      payload[key] = Object.prototype.hasOwnProperty.call(local, key)
-        ? local[key]
-        : (SETTINGS_DEFAULTS[key] || "");
-    });
-    const mainTargets = Object.prototype.hasOwnProperty.call(cloud, "exportTargets")
-      ? cloud.exportTargets
-      : (Object.prototype.hasOwnProperty.call(local, "exportTargets")
-        ? local.exportTargets
-        : (SETTINGS_DEFAULTS.exportTargets || {}));
-    payload.exportTargets = pbpMergeExportTargetCredentials(mainTargets, local.exportTargets);
-    await chrome.storage.sync.set(payload);
+    await chrome.storage.sync.set(pbpBuildKeysOnSnapshot(local, cloud));
   });
 }
 

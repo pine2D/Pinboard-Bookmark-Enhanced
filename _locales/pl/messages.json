@@ -923,6 +923,9 @@
   "importApplyFailed": {
     "message": "Nie udało się ukończyć importu; niektóre ustawienia mogły już zostać zmienione. Sprawdź je i spróbuj ponownie."
   },
+  "importHighlightsSkipped": {
+    "message": "Zaimportowano — pominięto zaznaczenia i notatki. Zaloguj się na konto Pinboard, z którego utworzono tę kopię zapasową, i zaimportuj plik ponownie."
+  },
   "importSettingsTitle": {
     "message": "Importuj ustawienia z pliku JSON"
   },

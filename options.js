@@ -36,9 +36,17 @@ async function pbpRevokeLegacyAllSitesPermission(permissionApi) {
 // Persist overlay CSS without touching UI state. Callers own the one status
 // message shown to the user; import callers can still observe genuine errors.
 async function saveOverlayWithFallback(value) {
-  pbpAssertOverlaySize(value);
   const ssl = (typeof globalThis !== "undefined" && globalThis.__pbpTestSyncSetLarge)
     ? globalThis.__pbpTestSyncSetLarge : syncSetLarge;
+  // Oversize CSS (legacy themes/imports predating the 50 KB form gate) goes
+  // straight to this device's local fallback instead of throwing: the sync
+  // area has a policy cap, but a restore path must never refuse user data.
+  // The form path still rejects oversize input via pbpSaveOptionsSnapshot's
+  // assertOverlay before it ever reaches here.
+  if (pbpOverlayByteLength(value) > OVERLAY_BYTE_LIMIT) {
+    await chrome.storage.local.set({ customOverlayCSS_localFallback: value });
+    return { fellBackToLocal: true };
+  }
   try {
     await ssl("customOverlayCSS", value);
     await chrome.storage.local.remove("customOverlayCSS_localFallback");
@@ -857,7 +865,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   chrome.storage.local.remove(["_migrationBackup", "_migrationBannerDismissed"]).catch(() => {});
 
   migrationV2: {
-    const flags = await chrome.storage.sync.get({ _migrationV2: false });
+    // Earlier builds wrote themePresetKey/_migrationV2 straight to
+    // chrome.storage.sync even when settings sync was OFF, where no reader
+    // (getSettingsStorage routes to local) ever saw them — the user's site
+    // theme silently vanished after migration. Adopt a stray preset key once
+    // (never delete the sync copy: another device may sync for real), and
+    // honor the migration flag from either area so migration never re-runs.
+    const settingsArea = await getSettingsStorage();
+    if (settingsArea !== chrome.storage.sync && !s.themePresetKey) {
+      try {
+        const stray = await chrome.storage.sync.get({ themePresetKey: "" });
+        if (typeof stray.themePresetKey === "string" && stray.themePresetKey) {
+          await settingsArea.set({ themePresetKey: stray.themePresetKey });
+          s.themePresetKey = stray.themePresetKey;
+        }
+      } catch (_) {}
+    }
+    let migrated = false;
+    try {
+      const flags = await settingsArea.get({ _migrationV2: false });
+      migrated = flags._migrationV2 === true;
+      if (!migrated && settingsArea !== chrome.storage.sync) {
+        const legacyFlags = await chrome.storage.sync.get({ _migrationV2: false });
+        migrated = legacyFlags._migrationV2 === true;
+      }
+    } catch (_) {}
     const oldCSSFromSync = await syncGetLarge("customCSS", "");
     let oldCSS = oldCSSFromSync;
     if (!oldCSS) {
@@ -866,7 +898,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const oldKeyForMigration = s.themePresetKey || "";
     const hasOldData = !!oldCSS || !!oldKeyForMigration;
-    if (!flags._migrationV2 && hasOldData) {
+    if (!migrated && hasOldData) {
       try {
         // A2 Phase 3: migration uses PINBOARD_THEMES so we must load it now.
         // This is a one-time cost for un-migrated users; future opens skip this entire block.
@@ -908,8 +940,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           await syncSetLarge("customOverlayCSS", newOverlay);
           await chrome.storage.local.remove("customOverlayCSS_localFallback");
         }
-        // Persist resolved preset key in sync
-        await chrome.storage.sync.set({ themePresetKey: resolvedKey || "" });
+        // Persist resolved preset key + done-flag in the ACTIVE settings area
+        // (sync only when settings sync is on) so readers actually see them.
+        await settingsArea.set({ themePresetKey: resolvedKey || "" });
         // Cleanup old customCSS (sync chunks + local backup)
         const meta = await chrome.storage.sync.get("customCSS");
         if (meta.customCSS && meta.customCSS._chunks) {
@@ -917,7 +950,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           await chrome.storage.sync.remove(["customCSS", ...oldChunks]);
         }
         await chrome.storage.local.remove("customCSS");
-        await chrome.storage.sync.set({ _migrationV2: true });
+        await settingsArea.set({ _migrationV2: true });
         // Update s.* with new schema for the rest of the page init
         s.themePresetKey = resolvedKey || "";
         s.customOverlayCSS = newOverlay;
@@ -970,8 +1003,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-preview-ai-model": s.previewAiModel,
     "opt-translate-glossary": s.translateGlossary,
     "opt-selection-trigger": s.selectionTrigger,
-    "opt-webdav-url": s.webdavUrl,
-    "opt-webdav-user": s.webdavUser,
+    "opt-webdav-url": deobfuscateKey(s.webdavUrl || ""),
+    "opt-webdav-user": deobfuscateKey(s.webdavUser || ""),
     "opt-webdav-pass": s.webdavPass,
     "opt-webdav-autopush": s.webdavAutoPush || "off"
   };
@@ -1168,7 +1201,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       // focus; holding the lock there would also stall popup and SW reads.
       if (enabling && !beforeTransition.optSyncEnabled) {
         const cloud = await chrome.storage.sync.get(null);
-        if (Object.keys(cloud).some((key) => key !== "syncApiKeys")) {
+        // Bookkeeping residue (optOverlayInLocal, _migrationV2, a stray
+        // themePresetKey) and default-valued keys must not trigger this
+        // dialog: choosing "use cloud" against a hollow profile silently
+        // resets every local setting to defaults after the reload.
+        if (pbpCloudHasMeaningfulSyncSettings(cloud)) {
           if (confirm(t("syncConflictUseCloud"))) {
             useCloud = true;
           } else if (!confirm(t("syncConflictOverwriteCloud"))) {
@@ -1541,9 +1578,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (_) {}
   })();
 
-  const autoSaveState = { suspended: false, chain: Promise.resolve() };
+  const autoSaveState = { suspended: false, chain: Promise.resolve(), waiters: [] };
 
+  // pause/resume double as a mutex between the bulk flows that bracket
+  // themselves with them (export, file import, WebDAV push/pull, sync toggle,
+  // language switch): a second flow's pause() WAITS until the current one
+  // resumes. Without this, the flows shared one non-nesting boolean — one
+  // flow's finally re-enabled auto-save inside another flow's protected
+  // window, and Export could read storage an import was still half-applying.
+  // Flows that end in location.reload() never resume; queued waiters die
+  // with the page, which is the correct outcome for a page-replacing action.
   async function pauseOptionsAutoSave() {
+    while (autoSaveState.suspended) {
+      await new Promise((resolve) => autoSaveState.waiters.push(resolve));
+    }
     autoSaveState.suspended = true;
     clearTimeout(saveTimer);
     await autoSaveState.chain;
@@ -1551,6 +1599,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function resumeOptionsAutoSave() {
     autoSaveState.suspended = false;
+    const next = autoSaveState.waiters.shift();
+    if (next) next();
     scheduleAutoSave();
   }
 
@@ -1685,11 +1735,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // deliberately absent from backups (API keys, WebDAV credentials, target
     // credentials) survive the reload; backed-up ordinary fields are replaced
     // immediately afterward. Keep timers suppressed throughout.
+    let applied;
     try {
       await pauseOptionsAutoSave();
       const saved = await saveAll();
       if (!saved.ok) throw saved.error || new Error("settings save failed");
-      await pbpApplyBackupPayload(res.data, {
+      applied = await pbpApplyBackupPayload(res.data, {
         exportableKeys: EXPORTABLE_KEYS,
         saveOverlayWithFallback,
         loadThemes: _loadPinboardThemes,
@@ -1716,6 +1767,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "general";
     sessionStorage.setItem("activeTab", activePanel);
     document.body.style.transition = "opacity 0.18s";
+    if (applied && applied.highlightsSkipped) {
+      // The backup carried highlights this device refused (owner mismatch /
+      // logged out). Hold the reload long enough to say so — reporting a
+      // clean restore here is how notes get silently lost for good.
+      setStatusIcon(statusEl, false, t("importHighlightsSkipped"));
+      statusEl.style.color = "#c00";
+      setTimeout(() => {
+        document.body.style.opacity = "0";
+        setTimeout(() => location.reload(), 180);
+      }, 4000);
+      return;
+    }
     document.body.style.opacity = "0";
     setTimeout(() => location.reload(), 180);
   });
@@ -1851,8 +1914,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       waybackSkipPrivate: $id("opt-wayback-skip-private").checked,
       waybackS3Key: obfuscateKey($id("opt-wayback-s3key").value.trim()),
       waybackS3Secret: obfuscateKey($id("opt-wayback-s3secret").value.trim()),
-      webdavUrl: obfuscateKey($id("opt-webdav-url").value.trim()),
-      webdavUser: obfuscateKey($id("opt-webdav-user").value.trim()),
+      // URL/username are ordinary synced settings (plaintext, like every other
+      // endpoint field); only the password below is a credential.
+      webdavUrl: $id("opt-webdav-url").value.trim(),
+      webdavUser: $id("opt-webdav-user").value.trim(),
       webdavPass: obfuscateKey($id("opt-webdav-pass").value.trim()),
       webdavAutoPush: $id("opt-webdav-autopush").value,
       backupIncludeHighlights: $id("opt-backup-include-highlights").checked,

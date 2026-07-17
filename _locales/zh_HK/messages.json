@@ -923,6 +923,9 @@
   "importApplyFailed": {
     "message": "匯入未能完成；部分設定可能已經變更，請檢查後再試"
   },
+  "importHighlightsSkipped": {
+    "message": "已匯入 — 標示和筆記未還原。請登入建立此備份的 Pinboard 帳號，然後再匯入一次"
+  },
   "importSettingsTitle": {
     "message": "從 JSON 檔案匯入設定"
   },

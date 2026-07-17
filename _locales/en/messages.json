@@ -923,6 +923,9 @@
   "importApplyFailed": {
     "message": "Import could not be completed; some settings may already have changed. Review them and try again."
   },
+  "importHighlightsSkipped": {
+    "message": "Imported — highlights and notes were skipped. Sign in with the Pinboard account that created this backup, then import the file again."
+  },
   "importSettingsTitle": {
     "message": "Import settings from JSON file"
   },

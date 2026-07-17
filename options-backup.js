@@ -100,14 +100,15 @@ function pbpPreflightBackupPayload(data, exportableKeys) {
   const safeData = pbpSanitizeBackupSettings(data, exportableKeys);
   let customCSS;
   let customOverlayCSS;
+  // Type checks only — no size gate. An oversize overlay from a legacy backup
+  // is preserved through saveOverlayWithFallback's local-fallback path; a
+  // rejection here would make the whole otherwise-valid backup unimportable.
   if (schemaVersion === 1 && Object.prototype.hasOwnProperty.call(data, "customCSS")) {
     if (typeof data.customCSS !== "string") throw pbpBackupValueError("customCSS");
-    pbpAssertOverlaySize(data.customCSS);
     customCSS = data.customCSS;
   }
   if (schemaVersion === 2 && Object.prototype.hasOwnProperty.call(data, "customOverlayCSS")) {
     if (typeof data.customOverlayCSS !== "string") throw pbpBackupValueError("customOverlayCSS");
-    pbpAssertOverlaySize(data.customOverlayCSS);
     customOverlayCSS = data.customOverlayCSS;
   }
   const importedThemes = Object.prototype.hasOwnProperty.call(data, "savedThemes")
@@ -134,8 +135,11 @@ function pbpPreflightBackupPayload(data, exportableKeys) {
 // storage: whitelist-filters to exportableKeys, merges exportTargets per-target
 // (protecting live secret fields the backup never carried), persists via
 // persistSettings, migrates v1->v2 CSS if needed, and imports savedThemes.
-// Returns a t() status key ("importedReload" | "importPartial"). Throws on
-// a genuine persist failure -- callers decide how to surface that.
+// Returns { statusKey, highlightsSkipped }: statusKey is a t() key
+// ("importedReload" | "importPartial"); highlightsSkipped=true means the
+// backup carried highlights this device refused (owner mismatch or logged
+// out) — callers MUST surface that, or the user deletes the backup believing
+// their notes were restored. Throws on a genuine persist failure.
 async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback, loadThemes }) {
   const prepared = pbpPreflightBackupPayload(data, exportableKeys);
   const { schemaVersion, safeData, customCSS, customOverlayCSS, importedThemes } = prepared;
@@ -200,6 +204,7 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
       themesStatusKey = key; // "importPartial": data preserved to local by syncSetLarge fallback
     }
   }
+  let highlightsSkipped = false;
   if (prepared.highlights) {
     // Cross-account guard: refuse to merge one account's reading notes into a
     // device logged into a different Pinboard account. pbp_hl_<url> keys have no
@@ -216,9 +221,11 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
     if (pbpHighlightBackupOwnerAllowed(prepared.highlightsOwner, currentAccount, accountResolved)) {
       const cleanedHighlights = pbpCleanHighlightBackup(prepared.highlights);
       if (Object.keys(cleanedHighlights).length) await chrome.storage.local.set(cleanedHighlights);
+    } else {
+      highlightsSkipped = true;
     }
   }
-  return themesStatusKey;
+  return { statusKey: themesStatusKey, highlightsSkipped };
 }
 
 function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, beforeExport, beforeApply, afterApply }) {
@@ -253,7 +260,10 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
         }
         exportData.exportTargets = cleaned;
       }
-      // Read overlay from sync OR local fallback (preserve user data either way)
+      // Read overlay from sync OR local fallback (preserve user data either
+      // way — including a legacy oversize overlay, which is why there is no
+      // size assert here: a backup that refuses to carry the user's own data
+      // would make Export permanently fail for them).
       const localOverlay = await chrome.storage.local.get("customOverlayCSS_localFallback");
       let overlay = "";
       if (typeof localOverlay.customOverlayCSS_localFallback === "string") {
@@ -261,7 +271,6 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       } else {
         overlay = await syncGetLarge("customOverlayCSS", "");
       }
-      pbpAssertOverlaySize(overlay);
       exportData.customOverlayCSS = overlay;
       const savedThemesData = await syncGetLarge("savedThemes", []);
       exportData.savedThemes = pbpSanitizeBackupThemes(savedThemesData);
@@ -308,10 +317,18 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       pbpPreflightBackupPayload(data, exportableKeys);
       validated = true;
       if (beforeApply) { await beforeApply(); applyPaused = true; }
-      const themesStatusKey = await pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback, loadThemes });
+      const applied = await pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback, loadThemes });
       const status = $id("import-status");
-      setStatusIcon(status, themesStatusKey === "importPartial" ? false : true, t(themesStatusKey));
-      setTimeout(() => { status.textContent = ""; }, 3000);
+      if (applied.highlightsSkipped) {
+        // Never report a clean success when the backup's highlights were
+        // refused (owner mismatch / logged out): the user can log into the
+        // matching account and simply import the same file again.
+        setStatusIcon(status, false, t("importHighlightsSkipped"));
+        setTimeout(() => { status.textContent = ""; }, 8000);
+      } else {
+        setStatusIcon(status, applied.statusKey === "importPartial" ? false : true, t(applied.statusKey));
+        setTimeout(() => { status.textContent = ""; }, 3000);
+      }
     } catch (err) {
       console.error("[import] failed", err);
       const status = $id("import-status");

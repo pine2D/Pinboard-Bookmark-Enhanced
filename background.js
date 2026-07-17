@@ -1460,7 +1460,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
     syncPrewarmTagsAlarm().catch(() => {});
   }
   if ((area === "sync" || area === "local") &&
-      (routingChanged || changes.webdavAutoPush || changes.webdavUrl || changes.webdavPass)) {
+      (routingChanged || changes.webdavAutoPush || changes.webdavUrl ||
+       changes.webdavUser || changes.webdavPass)) {
     syncWebdavPushAlarm().catch(() => {});
   }
 });

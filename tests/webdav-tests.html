@@ -83,6 +83,10 @@ assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "https://dav.example.com/dav", web
   "off mode creates no alarm");
 assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "http://192.168.1.2/dav", webdavAutoPush: "hourly" }), 0,
   "blocked endpoint creates no automatic alarm");
+assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "https://dav.example.com/dav", webdavAutoPush: "hourly", webdavUser: "bob", webdavPass: "" }), 0,
+  "username without a password never schedules — every tick would 401 forever");
+assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "obf:" + btoa("https://dav.example.com/dav"), webdavAutoPush: "hourly" }), 60,
+  "transitional obf-wrapped URL is healed before the origin gate");
 
 section("pbpWebdavBuildPayload — zero secrets (spec invariant #1)");
 {
@@ -167,12 +171,10 @@ section("pbpWebdavBuildPayload — custom themes + savedThemes (BUG-1) & highlig
   } catch (error) { malformedThemeError = error; }
   assert(malformedThemeError instanceof TypeError,
     "malformed saved themes are rejected before creating an unrestorable WebDAV backup");
-  let oversizedOverlayError = null;
-  try {
-    pbpWebdavBuildPayload(s, { pushedAt: "t", appVersion: "v" }, { overlay: "x".repeat(OVERLAY_BYTE_LIMIT + 1) });
-  } catch (error) { oversizedOverlayError = error; }
-  assert(oversizedOverlayError instanceof RangeError,
-    "over-limit overlay CSS is rejected before creating an unrestorable WebDAV backup");
+  const oversizeOverlay = "x".repeat(OVERLAY_BYTE_LIMIT + 1);
+  const oversizePayload = pbpWebdavBuildPayload(s, { pushedAt: "t", appVersion: "v" }, { overlay: oversizeOverlay });
+  assertEq(oversizePayload.customOverlayCSS, oversizeOverlay,
+    "over-limit legacy overlay rides the backup instead of silently killing every scheduled push");
 }
 
 section("pbpHighlightBackupOwnerAllowed (SEC-1 pure gate)");
@@ -195,8 +197,9 @@ section("pbpWebdavBuildRequest");
   assertEq(push.method, "PUT", "push -> PUT");
   assertEq(push.headers["Content-Type"], "application/json", "push sets JSON content-type");
   assertEq(push.url, pbpWebdavFileUrl(cfg.baseUrl), "push url built via pbpWebdavFileUrl");
-  assertEq(push.headers["If-None-Match"], "*", "first push is create-only and cannot overwrite an unknown remote file");
-  assert(!("If-Match" in push.headers), "first push does not send If-Match");
+  assert(!("If-None-Match" in push.headers),
+    "unknown revision pushes unconditionally — create-only If-None-Match would 412 forever against a pre-existing remote backup");
+  assert(!("If-Match" in push.headers), "unknown revision push does not send If-Match");
 
   const updatePush = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { etag: '"v1"' }));
   assertEq(updatePush.headers["If-Match"], '"v1"', "known remote revision is updated with If-Match");
@@ -508,8 +511,8 @@ async function runChromeLayerTests() {
     const casCfg = { baseUrl: "https://dav.example.com/cas/", user: "", pass: "" };
     const created = await pbpWebdavPush(casCfg);
     const firstPut = casRequests.find((request) => request.method === "PUT");
-    check("first CAS push creates only when the remote file is absent",
-      created.ok && firstPut.headers["If-None-Match"] === "*" && !("If-Match" in firstPut.headers));
+    check("first CAS push is unconditional (upgrade parity: no 412 deadlock against an existing backup)",
+      created.ok && !("If-None-Match" in firstPut.headers) && !("If-Match" in firstPut.headers));
     check("successful create remembers the server ETag",
       casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v1"');
     check("ETag state does not persist a plaintext capability URL",
@@ -563,8 +566,8 @@ async function runChromeLayerTests() {
     const noTagSecond = await pbpWebdavPush(noTagCfg);
     check("a WebDAV server that omits ETag remains writable after the first push",
       noTagFirst.ok && noTagSecond.ok && noTagPutHeaders.length === 2);
-    check("missing ETag transitions from create-only to known-exists conditional writes",
-      noTagPutHeaders[0]["If-None-Match"] === "*" &&
+    check("missing ETag transitions from unconditional first write to known-exists conditional writes",
+      !("If-None-Match" in noTagPutHeaders[0]) && !("If-Match" in noTagPutHeaders[0]) &&
       noTagPutHeaders[1]["If-Match"] === "*" && !("If-None-Match" in noTagPutHeaders[1]));
 
     const weakCfg = { baseUrl: "https://dav.example.com/weak-etag/", user: "", pass: "" };

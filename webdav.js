@@ -102,7 +102,14 @@ function pbpWebdavEtagStateMatchesTarget(state, target, user) {
 
 function pbpWebdavAutoPushPeriod(settings) {
   const s = settings || {};
-  if (!s.webdavUrl || !pbpWebdavOrigin(s.webdavUrl)) return 0;
+  // deobfuscateKey passes plaintext through and heals values a transitional
+  // build stored obf-wrapped. Half-configured Basic auth (username saved,
+  // password cleared/never stored) never schedules: every tick would 401 and
+  // rewrite webdavLastPush with the same error forever. A fully anonymous
+  // config (no username, no password) is a supported WebDAV share shape.
+  const url = deobfuscateKey(s.webdavUrl || "");
+  if (!url || !pbpWebdavOrigin(url)) return 0;
+  if (s.webdavUser && !s.webdavPass) return 0;
   if (s.webdavAutoPush === "daily") return 1440;
   if (s.webdavAutoPush === "hourly") return 60;
   return 0;
@@ -129,9 +136,11 @@ function pbpWebdavBuildPayload(settings, meta, extra) {
   // them and hands them in, mirroring options-backup.js's file export, so a WebDAV
   // restore carries the user's custom theme instead of silently dropping it.
   payload.customOverlayCSS = typeof extra.overlay === "string" ? extra.overlay : "";
-  pbpAssertOverlaySize(payload.customOverlayCSS);
-  // Keep generated backups self-importable. This also rejects legacy/corrupt
-  // or over-limit theme entries before replacing a valid remote backup.
+  // No size gate on the overlay: a legacy oversize overlay is still the
+  // user's data, and throwing here would silently kill every scheduled push.
+  // Keep generated backups self-importable: reject structurally corrupt theme
+  // entries before replacing a valid remote backup (size is NOT asserted —
+  // the import side re-chunks through syncSetLarge, local fallback on quota).
   payload.savedThemes = pbpSanitizeBackupThemes(
     Array.isArray(extra.savedThemes) ? extra.savedThemes : [],
   );
@@ -171,7 +180,11 @@ function pbpWebdavBuildRequest(kind, cfg) {
     headers["Content-Type"] = "application/json";
     if (pbpWebdavValidEtag(cfg.etag)) headers["If-Match"] = cfg.etag.trim();
     else if (cfg.known === true) headers["If-Match"] = "*";
-    else headers["If-None-Match"] = "*";
+    // Unknown revision (first push from this device, upgrade from a pre-ETag
+    // build, or cleared local state): plain unconditional PUT, matching the
+    // pre-CAS releases. If-None-Match:* here would 412 forever against an
+    // existing remote file — the only unlock being a destructive Pull — while
+    // every LATER push still gets CAS protection from the remembered state.
     return { url, method: "PUT", headers };
   }
   return { url, method: "GET", headers }; // "pull" | "test"
@@ -224,8 +237,9 @@ async function pbpWebdavProbeWritable(cfg) {
 // ============================================================
 
 // Storage-sourced cfg (used by the alarm, and as the default when a caller
-// doesn't hand in a live-DOM override). Both the capability URL and password
-// are credential-routed/obfuscated at rest, so decode them before validation.
+// doesn't hand in a live-DOM override). The password is credential-routed and
+// obfuscated at rest; URL/username are ordinary settings stored in plaintext
+// (deobfuscateKey passes them through, healing transitional obf-wrapped values).
 async function _pbpWebdavCfg() {
   const s = await pbpReadSettingsWithSecrets({ webdavUrl: "", webdavUser: "", webdavPass: "" });
   return {

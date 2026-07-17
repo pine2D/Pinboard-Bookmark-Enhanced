@@ -923,6 +923,9 @@
   "importApplyFailed": {
     "message": "Der Import konnte nicht abgeschlossen werden; einige Einstellungen wurden möglicherweise bereits geändert. Bitte prüfe sie und versuche es erneut."
   },
+  "importHighlightsSkipped": {
+    "message": "Importiert — Markierungen und Notizen wurden übersprungen. Melde dich mit dem Pinboard-Konto an, das diese Sicherung erstellt hat, und importiere die Datei erneut."
+  },
   "importSettingsTitle": {
     "message": "Einstellungen aus JSON-Datei importieren"
   },

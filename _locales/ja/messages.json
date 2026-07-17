@@ -923,6 +923,9 @@
   "importApplyFailed": {
     "message": "インポートを完了できませんでした。一部の設定はすでに変更されている可能性があります。内容を確認してから再試行してください。"
   },
+  "importHighlightsSkipped": {
+    "message": "インポート完了 — ハイライトとメモは復元されませんでした。このバックアップを作成した Pinboard アカウントでログインしてから、もう一度インポートしてください"
+  },
   "importSettingsTitle": {
     "message": "JSONファイルから設定をインポート"
   },

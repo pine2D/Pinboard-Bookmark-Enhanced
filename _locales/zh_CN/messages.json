@@ -923,6 +923,9 @@
   "importApplyFailed": {
     "message": "导入未能完成；部分设置可能已经更改，请检查后重试"
   },
+  "importHighlightsSkipped": {
+    "message": "已导入 — 高亮和笔记未恢复。请登录创建该备份的 Pinboard 账号，然后再导入一次"
+  },
   "importSettingsTitle": {
     "message": "从 JSON 文件导入设置"
   },

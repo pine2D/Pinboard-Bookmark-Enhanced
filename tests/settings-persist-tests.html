@@ -367,8 +367,7 @@ async function run() {
       env.state.rejectSyncSet = true;
       try { await syncSetLarge("customSummaryPrompt", "saved only on this device"); } catch (_) {}
       env.state.rejectSyncSet = false;
-      env.sync.customSummaryPrompt = "newer value from another device";
-      check("E1b quota fallback remains the explicit device-local override until a successful retry",
+      check("E1b quota fallback remains the explicit device-local override while sync is unchanged",
         await syncGetLarge("customSummaryPrompt", "") === "saved only on this device");
 
       const priorFallback = JSON.stringify(env.local.customSummaryPrompt_localFallback);
@@ -382,6 +381,17 @@ async function run() {
         nonQuotaError?.message === "storage unavailable" &&
         JSON.stringify(env.local.customSummaryPrompt_localFallback) === priorFallback &&
         await syncGetLarge("customSummaryPrompt", "") === "saved only on this device");
+
+      // Another device commits AFTER this device's fallback was stranded: the
+      // newer committed generation wins and the stale record is dropped, so
+      // that device's future updates are never shadowed (previously the
+      // stranded record won forever and cloud changes stayed invisible here).
+      env.sync["customSummaryPrompt_zzforeign_0"] = "newer value from another device";
+      env.sync.customSummaryPrompt = { _chunks: 1, _generation: "zzforeign" };
+      check("E1b a newer foreign generation beats the stranded quota fallback",
+        await syncGetLarge("customSummaryPrompt", "") === "newer value from another device");
+      check("E1b the stale fallback record is dropped so it cannot shadow future cloud updates",
+        !("customSummaryPrompt_localFallback" in env.local));
     } finally {
       globalThis.chrome = previousChrome;
       _settingsStorageCache = previousCache;
@@ -649,8 +659,14 @@ async function run() {
   check("E4 strip: null/undefined -> {}", Object.keys(pbpStripExportTargetTokens(null)).length === 0
     && Object.keys(pbpStripExportTargetTokens(undefined)).length === 0);
 
-  check("E4 secret detection: webhook capability URL is treated as a credential",
-    pbpSyncPayloadHasSecrets({ exportTargets: { webhook: { url: "obf:capability" } } }));
+  // Routing still treats the webhook URL as a secret (strip/overlay above),
+  // but marker INFERENCE must not: previous releases synced the URL as an
+  // ordinary setting, so a pre-marker cloud holding only that legacy value
+  // must not silently flip the whole account to syncApiKeys=true.
+  check("E4 secret detection: a legacy synced webhook URL alone is NOT key-sync opt-in evidence",
+    !pbpSyncPayloadHasSecrets({ exportTargets: { webhook: { url: "obf:capability" } } }));
+  check("E4 secret detection: a webhook token IS key-sync opt-in evidence",
+    pbpSyncPayloadHasSecrets({ exportTargets: { webhook: { token: "obf:auth" } } }));
 
   // -- pbpSplitSecretBatch: every API_KEY_FIELDS entry routed --
   const fullBatch = {};
@@ -952,8 +968,9 @@ async function run() {
     check("E4 persistSettings: reports ok", r.ok === true);
     check("E4 persistSettings: geminiApiKey NOT in the main-area batch", syncSet && !("geminiApiKey" in syncSet));
     check("E4 persistSettings: pinboardToken NOT in the main-area batch", syncSet && !("pinboardToken" in syncSet));
-    check("E4 persistSettings: complete WebDAV credentials NOT in the main-area batch",
-      syncSet && !("webdavUrl" in syncSet) && !("webdavUser" in syncSet) && !("webdavPass" in syncSet));
+    check("E4 persistSettings: WebDAV password NOT in the main-area batch, URL/username ride it as ordinary settings",
+      syncSet && !("webdavPass" in syncSet) &&
+      syncSet.webdavUrl === "obf:webdav-capability" && syncSet.webdavUser === "obf:webdav-user");
     check("E4 persistSettings: exportTargets in main-area batch is token-stripped",
       syncSet && syncSet.exportTargets && !("token" in syncSet.exportTargets.github));
     check("E4 persistSettings: webhook capability credentials NOT in the main-area batch",
@@ -964,8 +981,7 @@ async function run() {
     check("E4 persistSettings: local exportTargets is the FULL (with-token) copy",
       localWrites[0].exportTargets.github.token === "obf:ghtok" &&
       localWrites[0].exportTargets.webhook.url === "obf:webhook-capability" &&
-      localWrites[0].webdavUrl === "obf:webdav-capability" &&
-      localWrites[0].webdavUser === "obf:webdav-user");
+      !("webdavUrl" in localWrites[0]) && !("webdavUser" in localWrites[0]));
     globalThis.chrome = prevChromeE4d;
     delete globalThis.__pbpTestStorage;
     delete globalThis.__pbpTestSyncSetLarge;
@@ -1127,6 +1143,48 @@ async function run() {
       check("E4 keys-off: sync-off device neither reads nor scrubs cloud credentials",
         disabledSettingsLocal.openaiApiKey === "obf:local-current" &&
         JSON.stringify(disabledSettingsSync) === disabledSettingsBefore);
+
+      // Regression (602062f review): enabling key sync from a device that
+      // holds NO credentials must not publish "" tombstones over values other
+      // devices still rely on — a later keys-off copy-down would spread that
+      // destruction to every device.
+      const emptyEnableLocal = { optSyncEnabled: true };
+      const emptyEnableSync = {
+        syncApiKeys: false,
+        pinboardToken: "obf:cloud-token",
+        exportTargets: { webhook: { enabled: true, token: "obf:cloud-auth", url: "obf:cloud-capability" } },
+      };
+      install(emptyEnableLocal, emptyEnableSync);
+      await pbpEnableSyncApiKeys();
+      check("E4 keys-on from an empty device preserves existing cloud credentials instead of tombstoning them",
+        emptyEnableSync.syncApiKeys === true &&
+        emptyEnableSync.pinboardToken === "obf:cloud-token" &&
+        emptyEnableSync.exportTargets.webhook.token === "obf:cloud-auth" &&
+        emptyEnableSync.exportTargets.webhook.url === "obf:cloud-capability");
+      check("E4 keys-on from an empty device publishes \"\" only where neither side holds a value",
+        emptyEnableSync.openaiApiKey === "");
+
+      // Regression (602062f review): keys-off copy-down must never overwrite
+      // a real local credential with a cloud "" tombstone.
+      const tombstoneLocal = {
+        optSyncEnabled: true,
+        pinboardToken: "obf:only-real-copy",
+        exportTargets: { github: { enabled: true, token: "obf:local-gh" } },
+      };
+      const tombstoneSync = {
+        syncApiKeys: true,
+        pinboardToken: "",
+        openaiApiKey: "obf:cloud-openai",
+        exportTargets: { github: { enabled: false } },
+      };
+      install(tombstoneLocal, tombstoneSync);
+      await pbpDisableSyncApiKeys();
+      check("E4 keys-off: a cloud \"\" tombstone never destroys this device's only real credential",
+        tombstoneLocal.pinboardToken === "obf:only-real-copy");
+      check("E4 keys-off: non-empty cloud values still copy down beside preserved local ones",
+        tombstoneLocal.openaiApiKey === "obf:cloud-openai" &&
+        tombstoneLocal.exportTargets.github.enabled === false &&
+        tombstoneLocal.exportTargets.github.token === "obf:local-gh");
 
       const scrubLocal = { optSyncEnabled: true, openaiApiKey: "obf:old" };
       const scrubSync = {
@@ -2158,7 +2216,9 @@ async function run() {
         importedBatch.exportTargets.webhook.token === "obf:live-auth" &&
         importedBatch.exportTargets.github.enabled === false &&
         importedBatch.exportTargets.github.token === "obf:live-github" && overlayApplied === "" &&
-        !("webdavUrl" in importedBatch));
+        // webdavUrl is an ordinary setting again (v2.96 parity): a backup may
+        // restore the server address, while the password stays local-only.
+        importedBatch.webdavUrl === "https://attacker.example/secret");
 
       const writesBeforeInvalid = importedBatch;
       let invalidApplyError = null;
@@ -2278,25 +2338,29 @@ async function run() {
       check("E9 synced overlay removes stale fallback data",
         localRemoves.at(-1) === "customOverlayCSS_localFallback");
 
-      const callsBeforeOversize = largeWrites.length;
-      let oversizeError = null;
-      try { await saveOverlayWithFallback("中".repeat(Math.floor(OVERLAY_BYTE_LIMIT / 3) + 1)); }
-      catch (error) { oversizeError = error; }
-      check("E9 multi-byte CSS over 50 KB rejects visibly",
-        oversizeError instanceof RangeError && /UTF-8/.test(oversizeError.message));
-      check("E9 over-limit CSS is rejected before any storage write",
-        largeWrites.length === callsBeforeOversize);
+      const syncCallsBeforeOversize = largeWrites.length;
+      const oversizeCss = "中".repeat(Math.floor(OVERLAY_BYTE_LIMIT / 3) + 1);
+      const oversizeResult = await saveOverlayWithFallback(oversizeCss);
+      check("E9 multi-byte CSS over 50 KB is preserved to the local fallback instead of throwing",
+        oversizeResult.fellBackToLocal === true &&
+        localWrites.at(-1).customOverlayCSS_localFallback === oversizeCss);
+      check("E9 over-limit CSS never attempts the sync write",
+        largeWrites.length === syncCallsBeforeOversize);
+      // The options FORM still rejects oversize input up front — only the
+      // restore/import paths must preserve legacy data instead of refusing it.
+      check("E9 the form path still rejects over-limit CSS via pbpAssertOverlaySize",
+        (() => { try { pbpAssertOverlaySize(oversizeCss); return false; }
+                 catch (error) { return error instanceof RangeError && /UTF-8/.test(error.message); } })());
 
       const settingsBeforeOversizeImport = settingsWrites;
-      let oversizeImportError = null;
-      try {
-        await pbpApplyBackupPayload(
-          { _schemaVersion: 2, optTheme: "dark", customOverlayCSS: "中".repeat(Math.floor(OVERLAY_BYTE_LIMIT / 3) + 1) },
-          { exportableKeys: ["optTheme"], saveOverlayWithFallback }
-        );
-      } catch (error) { oversizeImportError = error; }
-      check("E9 over-limit backup CSS is rejected before importing other settings",
-        oversizeImportError instanceof RangeError && settingsWrites === settingsBeforeOversizeImport);
+      const oversizeImport = await pbpApplyBackupPayload(
+        { _schemaVersion: 2, optTheme: "dark", customOverlayCSS: oversizeCss },
+        { exportableKeys: ["optTheme"], saveOverlayWithFallback }
+      );
+      check("E9 over-limit backup CSS imports with the rest of the settings (overlay lands in the local fallback)",
+        oversizeImport.statusKey === "importedReload" &&
+        settingsWrites === settingsBeforeOversizeImport + 1 &&
+        localWrites.at(-1).customOverlayCSS_localFallback === oversizeCss);
 
       largeError = new Error("QUOTA_BYTES quota exceeded");
       const quota = await saveOverlayWithFallback("quota-css");
@@ -2313,6 +2377,7 @@ async function run() {
       check("E9 non-quota storage failure rejects without claiming fallback",
         genuineError === largeError && localWrites.length === fallbackWrites);
 
+      const settingsBeforeGenuineFailure = settingsWrites;
       let importError = null;
       try {
         await pbpApplyBackupPayload(
@@ -2322,7 +2387,7 @@ async function run() {
       } catch (error) { importError = error; }
       check("E9 backup import still observes a genuine overlay failure", importError === largeError);
       check("E9 genuine overlay failure occurs only after ordinary settings were persisted",
-        settingsWrites === settingsBeforeOversizeImport + 1);
+        settingsWrites === settingsBeforeGenuineFailure + 1);
 
       const optionsSource = await (await fetch("../options.js")).text();
       const helperSource = optionsSource.slice(

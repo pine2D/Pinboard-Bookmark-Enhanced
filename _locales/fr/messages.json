@@ -923,6 +923,9 @@
   "importApplyFailed": {
     "message": "L’importation n’a pas pu aboutir ; certains paramètres ont peut-être déjà été modifiés. Vérifiez-les, puis réessayez."
   },
+  "importHighlightsSkipped": {
+    "message": "Importé — surlignages et notes ignorés. Connectez-vous avec le compte Pinboard qui a créé cette sauvegarde, puis importez à nouveau le fichier."
+  },
   "importSettingsTitle": {
     "message": "Importer les paramètres depuis un fichier JSON"
   },

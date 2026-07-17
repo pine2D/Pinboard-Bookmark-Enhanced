@@ -36,7 +36,13 @@ if (_pbpHasTheme) {
     return optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
   }
 
-  // Read large value — chunked from sync, direct from local
+  // Read large value — chunked from sync, direct from local. Mirrors
+  // shared.js's fallback-freshness rules (content scripts can't load shared.js
+  // or take its Web Locks): a quota-fallback record wins only while sync still
+  // shows the generation it was written against ("_base"); once another device
+  // commits a newer generation, sync wins. A generation swap racing these
+  // unlocked reads (meta read, then chunks already deleted) is retried once
+  // with fresh metadata instead of silently rendering without the overlay.
   async function readChunkedSync(key, defaultValue) {
     const storage = await getStorage();
     if (storage === chrome.storage.local) {
@@ -46,29 +52,36 @@ if (_pbpHasTheme) {
     const fallbackKey = `${key}_localFallback`;
     const fallback = await chrome.storage.local.get(fallbackKey);
     if (typeof fallback[fallbackKey] === "string") return fallback[fallbackKey];
-    const meta = await chrome.storage.sync.get(key);
-    const fallbackRecord = fallback[fallbackKey];
-    if (fallbackRecord && fallbackRecord._pbpLargeFallback === 1 &&
-        (!meta[key] || meta[key]._generation !== fallbackRecord._generation)) {
-      return typeof fallbackRecord.value === "string" ? fallbackRecord.value : defaultValue;
+    const record = fallback[fallbackKey];
+    const isRecord = !!(record && record._pbpLargeFallback === 1 && typeof record.value === "string");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const meta = await chrome.storage.sync.get(key);
+      const stored = meta[key];
+      const generation = stored && typeof stored === "object" ? stored._generation : undefined;
+      if (isRecord && !(stored && typeof stored === "object" && generation === record._generation)) {
+        // Not the committed-then-crashed case; is the record still fresh?
+        const current = typeof generation === "string" ? generation : null;
+        const base = Object.prototype.hasOwnProperty.call(record, "_base") ? record._base : current;
+        if (current === base) return record.value;
+        // Stale record (another device committed a newer generation): sync wins.
+      }
+      if (typeof stored === "string") return stored;
+      const count = Number(stored && stored._chunks);
+      if (!Number.isInteger(count) || count < 1 || count > 512 ||
+          (generation !== undefined && (typeof generation !== "string" || !/^[a-z0-9]+$/i.test(generation)))) {
+        return defaultValue;
+      }
+      const prefix = generation ? `${key}_${generation}_` : `${key}_`;
+      const chunkKeys = Array.from({ length: count }, (_, i) => `${prefix}${i}`);
+      const chunks = await chrome.storage.sync.get(chunkKeys);
+      if (chunkKeys.every((chunkKey) => typeof chunks[chunkKey] === "string")) {
+        return chunkKeys.map((chunkKey) => chunks[chunkKey]).join("") || defaultValue;
+      }
+      // Missing chunks: a writer likely swapped generations mid-read — loop
+      // once for fresh metadata, then give up to the default (page renders
+      // unthemed for this load; the 400ms uncloak guard still applies).
     }
-    if (typeof meta[key] === "string") return meta[key];
-    const count = Number(meta[key] && meta[key]._chunks);
-    const generation = meta[key] && meta[key]._generation;
-    const matchingFallback = fallbackRecord && fallbackRecord._pbpLargeFallback === 1 &&
-      typeof fallbackRecord.value === "string" ? fallbackRecord.value : null;
-    if (!Number.isInteger(count) || count < 1 || count > 512 ||
-        (generation !== undefined && (typeof generation !== "string" || !/^[a-z0-9]+$/i.test(generation)))) {
-      return matchingFallback === null ? defaultValue : matchingFallback;
-    }
-    const prefix = generation ? `${key}_${generation}_` : `${key}_`;
-    const chunkKeys = Array.from({ length: count }, (_, i) => `${prefix}${i}`);
-    const chunks = await chrome.storage.sync.get(chunkKeys);
-    if (chunkKeys.some((chunkKey) => typeof chunks[chunkKey] !== "string")) {
-      return matchingFallback === null ? defaultValue : matchingFallback;
-    }
-    const joined = chunkKeys.map((chunkKey) => chunks[chunkKey]).join("");
-    return joined || (matchingFallback === null ? defaultValue : matchingFallback);
+    return defaultValue;
   }
 
   function uncloak() {
