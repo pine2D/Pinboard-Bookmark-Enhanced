@@ -1303,9 +1303,25 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
           } else {
             if (fresh.syncApiKeys) {
-              // Cloud is current while keys-on; copy its full snapshot down so
-              // this sync-off device can continue locally without cloud reads.
-              await newStorage.set(data);
+              // Cloud is current while keys-on; copy its snapshot down so this
+              // sync-off device can continue locally without cloud reads. But
+              // guard against a keys-off scrub racing this copy-down (the
+              // marker read above and this data read are not atomic across
+              // devices): a "" tombstone must never overwrite a non-empty
+              // local credential, and local-only export-target credentials
+              // survive the merge — same rule as pbpDisableSyncApiKeys.
+              const guarded = { ...data };
+              const localSnapshot = await chrome.storage.local.get(API_KEY_FIELDS.concat(["exportTargets"]));
+              API_KEY_FIELDS.forEach((key) => {
+                if (guarded[key] === "" && typeof localSnapshot[key] === "string" && localSnapshot[key] !== "") {
+                  delete guarded[key];
+                }
+              });
+              if (guarded.exportTargets && typeof guarded.exportTargets === "object" && !Array.isArray(guarded.exportTargets)) {
+                guarded.exportTargets = pbpMergeExportTargetSecrets(
+                  guarded.exportTargets, localSnapshot.exportTargets, { fillWins: false });
+              }
+              await newStorage.set(guarded);
             } else {
               // Merge the latest cloud non-secret target settings with this
               // device's credential fields before local becomes the sole area.

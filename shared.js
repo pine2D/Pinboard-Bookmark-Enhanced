@@ -1057,7 +1057,49 @@ function pbpLargeFallbackFreshness(record, stored) {
   if (!Object.prototype.hasOwnProperty.call(record, "_base")) return "fresh";
   const current = stored && typeof stored === "object" && typeof stored._generation === "string"
     ? stored._generation : null;
+  // Mixed-version limitation: pre-generation metadata carries no _generation,
+  // so "unchanged since my write" and "replaced by a pre-generation device"
+  // both read as current=null. A null _base therefore stays "fresh" — the
+  // safe default (dropping the record could destroy this device's only
+  // copy); the first generation-stamped write resolves the ambiguity.
   return current === record._base ? "fresh" : "stale";
+}
+
+// Shared in-lock read for one chunked key: fallback-record freshness handling
+// plus ONE metadata retry when a chunk read fails with no fallback in play (a
+// foreign device's generation swap can land between the metadata read and the
+// chunk read — the same race the content-script reader retries).
+async function pbpReadLargeWithFallbackUnlocked(key, readMeta, defaultValue) {
+  let stored = await readMeta();
+  const fallbackKey = pbpLargeFallbackKey(key);
+  let fallbacks = {};
+  try { fallbacks = await chrome.storage.local.get(fallbackKey); } catch (_) {}
+  if (Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) {
+    const record = fallbacks[fallbackKey];
+    const freshness = pbpLargeFallbackFreshness(record, stored);
+    if (freshness === "fresh") return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+    if (freshness === "committed") {
+      const committed = await pbpReadChunkedSyncResult(key, stored, defaultValue);
+      if (!committed.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+      await chrome.storage.local.remove(fallbackKey).catch(() => {});
+      return committed.value;
+    }
+    // "stale" — another device committed a newer generation. Confirm the
+    // replacement actually READS before destroying this device's last known
+    // value (sync propagates per item: metadata can arrive before chunks).
+    // The remove stays inside the caller's lock so it cannot race a writer's
+    // fresh record.
+    const replacement = await pbpReadChunkedSyncResult(key, stored, defaultValue);
+    if (!replacement.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
+    await chrome.storage.local.remove(fallbackKey).catch(() => {});
+    return replacement.value;
+  }
+  let result = await pbpReadChunkedSyncResult(key, stored, defaultValue);
+  if (!result.ok) {
+    stored = await readMeta();
+    result = await pbpReadChunkedSyncResult(key, stored, defaultValue);
+  }
+  return result.value;
 }
 
 function pbpNewChunkGeneration() {
@@ -1153,43 +1195,16 @@ async function pbpResolveChunkedSettings(settings, storage, query) {
     return out;
   }
   for (const key of requested) {
-    out[key] = await pbpWithLargeStorageLock(key, async () => {
-      // Re-read the metadata INSIDE the lock: the row captured by the caller's
-      // bulk get() may predate a concurrent generation swap whose stale chunks
-      // are already deleted (same rule as pbpSyncGetLargeUnlocked).
-      let stored = out[key];
-      try {
-        const fresh = await storage.get(key);
-        stored = fresh[key];
-      } catch (_) {}
-      const fallbackKey = pbpLargeFallbackKey(key);
-      let fallbacks = {};
-      try { fallbacks = await chrome.storage.local.get(fallbackKey); } catch (_) {}
-      const fallback = fallbacks[fallbackKey];
-      if (Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) {
-        const freshness = pbpLargeFallbackFreshness(fallback, stored);
-        if (freshness === "fresh") {
-          return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback), SETTINGS_DEFAULTS[key]);
-        }
-        if (freshness === "committed") {
-          const committed = await pbpReadChunkedSyncResult(key, stored, SETTINGS_DEFAULTS[key]);
-          if (!committed.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback), SETTINGS_DEFAULTS[key]);
-          await chrome.storage.local.remove(fallbackKey).catch(() => {});
-          return committed.value;
-        }
-        // "stale" — another device committed a newer generation. Confirm the
-        // replacement actually READS before destroying this device's last
-        // known value: sync propagates per item, so the new metadata can
-        // arrive before its chunks. The remove stays inside the lock (an
-        // unawaited remove could land after it and delete a NEWER record a
-        // writer just stored).
-        const replacement = await pbpReadChunkedSyncResult(key, stored, SETTINGS_DEFAULTS[key]);
-        if (!replacement.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(fallback), SETTINGS_DEFAULTS[key]);
-        await chrome.storage.local.remove(fallbackKey).catch(() => {});
-        return replacement.value;
-      }
-      return pbpReadChunkedSyncValue(key, stored, SETTINGS_DEFAULTS[key]);
-    });
+    // Metadata is (re-)read INSIDE the lock: the row captured by the caller's
+    // bulk get() may predate a concurrent generation swap whose stale chunks
+    // are already deleted. A metadata read failure degrades to that snapshot.
+    out[key] = await pbpWithLargeStorageLock(key, () =>
+      pbpReadLargeWithFallbackUnlocked(key, async () => {
+        try {
+          const fresh = await storage.get(key);
+          return fresh[key];
+        } catch (_) { return out[key]; }
+      }, SETTINGS_DEFAULTS[key]));
   }
   return out;
 }
@@ -1246,6 +1261,13 @@ async function pbpSyncSetLargeUnlocked(key, value) {
     }
     throw e;
   }
+  // Known cross-DEVICE limitation: the Web Lock serializes writers on THIS
+  // device only. If another device's write of the same key is in flight (its
+  // chunks arrived in sync, its metadata not yet), this prefix cleanup can
+  // delete that generation and orphan its later metadata commit.
+  // chrome.storage.sync offers no CAS to close the window; the reader-side
+  // retry/rescue paths bound the damage to that rare same-key same-moment
+  // collision.
   const staleChunkKeys = oldChunkKeys.filter((storedKey) => !newChunkKeys.includes(storedKey));
   if (staleChunkKeys.length) await chrome.storage.sync.remove(staleChunkKeys).catch(() => {});
   await chrome.storage.local.remove(fallbackKey).catch(() => {});
@@ -1261,31 +1283,8 @@ async function pbpSyncGetLargeUnlocked(key, defaultValue) {
     const data = await chrome.storage.local.get({ [key]: defaultValue });
     return pbpDecodeLargeValue(data[key], defaultValue);
   }
-  const fallbackKey = pbpLargeFallbackKey(key);
-  let fallback = {};
-  try { fallback = await chrome.storage.local.get(fallbackKey); } catch (_) {}
-  const meta = await chrome.storage.sync.get(key);
-  if (Object.prototype.hasOwnProperty.call(fallback, fallbackKey)) {
-    const record = fallback[fallbackKey];
-    const freshness = pbpLargeFallbackFreshness(record, meta[key]);
-    if (freshness === "fresh") return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
-    if (freshness === "committed") {
-      const committed = await pbpReadChunkedSyncResult(key, meta[key], defaultValue);
-      if (!committed.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
-      await chrome.storage.local.remove(fallbackKey).catch(() => {});
-      return committed.value;
-    }
-    // "stale" — another device committed a newer generation. Confirm the
-    // replacement actually READS before destroying this device's last known
-    // value (sync propagates per item: metadata can arrive before chunks).
-    // The remove stays inside the lock so it cannot race a writer's fresh
-    // record.
-    const replacement = await pbpReadChunkedSyncResult(key, meta[key], defaultValue);
-    if (!replacement.ok) return pbpDecodeLargeValue(pbpLargeFallbackValue(record), defaultValue);
-    await chrome.storage.local.remove(fallbackKey).catch(() => {});
-    return replacement.value;
-  }
-  return pbpReadChunkedSyncValue(key, meta[key], defaultValue);
+  return pbpReadLargeWithFallbackUnlocked(key,
+    async () => (await chrome.storage.sync.get(key))[key], defaultValue);
 }
 
 function syncGetLarge(key, defaultValue) {
@@ -1607,20 +1606,10 @@ function pbpOverlaySecrets(s, localVals, requestedKeys) {
   return out;
 }
 
-// Rebuilds a complete exportTargets value for publishing credentials to sync:
-// ordinary target settings remain owned by the current main/cloud snapshot,
-// while only credential fields come from this device's local store.
-function pbpMergeExportTargetCredentials(mainTargets, localTargets) {
-  return pbpOverlaySecrets(
-    { exportTargets: pbpStripExportTargetTokens(mainTargets) },
-    { exportTargets: localTargets },
-    new Set(["exportTargets"]),
-  ).exportTargets;
-}
-
 // Merge two exportTargets values KEEPING base credentials (unlike
-// pbpMergeExportTargetCredentials, which strips them first). Base owns target
-// existence and ordinary fields; fill's non-empty secret fields land on top.
+// pbpStripExportTargetTokens-based flows, which drop them first). Base owns
+// target existence and ordinary fields; fill's non-empty secret fields land
+// on top.
 // fillWins=true lets fill overwrite a non-empty base secret (keys-on enable:
 // this device is opting ITS credentials in); fillWins=false only fills slots
 // the base left empty/missing (keys-off copy-down: cloud is the truth, local
@@ -1856,6 +1845,15 @@ async function pbpMigrateSecretsToLocal() {
       // writes nothing to sync — repeating an identical scrub every boot and
       // storage-warm tick would just burn sync write quota.
       if (plan.syncKeys.length || plan.scrubExportTargets) {
+        // Cross-device TOCTOU guard: another device may have just explicitly
+        // enabled key sync while this idempotent cleanup was mid-flight.
+        // Re-read the marker at the last moment — scrubbing after a fresh
+        // enable would silently undo the user's opt-in and tombstone the
+        // credentials it just published. (The window cannot be closed
+        // entirely without a sync-side CAS; this narrows it to one write.)
+        let recheck = {};
+        try { recheck = await chrome.storage.sync.get("syncApiKeys"); } catch (_) {}
+        if (recheck.syncApiKeys === true) return;
         const scrub = { syncApiKeys: false };
         plan.syncKeys.forEach((key) => { scrub[key] = ""; });
         if (plan.scrubExportTargets) scrub.exportTargets = pbpStripExportTargetTokensOnly(fromSync.exportTargets);

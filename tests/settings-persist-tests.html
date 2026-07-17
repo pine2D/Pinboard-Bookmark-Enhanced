@@ -1542,6 +1542,33 @@ async function run() {
     check("E5 migration: local cleared empty remains empty while stale sync is scrubbed",
       localArea.geminiApiKey === "" && syncArea.geminiApiKey === "");
 
+    // Regression (Codex review): an explicit keys-on enable landing while the
+    // idempotent cleanup is mid-flight must not be undone by its scrub — the
+    // last-moment marker recheck aborts instead of tombstoning the freshly
+    // published credentials.
+    localArea.geminiApiKey = "obf:g-local";
+    syncArea.geminiApiKey = "obf:g-stale";
+    syncArea.syncApiKeys = false;
+    const realSyncGetC5 = globalThis.chrome.storage.sync.get;
+    let c5MarkerReads = 0;
+    globalThis.chrome.storage.sync.get = (keys) => {
+      const markerOnly = keys === "syncApiKeys" ||
+        (Array.isArray(keys) && keys.length === 1 && keys[0] === "syncApiKeys");
+      const result = realSyncGetC5(keys);
+      if (markerOnly && ++c5MarkerReads === 1) {
+        // Simulate a remote device enabling key sync right after the state read.
+        return result.then((snapshot) => { syncArea.syncApiKeys = true; return snapshot; });
+      }
+      return result;
+    };
+    await pbpMigrateSecretsToLocal();
+    globalThis.chrome.storage.sync.get = realSyncGetC5;
+    check("E5 migration scrub aborts when a concurrent keys-on enable lands mid-flight",
+      syncArea.syncApiKeys === true && syncArea.geminiApiKey === "obf:g-stale");
+    syncArea.syncApiKeys = false;
+    syncArea.geminiApiKey = "";
+    localArea.geminiApiKey = "";
+
     // Stripped/full sync exportTargets cannot erase or overwrite local truth.
     syncArea.exportTargets = { github: { enabled: false, repo: "stale-stripped" } };
     const localTargetsBeforeStrip = JSON.stringify(localArea.exportTargets);

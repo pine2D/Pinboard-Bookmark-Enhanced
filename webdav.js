@@ -360,12 +360,21 @@ async function pbpWebdavPush(cfgOverride) {
     }
     let resp = await _pbpWebdavFetch("push", conditionalCfg, { body: JSON.stringify(payload) });
     if (resp.status === 412 && conditionalCfg.createOnly === true) {
-      let priorPushSucceeded = false;
+      // Only a prior success against the SAME target+user may authorize the
+      // one-time If-Match:* takeover: a success recorded at an old server
+      // must not let the alarm blind-overwrite a NEW target's existing file.
+      // Legacy records from pre-binding builds carry no target and get one
+      // grace pass — the first success under this build rebinds them.
+      let allowTakeover = false;
       try {
         const { webdavLastPush } = await chrome.storage.local.get("webdavLastPush");
-        priorPushSucceeded = !!(webdavLastPush && webdavLastPush.ok === true);
+        if (webdavLastPush && webdavLastPush.ok === true) {
+          allowTakeover = !("target" in webdavLastPush) ||
+            (deobfuscateKey(webdavLastPush.target || "") === pbpWebdavFileUrl(cfg.baseUrl) &&
+             deobfuscateKey(webdavLastPush.user || "") === String(cfg.user || ""));
+        }
       } catch (_) {}
-      if (priorPushSucceeded) {
+      if (allowTakeover) {
         resp = await _pbpWebdavFetch("push",
           Object.assign({}, cfg, { known: true, etag: "" }),
           { body: JSON.stringify(payload) });
@@ -391,6 +400,12 @@ async function pbpWebdavPush(cfgOverride) {
     // validator is remembered as known-exists and degrades to If-Match:*.
     if (resp.ok) await pbpWebdavRememberEtag(cfg, nextEtag).catch(() => {});
     const result = { ts: Date.now(), ok: resp.ok, error, status, etag: nextEtag || undefined };
+    if (resp.ok) {
+      // Bind the success to its target (obfuscated like the ETag state) so a
+      // later URL/username switch cannot inherit takeover authority from it.
+      result.target = obfuscateKey(pbpWebdavFileUrl(cfg.baseUrl));
+      result.user = obfuscateKey(String(cfg.user || ""));
+    }
     await chrome.storage.local.set({ webdavLastPush: result });
     return result;
   } catch (e) {
