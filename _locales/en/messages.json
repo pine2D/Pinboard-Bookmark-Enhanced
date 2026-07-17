@@ -993,6 +993,9 @@
   "webdavTargetUnavailable": {
     "message": "Target directory was not found or could not be created. Use a writable WebDAV folder URL."
   },
+  "webdavConflict": {
+    "message": "The remote backup changed. Pull it before pushing again."
+  },
   "webdavPermDenied": {
     "message": "Permission denied — click Test to grant access"
   },
@@ -1757,7 +1760,13 @@
     }
   },
   "syncMigrationFailed": {
-    "message": "Sync migration failed. Please try again or reduce custom CSS size."
+    "message": "Sync migration failed. Try again; if it persists, check available Chrome Sync storage."
+  },
+  "syncConflictUseCloud": {
+    "message": "Chrome Sync already has settings. Use the cloud settings on this device?\n\nChoose Cancel to use this device's settings instead."
+  },
+  "syncConflictOverwriteCloud": {
+    "message": "Replace the settings in Chrome Sync with this device's settings?\n\nChoose Cancel to leave Chrome Sync off."
   },
   "jinaFreeTierHint": {
     "message": "Free tier: 20 RPM. Add key for higher quota."

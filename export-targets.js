@@ -41,6 +41,11 @@ function pbpWebhookHttpWarn(url) {
   return !!raw && !pbpEndpointOriginPattern(raw);
 }
 
+function pbpExportTargetSecretValue(cfg, key) {
+  const value = String((cfg && cfg[key]) || "");
+  return typeof deobfuscateKey === "function" ? deobfuscateKey(value) : value;
+}
+
 // Inline SVG icons (no emoji — font-fallback rule). 16px line icons.
 const _PBP_ICON_OBSIDIAN =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>';
@@ -134,7 +139,7 @@ const PBP_EXPORT_TARGETS = {
     mechanism: "token-api",
     frontmatter: "strip",          // bare markdown rides the envelope's `markdown` field
     origin(cfg) {
-      return pbpEndpointOriginPattern((cfg && cfg.url) || "");
+      return pbpEndpointOriginPattern(pbpExportTargetSecretValue(cfg, "url"));
     },
     parseSuccess(resp) { return !!(resp && resp.ok); },
     buildRequest(meta, body, cfg, token) {
@@ -162,10 +167,12 @@ const PBP_EXPORT_TARGETS = {
       if (meta.site) payload.site = String(meta.site);
       if (meta.image) payload.image = String(meta.image);
       if (Number.isFinite(meta.words)) payload.words = meta.words;
-      return { url: String((cfg && cfg.url) || ""), method: "POST", headers, body: JSON.stringify(payload) };
+      return { url: pbpExportTargetSecretValue(cfg, "url"), method: "POST", headers, body: JSON.stringify(payload) };
     },
     settings: [
-      { key: "url", type: "text", required: true, label: "mdTargetWebhookUrl", placeholder: "https://…" },
+      // Capability URLs often contain an unrevoked secret in their path/query.
+      // Keep the text input usable, but route/store/export it as a credential.
+      { key: "url", type: "text", secret: true, required: true, label: "mdTargetWebhookUrl", placeholder: "https://…" },
       { key: "token", type: "secret", label: "mdTargetWebhookToken", placeholder: "Bearer …  /  Token …" }
     ],
     onboarding: "mdTargetWebhookOnboarding"

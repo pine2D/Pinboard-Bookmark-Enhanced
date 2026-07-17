@@ -993,6 +993,9 @@
   "webdavTargetUnavailable": {
     "message": "Katalog docelowy nie istnieje albo nie można go utworzyć. Podaj adres URL zapisywalnego folderu WebDAV."
   },
+  "webdavConflict": {
+    "message": "Kopia zapasowa na serwerze została zmieniona. Pobierz ją przed ponownym wysłaniem."
+  },
   "webdavPermDenied": {
     "message": "Odmowa uprawnień — kliknij „Testuj”, aby je przyznać"
   },
@@ -1787,7 +1790,13 @@
     }
   },
   "syncMigrationFailed": {
-    "message": "Migracja synchronizacji nie powiodła się. Spróbuj ponownie lub zmniejsz rozmiar niestandardowego CSS."
+    "message": "Migracja synchronizacji nie powiodła się. Spróbuj ponownie. Jeśli problem nie ustąpi, sprawdź dostępne miejsce w Chrome Sync."
+  },
+  "syncConflictUseCloud": {
+    "message": "Chrome Sync zawiera już ustawienia. Czy użyć ustawień z chmury na tym urządzeniu?\n\nWybierz „Anuluj”, aby zamiast tego użyć ustawień z tego urządzenia."
+  },
+  "syncConflictOverwriteCloud": {
+    "message": "Czy zastąpić ustawienia w Chrome Sync ustawieniami z tego urządzenia?\n\nWybierz „Anuluj”, aby pozostawić Chrome Sync wyłączone."
   },
   "jinaFreeTierHint": {
     "message": "Darmowy poziom: 20 RPM. Dodaj klucz, aby uzyskać większy limit."

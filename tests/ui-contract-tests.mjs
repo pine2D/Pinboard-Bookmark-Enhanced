@@ -386,9 +386,16 @@ check(inOrder(optionsJs,
   "pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey);",
   'document.documentElement.dataset.optionsReady = "1";', "// Language change"),
   "options.js: General values, authoritative theme/mirror, and ready gate are out of order");
-check(inOrder(optionsJs, "const res = await persistSettings(data);", "if (!res.ok)",
-  "pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey);",
-  "const overlay = await saveOverlayWithFallback(overlayValue);"),
+const optionsSnapshotStart = optionsJs.indexOf("async function pbpSaveOptionsSnapshot");
+const optionsSnapshotEnd = optionsJs.indexOf("function pbpQueueOptionsSave", optionsSnapshotStart);
+const optionsSnapshot = optionsJs.slice(optionsSnapshotStart, optionsSnapshotEnd);
+const optionsSaveAllStart = optionsJs.indexOf("async function saveAll()", optionsSnapshotEnd);
+const optionsSaveAllEnd = optionsJs.indexOf("function reportAutoSaveFailure", optionsSaveAllStart);
+const optionsSaveAll = optionsJs.slice(optionsSaveAllStart, optionsSaveAllEnd);
+check(inOrder(optionsSnapshot, "await persist(settingsDelta)", "if (!res.ok)",
+  "if (onSettingsSaved) onSettingsSaved(settingsDelta);",
+  "overlay = await saveOverlay(overlayValue);") &&
+  /onSettingsSaved\(settingsDelta\)[\s\S]*pbpStoreOptionsThemeMirror\(data\.optTheme, data\.themePresetKey\)/.test(optionsSaveAll),
   "options.js: theme mirror is updated before settings persistence succeeds or after overlay work");
 
 check(/const el = document\.createElement\("button"\);[\s\S]{0,240}el\.className = "stag";/.test(popupTagsJs), "popup-tags.js: suggested tag is not a button");

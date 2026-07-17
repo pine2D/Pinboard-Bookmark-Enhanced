@@ -41,15 +41,56 @@ async function saveOverlayWithFallback(value) {
     ? globalThis.__pbpTestSyncSetLarge : syncSetLarge;
   try {
     await ssl("customOverlayCSS", value);
-    await chrome.storage.sync.set({ optOverlayInLocal: false });
     await chrome.storage.local.remove("customOverlayCSS_localFallback");
     return { fellBackToLocal: false };
   } catch (e) {
-    if (!/QUOTA|quota/i.test(e && e.message || "")) throw e;
+    if (!(e && e.pbpFellBackToLocal) && !/QUOTA|quota/i.test(e && e.message || "")) throw e;
     await chrome.storage.local.set({ customOverlayCSS_localFallback: value });
-    await chrome.storage.sync.set({ optOverlayInLocal: true });
     return { fellBackToLocal: true };
   }
+}
+
+// One auto-save transaction with explicit mutable baselines. Ordinary
+// settings commit first; an invalid/failed overlay cannot roll their baseline
+// back or cause an unrelated stale form snapshot to be retried later.
+async function pbpSaveOptionsSnapshot(state, data, overlayValue, {
+  persist,
+  saveOverlay,
+  assertOverlay,
+  onSettingsSaved,
+}) {
+  const settingsDelta = pbpSettingsDelta(data, state.settings);
+  const overlayChanged = overlayValue !== state.overlay;
+  const res = Object.keys(settingsDelta).length
+    ? await persist(settingsDelta)
+    : { ok: true, fellBackToLocal: false };
+  if (!res.ok) throw res.error || new Error("settings save failed");
+  if (Object.keys(settingsDelta).length) {
+    state.settings = Object.assign({}, state.settings, settingsDelta);
+    if (onSettingsSaved) onSettingsSaved(settingsDelta);
+  }
+
+  let overlay = { fellBackToLocal: false };
+  if (overlayChanged) {
+    assertOverlay(overlayValue);
+    overlay = await saveOverlay(overlayValue);
+    state.overlay = overlayValue;
+  }
+  return {
+    settingsDelta,
+    overlayChanged,
+    fellBackToLocal: !!(res.fellBackToLocal || overlay.fellBackToLocal),
+  };
+}
+
+function pbpQueueOptionsSave(state, save) {
+  if (state.suspended) return state.chain;
+  const run = state.chain.then(save, save);
+  // Return the real outcome so the caller can report it, while keeping the
+  // stored queue tail fulfilled so one unexpected exception cannot poison all
+  // later saves or a bulk-import drain.
+  state.chain = run.catch(() => {});
+  return run;
 }
 
 let _tagGovVisibleAccount = "";
@@ -573,7 +614,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         inp.id = id + "-" + s.key;
         lab.htmlFor = inp.id;
         inp.dataset.et = id + "." + s.key;
-        if (s.type === "secret") {
+        if (s.type === "secret" || s.secret === true) {
           inp.dataset.secret = "1";
           inp.value = (typeof deobfuscateKey === "function") ? deobfuscateKey(cfg[s.key] || "") : (cfg[s.key] || "");
         } else if (s.type === "select") {
@@ -863,10 +904,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Cap synced overlay at 50 KB; oversize data stays available locally.
         if (pbpOverlayByteLength(newOverlay) > OVERLAY_BYTE_LIMIT) {
           await chrome.storage.local.set({ customOverlayCSS_localFallback: newOverlay });
-          await chrome.storage.sync.set({ optOverlayInLocal: true });
         } else {
           await syncSetLarge("customOverlayCSS", newOverlay);
-          await chrome.storage.sync.set({ optOverlayInLocal: false });
+          await chrome.storage.local.remove("customOverlayCSS_localFallback");
         }
         // Persist resolved preset key in sync
         await chrome.storage.sync.set({ themePresetKey: resolvedKey || "" });
@@ -888,9 +928,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     // Always read overlay (post-migration or fresh install)
     if (s.customOverlayCSS === undefined) {
-      const overlayFlags = await chrome.storage.sync.get({ optOverlayInLocal: false });
-      if (overlayFlags.optOverlayInLocal) {
-        const local = await chrome.storage.local.get({ customOverlayCSS_localFallback: "" });
+      const local = await chrome.storage.local.get("customOverlayCSS_localFallback");
+      if (typeof local.customOverlayCSS_localFallback === "string") {
         s.customOverlayCSS = local.customOverlayCSS_localFallback;
       } else {
         s.customOverlayCSS = await syncGetLarge("customOverlayCSS", "");
@@ -1105,16 +1144,68 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Sync toggle change: migrate settings then reload
   syncToggle?.addEventListener("change", async () => {
     const enabling = syncToggle.checked;
+    let cancelled = false;
     if (syncKeysToggle) syncKeysToggle.disabled = !enabling;
     const oldStorage = enabling ? chrome.storage.local : chrome.storage.sync;
     const newStorage = enabling ? chrome.storage.sync : chrome.storage.local;
+    // This action reloads the page and migrates the persisted snapshot. Freeze
+    // the debounce queue first so edits made immediately before the toggle are
+    // neither lost on reload nor omitted from the migration source.
+    await pauseOptionsAutoSave();
+    const pendingSave = await saveAll();
+    if (!pendingSave.ok) {
+      const actual = await chrome.storage.local.get({ optSyncEnabled: !enabling }).catch(() => ({ optSyncEnabled: !enabling }));
+      syncToggle.checked = !!actual.optSyncEnabled;
+      if (syncKeysToggle) syncKeysToggle.disabled = !actual.optSyncEnabled;
+      resumeOptionsAutoSave();
+      return;
+    }
     try {
+      let useCloud = false;
+      const beforeTransition = await chrome.storage.local.get({ optSyncEnabled: !enabling });
+      // Never hold the origin-wide secret-storage Web Lock across a modal.
+      // Chrome can suspend a tab-modal confirm when the options tab loses
+      // focus; holding the lock there would also stall popup and SW reads.
+      if (enabling && !beforeTransition.optSyncEnabled) {
+        const cloud = await chrome.storage.sync.get(null);
+        if (Object.keys(cloud).some((key) => key !== "syncApiKeys")) {
+          if (confirm(t("syncConflictUseCloud"))) {
+            useCloud = true;
+          } else if (!confirm(t("syncConflictOverwriteCloud"))) {
+            cancelled = true;
+          }
+        }
+      }
+      if (cancelled) {
+        syncToggle.checked = false;
+        if (syncKeysToggle) syncKeysToggle.disabled = true;
+        resumeOptionsAutoSave();
+        return;
+      }
       await pbpWithSecretStorageLock(async () => {
         const fresh = await pbpReadSecretSyncStateUnlocked({ includeGlobalWhenSyncOff: true });
         if (!!fresh.optSyncEnabled === enabling) return;
         try {
+          // Joining an existing Chrome account uses its cloud settings as the
+          // source of truth. Local values remain untouched, so enabling sync on
+          // a second device can never overwrite an established cloud profile.
+          if (enabling && useCloud) {
+            await chrome.storage.local.set({ optSyncEnabled: true });
+            _settingsStorageCache = chrome.storage.sync;
+            return;
+          }
+
           // 1. Migrate regular settings
-          const data = await oldStorage.get(Object.keys(SETTINGS_DEFAULTS));
+          const settingKeys = Object.keys(SETTINGS_DEFAULTS);
+          let data = await oldStorage.get(settingKeys);
+          data = await pbpResolveChunkedSettings(data, oldStorage, settingKeys);
+          const largeValues = {};
+          PBP_CHUNKED_SETTING_KEYS.forEach((key) => {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+              largeValues[key] = data[key];
+              delete data[key];
+            }
+          });
           // Keep the ordinary-settings migration from overwriting whichever
           // side currently owns the full credential/export-target snapshot.
           if (enabling) {
@@ -1124,9 +1215,15 @@ document.addEventListener("DOMContentLoaded", async () => {
               await newStorage.set(main);
             } else {
               // Global key sync is already on. Local credentials can be stale;
-              // publish only ordinary settings and keep cloud secrets/targets.
+              // publish this device's ordinary target settings while keeping
+              // the current cloud credentials inside the same mixed object.
               const { main } = pbpSplitSecretBatch(data);
-              delete main.exportTargets;
+              const cloudTargets = await chrome.storage.sync.get("exportTargets");
+              main.exportTargets = pbpOverlaySecrets(
+                { exportTargets: main.exportTargets || {} },
+                cloudTargets,
+                new Set(["exportTargets"]),
+              ).exportTargets;
               await newStorage.set(main);
             }
           } else {
@@ -1135,10 +1232,15 @@ document.addEventListener("DOMContentLoaded", async () => {
               // this sync-off device can continue locally without cloud reads.
               await newStorage.set(data);
             } else {
-              // Local already owns the full secret target object. Do not replace
-              // it with the stripped main-area copy from sync.
+              // Merge the latest cloud non-secret target settings with this
+              // device's credential fields before local becomes the sole area.
               const { main } = pbpSplitSecretBatch(data);
-              delete main.exportTargets;
+              const localTargets = await chrome.storage.local.get("exportTargets");
+              main.exportTargets = pbpOverlaySecrets(
+                { exportTargets: main.exportTargets || {} },
+                localTargets,
+                new Set(["exportTargets"]),
+              ).exportTargets;
               await newStorage.set(main);
             }
           }
@@ -1147,8 +1249,20 @@ document.addEventListener("DOMContentLoaded", async () => {
           const savedThemes = await syncGetLarge("savedThemes", []);
           await chrome.storage.local.set({ optSyncEnabled: enabling });
           _settingsStorageCache = newStorage;
-          await syncSetLarge("customOverlayCSS", customOverlayCSS);
-          await syncSetLarge("savedThemes", savedThemes);
+          for (const [key, value] of [
+            ...Object.entries(largeValues),
+            ["customOverlayCSS", customOverlayCSS],
+            ["savedThemes", savedThemes],
+          ]) {
+            try { await syncSetLarge(key, value); }
+            catch (error) {
+              if (!enabling) throw error;
+              // Quota fallback is an explicit device-local override. Network,
+              // permission, and other storage failures are not safe to label
+              // as saved locally; abort and restore the device sync flag.
+              if (!(error && error.pbpFellBackToLocal)) throw error;
+            }
+          }
         } catch (e) {
           await chrome.storage.local.set({ optSyncEnabled: !enabling });
           _settingsStorageCache = oldStorage;
@@ -1163,10 +1277,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (syncKeysToggle) syncKeysToggle.disabled = !actual.optSyncEnabled;
       const errEl = $id("opt-sync-error");
       if (errEl) {
-        errEl.textContent = t("syncMigrationFailed") || "Sync migration failed. Please try again or reduce custom CSS size.";
+        errEl.textContent = t("syncMigrationFailed") || "Sync migration failed. Try again; if it persists, check available Chrome Sync storage.";
         errEl.classList.remove("hidden");
         setTimeout(() => errEl.classList.add("hidden"), 8000);
       }
+      resumeOptionsAutoSave();
       return;
     }
     // Fade out and reload
@@ -1201,7 +1316,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       syncKeysToggle.disabled = !actual.optSyncEnabled;
       const errEl = $id("opt-sync-error");
       if (errEl) {
-        errEl.textContent = t("syncMigrationFailed") || "Sync migration failed. Please try again.";
+        errEl.textContent = t("syncMigrationFailed") || "Sync migration failed. Try again; if it persists, check available Chrome Sync storage.";
         errEl.classList.remove("hidden");
         setTimeout(() => errEl.classList.add("hidden"), 8000);
       }
@@ -1222,7 +1337,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("opt-lang").addEventListener("change", async () => {
     const lang = $id("opt-lang").value;
     const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "general";
-    await (await getSettingsStorage()).set({ optLang: lang });
+    // The generic select listener runs after this handler. Suspend it before
+    // the first await, flush every pending field (including optLang), and keep
+    // it suspended until reload so the 500 ms timer cannot race the transition.
+    await pauseOptionsAutoSave();
+    const saved = await saveAll();
+    if (!saved.ok) {
+      resumeOptionsAutoSave();
+      return;
+    }
     sessionStorage.setItem("activeTab", activePanel);
     document.body.style.transition = "opacity 0.18s";
     document.body.style.opacity = "0";
@@ -1410,11 +1533,35 @@ document.addEventListener("DOMContentLoaded", async () => {
         setStatusIcon(statusEl, false, webdavLastPush.status ? t("webdavPushFail", "http-" + webdavLastPush.status) : t("webdavPushNotWritable"));
       } else if (webdavLastPush.error === "not-found") {
         setStatusIcon(statusEl, false, t("webdavTargetUnavailable"));
+      } else if (webdavLastPush.error === "conflict") {
+        setStatusIcon(statusEl, false, t("webdavConflict"));
       } else {
         setStatusIcon(statusEl, false, t("webdavPushFail", webdavLastPush.error || ""));
       }
     } catch (_) {}
   })();
+
+  const autoSaveState = { suspended: false, chain: Promise.resolve() };
+
+  async function pauseOptionsAutoSave() {
+    autoSaveState.suspended = true;
+    clearTimeout(saveTimer);
+    await autoSaveState.chain;
+  }
+
+  function resumeOptionsAutoSave() {
+    autoSaveState.suspended = false;
+    scheduleAutoSave();
+  }
+
+  async function flushOptionsAutoSave() {
+    await pauseOptionsAutoSave();
+    try {
+      return await saveAll();
+    } finally {
+      resumeOptionsAutoSave();
+    }
+  }
 
   // ---- WebDAV: Test ----
   $id("webdav-test-btn")?.addEventListener("click", async () => {
@@ -1456,12 +1603,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       return;
     }
-    const res = await pbpWebdavPush(cfg);
+    let res;
+    try {
+      // The payload is read from storage. Hold the debounce queue, persist the
+      // current form once, then keep it suspended until that exact snapshot has
+      // been sent. Edits made during the request are saved after resume().
+      await pauseOptionsAutoSave();
+      const saved = await saveAll();
+      if (!saved.ok) {
+        setStatusIcon(statusEl, false, t("optSaveFailed"));
+        statusEl.style.color = "#c00";
+        setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+        return;
+      }
+      res = await pbpWebdavPush(cfg);
+    } finally {
+      resumeOptionsAutoSave();
+    }
     if (res.ok) {
       setStatusIcon(statusEl, true, t("webdavPushOk", new Date(res.ts).toLocaleString()));
       statusEl.style.color = "#080";
     } else {
-      const msg = res.error === "not-writable" ? (res.status ? t("webdavPushFail", "http-" + res.status) : t("webdavPushNotWritable"))
+      const msg = res.error === "conflict" ? t("webdavConflict")
+        : res.error === "not-writable" ? (res.status ? t("webdavPushFail", "http-" + res.status) : t("webdavPushNotWritable"))
         : res.error === "not-found" ? t("webdavTargetUnavailable")
         : t("webdavPushFail", res.error || "");
       setStatusIcon(statusEl, false, msg);
@@ -1496,6 +1660,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       return;
     }
+    try {
+      // Reject malformed or future-schema backups before asking the user to
+      // confirm a replacement. pbpApplyBackupPayload repeats this check before
+      // the first write, so this is an early UX gate rather than the sole guard.
+      pbpPreflightBackupPayload(res.data, EXPORTABLE_KEYS);
+    } catch (_) {
+      setStatusIcon(statusEl, false, t("webdavPullInvalid"));
+      statusEl.style.color = "#c00";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      return;
+    }
     const pushedAt = (res.data._webdav && res.data._webdav.pushedAt) || "";
     const when = pushedAt ? new Date(pushedAt).toLocaleString() : "?";
     // Spec invariant #2: pull only ever applies after this confirm(); Cancel
@@ -1505,9 +1680,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusEl.textContent = "";
       return;
     }
+    // A confirmed bulk replacement wins over edits that were still waiting in
+    // the debounce queue. Persist the live form once before applying so fields
+    // deliberately absent from backups (API keys, WebDAV credentials, target
+    // credentials) survive the reload; backed-up ordinary fields are replaced
+    // immediately afterward. Keep timers suppressed throughout.
     try {
-      await pbpApplyBackupPayload(res.data, { exportableKeys: EXPORTABLE_KEYS, saveOverlayWithFallback });
+      await pauseOptionsAutoSave();
+      const saved = await saveAll();
+      if (!saved.ok) throw saved.error || new Error("settings save failed");
+      await pbpApplyBackupPayload(res.data, {
+        exportableKeys: EXPORTABLE_KEYS,
+        saveOverlayWithFallback,
+        loadThemes: _loadPinboardThemes,
+      });
+      // The settings restore already succeeded. ETag persistence is only the
+      // next-push conflict guard; a local storage hiccup must not misreport the
+      // completed restore as failed (an unknown ETag still fails closed).
+      await pbpWebdavRememberEtag(cfg, res.etag).catch(() => {});
     } catch (err) {
+      resumeOptionsAutoSave();
       console.error("[webdav-pull] apply failed", err);
       setStatusIcon(statusEl, false, t("importApplyFailed"));
       statusEl.style.color = "#c00";
@@ -1530,9 +1722,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ===================== Auto-save =====================
   // Collect all settings from the form and save to chrome.storage.sync
-  async function saveAll() {
+  function collectSettingsFromForm() {
     const _ets = collectExportTargets();
-    const data = {
+    return {
       // Bookmarks
       pinboardToken: obfuscateKey($id("opt-pinboard-token").value.trim()),
       optPrivateDefault: $id("opt-private-default").checked,
@@ -1659,8 +1851,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       waybackSkipPrivate: $id("opt-wayback-skip-private").checked,
       waybackS3Key: obfuscateKey($id("opt-wayback-s3key").value.trim()),
       waybackS3Secret: obfuscateKey($id("opt-wayback-s3secret").value.trim()),
-      webdavUrl: $id("opt-webdav-url").value.trim(),
-      webdavUser: $id("opt-webdav-user").value.trim(),
+      webdavUrl: obfuscateKey($id("opt-webdav-url").value.trim()),
+      webdavUser: obfuscateKey($id("opt-webdav-user").value.trim()),
       webdavPass: obfuscateKey($id("opt-webdav-pass").value.trim()),
       webdavAutoPush: $id("opt-webdav-autopush").value,
       backupIncludeHighlights: $id("opt-backup-include-highlights").checked,
@@ -1690,19 +1882,33 @@ document.addEventListener("DOMContentLoaded", async () => {
         return { popupWidth: popupWidthToSave };
       })()
     };
+  }
+
+  const savedState = {
+    settings: collectSettingsFromForm(),
+    overlay: $id("opt-custom-css").value,
+  };
+
+  async function saveAll() {
+    const data = collectSettingsFromForm();
+    const overlayValue = $id("opt-custom-css").value;
     try {
-      const overlayValue = $id("opt-custom-css").value;
-      pbpAssertOverlaySize(overlayValue);
-      const res = await persistSettings(data);
-      if (!res.ok) throw res.error || new Error("settings save failed");
-      pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey);
-      const overlay = await saveOverlayWithFallback(overlayValue);
-      if (res.fellBackToLocal || overlay.fellBackToLocal) {
+      const result = await pbpSaveOptionsSnapshot(savedState, data, overlayValue, {
+        persist: persistSettings,
+        saveOverlay: saveOverlayWithFallback,
+        assertOverlay: pbpAssertOverlaySize,
+        onSettingsSaved(settingsDelta) {
+          if ("optTheme" in settingsDelta || "themePresetKey" in settingsDelta) {
+            pbpStoreOptionsThemeMirror(data.optTheme, data.themePresetKey);
+          }
+        },
+      });
+      if (result.fellBackToLocal) {
         flashAutoSave("optSavedLocally", "Saved locally (sync quota full)", 4000);
       } else {
         flashAutoSave();
       }
-      return { ok: true, fellBackToLocal: res.fellBackToLocal || overlay.fellBackToLocal };
+      return { ok: true, fellBackToLocal: result.fellBackToLocal };
     } catch (error) {
       return reportAutoSaveFailure(error);
     }
@@ -1715,12 +1921,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function saveAllSafely() {
-    void saveAll().catch(reportAutoSaveFailure);
+    void pbpQueueOptionsSave(autoSaveState, saveAll).catch(reportAutoSaveFailure);
   }
 
   // Debounced auto-save: triggers 500ms after last change
   let saveTimer = null;
   function scheduleAutoSave() {
+    if (autoSaveState.suspended) return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveAllSafely, 500);
   }
@@ -1753,7 +1960,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- Export/Import: see options-backup.js ----
   // EXPORTABLE_KEYS whitelist excludes API keys + cache entries from backup.
   const EXPORTABLE_KEYS = Object.keys(SETTINGS_DEFAULTS).filter(k => !API_KEY_FIELDS.includes(k));
-  setupBackup({ exportableKeys: EXPORTABLE_KEYS, saveOverlayWithFallback });
+  setupBackup({
+    exportableKeys: EXPORTABLE_KEYS,
+    saveOverlayWithFallback,
+    loadThemes: _loadPinboardThemes,
+    beforeExport: async () => (await flushOptionsAutoSave()).ok,
+    beforeApply: pauseOptionsAutoSave,
+    afterApply: resumeOptionsAutoSave,
+  });
   setupApiTests();
 
 
@@ -1827,7 +2041,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const saveBtn = $id("save-custom-theme");
     if (!saveBtn) return;
     const css = $id("opt-custom-css").value;
-    saveBtn.disabled = !css.trim();
+    saveBtn.disabled = !css.trim() || pbpOverlayByteLength(css) > OVERLAY_BYTE_LIMIT;
   }
 
   // Update saved-theme/save-button state and byte counter when user edits overlay CSS.
@@ -1944,7 +2158,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $id("save-custom-theme").addEventListener("click", () => {
     const css = $id("opt-custom-css").value.trim();
-    if (!css) return;
+    if (!css || pbpOverlayByteLength(css) > OVERLAY_BYTE_LIMIT) return;
 
     const wrap = document.querySelector(".save-theme-wrap");
     if (wrap.querySelector(".theme-name-popover")) return; // already open

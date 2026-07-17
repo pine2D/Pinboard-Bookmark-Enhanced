@@ -52,7 +52,16 @@ assert(PBP_EXPORT_TARGETS.github.settings[0].required === true, "github token is
 assert(PBP_EXPORT_TARGETS.webhook.mechanism === "token-api", "webhook is token-api");
 assert(typeof PBP_EXPORT_TARGETS.webhook.origin === "function", "webhook origin is a fn of cfg (dynamic host)");
 assert(PBP_EXPORT_TARGETS.webhook.settings[0].required === true, "webhook url is required");
+assert(PBP_EXPORT_TARGETS.webhook.settings[0].secret === true, "webhook capability URL is classified as a secret");
 assert(PBP_URI_BUDGET === 2000, "budget constant");
+pbpExportTargetIds().forEach((id) => {
+  const registrySecrets = (PBP_EXPORT_TARGETS[id].settings || [])
+    .filter((setting) => setting.type === "secret" || setting.secret === true)
+    .map((setting) => setting.key);
+  const routedSecrets = pbpExportTargetSecretKeys(id);
+  assert(registrySecrets.every((key) => routedSecrets.includes(key)),
+    `every ${id} registry secret is covered by shared secret routing`);
+});
 
 section("github.buildRequest (private gist)");
 {
@@ -163,6 +172,13 @@ assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "http://192.168.1.50/hook" }) ==
 assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "http://example.com/hook" }) === null, "public http -> blocked");
 assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "not a url" }) === null, "malformed URL -> null origin");
 assert(PBP_EXPORT_TARGETS.webhook.origin({ url: "https://user:pass@hook.example.com/x" }) === null, "credential URL -> blocked");
+{
+  const encodedUrl = obfuscateKey("https://secret-hook.example.com/abc?token=x");
+  const origin = PBP_EXPORT_TARGETS.webhook.origin({ url: encodedUrl });
+  const req = PBP_EXPORT_TARGETS.webhook.buildRequest({ title: "T" }, "x", { url: encodedUrl }, "");
+  assert(origin === "https://secret-hook.example.com/*" && req.url === "https://secret-hook.example.com/abc?token=x",
+    "obfuscated webhook capability URL is decoded for permission and dispatch");
+}
 
 section("pbpWebhookHttpWarn (mirrors the hard runtime policy)");
 assert(pbpWebhookHttpWarn("https://example.com/hook") === false, "https -> no warn");

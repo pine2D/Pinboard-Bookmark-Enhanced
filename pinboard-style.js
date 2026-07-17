@@ -5,7 +5,7 @@
 // Schema v2 (2026-05-01):
 //   themePresetKey   → string, looks up CSS from PINBOARD_THEMES (loaded above)
 //   customOverlayCSS → user's tweak CSS, appended after preset (CSS later wins)
-//   optOverlayInLocal → flag: overlay exceeded sync quota, lives in local
+//   customOverlayCSS_localFallback → this device's quota fallback
 // ============================================================
 
 // Adaptive theme map (mirrors shared.js — content scripts can't import it)
@@ -43,13 +43,32 @@ if (_pbpHasTheme) {
       const data = await chrome.storage.local.get({ [key]: defaultValue });
       return data[key];
     }
+    const fallbackKey = `${key}_localFallback`;
+    const fallback = await chrome.storage.local.get(fallbackKey);
+    if (typeof fallback[fallbackKey] === "string") return fallback[fallbackKey];
     const meta = await chrome.storage.sync.get(key);
-    if (!meta[key] || !meta[key]._chunks) return defaultValue;
-    const chunkKeys = Array.from({ length: meta[key]._chunks }, (_, i) => `${key}_${i}`);
+    const fallbackRecord = fallback[fallbackKey];
+    if (fallbackRecord && fallbackRecord._pbpLargeFallback === 1 &&
+        (!meta[key] || meta[key]._generation !== fallbackRecord._generation)) {
+      return typeof fallbackRecord.value === "string" ? fallbackRecord.value : defaultValue;
+    }
+    if (typeof meta[key] === "string") return meta[key];
+    const count = Number(meta[key] && meta[key]._chunks);
+    const generation = meta[key] && meta[key]._generation;
+    const matchingFallback = fallbackRecord && fallbackRecord._pbpLargeFallback === 1 &&
+      typeof fallbackRecord.value === "string" ? fallbackRecord.value : null;
+    if (!Number.isInteger(count) || count < 1 || count > 512 ||
+        (generation !== undefined && (typeof generation !== "string" || !/^[a-z0-9]+$/i.test(generation)))) {
+      return matchingFallback === null ? defaultValue : matchingFallback;
+    }
+    const prefix = generation ? `${key}_${generation}_` : `${key}_`;
+    const chunkKeys = Array.from({ length: count }, (_, i) => `${prefix}${i}`);
     const chunks = await chrome.storage.sync.get(chunkKeys);
-    let str = "";
-    for (const k of chunkKeys) str += (chunks[k] || "");
-    return str || defaultValue;
+    if (chunkKeys.some((chunkKey) => typeof chunks[chunkKey] !== "string")) {
+      return matchingFallback === null ? defaultValue : matchingFallback;
+    }
+    const joined = chunkKeys.map((chunkKey) => chunks[chunkKey]).join("");
+    return joined || (matchingFallback === null ? defaultValue : matchingFallback);
   }
 
   function uncloak() {
@@ -69,15 +88,8 @@ if (_pbpHasTheme) {
       themePresetKey: "",
     });
 
-    // Overlay may live in sync (chunked) or local fallback (when sync quota hit)
-    const { optOverlayInLocal } = await chrome.storage.sync.get({ optOverlayInLocal: false });
-    let overlay = "";
-    if (optOverlayInLocal) {
-      const local = await chrome.storage.local.get({ customOverlayCSS_localFallback: "" });
-      overlay = local.customOverlayCSS_localFallback;
-    } else {
-      overlay = await readChunkedSync("customOverlayCSS", "");
-    }
+    // The reader itself prefers this device's local quota fallback when present.
+    const overlay = await readChunkedSync("customOverlayCSS", "");
 
     // Inject pbp-dark class based on extension theme setting
     const isDark = data.optTheme === "dark" ||

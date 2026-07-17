@@ -993,6 +993,9 @@
   "webdavTargetUnavailable": {
     "message": "Le dossier cible est introuvable ou n’a pas pu être créé. Indiquez l’URL d’un dossier WebDAV inscriptible."
   },
+  "webdavConflict": {
+    "message": "La sauvegarde distante a été modifiée. Récupérez-la avant un nouvel envoi."
+  },
   "webdavPermDenied": {
     "message": "Permission refusée — cliquez sur « Tester » pour l'accorder"
   },
@@ -1787,7 +1790,13 @@
     }
   },
   "syncMigrationFailed": {
-    "message": "Échec de la migration de synchronisation. Veuillez réessayer ou réduire la taille du CSS personnalisé."
+    "message": "Échec de la migration de la synchronisation. Réessayez. Si le problème persiste, vérifiez l’espace disponible dans Chrome Sync."
+  },
+  "syncConflictUseCloud": {
+    "message": "Chrome Sync contient déjà des paramètres. Voulez-vous utiliser les paramètres du cloud sur cet appareil ?\n\nChoisissez « Annuler » pour utiliser plutôt les paramètres de cet appareil."
+  },
+  "syncConflictOverwriteCloud": {
+    "message": "Voulez-vous remplacer les paramètres de Chrome Sync par ceux de cet appareil ?\n\nChoisissez « Annuler » pour laisser Chrome Sync désactivé."
   },
   "jinaFreeTierHint": {
     "message": "Niveau gratuit : 20 RPM. Ajoutez une clé pour un quota plus élevé."

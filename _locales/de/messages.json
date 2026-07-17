@@ -993,6 +993,9 @@
   "webdavTargetUnavailable": {
     "message": "Zielverzeichnis wurde nicht gefunden oder konnte nicht erstellt werden. Verwende eine beschreibbare WebDAV-Ordner-URL."
   },
+  "webdavConflict": {
+    "message": "Die Sicherung auf dem Server wurde geändert. Rufe sie ab, bevor du erneut pushst."
+  },
   "webdavPermDenied": {
     "message": "Zugriff verweigert — auf „Testen“ klicken, um ihn zu gewähren"
   },
@@ -1787,7 +1790,13 @@
     }
   },
   "syncMigrationFailed": {
-    "message": "Sync-Migration fehlgeschlagen. Bitte erneut versuchen oder die Größe des eigenen CSS reduzieren."
+    "message": "Die Synchronisierungsmigration ist fehlgeschlagen. Versuche es erneut. Falls das Problem bleibt, prüfe den verfügbaren Chrome-Sync-Speicher."
+  },
+  "syncConflictUseCloud": {
+    "message": "In Chrome Sync sind bereits Einstellungen gespeichert. Möchtest du die Cloud-Einstellungen auf diesem Gerät verwenden?\n\nMit „Abbrechen“ kannst du stattdessen die Einstellungen dieses Geräts verwenden."
+  },
+  "syncConflictOverwriteCloud": {
+    "message": "Möchtest du die Einstellungen in Chrome Sync mit den Einstellungen dieses Geräts überschreiben?\n\nMit „Abbrechen“ bleibt Chrome Sync deaktiviert."
   },
   "jinaFreeTierHint": {
     "message": "Kostenlos: 20 RPM. Key für höheres Kontingent hinzufügen."

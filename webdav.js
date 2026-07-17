@@ -2,33 +2,44 @@
 // Pinboard Bookmark Enhanced -- WebDAV settings backup (batch (5))
 // Top section is PURE: no DOM / chrome / fetch. Loaded by options.html,
 // background.js (importScripts), and tests/webdav-tests.html (file://).
-// Depends only on shared.js globals: SETTINGS_DEFAULTS, API_KEY_FIELDS,
-// pbpStripExportTargetTokens, getSettingsStorage, pbpApplySecretOverlay,
-// deobfuscateKey, deobfuscateSettings (the last four are only used by the
-// chrome layer further down, added in a later task).
+// Depends only on shared.js globals for settings/secret routing, backup
+// validation, endpoint checks, and deobfuscation.
 // ============================================================
 
 const PBP_WEBDAV_FILENAME = "pinboard-bookmark-enhanced-settings.json";
 const PBP_WEBDAV_WRITE_TEST_PREFIX = "pinboard-bookmark-enhanced-write-test-";
 const PBP_WEBDAV_APP_COLLECTION = "pinboard-bookmark-enhanced";
+const PBP_WEBDAV_ETAG_STATE_KEY = "_webdavEtagState";
 
 // Appends the fixed backup filename to a user-supplied collection URL,
 // handling a missing/present trailing slash. Degrades to "" on empty input
 // (never throws) -- callers treat "" as "not configured".
 function pbpWebdavFileUrl(baseUrl) {
-  const base = pbpWebdavTargetCollectionUrl(baseUrl);
-  return base ? base + PBP_WEBDAV_FILENAME : "";
+  return pbpWebdavCollectionFileUrl(baseUrl, PBP_WEBDAV_FILENAME);
 }
 
 function pbpWebdavCollectionUrl(baseUrl) {
   const raw = String(baseUrl == null ? "" : baseUrl).trim();
   if (!raw) return "";
-  return raw.endsWith("/") ? raw : raw + "/";
+  try {
+    const url = new URL(raw);
+    // Fragments never reach a WebDAV server and would make the configured
+    // target differ from the actual request. Query capability tokens are
+    // preserved, but path components are always appended through URL().
+    if (url.hash) return "";
+    if (!url.pathname.endsWith("/")) url.pathname += "/";
+    return url.href;
+  } catch (_) { return ""; }
 }
 
 function pbpWebdavCollectionFileUrl(baseUrl, name) {
   const base = pbpWebdavTargetCollectionUrl(baseUrl);
-  return base ? base + encodeURIComponent(String(name || "")) : "";
+  if (!base) return "";
+  try {
+    const url = new URL(base);
+    url.pathname += encodeURIComponent(String(name || ""));
+    return url.href;
+  } catch (_) { return ""; }
 }
 
 function pbpWebdavTargetCollectionUrl(baseUrl) {
@@ -37,7 +48,8 @@ function pbpWebdavTargetCollectionUrl(baseUrl) {
   try {
     const u = new URL(base);
     if (u.hostname === "dav.jianguoyun.com" && u.pathname.replace(/\/+$/, "") === "/dav") {
-      return base + PBP_WEBDAV_APP_COLLECTION + "/";
+      u.pathname += PBP_WEBDAV_APP_COLLECTION + "/";
+      return u.href;
     }
   } catch (_) {}
   return base;
@@ -60,7 +72,40 @@ function pbpWebdavAuthHeader(user, pass) {
 
 // Derives a secure chrome.permissions origin pattern via shared.js.
 function pbpWebdavOrigin(baseUrl) {
-  return pbpEndpointOriginPattern(baseUrl);
+  return pbpWebdavTargetCollectionUrl(baseUrl) ? pbpEndpointOriginPattern(baseUrl) : null;
+}
+
+function pbpWebdavValidEtag(value) {
+  // If-Match uses strong comparison. Only accept a syntactically valid strong
+  // entity-tag; weak validators and wildcard/garbage values must never be
+  // echoed back as though they identify one exact remote revision.
+  return typeof value === "string" && /^"[\x21\x23-\x7E\x80-\xFF]*"$/.test(value.trim());
+}
+
+function pbpWebdavResponseEtag(response) {
+  try {
+    const value = response && response.headers && response.headers.get("ETag");
+    return pbpWebdavValidEtag(value) ? value.trim() : "";
+  } catch (_) { return ""; }
+}
+
+function pbpWebdavEtagStateMatchesTarget(state, target, user) {
+  if (!state || typeof state.target !== "string") return false;
+  // Accept the short-lived plaintext shape from pre-fix builds, but every new
+  // write below stores the capability URL through the normal obf: wrapper.
+  // The Basic-auth username is part of the remote resource identity: the same
+  // URL can expose a different DAV tree for each account. Legacy state without
+  // a user is accepted only for anonymous configurations.
+  return deobfuscateKey(state.target) === target &&
+    deobfuscateKey(state.user || "") === String(user || "");
+}
+
+function pbpWebdavAutoPushPeriod(settings) {
+  const s = settings || {};
+  if (!s.webdavUrl || !pbpWebdavOrigin(s.webdavUrl)) return 0;
+  if (s.webdavAutoPush === "daily") return 1440;
+  if (s.webdavAutoPush === "hourly") return 60;
+  return 0;
 }
 
 // Whitelist-builds the push payload: every SETTINGS_DEFAULTS key EXCEPT the
@@ -83,8 +128,13 @@ function pbpWebdavBuildPayload(settings, meta, extra) {
   // via syncSetLarge), so the whitelist above never picks them up. The caller reads
   // them and hands them in, mirroring options-backup.js's file export, so a WebDAV
   // restore carries the user's custom theme instead of silently dropping it.
-  if (extra.overlay) payload.customOverlayCSS = extra.overlay;
-  if (Array.isArray(extra.savedThemes) && extra.savedThemes.length) payload.savedThemes = extra.savedThemes;
+  payload.customOverlayCSS = typeof extra.overlay === "string" ? extra.overlay : "";
+  pbpAssertOverlaySize(payload.customOverlayCSS);
+  // Keep generated backups self-importable. This also rejects legacy/corrupt
+  // or over-limit theme entries before replacing a valid remote backup.
+  payload.savedThemes = pbpSanitizeBackupThemes(
+    Array.isArray(extra.savedThemes) ? extra.savedThemes : [],
+  );
   if (s.backupIncludeHighlights !== false && extra.highlights) {
     payload._highlights = extra.highlights;
     // Non-secret owner (Pinboard username) so a restore onto a different account
@@ -119,6 +169,9 @@ function pbpWebdavBuildRequest(kind, cfg) {
   if (kind === "mkdir") return { url, method: "MKCOL", headers };
   if (kind === "push") {
     headers["Content-Type"] = "application/json";
+    if (pbpWebdavValidEtag(cfg.etag)) headers["If-Match"] = cfg.etag.trim();
+    else if (cfg.known === true) headers["If-Match"] = "*";
+    else headers["If-None-Match"] = "*";
     return { url, method: "PUT", headers };
   }
   return { url, method: "GET", headers }; // "pull" | "test"
@@ -131,6 +184,7 @@ function _pbpWebdavFetch(kind, cfg, extra) {
     method: req.method,
     headers: req.headers,
     ...(extra || {}),
+    cache: "no-store",
     redirect: "error",
     signal: AbortSignal.timeout(20000),
   });
@@ -170,11 +224,54 @@ async function pbpWebdavProbeWritable(cfg) {
 // ============================================================
 
 // Storage-sourced cfg (used by the alarm, and as the default when a caller
-// doesn't hand in a live-DOM override). webdavPass is deobfuscated here so
-// callers never see the obf: wrapper.
+// doesn't hand in a live-DOM override). Both the capability URL and password
+// are credential-routed/obfuscated at rest, so decode them before validation.
 async function _pbpWebdavCfg() {
   const s = await pbpReadSettingsWithSecrets({ webdavUrl: "", webdavUser: "", webdavPass: "" });
-  return { baseUrl: s.webdavUrl || "", user: s.webdavUser || "", pass: deobfuscateKey(s.webdavPass || "") };
+  return {
+    baseUrl: deobfuscateKey(s.webdavUrl || ""),
+    user: deobfuscateKey(s.webdavUser || ""),
+    pass: deobfuscateKey(s.webdavPass || ""),
+  };
+}
+
+async function pbpWebdavReadRevision(cfg) {
+  const target = pbpWebdavFileUrl(cfg && cfg.baseUrl);
+  if (!target) return { known: false, etag: "" };
+  try {
+    const stored = await chrome.storage.local.get(PBP_WEBDAV_ETAG_STATE_KEY);
+    const state = stored[PBP_WEBDAV_ETAG_STATE_KEY];
+    if (!pbpWebdavEtagStateMatchesTarget(state, target, cfg && cfg.user)) return { known: false, etag: "" };
+    return { known: true, etag: pbpWebdavValidEtag(state.etag) ? state.etag.trim() : "" };
+  } catch (_) { return { known: false, etag: "" }; }
+}
+
+async function pbpWebdavClearEtag(cfg) {
+  const target = pbpWebdavFileUrl(cfg && cfg.baseUrl);
+  if (!target) return;
+  try {
+    const stored = await chrome.storage.local.get(PBP_WEBDAV_ETAG_STATE_KEY);
+    if (pbpWebdavEtagStateMatchesTarget(stored[PBP_WEBDAV_ETAG_STATE_KEY], target, cfg && cfg.user)) {
+      await chrome.storage.local.remove(PBP_WEBDAV_ETAG_STATE_KEY);
+    }
+  } catch (_) {}
+}
+
+async function pbpWebdavRememberEtag(cfg, etag) {
+  const target = pbpWebdavFileUrl(cfg && cfg.baseUrl);
+  if (!target) return false;
+  const strongEtag = pbpWebdavValidEtag(etag) ? etag.trim() : "";
+  await chrome.storage.local.set({
+    // Target match means the remote file is known to exist even when this
+    // WebDAV server does not expose a usable strong validator. That state uses
+    // If-Match:* on the next write instead of getting stuck on create-only 412.
+    [PBP_WEBDAV_ETAG_STATE_KEY]: {
+      target: obfuscateKey(target),
+      user: obfuscateKey(String(cfg && cfg.user || "")),
+      etag: strongEtag,
+    },
+  });
+  return !!strongEtag;
 }
 
 // Test button / Push now / Pull now in options.js pass a cfgOverride built
@@ -218,23 +315,26 @@ async function pbpWebdavPush(cfgOverride) {
     const meta = { pushedAt: new Date().toISOString(), appVersion: chrome.runtime.getManifest().version };
     // customOverlayCSS + savedThemes live outside SETTINGS_DEFAULTS (chunked via
     // syncSetLarge), so read them explicitly and mirror options-backup.js's export
-    // overlay source selection (sync large blob, or local fallback when optOverlayInLocal).
-    let overlay = "";
-    try {
-      const flags = await chrome.storage.sync.get({ optOverlayInLocal: false });
-      overlay = flags.optOverlayInLocal
-        ? (await chrome.storage.local.get({ customOverlayCSS_localFallback: "" })).customOverlayCSS_localFallback
-        : await syncGetLarge("customOverlayCSS", "");
-    } catch (_) {}
-    let savedThemes = [];
-    try { savedThemes = await syncGetLarge("savedThemes", []); } catch (_) {}
+    // overlay source selection (sync large blob, or this device's local fallback).
+    const local = await chrome.storage.local.get("customOverlayCSS_localFallback");
+    const overlay = typeof local.customOverlayCSS_localFallback === "string"
+      ? local.customOverlayCSS_localFallback
+      : await syncGetLarge("customOverlayCSS", "");
+    const savedThemes = await syncGetLarge("savedThemes", []);
     let highlights = null;
     if (settings.backupIncludeHighlights !== false) {
-      try { highlights = pbpBuildHighlightBackup(await chrome.storage.local.get(null)); } catch (_) {}
+      highlights = pbpBuildHighlightBackup(await chrome.storage.local.get(null));
     }
     const owner = pbpPinboardAccountFromToken(settings.pinboardToken);
     const payload = pbpWebdavBuildPayload(settings, meta, { highlights, highlightsOwner: owner, overlay, savedThemes });
-    const resp = await _pbpWebdavFetch("push", cfg, { body: JSON.stringify(payload) });
+    const expectedRevision = await pbpWebdavReadRevision(cfg);
+    const conditionalCfg = Object.assign({}, cfg, expectedRevision);
+    const resp = await _pbpWebdavFetch("push", conditionalCfg, { body: JSON.stringify(payload) });
+    if (resp.status === 412) {
+      const result = { ts: Date.now(), ok: false, error: "conflict", status: 412 };
+      await chrome.storage.local.set({ webdavLastPush: result });
+      return result;
+    }
     let error = resp.ok ? undefined : ("http-" + resp.status);
     const status = resp.ok ? undefined : resp.status;
     if (resp.status === 404) {
@@ -244,7 +344,12 @@ async function pbpWebdavPush(cfgOverride) {
         if (dir.ok) error = "not-writable";
       } catch (_) {}
     }
-    const result = { ts: Date.now(), ok: resp.ok, error, status };
+    const nextEtag = resp.ok ? pbpWebdavResponseEtag(resp) : "";
+    // Do not GET after PUT to hunt for an ETag: another device could write in
+    // that gap and we would incorrectly claim its revision. A missing/weak
+    // validator is remembered as known-exists and degrades to If-Match:*.
+    if (resp.ok) await pbpWebdavRememberEtag(cfg, nextEtag).catch(() => {});
+    const result = { ts: Date.now(), ok: resp.ok, error, status, etag: nextEtag || undefined };
     await chrome.storage.local.set({ webdavLastPush: result });
     return result;
   } catch (e) {
@@ -266,11 +371,15 @@ async function pbpWebdavPull(cfgOverride) {
   try {
     const resp = await _pbpWebdavFetch("pull", cfg);
     if (resp.status === 401 || resp.status === 403) return { ok: false, error: "auth" };
-    if (resp.status === 404) return { ok: false, error: "not-found" };
+    if (resp.status === 404) {
+      await pbpWebdavClearEtag(cfg);
+      return { ok: false, error: "not-found" };
+    }
     if (!resp.ok) return { ok: false, error: "http-" + resp.status };
     const data = await resp.json().catch(() => null);
-    if (!data || typeof data !== "object" || !data._schemaVersion) return { ok: false, error: "invalid" };
-    return { ok: true, data };
+    try { pbpBackupSchemaVersion(data); }
+    catch (_) { return { ok: false, error: "invalid" }; }
+    return { ok: true, data, etag: pbpWebdavResponseEtag(resp) };
   } catch (e) {
     return { ok: false, error: (e && e.message) || "network" };
   }

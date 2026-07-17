@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", (event) => event.stopImmediateProp
 </script>
 <script src="../shared.js"></script>
 <script src="../options-backup.js"></script>
+<script src="../export-targets.js"></script>
 <script src="../options.js"></script>
 <script>
 const root = document.getElementById("results");
@@ -57,11 +58,345 @@ async function run() {
   check("E1 quota reject does NOT throw out of persistSettings", threw === false);
   check("E1 quota reject reported as not-ok", r2 && r2.ok === false && /quota/i.test(r2.error.message));
 
+  const baselineSettings = {
+    optTheme: "auto",
+    customTagPrompt: "",
+    urlClean: { enabled: true, customParams: [], excludeParams: [] },
+  };
+  check("E1 settings delta: untouched stale form fields are omitted",
+    JSON.stringify(pbpSettingsDelta({ ...baselineSettings, customFont: "Inter" }, baselineSettings)) ===
+      JSON.stringify({ customFont: "Inter" }));
+  check("E1 settings delta: an explicit empty value is preserved",
+    pbpSettingsDelta({ ...baselineSettings, optTheme: "" }, baselineSettings).optTheme === "");
+  check("E1 settings delta: nested settings use value equality",
+    Object.keys(pbpSettingsDelta({ ...baselineSettings, urlClean: { ...baselineSettings.urlClean } }, baselineSettings)).length === 0 &&
+    pbpSettingsDelta({ ...baselineSettings, urlClean: { ...baselineSettings.urlClean, enabled: false } }, baselineSettings).urlClean.enabled === false);
+
+  let persistedDelta = null;
+  let settingsSavedDelta = null;
+  const snapshotState = { settings: { optTheme: "auto", customFont: "" }, overlay: "base-css" };
+  const snapshotResult = await pbpSaveOptionsSnapshot(
+    snapshotState,
+    { optTheme: "auto", customFont: "Inter" },
+    "base-css",
+    {
+      persist: async (delta) => { persistedDelta = delta; return { ok: true, fellBackToLocal: false }; },
+      saveOverlay: async () => ({ fellBackToLocal: false }),
+      assertOverlay: () => {},
+      onSettingsSaved: (delta) => { settingsSavedDelta = delta; },
+    }
+  );
+  check("E1 options snapshot: runtime save writes only the changed settings delta",
+    JSON.stringify(persistedDelta) === JSON.stringify({ customFont: "Inter" }) &&
+    JSON.stringify(settingsSavedDelta) === JSON.stringify(persistedDelta) &&
+    snapshotState.settings.optTheme === "auto" && snapshotResult.overlayChanged === false);
+
+  const inFlightState = { settings: { a: 1, b: 1 }, overlay: "" };
+  const inFlightForm = { a: 2, b: 1 };
+  let releaseInFlight;
+  const inFlightSave = pbpSaveOptionsSnapshot(inFlightState, inFlightForm, "", {
+    persist: async () => {
+      await new Promise((resolve) => { releaseInFlight = resolve; });
+      return { ok: true, fellBackToLocal: false };
+    },
+    saveOverlay: async () => ({ fellBackToLocal: false }),
+    assertOverlay: () => {},
+  });
+  await Promise.resolve();
+  inFlightForm.b = 3;
+  releaseInFlight();
+  await inFlightSave;
+  check("E1 options snapshot: edits made while saving remain dirty for the next delta",
+    JSON.stringify(pbpSettingsDelta(inFlightForm, inFlightState.settings)) === JSON.stringify({ b: 3 }));
+
+  const failedState = { settings: { optTheme: "auto" }, overlay: "" };
+  let failedSaveError = null;
+  try {
+    await pbpSaveOptionsSnapshot(failedState, { optTheme: "dark" }, "", {
+      persist: async () => ({ ok: false, error: new Error("write failed") }),
+      saveOverlay: async () => ({ fellBackToLocal: false }),
+      assertOverlay: () => {},
+    });
+  } catch (error) { failedSaveError = error; }
+  check("E1 options snapshot: failed settings write does not advance the baseline",
+    failedSaveError?.message === "write failed" && failedState.settings.optTheme === "auto");
+
+  const oversizedState = { settings: { optTheme: "auto" }, overlay: "valid-css" };
+  let oversizedPersisted = null;
+  let oversizedOverlayWrites = 0;
+  let oversizedError = null;
+  try {
+    await pbpSaveOptionsSnapshot(oversizedState, { optTheme: "dark" }, "oversized-css", {
+      persist: async (delta) => { oversizedPersisted = delta; return { ok: true, fellBackToLocal: false }; },
+      saveOverlay: async () => { oversizedOverlayWrites++; return { fellBackToLocal: false }; },
+      assertOverlay: () => { throw new RangeError("too large"); },
+    });
+  } catch (error) { oversizedError = error; }
+  check("E1 options snapshot: invalid overlay cannot block or roll back ordinary settings",
+    oversizedError instanceof RangeError && oversizedPersisted.optTheme === "dark" &&
+    oversizedState.settings.optTheme === "dark" && oversizedState.overlay === "valid-css" && oversizedOverlayWrites === 0);
+
+  const overlayOnlyState = { settings: { optTheme: "auto" }, overlay: "before" };
+  let overlayOnlyPersistCalls = 0;
+  let overlayOnlyValue = "";
+  await pbpSaveOptionsSnapshot(overlayOnlyState, { optTheme: "auto" }, "after", {
+    persist: async () => { overlayOnlyPersistCalls++; return { ok: true, fellBackToLocal: false }; },
+    saveOverlay: async (value) => { overlayOnlyValue = value; return { fellBackToLocal: false }; },
+    assertOverlay: () => {},
+  });
+  check("E1 options snapshot: overlay baseline advances independently without a settings write",
+    overlayOnlyPersistCalls === 0 && overlayOnlyValue === "after" && overlayOnlyState.overlay === "after");
+
+  const optionQueueState = { suspended: true, chain: Promise.resolve() };
+  let optionQueueCalls = 0;
+  await pbpQueueOptionsSave(optionQueueState, async () => { optionQueueCalls++; });
+  optionQueueState.suspended = false;
+  const optionQueueOrder = [];
+  let releaseQueuedSave;
+  const queuedFirst = pbpQueueOptionsSave(optionQueueState, async () => {
+    optionQueueOrder.push("first-enter");
+    await new Promise((resolve) => { releaseQueuedSave = resolve; });
+    optionQueueOrder.push("first-exit");
+  });
+  const queuedSecond = pbpQueueOptionsSave(optionQueueState, async () => {
+    optionQueueOrder.push("second");
+  });
+  await Promise.resolve();
+  releaseQueuedSave();
+  await Promise.all([queuedFirst, queuedSecond]);
+  check("E1 options save queue: suspension blocks direct saves and active saves remain serialized",
+    optionQueueCalls === 0 && optionQueueOrder.join(",") === "first-enter,first-exit,second");
+
+  const recoveringQueueState = { suspended: false, chain: Promise.resolve() };
+  let reportedQueueError = null;
+  try {
+    await pbpQueueOptionsSave(recoveringQueueState, async () => { throw new Error("unexpected save crash"); });
+  } catch (error) { reportedQueueError = error; }
+  let recoveredQueueCalls = 0;
+  await pbpQueueOptionsSave(recoveringQueueState, async () => { recoveredQueueCalls++; });
+  check("E1 options save queue: a rejected task is reportable but cannot poison the stored queue tail",
+    reportedQueueError?.message === "unexpected save crash" && recoveredQueueCalls === 1 &&
+    await recoveringQueueState.chain === undefined);
+
+  // ---------- E1b: real large-value codec round trips ----------
+  await (async () => {
+    const previousChrome = globalThis.chrome;
+    const previousCache = _settingsStorageCache;
+    const previousTestStorage = globalThis.__pbpTestStorage;
+    const previousTestLarge = globalThis.__pbpTestSyncSetLarge;
+    delete globalThis.__pbpTestStorage;
+    delete globalThis.__pbpTestSyncSetLarge;
+
+    const getFrom = (backing, keys) => {
+      if (keys == null) return Object.assign({}, backing);
+      if (typeof keys === "string") return keys in backing ? { [keys]: backing[keys] } : {};
+      if (Array.isArray(keys)) {
+        const out = {};
+        keys.forEach((key) => { if (key in backing) out[key] = backing[key]; });
+        return out;
+      }
+      const out = Object.assign({}, keys || {});
+      Object.keys(keys || {}).forEach((key) => { if (key in backing) out[key] = backing[key]; });
+      return out;
+    };
+    const removeFrom = (backing, keys) => {
+      (Array.isArray(keys) ? keys : [keys]).forEach((key) => { delete backing[key]; });
+    };
+    const itemBytes = (key, value) => new TextEncoder().encode(key + JSON.stringify(value)).length;
+
+    function installLargeStorage(syncEnabled) {
+      const local = { optSyncEnabled: !!syncEnabled };
+      const sync = { syncApiKeys: false };
+      const state = { rejectSyncSet: false, syncSetCalls: 0, rejectOnSyncSetCall: 0, rejectLocalRemove: false };
+      globalThis.chrome = {
+        storage: {
+          local: {
+            get: async (keys) => getFrom(local, keys),
+            set: async (data) => { Object.assign(local, data); },
+            remove: async (keys) => {
+              if (state.rejectLocalRemove) throw new Error("local remove failed");
+              removeFrom(local, keys);
+            },
+          },
+          sync: {
+            QUOTA_BYTES_PER_ITEM: 8192,
+            get: async (keys) => getFrom(sync, keys),
+            set: async (data) => {
+              state.syncSetCalls++;
+              if (state.rejectSyncSet || state.syncSetCalls === state.rejectOnSyncSetCall) {
+                throw new Error("QUOTA_BYTES_PER_ITEM exceeded");
+              }
+              Object.assign(sync, data);
+            },
+            remove: async (keys) => { removeFrom(sync, keys); },
+          },
+          onChanged: { addListener() {} },
+        },
+      };
+      _settingsStorageCache = null;
+      return { local, sync, state };
+    }
+
+    try {
+      let env = installLargeStorage(false);
+      const themes = [{ name: "Mine", css: ".x{color:red}" }];
+      await syncSetLarge("savedThemes", themes);
+      const localThemes = await syncGetLarge("savedThemes", []);
+      check("E1b local large values preserve array type", Array.isArray(localThemes) && localThemes[0].name === "Mine");
+      env.local.savedThemes = JSON.stringify(themes);
+      check("E1b local legacy JSON strings decode back to their original type",
+        Array.isArray(await syncGetLarge("savedThemes", [])) && (await syncGetLarge("savedThemes", []))[0].name === "Mine");
+
+      env = installLargeStorage(true);
+      const cjk = "中".repeat(3000) + "\u0000".repeat(2000) + "😀".repeat(1000);
+      let cjkError = null;
+      try { await syncSetLarge("customTagPrompt", cjk); } catch (error) { cjkError = error; }
+      const cjkRoundTrip = await syncGetLarge("customTagPrompt", "");
+      check("E1b sync codec round-trips multi-byte and escaped text", !cjkError && cjkRoundTrip === cjk);
+      check("E1b every physical sync item stays within the 8 KB byte quota",
+        Object.entries(env.sync).every(([key, value]) => itemBytes(key, value) <= 8192));
+
+      const logicalRead = await pbpReadSettingsWithSecrets({ customTagPrompt: "" });
+      check("E1b atomic settings read resolves chunk metadata", logicalRead.customTagPrompt === cjk);
+      const physicalChunkKey = Object.keys(env.sync).find((key) => key.startsWith("customTagPrompt_") && key !== "customTagPrompt");
+      check("E1b physical chunk changes invalidate the SW settings cache",
+        !!physicalChunkKey && pbpSettingsKeysChanged({ [physicalChunkKey]: { oldValue: "a", newValue: "b" } }));
+
+      env.sync.customSummaryPrompt = "direct pre-chunk value";
+      check("E1b direct sync strings from pre-chunk migration remain readable",
+        await syncGetLarge("customSummaryPrompt", "") === "direct pre-chunk value");
+
+      env = installLargeStorage(true);
+      await syncSetLarge("customSummaryPrompt", "old value");
+      const oldSync = JSON.stringify(env.sync);
+      env.state.rejectSyncSet = true;
+      let quotaError = null;
+      try { await syncSetLarge("customSummaryPrompt", "new value"); } catch (error) { quotaError = error; }
+      env.state.rejectSyncSet = false;
+      check("E1b failed sync write exposes the new local fallback",
+        /quota/i.test(quotaError && quotaError.message || "") && await syncGetLarge("customSummaryPrompt", "") === "new value");
+      await chrome.storage.local.remove("customSummaryPrompt_localFallback");
+      check("E1b failed sync write leaves the previous cloud value intact",
+        JSON.stringify(env.sync) === oldSync && await syncGetLarge("customSummaryPrompt", "") === "old value");
+
+      env = installLargeStorage(true);
+      await syncSetLarge("translateGlossary", "old glossary");
+      const beforeMetaFailure = JSON.stringify(env.sync);
+      env.state.rejectOnSyncSetCall = env.state.syncSetCalls + 2;
+      let metadataError = null;
+      try { await syncSetLarge("translateGlossary", "new glossary"); } catch (error) { metadataError = error; }
+      env.state.rejectOnSyncSetCall = 0;
+      check("E1b metadata commit failure keeps old cloud data and exposes the local fallback",
+        /quota/i.test(metadataError && metadataError.message || "") &&
+        beforeMetaFailure === JSON.stringify(env.sync) &&
+        await syncGetLarge("translateGlossary", "") === "new glossary");
+      env.state.rejectLocalRemove = true;
+      await syncSetLarge("translateGlossary", "new glossary");
+      env.local.translateGlossary_localFallback.value = "stale fallback sentinel";
+      env.state.rejectLocalRemove = false;
+      const resolvedAfterCleanupFailure = await syncGetLarge("translateGlossary", "");
+      await Promise.resolve();
+      check("E1b stale fallback cannot shadow an equivalent committed generation when cleanup fails",
+        resolvedAfterCleanupFailure === "new glossary" && !("translateGlossary_localFallback" in env.local));
+
+      env = installLargeStorage(true);
+      env.sync.customSummaryPrompt = { _chunks: 1, _generation: "pendinggen" };
+      env.local.customSummaryPrompt_localFallback = pbpLargeFallbackRecord("safe local copy", "pendinggen");
+      check("E1b matching-generation fallback survives until every committed chunk is readable",
+        await syncGetLarge("customSummaryPrompt", "") === "safe local copy" &&
+        !!env.local.customSummaryPrompt_localFallback);
+
+      env = installLargeStorage(true);
+      Object.assign(env.sync, {
+        customTagPrompt: { _chunks: 2 },
+        customTagPrompt_0: "legacy ",
+        customTagPrompt_1: "value",
+      });
+      check("E1b legacy chunk metadata remains readable",
+        await syncGetLarge("customTagPrompt", "") === "legacy value");
+
+      const lockOrder = [];
+      await Promise.all([
+        pbpWithLargeStorageLock("test-serialization", async () => {
+          lockOrder.push("first-enter");
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          lockOrder.push("first-exit");
+        }),
+        pbpWithLargeStorageLock("test-serialization", async () => {
+          lockOrder.push("second-enter");
+          lockOrder.push("second-exit");
+        }),
+      ]);
+      check("E1b large-value lock prevents overlapping same-key critical sections",
+        lockOrder.join(",") === "first-enter,first-exit,second-enter,second-exit");
+
+      const localQueueOrder = [];
+      await Promise.all([
+        pbpWithLocalLargeStorageQueue("test-local-queue", async () => {
+          localQueueOrder.push("first-enter");
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          localQueueOrder.push("first-exit");
+        }),
+        pbpWithLocalLargeStorageQueue("test-local-queue", async () => {
+          localQueueOrder.push("second-enter");
+        }),
+      ]);
+      check("E1b no-Web-Locks fallback serializes same-key work in the current context",
+        localQueueOrder.join(",") === "first-enter,first-exit,second-enter");
+
+      env = installLargeStorage(true);
+      const originalSyncSet = chrome.storage.sync.set;
+      let firstGeneration = "";
+      chrome.storage.sync.set = async (data) => {
+        const chunkKey = Object.keys(data).find((key) => key.startsWith("customTagPrompt_") && key !== "customTagPrompt");
+        if (chunkKey && !firstGeneration) firstGeneration = chunkKey.split("_")[1];
+        if (data.customTagPrompt?._generation === firstGeneration) {
+          await new Promise((resolve) => setTimeout(resolve, 30));
+        }
+        return originalSyncSet(data);
+      };
+      const firstConcurrentWrite = syncSetLarge("customTagPrompt", "first concurrent value");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const secondConcurrentWrite = syncSetLarge("customTagPrompt", "second concurrent value");
+      await Promise.all([firstConcurrentWrite, secondConcurrentWrite]);
+      check("E1b same-key concurrent writes are serialized before stale-chunk cleanup",
+        await syncGetLarge("customTagPrompt", "") === "second concurrent value");
+
+      env = installLargeStorage(true);
+      await syncSetLarge("customSummaryPrompt", "cloud before quota");
+      env.state.rejectSyncSet = true;
+      try { await syncSetLarge("customSummaryPrompt", "saved only on this device"); } catch (_) {}
+      env.state.rejectSyncSet = false;
+      env.sync.customSummaryPrompt = "newer value from another device";
+      check("E1b quota fallback remains the explicit device-local override until a successful retry",
+        await syncGetLarge("customSummaryPrompt", "") === "saved only on this device");
+
+      const priorFallback = JSON.stringify(env.local.customSummaryPrompt_localFallback);
+      const realSetAfterFallback = chrome.storage.sync.set;
+      chrome.storage.sync.set = async () => { throw new Error("storage unavailable"); };
+      let nonQuotaError = null;
+      try { await syncSetLarge("customSummaryPrompt", "failed replacement"); }
+      catch (error) { nonQuotaError = error; }
+      chrome.storage.sync.set = realSetAfterFallback;
+      check("E1b non-quota retry failure restores the previous effective local override",
+        nonQuotaError?.message === "storage unavailable" &&
+        JSON.stringify(env.local.customSummaryPrompt_localFallback) === priorFallback &&
+        await syncGetLarge("customSummaryPrompt", "") === "saved only on this device");
+    } finally {
+      globalThis.chrome = previousChrome;
+      _settingsStorageCache = previousCache;
+      globalThis.__pbpTestStorage = previousTestStorage;
+      globalThis.__pbpTestSyncSetLarge = previousTestLarge;
+    }
+  })();
+
   // ---------- E2: savedThemes import quota classification ----------
   // importThemesResult(err|null) maps the syncSetLarge outcome to a status key.
   check("E2 no error → importedReload", importThemesResult(null) === "importedReload");
   check("E2 quota error → importPartial (not importInvalid)",
         importThemesResult(new Error("QUOTA_BYTES_PER_ITEM quota exceeded")) === "importPartial");
+  check("E2 explicit local-fallback marker → importPartial without relying on error text",
+        importThemesResult(Object.assign(new Error("storage write failed"), { pbpFellBackToLocal: true })) === "importPartial");
   check("E2 non-quota error rethrows (returns null sentinel)",
         importThemesResult(new SyntaxError("bad json")) === null);
 
@@ -217,16 +552,24 @@ async function run() {
       check("E4 sync state: missing marker plus cloud target token initializes true",
         state.syncApiKeys === true && sync.syncApiKeys === true && sync.exportTargets.github.token === "obf:cloud-target");
 
-      local = {
-        optSyncEnabled: true, syncApiKeys: true, openaiApiKey: "obf:legacy-local",
-        exportTargets: { github: { token: "obf:legacy-target" } },
-      };
-      sync = {};
+      local = { optSyncEnabled: true };
+      sync = { webdavUser: "legacy-ordinary-user" };
       installState(local, sync);
       state = await pbpReadSecretSyncState();
-      check("E4 sync state: legacy local opt-in atomically publishes its complete local credentials",
+      check("E4 sync state: a legacy WebDAV username alone does not infer credential-sync opt-in",
+        state.syncApiKeys === false && sync.syncApiKeys === false && sync.webdavUser === "legacy-ordinary-user");
+
+      local = {
+        optSyncEnabled: true, syncApiKeys: true, openaiApiKey: "obf:legacy-local",
+        exportTargets: { github: { enabled: false, repo: "stale-local", token: "obf:legacy-target" } },
+      };
+      sync = { exportTargets: { github: { enabled: true, repo: "current-cloud" } } };
+      installState(local, sync);
+      state = await pbpReadSecretSyncState();
+      check("E4 sync state: legacy local opt-in publishes credentials without overwriting cloud target settings",
         state.syncApiKeys === true && !("syncApiKeys" in local) && sync.syncApiKeys === true &&
-        sync.openaiApiKey === "obf:legacy-local" && sync.exportTargets.github.token === "obf:legacy-target");
+        sync.openaiApiKey === "obf:legacy-local" && sync.exportTargets.github.token === "obf:legacy-target" &&
+        sync.exportTargets.github.enabled === true && sync.exportTargets.github.repo === "current-cloud");
 
       local = { optSyncEnabled: true };
       sync = {};
@@ -299,29 +642,38 @@ async function run() {
   const etsOut = pbpStripExportTargetTokens(etsIn);
   check("E4 strip: github token removed", !("token" in etsOut.github));
   check("E4 strip: webhook token removed", !("token" in etsOut.webhook));
-  check("E4 strip: non-secret fields survive", etsOut.github.repo === "r" && etsOut.webhook.url === "https://x");
+  check("E4 strip: webhook capability URL removed", !("url" in etsOut.webhook));
+  check("E4 strip: non-secret fields survive", etsOut.github.repo === "r" && etsOut.webhook.enabled === false);
   check("E4 strip: obsidian (no token) untouched", etsOut.obsidian.vault === "v" && etsOut.obsidian.folder === "f");
   check("E4 strip: does not mutate input", etsIn.github.token === "obf:ghtok");
   check("E4 strip: null/undefined -> {}", Object.keys(pbpStripExportTargetTokens(null)).length === 0
     && Object.keys(pbpStripExportTargetTokens(undefined)).length === 0);
 
-  // -- pbpSplitSecretBatch: every one of the 19 API_KEY_FIELDS routed --
+  check("E4 secret detection: webhook capability URL is treated as a credential",
+    pbpSyncPayloadHasSecrets({ exportTargets: { webhook: { url: "obf:capability" } } }));
+
+  // -- pbpSplitSecretBatch: every API_KEY_FIELDS entry routed --
   const fullBatch = {};
   API_KEY_FIELDS.forEach((k, i) => { fullBatch[k] = "obf:v" + i; });
   fullBatch.optTheme = "nord"; // non-secret, must stay in main
-  fullBatch.exportTargets = { github: { enabled: true, token: "obf:ghtok", repo: "r" } };
+  fullBatch.exportTargets = {
+    github: { enabled: true, token: "obf:ghtok", repo: "r" },
+    webhook: { enabled: true, url: "obf:capability", token: "obf:auth" },
+  };
   const { main: splitMain, secrets: splitSecrets } = pbpSplitSecretBatch(fullBatch);
   let allRouted = true;
   API_KEY_FIELDS.forEach((k, i) => {
     if (splitSecrets[k] !== "obf:v" + i) allRouted = false;
     if (k in splitMain) allRouted = false;
   });
-  check("E4 split: every one of the 19 API_KEY_FIELDS routed to secrets, absent from main", allRouted);
+  check("E4 split: every API_KEY_FIELDS entry routed to secrets, absent from main", allRouted);
   check("E4 split: non-secret key stays in main", splitMain.optTheme === "nord");
   check("E4 split: exportTargets in secrets is the FULL (with-token) object",
     splitSecrets.exportTargets.github.token === "obf:ghtok");
   check("E4 split: exportTargets in main is token-stripped",
     !("token" in splitMain.exportTargets.github) && splitMain.exportTargets.github.repo === "r");
+  check("E4 split: exportTargets main copy strips webhook URL and Authorization",
+    !("url" in splitMain.exportTargets.webhook) && !("token" in splitMain.exportTargets.webhook));
   check("E4 split: does not mutate input batch", fullBatch.geminiApiKey === "obf:v" + API_KEY_FIELDS.indexOf("geminiApiKey"));
 
   // -- pbpSplitSecretBatch: no exportTargets in batch -> secrets has no exportTargets key --
@@ -342,10 +694,22 @@ async function run() {
   check("E4 overlay: non-secret untouched", overlaid.optTheme === "nord");
   check("E4 overlay: exportTargets untouched when absent from localVals", overlaid.exportTargets.github.enabled === true);
 
-  // -- pbpOverlaySecrets: exportTargets REPLACED wholesale when present in localVals --
+  // -- pbpOverlaySecrets: exportTargets merges only local credential fields --
   const overlaidEts = pbpOverlaySecrets(baseS, { exportTargets: { webhook: { enabled: true, token: "obf:whtok" } } });
-  check("E4 overlay: exportTargets replaced wholesale (old github key gone)", !("github" in overlaidEts.exportTargets));
-  check("E4 overlay: exportTargets replaced wholesale (new webhook present)", overlaidEts.exportTargets.webhook.token === "obf:whtok");
+  check("E4 overlay: cloud non-secret target survives a local credential overlay",
+    overlaidEts.exportTargets.github.enabled === true);
+  check("E4 overlay: local credential is added without copying local non-secret fields",
+    overlaidEts.exportTargets.webhook.token === "obf:whtok" && !("enabled" in overlaidEts.exportTargets.webhook));
+  const mergedTargetFields = pbpOverlaySecrets(
+    { exportTargets: { webhook: { enabled: true }, obsidian: { enabled: true, vault: "cloud" } } },
+    { exportTargets: { webhook: { enabled: false, url: "obf:cap", token: "obf:auth" }, obsidian: { enabled: false, vault: "local" } } },
+  );
+  check("E4 overlay: cloud ordinary fields win while local webhook credentials survive",
+    mergedTargetFields.exportTargets.webhook.enabled === true &&
+    mergedTargetFields.exportTargets.webhook.url === "obf:cap" &&
+    mergedTargetFields.exportTargets.webhook.token === "obf:auth" &&
+    mergedTargetFields.exportTargets.obsidian.enabled === true &&
+    mergedTargetFields.exportTargets.obsidian.vault === "cloud");
 
   // -- pbpOverlaySecrets: EMPTY-VALUE semantics — local "" wins over a non-empty s[k] --
   const staleS = { geminiApiKey: "obf:stale-should-not-survive" };
@@ -415,6 +779,21 @@ async function run() {
     recoverTargetPlan.localPayload.exportTargets.github.enabled === false &&
     recoverTargetPlan.localPayload.exportTargets.github.repo === "local" &&
     !("webhook" in recoverTargetPlan.localPayload.exportTargets));
+
+  const recoverCapabilityPlan = pbpPlanSecretMigration(
+    { exportTargets: { webhook: { enabled: true, url: "obf:cloud-capability", token: "obf:cloud-auth" } } },
+    { exportTargets: { webhook: { enabled: false } } },
+  );
+  check("E4 migration plan: existing webhook may recover only missing capability credentials",
+    recoverCapabilityPlan.localPayload.exportTargets.webhook.enabled === false &&
+    recoverCapabilityPlan.localPayload.exportTargets.webhook.url === "obf:cloud-capability" &&
+    recoverCapabilityPlan.localPayload.exportTargets.webhook.token === "obf:cloud-auth");
+  const clearedCapabilityPlan = pbpPlanSecretMigration(
+    { exportTargets: { webhook: { url: "obf:stale-capability" } } },
+    { exportTargets: { webhook: { url: "" } } },
+  );
+  check("E4 migration plan: explicit empty webhook URL blocks stale capability resurrection",
+    !("exportTargets" in clearedCapabilityPlan.localPayload));
 
   const firstMigrationPlan = pbpPlanSecretMigration(
     { jinaApiKey: "obf:first-key", exportTargets: { github: { enabled: true, token: "obf:first-token" } } },
@@ -563,18 +942,30 @@ async function run() {
       optTheme: "nord",
       geminiApiKey: "obf:realgem",
       pinboardToken: "obf:realpb",
-      exportTargets: { github: { enabled: true, token: "obf:ghtok", repo: "r" } },
+      webdavUrl: "obf:webdav-capability",
+      webdavUser: "obf:webdav-user",
+      exportTargets: {
+        github: { enabled: true, token: "obf:ghtok", repo: "r" },
+        webhook: { enabled: true, url: "obf:webhook-capability", token: "obf:webhook-auth" },
+      },
     });
     check("E4 persistSettings: reports ok", r.ok === true);
     check("E4 persistSettings: geminiApiKey NOT in the main-area batch", syncSet && !("geminiApiKey" in syncSet));
     check("E4 persistSettings: pinboardToken NOT in the main-area batch", syncSet && !("pinboardToken" in syncSet));
+    check("E4 persistSettings: complete WebDAV credentials NOT in the main-area batch",
+      syncSet && !("webdavUrl" in syncSet) && !("webdavUser" in syncSet) && !("webdavPass" in syncSet));
     check("E4 persistSettings: exportTargets in main-area batch is token-stripped",
       syncSet && syncSet.exportTargets && !("token" in syncSet.exportTargets.github));
+    check("E4 persistSettings: webhook capability credentials NOT in the main-area batch",
+      syncSet && !("url" in syncSet.exportTargets.webhook) && !("token" in syncSet.exportTargets.webhook));
     check("E4 persistSettings: non-secret optTheme stays in main-area batch", syncSet && syncSet.optTheme === "nord");
     check("E4 persistSettings: secrets landed in local", localWrites.length === 1 &&
       localWrites[0].geminiApiKey === "obf:realgem" && localWrites[0].pinboardToken === "obf:realpb");
     check("E4 persistSettings: local exportTargets is the FULL (with-token) copy",
-      localWrites[0].exportTargets.github.token === "obf:ghtok");
+      localWrites[0].exportTargets.github.token === "obf:ghtok" &&
+      localWrites[0].exportTargets.webhook.url === "obf:webhook-capability" &&
+      localWrites[0].webdavUrl === "obf:webdav-capability" &&
+      localWrites[0].webdavUser === "obf:webdav-user");
     globalThis.chrome = prevChromeE4d;
     delete globalThis.__pbpTestStorage;
     delete globalThis.__pbpTestSyncSetLarge;
@@ -684,6 +1075,22 @@ async function run() {
       check("E4 keys-off: flag flips only after copy and sync is scrubbed",
         sync.syncApiKeys === false && sync.openaiApiKey === "" &&
         sync.exportTargets.github.repo === "new" && !("token" in sync.exportTargets.github));
+
+      const currentTargetLocal = {
+        optSyncEnabled: true, openaiApiKey: "obf:local-current",
+        exportTargets: { github: { enabled: false, repo: "stale-local", token: "obf:local-target" } },
+      };
+      const currentTargetSync = {
+        syncApiKeys: false,
+        exportTargets: { github: { enabled: true, repo: "current-cloud" } },
+      };
+      install(currentTargetLocal, currentTargetSync);
+      await pbpEnableSyncApiKeys();
+      check("E4 keys-on: local credentials merge into current cloud target settings",
+        currentTargetSync.syncApiKeys === true &&
+        currentTargetSync.exportTargets.github.enabled === true &&
+        currentTargetSync.exportTargets.github.repo === "current-cloud" &&
+        currentTargetSync.exportTargets.github.token === "obf:local-target");
 
       const duplicateLocal = {
         optSyncEnabled: true, openaiApiKey: "obf:stale-local",
@@ -985,6 +1392,38 @@ async function run() {
       };
     }
 
+    // Two-device keys-off regression: this context represents device B. It
+    // observes the shared cloud while keys are on, then device A's atomic
+    // marker+credential scrub is represented by the direct syncArea update.
+    Object.assign(syncArea, {
+      syncApiKeys: true,
+      pinboardToken: "obf:cloud-pinboard",
+      openaiApiKey: "obf:cloud-openai",
+      exportTargets: { webhook: { enabled: true, url: "obf:cloud-url", token: "obf:cloud-auth" } },
+    });
+    await pbpMigrateSecretsToLocal();
+    check("E5 keys-on mirror: participating devices retain the last observed cloud credential snapshot locally",
+      localArea.pinboardToken === "obf:cloud-pinboard" && localArea.openaiApiKey === "obf:cloud-openai" &&
+      localArea.exportTargets.webhook.url === "obf:cloud-url" &&
+      localArea.exportTargets.webhook.token === "obf:cloud-auth");
+    Object.assign(syncArea, {
+      syncApiKeys: false,
+      pinboardToken: "",
+      openaiApiKey: "",
+      exportTargets: { webhook: { enabled: true } },
+    });
+    await pbpMigrateSecretsToLocal();
+    check("E5 keys-off mirror: another device's cloud scrub does not empty this device's mirrored credentials",
+      localArea.pinboardToken === "obf:cloud-pinboard" && localArea.openaiApiKey === "obf:cloud-openai" &&
+      localArea.exportTargets.webhook.url === "obf:cloud-url" &&
+      localArea.exportTargets.webhook.token === "obf:cloud-auth");
+    delete localArea.pinboardToken;
+    delete localArea.openaiApiKey;
+    delete localArea.exportTargets;
+    delete syncArea.pinboardToken;
+    delete syncArea.openaiApiKey;
+    delete syncArea.exportTargets;
+
     await persistSettings({ optTheme: "nord", geminiApiKey: "obf:g1", pinboardToken: "obf:p1", exportTargets: { github: { token: "obf:t1", enabled: true } } });
     check("E5 default-state: sync area has NO API_KEY_FIELDS after saveAll", API_KEY_FIELDS.every((k) => !(k in syncArea)));
     // Parenthesized member-access-then-fallback BEFORE the `in` check: `in`
@@ -1191,10 +1630,20 @@ async function run() {
     const keysHandlerSource = optionsSource.slice(keysHandlerStart, keysHandlerEnd);
     check("E5 Options handlers: settings migration is fully locked and disable uses the authoritative transition helper",
       syncHandlerSource.indexOf("await pbpWithSecretStorageLock") < syncHandlerSource.indexOf("oldStorage.get") &&
-      syncHandlerSource.indexOf('syncSetLarge("savedThemes"') > syncHandlerSource.indexOf("await pbpWithSecretStorageLock") &&
+      syncHandlerSource.includes("pbpResolveChunkedSettings") &&
+      syncHandlerSource.includes("PBP_CHUNKED_SETTING_KEYS") &&
+      syncHandlerSource.includes("await syncSetLarge(key, value)") &&
       keysHandlerSource.includes("pbpDisableSyncApiKeys()") &&
       keysHandlerSource.includes("pbpReadSecretSyncState(") &&
       !keysHandlerSource.includes("storage.local.set({ syncApiKeys: false })"));
+    check("E5 Options handler: conflict confirmation runs before the cross-context secret-storage lock",
+      syncHandlerSource.indexOf('confirm(t("syncConflictUseCloud"))') <
+        syncHandlerSource.indexOf("await pbpWithSecretStorageLock") &&
+      !syncHandlerSource.slice(syncHandlerSource.indexOf("await pbpWithSecretStorageLock"))
+        .includes("confirm("));
+    check("E5 Options auto-save persists only the baseline delta and serializes saves",
+      optionsSource.includes("pbpSaveOptionsSnapshot(savedState, data, overlayValue") &&
+      optionsSource.includes("pbpQueueOptionsSave(autoSaveState, saveAll)"));
 
     const handlerLocal = {
       optSyncEnabled: false,
@@ -1203,6 +1652,7 @@ async function run() {
     const handlerSync = { syncApiKeys: false };
     const area = (backing) => ({
       get: async (keys) => {
+        if (keys == null) return Object.assign({}, backing);
         if (Array.isArray(keys)) {
           const out = {};
           keys.forEach((key) => { if (key in backing) out[key] = backing[key]; });
@@ -1232,6 +1682,7 @@ async function run() {
     };
     const previousHandlerChrome = globalThis.chrome;
     globalThis.chrome = handlerChrome;
+    const handlerLargeWrites = [];
     let syncChangeHandler;
     const syncToggleStub = { checked: true, addEventListener: (_type, fn) => { syncChangeHandler = fn; } };
     const handlerDeps = {
@@ -1242,8 +1693,18 @@ async function run() {
       pbpWithSecretStorageLock,
       pbpReadSecretSyncStateUnlocked,
       pbpSplitSecretBatch,
+      pbpOverlaySecrets,
+      pbpResolveChunkedSettings,
+      PBP_CHUNKED_SETTING_KEYS,
+      pbpLargeFallbackKey,
+      pbpLargeFallbackRecord,
+      pbpNewChunkGeneration,
       syncGetLarge: async (key) => key === "savedThemes" ? [] : "",
-      syncSetLarge: async () => {},
+      syncSetLarge: async (key, value) => { handlerLargeWrites.push({ key, value }); },
+      pauseOptionsAutoSave: async () => {},
+      saveAll: async () => ({ ok: true }),
+      resumeOptionsAutoSave: () => {},
+      confirm: () => true,
       $id: () => null,
       t: (key) => key,
       document: { body: { style: {} }, querySelector: () => ({ dataset: { panel: "general" } }) },
@@ -1262,12 +1723,62 @@ async function run() {
     check("E5 Options handler lock: keys-on wins after the real stripped migration write",
       handlerSync.syncApiKeys === true && handlerSync.exportTargets.github.token === "obf:handler-token");
 
+    const longLocal = { optSyncEnabled: false, customTagPrompt: "中".repeat(5000), optTheme: "local-theme" };
+    const longSync = { syncApiKeys: false };
+    const longChrome = { storage: { local: area(longLocal), sync: area(longSync) } };
+    const longWrites = [];
+    let longHandler;
+    const longDeps = {
+      ...handlerDeps,
+      syncToggle: { checked: true, addEventListener: (_type, fn) => { longHandler = fn; } },
+      chrome: longChrome,
+      syncSetLarge: async (key, value) => { longWrites.push({ key, value }); },
+    };
+    globalThis.chrome = longChrome;
+    new Function(...Object.keys(longDeps), syncHandlerSource)(...Object.values(longDeps));
+    await longHandler();
+    check("E5 Options handler: enabling sync dispatches long prompt text to the large-value codec",
+      longLocal.optSyncEnabled === true && !("customTagPrompt" in longSync) &&
+      longWrites.some((entry) => entry.key === "customTagPrompt" && entry.value === longLocal.customTagPrompt));
+
+    const offLocal = {
+      optSyncEnabled: true,
+      exportTargets: { webhook: { enabled: false, url: "obf:local-cap", token: "obf:local-auth" } },
+    };
+    const offSync = {
+      syncApiKeys: false,
+      optTheme: "cloud-theme",
+      exportTargets: { webhook: { enabled: true }, obsidian: { enabled: true, vault: "cloud-vault" } },
+      customSummaryPrompt: { _chunks: 1, _generation: "legacygen" },
+      customSummaryPrompt_legacygen_0: "decoded prompt",
+    };
+    const offChrome = { storage: { local: area(offLocal), sync: area(offSync) } };
+    const offWrites = [];
+    let offHandler;
+    const offDeps = {
+      ...handlerDeps,
+      syncToggle: { checked: false, addEventListener: (_type, fn) => { offHandler = fn; } },
+      chrome: offChrome,
+      syncSetLarge: async (key, value) => { offWrites.push({ key, value }); },
+    };
+    globalThis.chrome = offChrome;
+    new Function(...Object.keys(offDeps), syncHandlerSource)(...Object.values(offDeps));
+    await offHandler();
+    check("E5 Options handler: disabling sync decodes chunk metadata before writing local settings",
+      offLocal.optSyncEnabled === false && !("customSummaryPrompt" in offLocal) &&
+      offWrites.some((entry) => entry.key === "customSummaryPrompt" && entry.value === "decoded prompt"));
+    check("E5 Options handler: disabling sync merges cloud target settings with local credentials",
+      offLocal.exportTargets.webhook.enabled === true &&
+      offLocal.exportTargets.webhook.url === "obf:local-cap" &&
+      offLocal.exportTargets.webhook.token === "obf:local-auth" &&
+      offLocal.exportTargets.obsidian.vault === "cloud-vault");
+
     const joinLocal = {
       optSyncEnabled: false, optTheme: "local-theme", openaiApiKey: "obf:stale-local",
       exportTargets: { github: { enabled: false, token: "obf:stale-local-target", repo: "local" } },
     };
     const joinSync = {
-      syncApiKeys: true, openaiApiKey: "obf:cloud-current",
+      syncApiKeys: true, optTheme: "cloud-theme", openaiApiKey: "obf:cloud-current",
       exportTargets: { github: { enabled: true, token: "obf:cloud-target", repo: "cloud" } },
     };
     const joinChrome = { storage: { local: area(joinLocal), sync: area(joinSync) } };
@@ -1283,13 +1794,100 @@ async function run() {
       chrome: joinChrome,
     };
     globalThis.chrome = joinChrome;
+    const writesBeforeCloudJoin = handlerLargeWrites.length;
     new Function(...Object.keys(joinDeps), syncHandlerSource)(...Object.values(joinDeps));
     await joinHandler();
-    check("E5 Options handler: joining existing global keys-on preserves cloud secrets byte-identically",
+    check("E5 Options handler: choosing cloud preserves ordinary settings, secrets, and skips all migration writes",
       joinLocal.optSyncEnabled === true && cloudSecretsBeforeJoin === JSON.stringify({
         openaiApiKey: joinSync.openaiApiKey,
         exportTargets: joinSync.exportTargets,
-      }));
+      }) && joinSync.optTheme === "cloud-theme" && handlerLargeWrites.length === writesBeforeCloudJoin);
+
+    const overwriteLocal = {
+      optSyncEnabled: false,
+      optTheme: "device-theme",
+      openaiApiKey: "obf:stale-local-key",
+      exportTargets: { github: { enabled: false, token: "obf:stale-local-target" } },
+    };
+    const overwriteSync = {
+      syncApiKeys: true,
+      optTheme: "older-cloud-theme",
+      openaiApiKey: "obf:current-cloud-key",
+      exportTargets: { github: { enabled: true, token: "obf:current-cloud-target" } },
+    };
+    const overwriteChrome = { storage: { local: area(overwriteLocal), sync: area(overwriteSync) } };
+    const overwriteAnswers = [false, true];
+    let overwriteHandler;
+    const overwriteDeps = {
+      ...handlerDeps,
+      syncToggle: { checked: true, addEventListener: (_type, fn) => { overwriteHandler = fn; } },
+      chrome: overwriteChrome,
+      confirm: () => overwriteAnswers.shift(),
+    };
+    globalThis.chrome = overwriteChrome;
+    new Function(...Object.keys(overwriteDeps), syncHandlerSource)(...Object.values(overwriteDeps));
+    await overwriteHandler();
+    check("E5 Options handler: explicit overwrite publishes ordinary target settings but preserves cloud credentials",
+      overwriteLocal.optSyncEnabled === true && overwriteSync.optTheme === "device-theme" &&
+      overwriteSync.openaiApiKey === "obf:current-cloud-key" &&
+      overwriteSync.exportTargets.github.enabled === false &&
+      overwriteSync.exportTargets.github.token === "obf:current-cloud-target" && overwriteAnswers.length === 0);
+
+    const abortLocal = { optSyncEnabled: false, optTheme: "device-theme" };
+    const abortSync = { syncApiKeys: false, optTheme: "cloud-theme" };
+    const abortChrome = { storage: { local: area(abortLocal), sync: area(abortSync) } };
+    const abortToggle = { checked: true, addEventListener: (_type, fn) => { abortHandler = fn; } };
+    let abortHandler;
+    const abortDeps = {
+      ...handlerDeps,
+      syncToggle: abortToggle,
+      chrome: abortChrome,
+      confirm: (() => { const answers = [false, false]; return () => answers.shift(); })(),
+    };
+    globalThis.chrome = abortChrome;
+    new Function(...Object.keys(abortDeps), syncHandlerSource)(...Object.values(abortDeps));
+    await abortHandler();
+    check("E5 Options handler: cancelling both conflict choices leaves sync off and both copies untouched",
+      abortToggle.checked === false && abortLocal.optSyncEnabled === false &&
+      abortLocal.optTheme === "device-theme" && abortSync.optTheme === "cloud-theme");
+
+    const fallbackLocal = { optSyncEnabled: false, customTagPrompt: "device prompt" };
+    const fallbackSync = { syncApiKeys: false };
+    const fallbackChrome = { storage: { local: area(fallbackLocal), sync: area(fallbackSync) } };
+    let fallbackHandler;
+    const fallbackToggle = { checked: true, addEventListener: (_type, fn) => { fallbackHandler = fn; } };
+    const fallbackDeps = {
+      ...handlerDeps,
+      syncToggle: fallbackToggle,
+      chrome: fallbackChrome,
+      syncSetLarge: async (key) => {
+        if (key === "customTagPrompt") throw new Error("temporary sync failure");
+      },
+    };
+    globalThis.chrome = fallbackChrome;
+    new Function(...Object.keys(fallbackDeps), syncHandlerSource)(...Object.values(fallbackDeps));
+    await fallbackHandler();
+    check("E5 Options handler: non-quota large-write failure aborts instead of creating a misleading fallback",
+      fallbackToggle.checked === false && fallbackLocal.optSyncEnabled === false &&
+      !("customTagPrompt_localFallback" in fallbackLocal));
+
+    const rollbackLocal = { optSyncEnabled: true };
+    const rollbackSync = { syncApiKeys: false, customTagPrompt: "cloud prompt" };
+    const rollbackChrome = { storage: { local: area(rollbackLocal), sync: area(rollbackSync) } };
+    let rollbackHandler;
+    let rollbackLargeCalls = 0;
+    const rollbackToggle = { checked: false, addEventListener: (_type, fn) => { rollbackHandler = fn; } };
+    const rollbackDeps = {
+      ...handlerDeps,
+      syncToggle: rollbackToggle,
+      chrome: rollbackChrome,
+      syncSetLarge: async () => { rollbackLargeCalls++; throw new Error("local write failed"); },
+    };
+    globalThis.chrome = rollbackChrome;
+    new Function(...Object.keys(rollbackDeps), syncHandlerSource)(...Object.values(rollbackDeps));
+    await rollbackHandler();
+    check("E5 Options handler: disabling sync rolls the device flag back when a large local write fails",
+      rollbackLargeCalls === 1 && rollbackToggle.checked === true && rollbackLocal.optSyncEnabled === true);
 
     const staleLocal = { optSyncEnabled: true, optTheme: "stale-local" };
     const staleSync = { optSyncEnabled: true, syncApiKeys: false, optTheme: "fresh-sync" };
@@ -1369,9 +1967,15 @@ async function run() {
     const prevRevokeObjectURL = URL.revokeObjectURL;
     const prevCache = _settingsStorageCache;
     let exportedBlob = null;
+    let beforeExportCalls = 0;
     const localArea = Object.assign({}, SETTINGS_DEFAULTS, {
       optSyncEnabled: false,
       backupIncludeHighlights: true,
+      webdavUrl: "obf:" + btoa("https://dav.example.com/secret-path"),
+      exportTargets: {
+        webhook: { enabled: true, url: "obf:" + btoa("https://hooks.example/secret"), token: "obf:auth" },
+        github: { enabled: true, token: "obf:github" },
+      },
       pbp_hl_good: { v: 1, url: "https://x.test", title: "X", items: [{ id: "a", n: 1, quote: "q", color: 1 }] },
       pbp_hl_last_color: 4,
     });
@@ -1407,6 +2011,11 @@ async function run() {
       setupBackup({
         exportableKeys: Object.keys(SETTINGS_DEFAULTS).filter((k) => !API_KEY_FIELDS.includes(k)),
         saveOverlayWithFallback: () => Promise.resolve(),
+        beforeExport: async () => {
+          beforeExportCalls++;
+          localArea.optTheme = "dark";
+          return true;
+        },
       });
       let importPickerOpened = false;
       document.getElementById("import-settings-file").click = () => { importPickerOpened = true; };
@@ -1418,18 +2027,166 @@ async function run() {
       }
       if (!exportedBlob) throw new Error("settings export did not produce a Blob");
       const exported = JSON.parse(await exportedBlob.text());
+      check("E7 manual export: pending form save is flushed before storage is read",
+        beforeExportCalls === 1 && exported.optTheme === "dark");
       check("E7 manual export: live unchecked checkbox serializes backupIncludeHighlights=false",
         exported.backupIncludeHighlights === false);
       check("E7 manual export: live unchecked checkbox omits _highlights",
         !("_highlights" in exported));
       check("E7 manual export: atomic partial read never adds top-level API key fields",
         API_KEY_FIELDS.every((key) => !(key in exported)));
+      check("E7 manual export: nested target credentials and capability URLs are absent",
+        exported.exportTargets.webhook.enabled === true &&
+        !("url" in exported.exportTargets.webhook) && !("token" in exported.exportTargets.webhook) &&
+        !("token" in exported.exportTargets.github));
     } finally {
       globalThis.chrome = prevChromeE7;
       URL.createObjectURL = prevCreateObjectURL;
       URL.revokeObjectURL = prevRevokeObjectURL;
       _settingsStorageCache = prevCache;
       wrap.remove();
+    }
+  })();
+
+  // ---------- E7b: backup schema/type/nested-secret preflight ----------
+  await (async () => {
+    const exportableKeys = Object.keys(SETTINGS_DEFAULTS).filter((key) => !API_KEY_FIELDS.includes(key));
+    let schemaError = null;
+    try { pbpBackupSchemaVersion({ _schemaVersion: 3 }); } catch (error) { schemaError = error; }
+    check("E7b backup schema: absent version is v1, exact v2 is accepted, future version is rejected",
+      pbpBackupSchemaVersion({ optTheme: "light" }) === 1 &&
+      pbpBackupSchemaVersion({ _schemaVersion: 2 }) === 2 && schemaError instanceof TypeError);
+
+    const prepared = pbpPreflightBackupPayload({
+      _schemaVersion: 2,
+      optShowRecent: false,
+      customFont: "",
+      exportTargets: {
+        webhook: { enabled: true, url: "https://hooks.example/secret", token: "Bearer secret", extra: "drop" },
+        github: { enabled: false, token: "secret" },
+        unknown: { enabled: true, token: "secret" },
+      },
+      customOverlayCSS: "",
+      savedThemes: [],
+    }, exportableKeys);
+    check("E7b preflight: false and empty values survive as explicit clears",
+      prepared.safeData.optShowRecent === false && prepared.safeData.customFont === "" &&
+      prepared.customOverlayCSS === "" && Array.isArray(prepared.importedThemes));
+    check("E7b preflight: nested target allowlist strips tokens, capability URLs, extras, and unknown targets",
+      prepared.safeData.exportTargets.webhook.enabled === true &&
+      !("url" in prepared.safeData.exportTargets.webhook) && !("token" in prepared.safeData.exportTargets.webhook) &&
+      Object.keys(prepared.safeData.exportTargets.github).join(",") === "enabled" &&
+      !("unknown" in prepared.safeData.exportTargets));
+    check("E7b registry contract: every current non-secret target setting is included in backups",
+      pbpExportTargetIds().every((targetId) => {
+        const allowed = PBP_BACKUP_TARGET_FIELDS[targetId] || {};
+        return allowed.enabled === "boolean" && (PBP_EXPORT_TARGETS[targetId].settings || [])
+          .filter((setting) => setting.type !== "secret" && setting.secret !== true)
+          .every((setting) => allowed[setting.key] === "string");
+      }));
+
+    let typeError = null;
+    try { pbpPreflightBackupPayload({ _schemaVersion: 2, optTheme: false }, exportableKeys); }
+    catch (error) { typeError = error; }
+    check("E7b preflight: wrong primitive type is rejected", typeError instanceof TypeError);
+    let enumError = null;
+    try { pbpPreflightBackupPayload({ _schemaVersion: 2, mdExportImagePolicy: "embed" }, exportableKeys); }
+    catch (error) { enumError = error; }
+    const validEnums = pbpPreflightBackupPayload({
+      _schemaVersion: 2,
+      mdExportImagePolicy: "alt",
+      selectionTrigger: "hotkey",
+    }, exportableKeys);
+    check("E7b preflight: current UI enum values pass and unknown legacy-looking values fail",
+      validEnums.safeData.mdExportImagePolicy === "alt" &&
+      validEnums.safeData.selectionTrigger === "hotkey" && enumError instanceof TypeError);
+    let themeError = null;
+    try { pbpPreflightBackupPayload({ _schemaVersion: 2, savedThemes: [{ name: "x", css: 42 }] }, exportableKeys); }
+    catch (error) { themeError = error; }
+    check("E7b preflight: malformed saved theme is rejected", themeError instanceof TypeError);
+    let rootError = null;
+    try { pbpPreflightBackupPayload([], exportableKeys); } catch (error) { rootError = error; }
+    check("E7b preflight: non-object root is rejected", rootError instanceof TypeError);
+
+    const previousChrome = globalThis.chrome;
+    const previousStorage = globalThis.__pbpTestStorage;
+    const previousLarge = globalThis.__pbpTestSyncSetLarge;
+    const previousCache = _settingsStorageCache;
+    const local = {
+      optSyncEnabled: false,
+      exportTargets: {
+        webhook: { enabled: false, url: "obf:live-capability", token: "obf:live-auth" },
+        github: { enabled: true, token: "obf:live-github" },
+      },
+    };
+    const getLocal = (keys) => {
+      if (typeof keys === "string") return Promise.resolve(keys in local ? { [keys]: local[keys] } : {});
+      if (Array.isArray(keys)) {
+        const out = {}; keys.forEach((key) => { if (key in local) out[key] = local[key]; }); return Promise.resolve(out);
+      }
+      const out = Object.assign({}, keys || {});
+      Object.keys(keys || {}).forEach((key) => { if (key in local) out[key] = local[key]; });
+      return Promise.resolve(out);
+    };
+    let importedBatch = null;
+    let overlayApplied = null;
+    try {
+      globalThis.chrome = { storage: {
+        local: { get: getLocal, set: async (data) => Object.assign(local, data), remove: async () => {} },
+        sync: { get: async () => ({ syncApiKeys: false }), set: async () => {}, remove: async () => {} },
+        onChanged: { addListener() {} },
+      } };
+      _settingsStorageCache = null;
+      globalThis.__pbpTestStorage = { get: async () => ({}), set: async (data) => { importedBatch = data; } };
+      globalThis.__pbpTestSyncSetLarge = async () => {};
+      await pbpApplyBackupPayload({
+        _schemaVersion: 2,
+        optTheme: "dark",
+        webdavUrl: "https://attacker.example/secret",
+        exportTargets: {
+          webhook: { enabled: true, url: "https://attacker.example/hook", token: "attacker" },
+          github: { enabled: false, token: "attacker" },
+        },
+        customOverlayCSS: "",
+      }, {
+        exportableKeys,
+        saveOverlayWithFallback: async (value) => { overlayApplied = value; },
+      });
+      check("E7b apply: imported non-secret target fields merge without replacing live credentials",
+        importedBatch.optTheme === "dark" && importedBatch.exportTargets.webhook.enabled === true &&
+        importedBatch.exportTargets.webhook.url === "obf:live-capability" &&
+        importedBatch.exportTargets.webhook.token === "obf:live-auth" &&
+        importedBatch.exportTargets.github.enabled === false &&
+        importedBatch.exportTargets.github.token === "obf:live-github" && overlayApplied === "" &&
+        !("webdavUrl" in importedBatch));
+
+      const writesBeforeInvalid = importedBatch;
+      let invalidApplyError = null;
+      try {
+        await pbpApplyBackupPayload({ _schemaVersion: 99, optTheme: "light" }, {
+          exportableKeys,
+          saveOverlayWithFallback: async () => {},
+        });
+      } catch (error) { invalidApplyError = error; }
+      check("E7b apply: invalid schema fails before any new storage write",
+        invalidApplyError instanceof TypeError && importedBatch === writesBeforeInvalid);
+
+      const batchBeforeThemeLoadFailure = importedBatch;
+      let themeLoadError = null;
+      try {
+        await pbpApplyBackupPayload({ optTheme: "light", customCSS: "body{}" }, {
+          exportableKeys,
+          saveOverlayWithFallback: async () => {},
+          loadThemes: async () => { throw new Error("theme registry unavailable"); },
+        });
+      } catch (error) { themeLoadError = error; }
+      check("E7b apply: v1 theme dependency failure occurs before any settings write",
+        themeLoadError?.message === "theme registry unavailable" && importedBatch === batchBeforeThemeLoadFailure);
+    } finally {
+      globalThis.chrome = previousChrome;
+      globalThis.__pbpTestStorage = previousStorage;
+      globalThis.__pbpTestSyncSetLarge = previousLarge;
+      _settingsStorageCache = previousCache;
     }
   })();
 
@@ -1516,8 +2273,8 @@ async function run() {
       const normal = await saveOverlayWithFallback(exactLimit);
       check("E9 exact 50 KB is accepted and reported as synced",
         normal.fellBackToLocal === false && largeWrites.at(-1).value === exactLimit);
-      check("E9 synced overlay clears the local-fallback flag",
-        syncWrites.at(-1).optOverlayInLocal === false);
+      check("E9 synced overlay does not publish a cross-device fallback flag",
+        syncWrites.length === 0);
       check("E9 synced overlay removes stale fallback data",
         localRemoves.at(-1) === "customOverlayCSS_localFallback");
 
@@ -1545,9 +2302,8 @@ async function run() {
       const quota = await saveOverlayWithFallback("quota-css");
       check("E9 quota fallback is returned to the sole UI status owner",
         quota.fellBackToLocal === true);
-      check("E9 quota fallback persists CSS locally and records the flag",
-        localWrites.at(-1).customOverlayCSS_localFallback === "quota-css" &&
-        syncWrites.at(-1).optOverlayInLocal === true);
+      check("E9 quota fallback stays local without a cross-device flag",
+        localWrites.at(-1).customOverlayCSS_localFallback === "quota-css" && syncWrites.length === 0);
 
       const fallbackWrites = localWrites.length;
       largeError = new Error("storage unavailable");
@@ -1576,7 +2332,16 @@ async function run() {
       check("E9 overlay persistence helper never writes UI status", !helperSource.includes("auto-save-status"));
       check("E9 saveAll converts rejected persistence into a visible resolved failure",
         /catch \(error\) \{\s*return reportAutoSaveFailure\(error\)/.test(optionsSource) &&
-        /void saveAll\(\)\.catch\(reportAutoSaveFailure\)/.test(optionsSource));
+        /pbpQueueOptionsSave\(autoSaveState, saveAll\)\.catch\(reportAutoSaveFailure\)/.test(optionsSource));
+      const pullStart = optionsSource.indexOf('  $id("webdav-pull-btn")?.addEventListener');
+      const pullEnd = optionsSource.indexOf("  // ===================== Auto-save", pullStart);
+      const pullSource = optionsSource.slice(pullStart, pullEnd);
+      check("E9 WebDAV pull saves live excluded credentials before applying and reloading the backup",
+        pullSource.indexOf("await pauseOptionsAutoSave()") < pullSource.indexOf("const saved = await saveAll()") &&
+        pullSource.indexOf("const saved = await saveAll()") < pullSource.indexOf("await pbpApplyBackupPayload"));
+      check("E9 over-limit CSS cannot be stored as a custom theme that backups would reject",
+        optionsSource.includes("saveBtn.disabled = !css.trim() || pbpOverlayByteLength(css) > OVERLAY_BYTE_LIMIT") &&
+        optionsSource.includes("if (!css || pbpOverlayByteLength(css) > OVERLAY_BYTE_LIMIT) return"));
     } finally {
       globalThis.chrome = prevChromeE9;
       globalThis.__pbpTestStorage = prevStorageE9;

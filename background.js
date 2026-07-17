@@ -1363,39 +1363,44 @@ async function pbpMigrateLegacyWildcardPermission() {
 }
 pbpMigrateLegacyWildcardPermission().catch(() => {});
 
-// syncApiKeys cleanup (batch (4)): idempotent, best-effort, fire-and-forget at
-// boot -- self-heals on the next boot/alarm tick if it fails partway (see
-// pbpMigrateSecretsToLocal's own try/catch in shared.js). Also re-run on the
-// existing storage-warm alarm below so a mid-session syncApiKeys-off toggle
-// and any stray reintroduction of a secret into sync gets swept within 5 minutes.
+// Credential-routing maintenance (batch (4)): idempotent, best-effort,
+// fire-and-forget at boot. It mirrors the last keys-on cloud snapshot locally
+// and, while keys are off, migrates/scrubs any stale cloud secret. The existing
+// storage-warm alarm retries either direction within 5 minutes.
 pbpMigrateSecretsToLocal().catch(() => {});
 
-async function syncPrewarmTagsAlarm() {
-  const s = await loadSettings();
-  const existing = await chrome.alarms.get("prewarm-tags");
-  const shouldRun = s.tagSyncMode === "prewarmed" && !!s.pinboardToken;
-  if (shouldRun && !existing) {
-    chrome.alarms.create("prewarm-tags", { periodInMinutes: 15, delayInMinutes: 0.5 });
-    prewarmTagsNow().catch(() => {}); // populate now; don't wait ~30s for the first alarm
-  } else if (!shouldRun && existing) {
-    chrome.alarms.clear("prewarm-tags");
-  }
+const queuePrewarmAlarmSync = pbpCreateRecoveringTail();
+function syncPrewarmTagsAlarm() {
+  return queuePrewarmAlarmSync(async () => {
+    const s = await loadSettings();
+    const existing = await chrome.alarms.get("prewarm-tags");
+    const shouldRun = s.tagSyncMode === "prewarmed" && !!s.pinboardToken;
+    if (shouldRun && !existing) {
+      chrome.alarms.create("prewarm-tags", { periodInMinutes: 15, delayInMinutes: 0.5 });
+      prewarmTagsNow().catch(() => {}); // populate now; don't wait ~30s for the first alarm
+    } else if (!shouldRun && existing) {
+      chrome.alarms.clear("prewarm-tags");
+    }
+  });
 }
 
 // React to webdav settings: create/clear the "webdav-push" alarm. Mirrors
 // syncPrewarmTagsAlarm's gated create/clear above. chrome.alarms.create()
 // silently replaces any existing alarm of the same name, so no explicit
 // clear-then-recreate dance is needed when only the period changes.
-async function syncWebdavPushAlarm() {
-  const s = await loadSettings();
-  const existing = await chrome.alarms.get("webdav-push");
-  const shouldRun = !!s.webdavAutoPush && s.webdavAutoPush !== "off" && !!s.webdavUrl && !!s.webdavPass;
-  const wantedPeriod = s.webdavAutoPush === "daily" ? 1440 : 60;
-  if (shouldRun && (!existing || existing.periodInMinutes !== wantedPeriod)) {
-    chrome.alarms.create("webdav-push", { periodInMinutes: wantedPeriod, delayInMinutes: wantedPeriod });
-  } else if (!shouldRun && existing) {
-    chrome.alarms.clear("webdav-push");
-  }
+const queueWebdavAlarmSync = pbpCreateRecoveringTail();
+function syncWebdavPushAlarm() {
+  return queueWebdavAlarmSync(async () => {
+    const s = await loadSettings();
+    const existing = await chrome.alarms.get("webdav-push");
+    const wantedPeriod = pbpWebdavAutoPushPeriod(s);
+    const shouldRun = wantedPeriod > 0;
+    if (shouldRun && (!existing || existing.periodInMinutes !== wantedPeriod)) {
+      chrome.alarms.create("webdav-push", { periodInMinutes: wantedPeriod, delayInMinutes: wantedPeriod });
+    } else if (!shouldRun && existing) {
+      chrome.alarms.clear("webdav-push");
+    }
+  });
 }
 
 async function prewarmTagsNow() {
@@ -1444,10 +1449,18 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if ((area === "sync" || area === "local") && pbpSettingsKeysChanged(changes)) invalidateSettingsCache();
   if (area === "sync" || area === "local") scheduleEffectiveAuthRefresh(changes, area);
-  if ((area === "sync" || area === "local") && (changes.tagSyncMode || changes.pinboardToken)) {
+  if (area === "sync" && (changes.syncApiKeys || changes.exportTargets ||
+      API_KEY_FIELDS.some((key) => !!changes[key]))) {
+    // Mirror keys-on snapshots promptly on every participating online device;
+    // the periodic storage-warm run remains the MV3 restart/offline fallback.
+    pbpMigrateSecretsToLocal().catch(() => {});
+  }
+  const routingChanged = !!(changes.optSyncEnabled || changes.syncApiKeys);
+  if ((area === "sync" || area === "local") && (routingChanged || changes.tagSyncMode || changes.pinboardToken)) {
     syncPrewarmTagsAlarm().catch(() => {});
   }
-  if ((area === "sync" || area === "local") && (changes.webdavAutoPush || changes.webdavUrl || changes.webdavPass)) {
+  if ((area === "sync" || area === "local") &&
+      (routingChanged || changes.webdavAutoPush || changes.webdavUrl || changes.webdavPass)) {
     syncWebdavPushAlarm().catch(() => {});
   }
 });

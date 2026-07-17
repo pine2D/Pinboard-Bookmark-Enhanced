@@ -1,6 +1,6 @@
 // ============================================================
 // Options page — settings export/import (backup file).
-// Exposes setupBackup({ exportableKeys, saveOverlayWithFallback }).
+// Exposes setupBackup() with storage helpers and optional save-queue hooks.
 // Schema-version aware: v2 backups use customOverlayCSS, v1 uses customCSS.
 // ============================================================
 
@@ -10,8 +10,124 @@
 // Returns a t() key, or null to signal "rethrow as a genuine import failure".
 function importThemesResult(err) {
   if (!err) return "importedReload";
-  if (/QUOTA|quota/i.test(err.message || "")) return "importPartial";
+  if (err.pbpFellBackToLocal || /QUOTA|quota/i.test(err.message || "")) return "importPartial";
   return null;
+}
+
+const PBP_BACKUP_TARGET_FIELDS = Object.freeze({
+  obsidian: Object.freeze({ enabled: "boolean", route: "string", vault: "string", folder: "string" }),
+  github: Object.freeze({ enabled: "boolean" }),
+  webhook: Object.freeze({ enabled: "boolean" }),
+});
+
+const PBP_BACKUP_ENUMS = Object.freeze({
+  optTheme: ["auto", "light", "dark"],
+  bgSaveMode: ["merge", "skip", "overwrite"],
+  tagSyncMode: ["fresh", "cached", "prewarmed"],
+  webdavAutoPush: ["off", "hourly", "daily"],
+  aiContentSource: ["local", "jina"],
+  mdExportImagePolicy: ["keep", "alt", "strip"],
+  selectionTrigger: ["icon", "hotkey", "off"],
+});
+
+function pbpSanitizeBackupUrlClean(value) {
+  if (!pbpIsPlainRecord(value)) throw pbpBackupValueError("urlClean");
+  const out = {};
+  ["enabled", "onPopupOpen", "onPaste", "aggressiveMode"].forEach((key) => {
+    if (typeof value[key] !== "boolean") throw pbpBackupValueError("urlClean." + key);
+    out[key] = value[key];
+  });
+  ["customParams", "excludeParams"].forEach((key) => {
+    if (!Array.isArray(value[key]) || value[key].some((item) => typeof item !== "string")) {
+      throw pbpBackupValueError("urlClean." + key);
+    }
+    out[key] = value[key].slice();
+  });
+  return out;
+}
+
+function pbpSanitizeBackupExportTargets(value) {
+  if (!pbpIsPlainRecord(value)) throw pbpBackupValueError("exportTargets");
+  const out = {};
+  for (const [targetId, fields] of Object.entries(PBP_BACKUP_TARGET_FIELDS)) {
+    if (!Object.prototype.hasOwnProperty.call(value, targetId)) continue;
+    const cfg = value[targetId];
+    if (!pbpIsPlainRecord(cfg)) throw pbpBackupValueError("exportTargets." + targetId);
+    const cleaned = {};
+    for (const [key, expectedType] of Object.entries(fields)) {
+      if (!Object.prototype.hasOwnProperty.call(cfg, key)) continue;
+      if (typeof cfg[key] !== expectedType) throw pbpBackupValueError(`exportTargets.${targetId}.${key}`);
+      cleaned[key] = cfg[key];
+    }
+    if (targetId === "obsidian" && Object.prototype.hasOwnProperty.call(cleaned, "route") &&
+        !["new", "append", "daily"].includes(cleaned.route)) {
+      throw pbpBackupValueError("exportTargets.obsidian.route");
+    }
+    out[targetId] = cleaned;
+  }
+  return out;
+}
+
+function pbpSanitizeBackupSettings(data, exportableKeys) {
+  const safe = {};
+  for (const key of exportableKeys) {
+    if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
+    const value = data[key];
+    if (key === "exportTargets") {
+      safe[key] = pbpSanitizeBackupExportTargets(value);
+      continue;
+    }
+    if (key === "urlClean") {
+      safe[key] = pbpSanitizeBackupUrlClean(value);
+      continue;
+    }
+    const expected = SETTINGS_DEFAULTS[key];
+    if (typeof expected === "boolean" && typeof value !== "boolean") throw pbpBackupValueError(key);
+    if (typeof expected === "string" && typeof value !== "string") throw pbpBackupValueError(key);
+    if (typeof expected === "number" && (typeof value !== "number" || !Number.isFinite(value))) {
+      throw pbpBackupValueError(key);
+    }
+    if (PBP_BACKUP_ENUMS[key] && !PBP_BACKUP_ENUMS[key].includes(value)) throw pbpBackupValueError(key);
+    if (key === "popupWidth" && (value < 420 || value > 720)) throw pbpBackupValueError(key);
+    if (key === "aiCacheDuration" && (value < 0 || value > 10080)) throw pbpBackupValueError(key);
+    safe[key] = value;
+  }
+  return safe;
+}
+
+function pbpPreflightBackupPayload(data, exportableKeys) {
+  const schemaVersion = pbpBackupSchemaVersion(data);
+  const safeData = pbpSanitizeBackupSettings(data, exportableKeys);
+  let customCSS;
+  let customOverlayCSS;
+  if (schemaVersion === 1 && Object.prototype.hasOwnProperty.call(data, "customCSS")) {
+    if (typeof data.customCSS !== "string") throw pbpBackupValueError("customCSS");
+    pbpAssertOverlaySize(data.customCSS);
+    customCSS = data.customCSS;
+  }
+  if (schemaVersion === 2 && Object.prototype.hasOwnProperty.call(data, "customOverlayCSS")) {
+    if (typeof data.customOverlayCSS !== "string") throw pbpBackupValueError("customOverlayCSS");
+    pbpAssertOverlaySize(data.customOverlayCSS);
+    customOverlayCSS = data.customOverlayCSS;
+  }
+  const importedThemes = Object.prototype.hasOwnProperty.call(data, "savedThemes")
+    ? pbpSanitizeBackupThemes(data.savedThemes)
+    : undefined;
+  if (Object.prototype.hasOwnProperty.call(data, "_highlights") && !pbpIsPlainRecord(data._highlights)) {
+    throw pbpBackupValueError("_highlights");
+  }
+  if (Object.prototype.hasOwnProperty.call(data, "_highlightsOwner") && typeof data._highlightsOwner !== "string") {
+    throw pbpBackupValueError("_highlightsOwner");
+  }
+  return {
+    schemaVersion,
+    safeData,
+    customCSS,
+    customOverlayCSS,
+    importedThemes,
+    highlights: data._highlights,
+    highlightsOwner: data._highlightsOwner,
+  };
 }
 
 // Applies a parsed backup JSON blob (from a file import OR a WebDAV pull) to
@@ -20,13 +136,13 @@ function importThemesResult(err) {
 // persistSettings, migrates v1->v2 CSS if needed, and imports savedThemes.
 // Returns a t() status key ("importedReload" | "importPartial"). Throws on
 // a genuine persist failure -- callers decide how to surface that.
-async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback }) {
-  const schemaVersion = data._schemaVersion || 1;
-  const { _schemaVersion, _highlights, customCSS, customOverlayCSS, savedThemes: importedThemes, ...rest } = data;
-  const safeData = Object.fromEntries(
-    Object.entries(rest).filter(([k]) => exportableKeys.includes(k))
-  );
-  if (schemaVersion >= 2 && customOverlayCSS !== undefined) pbpAssertOverlaySize(customOverlayCSS);
+async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback, loadThemes }) {
+  const prepared = pbpPreflightBackupPayload(data, exportableKeys);
+  const { schemaVersion, safeData, customCSS, customOverlayCSS, importedThemes } = prepared;
+  // A v1 restore may need the preset registry to derive its v2 overlay. Load
+  // that dependency before the first storage write so a script/load failure
+  // cannot leave an otherwise valid settings batch half-applied.
+  if (schemaVersion < 2 && loadThemes) await loadThemes();
   if (safeData.exportTargets) {
     // Export/webdav-push strips nested secrets, so a raw key-set here would
     // blast away live tokens (github PAT, webhook Authorization) with the
@@ -48,24 +164,26 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
     if (customOverlayCSS !== undefined) await saveOverlayWithFallback(customOverlayCSS);
   } else {
     // v1 → v2: detect preset match, derive overlay
+    const themes = typeof PINBOARD_THEMES === "object" && PINBOARD_THEMES ? PINBOARD_THEMES : {};
+    const adaptiveMap = typeof ADAPTIVE_THEME_MAP === "object" && ADAPTIVE_THEME_MAP ? ADAPTIVE_THEME_MAP : {};
     const oldKey = safeData.themePresetKey || "";
     let resolvedKey = oldKey;
     if (!resolvedKey && customCSS) {
-      for (const [key, theme] of Object.entries(PINBOARD_THEMES)) {
+      for (const [key, theme] of Object.entries(themes)) {
         if (theme.css.trim() === customCSS.trim()) { resolvedKey = key; break; }
       }
       if (resolvedKey) {
-        for (const [parent, [light, dark]] of Object.entries(ADAPTIVE_THEME_MAP)) {
+        for (const [parent, [light, dark]] of Object.entries(adaptiveMap)) {
           if (resolvedKey === light || resolvedKey === dark) { resolvedKey = parent; break; }
         }
       }
     }
     let newOverlay = "";
     if (customCSS) {
-      const preset = resolvedKey ? PINBOARD_THEMES[resolvedKey] : null;
+      const preset = resolvedKey ? themes[resolvedKey] : null;
       const presetCSS = preset ? preset.css : "";
-      const variants = ADAPTIVE_THEME_MAP[resolvedKey] || [];
-      const allowed = [presetCSS, ...variants.map(k => PINBOARD_THEMES[k]?.css || "")];
+      const variants = adaptiveMap[resolvedKey] || [];
+      const allowed = [presetCSS, ...variants.map(k => themes[k]?.css || "")];
       newOverlay = allowed.some(c => c && c.trim() === customCSS.trim()) ? "" : customCSS;
     }
     await (await getSettingsStorage()).set({ themePresetKey: resolvedKey || "" });
@@ -82,11 +200,12 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
       themesStatusKey = key; // "importPartial": data preserved to local by syncSetLarge fallback
     }
   }
-  if (_highlights && typeof _highlights === "object") {
+  if (prepared.highlights) {
     // Cross-account guard: refuse to merge one account's reading notes into a
     // device logged into a different Pinboard account. pbp_hl_<url> keys have no
     // account dimension, so this owner check is the only barrier. Legacy backups
-    // (no owner) and not-logged-in restores pass through unchanged.
+    // (no owner) restores remain backward compatible; a named owner requires
+    // the same currently authenticated account, including on logged-out devices.
     let currentAccount = "";
     let accountResolved = false;
     try {
@@ -94,53 +213,59 @@ async function pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFall
       currentAccount = pbpPinboardAccountFromToken(sec.pinboardToken);
       accountResolved = true;
     } catch (_) {}
-    if (pbpHighlightBackupOwnerAllowed(data._highlightsOwner, currentAccount, accountResolved)) {
-      const cleanedHighlights = pbpCleanHighlightBackup(_highlights);
+    if (pbpHighlightBackupOwnerAllowed(prepared.highlightsOwner, currentAccount, accountResolved)) {
+      const cleanedHighlights = pbpCleanHighlightBackup(prepared.highlights);
       if (Object.keys(cleanedHighlights).length) await chrome.storage.local.set(cleanedHighlights);
     }
   }
   return themesStatusKey;
 }
 
-function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
+function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, beforeExport, beforeApply, afterApply }) {
   $id("import-settings").addEventListener("click", () => $id("import-settings-file").click());
 
   $id("export-settings").addEventListener("click", async () => {
-    const raw = await pbpReadSettingsWithSecrets(exportableKeys);
-    const exportData = Object.fromEntries(
-      Object.entries(raw).filter(([, v]) => v !== undefined)
-    );
-    exportData._schemaVersion = 2;
-    const includeHighlightsEl = $id("opt-backup-include-highlights");
-    if (includeHighlightsEl) exportData.backupIncludeHighlights = !!includeHighlightsEl.checked;
-    // Strip NESTED secrets (e.g. exportTargets.github.token) — the top-level
-    // API_KEY_FIELDS exclusion only covers flat keys, so a nested token would
-    // otherwise ride into this shareable plaintext backup. Keep non-secret
-    // fields (enabled/vault/folder) so config still roundtrips.
-    if (exportData.exportTargets && typeof PBP_EXPORT_TARGETS !== "undefined") {
-      const cleaned = {};
-      for (const [tid, cfg] of Object.entries(exportData.exportTargets)) {
-        cleaned[tid] = Object.assign({}, cfg);
-        const row = PBP_EXPORT_TARGETS[tid];
-        ((row && row.settings) || []).forEach((s) => { if (s.type === "secret") delete cleaned[tid][s.key]; });
-        delete cleaned[tid].token;   // belt: also drop a bare token from orphan/removed targets (e.g. old logseq)
+    try {
+      // The form auto-saves on a debounce. Flush it before reading storage so
+      // clicking Export immediately after an edit cannot create a stale backup.
+      if (beforeExport && (await beforeExport()) === false) return;
+      const raw = await pbpReadSettingsWithSecrets(exportableKeys);
+      const exportData = Object.fromEntries(
+        Object.entries(raw).filter(([, v]) => v !== undefined)
+      );
+      exportData._schemaVersion = 2;
+      const includeHighlightsEl = $id("opt-backup-include-highlights");
+      if (includeHighlightsEl) exportData.backupIncludeHighlights = !!includeHighlightsEl.checked;
+      // Strip NESTED secrets (e.g. exportTargets.github.token) — the top-level
+      // API_KEY_FIELDS exclusion only covers flat keys, so a nested token would
+      // otherwise ride into this shareable plaintext backup. The shared belt
+      // works even if the registry script failed to load; registry metadata
+      // then removes any additional secret field introduced by a target.
+      if (exportData.exportTargets) {
+        const cleaned = pbpStripExportTargetTokens(exportData.exportTargets);
+        if (typeof PBP_EXPORT_TARGETS !== "undefined") {
+          for (const [tid, cfg] of Object.entries(cleaned)) {
+            const row = PBP_EXPORT_TARGETS[tid];
+            ((row && row.settings) || []).forEach((setting) => {
+              if (setting.type === "secret" || setting.secret === true) delete cfg[setting.key];
+            });
+          }
+        }
+        exportData.exportTargets = cleaned;
       }
-      exportData.exportTargets = cleaned;
-    }
-    // Read overlay from sync OR local fallback (preserve user data either way)
-    const overlayFlags = await chrome.storage.sync.get({ optOverlayInLocal: false });
-    let overlay = "";
-    if (overlayFlags.optOverlayInLocal) {
-      const local = await chrome.storage.local.get({ customOverlayCSS_localFallback: "" });
-      overlay = local.customOverlayCSS_localFallback;
-    } else {
-      overlay = await syncGetLarge("customOverlayCSS", "");
-    }
-    if (overlay) exportData.customOverlayCSS = overlay;
-    const savedThemesData = await syncGetLarge("savedThemes", []);
-    if (savedThemesData.length) exportData.savedThemes = savedThemesData;
-    if (exportData.backupIncludeHighlights !== false) {
-      try {
+      // Read overlay from sync OR local fallback (preserve user data either way)
+      const localOverlay = await chrome.storage.local.get("customOverlayCSS_localFallback");
+      let overlay = "";
+      if (typeof localOverlay.customOverlayCSS_localFallback === "string") {
+        overlay = localOverlay.customOverlayCSS_localFallback;
+      } else {
+        overlay = await syncGetLarge("customOverlayCSS", "");
+      }
+      pbpAssertOverlaySize(overlay);
+      exportData.customOverlayCSS = overlay;
+      const savedThemesData = await syncGetLarge("savedThemes", []);
+      exportData.savedThemes = pbpSanitizeBackupThemes(savedThemesData);
+      if (exportData.backupIncludeHighlights !== false) {
         const allLocal = await chrome.storage.local.get(null);
         const highlights = pbpBuildHighlightBackup(allLocal);
         if (highlights) {
@@ -148,39 +273,55 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback }) {
           // Tag with the exporting Pinboard account (non-secret username) so a
           // restore onto a different account can refuse to merge these notes.
           // Read the token directly — exportableKeys excludes secrets.
-          try {
-            const sec = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
-            const owner = pbpPinboardAccountFromToken(sec.pinboardToken);
-            if (owner) exportData._highlightsOwner = owner;
-          } catch (_) {}
+          const sec = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+          const owner = pbpPinboardAccountFromToken(sec.pinboardToken);
+          if (owner) exportData._highlightsOwner = owner;
         }
-      } catch (_) {}
+      }
+      // Generated backups must pass the exact same contract as imports; never
+      // hand the user a file this release would reject on restore.
+      pbpPreflightBackupPayload(exportData, exportableKeys);
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "Pinboard Bookmark Enhanced settings backup.json"; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[export] failed", err);
+      const status = $id("import-status");
+      setStatusIcon(status, false, t("optSaveFailed"));
+      status.style.color = "#c00";
+      setTimeout(() => { status.textContent = ""; status.style.color = ""; }, 3000);
     }
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "Pinboard Bookmark Enhanced settings backup.json"; a.click();
-    URL.revokeObjectURL(url);
   });
 
   $id("import-settings-file").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    let parsed = false;
+    let validated = false;
+    let applyPaused = false;
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      parsed = true;
-      const themesStatusKey = await pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback });
+      // Validate before pausing/draining UI saves, and again inside apply as a
+      // defense against accidental future bypasses.
+      pbpPreflightBackupPayload(data, exportableKeys);
+      validated = true;
+      if (beforeApply) { await beforeApply(); applyPaused = true; }
+      const themesStatusKey = await pbpApplyBackupPayload(data, { exportableKeys, saveOverlayWithFallback, loadThemes });
       const status = $id("import-status");
       setStatusIcon(status, themesStatusKey === "importPartial" ? false : true, t(themesStatusKey));
       setTimeout(() => { status.textContent = ""; }, 3000);
     } catch (err) {
       console.error("[import] failed", err);
       const status = $id("import-status");
-      setStatusIcon(status, false, t(parsed ? "importApplyFailed" : "importInvalid"));
+      setStatusIcon(status, false, t(validated ? "importApplyFailed" : "importInvalid"));
       status.style.color = "#c00";
       setTimeout(() => { status.textContent = ""; status.style.color = ""; }, 3000);
+    } finally {
+      if (applyPaused && afterApply) {
+        try { afterApply(); } catch (_) {}
+      }
     }
     e.target.value = "";
   });

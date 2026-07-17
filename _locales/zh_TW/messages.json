@@ -993,6 +993,9 @@
   "webdavTargetUnavailable": {
     "message": "目標目錄不存在或無法建立。請填寫一個可寫的 WebDAV 資料夾地址。"
   },
+  "webdavConflict": {
+    "message": "遠端備份已變更。請先提取，再重新推送。"
+  },
   "webdavPermDenied": {
     "message": "權限遭拒——按「測試」以授權"
   },
@@ -1787,7 +1790,13 @@
     }
   },
   "syncMigrationFailed": {
-    "message": "同步遷移失敗。請重試，或縮減自訂 CSS 大小。"
+    "message": "同步移轉失敗。請再試一次；如果問題持續發生，請檢查 Chrome Sync 的可用儲存空間。"
+  },
+  "syncConflictUseCloud": {
+    "message": "Chrome Sync 已有設定。要在此裝置使用雲端設定嗎？\n\n選擇「取消」可改用此裝置的設定。"
+  },
+  "syncConflictOverwriteCloud": {
+    "message": "要用此裝置的設定覆蓋 Chrome Sync 中的設定嗎？\n\n選擇「取消」將保持同步關閉。"
   },
   "jinaFreeTierHint": {
     "message": "免費額度：20 RPM。設定 key 可提高配額。"

@@ -45,6 +45,11 @@ assertEq(pbpWebdavFileUrl("   "), "", "whitespace-only baseUrl -> empty string")
 assertEq(pbpWebdavFileUrl("https://dav.example.com/remote.php/webdav"),
   "https://dav.example.com/remote.php/webdav/pinboard-bookmark-enhanced-settings.json",
   "multi-segment path, no trailing slash");
+assertEq(pbpWebdavFileUrl("https://dav.example.com/dav?access_token=secret"),
+  "https://dav.example.com/dav/pinboard-bookmark-enhanced-settings.json?access_token=secret",
+  "query capability token stays on the request while filename joins the path");
+assertEq(pbpWebdavFileUrl("https://dav.example.com/dav#fragment"), "",
+  "fragment-bearing target is rejected because fragments never reach WebDAV");
 assertEq(pbpWebdavFileUrl(null), "", "null -> empty string, no throw");
 
 section("pbpWebdavAuthHeader");
@@ -67,6 +72,17 @@ assertEq(pbpWebdavOrigin("http://[::1]:8080/dav/"), "http://[::1]:8080/*", "lite
 assertEq(pbpWebdavOrigin("http://192.168.1.2/dav/"), null, "LAN HTTP is rejected");
 assertEq(pbpWebdavOrigin("http://127.1/dav/"), null, "alternate loopback spelling is rejected");
 assertEq(pbpWebdavOrigin("ftp://dav.example.com/"), null, "non-HTTP scheme is rejected");
+assertEq(pbpWebdavOrigin("https://dav.example.com/dav#fragment"), null, "fragment-bearing endpoint is rejected before permission lookup");
+
+section("pbpWebdavAutoPushPeriod");
+assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "https://dav.example.com/dav", webdavAutoPush: "hourly", webdavPass: "" }), 60,
+  "anonymous WebDAV can schedule hourly pushes without a password");
+assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "https://dav.example.com/dav", webdavAutoPush: "daily" }), 1440,
+  "daily mode maps to a 1440-minute alarm");
+assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "https://dav.example.com/dav", webdavAutoPush: "off" }), 0,
+  "off mode creates no alarm");
+assertEq(pbpWebdavAutoPushPeriod({ webdavUrl: "http://192.168.1.2/dav", webdavAutoPush: "hourly" }), 0,
+  "blocked endpoint creates no automatic alarm");
 
 section("pbpWebdavBuildPayload — zero secrets (spec invariant #1)");
 {
@@ -127,21 +143,36 @@ section("pbpWebdavBuildPayload — custom themes + savedThemes (BUG-1) & highlig
     highlights: { pbp_hl_x: { v: 1, url: "https://x.test", title: "X", items: [] } },
     highlightsOwner: "alice",
     overlay: "body{color:red}",
-    savedThemes: [{ key: "mine", css: "x" }],
+    savedThemes: [{ name: "Mine", css: "x" }],
   });
   assertEq(payload.customOverlayCSS, "body{color:red}", "custom overlay CSS rides the WebDAV payload (BUG-1)");
-  assert(Array.isArray(payload.savedThemes) && payload.savedThemes[0].key === "mine", "savedThemes ride the WebDAV payload (BUG-1)");
+  assert(Array.isArray(payload.savedThemes) && payload.savedThemes[0].name === "Mine", "savedThemes ride the WebDAV payload (BUG-1)");
   assertEq(payload._highlightsOwner, "alice", "highlight backup carries the non-secret owner account (SEC-1)");
 
   const noExtra = pbpWebdavBuildPayload(s, { pushedAt: "t", appVersion: "v" },
     { highlights: { pbp_hl_x: { v: 1, url: "https://x.test", title: "X", items: [] } } });
-  assert(!("customOverlayCSS" in noExtra), "no overlay extra -> no customOverlayCSS key");
-  assert(!("savedThemes" in noExtra), "no savedThemes extra -> no savedThemes key");
+  assertEq(noExtra.customOverlayCSS, "", "missing overlay extra serializes as an explicit clear");
+  assert(Array.isArray(noExtra.savedThemes) && noExtra.savedThemes.length === 0,
+    "missing savedThemes extra serializes as an explicit clear");
   assert(!("_highlightsOwner" in noExtra), "no owner -> no _highlightsOwner key (legacy-compatible)");
 
   const emptyExtra = pbpWebdavBuildPayload(s, { pushedAt: "t", appVersion: "v" }, { overlay: "", savedThemes: [] });
-  assert(!("customOverlayCSS" in emptyExtra), "empty overlay string is omitted (no noise key)");
-  assert(!("savedThemes" in emptyExtra), "empty savedThemes array is omitted");
+  assertEq(emptyExtra.customOverlayCSS, "", "empty overlay string is preserved so restore can clear stale CSS");
+  assert(Array.isArray(emptyExtra.savedThemes) && emptyExtra.savedThemes.length === 0,
+    "empty savedThemes array is preserved so restore can clear stale themes");
+
+  let malformedThemeError = null;
+  try {
+    pbpWebdavBuildPayload(s, { pushedAt: "t", appVersion: "v" }, { savedThemes: [{ key: "legacy", css: "x" }] });
+  } catch (error) { malformedThemeError = error; }
+  assert(malformedThemeError instanceof TypeError,
+    "malformed saved themes are rejected before creating an unrestorable WebDAV backup");
+  let oversizedOverlayError = null;
+  try {
+    pbpWebdavBuildPayload(s, { pushedAt: "t", appVersion: "v" }, { overlay: "x".repeat(OVERLAY_BYTE_LIMIT + 1) });
+  } catch (error) { oversizedOverlayError = error; }
+  assert(oversizedOverlayError instanceof RangeError,
+    "over-limit overlay CSS is rejected before creating an unrestorable WebDAV backup");
 }
 
 section("pbpHighlightBackupOwnerAllowed (SEC-1 pure gate)");
@@ -150,7 +181,7 @@ section("pbpHighlightBackupOwnerAllowed (SEC-1 pure gate)");
   assert(pbpHighlightBackupOwnerAllowed("alice", "bob") === false, "different account -> blocked (cross-account leak prevented)");
   assert(pbpHighlightBackupOwnerAllowed("", "bob") === true, "no backup owner (legacy backup) -> allowed, backward compatible");
   assert(pbpHighlightBackupOwnerAllowed(undefined, "bob") === true, "undefined owner -> allowed");
-  assert(pbpHighlightBackupOwnerAllowed("alice", "") === true, "not logged in (no current account) -> allowed, no cross-account boundary");
+  assert(pbpHighlightBackupOwnerAllowed("alice", "") === false, "known owner + logged-out restore -> blocked until the matching account is available");
   // Fail-closed when the current account could not be resolved (storage/lock error).
   assert(pbpHighlightBackupOwnerAllowed("alice", "", false) === false, "unresolved account + known foreign owner -> blocked (fail closed)");
   assert(pbpHighlightBackupOwnerAllowed("", "", false) === true, "unresolved account + legacy/ownerless backup -> still allowed");
@@ -164,6 +195,19 @@ section("pbpWebdavBuildRequest");
   assertEq(push.method, "PUT", "push -> PUT");
   assertEq(push.headers["Content-Type"], "application/json", "push sets JSON content-type");
   assertEq(push.url, pbpWebdavFileUrl(cfg.baseUrl), "push url built via pbpWebdavFileUrl");
+  assertEq(push.headers["If-None-Match"], "*", "first push is create-only and cannot overwrite an unknown remote file");
+  assert(!("If-Match" in push.headers), "first push does not send If-Match");
+
+  const updatePush = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { etag: '"v1"' }));
+  assertEq(updatePush.headers["If-Match"], '"v1"', "known remote revision is updated with If-Match");
+  assert(!("If-None-Match" in updatePush.headers), "known remote revision never sends the create-only precondition");
+
+  const coarseUpdate = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { known: true, etag: "" }));
+  assertEq(coarseUpdate.headers["If-Match"], "*", "known file without a strong ETag stays writable without reverting to create-only mode");
+  assert(!("If-None-Match" in coarseUpdate.headers), "known file without a strong ETag never sends If-None-Match");
+  assert(pbpWebdavValidEtag('"strong"') && !pbpWebdavValidEtag('W/"weak"') &&
+    !pbpWebdavValidEtag("*") && !pbpWebdavValidEtag("unquoted"),
+    "only syntactically valid strong ETags are eligible for exact If-Match CAS");
 
   const pull = pbpWebdavBuildRequest("pull", cfg);
   assertEq(pull.method, "GET", "pull -> GET");
@@ -200,6 +244,61 @@ section("pbpWebdavBuildRequest");
 }
 
 async function runChromeLayerTests() {
+  section("background routing-change alarm refresh");
+  const backgroundSource = await fetch("../background.js").then((response) => response.text());
+  const storageListener = backgroundSource.slice(
+    backgroundSource.indexOf("chrome.storage.onChanged.addListener((changes, area) => {"),
+    backgroundSource.indexOf("// Initial check", backgroundSource.indexOf("chrome.storage.onChanged.addListener((changes, area) => {")),
+  );
+  check("ordinary/key sync route changes recompute scheduled WebDAV and tag alarms",
+    storageListener.includes("changes.optSyncEnabled || changes.syncApiKeys") &&
+    storageListener.includes("routingChanged || changes.tagSyncMode") &&
+    storageListener.includes("routingChanged || changes.webdavAutoPush") &&
+    backgroundSource.includes("queuePrewarmAlarmSync = pbpCreateRecoveringTail()") &&
+    backgroundSource.includes("queueWebdavAlarmSync = pbpCreateRecoveringTail()"));
+
+  section("_pbpWebdavCfg — credentials decoded for background alarm");
+  const realCfgChrome = globalThis.chrome;
+  const realCfgCache = _settingsStorageCache;
+  const cfgLocal = {
+    optSyncEnabled: false,
+    webdavUrl: obfuscateKey("https://dav.example.com/capability?token=secret"),
+    webdavUser: obfuscateKey("alice"),
+    webdavPass: obfuscateKey("password"),
+  };
+  const cfgGet = async (keys) => {
+    if (Array.isArray(keys)) {
+      const out = {};
+      keys.forEach((key) => { if (key in cfgLocal) out[key] = cfgLocal[key]; });
+      return out;
+    }
+    if (typeof keys === "object" && keys !== null) {
+      const out = Object.assign({}, keys);
+      Object.keys(keys).forEach((key) => { if (key in cfgLocal) out[key] = cfgLocal[key]; });
+      return out;
+    }
+    return keys in cfgLocal ? { [keys]: cfgLocal[keys] } : {};
+  };
+  try {
+    _settingsStorageCache = null;
+    globalThis.chrome = {
+      storage: {
+        local: { get: cfgGet },
+        sync: { get: async () => ({}) },
+        onChanged: { addListener() {} },
+      },
+    };
+    const storedCfg = await _pbpWebdavCfg();
+    check("background cfg decodes the WebDAV capability URL before endpoint validation",
+      storedCfg.baseUrl === "https://dav.example.com/capability?token=secret" &&
+      pbpWebdavOrigin(storedCfg.baseUrl) === "https://dav.example.com/*");
+    check("background cfg decodes password while preserving username",
+      storedCfg.user === "alice" && storedCfg.pass === "password");
+  } finally {
+    globalThis.chrome = realCfgChrome;
+    _settingsStorageCache = realCfgCache;
+  }
+
   section("WebDAV endpoint gate — zero fetch");
   const realFetch0 = globalThis.fetch;
   const realChrome0 = globalThis.chrome;
@@ -243,14 +342,14 @@ async function runChromeLayerTests() {
     backupIncludeHighlights: true,
     webdavUrl: "https://dav.example.com/backups/",
     customOverlayCSS: "body{color:blue}",
-    savedThemes: [{ key: "t1", css: "x" }],
+    savedThemes: [{ name: "Theme 1", css: "x" }],
     pinboardToken: "alice:DEADBEEF00",
     pbp_hl_good: { v: 1, url: "https://x.test", title: "X", items: [{ id: "a", n: 1, quote: "q", color: 1 }] },
     pbp_hl_last_color: 4,
   });
   const puts = [];
   const pushMethods = [];
-  const pushRedirects = [];
+  const pushRedirects = [], pushCacheModes = [];
   function storageGet(keys) {
     if (keys === null) return Promise.resolve(Object.assign({}, localArea));
     if (Array.isArray(keys)) {
@@ -283,13 +382,16 @@ async function runChromeLayerTests() {
     globalThis.fetch = (_url, opts) => {
       pushMethods.push(opts.method);
       pushRedirects.push(opts.redirect);
+      pushCacheModes.push(opts.cache);
       if (opts.method === "PUT") puts.push(JSON.parse(opts.body));
       return Promise.resolve({ ok: true, status: opts.method === "PROPFIND" ? 207 : 200 });
     };
     const res = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: false });
     check("push succeeds under stubbed chrome/fetch", res.ok === true);
     check("push verifies the collection before PUT", pushMethods[0] === "PROPFIND" && pushMethods[1] === "PUT");
-    check("WebDAV fetches reject redirects", pushRedirects.length === 2 && pushRedirects.every((mode) => mode === "error"));
+    check("WebDAV fetches reject redirects and bypass HTTP response caches",
+      pushRedirects.length === 2 && pushRedirects.every((mode) => mode === "error") &&
+      pushCacheModes.length === 2 && pushCacheModes.every((mode) => mode === "no-store"));
     check("live includeHighlights=false omits _highlights despite stale stored true",
       puts[0] && !("_highlights" in puts[0]));
     check("live includeHighlights=false is serialized into pushed settings",
@@ -297,7 +399,7 @@ async function runChromeLayerTests() {
     check("push payload carries customOverlayCSS read from storage (BUG-1)",
       puts[0] && puts[0].customOverlayCSS === "body{color:blue}");
     check("push payload carries savedThemes read from storage (BUG-1)",
-      puts[0] && Array.isArray(puts[0].savedThemes) && puts[0].savedThemes[0] && puts[0].savedThemes[0].key === "t1");
+      puts[0] && Array.isArray(puts[0].savedThemes) && puts[0].savedThemes[0] && puts[0].savedThemes[0].name === "Theme 1");
     const withHlPush = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: true });
     const hlPut = puts[puts.length - 1];
     check("push with highlights includes _highlights (BUG-1 regression guard)",
@@ -356,6 +458,138 @@ async function runChromeLayerTests() {
     globalThis.chrome = prevChrome;
     globalThis.fetch = prevFetch;
     _settingsStorageCache = prevCache;
+  }
+
+  section("pbpWebdavPush/Pull — ETag compare-and-swap");
+  const prevChromeCas = globalThis.chrome;
+  const prevFetchCas = globalThis.fetch;
+  const prevCacheCas = _settingsStorageCache;
+  const casLocal = Object.assign({}, SETTINGS_DEFAULTS, { optSyncEnabled: false });
+  const casRequests = [];
+  const casGet = (keys) => {
+    if (keys === null) return Promise.resolve(Object.assign({}, casLocal));
+    if (typeof keys === "string") return Promise.resolve(keys in casLocal ? { [keys]: casLocal[keys] } : {});
+    if (Array.isArray(keys)) {
+      const out = {};
+      keys.forEach((key) => { if (key in casLocal) out[key] = casLocal[key]; });
+      return Promise.resolve(out);
+    }
+    const out = Object.assign({}, keys || {});
+    Object.keys(keys || {}).forEach((key) => { if (key in casLocal) out[key] = casLocal[key]; });
+    return Promise.resolve(out);
+  };
+  try {
+    _settingsStorageCache = null;
+    globalThis.chrome = {
+      permissions: { contains: async () => true },
+      runtime: { getManifest: () => ({ version: "test-version" }) },
+      storage: {
+        local: {
+          get: casGet,
+          set: async (data) => { Object.assign(casLocal, data); },
+          remove: async (keys) => { (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete casLocal[key]); },
+        },
+        sync: { get: casGet, set: async () => {}, remove: async () => {} },
+        onChanged: { addListener() {} },
+      },
+    };
+    let putNumber = 0;
+    globalThis.fetch = (_url, opts) => {
+      casRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
+      if (opts.method === "PUT") {
+        putNumber++;
+        if (putNumber === 3) return Promise.resolve({ ok: false, status: 412, headers: { get: () => '"remote-v3"' } });
+        const etag = putNumber === 1 ? '"v1"' : '"v2"';
+        return Promise.resolve({ ok: true, status: putNumber === 1 ? 201 : 200, headers: { get: () => etag } });
+      }
+      throw new Error("unexpected method " + opts.method);
+    };
+    const casCfg = { baseUrl: "https://dav.example.com/cas/", user: "", pass: "" };
+    const created = await pbpWebdavPush(casCfg);
+    const firstPut = casRequests.find((request) => request.method === "PUT");
+    check("first CAS push creates only when the remote file is absent",
+      created.ok && firstPut.headers["If-None-Match"] === "*" && !("If-Match" in firstPut.headers));
+    check("successful create remembers the server ETag",
+      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v1"');
+    check("ETag state does not persist a plaintext capability URL",
+      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.target.startsWith("obf:") &&
+      deobfuscateKey(casLocal[PBP_WEBDAV_ETAG_STATE_KEY].target) === pbpWebdavFileUrl(casCfg.baseUrl));
+    const otherUserRevision = await pbpWebdavReadRevision(Object.assign({}, casCfg, { user: "other-account" }));
+    check("ETag state is isolated by WebDAV username as well as URL",
+      otherUserRevision.known === false && otherUserRevision.etag === "");
+
+    casRequests.length = 0;
+    const updated = await pbpWebdavPush(casCfg);
+    const secondPut = casRequests.find((request) => request.method === "PUT");
+    check("subsequent CAS push uses the last observed ETag",
+      updated.ok && secondPut.headers["If-Match"] === '"v1"' && !("If-None-Match" in secondPut.headers));
+    check("successful update advances the remembered ETag",
+      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v2"');
+
+    casRequests.length = 0;
+    const conflicted = await pbpWebdavPush(casCfg);
+    const conflictPut = casRequests.find((request) => request.method === "PUT");
+    check("stale ETag returns an explicit conflict without a force overwrite",
+      !conflicted.ok && conflicted.error === "conflict" && conflicted.status === 412 &&
+      conflictPut.headers["If-Match"] === '"v2"');
+    check("conflict keeps the last locally observed ETag",
+      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v2"');
+
+    globalThis.fetch = () => Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: { get: () => '"v3"' },
+      json: async () => ({ _schemaVersion: 2, optTheme: "dark" }),
+    });
+    const pulled = await pbpWebdavPull(casCfg);
+    check("pull returns the observed ETag but does not commit it before settings are applied",
+      pulled.ok && pulled.etag === '"v3"' && casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v2"');
+    await pbpWebdavRememberEtag(casCfg, pulled.etag);
+    check("caller commits the pulled ETag only after a successful apply",
+      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v3"');
+
+    const noTagCfg = { baseUrl: "https://dav.example.com/no-etag/", user: "", pass: "" };
+    const noTagPutHeaders = [];
+    globalThis.fetch = (_url, opts) => {
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
+      if (opts.method === "PUT") {
+        noTagPutHeaders.push(Object.assign({}, opts.headers));
+        return Promise.resolve({ ok: true, status: 200, headers: { get: () => null } });
+      }
+      throw new Error("unexpected no-ETag request");
+    };
+    const noTagFirst = await pbpWebdavPush(noTagCfg);
+    const noTagSecond = await pbpWebdavPush(noTagCfg);
+    check("a WebDAV server that omits ETag remains writable after the first push",
+      noTagFirst.ok && noTagSecond.ok && noTagPutHeaders.length === 2);
+    check("missing ETag transitions from create-only to known-exists conditional writes",
+      noTagPutHeaders[0]["If-None-Match"] === "*" &&
+      noTagPutHeaders[1]["If-Match"] === "*" && !("If-None-Match" in noTagPutHeaders[1]));
+
+    const weakCfg = { baseUrl: "https://dav.example.com/weak-etag/", user: "", pass: "" };
+    await pbpWebdavRememberEtag(weakCfg, 'W/"weak"');
+    const weakRevision = await pbpWebdavReadRevision(weakCfg);
+    const weakReq = pbpWebdavBuildRequest("push", Object.assign({}, weakCfg, weakRevision));
+    check("weak ETag is never echoed into If-Match and degrades to known-exists mode",
+      weakRevision.known && weakRevision.etag === "" && weakReq.headers["If-Match"] === "*");
+
+    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, headers: { get: () => '"x"' }, json: async () => ({ _schemaVersion: 3 }) });
+    const futureSchema = await pbpWebdavPull(casCfg);
+    check("pull rejects an unsupported future schema", !futureSchema.ok && futureSchema.error === "invalid");
+    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, headers: { get: () => '"x"' }, json: async () => [] });
+    const arrayRoot = await pbpWebdavPull(casCfg);
+    check("pull rejects a non-object backup root", !arrayRoot.ok && arrayRoot.error === "invalid");
+    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, headers: { get: () => '"legacy"' }, json: async () => ({ optTheme: "light" }) });
+    const legacySchema = await pbpWebdavPull(casCfg);
+    check("pull accepts an ownerless schema-v1 backup with no explicit version",
+      legacySchema.ok && legacySchema.data.optTheme === "light" && legacySchema.etag === '"legacy"');
+  } catch (error) {
+    check("ETag compare-and-swap test did not throw", false, error.message);
+  } finally {
+    globalThis.chrome = prevChromeCas;
+    globalThis.fetch = prevFetchCas;
+    _settingsStorageCache = prevCacheCas;
   }
 
   section("pbpWebdavTest — distinguishes missing backup file from missing folder");

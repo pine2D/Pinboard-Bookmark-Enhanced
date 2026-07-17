@@ -993,6 +993,9 @@
   "webdavTargetUnavailable": {
     "message": "対象ディレクトリが存在しないか作成できません。書き込み可能な WebDAV フォルダー URL を指定してください。"
   },
+  "webdavConflict": {
+    "message": "リモートのバックアップが変更されています。プルしてから、もう一度プッシュしてください。"
+  },
   "webdavPermDenied": {
     "message": "権限が拒否されています — 「テスト」をクリックして許可してください"
   },
@@ -1787,7 +1790,13 @@
     }
   },
   "syncMigrationFailed": {
-    "message": "同期移行に失敗しました。再試行するか、カスタム CSS のサイズを減らしてください。"
+    "message": "同期データの移行に失敗しました。もう一度試してください。解決しない場合は、Chrome Sync の空き容量を確認してください。"
+  },
+  "syncConflictUseCloud": {
+    "message": "Chrome Sync に設定があります。このデバイスでクラウド側の設定を使用しますか？\n\nキャンセルすると、このデバイスの設定を使用するか選べます。"
+  },
+  "syncConflictOverwriteCloud": {
+    "message": "このデバイスの設定で Chrome Sync の設定を上書きしますか？\n\nキャンセルすると、Chrome Sync はオフのままになります。"
   },
   "jinaFreeTierHint": {
     "message": "無料枠: 20 RPM。キーを追加するとクォータが増えます。"
