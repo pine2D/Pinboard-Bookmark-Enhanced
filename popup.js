@@ -215,16 +215,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   $id("options-link").addEventListener("click", (e) => {
     e.preventDefault(); pbpOpenOptionsTab("general");
   });
-  $id("logout-link").addEventListener("click", async (e) => {
+  $id("logout-link").addEventListener("click", (e) => {
     e.preventDefault();
-    if (!confirm(t("confirmLogout"))) return;
-    const result = await persistSettings({ pinboardToken: "" });
-    if (!result.ok) return;
-    settings.pinboardToken = "";
-    invalidateBookmarkLookup();
-    const recent = $id("recent-bookmarks");
-    if (recent) { recent.replaceChildren(); recent.classList.add("hidden"); }
-    window.location.reload();
+    // Anchored confirm popover, matching every other destructive action —
+    // window.confirm is a browser-modal that freezes the whole popup.
+    showConfirmPopover($id("logout-link"), {
+      msg: t("confirmLogout"),
+      yesText: t("logout"),
+      noText: t("cancel"),
+      onConfirm: async () => {
+        const result = await persistSettings({ pinboardToken: "" });
+        if (!result.ok) return;
+        settings.pinboardToken = "";
+        invalidateBookmarkLookup();
+        const recent = $id("recent-bookmarks");
+        if (recent) { recent.replaceChildren(); recent.classList.add("hidden"); }
+        window.location.reload();
+      },
+    });
   });
 });
 
@@ -1433,15 +1441,23 @@ async function fetchRecentBookmarks(token) {
       del.setAttribute("role", "button");
       del.setAttribute("tabindex", "0");
       del.setAttribute("aria-label", t("recentDeleteTitle"));
-      const doDelete = async () => {
-        if (!confirm(t("confirmDelete"))) return;
-        try {
-          const data = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(p.href)}&auth_token=${token}&format=json`)).json();
-          if (data.result_code === "done" || data.result_code === "item not found") {
-            row.remove();
-            chrome.runtime.sendMessage({ type: "bookmark_deleted", url: p.href, account });
-          }
-        } catch (_) {}
+      const doDelete = () => {
+        // Anchored confirm popover, matching the other destructive actions —
+        // never the browser-modal window.confirm.
+        showConfirmPopover(del, {
+          msg: t("confirmDelete"),
+          yesText: t("delete"),
+          noText: t("cancel"),
+          onConfirm: async () => {
+            try {
+              const data = await (await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(p.href)}&auth_token=${token}&format=json`)).json();
+              if (data.result_code === "done" || data.result_code === "item not found") {
+                row.remove();
+                chrome.runtime.sendMessage({ type: "bookmark_deleted", url: p.href, account });
+              }
+            } catch (_) {}
+          },
+        });
       };
       del.addEventListener("click", doDelete);
       del.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); doDelete(); } });

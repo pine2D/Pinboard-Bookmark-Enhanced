@@ -419,6 +419,15 @@ check(batchGrantStart >= 0 && batchGrantEnd > batchGrantStart &&
 check(!/\bconfirm\s*\(/.test(popupBatchJs) && !popupBatchJs.includes("BATCH_PERMISSION_DISCLOSE_LIMIT") &&
   !popupBatchJs.includes("batchPermMore") && !popupBatchJs.includes("*://*/*"),
   "popup-batch.js: native confirm, truncated disclosure, or broad wildcard remains");
+// Destructive micro-actions use the anchored confirm popover everywhere; the
+// ONLY sanctioned native confirm() calls are the two whole-profile modal
+// flows in options.js (sync-enable conflict chain, WebDAV pull overwrite).
+check(!/\bconfirm\s*\(/.test(popupJs),
+  "popup.js: a native confirm() dialog crept back in (use showConfirmPopover)");
+check(!/\bconfirm\s*\(/.test(read("options-notes.js")),
+  "options-notes.js: a native confirm() dialog crept back in (use showConfirmPopover)");
+check((optionsJs.match(/\bconfirm\(t\(/g) || []).length === 3,
+  "options.js: native confirm() call count drifted from the three sanctioned modal-flow calls");
 check(/\.batch-permission-list\s*\{[\s\S]*?max-height:\s*92px;[\s\S]*?overflow:\s*auto;/.test(popupCss),
   "popup.css: complete Batch permission list is not bounded with scrolling");
 

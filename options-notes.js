@@ -230,7 +230,7 @@ function _pbpNotesBuildRow(entry) {
   delBtn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    _pbpNotesDelete(row);
+    _pbpNotesDelete(row, delBtn);
   });
   top.appendChild(delBtn);
   card.appendChild(top);
@@ -310,12 +310,23 @@ function _pbpNotesRenderList(entries) {
   entries.forEach((entry) => list.appendChild(_pbpNotesBuildRow(entry)));
 }
 
-async function _pbpNotesDelete(row) {
+// Same anchored confirm popover as every other destructive micro-action
+// (theme delete, tab reset, offline-queue remove) — never window.confirm.
+// showConfirmPopover lives in shared.js, which the standalone test page does
+// not load; that is fine because the tests exercise only the pure layer and
+// never invoke this handler.
+function _pbpNotesDelete(row, anchor) {
   const label = row.title || row.url || t("notesUnknownPage");
-  if (!confirm(t("notesDeleteConfirm", label))) return;
-  try { await chrome.storage.local.remove(row.key); } catch (_) { return; }
-  _notesAllRows = _notesAllRows.filter((e) => e.row.key !== row.key);
-  _pbpNotesRenderList(_pbpNotesVisibleEntries());
+  showConfirmPopover(anchor, {
+    msg: t("notesDeleteConfirm", label),
+    yesText: t("delete"),
+    noText: t("cancel"),
+    onConfirm: async () => {
+      try { await chrome.storage.local.remove(row.key); } catch (_) { return; }
+      _notesAllRows = _notesAllRows.filter((e) => e.row.key !== row.key);
+      _pbpNotesRenderList(_pbpNotesVisibleEntries());
+    },
+  });
 }
 
 // Called from options.js's activateTab -- the sole lazy-init line added
