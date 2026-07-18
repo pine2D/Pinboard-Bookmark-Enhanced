@@ -3,7 +3,7 @@
     "message": "Pinboard 书签增强"
   },
   "extDescription": {
-    "message": "一键保存到 Pinboard，附带 AI 标签与摘要、内置阅读器，以及整套站点主题。"
+    "message": "一键保存到 Pinboard：AI 标签与摘要、内置阅读器（全文翻译、高亮）、Markdown/EPUB 导出、13 套站点主题。"
   },
   "cmdOpenPopup": {
     "message": "打开 Pinboard 书签增强"

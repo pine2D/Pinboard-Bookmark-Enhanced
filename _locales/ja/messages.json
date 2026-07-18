@@ -3,7 +3,7 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "ワンクリックで Pinboard に保存。AI タグ・要約、内蔵リーダー、サイト全体のテーマ変更に対応します。"
+    "message": "ワンクリックで Pinboard に保存。AI タグ・要約、翻訳とハイライト対応の内蔵リーダー、Markdown/EPUB エクスポート、13 種のサイトテーマ。"
   },
   "cmdOpenPopup": {
     "message": "Pinboard Bookmark Enhanced を開く"

@@ -3,7 +3,7 @@
     "message": "Pinboard 書籤強化"
   },
   "extDescription": {
-    "message": "一鍵儲存到 Pinboard，支援 AI 標籤與摘要、內建閱讀器，以及完整的網站主題自訂。"
+    "message": "一鍵儲存到 Pinboard：AI 標籤與摘要、內建閱讀器（全文翻譯、標記）、Markdown/EPUB 匯出、13 套網站主題。"
   },
   "cmdOpenPopup": {
     "message": "開啟 Pinboard 書籤強化"
