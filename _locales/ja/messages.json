@@ -3,7 +3,7 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Pinboard ブックマークを AI タグ・要約と完全カスタマイズ可能なテーマで強化します。"
+    "message": "ワンクリックで Pinboard に保存。AI タグ・要約、内蔵リーダー、サイト全体のテーマ変更に対応します。"
   },
   "cmdOpenPopup": {
     "message": "Pinboard Bookmark Enhanced を開く"
@@ -297,7 +297,7 @@
     "message": "不明なエラー"
   },
   "aiErrorModelNotFound": {
-    "message": "$PROVIDER$ のデフォルトモデルが古くなっている可能性があります — 設定でモデルを選択してください",
+    "message": "$PROVIDER$ のデフォルトモデルが古くなっている可能性があります。設定でモデルを選択してください",
     "placeholders": {
       "provider": {
         "content": "$1"
@@ -305,7 +305,7 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "$HOST$ にアクセスできません — アクセスを許可して再試行してください。",
+    "message": "$HOST$ にアクセスできません。アクセスを許可して再試行してください。",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -636,13 +636,13 @@
     }
   },
   "mdEngineExtractingNoteJina": {
-    "message": "初回の抽出は Jina クラウド（r.jina.ai）への通信が必要です。待ち時間は、このページがローカルにキャッシュ済みか、通信速度、ページの大きさによって変わります（通常は数秒）。"
+    "message": "初回の抽出は Jina のクラウド（r.jina.ai）から取得します。待ち時間は、ページがキャッシュ済みかどうか、通信速度、ページの大きさによって変わります（通常は数秒）。"
   },
   "mdEngineExtractFailed": {
     "message": "このページを抽出できませんでした。もう一度お試しください。"
   },
   "mdEngineTabGone": {
-    "message": "元のタブが利用できません — ページを開き直すと Defuddle を使えます"
+    "message": "元のタブが利用できません。ページを開き直すと Defuddle を使えます"
   },
   "mdEngineGroupAria": {
     "message": "抽出エンジン"
@@ -651,7 +651,7 @@
     "message": "Pinboard：保存まであと一歩"
   },
   "bgTabsSavedCount": {
-    "message": "$COUNT$ 個のタブを送信しました — 開いた Pinboard ページで Save をクリックすると完了です。",
+    "message": "$COUNT$ 個のタブを送信しました。開いた Pinboard ページで Save をクリックすると完了です。",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -710,7 +710,7 @@
     "message": "取り消し"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Enhanced — 設定"
+    "message": "Pinboard Bookmark Enhanced - 設定"
   },
   "settingsCategory": {
     "message": "設定カテゴリ"
@@ -864,13 +864,13 @@
     "message": "タグキャッシュ戦略"
   },
   "tagSyncCached": {
-    "message": "キャッシュ（デフォルト — 10 分後に再取得）"
+    "message": "キャッシュ（デフォルト、10 分後に再取得）"
   },
   "tagSyncFresh": {
-    "message": "ライブ（ポップアップごとに取得 — 最新、低速）"
+    "message": "ライブ（ポップアップを開くたびに取得、低速）"
   },
   "tagSyncPrewarmed": {
-    "message": "プリウォーム（バックグラウンドで 15 分ごとに取得 — 即表示）"
+    "message": "プリウォーム（バックグラウンドで 15 分ごとに取得、即表示）"
   },
   "tagSyncHint": {
     "message": "Pinboard 上の既存タグクラウドをポップアップの自動補完にどう取り込むかを制御します。読み取り専用で、Pinboard へのアップロードは一切行いません。"
@@ -882,7 +882,7 @@
     "message": "1行に1セット：\n仕事: project, review, report\n開発: programming, tutorial, tool"
   },
   "tagPresetsHint": {
-    "message": "形式：名前: タグ1, タグ2, タグ3 — ポップアップにクイック追加ボタンとして表示されます。"
+    "message": "形式：名前: タグ1, タグ2, タグ3。各プリセットはポップアップにクイック追加ボタンとして表示されます。"
   },
   "secPopupBehavior": {
     "message": "ポップアップの動作"
@@ -915,7 +915,7 @@
     "message": "設定をインポート"
   },
   "importedReload": {
-    "message": "インポート完了 — リロードすると反映されます"
+    "message": "インポート完了。リロードすると反映されます"
   },
   "importInvalid": {
     "message": "無効なファイル"
@@ -924,7 +924,7 @@
     "message": "インポートを完了できませんでした。一部の設定はすでに変更されている可能性があります。内容を確認してから再試行してください。"
   },
   "importHighlightsSkipped": {
-    "message": "インポート完了 — ハイライトとメモは復元されませんでした。このバックアップを作成した Pinboard アカウントでログインしてから、もう一度インポートしてください"
+    "message": "インポートは完了しましたが、ハイライトとメモはスキップされました。このバックアップを作成した Pinboard アカウントでログインしてから、もう一度インポートしてください"
   },
   "importSettingsTitle": {
     "message": "JSONファイルから設定をインポート"
@@ -966,7 +966,7 @@
     "message": "サーバー上にバックアップが見つかりました"
   },
   "webdavTestOkEmpty": {
-    "message": "サーバーに接続できました — バックアップはまだありません"
+    "message": "サーバーに接続できました。バックアップはまだありません"
   },
   "webdavTestAuthFail": {
     "message": "認証に失敗しました"
@@ -994,13 +994,13 @@
     "message": "フォルダは存在しますがアップロードできません。WebDAV ルートではなく、既存の書き込み可能な同期フォルダを選択してください。"
   },
   "webdavTargetUnavailable": {
-    "message": "対象ディレクトリが存在しないか作成できません。書き込み可能な WebDAV フォルダー URL を指定してください。"
+    "message": "対象ディレクトリが存在しないか作成できません。書き込み可能な WebDAV フォルダ URL を指定してください。"
   },
   "webdavConflict": {
     "message": "リモートのバックアップが変更されています。プルしてから、もう一度プッシュしてください。"
   },
   "webdavPermDenied": {
-    "message": "権限が拒否されています — 「テスト」をクリックして許可してください"
+    "message": "権限が拒否されています。「テスト」をクリックして許可してください"
   },
   "webdavPullConfirm": {
     "message": "$TIME$ のバックアップでローカル設定を上書きしますか？API キーには影響しません。",
@@ -1020,7 +1020,7 @@
     "message": "このページを人気順に並び替える"
   },
   "importPartial": {
-    "message": "インポート完了 — テーマはローカルに保存されました（同期容量超過）；リロードで反映"
+    "message": "インポート完了。テーマはローカルに保存されました（同期容量超過）。リロードで反映"
   },
   "secQuickSave": {
     "message": "クイック保存"
@@ -1756,7 +1756,7 @@
     "message": "jina_xxxx（空欄で無料枠を使用）"
   },
   "submitUriTooLong": {
-    "message": "リクエストが大きすぎます — ノート・タイトル・タグを短くしてください"
+    "message": "リクエストが大きすぎます。メモ・タイトル・タグを短くしてください"
   },
   "saveAsThemeDisabledHint": {
     "message": "カスタム CSS を編集してからテーマとして保存できます"
@@ -1901,7 +1901,7 @@
     "message": "カスタムパラメータ（1 行に 1 つ、デフォルトリストに追加）"
   },
   "optUrlCleanExclude": {
-    "message": "除外パラメータ（1 行に 1 つ、クリーンアップしない — 例: アフィリエイト tag= を保持）"
+    "message": "除外パラメータ（1 行に 1 つ、例: アフィリエイトの tag= を残す）"
   },
   "emptyRecentBookmarks": {
     "message": "最近のブックマークはありません"
@@ -1937,16 +1937,16 @@
     "message": "tag\nref\nsi"
   },
   "optBgSaveNoClobber": {
-    "message": "バックグラウンド保存のタグをマージ（クイック保存/後で読む）"
+    "message": "バックグラウンド保存のタグをマージ（クイック保存 / あとで読む）"
   },
   "optBgSaveNoClobberHint": {
-    "message": "有効にすると、バックグラウンド保存は既存の Pinboard ブックマーク（存在する場合）を読み取り、新しいタグを既存のタグと置き換えるのではなくマージします。これにより、重複する URL での誤ったタグ損失を防ぎます。注意：追加の API 呼び出しにより、保存時間が約 3 秒増加します。フォアグラウンド ポップアップ編集は常に置き換えます（完全に制御できます）。"
+    "message": "有効にすると、バックグラウンド保存は既存の Pinboard ブックマーク（あれば）を読み取り、新しいタグを既存のタグと置き換えず、マージします。これにより、重複する URL でタグが誤って失われるのを防ぎます。注意：追加の API 呼び出しのため、保存ごとに約 3 秒増えます。フォアグラウンドのポップアップ編集は常に置き換えるので、完全に制御できます。"
   },
   "obsidianInstallHint": {
     "message": "ノートを開くには Obsidian がインストールされている必要があります。ノートの内容はバックアップとしてクリップボードにもコピーされています。"
   },
   "obsidianClipboardFailed": {
-    "message": "クリップボードへの書き込みに失敗しました — ノートは作成されていません。もう一度お試しください。"
+    "message": "クリップボードへの書き込みに失敗したため、ノートは作成されていません。もう一度お試しください。"
   },
   "apiKeySecurityHint": {
     "message": "新規ユーザーの認証情報は既定でこのデバイスだけに保存されます。既存のクラウド認証情報がある場合、アップグレード後もアカウント全体の同期が有効なことがあります。設定同期を有効にしたデバイスだけが参加し、同期される認証情報は難読化されるだけで暗号化はされません。"
@@ -1976,10 +1976,10 @@
     "message": "Wayback Machine アーカイブ"
   },
   "optWayback": {
-    "message": "保存したページをインターネット アーカイブに保存する"
+    "message": "保存したページを Wayback Machine にアーカイブする"
   },
   "optWaybackHint": {
-    "message": "保存するたびに、インターネット アーカイブにページのスナップショットを撮影するよう要求します（ベストエフォート、保存をブロックしません）。保存した URL を archive.org に送信 - デフォルトでオフです。"
+    "message": "保存するたびに、Internet Archive にページのスナップショットを作成するよう要求します（ベストエフォートで、保存をブロックしません）。保存した URL を archive.org に送信します。デフォルトはオフです。"
   },
   "optWaybackBatch": {
     "message": "一括保存中もアーカイブする"
@@ -2050,7 +2050,7 @@
     "message": "アーカイブを再試行"
   },
   "archiveLogNote": {
-    "message": "送信成功はスナップショットの即時公開を意味しません — Wayback Machine が新しいキャプチャをインデックスするまで通常数分（場合によってはそれ以上）かかります。"
+    "message": "送信に成功しても、スナップショットがすぐに表示されるとは限りません。Wayback Machine が新しいキャプチャをインデックスするまで、通常は数分（場合によってはそれ以上）かかります。"
   },
   "archiveErrAuth": {
     "message": "認証情報が無効です"
@@ -2071,13 +2071,13 @@
     "message": "この URL の本日のキャプチャ上限に達しました"
   },
   "archiveErrServer": {
-    "message": "archive.org のサーバーエラーです — しばらくしてから再試行してください"
+    "message": "archive.org のサーバーエラーです。しばらくしてから再試行してください"
   },
   "archiveErrRateLimited": {
-    "message": "匿名リクエストは IP ごとにレート制限されています — しばらく待つか S3 キーを追加してください"
+    "message": "匿名リクエストは IP ごとにレート制限されています。しばらく待つか S3 キーを追加してください"
   },
   "archiveErrTimeoutHint": {
-    "message": "リクエストがタイムアウトしました — archive.org が混雑しているかネットワークが遅い可能性があります"
+    "message": "リクエストがタイムアウトしました。archive.org が混雑しているかネットワークが遅い可能性があります"
   },
   "tabTags": {
     "message": "タグ"
@@ -2181,7 +2181,7 @@
     }
   },
   "tagGovAborted429": {
-    "message": "レート制限によりバッチを停止しました。完了済みの変更は保存されています。同じ統合を再実行すると安全に再開できます（更新済みのブックマークは自動でスキップされます）。"
+    "message": "レート制限によりバッチを停止しました。完了済みの変更は保存されています。同じマージを再実行すると安全に再開できます（更新済みのブックマークは自動でスキップされます）。"
   },
   "tagGovMergeEstimate": {
     "message": "推定所要時間：約 $T$",
@@ -2242,7 +2242,7 @@
     "message": "ページ下部で詳細を表示"
   },
   "tagGovRateLimitWait": {
-    "message": "レート制限中 — まもなく再試行します…"
+    "message": "レート制限中。再試行を待機しています…"
   },
   "tagGovQueuedCancelled": {
     "message": "待機中の $N$ 件をキャンセルしました",
@@ -2281,7 +2281,7 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "タグを読み込めませんでした — Pinboard トークンまたはネットワークを確認して更新してください"
+    "message": "タグを読み込めませんでした。Pinboard トークンまたはネットワークを確認して更新してください"
   },
   "placeholderOptional": {
     "message": "任意"
@@ -2290,19 +2290,19 @@
     "message": "タグ一覧のスナップショットをダウンロードしました（名前と件数のみ。手動修復の参考用で、自動復元はできません）"
   },
   "tagGovSnapshotFailed": {
-    "message": "スナップショットを作成できません — マージ/削除がブロックされています"
+    "message": "スナップショットを作成できません。マージ/削除がブロックされています"
   },
   "tagGovIrreversibleWarn": {
-    "message": "統合と削除は元に戻せません。最初の変更前にタグ一覧のスナップショット（名前と件数のみ、手動修復の参考用）を自動ダウンロードします。"
+    "message": "マージと削除は元に戻せません。最初の変更前にタグ一覧のスナップショット（名前と件数のみ、手動修復の参考用）を自動ダウンロードします。"
   },
   "tagGovBundlesWarn": {
-    "message": "pinboard.in のタグバンドルは、名前変更によって自動更新されません — マージ後に手動で確認してください。"
+    "message": "pinboard.in のタグバンドルは、名前変更によって自動更新されません。マージ後に手動で確認してください。"
   },
   "optBgSaveMode": {
     "message": "バックグラウンド保存モード"
   },
   "optBgSaveModeMerge": {
-    "message": "マージ（デフォルト — 新しいタグと既存タグを結合）"
+    "message": "マージ（デフォルト、新しいタグと既存タグを結合）"
   },
   "optBgSaveModeSkip": {
     "message": "スキップ（URL が既に保存されている場合は何もしない）"
@@ -2317,7 +2317,7 @@
     "message": "既にブックマーク済み"
   },
   "bgSkippedExists": {
-    "message": "既にブックマークされています — 保存がスキップされました"
+    "message": "既にブックマークされています。保存をスキップしました"
   },
   "secPreviewAi": {
     "message": "プレビューページ AI"
@@ -2610,10 +2610,10 @@
     "message": "最後に使用"
   },
   "mdSendTooLongFellBack": {
-    "message": "直接リンクには長すぎます — 全文をコピーしました。{name} に貼り付けて（Ctrl+V）完了してください。"
+    "message": "直接リンクには長すぎます。全文をコピーしました。{name} に貼り付けて（Ctrl+V）完了してください。"
   },
   "mdSentUrlScheme": {
-    "message": "{name} を開きました · 全文をクリップボードにコピーしました"
+    "message": "{name} を開きました。全文をクリップボードにコピーしました"
   },
   "mdOpenedApp": {
     "message": "{name} を開きました"
@@ -2625,23 +2625,23 @@
     "message": "送信失敗"
   },
   "mdSendOpenBlocked": {
-    "message": "アプリを開けませんでした · 全文をクリップボードにコピーしました"
+    "message": "アプリを開けませんでした。全文をクリップボードにコピーしました"
   },
   "mdSendNoneConfigured": {
-    "message": "送信先が有効化されていません — 設定で追加してください"
+    "message": "送信先が有効化されていません。設定で追加してください"
   },
   "mdManageDestinations": {
     "message": "送信先を管理 →"
   },
-  "mdSendApiDown": { "message": "エクスポートサーバーに接続できませんでした。全文をクリップボードにコピーしました — 貼り付けて完了してください。" },
+  "mdSendApiDown": { "message": "エクスポートサーバーに接続できませんでした。全文をクリップボードにコピーしました。貼り付けて完了してください。" },
   "mdSendApiBadToken": { "message": "サーバーがトークンを拒否しました。アプリからコピーし直してください。全文をクリップボードにコピーしました。" },
-  "mdSendApiFailed": { "message": "エクスポートリクエストに失敗しました。全文をクリップボードにコピーしました — 貼り付けて完了してください。" },
+  "mdSendApiFailed": { "message": "エクスポートリクエストに失敗しました。全文をクリップボードにコピーしました。貼り付けて完了してください。" },
   "mdSendTest": {
     "message": "接続テスト"
   },
   "mdSendTestOk": { "message": "接続成功" },
-  "mdSendTestDown": { "message": "サーバーに接続できません — アプリは起動していますか？" },
-  "mdSendTestBadToken": { "message": "トークンが拒否されました — アプリからコピーし直してください。" },
+  "mdSendTestDown": { "message": "サーバーに接続できません。アプリは起動していますか？" },
+  "mdSendTestBadToken": { "message": "トークンが拒否されました。アプリからコピーし直してください。" },
   "mdSendTestNoToken": {
     "message": "先にトークンを入力してください。"
   },
@@ -2652,13 +2652,13 @@
     "message": "GitHub トークン（classic、gist スコープ）"
   },
   "mdTargetGithubOnboarding": {
-    "message": "GitHub → Settings → Developer settings → Tokens (classic) で「gist」スコープを付与した個人アクセストークン（classic）を作成し、下に貼り付けてください。各クリップは非公開 gist として保存されます。注意：fine-grained トークンはまだ gist を作成できません — classic トークンを使用してください。"
+    "message": "GitHub → Settings → Developer settings → Tokens (classic) で「gist」スコープを付与した個人アクセストークン（classic）を作成し、下に貼り付けてください。各クリップは非公開 gist として保存されます。注意：fine-grained トークンはまだ gist を作成できないため、classic トークンを使用してください。"
   },
   "mdSendViewGist": {
     "message": "gist を表示 →"
   },
   "mdSendApiPerm": {
-    "message": "アクセス権限が拒否されました。全文をクリップボードにコピーしました — 貼り付けて完了してください。"
+    "message": "アクセス権限が拒否されました。全文をクリップボードにコピーしました。貼り付けて完了してください。"
   },
   "mdTargetWebhookUrl": {
     "message": "エンドポイント URL"
@@ -2667,7 +2667,7 @@
     "message": "Authorization ヘッダー（任意）"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "JSON ペイロード {title, url, date, tags, markdown} をエンドポイントに POST します。設定した Authorization 値はそのまま送信されるため（例：Bearer <token> や Token <key>）、あらゆる認証方式に対応します。n8n、Make、Zapier、Readwise、または任意の自己ホスト型レシーバーで利用できます — ここでのアカウント登録は不要です。"
+    "message": "JSON ペイロード {title, url, date, tags, markdown} をエンドポイントに POST します。設定した Authorization 値はそのまま送信されるため（例：Bearer <token> や Token <key>）、あらゆる認証方式に対応します。n8n、Make、Zapier、Readwise、または任意の自己ホスト型レシーバーで利用できます。ここでのアカウント登録は不要です。"
   },
   "mdTargetWebhookHttpWarn": {
     "message": "ブロックしました。HTTPS、または localhost、127.0.0.1、[::1] に限り HTTP を使用してください。LAN／公開 HTTP、不正な URL、認証情報を含む URL は送信されません。"
@@ -2683,8 +2683,8 @@
   "hlNotePlaceholder": { "message": "メモを追加…" },
   "hlSave": { "message": "保存" },
   "hlDelete": { "message": "ハイライトを削除" },
-  "hlDegraded": { "message": "位置がずれました — 周囲のテキストが変更されたため、このハイライトは段落全体に適用されています。" },
-  "hlOrphanNote": { "message": "$COUNT$ 件のハイライトが現在のページ内容で見つかりませんでした（メモは保持されます）", "placeholders": { "count": { "content": "$1" } } },
+  "hlDegraded": { "message": "位置が失われました。周囲のテキストが変更されたため、このハイライトは段落全体に適用されています。" },
+  "hlOrphanNote": { "message": "$COUNT$ 件のハイライトが現在のページ内容で見つかりませんでした。メモは保持されます。", "placeholders": { "count": { "content": "$1" } } },
   "hlOrphanUnlocatable": { "message": "このハイライトは現在のページ内容で見つかりません。" },
   "mdImgFixNote": {"message": "$COUNT$ 件の画像を読み込めませんでした", "placeholders": {"count": {"content": "$1"}}},
   "mdImgFixBtn": {"message": "このページの画像を修復"},

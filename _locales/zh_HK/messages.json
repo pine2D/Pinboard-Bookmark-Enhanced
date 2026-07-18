@@ -3,19 +3,19 @@
     "message": "Pinboard 書籤增強"
   },
   "extDescription": {
-    "message": "全面強化 Pinboard 書籤體驗：AI 智能標籤、自動摘要，以及全套可自訂主題介面。"
+    "message": "一鍵儲存到 Pinboard，備有 AI 標籤與摘要、內建閱讀器，以及完整的網站主題自訂。"
   },
   "cmdOpenPopup": {
     "message": "開啟 Pinboard 書籤增強"
   },
   "cmdQuickSave": {
-    "message": "快速儲存到 Pinboard（無彈出窗口）"
+    "message": "快速儲存到 Pinboard（無彈出視窗）"
   },
   "cmdReadLater": {
-    "message": "快速標記為稍後閱讀（無彈出窗口）"
+    "message": "快速標記為稍後閱讀（無彈出視窗）"
   },
   "cmdMarkdownPreview": {
-    "message": "將頁面轉為 Markdown 預覽（無彈出窗口）"
+    "message": "將頁面轉為 Markdown 預覽（無彈出視窗）"
   },
   "cmdSaveTabSet": {
     "message": "將所有標籤頁儲存為標籤集"
@@ -54,7 +54,7 @@
     "message": "複製"
   },
   "copyAllTagsTitle": {
-    "message": "複製所有標籤到剪貼板"
+    "message": "複製所有標籤到剪貼簿"
   },
   "tagsCopied": {
     "message": "已複製 $COUNT$ 個",
@@ -297,7 +297,7 @@
     "message": "未知錯誤"
   },
   "aiErrorModelNotFound": {
-    "message": "$PROVIDER$ 嘅預設模型可能已過期 — 請喺設定中選擇一個模型",
+    "message": "$PROVIDER$ 的預設模型可能已過時，請在設定中選擇一個模型",
     "placeholders": {
       "provider": {
         "content": "$1"
@@ -305,7 +305,7 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "無法存取 $HOST$ — 請授權並重試。",
+    "message": "無法存取 $HOST$，請授權並重試。",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -316,7 +316,7 @@
     "message": "授權並重試"
   },
   "aiErrorModelNotFoundHint": {
-    "message": "前往設定 > AI，選擇一個可用嘅模型"
+    "message": "前往設定 > AI，選擇一個可用的模型"
   },
   "addAll": {
     "message": "全部新增"
@@ -555,7 +555,7 @@
     "message": "儲存空間已滿。請在擴充功能選項的「儲存」中清理快取資料後重試。"
   },
   "mdPreviewOpenFailed": {
-    "message": "無法開啟預覽——此頁面可能過大，無法儲存。"
+    "message": "無法開啟預覽，此頁面可能過大，無法儲存。"
   },
   "mdPreviewQuotaFull": {
     "message": "儲存空間已滿，無法儲存預覽。請先騰出空間再重試。"
@@ -642,16 +642,16 @@
     "message": "無法擷取此頁面，請重試。"
   },
   "mdEngineTabGone": {
-    "message": "來源分頁已無法使用 — 重新開啟該頁面才能使用 Defuddle"
+    "message": "來源標籤頁已無法使用，重新開啟該頁面才能使用 Defuddle"
   },
   "mdEngineGroupAria": {
     "message": "擷取引擎"
   },
   "bgTabSetSaved": {
-    "message": "Pinboard：仲差一步完成儲存"
+    "message": "Pinboard：還差一步完成儲存"
   },
   "bgTabsSavedCount": {
-    "message": "已傳送 $COUNT$ 個標籤頁 — 喺打開嘅 Pinboard 頁面撳 Save 先完成儲存。",
+    "message": "已傳送 $COUNT$ 個標籤頁，請在開啟的 Pinboard 頁面按 Save 完成儲存。",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -846,31 +846,31 @@
     "message": "尊重已有標籤大小寫（匹配使用最多的寫法）"
   },
   "optShowSuggestTags": {
-    "message": "在彈出窗口中顯示 Pinboard 推薦標籤"
+    "message": "在彈出視窗中顯示 Pinboard 推薦標籤"
   },
   "optShowAiSummary": {
-    "message": "在彈出窗口中顯示 AI 摘要按鈕"
+    "message": "在彈出視窗中顯示 AI 摘要按鈕"
   },
   "optShowAiTags": {
-    "message": "在彈出窗口中顯示 AI 標籤區"
+    "message": "在彈出視窗中顯示 AI 標籤區"
   },
   "optShowQuickLinks": {
-    "message": "在彈出窗口中顯示快捷連結"
+    "message": "在彈出視窗中顯示快捷連結"
   },
   "optShowQuickRow": {
-    "message": "在彈出窗口中顯示快捷操作按鈕（儲存分頁 · 批次儲存 · Markdown）"
+    "message": "在彈出視窗中顯示快捷操作按鈕（儲存標籤頁 · 批次儲存 · Markdown）"
   },
   "tagSyncLabel": {
     "message": "標籤快取策略"
   },
   "tagSyncCached": {
-    "message": "快取（預設 — 10 分鐘後重新取得）"
+    "message": "快取（預設，10 分鐘後重新取得）"
   },
   "tagSyncFresh": {
-    "message": "即時（每次開啟都請求 — 最新，較慢）"
+    "message": "即時（每次開啟都請求，最新但較慢）"
   },
   "tagSyncPrewarmed": {
-    "message": "預熱（背景每 15 分鐘更新 — 開啟即用）"
+    "message": "預熱（背景每 15 分鐘更新，開啟即用）"
   },
   "tagSyncHint": {
     "message": "控制如何從 Pinboard 取得你已有的標籤雲用於自動完成。僅讀取，不會向 Pinboard 上傳任何標籤。"
@@ -882,16 +882,16 @@
     "message": "每行一組預設：\n工作: project, review, report\n開發: programming, tutorial, tool"
   },
   "tagPresetsHint": {
-    "message": "格式：名稱: 標籤1, 標籤2, 標籤3 — 在彈出窗口中顯示為快捷新增按鈕。"
+    "message": "格式：名稱: 標籤1, 標籤2, 標籤3。在彈出視窗中顯示為快捷新增按鈕。"
   },
   "secPopupBehavior": {
-    "message": "彈出窗口行為"
+    "message": "彈出視窗行為"
   },
   "optCheckBookmarkStatus": {
     "message": "透過圖示顯示收藏狀態（偵測當前頁面是否已儲存）"
   },
   "optAutoClose": {
-    "message": "儲存後自動關閉彈出窗口"
+    "message": "儲存後自動關閉彈出視窗"
   },
   "optOfflineQueue": {
     "message": "啟用離線儲存佇列"
@@ -903,7 +903,7 @@
     "message": "匯出或匯入設定（出於安全考慮，API 密鑰不包含在匯出檔案中）。"
   },
   "backupIncludeHighlightsLabel": {
-    "message": "在備份中包含標示和筆記"
+    "message": "在備份中包含標記和筆記"
   },
   "backupIncludeHighlightsHint": {
     "message": "手動備份和 WebDAV 備份會包含頁面 URL、標題、已選文字、筆記、顏色和時間戳。API 密鑰仍然不會被包含。"
@@ -915,7 +915,7 @@
     "message": "匯入設定"
   },
   "importedReload": {
-    "message": "已匯入 — 重新整理頁面後生效"
+    "message": "已匯入，重新整理頁面後生效"
   },
   "importInvalid": {
     "message": "檔案格式無效"
@@ -924,7 +924,7 @@
     "message": "匯入未能完成；部分設定可能已經變更，請檢查後再試"
   },
   "importHighlightsSkipped": {
-    "message": "已匯入 — 標示和筆記未還原。請登入建立此備份的 Pinboard 帳號，然後再匯入一次"
+    "message": "已匯入，但標記和筆記未還原。請登入建立此備份的 Pinboard 帳號，然後再匯入一次"
   },
   "importSettingsTitle": {
     "message": "從 JSON 檔案匯入設定"
@@ -966,7 +966,7 @@
     "message": "伺服器上已找到備份"
   },
   "webdavTestOkEmpty": {
-    "message": "伺服器可連接——尚無備份"
+    "message": "伺服器可連接，尚無備份"
   },
   "webdavTestAuthFail": {
     "message": "身份驗證失敗"
@@ -1000,7 +1000,7 @@
     "message": "遠端備份已變更。請先拉取，再重新推送。"
   },
   "webdavPermDenied": {
-    "message": "權限被拒絕——按「測試」以授權"
+    "message": "權限被拒絕，按「測試」以授權"
   },
   "webdavPullConfirm": {
     "message": "用來自 $TIME$ 的備份覆蓋本機設定？不會影響你的 API 密鑰。",
@@ -1020,13 +1020,13 @@
     "message": "按熱門程度排序此頁面"
   },
   "importPartial": {
-    "message": "已匯入 — 主題已儲存至本機（同步配額已滿）；重新整理後生效"
+    "message": "已匯入，主題已儲存至本機（同步配額已滿）；重新整理後生效"
   },
   "secQuickSave": {
     "message": "快速儲存"
   },
   "qsHint": {
-    "message": "透過鍵盤快捷鍵即時儲存當前頁面（無需開啟彈出窗口）。"
+    "message": "透過鍵盤快捷鍵即時儲存當前頁面（無需開啟彈出視窗）。"
   },
   "labelShortcut": {
     "message": "快捷鍵"
@@ -1095,7 +1095,7 @@
     "message": "跳過已收藏的網址"
   },
   "batchAiHint": {
-    "message": "AI 會為每個標籤頁單獨調用，可能較慢。首次使用時，批量儲存只會申請清單中的標籤頁網站和目前 AI 服務商權限。"
+    "message": "AI 會為每個標籤頁單獨呼叫，可能較慢。首次使用時，批量儲存只會申請清單中的標籤頁網站和目前 AI 服務商權限。"
   },
   "batchPermDenied": {
     "message": "未獲得清單中的網站權限，批量 AI 未啟動。"
@@ -1107,7 +1107,7 @@
     }
   },
   "batchPermProvider": {
-    "message": "$PROVIDER$（AI 服務供應商）：$ORIGIN$",
+    "message": "$PROVIDER$（AI 服務商）：$ORIGIN$",
     "placeholders": {
       "provider": { "content": "$1" },
       "origin": { "content": "$2" }
@@ -1126,7 +1126,7 @@
     "message": "模型"
   },
   "labelBaseUrl": {
-    "message": "接口地址"
+    "message": "端點網址"
   },
   "labelDisplayName": {
     "message": "顯示名稱"
@@ -1158,7 +1158,7 @@
     "message": "顯示/隱藏密鑰"
   },
   "hintOpenAIBaseUrl": {
-    "message": "可修改為代理或兼容接口地址"
+    "message": "可修改為代理或相容端點網址"
   },
   "hintClaudeModel": {
     "message": "如 claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
@@ -1167,7 +1167,7 @@
     "message": "需先執行 ollama pull llama3.2"
   },
   "hintCustomBaseUrl": {
-    "message": "必須支援 /chat/completions 接口"
+    "message": "必須支援 /chat/completions 端點"
   },
   "hintCustomKey": {
     "message": "無需密鑰時留空"
@@ -1176,7 +1176,7 @@
     "message": "AI 行為"
   },
   "optAiAutoTags": {
-    "message": "開啟彈出窗口時自動產生 AI 標籤"
+    "message": "開啟彈出視窗時自動產生 AI 標籤"
   },
   "labelAiTagLang": {
     "message": "AI 標籤語言"
@@ -1272,19 +1272,19 @@
     "message": "深色"
   },
   "optPopupFollowTheme": {
-    "message": "彈出窗口跟隨 Pinboard 主題預設"
+    "message": "彈出視窗跟隨 Pinboard 主題預設"
   },
   "popupFollowHint": {
-    "message": "啟用後，彈出窗口外觀將與所選的 Pinboard CSS 主題保持一致。"
+    "message": "啟用後，彈出視窗外觀將與所選的 Pinboard CSS 主題保持一致。"
   },
   "secPopupElements": {
-    "message": "彈出窗口元素"
+    "message": "彈出視窗元素"
   },
   "optShowSearch": {
-    "message": "在彈出窗口中顯示搜尋欄"
+    "message": "在彈出視窗中顯示搜尋欄"
   },
   "optShowRecent": {
-    "message": "在彈出窗口中顯示最近書籤"
+    "message": "在彈出視窗中顯示最近書籤"
   },
   "optShowBadge": {
     "message": "在圖示上顯示未讀數量角標"
@@ -1311,10 +1311,10 @@
     "message": "Pinboard.in 標籤頁"
   },
   "optTagSortByPop": {
-    "message": "喺標籤頁加入「按熱度排序」控制項"
+    "message": "在標籤頁加入「按熱度排序」控制項"
   },
   "optTagSortByPopHint": {
-    "message": "喺 pinboard.in 標籤頁加入「pop」控制項，按收藏人數排序目前頁嘅書籤，再撳一次還原。"
+    "message": "在 pinboard.in 標籤頁加入「pop」控制項，按收藏人數為目前頁面的書籤排序，再按一次還原。"
   },
   "secCustomStyle": {
     "message": "Pinboard.in 自訂樣式"
@@ -1427,16 +1427,16 @@
     "message": "資料同步"
   },
   "optSyncEnabled": {
-    "message": "喺呢部裝置使用 Chrome Sync 同步設定"
+    "message": "在這部裝置使用 Chrome Sync 同步設定"
   },
   "optSyncHint": {
-    "message": "呢個選項只對目前裝置生效。每部需要使用 Google 帳戶設定嘅裝置都要分別開啟。"
+    "message": "這個選項只對目前裝置生效。每部需要使用 Google 帳戶設定的裝置都要分別開啟。"
   },
   "syncApiKeysLabel": {
-    "message": "透過呢個 Google 帳戶同步憑據"
+    "message": "透過這個 Google 帳戶同步憑據"
   },
   "syncApiKeysHint": {
-    "message": "呢個係帳號級嘅單一選項，但只有開咗設定同步嘅裝置會參與；其他裝置會繼續使用本機憑據。新用戶預設關閉。如果升級時 Chrome Sync 已經有非空憑據，為免資料遺失會保持開啟。同步嘅 API 金鑰、token、密碼同匯出憑據只經過混淆處理，並無加密。"
+    "message": "這是帳號級的單一選項，但只有已開啟設定同步的裝置會參與；其他裝置會繼續使用本機憑據。新用戶預設關閉。如果升級時 Chrome Sync 已經有非空憑據，為免資料遺失會保持開啟。同步的 API 金鑰、token、密碼與匯出憑據只經過混淆處理，並無加密。"
   },
   "qlPopularTitle": {
     "message": "熱門"
@@ -1484,7 +1484,7 @@
     "message": "Ollama (本機)"
   },
   "provCustom": {
-    "message": "自訂 OpenAI 兼容"
+    "message": "自訂 OpenAI 相容"
   },
   "jinaMarkdownBtn": {
     "message": "Markdown"
@@ -1565,7 +1565,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdImgEmbedNotHere": {
-    "message": "內嵌僅對下載生效——本次匯出保留圖片連結。"
+    "message": "內嵌僅對下載生效，本次匯出保留圖片連結。"
   },
   "mdImgBrokenNote": {
     "message": "$COUNT$ 張圖片在目前預覽中載入失敗，匯出後可能仍無法顯示；下載並選擇「內嵌」可打包圖片。",
@@ -1662,13 +1662,13 @@
     "message": "下載 .md"
   },
   "mdDownloadMdTitle": {
-    "message": "下載 Markdown 文件"
+    "message": "下載 Markdown 檔案"
   },
   "mdDownloadHtml": {
     "message": "下載 .html"
   },
   "mdDownloadHtmlTitle": {
-    "message": "下載 HTML 文件"
+    "message": "下載 HTML 檔案"
   },
   "mdDownloadEpub": {
     "message": "下載 .epub"
@@ -1756,7 +1756,7 @@
     "message": "jina_xxxx（留空使用免費額度）"
   },
   "submitUriTooLong": {
-    "message": "請求過長 — 請精簡筆記、標題或標籤"
+    "message": "請求過長，請精簡備註、標題或標籤"
   },
   "saveAsThemeDisabledHint": {
     "message": "請先修改 Custom CSS 才能儲存為主題"
@@ -1796,10 +1796,10 @@
     "message": "同步遷移失敗。請再試；如果問題持續，請檢查 Chrome Sync 的可用儲存空間。"
   },
   "syncConflictUseCloud": {
-    "message": "Chrome Sync 已有設定。要喺呢部裝置使用雲端設定嗎？\n\n選擇「取消」可改用呢部裝置嘅設定。"
+    "message": "Chrome Sync 已有設定。要在這部裝置使用雲端設定嗎？\n\n選擇「取消」可改用這部裝置的設定。"
   },
   "syncConflictOverwriteCloud": {
-    "message": "要用呢部裝置嘅設定覆蓋 Chrome Sync 入面嘅設定嗎？\n\n選擇「取消」會保持同步關閉。"
+    "message": "要用這部裝置的設定覆蓋 Chrome Sync 中的設定嗎？\n\n選擇「取消」會保持同步關閉。"
   },
   "jinaFreeTierHint": {
     "message": "免費額度：20 RPM。設定 key 可提高配額。"
@@ -1820,10 +1820,10 @@
     "message": "暫無預覽資料，請先在彈窗中點擊 Markdown 按鈕。"
   },
   "freeTierTitle": {
-    "message": "邊啲 AI 服務商提供免費 API？"
+    "message": "哪些 AI 服務商提供免費 API？"
   },
   "freeTierGemini": {
-    "message": "— 約 1500 次/日（Flash），唔使信用卡，Google 帳號就得"
+    "message": "— 約 1500 次/日（Flash），無需信用卡，有 Google 帳號即可"
   },
   "freeTierGroq": {
     "message": "— 約 1000 次/日，推理速度最快"
@@ -1847,13 +1847,13 @@
     "message": "— 每模型 100 萬 tokens，90 日（只限新加坡端點）"
   },
   "freeTierOllama": {
-    "message": "— 完全免費，喺本機執行"
+    "message": "— 完全免費，在本機執行"
   },
   "freeTierDisclaimer": {
     "message": "各服務商政策時常變動。以上資料截至 2026-06，可能已失效。註冊時請以官方頁面為準。"
   },
   "freeTierResourcesPrefix": {
-    "message": "更全面、更新更勤嘅清單："
+    "message": "更全面、更新更勤的清單："
   },
   "aiStage_extracting": {
     "message": "擷取頁面內容…"
@@ -1889,7 +1889,7 @@
     "message": "自動清理 URL 追蹤參數"
   },
   "optUrlCleanOnOpen": {
-    "message": "打開 popup 時清理（靜默，含撤銷連結）"
+    "message": "開啟彈窗時清理（靜默，含撤銷連結）"
   },
   "optUrlCleanOnPaste": {
     "message": "貼上 URL 時清理（toast 提示）"
@@ -1937,10 +1937,10 @@
     "message": "tag\nref\nsi"
   },
   "optBgSaveNoClobber": {
-    "message": "合併背景保存中的標籤（快速保存/稍後閱讀）"
+    "message": "合併背景儲存中的標籤（快速儲存/稍後閱讀）"
   },
   "optBgSaveNoClobberHint": {
-    "message": "啟用時，背景保存將讀取您現有的 Pinboard 書籤（如有），並將新標籤與現有標籤合併，而不是替換。這可防止在重複 URL 上意外遺失標籤。注意：額外的 API 呼叫會增加約 3 秒的保存時間。前台彈出窗口編輯始終替換（讓您完全控制）。"
+    "message": "啟用後，背景儲存會讀取你現有的 Pinboard 書籤（如有），並把新標籤與現有標籤合併，而不是取代。這可避免在重複網址上意外遺失標籤。注意：額外的 API 呼叫會令每次儲存增加約 3 秒。在彈出視窗中的編輯一律取代標籤，讓你完全掌控。"
   },
   "obsidianInstallHint": {
     "message": "需要安裝 Obsidian 才能開啟筆記。筆記內容已複製到剪貼簿作為備份。"
@@ -1949,7 +1949,7 @@
     "message": "寫入剪貼簿失敗——筆記未建立，請重試。"
   },
   "apiKeySecurityHint": {
-    "message": "新用戶嘅憑據預設只儲存喺本機；舊有雲端憑據可能令帳號級同步喺升級後保持開啟。只有開咗設定同步嘅裝置會參與；同步憑據只經過混淆處理，並無加密。"
+    "message": "新用戶的憑據預設只儲存在本機；舊有雲端憑據可能令帳號級同步在升級後保持開啟。只有已開啟設定同步的裝置會參與；同步憑據只經過混淆處理，並無加密。"
   },
   "batchPermLabel": {
     "message": "舊版所有網站權限："
@@ -1976,16 +1976,16 @@
     "message": "Wayback 封存"
   },
   "optWayback": {
-    "message": "保存頁面到互聯網檔案館"
+    "message": "儲存頁面到互聯網檔案館"
   },
   "optWaybackHint": {
-    "message": "每次保存後，請求互聯網檔案館為該頁面拍攝快照（盡力而為，不會阻擋保存）。將保存的 URL 發送至 archive.org - 預設關閉。"
+    "message": "每次儲存後，請求互聯網檔案館為該頁面拍攝快照（盡力而為，不會阻擋儲存）。將已儲存的網址發送至 archive.org；預設關閉。"
   },
   "optWaybackBatch": {
-    "message": "批量保存時也要存檔"
+    "message": "批量儲存時也要存檔"
   },
   "optWaybackBatchHint": {
-    "message": "批量保存可能會同時發送多個存檔請求；匿名配額有限。"
+    "message": "批量儲存可能會同時發送多個存檔請求；匿名配額有限。"
   },
   "optWaybackS3Key": {
     "message": "archive.org S3 Access Key（可選）"
@@ -1997,7 +1997,7 @@
     "message": "使用免費的 archive.org 帳戶密鑰，存檔將使用已認證的 API：更高的配額、伺服器端去重、可靠的結果。"
   },
   "waybackSkipPrivate": {
-    "message": "存為私密嘅書籤一律唔提交去 archive.org"
+    "message": "凡儲存為私密的書籤，一律不提交到 archive.org"
   },
   "waybackPermDenied": {
     "message": "缺少 web.archive.org 權限，重新開啟存檔即可授權。"
@@ -2050,7 +2050,7 @@
     "message": "重新提交存檔"
   },
   "archiveLogNote": {
-    "message": "提交成功不代表即時可見 — Wayback Machine 通常需要幾分鐘（有時更久）才會將新快照編入索引。"
+    "message": "提交成功不代表即時可見，Wayback Machine 通常需要幾分鐘（有時更久）才會將新快照編入索引。"
   },
   "archiveErrAuth": {
     "message": "憑證無效"
@@ -2074,10 +2074,10 @@
     "message": "archive.org 伺服器故障，請稍後再試"
   },
   "archiveErrRateLimited": {
-    "message": "匿名請求按 IP 限流 — 請稍後再試或填入 S3 key"
+    "message": "匿名請求按 IP 限流，請稍後再試或填入 S3 key"
   },
   "archiveErrTimeoutHint": {
-    "message": "請求逾時 — archive.org 繁忙或網路緩慢"
+    "message": "請求逾時，archive.org 繁忙或網絡緩慢"
   },
   "tabTags": {
     "message": "標籤"
@@ -2136,7 +2136,7 @@
     "message": "AI 未發現重複項"
   },
   "tagGovAiNoKey": {
-    "message": "未設定 AI 提供商——請前往 AI 分頁設定"
+    "message": "未設定 AI 服務商，請前往 AI 分頁設定"
   },
   "tagGovLowCountTitle": {
     "message": "低頻標籤（1 次或更少）"
@@ -2281,7 +2281,7 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "無法載入標籤——請檢查 Pinboard token 或網路後按重新整理"
+    "message": "無法載入標籤，請檢查 Pinboard token 或網絡後按「重新整理」"
   },
   "placeholderOptional": {
     "message": "可選"
@@ -2290,40 +2290,40 @@
     "message": "已下載標籤清單快照（僅含標籤名稱和數量，供手工修復參考，不能自動還原）"
   },
   "tagGovSnapshotFailed": {
-    "message": "無法生成快照 — 合併/刪除已阻止"
+    "message": "無法生成快照，合併/刪除已阻止"
   },
   "tagGovIrreversibleWarn": {
     "message": "合併和刪除操作無法復原。第一次修改前會自動下載你的標籤清單快照（僅含標籤名稱和數量，供手工修復參考）。"
   },
   "tagGovBundlesWarn": {
-    "message": "Pinboard.in 上的標籤束不會跟隨重命名自動更新 — 合併後請手動檢查。"
+    "message": "Pinboard.in 上的標籤束不會跟隨重新命名自動更新，合併後請手動檢查。"
   },
   "optBgSaveMode": {
-    "message": "後台保存模式"
+    "message": "背景儲存模式"
   },
   "optBgSaveModeMerge": {
-    "message": "合併（預設 — 新標籤與現有標籤合併）"
+    "message": "合併（預設，新標籤與現有標籤合併）"
   },
   "optBgSaveModeSkip": {
-    "message": "跳過（如果網址已保存則不操作）"
+    "message": "跳過（如果網址已儲存則不操作）"
   },
   "optBgSaveModeOverwrite": {
     "message": "覆蓋（完全取代標籤，不合併）"
   },
   "optBgSaveModeHint": {
-    "message": "合併：讀取已有書籤標籤並與新標籤合併。跳過：避免保存重複網址。覆蓋：完全取代標籤（前台編輯始終取代）。"
+    "message": "合併：讀取已有書籤標籤並與新標籤合併。跳過：避免儲存重複網址。覆蓋：完全取代標籤（彈出視窗中的編輯一律取代）。"
   },
   "bgSkippedTitle": {
     "message": "已收藏"
   },
   "bgSkippedExists": {
-    "message": "已收藏過 — 保存已跳過"
+    "message": "已收藏過，儲存已跳過"
   },
   "secPreviewAi": {
     "message": "預覽頁 AI"
   },
   "previewAiSectionHint": {
-    "message": "Markdown 預覽頁嘅劃詞解釋、全文問答同全文翻譯都由你主動使用，並使用上方配置嘅 AI 服務商同 Key。若啟用可選嘅 AI 重點速覽，佢可能會喺 Markdown 預覽開啟時執行；唔會有任何功能以隱藏背景工作形式執行。"
+    "message": "Markdown 預覽頁的劃詞解釋、全文問答與全文翻譯都由你主動使用，並使用上方配置的 AI 服務商與 Key。若啟用可選的 AI 重點速覽，它可能會在 Markdown 預覽開啟時執行；不會有任何功能以隱藏背景工作形式執行。"
   },
   "previewAiEnabled": {
     "message": "在預覽頁啟用 AI 功能"
@@ -2335,7 +2335,7 @@
     "message": "模型覆蓋（可選）"
   },
   "previewAiModelHint": {
-    "message": "僅供預覽頁 AI 功能使用的模型名（與上方同一提供商）。留空則使用上方配置的預設模型。"
+    "message": "僅供預覽頁 AI 功能使用的模型名（與上方同一服務商）。留空則使用上方配置的預設模型。"
   },
   "translateTargetLangLabel": {
     "message": "翻譯目標語言"
@@ -2610,10 +2610,10 @@
     "message": "最近使用"
   },
   "mdSendTooLongFellBack": {
-    "message": "內容過長，無法用直接連結傳送——已複製全文，在 {name} 中貼上（Ctrl+V）即可完成。"
+    "message": "內容過長，無法用直接連結傳送；已改為複製全文，在 {name} 中貼上（Ctrl+V）即可完成。"
   },
   "mdSentUrlScheme": {
-    "message": "已開啟 {name} · 全文已複製到剪貼簿"
+    "message": "已開啟 {name}，全文已複製到剪貼簿"
   },
   "mdOpenedApp": {
     "message": "已開啟 {name}"
@@ -2625,23 +2625,23 @@
     "message": "傳送失敗"
   },
   "mdSendOpenBlocked": {
-    "message": "無法開啟應用程式 · 全文已複製到剪貼簿"
+    "message": "無法開啟應用程式，全文已複製到剪貼簿"
   },
   "mdSendNoneConfigured": {
-    "message": "尚未啟用任何目標——請在設定中新增"
+    "message": "尚未啟用任何目標，請在設定中新增"
   },
   "mdManageDestinations": {
     "message": "管理目標 →"
   },
-  "mdSendApiDown": { "message": "無法連接匯出伺服器，全文已複製到剪貼簿 — 貼上即可完成。" },
+  "mdSendApiDown": { "message": "無法連接匯出伺服器，全文已複製到剪貼簿；貼上即可完成。" },
   "mdSendApiBadToken": { "message": "伺服器拒絕了 Token，請從應用程式重新複製。全文已複製到剪貼簿。" },
-  "mdSendApiFailed": { "message": "匯出請求失敗，全文已複製到剪貼簿 — 貼上即可完成。" },
+  "mdSendApiFailed": { "message": "匯出請求失敗，全文已複製到剪貼簿；貼上即可完成。" },
   "mdSendTest": {
     "message": "測試連接"
   },
   "mdSendTestOk": { "message": "已連接" },
-  "mdSendTestDown": { "message": "無法連接伺服器 — 應用程式是否正在執行？" },
-  "mdSendTestBadToken": { "message": "Token 被拒絕 — 請從應用程式重新複製。" },
+  "mdSendTestDown": { "message": "無法連接伺服器，應用程式是否正在執行？" },
+  "mdSendTestBadToken": { "message": "Token 被拒絕，請從應用程式重新複製。" },
   "mdSendTestNoToken": {
     "message": "請先輸入 Token。"
   },
@@ -2652,13 +2652,13 @@
     "message": "GitHub Token（classic 類型，gist 權限）"
   },
   "mdTargetGithubOnboarding": {
-    "message": "在 GitHub → Settings → Developer settings → Tokens (classic) 建立一個 classic 類型的個人存取 Token，勾選「gist」權限，然後貼到下方。每次剪藏都會儲存為一個私人 gist。注意：fine-grained Token 暫時無法建立 gist — 請使用 classic Token。"
+    "message": "在 GitHub → Settings → Developer settings → Tokens (classic) 建立一個 classic 類型的個人存取 Token，勾選「gist」權限，然後貼到下方。每次剪藏都會儲存為一個私人 gist。注意：fine-grained Token 暫時無法建立 gist，請改用 classic Token。"
   },
   "mdSendViewGist": {
     "message": "檢視 gist →"
   },
   "mdSendApiPerm": {
-    "message": "存取權限被拒絕，全文已複製到剪貼簿 — 貼上即可完成。"
+    "message": "存取權限被拒絕，全文已複製到剪貼簿；貼上即可完成。"
   },
   "mdTargetWebhookUrl": {
     "message": "接收端 URL"
@@ -2667,7 +2667,7 @@
     "message": "Authorization 標頭（可選）"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填寫的 Authorization 值會原樣傳送（例如 Bearer <token> 或 Token <key>），因此支援任何驗證方式。可搭配 n8n、Make、Zapier、Readwise 或任何自架接收端使用 — 這裡無需註冊帳戶。"
+    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填寫的 Authorization 值會原樣傳送（例如 Bearer <token> 或 Token <key>），因此支援任何驗證方式。可搭配 n8n、Make、Zapier、Readwise 或任何自架接收端使用；這裡無需註冊帳戶。"
   },
   "mdTargetWebhookHttpWarn": {
     "message": "已阻止：請使用 HTTPS；HTTP 僅允許 localhost、127.0.0.1 或 [::1]。區域網絡／公網 HTTP、無效位址及含帳號密碼的位址不會傳送。"
@@ -2677,19 +2677,19 @@
   "hlColorExample": { "message": "例子" },
   "hlColorDoubt": { "message": "存疑" },
   "hlColorTodo": { "message": "待辦" },
-  "hlTrBadgeAria": { "message": "譯文標示（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
+  "hlTrBadgeAria": { "message": "譯文標記（$LANG$）", "placeholders": { "lang": { "content": "$1" } } },
   "hlNoteBtn": { "message": "連筆記一併標記" },
   "hlSaveFailed": { "message": "標記未能儲存（儲存空間已滿）" },
   "hlNotePlaceholder": { "message": "新增筆記…" },
   "hlSave": { "message": "儲存" },
   "hlDelete": { "message": "刪除標記" },
-  "hlDegraded": { "message": "位置已失準——周圍文字有變動，此標記已回退為整段標示。" },
+  "hlDegraded": { "message": "位置已失準：周圍文字有變動，此標記已回退為覆蓋整段。" },
   "hlOrphanNote": { "message": "$COUNT$ 條標記未能在目前頁面內容中定位（筆記仍保留）", "placeholders": { "count": { "content": "$1" } } },
   "hlOrphanUnlocatable": { "message": "此標記已無法在目前頁面內容中定位。" },
   "mdImgFixNote": {"message": "$COUNT$ 張圖片載入失敗", "placeholders": {"count": {"content": "$1"}}},
-  "mdImgFixBtn": {"message": "試吓修復本頁圖片"},
+  "mdImgFixBtn": {"message": "嘗試修復本頁圖片"},
   "mdImgFixFailed": {"message": "圖片載入失敗"},
-  "mdImgFixUnfixable": {"message": "圖片仍然載入唔到"},
+  "mdImgFixUnfixable": {"message": "圖片仍然無法載入"},
   "mdImgFixPartial": {"message": "已修復 $OK$/$TOTAL$ 張圖片", "placeholders": {"ok": {"content": "$1"}, "total": {"content": "$2"}}},
   "hlSectionTitle": { "message": "標記" },
   "kbdHelpTitle": { "message": "鍵盤快捷鍵" },

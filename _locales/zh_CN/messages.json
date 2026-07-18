@@ -3,7 +3,7 @@
     "message": "Pinboard 书签增强"
   },
   "extDescription": {
-    "message": "全面增强 Pinboard 书签体验：AI 智能标签、自动摘要，以及全套可定制主题界面。"
+    "message": "一键保存到 Pinboard，附带 AI 标签与摘要、内置阅读器，以及整套站点主题。"
   },
   "cmdOpenPopup": {
     "message": "打开 Pinboard 书签增强"
@@ -297,7 +297,7 @@
     "message": "未知错误"
   },
   "aiErrorModelNotFound": {
-    "message": "$PROVIDER$ 的默认模型可能已过期 — 请在设置中选择一个模型",
+    "message": "$PROVIDER$ 的默认模型可能已过期，请在设置中选择模型",
     "placeholders": {
       "provider": {
         "content": "$1"
@@ -305,7 +305,7 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "无法访问 $HOST$ — 请授权并重试。",
+    "message": "无法访问 $HOST$，请授权并重试。",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -555,7 +555,7 @@
     "message": "存储空间已满。请在扩展选项的“存储”中清理缓存数据后重试。"
   },
   "mdPreviewOpenFailed": {
-    "message": "无法打开预览——该页面可能过大，无法存储。"
+    "message": "无法打开预览。该页面可能过大，无法存储。"
   },
   "mdPreviewQuotaFull": {
     "message": "存储空间已满，预览无法保存。请先腾出空间再重试。"
@@ -636,13 +636,13 @@
     }
   },
   "mdEngineExtractingNoteJina": {
-    "message": "首次抽取需联网请求 Jina 云端（r.jina.ai）；耗时取决于本页是否已在本地缓存、你的网速与页面大小，通常数秒。"
+    "message": "首次抽取需联网请求 Jina 云端（r.jina.ai）；耗时取决于该页是否已被缓存、你的网速与页面大小，通常数秒。"
   },
   "mdEngineExtractFailed": {
     "message": "无法抽取此页面，请重试。"
   },
   "mdEngineTabGone": {
-    "message": "源标签页已不可用 — 重新打开该页面才能使用 Defuddle"
+    "message": "源标签页已不可用。重新打开该页面才能使用 Defuddle"
   },
   "mdEngineGroupAria": {
     "message": "抽取引擎"
@@ -651,7 +651,7 @@
     "message": "Pinboard：还需一步完成保存"
   },
   "bgTabsSavedCount": {
-    "message": "已发送 $COUNT$ 个标签页 — 在打开的 Pinboard 页面点击 Save 才完成保存。",
+    "message": "已发送 $COUNT$ 个标签页。在打开的 Pinboard 页面点击 Save 即可完成保存。",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -710,7 +710,7 @@
     "message": "撤销"
   },
   "optTitle": {
-    "message": "Pinboard 书签增强 — 设置"
+    "message": "Pinboard 书签增强 - 设置"
   },
   "settingsCategory": {
     "message": "设置分类"
@@ -864,13 +864,13 @@
     "message": "标签缓存策略"
   },
   "tagSyncCached": {
-    "message": "缓存（默认 — 10 分钟过期后刷新）"
+    "message": "缓存（默认，10 分钟后刷新）"
   },
   "tagSyncFresh": {
-    "message": "实时（每次打开都请求 — 最新，较慢）"
+    "message": "实时（每次打开弹窗都请求，较慢）"
   },
   "tagSyncPrewarmed": {
-    "message": "预热（后台每 15 分钟刷新 — 打开即用）"
+    "message": "预热（后台每 15 分钟刷新，打开即用）"
   },
   "tagSyncHint": {
     "message": "控制如何从 Pinboard 拉取你已有的标签云用于自动补全。仅读取，不会向 Pinboard 上传任何标签。"
@@ -882,7 +882,7 @@
     "message": "每行一组预设：\n工作: project, review, report\n开发: programming, tutorial, tool"
   },
   "tagPresetsHint": {
-    "message": "格式：名称: 标签1, 标签2, 标签3 — 在弹窗中显示为快捷添加按钮。"
+    "message": "格式：名称: 标签1, 标签2, 标签3。每组预设会在弹窗中显示为一个快捷添加按钮。"
   },
   "secPopupBehavior": {
     "message": "弹窗行为"
@@ -915,7 +915,7 @@
     "message": "导入设置"
   },
   "importedReload": {
-    "message": "已导入 — 刷新页面后生效"
+    "message": "已导入。刷新页面后生效"
   },
   "importInvalid": {
     "message": "文件格式无效"
@@ -924,7 +924,7 @@
     "message": "导入未能完成；部分设置可能已经更改，请检查后重试"
   },
   "importHighlightsSkipped": {
-    "message": "已导入 — 高亮和笔记未恢复。请登录创建该备份的 Pinboard 账号，然后再导入一次"
+    "message": "已导入，但高亮和笔记未恢复。请登录创建该备份的 Pinboard 账号，然后再导入一次"
   },
   "importSettingsTitle": {
     "message": "从 JSON 文件导入设置"
@@ -966,7 +966,7 @@
     "message": "服务器上已找到备份"
   },
   "webdavTestOkEmpty": {
-    "message": "服务器可连接——尚无备份"
+    "message": "服务器可连接，尚无备份"
   },
   "webdavTestAuthFail": {
     "message": "身份验证失败"
@@ -991,7 +991,7 @@
     }
   },
   "webdavPushNotWritable": {
-    "message": "目录存在但无法写入。请选择坚果云中已存在且可写的同步文件夹，不要使用 WebDAV 根目录。"
+    "message": "目录存在但无法写入。请选择已存在且可写的同步文件夹，不要使用 WebDAV 根目录。"
   },
   "webdavTargetUnavailable": {
     "message": "目标目录不存在或无法创建。请填写一个可写的 WebDAV 文件夹地址。"
@@ -1000,7 +1000,7 @@
     "message": "远端备份已更改。请先拉取，再重新推送。"
   },
   "webdavPermDenied": {
-    "message": "权限被拒绝——点击“测试”以授权"
+    "message": "权限被拒绝。点击“测试”以授权"
   },
   "webdavPullConfirm": {
     "message": "用来自 $TIME$ 的备份覆盖本地设置？不会影响你的 API 密钥。",
@@ -1020,7 +1020,7 @@
     "message": "按热门程度排序此页面"
   },
   "importPartial": {
-    "message": "已导入 — 主题已保存到本地（同步配额已满）；刷新页面后生效"
+    "message": "已导入。主题已保存到本地（同步配额已满）；刷新页面后生效"
   },
   "secQuickSave": {
     "message": "快速保存"
@@ -1565,7 +1565,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdImgEmbedNotHere": {
-    "message": "内嵌仅对下载生效——本次导出保留图片链接。"
+    "message": "内嵌仅对下载生效，本次导出保留图片链接。"
   },
   "mdImgBrokenNote": {
     "message": "$COUNT$ 张图片在当前预览中加载失败，导出后可能仍无法显示；下载并选择「内嵌」可打包图片。",
@@ -1756,7 +1756,7 @@
     "message": "jina_xxxx（留空使用免费配额）"
   },
   "submitUriTooLong": {
-    "message": "请求过长 — 请精简笔记、标题或标签"
+    "message": "请求过长，请缩短备注、标题或标签"
   },
   "saveAsThemeDisabledHint": {
     "message": "请先修改 Custom CSS 才能保存为主题"
@@ -1820,7 +1820,7 @@
     "message": "暂无预览数据，请先在弹窗中点击 Markdown 按钮。"
   },
   "freeTierTitle": {
-    "message": "哪些 AI 提供商有免费 API？"
+    "message": "哪些 AI 服务商有免费 API？"
   },
   "freeTierGemini": {
     "message": "— 约 1500 次/天（Flash），无需信用卡，Google 账号即可"
@@ -1850,7 +1850,7 @@
     "message": "— 完全免费，本地运行"
   },
   "freeTierDisclaimer": {
-    "message": "各提供商政策经常变化。以上信息截至 2026-06，可能已失效。注册时请以官方页面为准。"
+    "message": "各服务商政策经常变化。以上信息截至 2026-06，可能已失效。注册时请以官方页面为准。"
   },
   "freeTierResourcesPrefix": {
     "message": "更全面、更新更勤的清单："
@@ -1901,7 +1901,7 @@
     "message": "自定义参数（每行一个，追加到默认列表）"
   },
   "optUrlCleanExclude": {
-    "message": "排除参数（每行一个，永不清理 —— 例如保留 affiliate `tag=`）"
+    "message": "永不清理的参数（每行一个，例如保留联盟推广的 `tag=`）"
   },
   "emptyRecentBookmarks": {
     "message": "暂无最近书签"
@@ -1940,13 +1940,13 @@
     "message": "合并后台保存中的标签（快速保存/稍后阅读）"
   },
   "optBgSaveNoClobberHint": {
-    "message": "启用时，后台保存将读取您现有的 Pinboard 书签（如有），并将新标签与现有标签合并，而不是替换。这可防止在重复 URL 上意外丢失标签。注意：额外的 API 调用会增加约 3 秒的保存时间。前台弹出窗口编辑始终替换（让您完全控制）。"
+    "message": "启用时，后台保存会先读取你现有的 Pinboard 书签（如有），把新标签与已有标签合并，而不是直接替换。这样可避免在重复网址上意外丢失标签。注意：额外的 API 调用会让每次保存多花约 3 秒。前台弹窗中的编辑始终替换，你仍可完全掌控。"
   },
   "obsidianInstallHint": {
     "message": "需要安装 Obsidian 才能打开笔记。笔记内容已复制到剪贴板作为备份。"
   },
   "obsidianClipboardFailed": {
-    "message": "写入剪贴板失败——笔记未创建，请重试。"
+    "message": "无法复制到剪贴板，笔记未创建，请重试。"
   },
   "apiKeySecurityHint": {
     "message": "新用户的凭据默认只保存在本机；旧云端凭据可能使账号级同步在升级后保持开启。只有开启设置同步的设备才会参与；同步凭据仅经过混淆处理，并未加密。"
@@ -1979,7 +1979,7 @@
     "message": "保存页面到互联网档案馆"
   },
   "optWaybackHint": {
-    "message": "每次保存后，请求互联网档案馆为该页面拍摄快照（尽力而为，不会阻挡保存）。将保存的 URL 发送至 archive.org - 默认关闭。"
+    "message": "每次保存后，请求互联网档案馆为该页面拍摄快照（尽力而为，不会阻挡保存）。将保存的 URL 发送至 archive.org；默认关闭。"
   },
   "optWaybackBatch": {
     "message": "批量保存时也要存档"
@@ -2050,7 +2050,7 @@
     "message": "重新提交存档"
   },
   "archiveLogNote": {
-    "message": "提交成功不代表立即可见 — Wayback Machine 通常需要几分钟（有时更久）才会将新快照编入索引。"
+    "message": "提交成功不代表立即可见；Wayback Machine 通常需要几分钟（有时更久）才会将新快照编入索引。"
   },
   "archiveErrAuth": {
     "message": "凭证无效"
@@ -2074,10 +2074,10 @@
     "message": "archive.org 服务端故障，稍后重试"
   },
   "archiveErrRateLimited": {
-    "message": "匿名请求按 IP 限流 — 稍后再试或填入 S3 key"
+    "message": "匿名请求按 IP 限流，稍后再试或填入 S3 key"
   },
   "archiveErrTimeoutHint": {
-    "message": "请求超时 — archive.org 繁忙或网络缓慢"
+    "message": "请求超时，archive.org 可能繁忙或网络缓慢"
   },
   "tabTags": {
     "message": "标签"
@@ -2136,7 +2136,7 @@
     "message": "AI 未发现重复项"
   },
   "tagGovAiNoKey": {
-    "message": "未配置 AI 提供商——请前往 AI 标签页设置"
+    "message": "未配置 AI 服务商，请前往 AI 标签页设置"
   },
   "tagGovLowCountTitle": {
     "message": "低频标签（1 次或更少）"
@@ -2281,7 +2281,7 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "无法加载标签——请检查 Pinboard token 或网络后点刷新"
+    "message": "无法加载标签。请检查 Pinboard token 或网络后点击刷新"
   },
   "placeholderOptional": {
     "message": "可选"
@@ -2290,19 +2290,19 @@
     "message": "已下载标签清单快照（仅含标签名和数量，供手工修复参考，不能自动还原）"
   },
   "tagGovSnapshotFailed": {
-    "message": "无法生成快照 — 合并/删除已阻止"
+    "message": "无法生成快照，合并/删除已阻止"
   },
   "tagGovIrreversibleWarn": {
     "message": "合并和删除操作不可撤销。第一次修改前会自动下载你的标签清单快照（仅含标签名和数量，供手工修复参考）。"
   },
   "tagGovBundlesWarn": {
-    "message": "Pinboard.in 上的标签束不会跟随重命名自动更新 — 合并后请手动检查。"
+    "message": "Pinboard.in 上的标签束不会跟随重命名自动更新，合并后请手动检查。"
   },
   "optBgSaveMode": {
     "message": "后台保存模式"
   },
   "optBgSaveModeMerge": {
-    "message": "合并（默认 — 新标签与现有标签合并）"
+    "message": "合并（默认，新标签与现有标签合并）"
   },
   "optBgSaveModeSkip": {
     "message": "跳过（如果网址已保存则不操作）"
@@ -2317,13 +2317,13 @@
     "message": "已收藏"
   },
   "bgSkippedExists": {
-    "message": "已收藏过 — 保存已跳过"
+    "message": "已收藏过，已跳过保存"
   },
   "secPreviewAi": {
     "message": "预览页 AI"
   },
   "previewAiSectionHint": {
-    "message": "Markdown 预览页的划词解释、全文问答和全文翻译均由你主动调用，并使用上方配置的 AI 提供商与 Key。若启用可选的 AI 要点速览，它可能会在 Markdown 预览打开时运行；所有功能都不会作为隐藏的后台任务运行。"
+    "message": "Markdown 预览页的划词解释、全文问答和全文翻译均由你主动调用，并使用上方配置的 AI 服务商与 Key。若启用可选的 AI 要点速览，它可能会在 Markdown 预览打开时运行；所有功能都不会作为隐藏的后台任务运行。"
   },
   "previewAiEnabled": {
     "message": "在预览页启用 AI 功能"
@@ -2335,7 +2335,7 @@
     "message": "模型覆盖（可选）"
   },
   "previewAiModelHint": {
-    "message": "仅供预览页 AI 功能使用的模型名（与上方同一提供商）。留空则使用上方配置的默认模型。"
+    "message": "仅供预览页 AI 功能使用的模型名（与上方同一服务商）。留空则使用上方配置的默认模型。"
   },
   "translateTargetLangLabel": {
     "message": "翻译目标语言"
@@ -2610,7 +2610,7 @@
     "message": "最近使用"
   },
   "mdSendTooLongFellBack": {
-    "message": "内容较长，无法用链接直接发送——已复制全文，在 {name} 中粘贴（Ctrl+V）即可完成。"
+    "message": "内容过长，无法用链接直接发送；已改为复制全文，在 {name} 中粘贴（Ctrl+V）即可完成。"
   },
   "mdSentUrlScheme": {
     "message": "已打开 {name} · 全文已复制到剪贴板"
@@ -2628,18 +2628,18 @@
     "message": "无法打开应用 · 全文已复制到剪贴板"
   },
   "mdSendNoneConfigured": {
-    "message": "尚未启用任何目标——请在设置中添加"
+    "message": "尚未启用任何目标。请在设置中添加"
   },
   "mdManageDestinations": {
     "message": "管理目标 →"
   },
-  "mdSendApiDown": { "message": "无法连接到导出服务器，全文已复制到剪贴板——粘贴即可完成。" },
+  "mdSendApiDown": { "message": "无法连接到导出服务器。全文已复制到剪贴板，粘贴即可完成。" },
   "mdSendApiBadToken": { "message": "服务器拒绝了令牌，请从应用中重新复制。全文已复制到剪贴板。" },
-  "mdSendApiFailed": { "message": "导出请求失败，全文已复制到剪贴板——粘贴即可完成。" },
+  "mdSendApiFailed": { "message": "导出请求失败。全文已复制到剪贴板，粘贴即可完成。" },
   "mdSendTest": { "message": "测试连接" },
   "mdSendTestOk": { "message": "连接成功" },
-  "mdSendTestDown": { "message": "无法连接到服务器——应用是否正在运行？" },
-  "mdSendTestBadToken": { "message": "令牌被拒绝——请从应用中重新复制。" },
+  "mdSendTestDown": { "message": "无法连接到服务器。应用是否正在运行？" },
+  "mdSendTestBadToken": { "message": "令牌被拒绝。请从应用中重新复制。" },
   "mdSendTestNoToken": { "message": "请先输入令牌。" },
   "mdSendTestPerm": { "message": "本地访问权限被拒绝。" },
   "mdTargetGithubToken": {
@@ -2652,7 +2652,7 @@
     "message": "查看 gist →"
   },
   "mdSendApiPerm": {
-    "message": "未授予访问权限，全文已复制到剪贴板——粘贴即可完成。"
+    "message": "未授予访问权限。全文已复制到剪贴板，粘贴即可完成。"
   },
   "mdTargetWebhookUrl": {
     "message": "接收端 URL"
@@ -2661,7 +2661,7 @@
     "message": "Authorization 头（可选）"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填写的 Authorization 值会原样发送（如 Bearer <令牌> 或 Token <密钥>），任何认证方案都支持。可对接 n8n、Make、Zapier、Readwise 或任意自建接收端——无需在此注册账号。"
+    "message": "以 JSON 格式 POST {title, url, date, tags, markdown} 到你的接收端。你填写的 Authorization 值会原样发送（如 Bearer <令牌> 或 Token <密钥>），任何认证方案都支持。可对接 n8n、Make、Zapier、Readwise 或任意自建接收端，无需在此注册账号。"
   },
   "mdTargetWebhookHttpWarn": {
     "message": "已阻止：请使用 HTTPS；HTTP 仅允许 localhost、127.0.0.1 或 [::1]。局域网/公网 HTTP、无效地址及含账号密码的地址不会发送。"
@@ -2677,7 +2677,7 @@
   "hlNotePlaceholder": { "message": "添加笔记…" },
   "hlSave": { "message": "保存" },
   "hlDelete": { "message": "删除高亮" },
-  "hlDegraded": { "message": "位置已失准——周围文本发生了变化，该高亮已回退为整段标注。" },
+  "hlDegraded": { "message": "位置已失准：周围文本发生了变化，该高亮现已覆盖整段。" },
   "hlOrphanNote": { "message": "$COUNT$ 条高亮未能在当前页面内容中定位（笔记仍保留）", "placeholders": { "count": { "content": "$1" } } },
   "hlOrphanUnlocatable": { "message": "该高亮已无法在当前页面内容中定位。" },
   "mdImgFixNote": {"message": "$COUNT$ 张图片加载失败", "placeholders": {"count": {"content": "$1"}}},

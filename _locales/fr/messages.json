@@ -3,7 +3,7 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Booste vos signets Pinboard avec tags et résumés par IA, et une interface entièrement personnalisable."
+    "message": "Enregistrez sur Pinboard en un clic : tags et résumés par IA, lecteur intégré et thèmes complets pour le site."
   },
   "cmdOpenPopup": {
     "message": "Ouvrir Pinboard Bookmark Enhanced"
@@ -74,7 +74,7 @@
     "message": "Alt+1–9 pour ajouter"
   },
   "lastUsedTagsLabel": {
-    "message": "Dernière :"
+    "message": "Derniers :"
   },
   "loading": {
     "message": "chargement..."
@@ -297,7 +297,7 @@
     "message": "Erreur inconnue"
   },
   "aiErrorModelNotFound": {
-    "message": "Le modèle par défaut de $PROVIDER$ est peut-être obsolète — choisissez un modèle dans les Paramètres",
+    "message": "Le modèle par défaut de $PROVIDER$ est peut-être obsolète. Choisissez un modèle dans les Paramètres",
     "placeholders": {
       "provider": {
         "content": "$1"
@@ -305,7 +305,7 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "Pas d'accès à $HOST$ — autorisez l'accès, puis réessayez.",
+    "message": "Aucun accès à $HOST$. Autorisez l'accès, puis réessayez.",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -555,7 +555,7 @@
     "message": "Le stockage est plein. Effacez les données en cache dans les options de l'extension (Stockage), puis réessayez."
   },
   "mdPreviewOpenFailed": {
-    "message": "Impossible d'ouvrir l'aperçu — la page est peut-être trop volumineuse pour être stockée."
+    "message": "Impossible d'ouvrir l'aperçu. La page est peut-être trop volumineuse pour être stockée."
   },
   "mdPreviewQuotaFull": {
     "message": "Le stockage est plein, l'aperçu n'a pas pu être enregistré. Libérez de l'espace, puis réessayez."
@@ -636,13 +636,13 @@
     }
   },
   "mdEngineExtractingNoteJina": {
-    "message": "La première extraction interroge le cloud de Jina (r.jina.ai). Le délai dépend de la mise en cache locale de cette page, de votre vitesse réseau et de la taille de la page — généralement quelques secondes."
+    "message": "La première extraction interroge le cloud de Jina (r.jina.ai). Elle prend généralement quelques secondes, selon la mise en cache de la page, votre vitesse réseau et la taille de la page."
   },
   "mdEngineExtractFailed": {
     "message": "Impossible d'extraire cette page. Veuillez réessayer."
   },
   "mdEngineTabGone": {
-    "message": "Onglet source indisponible — rouvrez la page pour utiliser Defuddle"
+    "message": "Onglet source indisponible. Rouvrez la page pour utiliser Defuddle"
   },
   "mdEngineGroupAria": {
     "message": "Moteur d'extraction"
@@ -651,7 +651,7 @@
     "message": "Pinboard : une dernière étape"
   },
   "bgTabsSavedCount": {
-    "message": "$COUNT$ onglets envoyés — cliquez sur « Save » sur la page Pinboard ouverte pour terminer.",
+    "message": "$COUNT$ onglets envoyés. Cliquez sur « Save » dans la page Pinboard ouverte pour terminer.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -864,13 +864,13 @@
     "message": "Stratégie de cache des tags"
   },
   "tagSyncCached": {
-    "message": "En cache (par défaut — actualiser après 10 min)"
+    "message": "En cache (par défaut, actualisé après 10 min)"
   },
   "tagSyncFresh": {
-    "message": "En direct (récupérer à chaque popup — plus lent)"
+    "message": "En direct (récupération à chaque popup, plus lent)"
   },
   "tagSyncPrewarmed": {
-    "message": "Préchauffé (récupération en arrière-plan toutes les 15 min — popup instantané)"
+    "message": "Préchauffé (récupération en arrière-plan toutes les 15 min, popup instantané)"
   },
   "tagSyncHint": {
     "message": "Contrôle comment votre nuage de tags Pinboard est chargé dans le popup pour l'autocomplétion. Lecture seule ; aucun tag n'est envoyé vers Pinboard."
@@ -882,7 +882,7 @@
     "message": "Un préréglage par ligne :\nTravail : projet, revue, rapport\nDév : programmation, tutoriel, outil"
   },
   "tagPresetsHint": {
-    "message": "Format : Nom : tag1, tag2, tag3 — affiché comme boutons d'ajout rapide dans le popup."
+    "message": "Format : Nom : tag1, tag2, tag3. Chaque préréglage apparaît comme un bouton d'ajout rapide dans le popup."
   },
   "secPopupBehavior": {
     "message": "Comportement du popup"
@@ -915,7 +915,7 @@
     "message": "Importer les paramètres"
   },
   "importedReload": {
-    "message": "Importé — rechargez pour voir les modifications"
+    "message": "Importé. Rechargez pour voir les modifications"
   },
   "importInvalid": {
     "message": "Fichier invalide"
@@ -924,7 +924,7 @@
     "message": "L’importation n’a pas pu aboutir ; certains paramètres ont peut-être déjà été modifiés. Vérifiez-les, puis réessayez."
   },
   "importHighlightsSkipped": {
-    "message": "Importé — surlignages et notes ignorés. Connectez-vous avec le compte Pinboard qui a créé cette sauvegarde, puis importez à nouveau le fichier."
+    "message": "Importé, mais les surlignages et les notes ont été ignorés. Connectez-vous avec le compte Pinboard qui a créé cette sauvegarde, puis importez à nouveau le fichier."
   },
   "importSettingsTitle": {
     "message": "Importer les paramètres depuis un fichier JSON"
@@ -966,7 +966,7 @@
     "message": "Sauvegarde trouvée sur le serveur"
   },
   "webdavTestOkEmpty": {
-    "message": "Serveur accessible — aucune sauvegarde pour l'instant"
+    "message": "Serveur accessible ; aucune sauvegarde pour l'instant"
   },
   "webdavTestAuthFail": {
     "message": "Échec de l'authentification"
@@ -1000,7 +1000,7 @@
     "message": "La sauvegarde distante a été modifiée. Récupérez-la avant un nouvel envoi."
   },
   "webdavPermDenied": {
-    "message": "Permission refusée — cliquez sur « Tester » pour l'accorder"
+    "message": "Permission refusée. Cliquez sur « Tester » pour l'accorder"
   },
   "webdavPullConfirm": {
     "message": "Écraser les paramètres locaux avec la sauvegarde du $TIME$ ? Vos clés API ne sont pas affectées.",
@@ -1020,7 +1020,7 @@
     "message": "Trier cette page par popularité"
   },
   "importPartial": {
-    "message": "Importé — thèmes sauvegardés localement (quota sync plein); rechargez"
+    "message": "Importé. Thèmes enregistrés localement (quota de synchronisation plein) ; rechargez pour voir les modifications"
   },
   "secQuickSave": {
     "message": "Enregistrement rapide"
@@ -1484,7 +1484,7 @@
     "message": "Ollama (Local)"
   },
   "provCustom": {
-    "message": "Custom OpenAI-compatible"
+    "message": "Personnalisé (compatible OpenAI)"
   },
   "jinaMarkdownBtn": {
     "message": "Markdown"
@@ -1565,7 +1565,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdImgEmbedNotHere": {
-    "message": "L’intégration ne s’applique qu’aux téléchargements — cet export conserve les liens d’images."
+    "message": "L’intégration ne s’applique qu’aux téléchargements ; cet export conserve les liens d’images."
   },
   "mdImgBrokenNote": {
     "message": "$COUNT$ image(s) n’ont pas pu se charger dans cet aperçu et pourraient ne pas s’afficher après l’export ; « Intégrer » les emballe dans les téléchargements.",
@@ -1756,7 +1756,7 @@
     "message": "jina_xxxx (laisser vide pour l'offre gratuite)"
   },
   "submitUriTooLong": {
-    "message": "Requête trop longue — raccourcissez les notes, le titre ou les tags"
+    "message": "Requête trop longue. Raccourcissez les notes, le titre ou les tags"
   },
   "saveAsThemeDisabledHint": {
     "message": "Modifiez d'abord le CSS personnalisé pour sauvegarder comme thème"
@@ -1901,7 +1901,7 @@
     "message": "Paramètres personnalisés (un par ligne, ajoutés à la liste par défaut)"
   },
   "optUrlCleanExclude": {
-    "message": "Paramètres à exclure (un par ligne, jamais nettoyés — ex. garder affiliate tag=)"
+    "message": "Paramètres jamais nettoyés (un par ligne, ex. tag= pour conserver les tags d'affiliation)"
   },
   "emptyRecentBookmarks": {
     "message": "Aucun favori récent"
@@ -1946,7 +1946,7 @@
     "message": "Obsidian doit être installé pour que la note s'ouvre. Le contenu a également été copié dans le presse-papiers en guise de sauvegarde."
   },
   "obsidianClipboardFailed": {
-    "message": "Échec de la copie dans le presse-papiers — la note n'a pas été créée. Réessayez."
+    "message": "Impossible de copier dans le presse-papiers, la note n'a donc pas été créée. Réessayez."
   },
   "apiKeySecurityHint": {
     "message": "Pour les nouveaux utilisateurs, les identifiants restent par défaut sur cet appareil. Des identifiants cloud existants peuvent maintenir la synchronisation du compte après une mise à niveau. Seuls les appareils où la synchronisation des paramètres est activée y participent ; les identifiants synchronisés sont obfusqués, pas chiffrés."
@@ -1979,7 +1979,7 @@
     "message": "Archiver les pages enregistrées sur Internet Archive"
   },
   "optWaybackHint": {
-    "message": "Après chaque enregistrement, demandez à Internet Archive de prendre un instantané de la page (meilleur effort, ne bloque jamais l'enregistrement). Envoie l'URL enregistrée à archive.org - désactivé par défaut."
+    "message": "Après chaque enregistrement, demandez à Internet Archive de prendre un instantané de la page (meilleur effort, ne bloque jamais l'enregistrement). Envoie l'URL enregistrée à archive.org ; désactivé par défaut."
   },
   "optWaybackBatch": {
     "message": "Archiver également lors de l'enregistrement par lot"
@@ -2000,7 +2000,7 @@
     "message": "Ne jamais archiver sur archive.org les favoris enregistrés comme privés"
   },
   "waybackPermDenied": {
-    "message": "L'autorisation pour web.archive.org manque - réactivez l'archivage pour l'accorder."
+    "message": "L'autorisation pour web.archive.org manque. Réactivez l'archivage pour l'accorder."
   },
   "archiveThisSave": {
     "message": "archiver"
@@ -2050,7 +2050,7 @@
     "message": "Réessayer l'archivage"
   },
   "archiveLogNote": {
-    "message": "Une soumission réussie ne signifie pas que la capture est immédiatement visible - la Wayback Machine prend généralement quelques minutes (parfois plus) pour indexer les nouvelles captures."
+    "message": "Une soumission réussie ne signifie pas que la capture est immédiatement visible ; la Wayback Machine prend généralement quelques minutes (parfois plus) pour indexer les nouvelles captures."
   },
   "archiveErrAuth": {
     "message": "identifiants invalides"
@@ -2071,13 +2071,13 @@
     "message": "limite quotidienne de captures atteinte pour cette URL"
   },
   "archiveErrServer": {
-    "message": "erreur serveur archive.org - réessayez plus tard"
+    "message": "erreur serveur archive.org, réessayez plus tard"
   },
   "archiveErrRateLimited": {
-    "message": "les requêtes anonymes sont limitées par IP - réessayez plus tard ou ajoutez une clé S3"
+    "message": "les requêtes anonymes sont limitées par IP, réessayez plus tard ou ajoutez une clé S3"
   },
   "archiveErrTimeoutHint": {
-    "message": "la requête a expiré - archive.org est peut-être surchargé ou le réseau est lent"
+    "message": "la requête a expiré, archive.org est peut-être surchargé ou le réseau est lent"
   },
   "tabTags": {
     "message": "Étiquettes"
@@ -2124,7 +2124,7 @@
     "message": "Réinitialiser les ignorés"
   },
   "tagGovResetIgnoredConfirm": {
-    "message": "Effacer les groupes ignorés et réafficher tous les doublons?"
+    "message": "Effacer les groupes ignorés et réafficher tous les doublons ?"
   },
   "tagGovAiBtn": {
     "message": "Analyse approfondie par IA"
@@ -2136,7 +2136,7 @@
     "message": "Aucun groupe d'IA trouvé"
   },
   "tagGovAiNoKey": {
-    "message": "Aucun fournisseur IA configuré - configurez-le dans l'onglet IA"
+    "message": "Aucun fournisseur IA configuré. Configurez-le dans l'onglet IA"
   },
   "tagGovLowCountTitle": {
     "message": "Étiquettes peu utilisées (1 utilisation ou moins)"
@@ -2151,7 +2151,7 @@
     "message": "Aucune étiquette avec 1 utilisation ou moins."
   },
   "tagGovConfirmMerge": {
-    "message": "Fusionner $N$ étiquettes dans $CANONICAL$?",
+    "message": "Fusionner $N$ étiquettes dans $CANONICAL$ ?",
     "placeholders": {
       "N": {
         "content": "$1"
@@ -2162,7 +2162,7 @@
     }
   },
   "tagGovConfirmDelete": {
-    "message": "Supprimer $N$ étiquettes sélectionnées? (permanent)",
+    "message": "Supprimer $N$ étiquettes sélectionnées ? (permanent)",
     "placeholders": {
       "N": {
         "content": "$1"
@@ -2181,7 +2181,7 @@
     }
   },
   "tagGovAborted429": {
-    "message": "Limite de débit — lot arrêté, les modifications terminées sont conservées. Relancer la même fusion reprend en toute sécurité (les signets déjà mis à jour sont ignorés)."
+    "message": "Limite de débit atteinte. Le lot s'est arrêté ; les modifications terminées sont conservées. Relancer la même fusion reprend en toute sécurité (les signets déjà mis à jour sont ignorés)."
   },
   "tagGovMergeEstimate": {
     "message": "Durée estimée : env. $T$",
@@ -2242,7 +2242,7 @@
     "message": "voir les détails en bas de page"
   },
   "tagGovRateLimitWait": {
-    "message": "Limite de débit atteinte — nouvelle tentative sous peu…"
+    "message": "Limite de débit atteinte ; nouvelle tentative sous peu…"
   },
   "tagGovQueuedCancelled": {
     "message": "$N$ tâches en attente annulées",
@@ -2259,7 +2259,7 @@
     "message": "Fermer"
   },
   "tagGovStopped": {
-    "message": "Arrêté — les modifications terminées sont conservées."
+    "message": "Arrêté. Les modifications terminées sont conservées."
   },
   "tagGovQueuedBadge": {
     "message": "En attente…"
@@ -2281,31 +2281,31 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "Impossible de charger les tags — vérifiez votre jeton Pinboard ou le réseau, puis actualisez"
+    "message": "Impossible de charger les tags. Vérifiez votre jeton Pinboard ou le réseau, puis actualisez"
   },
   "placeholderOptional": {
     "message": "facultatif"
   },
   "tagGovSnapshotSaved": {
-    "message": "Instantané de la liste des tags téléchargé (noms et compteurs uniquement — référence pour réparation manuelle, pas de restauration automatique)"
+    "message": "Instantané de la liste des tags téléchargé (noms et compteurs ; référence pour réparation manuelle, pas de restauration automatique)"
   },
   "tagGovSnapshotFailed": {
-    "message": "Impossible de créer le snapshot — fusion/suppression bloquée"
+    "message": "Impossible de créer l'instantané ; fusion/suppression bloquée"
   },
   "tagGovIrreversibleWarn": {
-    "message": "Les fusions et suppressions sont irréversibles. Avant la première modification, un instantané de la liste des tags (noms et compteurs) est téléchargé — à titre de référence uniquement."
+    "message": "Les fusions et suppressions sont irréversibles. Avant la première modification, un instantané de la liste des tags (noms et compteurs) est téléchargé, à titre de référence manuelle uniquement."
   },
   "tagGovBundlesWarn": {
-    "message": "Les bundles d'étiquettes sur pinboard.in ne sont pas mis à jour par les renommages — vérifiez-les manuellement après fusion."
+    "message": "Les bundles d'étiquettes sur pinboard.in ne sont pas mis à jour par les renommages ; vérifiez-les manuellement après fusion."
   },
   "optBgSaveMode": {
     "message": "Mode de sauvegarde en arrière-plan"
   },
   "optBgSaveModeMerge": {
-    "message": "Fusion (par défaut — combine les nouvelles étiquettes avec les existantes)"
+    "message": "Fusion (par défaut, combine les nouvelles étiquettes avec les existantes)"
   },
   "optBgSaveModeSkip": {
-    "message": "Ignorer (si l'URL est déjà sauvegardée, rien faire)"
+    "message": "Ignorer (si l'URL est déjà sauvegardée, ne rien faire)"
   },
   "optBgSaveModeOverwrite": {
     "message": "Remplacer (remplace toutes les étiquettes, sans fusion)"
@@ -2317,10 +2317,10 @@
     "message": "Déjà en signet"
   },
   "bgSkippedExists": {
-    "message": "Déjà en signet — sauvegarde ignorée"
+    "message": "Déjà en signet ; sauvegarde ignorée"
   },
   "secPreviewAi": {
-    "message": "IA page de prévisualisation"
+    "message": "IA de la page de prévisualisation"
   },
   "previewAiSectionHint": {
     "message": "L'explication d'une sélection, les questions à la page et la traduction intégrale dans l'aperçu Markdown sont lancées par l'utilisateur et utilisent le fournisseur IA et la clé configurés ci-dessus. Si l'aperçu facultatif des points clés est activé, il peut s'exécuter à l'ouverture de l'aperçu Markdown ; rien ne s'exécute comme tâche masquée en arrière-plan."
@@ -2583,7 +2583,7 @@
     "message": "Destinations d’envoi"
   },
   "secSendDestinationsHint": {
-    "message": "Chaque destination activée apparaît dans le menu « Envoyer vers » de la page de prévisualisation."
+    "message": "Chaque destination activée apparaît dans le menu « Envoyer vers » de la page de prévisualisation."
   },
   "mdSendEnableTo": {
     "message": "Activer l’export vers {name}"
@@ -2610,10 +2610,10 @@
     "message": "dernière utilisation"
   },
   "mdSendTooLongFellBack": {
-    "message": "Trop long pour un lien direct — texte complet copié. Collez dans {name} (Ctrl+V) pour terminer."
+    "message": "Trop long pour un lien direct ; texte complet copié. Collez dans {name} (Ctrl+V) pour terminer."
   },
   "mdSentUrlScheme": {
-    "message": "{name} ouvert — texte complet copié dans le presse-papiers"
+    "message": "{name} ouvert ; texte complet copié dans le presse-papiers"
   },
   "mdOpenedApp": {
     "message": "{name} ouvert"
@@ -2625,23 +2625,23 @@
     "message": "Échec de l’envoi"
   },
   "mdSendOpenBlocked": {
-    "message": "Impossible d’ouvrir l’application — texte complet copié dans le presse-papiers"
+    "message": "Impossible d’ouvrir l’application ; texte complet copié dans le presse-papiers"
   },
   "mdSendNoneConfigured": {
-    "message": "Aucune destination activée — en ajouter une dans les Paramètres"
+    "message": "Aucune destination activée. Ajoutez-en une dans les Paramètres"
   },
   "mdManageDestinations": {
     "message": "Gérer les destinations →"
   },
-  "mdSendApiDown": { "message": "Impossible de joindre le serveur d'export. Texte intégral copié dans le presse-papiers — collez pour terminer." },
-  "mdSendApiBadToken": { "message": "Le serveur a rejeté le jeton. Recopiez-le depuis l'application. Texte intégral copié dans le presse-papiers." },
-  "mdSendApiFailed": { "message": "La requête d'export a échoué. Texte intégral copié dans le presse-papiers — collez pour terminer." },
+  "mdSendApiDown": { "message": "Impossible de joindre le serveur d'export. Texte complet copié dans le presse-papiers ; collez pour terminer." },
+  "mdSendApiBadToken": { "message": "Le serveur a rejeté le jeton. Recopiez-le depuis l'application. Texte complet copié dans le presse-papiers." },
+  "mdSendApiFailed": { "message": "La requête d'export a échoué. Texte complet copié dans le presse-papiers ; collez pour terminer." },
   "mdSendTest": {
     "message": "Tester la connexion"
   },
   "mdSendTestOk": { "message": "Connecté" },
-  "mdSendTestDown": { "message": "Impossible de joindre le serveur — l'application est-elle en cours d'exécution ?" },
-  "mdSendTestBadToken": { "message": "Jeton rejeté — recopiez-le depuis l'application." },
+  "mdSendTestDown": { "message": "Impossible de joindre le serveur. L'application est-elle en cours d'exécution ?" },
+  "mdSendTestBadToken": { "message": "Jeton rejeté. Recopiez-le depuis l'application." },
   "mdSendTestNoToken": {
     "message": "Entrez d'abord un jeton."
   },
@@ -2652,13 +2652,13 @@
     "message": "Jeton GitHub (classic, portée gist)"
   },
   "mdTargetGithubOnboarding": {
-    "message": "Créez un jeton d'accès personnel (classic) sur GitHub → Settings → Developer settings → Tokens (classic) avec la portée « gist », puis collez-le ci-dessous. Chaque extrait est enregistré comme un gist privé. Remarque : les jetons fine-grained ne peuvent pas encore créer de gists — utilisez un jeton classic."
+    "message": "Créez un jeton d'accès personnel (classic) sur GitHub → Settings → Developer settings → Tokens (classic) avec la portée « gist », puis collez-le ci-dessous. Chaque extrait est enregistré comme un gist privé. Remarque : les jetons fine-grained ne peuvent pas encore créer de gists, utilisez donc un jeton classic."
   },
   "mdSendViewGist": {
     "message": "Voir le gist →"
   },
   "mdSendApiPerm": {
-    "message": "L'autorisation d'accès a été refusée. Texte intégral copié dans le presse-papiers — collez pour terminer."
+    "message": "L'autorisation d'accès a été refusée. Texte complet copié dans le presse-papiers ; collez pour terminer."
   },
   "mdTargetWebhookUrl": {
     "message": "URL du point de terminaison"
@@ -2667,7 +2667,7 @@
     "message": "En-tête Authorization (facultatif)"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "Envoie une requête POST avec une charge utile JSON {title, url, date, tags, markdown} vers votre point de terminaison. Toute valeur Authorization que vous définissez est envoyée telle quelle (p. ex. Bearer <token> ou Token <key>), donc n'importe quel schéma d'authentification fonctionne. Pour n8n, Make, Zapier, Readwise ou tout récepteur auto-hébergé — aucun compte requis ici."
+    "message": "Envoie une requête POST avec une charge utile JSON {title, url, date, tags, markdown} vers votre point de terminaison. Toute valeur Authorization que vous définissez est envoyée telle quelle (p. ex. Bearer <token> ou Token <key>), donc n'importe quel schéma d'authentification fonctionne. Pour n8n, Make, Zapier, Readwise ou tout récepteur auto-hébergé ; aucun compte requis ici."
   },
   "mdTargetWebhookHttpWarn": {
     "message": "Bloqué : utilisez HTTPS, ou HTTP uniquement pour localhost, 127.0.0.1 ou [::1]. Les URL HTTP sur réseau local/public, non valides ou contenant des identifiants ne sont pas envoyées."
@@ -2683,8 +2683,8 @@
   "hlNotePlaceholder": { "message": "Ajouter une note…" },
   "hlSave": { "message": "Enregistrer" },
   "hlDelete": { "message": "Supprimer le surlignage" },
-  "hlDegraded": { "message": "Position perdue — le texte environnant a changé, ce surlignage couvre désormais tout le paragraphe." },
-  "hlOrphanNote": { "message": "$COUNT$ surlignages n'ont pas pu être localisés dans le contenu actuel de la page — les notes sont conservées.", "placeholders": { "count": { "content": "$1" } } },
+  "hlDegraded": { "message": "Position perdue : le texte environnant a changé ; ce surlignage couvre désormais tout le paragraphe." },
+  "hlOrphanNote": { "message": "$COUNT$ surlignages n'ont pas pu être localisés dans le contenu actuel de la page ; leurs notes sont conservées.", "placeholders": { "count": { "content": "$1" } } },
   "hlOrphanUnlocatable": { "message": "Ce surlignage est introuvable dans le contenu actuel de la page." },
   "mdImgFixNote": {"message": "$COUNT$ images n'ont pas pu être chargées", "placeholders": {"count": {"content": "$1"}}},
   "mdImgFixBtn": {"message": "Réparer les images de cette page"},
@@ -2735,7 +2735,7 @@
   "skimTitle": { "message": "Points clés" },
   "skimRegen": { "message": "Régénérer" },
   "skimCollapseAria": { "message": "Basculer la section des points clés" },
-  "skimStaleNote": { "message": "Le contenu a changé — ces points clés peuvent être obsolètes" },
+  "skimStaleNote": { "message": "Le contenu a changé ; ces points clés peuvent être obsolètes" },
   "skimStop": { "message": "Arrêter" },
   "skimGenerating": { "message": "Génération des points clés…" },
   "skimFailed": { "message": "Impossible de générer les points clés" }

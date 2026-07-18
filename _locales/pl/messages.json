@@ -3,7 +3,7 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Wzbogaca zakładki Pinboard o tagi i streszczenia AI oraz w pełni konfigurowalny interfejs."
+    "message": "Zapisuj do Pinboard jednym kliknięciem — tagi i podsumowania AI, wbudowany czytnik i pełne motywy strony."
   },
   "cmdOpenPopup": {
     "message": "Otwórz Pinboard Bookmark Enhanced"
@@ -71,7 +71,7 @@
     "message": "nowy tag"
   },
   "kbdAltTagHint": {
-    "message": "Alt+1–9 aby dodać"
+    "message": "Alt+1–9, aby dodać"
   },
   "lastUsedTagsLabel": {
     "message": "Ostatnie:"
@@ -80,7 +80,7 @@
     "message": "ładowanie..."
   },
   "private": {
-    "message": "prywatność"
+    "message": "prywatne"
   },
   "readLater": {
     "message": "przeczytaj później"
@@ -89,7 +89,7 @@
     "message": "Błąd sieci"
   },
   "uriTooLong": {
-    "message": "Żądanie zbyt długie ($LEN$/$MAX$ zn.). Skróć notatki lub tagi.",
+    "message": "Żądanie zbyt długie ($LEN$/$MAX$ zn.). Skróć notki lub tagi.",
     "placeholders": {
       "len": {
         "content": "$1"
@@ -636,7 +636,7 @@
     }
   },
   "mdEngineExtractingNoteJina": {
-    "message": "Pierwsza ekstrakcja pobiera dane z chmury Jina (r.jina.ai). Czas oczekiwania zależy od tego, czy strona jest zapisana lokalnie w pamięci podręcznej, od szybkości sieci i rozmiaru strony — zwykle kilka sekund."
+    "message": "Pierwsza ekstrakcja pobiera dane z chmury Jina (r.jina.ai). Czas oczekiwania zależy od tego, czy strona jest w pamięci podręcznej, od szybkości sieci i rozmiaru strony — zwykle kilka sekund."
   },
   "mdEngineExtractFailed": {
     "message": "Nie udało się wyodrębnić tej strony. Spróbuj ponownie."
@@ -864,13 +864,13 @@
     "message": "Strategia pamięci podręcznej tagów"
   },
   "tagSyncCached": {
-    "message": "W pamięci podręcznej (domyślnie — odśwież po 10 min)"
+    "message": "W pamięci podręcznej (domyślnie — odświeża się po 10 min)"
   },
   "tagSyncFresh": {
-    "message": "Na żywo (pobierz przy każdym otwarciu — wolniej)"
+    "message": "Na żywo (pobiera przy każdym otwarciu — wolniej)"
   },
   "tagSyncPrewarmed": {
-    "message": "Wstępnie załadowane (tło co 15 min — natychmiastowy popup)"
+    "message": "Wstępnie załadowane (pobieranie w tle co 15 min — natychmiastowy popup)"
   },
   "tagSyncHint": {
     "message": "Kontroluje, jak istniejąca chmura tagów z Pinboard jest pobierana do popup dla autouzupełniania. Tylko odczyt; nic nie jest wysyłane z powrotem do Pinboard."
@@ -1020,7 +1020,7 @@
     "message": "Sortuj tę stronę według popularności"
   },
   "importPartial": {
-    "message": "Zaimportowano — motywy zapisane lokalnie (limit sync pełny); odśwież"
+    "message": "Zaimportowano — motywy zapisane lokalnie (limit synchronizacji pełny); odśwież, aby zobaczyć zmiany"
   },
   "secQuickSave": {
     "message": "Szybki zapis"
@@ -1756,7 +1756,7 @@
     "message": "jina_xxxx (puste = darmowy plan)"
   },
   "submitUriTooLong": {
-    "message": "Żądanie zbyt duże — skróć notatki, tytuł lub tagi"
+    "message": "Żądanie zbyt duże — skróć notki, tytuł lub tagi"
   },
   "saveAsThemeDisabledHint": {
     "message": "Najpierw zmodyfikuj Custom CSS, aby zapisać jako motyw"
@@ -1901,7 +1901,7 @@
     "message": "Niestandardowe parametry (jeden na linię, dodawane do domyślnej listy)"
   },
   "optUrlCleanExclude": {
-    "message": "Parametry wykluczone (jeden na linię, nigdy nie czyszczone — np. zachowaj affiliate tag=)"
+    "message": "Parametry, które nigdy nie są czyszczone (jeden na linię, np. tag=, aby zachować tagi afiliacyjne)"
   },
   "emptyRecentBookmarks": {
     "message": "Brak ostatnich zakładek"
@@ -1937,10 +1937,10 @@
     "message": "tag\nref\nsi"
   },
   "optBgSaveNoClobber": {
-    "message": "Łączenie tagów w zapisach w tle (Szybkie zapisanie/Przeczytaj później)"
+    "message": "Łączenie tagów w zapisach w tle (Szybki zapis / Przeczytaj później)"
   },
   "optBgSaveNoClobberHint": {
-    "message": "Gdy ta opcja jest włączona, zapis w tle odczytuje Twój istniejący zakładkę Pinboard (jeśli istnieje) i łączy nowe tagi z istniejącymi zamiast ich zastępować. Zapobiega to przypadkowemu utracie tagów w zduplikowanych adresach URL. Uwaga: dodatkowe wywołanie API dodaje około 3 sekundę do czasu zapisywania. Edycje wyskakującego okna na pierwszym planie zawsze zastępują (masz pełną kontrolę)."
+    "message": "Gdy ta opcja jest włączona, zapis w tle odczytuje Twoją istniejącą zakładkę Pinboard (jeśli istnieje) i łączy nowe tagi z istniejącymi zamiast je zastępować. Zapobiega to przypadkowej utracie tagów przy zduplikowanych adresach URL. Uwaga: dodatkowe wywołanie API dodaje około 3 s do każdego zapisu. Edycje w wyskakującym okienku na pierwszym planie zawsze zastępują tagi, więc zachowujesz pełną kontrolę."
   },
   "obsidianInstallHint": {
     "message": "Aby otworzyć notatkę, musi być zainstalowany Obsidian. Treść została również skopiowana do schowka jako kopia zapasowa."
@@ -1979,7 +1979,7 @@
     "message": "Archiwizuj zapisane strony w Internet Archive"
   },
   "optWaybackHint": {
-    "message": "Po każdym zapisaniu poproś Internet Archive o zrobienie migawki strony (najlepszy wysiłek, nigdy nie blokuje zapisywania). Wysyła zapisany adres URL do archive.org - domyślnie wyłączone."
+    "message": "Po każdym zapisaniu prosi Internet Archive o zrobienie migawki strony (w miarę możliwości, nigdy nie blokuje zapisywania). Wysyła zapisany adres URL do archive.org; domyślnie wyłączone."
   },
   "optWaybackBatch": {
     "message": "Archiwizuj również podczas zapisywania wsadowego"
@@ -2000,7 +2000,7 @@
     "message": "Nigdy nie archiwizuj w archive.org zakładek zapisanych jako prywatne"
   },
   "waybackPermDenied": {
-    "message": "Brakuje uprawnienia dla web.archive.org - włącz archiwizację ponownie, aby je przyznać."
+    "message": "Brakuje uprawnienia dla web.archive.org — włącz archiwizację ponownie, aby je przyznać."
   },
   "archiveThisSave": {
     "message": "archiwizuj"
@@ -2050,7 +2050,7 @@
     "message": "Ponów archiwizację"
   },
   "archiveLogNote": {
-    "message": "Pomyślne przesłanie nie oznacza, że migawka jest natychmiast widoczna - Wayback Machine zazwyczaj potrzebuje kilku minut (czasem dłużej), aby zaindeksować nowe przechwycenia."
+    "message": "Pomyślne przesłanie nie oznacza, że migawka jest natychmiast widoczna — Wayback Machine zazwyczaj potrzebuje kilku minut (czasem dłużej), aby zaindeksować nowe przechwycenia."
   },
   "archiveErrAuth": {
     "message": "nieprawidłowe dane uwierzytelniające"
@@ -2071,13 +2071,13 @@
     "message": "dzienny limit przechwytywania osiągnięty dla tego adresu URL"
   },
   "archiveErrServer": {
-    "message": "błąd serwera archive.org - spróbuj ponownie później"
+    "message": "błąd serwera archive.org — spróbuj ponownie później"
   },
   "archiveErrRateLimited": {
-    "message": "anonimowe żądania są ograniczane per IP - spróbuj później lub dodaj klucz S3"
+    "message": "anonimowe żądania są ograniczane per IP — spróbuj później lub dodaj klucz S3"
   },
   "archiveErrTimeoutHint": {
-    "message": "żądanie przekroczyło limit czasu - archive.org może być przeciążony lub sieć jest wolna"
+    "message": "żądanie przekroczyło limit czasu — archive.org może być przeciążony lub sieć jest wolna"
   },
   "tabTags": {
     "message": "Tagi"
@@ -2136,7 +2136,7 @@
     "message": "Nie znaleziono grup AI"
   },
   "tagGovAiNoKey": {
-    "message": "Brak skonfigurowanego dostawcy AI - przejdź do karty AI, aby skonfigurować"
+    "message": "Brak skonfigurowanego dostawcy AI — przejdź do karty AI, aby skonfigurować"
   },
   "tagGovLowCountTitle": {
     "message": "Tagi o niskiej częstości (1 lub mniej)"
@@ -2302,7 +2302,7 @@
     "message": "Tryb zapisywania w tle"
   },
   "optBgSaveModeMerge": {
-    "message": "Połącz (domyślnie — połącz nowe tagi z istniejącymi)"
+    "message": "Połącz (domyślnie — łączy nowe tagi z istniejącymi)"
   },
   "optBgSaveModeSkip": {
     "message": "Pomiń (jeśli adres URL jest już zapisany, nic nie rób)"
@@ -2422,7 +2422,7 @@
     "message": "Tłu­ma­cze­nie"
   },
   "trEstCost": {
-    "message": "Około ~$COUNT$ tokens · $MODEL$",
+    "message": "Około ~$COUNT$ tokenów · $MODEL$",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2583,7 +2583,7 @@
     "message": "Miejsca docelowe"
   },
   "secSendDestinationsHint": {
-    "message": "Każde włączone miejsce docelowe pojawia się w menu „Wyślij do“ na stronie podglądu."
+    "message": "Każde włączone miejsce docelowe pojawia się w menu „Wyślij do” na stronie podglądu."
   },
   "mdSendEnableTo": {
     "message": "Włącz eksport do {name}"
@@ -2652,7 +2652,7 @@
     "message": "Token GitHub (classic, zakres gist)"
   },
   "mdTargetGithubOnboarding": {
-    "message": "Utwórz osobisty token dostępu (classic) w GitHub → Settings → Developer settings → Tokens (classic) z zakresem „gist\", a następnie wklej go poniżej. Każdy wycinek zapisywany jest jako prywatny gist. Uwaga: tokeny fine-grained nie mogą jeszcze tworzyć gistów — użyj tokena classic."
+    "message": "Utwórz osobisty token dostępu (classic) w GitHub → Settings → Developer settings → Tokens (classic) z zakresem „gist”, a następnie wklej go poniżej. Każdy wycinek zapisywany jest jako prywatny gist. Uwaga: tokeny fine-grained nie mogą jeszcze tworzyć gistów — użyj tokena classic."
   },
   "mdSendViewGist": {
     "message": "Zobacz gist →"
@@ -2683,7 +2683,7 @@
   "hlNotePlaceholder": { "message": "Dodaj notatkę…" },
   "hlSave": { "message": "Zapisz" },
   "hlDelete": { "message": "Usuń zaznaczenie" },
-  "hlDegraded": { "message": "Pozycja utracona — otaczający tekst się zmienił, to zaznaczenie obejmuje teraz cały akapit." },
+  "hlDegraded": { "message": "Pozycja utracona — otaczający tekst się zmienił, więc to zaznaczenie obejmuje teraz cały akapit." },
   "hlOrphanNote": { "message": "$COUNT$ zaznaczeń nie udało się odnaleźć w bieżącej treści strony — notatki zostały zachowane.", "placeholders": { "count": { "content": "$1" } } },
   "hlOrphanUnlocatable": { "message": "Tego zaznaczenia nie można odnaleźć w bieżącej treści strony." },
   "mdImgFixNote": {"message": "Nie udało się wczytać $COUNT$ obrazów", "placeholders": {"count": {"content": "$1"}}},

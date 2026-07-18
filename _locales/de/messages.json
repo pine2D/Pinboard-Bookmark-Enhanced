@@ -3,7 +3,7 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Verbessert Pinboard-Lesezeichen mit KI-gestützten Tags, Zusammenfassungen und einer voll anpassbaren Oberfläche."
+    "message": "Mit einem Klick in Pinboard speichern: KI-Tags und -Zusammenfassungen, integrierter Reader und volles Theming für die Website."
   },
   "cmdOpenPopup": {
     "message": "Pinboard Bookmark Enhanced öffnen"
@@ -103,13 +103,13 @@
     "message": "Löschen"
   },
   "loginPrompt": {
-    "message": "Geben Sie Ihren API Token ein von"
+    "message": "Gib deinen API Token ein von"
   },
   "loginTokenPlaceholder": {
     "message": "Benutzername:XXXXXXXXXXXXXX"
   },
   "loginInvalidFormat": {
-    "message": "Ungültiges Format. Verwenden Sie Benutzername:TOKEN"
+    "message": "Ungültiges Format. Verwende Benutzername:TOKEN"
   },
   "loginFailed": {
     "message": "Authentifizierung fehlgeschlagen."
@@ -136,7 +136,7 @@
     "message": "Vorschläge"
   },
   "labelAiTags": {
-    "message": "AI Tags"
+    "message": "KI-Tags"
   },
   "urlWarning": {
     "message": "Diese Seite kann nicht in Pinboard gespeichert werden (nicht unterstützte URL)"
@@ -175,7 +175,7 @@
     "message": "Dieses Lesezeichen löschen?"
   },
   "confirmLogout": {
-    "message": "Ausloggen? Ihr API Token wird entfernt."
+    "message": "Ausloggen? Dein API Token wird entfernt."
   },
   "hintCtrlEnter": {
     "message": "Strg+Eingabe"
@@ -214,7 +214,7 @@
     }
   },
   "aiSummaryBtn": {
-    "message": "AI Zusammenfassung"
+    "message": "KI-Zusammenfassung"
   },
   "aiSummaryBtnTitle": {
     "message": "Umschalt+Eingabe"
@@ -247,7 +247,7 @@
     "message": "Kein Seiteninhalt zum Zusammenfassen"
   },
   "aiSetKey": {
-    "message": "Legen Sie den AI API Key in den [[Einstellungen]] fest"
+    "message": "Lege den KI-API-Key in den [[Einstellungen]] fest"
   },
   "aiCached": {
     "message": "Zwischengespeichert"
@@ -297,7 +297,7 @@
     "message": "Unbekannter Fehler"
   },
   "aiErrorModelNotFound": {
-    "message": "Das Standardmodell für $PROVIDER$ ist möglicherweise veraltet — wählen Sie ein Modell in den Einstellungen",
+    "message": "Das Standardmodell für $PROVIDER$ ist möglicherweise veraltet. Wähle ein Modell in den Einstellungen",
     "placeholders": {
       "provider": {
         "content": "$1"
@@ -305,7 +305,7 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "Kein Zugriff auf $HOST$ — Zugriff erlauben und erneut versuchen.",
+    "message": "Kein Zugriff auf $HOST$. Zugriff erlauben und erneut versuchen.",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -316,7 +316,7 @@
     "message": "Erlauben und erneut versuchen"
   },
   "aiErrorModelNotFoundHint": {
-    "message": "Öffnen Sie Einstellungen > KI und wählen Sie ein verfügbares Modell"
+    "message": "Öffne Einstellungen > KI und wähle ein verfügbares Modell"
   },
   "addAll": {
     "message": "Alle hinzufügen"
@@ -525,7 +525,7 @@
     "message": "Pinboard: Nicht angemeldet"
   },
   "bgSetToken": {
-    "message": "Legen Sie Ihren API Token in den Erweiterungseinstellungen fest."
+    "message": "Lege deinen API Token in den Erweiterungseinstellungen fest."
   },
   "bgUndone": {
     "message": "Pinboard: Rückgängig gemacht"
@@ -552,13 +552,13 @@
     "message": "Auf dieser Seite wurde kein lesbarer Inhalt gefunden."
   },
   "bgMdPreviewTooLarge": {
-    "message": "Der Speicher ist voll. Löschen Sie zwischengespeicherte Daten in den Erweiterungsoptionen (Speicher) und versuchen Sie es erneut."
+    "message": "Der Speicher ist voll. Lösche zwischengespeicherte Daten in den Erweiterungsoptionen (Speicher) und versuche es erneut."
   },
   "mdPreviewOpenFailed": {
-    "message": "Vorschau konnte nicht geöffnet werden – die Seite ist möglicherweise zu groß zum Speichern."
+    "message": "Vorschau konnte nicht geöffnet werden. Die Seite ist möglicherweise zu groß zum Speichern."
   },
   "mdPreviewQuotaFull": {
-    "message": "Der Speicher ist voll, daher konnte die Vorschau nicht gespeichert werden. Geben Sie Speicher frei und versuchen Sie es erneut."
+    "message": "Der Speicher ist voll, daher konnte die Vorschau nicht gespeichert werden. Gib Speicher frei und versuche es erneut."
   },
   "manageStorage": {
     "message": "Speicher verwalten"
@@ -570,7 +570,7 @@
     "message": "Speichern"
   },
   "tabGroupAI": {
-    "message": "AI"
+    "message": "KI"
   },
   "tabGroupReading": {
     "message": "Lesen"
@@ -585,7 +585,7 @@
     "message": "Speicherverwaltung"
   },
   "storageIntro": {
-    "message": "Lokalen Cache freigeben. Diese Caches werden nach dem Löschen automatisch neu aufgebaut. Ihre Einstellungen, Zugangsdaten, ausstehenden Speicherungen und laufenden Daten werden nie angetastet."
+    "message": "Lokalen Cache freigeben. Diese Caches werden nach dem Löschen automatisch neu aufgebaut. Deine Einstellungen, Zugangsdaten, ausstehenden Speicherungen und laufenden Daten werden nie angetastet."
   },
   "storageCatJina": {
     "message": "Seiten-Lese-Cache"
@@ -607,7 +607,7 @@
     "message": "Auswahl löschen"
   },
   "storageNoneSelected": {
-    "message": "Wählen Sie mindestens eine Kategorie zum Löschen aus."
+    "message": "Wähle mindestens eine Kategorie zum Löschen aus."
   },
   "storageCleared": {
     "message": "$AMOUNT$ freigegeben.",
@@ -636,13 +636,13 @@
     }
   },
   "mdEngineExtractingNoteJina": {
-    "message": "Die erste Extraktion ruft die Jina-Cloud (r.jina.ai) ab. Die Wartezeit hängt davon ab, ob diese Seite lokal zwischengespeichert ist, von deiner Netzwerkgeschwindigkeit und der Seitengröße – meist ein paar Sekunden."
+    "message": "Die erste Extraktion ruft die Jina-Cloud (r.jina.ai) ab. Sie dauert meist ein paar Sekunden, abhängig davon, ob die Seite zwischengespeichert ist, von deiner Netzwerkgeschwindigkeit und der Seitengröße."
   },
   "mdEngineExtractFailed": {
     "message": "Diese Seite konnte nicht extrahiert werden. Bitte erneut versuchen."
   },
   "mdEngineTabGone": {
-    "message": "Quell-Tab nicht mehr verfügbar — Seite erneut öffnen, um Defuddle zu nutzen"
+    "message": "Quell-Tab nicht mehr verfügbar. Seite erneut öffnen, um Defuddle zu nutzen"
   },
   "mdEngineGroupAria": {
     "message": "Extraktions-Engine"
@@ -651,7 +651,7 @@
     "message": "Pinboard: Noch ein Schritt zum Speichern"
   },
   "bgTabsSavedCount": {
-    "message": "$COUNT$ Tabs gesendet – zum Abschluss auf der geöffneten Pinboard-Seite auf „Save“ klicken.",
+    "message": "$COUNT$ Tabs gesendet. Zum Abschluss auf der geöffneten Pinboard-Seite auf „Save“ klicken.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -662,7 +662,7 @@
     "message": "Pinboard: Tab-Set speichern fehlgeschlagen"
   },
   "bgLoginRequired": {
-    "message": "Bitte melden Sie sich zuerst bei pinboard.in in Ihrem Browser an."
+    "message": "Bitte melde dich zuerst bei pinboard.in in deinem Browser an."
   },
   "bgQuickSaveFailed": {
     "message": "Pinboard: Schnellspeicherung fehlgeschlagen"
@@ -696,7 +696,7 @@
     }
   },
   "bgTitleQueued": {
-    "message": "\"$TITLE$\" wird gespeichert, sobald Sie online sind.",
+    "message": "\"$TITLE$\" wird gespeichert, sobald du online bist.",
     "placeholders": {
       "title": {
         "content": "$1"
@@ -710,7 +710,7 @@
     "message": "Rückgängig"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Enhanced — Einstellungen"
+    "message": "Pinboard Bookmark Enhanced – Einstellungen"
   },
   "settingsCategory": {
     "message": "Einstellungskategorie"
@@ -734,10 +734,10 @@
     "message": "Popup"
   },
   "tabAI": {
-    "message": "AI Anbieter"
+    "message": "KI-Anbieter"
   },
   "tabAiBehavior": {
-    "message": "AI Verhalten"
+    "message": "KI-Verhalten"
   },
   "tabReader": {
     "message": "Leseansicht"
@@ -761,7 +761,7 @@
     "message": "Größe"
   },
   "notesEmpty": {
-    "message": "Markieren Sie Text auf der Markdown-Vorschauseite, um ihn hervorzuheben oder eine Notiz hinzuzufügen."
+    "message": "Markiere Text auf der Markdown-Vorschauseite, um ihn hervorzuheben oder eine Notiz hinzuzufügen."
   },
   "notesFilterEmpty": {
     "message": "Keine Notizen entsprechen diesem Filter."
@@ -770,7 +770,7 @@
     "message": "Unbekannte Seite"
   },
   "notesUnknownHint": {
-    "message": "Öffnen Sie die Vorschau dieser Seite erneut und speichern Sie eine Markierung, um Titel und Link zu ergänzen."
+    "message": "Öffne die Vorschau dieser Seite erneut und speichere eine Markierung, um Titel und Link zu ergänzen."
   },
   "notesDeleteBtn": {
     "message": "Löschen"
@@ -864,13 +864,13 @@
     "message": "Tag-Cache-Strategie"
   },
   "tagSyncCached": {
-    "message": "Cached (Standard — alle 10 Min. neu laden)"
+    "message": "Cached (Standard, alle 10 Min. neu laden)"
   },
   "tagSyncFresh": {
-    "message": "Live (bei jedem Popup abrufen — langsamer)"
+    "message": "Live (bei jedem Popup abrufen, langsamer)"
   },
   "tagSyncPrewarmed": {
-    "message": "Vorgewärmt (Hintergrund alle 15 Min. — sofort verfügbar)"
+    "message": "Vorgewärmt (Hintergrundabruf alle 15 Min., sofort verfügbar)"
   },
   "tagSyncHint": {
     "message": "Steuert, wie deine vorhandene Pinboard-Tag-Cloud für die Autovervollständigung in das Popup geladen wird. Nur Lesezugriff; es werden keine Tags zu Pinboard hochgeladen."
@@ -882,7 +882,7 @@
     "message": "Eine Vorlage pro Zeile:\nArbeit: project, review, report\nDev: programming, tutorial, tool"
   },
   "tagPresetsHint": {
-    "message": "Format: Name: Tag1, Tag2, Tag3 — wird als Schnell-Buttons im Popup angezeigt."
+    "message": "Format: Name: Tag1, Tag2, Tag3. Jede Vorlage erscheint als Schaltfläche zum schnellen Hinzufügen im Popup."
   },
   "secPopupBehavior": {
     "message": "Popup-Verhalten"
@@ -915,7 +915,7 @@
     "message": "Einstellungen importieren"
   },
   "importedReload": {
-    "message": "Importiert — Seite neu laden, um Änderungen zu sehen"
+    "message": "Importiert. Seite neu laden, um Änderungen zu sehen"
   },
   "importInvalid": {
     "message": "Ungültige Datei"
@@ -924,7 +924,7 @@
     "message": "Der Import konnte nicht abgeschlossen werden; einige Einstellungen wurden möglicherweise bereits geändert. Bitte prüfe sie und versuche es erneut."
   },
   "importHighlightsSkipped": {
-    "message": "Importiert — Markierungen und Notizen wurden übersprungen. Melde dich mit dem Pinboard-Konto an, das diese Sicherung erstellt hat, und importiere die Datei erneut."
+    "message": "Importiert, aber Markierungen und Notizen wurden übersprungen. Melde dich mit dem Pinboard-Konto an, das diese Sicherung erstellt hat, und importiere die Datei erneut."
   },
   "importSettingsTitle": {
     "message": "Einstellungen aus JSON-Datei importieren"
@@ -966,7 +966,7 @@
     "message": "Sicherung auf dem Server gefunden"
   },
   "webdavTestOkEmpty": {
-    "message": "Server erreichbar — noch keine Sicherung vorhanden"
+    "message": "Server erreichbar, noch keine Sicherung vorhanden"
   },
   "webdavTestAuthFail": {
     "message": "Authentifizierung fehlgeschlagen"
@@ -1000,7 +1000,7 @@
     "message": "Die Sicherung auf dem Server wurde geändert. Rufe sie ab, bevor du erneut pushst."
   },
   "webdavPermDenied": {
-    "message": "Zugriff verweigert — auf „Testen“ klicken, um ihn zu gewähren"
+    "message": "Zugriff verweigert. Auf „Testen“ klicken, um ihn zu gewähren"
   },
   "webdavPullConfirm": {
     "message": "Lokale Einstellungen mit der Sicherung vom $TIME$ überschreiben? Deine API-Schlüssel sind davon nicht betroffen.",
@@ -1020,7 +1020,7 @@
     "message": "Diese Seite nach Beliebtheit sortieren"
   },
   "importPartial": {
-    "message": "Importiert — Themes lokal gespeichert (Sync-Kontingent voll); Seite neu laden"
+    "message": "Importiert. Themes lokal gespeichert (Sync-Kontingent voll); Seite neu laden"
   },
   "secQuickSave": {
     "message": "Schnellspeicherung"
@@ -1059,10 +1059,10 @@
     "message": "Tag1, Tag2"
   },
   "qsAiTags": {
-    "message": "AI Tags automatisch generieren"
+    "message": "KI-Tags automatisch generieren"
   },
   "qsAiSummary": {
-    "message": "AI Zusammenfassung automatisch in Notizen generieren"
+    "message": "KI-Zusammenfassung automatisch in Notizen generieren"
   },
   "secReadLater": {
     "message": "Später lesen"
@@ -1086,10 +1086,10 @@
     "message": "Mehrere Tags durch Kommas getrennt. Z.B. batch_saved, research"
   },
   "batchAiTags": {
-    "message": "AI Tags für jeden Tab automatisch generieren"
+    "message": "KI-Tags für jeden Tab automatisch generieren"
   },
   "batchAiSummary": {
-    "message": "AI Zusammenfassung für jeden Tab automatisch generieren"
+    "message": "KI-Zusammenfassung für jeden Tab automatisch generieren"
   },
   "batchSkipExisting": {
     "message": "Bereits gespeicherte URLs überspringen"
@@ -1117,7 +1117,7 @@
     "message": "Zugriff erlauben und starten"
   },
   "secAiProvider": {
-    "message": "AI Anbieter"
+    "message": "KI-Anbieter"
   },
   "labelApiKey": {
     "message": "API Key"
@@ -1164,7 +1164,7 @@
     "message": "Z.B. claude-sonnet-4-20250514, claude-3-5-haiku-20241022"
   },
   "hintOllamaModel": {
-    "message": "Führen Sie zuerst ollama pull llama3.2 aus"
+    "message": "Führe zuerst ollama pull llama3.2 aus"
   },
   "hintCustomBaseUrl": {
     "message": "Muss den /chat/completions Endpunkt unterstützen"
@@ -1173,16 +1173,16 @@
     "message": "Leer lassen, wenn nicht erforderlich"
   },
   "secAiBehavior": {
-    "message": "AI Verhalten"
+    "message": "KI-Verhalten"
   },
   "optAiAutoTags": {
-    "message": "AI Tags beim Öffnen des Popups automatisch generieren"
+    "message": "KI-Tags beim Öffnen des Popups automatisch generieren"
   },
   "labelAiTagLang": {
-    "message": "AI Tag-Sprache"
+    "message": "KI-Tag-Sprache"
   },
   "labelAiSummaryLang": {
-    "message": "AI Zusammenfassungssprache"
+    "message": "KI-Zusammenfassungssprache"
   },
   "aiLangAuto": {
     "message": "Automatisch (wie der Inhalt)"
@@ -1218,7 +1218,7 @@
     "message": "Русский"
   },
   "labelAiCache": {
-    "message": "AI Cache-Dauer (Minuten)"
+    "message": "KI-Cache-Dauer (Minuten)"
   },
   "aiCacheHint": {
     "message": "Pro URL zwischengespeichert, max. 200 Einträge (LRU). Auf 0 setzen zum Deaktivieren."
@@ -1236,19 +1236,19 @@
     "message": "Prompts"
   },
   "promptsHint": {
-    "message": "Passen Sie die an die AI gesendeten Prompts an. Platzhalter: {{title}} {{url}} {{content}} {{description}} {{lang_instruction}} {{separator_instruction}}. Leer lassen für Standardwerte."
+    "message": "Passe die an die KI gesendeten Prompts an. Platzhalter: {{title}} {{url}} {{content}} {{description}} {{lang_instruction}} {{separator_instruction}}. Leer lassen für Standardwerte."
   },
   "labelTagPrompt": {
-    "message": "AI-Tags-Prompt"
+    "message": "KI-Tags-Prompt"
   },
   "tagPromptHint": {
-    "message": "Leer lassen für den oben angezeigten Standard-Prompt. Muss die AI anweisen, [\"tag1\",\"tag2\"] Format zurückzugeben."
+    "message": "Leer lassen für den oben angezeigten Standard-Prompt. Muss die KI anweisen, [\"tag1\",\"tag2\"] Format zurückzugeben."
   },
   "resetToDefault": {
     "message": "Auf Standard zurücksetzen"
   },
   "labelSummaryPrompt": {
-    "message": "AI Zusammenfassungs-Prompt"
+    "message": "KI-Zusammenfassungs-Prompt"
   },
   "summaryPromptHint": {
     "message": "Leer lassen für den oben angezeigten Standard-Prompt. {{lang_instruction}} für automatische Spracherkennung verwenden."
@@ -1320,7 +1320,7 @@
     "message": "Pinboard.in Benutzerdefinierter Stil"
   },
   "customStyleHint": {
-    "message": "Benutzerdefiniertes CSS in pinboard.in Seiten einfügen. Nützlich zum Ändern von Schriftarten, Farben, Layout usw."
+    "message": "Benutzerdefiniertes CSS in pinboard.in-Seiten einfügen. Nützlich zum Ändern von Schriftarten, Farben, Layout usw."
   },
   "labelCustomFont": {
     "message": "Benutzerdefinierte Schriftart"
@@ -1347,7 +1347,7 @@
     "message": "Dunkel"
   },
   "themePresetsHint": {
-    "message": "Klicken Sie auf eine Vorlage, um deren CSS zu laden. Adaptive Themes folgen Ihrer Design-Einstellung (Hell/Dunkel)."
+    "message": "Klicke auf eine Vorlage, um deren CSS zu laden. Adaptive Themes folgen deiner Design-Einstellung (Hell/Dunkel)."
   },
   "labelSavedThemes": {
     "message": "Gespeicherte Themes"
@@ -1565,7 +1565,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdImgEmbedNotHere": {
-    "message": "Einbetten gilt nur für Downloads — dieser Export behält Bildlinks."
+    "message": "Einbetten gilt nur für Downloads; dieser Export behält Bildlinks."
   },
   "mdImgBrokenNote": {
     "message": "$COUNT$ Bild(er) konnten in dieser Vorschau nicht geladen werden und werden nach dem Export möglicherweise nicht angezeigt; „Einbetten“ packt Bilder in Downloads.",
@@ -1756,7 +1756,7 @@
     "message": "jina_xxxx (für kostenloses Kontingent leer lassen)"
   },
   "submitUriTooLong": {
-    "message": "Anfrage zu groß — Notizen, Titel oder Tags kürzen"
+    "message": "Anfrage zu groß. Notizen, Titel oder Tags kürzen"
   },
   "saveAsThemeDisabledHint": {
     "message": "Zuerst Custom CSS ändern, um als Theme zu speichern"
@@ -1901,7 +1901,7 @@
     "message": "Benutzerdefinierte Parameter (einer pro Zeile, zur Standardliste hinzufügen)"
   },
   "optUrlCleanExclude": {
-    "message": "Auszuschließende Parameter (einer pro Zeile, niemals bereinigen – z. B. Affiliate-tag= behalten)"
+    "message": "Auszuschließende Parameter (einer pro Zeile, werden nie bereinigt; z. B. tag= behalten, um Affiliate-Tags zu erhalten)"
   },
   "emptyRecentBookmarks": {
     "message": "Keine aktuellen Lesezeichen"
@@ -1940,13 +1940,13 @@
     "message": "Tags in Hintergrund-Speichervorgängen zusammenführen (Schnellspeichern/Später lesen)"
   },
   "optBgSaveNoClobberHint": {
-    "message": "Wenn aktiviert, liest das Hintergrund-Speichern Ihr vorhandenes Pinboard-Lesezeichen (falls vorhanden) und führt neue Tags mit vorhandenen Tags zusammen, anstatt sie zu ersetzen. Dies verhindert versehentlichen Tagloss bei doppelten URLs. Hinweis: Der zusätzliche API-Aufruf verlängert die Speicherdauer um etwa 3 Sekunden. Vordergrund-Popup-Bearbeitungen ersetzen immer (Sie haben vollständige Kontrolle)."
+    "message": "Wenn aktiviert, liest das Hintergrund-Speichern dein vorhandenes Pinboard-Lesezeichen (falls vorhanden) und führt neue Tags mit vorhandenen Tags zusammen, anstatt sie zu ersetzen. Dies verhindert versehentlichen Tag-Verlust bei doppelten URLs. Hinweis: Der zusätzliche API-Aufruf verlängert die Speicherdauer um etwa 3 Sekunden. Vordergrund-Popup-Bearbeitungen ersetzen immer (du hast vollständige Kontrolle)."
   },
   "obsidianInstallHint": {
     "message": "Obsidian muss installiert sein, damit die Notiz geöffnet werden kann. Der Inhalt wurde zur Sicherheit auch in die Zwischenablage kopiert."
   },
   "obsidianClipboardFailed": {
-    "message": "Kopieren in die Zwischenablage fehlgeschlagen — die Notiz wurde nicht erstellt. Bitte erneut versuchen."
+    "message": "Kopieren in die Zwischenablage fehlgeschlagen, daher wurde die Notiz nicht erstellt. Bitte erneut versuchen."
   },
   "apiKeySecurityHint": {
     "message": "Bei neuen Nutzern bleiben Zugangsdaten standardmäßig auf diesem Gerät. Vorhandene Cloud-Zugangsdaten können die kontoweite Synchronisierung nach einem Upgrade aktiviert halten. Nur Geräte mit aktivierter Einstellungssynchronisierung nehmen teil; synchronisierte Zugangsdaten sind nur verschleiert, nicht verschlüsselt."
@@ -1979,7 +1979,7 @@
     "message": "Gespeicherte Seiten im Wayback Machine archivieren"
   },
   "optWaybackHint": {
-    "message": "Nach jedem Speichern das Internet Archive bitten, einen Schnappschuss der Seite zu erstellen (Best-Effort, blockiert das Speichern nicht). Sendet die gespeicherte URL an archive.org - standardmäßig deaktiviert."
+    "message": "Nach jedem Speichern das Internet Archive bitten, einen Schnappschuss der Seite zu erstellen (Best-Effort, blockiert das Speichern nicht). Sendet die gespeicherte URL an archive.org; standardmäßig deaktiviert."
   },
   "optWaybackBatch": {
     "message": "Auch während Batch-Speichern archivieren"
@@ -2000,7 +2000,7 @@
     "message": "Als privat gespeicherte Lesezeichen nie bei archive.org archivieren"
   },
   "waybackPermDenied": {
-    "message": "Berechtigung für web.archive.org fehlt - aktivieren Sie die Archivierung erneut, um sie zu erteilen."
+    "message": "Berechtigung für web.archive.org fehlt. Aktiviere die Archivierung erneut, um sie zu erteilen."
   },
   "archiveThisSave": {
     "message": "Archivieren"
@@ -2050,7 +2050,7 @@
     "message": "Archivierung erneut versuchen"
   },
   "archiveLogNote": {
-    "message": "Eine erfolgreiche Einreichung bedeutet nicht, dass der Schnappschuss sofort sichtbar ist - die Wayback Machine benötigt normalerweise einige Minuten (manchmal länger), um neue Aufnahmen zu indizieren."
+    "message": "Eine erfolgreiche Einreichung bedeutet nicht, dass der Schnappschuss sofort sichtbar ist; die Wayback Machine benötigt normalerweise einige Minuten (manchmal länger), um neue Aufnahmen zu indizieren."
   },
   "archiveErrAuth": {
     "message": "ungültige Anmeldedaten"
@@ -2071,13 +2071,13 @@
     "message": "Tägliches Aufnahmelimit für diese URL erreicht"
   },
   "archiveErrServer": {
-    "message": "archive.org-Serverfehler - versuchen Sie es später erneut"
+    "message": "archive.org-Serverfehler; versuche es später erneut"
   },
   "archiveErrRateLimited": {
-    "message": "Anonyme Anfragen sind pro IP ratenbegrenzt - versuchen Sie es später oder fügen Sie einen S3-Schlüssel hinzu"
+    "message": "Anonyme Anfragen sind pro IP ratenbegrenzt; versuche es später oder füge einen S3-Schlüssel hinzu"
   },
   "archiveErrTimeoutHint": {
-    "message": "Die Anfrage hat das Zeitlimit überschritten - archive.org ist möglicherweise ausgelastet oder das Netzwerk ist langsam"
+    "message": "Die Anfrage hat das Zeitlimit überschritten; archive.org ist möglicherweise ausgelastet oder das Netzwerk ist langsam"
   },
   "tabTags": {
     "message": "Tags"
@@ -2136,7 +2136,7 @@
     "message": "Keine KI-Gruppen gefunden"
   },
   "tagGovAiNoKey": {
-    "message": "Kein KI-Anbieter konfiguriert - im KI-Tab einrichten"
+    "message": "Kein KI-Anbieter konfiguriert. Im KI-Tab einrichten"
   },
   "tagGovLowCountTitle": {
     "message": "Tags mit niedriger Häufigkeit (1 oder weniger)"
@@ -2181,7 +2181,7 @@
     }
   },
   "tagGovAborted429": {
-    "message": "Rate-Limit — Stapel gestoppt, abgeschlossene Änderungen bleiben erhalten. Ein erneuter Lauf derselben Zusammenführung setzt sicher fort (bereits aktualisierte Lesezeichen werden übersprungen)."
+    "message": "Rate-Limit erreicht. Der Stapel wurde gestoppt; abgeschlossene Änderungen bleiben erhalten. Ein erneuter Lauf derselben Zusammenführung setzt sicher fort (bereits aktualisierte Lesezeichen werden übersprungen)."
   },
   "tagGovMergeEstimate": {
     "message": "Geschätzte Dauer: ca. $T$",
@@ -2242,7 +2242,7 @@
     "message": "Details unten anzeigen"
   },
   "tagGovRateLimitWait": {
-    "message": "Rate-Limit erreicht — erneuter Versuch folgt…"
+    "message": "Rate-Limit erreicht; erneuter Versuch folgt…"
   },
   "tagGovQueuedCancelled": {
     "message": "$N$ wartende Aufgaben abgebrochen",
@@ -2259,7 +2259,7 @@
     "message": "Schließen"
   },
   "tagGovStopped": {
-    "message": "Gestoppt — abgeschlossene Änderungen bleiben erhalten."
+    "message": "Gestoppt. Abgeschlossene Änderungen bleiben erhalten."
   },
   "tagGovQueuedBadge": {
     "message": "In Warteschlange…"
@@ -2281,28 +2281,28 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "Tags konnten nicht geladen werden — Pinboard-Token oder Netzwerk prüfen, dann Aktualisieren"
+    "message": "Tags konnten nicht geladen werden. Pinboard-Token oder Netzwerk prüfen, dann Aktualisieren"
   },
   "placeholderOptional": {
     "message": "optional"
   },
   "tagGovSnapshotSaved": {
-    "message": "Tag-Listen-Snapshot heruntergeladen (nur Namen und Anzahl — Referenz für manuelle Reparatur, keine automatische Wiederherstellung)"
+    "message": "Tag-Listen-Snapshot heruntergeladen (nur Namen und Anzahl; Referenz für manuelle Reparatur, keine automatische Wiederherstellung)"
   },
   "tagGovSnapshotFailed": {
-    "message": "Snapshot konnte nicht erstellt werden — Zusammenführen/Löschen blockiert"
+    "message": "Snapshot konnte nicht erstellt werden; Zusammenführen/Löschen blockiert"
   },
   "tagGovIrreversibleWarn": {
-    "message": "Zusammenführungen und Löschungen können nicht rückgängig gemacht werden. Vor der ersten Änderung wird ein Snapshot der Tag-Liste (Namen und Anzahl) heruntergeladen — nur als Referenz."
+    "message": "Zusammenführungen und Löschungen können nicht rückgängig gemacht werden. Vor der ersten Änderung wird ein Snapshot der Tag-Liste (Namen und Anzahl) heruntergeladen, nur als Referenz."
   },
   "tagGovBundlesWarn": {
-    "message": "Tag-Bundles auf pinboard.in werden bei Umbenennungen nicht automatisch aktualisiert — überprüfen Sie sie nach dem Zusammenführen manuell."
+    "message": "Tag-Bundles auf pinboard.in werden bei Umbenennungen nicht automatisch aktualisiert; überprüfe sie nach dem Zusammenführen manuell."
   },
   "optBgSaveMode": {
     "message": "Modus für Hintergrund-Speichern"
   },
   "optBgSaveModeMerge": {
-    "message": "Zusammenführen (Standard — neue Tags mit vorhandenen kombinieren)"
+    "message": "Zusammenführen (Standard, neue Tags mit vorhandenen kombinieren)"
   },
   "optBgSaveModeSkip": {
     "message": "Überspringen (wenn URL bereits gespeichert, nichts tun)"
@@ -2317,7 +2317,7 @@
     "message": "Bereits als Lesezeichen gespeichert"
   },
   "bgSkippedExists": {
-    "message": "Bereits als Lesezeichen — Speichern übersprungen"
+    "message": "Bereits als Lesezeichen; Speichern übersprungen"
   },
   "secPreviewAi": {
     "message": "Vorschauseite KI"
@@ -2610,10 +2610,10 @@
     "message": "zuletzt verwendet"
   },
   "mdSendTooLongFellBack": {
-    "message": "Zu lang für einen direkten Link — vollständiger Text kopiert. In {name} einfügen (Ctrl+V), um den Vorgang abzuschließen."
+    "message": "Zu lang für einen direkten Link; vollständiger Text kopiert. In {name} einfügen (Ctrl+V), um den Vorgang abzuschließen."
   },
   "mdSentUrlScheme": {
-    "message": "{name} geöffnet — vollständiger Text in die Zwischenablage kopiert"
+    "message": "{name} geöffnet; vollständiger Text in die Zwischenablage kopiert"
   },
   "mdOpenedApp": {
     "message": "{name} geöffnet"
@@ -2625,23 +2625,23 @@
     "message": "Senden fehlgeschlagen"
   },
   "mdSendOpenBlocked": {
-    "message": "App konnte nicht geöffnet werden — vollständiger Text in die Zwischenablage kopiert"
+    "message": "App konnte nicht geöffnet werden; vollständiger Text in die Zwischenablage kopiert"
   },
   "mdSendNoneConfigured": {
-    "message": "Keine Ziele aktiviert — eines in den Einstellungen hinzufügen"
+    "message": "Keine Ziele aktiviert. Eines in den Einstellungen hinzufügen"
   },
   "mdManageDestinations": {
     "message": "Ziele verwalten →"
   },
-  "mdSendApiDown": { "message": "Export-Server nicht erreichbar. Volltext in die Zwischenablage kopiert — zum Abschließen einfügen." },
+  "mdSendApiDown": { "message": "Export-Server nicht erreichbar. Volltext in die Zwischenablage kopiert; zum Abschließen einfügen." },
   "mdSendApiBadToken": { "message": "Der Server hat den Token abgelehnt. Erneut aus der App kopieren. Volltext in die Zwischenablage kopiert." },
-  "mdSendApiFailed": { "message": "Die Export-Anfrage ist fehlgeschlagen. Volltext in die Zwischenablage kopiert — zum Abschließen einfügen." },
+  "mdSendApiFailed": { "message": "Die Export-Anfrage ist fehlgeschlagen. Volltext in die Zwischenablage kopiert; zum Abschließen einfügen." },
   "mdSendTest": {
     "message": "Verbindung testen"
   },
   "mdSendTestOk": { "message": "Verbunden" },
-  "mdSendTestDown": { "message": "Server nicht erreichbar — läuft die App?" },
-  "mdSendTestBadToken": { "message": "Token abgelehnt — erneut aus der App kopieren." },
+  "mdSendTestDown": { "message": "Server nicht erreichbar. Läuft die App?" },
+  "mdSendTestBadToken": { "message": "Token abgelehnt. Erneut aus der App kopieren." },
   "mdSendTestNoToken": {
     "message": "Zuerst einen Token eingeben."
   },
@@ -2652,13 +2652,13 @@
     "message": "GitHub-Token (classic, gist-Scope)"
   },
   "mdTargetGithubOnboarding": {
-    "message": "Erstelle bei GitHub → Settings → Developer settings → Tokens (classic) einen Personal Access Token (classic) mit dem „gist“-Scope und füge ihn unten ein. Jeder Clip wird als privater gist gespeichert. Hinweis: fine-grained Tokens können noch keine gists erstellen — verwende einen classic Token."
+    "message": "Erstelle bei GitHub → Settings → Developer settings → Tokens (classic) einen Personal Access Token (classic) mit dem „gist“-Scope und füge ihn unten ein. Jeder Clip wird als privater gist gespeichert. Hinweis: fine-grained Tokens können noch keine gists erstellen, verwende daher einen classic Token."
   },
   "mdSendViewGist": {
     "message": "gist ansehen →"
   },
   "mdSendApiPerm": {
-    "message": "Zugriffsberechtigung verweigert. Volltext in die Zwischenablage kopiert — zum Abschließen einfügen."
+    "message": "Zugriffsberechtigung verweigert. Volltext in die Zwischenablage kopiert; zum Abschließen einfügen."
   },
   "mdTargetWebhookUrl": {
     "message": "Endpunkt-URL"
@@ -2667,10 +2667,10 @@
     "message": "Authorization-Header (optional)"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "Sendet ein JSON-Payload {title, url, date, tags, markdown} per POST an deinen Endpunkt. Ein von dir gesetzter Authorization-Wert wird unverändert gesendet (z. B. Bearer <token> oder Token <key>), sodass jedes Auth-Schema funktioniert. Für n8n, Make, Zapier, Readwise oder jeden selbst gehosteten Empfänger — hier ist kein Konto nötig."
+    "message": "Sendet ein JSON-Payload {title, url, date, tags, markdown} per POST an deinen Endpunkt. Ein von dir gesetzter Authorization-Wert wird unverändert gesendet (z. B. Bearer <token> oder Token <key>), sodass jedes Auth-Schema funktioniert. Für n8n, Make, Zapier, Readwise oder jeden selbst gehosteten Empfänger; hier ist kein Konto nötig."
   },
   "mdTargetWebhookHttpWarn": {
-    "message": "Blockiert: Verwenden Sie HTTPS oder HTTP nur für localhost, 127.0.0.1 oder [::1]. LAN-/öffentliches HTTP, ungültige URLs und URLs mit Zugangsdaten werden nicht gesendet."
+    "message": "Blockiert: Verwende HTTPS oder HTTP nur für localhost, 127.0.0.1 oder [::1]. LAN-/öffentliches HTTP, ungültige URLs und URLs mit Zugangsdaten werden nicht gesendet."
   },
   "hlColorQuote": { "message": "Zitat" },
   "hlColorDefinition": { "message": "Begriffsdefinition" },
@@ -2683,8 +2683,8 @@
   "hlNotePlaceholder": { "message": "Notiz hinzufügen…" },
   "hlSave": { "message": "Speichern" },
   "hlDelete": { "message": "Markierung löschen" },
-  "hlDegraded": { "message": "Position verloren — der umliegende Text hat sich geändert, diese Markierung deckt jetzt den ganzen Absatz ab." },
-  "hlOrphanNote": { "message": "$COUNT$ Markierungen konnten im aktuellen Seiteninhalt nicht gefunden werden — Notizen bleiben erhalten.", "placeholders": { "count": { "content": "$1" } } },
+  "hlDegraded": { "message": "Position verloren: Der umliegende Text hat sich geändert, daher deckt diese Markierung jetzt den ganzen Absatz ab." },
+  "hlOrphanNote": { "message": "$COUNT$ Markierungen konnten im aktuellen Seiteninhalt nicht gefunden werden; ihre Notizen bleiben erhalten.", "placeholders": { "count": { "content": "$1" } } },
   "hlOrphanUnlocatable": { "message": "Diese Markierung ist im aktuellen Seiteninhalt nicht auffindbar." },
   "mdImgFixNote": {"message": "$COUNT$ Bilder konnten nicht geladen werden", "placeholders": {"count": {"content": "$1"}}},
   "mdImgFixBtn": {"message": "Bilder dieser Seite reparieren"},
@@ -2735,7 +2735,7 @@
   "skimTitle": { "message": "Kernpunkte" },
   "skimRegen": { "message": "Neu erzeugen" },
   "skimCollapseAria": { "message": "Abschnitt Kernpunkte ein-/ausblenden" },
-  "skimStaleNote": { "message": "Inhalt hat sich geändert — diese Kernpunkte könnten veraltet sein" },
+  "skimStaleNote": { "message": "Inhalt hat sich geändert; diese Kernpunkte könnten veraltet sein" },
   "skimStop": { "message": "Stopp" },
   "skimGenerating": { "message": "Kernpunkte werden erzeugt…" },
   "skimFailed": { "message": "Kernpunkte konnten nicht erzeugt werden" }
