@@ -3,7 +3,7 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Supercharges Pinboard bookmarking with AI-powered tags, summaries, and a fully themeable interface."
+    "message": "Save to Pinboard in one click, with AI tags and summaries, a built-in reader, and full theming for the site."
   },
   "cmdOpenPopup": {
     "message": "Open Pinboard Bookmark Enhanced"
@@ -297,7 +297,7 @@
     "message": "Unknown error"
   },
   "aiErrorModelNotFound": {
-    "message": "The default model for $PROVIDER$ may be outdated — pick a model in Settings",
+    "message": "The default model for $PROVIDER$ may be outdated. Pick a model in Settings",
     "placeholders": {
       "provider": {
         "content": "$1"
@@ -305,7 +305,7 @@
     }
   },
   "aiErrorHostPermission": {
-    "message": "No access to $HOST$ — grant access and retry.",
+    "message": "No access to $HOST$. Grant access and retry.",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -555,7 +555,7 @@
     "message": "Storage is full. Clear cached data in the extension's options (Storage), then try again."
   },
   "mdPreviewOpenFailed": {
-    "message": "Couldn't open the preview — the page may be too large to store."
+    "message": "Couldn't open the preview. The page may be too large to store."
   },
   "mdPreviewQuotaFull": {
     "message": "Storage is full, so the preview couldn't be saved. Free up space, then try again."
@@ -636,13 +636,13 @@
     }
   },
   "mdEngineExtractingNoteJina": {
-    "message": "First-time extraction fetches from Jina's cloud (r.jina.ai). The wait depends on whether this page is cached locally, your network speed, and the page size — usually a few seconds."
+    "message": "First-time extraction fetches from Jina's cloud (r.jina.ai). It usually takes a few seconds, depending on whether the page is cached, your network speed, and the page size."
   },
   "mdEngineExtractFailed": {
     "message": "Couldn't extract this page. Please try again."
   },
   "mdEngineTabGone": {
-    "message": "Source tab no longer available — reopen the page to use Defuddle"
+    "message": "Source tab no longer available. Reopen the page to use Defuddle"
   },
   "mdEngineGroupAria": {
     "message": "Extraction engine"
@@ -651,7 +651,7 @@
     "message": "Pinboard: One more step to save"
   },
   "bgTabsSavedCount": {
-    "message": "$COUNT$ tabs sent — click Save on the opened Pinboard page to finish.",
+    "message": "$COUNT$ tabs sent. Click Save on the opened Pinboard page to finish.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -710,7 +710,7 @@
     "message": "Undo"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Enhanced — Settings"
+    "message": "Pinboard Bookmark Enhanced - Settings"
   },
   "settingsCategory": {
     "message": "Settings category"
@@ -864,13 +864,13 @@
     "message": "Tag Cache Strategy"
   },
   "tagSyncCached": {
-    "message": "Cached (default — refresh after 10 min)"
+    "message": "Cached (default, refreshes after 10 min)"
   },
   "tagSyncFresh": {
-    "message": "Live (fetch on every popup — slower)"
+    "message": "Live (fetches on every popup, slower)"
   },
   "tagSyncPrewarmed": {
-    "message": "Prewarmed (background fetch every 15 min — instant popup)"
+    "message": "Prewarmed (background fetch every 15 min, instant popup)"
   },
   "tagSyncHint": {
     "message": "Controls how your existing Pinboard tag cloud is pulled into the popup for autocomplete. Tags are read-only; nothing is uploaded back to Pinboard."
@@ -882,7 +882,7 @@
     "message": "One preset per line:\nWork: project, review, report\nDev: programming, tutorial, tool"
   },
   "tagPresetsHint": {
-    "message": "Format: Name: tag1, tag2, tag3 — shown as quick-add buttons in popup."
+    "message": "Format: Name: tag1, tag2, tag3. Each preset appears as a quick-add button in the popup."
   },
   "secPopupBehavior": {
     "message": "Popup Behavior"
@@ -915,7 +915,7 @@
     "message": "Import Settings"
   },
   "importedReload": {
-    "message": "Imported — reload to see changes"
+    "message": "Imported. Reload to see changes"
   },
   "importInvalid": {
     "message": "Invalid file"
@@ -924,7 +924,7 @@
     "message": "Import could not be completed; some settings may already have changed. Review them and try again."
   },
   "importHighlightsSkipped": {
-    "message": "Imported — highlights and notes were skipped. Sign in with the Pinboard account that created this backup, then import the file again."
+    "message": "Imported, but highlights and notes were skipped. Sign in with the Pinboard account that created this backup, then import the file again."
   },
   "importSettingsTitle": {
     "message": "Import settings from JSON file"
@@ -966,7 +966,7 @@
     "message": "Backup found on server"
   },
   "webdavTestOkEmpty": {
-    "message": "Server reachable — no backup yet"
+    "message": "Server reachable; no backup yet"
   },
   "webdavTestAuthFail": {
     "message": "Authentication failed"
@@ -1000,7 +1000,7 @@
     "message": "The remote backup changed. Pull it before pushing again."
   },
   "webdavPermDenied": {
-    "message": "Permission denied — click Test to grant access"
+    "message": "Permission denied. Click Test to grant access"
   },
   "webdavPullConfirm": {
     "message": "Overwrite local settings with the backup from $TIME$? Your API keys are not affected.",
@@ -1020,7 +1020,7 @@
     "message": "Sort this page by popularity"
   },
   "importPartial": {
-    "message": "Imported — themes saved locally (sync quota full); reload to see changes"
+    "message": "Imported. Themes saved locally (sync quota full); reload to see changes"
   },
   "secQuickSave": {
     "message": "Quick Save"
@@ -1314,7 +1314,7 @@
     "message": "Add a “sort by popularity” control on tag pages"
   },
   "optTagSortByPopHint": {
-    "message": "On pinboard.in tag pages, adds a “pop” control that sorts the current page’s bookmarks by how many people saved each link; click again to restore."
+    "message": "On pinboard.in tag pages, adds a \"pop\" control that sorts the current page’s bookmarks by how many people saved each link; click again to restore."
   },
   "secCustomStyle": {
     "message": "Pinboard.in Custom Style"
@@ -1565,7 +1565,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "mdImgEmbedNotHere": {
-    "message": "Embed applies to downloads only — this export keeps image links."
+    "message": "Embed applies to downloads only; this export keeps image links."
   },
   "mdImgBrokenNote": {
     "message": "$COUNT$ image link(s) failed to load in this preview and may not display after export; Embed packs images into downloads.",
@@ -1726,7 +1726,7 @@
     "message": "jina_xxxx (leave empty for free tier)"
   },
   "submitUriTooLong": {
-    "message": "Request too large — shorten notes, title, or tags"
+    "message": "Request too large. Shorten notes, title, or tags"
   },
   "saveAsThemeDisabledHint": {
     "message": "Modify Custom CSS first to save as theme"
@@ -1871,7 +1871,7 @@
     "message": "Custom parameters (one per line, appended to default list)"
   },
   "optUrlCleanExclude": {
-    "message": "Exclude parameters (one per line, never cleaned — e.g. keep affiliate tag=)"
+    "message": "Parameters that are never cleaned (one per line, e.g. tag= to keep affiliate tags)"
   },
   "emptyRecentBookmarks": {
     "message": "No recent bookmarks"
@@ -1940,13 +1940,13 @@
     "message": "Merge tags in background saves (Quick Save / Read Later)"
   },
   "optBgSaveNoClobberHint": {
-    "message": "When enabled, background saves read your existing Pinboard bookmark (if any) and merge new tags with existing tags instead of replacing them. This prevents accidental tag loss on duplicate URLs. Note: adds ~3s per save for the extra API call. Foreground popup edits always replace (give you full control)."
+    "message": "When enabled, background saves read your existing Pinboard bookmark (if any) and merge new tags with existing tags instead of replacing them. This prevents accidental tag loss on duplicate URLs. Note: adds ~3s per save for the extra API call. Foreground popup edits always replace, so you keep full control."
   },
   "obsidianInstallHint": {
     "message": "Obsidian must be installed for the note to open. Your note is also copied to the clipboard as a backup."
   },
   "obsidianClipboardFailed": {
-    "message": "Couldn't copy to clipboard — the note wasn't created. Try again."
+    "message": "Couldn't copy to clipboard, so the note wasn't created. Try again."
   },
   "apiKeySecurityHint": {
     "message": "New users keep credentials on this device by default. Existing cloud credentials may keep account-wide sync on after upgrade. Only devices with settings sync enabled participate; synced credentials are obfuscated, not encrypted."
@@ -1979,7 +1979,7 @@
     "message": "Archive saved pages to the Wayback Machine"
   },
   "optWaybackHint": {
-    "message": "After each save, ask the Internet Archive to snapshot the page (best effort, never blocks saving). Sends the saved URL to archive.org - off by default."
+    "message": "After each save, ask the Internet Archive to snapshot the page (best effort, never blocks saving). Sends the saved URL to archive.org; off by default."
   },
   "optWaybackBatch": {
     "message": "Also archive during batch save"
@@ -2000,7 +2000,7 @@
     "message": "Never archive bookmarks you save as private"
   },
   "waybackPermDenied": {
-    "message": "Permission for web.archive.org is missing - turn archiving on again to grant it."
+    "message": "Permission for web.archive.org is missing. Turn archiving on again to grant it."
   },
   "archiveThisSave": {
     "message": "archive"
@@ -2050,7 +2050,7 @@
     "message": "Retry archive"
   },
   "archiveLogNote": {
-    "message": "A successful submission does not mean the snapshot is instantly visible - the Wayback Machine usually takes a few minutes (sometimes longer) to index new captures."
+    "message": "A successful submission does not mean the snapshot is instantly visible; the Wayback Machine usually takes a few minutes (sometimes longer) to index new captures."
   },
   "archiveErrAuth": {
     "message": "invalid credentials"
@@ -2071,13 +2071,13 @@
     "message": "daily capture limit reached for this URL"
   },
   "archiveErrServer": {
-    "message": "archive.org server error - try again later"
+    "message": "archive.org server error; try again later"
   },
   "archiveErrRateLimited": {
-    "message": "anonymous requests are rate-limited per IP - try later or add an S3 key"
+    "message": "anonymous requests are rate-limited per IP; try later or add an S3 key"
   },
   "archiveErrTimeoutHint": {
-    "message": "the request timed out - archive.org may be busy or the network slow"
+    "message": "the request timed out; archive.org may be busy or the network slow"
   },
   "tabTags": {
     "message": "Tags"
@@ -2136,7 +2136,7 @@
     "message": "No AI groups found"
   },
   "tagGovAiNoKey": {
-    "message": "No AI provider configured - set one up in the AI tab"
+    "message": "No AI provider configured. Set one up in the AI tab"
   },
   "tagGovLowCountTitle": {
     "message": "Low-count tags (1 use or fewer)"
@@ -2181,7 +2181,7 @@
     }
   },
   "tagGovAborted429": {
-    "message": "Rate-limited — batch stopped, completed items saved. Re-running the same merge resumes safely (already-updated bookmarks are skipped)."
+    "message": "Rate-limited. The batch stopped; completed items are saved. Re-running the same merge resumes safely (already-updated bookmarks are skipped)."
   },
   "tagGovMergeEstimate": {
     "message": "Estimated time: ~$T$",
@@ -2242,7 +2242,7 @@
     "message": "view details below"
   },
   "tagGovRateLimitWait": {
-    "message": "Rate-limited — waiting to retry…"
+    "message": "Rate-limited; waiting to retry…"
   },
   "tagGovQueuedCancelled": {
     "message": "$N$ queued tasks cancelled",
@@ -2259,7 +2259,7 @@
     "message": "Dismiss"
   },
   "tagGovStopped": {
-    "message": "Stopped — completed changes are saved."
+    "message": "Stopped. Completed changes are saved."
   },
   "tagGovQueuedBadge": {
     "message": "Queued…"
@@ -2281,28 +2281,28 @@
     }
   },
   "tagGovLoadFailed": {
-    "message": "Could not load tags — check your Pinboard token or network, then Refresh"
+    "message": "Could not load tags. Check your Pinboard token or network, then Refresh"
   },
   "placeholderOptional": {
     "message": "optional"
   },
   "tagGovSnapshotSaved": {
-    "message": "Tag list snapshot downloaded (names and counts — reference for manual repair, not an automatic restore)"
+    "message": "Tag list snapshot downloaded (names and counts; a reference for manual repair, not an automatic restore)"
   },
   "tagGovSnapshotFailed": {
-    "message": "Could not create snapshot — merge/delete blocked"
+    "message": "Could not create snapshot; merge/delete blocked"
   },
   "tagGovIrreversibleWarn": {
-    "message": "Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change — for manual reference only."
+    "message": "Merges and deletions cannot be undone. A snapshot of your tag list (names and counts) is downloaded before the first change, for manual reference only."
   },
   "tagGovBundlesWarn": {
-    "message": "Tag bundles on pinboard.in are not updated by renames — review them manually after merging."
+    "message": "Tag bundles on pinboard.in are not updated by renames; review them manually after merging."
   },
   "optBgSaveMode": {
     "message": "Background save mode"
   },
   "optBgSaveModeMerge": {
-    "message": "Merge (default — combine new tags with existing)"
+    "message": "Merge (default, combines new tags with existing)"
   },
   "optBgSaveModeSkip": {
     "message": "Skip (if URL already saved, do nothing)"
@@ -2317,7 +2317,7 @@
     "message": "Already bookmarked"
   },
   "bgSkippedExists": {
-    "message": "Already bookmarked — save skipped"
+    "message": "Already bookmarked; save skipped"
   },
   "secPreviewAi": {
     "message": "Preview Page AI"
@@ -2610,10 +2610,10 @@
     "message": "last used"
   },
   "mdSendTooLongFellBack": {
-    "message": "Too long for a direct link — full text copied. Paste into {name} (Ctrl+V) to finish."
+    "message": "Too long for a direct link; full text copied instead. Paste into {name} (Ctrl+V) to finish."
   },
   "mdSentUrlScheme": {
-    "message": "Opened {name} — full text copied to clipboard"
+    "message": "Opened {name}; full text copied to clipboard"
   },
   "mdOpenedApp": {
     "message": "Opened {name}"
@@ -2625,34 +2625,34 @@
     "message": "Send failed"
   },
   "mdSendOpenBlocked": {
-    "message": "Could not open the app — full text copied to clipboard"
+    "message": "Could not open the app; full text copied to clipboard"
   },
   "mdSendNoneConfigured": {
-    "message": "No destinations enabled — add one in Settings"
+    "message": "No destinations enabled. Add one in Settings"
   },
   "mdManageDestinations": {
     "message": "Manage destinations →"
   },
-  "mdSendApiDown": { "message": "Couldn't reach the export server. Full text copied to clipboard — paste to finish." },
+  "mdSendApiDown": { "message": "Couldn't reach the export server. Full text copied to clipboard; paste to finish." },
   "mdSendApiBadToken": { "message": "The server rejected the token. Re-copy it from the app. Full text copied to clipboard." },
-  "mdSendApiFailed": { "message": "The export request failed. Full text copied to clipboard — paste to finish." },
+  "mdSendApiFailed": { "message": "The export request failed. Full text copied to clipboard; paste to finish." },
   "mdSendTest": { "message": "Test connection" },
   "mdSendTestOk": { "message": "Connected" },
-  "mdSendTestDown": { "message": "Can't reach the server — is the app running?" },
-  "mdSendTestBadToken": { "message": "Token rejected — re-copy it from the app." },
+  "mdSendTestDown": { "message": "Can't reach the server. Is the app running?" },
+  "mdSendTestBadToken": { "message": "Token rejected. Re-copy it from the app." },
   "mdSendTestNoToken": { "message": "Enter a token first." },
   "mdSendTestPerm": { "message": "Local-access permission was denied." },
   "mdTargetGithubToken": {
     "message": "GitHub token (classic, gist scope)"
   },
   "mdTargetGithubOnboarding": {
-    "message": "Create a Personal Access Token (classic) at GitHub → Settings → Developer settings → Tokens (classic) with the \"gist\" scope, then paste it below. Each clip is saved as a private gist. Note: fine-grained tokens can't create gists yet — use a classic token."
+    "message": "Create a Personal Access Token (classic) at GitHub → Settings → Developer settings → Tokens (classic) with the \"gist\" scope, then paste it below. Each clip is saved as a private gist. Note: fine-grained tokens can't create gists yet, so use a classic token."
   },
   "mdSendViewGist": {
     "message": "View gist →"
   },
   "mdSendApiPerm": {
-    "message": "Access permission was denied. Full text copied to clipboard — paste to finish."
+    "message": "Access permission was denied. Full text copied to clipboard; paste to finish."
   },
   "mdTargetWebhookUrl": {
     "message": "Endpoint URL"
@@ -2661,7 +2661,7 @@
     "message": "Authorization header (optional)"
   },
   "mdTargetWebhookOnboarding": {
-    "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. Any Authorization value you set is sent verbatim (e.g. Bearer <token> or Token <key>), so any auth scheme works. For n8n, Make, Zapier, Readwise, or any self-hosted receiver — no account needed here."
+    "message": "POSTs a JSON payload {title, url, date, tags, markdown} to your endpoint. Any Authorization value you set is sent verbatim (e.g. Bearer <token> or Token <key>), so any auth scheme works. For n8n, Make, Zapier, Readwise, or any self-hosted receiver; no account is needed here."
   },
   "mdTargetWebhookHttpWarn": {
     "message": "Blocked: use HTTPS, or HTTP only for localhost, 127.0.0.1, or [::1]. LAN/public HTTP, malformed URLs, and URLs containing credentials are not sent."
@@ -2677,8 +2677,8 @@
   "hlNotePlaceholder": { "message": "Add a note…" },
   "hlSave": { "message": "Save" },
   "hlDelete": { "message": "Delete highlight" },
-  "hlDegraded": { "message": "Position lost — the surrounding text changed, so this highlight now covers the whole paragraph." },
-  "hlOrphanNote": { "message": "$COUNT$ highlights could not be located in the current page content — notes are kept.", "placeholders": { "count": { "content": "$1" } } },
+  "hlDegraded": { "message": "Position lost: the surrounding text changed, so this highlight now covers the whole paragraph." },
+  "hlOrphanNote": { "message": "$COUNT$ highlights could not be located in the current page content; their notes are kept.", "placeholders": { "count": { "content": "$1" } } },
   "hlOrphanUnlocatable": { "message": "This highlight can't be located in the current page content." },
   "mdImgFixNote": {"message": "$COUNT$ images failed to load", "placeholders": {"count": {"content": "$1"}}},
   "mdImgFixBtn": {"message": "Try to fix this page's images"},
@@ -2729,7 +2729,7 @@
   "skimTitle": { "message": "Key Points" },
   "skimRegen": { "message": "Regenerate" },
   "skimCollapseAria": { "message": "Toggle key points section" },
-  "skimStaleNote": { "message": "Content has changed — these key points may be out of date" },
+  "skimStaleNote": { "message": "Content has changed; these key points may be out of date" },
   "skimStop": { "message": "Stop" },
   "skimGenerating": { "message": "Generating key points…" },
   "skimFailed": { "message": "Couldn't generate key points" }
