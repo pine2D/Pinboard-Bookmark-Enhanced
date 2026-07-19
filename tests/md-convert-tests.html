@@ -766,6 +766,14 @@ const ART_HTML = `<html><head><script id="js-initialData" type="text/json">{"ini
   check("zhihu zhuanlan → body present, no answer H2", /文章正文/.test(c) && !/<h2>/.test(c), c);
 })();
 
+(() => {
+  const doc = new DOMParser().parseFromString(QUESTION_HTML, "text/html");
+  check("zhihu question sort URL (/answers/updated) → question rule",
+    applySiteRule(doc, "https://www.zhihu.com/question/659317023/answers/updated")?.id === "zhihu-question");
+  check("zhihu question /log sub-path → no rule (Defuddle)",
+    applySiteRule(doc, "https://www.zhihu.com/question/659317023/log") === null);
+})();
+
 // --- Foreign-question answers in the shared entity table must not leak in ---
 const QUESTION_FOREIGN = `<!DOCTYPE html><html><head>
 <script id="js-initialData" type="text/json">{"initialState":{"entities":{

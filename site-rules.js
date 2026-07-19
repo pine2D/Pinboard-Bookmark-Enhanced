@@ -905,7 +905,9 @@
     { id: "zhihu-answer",   source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
       match: { host: "zhihu.com", url: /\/question\/\d+\/answer\/\d+/ }, extract: extractZhihuAnswer },
     { id: "zhihu-question", source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
-      match: { host: "zhihu.com", url: /\/question\/\d+\/?(?:[?#].*)?$/ }, extract: extractZhihuQuestion },
+      // /answers/<sort> is the answer-sort path variant of the same page; other
+      // sub-paths (/log, /answer/<id>) must still fall through.
+      match: { host: "zhihu.com", url: /\/question\/\d+(?:\/answers\/[\w-]+)?\/?(?:[?#].*)?$/ }, extract: extractZhihuQuestion },
     { id: "zhihu-zhuanlan", source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
       match: { host: "zhuanlan.zhihu.com", url: /\/p\/\d+/ }, extract: extractZhihuArticle }
     ,{ id: "stackoverflow", source: "json-ld+self", forum: true, lastVerified: "2026-06-06", driftCheck: "auto",
