@@ -71,15 +71,11 @@ async function getPageInfoFromTab(tabId, opts = {}) {
         if (typeof applySiteRule === "function") {
           try {
             const hit = applySiteRule(document, location.href);
-            if (hit && hit.contentHtml) {
-              const div = document.createElement("div");
-              // newline after block closers so textContent keeps block breaks
-              div.innerHTML = String(hit.contentHtml).replace(/<\/(p|div|h[1-6]|li|blockquote|tr)>/gi, "</$1>\n");
-              const text = (div.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
-              if (text.length > 50) {
-                info.pageText = text.substring(0, 8000);
-                return info;
-              }
+            const text = (hit && hit.contentHtml && typeof pbpSiteRuleText === "function")
+              ? pbpSiteRuleText(hit.contentHtml) : "";
+            if (text.length > 50) {
+              info.pageText = text.substring(0, 8000);
+              return info;
             }
           } catch (_) { /* fall through to Defuddle */ }
         }

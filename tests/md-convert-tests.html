@@ -1658,8 +1658,9 @@ section("site-rules: popup/background extractor mirror invariants");
   // summary + batch save): it must keep injecting site-rules.js and trying
   // applySiteRule before Defuddle.
   const AI_INV = [
-    ["site-rules.js injected before Defuddle", 'files: ["site-rules.js"]'],
-    ["site-rule dispatch before Defuddle text extraction", 'applySiteRule(document, location.href)'],
+    ["site-rules.js injection wired", 'files: ["site-rules.js"]'],
+    ["site-rule dispatch wired", 'applySiteRule(document, location.href)'],
+    ["hit flattened via pbpSiteRuleText", 'pbpSiteRuleText(hit.contentHtml)'],
   ];
   let pj = "", bj = "", aj = "";
   try {
@@ -1683,6 +1684,19 @@ section("site-rules: popup/background extractor mirror invariants");
       check("AI-path invariant in ai.js: " + label, aj.indexOf(needle) !== -1, needle);
     }
   }
+})();
+
+section("site-rules: pbpSiteRuleText (AI-path flatten)");
+(() => {
+  check("pbpSiteRuleText → <br> becomes a line break, spans not glued",
+    pbpSiteRuleText('<span>Line one</span><br><span>Line two</span>') === "Line one\nLine two",
+    JSON.stringify(pbpSiteRuleText('<span>Line one</span><br><span>Line two</span>')));
+  check("pbpSiteRuleText → block closers break, runs collapse",
+    pbpSiteRuleText('<h2>头</h2><p>a</p><blockquote><p>b</p></blockquote><p></p><p></p><p>c</p>').indexOf("头\na\nb") === 0,
+    JSON.stringify(pbpSiteRuleText('<h2>头</h2><p>a</p><blockquote><p>b</p></blockquote><p></p><p></p><p>c</p>')));
+  check("pbpSiteRuleText → table cells not glued",
+    /1\n\s*2/.test(pbpSiteRuleText('<table><tr><td>1</td><td>2</td></tr></table>')),
+    JSON.stringify(pbpSiteRuleText('<table><tr><td>1</td><td>2</td></tr></table>')));
 })();
 
 section("site-rules: v2ex buildReplyTree multi-@ (pure)");

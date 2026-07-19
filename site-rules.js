@@ -94,6 +94,18 @@
     return count;
   }
 
+  // Flatten a site-rule hit's contentHtml to prompt text (ai.js AI tags/
+  // summary + batch save): newline after block closers and <br> so textContent
+  // keeps block breaks — bare textContent glues "Line one<br>Line two" and
+  // adjacent table cells together. Detached div: nothing renders or loads.
+  function pbpSiteRuleText(html) {
+    var div = document.createElement("div");
+    div.innerHTML = String(html == null ? "" : html)
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|h[1-6]|li|blockquote|tr|td|th)>/gi, "$&\n");
+    return (div.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
   // ---- shared helpers ----------------------------------------------------
 
   function readEntities(doc) {
@@ -962,6 +974,7 @@
   g.SITE_RULES = SITE_RULES;
   g.matchRule = matchRule;
   g.applySiteRule = applySiteRule;
+  g.pbpSiteRuleText = pbpSiteRuleText;
   g.pbpNormalizeLazyImages = pbpNormalizeLazyImages;
   g.buildReplyTree = buildReplyTree;
   g.buildDepthTree = buildDepthTree;
