@@ -50,7 +50,9 @@ function _splitMergedComments(html) {
 }
 
 // ---- HTML -> Markdown via Turndown (popup uses lazy ensureTurndown) ----
-// baseUrl is accepted now (used by P2 image absolutization); ignored here.
+// opts.baseUrl absolutizes relative a[href] before conversion (see
+// _pbpAbsolutizeLinks); relative img src stays untouched here — that is
+// applyImagePolicy's job at export time.
 // Module-level singleton (perf): building a TurndownService + its 8 custom rules on
 // every call was a real multiplier when pbpAiMdOf() converts a page block by block
 // (a forum thread is hundreds of blocks). turndown() holds no per-call mutable state,
@@ -204,10 +206,34 @@ function _pbpGetTurndown() {
   return td;
 }
 
+// Site-rule contentHtml preserves the page's relative hrefs (V2EX /member/…,
+// X /hashtag/…, SO /questions/…); Turndown copies href verbatim, so those links
+// would resolve against chrome-extension:// in the preview and stay dead in
+// exported .md. Absolutize non-fragment relative a[href] against baseUrl before
+// conversion — the anchor-side mirror of applyImagePolicy's img-src handling
+// (same skip set: absolute schemes, protocol-relative //; plus #fragments).
+function _pbpAbsolutizeLinks(html, baseUrl) {
+  if (typeof document === "undefined" || html.indexOf("href") === -1) return html;
+  // Inert document (same pattern as _splitMergedComments): scripts never
+  // execute and resources never load while we rewrite third-party HTML.
+  const doc = document.implementation.createHTMLDocument("");
+  const root = doc.createElement("div");
+  root.innerHTML = html;
+  let touched = false;
+  root.querySelectorAll("a[href]").forEach((a) => {
+    const href = a.getAttribute("href") || "";
+    if (!href || href.startsWith("#") || href.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(href)) return;
+    try { a.setAttribute("href", new URL(href, baseUrl).href); touched = true; } catch (_) { /* keep original */ }
+  });
+  return touched ? root.innerHTML : html;
+}
+
 function htmlToMarkdown(html, opts) {
   const td = _pbpGetTurndown();
   if (!td) return html;
   html = _splitMergedComments(String(html == null ? "" : html));
+  const baseUrl = (opts && opts.baseUrl) || "";
+  if (baseUrl) html = _pbpAbsolutizeLinks(html, baseUrl);
   return td.turndown(html);
 }
 

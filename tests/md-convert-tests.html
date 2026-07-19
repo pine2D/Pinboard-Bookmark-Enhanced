@@ -594,6 +594,22 @@ function assertEq(actual, expected, label) {
     check("multi-paragraph callout quotes every line",
       /> \[!NOTE\]/.test(note) && /> Line one\./.test(note) && /> Line two\./.test(note), note);
   })();
+
+  // ---- Relative a[href] absolutized against opts.baseUrl (site-rule content keeps
+  // the page's relative links; without this they'd resolve to chrome-extension://) ----
+  section("htmlToMarkdown relative link absolutization");
+  (() => {
+    const base = "https://x.com/alice/status/123";
+    const md = htmlToMarkdown('<p><a href="/hashtag/pbp">#pbp</a> <a href="#sec">frag</a> ' +
+      '<a href="https://abs.example/p">abs</a> <a href="//cdn.example/x">pr</a> <a href="member/1">rel2</a></p>', { baseUrl: base });
+    check("root-relative href resolves against origin", md.indexOf("(https://x.com/hashtag/pbp)") !== -1, md);
+    check("path-relative href resolves against page path", md.indexOf("(https://x.com/alice/status/member/1)") !== -1, md);
+    check("fragment href untouched", md.indexOf("(#sec)") !== -1, md);
+    check("absolute href untouched", md.indexOf("(https://abs.example/p)") !== -1, md);
+    check("protocol-relative href untouched", md.indexOf("(//cdn.example/x)") !== -1, md);
+    const noBase = htmlToMarkdown('<p><a href="/hashtag/pbp">#pbp</a></p>', {});
+    check("no baseUrl -> relative href unchanged", noBase.indexOf("(/hashtag/pbp)") !== -1, noBase);
+  })();
 </script>
 
 <script>
