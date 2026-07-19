@@ -887,6 +887,13 @@ suite("pbpAiParseCites", () => {
     assert(r.cites[0].p === 1 && r.cites[0].quote === "quote", "P1 parsed");
     assert(r.cites[1].p === 2 && r.cites[1].quote === "second", "P2 parsed");
   });
+  test("full-width colon marker + CJK corner quotes are tolerated", () => {
+    const r = pbpAiParseCites('要点一 [P3]。\nCITES：\nP3：「原文引用」\nP5: 『另一段引文』');
+    assert(r.body.indexOf("CITES") === -1, "body split at full-width marker");
+    assert(r.cites.length === 2, "2 cites, got " + r.cites.length);
+    assert(r.cites[0].p === 3 && r.cites[0].quote === "原文引用", "「」 stripped");
+    assert(r.cites[1].p === 5 && r.cites[1].quote === "另一段引文", "『』 stripped");
+  });
 });
 
 // ============ Task 5: pbpAiFuzzyFind ============

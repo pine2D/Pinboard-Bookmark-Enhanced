@@ -346,9 +346,13 @@ function pbpAiMakeStreamJsonParser(onItem) {
 // Tolerates: absence, curly/straight/missing quotes, "- " list dashes,
 // junk lines, stream truncation mid-line. Anchors on the LAST "CITES:"
 // line so a body that mentions the word is not split early.
+// Full-width colon (：) and CJK corner quotes (「」『』) are accepted
+// everywhere ASCII forms are: models generating Chinese output routinely
+// emit them despite the ASCII wire format in the prompt, and a missed
+// marker dumps the whole CITES block into the rendered body.
 function pbpAiParseCites(fullText) {
   const text = String(fullText == null ? "" : fullText);
-  const markerRe = /(?:^|\n)[ \t]*CITES:[ \t]*\r?\n?/g;
+  const markerRe = /(?:^|\n)[ \t]*CITES[:：][ \t]*\r?\n?/g;
   let m;
   let last = null;
   while ((m = markerRe.exec(text)) !== null) last = m;
@@ -357,11 +361,11 @@ function pbpAiParseCites(fullText) {
   const cites = [];
   for (let line of text.slice(last.index + last[0].length).split("\n")) {
     line = line.replace(/\r$/, "");
-    const lm = line.match(/^[ \t]*[-*]?[ \t]*P(\d+)[ \t]*:[ \t]*(.+)$/);
+    const lm = line.match(/^[ \t]*[-*]?[ \t]*P(\d+)[ \t]*[:：][ \t]*(.+)$/);
     if (!lm) continue;
     const quote = lm[2].trim()
-      .replace(/^["“'‘]/, "")
-      .replace(/["”'’]$/, "")
+      .replace(/^["“'‘「『]/, "")
+      .replace(/["”'’」』]$/, "")
       .trim();
     if (quote) cites.push({ p: Number(lm[1]), quote });
   }
