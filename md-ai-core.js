@@ -474,6 +474,25 @@ function pbpAiResolveModelOverride(s) {
   return m || undefined;
 }
 
+// Cache-identity model: the preview override if set, else the provider's
+// CONFIGURED model (what requests will actually use), else that provider's
+// default. A bare "default" placeholder would let a configured-model switch
+// keep serving the old model's cached output.
+function pbpAiEffectiveModel(s) {
+  const o = pbpAiResolveModelOverride(s);
+  if (o) return o;
+  const st = s || {};
+  const p = st.aiProvider || "gemini";
+  const own = p === "gemini" ? (st.geminiModel || "gemini-2.5-flash-lite")
+    : p === "claude" ? (st.claudeModel || "claude-haiku-4-5")
+    : p === "ollama" ? (st.ollamaModel || "llama3.2")
+    : null;
+  if (own !== null) return String(own).trim() || "default";
+  const reg = (typeof OPENAI_COMPAT_PROVIDERS === "object" && OPENAI_COMPAT_PROVIDERS[p]) || null;
+  const conf = (reg && reg.modelField && st[reg.modelField]) || "";
+  return String(conf).trim() || (reg && reg.defaultModel) || "default";
+}
+
 // A permission prompt is only legal from a real user gesture. Error UIs call this
 // directly from their existing Retry/Regenerate click; the callback is untouched
 // until the exact provider origin is granted, so denial leaves state and caches alone.

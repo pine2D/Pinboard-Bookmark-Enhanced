@@ -61,9 +61,14 @@ function _pbpSkimCacheKey(url) {
 function _pbpSkimCacheMeta(st) {
   const s = (st && st.s) || {};
   const provider = s.aiProvider || "gemini";
+  // pbpAiEffectiveModel (not just the override): with no preview override,
+  // switching the provider's configured model must invalidate the cache —
+  // "openai:default" served model A's summary after switching to model B.
+  const model = (typeof pbpAiEffectiveModel === "function")
+    ? pbpAiEffectiveModel(s) : (pbpAiResolveModelOverride(s) || "default");
   return {
     langKey: aiSummaryLangInstruction(s),
-    modelKey: provider + ":" + (pbpAiResolveModelOverride(s) || "default")
+    modelKey: provider + ":" + model
   };
 }
 

@@ -4993,6 +4993,15 @@ suiteIf("skim cache metadata", "_pbpSkimCacheMeta", () => {
     assertEq(meta.modelKey, "openai:gpt-test", "provider and model override included");
   });
 
+  test("configured provider model (no override) enters the cache identity", () => {
+    const a = _pbpSkimCacheMeta({ s: { aiProvider: "openai", openaiModel: "m-A", aiSummaryLang: "en" } });
+    const b = _pbpSkimCacheMeta({ s: { aiProvider: "openai", openaiModel: "m-B", aiSummaryLang: "en" } });
+    assertEq(a.modelKey, "openai:m-A", "configured model in identity");
+    assert(a.modelKey !== b.modelKey, "configured-model switch changes identity");
+    const g = _pbpSkimCacheMeta({ s: { aiProvider: "gemini", aiSummaryLang: "en" } });
+    assertEq(g.modelKey, "gemini:gemini-2.5-flash-lite", "provider default resolved, not 'default'");
+  });
+
   test("cache entry with same blocks/lang/model matches", () => {
     const st = { s: { aiProvider: "gemini", aiSummaryLang: "en" } };
     const meta = _pbpSkimCacheMeta(st);
