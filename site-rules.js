@@ -434,8 +434,19 @@
   // ---- X / Twitter: single status page ----------------------------------
   // Scope is deliberately narrow: keep the tweet text's inline <br> fidelity, and
   // leave thread/reply expansion to Defuddle or a future explicit rule.
-  function extractTwitterStatus(doc) {
-    var article = doc.querySelector('article[data-testid="tweet"]') || doc.querySelector("article");
+  function extractTwitterStatus(doc, url) {
+    // A reply's status page renders the PARENT tweet above the target, so
+    // first-article grabs the wrong status. Anchor on the id from the URL:
+    // the target tweet's own timestamp/analytics links carry /status/<id>
+    // inside its article. Fall back to the old first-article heuristic when
+    // the id link isn't rendered (test fixtures, markup drift).
+    var sid = (String(url || "").match(/\/status\/(\d+)/) || [])[1];
+    var article = null;
+    if (sid) {
+      var link = doc.querySelector('article a[href*="/status/' + sid + '"]');
+      if (link && link.closest) article = link.closest("article");
+    }
+    article = article || doc.querySelector('article[data-testid="tweet"]') || doc.querySelector("article");
     if (!article) return null;
     var textEl = article.querySelector('[data-testid="tweetText"]');
     if (!textEl || !textEl.textContent.trim()) return null;
@@ -799,9 +810,9 @@
     ,{ id: "hackernews", source: "self", forum: true, lastVerified: "2026-06-16", driftCheck: "manual",
        sampleUrl: "", match: { host: "news.ycombinator.com", url: /\/item\?id=\d+/ }, extract: function (d) { return extractHackerNews(d); } }
     ,{ id: "x-status", source: "self", lastVerified: "2026-07-09", driftCheck: "manual",
-       sampleUrl: "", match: { host: "x.com", url: /\/status\/\d+/ }, extract: function (d) { return extractTwitterStatus(d); } }
+       sampleUrl: "", match: { host: "x.com", url: /\/status\/\d+/ }, extract: extractTwitterStatus }
     ,{ id: "twitter-status", source: "self", lastVerified: "2026-07-09", driftCheck: "manual",
-       sampleUrl: "", match: { host: "twitter.com", url: /\/status\/\d+/ }, extract: function (d) { return extractTwitterStatus(d); } }
+       sampleUrl: "", match: { host: "twitter.com", url: /\/status\/\d+/ }, extract: extractTwitterStatus }
   ];
 
   function applySiteRule(doc, url) {

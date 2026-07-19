@@ -1234,6 +1234,29 @@ section("site-rules: X/Twitter status");
   check("x status → id + title from tweet text", r && r.id === "x-status" && /Line one/.test(r.title), JSON.stringify(r && [r.id, r.title]));
   check("x status → tweet line break survives markdown", /Line one\s{0,2}\n\s*Line two/.test(md), md);
   check("twitter.com status → same extractor", applySiteRule(doc, "https://twitter.com/alice/status/1234567890")?.id === "twitter-status");
+
+  // Reply pages render the parent tweet FIRST; the extractor must pick the
+  // article whose own /status/<id> link matches the URL, not document order.
+  const XR = '<html><body>' +
+    '<article data-testid="tweet">' +
+      '<div data-testid="User-Name"><span>Parent</span><span>@parent</span></div>' +
+      '<div data-testid="tweetText"><span>Parent tweet body</span></div>' +
+      '<a href="/parent/status/111"><time datetime="2026-07-01T00:00:00.000Z">Jul 1</time></a>' +
+    '</article>' +
+    '<article data-testid="tweet">' +
+      '<div data-testid="User-Name"><span>Bob</span><span>@bob</span></div>' +
+      '<div data-testid="tweetText"><span>The reply I bookmarked</span></div>' +
+      '<a href="/bob/status/222"><time datetime="2026-07-02T00:00:00.000Z">Jul 2</time></a>' +
+    '</article></body></html>';
+  const rdoc = new DOMParser().parseFromString(XR, "text/html");
+  const rr = applySiteRule(rdoc, "https://x.com/bob/status/222");
+  check("x reply page → target status extracted, not parent",
+    rr && /The reply I bookmarked/.test(rr.contentHtml) && !/Parent tweet body/.test(rr.contentHtml) && /Bob/.test(rr.contentHtml),
+    JSON.stringify(rr && rr.contentHtml));
+  const rp = applySiteRule(rdoc, "https://x.com/parent/status/111");
+  check("x parent URL on same DOM → parent extracted", rp && /Parent tweet body/.test(rp.contentHtml), JSON.stringify(rp && rp.contentHtml));
+  const rf = applySiteRule(rdoc, "https://x.com/ghost/status/999");
+  check("x unknown id → falls back to first article", rf && /Parent tweet body/.test(rf.contentHtml), JSON.stringify(rf && rf.contentHtml));
 }
 </script>
 
