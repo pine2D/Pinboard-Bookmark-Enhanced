@@ -1562,6 +1562,24 @@ section("site-rules: pbpNormalizeLazyImages");
     assertEq(n, 1, "srcset last candidate -> return count 1");
   }
 
+  // 11b. srcset URL containing commas (Cloudinary transforms) stays whole
+  {
+    const d = wrap('<img srcset="https://res.cdn.com/c_fill,w_400/a.jpg 1x, https://res.cdn.com/c_fill,w_800/a.jpg 2x">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("srcset comma-in-URL candidate survives intact",
+      d.querySelector("img").getAttribute("src") === "https://res.cdn.com/c_fill,w_800/a.jpg", d.innerHTML);
+    assertEq(n, 1, "srcset comma-in-URL -> return count 1");
+  }
+
+  // 11c. no-space comma separators still split on descriptor boundaries
+  {
+    const d = wrap('<img srcset="a.jpg 1x,b.jpg 2x">');
+    const n = pbpNormalizeLazyImages(d, BASE);
+    check("srcset comma without space still picks last URL",
+      d.querySelector("img").getAttribute("src") === "https://example.com/articles/b.jpg", d.innerHTML);
+    assertEq(n, 1, "srcset no-space separators -> return count 1");
+  }
+
   // 12. srcset messy whitespace
   {
     const d = wrap('<img srcset="  a.jpg   1x  ,   b.jpg   2x   ">');

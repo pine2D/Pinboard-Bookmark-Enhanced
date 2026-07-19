@@ -46,9 +46,22 @@
   // http: or https: -- this also rejects the background extractor's SafeURL
   // about:blank shim result, plus javascript:/data: candidates.
   function lastSrcsetCandidate(srcset) {
-    var segs = String(srcset).split(",");
-    var last = segs[segs.length - 1].replace(/^\s+|\s+$/g, "");
-    return last.split(/\s+/)[0] || "";
+    // srcset grammar is "URL [descriptor], ..." — but URLs may themselves
+    // contain commas (Cloudinary/imgproxy transforms), so a bare split(",")
+    // truncates them into bogus same-origin paths. Tokenize on whitespace
+    // instead: descriptor tokens (2x / 480w, maybe with the separator comma
+    // attached) are dropped, URL tokens keep embedded commas, and separator
+    // commas at token edges are trimmed.
+    var toks = String(srcset).trim().split(/\s+/);
+    var last = "";
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i].replace(/^,+|,+$/g, "");
+      var fused = t.match(/^([\d.]+[wxh]),(.+)$/i); // "2x,next.jpg": descriptor fused to the next URL
+      if (fused) t = fused[2];
+      if (!t || /^[\d.]+[wxh]$/i.test(t)) continue;
+      last = t;
+    }
+    return last;
   }
 
   function pbpNormalizeLazyImages(rootEl, baseHref) {
