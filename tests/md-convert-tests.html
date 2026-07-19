@@ -803,6 +803,18 @@ const QUESTION_FOREIGN = `<!DOCTYPE html><html><head>
     !/无实体外题卡片/.test(c) && /无实体本题卡片/.test(c), c);
 })();
 
+// --- snake_case voteup_count fallback (api/v4-shaped entity) ---
+(() => {
+  const html = `<!DOCTYPE html><html><head>
+<script id="js-initialData" type="text/json">{"initialState":{"entities":{
+"questions":{"777":{"id":777,"title":"蛇形计数"}},
+"answers":{"1":{"id":1,"content":"<p>蛇形回答</p>","voteup_count":77,"author":{"name":"甲"}}}
+}}}<\/script></head><body><h1 class="QuestionHeader-title">蛇形计数</h1></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/777");
+  check("zhihu snake_case voteup_count → 77 赞同", r && /77 赞同/.test(r.contentHtml), JSON.stringify(r && r.contentHtml));
+})();
+
 // --- Paginated-short initialData: answerCount total drives a truncation note ---
 (() => {
   const html = `<!DOCTYPE html><html><head>
@@ -1036,6 +1048,21 @@ check("buildDepthTree is a global function", typeof buildDepthTree === "function
     /Jane Doe/.test(c) && /King, Martin Luther, III/.test(c) && c.indexOf("Martin Luther King") === -1, c);
 })();
 
+(() => {
+  // Letter-macro family (\ss \aa with {} guard), braced accent \'{e}, dotless
+  // \i under an accent, and \= macron — with \cite still protected.
+  const html = `<!DOCTYPE html><html><head>
+  <meta name="citation_abstract" content="Stra\\ss{}e, caf\\'{e}, na\\&quot;{\\i}ve, R\\=oma, Ang\\aa{}r; \\cite{x} intact.">
+  <meta name="citation_arxiv_id" content="2401.77777">
+  </head><body></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://arxiv.org/abs/2401.77777");
+  const c = r ? norm(r.contentHtml) : "";
+  check("arxiv → letter macros + braced/dotless/macron accents decode",
+    /Straße/.test(c) && /café/.test(c) && /naïve/.test(c) && /Rōma/.test(c) && /Angår/.test(c), c);
+  check("arxiv → \\cite survives the letter-macro pass", /\\cite\{x\} intact/.test(c), c);
+})();
+
 section("site-rules: helpers");
 (() => {
   const doc = new DOMParser().parseFromString(
@@ -1233,6 +1260,15 @@ const SO_POST = (lis, extra) =>
   check("so reply-to-reply → carol top-level (never 3rd level)", /<\/ul><\/li><li><strong>carol<\/strong>/.test(out) && !/<ul>[\s\S]*<ul>[\s\S]*<ul>/.test(out), out);
 })();
 
+(() => {
+  // Anchor-less plain-text "@JohnDoe" target resolves through collapseName.
+  const doc = new DOMParser().parseFromString(SO_POST(
+    SO_C("first", 1, "John Doe", null) +
+    SO_C("@JohnDoe thanks a lot", 2, "bob", null)), "text/html");
+  const out = norm(soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false }));
+  check("so comments → plain-text @JohnDoe nests via collapsed-name match",
+    /<strong>John Doe<\/strong>[\s\S]*<ul>[\s\S]*<strong>bob<\/strong>/.test(out), out);
+})();
 (() => {
   // Locally capped loaded comments + a page show-link are DISJOINT hidden
   // sets: the note must sum them (5 rendered of 7 loaded => 2, plus 20).

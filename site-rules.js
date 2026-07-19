@@ -605,7 +605,10 @@
     });
     s = s.replace(/\\([`'^"~=.])\s*\{?\s*(\\[ij]|[A-Za-z])\s*\}?/g, texAcc);   // \'e \'{e} \' e
     s = s.replace(/\\([uvHrck])\{(\\[ij]|[A-Za-z])\}/g, texAcc);               // \c{c} \v{s} (braces only)
-    s = s.replace(/\\(ss|ae|AE|oe|OE|aa|AA|[oOlLij])(?:\{\})?(?![A-Za-z])/g, function (m, n) {
+    // {} is an explicit terminator ("Stra\ss{}e") — accept it OR a non-letter
+    // boundary. A bare optional {} before the lookahead would backtrack on
+    // \ss{}e and leave the braces in the output.
+    s = s.replace(/\\(ss|ae|AE|oe|OE|aa|AA|[oOlLij])(?:\{\}|(?![A-Za-z]))/g, function (m, n) {
       return Object.prototype.hasOwnProperty.call(TEX_LETTER, n) ? TEX_LETTER[n] : m;
     });
     return s.normalize ? s.normalize("NFC") : s;
