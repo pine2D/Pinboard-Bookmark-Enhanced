@@ -414,7 +414,20 @@
         var thanks = parseCount(((cell.querySelector(".small.fade") || {}).textContent || ""));
         var bodyEl = cell.querySelector(".reply_content");
         var text = bodyEl ? bodyEl.textContent : "";
-        var mentions = (text.match(/@([a-zA-Z0-9_]+)/g) || []).map(function (s) { return s.slice(1); });
+        // Mentions: V2EX renders them as @-prefixed /member/ anchors — harvest
+        // those instead of text-scanning the body, which mistook emails and
+        // code containing "@" for reply-to edges. The text scan survives only
+        // as an anchor-less fallback, gated to start-of-text/whitespace.
+        var mentions = [];
+        if (bodyEl) {
+          bodyEl.querySelectorAll("a[href^='/member/']").forEach(function (ma) {
+            var mt = (ma.textContent || "").trim();
+            if (mt.charAt(0) === "@" && mt.length > 1) mentions.push(mt.slice(1));
+          });
+        }
+        if (!mentions.length) {
+          mentions = (text.match(/(?:^|\s)@([A-Za-z0-9_]+)/g) || []).map(function (s) { return s.slice(s.indexOf("@") + 1); });
+        }
         var refFloors = (text.match(/#(\d+)/g) || []).map(function (s) { return s.slice(1); });
         replies.push({
           id: cell.id, author: author, floor: floor, mentions: mentions, refFloors: refFloors,

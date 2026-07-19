@@ -1255,6 +1255,25 @@ section("site-rules: so comments (end-to-end)");
   check("so global cap → one-time note exactly once", (c.match(/部分未提取/g) || []).length === 1, c);
 })();
 
+section("site-rules: v2ex mention extraction (anchors, not raw @)");
+(() => {
+  // An email in plain text must NOT create a reply-to edge; a real @-anchor must.
+  const v = `<!DOCTYPE html><html><body>
+  <h1>提及主题</h1>
+  <div class="topic_content"><p>正文</p></div>
+  <div class="cell" id="r_1"><strong><a href="/member/alice" class="dark">alice</a></strong><span class="no">1</span><div class="reply_content">第一层</div></div>
+  <div class="cell" id="r_2"><strong><a href="/member/bob" class="dark">bob</a></strong><span class="no">2</span><div class="reply_content">联系 foo@alice.com 就好</div></div>
+  <div class="cell" id="r_3"><strong><a href="/member/carol" class="dark">carol</a></strong><span class="no">3</span><div class="reply_content"><a href="/member/alice">@alice</a> 同意</div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(v, "text/html");
+  const r = applySiteRule(doc, "https://www.v2ex.com/t/777");
+  const c = r ? norm(r.contentHtml) : "";
+  check("v2ex email in body → bob stays at root (no fake mention)",
+    /<\/blockquote><blockquote><p><strong>#2 · bob/.test(c), c);
+  check("v2ex anchor mention → carol nested under alice",
+    /#1 · alice[\s\S]*<blockquote><p><strong>#3 · carol/.test(c) && c.indexOf("#3 · carol") < c.indexOf("#2 · bob"), c);
+})();
+
 section("site-rules: v2ex author robustness (avatar link)");
 (() => {
   // V2EX Polish / avatar adds <a href="/member/X"><img></a> (EMPTY text) BEFORE the username link.
