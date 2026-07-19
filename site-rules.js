@@ -442,7 +442,9 @@
           });
         }
         if (!mentions.length) {
-          mentions = (text.match(/(?:^|\s)@([A-Za-z0-9_]+)/g) || []).map(function (s) { return s.slice(s.indexOf("@") + 1); });
+          // Boundary also admits CJK/ASCII colon, comma and opening paren so
+          // anchor-less "回复：@alice" prefixes still thread.
+          mentions = (text.match(/(?:^|[\s(（:：,，])@([A-Za-z0-9_]+)/g) || []).map(function (s) { return s.slice(s.indexOf("@") + 1); });
         }
         var refFloors = (text.match(/#(\d+)/g) || []).map(function (s) { return s.slice(1); });
         replies.push({
