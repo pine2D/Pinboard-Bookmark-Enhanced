@@ -2292,6 +2292,14 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
     assert(r.prompt.indexOf("Q: only") !== -1, "most recent round kept");
     assert(r.prompt.indexOf("y".repeat(8001)) === -1, "capped");
   });
+  test("stopped partials finalize visually but never enter rounds or history", () => {
+    const run = _pbpAskRun.toString();
+    assert(run.indexOf('aEl.dataset.askStopped = "1"') !== -1, "stopped flag missing");
+    assert(run.indexOf("_pbpAskFinalize(aEl, acc)") !== -1, "abort visual finalize missing");
+    assert(run.indexOf("delete aEl.dataset.askStopped") !== -1, "flag not cleared on a successful re-run");
+    assert(_pbpAskRegenerate.toString().indexOf("replaceLast: !el.dataset.askStopped") !== -1,
+      "stopped-round regenerate must append, not replace");
+  });
   test("regenerate excludes the round being replaced from the prompt", () => {
     const run = _pbpAskRun.toString();
     assert(run.indexOf("opts.replaceLast && st.rounds.length") !== -1

@@ -642,6 +642,7 @@ async function _pbpAskRun(question, aEl, opts) {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     aEl.classList.remove("streaming");
     aEl.removeAttribute("aria-busy");
+    delete aEl.dataset.askStopped; // a re-run over a stopped round completed normally
     const parsed = _pbpAskFinalize(aEl, full);
     const record = {
       q: question,
@@ -686,6 +687,18 @@ async function _pbpAskRun(question, aEl, opts) {
     aEl.removeAttribute("aria-busy");
     if (opts.restoreNodes && opts.restoreNodes.length) {
       aEl.replaceChildren(...opts.restoreNodes);
+    } else if (e && e.name === "AbortError" && acc) {
+      // Stop is not an error: finalize the partial VISUALLY (markdown
+      // render, citation chips, copy/regenerate buttons) instead of
+      // leaving a dead bare-text orphan. Deliberately NOT pushed into
+      // st.rounds/records and never persisted: Clear aborts in-flight
+      // streams and relies on this branch never reviving the wiped
+      // conversation (_pbpAskClearThread), and partial output is never
+      // cached (same invariant as the skim layer). The flag routes a
+      // later Regenerate to append-mode - this round is not in st.rounds,
+      // so replaceLast would clobber the previous round instead.
+      aEl.dataset.askStopped = "1";
+      try { _pbpAskFinalize(aEl, acc); } catch (_) { aEl.textContent = acc; }
     } else {
       aEl.textContent = acc; // keep whatever already streamed in
     }
@@ -1172,7 +1185,10 @@ function _pbpAskRegenerate(el) {
   el.replaceChildren();
   el.classList.add("streaming");
   el.setAttribute("aria-busy", "true");
-  _pbpAskRun(el.dataset.askQuestion, el, { replaceLast: true, restoreNodes: oldNodes }).catch(() => {});
+  // A stopped partial never entered st.rounds/records (see the abort
+  // branch in _pbpAskRun), so its regenerate must APPEND, not replace -
+  // replaceLast would overwrite the previous, unrelated round.
+  _pbpAskRun(el.dataset.askQuestion, el, { replaceLast: !el.dataset.askStopped, restoreNodes: oldNodes }).catch(() => {});
 }
 
 // ---- Clear: inline two-button confirm strip (never window.confirm) ----
