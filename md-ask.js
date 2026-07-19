@@ -319,6 +319,9 @@ async function _pbpAskClearThread() {
   const chips = document.getElementById("ask-chips");
   if (chips) chips.hidden = false;
   if (_pbpAskState) await pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account);
+  // Rounds were just wiped - drop the stale token estimate and the
+  // long-thread window note from the transparency line immediately.
+  if (typeof _pbpAskUpdateMeta === "function") _pbpAskUpdateMeta();
 }
 
 // Send-flow seam: _pbpAskSend lands in the next task (same file, function
@@ -762,6 +765,10 @@ async function _pbpAskRun(question, aEl, opts) {
     st.ctrl = null;
     if (stopBtn) stopBtn.hidden = true;
     if (sendBtn) sendBtn.disabled = false;
+    // Refresh the transparency line NOW: st.rounds just changed, and the
+    // 4-round window note (B2) must appear as soon as the 5th round
+    // lands, not on the next open/send.
+    _pbpAskUpdateMeta();
   }
 }
 

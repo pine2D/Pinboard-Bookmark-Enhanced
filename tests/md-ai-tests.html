@@ -2370,6 +2370,10 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
     const src = _pbpAskUpdateMeta.toString();
     assert(src.indexOf('_askRounds.length > 4') !== -1
       && src.indexOf('t("askHistWindowNote")') !== -1, "history-window disclosure missing");
+    // Refresh points: a finished round and a clear must both repaint the
+    // line immediately, not wait for the next open/send.
+    assert(_pbpAskRun.toString().indexOf("_pbpAskUpdateMeta();") !== -1, "run finally must refresh the meta line");
+    assert(_pbpAskClearThread.toString().indexOf("_pbpAskUpdateMeta()") !== -1, "clear must refresh the meta line");
   });
   test("regenerate excludes the round being replaced from the prompt", () => {
     const run = _pbpAskRun.toString();
