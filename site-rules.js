@@ -618,9 +618,11 @@
     // Titles use the same TeX-escaped-accent convention as abstracts; decode
     // outside $...$ so inline math survives for KaTeX.
     var title = decodeTexText((metas("citation_title")[0]) || domText("h1.title"));
-    // citation_author is "Last, First" -> render "First Last"
+    // citation_author is "Last, First" -> render "First Last". Reorder only
+    // the exact two-part form: a third segment is a suffix ("King, M. L., III")
+    // and reordering would silently drop it — keep those verbatim.
     var authors = metas("citation_author").map(function (a) {
-      var p = a.split(","); return p.length >= 2 ? (p[1].trim() + " " + p[0].trim()) : a.trim();
+      var p = a.split(","); return p.length === 2 ? (p[1].trim() + " " + p[0].trim()) : a.trim();
     });
     var abs = metas("citation_abstract")[0] || domText("blockquote.abstract").replace(/^Abstract:?\s*/i, "");
     abs = decodeTexText(abs); // \'e -> é etc. in prose; $...$ math left intact for KaTeX

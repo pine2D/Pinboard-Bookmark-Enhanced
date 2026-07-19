@@ -1012,6 +1012,22 @@ check("buildDepthTree is a global function", typeof buildDepthTree === "function
   check("arxiv → separator form {\\c c} still decodes alongside", /façade/.test(c), c);
 })();
 
+(() => {
+  // "Last, First" reorders only the exact two-part form; a suffixed
+  // three-part name must not silently drop its tail.
+  const html = `<!DOCTYPE html><html><head>
+  <meta name="citation_author" content="Doe, Jane">
+  <meta name="citation_author" content="King, Martin Luther, III">
+  <meta name="citation_abstract" content="A.">
+  <meta name="citation_arxiv_id" content="2401.55555">
+  </head><body></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://arxiv.org/abs/2401.55555");
+  const c = r ? norm(r.contentHtml) : "";
+  check("arxiv → two-part author reordered, three-part kept verbatim",
+    /Jane Doe/.test(c) && /King, Martin Luther, III/.test(c) && c.indexOf("Martin Luther King") === -1, c);
+})();
+
 section("site-rules: helpers");
 (() => {
   const doc = new DOMParser().parseFromString(
