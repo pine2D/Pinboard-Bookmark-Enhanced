@@ -160,7 +160,7 @@ function _pbpAskBuildPanel() {
     '  <button type="button" class="ask-chip" data-i18n="askChipData"></button>',
     '</div>',
     '<form id="ask-form">',
-    '  <textarea id="ask-input" rows="2" dir="auto" data-i18n-placeholder="askPlaceholder"></textarea>',
+    '  <textarea id="ask-input" rows="2" dir="auto" maxlength="4000" data-i18n-placeholder="askPlaceholder"></textarea>',
     '  <div class="ask-actions">',
     '    <button type="button" id="ask-stop" class="action-btn" hidden data-i18n="askStop">Stop</button>',
     '    <button type="submit" id="ask-send" class="action-btn">' + PBP_ASK_SEND_SVG + '<span class="btn-label" data-i18n="askSend">Send</span></button>',
@@ -436,14 +436,35 @@ function _pbpAskRenderSuggestions(root) {
   chips.forEach((chip, i) => { chip.textContent = suggestions[i] || chip.textContent; });
 }
 
+// History serialization budget (est tokens) + per-answer char cap. The
+// article context is bounded (PBP_ASK_CTX_BUDGET) but history was not:
+// 4 rounds x 4096-token answers stacked past 40k est tokens per request,
+// hard-failing 32k-context models (small Ollama locals especially).
+const PBP_ASK_HIST_BUDGET = 6000;
+const PBP_ASK_HIST_ANSWER_CAP = 8000;
+
 // Prompt builder. history = [{q, a}] (caller passes the in-memory rounds);
-// only the last 4 are serialized. The CITES contract here is what
-// pbpAiParseCites (md-ai-core, Task 5) parses on the way back.
+// only the last 4 are serialized, newest-first budget fill - when the
+// budget runs out the OLDEST of those rounds drop first (the most recent
+// round always fits: both its q and a are char-capped upstream/here).
+// The CITES contract here is what pbpAiParseCites (md-ai-core, Task 5)
+// parses on the way back.
 function pbpAskBuildPrompt(args) {
   const a = args || {};
   const context = String(a.context == null ? "" : a.context);
   const question = String(a.question == null ? "" : a.question);
-  const history = Array.isArray(a.history) ? a.history.slice(-4) : [];
+  const recent = Array.isArray(a.history) ? a.history.slice(-4) : [];
+  const history = [];
+  let histTokens = 0;
+  for (let i = recent.length - 1; i >= 0; i--) {
+    const h = recent[i] || {};
+    const q = String(h.q == null ? "" : h.q);
+    const ans = String(h.a == null ? "" : h.a).slice(0, PBP_ASK_HIST_ANSWER_CAP);
+    const cost = pbpAiEstimateTokens(q.length + ans.length + 8);
+    if (history.length && histTokens + cost > PBP_ASK_HIST_BUDGET) break;
+    history.unshift({ q, a: ans });
+    histTokens += cost;
+  }
   const system = [
     "You answer questions about ONE article supplied below.",
     "Rules:",

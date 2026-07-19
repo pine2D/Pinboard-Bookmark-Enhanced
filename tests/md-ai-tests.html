@@ -2277,6 +2277,21 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
     const r2 = pbpAskBuildPrompt({ context: "c", history: [{ q: null, a: null }], question: "q" });
     assert(r2.prompt.indexOf("Q: \nA: ") !== -1, "null history fields become empty strings");
   });
+  test("history serialization is token-budgeted, oldest dropped first", () => {
+    // 4 answers x 6000 chars (~1502 est tokens each): three fit a
+    // 6000-token budget, the fourth would overflow it - q1 drops.
+    const hist = [];
+    for (let i = 1; i <= 4; i++) hist.push({ q: "q" + i, a: "x".repeat(6000) });
+    const r = pbpAskBuildPrompt({ context: "[P1] c", history: hist, question: "next" });
+    assert(r.prompt.indexOf("Q: q1") === -1, "over-budget oldest dropped");
+    assert(r.prompt.indexOf("Q: q2") !== -1 && r.prompt.indexOf("Q: q4") !== -1, "newest three kept");
+    assert(r.prompt.indexOf("Q: q2") < r.prompt.indexOf("Q: q4"), "chronological order kept");
+  });
+  test("a lone huge round always survives the budget", () => {
+    const r = pbpAskBuildPrompt({ context: "c", history: [{ q: "only", a: "y".repeat(20000) }], question: "q" });
+    assert(r.prompt.indexOf("Q: only") !== -1, "most recent round kept");
+    assert(r.prompt.indexOf("y".repeat(8001)) === -1, "capped");
+  });
 });
 
 // ============ Task 14: ask citation tokenizer ============
