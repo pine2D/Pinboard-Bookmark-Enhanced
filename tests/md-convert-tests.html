@@ -898,6 +898,25 @@ check("buildDepthTree is a global function", typeof buildDepthTree === "function
   check("arxiv → TeX accents decoded in prose, $...$ math left intact", /André's lemma/.test(c) && /mañana/.test(c) && /façade/.test(c) && /\$x \\geq 2\$/.test(c) && !/Andr\\'e/.test(c), c);
 })();
 
+(() => {
+  // Brace-protected accent forms ({\'e} wrapper, {\c c} space form, {\o} letter
+  // macro) and TeX decoding of the title — the common BibTeX spellings.
+  const html = `<!DOCTYPE html><html><head>
+  <meta name="citation_title" content="{\\'E}tude on Coll{\\\`e}ge $x \\geq 2$">
+  <meta name="citation_author" content="Lalande, Jerome">
+  <meta name="citation_abstract" content="By J{\\'e}r{\\^o}me at Coll{\\\`e}ge royal, a fa{\\c c}ade of Sm{\\o}rrebr{\\o}d; \\cite{x} and \\c{c} stay correct.">
+  <meta name="citation_arxiv_id" content="2111.07800">
+  </head><body></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://arxiv.org/abs/2111.07800");
+  const c = r ? norm(r.contentHtml) : "";
+  check("arxiv → {\\'e} wrapper decodes clean, no stray brace", /Jérôme/.test(c) && /Collège royal/.test(c) && !/\{é/.test(c) && !/r\{ô/.test(c), c);
+  check("arxiv → {\\c c} space form decodes", /façade/.test(c), c);
+  check("arxiv → {\\o} letter macro unwrapped", /Smørrebrød/.test(c), c);
+  check("arxiv → braced \\c{c} still decodes, \\cite untouched", /ç stay correct/.test(c) && /\\cite\{x\}/.test(c), c);
+  check("arxiv → title TeX-decoded with $...$ intact", r && r.title === "Étude on Collège $x \\geq 2$", JSON.stringify(r && r.title));
+})();
+
 section("site-rules: helpers");
 (() => {
   const doc = new DOMParser().parseFromString(

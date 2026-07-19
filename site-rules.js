@@ -466,6 +466,19 @@
   function texAcc(_, a, base) { var L = base === "\\i" ? "i" : base === "\\j" ? "j" : base; return L + TEX_ACCENT[a]; }
   function decodeTexSeg(s) {
     if (!s || s.indexOf("\\") === -1) return s;
+    // BibTeX's common brace-protected forms wrap the WHOLE command: {\'e},
+    // {\c c}, {\o}. The decoders below expect bare \'e or braced \c{c}, and the
+    // accent regex's trailing \}? would eat the wrapper's closing brace leaving
+    // a stray "{" (worse than not decoding at all). Normalize/resolve wrapped
+    // groups first. Each pattern requires the full balanced pair, so no lone
+    // brace is ever half-consumed; a letter directly after the command kills
+    // the match, so \Huge / \cite-style macros stay protected. Plain unwrapping
+    // would erase the word boundary the group provided ({\c c}ade, {\o}rre) —
+    // hence normalize-to-braced / resolve-in-place instead.
+    s = s.replace(/\{\\([`'^"~=.uvHrck])\s*\{?\s*(\\[ij]|[A-Za-z])\s*\}?\}/g, "\\$1{$2}"); // {\'e}/{\c c} -> \'{e}/\c{c}
+    s = s.replace(/\{\\(ss|ae|AE|oe|OE|aa|AA|[oOlLij])\}/g, function (m, n) {              // {\o} -> ø: braces ARE the boundary
+      return Object.prototype.hasOwnProperty.call(TEX_LETTER, n) ? TEX_LETTER[n] : m;
+    });
     s = s.replace(/\\([`'^"~=.])\s*\{?\s*(\\[ij]|[A-Za-z])\s*\}?/g, texAcc);   // \'e \'{e} \' e
     s = s.replace(/\\([uvHrck])\{(\\[ij]|[A-Za-z])\}/g, texAcc);               // \c{c} \v{s} (braces only)
     s = s.replace(/\\(ss|ae|AE|oe|OE|aa|AA|[oOlLij])(?:\{\})?(?![A-Za-z])/g, function (m, n) {
@@ -485,7 +498,9 @@
   function extractArxiv(doc) {
     function metas(name) { return Array.prototype.map.call(doc.querySelectorAll('meta[name="' + name + '"]'), function (m) { return m.getAttribute("content") || ""; }).filter(Boolean); }
     function domText(sel) { var e = doc.querySelector(sel); return e ? e.textContent.replace(/\s+/g, " ").trim() : ""; }
-    var title = (metas("citation_title")[0]) || domText("h1.title");
+    // Titles use the same TeX-escaped-accent convention as abstracts; decode
+    // outside $...$ so inline math survives for KaTeX.
+    var title = decodeTexText((metas("citation_title")[0]) || domText("h1.title"));
     // citation_author is "Last, First" -> render "First Last"
     var authors = metas("citation_author").map(function (a) {
       var p = a.split(","); return p.length >= 2 ? (p[1].trim() + " " + p[0].trim()) : a.trim();
