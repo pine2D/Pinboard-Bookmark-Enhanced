@@ -1474,6 +1474,47 @@ section("site-rules: hacker news");
   const c3 = (r3 && r3.contentHtml) || "";
   check("hn dead tail row at cap → no false truncation marker",
     /<h2>Comments \(1\)<\/h2>/.test(c3) && !/\(1\+\)/.test(c3) && !/only the first/.test(c3), c3);
+
+  const hnPage = (rows) => '<html><body><table class="fatitem"><tr class="athing"><td><span class="titleline"><a href="https://x.com">T</a></span></td></tr></table>' +
+    '<table class="comment-tree">' + rows + '</table></body></html>';
+
+  // Cap genuinely trips on a live row: 3 live under cap=2 -> "(2+)" + note.
+  window.__PBP_HN_COMMENTS_GLOBAL = 2;
+  const r4 = applySiteRule(new DOMParser().parseFromString(
+    hnPage(row("f1", 0, "a1", "one") + row("f2", 0, "a2", "two") + row("f3", 0, "a3", "three")), "text/html"),
+    "https://news.ycombinator.com/item?id=7");
+  window.__PBP_HN_COMMENTS_GLOBAL = undefined;
+  const c4 = (r4 && r4.contentHtml) || "";
+  check("hn live cap → (2+) heading and truncation note",
+    /<h2>Comments \(2\+\)<\/h2>/.test(c4) && /only the first 2 comments/.test(c4) && !/three/.test(c4), c4);
+
+  // Beyond maxDepth the chain flattens onto the deepest allowed level —
+  // nothing dropped, no deeper blockquote nesting.
+  window.__PBP_HN_MAX_DEPTH = 2;
+  const r5 = applySiteRule(new DOMParser().parseFromString(
+    hnPage(row("g1", 0, "a", "depth zero") + row("g2", 1, "b", "depth one") + row("g3", 2, "cc", "depth two") + row("g4", 3, "dd", "depth three")), "text/html"),
+    "https://news.ycombinator.com/item?id=6");
+  window.__PBP_HN_MAX_DEPTH = undefined;
+  const c5 = (r5 && r5.contentHtml) || "";
+  check("hn maxDepth → all bodies kept, flattened to 2 blockquotes in order",
+    (c5.match(/<blockquote>/g) || []).length === 2 &&
+    /depth zero/.test(c5) && /depth one/.test(c5) && /depth two/.test(c5) && /depth three/.test(c5) &&
+    c5.indexOf("depth two") < c5.indexOf("depth three"), c5);
+
+  // Legacy HN rows carry no indent attr — depth comes from spacer img width/40.
+  const legacyRow = (id, w, user, body) =>
+    '<tr class="athing comtr" id="' + id + '"><td><table><tr>' +
+    '<td class="ind"><img src="s.gif" width="' + w + '"></td>' +
+    '<td class="default"><div class="comhead"><a class="hnuser">' + user + '</a></div>' +
+    '<div class="comment"><div class="commtext c00">' + body + '</div></div></td>' +
+    '</tr></table></td></tr>';
+  const r6 = applySiteRule(new DOMParser().parseFromString(
+    hnPage(legacyRow("h1", 0, "x", "root x") + legacyRow("h2", 40, "y", "child y") + legacyRow("h3", 80, "z", "grand z")), "text/html"),
+    "https://news.ycombinator.com/item?id=5");
+  const c6 = (r6 && r6.contentHtml) || "";
+  check("hn legacy img-width depth → z nested two levels under x",
+    (c6.match(/<blockquote>/g) || []).length === 3 &&
+    /root x[\s\S]*<blockquote>[\s\S]*child y[\s\S]*<blockquote>[\s\S]*grand z/.test(c6), c6);
 }
 </script>
 
