@@ -350,13 +350,15 @@ const PBP_ASK_BLOCK_CAP = 8000;
 // Always keeps every heading block (h2/h3/h4) plus the first 3 and last 2
 // blocks; the remaining budget is filled by sampling the leftover middle
 // blocks at uniform document-order intervals (largest count that fits).
-// Returns { text: "[Pn] <text>" lines joined by \n, sentBlocks, totalBlocks }.
+// Returns { text: "[Pn] <text>" lines joined by \n, sentBlocks, totalBlocks,
+// sent: Set<block n actually included> } - `sent` lets the chip pass tell a
+// citation of a sampled-OUT paragraph from a genuinely grounded one.
 function pbpAskBuildContext(blocks, budgetTokens) {
   const budget = (budgetTokens === undefined || budgetTokens === null)
     ? PBP_ASK_CTX_BUDGET : Number(budgetTokens);
   const list = Array.isArray(blocks) ? blocks : [];
   const totalBlocks = list.length;
-  if (!totalBlocks) return { text: "", sentBlocks: 0, totalBlocks: 0 };
+  if (!totalBlocks) return { text: "", sentBlocks: 0, totalBlocks: 0, sent: new Set() };
   // pbpAiTextOfKatex (not raw b.el.textContent): a math block's textContent
   // gets mutated by KaTeX's async render into a glyph+MathML+annotation
   // duplicate string (D10-1) - the KaTeX-aware variant gives the model a
@@ -405,7 +407,7 @@ function pbpAskBuildContext(blocks, budgetTokens) {
   }
   const lines = [];
   for (const b of list) if (picked.has(b.n)) lines.push(lineOf(b));
-  return { text: lines.join("\n"), sentBlocks: lines.length, totalBlocks };
+  return { text: lines.join("\n"), sentBlocks: lines.length, totalBlocks, sent: picked };
 }
 
 function pbpAskBuildSuggestions(title, blocks, labels) {
@@ -643,7 +645,7 @@ async function _pbpAskRun(question, aEl, opts) {
     aEl.classList.remove("streaming");
     aEl.removeAttribute("aria-busy");
     delete aEl.dataset.askStopped; // a re-run over a stopped round completed normally
-    const parsed = _pbpAskFinalize(aEl, full);
+    const parsed = _pbpAskFinalize(aEl, full, st.ctx && st.ctx.sent);
     const record = {
       q: question,
       a: full,
@@ -698,7 +700,7 @@ async function _pbpAskRun(question, aEl, opts) {
       // later Regenerate to append-mode - this round is not in st.rounds,
       // so replaceLast would clobber the previous round instead.
       aEl.dataset.askStopped = "1";
-      try { _pbpAskFinalize(aEl, acc); } catch (_) { aEl.textContent = acc; }
+      try { _pbpAskFinalize(aEl, acc, st.ctx && st.ctx.sent); } catch (_) { aEl.textContent = acc; }
     } else {
       aEl.textContent = acc; // keep whatever already streamed in
     }
@@ -807,8 +809,15 @@ function _pbpAskStripCiteTokens(text) {
 // failed verification must never render as a link). Verification (fuzzy
 // quote locate) runs once per unique paragraph; chips are numbered
 // sequentially per answer (data-seq) in reading order.
-function _pbpAskChipPass(el, cites) {
+function _pbpAskChipPass(el, cites, sent) {
   const maxP = pbpAiBlocks().length;
+  // Set of paragraph numbers actually SENT to the model (pbpAskBuildContext
+  // .sent). A cite of a sampled-out paragraph is post-rationalization by
+  // construction - the model never saw that text - so it must not earn the
+  // solid "verified" state even when its guessed quote happens to fuzzy-
+  // match. null/absent (restored history: the original sample set is
+  // unknowable) skips the check - old behavior.
+  const sentSet = (sent && typeof sent.has === "function") ? sent : null;
   // First quote wins when the model emits several CITES lines for one Pn.
   const quoteByP = new Map();
   for (const c of (Array.isArray(cites) ? cites : [])) {
@@ -869,7 +878,7 @@ function _pbpAskChipPass(el, cites) {
       chip.setAttribute("aria-label", "P" + seg.p);
       const quote = quoteByP.get(seg.p);
       if (quote) chip.dataset.quote = quote;
-      const hit = verify(seg.p);
+      const hit = (sentSet && !sentSet.has(seg.p)) ? null : verify(seg.p);
       if (hit) {
         chip.dataset.qs = String(hit.start);
         chip.dataset.qe = String(hit.end);
@@ -1034,7 +1043,7 @@ function _pbpAskTipHide() {
 // Stream-end finalizer, called by the Task 13 send path and the Task 15
 // history restore. el = the .ask-a element that held streamed plain text.
 // Returns {body, cites} so the caller can persist them with the record.
-function _pbpAskFinalize(el, fullText) {
+function _pbpAskFinalize(el, fullText, sent) {
   const parsed = pbpAiParseCites(String(fullText == null ? "" : fullText));
   // renderMarkdown (md-convert.js) is the SINGLE sanitize point (marked +
   // DOMPurify); assigning its return via innerHTML is the established
@@ -1042,7 +1051,7 @@ function _pbpAskFinalize(el, fullText) {
   // md-preview.js ~line 330-333). NEVER assign raw model text to innerHTML.
   el.dir = "auto"; // D9-2: also covers the history-restore aEl, which skips _pbpAskAppendRound
   el.innerHTML = renderMarkdown(parsed.body);
-  _pbpAskChipPass(el, parsed.cites);
+  _pbpAskChipPass(el, parsed.cites, sent);
   // Task 15 hook (copy button + history chrome). typeof-guarded so this
   // Task 14 commit stands alone before Task 15 lands.
   if (typeof _pbpAskDecorate === "function") _pbpAskDecorate(el, parsed);

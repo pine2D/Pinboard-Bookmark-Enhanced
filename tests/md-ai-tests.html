@@ -2295,7 +2295,7 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
   test("stopped partials finalize visually but never enter rounds or history", () => {
     const run = _pbpAskRun.toString();
     assert(run.indexOf('aEl.dataset.askStopped = "1"') !== -1, "stopped flag missing");
-    assert(run.indexOf("_pbpAskFinalize(aEl, acc)") !== -1, "abort visual finalize missing");
+    assert(run.indexOf("_pbpAskFinalize(aEl, acc, st.ctx && st.ctx.sent)") !== -1, "abort visual finalize missing");
     assert(run.indexOf("delete aEl.dataset.askStopped") !== -1, "flag not cleared on a successful re-run");
     assert(_pbpAskRegenerate.toString().indexOf("replaceLast: !el.dataset.askStopped") !== -1,
       "stopped-round regenerate must append, not replace");
@@ -2503,6 +2503,26 @@ suiteIf("ask chip pass", "pbpAskBuildContext", () => {
     _pbpAskChipPass(a, [{ p: 1, quote: "totally different words here" }]);
     const chip = a.querySelector(".ask-chip");
     assert(chip && !chip.classList.contains("verified"), "fuzzy miss");
+  });
+  test("cite of a sampled-out paragraph never earns verified", () => {
+    makeBlocks("<p>alpha beta gamma</p><p>delta epsilon zeta</p>");
+    const a = document.createElement("div");
+    a.innerHTML = "<p>Claim [P1] and [P2].</p>";
+    // Only P1 was actually sent; P2's quote would fuzzy-match its block,
+    // but the model never saw that text - post-rationalization stays dashed.
+    _pbpAskChipPass(a, [{ p: 1, quote: "alpha beta" }, { p: 2, quote: "delta epsilon" }], new Set([1]));
+    const chips = a.querySelectorAll(".ask-chip");
+    assertEq(chips.length, 2, "both chips render");
+    assert(chips[0].classList.contains("verified"), "sent paragraph verifies");
+    assert(!chips[1].classList.contains("verified"), "unsent paragraph stays unverified");
+    assertEq(chips[1].dataset.qs, undefined, "no offsets for unsent paragraph");
+  });
+  test("pbpAskBuildContext exposes the sent set", () => {
+    makeBlocks("<p>a</p>");
+    const r = pbpAskBuildContext(pbpAiBlocks());
+    assert(r.sent instanceof Set, "sent is a Set");
+    assertEq(r.sent.size, r.sentBlocks, "sent size matches sentBlocks");
+    assertEq(pbpAskBuildContext([], 100).sent.size, 0, "empty input -> empty set");
   });
   test("repeated cite of same paragraph gets fresh seq numbers", () => {
     makeBlocks("<p>alpha beta gamma</p>");
