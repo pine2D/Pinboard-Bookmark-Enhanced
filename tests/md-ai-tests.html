@@ -2417,6 +2417,10 @@ suiteIf("ask citation tokenizer", "pbpAskBuildContext", () => {
     assertEq(_pbpAskStripCiteTokens("no cites"), "no cites", "prose untouched");
     assertEq(_pbpAskStripCiteTokens(""), "", "empty tolerated");
   });
+  test("_pbpAskStripCiteTokens leaves literal tokens inside code intact", () => {
+    assertEq(_pbpAskStripCiteTokens("Use `[P1]` literally [P2]."), "Use `[P1]` literally .", "inline code shielded");
+    assertEq(_pbpAskStripCiteTokens("```\nprint('[P3]')\n``` cite [P4]"), "```\nprint('[P3]')\n``` cite ", "fenced block shielded");
+  });
   test("stale restored rounds seed the prompt with stripped bodies", () => {
     const src = _pbpAskHistRestore.toString();
     assert(src.includes("stale ? _pbpAskStripCiteTokens(parsed.body) : parsed.body"), "stale strip missing in restore seeding");

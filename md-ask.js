@@ -843,10 +843,21 @@ function _pbpAskSplitCiteTokens(text) {
 // numbers index a DIFFERENT block list now, so feeding them through would
 // anchor follow-up citations to unrelated paragraphs.
 function _pbpAskStripCiteTokens(text) {
-  return _pbpAskSplitCiteTokens(text)
+  const s = String(text == null ? "" : text);
+  // Shield fenced blocks and inline code first: a literal `[P1]` inside
+  // code is answer CONTENT, not a citation - the chip pass skips pre/code
+  // for the same reason, and stripping must match that semantic. \u0000
+  // never occurs in model text (and never matches the cite grammar).
+  const slots = [];
+  const shielded = s.replace(/```[\s\S]*?```|`[^`\n]*`/g, (m) => {
+    slots.push(m);
+    return "\u0000" + (slots.length - 1) + "\u0000";
+  });
+  const stripped = _pbpAskSplitCiteTokens(shielded)
     .filter((seg) => seg.kind === "text")
     .map((seg) => seg.text)
     .join("");
+  return stripped.replace(/\u0000(\d+)\u0000/g, (m, i) => slots[Number(i)]);
 }
 
 // Chip pass: walk el's text nodes, replace every in-range [Pn] token with a
