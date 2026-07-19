@@ -1415,6 +1415,18 @@ section("site-rules: hacker news");
   check("hn dead rows → excluded from the visible count", /<h2>Comments \(3\)<\/h2>/.test(c2), c2);
   check("hn childless dead row → pruned (4 blockquotes, no [dead] text)",
     (c2.match(/<blockquote>/g) || []).length === 4 && !/\[dead\]/.test(c2), c2);
+
+  // Cap must trip only on LIVE rows: one live comment + a trailing dead row
+  // under cap=1 is complete extraction, not truncation.
+  window.__PBP_HN_COMMENTS_GLOBAL = 1;
+  const HN3 = '<html><body><table class="fatitem"><tr class="athing"><td><span class="titleline"><a href="https://x.com">T</a></span></td></tr></table>' +
+    '<table class="comment-tree">' + row("e1", 0, "alice", "only live comment") + row("e2", 0, "", "", true) + '</table></body></html>';
+  const d3 = new DOMParser().parseFromString(HN3, "text/html");
+  const r3 = applySiteRule(d3, "https://news.ycombinator.com/item?id=8");
+  window.__PBP_HN_COMMENTS_GLOBAL = undefined;
+  const c3 = (r3 && r3.contentHtml) || "";
+  check("hn dead tail row at cap → no false truncation marker",
+    /<h2>Comments \(1\)<\/h2>/.test(c3) && !/\(1\+\)/.test(c3) && !/only the first/.test(c3), c3);
 }
 </script>
 

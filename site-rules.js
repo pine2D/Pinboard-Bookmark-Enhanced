@@ -495,7 +495,6 @@
       // Collapsed threads: HN stamps noshow on every hidden descendant, so
       // skipping the rows outright cannot orphan a visible child.
       if (row.classList.contains("noshow")) continue;
-      if (live >= globalCap) { capped = true; break; }
       var userEl = row.querySelector(".hnuser");
       var author = userEl ? userEl.textContent.trim() : "";
       var bodyEl = row.querySelector(".commtext");
@@ -516,6 +515,9 @@
         replies.push({ author: author || "[dead]", bodyHtml: "", depth: depth, dead: true });
         continue;
       }
+      // Cap trips only on a LIVE row: breaking on a dead tail row would flag
+      // truncation ("N+" and the note) when nothing visible was omitted.
+      if (live >= globalCap) { capped = true; break; }
       replies.push({ author: author, bodyHtml: bodyHtml, depth: depth });
       live++;
     }
