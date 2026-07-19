@@ -795,6 +795,24 @@ const QUESTION_FOREIGN = `<!DOCTYPE html><html><head>
     !/无实体外题卡片/.test(c) && /无实体本题卡片/.test(c), c);
 })();
 
+// --- Paginated-short initialData: answerCount total drives a truncation note ---
+(() => {
+  const html = `<!DOCTYPE html><html><head>
+<script id="js-initialData" type="text/json">{"initialState":{"entities":{
+"questions":{"321":{"id":321,"title":"截断问题","answerCount":100}},
+"answers":{"1":{"id":1,"content":"<p>唯一加载的回答</p>","voteupCount":5,"author":{"name":"甲"}}}
+}}}<\/script></head><body><h1 class="QuestionHeader-title">截断问题</h1></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/321");
+  const c = r ? norm(r.contentHtml) : "";
+  check("zhihu paginated-short → note names total vs extracted", /共 100 个回答/.test(c) && /已加载的 1 个/.test(c), c);
+  const full = QUESTION_HTML; // 2 answers, question entity has no answerCount
+  const rf = new DOMParser().parseFromString(full, "text/html");
+  const r2 = applySiteRule(rf, "https://www.zhihu.com/question/659317023");
+  check("zhihu no-total entity + loaded answers → no truncation note",
+    r2 && !/仅提取到/.test(r2.contentHtml) && !/个回答/.test(r2.contentHtml), JSON.stringify(r2 && r2.contentHtml));
+})();
+
 // --- Degraded path: no initialData, DOM cards only → note prepended ---
 const QUESTION_NODATA = `<!DOCTYPE html><html><head></head><body>
 <h1 class="QuestionHeader-title">无数据问题</h1>

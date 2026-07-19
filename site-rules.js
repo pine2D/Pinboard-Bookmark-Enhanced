@@ -311,8 +311,18 @@
 
     if (!sections.length) return null;
 
+    // The initialData snapshot only carries the first paginated batch, so a
+    // 100-answer question can silently export 5. When the question entity
+    // reports a total, compare it against what we actually extracted; the
+    // empty-entities check stays as the fallback for payload-less pages.
     var note = "";
-    if (!ent.answers || !Object.keys(ent.answers).length) {
+    var qEnt = qid && ent.questions && ent.questions[qid];
+    var total = Number(qEnt && (qEnt.answerCount != null ? qEnt.answerCount : qEnt.answer_count)) || 0;
+    if (total > sections.length) {
+      note = "<blockquote><p>" +
+        escapeHtml("注：该问题共 " + total + " 个回答，本次仅提取到已加载的 " + sections.length + " 个；登录并向下滚动加载更多回答后再导出可获取更多。") +
+        "</p></blockquote>";
+    } else if (!ent.answers || !Object.keys(ent.answers).length) {
       note = "<blockquote><p>" +
         escapeHtml("注：仅提取到当前页面已加载/可见的回答；登录并向下滚动加载更多回答后再导出可获取更多。") +
         "</p></blockquote>";
