@@ -572,7 +572,10 @@
     var timeEl = article.querySelector("time");
     var when = timeEl ? ((timeEl.getAttribute("datetime") || timeEl.textContent || "").trim()) : "";
     var titleText = (textEl.textContent || "").replace(/\s+/g, " ").trim();
-    var title = titleText.length > 90 ? titleText.slice(0, 87) + "..." : titleText;
+    // Truncate by code points, not UTF-16 units — string slice can split a
+    // surrogate pair (emoji) at the boundary into a lone high surrogate.
+    var titleChars = Array.from(titleText);
+    var title = titleChars.length > 90 ? titleChars.slice(0, 87).join("") + "..." : titleText;
     var meta = author || when ? "<p><strong>" + escapeHtml(author || "X/Twitter") + "</strong>" +
       (when ? " · " + escapeHtml(when) : "") + "</p>" : "";
     return { contentHtml: meta + '<div class="tweet-text">' + cleanBodyHtml(doc, textEl.innerHTML) + "</div>", title: title || doc.title };

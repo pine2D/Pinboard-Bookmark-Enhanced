@@ -1406,7 +1406,7 @@ section("site-rules: v2ex 附言 / hideRefName / thanks parsing");
   // hideRefName text fallback (anchor-less body) + parseCount k-suffix thanks.
   const v = `<!DOCTYPE html><html><body><h1>剥离与感谢</h1><div class="topic_content"><p>t</p></div>
   <div class="cell" id="r_1"><strong><a href="/member/alice" class="dark">alice</a></strong><span class="no">1</span><div class="reply_content">一楼</div></div>
-  <div class="cell" id="r_2"><strong><a href="/member/bob" class="dark">bob</a></strong><span class="no">2</span><span class="small fade">♥ 1.2k</span><div class="reply_content">@alice 收到</div></div>
+  <div class="cell" id="r_2"><strong><a href="/member/bob" class="dark">bob</a></strong><span class="no">2</span><span class="ago">2 小时前</span><span class="small fade">♥ 1.2k</span><div class="reply_content">@alice 收到</div></div>
   </body></html>`;
   const doc = new DOMParser().parseFromString(v, "text/html");
   const r = applySiteRule(doc, "https://www.v2ex.com/t/1001");
@@ -1521,8 +1521,9 @@ section("site-rules: hacker news");
     "https://news.ycombinator.com/item?id=7");
   window.__PBP_HN_COMMENTS_GLOBAL = undefined;
   const c4 = (r4 && r4.contentHtml) || "";
-  check("hn live cap → (2+) heading and truncation note",
-    /<h2>Comments \(2\+\)<\/h2>/.test(c4) && /only the first 2 comments/.test(c4) && !/three/.test(c4), c4);
+  check("hn live cap → (2+) heading, note, first two kept, tail dropped",
+    /<h2>Comments \(2\+\)<\/h2>/.test(c4) && /only the first 2 comments/.test(c4) &&
+    /one/.test(c4) && /two/.test(c4) && !/three/.test(c4), c4);
 
   // Beyond maxDepth the chain flattens onto the deepest allowed level —
   // nothing dropped, no deeper blockquote nesting.
@@ -1626,6 +1627,15 @@ section("site-rules: X/Twitter status");
     rm && rm.contentHtml.indexOf("· 2026-07-09T01:00:00.000Z") !== -1, JSON.stringify(rm && rm.contentHtml));
   check("x title → 90-char cap with ellipsis",
     rm && rm.title.length === 90 && /\.\.\.$/.test(rm.title) && rm.title.indexOf("AAA") === 0, JSON.stringify(rm && rm.title));
+
+  // Truncation must count code points: an emoji at the cut must survive or
+  // vanish whole, never become a lone surrogate half.
+  const EMO = Array(87).join("A") + "😀😀😀😀😀"; // 86 ASCII + 5 astral => 91 code points
+  const XE = XM.replace('<span>' + LONG + '</span>', '<span>' + EMO + '</span>');
+  const re2 = applySiteRule(new DOMParser().parseFromString(XE, "text/html"), "https://x.com/alice/status/43");
+  check("x title → surrogate pair never split at the truncation point",
+    re2 && /\.\.\.$/.test(re2.title) && !/[\uD800-\uDBFF]\.\.\.$/.test(re2.title) && Array.from(re2.title).length === 90,
+    JSON.stringify(re2 && re2.title));
 }
 </script>
 
@@ -1672,13 +1682,15 @@ section("site-rules: v2ex buildReplyTree multi-@ (pure)");
     { id: "r1", author: "alice", floor: "1", mentions: [], refFloors: [], bodyHtml: "a", thanks: 0 },
     { id: "r2", author: "bob",   floor: "2", mentions: [], refFloors: [], bodyHtml: "b", thanks: 0 },
     { id: "r3", author: "carol", floor: "3", mentions: ["alice", "bob"], refFloors: ["1", "2"], bodyHtml: "c", thanks: 0 },
-    { id: "r4", author: "dave",  floor: "4", mentions: ["ghost", "alice"], refFloors: [], bodyHtml: "d", thanks: 0 },
+    // mentions [alice, ghost] reverse to [ghost, alice]: ghost (never replied)
+    // must be TRIED and rejected before alice resolves — real fallthrough.
+    { id: "r4", author: "dave",  floor: "4", mentions: ["alice", "ghost"], refFloors: [], bodyHtml: "d", thanks: 0 },
   ];
   const roots = buildReplyTree(replies);
   check("multi-@ → last mention wins (carol under bob)",
     roots.length === 2 && roots[1].author === "bob" && roots[1].children.length === 1 && roots[1].children[0].author === "carol",
     JSON.stringify(roots.map(r => [r.author, r.children.map(k => k.author)])));
-  check("multi-@ → unresolvable name falls through (dave under alice)",
+  check("multi-@ → unresolvable primary falls through to next name (dave under alice)",
     roots[0].author === "alice" && roots[0].children.some(n => n.author === "dave"),
     JSON.stringify(roots.map(r => [r.author, r.children.map(k => k.author)])));
 })();
