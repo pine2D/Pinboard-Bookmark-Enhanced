@@ -4984,6 +4984,16 @@ suiteIf("pbpSkimBuildPrompt", "pbpSkimBuildPrompt", () => {
   });
 });
 
+suiteIf("skim cache key normalization", "_pbpSkimCacheKey", () => {
+  test("fragment and tracking-param variants share one cache key", () => {
+    const base = _pbpSkimCacheKey("https://e.com/article?id=7");
+    assertEq(_pbpSkimCacheKey("https://e.com/article?id=7#section-2"), base, "fragment stripped");
+    assertEq(_pbpSkimCacheKey("https://e.com/article?id=7&utm_source=tw&utm_medium=x"), base, "tracker params stripped");
+    assert(_pbpSkimCacheKey("https://e.com/article?id=8") !== base, "real param still distinguishes");
+    assert(typeof _pbpSkimCacheKey("not a url") === "string", "unparsable url tolerated");
+  });
+});
+
 suiteIf("skim cache metadata", "_pbpSkimCacheMeta", () => {
   test("cache meta includes resolved language instruction and model key", () => {
     const meta = _pbpSkimCacheMeta({

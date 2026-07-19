@@ -55,7 +55,17 @@ const PBP_SKIM_CTX_BUDGET = 24000;
 let _pbpSkimState = null;
 
 function _pbpSkimCacheKey(url) {
-  return "skim_" + pbpAiHash(String(url || ""));
+  // Same article opened via a #fragment or ?utm= variant must share one
+  // cache entry — every miss is a paid generation. Fragments never change
+  // the content; stripTrackingParams (shared.js) removes the known tracker
+  // set with default settings (deterministic key, independent of the user's
+  // strip config). Any parse failure falls back to the raw string.
+  let u = String(url || "");
+  try { const p = new URL(u); p.hash = ""; u = p.href; } catch (_) {}
+  try {
+    if (typeof stripTrackingParams === "function") u = stripTrackingParams(u).cleaned || u;
+  } catch (_) {}
+  return "skim_" + pbpAiHash(u);
 }
 
 function _pbpSkimCacheMeta(st) {
