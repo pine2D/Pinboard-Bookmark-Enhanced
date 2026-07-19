@@ -2242,26 +2242,12 @@ suiteIf("pbpAskBuildContext", "pbpAskBuildContext", () => {
   });
 });
 
-suiteIf("pbpAskBuildSuggestions", "pbpAskBuildContext", () => {
-  function ctxBlocks(html) {
-    const root = document.createElement("div");
-    root.innerHTML = html;
-    return pbpAiIndexBlocks(root);
-  }
-  test("suggestions include title and local headings", () => {
-    const out = pbpAskBuildSuggestions("Article Title", ctxBlocks("<h2>Setup</h2><p>x</p><h3>Tradeoffs</h3>"), {
-      summarize: "Summarize",
-      argument: "Argument",
-      data: "Data"
-    });
-    assertEq(out.length, 3, "three suggestions");
-    assert(out[0].indexOf("Article Title") !== -1, "title used");
-    assert(out[1].indexOf("Setup") !== -1, "first heading used");
-    assert(out[2].indexOf("Tradeoffs") !== -1, "second heading used");
-  });
-  test("suggestions fall back to generic topic", () => {
-    const out = pbpAskBuildSuggestions("", [], { summarize: "S", argument: "A", data: "D" });
-    assertEq(out[0], "S: this page", "generic topic");
+suiteIf("ask starter chips", "pbpAskBuildContext", () => {
+  test("chips render pure i18n text - no topic gluing pass remains", () => {
+    assert(typeof pbpAskBuildSuggestions === "undefined", "suggestion composer deleted");
+    assert(typeof _pbpAskRenderSuggestions === "undefined", "chip override pass deleted");
+    const tpl = _pbpAskBuildPanel.toString();
+    assert(tpl.indexOf('data-i18n="askChipSummarize"') !== -1, "chips still i18n-driven");
   });
 });
 

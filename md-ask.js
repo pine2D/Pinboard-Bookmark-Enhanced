@@ -168,8 +168,11 @@ function _pbpAskBuildPanel() {
     '</form>',
     '<div id="ask-meta" aria-live="polite"></div>'
   ].join("\n");
+  // Starter chips: applyI18n fills them from data-i18n - each locale's
+  // message is a complete, natural question. (A JS pass used to append
+  // ": <topic>" on top, which glued a title onto an already-finished
+  // question in every locale - "What is the main argument?: Setup".)
   applyI18n(panel);
-  _pbpAskRenderSuggestions(panel);
   document.body.appendChild(panel);
   _pbpAskState.panel = panel;
   // #ask-thread now exists in the live document — restore history straight
@@ -408,34 +411,6 @@ function pbpAskBuildContext(blocks, budgetTokens) {
   const lines = [];
   for (const b of list) if (picked.has(b.n)) lines.push(lineOf(b));
   return { text: lines.join("\n"), sentBlocks: lines.length, totalBlocks, sent: picked };
-}
-
-function pbpAskBuildSuggestions(title, blocks, labels) {
-  const clean = (v) => String(v || "").replace(/\s+/g, " ").trim().slice(0, 80);
-  const l = labels || {};
-  const heads = (Array.isArray(blocks) ? blocks : [])
-    .filter((b) => b && (b.tag === "h2" || b.tag === "h3" || b.tag === "h4"))
-    .map((b) => clean(b.el && b.el.textContent))
-    .filter(Boolean);
-  const topic = clean(title) || heads[0] || "this page";
-  return [
-    (l.summarize || "Summarize") + ": " + topic,
-    (l.argument || "Key claims") + ": " + (heads[0] || topic),
-    (l.data || "Evidence and data") + ": " + (heads[1] || heads[0] || topic)
-  ];
-}
-
-function _pbpAskRenderSuggestions(root) {
-  const panel = root || document;
-  const chips = Array.from(panel.querySelectorAll("#ask-chips .ask-chip"));
-  if (!chips.length) return;
-  const st = _pbpAskState || {};
-  const suggestions = pbpAskBuildSuggestions(st.title, pbpAiBlocks(), {
-    summarize: t("askChipSummarize"),
-    argument: t("askChipArgument"),
-    data: t("askChipData")
-  });
-  chips.forEach((chip, i) => { chip.textContent = suggestions[i] || chip.textContent; });
 }
 
 // History serialization budget (est tokens) + per-answer char cap. The
