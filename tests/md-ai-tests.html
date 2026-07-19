@@ -2599,12 +2599,27 @@ suiteIf("ask copy text builder", "pbpAskBuildContext", () => {
   test("no cites -> trimmed body only", () => {
     assertEq(_pbpAskBuildCopyText("  Answer body.  ", []), "Answer body.", "body only");
   });
-  test("cites appended as footnote block", () => {
+  test("inline tokens become footnote references matching the definitions", () => {
     const out = _pbpAskBuildCopyText("Body [P7].", [
       { p: 7, quote: "exact words" },
       { p: 2, quote: "another quote" }
     ]);
-    assertEq(out, 'Body [P7].\n\n[^1]: "exact words" — P7\n[^2]: "another quote" — P2', "footnotes");
+    assertEq(out, 'Body [^1].\n\n[^1]: "exact words" — P7\n[^2]: "another quote" — P2', "linked footnotes");
+  });
+  test("duplicate CITES for one paragraph dedupe to a single definition", () => {
+    const out = _pbpAskBuildCopyText("A [P3] and again [P3].", [
+      { p: 3, quote: "first wins" },
+      { p: 3, quote: "second ignored" }
+    ]);
+    assertEq(out, 'A [^1] and again [^1].\n\n[^1]: "first wins" — P3', "dedupe + both tokens linked");
+  });
+  test("token without a CITES line keeps its literal form", () => {
+    const out = _pbpAskBuildCopyText("Known [P1] unknown [P9].", [{ p: 1, quote: "q" }]);
+    assertEq(out, 'Known [^1] unknown [P9].\n\n[^1]: "q" — P1', "orphan token untouched");
+  });
+  test("prefix namespaces footnote labels for multi-round export", () => {
+    const out = _pbpAskBuildCopyText("Body [P7].", [{ p: 7, quote: "w" }], "2-");
+    assertEq(out, 'Body [^2-1].\n\n[^2-1]: "w" — P7', "prefixed labels");
   });
   test("non-array cites tolerated", () => {
     assertEq(_pbpAskBuildCopyText("x", null), "x", "null cites");
@@ -2621,7 +2636,8 @@ suiteIf("ask copy text builder", "pbpAskBuildContext", () => {
     assert(out.indexOf("https://example.test") !== -1, "url");
     assert(out.indexOf("## Q1") !== -1 && out.indexOf("## Q2") !== -1, "round headers");
     assert(out.indexOf("**Q:** What is alpha?") !== -1, "question");
-    assert(out.indexOf('[^1]: "Alpha" — P1') !== -1, "cites footnote");
+    assert(out.indexOf('[^1-1]: "Alpha" — P1') !== -1, "round-prefixed cites footnote");
+    assert(out.indexOf("first. [^1-1]") !== -1, "inline token linked to the round-prefixed label");
   });
 });
 </script>

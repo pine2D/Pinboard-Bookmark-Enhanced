@@ -1076,15 +1076,38 @@ function _pbpAskFinalize(el, fullText, sent) {
 const PBP_ASK_COPY_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 
 // Pure: compose the copied markdown = answer body + footnote block from
-// the parsed cites. [^k] indexes follow cite order; quotes stay verbatim.
-function _pbpAskBuildCopyText(body, cites) {
+// the parsed cites. Inline [Pn] tokens become [^k] references matching
+// the footnote definitions (they used to stay literal, leaving every
+// definition an orphan no renderer links); quotes stay verbatim. Cites
+// are deduped by paragraph (first quote wins, same rule as the chip
+// pass) so each definition is referenced; [Pn] tokens without a CITES
+// line keep their literal form (no definition to point at). `prefix`
+// namespaces the labels ("2-" -> [^2-1]) so the multi-round thread
+// export does not collide identical [^1] definitions across answers.
+function _pbpAskBuildCopyText(body, cites, prefix) {
   const b = String(body == null ? "" : body).trim();
   const list = Array.isArray(cites) ? cites : [];
   if (!list.length) return b;
-  const foot = list
-    .map((c, i) => '[^' + (i + 1) + ']: "' + c.quote + '" — P' + c.p)
+  const pre = String(prefix == null ? "" : prefix);
+  const idxByP = new Map();
+  const uniq = [];
+  for (const c of list) {
+    if (!idxByP.has(c.p)) {
+      idxByP.set(c.p, uniq.length + 1);
+      uniq.push(c);
+    }
+  }
+  const label = (k) => "[^" + pre + k + "]";
+  const linked = _pbpAskSplitCiteTokens(b)
+    .map((seg) => {
+      if (seg.kind !== "cite") return seg.text;
+      return idxByP.has(seg.p) ? label(idxByP.get(seg.p)) : seg.token;
+    })
+    .join("");
+  const foot = uniq
+    .map((c, i) => label(i + 1) + ': "' + c.quote + '" — P' + c.p)
     .join("\n");
-  return b + "\n\n" + foot;
+  return linked + "\n\n" + foot;
 }
 
 function _pbpAskBuildThreadExport(rounds, page) {
@@ -1101,7 +1124,9 @@ function _pbpAskBuildThreadExport(rounds, page) {
       "## Q" + (i + 1),
       "**Q:** " + String((r && r.q) || "").trim(),
       "**A:**",
-      _pbpAskBuildCopyText(parsed.body, parsed.cites)
+      // Per-round label prefix: without it, every answer's footnotes
+      // restart at [^1] and collide inside the single exported document.
+      _pbpAskBuildCopyText(parsed.body, parsed.cites, (i + 1) + "-")
     ].join("\n\n"));
   });
   return parts.join("\n\n").trim();
