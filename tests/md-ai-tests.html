@@ -2342,6 +2342,11 @@ suiteIf("ask citation tokenizer", "pbpAskBuildContext", () => {
     const src = _pbpAskHistRestore.toString();
     assert(src.includes("stale ? _pbpAskStripCiteTokens(parsed.body) : parsed.body"), "stale strip missing in restore seeding");
   });
+  test("restored history prepends to st.rounds atomically after the loop", () => {
+    const src = _pbpAskHistRestore.toString();
+    assert(src.includes("restoredRounds.concat(_pbpAskState.rounds || [])"), "atomic prepend missing");
+    assert(!/_pbpAskState\.rounds\.push\(/.test(src), "mid-loop direct push must not return");
+  });
   test("empty input -> empty array", () => {
     assertEq(_pbpAskSplitCiteTokens("").length, 0, "empty");
   });

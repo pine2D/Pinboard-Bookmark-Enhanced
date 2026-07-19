@@ -1297,6 +1297,7 @@ async function _pbpAskHistRestore() {
   // built, preserving the "live round races in" ordering guarantee below.
   const raf = (typeof requestAnimationFrame === "function") ? requestAnimationFrame : (fn) => setTimeout(fn, 0);
   const PBP_ASK_HIST_CHUNK = 2;
+  const restoredRounds = [];
   let hi = 0;
   await new Promise((resolve) => {
     const step = () => {
@@ -1333,21 +1334,23 @@ async function _pbpAskHistRestore() {
             chip.disabled = true; // native: also drops it from the tab order + blocks click
           });
         }
-        // Seed st.rounds with the restored Q&A too, not just the DOM: it is
-        // what pbpAskBuildPrompt/_pbpAskUpdateMeta read (_pbpAskRun), so a
-        // follow-up question after a page reload still carries PREVIOUS
+        // Collect the restored Q&A for st.rounds too, not just the DOM: it
+        // is what pbpAskBuildPrompt/_pbpAskUpdateMeta read (_pbpAskRun), so
+        // a follow-up question after a page reload still carries PREVIOUS
         // Q&A context - same {q, a: <parsed body>} shape _pbpAskRun pushes
         // for a live answer (md-ask.js:466). A stale record's body enters
         // with its [Pn] tokens stripped - the UI already disabled those
         // chips as pointing nowhere, so the prompt must not re-teach the
-        // model the same dead indexes.
-        if (_pbpAskState) {
-          _pbpAskState.rounds = _pbpAskState.rounds || [];
-          _pbpAskState.rounds.push({
-            q: String(rec.q || ""),
-            a: stale ? _pbpAskStripCiteTokens(parsed.body) : parsed.body
-          });
-        }
+        // model the same dead indexes. NOT pushed straight into st.rounds
+        // here: a live round that races in while this chunked loop runs
+        // would land BEFORE later history chunks, and slice(-4) would then
+        // favor old rounds over the newest answer - the single concat
+        // below the loop prepends history atomically instead (mirror of
+        // the DOM insertBefore).
+        restoredRounds.push({
+          q: String(rec.q || ""),
+          a: stale ? _pbpAskStripCiteTokens(parsed.body) : parsed.body
+        });
       }
       if (hi < hist.length) raf(step); else resolve();
     };
@@ -1358,7 +1361,12 @@ async function _pbpAskHistRestore() {
   // the insert, or cleared history would silently reappear in the DOM.
   if (!_pbpAskHistRestored) return;
   // Prepend: if a live round raced in before the async build finished,
-  // restored history still reads in chronological order above it.
+  // restored history still reads in chronological order above it - and
+  // st.rounds gets the SAME ordering (history first, live rounds after),
+  // so slice(-4) keeps favoring the newest answers.
+  if (_pbpAskState) {
+    _pbpAskState.rounds = _pbpAskHistTrim(restoredRounds.concat(_pbpAskState.rounds || []));
+  }
   thread.insertBefore(frag, thread.firstChild);
   _pbpAskSyncRegenerate();
 }
