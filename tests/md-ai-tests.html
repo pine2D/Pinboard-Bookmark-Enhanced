@@ -5021,6 +5021,13 @@ suiteIf("skim cache metadata", "_pbpSkimCacheMeta", () => {
     assert(!_pbpSkimCacheMatches(Object.assign({ blocksHash: "b1" }, oldMeta), st, "b1"), "provider drift misses");
   });
 
+  test("cache entry missing blocksHash: stale (not fresh) when current fp known", () => {
+    const st = { s: { aiProvider: "gemini", aiSummaryLang: "en" } };
+    const meta = _pbpSkimCacheMeta(st);
+    assert(!_pbpSkimCacheMatches(Object.assign({ md: "- x" }, meta), st, "b1"), "no blocksHash + known fp -> not fresh");
+    assert(_pbpSkimCacheMatches(Object.assign({ md: "- x" }, meta), st, ""), "unknown current fp keeps tolerance");
+  });
+
   test("legacy cache entry without lang/model metadata is a miss", () => {
     const st = { s: { aiProvider: "gemini", aiSummaryLang: "en" } };
     assert(!_pbpSkimCacheMatches({ md: "- cached", blocksHash: "b1" }, st, "b1"), "legacy cache misses");

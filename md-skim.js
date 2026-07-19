@@ -78,7 +78,11 @@ function _pbpSkimCacheMatches(r, st, curBlocksHash) {
   if (!r.langKey || !r.modelKey) return false;
   return r.langKey === meta.langKey
     && r.modelKey === meta.modelKey
-    && (!r.blocksHash || !curBlocksHash || r.blocksHash === curBlocksHash);
+    // A record with NO blocksHash cannot prove it matches today's content —
+    // it goes down the stale path (render + stale bar), never fresh. Only an
+    // unavailable CURRENT fingerprint keeps the old tolerance (nothing to
+    // compare against).
+    && (!curBlocksHash || (!!r.blocksHash && r.blocksHash === curBlocksHash));
 }
 
 // Double gate (spec 1.1): shared master AI gate first, skim's own
@@ -235,7 +239,7 @@ async function _pbpSkimLoad() {
       && r.langKey && r.modelKey
       && r.langKey === meta.langKey
       && r.modelKey === meta.modelKey
-      && r.blocksHash && curFp && r.blocksHash !== curFp) {
+      && curFp && (!r.blocksHash || r.blocksHash !== curFp)) {
     _pbpSkimRenderCached(r);
     const stale = document.getElementById("skim-stale");
     if (stale) stale.hidden = false;
