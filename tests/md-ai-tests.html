@@ -965,11 +965,23 @@ suite("md-ai IDB key conventions", () => {
     const k = _pbpTrCacheKey("https://a.test/x", "zh-CN", "gemini-2.5-flash-lite", "alice");
     assert(k === "tr_acct_alice_zh-CN_gemini-2.5-flash-lite_" + pbpAiHash("https://a.test/x"), "got: " + k);
   });
-  test("ask_ stays URL-scoped while trview_ includes the owner namespace", () => {
-    assert(_pbpAskHistKey("https://a.test/x") === "ask_" + pbpAiHash("https://a.test/x"), "ask key");
+  test("ask_ includes the owner namespace and normalizes the URL", () => {
+    assert(_pbpAskHistKey("https://a.test/x", "alice") === "ask_acct_alice_" + pbpAiHash(pbpAiCacheUrlNorm("https://a.test/x")), "owner-scoped ask key");
+    assert(_pbpAskHistKey("https://a.test/x") === "ask_ownerless_" + pbpAiHash(pbpAiCacheUrlNorm("https://a.test/x")), "ownerless ask key");
+    assert(_pbpAskHistKey("https://a.test/x#top", "alice") === _pbpAskHistKey("https://a.test/x?utm_source=tw", "alice"), "fragment+tracker variants share one thread");
+    assert(_pbpAskHistKey("https://a.test/x", "alice") !== _pbpAskHistKey("https://a.test/x", "bob"), "cross-account isolation");
+    assert(_pbpAskHistLegacyKey("https://a.test/x") === "ask_" + pbpAiHash("https://a.test/x"), "legacy ownerless key shape (delete-on-sight target)");
     assert(_pbpTrViewKey("https://a.test/x", "alice") === "trview_acct_alice_" + pbpAiHash("https://a.test/x"), "trview key");
     assert(_pbpTrViewKey("https://a.test/x", "") === "trview_ownerless_" + pbpAiHash("https://a.test/x"), "ownerless trview key");
     assert(_pbpTrGlossaryCacheKey("https://a.test/x", "zh-CN", "gemini", "alice") === "gloss_acct_alice_zh-CN_gemini_" + pbpAiHash("https://a.test/x"), "glossary key");
+  });
+  test("ask run/clear/restore pass the owner to history persistence", () => {
+    const run = _pbpAskRun.toString();
+    assert(run.includes("pbpAskHistReplaceLast(st.url, record, st.account)"), "replaceLast owner missing");
+    assert(run.includes("pbpAskHistAppend(st.url, record, st.account)"), "append owner missing");
+    assert(_pbpAskClearThread.toString().includes("pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account)"), "clear owner missing");
+    assert(_pbpAskHistRestore.toString().includes("pbpAskHistGet(_pbpAskHistUrl, _pbpAskHistAccount)"), "restore owner missing");
+    assert(pbpAskInit.toString().includes('account: String((detail && detail.account) || "")'), "render detail owner not captured");
   });
   test("translate state passes immutable owner to summary and translation caches", () => {
     const init = pbpTrInit.toString();

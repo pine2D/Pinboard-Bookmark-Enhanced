@@ -42,6 +42,10 @@ async function pbpAskInit(detail) {
     s,
     url: String((detail && detail.url) || ""),
     title: String((detail && detail.title) || ""),
+    // Non-secret Pinboard username (md-preview.js previewAccount). Scopes
+    // the persisted thread key — account-isolation invariant, same as the
+    // tr_/gloss_ cache families.
+    account: String((detail && detail.account) || ""),
     panel: null,
     ctx: null,        // lazy context cache (filled by the send-flow task)
     records: [],
@@ -295,7 +299,7 @@ async function _pbpAskClearThread() {
   }
   const chips = document.getElementById("ask-chips");
   if (chips) chips.hidden = false;
-  if (_pbpAskState) await pbpAskHistSet(_pbpAskState.url, []);
+  if (_pbpAskState) await pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account);
   _pbpAskHistRestored = false;
 }
 
@@ -644,9 +648,9 @@ async function _pbpAskRun(question, aEl, opts) {
     // read-modify-write in one IDB transaction instead, which IndexedDB
     // serializes across tabs - no lost update.
     if (opts.replaceLast && typeof pbpAskHistReplaceLast === "function") {
-      await pbpAskHistReplaceLast(st.url, record);
+      await pbpAskHistReplaceLast(st.url, record, st.account);
     } else {
-      await pbpAskHistAppend(st.url, record);
+      await pbpAskHistAppend(st.url, record, st.account);
     }
     pbpAiBumpCounter("ask");
   } catch (e) {
@@ -1198,7 +1202,7 @@ function _pbpAskShowClearConfirm() {
       try { await _pbpAskClearThread(); } catch (_) {}
     } else {
       thread.replaceChildren();
-      try { await pbpAskHistSet(_pbpAskHistUrl, []); } catch (_) {}
+      try { await pbpAskHistSet(_pbpAskHistUrl, [], _pbpAskHistAccount); } catch (_) {}
     }
   });
   no.addEventListener("click", () => {
@@ -1211,14 +1215,21 @@ function _pbpAskShowClearConfirm() {
 
 // ---- Restore persisted rounds when the (lazily mounted) thread appears ----
 let _pbpAskHistUrl = "";
+let _pbpAskHistAccount = "";
 let _pbpAskHistRestored = false;
 
 async function _pbpAskHistRestore() {
   const thread = _pbpAskHistThread();
   if (_pbpAskHistRestored || !thread || !_pbpAskHistUrl) return;
   _pbpAskHistRestored = true;
+  // Pre-owner-scope hygiene: legacy ownerless "ask_<rawhash>" entries can
+  // never be read again (fail-closed, no adoption) — delete on sight so the
+  // leaked-to-nobody data actually disappears instead of waiting on LRU.
+  if (typeof _pbpAskHistLegacyKey === "function") {
+    pbpAiCacheDelete(_pbpAskHistLegacyKey(_pbpAskHistUrl)).catch(() => {});
+  }
   let hist = [];
-  try { hist = await pbpAskHistGet(_pbpAskHistUrl); } catch (_) {}
+  try { hist = await pbpAskHistGet(_pbpAskHistUrl, _pbpAskHistAccount); } catch (_) {}
   if (!hist.length) return;
   if (_pbpAskState) _pbpAskState.records = hist.slice();
   // Restored rounds replace the empty-state hint; the starter chips
@@ -1313,6 +1324,7 @@ async function _pbpAskHistRestore() {
 // page where AI is configured but the user never opens the panel.
 document.addEventListener("pbp:rendered", (e) => {
   _pbpAskHistUrl = (e.detail && e.detail.url) || "";
+  _pbpAskHistAccount = String((e.detail && e.detail.account) || "");
 }, { once: true });
 
 // ============================================================

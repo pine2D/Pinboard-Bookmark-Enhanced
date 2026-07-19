@@ -97,22 +97,12 @@ let _pbpSkimState = null;
 
 function _pbpSkimCacheKey(url) {
   // Same article opened via a #fragment or ?utm= variant must share one
-  // cache entry — every miss is a paid generation. Fragments never change
-  // the content; stripTrackingParams (shared.js) removes the known tracker
-  // set with default settings (deterministic key, independent of the user's
-  // strip config). Any parse failure falls back to the raw string.
-  let u = String(url || "");
-  try {
-    const p = new URL(u);
-    // Hash ROUTERS (#/docs/x, #!page) address content — keep those; plain
-    // anchors never change the article, drop them.
-    if (!/^#[!/]/.test(p.hash)) p.hash = "";
-    u = p.href;
-  } catch (_) {}
-  try {
-    if (typeof stripTrackingParams === "function") u = stripTrackingParams(u).cleaned || u;
-  } catch (_) {}
-  return "skim_" + pbpAiHash(u);
+  // cache entry — every miss is a paid generation. Normalization lives in
+  // pbpAiCacheUrlNorm (md-ai-core.js, shared with ask history): keeps hash
+  // ROUTERS (#/docs/x, #!page), drops plain anchors, strips the known
+  // tracker set. Same output as the pre-extraction inline version, so
+  // existing skim_ keys stay valid.
+  return "skim_" + pbpAiHash(pbpAiCacheUrlNorm(url));
 }
 
 function _pbpSkimCacheMeta(st) {

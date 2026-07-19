@@ -77,7 +77,7 @@ function pbpAiTextOf(n) {
 }
 
 // Fingerprint of the CURRENT block list's text (order + content). Ask history
-// is keyed only by URL (md-ai-core.js _pbpAskHistKey), not by extraction
+// is keyed by owner+URL (md-ai-core.js _pbpAskHistKey), not by extraction
 // engine/content version — switching Defuddle<->Jina (or a site re-render)
 // re-indexes blocks with different boundaries/order, so a [Pn] chip persisted
 // under the old index can point at unrelated content after restore (audit
@@ -517,10 +517,38 @@ const PBP_ASK_HIST_MAX = 20;
 function _pbpTrOwnerScope(account) {
   return account ? "acct_" + encodeURIComponent(String(account)) : "ownerless";
 }
+
+// Shared cache-key URL normalization (extracted from md-skim.js so ask
+// history and skim agree byte-for-byte): drop #fragments except hash
+// ROUTERS (#/docs/x, #!page — those address content), then strip the known
+// tracking-param set with default settings (deterministic key, independent
+// of the user's strip config). Any parse failure falls back to the input.
+function pbpAiCacheUrlNorm(url) {
+  let u = String(url || "");
+  try {
+    const p = new URL(u);
+    if (!/^#[!/]/.test(p.hash)) p.hash = "";
+    u = p.href;
+  } catch (_) {}
+  try {
+    if (typeof stripTrackingParams === "function") u = stripTrackingParams(u).cleaned || u;
+  } catch (_) {}
+  return u;
+}
 function _pbpTrCacheKey(url, lang, model, account) {
   return "tr_" + _pbpTrOwnerScope(account) + "_" + lang + "_" + model + "_" + pbpAiHash(String(url || ""));
 }
-function _pbpAskHistKey(url) { return "ask_" + pbpAiHash(String(url || "")); }
+// Owner-scoped like the tr_/trview_/gloss_ families (account-isolation
+// invariant): ask Q&A is account-derived data — an ownerless key let a
+// later Pinboard login on this machine read (and clear) the previous
+// user's threads. URL-normalized like skim: fragment/tracker variants of
+// one article share one thread. Legacy ownerless "ask_<rawhash>" entries
+// are NOT adopted (adoption would be the same cross-account leak); the
+// restore path deletes them on sight and the LRU ages out the rest.
+function _pbpAskHistKey(url, account) {
+  return "ask_" + _pbpTrOwnerScope(account) + "_" + pbpAiHash(pbpAiCacheUrlNorm(url));
+}
+function _pbpAskHistLegacyKey(url) { return "ask_" + pbpAiHash(String(url || "")); }
 function _pbpTrViewKey(url, account) {
   return "trview_" + _pbpTrOwnerScope(account) + "_" + pbpAiHash(String(url || ""));
 }
@@ -563,13 +591,13 @@ async function pbpTrGlossaryCacheSet(url, lang, model, terms, account) {
   await pbpAiCacheSet(_pbpTrGlossaryCacheKey(url, lang, model, account), { terms: terms || {} }, Date.now());
 }
 
-async function pbpAskHistGet(url) {
-  const entry = await pbpAiCacheGet(_pbpAskHistKey(url));
+async function pbpAskHistGet(url, account) {
+  const entry = await pbpAiCacheGet(_pbpAskHistKey(url, account));
   return (entry && Array.isArray(entry.result)) ? entry.result : [];
 }
 
-async function pbpAskHistSet(url, arr) {
-  await pbpAiCacheSet(_pbpAskHistKey(url), _pbpAskHistTrim(arr), Date.now());
+async function pbpAskHistSet(url, arr, account) {
+  await pbpAiCacheSet(_pbpAskHistKey(url, account), _pbpAskHistTrim(arr), Date.now());
 }
 
 // Atomic history append (D2-2): a plain pbpAskHistGet()+push+pbpAskHistSet()
@@ -578,16 +606,16 @@ async function pbpAskHistSet(url, arr) {
 // round (classic last-writer-wins). Routing the read-modify-write through
 // ai-cache.js's pbpAiCacheAppend puts it in ONE readwrite transaction,
 // which IndexedDB serializes across tabs/connections - closing the race.
-async function pbpAskHistAppend(url, round) {
-  await pbpAiCacheAppend(_pbpAskHistKey(url), (prev) => {
+async function pbpAskHistAppend(url, round, account) {
+  await pbpAiCacheAppend(_pbpAskHistKey(url, account), (prev) => {
     const hist = Array.isArray(prev) ? prev.slice() : [];
     hist.push(round);
     return _pbpAskHistTrim(hist);
   });
 }
 
-async function pbpAskHistReplaceLast(url, round) {
-  await pbpAiCacheAppend(_pbpAskHistKey(url), (prev) => {
+async function pbpAskHistReplaceLast(url, round, account) {
+  await pbpAiCacheAppend(_pbpAskHistKey(url, account), (prev) => {
     const hist = Array.isArray(prev) ? prev.slice() : [];
     if (hist.length && hist[hist.length - 1] && hist[hist.length - 1].q === round.q) {
       hist[hist.length - 1] = round;
