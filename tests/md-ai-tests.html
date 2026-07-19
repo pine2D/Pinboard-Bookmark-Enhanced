@@ -5193,6 +5193,19 @@ suiteIf("pbpSkimBuildPrompt", "pbpSkimBuildPrompt", () => {
   });
 });
 
+suiteIf("skim sent-set gating", "_pbpSkimFinalize", () => {
+  test("live finalize passes the sampled set and persists it", () => {
+    const src = _pbpSkimFinalize.toString();
+    assert(src.indexOf("_pbpAskChipPass(body, parsed.cites, sent)") !== -1, "chip pass missing the sent gate");
+    assert(src.indexOf("sent: Array.from(sent || [])") !== -1, "sent set not persisted with the cache entry");
+    assert(_pbpSkimRun.toString().indexOf("_pbpSkimFinalize(full, usage, ctx.sent)") !== -1, "run does not thread ctx.sent");
+  });
+  test("cache restore rebuilds the set; legacy entries degrade to unknown", () => {
+    const src = _pbpSkimRenderCached.toString();
+    assert(src.indexOf("Array.isArray(r.sent) ? new Set(r.sent) : null") !== -1, "restore must rebuild Set or degrade to null");
+  });
+});
+
 suiteIf("skim cache key normalization", "_pbpSkimCacheKey", () => {
   test("fragment and tracking-param variants share one cache key", () => {
     const base = _pbpSkimCacheKey("https://e.com/article?id=7");

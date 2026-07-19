@@ -302,7 +302,11 @@ function _pbpSkimRenderCached(r) {
   if (!body) return;
   _pbpSkimSetStatus("");
   body.innerHTML = renderMarkdown(r.md);
-  if (typeof _pbpAskChipPass === "function") _pbpAskChipPass(body, Array.isArray(r.cites) ? r.cites : []);
+  // Rebuild the sampled-paragraph set persisted at generation time so a
+  // cache hit applies the same sent-gate as the live pass; legacy entries
+  // without the field degrade to null = unknown (old behavior).
+  const sent = Array.isArray(r.sent) ? new Set(r.sent) : null;
+  if (typeof _pbpAskChipPass === "function") _pbpAskChipPass(body, Array.isArray(r.cites) ? r.cites : [], sent);
 }
 
 function _pbpSkimSetStatus(text) {
@@ -376,7 +380,7 @@ async function _pbpSkimRun() {
       usage.inTok = pbpAiEstimateTokens((built.system + built.prompt).length);
       usage.outTok = pbpAiEstimateTokens(full.length);
     }
-    _pbpSkimFinalize(full, usage);
+    _pbpSkimFinalize(full, usage, ctx.sent);
   } catch (e) {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     if (myGen !== st.gen) return; // superseded: ignore this run's error entirely
@@ -411,20 +415,24 @@ async function _pbpSkimRun() {
 // reused here -- its trailing call to _pbpAskDecorate adds ask's own
 // copy button + #ask-clear wiring (ask-thread-specific chrome); skim
 // only needs the two generic steps renderMarkdown + _pbpAskChipPass.
-function _pbpSkimFinalize(fullText, usage) {
+function _pbpSkimFinalize(fullText, usage, sent) {
   const st = _pbpSkimState;
   const body = document.getElementById("skim-body");
   if (!body) return;
   st.permissionError = null;
   const parsed = pbpAiParseCites(fullText);
   body.innerHTML = renderMarkdown(parsed.body);
-  if (typeof _pbpAskChipPass === "function") _pbpAskChipPass(body, parsed.cites);
+  // Same sent-gate as ask (A7): a cite of a paragraph the sampler never
+  // sent must not earn the solid verified state even when its guessed
+  // quote fuzzy-matches.
+  if (typeof _pbpAskChipPass === "function") _pbpAskChipPass(body, parsed.cites, sent);
   _pbpSkimSetStatus("");
   const blocksHash = (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : "";
   const meta = _pbpSkimCacheMeta(st);
   pbpAiCacheSet(_pbpSkimCacheKey(st.url), {
     md: parsed.body,
     cites: parsed.cites,
+    sent: Array.from(sent || []),
     blocksHash,
     ts: Date.now(),
     model: meta.modelKey,
