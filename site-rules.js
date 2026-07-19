@@ -246,6 +246,19 @@
     var sections = [];
     var seen = {};
 
+    // The entity table can carry answers belonging to OTHER questions
+    // (related/recommended modules ship in the same js-initialData), while
+    // pushAnswer always splices the CURRENT qid into permalinks — a foreign
+    // answer would leak in with a fabricated URL. An entity is foreign only
+    // when it explicitly names a different question; absent field = trusted
+    // (older payload shapes).
+    function foreignAnswer(ans) {
+      if (!ans || !qid) return false;
+      var q = ans.question;
+      var qown = q == null ? null : (typeof q === "object" ? q.id : q);
+      return qown != null && String(qown) !== String(qid);
+    }
+
     function pushAnswer(aid, author, voteup, bodyHtml) {
       bodyHtml = (typeof bodyHtml === "string") ? bodyHtml : "";
       if (!bodyHtml) return;
@@ -263,6 +276,7 @@
     cards.forEach(function (card) {
       var aid = card.getAttribute("name") || "";
       var ans = aid && ent.answers && ent.answers[aid];
+      if (foreignAnswer(ans)) return; // entity proves the card is another question's
       var bodyHtml = "", author = "", voteup = 0;
       if (ans) { bodyHtml = ans.content || ""; author = (ans.author && ans.author.name) || ""; voteup = entVoteup(ans); }
       if (!bodyHtml) { var node = card.querySelector(".RichText.ztext"); if (node) bodyHtml = node.innerHTML; }
@@ -276,7 +290,7 @@
       Object.keys(ent.answers).forEach(function (aid) {
         if (seen[aid]) return;
         var ans = ent.answers[aid];
-        if (!ans || !ans.content) return;
+        if (!ans || !ans.content || foreignAnswer(ans)) return;
         pushAnswer(aid, (ans.author && ans.author.name) || "", entVoteup(ans), ans.content);
       });
     }

@@ -757,6 +757,31 @@ const ART_HTML = `<html><head><script id="js-initialData" type="text/json">{"ini
   check("zhihu zhuanlan → body present, no answer H2", /文章正文/.test(c) && !/<h2>/.test(c), c);
 })();
 
+// --- Foreign-question answers in the shared entity table must not leak in ---
+const QUESTION_FOREIGN = `<!DOCTYPE html><html><head>
+<script id="js-initialData" type="text/json">{"initialState":{"entities":{
+"questions":{"659":{"id":659,"title":"过滤问题"}},
+"answers":{
+"111":{"id":111,"content":"<p>本题回答</p>","voteupCount":1,"author":{"name":"甲"},"question":{"id":659}},
+"999":{"id":999,"content":"<p>别的问题的回答</p>","voteupCount":9,"author":{"name":"乙"},"question":{"id":777}},
+"333":{"id":333,"content":"<p>无归属字段回答</p>","voteupCount":2,"author":{"name":"丙"}},
+"888":{"id":888,"content":"<p>外题卡片正文</p>","voteupCount":3,"author":{"name":"丁"},"question":{"id":777}}
+}}}}<\/script></head><body>
+<h1 class="QuestionHeader-title">过滤问题</h1>
+<div class="List-item"><div class="ContentItem AnswerItem" name="888"><div class="RichContent"><span class="RichText ztext"><p>外题卡片DOM正文</p></span></div></div></div>
+</body></html>`;
+
+(() => {
+  const doc = new DOMParser().parseFromString(QUESTION_FOREIGN, "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/659");
+  const c = r ? norm(r.contentHtml) : "";
+  check("zhihu foreign filter → own + field-less answers kept", /本题回答/.test(c) && /无归属字段回答/.test(c), c);
+  check("zhihu foreign filter → foreign entity dropped, no fabricated permalink",
+    !/别的问题的回答/.test(c) && c.indexOf("/question/659/answer/999") === -1, c);
+  check("zhihu foreign filter → entity-proven foreign DOM card dropped",
+    !/外题卡片正文/.test(c) && !/外题卡片DOM正文/.test(c), c);
+})();
+
 // --- Degraded path: no initialData, DOM cards only → note prepended ---
 const QUESTION_NODATA = `<!DOCTYPE html><html><head></head><body>
 <h1 class="QuestionHeader-title">无数据问题</h1>
