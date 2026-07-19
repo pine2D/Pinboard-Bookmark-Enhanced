@@ -221,8 +221,14 @@
     // as the answer body (and, for zero-vote answers, a foreign card's vote
     // button). No card at all => leave fields empty; a null return hands the
     // page to Defuddle rather than mislabeling the question description.
-    var card = (aid && doc.querySelector('.ContentItem.AnswerItem[name="' + aid + '"]')) ||
-               doc.querySelector(".ContentItem.AnswerItem");
+    var card = aid ? doc.querySelector('.ContentItem.AnswerItem[name="' + aid + '"]') : null;
+    if (!card) {
+      // Nameless first card = markup drift, acceptable stand-in. A card
+      // explicitly named as a DIFFERENT answer is not — its body would be
+      // exported under this URL's permalink.
+      var first = doc.querySelector(".ContentItem.AnswerItem");
+      if (first && !first.getAttribute("name")) card = first;
+    }
     if (!bodyHtml && card) {
       var node = card.querySelector(".RichText.ztext");
       if (node) bodyHtml = node.innerHTML;
@@ -277,6 +283,14 @@
       var aid = card.getAttribute("name") || "";
       var ans = aid && ent.answers && ent.answers[aid];
       if (foreignAnswer(ans)) return; // entity proves the card is another question's
+      if (!ans && qid) {
+        // No entity to consult — the card's own SSR itemprop=url meta still
+        // names the owning question; a mismatch means a recommended-module
+        // card from another question.
+        var mu = card.querySelector('meta[itemprop="url"]');
+        var mq = ((mu && mu.getAttribute("content") || "").match(/\/question\/(\d+)\//) || [])[1];
+        if (mq && mq !== qid) return;
+      }
       var bodyHtml = "", author = "", voteup = 0;
       if (ans) { bodyHtml = ans.content || ""; author = (ans.author && ans.author.name) || ""; voteup = entVoteup(ans); }
       if (!bodyHtml) { var node = card.querySelector(".RichText.ztext"); if (node) bodyHtml = node.innerHTML; }
@@ -465,8 +479,16 @@
     var sid = (String(url || "").match(/\/status\/(\d+)/) || [])[1];
     var article = null;
     if (sid) {
-      var link = doc.querySelector('article a[href*="/status/' + sid + '"]');
-      if (link && link.closest) article = link.closest("article");
+      // href*= is substring matching — /status/22 would hit /status/222 —
+      // so re-verify each candidate against an end-or-delimiter boundary.
+      var bnd = new RegExp("/status/" + sid + "(?:$|[/?#])");
+      var links = doc.querySelectorAll('article a[href*="/status/' + sid + '"]');
+      for (var li = 0; li < links.length; li++) {
+        if (bnd.test(links[li].getAttribute("href") || "")) {
+          article = links[li].closest ? links[li].closest("article") : null;
+          break;
+        }
+      }
     }
     article = article || doc.querySelector('article[data-testid="tweet"]') || doc.querySelector("article");
     if (!article) return null;
@@ -508,7 +530,11 @@
     // the match, so \Huge / \cite-style macros stay protected. Plain unwrapping
     // would erase the word boundary the group provided ({\c c}ade, {\o}rre) —
     // hence normalize-to-braced / resolve-in-place instead.
-    s = s.replace(/\{\\([`'^"~=.uvHrck])\s*\{?\s*(\\[ij]|[A-Za-z])\s*\}?\}/g, "\\$1{$2}"); // {\'e}/{\c c} -> \'{e}/\c{c}
+    // Letter-named accents (\u \v \H \r \c \k) REQUIRE a separator (space or
+    // brace) before their argument — TeX reads "\rm" as the control word rm,
+    // not \r+m, so {\rm} must stay untouched. Punctuation accents need none.
+    s = s.replace(/\{\\([`'^"~=.])\s*\{?\s*(\\[ij]|[A-Za-z])\s*\}?\}/g, "\\$1{$2}");                // {\'e} -> \'{e}
+    s = s.replace(/\{\\([uvHrck])(?:\s+|\s*\{\s*)(\\[ij]|[A-Za-z])\s*\}?\}/g, "\\$1{$2}");          // {\c c}/{\c{c}} -> \c{c}
     s = s.replace(/\{\\(ss|ae|AE|oe|OE|aa|AA|[oOlLij])\}/g, function (m, n) {              // {\o} -> ø: braces ARE the boundary
       return Object.prototype.hasOwnProperty.call(TEX_LETTER, n) ? TEX_LETTER[n] : m;
     });

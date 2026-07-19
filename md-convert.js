@@ -210,8 +210,11 @@ function _pbpGetTurndown() {
 // X /hashtag/…, SO /questions/…); Turndown copies href verbatim, so those links
 // would resolve against chrome-extension:// in the preview and stay dead in
 // exported .md. Absolutize non-fragment relative a[href] against baseUrl before
-// conversion — the anchor-side mirror of applyImagePolicy's img-src handling
-// (same skip set: absolute schemes, protocol-relative //; plus #fragments).
+// conversion — the anchor-side mirror of applyImagePolicy's img-src handling.
+// Protocol-relative //host/x IS absolutized here (new URL gives it baseUrl's
+// scheme): left alone it resolves against chrome-extension:// in the preview,
+// exactly the failure this pass exists to prevent. Skips: #fragments and
+// absolute schemes only.
 function _pbpAbsolutizeLinks(html, baseUrl) {
   if (typeof document === "undefined" || html.indexOf("href") === -1) return html;
   // Inert document (same pattern as _splitMergedComments): scripts never
@@ -222,7 +225,7 @@ function _pbpAbsolutizeLinks(html, baseUrl) {
   let touched = false;
   root.querySelectorAll("a[href]").forEach((a) => {
     const href = a.getAttribute("href") || "";
-    if (!href || href.startsWith("#") || href.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(href)) return;
+    if (!href || href.startsWith("#") || /^[a-z][a-z0-9+.-]*:/i.test(href)) return;
     try { a.setAttribute("href", new URL(href, baseUrl).href); touched = true; } catch (_) { /* keep original */ }
   });
   return touched ? root.innerHTML : html;

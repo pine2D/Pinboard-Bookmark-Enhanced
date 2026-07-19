@@ -606,7 +606,7 @@ function assertEq(actual, expected, label) {
     check("path-relative href resolves against page path", md.indexOf("(https://x.com/alice/status/member/1)") !== -1, md);
     check("fragment href untouched", md.indexOf("(#sec)") !== -1, md);
     check("absolute href untouched", md.indexOf("(https://abs.example/p)") !== -1, md);
-    check("protocol-relative href untouched", md.indexOf("(//cdn.example/x)") !== -1, md);
+    check("protocol-relative href gets baseUrl's scheme", md.indexOf("(https://cdn.example/x)") !== -1, md);
     const noBase = htmlToMarkdown('<p><a href="/hashtag/pbp">#pbp</a></p>', {});
     check("no baseUrl -> relative href unchanged", noBase.indexOf("(/hashtag/pbp)") !== -1, noBase);
   })();
@@ -743,6 +743,15 @@ const ANSWER_DOMFALLBACK = `<!DOCTYPE html><html><head></head><body>
     '<html><body><div class="QuestionRichText"><span class="RichText ztext"><p>只有问题描述</p></span></div></body></html>', "text/html");
   check("zhihu answer, no answer card at all → null (Defuddle takes over)",
     applySiteRule(drift, "https://www.zhihu.com/question/900/answer/555") === null);
+  const wrongCard = new DOMParser().parseFromString(
+    '<html><body><div class="ContentItem AnswerItem" name="666"><div class="RichContent"><span class="RichText ztext"><p>别人的回答</p></span></div></div></body></html>', "text/html");
+  check("zhihu answer, only a DIFFERENT named card → null, not a mislabeled body",
+    applySiteRule(wrongCard, "https://www.zhihu.com/question/900/answer/555") === null);
+  const nameless = new DOMParser().parseFromString(
+    '<html><body><div class="ContentItem AnswerItem"><div class="RichContent"><span class="RichText ztext"><p>无名卡片回答</p></span></div></div></body></html>', "text/html");
+  const rn = applySiteRule(nameless, "https://www.zhihu.com/question/900/answer/555");
+  check("zhihu answer, nameless card (markup drift) → still extracted",
+    rn && /无名卡片回答/.test(rn.contentHtml), JSON.stringify(rn && rn.contentHtml));
 })();
 
 // --- Zhihu zhuanlan article fixture ---
@@ -769,6 +778,8 @@ const QUESTION_FOREIGN = `<!DOCTYPE html><html><head>
 }}}}<\/script></head><body>
 <h1 class="QuestionHeader-title">过滤问题</h1>
 <div class="List-item"><div class="ContentItem AnswerItem" name="888"><div class="RichContent"><span class="RichText ztext"><p>外题卡片DOM正文</p></span></div></div></div>
+<div class="List-item"><div class="ContentItem AnswerItem" name="444"><meta itemprop="url" content="https://www.zhihu.com/question/777/answer/444"><div class="RichContent"><span class="RichText ztext"><p>无实体外题卡片</p></span></div></div></div>
+<div class="List-item"><div class="ContentItem AnswerItem" name="445"><meta itemprop="url" content="https://www.zhihu.com/question/659/answer/445"><div class="RichContent"><span class="RichText ztext"><p>无实体本题卡片</p></span></div></div></div>
 </body></html>`;
 
 (() => {
@@ -780,6 +791,8 @@ const QUESTION_FOREIGN = `<!DOCTYPE html><html><head>
     !/别的问题的回答/.test(c) && c.indexOf("/question/659/answer/999") === -1, c);
   check("zhihu foreign filter → entity-proven foreign DOM card dropped",
     !/外题卡片正文/.test(c) && !/外题卡片DOM正文/.test(c), c);
+  check("zhihu foreign filter → entity-less card judged by itemprop url meta",
+    !/无实体外题卡片/.test(c) && /无实体本题卡片/.test(c), c);
 })();
 
 // --- Degraded path: no initialData, DOM cards only → note prepended ---
@@ -963,6 +976,22 @@ check("buildDepthTree is a global function", typeof buildDepthTree === "function
   check("arxiv → {\\o} letter macro unwrapped", /Smørrebrød/.test(c), c);
   check("arxiv → braced \\c{c} still decodes, \\cite untouched", /ç stay correct/.test(c) && /\\cite\{x\}/.test(c), c);
   check("arxiv → title TeX-decoded with $...$ intact", r && r.title === "Étude on Collège $x \\geq 2$", JSON.stringify(r && r.title));
+})();
+
+(() => {
+  // Letter-named accent commands need a separator: {\rm} is the font switch
+  // control word, NOT \r + m — it must survive decoding untouched.
+  const html = `<!DOCTYPE html><html><head>
+  <meta name="citation_title" content="Results {\\rm} revisited">
+  <meta name="citation_abstract" content="Set {\\rm d}x with fa{\\c c}ade.">
+  <meta name="citation_arxiv_id" content="2401.99999">
+  </head><body></body></html>`;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const r = applySiteRule(doc, "https://arxiv.org/abs/2401.99999");
+  const c = r ? norm(r.contentHtml) : "";
+  check("arxiv → {\\rm} control word untouched in title and abstract",
+    r && r.title === "Results {\\rm} revisited" && /\{\\rm d\}x/.test(c), JSON.stringify(r && [r.title, c]));
+  check("arxiv → separator form {\\c c} still decodes alongside", /façade/.test(c), c);
 })();
 
 section("site-rules: helpers");
@@ -1305,6 +1334,24 @@ section("site-rules: X/Twitter status");
   check("x parent URL on same DOM → parent extracted", rp && /Parent tweet body/.test(rp.contentHtml), JSON.stringify(rp && rp.contentHtml));
   const rf = applySiteRule(rdoc, "https://x.com/ghost/status/999");
   check("x unknown id → falls back to first article", rf && /Parent tweet body/.test(rf.contentHtml), JSON.stringify(rf && rf.contentHtml));
+
+  // Substring trap: target id 22 must NOT match the /status/222 link of an
+  // earlier article; boundary check routes to the true /status/22 article.
+  const XS = '<html><body>' +
+    '<article data-testid="tweet">' +
+      '<div data-testid="User-Name"><span>Long</span><span>@long</span></div>' +
+      '<div data-testid="tweetText"><span>Status 222 body</span></div>' +
+      '<a href="/long/status/222"><time datetime="2026-07-01T00:00:00.000Z">Jul 1</time></a>' +
+    '</article>' +
+    '<article data-testid="tweet">' +
+      '<div data-testid="User-Name"><span>Short</span><span>@short</span></div>' +
+      '<div data-testid="tweetText"><span>Status 22 body</span></div>' +
+      '<a href="/short/status/22/photo/1"><time datetime="2026-07-02T00:00:00.000Z">Jul 2</time></a>' +
+    '</article></body></html>';
+  const sdoc = new DOMParser().parseFromString(XS, "text/html");
+  const rs = applySiteRule(sdoc, "https://x.com/short/status/22");
+  check("x id boundary → /status/22 not stolen by /status/222",
+    rs && /Status 22 body/.test(rs.contentHtml) && !/Status 222 body/.test(rs.contentHtml), JSON.stringify(rs && rs.contentHtml));
 }
 </script>
 
