@@ -2517,6 +2517,11 @@ suiteIf("ask chip pass", "pbpAskBuildContext", () => {
     assert(!chips[1].classList.contains("verified"), "unsent paragraph stays unverified");
     assertEq(chips[1].dataset.qs, undefined, "no offsets for unsent paragraph");
   });
+  test("jump skips precise offsets inside KaTeX-rendered blocks", () => {
+    const src = _pbpAskJump.toString();
+    assert(src.indexOf('!orig.querySelector(".katex")') !== -1,
+      "math blocks must fall back to whole-block flash (clean-text offsets do not map to the KaTeX DOM)");
+  });
   test("pbpAskBuildContext exposes the sent set", () => {
     makeBlocks("<p>a</p>");
     const r = pbpAskBuildContext(pbpAiBlocks());

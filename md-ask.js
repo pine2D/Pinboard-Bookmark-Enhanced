@@ -978,8 +978,13 @@ function _pbpAskJump(chip) {
   let range = null;
   // Verified offsets index the ORIGINAL block's textContent (translation
   // inserts siblings, never mutates the original's text nodes), so they
-  // only apply when the original itself is the visible target.
-  if (target === orig && chip.classList.contains("verified")) {
+  // only apply when the original itself is the visible target. Math
+  // blocks are excluded: their offsets were computed against the CLEAN
+  // "$tex$" text (pbpAiTextOfKatex, what the model quoted), but KaTeX has
+  // rewritten the live DOM into glyph+MathML+annotation duplicates - the
+  // two coordinate systems diverge, and a mid-block offset would flash
+  // the wrong span. Whole-block flash is the honest fallback there.
+  if (target === orig && chip.classList.contains("verified") && !orig.querySelector(".katex")) {
     range = _pbpAskRangeFromOffsets(orig, Number(chip.dataset.qs), Number(chip.dataset.qe));
   }
   if (!range) {
