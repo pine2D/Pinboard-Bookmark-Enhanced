@@ -1630,6 +1630,40 @@ section("site-rules: X/Twitter status");
 </script>
 
 <script>
+section("site-rules: popup/background extractor mirror invariants");
+(async () => {
+  // extractLocalMarkdown (popup.js) and extractPageForMarkdown (background.js)
+  // are deliberately hand-mirrored. Pin the load-bearing lines so one side
+  // silently losing a field/flag fails here instead of in production. Needs
+  // HTTP (run-test.mjs / verify.sh); direct file:// opens record skips.
+  const INV = [
+    ["site-rule dispatch", 'applySiteRule(document, location.href)'],
+    ["lazy-img pass on site-rule output", 'pbpNormalizeLazyImages(div, location.href)'],
+    ["lazy-img pass on Defuddle clone", 'pbpNormalizeLazyImages(clone, location.href)'],
+    ["site-rule payload incl. math/forum flags", 'title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum'],
+    ["MathML-derived math flag on Defuddle path", 'math: !!document.querySelector("math")'],
+    ["Defuddle metadata forwarding", 'author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || ""'],
+  ];
+  let pj = "", bj = "";
+  try {
+    pj = await (await fetch("../popup.js")).text();
+    bj = await (await fetch("../background.js")).text();
+  } catch (_) {}
+  if (!pj || !bj) {
+    for (const [label] of INV) {
+      const div = document.createElement("div");
+      div.className = "case skip";
+      div.textContent = "○  mirror invariant: " + label + " (file:// — fetch unavailable)";
+      root.appendChild(div);
+    }
+  } else {
+    for (const [label, needle] of INV) {
+      check("mirror invariant in BOTH extractors: " + label,
+        pj.indexOf(needle) !== -1 && bj.indexOf(needle) !== -1, needle);
+    }
+  }
+})();
+
 section("site-rules: v2ex buildReplyTree multi-@ (pure)");
 (() => {
   // Multiple @-mentions: the LAST mentioned member is the primary parent
