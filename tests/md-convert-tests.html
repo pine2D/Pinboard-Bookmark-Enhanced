@@ -722,6 +722,29 @@ const QUESTION_HTML = `<!DOCTYPE html><html><head>
   check("zhihu single answer → title is question title", r && r.title === "测试问题标题", r && r.title);
 })();
 
+// --- Answer permalink, no initialData: DOM fallback must scope to the answer
+// card — the page renders the QUESTION description as .RichText.ztext first ---
+const ANSWER_DOMFALLBACK = `<!DOCTYPE html><html><head></head><body>
+<h1 class="QuestionHeader-title">作用域问题</h1>
+<div class="QuestionRichText"><span class="RichText ztext"><p>问题描述文字</p></span></div>
+<div class="ContentItem AnswerItem" name="555"><div class="AuthorInfo"><span class="AuthorInfo-name">答主戊</span></div><div class="RichContent"><span class="RichText ztext"><p>真正的回答正文</p></span></div><button class="VoteButton" aria-label="赞同 77">赞同</button></div>
+<div class="ContentItem AnswerItem" name="666"><div class="RichContent"><span class="RichText ztext"><p>更多回答的正文</p></span></div><button class="VoteButton" aria-label="赞同 999">赞同</button></div>
+</body></html>`;
+
+(() => {
+  const doc = new DOMParser().parseFromString(ANSWER_DOMFALLBACK, "text/html");
+  const r = applySiteRule(doc, "https://www.zhihu.com/question/900/answer/555");
+  const c = r ? norm(r.contentHtml) : "";
+  check("zhihu answer DOM fallback → answer body, not question description",
+    /真正的回答正文/.test(c) && !/问题描述文字/.test(c), c);
+  check("zhihu answer DOM fallback → card-scoped author + votes",
+    /<h2>答主戊<\/h2>/.test(c) && /77 赞同/.test(c) && !/999/.test(c), c);
+  const drift = new DOMParser().parseFromString(
+    '<html><body><div class="QuestionRichText"><span class="RichText ztext"><p>只有问题描述</p></span></div></body></html>', "text/html");
+  check("zhihu answer, no answer card at all → null (Defuddle takes over)",
+    applySiteRule(drift, "https://www.zhihu.com/question/900/answer/555") === null);
+})();
+
 // --- Zhihu zhuanlan article fixture ---
 const ART_HTML = `<html><head><script id="js-initialData" type="text/json">{"initialState":{"entities":{"articles":{"700":{"id":700,"title":"专栏文章标题","content":"<p>文章正文</p>"}}}}}<\/script></head><body></body></html>`;
 

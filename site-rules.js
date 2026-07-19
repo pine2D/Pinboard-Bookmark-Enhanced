@@ -215,15 +215,23 @@
     var ans = aid && ent.answers && ent.answers[aid];
     var bodyHtml = "", author = "", voteup = 0;
     if (ans) { bodyHtml = ans.content || ""; author = (ans.author && ans.author.name) || ""; voteup = entVoteup(ans); }
-    if (!bodyHtml) {
-      var node = doc.querySelector(".RichText.ztext");
+    // DOM fallbacks are scoped to the answer's own card: the permalink page
+    // also renders the question description as a .RichText.ztext ABOVE the
+    // answer, so a whole-document first-match would return the question text
+    // as the answer body (and, for zero-vote answers, a foreign card's vote
+    // button). No card at all => leave fields empty; a null return hands the
+    // page to Defuddle rather than mislabeling the question description.
+    var card = (aid && doc.querySelector('.ContentItem.AnswerItem[name="' + aid + '"]')) ||
+               doc.querySelector(".ContentItem.AnswerItem");
+    if (!bodyHtml && card) {
+      var node = card.querySelector(".RichText.ztext");
       if (node) bodyHtml = node.innerHTML;
     }
-    if (!author) {
-      var aEl = doc.querySelector(".AuthorInfo-name") || doc.querySelector(".AuthorInfo .UserLink-link");
+    if (!author && card) {
+      var aEl = card.querySelector(".AuthorInfo-name") || card.querySelector(".AuthorInfo .UserLink-link");
       if (aEl) author = aEl.textContent.trim();
     }
-    if (!voteup) voteup = domVoteup(doc);
+    if (!voteup && card) voteup = domVoteup(card);
     var body = cleanBodyHtml(doc, bodyHtml);
     if (!body) return null;
     var permalink = (qid && aid) ? "https://www.zhihu.com/question/" + qid + "/answer/" + aid : url;
