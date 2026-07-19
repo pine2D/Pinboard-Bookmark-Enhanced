@@ -105,9 +105,12 @@
     } catch (_) { return {}; }
   }
 
+  // Also encodes double quotes: escapeHtml output lands inside double-quoted
+  // href attributes (answerSection, extractArxiv), where a bare " truncates
+  // the attribute even though downstream DOMPurify prevents actual XSS.
   function escapeHtml(s) {
     return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
   // Zhihu lazy-loads images: real URL in data-original / data-actualsrc / data-src. Promote

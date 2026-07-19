@@ -1289,6 +1289,17 @@ section("site-rules: so comments (end-to-end)");
   check("so global cap → one-time note exactly once", (c.match(/部分未提取/g) || []).length === 1, c);
 })();
 
+section("site-rules: escapeHtml attribute-context quotes");
+(() => {
+  const v = `<!DOCTYPE html><html><body><h1>引号</h1><div class="topic_content"><p>t</p></div>
+  <div class="cell" id="r_1"><strong><a href="/member/q" class="dark">甲"乙</a></strong><span class="no">1</span><div class="reply_content">正文</div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(v, "text/html");
+  const r = applySiteRule(doc, "https://www.v2ex.com/t/888");
+  check("escapeHtml → double quote encoded in emitted headers",
+    r && r.contentHtml.indexOf('甲&quot;乙') !== -1 && r.contentHtml.indexOf('甲"乙') === -1, JSON.stringify(r && r.contentHtml));
+})();
+
 section("site-rules: v2ex mention extraction (anchors, not raw @)");
 (() => {
   // An email in plain text must NOT create a reply-to edge; a real @-anchor must.
