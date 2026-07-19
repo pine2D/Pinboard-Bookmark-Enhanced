@@ -2261,13 +2261,41 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
     assert(r.system.indexOf("CITES:") !== -1, "cites block marker");
     assert(r.system.indexOf("15 words or fewer") !== -1, "quote length cap");
     assert(r.system.indexOf("article's original language") !== -1, "quote language rule");
-    assert(r.system.indexOf("does not contain") !== -1, "honesty rule");
+    assert(r.system.indexOf("does not cover it at all, say so plainly") !== -1, "honesty rule");
+  });
+  test("system carries the research-grounded additions", () => {
+    const r = pbpAskBuildPrompt({ context: "[P1] a", history: [], question: "q" });
+    assert(r.system.indexOf("silently resolve it against PREVIOUS Q&A") !== -1, "pronoun-resolution step");
+    assert(r.system.indexOf("silently locate every paragraph") !== -1, "locate-then-answer process line");
+    assert(r.system.indexOf("covers it only partially") !== -1, "partial-coverage middle state");
+    assert(r.system.indexOf("may be written in a different language") !== -1, "cross-language search rule");
+    assert(r.system.indexOf("Cite only paragraphs you actually drew on") !== -1, "anti post-rationalization");
+    // Narrative honesty rule, never an option menu (abstention-artifact
+    // guard, arXiv 2507.16199): no "choose between"/"Unknown" style menu.
+    assert(r.system.indexOf("choose") === -1 && r.system.indexOf("Unknown") === -1, "no option-menu abstention");
   });
   test("prompt carries article context and question; no history section when empty", () => {
     const r = pbpAskBuildPrompt({ context: "[P1] alpha\n[P2] beta", history: [], question: "What is beta?" });
     assert(r.prompt.indexOf("ARTICLE:\n[P1] alpha\n[P2] beta") !== -1, "context embedded");
     assert(r.prompt.indexOf("QUESTION: What is beta?") !== -1, "question line");
     assert(r.prompt.indexOf("PREVIOUS") === -1, "no history header");
+    assert(r.prompt.indexOf("TITLE:") === -1, "no empty title line");
+  });
+  test("title enters the prompt; reminder line sits right before the question", () => {
+    const r = pbpAskBuildPrompt({ context: "[P1] a", history: [], question: "q?", title: "  My   Page  " });
+    assert(r.prompt.indexOf("TITLE: My Page") === 0, "normalized title first");
+    const rem = r.prompt.indexOf("(Reminder:");
+    assert(rem !== -1, "sandwich reminder present");
+    assert(r.prompt.indexOf("QUESTION: q?") > rem, "reminder precedes the question");
+    assert(r.prompt.indexOf("cite [P<n>]") !== -1, "reminder restates the cite contract");
+  });
+  test("forum flag swaps the source noun, CITES contract unchanged", () => {
+    const r = pbpAskBuildPrompt({ context: "[P1] a", history: [], question: "q", forum: true });
+    assert(r.system.indexOf("discussion thread") !== -1, "thread variant");
+    assert(r.system.indexOf("ONE article") === -1, "article noun gone");
+    assert(r.system.indexOf("thread's original language") !== -1, "quote rule follows the noun");
+    assert(r.prompt.indexOf("THREAD:") !== -1 && r.prompt.indexOf("ARTICLE:") === -1, "thread payload header");
+    assert(r.system.indexOf("CITES:") !== -1 && r.system.indexOf("[P<n>]") !== -1, "cite contract identical");
   });
   test("history serialized as Q/A lines, last 4 only, order kept", () => {
     const hist = [];

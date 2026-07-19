@@ -46,6 +46,9 @@ async function pbpAskInit(detail) {
     // the persisted thread key — account-isolation invariant, same as the
     // tr_/gloss_ cache families.
     account: String((detail && detail.account) || ""),
+    // Forum/thread pages get the thread-variant prompt (same detection
+    // skim uses: md-preview.js resolves pbpForumShouldMark into detail).
+    forum: !!(detail && detail.forum),
     panel: null,
     ctx: null,        // lazy context cache (filled by the send-flow task)
     records: [],
@@ -426,10 +429,30 @@ const PBP_ASK_HIST_ANSWER_CAP = 8000;
 // round always fits: both its q and a are char-capped upstream/here).
 // The CITES contract here is what pbpAiParseCites (md-ai-core, Task 5)
 // parses on the way back.
+//
+// Research-grounded structure (ask campaign 2026-07):
+// - Page before question stays: Anthropic/Gemini long-context guidance
+//   (question-after-document, up to +30%) - the pre-existing layout was
+//   already right, so only the interior changed.
+// - "Reminder" line right before QUESTION = OpenAI's sandwich placement,
+//   compatible with the Anthropic ordering above.
+// - Silent locate-then-answer process line = Anthropic quote-first
+//   guidance, kept internal so the output format (and the CITES parser)
+//   is untouched - same approach the skim prompt ships.
+// - Rule 5's three-way honesty (full/partial/none) targets the measured
+//   failure mode: models fabricate hardest when context PARTIALLY covers
+//   a question (Google "Sufficient Context", ICLR 2025). Kept narrative -
+//   an explicit "answer/unknown" option menu induces artifact abstention.
+// - Pronoun resolution against PREVIOUS Q&A = the QuAC/CANARD failure
+//   class ("which one was the second?"), folded into the same call.
+// - forum flag swaps the source noun (thread vs article), mirroring the
+//   skim prompt's variant; [Pn]/CITES semantics are identical.
 function pbpAskBuildPrompt(args) {
   const a = args || {};
   const context = String(a.context == null ? "" : a.context);
   const question = String(a.question == null ? "" : a.question);
+  const title = String(a.title == null ? "" : a.title).replace(/\s+/g, " ").trim();
+  const src = a.forum ? "thread" : "article";
   const recent = Array.isArray(a.history) ? a.history.slice(-4) : [];
   const history = [];
   let histTokens = 0;
@@ -443,16 +466,21 @@ function pbpAskBuildPrompt(args) {
     histTokens += cost;
   }
   const system = [
-    "You answer questions about ONE article supplied below.",
+    a.forum
+      ? "You answer questions about ONE web discussion thread supplied below as numbered paragraphs."
+      : "You answer questions about ONE article supplied below as numbered paragraphs.",
+    "Process, before writing anything: if the question leans on earlier turns (pronouns, \"the second one\", \"that part\"), silently resolve it against PREVIOUS Q&A into a self-contained question; then silently locate every paragraph that bears on it, and answer from those paragraphs.",
     "Rules:",
-    "1. Answer in the same language as the question.",
-    "2. Use ONLY the article. Do not use outside knowledge.",
-    "3. After every claim the article supports, add an inline citation token [P<n>] where <n> is the paragraph number from the article. Write each citation as its own token, e.g. [P3][P5]. NEVER group citations inside one pair of brackets or parentheses such as (P3, P5).",
+    "1. Answer in the same language as the question. The " + src + " itself may be written in a different language - search all of it anyway.",
+    "2. Use ONLY the " + src + ". Do not use outside knowledge.",
+    "3. After every claim the " + src + " supports, add an inline citation token [P<n>] where <n> is the paragraph number from the " + src + ". Write each citation as its own token, e.g. [P3][P5]. NEVER group citations inside one pair of brackets or parentheses such as (P3, P5). Cite only paragraphs you actually drew on.",
     "4. End the answer with a CITES: block - one line per cited paragraph, formatted exactly as:",
-    "   P<n>: \"verbatim quote of 15 words or fewer, in the article's original language\"",
-    "5. If the article does not contain the answer, say so plainly. Never invent citations."
+    "   P<n>: \"verbatim quote of 15 words or fewer, in the " + src + "'s original language\"",
+    "5. Cover honestly: if the " + src + " fully answers the question, just answer; if it covers it only partially, answer what it does cover and say plainly what it does not; if it does not cover it at all, say so plainly. Never fill a gap from outside knowledge, and never invent citations."
   ].join("\n");
-  const parts = ["ARTICLE:", context, ""];
+  const parts = [];
+  if (title) parts.push("TITLE: " + title, "");
+  parts.push(a.forum ? "THREAD:" : "ARTICLE:", context, "");
   if (history.length) {
     parts.push("PREVIOUS Q&A (context for follow-ups only):");
     for (const h of history) {
@@ -461,6 +489,7 @@ function pbpAskBuildPrompt(args) {
     }
     parts.push("");
   }
+  parts.push("(Reminder: use only the " + src + " above, cite [P<n>] after supported claims, and say plainly what it does not cover.)");
   parts.push("QUESTION: " + question);
   return { system, prompt: parts.join("\n") };
 }
@@ -495,7 +524,10 @@ function _pbpAskUpdateMeta() {
   const _askQ = _askQuestion ? _askQuestion.value : "";
   const _askRounds = (st.rounds || []);
   const _askBuilt = st.ctx
-    ? pbpAskBuildPrompt({ context: st.ctx.text, history: _askRounds, question: _askQ })
+    ? pbpAskBuildPrompt({
+        context: st.ctx.text, history: _askRounds, question: _askQ,
+        title: st.title, forum: st.forum
+      })
     : { system: "", prompt: "" };
   const tokens = pbpAiEstimateTokens((_askBuilt.system + _askBuilt.prompt).length);
   let line = t("askWillSend", String(tokens), _pbpAskProviderLabel(st.s));
@@ -602,7 +634,10 @@ async function _pbpAskRun(question, aEl, opts) {
     // prior answer anchors on it and restates instead of re-answering.
     const promptHistory = (opts.replaceLast && st.rounds.length)
       ? st.rounds.slice(0, -1) : st.rounds;
-    const built = pbpAskBuildPrompt({ context: st.ctx.text, history: promptHistory, question });
+    const built = pbpAskBuildPrompt({
+      context: st.ctx.text, history: promptHistory, question,
+      title: st.title, forum: st.forum
+    });
     const full = await getOrCreateInflight("ask_" + st.url + "_" + question, () =>
       callAIStream(st.s, built.prompt, {
         maxTokens: 4096,
