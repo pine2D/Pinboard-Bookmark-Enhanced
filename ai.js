@@ -38,7 +38,12 @@ async function getPageInfoFromTab(tabId, opts = {}) {
     }
 
     if (withDefuddle) {
-      // Inject Defuddle library first (ignore failure — e.g. tab closed mid-inject)
+      // site-rules.js first (paired with Defuddle, runs before it — a matched
+      // rule short-circuits). OPTIONAL: injected separately with failure
+      // ignored so a broken rule can't mask Defuddle. Mirrors popup.js
+      // extractLocalMarkdown / background.js extractForPreview.
+      await _cbExecuteScript({ target: { tabId }, files: ["site-rules.js"] });
+      // Inject Defuddle library (ignore failure — e.g. tab closed mid-inject)
       await _cbExecuteScript({ target: { tabId }, files: ["vendor/defuddle.js"] });
       const injectedTab = await _cbTabsGet(tabId);
       if (!injectedTab || (expectedUrl !== null && injectedTab.url !== expectedUrl)) return null;
@@ -56,6 +61,28 @@ async function getPageInfoFromTab(tabId, opts = {}) {
 
         // Fast path (default): no pageText extraction. Popup form only needs the fields above.
         if (!useDefuddle) return info;
+
+        // Per-site rule first (Zhihu/SO/HN/V2EX/arXiv/X): Defuddle's generic
+        // single-body extraction drops the answers/replies on exactly the
+        // pages site-rules.js exists to cover, so AI tags/summary and batch
+        // save fed the model a fraction of the page. Same contract as the
+        // markdown extractors: any failure or thin result falls to Defuddle.
+        // Text stays under the same 8000-char budget as the Defuddle path.
+        if (typeof applySiteRule === "function") {
+          try {
+            const hit = applySiteRule(document, location.href);
+            if (hit && hit.contentHtml) {
+              const div = document.createElement("div");
+              // newline after block closers so textContent keeps block breaks
+              div.innerHTML = String(hit.contentHtml).replace(/<\/(p|div|h[1-6]|li|blockquote|tr)>/gi, "</$1>\n");
+              const text = (div.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+              if (text.length > 50) {
+                info.pageText = text.substring(0, 8000);
+                return info;
+              }
+            }
+          } catch (_) { /* fall through to Defuddle */ }
+        }
 
         // Try Defuddle for high-quality content extraction
         if (typeof Defuddle !== "undefined") {
