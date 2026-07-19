@@ -1574,7 +1574,44 @@ section("site-rules: X/Twitter status");
   const rs = applySiteRule(sdoc, "https://x.com/short/status/22");
   check("x id boundary → /status/22 not stolen by /status/222",
     rs && /Status 22 body/.test(rs.contentHtml) && !/Status 222 body/.test(rs.contentHtml), JSON.stringify(rs && rs.contentHtml));
+
+  // Author span dedup/glue, datetime preference, >90-char title truncation.
+  const LONG = Array(101).join("A"); // 100 chars
+  const XM = '<html><body><article data-testid="tweet">' +
+    '<div data-testid="User-Name"><span>Alice</span><span>Alice</span><span>@alice</span><span>Jul 9</span></div>' +
+    '<div data-testid="tweetText"><span>' + LONG + '</span></div>' +
+    '<time datetime="2026-07-09T01:00:00.000Z">Jul 9</time>' +
+    '</article></body></html>';
+  const mdoc = new DOMParser().parseFromString(XM, "text/html");
+  const rm = applySiteRule(mdoc, "https://x.com/alice/status/42");
+  check("x meta → display name deduped and glued to @handle",
+    rm && rm.contentHtml.indexOf("<strong>Alice @alice</strong>") !== -1, JSON.stringify(rm && rm.contentHtml));
+  check("x meta → datetime attribute preferred over label text",
+    rm && rm.contentHtml.indexOf("· 2026-07-09T01:00:00.000Z") !== -1, JSON.stringify(rm && rm.contentHtml));
+  check("x title → 90-char cap with ellipsis",
+    rm && rm.title.length === 90 && /\.\.\.$/.test(rm.title) && rm.title.indexOf("AAA") === 0, JSON.stringify(rm && rm.title));
 }
+</script>
+
+<script>
+section("site-rules: v2ex buildReplyTree multi-@ (pure)");
+(() => {
+  // Multiple @-mentions: the LAST mentioned member is the primary parent
+  // (arrays reversed); an unresolvable name falls through to the next.
+  const replies = [
+    { id: "r1", author: "alice", floor: "1", mentions: [], refFloors: [], bodyHtml: "a", thanks: 0 },
+    { id: "r2", author: "bob",   floor: "2", mentions: [], refFloors: [], bodyHtml: "b", thanks: 0 },
+    { id: "r3", author: "carol", floor: "3", mentions: ["alice", "bob"], refFloors: ["1", "2"], bodyHtml: "c", thanks: 0 },
+    { id: "r4", author: "dave",  floor: "4", mentions: ["ghost", "alice"], refFloors: [], bodyHtml: "d", thanks: 0 },
+  ];
+  const roots = buildReplyTree(replies);
+  check("multi-@ → last mention wins (carol under bob)",
+    roots.length === 2 && roots[1].author === "bob" && roots[1].children.length === 1 && roots[1].children[0].author === "carol",
+    JSON.stringify(roots.map(r => [r.author, r.children.map(k => k.author)])));
+  check("multi-@ → unresolvable name falls through (dave under alice)",
+    roots[0].author === "alice" && roots[0].children.some(n => n.author === "dave"),
+    JSON.stringify(roots.map(r => [r.author, r.children.map(k => k.author)])));
+})();
 </script>
 
 <script>
