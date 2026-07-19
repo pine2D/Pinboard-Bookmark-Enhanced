@@ -20,28 +20,65 @@
 // tests) ----
 
 // Prompt builder for the skim/key-points layer (spec 1.2.3). Pure: no
-// settings/DOM read -- both arguments are plain strings the caller
-// already resolved (context = pbpAskBuildContext(...).text;
-// langInstruction = aiSummaryLangInstruction(s)). Rule 2 below reuses
-// ask's rule-3 wording verbatim (md-ask.js:388, "NEVER group
-// citations...") and rule 3 reuses ask's rule-4 CITES block format
-// verbatim (md-ask.js:389-390) -- the skim CITES: block is parsed by
-// the SAME pbpAiParseCites (md-ai-core.js) the ask answers use, so the
-// wire format must match exactly.
-function pbpSkimBuildPrompt(context, langInstruction) {
+// settings/DOM read -- string/flag arguments the caller already resolved
+// (context = pbpAskBuildContext(...).text; langInstruction =
+// aiSummaryLangInstruction(s); opts = { title, forum }). The citation
+// rule reuses ask's rule-3 wording verbatim (md-ask.js, "NEVER group
+// citations...") and the CITES rule reuses ask's rule-4 block format
+// verbatim -- the skim CITES: block is parsed by the SAME pbpAiParseCites
+// (md-ai-core.js) the ask answers use, so the wire format must match
+// exactly.
+//
+// Prompt design (2026-07 research pass): vanilla summary prompts default
+// to lead-bias + entity-sparse output (Chain of Density, arXiv 2309.04269),
+// and "the article discusses..." filler is the canonical vagueness marker —
+// both countered by explicit rules, which beats piling on persona/CoT
+// tricks (measured near-zero effect vs a plain baseline). The scan-first
+// process line grounds points in located paragraphs before wording them
+// (post-rationalized citations are the documented failure mode of
+// claim-first ordering). Threads get their own variant: viewpoints with
+// attribution, real disagreement preserved (stance homogenization is the
+// documented failure of consensus-seeking summaries). The trailing
+// reminder after the long context follows the long-context guidance of
+// putting instructions after the document.
+function pbpSkimBuildPrompt(context, langInstruction, opts) {
   const ctx = String(context == null ? "" : context);
   const lang = String(langInstruction == null ? "" : langInstruction);
-  const system = [
-    "You extract the key points of ONE article supplied below.",
+  const o = opts || {};
+  const title = String(o.title == null ? "" : o.title).replace(/\s+/g, " ").trim();
+  const forum = !!o.forum;
+  const cite = "After every point, add an inline citation token [P<n>] where <n> is the paragraph number from the article. Write each citation as its own token, e.g. [P3][P5]. NEVER group citations inside one pair of brackets or parentheses such as (P3, P5).";
+  const citesA = "End the list with a CITES: block - one line per cited paragraph, formatted exactly as:";
+  const citesB = "   P<n>: \"verbatim quote of 15 words or fewer, in the article's original language\"";
+  const system = (forum ? [
+    "You extract the key points of ONE discussion thread (original post plus replies) supplied below.",
+    "Process: FIRST identify the distinct viewpoints across the WHOLE thread - the original post's claim, where replies genuinely agree, and where they differ. THEN write the points from those paragraphs only.",
     "Rules:",
-    "1. Output 3 to 5 key points as a markdown unordered list (one line per point, using \"- \"). Each point must be concise: one sentence.",
-    "2. After every point, add an inline citation token [P<n>] where <n> is the paragraph number from the article. Write each citation as its own token, e.g. [P3][P5]. NEVER group citations inside one pair of brackets or parentheses such as (P3, P5).",
-    "3. End the list with a CITES: block - one line per cited paragraph, formatted exactly as:",
-    "   P<n>: \"verbatim quote of 15 words or fewer, in the article's original language\"",
-    "4. " + lang,
-    "5. Use ONLY the article. Do not invent points the text does not support."
-  ].join("\n");
-  return { system, prompt: "ARTICLE:\n" + ctx };
+    "1. Start with a single plain line (no bullet): the one thing someone should know about this thread. Then output 3 to 5 key points as a markdown unordered list (one line per point, using \"- \"). If the thread genuinely supports fewer distinct points, output fewer - never pad.",
+    "2. Cover the original post's core claim first, then the strongest reply viewpoints - including notable disagreement or minority views. Do NOT manufacture consensus the thread does not contain; disagreement is information, keep it.",
+    "3. Attribute reply viewpoints as viewpoints (e.g. \"several replies argue...\", \"one reply counters...\"), not as facts. Each point must carry at least one concrete detail (number, name, claim, outcome). Never open a point with filler such as \"The thread discusses\" in any language. No two points may repeat the same information.",
+    "4. " + cite,
+    "5. " + citesA,
+    citesB,
+    "6. " + lang,
+    "7. Use ONLY the thread. Do not invent points the text does not support."
+  ] : [
+    "You extract the key points of ONE article supplied below.",
+    "Process: FIRST scan the ENTIRE article and pick the paragraphs that carry its core claims - conclusions, findings, numbers, decisions - not only the opening paragraphs. THEN write each point from those paragraphs only.",
+    "Rules:",
+    "1. Start with a single plain line (no bullet): what is genuinely new or most consequential here. Then output 3 to 5 key points as a markdown unordered list (one line per point, using \"- \"). If the article genuinely supports fewer than 3 distinct points, output fewer - never pad.",
+    "2. Each point must state a concrete fact, claim or conclusion with at least one specific detail (number, name, date, result). Never open a point with filler such as \"The article discusses/introduces/describes\" in any language. No two points may repeat the same information.",
+    "3. If the article contains an important caveat, counter-argument or limitation, dedicate one point to it.",
+    "4. " + cite,
+    "5. " + citesA,
+    citesB,
+    "6. " + lang,
+    "7. Use ONLY the article. Do not invent points the text does not support."
+  ]).join("\n");
+  const head = title ? "TITLE: " + title + "\n" : "";
+  const label = forum ? "THREAD" : "ARTICLE";
+  return { system, prompt: head + label + ":\n" + ctx +
+    "\n\nNow output exactly as instructed: the single opening line, the key-point list with [P<n>] citations, then the CITES: block." };
 }
 
 // ---- DOM wiring ----
@@ -114,6 +151,8 @@ async function pbpSkimInit(detail) {
   _pbpSkimState = {
     s,
     url: String((detail && detail.url) || ""),
+    title: String((detail && detail.title) || ""),
+    forum: !!(detail && detail.forum),
     section: null,
     running: false,
     ctrl: null,
@@ -313,7 +352,7 @@ async function _pbpSkimRun() {
   try {
     const ctx = pbpAskBuildContext(pbpAiBlocks(), PBP_SKIM_CTX_BUDGET);
     const langInstruction = aiSummaryLangInstruction(st.s);
-    built = pbpSkimBuildPrompt(ctx.text, langInstruction);
+    built = pbpSkimBuildPrompt(ctx.text, langInstruction, { title: st.title, forum: st.forum });
     // st.gen in the key: a future regen fired mid-stream would otherwise
     // collide with the not-yet-cleaned-up previous inflight promise for the
     // same url and be silently swallowed instead of restarted (reviewer

@@ -1639,7 +1639,9 @@ function pbpApplyColorScheme(mode) {
   // the cache-key source for tr_/ask_/trview_ entries (md_preview_data is
   // already removed from storage at this point; the page holds the markdown
   // in closure and md-ai reads text via the DOM blocks).
-  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, account: previewAccount } }));
+  // detail.forum: site-rule extractors flag threaded pages (HN/V2EX/Zhihu/SO);
+  // md-skim switches to the discussion-thread prompt variant on it.
+  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, forum: !!info.forum, account: previewAccount } }));
 
   // Raw view populated lazily on first switch
 

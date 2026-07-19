@@ -4982,6 +4982,28 @@ suiteIf("pbpSkimBuildPrompt", "pbpSkimBuildPrompt", () => {
     const r2 = pbpSkimBuildPrompt();
     assert(typeof r2.system === "string" && typeof r2.prompt === "string", "null args tolerated, shapes stay strings");
   });
+  test("article variant: scan-first, filler ban, caveat rule, honest count, hook line", () => {
+    const r = pbpSkimBuildPrompt("[P1] alpha", "Write in English.");
+    assert(r.system.indexOf("scan the ENTIRE article") !== -1, "anti-lead-bias process line");
+    assert(r.system.indexOf("The article discusses/introduces/describes") !== -1, "filler ban list");
+    assert(r.system.indexOf("caveat, counter-argument or limitation") !== -1, "caveat rule");
+    assert(r.system.indexOf("never pad") !== -1, "honest point count");
+    assert(r.system.indexOf("Start with a single plain line") !== -1, "decision-hook opening line");
+  });
+  test("title enters the user prompt; reminder trails the long context", () => {
+    const r = pbpSkimBuildPrompt("[P1] alpha", "Write in English.", { title: "My  Title " });
+    assert(r.prompt.indexOf("TITLE: My Title\nARTICLE:") === 0, "title first, whitespace collapsed");
+    assert(r.prompt.indexOf("Now output exactly as instructed") > r.prompt.indexOf("[P1] alpha"), "instructions after document");
+  });
+  test("forum variant: thread framing, attribution, no manufactured consensus, shared wire format", () => {
+    const r = pbpSkimBuildPrompt("[P1] op\n[P2] reply", "Write in English.", { forum: true });
+    assert(r.system.indexOf("discussion thread") !== -1, "thread framing");
+    assert(r.system.indexOf("Do NOT manufacture consensus") !== -1, "consensus guard");
+    assert(r.system.indexOf("several replies argue") !== -1, "viewpoint attribution wording");
+    assert(r.prompt.indexOf("THREAD:\n[P1] op") !== -1, "THREAD label");
+    assert(r.system.indexOf("NEVER group citations inside one pair of brackets or parentheses such as (P3, P5)") !== -1, "citation rule verbatim");
+    assert(r.system.indexOf("15 words or fewer") !== -1, "CITES quote cap verbatim");
+  });
 });
 
 suiteIf("skim cache key normalization", "_pbpSkimCacheKey", () => {
