@@ -1069,6 +1069,15 @@ suite("md-ai IDB key conventions", () => {
     assert(after && after.ts > staleTs, "ts refreshed on read, got " + (after && after.ts));
     assertEq(after.result, "v", "result untouched");
   });
+  await atest("fixed-TTL ai_cache_ entries are never read-touched", async () => {
+    const key = "ai_cache_summary_local_test_" + Date.now() + "_" + Math.random();
+    const genTs = Date.now() - 7200000; // old enough to trigger a touch otherwise
+    await pbpAiCacheSet(key, "v", genTs);
+    await pbpAiCacheGet(key);
+    await new Promise((r) => setTimeout(r, 60));
+    const after = await pbpAiCacheGet(key);
+    assertEq(after.ts, genTs, "generation ts preserved (fixed TTL must not slide)");
+  });
   await atest("fresh read hit does not churn ts", async () => {
     const key = "test_touch_fresh_" + Date.now() + "_" + Math.random();
     const freshTs = Date.now() - 1000;

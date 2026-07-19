@@ -66,7 +66,14 @@ async function pbpAiCacheGet(key) {
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });
-    if (entry && typeof entry.ts === "number" && Date.now() - entry.ts > _PBP_AI_TOUCH_MIN_AGE) {
+    // ai_cache_ entries (tags/summary, ai.js getAICache) use ts as their
+    // GENERATION time for a user-configured fixed TTL - touching them
+    // would turn that into a sliding expiry where a frequently-read
+    // summary never expires. Only the LRU-semantic families (ask_/tr_/
+    // trview_/gloss_/skim_) get the read-touch.
+    if (entry && typeof entry.ts === "number"
+      && String(key).indexOf("ai_cache_") !== 0
+      && Date.now() - entry.ts > _PBP_AI_TOUCH_MIN_AGE) {
       _pbpAiTouch(db, key);
     }
     return entry;
