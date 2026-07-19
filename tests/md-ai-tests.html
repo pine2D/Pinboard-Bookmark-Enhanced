@@ -2292,6 +2292,12 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
     assert(r.prompt.indexOf("Q: only") !== -1, "most recent round kept");
     assert(r.prompt.indexOf("y".repeat(8001)) === -1, "capped");
   });
+  test("regenerate excludes the round being replaced from the prompt", () => {
+    const run = _pbpAskRun.toString();
+    assert(run.indexOf("opts.replaceLast && st.rounds.length") !== -1
+      && run.indexOf("st.rounds.slice(0, -1)") !== -1, "replaceLast history exclusion missing");
+    assert(run.indexOf("history: promptHistory") !== -1, "prompt not built from the filtered history");
+  });
 });
 
 // ============ Task 14: ask citation tokenizer ============

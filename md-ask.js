@@ -619,7 +619,13 @@ async function _pbpAskRun(question, aEl, opts) {
   const paint = () => { raf = 0; aEl.textContent = acc; };
   try {
     if (!st.ctx) st.ctx = pbpAskBuildContext(pbpAiBlocks(), PBP_ASK_CTX_BUDGET);
-    const built = pbpAskBuildPrompt({ context: st.ctx.text, history: st.rounds, question });
+    // Regenerate must not show the model the very answer it is replacing:
+    // replaceLast swaps st.rounds only AFTER success, so at build time the
+    // old round is still the last element - and a model that sees its own
+    // prior answer anchors on it and restates instead of re-answering.
+    const promptHistory = (opts.replaceLast && st.rounds.length)
+      ? st.rounds.slice(0, -1) : st.rounds;
+    const built = pbpAskBuildPrompt({ context: st.ctx.text, history: promptHistory, question });
     const full = await getOrCreateInflight("ask_" + st.url + "_" + question, () =>
       callAIStream(st.s, built.prompt, {
         maxTokens: 4096,
