@@ -1055,6 +1055,29 @@ suite("md-ai IDB key conventions", () => {
     const entry = await pbpAiCacheGet(key);
     assertEq(entry.result.length, 2, "both concurrent pushes survived: " + JSON.stringify(entry && entry.result));
   });
+  await atest("read hit older than the throttle refreshes ts (true LRU)", async () => {
+    const key = "test_touch_old_" + Date.now() + "_" + Math.random();
+    const staleTs = Date.now() - 7200000; // 2h old, past the 1h throttle
+    await pbpAiCacheSet(key, "v", staleTs);
+    await pbpAiCacheGet(key); // schedules the fire-and-forget touch
+    let after = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 25));
+      after = await pbpAiCacheGet(key);
+      if (after && after.ts !== staleTs) break;
+    }
+    assert(after && after.ts > staleTs, "ts refreshed on read, got " + (after && after.ts));
+    assertEq(after.result, "v", "result untouched");
+  });
+  await atest("fresh read hit does not churn ts", async () => {
+    const key = "test_touch_fresh_" + Date.now() + "_" + Math.random();
+    const freshTs = Date.now() - 1000;
+    await pbpAiCacheSet(key, "v", freshTs);
+    await pbpAiCacheGet(key);
+    await new Promise((r) => setTimeout(r, 60));
+    const after = await pbpAiCacheGet(key);
+    assertEq(after.ts, freshTs, "fresh ts left alone");
+  });
   await atest("pbpAskHistAppend appends a round and trims to 20 (PBP_ASK_HIST_MAX)", async () => {
     const url = "https://append-test.example/" + Date.now() + "_" + Math.random();
     for (let i = 1; i <= 22; i++) await pbpAskHistAppend(url, { q: "q" + i });

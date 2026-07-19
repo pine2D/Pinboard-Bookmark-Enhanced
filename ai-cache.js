@@ -30,15 +30,46 @@ function _pbpAiOpenDB() {
   return _pbpAiDbPromise;
 }
 
+// Read-touch throttle: bump ts on cache hits at most once per hour per
+// entry. Eviction sorts by ts, but ts used to change only on writes -
+// "LRU" was really write-recency, so read-hot entries that are never
+// rewritten (an ask thread you reopen without asking again) were silently
+// evicted by unrelated tr_/skim_ write bursts. No consumer displays
+// entry.ts, so touching it is safe.
+const _PBP_AI_TOUCH_MIN_AGE = 3600000;
+
+// Fire-and-forget ts bump. Get-then-put inside ONE readwrite transaction:
+// putting back the entry the caller already read would race a concurrent
+// pbpAiCacheAppend from another tab (the same lost-update window that
+// helper exists to close); re-reading inside the transaction keeps the
+// freshest result and only refreshes ts.
+function _pbpAiTouch(db, key) {
+  try {
+    const tx = db.transaction(_PBP_AI_STORE, "readwrite");
+    const store = tx.objectStore(_PBP_AI_STORE);
+    const req = store.get(key);
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (cur) {
+        try { store.put({ key: cur.key, result: cur.result, ts: Date.now() }); } catch (_) {}
+      }
+    };
+  } catch (_) {}
+}
+
 async function pbpAiCacheGet(key) {
   try {
     const db = await _pbpAiOpenDB();
-    return await new Promise((resolve) => {
+    const entry = await new Promise((resolve) => {
       const tx = db.transaction(_PBP_AI_STORE, "readonly");
       const req = tx.objectStore(_PBP_AI_STORE).get(key);
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });
+    if (entry && typeof entry.ts === "number" && Date.now() - entry.ts > _PBP_AI_TOUCH_MIN_AGE) {
+      _pbpAiTouch(db, key);
+    }
+    return entry;
   } catch (_) {
     return null;
   }
