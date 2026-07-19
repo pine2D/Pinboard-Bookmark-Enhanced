@@ -1348,6 +1348,38 @@ section("site-rules: v2ex mention extraction (anchors, not raw @)");
     /#1 · __proto__[\s\S]*<blockquote><p><strong>#2 · dave/.test(c), c);
 })();
 
+section("site-rules: v2ex 附言 / hideRefName / thanks parsing");
+(() => {
+  // 附言 blocks promote their .fade header to <h3> (missing header falls back
+  // to a counted label) and sit before the replies <h2> — 2026-07-15 regression.
+  const v = `<!DOCTYPE html><html><body><h1>附言主题</h1>
+  <div class="topic_content"><p>主贴正文</p></div>
+  <div class="subtle"><span class="fade">第 1 条附言 · 2 小时前</span><div class="topic_content"><p>附言一正文</p></div></div>
+  <div class="subtle"><div class="topic_content"><p>附言二正文</p></div></div>
+  <div class="cell" id="r_1"><strong><a href="/member/alice" class="dark">alice</a></strong><span class="no">1</span><div class="reply_content">一楼</div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(v, "text/html");
+  const r = applySiteRule(doc, "https://www.v2ex.com/t/1226505");
+  const c = r ? norm(r.contentHtml) : "";
+  check("v2ex 附言 → .fade header promoted to h3", /<h3>第 1 条附言 · 2 小时前<\/h3>/.test(c) && /附言一正文/.test(c), c);
+  check("v2ex 附言 → header-less block gets counted fallback label", /<h3>附言 2<\/h3>/.test(c) && /附言二正文/.test(c), c);
+  check("v2ex 附言 → both precede the replies h2", c.indexOf("附言二正文") < c.indexOf("<h2>回复"), c);
+})();
+
+(() => {
+  // hideRefName text fallback (anchor-less body) + parseCount k-suffix thanks.
+  const v = `<!DOCTYPE html><html><body><h1>剥离与感谢</h1><div class="topic_content"><p>t</p></div>
+  <div class="cell" id="r_1"><strong><a href="/member/alice" class="dark">alice</a></strong><span class="no">1</span><div class="reply_content">一楼</div></div>
+  <div class="cell" id="r_2"><strong><a href="/member/bob" class="dark">bob</a></strong><span class="no">2</span><span class="small fade">♥ 1.2k</span><div class="reply_content">@alice 收到</div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(v, "text/html");
+  const r = applySiteRule(doc, "https://www.v2ex.com/t/1001");
+  const c = r ? norm(r.contentHtml) : "";
+  check("v2ex nested reply → leading text @alice stripped from body",
+    /#2 · bob<\/strong>[\s\S]{0,40}<\/p>收到/.test(c) && !/@alice 收到/.test(c), c);
+  check("v2ex thanks → 1.2k parsed to 感谢 1200", /感谢 1200/.test(c), c);
+})();
+
 section("site-rules: v2ex author robustness (avatar link)");
 (() => {
   // V2EX Polish / avatar adds <a href="/member/X"><img></a> (EMPTY text) BEFORE the username link.
