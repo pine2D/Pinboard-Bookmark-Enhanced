@@ -2332,6 +2332,7 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
   test("stopped partials finalize visually but never enter rounds or history", () => {
     const run = _pbpAskRun.toString();
     assert(run.indexOf('aEl.dataset.askStopped = "1"') !== -1, "stopped flag missing");
+    assert(run.indexOf("acc && aEl.isConnected") !== -1, "detached (cleared) elements must not finalize");
     assert(run.indexOf("_pbpAskFinalize(aEl, acc, st.ctx && st.ctx.sent)") !== -1, "abort visual finalize missing");
     assert(run.indexOf("delete aEl.dataset.askStopped") !== -1, "flag not cleared on a successful re-run");
     assert(_pbpAskRegenerate.toString().indexOf("replaceLast: !el.dataset.askStopped") !== -1,

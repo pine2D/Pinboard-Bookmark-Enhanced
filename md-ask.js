@@ -710,7 +710,11 @@ async function _pbpAskRun(question, aEl, opts) {
     aEl.removeAttribute("aria-busy");
     if (opts.restoreNodes && opts.restoreNodes.length) {
       aEl.replaceChildren(...opts.restoreNodes);
-    } else if (e && e.name === "AbortError" && acc) {
+    } else if (e && e.name === "AbortError" && acc && aEl.isConnected) {
+      // isConnected: Clear aborts in-flight streams AFTER detaching the
+      // thread's children - finalizing the detached element would be
+      // invisible busywork, and its _pbpAskDecorate -> _pbpAskEnsureClear
+      // call would re-show the Clear button over the now-empty thread.
       // Stop is not an error: finalize the partial VISUALLY (markdown
       // render, citation chips, copy/regenerate buttons) instead of
       // leaving a dead bare-text orphan. Deliberately NOT pushed into
