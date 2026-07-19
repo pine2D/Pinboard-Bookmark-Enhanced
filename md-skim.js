@@ -332,6 +332,9 @@ async function _pbpSkimRun() {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     if (myGen !== st.gen) return; // superseded: ignore this run's error entirely
     if (e && e.name === "AbortError") {
+      // The cancelled rAF above may hold the LAST streamed chunk unpainted;
+      // flush it so "keep whatever text already streamed" holds exactly.
+      if (acc) body.textContent = acc;
       _pbpSkimSetStatus("");
       // Stop button: keep whatever text already streamed, quietly (spec
       // 1.2.3/1.2.6) -- unlike ask's Stop, no "Stopped" note is
@@ -445,6 +448,12 @@ async function _pbpSkimRegen() {
   const retry = document.querySelector("#skim-body .skim-retry");
   if (retry) retry.disabled = true;
   try {
+    // Settings may have changed since init (provider/model/summary language
+    // switched in Options while this tab stayed open): re-read, and re-run
+    // the double gate — if the user has since turned AI or skim off, a
+    // manual regen must stay a no-op (token-protection invariant #1).
+    try { st.s = await pbpAiGetSettings(); } catch (_) {}
+    if (!pbpAiAvailable(st.s) || st.s.previewSkimEnabled !== true) return;
     if (st.permissionError) {
       const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});
       if (!recovered) return;
