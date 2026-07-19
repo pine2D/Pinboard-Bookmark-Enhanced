@@ -775,12 +775,11 @@
   // Build a tree from a flat list carrying explicit .depth (document/pre-order).
   // A reply at depth d attaches under the most recent earlier reply at depth d-1.
   function buildDepthTree(replies) {
-    var nodes = [], roots = [], stack = [];
+    var roots = [], stack = [];
     for (var k = 0; k < replies.length; k++) {
       var r0 = replies[k];
       var nd = { author: r0.author, bodyHtml: r0.bodyHtml, depth: r0.depth || 0, children: [] };
       if (r0.dead) nd.dead = true; // HN placeholder rows; pruned later when childless
-      nodes.push(nd);
       var d = nd.depth;
       if (d === 0 || !stack[d - 1]) roots.push(nd);
       else stack[d - 1].children.push(nd);
