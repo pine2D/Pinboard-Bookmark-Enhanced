@@ -2324,6 +2324,25 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
     assert(r.prompt.indexOf("Q: q2") !== -1 && r.prompt.indexOf("Q: q4") !== -1, "newest three kept");
     assert(r.prompt.indexOf("Q: q2") < r.prompt.indexOf("Q: q4"), "chronological order kept");
   });
+  test("history yields when the article context crowds the input target", () => {
+    // ~24k-est-token context: fixed cost ~24.4k of the 28k target, so the
+    // history budget squeezes below the flat 6000 and older rounds drop
+    // harder than under an empty context (which keeps 3 of these rounds).
+    const bigCtx = "[P1] " + "c".repeat(96000);
+    const hist = [];
+    for (let i = 1; i <= 4; i++) hist.push({ q: "q" + i, a: "x".repeat(6000) });
+    const r = pbpAskBuildPrompt({ context: bigCtx, history: hist, question: "next" });
+    assert(r.prompt.indexOf("Q: q4") !== -1, "newest round always kept");
+    assert(r.prompt.indexOf("Q: q1") === -1 && r.prompt.indexOf("Q: q2") === -1,
+      "older rounds dropped under the squeezed budget");
+    const total = pbpAiEstimateTokens((r.system + r.prompt).length);
+    assert(total <= 28800, "whole request stays near the input target, got " + total);
+  });
+  test("title is clamped before entering the prompt", () => {
+    const r = pbpAskBuildPrompt({ context: "c", history: [], question: "q", title: "T".repeat(500) });
+    assert(r.prompt.indexOf("TITLE: " + "T".repeat(200) + "\n") === 0, "title cut at 200 chars");
+    assert(r.prompt.indexOf("T".repeat(201)) === -1, "no overlong title");
+  });
   test("a lone huge round always survives the budget", () => {
     const r = pbpAskBuildPrompt({ context: "c", history: [{ q: "only", a: "y".repeat(20000) }], question: "q" });
     assert(r.prompt.indexOf("Q: only") !== -1, "most recent round kept");

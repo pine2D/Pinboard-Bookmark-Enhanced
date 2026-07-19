@@ -434,6 +434,12 @@ function pbpAskBuildContext(blocks, budgetTokens) {
 // hard-failing 32k-context models (small Ollama locals especially).
 const PBP_ASK_HIST_BUDGET = 6000;
 const PBP_ASK_HIST_ANSWER_CAP = 8000;
+// Whole-request input target (est tokens): 32k window minus the 4096
+// maxTokens output reserve, minus heuristic slack. History yields FIRST
+// when system+title+context+question already crowd the target - the
+// article is the grounding and keeps priority. Best-effort (chars/4
+// estimate), not a tokenizer guarantee.
+const PBP_ASK_INPUT_TARGET = 28000;
 
 // Prompt builder. history = [{q, a}] (caller passes the in-memory rounds);
 // only the last 4 are serialized, newest-first budget fill - when the
@@ -463,20 +469,8 @@ function pbpAskBuildPrompt(args) {
   const a = args || {};
   const context = String(a.context == null ? "" : a.context);
   const question = String(a.question == null ? "" : a.question);
-  const title = String(a.title == null ? "" : a.title).replace(/\s+/g, " ").trim();
+  const title = String(a.title == null ? "" : a.title).replace(/\s+/g, " ").trim().slice(0, 200);
   const src = a.forum ? "thread" : "article";
-  const recent = Array.isArray(a.history) ? a.history.slice(-4) : [];
-  const history = [];
-  let histTokens = 0;
-  for (let i = recent.length - 1; i >= 0; i--) {
-    const h = recent[i] || {};
-    const q = String(h.q == null ? "" : h.q);
-    const ans = String(h.a == null ? "" : h.a).slice(0, PBP_ASK_HIST_ANSWER_CAP);
-    const cost = pbpAiEstimateTokens(q.length + ans.length + 8);
-    if (history.length && histTokens + cost > PBP_ASK_HIST_BUDGET) break;
-    history.unshift({ q, a: ans });
-    histTokens += cost;
-  }
   const system = [
     a.forum
       ? "You answer questions about ONE web discussion thread supplied below as numbered paragraphs."
@@ -490,6 +484,27 @@ function pbpAskBuildPrompt(args) {
     "   P<n>: \"verbatim quote of 15 words or fewer, in the " + src + "'s original language\"",
     "5. Cover honestly: if the " + src + " fully answers the question, just answer; if it covers it only partially, answer what it does cover and say plainly what it does not; if it does not cover it at all, say so plainly. Never fill a gap from outside knowledge, and never invent citations."
   ].join("\n");
+  const reminder = "(Reminder: use only the " + src + " above, cite [P<n>] after supported claims, and say plainly what it does not cover.)";
+  // History budget yields to the whole-request target: everything that is
+  // NOT history is fixed cost, and history gets whatever headroom is left
+  // (capped at its own 6000). The newest round is still always kept - its
+  // char caps bound the worst-case overshoot within the estimate's slack.
+  const fixedChars = system.length + title.length + context.length
+    + question.length + reminder.length + 64;
+  const histBudget = Math.min(PBP_ASK_HIST_BUDGET,
+    Math.max(0, PBP_ASK_INPUT_TARGET - pbpAiEstimateTokens(fixedChars)));
+  const recent = Array.isArray(a.history) ? a.history.slice(-4) : [];
+  const history = [];
+  let histTokens = 0;
+  for (let i = recent.length - 1; i >= 0; i--) {
+    const h = recent[i] || {};
+    const q = String(h.q == null ? "" : h.q);
+    const ans = String(h.a == null ? "" : h.a).slice(0, PBP_ASK_HIST_ANSWER_CAP);
+    const cost = pbpAiEstimateTokens(q.length + ans.length + 8);
+    if (history.length && histTokens + cost > histBudget) break;
+    history.unshift({ q, a: ans });
+    histTokens += cost;
+  }
   const parts = [];
   if (title) parts.push("TITLE: " + title, "");
   parts.push(a.forum ? "THREAD:" : "ARTICLE:", context, "");
@@ -501,7 +516,7 @@ function pbpAskBuildPrompt(args) {
     }
     parts.push("");
   }
-  parts.push("(Reminder: use only the " + src + " above, cite [P<n>] after supported claims, and say plainly what it does not cover.)");
+  parts.push(reminder);
   parts.push("QUESTION: " + question);
   return { system, prompt: parts.join("\n") };
 }
