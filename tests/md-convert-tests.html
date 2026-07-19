@@ -1293,6 +1293,32 @@ section("site-rules: hacker news");
   check("hn → Comments heading (2)", /<h2>Comments \(2\)<\/h2>/.test(c), c);
   check("hn → authors + bodies present", /alice/.test(c) && /bob/.test(c) && /root comment here/.test(c) && /child reply here/.test(c), c);
   check("hn → bob nested under alice", /<blockquote>[\s\S]*alice[\s\S]*<blockquote>[\s\S]*bob[\s\S]*<\/blockquote>[\s\S]*<\/blockquote>/.test(c), c);
+
+  // Dead rows with LIVE deeper replies: the reply must stay under a [dead]
+  // placeholder in the dead row's branch, not slide to the previous branch;
+  // childless dead rows leave no stub at all.
+  const row = (id, ind, user, body, dead) =>
+    '<tr class="athing comtr" id="' + id + '"><td><table><tr>' +
+    '<td class="ind" indent="' + ind + '"></td>' +
+    '<td class="default"><div class="comhead">' + (user ? '<a class="hnuser">' + user + '</a>' : '') + '</div>' +
+    '<div class="comment">' + (dead ? '<div class="dead">[dead]</div>' : '<div class="commtext c00">' + body + '</div>') + '</div></td>' +
+    '</tr></table></td></tr>';
+  const HN2 = '<html><body><table class="fatitem"><tr class="athing"><td><span class="titleline"><a href="https://x.com">T</a></span></td></tr></table>' +
+    '<table class="comment-tree">' +
+    row("d1", 0, "alice", "branch one root") +
+    row("d2", 1, "bob", "reply to alice") +
+    row("d3", 1, "mallory", "", true) +          // dead, has a live child
+    row("d4", 2, "carol", "reply under dead") +
+    row("d5", 0, "", "", true) +                 // dead, childless -> pruned
+    '</table></body></html>';
+  const d2 = new DOMParser().parseFromString(HN2, "text/html");
+  const r2 = applySiteRule(d2, "https://news.ycombinator.com/item?id=9");
+  const c2 = (r2 && r2.contentHtml) || "";
+  check("hn dead-parent → carol nested directly under the mallory placeholder",
+    c2.indexOf("mallory</strong></p><blockquote><p><strong>carol") !== -1, c2);
+  check("hn dead rows → excluded from the visible count", /<h2>Comments \(3\)<\/h2>/.test(c2), c2);
+  check("hn childless dead row → pruned (4 blockquotes, no [dead] text)",
+    (c2.match(/<blockquote>/g) || []).length === 4 && !/\[dead\]/.test(c2), c2);
 }
 </script>
 

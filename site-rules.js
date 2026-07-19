@@ -427,6 +427,18 @@
     return "<p><strong>" + escapeHtml(node.author || "匿名") + "</strong></p>" + (node.bodyHtml || "");
   }
 
+  // Drop dead placeholders that shield no live descendants (bottom-up).
+  function pruneDeadLeaves(nodes) {
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      n.children = pruneDeadLeaves(n.children);
+      if (n.dead && !n.children.length) continue;
+      out.push(n);
+    }
+    return out;
+  }
+
   function extractHackerNews(doc) {
     var title = pickText(doc, [".fatitem .titleline > a", ".titleline > a", ".athing .titleline a"]) || doc.title;
     var parts = [];
@@ -438,16 +450,16 @@
     if (!rows.length) rows = doc.querySelectorAll("tr.athing.comtr");
     var globalCap = cfg("HN_COMMENTS_GLOBAL", HN_COMMENTS_GLOBAL);
     var maxDepth = cfg("HN_MAX_DEPTH", HN_MAX_DEPTH);
-    var replies = [], capped = false;
+    var replies = [], capped = false, live = 0;
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
-      if (row.classList.contains("noshow") || row.querySelector(".comment .dead")) continue; // collapsed/dead
-      if (replies.length >= globalCap) { capped = true; break; }
+      // Collapsed threads: HN stamps noshow on every hidden descendant, so
+      // skipping the rows outright cannot orphan a visible child.
+      if (row.classList.contains("noshow")) continue;
+      if (live >= globalCap) { capped = true; break; }
       var userEl = row.querySelector(".hnuser");
       var author = userEl ? userEl.textContent.trim() : "";
       var bodyEl = row.querySelector(".commtext");
-      var bodyHtml = bodyEl ? cleanBodyHtml(doc, bodyEl.innerHTML) : "";
-      if (!author && !bodyHtml) continue;
       // depth: td.ind[indent] (modern HN) or its spacer img width / 40 (legacy)
       var ind = row.querySelector("td.ind");
       var depth = 0;
@@ -456,11 +468,21 @@
         if (ia != null && ia !== "") depth = parseInt(ia, 10) || 0;
         else { var im = ind.querySelector("img"); if (im) depth = Math.round((parseInt(im.getAttribute("width"), 10) || 0) / 40); }
       }
+      var bodyHtml = bodyEl ? cleanBodyHtml(doc, bodyEl.innerHTML) : "";
+      if (row.querySelector(".comment .dead") || (!author && !bodyHtml)) {
+        // Dead/deleted rows CAN have live deeper replies. Dropping the row
+        // shifted buildDepthTree's stack, binding those replies to a stale
+        // earlier branch — keep a body-less placeholder at the row's depth;
+        // childless placeholders are pruned once the tree is built.
+        replies.push({ author: author || "[dead]", bodyHtml: "", depth: depth, dead: true });
+        continue;
+      }
       replies.push({ author: author, bodyHtml: bodyHtml, depth: depth });
+      live++;
     }
-    if (replies.length) {
-      parts.push("<h2>" + escapeHtml("Comments (" + replies.length + (capped ? "+" : "") + ")") + "</h2>");
-      parts.push(renderThreadHtml(buildDepthTree(replies), 0, { headFn: hnReplyHtml, maxDepth: maxDepth }));
+    if (live) {
+      parts.push("<h2>" + escapeHtml("Comments (" + live + (capped ? "+" : "") + ")") + "</h2>");
+      parts.push(renderThreadHtml(pruneDeadLeaves(buildDepthTree(replies)), 0, { headFn: hnReplyHtml, maxDepth: maxDepth }));
     }
     if (capped) parts.push("<blockquote><p>" + escapeHtml("Note: only the first " + globalCap + " comments were extracted.") + "</p></blockquote>");
     if (!parts.join("")) return null;
@@ -714,6 +736,7 @@
     for (var k = 0; k < replies.length; k++) {
       var r0 = replies[k];
       var nd = { author: r0.author, bodyHtml: r0.bodyHtml, depth: r0.depth || 0, children: [] };
+      if (r0.dead) nd.dead = true; // HN placeholder rows; pruned later when childless
       nodes.push(nd);
       var d = nd.depth;
       if (d === 0 || !stack[d - 1]) roots.push(nd);
