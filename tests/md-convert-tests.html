@@ -1319,6 +1319,20 @@ section("site-rules: v2ex mention extraction (anchors, not raw @)");
     /#1 · alice[\s\S]*<blockquote><p><strong>#3 · carol/.test(c) && c.indexOf("#3 · carol") < c.indexOf("#2 · bob"), c);
 })();
 
+(() => {
+  // Prototype-named users must thread like anyone else: lastSeenByMember
+  // ["constructor"] used to hit Object.prototype and drop the reply to root.
+  const v = `<!DOCTYPE html><html><body><h1>原型键</h1><div class="topic_content"><p>t</p></div>
+  <div class="cell" id="r_1"><strong><a href="/member/constructor" class="dark">constructor</a></strong><span class="no">1</span><div class="reply_content">一楼</div></div>
+  <div class="cell" id="r_2"><strong><a href="/member/dave" class="dark">dave</a></strong><span class="no">2</span><div class="reply_content"><a href="/member/constructor">@constructor</a> 回你</div></div>
+  </body></html>`;
+  const doc = new DOMParser().parseFromString(v, "text/html");
+  const r = applySiteRule(doc, "https://www.v2ex.com/t/999");
+  const c = r ? norm(r.contentHtml) : "";
+  check("v2ex prototype-named user → reply nests under constructor",
+    /#1 · constructor[\s\S]*<blockquote><p><strong>#2 · dave/.test(c), c);
+})();
+
 section("site-rules: v2ex author robustness (avatar link)");
 (() => {
   // V2EX Polish / avatar adds <a href="/member/X"><img></a> (EMPTY text) BEFORE the username link.

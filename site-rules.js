@@ -266,7 +266,7 @@
     var qid = (url.match(/\/question\/(\d+)/) || [])[1];
     var ent = readEntities(doc);
     var sections = [];
-    var seen = {};
+    var seen = Object.create(null); // keyed by page data — no prototype keys
 
     // The entity table can carry answers belonging to OTHER questions
     // (related/recommended modules ship in the same js-initialData), while
@@ -661,7 +661,9 @@
   // member's most-recent earlier reply. Zero-@ / @unseen / @OP-no-earlier -> root.
   // Maps update AFTER each reply, so parents always precede children (acyclic).
   function buildReplyTree(replies) {
-    var floorMemberToIndex = {}, lastSeenByMember = {}, nodes = [], roots = [];
+    // Object.create(null): usernames are map keys, so "constructor"/"__proto__"
+    // must miss instead of hitting Object.prototype.
+    var floorMemberToIndex = Object.create(null), lastSeenByMember = Object.create(null), nodes = [], roots = [];
     for (var k = 0; k < replies.length; k++) {
       var r0 = replies[k];
       nodes.push({
@@ -844,7 +846,7 @@
       });
     }
 
-    var topByName = {}, topByUid = {}, roots = [];
+    var topByName = Object.create(null), topByUid = Object.create(null), roots = []; // username keys — no prototype hits
     for (var k = 0; k < items.length; k++) {
       var c = items[k], parent = -1;
       if (c.target) {
