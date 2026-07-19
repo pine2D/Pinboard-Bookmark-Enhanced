@@ -1639,9 +1639,14 @@ function pbpApplyColorScheme(mode) {
   // the cache-key source for tr_/ask_/trview_ entries (md_preview_data is
   // already removed from storage at this point; the page holds the markdown
   // in closure and md-ai reads text via the DOM blocks).
-  // detail.forum: site-rule extractors flag threaded pages (HN/V2EX/Zhihu/SO);
-  // md-skim switches to the discussion-thread prompt variant on it.
-  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, forum: !!info.forum, account: previewAccount } }));
+  // detail.forum: md-skim switches to the discussion-thread prompt variant on
+  // it. Reuse the SAME determination the comment-marking pass above used —
+  // pbpForumShouldMark covers the site-rule flag AND structural detection
+  // (nested blockquotes: Reddit-likes with no per-site rule), so the prompt
+  // variant and the comment styling always agree.
+  const _isForumPage = (typeof pbpForumShouldMark === "function")
+    ? !!pbpForumShouldMark(info, renderedView) : !!info.forum;
+  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, forum: _isForumPage, account: previewAccount } }));
 
   // Raw view populated lazily on first switch
 

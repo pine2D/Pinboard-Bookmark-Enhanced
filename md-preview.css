@@ -2093,9 +2093,11 @@ body.ask-open main { margin-right: 396px; }
      specificity, which outranks a bare #ask-panel here -- without the
      [hidden] variant a closed panel would print as flex and only rely on
      its off-canvas transform to happen to fall outside the page. */
-  /* #ask-tip: the chip tooltip hangs off document.body, so hiding the
-     sections alone leaves an open tooltip printable (hover chip -> Ctrl+P). */
-  #ask-panel, #ask-panel[hidden], #ask-section, #fn-pop, #skim-section, #ask-tip { display: none; }
+  #ask-panel, #ask-panel[hidden], #ask-section, #fn-pop, #skim-section { display: none; }
+  /* #ask-tip hangs off document.body AND md-ask.js shows it via an INLINE
+     display:block — only !important outranks that in print (hover a chip,
+     then Ctrl+P). */
+  #ask-tip { display: none !important; }
   body.ask-open main { margin-right: 0; }
   /* must sit AFTER the base .pb-tr-err display rule in source order to win the cascade */
   .pb-tr-err { display: none; }

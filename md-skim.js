@@ -47,9 +47,13 @@ function pbpSkimBuildPrompt(context, langInstruction, opts) {
   const o = opts || {};
   const title = String(o.title == null ? "" : o.title).replace(/\s+/g, " ").trim();
   const forum = !!o.forum;
-  const cite = "After every point, add an inline citation token [P<n>] where <n> is the paragraph number from the article. Write each citation as its own token, e.g. [P3][P5]. NEVER group citations inside one pair of brackets or parentheses such as (P3, P5).";
+  // Wire FORMAT (tokens, quote cap, block shape) stays byte-compatible with
+  // ask's parser either way; only the source noun follows the framing so the
+  // thread variant never mixes "article" into its own rules.
+  const srcWord = forum ? "thread" : "article";
+  const cite = "After every point, add an inline citation token [P<n>] where <n> is the paragraph number from the " + srcWord + ". Write each citation as its own token, e.g. [P3][P5]. NEVER group citations inside one pair of brackets or parentheses such as (P3, P5).";
   const citesA = "End the list with a CITES: block - one line per cited paragraph, formatted exactly as:";
-  const citesB = "   P<n>: \"verbatim quote of 15 words or fewer, in the article's original language\"";
+  const citesB = "   P<n>: \"verbatim quote of 15 words or fewer, in the " + srcWord + "'s original language\"";
   const system = (forum ? [
     "You extract the key points of ONE discussion thread (original post plus replies) supplied below.",
     "Process: FIRST identify the distinct viewpoints across the WHOLE thread - the original post's claim, where replies genuinely agree, and where they differ. THEN write the points from those paragraphs only.",
@@ -98,7 +102,13 @@ function _pbpSkimCacheKey(url) {
   // set with default settings (deterministic key, independent of the user's
   // strip config). Any parse failure falls back to the raw string.
   let u = String(url || "");
-  try { const p = new URL(u); p.hash = ""; u = p.href; } catch (_) {}
+  try {
+    const p = new URL(u);
+    // Hash ROUTERS (#/docs/x, #!page) address content — keep those; plain
+    // anchors never change the article, drop them.
+    if (!/^#[!/]/.test(p.hash)) p.hash = "";
+    u = p.href;
+  } catch (_) {}
   try {
     if (typeof stripTrackingParams === "function") u = stripTrackingParams(u).cleaned || u;
   } catch (_) {}
@@ -501,7 +511,9 @@ async function _pbpSkimRegen() {
     // switched in Options while this tab stayed open): re-read, and re-run
     // the double gate — if the user has since turned AI or skim off, a
     // manual regen must stay a no-op (token-protection invariant #1).
-    try { st.s = await pbpAiGetSettings(); } catch (_) {}
+    // Fail CLOSED on a read failure: without confirmed-current settings a
+    // paid request must not fire on the stale snapshot.
+    try { st.s = await pbpAiGetSettings(); } catch (_) { return; }
     if (!pbpAiAvailable(st.s) || st.s.previewSkimEnabled !== true) return;
     if (st.permissionError) {
       const recovered = await pbpAiRetryWithPermission(st.permissionError, st.s, () => {});

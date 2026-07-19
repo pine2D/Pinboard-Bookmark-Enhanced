@@ -352,7 +352,10 @@ function pbpAiMakeStreamJsonParser(onItem) {
 // marker dumps the whole CITES block into the rendered body.
 function pbpAiParseCites(fullText) {
   const text = String(fullText == null ? "" : fullText);
-  const markerRe = /(?:^|\n)[ \t]*CITES[:：][ \t]*\r?\n?/g;
+  // The marker must END its line (or the text — stream truncation): without
+  // the anchor, a body line like "CITES：这是正文" would split the answer
+  // and swallow everything after it.
+  const markerRe = /(?:^|\n)[ \t]*CITES[:：][ \t]*\r?(?:\n|$)/g;
   let m;
   let last = null;
   while ((m = markerRe.exec(text)) !== null) last = m;

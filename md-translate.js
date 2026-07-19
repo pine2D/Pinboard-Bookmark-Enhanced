@@ -664,7 +664,11 @@ async function pbpTrInit(detail) {
     title: String((detail && detail.title) || ""),
     account: String((detail && detail.account) || ""),
     target,
-    modelKey: (s.aiProvider || "gemini") + ":" + (pbpAiResolveModelOverride(s) || "default"),
+    // pbpAiEffectiveModel (not just the override): with no preview override,
+    // switching the provider's configured model must invalidate translation/
+    // glossary caches too — same defect skim's cache meta had.
+    modelKey: (s.aiProvider || "gemini") + ":" + ((typeof pbpAiEffectiveModel === "function")
+      ? pbpAiEffectiveModel(s) : (pbpAiResolveModelOverride(s) || "default")),
     work: [],                      // non-pre blocks: {n, md, hash, shielded:{text,slots}}
     workReady: null,               // Promise: resolves once the rAF-chunked st.work build finishes
     trMd: Object.create(null),     // n -> RESTORED translated markdown (export + TOC)

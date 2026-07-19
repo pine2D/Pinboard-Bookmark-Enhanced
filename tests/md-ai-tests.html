@@ -894,6 +894,13 @@ suite("pbpAiParseCites", () => {
     assert(r.cites[0].p === 3 && r.cites[0].quote === "原文引用", "「」 stripped");
     assert(r.cites[1].p === 5 && r.cites[1].quote === "另一段引文", "『』 stripped");
   });
+  test("a body line starting with CITES: but carrying text is NOT the marker", () => {
+    const r = pbpAiParseCites('前文\nCITES：这一行是正文说明\n后文 [P1]\nCITES:\nP1: "q"');
+    assert(r.body.indexOf("这一行是正文说明") !== -1 && r.body.indexOf("后文") !== -1, "prose CITES line kept in body");
+    assert(r.cites.length === 1 && r.cites[0].p === 1, "real trailing block still parsed");
+    const trunc = pbpAiParseCites("Body\nCITES:");
+    assert(trunc.body === "Body" && trunc.cites.length === 0, "marker at text end (stream truncation) still splits");
+  });
 });
 
 // ============ Task 5: pbpAiFuzzyFind ============
@@ -5001,6 +5008,7 @@ suiteIf("pbpSkimBuildPrompt", "pbpSkimBuildPrompt", () => {
     assert(r.system.indexOf("Do NOT manufacture consensus") !== -1, "consensus guard");
     assert(r.system.indexOf("several replies argue") !== -1, "viewpoint attribution wording");
     assert(r.prompt.indexOf("THREAD:\n[P1] op") !== -1, "THREAD label");
+    assert(r.system.indexOf("paragraph number from the thread") !== -1 && r.system.indexOf("from the article") === -1, "no article wording inside the thread variant");
     assert(r.system.indexOf("NEVER group citations inside one pair of brackets or parentheses such as (P3, P5)") !== -1, "citation rule verbatim");
     assert(r.system.indexOf("15 words or fewer") !== -1, "CITES quote cap verbatim");
   });
@@ -5010,6 +5018,7 @@ suiteIf("skim cache key normalization", "_pbpSkimCacheKey", () => {
   test("fragment and tracking-param variants share one cache key", () => {
     const base = _pbpSkimCacheKey("https://e.com/article?id=7");
     assertEq(_pbpSkimCacheKey("https://e.com/article?id=7#section-2"), base, "fragment stripped");
+    assert(_pbpSkimCacheKey("https://e.com/article?id=7#/doc/A") !== _pbpSkimCacheKey("https://e.com/article?id=7#/doc/B"), "hash-router routes stay distinct");
     assertEq(_pbpSkimCacheKey("https://e.com/article?id=7&utm_source=tw&utm_medium=x"), base, "tracker params stripped");
     assert(_pbpSkimCacheKey("https://e.com/article?id=8") !== base, "real param still distinguishes");
     assert(typeof _pbpSkimCacheKey("not a url") === "string", "unparsable url tolerated");
