@@ -876,7 +876,10 @@
 
     var showMore = 0, link = postEl.querySelector(".js-show-link");
     if (link) { var mm = (link.textContent || "").match(/(\d+)/); if (mm) showMore = parseInt(mm[1], 10); }
-    var more = Math.max(showMore, items.length - perPostRendered);
+    // Page-collapsed comments (show-link) and locally capped LOADED comments
+    // are disjoint sets — sum them, don't take the max, or the note
+    // undercounts whenever both are nonzero.
+    var more = showMore + Math.max(0, items.length - perPostRendered);
     var moreLi = more > 0 ? "<li><em>" + escapeHtml("… and " + more + " more comments") + "</em></li>" : "";
     if (!lis && !moreLi) return "";
     return "<p><strong>Comments</strong></p><ul>" + lis + moreLi + "</ul>";

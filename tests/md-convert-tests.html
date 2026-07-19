@@ -1233,6 +1233,16 @@ const SO_POST = (lis, extra) =>
   check("so reply-to-reply → carol top-level (never 3rd level)", /<\/ul><\/li><li><strong>carol<\/strong>/.test(out) && !/<ul>[\s\S]*<ul>[\s\S]*<ul>/.test(out), out);
 })();
 
+(() => {
+  // Locally capped loaded comments + a page show-link are DISJOINT hidden
+  // sets: the note must sum them (5 rendered of 7 loaded => 2, plus 20).
+  const seven = ["c1","c2","c3","c4","c5","c6","c7"].map((t, i) => SO_C(t, i + 1, "u" + i, null)).join("");
+  const doc = new DOMParser().parseFromString(
+    SO_POST(seven, '<a class="js-show-link">Show 20 more comments</a>'), "text/html");
+  const out = norm(soCommentsHtml(doc.querySelector("#question"), doc, { total: 0, capped: false }));
+  check("so comments → hidden note sums capped-loaded + show-link", /and 22 more comments/.test(out), out);
+})();
+
 section("site-rules: so comments (end-to-end)");
 (() => {
   const html = `<!DOCTYPE html><html><body>
