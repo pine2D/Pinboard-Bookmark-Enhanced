@@ -2549,6 +2549,9 @@
       }
     }
   },
+  "askHistWindowNote": {
+    "message": "追加の質問には直近 4 件の質問と回答のみが含まれます。"
+  },
   "explainSelection": {
     "message": "選択範囲を解説"
   },

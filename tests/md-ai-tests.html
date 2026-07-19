@@ -2337,6 +2337,11 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
     assert(_pbpAskRegenerate.toString().indexOf("replaceLast: !el.dataset.askStopped") !== -1,
       "stopped-round regenerate must append, not replace");
   });
+  test("meta line discloses the 4-round history window on long threads", () => {
+    const src = _pbpAskUpdateMeta.toString();
+    assert(src.indexOf('_askRounds.length > 4') !== -1
+      && src.indexOf('t("askHistWindowNote")') !== -1, "history-window disclosure missing");
+  });
   test("regenerate excludes the round being replaced from the prompt", () => {
     const run = _pbpAskRun.toString();
     assert(run.indexOf("opts.replaceLast && st.rounds.length") !== -1

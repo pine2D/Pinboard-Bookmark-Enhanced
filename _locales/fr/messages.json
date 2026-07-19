@@ -2549,6 +2549,9 @@
       }
     }
   },
+  "askHistWindowNote": {
+    "message": "Les questions de suivi n'incluent que les 4 derniers échanges."
+  },
   "explainSelection": {
     "message": "Expliquer la sélection"
   },

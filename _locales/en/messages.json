@@ -2549,6 +2549,9 @@
       }
     }
   },
+  "askHistWindowNote": {
+    "message": "Follow-ups carry only the last 4 questions and answers."
+  },
   "explainSelection": {
     "message": "Explain selection"
   },

@@ -2549,6 +2549,9 @@
       }
     }
   },
+  "askHistWindowNote": {
+    "message": "Rückfragen enthalten nur die letzten 4 Fragen und Antworten."
+  },
   "explainSelection": {
     "message": "Auswahl erklären"
   },

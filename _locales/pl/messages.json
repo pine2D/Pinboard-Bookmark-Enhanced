@@ -2549,6 +2549,9 @@
       }
     }
   },
+  "askHistWindowNote": {
+    "message": "Kolejne pytania uwzględniają tylko 4 ostatnie pytania i odpowiedzi."
+  },
   "explainSelection": {
     "message": "Wyjaśnij zaznaczenie"
   },

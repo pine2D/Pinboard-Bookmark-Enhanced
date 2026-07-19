@@ -283,6 +283,13 @@ function _pbpAskSetOpen(open) {
 
 // Clear: wipe the visible thread, restore starter chips + empty hint,
 // and erase the persisted ask_<url> history.
+// WONTFIX (ask campaign 2026-07, Codex finding): with TWO preview tabs on
+// the same URL, a round that tab B already had in flight when tab A
+// cleared will still append once it finishes - the wiped history "grows
+// back" one round. Guarding it needs a cross-tab tombstone/epoch in the
+// IDB entry, and the semantics are genuinely arguable (from B's view its
+// just-finished answer SHOULD persist). Scope: same account, same URL,
+// two open readers, mid-stream clear - accepted as-is.
 async function _pbpAskClearThread() {
   // Wipe the in-memory conversation FIRST: st.rounds feeds every future
   // prompt (_pbpAskRun/_pbpAskUpdateMeta), and aborting any in-flight
@@ -534,6 +541,10 @@ function _pbpAskUpdateMeta() {
   if (st.ctx.sentBlocks < st.ctx.totalBlocks) {
     line += " " + t("askSentPartial", String(st.ctx.sentBlocks), String(st.ctx.totalBlocks));
   }
+  // History-window disclosure (context-rot line of the ask campaign):
+  // once the thread outgrows the 4-round prompt window, say so instead
+  // of silently reinterpreting follow-ups against a truncated history.
+  if (_askRounds.length > 4) line += " " + t("askHistWindowNote");
   meta.textContent = line;
 }
 

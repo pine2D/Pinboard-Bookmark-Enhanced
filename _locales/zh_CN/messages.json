@@ -2549,6 +2549,9 @@
       }
     }
   },
+  "askHistWindowNote": {
+    "message": "追问仅携带最近 4 轮问答。"
+  },
   "explainSelection": {
     "message": "解释所选内容"
   },
