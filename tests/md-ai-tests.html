@@ -2393,6 +2393,17 @@ suiteIf("ask citation tokenizer", "pbpAskBuildContext", () => {
     const src = _pbpAskHistRestore.toString();
     assert(src.includes("stale ? _pbpAskStripCiteTokens(parsed.body) : parsed.body"), "stale strip missing in restore seeding");
   });
+  test("clear drops the restore flag synchronously; restore re-checks after its read", () => {
+    const clear = _pbpAskClearThread.toString();
+    // The flag reset must appear BEFORE the awaited persistence write.
+    assert(clear.indexOf("_pbpAskHistRestored = false") < clear.indexOf("await pbpAskHistSet"),
+      "clear must drop the flag before any await");
+    const restore = _pbpAskHistRestore.toString();
+    const readIdx = restore.indexOf("await pbpAskHistGet");
+    const recheck = restore.indexOf("if (!_pbpAskHistRestored) return;");
+    assert(readIdx !== -1 && recheck > readIdx, "restore must re-check the flag after the IDB read");
+    assert(recheck < restore.indexOf("records = hist.slice()"), "re-check must precede records repopulation");
+  });
   test("restored history prepends to st.rounds atomically after the loop", () => {
     const src = _pbpAskHistRestore.toString();
     assert(src.includes("restoredRounds.concat(_pbpAskState.rounds || [])"), "atomic prepend missing");

@@ -297,6 +297,12 @@ async function _pbpAskClearThread() {
   // which never pushes to st.rounds or ask history - so a stream that
   // was mid-flight when the user clicked Clear can't silently "revive"
   // the wiped conversation once it finishes.
+  // Drop the restore flag SYNCHRONOUSLY, before any await: a restore that
+  // is currently parked on its IDB read would otherwise come back, see the
+  // old flag, and repopulate st.records / strip the empty hint from the
+  // just-cleared thread (its own frag guard fires too late to stop that) -
+  // letting the export button copy history the user had erased.
+  _pbpAskHistRestored = false;
   if (_pbpAskState) {
     _pbpAskState.rounds = [];
     _pbpAskState.records = [];
@@ -313,7 +319,6 @@ async function _pbpAskClearThread() {
   const chips = document.getElementById("ask-chips");
   if (chips) chips.hidden = false;
   if (_pbpAskState) await pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account);
-  _pbpAskHistRestored = false;
 }
 
 // Send-flow seam: _pbpAskSend lands in the next task (same file, function
@@ -1349,6 +1354,11 @@ async function _pbpAskHistRestore() {
   }
   let hist = [];
   try { hist = await pbpAskHistGet(_pbpAskHistUrl, _pbpAskHistAccount); } catch (_) {}
+  // Re-check after the await: a Clear that landed while the IDB read was
+  // in flight dropped the flag synchronously - this stale result must not
+  // repopulate st.records (export would copy erased history) or touch the
+  // freshly-reset empty hint / starter chips.
+  if (!_pbpAskHistRestored) return;
   if (!hist.length) return;
   if (_pbpAskState) _pbpAskState.records = hist.slice();
   // Restored rounds replace the empty-state hint; the starter chips
