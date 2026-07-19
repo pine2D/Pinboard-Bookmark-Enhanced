@@ -750,6 +750,18 @@ function _pbpAskSplitCiteTokens(text) {
   return segs;
 }
 
+// Pure: drop [Pn] citation tokens (incl. grouped forms) from an answer
+// body, keeping the prose. Used when seeding PREVIOUS Q&A from a STALE
+// record (blocksHash mismatch, see _pbpAskHistRestore): the old paragraph
+// numbers index a DIFFERENT block list now, so feeding them through would
+// anchor follow-up citations to unrelated paragraphs.
+function _pbpAskStripCiteTokens(text) {
+  return _pbpAskSplitCiteTokens(text)
+    .filter((seg) => seg.kind === "text")
+    .map((seg) => seg.text)
+    .join("");
+}
+
 // Chip pass: walk el's text nodes, replace every in-range [Pn] token with a
 // superscript chip button; out-of-range tokens stay literal text (spec 5.2:
 // failed verification must never render as a link). Verification (fuzzy
@@ -1287,7 +1299,8 @@ async function _pbpAskHistRestore() {
         // (single sanitize point) -> chip pass -> verification runs AGAIN
         // against the current block index -> decorate (copy button).
         const parsed = _pbpAskFinalize(aEl, rec.a);
-        if (rec.blocksHash && curFp && rec.blocksHash !== curFp) {
+        const stale = !!(rec.blocksHash && curFp && rec.blocksHash !== curFp);
+        if (stale) {
           aEl.querySelectorAll(".ask-chip").forEach((chip) => {
             chip.classList.add("stale");
             chip.disabled = true; // native: also drops it from the tab order + blocks click
@@ -1297,10 +1310,16 @@ async function _pbpAskHistRestore() {
         // what pbpAskBuildPrompt/_pbpAskUpdateMeta read (_pbpAskRun), so a
         // follow-up question after a page reload still carries PREVIOUS
         // Q&A context - same {q, a: <parsed body>} shape _pbpAskRun pushes
-        // for a live answer (md-ask.js:466).
+        // for a live answer (md-ask.js:466). A stale record's body enters
+        // with its [Pn] tokens stripped - the UI already disabled those
+        // chips as pointing nowhere, so the prompt must not re-teach the
+        // model the same dead indexes.
         if (_pbpAskState) {
           _pbpAskState.rounds = _pbpAskState.rounds || [];
-          _pbpAskState.rounds.push({ q: String(rec.q || ""), a: parsed.body });
+          _pbpAskState.rounds.push({
+            q: String(rec.q || ""),
+            a: stale ? _pbpAskStripCiteTokens(parsed.body) : parsed.body
+          });
         }
       }
       if (hi < hist.length) raf(step); else resolve();

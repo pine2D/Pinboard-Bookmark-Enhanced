@@ -2311,6 +2311,16 @@ suiteIf("ask citation tokenizer", "pbpAskBuildContext", () => {
     assertEq(segs.length, 1, "single text seg");
     assertEq(segs[0].kind, "text", "text kind");
   });
+  test("_pbpAskStripCiteTokens drops plain and grouped tokens, keeps prose", () => {
+    assertEq(_pbpAskStripCiteTokens("A [P7] b"), "A  b", "plain token dropped");
+    assertEq(_pbpAskStripCiteTokens("claim (P3, P5) end"), "claim  end", "grouped form dropped");
+    assertEq(_pbpAskStripCiteTokens("no cites"), "no cites", "prose untouched");
+    assertEq(_pbpAskStripCiteTokens(""), "", "empty tolerated");
+  });
+  test("stale restored rounds seed the prompt with stripped bodies", () => {
+    const src = _pbpAskHistRestore.toString();
+    assert(src.includes("stale ? _pbpAskStripCiteTokens(parsed.body) : parsed.body"), "stale strip missing in restore seeding");
+  });
   test("empty input -> empty array", () => {
     assertEq(_pbpAskSplitCiteTokens("").length, 0, "empty");
   });
