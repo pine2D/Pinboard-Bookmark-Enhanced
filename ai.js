@@ -980,9 +980,15 @@ function parseAITags(resp, separator) {
   return tags.map(t => t.toLowerCase().replace(/\s+/g, sep));
 }
 
-// ---- Refine AI tags: dedup, conservative plural fold, preserve order, cap ----
+// ---- Refine AI tags: dedup, preserve order, cap ----
 // Input is the already-normalized output of parseAITags (lowercased, separator-applied),
 // but the helper is defensive so it can also be fed raw model strings.
+// The former "conservative plural fold" (drop an s-suffixed tag whose
+// singular was already kept) is gone: it deleted semantically DIFFERENT
+// tags - ["new","news"] lost news, ["cs","css"] lost css (both
+// reproduced by the popup-AI audit). Exact/separator-normalized dedup
+// stays; genuine plural near-dupes are rare within one 8-tag reply and
+// tag-gov's grouped cleanup owns the vocabulary-wide case.
 function refineTags(tags, opts) {
   const cap = (opts && opts.cap) || AI_TAG_CAP;
   if (!Array.isArray(tags)) return [];
@@ -995,8 +1001,6 @@ function refineTags(tags, opts) {
     // Canonical key: lowercase, strip separators/spaces so "token-relay" == "token_relay" == "tokenrelay".
     const key = tag.toLowerCase().replace(/[\s_-]+/g, "");
     if (!key || seen.has(key)) continue;
-    // Conservative English plural fold: an ASCII word ending in "s" whose singular was already kept.
-    if (/^[a-z0-9][a-z0-9_\- ]*s$/.test(tag.toLowerCase()) && seen.has(key.slice(0, -1))) continue;
     seen.add(key);
     out.push(tag);
     if (out.length >= cap) break;

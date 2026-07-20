@@ -70,11 +70,13 @@ suite("refineTags", () => {
     assertEq(refineTags(["Token-Relay", "token_relay", "tokenrelay"], { cap: 8, separator: "_" }).join(","),
       "Token-Relay", "separator+case variants collapse");
   });
-  test("folds ASCII plural when singular already kept (rating before ratings)", () => {
-    assertEq(refineTags(["rating", "ratings", "proxy"], { cap: 8, separator: "-" }).join(","),
-      "rating,proxy", "ratings dropped");
+  test("plural fold removed: distinct s-suffixed tags survive", () => {
+    assertEq(refineTags(["new", "news", "cs", "css"], { cap: 8, separator: "-" }).join(","),
+      "new,news,cs,css", "news/css no longer eaten by their prefixes");
+    assertEq(refineTags(["rating", "ratings"], { cap: 8, separator: "-" }).join(","),
+      "rating,ratings", "true plural pair kept too (tag-gov owns vocabulary-wide merging)");
   });
-  test("CJK tags are never plural-folded and survive", () => {
+  test("CJK tags survive untouched", () => {
     assertEq(refineTags(["评分", "代理"], { cap: 8, separator: "-" }).join(","), "评分,代理", "cjk kept");
   });
   test("drops empties and trims; tolerates non-strings", () => {
@@ -202,9 +204,9 @@ suite("buildCombinedPrompt", () => {
 
 suite("parseAICombined", () => {
   test("clean object parsed; tags normalized + refined", () => {
-    const r = parseAICombined('{"summary":"  A short summary. ","tags":["AI Token Relay","rating","ratings"]}', "_");
+    const r = parseAICombined('{"summary":"  A short summary. ","tags":["AI Token Relay","rating","Rating"]}', "_");
     assertEq(r.summary, "A short summary.", "summary trimmed");
-    assertEq(r.tags.join(","), "ai_token_relay,rating", "tags normalized, ratings folded");
+    assertEq(r.tags.join(","), "ai_token_relay,rating", "tags normalized, case-dupe deduped");
   });
   test("object embedded in prose / fences is extracted", () => {
     const r = parseAICombined('Sure!\n```json\n{"summary":"S","tags":["proxy"]}\n```\nDone', "-");
