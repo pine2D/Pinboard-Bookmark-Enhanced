@@ -1696,11 +1696,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Extracted so the conflict-choice popover can re-run it with force
   // (user-confirmed remote overwrite, campaign 2026-07-20). Each run
   // persists the live form once and holds the debounce queue for its
-  // exact snapshot.
+  // exact snapshot. One shared clear-timer: a stale 5s timer from the
+  // conflicted first run must not wipe the force run's fresh status
+  // (Codex r3 LOW).
+  let _webdavPushStatusTimer = null;
   async function _pbpWebdavRunPush(force) {
     const statusEl = $id("webdav-status");
     const cfg = _pbpWebdavCfgFromForm();
     if (!statusEl) return;
+    clearTimeout(_webdavPushStatusTimer);
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
@@ -1708,7 +1712,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (errorKey) {
       setStatusIcon(statusEl, false, t(errorKey));
       statusEl.style.color = "#c00";
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      _webdavPushStatusTimer = setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       return;
     }
     let res;
@@ -1721,7 +1725,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!saved.ok) {
         setStatusIcon(statusEl, false, t("optSaveFailed"));
         statusEl.style.color = "#c00";
-        setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+        _webdavPushStatusTimer = setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
         return;
       }
       res = await pbpWebdavPush(force ? Object.assign({}, cfg, { force: true }) : cfg);
@@ -1762,7 +1766,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setStatusIcon(statusEl, false, msg);
       statusEl.style.color = "#c00";
     }
-    setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+    _webdavPushStatusTimer = setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
   }
   $id("webdav-push-btn")?.addEventListener("click", () => { _pbpWebdavRunPush(false); });
 
