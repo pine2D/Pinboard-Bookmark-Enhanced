@@ -168,9 +168,22 @@ suite("default tag prompt", () => {
   });
   test("buildTagPrompt appends existing-tags line only when userTags present", () => {
     const withTags = buildTagPrompt({ aiTagLang: "en" }, "t", "u", "c", "", ["alpha", "beta"]);
-    assert(/Existing tags \(prefer reusing/.test(withTags), "reuse line present");
+    assert(withTags.includes(AI_TAG_REUSE_LINE), "reuse line present");
     const none = buildTagPrompt({ aiTagLang: "en" }, "t", "u", "c", "", []);
     assert(!/Existing tags/.test(none), "no reuse line when empty");
+  });
+  test("reuse line is strengthened, shared by tag and combined prompts (B2)", () => {
+    assert(AI_TAG_REUSE_LINE.includes("reuse EVERY tag below that fits"), "hard-leaning reuse wording");
+    assert(AI_TAG_REUSE_LINE.includes("close variants"), "near-variant check requested");
+    assert(AI_TAG_REUSE_LINE.includes("only when nothing below covers"), "new-tag escape hatch kept");
+    const c = buildCombinedPrompt({}, "T", "u", "c", "", ["alpha"]);
+    assert(c.includes(AI_TAG_REUSE_LINE), "combined prompt uses the same line");
+    assert(!/prefer reusing these if applicable/.test(c), "old soft wording gone");
+  });
+  test("guidance covers failure pages and CJK term policy (B2)", () => {
+    assert(TAG_GUIDANCE.includes("give NO tags at all"), "failure-page empty-list rule");
+    assert(/error page, verification wall/.test(TAG_GUIDANCE), "failure surfaces enumerated");
+    assert(TAG_GUIDANCE.includes("stay in English even when tagging in another language"), "technical-term language policy");
   });
   test("inserted values are never re-expanded as placeholders (single-pass fill)", () => {
     const p = buildTagPrompt({ aiTagLang: "en" }, "literal {{content}}", "u", "SECRETBODY", "", []);
@@ -250,7 +263,7 @@ suite("buildCombinedPrompt", () => {
     assert(p.indexOf("x".repeat(4001)) === -1, "not 4001");
   });
   test("appends existing-tags line only when userTags present", () => {
-    assert(/Existing tags \(prefer reusing/.test(buildCombinedPrompt({}, "t", "u", "c", "", ["a"])), "present");
+    assert(buildCombinedPrompt({}, "t", "u", "c", "", ["a"]).includes(AI_TAG_REUSE_LINE), "present");
     assert(!/Existing tags/.test(buildCombinedPrompt({}, "t", "u", "c", "", [])), "absent");
   });
 });

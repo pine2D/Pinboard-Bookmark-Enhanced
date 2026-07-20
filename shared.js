@@ -101,7 +101,9 @@ const AI_TAG_CAP = 8;
 const TAG_GUIDANCE = `Choose tags that capture this page's specific identity, not just its broad category:
 - Include the single most specific term that identifies what this page or site IS and what it DOES — the term someone in its niche would actually use to find it — even if it is uncommon or you have to coin it (a broad category like "ai" is the genus; also give the differentia, e.g. "llm_proxy" instead of stopping at "ai").
 - Avoid over-generic catch-all tags (ai, api, tools, web, service, software, app, productivity, online) unless no more specific term fits.
-- Order tags from most specific/defining to most general.`;
+- Order tags from most specific/defining to most general.
+- Established English technical terms and product names stay in English even when tagging in another language; translate only general-topic words.
+- If the content is an error page, verification wall (e.g. Cloudflare check), login/consent screen or an empty shell, give NO tags at all (an empty list) — never tag the failure page itself.`;
 
 const DEFAULT_TAG_PROMPT = `Suggest up to ${AI_TAG_CAP} bookmark tags for the following webpage. {{lang_instruction}} Tags should be lowercase, {{separator_instruction}}.
 

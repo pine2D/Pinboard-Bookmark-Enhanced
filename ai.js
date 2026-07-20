@@ -880,6 +880,14 @@ function _aiFillTemplate(tmpl, vars) {
     Object.prototype.hasOwnProperty.call(vars, name) ? vars[name] : m);
 }
 
+// Vocabulary-reuse line appended to tag and combined prompts. Strength is
+// deliberate (campaign B2): three shipped bookmark managers independently
+// demonstrated that a soft "prefer reusing" does not stop models from
+// coining near-duplicate new tags ("ad tech"/"adtech"/"ad-technology"),
+// fragmenting the vocabulary. Still not a hard closed list - a genuinely
+// new topic may coin a tag when nothing listed covers it.
+const AI_TAG_REUSE_LINE = "Existing tags - reuse EVERY tag below that fits this page; check for close variants of a candidate before coining anything new, and invent a new tag only when nothing below covers that facet: ";
+
 function buildTagPrompt(s, title, url, content, description, userTags) {
   const sep = s.aiTagSeparator || "-";
   const tmpl = s.customTagPrompt?.trim() || DEFAULT_TAG_PROMPT;
@@ -892,7 +900,7 @@ function buildTagPrompt(s, title, url, content, description, userTags) {
     description: description || "",
   });
   if (userTags && userTags.length > 0) {
-    prompt += `\n\nExisting tags (prefer reusing these if applicable): ${userTags.slice(0, 50).join(", ")}`;
+    prompt += `\n\n${AI_TAG_REUSE_LINE}${userTags.slice(0, 50).join(", ")}`;
   }
   return prompt;
 }
@@ -928,7 +936,7 @@ Format: {"summary":"...","tags":["tag1","tag2"]}`;
     content: (content || "").substring(0, 4000),
   });
   if (userTags && userTags.length > 0) {
-    prompt += `\n\nExisting tags (prefer reusing these if applicable): ${userTags.slice(0, 50).join(", ")}`;
+    prompt += `\n\n${AI_TAG_REUSE_LINE}${userTags.slice(0, 50).join(", ")}`;
   }
   return prompt;
 }
