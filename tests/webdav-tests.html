@@ -217,6 +217,12 @@ section("pbpWebdavBuildRequest");
     !pbpWebdavValidEtag("*") && !pbpWebdavValidEtag("unquoted"),
     "only syntactically valid strong ETags are eligible for exact If-Match CAS");
 
+  assertEq(pbpWebdavNormalizeEtag('"abc-gzip"'), '"abc"',
+    "Apache mod_deflate suffix stripped from GET etags (the pull->push 412 loop)");
+  assertEq(pbpWebdavNormalizeEtag('"abc-br"'), '"abc"', "brotli suffix stripped too");
+  assertEq(pbpWebdavNormalizeEtag('"plain"'), '"plain"', "clean etag passes through unchanged");
+  assertEq(pbpWebdavNormalizeEtag('W/"weak-gzip"'), "", "weak/invalid input normalizes to empty, never a fabricated tag");
+
   const pull = pbpWebdavBuildRequest("pull", cfg);
   assertEq(pull.method, "GET", "pull -> GET");
   assert(!("Content-Type" in pull.headers), "pull has no content-type header");

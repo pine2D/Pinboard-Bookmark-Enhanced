@@ -89,6 +89,20 @@ function pbpWebdavResponseEtag(response) {
   } catch (_) { return ""; }
 }
 
+// Strip the documented Apache mod_deflate/brotli content-coding suffix
+// from a GET-response ETag ("abc-gzip" -> "abc"). Apache appends it to
+// the ENTITY etag when serving a compressed representation, but PUT
+// If-Match validates against the entity etag - remembering the suffixed
+// form wedged push into a permanent 412 that a pull could never clear
+// (pull re-read the same suffixed value). PUT responses are never
+// content-coded, so their ETags pass through here untouched by
+// construction; a genuine entity tag that happens to END in "-gzip" is
+// pathological enough to accept the trade.
+function pbpWebdavNormalizeEtag(etag) {
+  if (!pbpWebdavValidEtag(etag)) return "";
+  return etag.trim().replace(/-(?:gzip|br|deflate)"$/, '"');
+}
+
 function pbpWebdavEtagStateMatchesTarget(state, target, user) {
   if (!state || typeof state.target !== "string") return false;
   // Accept the short-lived plaintext shape from pre-fix builds, but every new
@@ -435,7 +449,9 @@ async function pbpWebdavPull(cfgOverride) {
     const data = await resp.json().catch(() => null);
     try { pbpBackupSchemaVersion(data); }
     catch (_) { return { ok: false, error: "invalid" }; }
-    return { ok: true, data, etag: pbpWebdavResponseEtag(resp) };
+    // GET etags go through the content-coding normalizer: the caller
+    // remembers this value as the If-Match baseline for the next push.
+    return { ok: true, data, etag: pbpWebdavNormalizeEtag(pbpWebdavResponseEtag(resp)) };
   } catch (e) {
     return { ok: false, error: (e && e.message) || "network" };
   }
