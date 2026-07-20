@@ -625,6 +625,18 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!backgroundSource.includes("if (tCached && sCached)"), "old both-or-regenerate shape must be gone");
     });
 
+    await testAsync("provenance survives hotkeys, removal, and form switches (r2 M3)", async () => {
+      const hotkey = source.slice(source.indexOf('document.querySelector(`.stag[data-alt-num='));
+      assert(hotkey.slice(0, 400).includes("el.click();") && !hotkey.slice(0, 400).includes("addTag(el.dataset.tag)"),
+        "Alt+N must route through the chip click handler");
+      const removeSrc = await fetch("../popup-tags.js").then(r => r.text());
+      assert(removeSrc.includes("_aiSessionAddedTags.delete(tag.toLowerCase())"),
+        "removeTag must drop AI provenance for re-added names");
+      const regenHandler = popupAiSource.slice(popupAiSource.indexOf('["append", "replace"].forEach'));
+      assert(regenHandler.includes('_aiUrlEquivalent($id("url-input").value, pageInfo.url)) return;'),
+        "replace handler must gate on op liveness before removing tags");
+    });
+
     test("replace-mode regen retracts only session-AI-added tags (A10)", () => {
       assert(popupAiSource.includes("const _aiSessionAddedTags = new Set()"), "provenance set missing");
       assert(popupAiSource.includes("cachedTagSet.has(t.toLowerCase()) && _aiSessionAddedTags.has(t.toLowerCase())"),

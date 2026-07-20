@@ -1589,6 +1589,10 @@ document.addEventListener("keydown", (e) => {
   const el = document.querySelector(`.stag[data-alt-num="${e.key}"]:not(.used)`);
   if (el) {
     e.preventDefault();
-    addTag(el.dataset.tag);
+    // Route through the chip's own click handler (Codex r2 M3): a direct
+    // addTag() bypassed the AI chips' provenance recording, so replace-
+    // mode regen could not retract hotkey-added AI tags. The handler also
+    // owns the .used/disabled marking.
+    el.click();
   }
 });

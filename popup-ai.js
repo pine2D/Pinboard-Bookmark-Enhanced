@@ -817,6 +817,11 @@ function renderAITags(tags, fromCache) {
         e.preventDefault();
         hintWrap.querySelectorAll(".regen-link").forEach((l) => l.classList.add("loading"));
         link.textContent = mode === "replace" ? t("aiReplacing") : t("aiRegenerating");
+        // Codex r2 M3: the form may have been switched to another bookmark
+        // (edit-from-recent) since these links rendered - doAITags would
+        // refuse below, but the replace-mode removal would already have
+        // fired. Gate the whole handler on op liveness first.
+        if (!_aiUrlEquivalent($id("url-input").value, pageInfo.url)) return;
         if (mode === "replace") {
           // Retract only tags this session's AI chips added: a same-named
           // tag with no AI provenance (typed, or from the saved bookmark)

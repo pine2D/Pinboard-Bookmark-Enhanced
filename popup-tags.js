@@ -486,6 +486,10 @@ function addTag(tag) {
 
 function removeTag(tag) {
   currentTags = currentTags.filter((t) => t.toLowerCase() !== tag.toLowerCase());
+  // Codex r2 M3: a removed tag loses its AI provenance - if the user
+  // re-adds the same name by hand, replace-mode regen must treat it as
+  // the user's tag and never retract it.
+  if (typeof _aiSessionAddedTags !== "undefined") _aiSessionAddedTags.delete(tag.toLowerCase());
   renderTags();
 }
 
