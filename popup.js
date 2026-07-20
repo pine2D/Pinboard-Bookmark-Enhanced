@@ -389,6 +389,9 @@ async function showMain(token) {
     const val = $id("url-input").value.trim();
     const bad = !val || (!val.startsWith("http://") && !val.startsWith("https://"));
     $id("url-warning").classList.toggle("hidden", !bad);
+    // audit A1: AI is anchored to the opened page - grey it out while the
+    // URL points somewhere non-equivalent (popup-ai.js owns the check).
+    if (typeof pbpAiSyncUrlEditState === "function") pbpAiSyncUrlEditState();
     updateCharCount();
   });
   $id("title-input").addEventListener("input", updateCharCount);

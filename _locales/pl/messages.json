@@ -246,6 +246,9 @@
   "aiNoContent": {
     "message": "Brak treści strony do podsumowania"
   },
+  "aiUrlEdited": {
+    "message": "Adres URL zmieniony — AI generuje tylko dla pierwotnie otwartej strony."
+  },
   "aiSetKey": {
     "message": "Ustaw klucz AI API w [[ustawieniach]]"
   },

@@ -119,6 +119,33 @@ async function enrichPageTextIfJina(s) {
   }
 }
 
+// ---- URL-edit guard (audit A1) ----
+// The AI pipeline is anchored to pageInfo.url: extraction reads the tab
+// that page is showing, the cache keys use it, and the save uses the
+// edited url-input. Editing the URL to a NON-equivalent target used to
+// produce a summary of page A cached under A but saved onto bookmark B.
+// Equivalence deliberately ignores fragments and tracking params so the
+// paste-clean flow (strip utm etc.) keeps AI enabled.
+function _aiUrlEquivalent(a, b) {
+  const norm = (u) => {
+    let x = String(u == null ? "" : u).trim();
+    try { const p = new URL(x); p.hash = ""; x = p.href; } catch (_) {}
+    try { if (typeof stripTrackingParams === "function") x = stripTrackingParams(x).cleaned || x; } catch (_) {}
+    return x;
+  };
+  return norm(a) === norm(b);
+}
+
+// Called from the url-input "input" listener (popup.js): grey the AI
+// entry points out while the URL differs from the opened page; editing
+// back re-enables them. The in-op guards below stay authoritative
+// (hotkey/retry paths bypass pointer-events).
+function pbpAiSyncUrlEditState() {
+  const edited = !_aiUrlEquivalent($id("url-input").value, pageInfo.url);
+  $id("ai-summary-btn")?.classList.toggle("disabled-link", edited);
+  $id("ai-tags-btn")?.classList.toggle("disabled-link", edited);
+}
+
 // Settle any in-flight same-URL bookmark lookup before touching the
 // description (audit A2). checkExistingBookmark nulls .promise once it
 // lands, so this is a no-op when the lookup already settled; the promise
@@ -408,10 +435,10 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s) {
   const callSingle = () => {
     if (kind === "summary") {
       return getOrCreateInflight(`${account}|${aiCacheFingerprint(s, "summary")}|summary|${url}`, () =>
-        callAI(s, buildSummaryPrompt(s, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value)));
+        callAI(s, buildSummaryPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value)));
     }
     return getOrCreateInflight(`${account}|${aiCacheFingerprint(s, "tags")}|tags|${url}`, async () => {
-      const resp = await callAI(s, buildTagPrompt(s, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
+      const resp = await callAI(s, buildTagPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, allUserTags));
       return finalizeAITags(refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator }), s);
     });
   };
@@ -454,7 +481,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s) {
   let both = null;
   try {
     both = await getOrCreateInflight(combinedKey, async () => {
-      const resp = await callAI(s, buildCombinedPrompt(s, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
+      const resp = await callAI(s, buildCombinedPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, allUserTags));
       return parseAICombined(resp, s.aiTagSeparator);
     });
   } catch (e) {
@@ -486,6 +513,10 @@ async function doAISummary(forceRefresh, sOverride) {
   const account = pbpPopupAiAccount();
   if (!account) return;
   if (!hasAIKey(s)) { showSetKeyError(); return; }
+  if (!_aiUrlEquivalent($id("url-input").value, pageInfo.url)) {
+    showStatus("status-msg", t("aiUrlEdited"), "error");
+    return;
+  }
   hideAIError();
   // audit A2: a pending bookmark lookup rewrites the description when it
   // lands - a summary inserted before that gets clobbered (paid result
@@ -600,6 +631,10 @@ async function doAITags(forceRefresh, sOverride) {
   hideAIError();
 
   if (!hasAIKey(s)) { showSetKeyError(); return; }
+  if (!_aiUrlEquivalent($id("url-input").value, pageInfo.url)) {
+    showStatus("status-msg", t("aiUrlEdited"), "error");
+    return;
+  }
 
   if (!forceRefresh) {
     const cached = await getAICache(pageInfo.url, "tags", s.aiCacheDuration, s.aiContentSource, account, s);

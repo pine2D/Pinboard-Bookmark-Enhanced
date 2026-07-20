@@ -246,6 +246,9 @@
   "aiNoContent": {
     "message": "Aucun contenu de page à résumer"
   },
+  "aiUrlEdited": {
+    "message": "URL modifiée — l'IA ne génère que pour la page d'origine."
+  },
   "aiSetKey": {
     "message": "Définir la clé API IA dans les [[paramètres]]"
   },

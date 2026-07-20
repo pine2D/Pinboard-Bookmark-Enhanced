@@ -246,6 +246,9 @@
   "aiNoContent": {
     "message": "Kein Seiteninhalt zum Zusammenfassen"
   },
+  "aiUrlEdited": {
+    "message": "URL geändert – KI erzeugt nur für die ursprünglich geöffnete Seite."
+  },
   "aiSetKey": {
     "message": "Lege den KI-API-Key in den [[Einstellungen]] fest"
   },

@@ -246,6 +246,9 @@
   "aiNoContent": {
     "message": "要約するページ内容がありません"
   },
+  "aiUrlEdited": {
+    "message": "URL が編集されているため、AI は元のページに対してのみ生成できます。"
+  },
   "aiSetKey": {
     "message": "[[設定]]で AI API Key を設定してください"
   },

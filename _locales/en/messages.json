@@ -246,6 +246,9 @@
   "aiNoContent": {
     "message": "No page content to summarize"
   },
+  "aiUrlEdited": {
+    "message": "URL edited: AI generates from the originally opened page only."
+  },
   "aiSetKey": {
     "message": "Set AI API key in [[settings]]"
   },

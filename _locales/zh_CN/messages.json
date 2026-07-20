@@ -246,6 +246,9 @@
   "aiNoContent": {
     "message": "页面无可用内容"
   },
+  "aiUrlEdited": {
+    "message": "URL 已修改，AI 只针对最初打开的页面生成。"
+  },
   "aiSetKey": {
     "message": "请先在[[设置]]中配置 AI API Key"
   },
