@@ -64,8 +64,13 @@ function clearAiProgress(buttonId) {
 async function ensurePageText() {
   if (pageInfo.pageText) return; // already populated (cache from earlier AI call this session)
   if (settings.aiContentSource === "jina") {
+    // Throws only on host_permission (surface the grant flow); any other
+    // failure leaves pageText empty and falls through to local Defuddle
+    // below. The old code returned unconditionally here - its warn log
+    // claimed "using local content" while nobody ever ran the local
+    // extractor (audit A9).
     await enrichPageTextIfJina();
-    return;
+    if (pageInfo.pageText) return;
   }
   // Local source: lazy-inject Defuddle and pull full page text
   try {

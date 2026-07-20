@@ -519,6 +519,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!backgroundSource.includes('message.type === "bookmark_saved"'), "Service Worker still handles bookmark_saved");
     });
 
+    test("Jina extraction failure falls through to local Defuddle (A9)", () => {
+      const fnStart = popupAiSource.indexOf("async function ensurePageText");
+      const fnEnd = popupAiSource.indexOf("async function enrichPageTextIfJina", fnStart);
+      const fn = popupAiSource.slice(fnStart, fnEnd);
+      assert(fnStart >= 0 && fnEnd > fnStart, "ensurePageText source not found");
+      assert(fn.includes("await enrichPageTextIfJina();"), "jina branch present");
+      assert(!/enrichPageTextIfJina\(\);\s*return;/.test(fn), "unconditional return after Jina must be gone");
+      assert(fn.includes("if (pageInfo.pageText) return;"), "fall-through gated on actual content");
+    });
+
     test("summary upsert/remove operate on the LAST block, in place (A11)", () => {
       assert(popupAiSource.includes("function _aiSummaryBlockMatches"), "global block matcher missing");
       assert(popupAiSource.includes("matches[matches.length - 1]"), "last-match selection missing");
