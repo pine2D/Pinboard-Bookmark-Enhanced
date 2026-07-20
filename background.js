@@ -1901,11 +1901,12 @@ async function _runBatchSave(tabs, expectedAccount) {
     // second credential read - a bare return left no terminal
     // batch_progress record and the popup sat disabled at 0% forever.
     // Write the same done-with-error shape the in-run catch produces -
-    // but ONLY for a genuine account SWITCH (token present, different
-    // account): that is the case where a popup is polling under the
-    // expected account. Missing token/account keeps the established
-    // no-record contract (logout tears the popup session down anyway).
-    if (startAuth.token && account && startAuth.account !== account) {
+    // but ONLY when an expectedAccount was explicitly handed over (the
+    // popup start flow always passes one, so a poller exists): that
+    // covers both a genuine account switch AND an external token clear
+    // in this window (Codex r2 L6). Internal/legacy calls without an
+    // expected account keep the established no-record contract.
+    if (expectedAccount && account) {
       await _writeBatchProgress({
         running: false, done: true, error: "account_changed",
         account, total: tabs.length, i: 0,

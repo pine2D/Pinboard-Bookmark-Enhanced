@@ -432,7 +432,9 @@ function pbpRelevantTagsFirst(tags, title, url) {
   const hit = [];
   const rest = [];
   for (const tag of tags) {
-    const parts = String(tag).toLowerCase().split(/[\s_-]+/).filter(Boolean);
+    // Same unicode tokenizer as the haystack (Codex r2 L8): "node.js" ->
+    // ["node","js"], "c++" -> ["c"] - punctuated tech tags now match.
+    const parts = String(tag).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
     const matched = parts.length && parts.every(w => cjk.test(w) ? hay.includes(w) : words.has(w));
     (matched ? hit : rest).push(tag);
   }

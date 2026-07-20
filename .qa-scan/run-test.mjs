@@ -27,7 +27,7 @@ const CLEANUP_TIMEOUT_MS = 5000;
 // assertions; an unregistered suite is rejected instead of guessed complete.
 const EXPECTED_RESULTS = Object.freeze({
   "tests/a11y-tests.html": 31,
-  "tests/ai-tags-tests.html": 68,
+  "tests/ai-tags-tests.html": 70,
   "tests/background-active-tab-tests.html": 28,
   "tests/batch-dedup-tests.html": 24,
   "tests/contrast-tests.html": 10,

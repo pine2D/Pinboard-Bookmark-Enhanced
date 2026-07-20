@@ -260,7 +260,10 @@ function showAIError(op, err, opSettings) {
   // Fallback button: show when another provider has a valid key
   const fallbackBtn = $id("ai-error-fallback");
   if (fallbackBtn) {
-    const next = pickFallbackProvider(settings);
+    // Pick relative to the provider that actually FAILED (Codex r2 L5):
+    // after a fallback-provider failure, choosing from the global default
+    // could re-offer the provider that just failed.
+    const next = pickFallbackProvider(s);
     if (next) {
       const nextLabel = AI_PROVIDER_LABEL[next] || next;
       fallbackBtn.textContent = t("aiErrorTryWith", nextLabel) || `Try with ${nextLabel}`;

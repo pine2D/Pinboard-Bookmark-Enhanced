@@ -1078,12 +1078,24 @@ function _aiEffectiveModelForFp(s) {
 // the cached English). Baked into the cache key AND the inflight keys;
 // changing any dimension is a clean miss and old entries LRU-age out.
 // type "combined" is the inflight-only identity covering both halves.
+// Effective network endpoint for the fingerprint (Codex r2 L7): the
+// configurable-base providers (openai/custom via baseField, ollama) can
+// point the SAME provider:model at a different backend - a fingerprint
+// that ignores it kept serving the old backend's results.
+function _aiEffectiveEndpointForFp(s) {
+  const p = s.aiProvider || "gemini";
+  if (p === "ollama") return s.ollamaBaseUrl || "http://localhost:11434";
+  const cfg = OPENAI_COMPAT_PROVIDERS[p];
+  return cfg ? _openaiCompatBase(cfg, s) : "";
+}
+
 function aiCacheFingerprint(s, type) {
   if (!s) return "";
   if (type === "combined") {
     return aiCacheFingerprint(s, "tags") + "&" + aiCacheFingerprint(s, "summary");
   }
-  const base = (s.aiProvider || "gemini") + ":" + _aiEffectiveModelForFp(s);
+  const base = (s.aiProvider || "gemini") + ":" + _aiEffectiveModelForFp(s)
+    + ":e" + _aiFpHash(_aiEffectiveEndpointForFp(s));
   if (type === "tags") {
     return [base, "l" + (s.aiTagLang || "en"), "s" + (s.aiTagSeparator || "-"),
       "c" + _aiFpHash(s.customTagPrompt?.trim() || "")].join("|");

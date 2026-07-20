@@ -131,6 +131,21 @@ suite("aiCacheFingerprint (A5)", () => {
     const comb = aiCacheFingerprint(base, "combined");
     assert(comb.includes(aiCacheFingerprint(base, "tags")) && comb.includes(aiCacheFingerprint(base, "summary")), "combined = tags & summary");
   });
+  test("configurable endpoint enters the fingerprint (r2 L7)", () => {
+    const base = { aiProvider: "openai", openaiModel: "m" };
+    assert(aiCacheFingerprint(base, "summary") !== aiCacheFingerprint({ ...base, openaiBaseUrl: "https://proxy.test/v1" }, "summary"),
+      "openai baseField enters fp");
+    const oll = { aiProvider: "ollama" };
+    assert(aiCacheFingerprint(oll, "tags") !== aiCacheFingerprint({ ...oll, ollamaBaseUrl: "http://127.0.0.1:9999" }, "tags"),
+      "ollama base enters fp");
+    const gem = { aiProvider: "gemini" };
+    assertEq(aiCacheFingerprint(gem, "tags"), aiCacheFingerprint({ ...gem, openaiBaseUrl: "x" }, "tags"),
+      "fixed-endpoint provider ignores foreign base fields");
+  });
+  test("punctuated tech tags match via the shared tokenizer (r2 L8)", () => {
+    assertEq(pbpRelevantTagsFirst(["python", "c++"], "The C++ guide", "https://x.test/")[0], "c++", "c++ promoted");
+    assertEq(pbpRelevantTagsFirst(["cooking", "node.js"], "Node.js streams", "https://x.test/")[0], "node.js", "node.js promoted");
+  });
   test("cache key embeds the fingerprint; empty fp keeps legacy shape", () => {
     const k = getCacheKey("https://x.test/", "tags", "local", "alice", "FP|1");
     assert(k.includes(encodeURIComponent("FP|1") + "_alice_"), "fp slots before the account: " + k);
