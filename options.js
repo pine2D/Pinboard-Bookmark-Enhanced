@@ -1738,11 +1738,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       // (ui-contract keeps those pinned to three approved modals).
       setStatusIcon(statusEl, false, t("webdavConflict"));
       statusEl.style.color = "#c00";
+      // The overwrite consent binds to the target that CONFLICTED (Codex
+      // r3 HIGH): the re-run reads the live form, so if the user edits
+      // the URL/username while the popover is open, forcing would blind-
+      // overwrite a DIFFERENT target than the one they confirmed. On a
+      // changed target fall back to a normal CAS push against it.
+      const conflictedTarget = pbpWebdavFileUrl(cfg.baseUrl) + " " + String(cfg.user || "");
       showConfirmPopover($id("webdav-push-btn"), {
         msg: t("webdavConflictChoice"),
         yesText: t("webdavOverwriteRemote"),
         noText: t("cancel"),
-        onConfirm: () => { _pbpWebdavRunPush(true); },
+        onConfirm: () => {
+          const cur = _pbpWebdavCfgFromForm();
+          const curTarget = pbpWebdavFileUrl(cur.baseUrl) + " " + String(cur.user || "");
+          _pbpWebdavRunPush(curTarget === conflictedTarget);
+        },
       });
     } else {
       const msg = res.error === "conflict" ? t("webdavConflict")

@@ -236,6 +236,13 @@ check(/function _pbpWebdavPermissionError[\s\S]{0,180}granted === null \? "mdTar
   "options.js: WebDAV permission errors do not map invalid and denied states separately");
 check((optionsJs.match(/const errorKey = _pbpWebdavPermissionError\(granted\);/g) || []).length === 4,
   "options.js: WebDAV Test/Push/Pull/auto-push do not all use the permission-state mapping");
+// Conflict-choice consent binding (Codex r3 HIGH): the overwrite confirm
+// must compare the LIVE form target against the one that conflicted and
+// downgrade to a normal CAS push when they differ.
+check(/const conflictedTarget = pbpWebdavFileUrl\(cfg\.baseUrl\)[\s\S]{0,600}_pbpWebdavRunPush\(curTarget === conflictedTarget\);/.test(optionsJs),
+  "options.js: WebDAV overwrite consent is not bound to the conflicted target");
+check(/error === "conflict" && !force/.test(optionsJs) && optionsJs.includes('yesText: t("webdavOverwriteRemote")'),
+  "options.js: WebDAV manual push conflict does not offer the overwrite choice");
 const webdavAutoStart = optionsJs.indexOf('$id("opt-webdav-autopush")?.addEventListener');
 const webdavAutoEnd = optionsJs.indexOf("// ---- WebDAV: render", webdavAutoStart);
 const webdavAutoHandler = optionsJs.slice(webdavAutoStart, webdavAutoEnd);
