@@ -69,9 +69,16 @@ function clearAiProgress(buttonId) {
 // ---- Enrich page content via Jina Reader if configured ----
 // Populate pageInfo.pageText on demand. Avoids Defuddle injection on popup boot — the
 // content script for AI quality is only fetched when the user actually invokes AI.
+// Returns the source the text ACTUALLY came from ("jina" | "local") -
+// callers key the AI caches by it (Codex r2 M2): a Jina failure that
+// fell back to local Defuddle must not persist local-content results
+// into the jina namespace. Remembered on pageInfo for the session so a
+// second op reuses the same answer.
 async function ensurePageText(s) {
   s = s || settings;
-  if (pageInfo.pageText) return; // already populated (cache from earlier AI call this session)
+  if (pageInfo.pageText) {
+    return pageInfo._pbpTextSource || (s.aiContentSource === "jina" ? "jina" : "local");
+  }
   if (s.aiContentSource === "jina") {
     // Throws only on host_permission (surface the grant flow); any other
     // failure leaves pageText empty and falls through to local Defuddle
@@ -79,15 +86,17 @@ async function ensurePageText(s) {
     // claimed "using local content" while nobody ever ran the local
     // extractor (audit A9).
     await enrichPageTextIfJina(s);
-    if (pageInfo.pageText) return;
+    if (pageInfo.pageText) { pageInfo._pbpTextSource = "jina"; return "jina"; }
   }
   // Local source: lazy-inject Defuddle and pull full page text
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) return;
-    const info = await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: pageInfo.url });
-    if (info?.pageText) pageInfo.pageText = info.pageText;
+    if (tab) {
+      const info = await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: pageInfo.url });
+      if (info?.pageText) { pageInfo.pageText = info.pageText; pageInfo._pbpTextSource = "local"; }
+    }
   } catch (_) { /* tab gone / inject failed — pageText stays empty, caller will surface aiNoContent */ }
+  return "local";
 }
 
 async function enrichPageTextIfJina(s) {
@@ -441,8 +450,9 @@ function finalizeAITags(rawTags, s) {
 // (regenerate) always does a single dedicated call. Combined failure -> single fallback.
 // `s` = the caller's immutable settings snapshot (audit A4): every read
 // below sees one consistent provider/model/lang for the op's whole life.
-async function fetchAIArtifacts(kind, forceRefresh, account, s) {
+async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
   s = s || settings;
+  source = source || s.aiContentSource;
   const url = pageInfo.url;
   const otherKind = kind === "summary" ? "tags" : "summary";
   // Inflight identity carries the same generation fingerprint as the
@@ -463,6 +473,16 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s) {
   };
 
   if (forceRefresh) return callSingle();
+
+  // Codex r2 M2: extraction fell back to a different source than the
+  // configured one (Jina -> local). The caller's fast-path cache check ran
+  // under the CONFIGURED namespace; re-check our own kind under the
+  // ACTUAL namespace before paying for a call.
+  if (source !== s.aiContentSource) {
+    const own = await getAICache(url, kind, s.aiCacheDuration, source, account, s);
+    if (!pbpPopupAiAccountIsCurrent(account)) return null;
+    if (own != null) return own;
+  }
 
   // Custom-prompt users keep their own templates -> never use the combined prompt
   // (it uses TAG_GUIDANCE, not customTagPrompt/customSummaryPrompt). Global Constraint.
@@ -492,7 +512,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s) {
   }
 
   // If the other half is already cached, only the requested half is missing.
-  const otherCached = await getAICache(url, otherKind, s.aiCacheDuration, s.aiContentSource, account, s);
+  const otherCached = await getAICache(url, otherKind, s.aiCacheDuration, source, account, s);
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
   if (otherCached != null) return callSingle();
 
@@ -514,7 +534,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s) {
   // a malformed half into a sticky fake success (A8).
   const otherVal = halfOf(both, otherKind);
   if (otherVal != null && pbpPopupAiAccountIsCurrent(account)) {
-    await setAICache(url, otherKind, otherVal, s.aiCacheDuration, s.aiContentSource, account, s);
+    await setAICache(url, otherKind, otherVal, s.aiCacheDuration, source, account, s);
   }
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
   // Empty requested half = miss -> dedicated single call (A8).
@@ -558,17 +578,17 @@ async function doAISummary(forceRefresh, sOverride) {
   }
   try {
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "extracting" });
-    await ensurePageText(s);
+    const contentSource = await ensurePageText(s);
     if (!_aiOpStillCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "calling" });
-    const summary = await fetchAIArtifacts("summary", forceRefresh, account, s);
+    const summary = await fetchAIArtifacts("summary", forceRefresh, account, s, contentSource);
     // account-only here: the result belongs to pageInfo.url and SHOULD be
     // cached even if the URL field drifted; the stillCurrent gate below
     // protects the form commit.
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "parsing" });
-    await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account, s);
+    await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
     upsertSummary(summary);
     showSummaryActions(false);
@@ -675,16 +695,16 @@ async function doAITags(forceRefresh, sOverride) {
 
   try {
     if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "extracting" });
-    await ensurePageText(s);
+    const contentSource = await ensurePageText(s);
     if (!_aiOpStillCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "calling" });
-    const tags = await fetchAIArtifacts("tags", forceRefresh, account, s);
+    const tags = await fetchAIArtifacts("tags", forceRefresh, account, s, contentSource);
     // account-only here: cache the paid result regardless of URL drift;
     // the stillCurrent gate below protects the chip render.
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "parsing" });
-    await setAICache(pageInfo.url, "tags", tags, s.aiCacheDuration, s.aiContentSource, account, s);
+    await setAICache(pageInfo.url, "tags", tags, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
     renderAITags(tags, false);
     if (forceRefresh) {

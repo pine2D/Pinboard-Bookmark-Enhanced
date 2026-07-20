@@ -525,8 +525,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const fn = popupAiSource.slice(fnStart, fnEnd);
       assert(fnStart >= 0 && fnEnd > fnStart, "ensurePageText source not found");
       assert(fn.includes("await enrichPageTextIfJina(s);"), "jina branch present");
-      assert(!/enrichPageTextIfJina\(\);\s*return;/.test(fn), "unconditional return after Jina must be gone");
-      assert(fn.includes("if (pageInfo.pageText) return;"), "fall-through gated on actual content");
+      assert(!/enrichPageTextIfJina\(s\);\s*return/.test(fn), "unconditional return after Jina must be gone");
+      assert(fn.includes('return "jina"') && fn.includes('return "local"'),
+        "ensurePageText must report the ACTUAL source (r2 M2)");
     });
 
     test("combined half-empty replies fall back per artifact, never cache the empty half (A8)", () => {
@@ -574,7 +575,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!popupAiSource.includes("settings.aiProvider = "), "global settings.aiProvider mutation must be gone");
       assert(popupAiSource.includes("const s = { ...(sOverride || settings) }"), "op-level snapshot missing");
       assert(popupAiSource.includes("{ ...settings, aiProvider: next }"), "fallback must build its own snapshot");
-      assert(popupAiSource.includes("async function fetchAIArtifacts(kind, forceRefresh, account, s)"),
+      assert(popupAiSource.includes("async function fetchAIArtifacts(kind, forceRefresh, account, s, source)"),
         "fetchAIArtifacts must take the snapshot explicitly");
     });
 
@@ -662,8 +663,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(setupAi.includes("restoreAccount") && setupAi.includes("_aiOpStillCurrent(restoreAccount)"),
         "cached summary restore lacks owner recheck (stillCurrent = account + URL liveness)");
       assert(doSummary.includes('getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account, s)') &&
-        doSummary.includes('setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account, s)'),
-        "doAISummary cache calls lack owner+fingerprint settings");
+        doSummary.includes('setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s)'),
+        "doAISummary cache calls lack owner+fingerprint settings (write keyed by ACTUAL source, r2 M2)");
       assert((doSummary.match(/_aiOpStillCurrent\(account\)|pbpPopupAiAccountIsCurrent\(account\)/g) || []).length >= 5,
         "doAISummary does not guard every late UI/cache commit");
       assert(doTags.includes('} catch (e) {\n    if (!_aiOpStillCurrent(account)) return;'),
