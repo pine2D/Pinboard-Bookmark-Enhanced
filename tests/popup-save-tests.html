@@ -540,6 +540,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert((backgroundSource.match(/if \(parsed\.summary\) \{/g) || []).length >= 2, "SW combined must cache summary only when non-empty");
     });
 
+    test("SW AI caches always use the local namespace (A3)", () => {
+      const swAiCalls = (backgroundSource.match(/s\.aiCacheDuration, aiCacheSource/g) || []).length;
+      assert(swAiCalls === 16, "all 16 SW getAICache/setAICache calls must key by aiCacheSource, got " + swAiCalls);
+      assert(!/s\.aiCacheDuration, s\.aiContentSource/.test(backgroundSource), "no SW AI cache call may key by the configured source");
+      assert((backgroundSource.match(/const aiCacheSource = "local"/g) || []).length === 2, "quick-save and batch both pin local");
+    });
+
     test("SW combined call runs only when BOTH halves miss the cache (A16)", () => {
       const gates = (backgroundSource.match(/if \(aiTagsResolved === null && summaryResolved === null\) \{/g) || []).length;
       assert(gates >= 2, "quick-save AND batch must gate the combined call on both-missing, got " + gates);

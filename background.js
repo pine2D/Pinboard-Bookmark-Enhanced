@@ -841,6 +841,12 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   }
 
   // AI features
+  // SW extraction is ALWAYS local (getPageInfoFromTab + Defuddle) - it
+  // never calls Jina. Cache under the namespace that matches the content
+  // (audit A3): keying by the configured aiContentSource wrote local
+  // results into the "jina" namespace, which the popup then served as
+  // supposed Jina extractions.
+  const aiCacheSource = "local";
   const aiPromises = [];
   let aiHostPermissionMissing = false;
   let combinedCachedTags = null;
@@ -860,8 +866,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   if (pageInfo?.pageText && hasAIKey(s) && s._aiTags && s._aiSummary
       && !s.customTagPrompt?.trim() && !s.customSummaryPrompt?.trim()) {
     try {
-      const tCached = combinedCachedTags = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource, startAuth.account);
-      const sCached = combinedCachedSummary = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource, startAuth.account);
+      const tCached = combinedCachedTags = await getAICache(url, "tags", s.aiCacheDuration, aiCacheSource, startAuth.account);
+      const sCached = combinedCachedSummary = await getAICache(url, "summary", s.aiCacheDuration, aiCacheSource, startAuth.account);
       // A16: a cached half is reused as-is; the combined call only runs
       // when BOTH halves are missing (regenerating both overwrote the
       // cached one and paid for it again). Exactly one missing -> its
@@ -875,11 +881,11 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
         // turn the malformed half into a sticky fake success (A8).
         if (parsed.tags.length) {
           aiTagsResolved = parsed.tags;
-          await setAICache(url, "tags", parsed.tags, s.aiCacheDuration, s.aiContentSource, startAuth.account);
+          await setAICache(url, "tags", parsed.tags, s.aiCacheDuration, aiCacheSource, startAuth.account);
         }
         if (parsed.summary) {
           summaryResolved = parsed.summary;
-          await setAICache(url, "summary", parsed.summary, s.aiCacheDuration, s.aiContentSource, startAuth.account);
+          await setAICache(url, "summary", parsed.summary, s.aiCacheDuration, aiCacheSource, startAuth.account);
         }
       }
     } catch (e) {
@@ -899,12 +905,12 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       aiPromises.push(
         (async () => {
           try {
-            const cached = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource, startAuth.account);
+            const cached = await getAICache(url, "tags", s.aiCacheDuration, aiCacheSource, startAuth.account);
             if (cached) return { type: "tags", result: cached };
             const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
             const resp = await callAI(s, prompt);
             const aiTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
-            await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource, startAuth.account);
+            await setAICache(url, "tags", aiTags, s.aiCacheDuration, aiCacheSource, startAuth.account);
             return { type: "tags", result: aiTags };
           } catch (e) {
             if (e?.code === "host_permission") aiHostPermissionMissing = true;
@@ -918,11 +924,11 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       aiPromises.push(
         (async () => {
           try {
-            const cached = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource, startAuth.account);
+            const cached = await getAICache(url, "summary", s.aiCacheDuration, aiCacheSource, startAuth.account);
             if (cached) return { type: "summary", result: cached };
             const prompt = buildSummaryPrompt(s, title, url, pageInfo.pageText, notes);
             const summary = await callAI(s, prompt);
-            await setAICache(url, "summary", summary, s.aiCacheDuration, s.aiContentSource, startAuth.account);
+            await setAICache(url, "summary", summary, s.aiCacheDuration, aiCacheSource, startAuth.account);
             return { type: "summary", result: summary };
           } catch (e) {
             if (e?.code === "host_permission") aiHostPermissionMissing = true;
@@ -1916,6 +1922,10 @@ async function _runBatchSave(tabs, expectedAccount) {
       : [];
     const useAiTags = s.batchAiTags && hasAIKey(s);
     const useAiSummary = s.batchAiSummary && hasAIKey(s);
+    // Batch extraction is always local Defuddle - cache under the matching
+    // namespace, never the configured aiContentSource (audit A3, same as
+    // saveFromBackground).
+    const aiCacheSource = "local";
 
     // popup's global tagCaseMap is unreachable in the SW; rebuild from the cached
     // user-tag counts (popup-tags.js persists them under "cached_user_tags").
@@ -1952,8 +1962,8 @@ async function _runBatchSave(tabs, expectedAccount) {
             let summaryResolved = null;
             if (useAiTags && useAiSummary && !s.customTagPrompt?.trim() && !s.customSummaryPrompt?.trim()) {
               try {
-                const tCached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource, account);
-                const sCached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource, account);
+                const tCached = await getAICache(tab.url, "tags", s.aiCacheDuration, aiCacheSource, account);
+                const sCached = await getAICache(tab.url, "summary", s.aiCacheDuration, aiCacheSource, account);
                 // A16: reuse a cached half; combined call only when both missing.
                 if (tCached) aiTagsResolved = tCached;
                 if (sCached) summaryResolved = sCached;
@@ -1962,11 +1972,11 @@ async function _runBatchSave(tabs, expectedAccount) {
                   const parsed = parseAICombined(resp, s.aiTagSeparator);
                   if (parsed.tags.length) {
                     aiTagsResolved = s.optRespectTagCase ? parsed.tags.map(tg => resolveTagCase(tg, tagCaseMap)) : parsed.tags;
-                    await setAICache(tab.url, "tags", aiTagsResolved, s.aiCacheDuration, s.aiContentSource, account);
+                    await setAICache(tab.url, "tags", aiTagsResolved, s.aiCacheDuration, aiCacheSource, account);
                   }
                   if (parsed.summary) {
                     summaryResolved = parsed.summary;
-                    await setAICache(tab.url, "summary", parsed.summary, s.aiCacheDuration, s.aiContentSource, account);
+                    await setAICache(tab.url, "summary", parsed.summary, s.aiCacheDuration, aiCacheSource, account);
                   }
                 }
               } catch (e) { console.warn("batch AI combined failed, falling back:", tab.url, e.message); }
@@ -1975,23 +1985,23 @@ async function _runBatchSave(tabs, expectedAccount) {
               const aiJobs = [];
               if (useAiTags && aiTagsResolved === null) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource, account);
+                  const cached = await getAICache(tab.url, "tags", s.aiCacheDuration, aiCacheSource, account);
                   if (cached) return { type: "tags", result: cached };
                   const prompt = buildTagPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", []);
                   const resp = await callAI(s, prompt);
                   const rawTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
                   const aiTags = s.optRespectTagCase ? rawTags.map(tg => resolveTagCase(tg, tagCaseMap)) : rawTags;
-                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource, account);
+                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, aiCacheSource, account);
                   return { type: "tags", result: aiTags };
                 } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
               })());
               if (useAiSummary && summaryResolved === null) aiJobs.push((async () => {
                 try {
-                  const cached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource, account);
+                  const cached = await getAICache(tab.url, "summary", s.aiCacheDuration, aiCacheSource, account);
                   if (cached) return { type: "summary", result: cached };
                   const prompt = buildSummaryPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "");
                   const summary = await callAI(s, prompt);
-                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account);
+                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, aiCacheSource, account);
                   return { type: "summary", result: summary };
                 } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
               })());
