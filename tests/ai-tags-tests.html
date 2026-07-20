@@ -117,6 +117,21 @@ suite("default tag prompt", () => {
     const none = buildTagPrompt({ aiTagLang: "en" }, "t", "u", "c", "", []);
     assert(!/Existing tags/.test(none), "no reuse line when empty");
   });
+  test("inserted values are never re-expanded as placeholders (single-pass fill)", () => {
+    const p = buildTagPrompt({ aiTagLang: "en" }, "literal {{content}}", "u", "SECRETBODY", "", []);
+    assert(p.indexOf("literal {{content}}") !== -1, "title keeps its literal placeholder text");
+    assert(p.indexOf("literal SECRETBODY") === -1, "title must not swallow the page body");
+    const s = buildSummaryPrompt({}, "t", "u", "body with {{description}}", "DESCVALUE");
+    assert(s.indexOf("body with {{description}}") !== -1, "content keeps literal placeholder");
+    const c = buildCombinedPrompt({}, "{{url}} in title", "https://real.test/", "c", "", []);
+    assert(c.indexOf("{{url}} in title") !== -1, "combined title not re-expanded");
+    assert(c.indexOf("https://real.test/ in title") === -1, "combined title must not get the url");
+  });
+  test("unknown placeholders in custom templates stay literal", () => {
+    const p = buildTagPrompt({ aiTagLang: "en", customTagPrompt: "X {{typo_var}} {{title}}" }, "T", "u", "c", "", []);
+    assert(p.indexOf("{{typo_var}}") !== -1, "typo placeholder visible");
+    assert(p.indexOf("T") !== -1, "known placeholder filled");
+  });
 });
 </script>
 

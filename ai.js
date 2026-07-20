@@ -869,16 +869,28 @@ function aiSummaryLangInstruction(s) {
 }
 
 // ---- Prompt builders (no DOM dependency) ----
+// Single-pass template fill: sequential .replace() calls re-scanned the
+// WHOLE prompt after each substitution, so a page value containing a later
+// placeholder was expanded too (title "literal {{content}}" became the
+// page body). One pass over the ORIGINAL template only; inserted values
+// are never rescanned, unknown placeholders stay literal (custom-template
+// typo stays visible instead of vanishing).
+function _aiFillTemplate(tmpl, vars) {
+  return String(tmpl).replace(/\{\{(\w+)\}\}/g, (m, name) =>
+    Object.prototype.hasOwnProperty.call(vars, name) ? vars[name] : m);
+}
+
 function buildTagPrompt(s, title, url, content, description, userTags) {
   const sep = s.aiTagSeparator || "-";
   const tmpl = s.customTagPrompt?.trim() || DEFAULT_TAG_PROMPT;
-  let prompt = tmpl
-    .replace(/\{\{lang_instruction\}\}/g, () => aiTagLangInstruction(s))
-    .replace(/\{\{separator_instruction\}\}/g, () => TAG_SEP_MAP[sep] || TAG_SEP_MAP["-"])
-    .replace(/\{\{title\}\}/g, () => title || "")
-    .replace(/\{\{url\}\}/g, () => url || "")
-    .replace(/\{\{content\}\}/g, () => (content || "").substring(0, 4000))
-    .replace(/\{\{description\}\}/g, () => description || "");
+  let prompt = _aiFillTemplate(tmpl, {
+    lang_instruction: aiTagLangInstruction(s),
+    separator_instruction: TAG_SEP_MAP[sep] || TAG_SEP_MAP["-"],
+    title: title || "",
+    url: url || "",
+    content: (content || "").substring(0, 4000),
+    description: description || "",
+  });
   if (userTags && userTags.length > 0) {
     prompt += `\n\nExisting tags (prefer reusing these if applicable): ${userTags.slice(0, 50).join(", ")}`;
   }
@@ -887,12 +899,13 @@ function buildTagPrompt(s, title, url, content, description, userTags) {
 
 function buildSummaryPrompt(s, title, url, content, description) {
   const tmpl = s.customSummaryPrompt?.trim() || DEFAULT_SUMMARY_PROMPT;
-  return tmpl
-    .replace(/\{\{title\}\}/g, () => title || "")
-    .replace(/\{\{url\}\}/g, () => url || "")
-    .replace(/\{\{content\}\}/g, () => (content || "").substring(0, 4000))
-    .replace(/\{\{description\}\}/g, () => description || "")
-    .replace(/\{\{lang_instruction\}\}/g, () => aiSummaryLangInstruction(s));
+  return _aiFillTemplate(tmpl, {
+    lang_instruction: aiSummaryLangInstruction(s),
+    title: title || "",
+    url: url || "",
+    content: (content || "").substring(0, 4000),
+    description: description || "",
+  });
 }
 
 function buildCombinedPrompt(s, title, url, content, description, userTags) {
@@ -909,10 +922,11 @@ URL: {{url}}
 Content: {{content}}
 
 Format: {"summary":"...","tags":["tag1","tag2"]}`;
-  prompt = prompt
-    .replace(/\{\{title\}\}/g, () => title || "")
-    .replace(/\{\{url\}\}/g, () => url || "")
-    .replace(/\{\{content\}\}/g, () => (content || "").substring(0, 4000));
+  prompt = _aiFillTemplate(prompt, {
+    title: title || "",
+    url: url || "",
+    content: (content || "").substring(0, 4000),
+  });
   if (userTags && userTags.length > 0) {
     prompt += `\n\nExisting tags (prefer reusing these if applicable): ${userTags.slice(0, 50).join(", ")}`;
   }
