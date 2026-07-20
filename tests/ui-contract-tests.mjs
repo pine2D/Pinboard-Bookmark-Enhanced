@@ -270,7 +270,8 @@ check(popupRetryStart >= 0 && popupRetryEnd > popupRetryStart &&
   "popup-ai.js: permission retry recomputes destinations instead of using the failed-stage origins");
 check(/err\.permissionStage = "extracting";[\s\S]{0,100}err\.permissionOrigins = origins;/.test(popupAiJs) &&
   (popupAiJs.match(/e\.permissionStage = "calling";/g) || []).length === 2 &&
-  (popupAiJs.match(/e\.permissionOrigins = _aiRequiredOriginPatterns\(settings\);/g) || []).length === 2,
+  // (s) = the op's immutable settings snapshot (audit A4), not the mutable global
+  (popupAiJs.match(/e\.permissionOrigins = _aiRequiredOriginPatterns\(s\);/g) || []).length === 2,
   "popup-ai.js: extraction and provider permission failures do not record their actual stage/origins");
 
 const popupWaybackStart = popupJs.indexOf('$id("archive-check").addEventListener("change", async (e) =>');
