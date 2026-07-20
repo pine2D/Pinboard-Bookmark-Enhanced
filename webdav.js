@@ -358,7 +358,14 @@ async function pbpWebdavPush(cfgOverride) {
     }
     const owner = pbpPinboardAccountFromToken(settings.pinboardToken);
     const payload = pbpWebdavBuildPayload(settings, meta, { highlights, highlightsOwner: owner, overlay, savedThemes });
-    const expectedRevision = await pbpWebdavReadRevision(cfg);
+    // Explicit user-confirmed overwrite (the conflict-choice UI): a plain
+    // unconditional PUT, exactly the pre-CAS "the click is the overwrite
+    // intent" shape - overwrite any revision, recreate if deleted (an
+    // If-Match:* would re-412 on a deleted file and re-wedge the user).
+    // Never available to scheduled pushes: the alarm path builds its cfg
+    // from storage and cannot carry this flag.
+    const force = cfgOverride && cfgOverride.force === true;
+    const expectedRevision = force ? { known: false, etag: "" } : await pbpWebdavReadRevision(cfg);
     const conditionalCfg = Object.assign({}, cfg, expectedRevision);
     // A SCHEDULED push with no known revision must never blind-overwrite: a
     // second device's alarm would silently clobber the first device's backup.

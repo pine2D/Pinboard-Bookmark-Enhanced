@@ -422,6 +422,24 @@ async function runChromeLayerTests() {
       hlPut._highlightsOwner === "alice");
     check("push never leaks the pinboardToken into the payload (SEC-1 belt)",
       !("pinboardToken" in hlPut));
+    // User-confirmed overwrite (conflict-choice UI): even with a stale
+    // CAS baseline stored, force must send a PLAIN unconditional PUT.
+    localArea[PBP_WEBDAV_ETAG_STATE_KEY] = {
+      target: obfuscateKey(pbpWebdavFileUrl("https://dav.example.com/backups/")),
+      user: obfuscateKey(""),
+      etag: '"stale-rev"',
+    };
+    const forceHeaderLog = [];
+    globalThis.fetch = (_url, opts) => {
+      forceHeaderLog.push(opts.headers || {});
+      return Promise.resolve({ ok: true, status: opts.method === "PROPFIND" ? 207 : 200 });
+    };
+    const forced = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", force: true });
+    const forcePutHeaders = forceHeaderLog[1] || {};
+    check("force push succeeds and ignores the stored stale baseline", forced.ok === true);
+    check("force push sends NO preconditions (plain overwrite, recreates a deleted file too)",
+      !("If-Match" in forcePutHeaders) && !("If-None-Match" in forcePutHeaders));
+    delete localArea[PBP_WEBDAV_ETAG_STATE_KEY];
     globalThis.fetch = () => Promise.resolve({ ok: false, status: 404 });
     const missing = await pbpWebdavPush({ baseUrl: "https://dav.example.com/missing/", user: "", pass: "", includeHighlights: false });
     check("push 404 maps to not-found instead of raw http-404", missing.error === "not-found");
