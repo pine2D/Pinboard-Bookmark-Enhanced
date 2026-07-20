@@ -384,6 +384,16 @@ function pbpAuthStorageChangeIsRelevant(changes, area, state) {
   return area === tokenArea && !!changes.pinboardToken;
 }
 
+// Frequency-sorted tag list from a counts map (desc by count, name as
+// tiebreak). Single source for the popup's allUserTags ordering AND the
+// SW quick-save/batch AI prompts (audit A14) - the top-50 slice fed to
+// "Existing tags (prefer reusing...)" must be the same list everywhere.
+function pbpTagsByCount(counts) {
+  return Object.entries(counts || {})
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([tag]) => tag);
+}
+
 // ---- Tag case normalization helpers ----
 // Build a map: normalized_tag → preferred_casing (by highest count)
 function buildTagCaseMap(tagCounts) {

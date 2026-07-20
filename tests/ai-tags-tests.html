@@ -92,6 +92,13 @@ suite("refineTags", () => {
 
 <script>
 // ============ Task 2: DEFAULT_TAG_PROMPT + TAG_GUIDANCE ============
+suite("pbpTagsByCount", () => {
+  test("frequency desc, name tiebreak, null tolerated", () => {
+    assertEq(pbpTagsByCount({ b: 2, a: 5, c: 2 }).join(","), "a,b,c", "count desc then name");
+    assertEq(pbpTagsByCount(null).length, 0, "null -> []");
+  });
+});
+
 suite("default tag prompt", () => {
   test("TAG_GUIDANCE pushes specificity and bans no evaluation facet", () => {
     assert(/most specific/i.test(TAG_GUIDANCE), "asks for most specific term");

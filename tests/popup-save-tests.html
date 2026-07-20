@@ -540,6 +540,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert((backgroundSource.match(/if \(parsed\.summary\) \{/g) || []).length >= 2, "SW combined must cache summary only when non-empty");
     });
 
+    test("SW tag prompts anchor on the cached user vocabulary (A14)", () => {
+      assert((backgroundSource.match(/userTagsTop = pbpTagsByCount/g) || []).length === 2,
+        "quick-save AND batch must derive the frequency-sorted list");
+      const fed = (backgroundSource.match(/pageInfo\.pageText, notes, userTagsTop|pageInfo\.pageText, "", userTagsTop/g) || []).length;
+      assert(fed === 4, "all four SW tag/combined builders must receive the vocabulary, got " + fed);
+    });
+
     test("SW AI caches always use the local namespace (A3)", () => {
       const swAiCalls = (backgroundSource.match(/s\.aiCacheDuration, aiCacheSource/g) || []).length;
       assert(swAiCalls === 16, "all 16 SW getAICache/setAICache calls must key by aiCacheSource, got " + swAiCalls);

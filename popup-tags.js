@@ -160,9 +160,7 @@ async function fetchPinboardSuggestTags(token, url) {
 // ---- Fetch All User Tags (with local cache) ----
 function applyTagData(counts) {
   allUserTagCounts = counts;
-  allUserTags = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([tag]) => tag);
+  allUserTags = pbpTagsByCount(counts); // shared.js: same ordering the SW AI prompts use (A14)
   tagCaseMap = buildTagCaseMap(counts);
 }
 

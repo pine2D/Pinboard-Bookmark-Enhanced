@@ -847,6 +847,15 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // results into the "jina" namespace, which the popup then served as
   // supposed Jina extractions.
   const aiCacheSource = "local";
+  // Popup parity (audit A14): feed the tag prompts the same frequency-
+  // sorted vocabulary the popup injects; without it quick-saved bookmarks
+  // got tags with zero anchoring to the user's existing tag system.
+  let userTagsTop = [];
+  try {
+    const cachedTags = await chrome.storage.local.get("cached_user_tags");
+    const entry = cachedTags?.cached_user_tags;
+    if (entry?.account === startAuth.account && entry.counts) userTagsTop = pbpTagsByCount(entry.counts);
+  } catch (_) { /* no cache -> unanchored prompt, same as before */ }
   const aiPromises = [];
   let aiHostPermissionMissing = false;
   let combinedCachedTags = null;
@@ -875,7 +884,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       if (tCached) aiTagsResolved = tCached;
       if (sCached) summaryResolved = sCached;
       if (aiTagsResolved === null && summaryResolved === null) {
-        const resp = await callAI(s, buildCombinedPrompt(s, title, url, pageInfo.pageText, notes, []));
+        const resp = await callAI(s, buildCombinedPrompt(s, title, url, pageInfo.pageText, notes, userTagsTop));
         const parsed = parseAICombined(resp, s.aiTagSeparator);
         // Cache each half only when it has content: a cached empty would
         // turn the malformed half into a sticky fake success (A8).
@@ -907,7 +916,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
           try {
             const cached = await getAICache(url, "tags", s.aiCacheDuration, aiCacheSource, startAuth.account);
             if (cached) return { type: "tags", result: cached };
-            const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, []);
+            const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, userTagsTop);
             const resp = await callAI(s, prompt);
             const aiTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
             await setAICache(url, "tags", aiTags, s.aiCacheDuration, aiCacheSource, startAuth.account);
@@ -1929,15 +1938,19 @@ async function _runBatchSave(tabs, expectedAccount) {
 
     // popup's global tagCaseMap is unreachable in the SW; rebuild from the cached
     // user-tag counts (popup-tags.js persists them under "cached_user_tags").
+    // The same counts also feed the frequency-sorted vocabulary the tag
+    // prompts anchor on (audit A14, popup parity).
     let tagCaseMap = {};
-    if (s.optRespectTagCase) {
-      try {
-        const cached = await chrome.storage.local.get("cached_user_tags");
-        const entry = cached?.cached_user_tags;
-        const counts = entry?.account === account ? entry.counts : null;
-        if (counts) tagCaseMap = buildTagCaseMap(counts);
-      } catch (_) { /* no cache -> map stays empty, resolveTagCase returns tag as-is */ }
-    }
+    let userTagsTop = [];
+    try {
+      const cached = await chrome.storage.local.get("cached_user_tags");
+      const entry = cached?.cached_user_tags;
+      const counts = entry?.account === account ? entry.counts : null;
+      if (counts) {
+        userTagsTop = pbpTagsByCount(counts);
+        if (s.optRespectTagCase) tagCaseMap = buildTagCaseMap(counts);
+      }
+    } catch (_) { /* no cache -> map stays empty, prompt unanchored (same as before) */ }
 
     for (let i = 0; i < tabs.length; i++) {
       const tab = tabs[i];
@@ -1968,7 +1981,7 @@ async function _runBatchSave(tabs, expectedAccount) {
                 if (tCached) aiTagsResolved = tCached;
                 if (sCached) summaryResolved = sCached;
                 if (aiTagsResolved === null && summaryResolved === null) {
-                  const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", []));
+                  const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", userTagsTop));
                   const parsed = parseAICombined(resp, s.aiTagSeparator);
                   if (parsed.tags.length) {
                     aiTagsResolved = s.optRespectTagCase ? parsed.tags.map(tg => resolveTagCase(tg, tagCaseMap)) : parsed.tags;
@@ -1987,7 +2000,7 @@ async function _runBatchSave(tabs, expectedAccount) {
                 try {
                   const cached = await getAICache(tab.url, "tags", s.aiCacheDuration, aiCacheSource, account);
                   if (cached) return { type: "tags", result: cached };
-                  const prompt = buildTagPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", []);
+                  const prompt = buildTagPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", userTagsTop);
                   const resp = await callAI(s, prompt);
                   const rawTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
                   const aiTags = s.optRespectTagCase ? rawTags.map(tg => resolveTagCase(tg, tagCaseMap)) : rawTags;
