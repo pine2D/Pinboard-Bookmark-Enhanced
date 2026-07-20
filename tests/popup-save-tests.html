@@ -529,6 +529,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(fn.includes("if (pageInfo.pageText) return;"), "fall-through gated on actual content");
     });
 
+    test("replace-mode regen retracts only session-AI-added tags (A10)", () => {
+      assert(popupAiSource.includes("const _aiSessionAddedTags = new Set()"), "provenance set missing");
+      assert(popupAiSource.includes("cachedTagSet.has(t.toLowerCase()) && _aiSessionAddedTags.has(t.toLowerCase())"),
+        "replace filter must require AI provenance, not just name equality");
+      const chipAdds = (popupAiSource.match(/_aiSessionAddedTags\.add\(/g) || []).length;
+      assert(chipAdds >= 2, "both the single-chip and add-all paths must record provenance, got " + chipAdds);
+    });
+
     test("summary upsert/remove operate on the LAST block, in place (A11)", () => {
       assert(popupAiSource.includes("function _aiSummaryBlockMatches"), "global block matcher missing");
       assert(popupAiSource.includes("matches[matches.length - 1]"), "last-match selection missing");

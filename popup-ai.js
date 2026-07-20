@@ -595,6 +595,12 @@ async function doAITags(forceRefresh) {
   }
 }
 
+// Tags added via AI chips THIS popup session (lowercase). Replace-mode
+// regen may only retract tags it knows the AI added here: a same-named
+// tag the user typed, or that came back on an existing bookmark, has no
+// AI provenance and must survive (audit A10).
+const _aiSessionAddedTags = new Set();
+
 function renderAITags(tags, fromCache) {
   const container = $id("ai-suggest-tags");
   container.innerHTML = "";
@@ -624,7 +630,12 @@ function renderAITags(tags, fromCache) {
       cs.textContent = ` (${count})`;
       el.appendChild(cs);
     }
-    el.addEventListener("click", () => { addTag(tag); el.classList.add("used"); el.disabled = true; });
+    el.addEventListener("click", () => {
+      addTag(tag);
+      _aiSessionAddedTags.add(tag.toLowerCase());
+      el.classList.add("used");
+      el.disabled = true;
+    });
     container.appendChild(el);
   });
 
@@ -634,7 +645,11 @@ function renderAITags(tags, fromCache) {
   aa.textContent = t("addAll");
   aa.setAttribute("aria-label", t("addAll"));
   aa.addEventListener("click", () => {
-    container.querySelectorAll(".stag:not(.used)").forEach((el) => { addTag(el.dataset.tag); el.classList.add("used"); });
+    container.querySelectorAll(".stag:not(.used)").forEach((el) => {
+      addTag(el.dataset.tag);
+      _aiSessionAddedTags.add(el.dataset.tag.toLowerCase());
+      el.classList.add("used");
+    });
     aa.innerHTML = PBP_ICONS.check; aa.disabled = true; aa.style.color = "#080";
   });
   container.appendChild(aa);
@@ -663,7 +678,11 @@ function renderAITags(tags, fromCache) {
         hintWrap.querySelectorAll(".regen-link").forEach((l) => l.classList.add("loading"));
         link.textContent = mode === "replace" ? t("aiReplacing") : t("aiRegenerating");
         if (mode === "replace") {
-          currentTags = currentTags.filter(t => !cachedTagSet.has(t.toLowerCase()));
+          // Retract only tags this session's AI chips added: a same-named
+          // tag with no AI provenance (typed, or from the saved bookmark)
+          // stays (audit A10).
+          currentTags = currentTags.filter(t =>
+            !(cachedTagSet.has(t.toLowerCase()) && _aiSessionAddedTags.has(t.toLowerCase())));
           renderTags();
         }
         await doAITags(true);
