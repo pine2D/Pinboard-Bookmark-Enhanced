@@ -951,14 +951,31 @@ function parseAICombined(resp, separator) {
 
 // ---- Parse AI tag response ----
 // separator: "-" or "_" (configurable via settings.aiTagSeparator)
+// JSON first: try EVERY bracketed candidate (a "[Note]" in prose before
+// the real array must not eat the parse), accept the first that is a JSON
+// array with string members - or a deliberate empty [] (the model saying
+// "no tags"). Only when NO candidate qualifies fall back to text
+// splitting; the old code skipped the fallback entirely when the reply
+// had no bracket at all ("alpha, beta" silently became zero tags, then
+// got cached as an empty success). The splitter also accepts CJK
+// separators - a Chinese model reply "机器学习，深度学习、翻译" used to
+// survive as ONE glued tag.
 function parseAITags(resp, separator) {
   const sep = separator || "-";
-  let tags = [];
-  try {
-    const m = resp.match(/\[[\s\S]*?\]/);
-    if (m) tags = JSON.parse(m[0]);
-  } catch (_) {
-    tags = resp.split(/[,\n]/).map(t => t.replace(/["[\]`]/g, "").trim()).filter(Boolean);
+  const text = typeof resp === "string" ? resp : "";
+  let tags = null;
+  for (const m of text.matchAll(/\[[\s\S]*?\]/g)) {
+    try {
+      const arr = JSON.parse(m[0]);
+      if (!Array.isArray(arr)) continue;
+      const strs = arr.filter(t => typeof t === "string");
+      if (arr.length === 0 || strs.length) { tags = strs; break; }
+    } catch (_) { /* not JSON - try the next bracketed candidate */ }
+  }
+  if (tags === null) {
+    tags = text.split(/[,\n;，、；]/)
+      .map(t => t.replace(/["[\]`]/g, "").trim())
+      .filter(Boolean);
   }
   return tags.map(t => t.toLowerCase().replace(/\s+/g, sep));
 }

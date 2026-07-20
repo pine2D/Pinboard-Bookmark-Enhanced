@@ -137,6 +137,30 @@ suite("default tag prompt", () => {
 
 <script>
 // ============ Task 3: lang helpers + combined prompt/parse ============
+suite("parseAITags fallback + CJK", () => {
+  test("JSON array parsed as before", () => {
+    assertEq(parseAITags('["Machine Learning","AI"]', "-").join("|"), "machine-learning|ai", "json path");
+  });
+  test("no bracket at all -> text fallback, not silent empty", () => {
+    assertEq(parseAITags("alpha, beta", "-").join("|"), "alpha|beta", "comma prose");
+  });
+  test("CJK separators split in the fallback", () => {
+    assertEq(parseAITags("机器学习，深度学习、翻译；nlp", "-").length, 4, "，、； all split");
+  });
+  test("bracketed prose before the real array does not eat the parse", () => {
+    assertEq(parseAITags('[Note] tags follow: ["a","b"]', "-").join("|"), "a|b", "second candidate wins");
+  });
+  test("deliberate empty [] honored, no garbage fallback", () => {
+    assertEq(parseAITags('This is an error page. []', "-").length, 0, "empty array respected");
+  });
+  test("all-numeric array skipped as a candidate", () => {
+    assertEq(parseAITags('scores [1,2] then ["real-tag"]', "-").join("|"), "real-tag", "numeric candidate skipped");
+  });
+  test("non-string reply tolerated", () => {
+    assertEq(parseAITags(null, "-").length, 0, "null -> []");
+  });
+});
+
 suite("lang instruction helpers", () => {
   test("tag lang: explicit, auto, fallback", () => {
     assertEq(aiTagLangInstruction({ aiTagLang: "en" }), "Tags must be in English.", "en");
