@@ -389,14 +389,26 @@ async function fetchAIArtifacts(kind, forceRefresh, account) {
   // (it uses TAG_GUIDANCE, not customTagPrompt/customSummaryPrompt). Global Constraint.
   if (settings.customTagPrompt?.trim() || settings.customSummaryPrompt?.trim()) return callSingle();
 
+  // A8: a combined reply may come back half-empty ({"summary":"ok",
+  // "tags":[]}) - the parser deliberately tolerates that so the GOOD half
+  // survives, but the requester of the EMPTY half must treat it as a
+  // miss, not render/cache an empty artifact as success.
+  const halfOf = (both, which) => which === "tags"
+    ? (both.tags && both.tags.length ? finalizeAITags(both.tags) : null)
+    : (both.summary ? both.summary : null);
+
   // Ride an in-flight combined call if one is already running. If that call
-  // rejects (combined parse failure), fall through to this call's own
-  // cache/single path instead of surfacing the other click's error.
+  // rejects (combined parse failure) or came back empty for OUR half, fall
+  // through to this call's own cache/single path instead of surfacing the
+  // other click's error or its empty half.
   if (_inflightAI.has(combinedKey)) {
     try {
       const both = await _inflightAI.get(combinedKey);
       if (!pbpPopupAiAccountIsCurrent(account)) return null;
-      if (both) return kind === "tags" ? finalizeAITags(both.tags) : both.summary;
+      if (both) {
+        const mine = halfOf(both, kind);
+        if (mine != null) return mine;
+      }
     } catch (_) { /* combined in-flight failed; fall through */ }
   }
 
@@ -418,19 +430,17 @@ async function fetchAIArtifacts(kind, forceRefresh, account) {
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
   if (!both) return callSingle();
 
-  // Cache the OTHER half so its later click is instant + free.
-  if (otherKind === "tags") {
-    if (pbpPopupAiAccountIsCurrent(account)) {
-      await setAICache(url, "tags", finalizeAITags(both.tags), settings.aiCacheDuration, settings.aiContentSource, account);
-    }
-  } else {
-    if (pbpPopupAiAccountIsCurrent(account)) {
-      await setAICache(url, "summary", both.summary, settings.aiCacheDuration, settings.aiContentSource, account);
-    }
+  // Cache the OTHER half so its later click is instant + free - but only
+  // when that half has content: caching a combined-parse empty would turn
+  // a malformed half into a sticky fake success (A8).
+  const otherVal = halfOf(both, otherKind);
+  if (otherVal != null && pbpPopupAiAccountIsCurrent(account)) {
+    await setAICache(url, otherKind, otherVal, settings.aiCacheDuration, settings.aiContentSource, account);
   }
-  return pbpPopupAiAccountIsCurrent(account)
-    ? (kind === "tags" ? finalizeAITags(both.tags) : both.summary)
-    : null;
+  if (!pbpPopupAiAccountIsCurrent(account)) return null;
+  // Empty requested half = miss -> dedicated single call (A8).
+  const mine = halfOf(both, kind);
+  return mine != null ? mine : callSingle();
 }
 
 // ---- AI Summary core logic ----

@@ -529,6 +529,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(fn.includes("if (pageInfo.pageText) return;"), "fall-through gated on actual content");
     });
 
+    test("combined half-empty replies fall back per artifact, never cache the empty half (A8)", () => {
+      assert(popupAiSource.includes("const halfOf = (both, which)"), "popup half extractor missing");
+      assert(popupAiSource.includes("mine != null ? mine : callSingle()"), "popup empty-requested-half must single-call");
+      assert(popupAiSource.includes("otherVal != null && pbpPopupAiAccountIsCurrent(account)"), "popup other-half cache must require content");
+      const tagGates = (backgroundSource.match(/aiTagsResolved === null/g) || []).length;
+      const sumGates = (backgroundSource.match(/summaryResolved === null/g) || []).length;
+      assert(tagGates >= 2 && sumGates >= 2, "SW quick-save AND batch must gate singles per artifact, got " + tagGates + "/" + sumGates);
+      assert((backgroundSource.match(/if \(parsed\.tags\.length\) \{/g) || []).length >= 2, "SW combined must cache tags only when non-empty");
+      assert((backgroundSource.match(/if \(parsed\.summary\) \{/g) || []).length >= 2, "SW combined must cache summary only when non-empty");
+    });
+
     test("replace-mode regen retracts only session-AI-added tags (A10)", () => {
       assert(popupAiSource.includes("const _aiSessionAddedTags = new Set()"), "provenance set missing");
       assert(popupAiSource.includes("cachedTagSet.has(t.toLowerCase()) && _aiSessionAddedTags.has(t.toLowerCase())"),

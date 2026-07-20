@@ -842,10 +842,16 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
 
   // AI features
   const aiPromises = [];
-  let combinedHandled = false;
   let aiHostPermissionMissing = false;
   let combinedCachedTags = null;
   let combinedCachedSummary = null;
+  // Per-artifact resolution state (audit A8): null = still needed. A
+  // combined reply may legally come back half-empty ({"summary":"ok",
+  // "tags":[]}) - the produced half is applied, the EMPTY half falls
+  // through to its own dedicated single call below instead of being
+  // silently treated as a produced result.
+  let aiTagsResolved = null;
+  let summaryResolved = null;
 
   // Both tags AND summary requested -> one combined call (sends the body once).
   // Gated OFF when the user set a custom tag/summary prompt: the combined prompt uses
@@ -856,30 +862,27 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     try {
       const tCached = combinedCachedTags = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource, startAuth.account);
       const sCached = combinedCachedSummary = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource, startAuth.account);
-      let aiTags, summary;
       if (tCached && sCached) {
-        aiTags = tCached; summary = sCached;
+        aiTagsResolved = tCached; summaryResolved = sCached;
       } else {
         const resp = await callAI(s, buildCombinedPrompt(s, title, url, pageInfo.pageText, notes, []));
         const parsed = parseAICombined(resp, s.aiTagSeparator);
-        aiTags = parsed.tags; summary = parsed.summary;
-        await setAICache(url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource, startAuth.account);
-        await setAICache(url, "summary", summary, s.aiCacheDuration, s.aiContentSource, startAuth.account);
+        // Cache each half only when it has content: a cached empty would
+        // turn the malformed half into a sticky fake success (A8).
+        if (parsed.tags.length) {
+          aiTagsResolved = parsed.tags;
+          await setAICache(url, "tags", parsed.tags, s.aiCacheDuration, s.aiContentSource, startAuth.account);
+        }
+        if (parsed.summary) {
+          summaryResolved = parsed.summary;
+          await setAICache(url, "summary", parsed.summary, s.aiCacheDuration, s.aiContentSource, startAuth.account);
+        }
       }
-      tags = [...tags, ...aiTags];
-      if (summary) {
-        const wrapped = `[AI Summary]\n<blockquote>${escapeForExtended(summary)}</blockquote>`;
-        notes = notes ? notes + "\n\n" + wrapped : wrapped;
-      }
-      combinedHandled = true;
     } catch (e) {
       if (e?.code === "host_permission") {
         aiHostPermissionMissing = true;
-        if (combinedCachedTags) tags = [...tags, ...combinedCachedTags];
-        if (combinedCachedSummary) {
-          const wrapped = `[AI Summary]\n<blockquote>${escapeForExtended(combinedCachedSummary)}</blockquote>`;
-          notes = notes ? notes + "\n\n" + wrapped : wrapped;
-        }
+        if (combinedCachedTags) aiTagsResolved = combinedCachedTags;
+        if (combinedCachedSummary) summaryResolved = combinedCachedSummary;
         console.warn(`${notifyCategory} AI skipped:`, e.message);
       } else {
         console.warn(`${notifyCategory} AI combined failed, falling back to separate calls:`, e.message);
@@ -887,8 +890,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     }
   }
 
-  if (!combinedHandled && !aiHostPermissionMissing && pageInfo?.pageText && hasAIKey(s)) {
-    if (s._aiTags) {
+  if (!aiHostPermissionMissing && pageInfo?.pageText && hasAIKey(s)) {
+    if (s._aiTags && aiTagsResolved === null) {
       aiPromises.push(
         (async () => {
           try {
@@ -907,7 +910,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
         })()
       );
     }
-    if (s._aiSummary) {
+    if (s._aiSummary && summaryResolved === null) {
       aiPromises.push(
         (async () => {
           try {
@@ -927,7 +930,12 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     }
   }
 
-  // Wait for AI results (empty when combinedHandled)
+  // Apply combined-path results, then whatever the single calls produced.
+  if (aiTagsResolved) tags = [...tags, ...aiTagsResolved];
+  if (summaryResolved) {
+    const wrapped = `[AI Summary]\n<blockquote>${escapeForExtended(summaryResolved)}</blockquote>`;
+    notes = notes ? notes + "\n\n" + wrapped : wrapped;
+  }
   const aiResults = await Promise.all(aiPromises);
   for (const r of aiResults) {
     if (!r) continue;
@@ -1931,29 +1939,35 @@ async function _runBatchSave(tabs, expectedAccount) {
           catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
           await requireAccount();
           if (pageInfo?.pageText) {
-            let combinedHandled = false;
+            // Per-artifact resolution (audit A8, mirrors the quick-save
+            // path): a half-empty combined reply keeps its good half and
+            // sends ONLY the empty half to a dedicated single call - the
+            // old boolean gate treated any parsed reply as fully handled,
+            // silently dropping the missing artifact without counting it.
+            let aiTagsResolved = null;
+            let summaryResolved = null;
             if (useAiTags && useAiSummary && !s.customTagPrompt?.trim() && !s.customSummaryPrompt?.trim()) {
               try {
                 const tCached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource, account);
                 const sCached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource, account);
-                let aiTags, summary;
-                if (tCached && sCached) { aiTags = tCached; summary = sCached; }
+                if (tCached && sCached) { aiTagsResolved = tCached; summaryResolved = sCached; }
                 else {
                   const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", []));
                   const parsed = parseAICombined(resp, s.aiTagSeparator);
-                  aiTags = s.optRespectTagCase ? parsed.tags.map(tg => resolveTagCase(tg, tagCaseMap)) : parsed.tags;
-                  summary = parsed.summary;
-                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, s.aiContentSource, account);
-                  await setAICache(tab.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account);
+                  if (parsed.tags.length) {
+                    aiTagsResolved = s.optRespectTagCase ? parsed.tags.map(tg => resolveTagCase(tg, tagCaseMap)) : parsed.tags;
+                    await setAICache(tab.url, "tags", aiTagsResolved, s.aiCacheDuration, s.aiContentSource, account);
+                  }
+                  if (parsed.summary) {
+                    summaryResolved = parsed.summary;
+                    await setAICache(tab.url, "summary", parsed.summary, s.aiCacheDuration, s.aiContentSource, account);
+                  }
                 }
-                tags = [...tags, ...aiTags];
-                if (summary) notes = `[AI Summary]\n<blockquote>${escapeForExtended(summary)}</blockquote>`;
-                combinedHandled = true;
               } catch (e) { console.warn("batch AI combined failed, falling back:", tab.url, e.message); }
             }
-            if (!combinedHandled) {
+            {
               const aiJobs = [];
-              if (useAiTags) aiJobs.push((async () => {
+              if (useAiTags && aiTagsResolved === null) aiJobs.push((async () => {
                 try {
                   const cached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource, account);
                   if (cached) return { type: "tags", result: cached };
@@ -1965,7 +1979,7 @@ async function _runBatchSave(tabs, expectedAccount) {
                   return { type: "tags", result: aiTags };
                 } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
               })());
-              if (useAiSummary) aiJobs.push((async () => {
+              if (useAiSummary && summaryResolved === null) aiJobs.push((async () => {
                 try {
                   const cached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource, account);
                   if (cached) return { type: "summary", result: cached };
@@ -1975,6 +1989,8 @@ async function _runBatchSave(tabs, expectedAccount) {
                   return { type: "summary", result: summary };
                 } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
               })());
+              if (aiTagsResolved) tags = [...tags, ...aiTagsResolved];
+              if (summaryResolved) notes = `[AI Summary]\n<blockquote>${escapeForExtended(summaryResolved)}</blockquote>`;
               const results = await Promise.all(aiJobs);
               for (const r of results) {
                 if (!r) continue;
