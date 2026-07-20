@@ -540,6 +540,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert((backgroundSource.match(/if \(parsed\.summary\) \{/g) || []).length >= 2, "SW combined must cache summary only when non-empty");
     });
 
+    test("batch counts extraction failures as failed AI artifacts (A12)", () => {
+      assert(backgroundSource.includes("aiFailed += (useAiTags ? 1 : 0) + (useAiSummary ? 1 : 0)"),
+        "empty/failed extraction must count each requested artifact");
+    });
+
     test("SW tag prompts anchor on the cached user vocabulary (A14)", () => {
       assert((backgroundSource.match(/userTagsTop = pbpTagsByCount/g) || []).length === 2,
         "quick-save AND batch must derive the frequency-sorted list");

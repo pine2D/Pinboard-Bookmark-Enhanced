@@ -2027,6 +2027,14 @@ async function _runBatchSave(tabs, expectedAccount) {
                 if (r.type === "summary") notes = `[AI Summary]\n<blockquote>${escapeForExtended(r.result)}</blockquote>`;
               }
             }
+          } else {
+            // audit A12: extraction failed or came back empty (tab closed,
+            // navigation, injection failure) - the bookmark still saves
+            // bare, but the REQUESTED artifacts were not produced. Count
+            // them per artifact (the same unit the single-job catches
+            // use) so the batch summary's AI-failed figure stays truthful
+            // instead of reporting 0.
+            aiFailed += (useAiTags ? 1 : 0) + (useAiSummary ? 1 : 0);
           }
         }
 
