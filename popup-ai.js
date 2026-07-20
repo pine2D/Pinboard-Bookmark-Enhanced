@@ -119,6 +119,16 @@ async function enrichPageTextIfJina(s) {
   }
 }
 
+// Settle any in-flight same-URL bookmark lookup before touching the
+// description (audit A2). checkExistingBookmark nulls .promise once it
+// lands, so this is a no-op when the lookup already settled; the promise
+// resolves status objects and never rejects, catch is belt-and-braces.
+async function _aiAwaitBookmarkLookup() {
+  try {
+    if (typeof bookmarkLookup !== "undefined" && bookmarkLookup?.promise) await bookmarkLookup.promise;
+  } catch (_) {}
+}
+
 const AI_SUMMARY_TAG = "[AI Summary]";
 // Single source of truth: the regex literal lives in shared.js (_AI_BQ_REGEX_SHARED),
 // which popup.html loads before popup-ai.js. Alias it here so the [AI Summary]
@@ -282,8 +292,15 @@ function setupAIFeatures() {
   // checkExistingBookmark (popup.js) restores the user's saved `extended` — we
   // must not race it (lost summary) or append on top (duplicate summary).
   const restoreAccount = pbpPopupAiAccount();
-  getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource, restoreAccount, settings).then(cached => {
-    if (cached && pbpPopupAiAccountIsCurrent(restoreAccount)
+  getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource, restoreAccount, settings).then(async cached => {
+    if (!cached) return;
+    // audit A2: the IDB read can win the race against the bookmark lookup
+    // - existingBookmark is still null then, the guard passes, and the
+    // lookup later overwrites the description wholesale (upsertSummary
+    // does not mark the field dirty). Settle the lookup FIRST; the guard
+    // below then sees the real existingBookmark/description state.
+    await _aiAwaitBookmarkLookup();
+    if (pbpPopupAiAccountIsCurrent(restoreAccount)
         && pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
       upsertSummary(cached);
       showSummaryActions(true);
@@ -470,6 +487,11 @@ async function doAISummary(forceRefresh, sOverride) {
   if (!account) return;
   if (!hasAIKey(s)) { showSetKeyError(); return; }
   hideAIError();
+  // audit A2: a pending bookmark lookup rewrites the description when it
+  // lands - a summary inserted before that gets clobbered (paid result
+  // lost, regenerate/remove bar stranded over nothing).
+  await _aiAwaitBookmarkLookup();
+  if (!pbpPopupAiAccountIsCurrent(account)) return;
 
   if (!forceRefresh) {
     const cached = await getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account, s);

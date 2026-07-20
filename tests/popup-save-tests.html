@@ -540,6 +540,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert((backgroundSource.match(/if \(parsed\.summary\) \{/g) || []).length >= 2, "SW combined must cache summary only when non-empty");
     });
 
+    test("summary paths settle the bookmark lookup before touching the notes (A2)", () => {
+      assert(popupAiSource.includes("async function _aiAwaitBookmarkLookup"), "lookup-settle helper missing");
+      const doSummary = popupAiSource.slice(popupAiSource.indexOf("async function doAISummary"), popupAiSource.indexOf("// ---- Show regenerate"));
+      assert(doSummary.includes("await _aiAwaitBookmarkLookup();"), "doAISummary must settle the lookup first");
+      const setupAi = popupAiSource.slice(popupAiSource.indexOf("function setupAIFeatures()"), popupAiSource.indexOf("function _aiSummaryBlockMatches"));
+      assert(setupAi.includes("await _aiAwaitBookmarkLookup();"), "cached-summary auto-restore must settle the lookup first");
+      assert(setupAi.indexOf("await _aiAwaitBookmarkLookup();") < setupAi.indexOf("pbpShouldRestoreCachedSummary"),
+        "restore guard must run AFTER the lookup settles");
+    });
+
     test("AI ops run on immutable settings snapshots - no global provider mutation (A4)", () => {
       assert(!popupAiSource.includes("settings.aiProvider = "), "global settings.aiProvider mutation must be gone");
       assert(popupAiSource.includes("const s = { ...(sOverride || settings) }"), "op-level snapshot missing");
