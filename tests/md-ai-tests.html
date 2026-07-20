@@ -2919,6 +2919,16 @@ suiteIf("pbpShouldRestoreCachedSummary", "pbpShouldRestoreCachedSummary", () => 
   test("already bookmarked with notes -> skip (don't append on top)", () => {
     assertEq(pbpShouldRestoreCachedSummary({ extended: "my notes" }, "my notes"), false, "no double write");
   });
+  test("block followed by a user note still counts as present (A11)", () => {
+    assertEq(pbpShouldRestoreCachedSummary(null, BQ + "\n\nmy own note"), false,
+      "mid-text block must block restore (old $-anchored regex missed it)");
+  });
+  test("two blocks match separately - no first-to-last spanning (A11)", () => {
+    const two = BQ + "\n\nuser middle text\n\n" + BQ;
+    const ms = [...two.matchAll(new RegExp(_AI_BQ_REGEX_SHARED.source, "g"))];
+    assertEq(ms.length, 2, "two distinct blocks");
+    assert(ms[0][0].indexOf("user middle") === -1, "first match must not swallow the text between blocks");
+  });
 });
 </script>
 

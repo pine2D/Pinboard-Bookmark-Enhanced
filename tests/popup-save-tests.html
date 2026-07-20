@@ -519,6 +519,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!backgroundSource.includes('message.type === "bookmark_saved"'), "Service Worker still handles bookmark_saved");
     });
 
+    test("summary upsert/remove operate on the LAST block, in place (A11)", () => {
+      assert(popupAiSource.includes("function _aiSummaryBlockMatches"), "global block matcher missing");
+      assert(popupAiSource.includes("matches[matches.length - 1]"), "last-match selection missing");
+      assert(!popupAiSource.includes("cur.replace(AI_BQ_REGEX"), "old single-replace upsert path must be gone");
+    });
+
     await testAsync("popup summary cache, render, and inflight work are session-account scoped", async () => {
       const fetchStart = popupAiSource.indexOf("async function fetchAIArtifacts");
       const fetchEnd = popupAiSource.indexOf("// ---- AI Summary core logic", fetchStart);

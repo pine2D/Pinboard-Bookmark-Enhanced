@@ -2289,7 +2289,17 @@ function injectEmptyState(container, svgKey, messageText) {
 // the user's saved `extended`, which already owns any summary they kept — or
 // (b) the description already contains an [AI Summary] block.
 // Pure function; extracted here for testability (popup-ai.js uses it at runtime).
-const _AI_BQ_REGEX_SHARED = /(\n\n)?\[AI Summary\]\n<blockquote>[\s\S]*?<\/blockquote>\s*$/;
+// ONE structurally complete [AI Summary] block, matched ANYWHERE in the
+// description (audit A11). The old end-anchored variant ($) had two
+// failure modes: a user note typed AFTER the block made it invisible
+// (regenerate appended a duplicate, remove found nothing), and with two
+// markers present the lazy [\s\S]*? was forced by the anchor to span
+// from the FIRST marker to the LAST </blockquote>, eating the user text
+// between them. Minimal match is safe: escapeForExtended encodes < and >
+// in the summary text, so a wrapped block can never contain a literal
+// closing tag. Callers that need "the last block" iterate with the g
+// flag (upsertSummary/removeSummary build a global copy via .source).
+const _AI_BQ_REGEX_SHARED = /(\n\n)?\[AI Summary\]\n<blockquote>[\s\S]*?<\/blockquote>/;
 function pbpShouldRestoreCachedSummary(existing, descValue) {
   if (existing) return false;
   return !_AI_BQ_REGEX_SHARED.test(descValue || "");

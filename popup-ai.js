@@ -280,28 +280,44 @@ function setupAIFeatures() {
   });
 }
 
+// All complete [AI Summary] blocks in a description, in order. Callers
+// operate on the LAST one (the block this popup manages); earlier ones
+// are legacy duplicates the user can clean up block-by-block.
+function _aiSummaryBlockMatches(text) {
+  return [...String(text || "").matchAll(new RegExp(AI_BQ_REGEX.source, "g"))];
+}
+
 // ---- Insert or replace AI summary in description ----
+// Replaces the LAST existing block IN PLACE (a user note typed after the
+// block stays after it - the old append-at-end variant only recognized
+// end-anchored blocks and duplicated the summary otherwise, audit A11).
 function upsertSummary(summary) {
   const di = $id("description-input");
-  const cur = di.value.trim();
+  const cur = di.value;
   const wrapped = `${AI_SUMMARY_TAG}\n<blockquote>${escapeForExtended(summary)}</blockquote>`;
-
-  if (AI_BQ_REGEX.test(cur)) {
-    // Function replacer: `wrapped` carries AI-summary text that may contain
-    // $&, $1, $$ etc., which String.replace would interpret as special patterns
-    // and corrupt. A replacer fn inserts it literally (same fix as ai.js builders).
-    di.value = cur.replace(AI_BQ_REGEX, () => "\n\n" + wrapped).replace(/^\n\n/, "");
+  const matches = _aiSummaryBlockMatches(cur);
+  if (matches.length) {
+    const last = matches[matches.length - 1];
+    const lead = last[1] || ""; // keep the captured \n\n separator if present
+    di.value = (cur.slice(0, last.index) + lead + wrapped + cur.slice(last.index + last[0].length)).trim();
   } else {
-    di.value = cur ? cur + "\n\n" + wrapped : wrapped;
+    const base = cur.trim();
+    di.value = base ? base + "\n\n" + wrapped : wrapped;
   }
   updateCharCount();
   autoResizeTextarea(di);
 }
 
 // ---- Remove AI summary block from description ----
+// Removes only the LAST block; text before and after it is preserved.
 function removeSummary() {
   const di = $id("description-input");
-  di.value = di.value.replace(AI_BQ_REGEX, "").trim();
+  const cur = di.value;
+  const matches = _aiSummaryBlockMatches(cur);
+  if (matches.length) {
+    const last = matches[matches.length - 1];
+    di.value = (cur.slice(0, last.index) + cur.slice(last.index + last[0].length)).trim();
+  }
   updateCharCount();
   autoResizeTextarea(di);
 }
