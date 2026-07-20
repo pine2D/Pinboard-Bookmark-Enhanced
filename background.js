@@ -862,9 +862,13 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     try {
       const tCached = combinedCachedTags = await getAICache(url, "tags", s.aiCacheDuration, s.aiContentSource, startAuth.account);
       const sCached = combinedCachedSummary = await getAICache(url, "summary", s.aiCacheDuration, s.aiContentSource, startAuth.account);
-      if (tCached && sCached) {
-        aiTagsResolved = tCached; summaryResolved = sCached;
-      } else {
+      // A16: a cached half is reused as-is; the combined call only runs
+      // when BOTH halves are missing (regenerating both overwrote the
+      // cached one and paid for it again). Exactly one missing -> its
+      // dedicated single job below fills it.
+      if (tCached) aiTagsResolved = tCached;
+      if (sCached) summaryResolved = sCached;
+      if (aiTagsResolved === null && summaryResolved === null) {
         const resp = await callAI(s, buildCombinedPrompt(s, title, url, pageInfo.pageText, notes, []));
         const parsed = parseAICombined(resp, s.aiTagSeparator);
         // Cache each half only when it has content: a cached empty would
@@ -1950,8 +1954,10 @@ async function _runBatchSave(tabs, expectedAccount) {
               try {
                 const tCached = await getAICache(tab.url, "tags", s.aiCacheDuration, s.aiContentSource, account);
                 const sCached = await getAICache(tab.url, "summary", s.aiCacheDuration, s.aiContentSource, account);
-                if (tCached && sCached) { aiTagsResolved = tCached; summaryResolved = sCached; }
-                else {
+                // A16: reuse a cached half; combined call only when both missing.
+                if (tCached) aiTagsResolved = tCached;
+                if (sCached) summaryResolved = sCached;
+                if (aiTagsResolved === null && summaryResolved === null) {
                   const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", []));
                   const parsed = parseAICombined(resp, s.aiTagSeparator);
                   if (parsed.tags.length) {
