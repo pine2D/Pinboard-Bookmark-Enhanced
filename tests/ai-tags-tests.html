@@ -92,6 +92,30 @@ suite("refineTags", () => {
 
 <script>
 // ============ Task 2: DEFAULT_TAG_PROMPT + TAG_GUIDANCE ============
+suite("recall-oriented summary prompt (B1)", () => {
+  test("frames the note for future recall, not reading comprehension", () => {
+    assert(DEFAULT_SUMMARY_PROMPT.includes("bookmark note, not an article summary"), "recall framing");
+    assert(DEFAULT_SUMMARY_PROMPT.includes("months from now"), "future-reader anchor");
+    assert(DEFAULT_SUMMARY_PROMPT.includes("what kind of page this is"), "indicative type-first rule");
+    assert(DEFAULT_SUMMARY_PROMPT.includes("distinguish this page"), "distinguishing-detail rule");
+  });
+  test("carries the negative constraints and the trailing language reminder", () => {
+    assert(DEFAULT_SUMMARY_PROMPT.includes("Do not restate or rephrase the title"), "anti title-restate");
+    assert(DEFAULT_SUMMARY_PROMPT.includes('"This article discusses"'), "filler-opener ban");
+    assert(DEFAULT_SUMMARY_PROMPT.includes("do not translate proper nouns"), "proper-noun preservation");
+    const first = DEFAULT_SUMMARY_PROMPT.indexOf("{{lang_instruction}}");
+    const last = DEFAULT_SUMMARY_PROMPT.lastIndexOf("{{lang_instruction}}");
+    assert(first !== -1 && last > first, "language instruction must appear twice (sandwich)");
+    assert(DEFAULT_SUMMARY_PROMPT.indexOf("Content: {{content}}") < last, "reminder must sit after the content");
+  });
+  test("combined prompt summary section mirrors the recall rules", () => {
+    const c = buildCombinedPrompt({}, "T", "u", "c", "", []);
+    assert(c.includes("bookmark note read months from now"), "combined recall framing");
+    assert(c.includes("Do not restate the title"), "combined anti-restate");
+    assert(c.includes("This article discusses"), "combined filler ban");
+  });
+});
+
 suite("aiCacheFingerprint (A5)", () => {
   test("summary fp shifts with lang, custom template, and model", () => {
     const base = { aiProvider: "gemini" };

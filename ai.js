@@ -912,7 +912,7 @@ function buildCombinedPrompt(s, title, url, content, description, userTags) {
   const sep = s.aiTagSeparator || "-";
   let prompt = `Analyze the following webpage and return ONLY a JSON object with exactly two keys: "summary" and "tags".
 
-"summary": ${aiSummaryLangInstruction(s)} Summarize concisely in 2-4 sentences, focusing on key points.
+"summary": a bookmark note read months from now to recall what this page is and why it was saved - not an article summary. ${aiSummaryLangInstruction(s)} 2-4 sentences: first what kind of page this is and what it is for, then the 1-2 specific details that distinguish it from others of its kind. Do not restate the title; never open with filler like "This article discusses"; do not echo the page's marketing tone; keep product names and technical terms untranslated.
 
 "tags": an array of up to ${AI_TAG_CAP} bookmark tags. ${aiTagLangInstruction(s)} Tags should be lowercase, ${TAG_SEP_MAP[sep] || TAG_SEP_MAP["-"]}.
 ${TAG_GUIDANCE}

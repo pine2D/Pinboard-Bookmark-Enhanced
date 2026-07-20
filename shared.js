@@ -115,10 +115,28 @@ Content: {{content}}
 
 Format: ["tag1","tag2"]`;
 
-const DEFAULT_SUMMARY_PROMPT = `Summarize the following webpage concisely in 2-4 sentences. Focus on key points. {{lang_instruction}}
+// Recall-oriented bookmark note, NOT a reading-comprehension summary
+// (that is the reader's skim layer). Research grounding (popup-AI
+// campaign 2026-07): indicative-abstract framing ("what this is and what
+// it is for") serves re-finding; KFTF: bookmarks die without a context-
+// of-relevance note; CoD: 1-2 distinguishing specifics beat generic
+// coverage at this length; title-restating and filler openers add zero
+// recall value; proper nouns stay untranslated (zh user reading en
+// pages); language instruction repeated at the end (two shipped products
+// lost the language setting mid-prompt).
+const DEFAULT_SUMMARY_PROMPT = `You are writing a bookmark note, not an article summary. It will be read months from now by someone scanning their bookmark list to recall what this page is and why it was saved. {{lang_instruction}}
+
+Write 2-4 sentences:
+- Start with what kind of page this is (tool, paper, tutorial, essay, reference, product page...) and what it is for - phrased naturally, not as a label.
+- Then give the 1-2 specific details that distinguish this page from others of its kind: concrete names, methods, claims or numbers, not generic descriptors.
+- Do not restate or rephrase the title - the note is shown right under it; add what the title does not already say.
+- Never open with filler like "This article discusses". Use a neutral third-party voice; do not echo the page's own marketing tone.
+- Keep product names, project names and technical terms in their original language - do not translate proper nouns.
 
 Title: {{title}}
-Content: {{content}}`;
+Content: {{content}}
+
+Reminder: {{lang_instruction}} Output only the 2-4 sentence note itself - no preamble, no quotes.`;
 
 // Simple obfuscation for API keys stored in chrome.storage
 // Not real encryption — prevents casual plaintext reading
