@@ -1028,17 +1028,59 @@ function getOrCreateInflight(key, factory) {
 }
 
 // ---- AI cache helpers ----
-function getCacheKey(url, type, source, account) {
+// Tiny stable string hash (djb2, base36) for fingerprint components that
+// are free text (custom prompt templates).
+function _aiFpHash(str) {
+  let h = 5381;
+  const s = String(str || "");
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+// Effective model for the fingerprint - mirrors what callAI actually
+// dispatches per provider (configured model, else that provider's default).
+function _aiEffectiveModelForFp(s) {
+  const p = s.aiProvider || "gemini";
+  if (p === "gemini") return s.geminiModel || "gemini-2.5-flash-lite";
+  if (p === "claude") return s.claudeModel || "claude-haiku-4-5";
+  if (p === "ollama") return s.ollamaModel || "llama3.2";
+  const cfg = OPENAI_COMPAT_PROVIDERS[p];
+  return cfg ? (s[cfg.modelField] || cfg.defaultModel || "default") : "default";
+}
+
+// Generation-identity fingerprint (audit A5): a tags/summary result
+// depends on provider:model, output language, separator (tags) and the
+// custom template - a cache hit that ignored them kept serving
+// stale-config output (switch the language to Chinese, reopen, still get
+// the cached English). Baked into the cache key AND the inflight keys;
+// changing any dimension is a clean miss and old entries LRU-age out.
+// type "combined" is the inflight-only identity covering both halves.
+function aiCacheFingerprint(s, type) {
+  if (!s) return "";
+  if (type === "combined") {
+    return aiCacheFingerprint(s, "tags") + "&" + aiCacheFingerprint(s, "summary");
+  }
+  const base = (s.aiProvider || "gemini") + ":" + _aiEffectiveModelForFp(s);
+  if (type === "tags") {
+    return [base, "l" + (s.aiTagLang || "en"), "s" + (s.aiTagSeparator || "-"),
+      "c" + _aiFpHash(s.customTagPrompt?.trim() || "")].join("|");
+  }
+  return [base, "l" + (s.aiSummaryLang || "auto"),
+    "c" + _aiFpHash(s.customSummaryPrompt?.trim() || "")].join("|");
+}
+
+function getCacheKey(url, type, source, account, fp) {
   if (type === "tags" || type === "summary") {
     if (!account) return "";
-    return `ai_cache_${type}_${source || "local"}_${encodeURIComponent(account)}_${url}`;
+    const fpPart = fp ? encodeURIComponent(fp) + "_" : "";
+    return `ai_cache_${type}_${source || "local"}_${fpPart}${encodeURIComponent(account)}_${url}`;
   }
   return `ai_cache_${type}_${source || "local"}_${url}`;
 }
 
 
-async function getAICache(url, type, cacheDuration, source, account) {
-  const key = getCacheKey(url, type, source, account);
+async function getAICache(url, type, cacheDuration, source, account, s) {
+  const key = getCacheKey(url, type, source, account, aiCacheFingerprint(s, type));
   if (!key) return null;
   const dur = resolveCacheMs(cacheDuration);
   if (dur === 0) return null;   // 0 now reachable: cache disabled, never read
@@ -1054,9 +1096,9 @@ async function getAICache(url, type, cacheDuration, source, account) {
   return entry.result;
 }
 
-async function setAICache(url, type, result, cacheDuration, source, account) {
+async function setAICache(url, type, result, cacheDuration, source, account, s) {
   if (resolveCacheMs(cacheDuration) === 0) return;   // disabled: never write
-  const key = getCacheKey(url, type, source, account);
+  const key = getCacheKey(url, type, source, account, aiCacheFingerprint(s, type));
   if (!key) return;
   const timestamp = Date.now();
 

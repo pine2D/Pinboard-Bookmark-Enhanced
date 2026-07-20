@@ -92,6 +92,28 @@ suite("refineTags", () => {
 
 <script>
 // ============ Task 2: DEFAULT_TAG_PROMPT + TAG_GUIDANCE ============
+suite("aiCacheFingerprint (A5)", () => {
+  test("summary fp shifts with lang, custom template, and model", () => {
+    const base = { aiProvider: "gemini" };
+    const a = aiCacheFingerprint(base, "summary");
+    assert(a !== aiCacheFingerprint({ ...base, aiSummaryLang: "zh" }, "summary"), "lang enters fp");
+    assert(a !== aiCacheFingerprint({ ...base, customSummaryPrompt: "custom {{content}}" }, "summary"), "template enters fp");
+    assert(a !== aiCacheFingerprint({ ...base, geminiModel: "gemini-ultra" }, "summary"), "model enters fp");
+    assertEq(aiCacheFingerprint(null, "summary"), "", "no settings -> empty fp");
+  });
+  test("tags fp shifts with separator; combined covers both halves", () => {
+    const base = { aiProvider: "gemini" };
+    assert(aiCacheFingerprint(base, "tags") !== aiCacheFingerprint({ ...base, aiTagSeparator: "_" }, "tags"), "separator enters fp");
+    const comb = aiCacheFingerprint(base, "combined");
+    assert(comb.includes(aiCacheFingerprint(base, "tags")) && comb.includes(aiCacheFingerprint(base, "summary")), "combined = tags & summary");
+  });
+  test("cache key embeds the fingerprint; empty fp keeps legacy shape", () => {
+    const k = getCacheKey("https://x.test/", "tags", "local", "alice", "FP|1");
+    assert(k.includes(encodeURIComponent("FP|1") + "_alice_"), "fp slots before the account: " + k);
+    assert(getCacheKey("https://x.test/", "tags", "local", "alice", "").includes("_local_alice_"), "empty fp -> legacy shape");
+  });
+});
+
 suite("pbpTagsByCount", () => {
   test("frequency desc, name tiebreak, null tolerated", () => {
     assertEq(pbpTagsByCount({ b: 2, a: 5, c: 2 }).join(","), "a,b,c", "count desc then name");

@@ -987,7 +987,7 @@ suite("md-ai IDB key conventions", () => {
     const init = pbpTrInit.toString();
     const start = _pbpTrStart.toString();
     assert(init.includes('account: String((detail && detail.account) || "")'), "render detail owner not captured");
-    assert(start.includes('getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account)'), "summary context owner missing");
+    assert(start.includes('getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account, st.s)'), "summary context owner missing");
     assert(start.includes("pbpTrCacheSet(st.url, st.target.code, st.modelKey, newly, st.account)"), "translation write owner missing");
     assert(_pbpTrEnsureGlossary.toString().includes("pbpTrGlossaryCacheGet(st.url, st.target.code, st.modelKey, st.account)"), "glossary owner missing");
   });

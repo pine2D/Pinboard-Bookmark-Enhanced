@@ -605,7 +605,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       let currentAccount = "alice";
       const make = new Function(
         "pageInfo", "settings", "pbpPopupAiAccountIsCurrent", "getOrCreateInflight",
-        "$id", "callAI", "buildSummaryPrompt",
+        "$id", "callAI", "buildSummaryPrompt", "aiCacheFingerprint",
         popupAiSource.slice(fetchStart, fetchEnd) + "; return fetchAIArtifacts;"
       );
       const fetchArtifact = make(
@@ -615,22 +615,23 @@ test("posts/add default remains replace=yes for existing callers", () => {
         (key, factory) => { keys.push(key); return Promise.resolve().then(factory); },
         () => ({ value: "" }),
         async () => "summary",
-        () => "prompt"
+        () => "prompt",
+        (s, type) => s.aiProvider + "#" + type
       );
       assert(await fetchArtifact("summary", true, "alice") === "summary", "Alice summary missing");
       currentAccount = "bob";
       assert(await fetchArtifact("summary", true, "bob") === "summary", "Bob summary missing");
-      assert(keys.join("|") === `alice|openai|summary|${URL}|bob|openai|summary|${URL}`,
-        "summary inflight key is not owner-scoped: " + keys.join("|"));
+      assert(keys.join("|") === `alice|openai#summary|summary|${URL}|bob|openai#summary|summary|${URL}`,
+        "summary inflight key is not owner+fingerprint-scoped: " + keys.join("|"));
 
       const setupAi = popupAiSource.slice(popupAiSource.indexOf("function setupAIFeatures()"), popupAiSource.indexOf("// ---- Insert or replace AI summary"));
       const doSummary = popupAiSource.slice(popupAiSource.indexOf("async function doAISummary"), popupAiSource.indexOf("// ---- Show regenerate"));
       const doTags = popupAiSource.slice(popupAiSource.indexOf("async function doAITags"), popupAiSource.indexOf("function renderAITags"));
       assert(setupAi.includes("restoreAccount") && setupAi.includes("pbpPopupAiAccountIsCurrent(restoreAccount)"),
         "cached summary restore lacks owner recheck");
-      assert(doSummary.includes('getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account)') &&
-        doSummary.includes('setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account)'),
-        "doAISummary cache calls lack owner");
+      assert(doSummary.includes('getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account, s)') &&
+        doSummary.includes('setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account, s)'),
+        "doAISummary cache calls lack owner+fingerprint settings");
       assert((doSummary.match(/pbpPopupAiAccountIsCurrent\(account\)/g) || []).length >= 5,
         "doAISummary does not guard every late UI/cache commit");
       assert(doTags.includes('} catch (e) {\n    if (!pbpPopupAiAccountIsCurrent(account)) return;'),

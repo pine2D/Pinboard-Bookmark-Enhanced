@@ -282,7 +282,7 @@ function setupAIFeatures() {
   // checkExistingBookmark (popup.js) restores the user's saved `extended` — we
   // must not race it (lost summary) or append on top (duplicate summary).
   const restoreAccount = pbpPopupAiAccount();
-  getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource, restoreAccount).then(cached => {
+  getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource, restoreAccount, settings).then(cached => {
     if (cached && pbpPopupAiAccountIsCurrent(restoreAccount)
         && pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
       upsertSummary(cached);
@@ -381,17 +381,19 @@ function finalizeAITags(rawTags, s) {
 async function fetchAIArtifacts(kind, forceRefresh, account, s) {
   s = s || settings;
   const url = pageInfo.url;
-  const provider = s.aiProvider;
   const otherKind = kind === "summary" ? "tags" : "summary";
-  const combinedKey = `${account}|${provider}|combined|${url}`;
+  // Inflight identity carries the same generation fingerprint as the
+  // cache keys (audit A5): two ops differing in model/lang/template must
+  // not dedupe onto one request.
+  const combinedKey = `${account}|${aiCacheFingerprint(s, "combined")}|combined|${url}`;
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
 
   const callSingle = () => {
     if (kind === "summary") {
-      return getOrCreateInflight(`${account}|${provider}|summary|${url}`, () =>
+      return getOrCreateInflight(`${account}|${aiCacheFingerprint(s, "summary")}|summary|${url}`, () =>
         callAI(s, buildSummaryPrompt(s, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value)));
     }
-    return getOrCreateInflight(`${account}|${provider}|tags|${url}`, async () => {
+    return getOrCreateInflight(`${account}|${aiCacheFingerprint(s, "tags")}|tags|${url}`, async () => {
       const resp = await callAI(s, buildTagPrompt(s, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
       return finalizeAITags(refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator }), s);
     });
@@ -427,7 +429,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s) {
   }
 
   // If the other half is already cached, only the requested half is missing.
-  const otherCached = await getAICache(url, otherKind, s.aiCacheDuration, s.aiContentSource, account);
+  const otherCached = await getAICache(url, otherKind, s.aiCacheDuration, s.aiContentSource, account, s);
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
   if (otherCached != null) return callSingle();
 
@@ -449,7 +451,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s) {
   // a malformed half into a sticky fake success (A8).
   const otherVal = halfOf(both, otherKind);
   if (otherVal != null && pbpPopupAiAccountIsCurrent(account)) {
-    await setAICache(url, otherKind, otherVal, s.aiCacheDuration, s.aiContentSource, account);
+    await setAICache(url, otherKind, otherVal, s.aiCacheDuration, s.aiContentSource, account, s);
   }
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
   // Empty requested half = miss -> dedicated single call (A8).
@@ -470,7 +472,7 @@ async function doAISummary(forceRefresh, sOverride) {
   hideAIError();
 
   if (!forceRefresh) {
-    const cached = await getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account);
+    const cached = await getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account, s);
     if (cached && pbpPopupAiAccountIsCurrent(account)) {
       upsertSummary(cached);
       showSummaryActions(true);
@@ -491,7 +493,7 @@ async function doAISummary(forceRefresh, sOverride) {
     const summary = await fetchAIArtifacts("summary", forceRefresh, account, s);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "parsing" });
-    await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account);
+    await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account, s);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     upsertSummary(summary);
     showSummaryActions(false);
@@ -578,7 +580,7 @@ async function doAITags(forceRefresh, sOverride) {
   if (!hasAIKey(s)) { showSetKeyError(); return; }
 
   if (!forceRefresh) {
-    const cached = await getAICache(pageInfo.url, "tags", s.aiCacheDuration, s.aiContentSource, account);
+    const cached = await getAICache(pageInfo.url, "tags", s.aiCacheDuration, s.aiContentSource, account, s);
     if (cached && pbpPopupAiAccountIsCurrent(account)) {
       renderAITags(cached, true);
       return;
@@ -601,7 +603,7 @@ async function doAITags(forceRefresh, sOverride) {
     const tags = await fetchAIArtifacts("tags", forceRefresh, account, s);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "parsing" });
-    await setAICache(pageInfo.url, "tags", tags, s.aiCacheDuration, s.aiContentSource, account);
+    await setAICache(pageInfo.url, "tags", tags, s.aiCacheDuration, s.aiContentSource, account, s);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     renderAITags(tags, false);
     if (forceRefresh) {

@@ -1154,7 +1154,7 @@ async function _pbpTrStart(st) {
   try {
     const activeSeg = document.querySelector("#source-badge .src-seg.active");
     const source = (activeSeg && activeSeg.getAttribute("data-engine") === "jina") ? "jina" : "local";
-    summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account)) || "";
+    summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account, st.s)) || "";
   } catch (_) {}
   const prog0 = document.getElementById("tr-progress");
   if (prog0) prog0.textContent = t("trExtracting");
