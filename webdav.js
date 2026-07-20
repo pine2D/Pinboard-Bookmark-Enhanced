@@ -92,12 +92,12 @@ function pbpWebdavResponseEtag(response) {
 // Strip the documented Apache mod_deflate/brotli content-coding suffix
 // from a GET-response ETag ("abc-gzip" -> "abc"). Apache appends it to
 // the ENTITY etag when serving a compressed representation, but PUT
-// If-Match validates against the entity etag - remembering the suffixed
-// form wedged push into a permanent 412 that a pull could never clear
-// (pull re-read the same suffixed value). PUT responses are never
-// content-coded, so their ETags pass through here untouched by
-// construction; a genuine entity tag that happens to END in "-gzip" is
-// pathological enough to accept the trade.
+// If-Match validates against the entity etag - a baseline remembered
+// from a pull could then NEVER match on push (permanent 412 that
+// pulling again could not clear). Used ONLY by the push path's proven
+// retry: the stripped form is tried once, after a fresh GET has shown
+// the remote still carries the byte-identical suffixed etag we
+// remembered - never stored as the baseline itself (alias risk).
 function pbpWebdavNormalizeEtag(etag) {
   if (!pbpWebdavValidEtag(etag)) return "";
   return etag.trim().replace(/-(?:gzip|br|deflate)"$/, '"');
@@ -401,6 +401,25 @@ async function pbpWebdavPush(cfgOverride) {
           { body: JSON.stringify(payload) });
       }
     }
+    if (resp.status === 412 && pbpWebdavValidEtag(conditionalCfg.etag)) {
+      // Apache mod_deflate workaround, alias-safe: our baseline may be a
+      // content-coding-suffixed GET etag the server refuses on If-Match.
+      // Re-GET the file; ONLY if the remote still serves the byte-
+      // identical suffixed etag we remembered (i.e. provably the same
+      // revision we pulled) retry once with the de-suffixed entity tag.
+      // Any other GET etag = a genuine conflict and falls through.
+      const stripped = pbpWebdavNormalizeEtag(conditionalCfg.etag);
+      if (stripped && stripped !== conditionalCfg.etag.trim()) {
+        try {
+          const probe = await _pbpWebdavFetch("test", cfg);
+          if (probe.ok && pbpWebdavResponseEtag(probe) === conditionalCfg.etag.trim()) {
+            resp = await _pbpWebdavFetch("push",
+              Object.assign({}, cfg, { known: false, etag: stripped }),
+              { body: JSON.stringify(payload) });
+          }
+        } catch (_) { /* probe failure -> keep the original 412 flow */ }
+      }
+    }
     if (resp.status === 412) {
       const result = { ts: Date.now(), ok: false, error: "conflict", status: 412 };
       await chrome.storage.local.set({ webdavLastPush: result });
@@ -456,9 +475,12 @@ async function pbpWebdavPull(cfgOverride) {
     const data = await resp.json().catch(() => null);
     try { pbpBackupSchemaVersion(data); }
     catch (_) { return { ok: false, error: "invalid" }; }
-    // GET etags go through the content-coding normalizer: the caller
-    // remembers this value as the If-Match baseline for the next push.
-    return { ok: true, data, etag: pbpWebdavNormalizeEtag(pbpWebdavResponseEtag(resp)) };
+    // The ORIGINAL GET etag is the baseline - never a lossy normalized
+    // form (Codex: two legitimate revisions "x-gzip" and "x" would alias
+    // onto one baseline and let CAS silently overwrite an unseen
+    // revision). The Apache content-coding workaround lives in the push
+    // path's proven 412 retry instead.
+    return { ok: true, data, etag: pbpWebdavResponseEtag(resp) };
   } catch (e) {
     return { ok: false, error: (e && e.message) || "network" };
   }

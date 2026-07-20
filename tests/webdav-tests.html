@@ -439,6 +439,44 @@ async function runChromeLayerTests() {
     check("force push succeeds and ignores the stored stale baseline", forced.ok === true);
     check("force push sends NO preconditions (plain overwrite, recreates a deleted file too)",
       !("If-Match" in forcePutHeaders) && !("If-None-Match" in forcePutHeaders));
+    const forcedRev = await pbpWebdavReadRevision({ baseUrl: "https://dav.example.com/backups/", user: "" });
+    check("force success reseeds the baseline (known-exists when the PUT returns no etag)",
+      forcedRev.known === true);
+    delete localArea[PBP_WEBDAV_ETAG_STATE_KEY];
+
+    // Alias-safe Apache workaround: a suffixed baseline 412s; a fresh GET
+    // proving the byte-identical suffixed etag authorizes ONE de-suffixed
+    // retry. A different GET etag keeps the genuine conflict.
+    localArea[PBP_WEBDAV_ETAG_STATE_KEY] = {
+      target: obfuscateKey(pbpWebdavFileUrl("https://dav.example.com/backups/")),
+      user: obfuscateKey(""),
+      etag: '"x-gzip"',
+    };
+    const healSeq = [];
+    globalThis.fetch = (_url, opts) => {
+      healSeq.push({ method: opts.method, ifMatch: (opts.headers || {})["If-Match"] || "" });
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
+      if (opts.method === "GET") return Promise.resolve({ ok: true, status: 200, headers: { get: (h) => /etag/i.test(h) ? '"x-gzip"' : null } });
+      if ((opts.headers || {})["If-Match"] === '"x-gzip"') return Promise.resolve({ ok: false, status: 412 });
+      return Promise.resolve({ ok: true, status: 200 });
+    };
+    const healed = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "" });
+    check("suffixed-baseline 412 heals via the proven de-suffixed retry (pull->push loop fix)", healed.ok === true);
+    check("healing sequence = conditional PUT, verifying GET, entity-tag PUT",
+      healSeq.map((s) => s.method).join(",") === "PROPFIND,PUT,GET,PUT" &&
+      healSeq[1].ifMatch === '"x-gzip"' && healSeq[3].ifMatch === '"x"');
+    localArea[PBP_WEBDAV_ETAG_STATE_KEY] = {
+      target: obfuscateKey(pbpWebdavFileUrl("https://dav.example.com/backups/")),
+      user: obfuscateKey(""),
+      etag: '"y-gzip"',
+    };
+    globalThis.fetch = (_url, opts) => {
+      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
+      if (opts.method === "GET") return Promise.resolve({ ok: true, status: 200, headers: { get: (h) => /etag/i.test(h) ? '"other"' : null } });
+      return Promise.resolve({ ok: false, status: 412 });
+    };
+    const realConflict = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "" });
+    check("a changed remote etag keeps the genuine conflict - no blind retry", realConflict.error === "conflict");
     delete localArea[PBP_WEBDAV_ETAG_STATE_KEY];
     globalThis.fetch = () => Promise.resolve({ ok: false, status: 404 });
     const missing = await pbpWebdavPush({ baseUrl: "https://dav.example.com/missing/", user: "", pass: "", includeHighlights: false });
