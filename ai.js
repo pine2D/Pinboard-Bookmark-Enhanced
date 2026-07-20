@@ -869,6 +869,21 @@ function aiSummaryLangInstruction(s) {
 }
 
 // ---- Prompt builders (no DOM dependency) ----
+// Content window for the tag/summary/combined prompts (campaign S3).
+// The old cap kept only the FIRST 4000 chars - pure lead bias with the
+// conclusion physically deleted. Same total budget, split head+tail: the
+// head carries the framing/purpose the recall-note style leans on, the
+// tail adds the conclusion Defuddle-extracted articles end with (long
+// posts often state what a thing IS FOR at the end). Experimental:
+// head+tail over head-only at this size is inference, not measurement.
+const AI_CONTENT_HEAD = 3200;
+const AI_CONTENT_TAIL = 800;
+function _aiContentWindow(content) {
+  const text = String(content || "");
+  if (text.length <= AI_CONTENT_HEAD + AI_CONTENT_TAIL) return text;
+  return text.slice(0, AI_CONTENT_HEAD) + "\n[...]\n" + text.slice(text.length - AI_CONTENT_TAIL);
+}
+
 // Single-pass template fill: sequential .replace() calls re-scanned the
 // WHOLE prompt after each substitution, so a page value containing a later
 // placeholder was expanded too (title "literal {{content}}" became the
@@ -896,7 +911,7 @@ function buildTagPrompt(s, title, url, content, description, userTags) {
     separator_instruction: TAG_SEP_MAP[sep] || TAG_SEP_MAP["-"],
     title: title || "",
     url: url || "",
-    content: (content || "").substring(0, 4000),
+    content: _aiContentWindow(content),
     description: description || "",
   });
   if (userTags && userTags.length > 0) {
@@ -911,7 +926,7 @@ function buildSummaryPrompt(s, title, url, content, description) {
     lang_instruction: aiSummaryLangInstruction(s),
     title: title || "",
     url: url || "",
-    content: (content || "").substring(0, 4000),
+    content: _aiContentWindow(content),
     description: description || "",
   });
 }
@@ -933,7 +948,7 @@ Format: {"summary":"...","tags":["tag1","tag2"]}`;
   prompt = _aiFillTemplate(prompt, {
     title: title || "",
     url: url || "",
-    content: (content || "").substring(0, 4000),
+    content: _aiContentWindow(content),
   });
   if (userTags && userTags.length > 0) {
     prompt += `\n\n${AI_TAG_REUSE_LINE}${userTags.slice(0, 50).join(", ")}`;

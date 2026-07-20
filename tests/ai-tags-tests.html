@@ -278,11 +278,20 @@ suite("buildCombinedPrompt", () => {
     assert(p.indexOf("underscores") !== -1, "separator wording");
     assert(/\{"summary":"\.\.\.","tags":\[/.test(p), "output shape shown");
   });
-  test("content capped to 4000 and title is $-safe", () => {
-    const p = buildCombinedPrompt({ aiTagLang: "en" }, "A$1B", "u", "x".repeat(5000), "", []);
+  test("content windowed to head+tail within the same budget; title is $-safe (S3)", () => {
+    const body = "H".repeat(3300) + "M".repeat(2000) + "T".repeat(900);
+    const p = buildCombinedPrompt({ aiTagLang: "en" }, "A$1B", "u", body, "", []);
     assert(p.indexOf("A$1B") !== -1, "title verbatim incl $1");
-    assert(p.indexOf("x".repeat(4000)) !== -1, "4000 present");
-    assert(p.indexOf("x".repeat(4001)) === -1, "not 4001");
+    assert(p.indexOf("H".repeat(3200)) !== -1, "head kept");
+    assert(p.indexOf("H".repeat(3201)) === -1, "head capped at 3200");
+    assert(p.indexOf("T".repeat(800)) !== -1, "tail kept");
+    assert(p.indexOf("M".repeat(100)) === -1, "middle cut");
+    assert(p.indexOf("\n[...]\n") !== -1, "cut marker present");
+  });
+  test("short content passes through the window untouched (S3)", () => {
+    assertEq(_aiContentWindow("short body"), "short body", "no marker for short content");
+    assertEq(_aiContentWindow("y".repeat(4000)), "y".repeat(4000), "exactly at budget untouched");
+    assertEq(_aiContentWindow(null), "", "null tolerated");
   });
   test("appends existing-tags line only when userTags present", () => {
     assert(buildCombinedPrompt({}, "t", "u", "c", "", ["a"]).includes(AI_TAG_REUSE_LINE), "present");
