@@ -21,6 +21,8 @@
 - **快捷鍵直接儲存**：無需打開彈出視窗；也可以一次儲存所有已打開的分頁
 - **離線也能儲存**：內容先進入本機佇列，重新連線後自動重試
 
+![一鍵儲存，AI 產生標籤與摘要](docs/cws-assets/originals/screenshot-1-save.png)
+
 ### 標籤
 - **AI 產生標籤與摘要**：讀取去除廣告、選單與側欄後的文章正文；自備 API key，支援 13 家服務商或任何 OpenAI 兼容端點
 - **標籤自動完成**：你的歷史標籤、Pinboard 建議標籤、一按即用的預設
@@ -32,11 +34,17 @@
 - **整頁翻譯，或向文章提問**：支援雙語對照；答案附帶引註，一按即跳回原文出處
 - **傳送或下載**：傳送至 [Obsidian](https://obsidian.md)、GitHub Gist 或任何 webhook；也可下載為 `.md`、`.html`、`.epub`，在電子書閱讀器上閱讀
 
+![清爽閱讀器：雙語對照、五色高亮與筆記](docs/cws-assets/originals/screenshot-2-reader.png)
+
+![向文章提問，答案附帶引註](docs/cws-assets/originals/screenshot-3-ask.png)
+
 ### 個人化
 - **13 套 pinboard.in 佈景主題**（Dracula、Nord、Catppuccin、Solarized 等），更可疊加自訂 CSS
 - **自動存檔至 [Wayback Machine](https://web.archive.org)**：可選擇每次儲存時一併提交；原連結失效後仍可尋回網頁
 - **設定備份**：匯出為檔案，或自動備份至自己的 WebDAV
 - **9 種語言**、可自訂快捷鍵、本機優先儲存、零追蹤
+
+![13 套 pinboard.in 佈景主題](docs/cws-assets/originals/screenshot-4-themes.png)
 
 ## 安裝
 

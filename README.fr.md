@@ -21,6 +21,8 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 - **Enregistrement au raccourci clavier** : sans ouvrir la fenêtre ; ou enregistrez d'un coup tous les onglets ouverts
 - **Fonctionne hors ligne** : les enregistrements passent par une file locale et sont renvoyés au retour de la connexion
 
+![Enregistrement en un clic avec étiquettes et résumé par IA](docs/cws-assets/originals/screenshot-1-save.png)
+
 ### Étiquettes
 - **Étiquettes et résumé par IA** : l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 13 fournisseurs ou tout point d'accès compatible OpenAI
 - **Autocomplétion** : à partir de vos étiquettes, des suggestions Pinboard et de préréglages en un clic
@@ -32,11 +34,17 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 - **Traduisez la page ou posez-lui vos questions** : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
 - **Envoyer ou télécharger** : vers [Obsidian](https://obsidian.md), un Gist GitHub ou n'importe quel webhook ; ou en `.md`, `.html`, `.epub` pour votre liseuse
 
+![Lecture claire avec traduction bilingue et surlignages](docs/cws-assets/originals/screenshot-2-reader.png)
+
+![Posez vos questions à la page, les réponses citent la source](docs/cws-assets/originals/screenshot-3-ask.png)
+
 ### Personnalisation
 - **13 thèmes pour pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus votre CSS personnalisé
 - **Archivage automatique dans la [Wayback Machine](https://web.archive.org)** : à chaque enregistrement si vous le souhaitez ; les pages restent accessibles même quand le lien d'origine disparaît
 - **Sauvegarde des réglages** : export dans un fichier, ou sauvegarde automatique vers votre propre serveur WebDAV
 - **9 langues** · raccourcis configurables · stockage local en priorité · aucun pistage
+
+![13 thèmes pour pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
 
 ## Installation
 

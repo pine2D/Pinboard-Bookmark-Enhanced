@@ -21,6 +21,8 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 - **Save by hotkey**: skip the popup entirely, or batch-save every open tab at once
 - **Works offline**: saves are queued locally and retried when you're back online
 
+![One-click save with AI tags and summary](docs/cws-assets/originals/screenshot-1-save.png)
+
 ### Tag
 - **AI tags & summary**: the AI reads the article body with ads, menus, and sidebars stripped out; bring your own key (13 providers, or any OpenAI-compatible endpoint)
 - **Autocomplete** from your own tags, Pinboard's suggested tags, and one-tap presets
@@ -32,11 +34,17 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 - **Translate the page or ask it questions**: full-page translation with a bilingual view; answers cite the source and jump straight to it
 - **Send or download**: send to [Obsidian](https://obsidian.md), a GitHub Gist, or any webhook; download as `.md`, `.html`, or `.epub` for your e-reader
 
+![Reader with bilingual translation and highlights](docs/cws-assets/originals/screenshot-2-reader.png)
+
+![Ask the page and get cited answers](docs/cws-assets/originals/screenshot-3-ask.png)
+
 ### Make Pinboard yours
 - **13 themes for pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus your own custom CSS
 - **Auto-archive to the [Wayback Machine](https://web.archive.org)**: optionally submit every save, so pages stay reachable after the original link dies
 - **Settings backup**: export to a file, or auto-back-up to your own WebDAV server
 - **9 languages** · configurable shortcuts · local-first storage · zero tracking
+
+![13 themes for pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
 
 ## Install
 

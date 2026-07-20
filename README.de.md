@@ -21,6 +21,8 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): AI-Tags und Zusamm
 - **Per Tastenkürzel speichern** – ohne das Popup zu öffnen; auf Wunsch alle offenen Tabs auf einmal
 - **Funktioniert auch offline** – Speicherungen landen in einer lokalen Warteschlange und werden nach der Wiederverbindung erneut übertragen
 
+![Speichern mit einem Klick, AI-Tags und Zusammenfassung](docs/cws-assets/originals/screenshot-1-save.png)
+
 ### Tags
 - **AI-Tags und Zusammenfassung** – gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 13 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
 - **Autovervollständigung** – aus deinen Tags, Pinboards Vorschlägen und Ein-Klick-Voreinstellungen
@@ -32,11 +34,17 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): AI-Tags und Zusamm
 - **Seite übersetzen oder befragen** – Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle und springen direkt dorthin
 - **Senden oder herunterladen** – an [Obsidian](https://obsidian.md), ein GitHub Gist oder einen beliebigen Webhook senden; als `.md`, `.html` oder `.epub` für den E-Reader herunterladen
 
+![Leseansicht mit zweisprachiger Übersetzung und Markierungen](docs/cws-assets/originals/screenshot-2-reader.png)
+
+![Die Seite befragen, Antworten zitieren die Quelle](docs/cws-assets/originals/screenshot-3-ask.png)
+
 ### Pinboard nach deinem Geschmack
 - **13 Themes für pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus dein eigenes CSS
 - **Automatisch in die [Wayback Machine](https://web.archive.org) archivieren** – auf Wunsch bei jedem Speichern; Seiten bleiben erreichbar, auch wenn der Originallink tot ist
 - **Einstellungen sichern** – als Datei exportieren oder automatisch auf den eigenen WebDAV-Server
 - **9 Sprachen** · anpassbare Tastenkürzel · Speicherung primär lokal · kein Tracking
+
+![13 Themes für pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
 
 ## Installation
 

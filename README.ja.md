@@ -21,6 +21,8 @@
 - **ショートカットで直接保存**：ポップアップを開かずに保存でき、開いているタブの一括保存にも対応します
 - **オフラインでも保存**：いったんローカルキューに入り、再接続後に自動で再試行します
 
+![ワンクリック保存、AI タグと要約](docs/cws-assets/originals/screenshot-1-save.png)
+
 ### タグ
 - **AI タグ・要約**：広告・メニュー・サイドバーを除いた記事本文だけを読み取ります。自前の API キーで 13 のプロバイダー、または任意の OpenAI 互換エンドポイントに対応
 - **タグ補完**：自分のタグ、Pinboard のおすすめタグ、ワンタップのプリセットから入力できます
@@ -32,11 +34,17 @@
 - **ページ全体の翻訳と、ページへの質問**：対訳表示に対応。回答には出典への引用が付き、クリックで該当箇所へジャンプします
 - **送信もダウンロードも**：[Obsidian](https://obsidian.md)・GitHub Gist・任意の webhook へ送信でき、`.md`・`.html`・`.epub` としてダウンロードして電子書籍リーダーでも読めます
 
+![リーダー：対訳表示とハイライト](docs/cws-assets/originals/screenshot-2-reader.png)
+
+![ページへの質問、回答には出典引用付き](docs/cws-assets/originals/screenshot-3-ask.png)
+
 ### カスタマイズ
 - **pinboard.in 用テーマ 13 種**（Dracula、Nord、Catppuccin、Solarized など）+ 独自のカスタム CSS
 - **[Wayback Machine](https://web.archive.org) へ自動アーカイブ**：保存のたびに自動送信するよう選べます。元のページが消えても、あとから参照できます
 - **設定のバックアップ**：ファイルへのエクスポート、または自分の WebDAV サーバーへの自動バックアップ
 - **9 言語対応** · カスタマイズ可能なショートカット · ローカルファースト保存 · トラッキング一切なし
+
+![pinboard.in 用テーマ 13 種](docs/cws-assets/originals/screenshot-4-themes.png)
 
 ## インストール
 

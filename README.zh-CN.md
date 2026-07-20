@@ -21,6 +21,8 @@
 - **快捷键直接保存**：无需打开弹窗；也可以一次保存所有打开的标签页
 - **断网也能保存**：内容先进入本地队列，恢复联网后自动重试
 
+![一键保存，AI 生成标签和摘要](docs/cws-assets/originals/screenshot-1-save.png)
+
 ### 标签
 - **AI 生成标签和摘要**：读取去除广告、菜单与侧边栏后的文章正文；自备 API key，支持 13 家服务商或任意 OpenAI 兼容接口
 - **标签自动补全**：历史标签、Pinboard 建议标签、一键预设
@@ -32,11 +34,17 @@
 - **整页翻译，或向文章提问**：支持双语对照；回答附带引用，点击即可跳到原文出处
 - **发送或下载**：发送到 [Obsidian](https://obsidian.md)、GitHub Gist 或任意 webhook；也可下载 `.md`、`.html`、`.epub`，供电子书阅读器使用
 
+![清爽阅读器：双语对照、五色高亮与笔记](docs/cws-assets/originals/screenshot-2-reader.png)
+
+![向文章提问，回答附带引用](docs/cws-assets/originals/screenshot-3-ask.png)
+
 ### 个性化
 - **13 套 pinboard.in 主题**（Dracula、Nord、Catppuccin、Solarized 等），支持叠加自定义 CSS
 - **自动存档到 [Wayback Machine](https://web.archive.org)**：可选择每次保存时同步提交；原链接失效后仍能找回网页
 - **设置备份**：导出为文件，或自动备份到自己的 WebDAV
 - **9 种语言**、可自定义快捷键、本地优先存储、零追踪
+
+![13 套 pinboard.in 主题](docs/cws-assets/originals/screenshot-4-themes.png)
 
 ## 安装
 

@@ -21,6 +21,8 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 - **Zapis skrótem klawiszowym** — bez otwierania okienka; można też zapisać naraz wszystkie otwarte karty
 - **Działa offline** — zapisy trafiają do lokalnej kolejki i są ponawiane po odzyskaniu połączenia
 
+![Zapis jednym kliknięciem, tagi i streszczenie od AI](docs/cws-assets/originals/screenshot-1-save.png)
+
 ### Tagi
 - **Tagi i streszczenie od AI** — AI czyta treść artykułu bez reklam, menu i pasków bocznych; własny klucz API, 13 dostawców lub dowolny endpoint zgodny z OpenAI
 - **Autouzupełnianie** — z twoich tagów, podpowiedzi Pinboarda i gotowych zestawów na jedno kliknięcie
@@ -32,11 +34,17 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 - **Przetłumacz stronę albo zadaj jej pytanie** — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
 - **Wyślij albo pobierz** — do [Obsidiana](https://obsidian.md), GitHub Gist lub dowolnego webhooka; albo jako `.md`, `.html`, `.epub` na czytnik e-booków
 
+![Czytelny widok z tłumaczeniem dwujęzycznym i zakreśleniami](docs/cws-assets/originals/screenshot-2-reader.png)
+
+![Zadaj stronie pytanie — odpowiedzi cytują źródło](docs/cws-assets/originals/screenshot-3-ask.png)
+
 ### Personalizacja
 - **13 motywów dla pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus własny CSS
 - **Automatyczna archiwizacja w [Wayback Machine](https://web.archive.org)** — opcjonalnie przy każdym zapisie; strony pozostają dostępne, nawet gdy oryginalny link przestanie działać
 - **Kopia ustawień** — eksport do pliku albo automatyczny backup na własny serwer WebDAV
 - **9 języków** · konfigurowalne skróty · pamięć lokalna w pierwszej kolejności · zero śledzenia
+
+![13 motywów dla pinboard.in](docs/cws-assets/originals/screenshot-4-themes.png)
 
 ## Instalacja
 
