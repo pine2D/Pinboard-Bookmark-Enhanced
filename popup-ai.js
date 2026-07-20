@@ -11,6 +11,14 @@ function pbpPopupAiAccount() {
   return pbpPinboardAccountFromToken(settings?.pinboardToken);
 }
 
+// WONTFIX (audit L14, documented): this guard compares against the
+// popup's in-memory settings snapshot, so an EXTERNAL credential change
+// (sync from another device, options page in another window) while the
+// popup is held open is not observed - stale ops can keep updating this
+// popup's UI. Popup lifetimes are seconds; the save path re-reads
+// credentials atomically (submitSaveIntent expectedAccount) and fails
+// closed, so nothing crosses accounts at rest. A storage listener that
+// invalidates the session was judged over-engineering for that window.
 function pbpPopupAiAccountIsCurrent(account) {
   return !!account && pbpPopupAiAccount() === account;
 }
@@ -61,15 +69,16 @@ function clearAiProgress(buttonId) {
 // ---- Enrich page content via Jina Reader if configured ----
 // Populate pageInfo.pageText on demand. Avoids Defuddle injection on popup boot — the
 // content script for AI quality is only fetched when the user actually invokes AI.
-async function ensurePageText() {
+async function ensurePageText(s) {
+  s = s || settings;
   if (pageInfo.pageText) return; // already populated (cache from earlier AI call this session)
-  if (settings.aiContentSource === "jina") {
+  if (s.aiContentSource === "jina") {
     // Throws only on host_permission (surface the grant flow); any other
     // failure leaves pageText empty and falls through to local Defuddle
     // below. The old code returned unconditionally here - its warn log
     // claimed "using local content" while nobody ever ran the local
     // extractor (audit A9).
-    await enrichPageTextIfJina();
+    await enrichPageTextIfJina(s);
     if (pageInfo.pageText) return;
   }
   // Local source: lazy-inject Defuddle and pull full page text
@@ -81,17 +90,18 @@ async function ensurePageText() {
   } catch (_) { /* tab gone / inject failed — pageText stays empty, caller will surface aiNoContent */ }
 }
 
-async function enrichPageTextIfJina() {
-  if (settings.aiContentSource !== "jina") return;
+async function enrichPageTextIfJina(s) {
+  s = s || settings;
+  if (s.aiContentSource !== "jina") return;
   if (!pageInfo?.url) return;
   try {
-    const jinaKey = settings.jinaApiKey ? deobfuscateKey(settings.jinaApiKey) : "";
+    const jinaKey = s.jinaApiKey ? deobfuscateKey(s.jinaApiKey) : "";
     const result = await fetchJinaMarkdown(pageInfo.url, {
       apiKey: jinaKey,
-      cacheDuration: settings.aiCacheDuration
+      cacheDuration: s.aiCacheDuration
     });
     if (result.code === "host_permission") {
-      const origins = _aiRequiredOriginPatterns(settings, [PBP_JINA_ORIGIN_PATTERN]);
+      const origins = _aiRequiredOriginPatterns(s, [PBP_JINA_ORIGIN_PATTERN]);
       const hosts = origins
         .map(pattern => pattern.replace(/\/\*$/, "")).join(", ");
       const err = new Error(t("aiErrorHostPermission", hosts));
@@ -144,16 +154,20 @@ function pickFallbackProvider(s) {
   return null;
 }
 
-function showAIError(op, err) {
+function showAIError(op, err, opSettings) {
+  // opSettings = the immutable snapshot the failed op actually ran with
+  // (audit A4): the error card must describe the provider that failed,
+  // not whatever the global settings hold by the time it renders.
+  const s = opSettings || settings;
   _aiErrorLastOp = op;
   _aiErrorLastPermission = err?.code === "host_permission" ? {
-    settings: { ...settings },
+    settings: { ...s },
     stage: err.permissionStage,
-    origins: [...(err.permissionOrigins || _aiRequiredOriginPatterns(settings))],
+    origins: [...(err.permissionOrigins || _aiRequiredOriginPatterns(s))],
   } : null;
   const card = $id("ai-error-card");
   if (!card) return;
-  const providerKey = (settings.aiProvider || "openai");
+  const providerKey = (s.aiProvider || "openai");
   const provLabel = AI_PROVIDER_LABEL[providerKey] || providerKey;
   $id("ai-error-title").textContent = t("aiErrorTitle", op === "tags" ? t("aiErrorOpTags") : t("aiErrorOpSummary"));
   const msgEl = $id("ai-error-message");
@@ -226,14 +240,15 @@ function setupAIFeatures() {
         if (!granted) return;
       }
       hideAIError();
-      const originalProvider = settings.aiProvider;
-      if (recovery) settings.aiProvider = recovery.settings.aiProvider;
-      try {
-        if (op === "tags") await doAITags(true);
-        else if (op === "summary") await doAISummary(true);
-      } finally {
-        settings.aiProvider = originalProvider;
-      }
+      // Immutable per-op snapshot (audit A4): the old code mutated the
+      // GLOBAL settings.aiProvider for the await's duration, so a
+      // concurrent tags/summary op could read the wrong provider
+      // mid-flight and the interleaved finally could restore a stale one.
+      const opSettings = recovery
+        ? { ...settings, aiProvider: recovery.settings.aiProvider }
+        : undefined;
+      if (op === "tags") await doAITags(true, opSettings);
+      else if (op === "summary") await doAISummary(true, opSettings);
     } finally {
       retryBtn.disabled = false;
     }
@@ -242,17 +257,13 @@ function setupAIFeatures() {
     const next = e.currentTarget.dataset.provider;
     const op = _aiErrorLastOp;
     if (!next || !op) return;
-    // One-shot override: swap provider, run op, restore. Don't persist —
-    // user may want their default to remain (e.g., Gemini quota resets next day).
-    const original = settings.aiProvider;
-    settings.aiProvider = next;
+    // One-shot override via an immutable snapshot (audit A4) — never by
+    // mutating the global settings: a concurrent op would read the swapped
+    // provider mid-flight. Nothing to restore; the global stays untouched.
     hideAIError();
-    try {
-      if (op === "tags") await doAITags(true);
-      else if (op === "summary") await doAISummary(true);
-    } finally {
-      settings.aiProvider = original;
-    }
+    const opSettings = { ...settings, aiProvider: next };
+    if (op === "tags") await doAITags(true, opSettings);
+    else if (op === "summary") await doAISummary(true, opSettings);
   });
   $id("ai-error-details-toggle")?.addEventListener("click", (e) => {
     e.preventDefault();
@@ -357,17 +368,20 @@ function showSetKeyError() {
 }
 
 // Apply optional case-resolution to AI tags (mirrors the prior inline doAITags logic).
-function finalizeAITags(rawTags) {
-  return settings.optRespectTagCase ? rawTags.map(t => resolveTagCase(t, tagCaseMap)) : rawTags;
+function finalizeAITags(rawTags, s) {
+  return (s || settings).optRespectTagCase ? rawTags.map(t => resolveTagCase(t, tagCaseMap)) : rawTags;
 }
 
 // Fetch one AI artifact ("summary" | "tags") for the current page (cache-miss path only).
 // If the OTHER artifact is also missing, issue ONE combined call and cache the other
 // half so its later click is an instant, zero-extra-body-token cache hit. forceRefresh
 // (regenerate) always does a single dedicated call. Combined failure -> single fallback.
-async function fetchAIArtifacts(kind, forceRefresh, account) {
+// `s` = the caller's immutable settings snapshot (audit A4): every read
+// below sees one consistent provider/model/lang for the op's whole life.
+async function fetchAIArtifacts(kind, forceRefresh, account, s) {
+  s = s || settings;
   const url = pageInfo.url;
-  const provider = settings.aiProvider;
+  const provider = s.aiProvider;
   const otherKind = kind === "summary" ? "tags" : "summary";
   const combinedKey = `${account}|${provider}|combined|${url}`;
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
@@ -375,11 +389,11 @@ async function fetchAIArtifacts(kind, forceRefresh, account) {
   const callSingle = () => {
     if (kind === "summary") {
       return getOrCreateInflight(`${account}|${provider}|summary|${url}`, () =>
-        callAI(settings, buildSummaryPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value)));
+        callAI(s, buildSummaryPrompt(s, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value)));
     }
     return getOrCreateInflight(`${account}|${provider}|tags|${url}`, async () => {
-      const resp = await callAI(settings, buildTagPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
-      return finalizeAITags(refineTags(parseAITags(resp, settings.aiTagSeparator), { cap: AI_TAG_CAP, separator: settings.aiTagSeparator }));
+      const resp = await callAI(s, buildTagPrompt(s, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
+      return finalizeAITags(refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator }), s);
     });
   };
 
@@ -387,14 +401,14 @@ async function fetchAIArtifacts(kind, forceRefresh, account) {
 
   // Custom-prompt users keep their own templates -> never use the combined prompt
   // (it uses TAG_GUIDANCE, not customTagPrompt/customSummaryPrompt). Global Constraint.
-  if (settings.customTagPrompt?.trim() || settings.customSummaryPrompt?.trim()) return callSingle();
+  if (s.customTagPrompt?.trim() || s.customSummaryPrompt?.trim()) return callSingle();
 
   // A8: a combined reply may come back half-empty ({"summary":"ok",
   // "tags":[]}) - the parser deliberately tolerates that so the GOOD half
   // survives, but the requester of the EMPTY half must treat it as a
   // miss, not render/cache an empty artifact as success.
   const halfOf = (both, which) => which === "tags"
-    ? (both.tags && both.tags.length ? finalizeAITags(both.tags) : null)
+    ? (both.tags && both.tags.length ? finalizeAITags(both.tags, s) : null)
     : (both.summary ? both.summary : null);
 
   // Ride an in-flight combined call if one is already running. If that call
@@ -413,7 +427,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account) {
   }
 
   // If the other half is already cached, only the requested half is missing.
-  const otherCached = await getAICache(url, otherKind, settings.aiCacheDuration, settings.aiContentSource, account);
+  const otherCached = await getAICache(url, otherKind, s.aiCacheDuration, s.aiContentSource, account);
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
   if (otherCached != null) return callSingle();
 
@@ -421,8 +435,8 @@ async function fetchAIArtifacts(kind, forceRefresh, account) {
   let both = null;
   try {
     both = await getOrCreateInflight(combinedKey, async () => {
-      const resp = await callAI(settings, buildCombinedPrompt(settings, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
-      return parseAICombined(resp, settings.aiTagSeparator);
+      const resp = await callAI(s, buildCombinedPrompt(s, $id("title-input").value, $id("url-input").value, pageInfo.pageText, $id("description-input").value, allUserTags));
+      return parseAICombined(resp, s.aiTagSeparator);
     });
   } catch (e) {
     both = null;
@@ -435,7 +449,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account) {
   // a malformed half into a sticky fake success (A8).
   const otherVal = halfOf(both, otherKind);
   if (otherVal != null && pbpPopupAiAccountIsCurrent(account)) {
-    await setAICache(url, otherKind, otherVal, settings.aiCacheDuration, settings.aiContentSource, account);
+    await setAICache(url, otherKind, otherVal, s.aiCacheDuration, s.aiContentSource, account);
   }
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
   // Empty requested half = miss -> dedicated single call (A8).
@@ -444,15 +458,19 @@ async function fetchAIArtifacts(kind, forceRefresh, account) {
 }
 
 // ---- AI Summary core logic ----
-async function doAISummary(forceRefresh) {
+// sOverride (audit A4): optional immutable settings snapshot (fallback/
+// retry provider swaps). The op freezes its own copy up front - every
+// read across the awaits below sees one consistent configuration.
+async function doAISummary(forceRefresh, sOverride) {
   const btn = $id("ai-summary-btn");
+  const s = { ...(sOverride || settings) };
   const account = pbpPopupAiAccount();
   if (!account) return;
-  if (!hasAIKey(settings)) { showSetKeyError(); return; }
+  if (!hasAIKey(s)) { showSetKeyError(); return; }
   hideAIError();
 
   if (!forceRefresh) {
-    const cached = await getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource, account);
+    const cached = await getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account);
     if (cached && pbpPopupAiAccountIsCurrent(account)) {
       upsertSummary(cached);
       showSummaryActions(true);
@@ -465,15 +483,15 @@ async function doAISummary(forceRefresh) {
     btn.classList.add("loading");
   }
   try {
-    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "extracting" });
-    await ensurePageText();
+    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "extracting" });
+    await ensurePageText(s);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
-    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "calling" });
-    const summary = await fetchAIArtifacts("summary", forceRefresh, account);
+    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "calling" });
+    const summary = await fetchAIArtifacts("summary", forceRefresh, account, s);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
-    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: settings.aiProvider, stage: "parsing" });
-    await setAICache(pageInfo.url, "summary", summary, settings.aiCacheDuration, settings.aiContentSource, account);
+    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "parsing" });
+    await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     upsertSummary(summary);
     showSummaryActions(false);
@@ -482,9 +500,9 @@ async function doAISummary(forceRefresh) {
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (e?.code === "host_permission" && !e.permissionOrigins) {
       e.permissionStage = "calling";
-      e.permissionOrigins = _aiRequiredOriginPatterns(settings);
+      e.permissionOrigins = _aiRequiredOriginPatterns(s);
     }
-    showAIError("summary", e);
+    showAIError("summary", e, s);
     if (forceRefresh) showSummaryActions(false);
   } finally {
     if (showProgressOnBtn && pbpPopupAiAccountIsCurrent(account)) {
@@ -548,17 +566,19 @@ function showSummaryActions(fromCache) {
 }
 
 // ---- AI Tags core logic ----
-async function doAITags(forceRefresh) {
+// sOverride: same immutable-snapshot contract as doAISummary (audit A4).
+async function doAITags(forceRefresh, sOverride) {
   const btn = $id("ai-tags-btn");
   const container = $id("ai-suggest-tags");
+  const s = { ...(sOverride || settings) };
   const account = pbpPopupAiAccount();
   if (!account) return;
   hideAIError();
 
-  if (!hasAIKey(settings)) { showSetKeyError(); return; }
+  if (!hasAIKey(s)) { showSetKeyError(); return; }
 
   if (!forceRefresh) {
-    const cached = await getAICache(pageInfo.url, "tags", settings.aiCacheDuration, settings.aiContentSource, account);
+    const cached = await getAICache(pageInfo.url, "tags", s.aiCacheDuration, s.aiContentSource, account);
     if (cached && pbpPopupAiAccountIsCurrent(account)) {
       renderAITags(cached, true);
       return;
@@ -573,15 +593,15 @@ async function doAITags(forceRefresh) {
   }
 
   try {
-    if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "extracting" });
-    await ensurePageText();
+    if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "extracting" });
+    await ensurePageText(s);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
-    if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "calling" });
-    const tags = await fetchAIArtifacts("tags", forceRefresh, account);
+    if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "calling" });
+    const tags = await fetchAIArtifacts("tags", forceRefresh, account, s);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
-    if (btn) setAiProgress("ai-tags-btn", { provider: settings.aiProvider, stage: "parsing" });
-    await setAICache(pageInfo.url, "tags", tags, settings.aiCacheDuration, settings.aiContentSource, account);
+    if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "parsing" });
+    await setAICache(pageInfo.url, "tags", tags, s.aiCacheDuration, s.aiContentSource, account);
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     renderAITags(tags, false);
     if (forceRefresh) {
@@ -591,12 +611,12 @@ async function doAITags(forceRefresh) {
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (e?.code === "host_permission" && !e.permissionOrigins) {
       e.permissionStage = "calling";
-      e.permissionOrigins = _aiRequiredOriginPatterns(settings);
+      e.permissionOrigins = _aiRequiredOriginPatterns(s);
     }
     container.textContent = "";
     container.classList.add("muted");
     pbpAssignAltNumBadges(); // AI chips gone: re-slot so suggest-row digits/hint stay truthful
-    showAIError("tags", e);
+    showAIError("tags", e, s);
   } finally {
     if (btn && pbpPopupAiAccountIsCurrent(account)) {
       clearAiProgress("ai-tags-btn");
