@@ -150,10 +150,29 @@ function pbpAiSyncUrlEditState() {
 // description (audit A2). checkExistingBookmark nulls .promise once it
 // lands, so this is a no-op when the lookup already settled; the promise
 // resolves status objects and never rejects, catch is belt-and-braces.
+// Bounded re-await (Codex round 2, H1): a forceFresh lookup can REPLACE
+// the promise while we wait - keep settling the current one instead of
+// proceeding on a stale completion.
 async function _aiAwaitBookmarkLookup() {
   try {
-    if (typeof bookmarkLookup !== "undefined" && bookmarkLookup?.promise) await bookmarkLookup.promise;
+    for (let i = 0; i < 5; i++) {
+      const p = (typeof bookmarkLookup !== "undefined") ? bookmarkLookup?.promise : null;
+      if (!p) return;
+      await p;
+      const cur = (typeof bookmarkLookup !== "undefined") ? bookmarkLookup?.promise : null;
+      if (cur === p || !cur) return;
+    }
   } catch (_) {}
+}
+
+// Op-liveness guard for every post-await UI/cache commit (Codex round 2,
+// H1): the account can drift AND the URL field can be edited away from
+// the opened page while an op is mid-flight - either way the op's result
+// no longer belongs to what the form will save. Cache writes keyed by
+// pageInfo.url stay legitimate either way; only the FORM commits gate.
+function _aiOpStillCurrent(account) {
+  return pbpPopupAiAccountIsCurrent(account)
+    && _aiUrlEquivalent($id("url-input").value, pageInfo.url);
 }
 
 const AI_SUMMARY_TAG = "[AI Summary]";
@@ -327,7 +346,7 @@ function setupAIFeatures() {
     // does not mark the field dirty). Settle the lookup FIRST; the guard
     // below then sees the real existingBookmark/description state.
     await _aiAwaitBookmarkLookup();
-    if (pbpPopupAiAccountIsCurrent(restoreAccount)
+    if (_aiOpStillCurrent(restoreAccount)
         && pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
       upsertSummary(cached);
       showSummaryActions(true);
@@ -522,11 +541,11 @@ async function doAISummary(forceRefresh, sOverride) {
   // lands - a summary inserted before that gets clobbered (paid result
   // lost, regenerate/remove bar stranded over nothing).
   await _aiAwaitBookmarkLookup();
-  if (!pbpPopupAiAccountIsCurrent(account)) return;
+  if (!_aiOpStillCurrent(account)) return;
 
   if (!forceRefresh) {
     const cached = await getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account, s);
-    if (cached && pbpPopupAiAccountIsCurrent(account)) {
+    if (cached && _aiOpStillCurrent(account)) {
       upsertSummary(cached);
       showSummaryActions(true);
       return;
@@ -540,19 +559,22 @@ async function doAISummary(forceRefresh, sOverride) {
   try {
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "extracting" });
     await ensurePageText(s);
-    if (!pbpPopupAiAccountIsCurrent(account)) return;
+    if (!_aiOpStillCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "calling" });
     const summary = await fetchAIArtifacts("summary", forceRefresh, account, s);
+    // account-only here: the result belongs to pageInfo.url and SHOULD be
+    // cached even if the URL field drifted; the stillCurrent gate below
+    // protects the form commit.
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "parsing" });
     await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account, s);
-    if (!pbpPopupAiAccountIsCurrent(account)) return;
+    if (!_aiOpStillCurrent(account)) return;
     upsertSummary(summary);
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
   } catch (e) {
-    if (!pbpPopupAiAccountIsCurrent(account)) return;
+    if (!_aiOpStillCurrent(account)) return;
     if (e?.code === "host_permission" && !e.permissionOrigins) {
       e.permissionStage = "calling";
       e.permissionOrigins = _aiRequiredOriginPatterns(s);
@@ -638,7 +660,7 @@ async function doAITags(forceRefresh, sOverride) {
 
   if (!forceRefresh) {
     const cached = await getAICache(pageInfo.url, "tags", s.aiCacheDuration, s.aiContentSource, account, s);
-    if (cached && pbpPopupAiAccountIsCurrent(account)) {
+    if (cached && _aiOpStillCurrent(account)) {
       renderAITags(cached, true);
       return;
     }
@@ -654,20 +676,22 @@ async function doAITags(forceRefresh, sOverride) {
   try {
     if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "extracting" });
     await ensurePageText(s);
-    if (!pbpPopupAiAccountIsCurrent(account)) return;
+    if (!_aiOpStillCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "calling" });
     const tags = await fetchAIArtifacts("tags", forceRefresh, account, s);
+    // account-only here: cache the paid result regardless of URL drift;
+    // the stillCurrent gate below protects the chip render.
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (btn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "parsing" });
     await setAICache(pageInfo.url, "tags", tags, s.aiCacheDuration, s.aiContentSource, account, s);
-    if (!pbpPopupAiAccountIsCurrent(account)) return;
+    if (!_aiOpStillCurrent(account)) return;
     renderAITags(tags, false);
     if (forceRefresh) {
       showStatus("status-msg", t("aiTagsRegenerated"), "success");
     }
   } catch (e) {
-    if (!pbpPopupAiAccountIsCurrent(account)) return;
+    if (!_aiOpStillCurrent(account)) return;
     if (e?.code === "host_permission" && !e.permissionOrigins) {
       e.permissionStage = "calling";
       e.permissionOrigins = _aiRequiredOriginPatterns(s);

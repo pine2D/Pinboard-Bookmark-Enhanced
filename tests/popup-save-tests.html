@@ -540,6 +540,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert((backgroundSource.match(/if \(parsed\.summary\) \{/g) || []).length >= 2, "SW combined must cache summary only when non-empty");
     });
 
+    test("op commits re-check URL equivalence after every await (H1 round 2)", () => {
+      assert(popupAiSource.includes("function _aiOpStillCurrent"), "op-liveness guard missing");
+      const stillCount = (popupAiSource.match(/_aiOpStillCurrent\(account\)/g) || []).length;
+      assert(stillCount >= 8, "doAISummary/doAITags commits must gate on stillCurrent, got " + stillCount);
+      assert(popupAiSource.includes("_aiOpStillCurrent(restoreAccount)"), "auto-restore must carry the URL guard too");
+      const lookupFn = popupAiSource.slice(popupAiSource.indexOf("async function _aiAwaitBookmarkLookup"), popupAiSource.indexOf("function _aiOpStillCurrent"));
+      assert(lookupFn.includes("for (let i = 0; i < 5; i++)") && lookupFn.includes("cur === p || !cur"),
+        "lookup await must re-settle a replaced promise (bounded)");
+    });
+
     test("AI is anchored to the opened page when the URL is edited (A1)", () => {
       assert(popupAiSource.includes("function _aiUrlEquivalent"), "equivalence helper missing");
       assert(popupAiSource.includes("function pbpAiSyncUrlEditState"), "button-grey sync missing");
@@ -649,15 +659,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const setupAi = popupAiSource.slice(popupAiSource.indexOf("function setupAIFeatures()"), popupAiSource.indexOf("// ---- Insert or replace AI summary"));
       const doSummary = popupAiSource.slice(popupAiSource.indexOf("async function doAISummary"), popupAiSource.indexOf("// ---- Show regenerate"));
       const doTags = popupAiSource.slice(popupAiSource.indexOf("async function doAITags"), popupAiSource.indexOf("function renderAITags"));
-      assert(setupAi.includes("restoreAccount") && setupAi.includes("pbpPopupAiAccountIsCurrent(restoreAccount)"),
-        "cached summary restore lacks owner recheck");
+      assert(setupAi.includes("restoreAccount") && setupAi.includes("_aiOpStillCurrent(restoreAccount)"),
+        "cached summary restore lacks owner recheck (stillCurrent = account + URL liveness)");
       assert(doSummary.includes('getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account, s)') &&
         doSummary.includes('setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, s.aiContentSource, account, s)'),
         "doAISummary cache calls lack owner+fingerprint settings");
-      assert((doSummary.match(/pbpPopupAiAccountIsCurrent\(account\)/g) || []).length >= 5,
+      assert((doSummary.match(/_aiOpStillCurrent\(account\)|pbpPopupAiAccountIsCurrent\(account\)/g) || []).length >= 5,
         "doAISummary does not guard every late UI/cache commit");
-      assert(doTags.includes('} catch (e) {\n    if (!pbpPopupAiAccountIsCurrent(account)) return;'),
-        "doAITags stale error UI is not owner-guarded");
+      assert(doTags.includes('} catch (e) {\n    if (!_aiOpStillCurrent(account)) return;'),
+        "doAITags stale error UI is not liveness-guarded");
       assert(doTags.includes("if (btn && pbpPopupAiAccountIsCurrent(account))"),
         "doAITags stale progress cleanup is not owner-guarded");
     });
