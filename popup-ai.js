@@ -508,7 +508,14 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
         const mine = halfOf(both, kind);
         if (mine != null) return mine;
       }
-    } catch (_) { /* combined in-flight failed; fall through */ }
+    } catch (_) { /* combined in-flight failed */ }
+    // Codex r2 M4: the combined attempt already ran - whatever its
+    // outcome, falling through re-entered the opportunistic branch and
+    // fired a SECOND combined call (reproduced: 2x combined + 1x single
+    // for one half-empty reply). Go straight to the dedicated single
+    // call for our half.
+    if (!pbpPopupAiAccountIsCurrent(account)) return null;
+    return callSingle();
   }
 
   // If the other half is already cached, only the requested half is missing.

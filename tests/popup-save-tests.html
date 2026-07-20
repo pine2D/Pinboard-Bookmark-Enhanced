@@ -530,6 +530,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "ensurePageText must report the ACTUAL source (r2 M2)");
     });
 
+    test("a rider on an in-flight combined never re-enters the combined branch (r2 M4)", () => {
+      const fetchSrc = popupAiSource.slice(popupAiSource.indexOf("async function fetchAIArtifacts"),
+        popupAiSource.indexOf("// ---- AI Summary core logic"));
+      const riderStart = fetchSrc.indexOf("if (_inflightAI.has(combinedKey))");
+      const riderEnd = fetchSrc.indexOf("const otherCached", riderStart);
+      const rider = fetchSrc.slice(riderStart, riderEnd);
+      assert(rider.includes("return callSingle();"), "rider must exit via single call, not fall through");
+    });
+
     test("combined half-empty replies fall back per artifact, never cache the empty half (A8)", () => {
       assert(popupAiSource.includes("const halfOf = (both, which)"), "popup half extractor missing");
       assert(popupAiSource.includes("mine != null ? mine : callSingle()"), "popup empty-requested-half must single-call");
