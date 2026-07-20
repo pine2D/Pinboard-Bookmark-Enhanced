@@ -414,6 +414,31 @@ function pbpTagsByCount(counts) {
     .map(([tag]) => tag);
 }
 
+// Reorder a frequency-sorted tag list so tags lexically related to the
+// CURRENT page (title/URL tokens) come first; frequency order is
+// preserved within each group (campaign B3). The top-50 slice fed to the
+// AI reuse line used to be blind to which bookmark is being tagged; the
+// two reference implementations either abandoned pure frequency (vector
+// similarity) or pair frequency with a hard constraint - this is the
+// zero-dependency middle. Latin words match against the page's word SET
+// (exact tokens, so "ai" never matches inside "maintain"); CJK parts
+// match by substring (CJK titles have no word boundaries).
+function pbpRelevantTagsFirst(tags, title, url) {
+  if (!Array.isArray(tags)) return [];
+  const hay = (String(title || "") + " " + String(url || "")).toLowerCase();
+  if (!hay.trim()) return tags;
+  const words = new Set(hay.split(/[^\p{L}\p{N}]+/u).filter(Boolean));
+  const cjk = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/;
+  const hit = [];
+  const rest = [];
+  for (const tag of tags) {
+    const parts = String(tag).toLowerCase().split(/[\s_-]+/).filter(Boolean);
+    const matched = parts.length && parts.every(w => cjk.test(w) ? hay.includes(w) : words.has(w));
+    (matched ? hit : rest).push(tag);
+  }
+  return hit.concat(rest);
+}
+
 // ---- Tag case normalization helpers ----
 // Build a map: normalized_tag → preferred_casing (by highest count)
 function buildTagCaseMap(tagCounts) {

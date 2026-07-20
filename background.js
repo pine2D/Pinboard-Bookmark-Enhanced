@@ -884,7 +884,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       if (tCached) aiTagsResolved = tCached;
       if (sCached) summaryResolved = sCached;
       if (aiTagsResolved === null && summaryResolved === null) {
-        const resp = await callAI(s, buildCombinedPrompt(s, title, url, pageInfo.pageText, notes, userTagsTop));
+        const resp = await callAI(s, buildCombinedPrompt(s, title, url, pageInfo.pageText, notes, pbpRelevantTagsFirst(userTagsTop, title, url)));
         const parsed = parseAICombined(resp, s.aiTagSeparator);
         // Cache each half only when it has content: a cached empty would
         // turn the malformed half into a sticky fake success (A8).
@@ -916,7 +916,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
           try {
             const cached = await getAICache(url, "tags", s.aiCacheDuration, aiCacheSource, startAuth.account, s);
             if (cached) return { type: "tags", result: cached };
-            const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, userTagsTop);
+            const prompt = buildTagPrompt(s, title, url, pageInfo.pageText, notes, pbpRelevantTagsFirst(userTagsTop, title, url));
             const resp = await callAI(s, prompt);
             const aiTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
             await setAICache(url, "tags", aiTags, s.aiCacheDuration, aiCacheSource, startAuth.account, s);
@@ -1990,7 +1990,7 @@ async function _runBatchSave(tabs, expectedAccount) {
                 if (tCached) aiTagsResolved = tCached;
                 if (sCached) summaryResolved = sCached;
                 if (aiTagsResolved === null && summaryResolved === null) {
-                  const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", userTagsTop));
+                  const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", pbpRelevantTagsFirst(userTagsTop, tab.title || "", tab.url)));
                   const parsed = parseAICombined(resp, s.aiTagSeparator);
                   if (parsed.tags.length) {
                     aiTagsResolved = s.optRespectTagCase ? parsed.tags.map(tg => resolveTagCase(tg, tagCaseMap)) : parsed.tags;
@@ -2009,7 +2009,7 @@ async function _runBatchSave(tabs, expectedAccount) {
                 try {
                   const cached = await getAICache(tab.url, "tags", s.aiCacheDuration, aiCacheSource, account, s);
                   if (cached) return { type: "tags", result: cached };
-                  const prompt = buildTagPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", userTagsTop);
+                  const prompt = buildTagPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", pbpRelevantTagsFirst(userTagsTop, tab.title || "", tab.url));
                   const resp = await callAI(s, prompt);
                   const rawTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
                   const aiTags = s.optRespectTagCase ? rawTags.map(tg => resolveTagCase(tg, tagCaseMap)) : rawTags;

@@ -438,7 +438,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s) {
         callAI(s, buildSummaryPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value)));
     }
     return getOrCreateInflight(`${account}|${aiCacheFingerprint(s, "tags")}|tags|${url}`, async () => {
-      const resp = await callAI(s, buildTagPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, allUserTags));
+      const resp = await callAI(s, buildTagPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, pbpRelevantTagsFirst(allUserTags, $id("title-input").value, pageInfo.url)));
       return finalizeAITags(refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator }), s);
     });
   };
@@ -481,7 +481,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s) {
   let both = null;
   try {
     both = await getOrCreateInflight(combinedKey, async () => {
-      const resp = await callAI(s, buildCombinedPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, allUserTags));
+      const resp = await callAI(s, buildCombinedPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, pbpRelevantTagsFirst(allUserTags, $id("title-input").value, pageInfo.url)));
       return parseAICombined(resp, s.aiTagSeparator);
     });
   } catch (e) {

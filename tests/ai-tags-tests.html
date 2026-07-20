@@ -145,6 +145,28 @@ suite("pbpTagsByCount", () => {
   });
 });
 
+suite("pbpRelevantTagsFirst (B3)", () => {
+  test("page-related tags jump the queue; frequency order kept within groups", () => {
+    const out = pbpRelevantTagsFirst(["python", "rust", "machine-learning", "cooking"],
+      "A Machine Learning intro in Rust", "https://x.test/ml");
+    assertEq(out.join(","), "rust,machine-learning,python,cooking", "hits first, groups stable");
+  });
+  test("exact word matching - no substring false positives", () => {
+    const out = pbpRelevantTagsFirst(["ai", "maintenance"], "how to maintain a garden", "https://x.test/");
+    assertEq(out.join(","), "ai,maintenance", "'ai' inside 'maintain' must NOT promote");
+    const hit = pbpRelevantTagsFirst(["ai", "garden"], "AI in the garden", "https://x.test/");
+    assertEq(hit.join(","), "ai,garden", "standalone words promote");
+  });
+  test("CJK tags match by substring in unsegmented titles", () => {
+    const out = pbpRelevantTagsFirst(["机器学习", "烹饪"], "深入机器学习实践", "https://x.test/");
+    assertEq(out[0], "机器学习", "cjk substring hit first");
+  });
+  test("degenerate inputs pass through", () => {
+    assertEq(pbpRelevantTagsFirst(["a", "b"], "", "").join(","), "a,b", "empty hay untouched");
+    assertEq(pbpRelevantTagsFirst(null, "t", "u").length, 0, "null tags -> []");
+  });
+});
+
 suite("default tag prompt", () => {
   test("TAG_GUIDANCE pushes specificity and bans no evaluation facet", () => {
     assert(/most specific/i.test(TAG_GUIDANCE), "asks for most specific term");

@@ -586,8 +586,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
     test("SW tag prompts anchor on the cached user vocabulary (A14)", () => {
       assert((backgroundSource.match(/userTagsTop = pbpTagsByCount/g) || []).length === 2,
         "quick-save AND batch must derive the frequency-sorted list");
-      const fed = (backgroundSource.match(/pageInfo\.pageText, notes, userTagsTop|pageInfo\.pageText, "", userTagsTop/g) || []).length;
-      assert(fed === 4, "all four SW tag/combined builders must receive the vocabulary, got " + fed);
+      const fed = (backgroundSource.match(/pbpRelevantTagsFirst\(userTagsTop/g) || []).length;
+      assert(fed === 4, "all four SW tag/combined builders must receive the relevance-ordered vocabulary, got " + fed);
+      const popupFed = (popupAiSource.match(/pbpRelevantTagsFirst\(allUserTags/g) || []).length;
+      assert(popupFed === 2, "both popup builders must receive the relevance-ordered vocabulary, got " + popupFed);
     });
 
     test("SW AI caches always use the local namespace (A3)", () => {
