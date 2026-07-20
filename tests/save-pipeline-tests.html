@@ -711,7 +711,7 @@ await suite("unified save pipeline", async () => {
     equal(summaryCalls.length, 8, "unexpected production summary cache call count");
     assert(summaryCalls.slice(0, 4).every((call) => call.includes("startAuth.account")),
       "Quick/Read Later summary cache lost captured account");
-    assert(summaryCalls.slice(4).every((call) => /, account\)$/.test(call)),
+    assert(summaryCalls.slice(4).every((call) => /, account, s\)$/.test(call)),
       "Batch summary cache lost batch account");
   });
 

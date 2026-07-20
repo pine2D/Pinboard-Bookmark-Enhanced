@@ -1900,12 +1900,18 @@ async function _runBatchSave(tabs, expectedAccount) {
     // audit A13: the message handler already replied "started" before this
     // second credential read - a bare return left no terminal
     // batch_progress record and the popup sat disabled at 0% forever.
-    // Write the same done-with-error shape the in-run catch produces.
-    await _writeBatchProgress({
-      running: false, done: true, error: "account_changed",
-      account, total: tabs.length, i: 0,
-      saved: 0, queued: 0, failed: 0, aiFailed: 0, skipped: 0, tooLong: 0
-    });
+    // Write the same done-with-error shape the in-run catch produces -
+    // but ONLY for a genuine account SWITCH (token present, different
+    // account): that is the case where a popup is polling under the
+    // expected account. Missing token/account keeps the established
+    // no-record contract (logout tears the popup session down anyway).
+    if (startAuth.token && account && startAuth.account !== account) {
+      await _writeBatchProgress({
+        running: false, done: true, error: "account_changed",
+        account, total: tabs.length, i: 0,
+        saved: 0, queued: 0, failed: 0, aiFailed: 0, skipped: 0, tooLong: 0
+      });
+    }
     _batchRunning = false;
     return;
   }
