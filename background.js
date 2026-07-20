@@ -1897,6 +1897,15 @@ async function _runBatchSave(tabs, expectedAccount) {
   const startAuth = await getCurrentPinboardAuth();
   const account = expectedAccount || startAuth.account;
   if (!startAuth.token || !account || startAuth.account !== account) {
+    // audit A13: the message handler already replied "started" before this
+    // second credential read - a bare return left no terminal
+    // batch_progress record and the popup sat disabled at 0% forever.
+    // Write the same done-with-error shape the in-run catch produces.
+    await _writeBatchProgress({
+      running: false, done: true, error: "account_changed",
+      account, total: tabs.length, i: 0,
+      saved: 0, queued: 0, failed: 0, aiFailed: 0, skipped: 0, tooLong: 0
+    });
     _batchRunning = false;
     return;
   }

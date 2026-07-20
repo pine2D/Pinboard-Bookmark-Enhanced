@@ -540,6 +540,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert((backgroundSource.match(/if \(parsed\.summary\) \{/g) || []).length >= 2, "SW combined must cache summary only when non-empty");
     });
 
+    test("batch startup account race writes a terminal progress record (A13)", () => {
+      const fnStart = backgroundSource.indexOf("async function _runBatchSave");
+      const guardEnd = backgroundSource.indexOf("const total = tabs.length", fnStart);
+      const guard = backgroundSource.slice(fnStart, guardEnd);
+      assert(fnStart >= 0 && guardEnd > fnStart, "_runBatchSave source not found");
+      assert(guard.includes('error: "account_changed"') && guard.includes("done: true"),
+        "second credential check must write done-with-error before returning");
+      assert(!/account\) \{\s*_batchRunning = false;\s*return;/.test(guard), "bare return without progress must be gone");
+    });
+
     test("batch counts extraction failures as failed AI artifacts (A12)", () => {
       assert(backgroundSource.includes("aiFailed += (useAiTags ? 1 : 0) + (useAiSummary ? 1 : 0)"),
         "empty/failed extraction must count each requested artifact");
