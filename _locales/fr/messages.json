@@ -1002,6 +1002,12 @@
   "webdavConflict": {
     "message": "La sauvegarde distante a été modifiée. Récupérez-la avant un nouvel envoi."
   },
+  "webdavConflictChoice": {
+    "message": "La sauvegarde distante a changé. L'écraser avec les réglages de cet appareil ? (Vous pouvez aussi annuler et la récupérer d'abord.)"
+  },
+  "webdavOverwriteRemote": {
+    "message": "Écraser la distante"
+  },
   "webdavPermDenied": {
     "message": "Permission refusée. Cliquez sur « Tester » pour l'accorder"
   },

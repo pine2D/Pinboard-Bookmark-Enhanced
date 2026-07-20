@@ -1002,6 +1002,12 @@
   "webdavConflict": {
     "message": "The remote backup changed. Pull it before pushing again."
   },
+  "webdavConflictChoice": {
+    "message": "The remote backup has changed. Overwrite it with this device's settings? (Cancel to pull it first instead.)"
+  },
+  "webdavOverwriteRemote": {
+    "message": "Overwrite remote"
+  },
   "webdavPermDenied": {
     "message": "Permission denied. Click Test to grant access"
   },

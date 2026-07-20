@@ -1002,6 +1002,12 @@
   "webdavConflict": {
     "message": "Kopia zapasowa na serwerze została zmieniona. Pobierz ją przed ponownym wysłaniem."
   },
+  "webdavConflictChoice": {
+    "message": "Zdalna kopia zapasowa uległa zmianie. Nadpisać ją ustawieniami tego urządzenia? (Możesz też anulować i najpierw ją pobrać.)"
+  },
+  "webdavOverwriteRemote": {
+    "message": "Nadpisz zdalną"
+  },
   "webdavPermDenied": {
     "message": "Odmowa uprawnień — kliknij „Testuj”, aby je przyznać"
   },

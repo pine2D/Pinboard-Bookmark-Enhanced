@@ -1002,6 +1002,12 @@
   "webdavConflict": {
     "message": "リモートのバックアップが変更されています。プルしてから、もう一度プッシュしてください。"
   },
+  "webdavConflictChoice": {
+    "message": "リモートのバックアップが変更されています。この端末の設定で上書きしますか？（キャンセルして先に取得することもできます）"
+  },
+  "webdavOverwriteRemote": {
+    "message": "リモートを上書き"
+  },
   "webdavPermDenied": {
     "message": "権限が拒否されています。「テスト」をクリックして許可してください"
   },

@@ -1002,6 +1002,12 @@
   "webdavConflict": {
     "message": "Die Sicherung auf dem Server wurde geändert. Rufe sie ab, bevor du erneut pushst."
   },
+  "webdavConflictChoice": {
+    "message": "Das Remote-Backup wurde geändert. Mit den Einstellungen dieses Geräts überschreiben? (Du kannst auch abbrechen und es zuerst abrufen.)"
+  },
+  "webdavOverwriteRemote": {
+    "message": "Remote überschreiben"
+  },
   "webdavPermDenied": {
     "message": "Zugriff verweigert. Auf „Testen“ klicken, um ihn zu gewähren"
   },

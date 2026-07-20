@@ -1002,6 +1002,12 @@
   "webdavConflict": {
     "message": "遠端備份已變更。請先拉取，再重新推送。"
   },
+  "webdavConflictChoice": {
+    "message": "遠端備份已更改。要用本地設定覆蓋遠端嗎？（也可取消後先拉取）"
+  },
+  "webdavOverwriteRemote": {
+    "message": "覆蓋遠端"
+  },
   "webdavPermDenied": {
     "message": "權限被拒絕，按「測試」以授權"
   },

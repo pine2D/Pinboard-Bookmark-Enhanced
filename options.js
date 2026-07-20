@@ -1693,7 +1693,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- WebDAV: Push now ----
-  $id("webdav-push-btn")?.addEventListener("click", async () => {
+  // Extracted so the conflict-choice popover can re-run it with force
+  // (user-confirmed remote overwrite, campaign 2026-07-20). Each run
+  // persists the live form once and holds the debounce queue for its
+  // exact snapshot.
+  async function _pbpWebdavRunPush(force) {
     const statusEl = $id("webdav-status");
     const cfg = _pbpWebdavCfgFromForm();
     if (!statusEl) return;
@@ -1720,13 +1724,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
         return;
       }
-      res = await pbpWebdavPush(cfg);
+      res = await pbpWebdavPush(force ? Object.assign({}, cfg, { force: true }) : cfg);
     } finally {
       resumeOptionsAutoSave();
     }
     if (res.ok) {
       setStatusIcon(statusEl, true, t("webdavPushOk", new Date(res.ts).toLocaleString()));
       statusEl.style.color = "#080";
+    } else if (res.error === "conflict" && !force) {
+      // Conflict is a CHOICE, not a wall (user request): the pull button
+      // one row up is the take-remote path; this popover offers the
+      // explicit overwrite-remote path. Never a native confirm()
+      // (ui-contract keeps those pinned to three approved modals).
+      setStatusIcon(statusEl, false, t("webdavConflict"));
+      statusEl.style.color = "#c00";
+      showConfirmPopover($id("webdav-push-btn"), {
+        msg: t("webdavConflictChoice"),
+        yesText: t("webdavOverwriteRemote"),
+        noText: t("cancel"),
+        onConfirm: () => { _pbpWebdavRunPush(true); },
+      });
     } else {
       const msg = res.error === "conflict" ? t("webdavConflict")
         : res.error === "not-writable" ? (res.status ? t("webdavPushFail", "http-" + res.status) : t("webdavPushNotWritable"))
@@ -1736,7 +1753,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusEl.style.color = "#c00";
     }
     setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
-  });
+  }
+  $id("webdav-push-btn")?.addEventListener("click", () => { _pbpWebdavRunPush(false); });
 
   // ---- WebDAV: Pull now ----
   $id("webdav-pull-btn")?.addEventListener("click", async () => {
