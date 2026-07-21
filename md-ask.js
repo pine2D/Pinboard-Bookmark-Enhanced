@@ -1856,6 +1856,18 @@ function _pbpExplainEnsurePop() {
     if (ok) vocab.textContent = t("dictSavedVocab");
     else vocab.disabled = false;
   });
+  // Jump to the Options vocabulary tab (deep link: _activateHashPanel in
+  // options.js resolves #vocab on load AND on hashchange in a reused tab).
+  // dict-action-only, same visibility discipline as .xp-vocab; label reuses
+  // the tab's own i18n key so the two surfaces always name it identically.
+  const openVocab = document.createElement("button");
+  openVocab.type = "button";
+  openVocab.className = "xp-open-vocab";
+  openVocab.hidden = true;
+  openVocab.textContent = t("dictVocabSection");
+  openVocab.addEventListener("click", () => {
+    try { window.open(chrome.runtime.getURL("options.html#vocab")); } catch (_) {}
+  });
   const ask = document.createElement("button");
   ask.type = "button";
   ask.className = "xp-ask";
@@ -1915,6 +1927,7 @@ function _pbpExplainEnsurePop() {
   foot.appendChild(model);
   foot.appendChild(save);
   foot.appendChild(vocab);
+  foot.appendChild(openVocab);
   foot.appendChild(ask);
   foot.appendChild(gearWrap);
   pop.appendChild(head);
@@ -2029,6 +2042,8 @@ async function _pbpExplainRun(cap, ctx, pop) {
   save.textContent = t("explainSaveNote");
   const vocabBtn = pop.querySelector(".xp-vocab");
   if (vocabBtn) { vocabBtn.hidden = true; vocabBtn.disabled = false; vocabBtn.textContent = t("dictSaveVocab"); }
+  const openVocabBtn = pop.querySelector(".xp-open-vocab");
+  if (openVocabBtn) openVocabBtn.hidden = true;
   // No-AI users never initialize the ask panel, so "Ask more" would silently
   // no-op for them -- hide it whenever AI is unavailable, any action.
   const askBtn = pop.querySelector(".xp-ask");
@@ -2061,6 +2076,7 @@ async function _pbpExplainRun(cap, ctx, pop) {
   // it; aria-busy is only cleared here if this run is still the active one
   // (a newer run may already have taken over the same pop).
   if (_pbpExplainAction === "dict" && typeof window.pbpDictRun === "function") {
+    if (openVocabBtn) openVocabBtn.hidden = false; // dict view: offer the jump to Options > Vocabulary
     if (typeof window.pbpDictSetSaveTarget === "function") {
       window.pbpDictSetSaveTarget(cap.itemId ? { itemId: cap.itemId } : { range: cap.range });
     }

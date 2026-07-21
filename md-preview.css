@@ -1088,6 +1088,16 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
     padding: 4px;
     max-height: 320px;
     overflow: auto;
+    /* The picker is a top-layer pseudo-element: the document-wide
+       ::-webkit-scrollbar recipe (10px track, ~4px inset pill) does not
+       reach into it, so without this it falls back to the fat UA scrollbar.
+       Standard properties are banned DOCUMENT-WIDE (they would disable the
+       webkit customizations wholesale, see the scrollbar section header) --
+       but scoped HERE they are the only lever that styles the picker's bar,
+       and they cannot leak: the picker never had the webkit styling to lose.
+       thin + the same neutral translucent gray matches the .xp-body look. */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
   }
   .exp-img-row option, .xp-dict-lang option {
     padding: 7px 9px;
@@ -1490,7 +1500,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 @keyframes xp-shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .xp-skel { animation: none; } }
 .xp-error p { color: var(--danger); margin: 0 0 8px; font-size: 13px; }
-.xp-retry, .xp-ask, .xp-save, .xp-vocab, .xp-dict-connect {
+.xp-retry, .xp-ask, .xp-save, .xp-vocab, .xp-open-vocab, .xp-dict-connect {
   padding: 4px 10px;
   border: 1px solid var(--btn-border);
   border-radius: 6px;
@@ -1500,7 +1510,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   cursor: pointer;
   white-space: nowrap;
 }
-.xp-retry:hover, .xp-ask:hover, .xp-save:hover:not(:disabled), .xp-vocab:hover:not(:disabled), .xp-dict-connect:hover:not(:disabled) { background: var(--btn-hover); }
+.xp-retry:hover, .xp-ask:hover, .xp-save:hover:not(:disabled), .xp-vocab:hover:not(:disabled), .xp-open-vocab:hover, .xp-dict-connect:hover:not(:disabled) { background: var(--btn-hover); }
 .xp-save:disabled, .xp-vocab:disabled, .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
 .xp-foot {
   display: flex;
