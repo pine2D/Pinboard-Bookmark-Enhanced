@@ -93,3 +93,94 @@ function pbpAnkiFieldsMatch(names) {
 }
 
 // ---- PURE END ----
+
+// ---- Client (options.html only) -----------------------------------------
+
+// No Content-Type header ON PURPOSE: a string body ships as text/plain,
+// which is CORS-simple and skips the OPTIONS preflight. Before an origin is
+// trusted, AnkiConnect's preflight answer may carry the DEFAULT
+// Access-Control-Allow-Origin (http://localhost) and the browser would kill
+// a preflighted request before requestPermission ever runs.
+async function pbpAnkiCall(action, params, key, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 10000);
+  try {
+    const resp = await fetch(PBP_ANKI_ENDPOINT, {
+      method: "POST",
+      body: JSON.stringify(pbpAnkiBuildRequest(action, params, key)),
+      signal: ctrl.signal
+    });
+    return pbpAnkiParseResult(await resp.text());
+  } catch (e) {
+    return { ok: false, result: null, error: (e && e.name === "AbortError") ? "timeout" : "unreachable" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Full send pipeline. opts: {deck, key, ownerCheck: async () => bool}.
+// ownerCheck re-derives the CURRENT owner and compares to the rows' owner --
+// called before every dispatch that follows a potentially long await
+// (fail-closed account isolation; the Anki permission dialog can sit open
+// for minutes). Returns {stage, added, skipped, failed, error}.
+async function pbpAnkiSendRows(rows, opts) {
+  const deck = (opts && opts.deck) || PBP_ANKI_MODEL;
+  const key = (opts && opts.key) || "";
+  const ownerCheck = (opts && opts.ownerCheck) || (async () => true);
+  const out = { stage: "", added: 0, skipped: 0, failed: 0, error: null };
+
+  // requestPermission/version/keyRequired happen in _pbpVocabSendAnki BEFORE
+  // settings/owner (spec §3 ordering) -- this pipeline starts at createDeck.
+  const deckRes = await pbpAnkiCall("createDeck", { deck }, key, 10000); // idempotent
+  if (!deckRes.ok) { out.stage = "deck"; out.error = deckRes.error; return out; }
+
+  const models = await pbpAnkiCall("modelNames", {}, key, 10000);
+  if (!models.ok || !Array.isArray(models.result)) { out.stage = "model"; out.error = models.error || "modelNames failed"; return out; }
+  if (!models.result.includes(PBP_ANKI_MODEL)) {
+    const created = await pbpAnkiCall("createModel", pbpAnkiModelDef(), key, 10000);
+    if (!created.ok) { out.stage = "model"; out.error = created.error; return out; }
+  } else {
+    const fields = await pbpAnkiCall("modelFieldNames", { modelName: PBP_ANKI_MODEL }, key, 10000);
+    if (!fields.ok || !pbpAnkiFieldsMatch(fields.result)) {
+      // AnkiConnect silently drops values for unknown field names -- a
+      // user-modified model must abort, never silently lose data.
+      out.stage = "modelMismatch";
+      out.error = "model fields incompatible";
+      return out;
+    }
+  }
+
+  if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
+  const notes = rows.map((r) => pbpAnkiNoteFromRow(r, deck));
+  const can = await pbpAnkiCall("canAddNotesWithErrorDetail", { notes }, key, 30000);
+  if (!can.ok || !Array.isArray(can.result) || can.result.length !== notes.length) {
+    out.stage = "precheck";
+    out.error = can.error || "precheck failed";
+    return out;
+  }
+  const addable = [];
+  for (let i = 0; i < can.result.length; i++) {
+    const d = can.result[i];
+    if (d && d.canAdd) addable.push(notes[i]);
+    else if (d && /duplicate/i.test(String(d.error || ""))) out.skipped++;
+    else out.failed++;
+  }
+  if (!addable.length) { out.stage = "done"; return out; }
+
+  if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
+  const added = await pbpAnkiCall("addNotes", { notes: addable }, key, 60000);
+  if (!added.ok || !Array.isArray(added.result)) {
+    // addNotes is batch-rollback: on ANY error it deletes the notes it had
+    // already added and returns a top-level error -- count the whole batch
+    // as failed, never claim partial success.
+    out.stage = "add";
+    out.failed += addable.length;
+    out.error = added.error || "addNotes failed";
+    return out;
+  }
+  for (const id of added.result) {
+    if (id == null) out.failed++; else out.added++;
+  }
+  out.stage = "done";
+  return out;
+}

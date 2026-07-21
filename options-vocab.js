@@ -222,14 +222,7 @@ async function _pbpVocabExport() {
       _pbpVocabFlashStatus(false, t("jinaFailed"));
       return;
     }
-    const tsv = pbpDictTsv(rows.map((w) => ({
-      term: w.term,
-      reading: w.ipa || "",
-      definition: (w.gloss || "").replace(/\s*\n\s*/g, " "),
-      contexts: (Array.isArray(w.contexts) ? w.contexts : []).map((c) => c && c.quote).filter(Boolean),
-      source: (w.contexts && w.contexts[0] && w.contexts[0].articleUrl) || "",
-      license: [w.license, w.sourceUrl].filter(Boolean).join(" ")
-    })));
+    const tsv = pbpDictTsv(rows.map(_pbpVocabCanonicalRow));
     const blob = new Blob([tsv], { type: "text/tab-separated-values" });
     const a = document.createElement("a");
     const d = new Date();
@@ -244,6 +237,81 @@ async function _pbpVocabExport() {
     _pbpVocabFlashStatus(false, t("jinaFailed"));
   }
 }
+
+// Send-to-Anki click chain. Ordering is the spec (anki spec rev2 §3):
+// (1) FIRST await = chrome.permissions.request (user gesture; already-granted
+// resolves true without UI), (2) requestPermission as the first AnkiConnect
+// action, (3..n) owner derived AFTER the permission awaits and re-checked
+// via ownerCheck before every later dispatch -- the permission dialogs can
+// sit open long enough for an account switch (fail-closed invariant).
+// Canonical row shared by the TSV export and the Anki send (spec: both
+// derive from the SAME canonical shape; the Anki side escapes its own copy).
+function _pbpVocabCanonicalRow(w) {
+  return {
+    term: w.term,
+    reading: w.ipa || "",
+    definition: (w.gloss || "").replace(/\s*\n\s*/g, " "),
+    contexts: (Array.isArray(w.contexts) ? w.contexts : []).map((c) => c && c.quote).filter(Boolean),
+    source: (w.contexts && w.contexts[0] && w.contexts[0].articleUrl) || "",
+    license: [w.license, w.sourceUrl].filter(Boolean).join(" ")
+  };
+}
+
+async function _pbpVocabSendAnki() {
+  const btn = $id("vocab-anki-btn");
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  try {
+    btn.textContent = t("dictAnkiSending");
+    const pattern = pbpEndpointOriginPattern(PBP_ANKI_ENDPOINT);
+    let granted = false;
+    try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (_) {}
+    if (!granted) { _pbpVocabFlashStatus(false, t("dictAnkiUnreachable")); return; }
+    // requestPermission FIRST (spec §3): the long human-approval wait happens
+    // BEFORE owner derivation, so the owner snapshot below stays fresh.
+    const perm = await pbpAnkiCall("requestPermission", {}, "", 120000);
+    if (!perm.ok || !perm.result || perm.result.permission !== "granted"
+        || Number(perm.result.version) < 6) {
+      _pbpVocabFlashStatus(false, t("dictAnkiUnreachable"));
+      return;
+    }
+    const keyRequired = perm.result.requireApiKey === true || perm.result.requireApikey === true;
+    const raw = await pbpReadSettingsWithSecrets({
+      dictAnkiDeck: SETTINGS_DEFAULTS.dictAnkiDeck,
+      dictAnkiKey: SETTINGS_DEFAULTS.dictAnkiKey
+    });
+    const s = deobfuscateSettings(raw);
+    if (keyRequired && !s.dictAnkiKey) { _pbpVocabFlashStatus(false, t("dictAnkiKeyRequired")); return; }
+    const owner = await pbpVocabCurrentOwner();
+    const rows = await pbpVocabAll(owner);
+    if ((await pbpVocabCurrentOwner()) !== owner) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+    if (!rows.length) { _pbpVocabFlashStatus(false, t("dictAnkiNothing")); return; }
+    const canonical = rows.map(_pbpVocabCanonicalRow);
+    const res = await pbpAnkiSendRows(canonical, {
+      deck: s.dictAnkiDeck || "Pinboard Vocab",
+      key: s.dictAnkiKey || "",
+      ownerCheck: async () => (await pbpVocabCurrentOwner()) === owner
+    });
+    if (res.stage === "done") {
+      _pbpVocabFlashStatus(res.failed === 0, t("dictAnkiResult", String(res.added), String(res.skipped), String(res.failed)));
+    } else if (res.stage === "modelMismatch") {
+      _pbpVocabFlashStatus(false, t("dictAnkiModelMismatch"));
+    } else if (res.stage === "owner") {
+      _pbpVocabFlashStatus(false, t("jinaFailed"));
+    } else {
+      _pbpVocabFlashStatus(false, t("dictAnkiUnreachable"));
+    }
+  } catch (_) {
+    _pbpVocabFlashStatus(false, t("dictAnkiUnreachable"));
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
+
+const _vocabAnkiBtn = $id("vocab-anki-btn");
+if (_vocabAnkiBtn) _vocabAnkiBtn.addEventListener("click", _pbpVocabSendAnki);
 
 const _vocabExportBtn = $id("vocab-export-btn");
 if (_vocabExportBtn) _vocabExportBtn.addEventListener("click", _pbpVocabExport);
