@@ -1959,6 +1959,32 @@ function _pbpExplainEnsurePop() {
 const PBP_EXPLAIN_BLOCK_CAP = 4000;
 const PBP_EXPLAIN_NEIGHBOR_CAP = 1200;
 
+// UTF-16 offset of range.start within el.textContent (-1 when the range
+// does not start inside el). TreeWalker accumulation, no DOM mutation.
+function _pbpExplainRangeOffsetIn(el, range) {
+  if (!el || !range) return -1;
+  let off = 0;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node === range.startContainer) return off + range.startOffset;
+    off += node.data.length;
+  }
+  return -1;
+}
+
+// Index of the occ-th (0-based) occurrence of needle in hay; falls back to
+// the FIRST occurrence when there are fewer than occ+1 (transform drift
+// between textContent and the KaTeX snapshot).
+function _pbpExplainNthIndex(hay, needle, occ) {
+  let i = -1;
+  for (let k = 0; k <= occ; k++) {
+    i = hay.indexOf(needle, i + 1);
+    if (i === -1) break;
+  }
+  return i === -1 ? hay.indexOf(needle) : i;
+}
+
 // Shared core (spec 2.3): given a RESOLVED block index n and the selected
 // text, builds {sentence, blockText, prevText, nextText} purely from
 // pbpAiTextOfKatex(n) -- no Range, no blockEl. This is what Task 3's
@@ -1966,10 +1992,13 @@ const PBP_EXPLAIN_NEIGHBOR_CAP = 1200;
 // (a card only ever has item.n, never a live Range). n===0 / the .pb-tr
 // live-translation overlay are edge cases only the live-range path can see,
 // so they stay in _pbpExplainPackContext below, which calls this core for
-// the common case and adjusts on top for those two edge cases.
-function _pbpExplainPackFromBlock(n, selText) {
+// the common case and adjusts on top for those two edge cases. occ (0-based,
+// default 0) is which occurrence of selText in the block to anchor the
+// sentence on -- the range-bearing caller (Codex final-review F1) resolves
+// this from cap.range so a repeated word's sentence isn't always the first.
+function _pbpExplainPackFromBlock(n, selText, occ) {
   const origText = n ? pbpAiTextOfKatex(n) : String(selText || "");
-  const idx = origText.indexOf(selText);
+  const idx = occ > 0 ? _pbpExplainNthIndex(origText, selText, occ) : origText.indexOf(selText);
   const sentence = idx === -1
     ? selText
     : pbpExplainSentenceAround(origText, idx, idx + selText.length);
@@ -2012,12 +2041,31 @@ function _pbpExplainPackContext(cap) {
       : pbpExplainSentenceAround(origText, idx, idx + cap.text.length);
     return { sentence, blockText: origText.slice(0, PBP_EXPLAIN_BLOCK_CAP), prevText: "", nextText: "" };
   }
+  const rangeOff = _pbpExplainRangeOffsetIn(blockEl, cap.range);
+  if (!trText) {
+    // Original-text branch: rangeOff is a textContent offset, but the shared
+    // core anchors on OCCURRENCE (it re-scans pbpAiTextOfKatex(n), a KaTeX
+    // snapshot that can diverge from blockEl.textContent) -- count how many
+    // earlier occurrences of cap.text precede rangeOff in the live DOM text
+    // and pass that occurrence index through instead of the raw offset.
+    let occ = 0;
+    if (rangeOff > 0) {
+      const raw = blockEl.textContent;
+      let p = raw.indexOf(cap.text);
+      while (p !== -1 && p < rangeOff) { occ++; p = raw.indexOf(cap.text, p + 1); }
+    }
+    return _pbpExplainPackFromBlock(n, cap.text, occ);
+  }
   const core = _pbpExplainPackFromBlock(n, cap.text);
-  if (!trText) return core;
   // .pb-tr branch: the selection lives in the translated rendering, so the
   // sentence must be scanned against THAT text; the translated text is
   // appended to blockText for disambiguation (unchanged from pre-extraction).
-  const idx = trText.indexOf(cap.text);
+  // trText === blockEl.textContent here, so rangeOff already indexes it
+  // directly -- use it when it truly lands on cap.text, else fall back to
+  // the first occurrence (transform drift).
+  const idx = (rangeOff >= 0 && trText.slice(rangeOff, rangeOff + cap.text.length) === cap.text)
+    ? rangeOff
+    : trText.indexOf(cap.text);
   const sentence = idx === -1
     ? cap.text
     : pbpExplainSentenceAround(trText, idx, idx + cap.text.length);

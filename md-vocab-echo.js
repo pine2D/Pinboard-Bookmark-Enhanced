@@ -354,6 +354,8 @@ function _echoOnClick(e) {
   if (!_echoEnabled || !_echoTotal) return;
   if (e.target && e.target.closest
       && e.target.closest("a, button, input, select, textarea, [contenteditable]")) return;
+  const sel = window.getSelection && window.getSelection();
+  if (sel && !sel.isCollapsed) return; // drag-selection belongs to the highlight bar
   if (typeof document.caretRangeFromPoint !== "function") return;
   const caret = document.caretRangeFromPoint(e.clientX, e.clientY);
   if (!caret) return;
@@ -417,12 +419,17 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     // never trust a single area's newValue (spec §3). readSeq: a slow read
     // must not clobber the state a newer read/render already set.
     const readSeq = ++_echoReadSeq;
+    // Synchronous suspend (mirror the pbp:rendered path): a toggle-off must
+    // not leave scans/clicks running while the settings read is in flight;
+    // readSeq keeps a slow read from clobbering newer state.
+    _echoEpoch++;
+    _echoEnabled = false;
+    _echoClearAll();
+    _echoDisconnect();
     _echoReadEnabled().then((on) => {
       if (readSeq !== _echoReadSeq) return;
-      if (on === _echoEnabled) return;
       _echoEnabled = on;
       if (on) _echoRestart();
-      else { _echoEpoch++; _echoClearAll(); _echoDisconnect(); }
     }).catch(() => {});
   });
 }

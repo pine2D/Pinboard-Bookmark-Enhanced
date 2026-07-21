@@ -2769,6 +2769,71 @@ suiteIf("pbpExplainSentenceAround", "pbpAskInit", () => {
   });
 });
 
+// Codex final-review F1: a cap.range on a REPEATED word must anchor the
+// sentence to the occurrence actually clicked, not always the block's first
+// hit -- both the original-text branch (occurrence counting) and the .pb-tr
+// branch (direct rangeOff) of _pbpExplainPackContext.
+suiteIf("_pbpExplainPackContext nth-occurrence", "pbpAskInit", () => {
+  function fixture(html) {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    document.body.appendChild(d);
+    return d;
+  }
+  function rangeAt(textNode, needle, occ) {
+    let i = -1;
+    for (let k = 0; k <= occ; k++) i = textNode.data.indexOf(needle, i + 1);
+    const range = document.createRange();
+    range.setStart(textNode, i);
+    range.setEnd(textNode, i + needle.length);
+    return range;
+  }
+
+  test("original-text branch: second occurrence anchors the second sentence", () => {
+    const root = fixture("<p>The word here. Another word waits.</p>");
+    pbpAiIndexBlocks(root);
+    const textNode = root.querySelector("p").firstChild;
+    const out = _pbpExplainPackContext({ text: "word", range: rangeAt(textNode, "word", 1) });
+    assertEq(out.sentence, "Another word waits.", "second occurrence -> second sentence");
+    root.remove();
+  });
+
+  test("original-text branch: first occurrence still anchors the first sentence (unchanged)", () => {
+    const root = fixture("<p>The word here. Another word waits.</p>");
+    pbpAiIndexBlocks(root);
+    const textNode = root.querySelector("p").firstChild;
+    const out = _pbpExplainPackContext({ text: "word", range: rangeAt(textNode, "word", 0) });
+    assertEq(out.sentence, "The word here.", "first occurrence -> first sentence");
+    root.remove();
+  });
+
+  test(".pb-tr branch: second occurrence anchors the second sentence via rangeOff", () => {
+    const root = fixture("<p>Original block.</p>");
+    pbpAiIndexBlocks(root);
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.innerHTML = "<p>The word here. Another word waits.</p>";
+    root.appendChild(tr);
+    const textNode = tr.querySelector("p").firstChild;
+    const out = _pbpExplainPackContext({ text: "word", range: rangeAt(textNode, "word", 1) });
+    assertEq(out.sentence, "Another word waits.", "tr branch: second occurrence -> second sentence");
+    root.remove();
+  });
+
+  test(".pb-tr branch: first occurrence still anchors the first sentence (unchanged)", () => {
+    const root = fixture("<p>Original block.</p>");
+    pbpAiIndexBlocks(root);
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.innerHTML = "<p>The word here. Another word waits.</p>";
+    root.appendChild(tr);
+    const textNode = tr.querySelector("p").firstChild;
+    const out = _pbpExplainPackContext({ text: "word", range: rangeAt(textNode, "word", 0) });
+    assertEq(out.sentence, "The word here.", "tr branch: first occurrence -> first sentence");
+    root.remove();
+  });
+});
+
 suiteIf("pbpExplainLangName", "pbpAskInit", () => {
   test("maps known UI tags", () => {
     assertEq(pbpExplainLangName("zh-Hans"), "Simplified Chinese", "hans");

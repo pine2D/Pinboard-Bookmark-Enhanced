@@ -1274,7 +1274,6 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
      dark background-colors (#033a16/#67060c) in the dark vendor sheet,
      which against the forced #1f2328 text would print at ~1.2:1. */
   #rendered-view pre code, #rendered-view pre code span { color: #1f2328 !important; background: transparent !important; }
-  ::highlight(pbp-vocab-echo) { text-decoration-line: none; }
 }
 
 /* Raw view: the TOC navigates the rendered doc, which is hidden in Raw mode. */
@@ -1745,6 +1744,14 @@ html.motion-ready .xp-gear-menu[hidden] {
   text-decoration-line: underline;
   text-decoration-style: dotted;
   text-decoration-color: var(--vocab-echo);
+}
+
+/* Print override must come AFTER the base rule above: same specificity, so
+   source order decides the cascade (F4, Codex final-review) -- living inside
+   the earlier @media print block let the base rule win when it happened to
+   be defined later in the file. */
+@media print {
+  ::highlight(pbp-vocab-echo) { text-decoration-line: none; }
 }
 
 /* H5 block-level mirror bar (spec 1.5): a 3px left bar echoing the OTHER
