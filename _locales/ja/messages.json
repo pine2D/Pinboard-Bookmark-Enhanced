@@ -2645,6 +2645,20 @@
   "dictAiNotConfigured": {
     "message": "設定で AI プロバイダーを設定すると文脈に応じた説明が得られます。"
   },
+  "dictVocabEmpty": {
+    "message": "保存された単語はまだありません。リーダーの辞書ビューから保存できます。"
+  },
+  "dictDeleteConfirm": {
+    "message": "「$TERM$」を単語帳から削除しますか？",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictDeleteFailed": {
+    "message": "削除できませんでした"
+  },
   "secSendDestinations": {
     "message": "送信先"
   },

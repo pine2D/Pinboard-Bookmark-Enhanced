@@ -352,6 +352,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (btn.dataset.panel === "tags") _initTagGovPanel();
     if (btn.dataset.panel === "storage") renderStoragePanel();
     if (btn.dataset.panel === "notes") renderNotesPanel();
+    if (btn.dataset.panel === "vocab") renderVocabPanel();
     history.replaceState(null, "", "#" + btn.dataset.panel);
   }
   _tabBtns.forEach((btn, i) => {

@@ -2645,6 +2645,20 @@
   "dictAiNotConfigured": {
     "message": "Настройте ИИ-провайдера в настройках, чтобы получать контекстные объяснения."
   },
+  "dictVocabEmpty": {
+    "message": "Пока нет сохранённых слов. Сохраняйте слова из словаря в режиме чтения."
+  },
+  "dictDeleteConfirm": {
+    "message": "Убрать «$TERM$» из словарика?",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictDeleteFailed": {
+    "message": "Не удалось убрать слово"
+  },
   "secSendDestinations": {
     "message": "Места назначения"
   },

@@ -28,6 +28,7 @@
           <optgroup data-i18n-label="tabGroupReading" label="Reading">
               <option value="reader" data-i18n="tabReader">Reader</option>
               <option value="notes" data-i18n="tabNotes">Notes</option>
+              <option value="vocab" data-i18n="dictVocabSection">Vocabulary</option>
               <option value="markdown" data-i18n="tabMarkdown">Export</option>
           </optgroup>
           <optgroup data-i18n-label="tabGroupTools" label="Tools">
@@ -52,6 +53,7 @@
         <div class="tab-group-label" role="presentation" data-i18n="tabGroupReading">Reading</div>
         <button class="tab-btn" id="tab-reader" data-panel="reader" role="tab" aria-selected="false" aria-controls="panel-reader" data-i18n="tabReader">Reader</button>
         <button class="tab-btn" id="tab-notes" data-panel="notes" role="tab" aria-selected="false" aria-controls="panel-notes" data-i18n="tabNotes">Notes</button>
+        <button class="tab-btn" id="tab-vocab" data-panel="vocab" role="tab" aria-selected="false" aria-controls="panel-vocab" data-i18n="dictVocabSection">Vocabulary</button>
         <button class="tab-btn" id="tab-markdown" data-panel="markdown" role="tab" aria-selected="false" aria-controls="panel-markdown" data-i18n="tabMarkdown">Export</button>
         <div class="tab-group-label" role="presentation" data-i18n="tabGroupTools">Tools</div>
         <button class="tab-btn" id="tab-tags" data-panel="tags" role="tab" aria-selected="false" aria-controls="panel-tags" data-i18n="tabTags">Tags</button>
@@ -663,6 +665,18 @@
       <div id="notes-list"></div>
     </div>
 
+    <!-- Tab: Vocabulary -->
+    <div id="panel-vocab" class="panel" role="tabpanel" aria-labelledby="tab-vocab">
+      <div class="section-title" data-i18n="dictVocabSection">Vocabulary</div>
+      <div class="notes-toolbar">
+        <span id="vocab-count" class="notes-count" aria-live="polite"></span>
+        <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportTsv">Export TSV</button>
+        <span class="save-status" id="vocab-status" role="status" aria-live="polite"></span>
+      </div>
+      <div id="vocab-empty" class="notes-empty" data-i18n="dictVocabEmpty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
+      <div id="vocab-list"></div>
+    </div>
+
     <!-- Tab: Markdown -->
     <div id="panel-markdown" class="panel" role="tabpanel" aria-labelledby="tab-markdown">
       <div class="fg">
@@ -864,5 +878,7 @@
   <script defer src="export-targets.js"></script>
   <script defer src="options.js"></script>
   <script defer src="options-notes.js"></script>
+  <script defer src="md-dict.js"></script>
+  <script defer src="options-vocab.js"></script>
 </body>
 </html>

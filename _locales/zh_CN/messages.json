@@ -2645,6 +2645,20 @@
   "dictAiNotConfigured": {
     "message": "在设置中配置 AI 服务后可获得语境释义。"
   },
+  "dictVocabEmpty": {
+    "message": "还没有生词。在阅读器的词典视图里保存单词。"
+  },
+  "dictDeleteConfirm": {
+    "message": "从生词库移除「$TERM$」？",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictDeleteFailed": {
+    "message": "移除失败"
+  },
   "secSendDestinations": {
     "message": "发送目标"
   },

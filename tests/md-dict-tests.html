@@ -49,6 +49,11 @@ assertEq(pbpDictVocabKey("acct_u1", "zh", "书"), "acct_u1|zh|书", "CJK passthr
 assertEq(pbpDictCacheKeyPublic("en", "New  York"), pbpDictCacheKeyPublic("en", "New York"), "public key collapses whitespace");
 assertEq(pbpDictCacheKeyPublic("de", "Straße"), "de|straße", "public key has no owner");
 
+section("pbpDictOwnerScope");
+assertEq(pbpDictOwnerScope("alice"), "acct_alice", "account -> acct_ prefix");
+assertEq(pbpDictOwnerScope(""), "ownerless", "falsy -> ownerless");
+assertEq(pbpDictOwnerScope("a b"), "acct_a%20b", "encodes special chars");
+
 section("pbpDictSafeUrl");
 assertEq(pbpDictSafeUrl("https://en.wiktionary.org/wiki/x"), "https://en.wiktionary.org/wiki/x", "https passes");
 assertEq(pbpDictSafeUrl("http://a.example/x"), "http://a.example/x", "http passes");
@@ -170,7 +175,10 @@ async function runVocabIdbTests() {
   assertEq(aRows.length, 1, "owner filter: acct_a sees 1");
   assertEq(bRows.length, 1, "owner filter: acct_b sees 1");
   assert(aRows[0].gloss !== "other-account", "no cross-account leak");
-  const okDel = await pbpVocabDelete(aRows[0].id);
+  const badDel = await pbpVocabDelete(aRows[0].id, "acct_wrong");
+  assert(badDel === false, "delete with wrong owner resolves false");
+  assertEq((await pbpVocabAll("acct_a")).length, 1, "wrong-owner delete leaves the record in place");
+  const okDel = await pbpVocabDelete(aRows[0].id, "acct_a");
   assert(okDel === true, "delete resolves true on tx complete");
   assertEq((await pbpVocabAll("acct_a")).length, 0, "deleted row gone");
   assertEq((await pbpVocabAll("acct_b")).length, 1, "other owner untouched");

@@ -2645,6 +2645,20 @@
   "dictAiNotConfigured": {
     "message": "Configurez un fournisseur d'IA dans les réglages pour obtenir des explications contextuelles."
   },
+  "dictVocabEmpty": {
+    "message": "Aucun mot enregistré. Enregistrez des mots depuis la vue dictionnaire du lecteur."
+  },
+  "dictDeleteConfirm": {
+    "message": "Retirer « $TERM$ » du vocabulaire ?",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictDeleteFailed": {
+    "message": "Échec de la suppression"
+  },
   "secSendDestinations": {
     "message": "Destinations d’envoi"
   },

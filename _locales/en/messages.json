@@ -2645,6 +2645,20 @@
   "dictAiNotConfigured": {
     "message": "Configure an AI provider in Settings to get contextual explanations."
   },
+  "dictVocabEmpty": {
+    "message": "No saved words yet. Save words from the reader's dictionary view."
+  },
+  "dictDeleteConfirm": {
+    "message": "Remove \"$TERM$\" from vocabulary?",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictDeleteFailed": {
+    "message": "Could not remove the word"
+  },
   "secSendDestinations": {
     "message": "Send-to Destinations"
   },

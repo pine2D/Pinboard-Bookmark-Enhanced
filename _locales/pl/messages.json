@@ -2645,6 +2645,20 @@
   "dictAiNotConfigured": {
     "message": "Skonfiguruj dostawcę AI w ustawieniach, aby otrzymywać wyjaśnienia kontekstowe."
   },
+  "dictVocabEmpty": {
+    "message": "Brak zapisanych słówek. Zapisuj słowa z widoku słownika w czytniku."
+  },
+  "dictDeleteConfirm": {
+    "message": "Usunąć „$TERM$” ze słówek?",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictDeleteFailed": {
+    "message": "Nie udało się usunąć"
+  },
   "secSendDestinations": {
     "message": "Miejsca docelowe"
   },

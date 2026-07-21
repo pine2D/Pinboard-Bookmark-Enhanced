@@ -2645,6 +2645,20 @@
   "dictAiNotConfigured": {
     "message": "在設定中設置 AI 服務後可獲得語境釋義。"
   },
+  "dictVocabEmpty": {
+    "message": "還沒有生詞。在閱讀器的詞典視圖裡儲存單字。"
+  },
+  "dictDeleteConfirm": {
+    "message": "從生詞庫移除「$TERM$」？",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictDeleteFailed": {
+    "message": "移除失敗"
+  },
   "secSendDestinations": {
     "message": "傳送目標"
   },

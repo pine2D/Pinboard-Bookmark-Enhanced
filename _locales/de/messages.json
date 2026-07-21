@@ -2645,6 +2645,20 @@
   "dictAiNotConfigured": {
     "message": "Richte in den Einstellungen einen KI-Anbieter ein, um Kontexterklärungen zu erhalten."
   },
+  "dictVocabEmpty": {
+    "message": "Noch keine gespeicherten Vokabeln. Speichere Wörter aus der Wörterbuchansicht des Readers."
+  },
+  "dictDeleteConfirm": {
+    "message": "\"$TERM$\" aus der Vokabelliste entfernen?",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictDeleteFailed": {
+    "message": "Entfernen fehlgeschlagen"
+  },
   "secSendDestinations": {
     "message": "Sendeziele"
   },
