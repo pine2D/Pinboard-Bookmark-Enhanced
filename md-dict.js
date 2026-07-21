@@ -481,3 +481,263 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
   try { await pbpAiCacheSet(cacheKey, norm, Date.now()); } catch (_) {}
   return norm;
 }
+
+// ---- Contextual-gloss slot + run assembly -------------------------------
+let _pbpDictRunSeq = 0;
+let _pbpDictCurrent = null;      // merged results of the LIVE run only
+let _pbpDictChildCtrl = null;    // the live run's own controller (child of md-ask's)
+let _pbpDictSaveTarget = null;   // {itemId} | {range} | null — explain-shaped
+let _pbpDictOwner = "ownerless"; // set from pbp:rendered detail.account (Task 8 listener)
+
+function _pbpDictDetect(text) {
+  return new Promise((resolve) => {
+    try {
+      chrome.i18n.detectLanguage(String(text || "").slice(0, 800), (r) => {
+        const top = r && Array.isArray(r.languages) && r.languages[0] ? r.languages[0].language : "";
+        resolve({ lang: top, reliable: !!(r && r.isReliable) });
+      });
+    } catch (_) { resolve({ lang: "", reliable: false }); }
+  });
+}
+
+// Sentence -> block -> article-lang ladder (spec §3; Codex HIGH 6).
+async function _pbpDictResolveLang(cap, ctx, manual) {
+  const view = document.getElementById("rendered-view");
+  const articleLang = view ? (view.getAttribute("lang") || "") : "";
+  if (pbpDictPrimaryLang(manual)) return pbpDictPrimaryLang(manual);
+  const bySentence = await _pbpDictDetect(ctx.sentence || cap.text);
+  const first = pbpDictRouteLang(bySentence.lang, bySentence.reliable, "", "");
+  if (first) return first;
+  const byBlock = await _pbpDictDetect(ctx.blockText || "");
+  return pbpDictRouteLang(byBlock.lang, byBlock.reliable, articleLang, "");
+}
+
+// Whole function wrapped so EVERY exit resolves the lemma exactly once
+// (Codex HIGH 4) and no pre-try throw can hang the dictionary slot's 404 wait.
+async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
+  try {
+    if (typeof pbpAiAvailable === "function" && !pbpAiAvailable(s)) {
+      const msg = document.createElement("div");
+      msg.className = "xp-dict-msg";
+      msg.textContent = t("dictAiNotConfigured");
+      el.replaceChildren(msg);
+      return null; // finally resolves lemma
+    }
+    const langName = pbpExplainLangName(uiLangToBCP47());
+    const title = document.getElementById("preview-title").textContent;
+    const { system, prompt } = pbpDictBuildCtxPrompt({
+      selection: cap.text, sentence: ctx.sentence, title, answerLang: langName
+    });
+    const provider = s.aiProvider || "gemini";
+    const model = (typeof pbpAiEffectiveModel === "function" ? pbpAiEffectiveModel(s) : "") || "";
+    const cacheKey = "dictctx_" + _pbpDictOwner + "_" + provider + "_" + model + "_"
+      + pbpDictCacheKeyPublic(lang, cap.text) + "_" + pbpDictCtxHash(ctx.sentence + "␟" + title + "␟" + langName);
+    const finish = (full) => {
+      const parsed = pbpDictParseCtxAnswer(full);
+      const md = document.createElement("div");
+      md.className = "xp-md";
+      md.innerHTML = renderMarkdown(parsed.gloss); // single sanitize point
+      const tag = document.createElement("div");
+      tag.className = "xp-dict-ailabel";
+      tag.textContent = t("dictAiLabel") + " · " + provider;
+      el.replaceChildren(md, tag);
+      return parsed;
+    };
+    const hit = await pbpAiCacheGet(cacheKey).catch(() => null);
+    if (hit && typeof hit.result === "string") {
+      const parsed = finish(hit.result);
+      resolveLemmaOnce(parsed.lemma);
+      return parsed;
+    }
+    const streamEl = document.createElement("div");
+    streamEl.className = "xp-stream";
+    let started = false, pending = "", rafId = 0;
+    const flush = () => { rafId = 0; streamEl.textContent = pbpDictStripLemmaLine(pending); };
+    try {
+      pbpAiBumpCounter("explain"); // dict shares the explain usage bucket
+      const full = await callAIStream(s, prompt, {
+        maxTokens: 512, model: pbpAiResolveModelOverride(s), system, signal
+      }, (delta, acc) => {
+        if (!started) { started = true; el.replaceChildren(streamEl); }
+        pending = acc;
+        if (!rafId) rafId = requestAnimationFrame(flush);
+      });
+      if (rafId) cancelAnimationFrame(rafId);
+      const parsed = finish(full);
+      try { await pbpAiCacheSet(cacheKey, full, Date.now()); } catch (_) {}
+      resolveLemmaOnce(parsed.lemma);
+      return parsed;
+    } catch (e) {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (e && e.name === "AbortError") return null;
+      const wrap = document.createElement("div");
+      wrap.className = "xp-error";
+      const msg = document.createElement("p");
+      msg.textContent = (e && e.message) || "Request failed";
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "xp-retry";
+      retry.textContent = t(e && e.code === "host_permission" ? "aiGrantRetry" : "explainErrRetry");
+      retry.addEventListener("click", () => {
+        if (retry.disabled) return;
+        retry.disabled = true;
+        // Run-level restart: a successful retry must re-merge results and
+        // re-coordinate the lemma wait — never a slot-local recursion
+        // (Codex HIGH 2).
+        if (_pbpDictCurrent && typeof _pbpDictCurrent.rerun === "function") _pbpDictCurrent.rerun();
+      });
+      wrap.appendChild(msg);
+      wrap.appendChild(retry);
+      el.replaceChildren(wrap);
+      return null;
+    }
+  } finally {
+    resolveLemmaOnce(""); // once-only resolver: no-op if already resolved
+  }
+}
+
+const PBP_DICT_LANGS = ["auto", "en", "de", "fr", "es", "it", "pt", "nl", "ru", "pl", "ja", "ko", "zh"];
+
+async function pbpDictRun(cap, ctx, pop, ctrl, s) {
+  // Child controller: this run's own signal, chained to md-ask's parent ctrl.
+  // A language switch / rerun aborts ONLY the old child (Codex HIGH 1).
+  if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort();
+  const child = new AbortController();
+  _pbpDictChildCtrl = child;
+  const onParentAbort = () => child.abort();
+  if (ctrl.signal.aborted) child.abort();
+  else ctrl.signal.addEventListener("abort", onParentAbort, { once: true });
+  const signal = child.signal;
+
+  const runId = ++_pbpDictRunSeq;
+  const cur = {
+    runId, term: cap.text, lang: "", gloss: "", lemma: "", ipa: "",
+    sourceUrl: "", license: "", sentence: ctx.sentence || "", saved: false,
+    owner: _pbpDictOwner,
+    rerun: () => { if (_pbpDictCurrent === cur) pbpDictRun(cap, ctx, pop, ctrl, s); }
+  };
+  _pbpDictCurrent = cur;
+
+  const body = pop.querySelector(".xp-body");
+  const wrap = document.createElement("div");
+  wrap.className = "xp-dict";
+  const head = document.createElement("div");
+  head.className = "xp-dict-head";
+  const sel = document.createElement("select");
+  sel.className = "xp-dict-lang";
+  sel.setAttribute("aria-label", t("dictLangAria"));
+  for (const code of PBP_DICT_LANGS) {
+    const o = document.createElement("option");
+    o.value = code === "auto" ? "" : code;
+    o.textContent = code === "auto" ? t("dictLangAuto") : code;
+    sel.appendChild(o);
+  }
+  const speak = document.createElement("button");
+  speak.type = "button";
+  speak.className = "xp-dict-speak";
+  speak.setAttribute("aria-label", t("dictSpeak")); // no title — a11y label only
+  speak.innerHTML = PBP_DICT_SPEAKER_SVG; // static constant, never model text
+  head.appendChild(sel);
+  head.appendChild(speak);
+  const slot = document.createElement("div");
+  slot.className = "xp-dict-slot";
+  const ctxEl = document.createElement("div");
+  ctxEl.className = "xp-dict-ctx";
+  wrap.appendChild(head);
+  wrap.appendChild(slot);
+  wrap.appendChild(ctxEl);
+  body.replaceChildren(wrap);
+
+  const manual = typeof s.dictLangManual === "string" ? s.dictLangManual : "";
+  const lang = await _pbpDictResolveLang(cap, ctx, manual);
+  if (signal.aborted || _pbpDictCurrent !== cur) return;
+  cur.lang = lang;
+  const effectiveLang = lang || "und"; // vocab identity: query and save agree (Codex HIGH 6)
+  sel.value = PBP_DICT_LANGS.includes(lang) ? lang : "";
+  sel.addEventListener("change", async () => {
+    const v = sel.value;
+    s.dictLangManual = v;
+    try {
+      const r = await persistSettings({ dictLangManual: v }); // async result, not throw (Codex MEDIUM 9)
+      if (!r.ok) throw r.error || new Error("settings write failed");
+    } catch (_) { /* in-memory value already applied */ }
+    cur.rerun();
+  });
+  speak.addEventListener("click", () => pbpDictSpeak(cap.text, cur.lang));
+
+  let lemmaSettled = false;
+  let resolveLemmaRaw;
+  const lemmaPromise = new Promise((r) => { resolveLemmaRaw = r; });
+  const resolveLemmaOnce = (v) => { if (!lemmaSettled) { lemmaSettled = true; resolveLemmaRaw(v); } };
+
+  // Vocab button: disabled until BOTH slots settle so a save is never empty
+  // (Codex HIGH 3). dataset.runId guards stale promise writes.
+  const vocabBtn = pop.querySelector(".xp-vocab");
+  if (vocabBtn) {
+    vocabBtn.hidden = false;
+    vocabBtn.disabled = true;
+    vocabBtn.dataset.runId = String(runId);
+    vocabBtn.textContent = t("dictSaveVocab");
+  }
+
+  const results = await Promise.allSettled([
+    _pbpDictSlotRun(slot, cap.text, lang, signal, lemmaPromise, cur.rerun),
+    _pbpDictCtxRun(ctxEl, cap, ctx, s, signal, resolveLemmaOnce, lang)
+  ]);
+  if (signal.aborted || _pbpDictCurrent !== cur) return;
+  const norm = results[0].status === "fulfilled" ? results[0].value : null;
+  const parsed = results[1].status === "fulfilled" ? results[1].value : null;
+  if (norm) {
+    const first = norm.entries[0];
+    cur.ipa = first && first.ipas[0] ? first.ipas[0].text : "";
+    cur.sourceUrl = norm.sourceUrl;
+    cur.license = norm.license;
+    if (first && first.senses[0]) cur.gloss = first.senses[0].definition;
+  }
+  if (parsed) {
+    if (parsed.gloss) cur.gloss = parsed.gloss;
+    cur.lemma = parsed.lemma;
+  }
+  if (vocabBtn && vocabBtn.dataset.runId === String(runId)) {
+    const hit = await pbpVocabGet(pbpDictVocabKey(cur.owner, effectiveLang, cap.text));
+    if (_pbpDictCurrent !== cur || vocabBtn.dataset.runId !== String(runId)) return;
+    if (hit) { cur.saved = true; vocabBtn.textContent = t("dictSavedVocab"); }
+    vocabBtn.disabled = false;
+  }
+}
+window.pbpDictRun = pbpDictRun;
+
+async function pbpDictSaveCurrent() {
+  const cur = _pbpDictCurrent;
+  if (!cur || !cur.term) return false;
+  if (cur.owner !== _pbpDictOwner) return false; // owner re-check at commit time (invariant)
+  const urlEl = document.getElementById("preview-url");
+  const titleEl = document.getElementById("preview-title");
+  let highlightId = null;
+  const target = _pbpDictSaveTarget;
+  if (target && target.itemId) highlightId = target.itemId;                 // card path keeps its id
+  else if (target && target.range && typeof window.pbpHlItemIdAtRange === "function") {
+    try { highlightId = window.pbpHlItemIdAtRange(target.range) || null; } catch (_) {}
+  }
+  const entry = await pbpVocabSaveWord(cur.owner, {
+    term: cur.term, lemma: cur.lemma, language: cur.lang || "und",
+    gloss: cur.gloss, ipa: cur.ipa, sourceUrl: cur.sourceUrl, license: cur.license,
+    context: {
+      quote: cur.sentence, articleUrl: pbpDictSafeUrl(urlEl ? urlEl.href : ""),
+      articleTitle: titleEl ? titleEl.textContent : "", highlightId, createdAt: Date.now()
+    }
+  });
+  if (entry && _pbpDictCurrent === cur) {
+    cur.saved = true;
+    if (typeof _pbpDictPanelRefresh === "function") _pbpDictPanelRefresh();
+    return true;
+  }
+  return false;
+}
+window.pbpDictSaveCurrent = pbpDictSaveCurrent;
+window.pbpDictSetSaveTarget = (tgt) => { _pbpDictSaveTarget = tgt || null; };
+window.pbpDictOnActionSwitch = () => {
+  _pbpDictSaveTarget = null;
+  if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort(); // invalidate the run, not just the range
+  _pbpDictCurrent = null;
+};
