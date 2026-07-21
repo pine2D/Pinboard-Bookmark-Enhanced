@@ -48,6 +48,11 @@ check("save coercion keeps 0 as 0 (not 60)", coerce("0") === 0);
 check("save coercion keeps blank as 60", coerce("") === 60);
 check("save coercion clamps 99999 to 10080", coerce("99999") === 10080);
 
+// ---- i18n $-safe substitution (function replacement, not bare String.replace) ----
+const _i18nEntry = { message: "Delete $TERM$?", placeholders: { TERM: { content: "$1" } } };
+check("t() substitution: $&-containing arg passes through literally", _resolveMsg(_i18nEntry, ["$&"]) === "Delete $&?");
+check("t() substitution: normal arg still substitutes", _resolveMsg(_i18nEntry, ["Widget"]) === "Delete Widget?");
+
 async function acheck(name, fn) {
   try { await fn(); check(name, true); }
   catch (e) { console.error(name, e); check(name, false); }

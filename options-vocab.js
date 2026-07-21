@@ -22,14 +22,18 @@ async function pbpVocabCurrentOwner() {
   return pbpDictOwnerScope(pbpPinboardAccountFromToken(s.pinboardToken));
 }
 
-function _pbpVocabBuildRow(w) {
+function _pbpVocabBuildRow(w, index) {
   const card = document.createElement("article");
   card.className = "notes-card";
 
   const top = document.createElement("div");
   top.className = "notes-card-top";
 
-  const bodyId = "vocab-card-body-" + String(w.id).replace(/[^a-zA-Z0-9_-]/g, "_");
+  // Render-index-based id, not w.id -- non-ASCII terms squashed by a regex
+  // collide (two CJK words both become "_"), duplicating ids and breaking
+  // aria-controls. Index within the current render generation is always
+  // structurally unique, no hashing needed.
+  const bodyId = "vocab-body-" + _vocabRenderGen + "-" + index;
   const head = document.createElement("button");
   head.type = "button";
   head.className = "notes-card-head";
@@ -143,12 +147,19 @@ function _pbpVocabDeleteRow(w, anchor) {
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {
-      const owner = await pbpVocabCurrentOwner();
-      const ok = await pbpVocabDelete(w.id, owner);
-      if (ok) {
-        _vocabRows = _vocabRows.filter((r) => r.id !== w.id);
-        _pbpVocabRenderList(_vocabRows);
-      } else {
+      // Whole body in try/catch: showConfirmPopover only console.errors a
+      // rejected onConfirm, so a thrown owner read (or anything else here)
+      // would otherwise vanish with no user-visible feedback.
+      try {
+        const owner = await pbpVocabCurrentOwner();
+        const ok = await pbpVocabDelete(w.id, owner);
+        if (ok) {
+          _vocabRows = _vocabRows.filter((r) => r.id !== w.id);
+          _pbpVocabRenderList(_vocabRows);
+        } else {
+          _pbpVocabFlashStatus(false, t("dictDeleteFailed"));
+        }
+      } catch (_) {
         _pbpVocabFlashStatus(false, t("dictDeleteFailed"));
       }
     },
@@ -163,7 +174,7 @@ function _pbpVocabRenderList(rows) {
   const empty = $id("vocab-empty");
   if (empty) empty.hidden = !!rows.length;
   list.replaceChildren();
-  rows.forEach((w) => list.appendChild(_pbpVocabBuildRow(w)));
+  rows.forEach((w, i) => list.appendChild(_pbpVocabBuildRow(w, i)));
 }
 
 // Called from options.js's activateTab -- the sole lazy-init line added
@@ -181,8 +192,23 @@ async function renderVocabPanel() {
   _pbpVocabRenderList(rows);
 }
 
-function _pbpVocabExport() {
-  pbpVocabCurrentOwner().then((owner) => pbpVocabAll(owner)).then((rows) => {
+// Fail-closed on account switch: owner is re-derived AFTER the rows fetch
+// resolves and compared against the owner the rows were fetched for. If they
+// differ (token rotated, or sync/keys-routing toggled mid-fetch), the export
+// aborts BEFORE the Blob is built -- never download the previous account's
+// words under the new account's export click. The whole chain is wrapped so
+// any rejection (owner read, IDB read) surfaces feedback instead of dying
+// silently (this runs as a click handler; an unhandled rejection there is
+// invisible to the user).
+async function _pbpVocabExport() {
+  try {
+    const owner = await pbpVocabCurrentOwner();
+    const rows = await pbpVocabAll(owner);
+    const ownerNow = await pbpVocabCurrentOwner();
+    if (ownerNow !== owner) {
+      _pbpVocabFlashStatus(false, t("jinaFailed"));
+      return;
+    }
     const tsv = pbpDictTsv(rows.map((w) => ({
       term: w.term,
       reading: w.ipa || "",
@@ -201,7 +227,9 @@ function _pbpVocabExport() {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  });
+  } catch (_) {
+    _pbpVocabFlashStatus(false, t("jinaFailed"));
+  }
 }
 
 const _vocabExportBtn = $id("vocab-export-btn");

@@ -101,7 +101,10 @@ function _resolveMsg(entry, args) {
       if (m) {
         const idx = parseInt(m[1]) - 1;
         if (idx >= 0 && idx < args.length) {
-          msg = msg.replace(new RegExp("\\$" + name + "\\$", "gi"), args[idx]);
+          // Function replacement (not a bare string) -- a string replacement
+          // interprets $&, $`, $', $$, $N in the arg as special patterns and
+          // would corrupt any placeholder value containing them.
+          msg = msg.replace(new RegExp("\\$" + name + "\\$", "gi"), () => String(args[idx]));
         }
       }
     }

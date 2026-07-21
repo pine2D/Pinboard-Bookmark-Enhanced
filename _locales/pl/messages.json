@@ -2649,7 +2649,7 @@
     "message": "Brak zapisanych słówek. Zapisuj słowa z widoku słownika w czytniku."
   },
   "dictDeleteConfirm": {
-    "message": "Usunąć „$TERM$” ze słówek?",
+    "message": "Usunąć ze słówek: „$TERM$”?",
     "placeholders": {
       "term": {
         "content": "$1"
