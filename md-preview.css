@@ -1421,7 +1421,12 @@ html.motion-ready .send-menu[hidden] {
   border-radius: 10px;
   box-shadow: 0 8px 30px rgba(15, 23, 42, 0.22);
   overflow: hidden;
-  font-size: 14px;
+  /* em base for the popover's own hierarchy -- the same construction as
+     #ask-panel: the container rides the typography tier and every chrome
+     tier below is an em of it (term 1em/600, buttons 0.8em, meta 0.75em),
+     so payload and chrome scale together instead of a 20px-payload /
+     11px-chrome mismatch (real-device feedback 2026-07-21). */
+  font-size: var(--panel-payload-fs);
 }
 #explain-pop:popover-open { display: flex; }
 html.motion-ready :is(#explain-pop, #typo-pop) {
@@ -1448,7 +1453,6 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   padding: 10px 14px 8px;
   border-bottom: 1px solid var(--border-light);
   font-weight: 600;
-  font-size: 13px;
 }
 .xp-term {
   flex: 1 1 auto;
@@ -1468,7 +1472,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   border-radius: 6px;
   background: var(--btn-bg);
   color: var(--btn-fg);
-  font-size: 11px;
+  font-size: 0.75em;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -1485,20 +1489,14 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   overflow-y: auto;
   min-height: 64px;
   line-height: 1.6;
-  /* Reading payload rides the typography tier like the ask/skim panels
-     (--panel-payload-fs = prose clamp x tier x 0.9, defined on body):
-     a fixed px here stalled at a fraction of the 4K prose size and ignored
-     the rail typo tiers entirely (real-device feedback 2026-07-21, the same
-     defect class the 2026-07-15 panel-payload unification fixed). Chrome
-     (head, action buttons, footer) keeps its fixed px sizes; only the
-     payload scales. */
-  font-size: var(--panel-payload-fs);
+  /* font-size inherits the popover's --panel-payload-fs em base (see
+     #explain-pop) -- payload text renders at 1em of the typography tier. */
 }
 .xp-stream { white-space: pre-wrap; }
 .xp-md p { margin: 0.5em 0; }
 .xp-skel {
-  height: 12px;
-  margin: 9px 0;
+  height: 0.7em;
+  margin: 0.55em 0;
   border-radius: 6px;
   background: linear-gradient(90deg, var(--border-light) 25%, var(--border) 50%, var(--border-light) 75%);
   background-size: 200% 100%;
@@ -1514,7 +1512,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   border-radius: 6px;
   background: var(--btn-bg);
   color: var(--btn-fg);
-  font-size: 12px;
+  font-size: 0.8em;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -1528,13 +1526,13 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   border-top: 1px solid var(--border-light);
 }
 /* Dictionary view (md-dict.js) */
-.xp-dict-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.xp-dict-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 /* Joins the .exp-img-row select recipe above (shared border/background/chevron);
    this override only densifies for the dict view's tighter header row. */
-.xp-dict-lang { flex: 0 1 auto; padding: 3px 22px 3px 8px; font-size: 12px; background-position: right 6px center; }
-.xp-dict-speak { display: inline-flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--border); border-radius: 4px; padding: 3px; cursor: pointer; color: inherit; }
+.xp-dict-lang { flex: 0 1 auto; padding: 3px 22px 3px 8px; font-size: 0.8em; background-position: right 6px center; }
+.xp-dict-speak { display: inline-flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--btn-border); border-radius: 6px; padding: 4px; cursor: pointer; color: inherit; }
 .xp-dict-speak:hover { background: var(--btn-hover); }
-.xp-dict-speak svg { width: 14px; height: 14px; }
+.xp-dict-speak svg { width: 0.8em; height: 0.8em; }
 .xp-dict-slot { min-height: 20px; }
 .xp-dict-entry { margin: 0 0 8px; }
 .xp-dict-ipa-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
@@ -1553,7 +1551,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-model {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 11px;
+  font-size: 0.75em;
   color: var(--fg-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -1588,7 +1586,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
-  font-size: 12px;
+  font-size: 0.8em;
 }
 .xp-gear-menu[hidden] { display: none; }
 /* Same open/close motion as .send-menu (both are [hidden]-toggled dropdowns). */
