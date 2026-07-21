@@ -1102,7 +1102,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   .exp-img-row option, .xp-dict-lang option {
     padding: 7px 9px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: inherit; /* tracks each select's own size (13px exp-img-row, 0.8em tier dict-lang) */
     cursor: pointer;
   }
   .exp-img-row option:hover, .xp-dict-lang option:hover { background: var(--row-hover, rgba(127,127,127,.14)); }
@@ -1521,6 +1521,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-foot {
   display: flex;
   align-items: center;
+  flex-wrap: wrap; /* largest tier: 4 buttons + gear outgrow the row; wrap, never clip */
   gap: 8px;
   padding: 8px 14px 10px;
   border-top: 1px solid var(--border-light);
@@ -1530,7 +1531,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 /* Joins the .exp-img-row select recipe above (shared border/background/chevron);
    this override only densifies for the dict view's tighter header row. */
 .xp-dict-lang { flex: 0 1 auto; padding: 3px 22px 3px 8px; font-size: 0.8em; background-position: right 6px center; }
-.xp-dict-speak { display: inline-flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--btn-border); border-radius: 6px; padding: 4px; cursor: pointer; color: inherit; }
+.xp-dict-speak { display: inline-flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--btn-border); border-radius: 6px; padding: 4px; cursor: pointer; color: inherit; font-size: 1em; /* buttons don't inherit font-size; the 0.8em svg needs this anchor */ }
 .xp-dict-speak:hover { background: var(--btn-hover); }
 .xp-dict-speak svg { width: 0.8em; height: 0.8em; }
 .xp-dict-slot { min-height: 20px; }
