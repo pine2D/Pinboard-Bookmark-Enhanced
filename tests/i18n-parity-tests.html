@@ -100,7 +100,8 @@ async function loadLocale(loc) {
     "optWaybackS3Key","optWaybackS3Secret","trViewOriginal",
     "labelNotes","tagCount","tagCountPlural","qlNotes","sepUnderscore",
     "secNotifications","qlNotesTitle","mdOptImages","aiContentSourceLocal",
-    "optPopupWidth450","trProgress","labelModel","tagGovKindSeparator"
+    "optPopupWidth450","trProgress","labelModel","tagGovKindSeparator",
+    "dictLangAuto" // loanword: "Auto" is the same in all target languages
   ]);
   for (const loc of ["de","fr","pl","ru","zh_HK"]) {
     const offenders = Object.keys(msgs.en).filter(k =>

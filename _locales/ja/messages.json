@@ -2591,6 +2591,54 @@
   "explainActionTranslate": {
     "message": "翻訳"
   },
+  "explainActionDict": {
+    "message": "辞書"
+  },
+  "dictConnect": {
+    "message": "Wiktionary 辞書に接続"
+  },
+  "dictConnectHint": {
+    "message": "語義は freedictionaryapi.com（Wiktionary データ）から取得します。"
+  },
+  "dictNoEntry": {
+    "message": "辞書に項目がありません"
+  },
+  "dictLoadFailed": {
+    "message": "辞書を利用できません"
+  },
+  "dictSpeak": {
+    "message": "発音"
+  },
+  "dictSaveVocab": {
+    "message": "単語帳に保存"
+  },
+  "dictSavedVocab": {
+    "message": "単語帳に保存済み"
+  },
+  "dictVocabSection": {
+    "message": "単語帳"
+  },
+  "dictExportTsv": {
+    "message": "TSV を書き出す"
+  },
+  "dictAiLabel": {
+    "message": "AI 生成"
+  },
+  "dictLangAuto": {
+    "message": "自動"
+  },
+  "dictLangAria": {
+    "message": "辞書の言語"
+  },
+  "dictDeleted": {
+    "message": "削除しました"
+  },
+  "dictSource": {
+    "message": "出典:"
+  },
+  "dictAiNotConfigured": {
+    "message": "設定で AI プロバイダーを設定すると文脈に応じた説明が得られます。"
+  },
   "secSendDestinations": {
     "message": "送信先"
   },

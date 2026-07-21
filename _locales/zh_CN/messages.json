@@ -2591,6 +2591,54 @@
   "explainActionTranslate": {
     "message": "翻译"
   },
+  "explainActionDict": {
+    "message": "词典"
+  },
+  "dictConnect": {
+    "message": "连接 Wiktionary 词典"
+  },
+  "dictConnectHint": {
+    "message": "释义来自 freedictionaryapi.com（Wiktionary 数据）。"
+  },
+  "dictNoEntry": {
+    "message": "没有找到词条"
+  },
+  "dictLoadFailed": {
+    "message": "词典暂不可用"
+  },
+  "dictSpeak": {
+    "message": "发音"
+  },
+  "dictSaveVocab": {
+    "message": "存入生词库"
+  },
+  "dictSavedVocab": {
+    "message": "已在生词库"
+  },
+  "dictVocabSection": {
+    "message": "生词"
+  },
+  "dictExportTsv": {
+    "message": "导出 TSV"
+  },
+  "dictAiLabel": {
+    "message": "AI 生成"
+  },
+  "dictLangAuto": {
+    "message": "自动"
+  },
+  "dictLangAria": {
+    "message": "词典语言"
+  },
+  "dictDeleted": {
+    "message": "已删除"
+  },
+  "dictSource": {
+    "message": "来源："
+  },
+  "dictAiNotConfigured": {
+    "message": "在设置中配置 AI 服务后可获得语境释义。"
+  },
   "secSendDestinations": {
     "message": "发送目标"
   },

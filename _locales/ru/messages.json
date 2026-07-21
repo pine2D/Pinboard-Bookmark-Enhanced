@@ -2591,6 +2591,54 @@
   "explainActionTranslate": {
     "message": "Перевести"
   },
+  "explainActionDict": {
+    "message": "Словарь"
+  },
+  "dictConnect": {
+    "message": "Подключить словарь Wiktionary"
+  },
+  "dictConnectHint": {
+    "message": "Определения предоставляет freedictionaryapi.com (данные Wiktionary)."
+  },
+  "dictNoEntry": {
+    "message": "Словарная статья не найдена"
+  },
+  "dictLoadFailed": {
+    "message": "Словарь недоступен"
+  },
+  "dictSpeak": {
+    "message": "Произнести"
+  },
+  "dictSaveVocab": {
+    "message": "В словарик"
+  },
+  "dictSavedVocab": {
+    "message": "Уже в словарике"
+  },
+  "dictVocabSection": {
+    "message": "Словарик"
+  },
+  "dictExportTsv": {
+    "message": "Экспорт TSV"
+  },
+  "dictAiLabel": {
+    "message": "Сгенерировано ИИ"
+  },
+  "dictLangAuto": {
+    "message": "Авто"
+  },
+  "dictLangAria": {
+    "message": "Язык словаря"
+  },
+  "dictDeleted": {
+    "message": "Удалено"
+  },
+  "dictSource": {
+    "message": "Источник:"
+  },
+  "dictAiNotConfigured": {
+    "message": "Настройте ИИ-провайдера в настройках, чтобы получать контекстные объяснения."
+  },
   "secSendDestinations": {
     "message": "Места назначения"
   },

@@ -2591,6 +2591,54 @@
   "explainActionTranslate": {
     "message": "翻譯"
   },
+  "explainActionDict": {
+    "message": "詞典"
+  },
+  "dictConnect": {
+    "message": "連接 Wiktionary 詞典"
+  },
+  "dictConnectHint": {
+    "message": "釋義來自 freedictionaryapi.com（Wiktionary 資料）。"
+  },
+  "dictNoEntry": {
+    "message": "沒有找到詞條"
+  },
+  "dictLoadFailed": {
+    "message": "詞典暫不可用"
+  },
+  "dictSpeak": {
+    "message": "發音"
+  },
+  "dictSaveVocab": {
+    "message": "存入生詞庫"
+  },
+  "dictSavedVocab": {
+    "message": "已在生詞庫"
+  },
+  "dictVocabSection": {
+    "message": "生詞"
+  },
+  "dictExportTsv": {
+    "message": "匯出 TSV"
+  },
+  "dictAiLabel": {
+    "message": "AI 生成"
+  },
+  "dictLangAuto": {
+    "message": "自動"
+  },
+  "dictLangAria": {
+    "message": "詞典語言"
+  },
+  "dictDeleted": {
+    "message": "已刪除"
+  },
+  "dictSource": {
+    "message": "來源："
+  },
+  "dictAiNotConfigured": {
+    "message": "在設定中設置 AI 服務後可獲得語境釋義。"
+  },
   "secSendDestinations": {
     "message": "傳送目標"
   },

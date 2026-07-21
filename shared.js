@@ -367,6 +367,7 @@ const SETTINGS_DEFAULTS = {
   previewAiModel: "",
   translateTargetLang: "auto",
   translateGlossary: "",
+  dictLangManual: "",       // md-dict: manual dictionary language override ("" = auto-detect)
   selectionTrigger: "icon"
 };
 

@@ -2591,6 +2591,54 @@
   "explainActionTranslate": {
     "message": "Übersetzen"
   },
+  "explainActionDict": {
+    "message": "Wörterbuch"
+  },
+  "dictConnect": {
+    "message": "Wiktionary-Wörterbuch verbinden"
+  },
+  "dictConnectHint": {
+    "message": "Definitionen stammen von freedictionaryapi.com (Wiktionary-Daten)."
+  },
+  "dictNoEntry": {
+    "message": "Kein Wörterbucheintrag"
+  },
+  "dictLoadFailed": {
+    "message": "Wörterbuch nicht verfügbar"
+  },
+  "dictSpeak": {
+    "message": "Aussprechen"
+  },
+  "dictSaveVocab": {
+    "message": "In Vokabelliste speichern"
+  },
+  "dictSavedVocab": {
+    "message": "In Vokabelliste"
+  },
+  "dictVocabSection": {
+    "message": "Vokabeln"
+  },
+  "dictExportTsv": {
+    "message": "TSV exportieren"
+  },
+  "dictAiLabel": {
+    "message": "KI-generiert"
+  },
+  "dictLangAuto": {
+    "message": "Automatisch"
+  },
+  "dictLangAria": {
+    "message": "Wörterbuchsprache"
+  },
+  "dictDeleted": {
+    "message": "Gelöscht"
+  },
+  "dictSource": {
+    "message": "Quelle:"
+  },
+  "dictAiNotConfigured": {
+    "message": "Richte in den Einstellungen einen KI-Anbieter ein, um Kontexterklärungen zu erhalten."
+  },
   "secSendDestinations": {
     "message": "Sendeziele"
   },

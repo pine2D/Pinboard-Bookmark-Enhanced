@@ -2591,6 +2591,54 @@
   "explainActionTranslate": {
     "message": "Translate"
   },
+  "explainActionDict": {
+    "message": "Dictionary"
+  },
+  "dictConnect": {
+    "message": "Connect Wiktionary dictionary"
+  },
+  "dictConnectHint": {
+    "message": "Definitions come from freedictionaryapi.com (Wiktionary data)."
+  },
+  "dictNoEntry": {
+    "message": "No dictionary entry"
+  },
+  "dictLoadFailed": {
+    "message": "Dictionary unavailable"
+  },
+  "dictSpeak": {
+    "message": "Pronounce"
+  },
+  "dictSaveVocab": {
+    "message": "Save to vocabulary"
+  },
+  "dictSavedVocab": {
+    "message": "In vocabulary"
+  },
+  "dictVocabSection": {
+    "message": "Vocabulary"
+  },
+  "dictExportTsv": {
+    "message": "Export TSV"
+  },
+  "dictAiLabel": {
+    "message": "AI generated"
+  },
+  "dictLangAuto": {
+    "message": "Auto"
+  },
+  "dictLangAria": {
+    "message": "Dictionary language"
+  },
+  "dictDeleted": {
+    "message": "Deleted"
+  },
+  "dictSource": {
+    "message": "Source:"
+  },
+  "dictAiNotConfigured": {
+    "message": "Configure an AI provider in Settings to get contextual explanations."
+  },
   "secSendDestinations": {
     "message": "Send-to Destinations"
   },
