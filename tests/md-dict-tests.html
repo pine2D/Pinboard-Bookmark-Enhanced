@@ -152,6 +152,32 @@ assert(tsv.indexOf("我在读一本书。") >= 0, "CJK golden row survives");
 assertEq(pbpDictTsv([]), "#separator:Tab\n#html:false\n#columns:Term\tReading\tDefinition\tContext\tSource\tLicense\n", "empty -> header only");
 assert(tsv.indexOf('say "hi" x') === -1 || tsv.indexOf('"say ""hi"" x"') >= 0, "inner quotes doubled when field needs quoting");
 
-document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+async function runVocabIdbTests() {
+  section("pbp-vocab IDB (runtime)");
+  await new Promise((r) => { const del = indexedDB.deleteDatabase("pbp-vocab"); del.onsuccess = del.onerror = del.onblocked = r; });
+  const ctx1 = { quote: "q1", articleUrl: "u1", articleTitle: "t1", highlightId: null, createdAt: 1 };
+  const e1 = await pbpVocabSaveWord("acct_a", { term: "Running", language: "en-US", gloss: "g1", ipa: "", sourceUrl: "https://en.wiktionary.org/wiki/run", license: "CC BY-SA 4.0", context: ctx1 });
+  assert(e1 && e1.id === "acct_a|en|running", "save creates owner-scoped id");
+  assertEq(e1.sourceUrl, "https://en.wiktionary.org/wiki/run", "attribution saved WITHOUT ipa (independent merge)");
+  const e2 = await pbpVocabSaveWord("acct_a", { term: "running", language: "en", gloss: "g2", context: { ...ctx1 } });
+  assertEq(e2.contexts.length, 1, "same url+quote deduped");
+  assertEq(e2.gloss, "g2", "latest gloss wins");
+  const e3 = await pbpVocabSaveWord("acct_a", { term: "running", language: "en", gloss: "", context: { ...ctx1, articleUrl: "u2" } });
+  assertEq(e3.contexts.length, 2, "second article context appended");
+  await pbpVocabSaveWord("acct_b", { term: "running", language: "en", gloss: "other-account", context: ctx1 });
+  const aRows = await pbpVocabAll("acct_a");
+  const bRows = await pbpVocabAll("acct_b");
+  assertEq(aRows.length, 1, "owner filter: acct_a sees 1");
+  assertEq(bRows.length, 1, "owner filter: acct_b sees 1");
+  assert(aRows[0].gloss !== "other-account", "no cross-account leak");
+  const okDel = await pbpVocabDelete(aRows[0].id);
+  assert(okDel === true, "delete resolves true on tx complete");
+  assertEq((await pbpVocabAll("acct_a")).length, 0, "deleted row gone");
+  assertEq((await pbpVocabAll("acct_b")).length, 1, "other owner untouched");
+}
+(async function () {
+  await runVocabIdbTests();
+  document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+})();
 </script>
 </body></html>

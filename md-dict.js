@@ -189,3 +189,110 @@ function pbpDictTsv(rows) {
 }
 
 // ---- PURE END ----
+
+// ---- Vocabulary store: OWN IndexedDB database (spec §4.1) ---------------
+// NOT the ai-cache DB (vocab is permanent, never LRU'd, own version track).
+// Account-isolation invariant: every record carries the non-secret owner
+// scope and every read filters by it.
+const _PBP_VOCAB_DB_NAME = "pbp-vocab";
+const _PBP_VOCAB_DB_VERSION = 1;
+const _PBP_VOCAB_STORE = "words";
+let _pbpVocabDbPromise = null;
+
+function _pbpVocabOpenDB() {
+  if (_pbpVocabDbPromise) return _pbpVocabDbPromise;
+  _pbpVocabDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(_PBP_VOCAB_DB_NAME, _PBP_VOCAB_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(_PBP_VOCAB_STORE)) {
+        const store = db.createObjectStore(_PBP_VOCAB_STORE, { keyPath: "id" });
+        store.createIndex("owner", "owner", { unique: false });
+        store.createIndex("updatedAt", "updatedAt", { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  _pbpVocabDbPromise.catch(() => { _pbpVocabDbPromise = null; });
+  return _pbpVocabDbPromise;
+}
+
+async function pbpVocabGet(id) {
+  try {
+    const db = await _pbpVocabOpenDB();
+    return await new Promise((resolve) => {
+      const req = db.transaction(_PBP_VOCAB_STORE, "readonly").objectStore(_PBP_VOCAB_STORE).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (_) { return null; }
+}
+
+async function pbpVocabAll(owner) {
+  try {
+    const db = await _pbpVocabOpenDB();
+    const rows = await new Promise((resolve) => {
+      const idx = db.transaction(_PBP_VOCAB_STORE, "readonly").objectStore(_PBP_VOCAB_STORE).index("owner");
+      const req = idx.getAll(owner || "ownerless");
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+    rows.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    return rows;
+  } catch (_) { return []; }
+}
+
+// Transaction-complete semantics (Codex MEDIUM 3): resolve on tx.oncomplete,
+// not on the request's onsuccess — a put that later aborts must not report
+// success to the UI.
+async function pbpVocabDelete(id) {
+  try {
+    const db = await _pbpVocabOpenDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(_PBP_VOCAB_STORE, "readwrite");
+      tx.objectStore(_PBP_VOCAB_STORE).delete(id);
+      tx.oncomplete = () => resolve(true);
+      tx.onabort = () => resolve(false);
+      tx.onerror = () => resolve(false);
+    });
+  } catch (_) { return false; }
+}
+
+async function pbpVocabSaveWord(owner, w) {
+  try {
+    const db = await _pbpVocabOpenDB();
+    const scope = owner || "ownerless";
+    const id = pbpDictVocabKey(scope, w.language, w.term);
+    const now = Date.now();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(_PBP_VOCAB_STORE, "readwrite");
+      const store = tx.objectStore(_PBP_VOCAB_STORE);
+      let result = null;
+      const getReq = store.get(id);
+      getReq.onsuccess = () => {
+        const cur = getReq.result || {
+          id, owner: scope,
+          term: String(w.term || "").normalize("NFC").trim(),
+          lemma: null, language: pbpDictPrimaryLang(w.language) || "und",
+          gloss: "", ipa: null, sourceUrl: null, license: null,
+          contexts: [], note: "", status: "new", createdAt: now, updatedAt: now
+        };
+        if (w.lemma && !cur.lemma) cur.lemma = String(w.lemma);
+        if (w.gloss) cur.gloss = String(w.gloss); // latest lookup wins
+        if (w.ipa && !cur.ipa) cur.ipa = String(w.ipa);
+        // Attribution merges INDEPENDENTLY of IPA (a senses-only entry still
+        // carries its CC BY-SA obligation — Codex HIGH 7).
+        if (w.sourceUrl && !cur.sourceUrl) cur.sourceUrl = pbpDictSafeUrl(w.sourceUrl) || null;
+        if (w.license && !cur.license) cur.license = String(w.license);
+        cur.contexts = pbpDictMergeContext(cur.contexts, w.context);
+        cur.updatedAt = now;
+        store.put(cur);
+        result = cur;
+      };
+      tx.oncomplete = () => resolve(result);
+      tx.onabort = () => resolve(null);
+      tx.onerror = () => resolve(null);
+    });
+  } catch (_) { return null; }
+}
