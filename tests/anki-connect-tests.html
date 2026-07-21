@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>anki-connect Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; } .fail { color: #c00; font-weight: bold; }
+h2 { margin-top: 24px; }
+</style></head>
+<body>
+<h1>anki-connect Tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+<script src="../anki-connect.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond; ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+function section(name) { const h = document.createElement("h2"); h.textContent = name; root.appendChild(h); }
+function assert(cond, detail) { check(detail || String(cond), cond, detail); }
+function assertEq(a, e, label) {
+  const ok = a === e;
+  check(label || (String(e) + " === " + String(a)), ok, ok ? "" : "expected " + JSON.stringify(e) + " got " + JSON.stringify(a));
+}
+
+section("pbpAnkiEscapeHtml");
+assertEq(pbpAnkiEscapeHtml('<b>&"\'</b>'), "&lt;b&gt;&amp;&quot;&#39;&lt;/b&gt;", "all five specials escaped");
+assertEq(pbpAnkiEscapeHtml(null), "", "null -> empty");
+assertEq(pbpAnkiEscapeHtml("汉字 plain"), "汉字 plain", "plain text untouched");
+
+section("pbpAnkiNoteFromRow");
+const row1 = { term: "run<s>", reading: "/r&ʌn/", definition: 'to move "fast"', contexts: ["a<b>", "c&d"], source: "https://x/?a=1&b=2", license: "CC <BY>" };
+const note1 = pbpAnkiNoteFromRow(row1, "My Deck");
+assertEq(note1.deckName, "My Deck", "deck passed through");
+assertEq(note1.modelName, "Pinboard Vocab", "model name fixed");
+assertEq(note1.fields.Term, "run&lt;s&gt;", "term escaped");
+assertEq(note1.fields.Context, "a&lt;b&gt;<br>c&amp;d", "contexts escaped THEN joined with literal <br>");
+assert(note1.fields.Definition === "to move &quot;fast&quot;"
+  && note1.fields.Reading === "/r&amp;ʌn/"
+  && note1.fields.Source === "https://x/?a=1&amp;b=2"
+  && note1.fields.License === "CC &lt;BY&gt;", "remaining fields escaped");
+assert(note1.options.allowDuplicate === false && note1.options.duplicateScope === "deck", "dedup options");
+assert(Array.isArray(note1.tags) && note1.tags[0] === "pinboard-enhanced", "tag set");
+const note2 = pbpAnkiNoteFromRow({}, "");
+assert(note2.fields.Term === "" && note2.fields.Context === "" && note2.deckName === "Pinboard Vocab", "empty row -> empty fields, default deck");
+
+section("pbpAnkiBuildRequest");
+const req1 = pbpAnkiBuildRequest("addNotes", { notes: [] }, "sekrit");
+assert(req1.action === "addNotes" && req1.version === 6, "action + version 6");
+assertEq(req1.key, "sekrit", "api key at TOP LEVEL");
+assert(!("key" in (req1.params || {})), "key never inside params");
+assert(!("key" in pbpAnkiBuildRequest("version", {}, "")), "empty key omitted");
+
+section("pbpAnkiParseResult");
+assert(pbpAnkiParseResult("not json").ok === false, "malformed json -> ok:false");
+assert(pbpAnkiParseResult('"str"').ok === false, "non-object json -> ok:false");
+const pr1 = pbpAnkiParseResult('{"result": null, "error": "deck not found"}');
+assert(pr1.ok === false && pr1.error === "deck not found", "error envelope surfaces");
+const pr2 = pbpAnkiParseResult('{"result": [1, 2], "error": null}');
+assert(pr2.ok === true && pr2.result.length === 2, "success envelope");
+assert(pbpAnkiParseResult('{"result": {"permission": "granted", "version": 6, "requireApikey": true}, "error": null}').result.requireApikey === true, "lowercase requireApikey spelling reaches caller");
+
+section("pbpAnkiFieldsMatch");
+assertEq(pbpAnkiFieldsMatch(["Term", "Reading", "Definition", "Context", "Source", "License"]), true, "exact match passes");
+assertEq(pbpAnkiFieldsMatch(["Term", "Definition", "Reading", "Context", "Source", "License"]), false, "order matters");
+assertEq(pbpAnkiFieldsMatch(["Term", "Reading", "Definition", "Context", "Source"]), false, "missing field fails");
+assertEq(pbpAnkiFieldsMatch(null), false, "null fails");
+
+section("pbpAnkiModelDef");
+const md = pbpAnkiModelDef();
+assert(md.modelName === "Pinboard Vocab" && md.inOrderFields.join(",") === "Term,Reading,Definition,Context,Source,License", "model def fields in contract order");
+
+document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
+</script>
+</body></html>

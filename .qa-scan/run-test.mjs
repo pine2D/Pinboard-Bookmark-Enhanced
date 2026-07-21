@@ -28,6 +28,7 @@ const CLEANUP_TIMEOUT_MS = 5000;
 const EXPECTED_RESULTS = Object.freeze({
   "tests/a11y-tests.html": 31,
   "tests/ai-tags-tests.html": 70,
+  "tests/anki-connect-tests.html": 25,
   "tests/background-active-tab-tests.html": 28,
   "tests/batch-dedup-tests.html": 24,
   "tests/contrast-tests.html": 10,
