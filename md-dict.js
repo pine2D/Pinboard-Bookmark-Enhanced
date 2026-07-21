@@ -771,3 +771,159 @@ window.pbpDictOnActionSwitch = () => {
   if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort(); // invalidate the run, not just the range
   _pbpDictCurrent = null;
 };
+
+// ---- Rail vocabulary panel (spec §4.2; DOM built like the Notebook:
+// created in JS, inserted before #toc, header via pbpRailCollapsible) ----
+let _pbpDictPanelEls = null;
+
+function _pbpDictBuildPanel() {
+  const rail = document.getElementById("rail");
+  if (!rail || _pbpDictPanelEls) return;
+  const sec = document.createElement("div");
+  sec.className = "rail-section";
+  sec.id = "vocab-section";
+  sec.hidden = true;
+  const label = document.createElement("div");
+  label.className = "rail-label";
+  label.textContent = t("dictVocabSection");
+  sec.appendChild(label);
+  const actions = document.createElement("div");
+  actions.className = "vocab-actions";
+  const exportBtn = document.createElement("button");
+  exportBtn.type = "button";
+  exportBtn.className = "vocab-export";
+  exportBtn.textContent = t("dictExportTsv");
+  exportBtn.addEventListener("click", _pbpDictExportTsv);
+  actions.appendChild(exportBtn);
+  sec.appendChild(actions);
+  const list = document.createElement("div");
+  list.className = "vocab-list";
+  sec.appendChild(list);
+  const toc = document.getElementById("toc");
+  if (toc && toc.parentElement === rail) rail.insertBefore(sec, toc);
+  else rail.appendChild(sec);
+  // Collapsible header: `label` is an existing .rail-label Element with more
+  // than one sibling in `sec` at call time, so pbpRailCollapsible takes the
+  // non-headless branch and replaces `label` in place with the generated
+  // header button (tri + label text + optional count) -- same pattern as
+  // _pbpTrBuildSection in md-translate.js. The section itself stays the
+  // direct rail child (rail invariant: never wrap the container).
+  if (typeof pbpRailCollapsible === "function") pbpRailCollapsible(sec, "vocab", { label, defaultCollapsed: false });
+  _pbpDictPanelEls = { sec, list };
+}
+
+async function _pbpDictPanelRefresh() {
+  if (!_pbpDictPanelEls) _pbpDictBuildPanel();
+  if (!_pbpDictPanelEls) return;
+  const { sec, list } = _pbpDictPanelEls;
+  const rows = await pbpVocabAll(_pbpDictOwner);
+  sec.hidden = !rows.length;
+  list.replaceChildren();
+  for (const w of rows) {
+    const row = document.createElement("div");
+    row.className = "vocab-row";
+    const head = document.createElement("button");
+    head.type = "button";
+    head.className = "vocab-row-head";
+    head.setAttribute("aria-expanded", "false");
+    const termEl = document.createElement("span");
+    termEl.className = "vocab-term";
+    termEl.textContent = w.term;
+    const langTag = document.createElement("span");
+    langTag.className = "vocab-lang";
+    langTag.textContent = w.language || "";
+    const gloss = document.createElement("span");
+    gloss.className = "vocab-gloss";
+    gloss.textContent = (w.gloss || "").split("\n")[0];
+    head.appendChild(termEl);
+    head.appendChild(langTag);
+    head.appendChild(gloss);
+    const detail = document.createElement("div");
+    detail.className = "vocab-detail";
+    detail.hidden = true;
+    for (const c of Array.isArray(w.contexts) ? w.contexts : []) {
+      const q = document.createElement("div");
+      q.className = "vocab-quote";
+      q.textContent = c.quote || "";
+      detail.appendChild(q);
+      const safeHref = pbpDictSafeUrl(c.articleUrl);
+      if (safeHref) {
+        const srcLink = document.createElement("a");
+        srcLink.className = "vocab-src";
+        srcLink.href = safeHref;
+        srcLink.target = "_blank";
+        srcLink.rel = "noopener noreferrer";
+        srcLink.textContent = c.articleTitle || safeHref;
+        detail.appendChild(srcLink);
+      }
+    }
+    // Note stays readable even though there's no dedicated edit UI yet --
+    // spec: deleting the word must not silently drop its note context.
+    if (w.note) {
+      const note = document.createElement("div");
+      note.className = "vocab-note";
+      note.textContent = w.note;
+      detail.appendChild(note);
+    }
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "vocab-del";
+    del.textContent = t("hlDelete"); // reuse, per notebook-delete precedent
+    detail.appendChild(del);
+    del.addEventListener("click", async () => {
+      if (del.disabled) return;
+      del.disabled = true;
+      const ok = await pbpVocabDelete(w.id);
+      if (ok) { _pbpDictToast(t("dictDeleted")); _pbpDictPanelRefresh(); }
+      else del.disabled = false;
+    });
+    head.addEventListener("click", () => {
+      detail.hidden = !detail.hidden;
+      head.setAttribute("aria-expanded", String(!detail.hidden));
+    });
+    row.appendChild(head);
+    row.appendChild(detail);
+    list.appendChild(row);
+  }
+}
+
+function _pbpDictExportTsv() {
+  pbpVocabAll(_pbpDictOwner).then((rows) => {
+    const tsv = pbpDictTsv(rows.map((w) => ({
+      term: w.term,
+      reading: w.ipa || "",
+      definition: (w.gloss || "").replace(/\s*\n\s*/g, " "),
+      contexts: (Array.isArray(w.contexts) ? w.contexts : []).map((c) => c && c.quote).filter(Boolean),
+      source: (w.contexts && w.contexts[0] && w.contexts[0].articleUrl) || "",
+      license: w.sourceUrl ? ((w.license || "CC BY-SA") + " " + w.sourceUrl) : ""
+    })));
+    const blob = new Blob([tsv], { type: "text/tab-separated-values" });
+    const a = document.createElement("a");
+    const d = new Date();
+    const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+    a.href = URL.createObjectURL(blob);
+    a.download = "vocab-" + stamp + ".tsv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  });
+}
+
+function _pbpDictToast(msg) {
+  const el = document.createElement("div");
+  el.className = "dict-toast";
+  el.setAttribute("role", "status");
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2200);
+}
+
+// Owner arrives with the page render; the panel first builds here too
+// (defer scripts finish before pbp:rendered fires -- md-preview.js dispatches
+// it after async content rendering).
+document.addEventListener("pbp:rendered", (e) => {
+  const account = e && e.detail ? e.detail.account : "";
+  _pbpDictOwner = (typeof _pbpTrOwnerScope === "function") ? _pbpTrOwnerScope(account) : (account ? "acct_" + encodeURIComponent(String(account)) : "ownerless");
+  _pbpDictPanelRefresh();
+});
