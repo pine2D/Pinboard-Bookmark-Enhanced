@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>dict-pack Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; } .fail { color: #c00; font-weight: bold; }
+h2 { margin-top: 24px; }
+</style></head>
+<body>
+<h1>dict-pack Tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+<script src="../dict-pack.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond;
+  ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = (ok ? "✓" : "✗") + "  " + name + (ok ? "" : "\n   " + (detail || ""));
+  root.appendChild(div);
+}
+function section(name) {
+  const h = document.createElement("h2");
+  h.textContent = name;
+  root.appendChild(h);
+}
+function assertEq(a, e, label) {
+  const ok = a === e;
+  check(label || (String(e) + " === " + String(a)), ok, ok ? "" : "expected " + JSON.stringify(e) + " got " + JSON.stringify(a));
+}
+function assertArrayEq(a, e, label) {
+  const ok = JSON.stringify(a) === JSON.stringify(e);
+  check(label || ("array " + JSON.stringify(e)), ok, ok ? "" : "expected " + JSON.stringify(e) + " got " + JSON.stringify(a));
+}
+
+section("pbpCedictParseLine");
+const p1 = pbpCedictParseLine("中國 中国 [Zhong1 guo2] /China/");
+check("normal line parsed", p1 && p1.trad === "中國" && p1.simp === "中国" && p1.pinyin === "Zhong1 guo2" && p1.defs.length === 1);
+
+const p2 = pbpCedictParseLine("你好 你好 [ni3 hao3] /hello/hi/how are you/");
+check("multiple defs", p2 && p2.defs.length === 3 && p2.defs[0] === "hello" && p2.defs[1] === "hi" && p2.defs[2] === "how are you");
+
+const p3 = pbpCedictParseLine("女 女 [nu:3] /woman/female/");
+check("u: preserved in pinyin", p3 && p3.pinyin === "nu:3");
+
+assertEq(pbpCedictParseLine("# This is a comment"), null, "comment line returns null");
+assertEq(pbpCedictParseLine(""), null, "empty line returns null");
+assertEq(pbpCedictParseLine("   \t  "), null, "whitespace-only line returns null");
+assertEq(pbpCedictParseLine("中國 中国 Zhong1 guo2 /China/"), null, "malformed no brackets returns null");
+assertEq(pbpCedictParseLine("中國 中国 [Zhong1 guo2] China"), null, "malformed no slashes returns null");
+
+const p4 = pbpCedictParseLine("北京 北京 [Bei3 jing1] /Beijing/");
+check("pinyin case preserved", p4 && p4.pinyin === "Bei3 jing1");
+
+const p5 = pbpCedictParseLine("字 字 [zi4] /word/");
+check("normal single def", p5 && p5.defs.length === 1 && p5.defs[0] === "word");
+
+section("pbpCedictPinyinPretty");
+assertEq(pbpCedictPinyinPretty("ni3 hao3"), "nǐ hǎo", "ni3 hao3 -> nǐ hǎo");
+assertEq(pbpCedictPinyinPretty("lu:4"), "lǜ", "lu:4 -> lǜ");
+assertEq(pbpCedictPinyinPretty("de5"), "de", "de5 -> de (neutral tone)");
+assertEq(pbpCedictPinyinPretty("Bei3 jing1"), "Běi jīng", "Bei3 jing1 -> Běi jīng (uppercase preserved)");
+assertEq(pbpCedictPinyinPretty("nǐ"), "nǐ", "already marked nǐ passes through");
+assertEq(pbpCedictPinyinPretty("Zhong1 guo2"), "Zhōng guó", "Zhong1 guo2 -> Zhōng guó");
+assertEq(pbpCedictPinyinPretty(""), "", "empty pinyin -> empty");
+assertEq(pbpCedictPinyinPretty("le0"), "le", "le0 (tone 0) -> le");
+assertEq(pbpCedictPinyinPretty("xx5"), "xx5", "xx5 marker passes through");
+assertEq(pbpCedictPinyinPretty("r5"), "r", "r5 (erhua) -> r");
+assertEq(pbpCedictPinyinPretty("Tu2 shu1 guan3"), "Tú shū guǎn", "Tu2 shu1 guan3 -> Tú shū guǎn");
+
+section("pbpCedictLookupKeys");
+assertArrayEq(pbpCedictLookupKeys("图书馆里"), ["图书馆里", "图书馆", "图书", "图"], "lookup keys longest-first");
+assertArrayEq(pbpCedictLookupKeys("字"), ["字"], "single char key");
+assertArrayEq(pbpCedictLookupKeys(""), [], "empty string -> empty keys");
+assertArrayEq(pbpCedictLookupKeys(null), [], "null -> empty keys");
+
+const composed = "é";
+const decomposed = "é";
+const keysC = pbpCedictLookupKeys(composed);
+const keysD = pbpCedictLookupKeys(decomposed);
+assertEq(JSON.stringify(keysC), JSON.stringify(keysD), "NFC normalization applied");
+
+const long17 = "一二三四五六七八九十一二三四五六七";
+const keys = pbpCedictLookupKeys(long17);
+check("capped at 16 code points", keys[0].length === 16);
+
+assertArrayEq(pbpCedictLookupKeys("  图书  "), ["图书", "图"], "leading/trailing whitespace trimmed");
+
+section("pbpCedictEntryToNorm");
+const entry1 = pbpCedictEntryToNorm([{ trad: "中國", simp: "中国", pinyin: "Zhong1 guo2", defs: ["China", "PRC"] }], "中國");
+check("word field", entry1.word === "中國");
+check("entries array", Array.isArray(entry1.entries) && entry1.entries.length === 1);
+check("pos field empty", entry1.entries[0].pos === "");
+check("ipas with Pinyin tag", Array.isArray(entry1.entries[0].ipas) && entry1.entries[0].ipas[0].tags.includes("Pinyin"));
+check("forms array present", Array.isArray(entry1.entries[0].forms));
+check("senses array present", Array.isArray(entry1.entries[0].senses));
+assertEq(entry1.sourceLabel, "CC-CEDICT", "sourceLabel");
+assertEq(entry1.license, "CC BY-SA 4.0", "license CC BY-SA 4.0");
+
+const entry2 = pbpCedictEntryToNorm([{ trad: "中國", simp: "中国", pinyin: "Zhong1 guo2", defs: ["China"] }], "中國");
+check("matched=trad shows simp form", entry2.entries[0].forms.length === 1 && entry2.entries[0].forms[0].word === "中国" && entry2.entries[0].forms[0].tags[0] === "simp");
+
+const entry3 = pbpCedictEntryToNorm([{ trad: "中國", simp: "中国", pinyin: "Zhong1 guo2", defs: ["China"] }], "中国");
+check("matched=simp shows trad form", entry3.entries[0].forms.length === 1 && entry3.entries[0].forms[0].word === "中國" && entry3.entries[0].forms[0].tags[0] === "trad");
+
+const entry4 = pbpCedictEntryToNorm([{ trad: "你好", simp: "你好", pinyin: "ni3 hao3", defs: ["hello"] }], "你好");
+assertEq(entry4.entries[0].forms.length, 0, "trad === simp, forms empty");
+
+const entry5 = pbpCedictEntryToNorm([{ trad: "你好", simp: "你好", pinyin: "ni3 hao3", defs: ["hello", "hi", "how are you"] }], "你好");
+assertEq(entry5.entries[0].senses.length, 3, "multiple defs -> multiple senses");
+assertEq(entry5.entries[0].senses[0].definition, "hello", "first sense");
+
+const entry6 = pbpCedictEntryToNorm([], "test");
+assertEq(entry6.entries.length, 0, "empty rows -> empty entries");
+
+const entry7 = pbpCedictEntryToNorm(null, "test");
+assertEq(entry7.entries.length, 0, "null rows -> empty entries");
+
+section("pbpCedictLines");
+(async function() {
+  // Single line (no newline)
+  const lines1 = [];
+  const stream1 = new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode("中國 中国 [Zhong1 guo2] /China/"));
+      c.close();
+    }
+  });
+  for await (const line of pbpCedictLines(stream1)) {
+    lines1.push(line);
+  }
+  assertArrayEq(lines1, ["中國 中国 [Zhong1 guo2] /China/"], "single line no newline");
+
+  // Multiple lines
+  const lines2 = [];
+  const stream2 = new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode("你好 你好 [ni3 hao3] /hello/\n北京 北京 [Bei3 jing1] /Beijing/"));
+      c.close();
+    }
+  });
+  for await (const line of pbpCedictLines(stream2)) {
+    lines2.push(line);
+  }
+  assertArrayEq(lines2, ["你好 你好 [ni3 hao3] /hello/", "北京 北京 [Bei3 jing1] /Beijing/"], "multiple lines");
+
+  // Newline across chunks
+  const lines3 = [];
+  const stream3 = new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode("你好\n"));
+      c.enqueue(new TextEncoder().encode("北京"));
+      c.close();
+    }
+  });
+  for await (const line of pbpCedictLines(stream3)) {
+    lines3.push(line);
+  }
+  assertArrayEq(lines3, ["你好", "北京"], "newline across chunks");
+
+  // UTF-8 multi-byte character split across chunks
+  const lines4 = [];
+  const utf8Bytes = new TextEncoder().encode("你好");
+  const stream4 = new ReadableStream({
+    start(c) {
+      c.enqueue(utf8Bytes.slice(0, 1));
+      c.enqueue(utf8Bytes.slice(1));
+      c.close();
+    }
+  });
+  for await (const line of pbpCedictLines(stream4)) {
+    lines4.push(line);
+  }
+  assertArrayEq(lines4, ["你好"], "UTF-8 multi-byte split across chunks");
+
+  // CRLF handling
+  const lines5 = [];
+  const stream5 = new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode("你好\r\n北京\r\n"));
+      c.close();
+    }
+  });
+  for await (const line of pbpCedictLines(stream5)) {
+    lines5.push(line);
+  }
+  assertArrayEq(lines5, ["你好", "北京"], "CRLF stripped");
+
+  // Last line without newline (flush)
+  const lines6 = [];
+  const stream6 = new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode("你好\n北京"));
+      c.close();
+    }
+  });
+  for await (const line of pbpCedictLines(stream6)) {
+    lines6.push(line);
+  }
+  assertArrayEq(lines6, ["你好", "北京"], "last line without newline flushed");
+
+  // stats.bytes tracking
+  const stats = {};
+  const stream7 = new ReadableStream({
+    start(c) {
+      const bytes = new TextEncoder().encode("你好");
+      c.enqueue(bytes);
+      c.close();
+    }
+  });
+  for await (const line of pbpCedictLines(stream7, false, stats)) {
+    // consume
+  }
+  check("stats.bytes populated", stats.bytes > 0);
+
+  // gzip=false explicit path
+  const lines8 = [];
+  const stream8 = new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode("test"));
+      c.close();
+    }
+  });
+  for await (const line of pbpCedictLines(stream8, false)) {
+    lines8.push(line);
+  }
+  assertArrayEq(lines8, ["test"], "gzip=false plain path");
+
+  // Invalid UTF-8 should reject
+  let utf8Error = false;
+  try {
+    const stream9 = new ReadableStream({
+      start(c) {
+        c.enqueue(new Uint8Array([0xFF, 0xFE]));
+        c.close();
+      }
+    });
+    for await (const line of pbpCedictLines(stream9)) {
+      // should not reach
+    }
+  } catch (e) {
+    utf8Error = e.message.includes("UTF-8") || e.name === "TypeError";
+  }
+  check("invalid UTF-8 rejects", utf8Error);
+
+  // Line too long
+  let longError = false;
+  try {
+    const stream10 = new ReadableStream({
+      start(c) {
+        const longLine = new Uint8Array(65537);
+        c.enqueue(longLine);
+        c.enqueue(new TextEncoder().encode("\n"));
+        c.close();
+      }
+    });
+    for await (const line of pbpCedictLines(stream10)) {
+      // should not reach
+    }
+  } catch (e) {
+    longError = e.message.includes("too long");
+  }
+  check("line too long throws", longError);
+
+  // File too large
+  let sizeError = false;
+  try {
+    const stats2 = {};
+    const stream11 = new ReadableStream({
+      start(c) {
+        c.enqueue(new Uint8Array(65 * 1024 * 1024));
+        c.close();
+      }
+    });
+    for await (const line of pbpCedictLines(stream11, false, stats2)) {
+      // should not reach
+    }
+  } catch (e) {
+    sizeError = e.message.includes("too large");
+  }
+  check("file >64MB throws", sizeError);
+
+  document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
+})();
+</script>
+</body></html>
