@@ -102,6 +102,7 @@ function pbpDictNormalizeEntry(json) {
   return {
     word: typeof json.word === "string" ? json.word : "",
     entries,
+    sourceLabel: "Wiktionary",
     sourceUrl: pbpDictSafeUrl(src.url),
     license: typeof lic.name === "string" ? lic.name : ""
   };
@@ -446,7 +447,7 @@ function _pbpDictRenderEntry(slot, norm, term, lang) {
   a.href = pbpDictSafeUrl(norm.sourceUrl) || ("https://" + (lang || "en") + ".wiktionary.org/wiki/" + encodeURIComponent(term));
   a.target = "_blank";
   a.rel = "noopener noreferrer";
-  a.textContent = "Wiktionary · " + (norm.license || "CC BY-SA");
+  a.textContent = (norm.sourceLabel || "Wiktionary") + " · " + (norm.license || "CC BY-SA");
   src.appendChild(label);
   src.appendChild(a);
   slot.appendChild(src);
@@ -467,12 +468,45 @@ function _pbpDictSlotSkeleton(slot) {
   slot.appendChild(sk);
 }
 
+// dict-pack.js is NOT in md-preview.html: most users never import the pack,
+// and the reader stays lean. First zh lookup injects it once (CSP 'self').
+let _pbpDictPackLoad = null;
+function _pbpDictLoadPack() {
+  if (_pbpDictPackLoad) return _pbpDictPackLoad;
+  _pbpDictPackLoad = new Promise((resolve) => {
+    if (typeof pbpPackLookup === "function") { resolve(true); return; }
+    const s = document.createElement("script");
+    s.src = "dict-pack.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+  return _pbpDictPackLoad;
+}
+
 // perm? -> fetch -> 200 render / 404 wait-lemma -> refetch once / degrade.
 // Returns normalized entry or null; the RUN layer merges into _pbpDictCurrent.
 // onRerun: run-level restart used after a permission grant (never slot-local
 // recursion — Codex HIGH 2).
 async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onRerun) {
   if (!lang) { _pbpDictSlotMsg(slot, t("dictNoEntry")); return null; }
+  if (lang === "zh") {
+    const loaded = await _pbpDictLoadPack();
+    if (parentSignal && parentSignal.aborted) return null;
+    if (loaded && typeof pbpPackLookup === "function" && typeof pbpCedictLookupKeys === "function") {
+      let hit = null;
+      try { hit = await pbpPackLookup(pbpCedictLookupKeys(term)); } catch (_) {}
+      if (parentSignal && parentSignal.aborted) return null;
+      if (hit) {
+        const norm = pbpCedictEntryToNorm(hit.rows, hit.matched);
+        _pbpDictRenderEntry(slot, norm, hit.matched, lang);
+        return norm;
+      }
+      // (Prefix hits render norm.word, which may be SHORTER than the raw
+      // selection -- pbpDictRun's merge step must re-sync cur.term, see
+      // Step 2b below, or save/speak/saved-check operate on the wrong word.)
+    }
+  }
   const cacheKey = "dict_" + pbpDictCacheKeyPublic(lang, term);
   try {
     const hit = await pbpAiCacheGet(cacheKey);
@@ -728,7 +762,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
       if (!r || !r.ok) { /* in-memory value already applied; same swallow as _pbpExplainPersistTrigger */ }
     }).catch(() => {});
   });
-  speak.addEventListener("click", () => pbpDictSpeak(cap.text, cur.lang));
+  speak.addEventListener("click", () => pbpDictSpeak(cur.term || cap.text, cur.lang));
 
   let lemmaSettled = false;
   let resolveLemmaRaw;
@@ -758,13 +792,16 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     cur.sourceUrl = norm.sourceUrl;
     cur.license = norm.license;
     if (first && first.senses[0]) cur.gloss = first.senses[0].definition;
+    // A CC-CEDICT prefix hit dictionary-defines a SHORTER word than the raw
+    // selection; save/speak/saved-check must follow the defined word.
+    if (norm.sourceLabel === "CC-CEDICT" && norm.word) cur.term = norm.word;
   }
   if (parsed) {
     if (parsed.gloss) cur.gloss = parsed.gloss;
     cur.lemma = parsed.lemma;
   }
   if (vocabBtn && vocabBtn.dataset.runId === String(runId)) {
-    const hit = await pbpVocabGet(pbpDictVocabKey(cur.owner, effectiveLang, cap.text));
+    const hit = await pbpVocabGet(pbpDictVocabKey(cur.owner, effectiveLang, cur.term));
     if (signal.aborted || _pbpDictCurrent !== cur || vocabBtn.dataset.runId !== String(runId)) return;
     if (hit) { cur.saved = true; vocabBtn.textContent = t("dictSavedVocab"); }
     vocabBtn.disabled = false;

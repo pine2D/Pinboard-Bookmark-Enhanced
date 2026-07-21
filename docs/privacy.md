@@ -22,6 +22,7 @@ Extension settings, caches, and temporary state are stored locally by default. B
 | Custom CSS & themes | `chrome.storage.local` | Only if you enable settings sync; large synced values are chunked |
 | AI result cache (account-scoped keys include the non-secret plaintext Pinboard username owner) | IndexedDB | No |
 | Vocabulary book (account-scoped, includes the non-secret plaintext Pinboard username owner): saved words with their language, definition text, IPA, the sentence they appeared in, article URL/title, an optional note, and a highlight reference | IndexedDB | No |
+| CC-CEDICT offline dictionary pack (Chinese word, pinyin, and definition records from a file you import) | IndexedDB (`pbp-dict-packs`) | No |
 | Tag cache & tag-cleanup state (account-scoped records include the non-secret plaintext Pinboard username owner) | `chrome.storage.local` | No |
 | Bookmark-status cache (account-scoped in memory) | Service Worker memory | No |
 | Offline save queue (URL, title, notes, tags, save options, time, and a non-secret plaintext Pinboard username binding) | `chrome.storage.local` | No |
@@ -122,6 +123,7 @@ The extension communicates with the following services or destinations for the c
 - **Embedded export image hosts**: receive a direct extension-page fetch for each image referenced in a Markdown/HTML/EPUB export only when you choose the Embed (offline) image policy and grant the one-time origin permission; images are embedded in the downloaded file (as data URIs, or as bundled files inside the EPUB) with no third-party relay
 - **Free Dictionary API (freedictionaryapi.com)**: receives the word you look up and its language code when you use the Dictionary lookup and grant access; returns Wiktionary-based definitions licensed CC BY-SA 4.0
 - **AnkiConnect** ([project homepage](https://git.sr.ht/~foosoft/anki-connect)): your local Anki installation receives vocabulary book entries only through an explicit Send to Anki action, authenticated with an API key you provide if AnkiConnect requires one; this is local software running on your device, so no data leaves it
+- **CC-CEDICT** ([cc-cedict.org](https://cc-cedict.org/wiki/)): an open Chinese-English dictionary dataset licensed CC BY-SA 4.0 that you download from MDBG and import yourself; the **Open download page** button only opens that page in a new tab, and once imported the pack powers offline Chinese dictionary lookups in Markdown preview entirely on your device, with no request to MDBG, cc-cedict.org, or any other host
 
 Optional-service permission denial or revocation sends nothing to that destination and does not erase its configuration. Selected Batch sites are accessed only to extract the content requested for that batch; they do not receive data from the extension.
 

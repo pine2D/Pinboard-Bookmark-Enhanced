@@ -101,10 +101,24 @@ assertEq(norm.entries[0].senses.length, 5, "senses capped at 5");
 assertEq(norm.entries[0].senses[0].examples.length, 2, "examples capped at 2");
 assertEq(norm.sourceUrl, "https://en.wiktionary.org/wiki/hello", "source url");
 assertEq(norm.license, "CC BY-SA 4.0", "license name");
+assertEq(norm.sourceLabel, "Wiktionary", "network normalizer labels source");
 assertEq(pbpDictNormalizeEntry({ ...FDA_SAMPLE, source: { url: "javascript:x", license: {} } }).sourceUrl, "", "unsafe source url stripped");
 assertEq(pbpDictNormalizeEntry({ word: "书", entries: [], source: {} }), null, "empty entries (zh) -> null");
 assertEq(pbpDictNormalizeEntry(null), null, "null json -> null");
 assertEq(pbpDictNormalizeEntry({ entries: [{ partOfSpeech: "noun" }] }), null, "no ipa/sense/form -> null");
+
+section("_pbpDictRenderEntry source line");
+// _pbpDictRenderEntry reads t() (i18n.js, not loaded on this pure-layer test
+// page); stub it so the render call below does not throw.
+window.t = window.t || ((k) => k);
+const RENDER_ENTRIES = [{ pos: "", ipas: [], forms: [], senses: [{ definition: "d", examples: [] }] }];
+const cedictSlot = document.createElement("div");
+_pbpDictRenderEntry(cedictSlot, { entries: RENDER_ENTRIES, sourceLabel: "CC-CEDICT", sourceUrl: "https://cc-cedict.org/wiki/", license: "CC BY-SA 4.0" }, "词", "zh");
+assert(cedictSlot.querySelector(".xp-dict-src a").textContent.includes("CC-CEDICT"), "CC-CEDICT source rendered");
+const legacySlot = document.createElement("div");
+// No sourceLabel field at all -- shape of an entry cached before this field existed.
+_pbpDictRenderEntry(legacySlot, { entries: RENDER_ENTRIES, sourceUrl: "https://en.wiktionary.org/wiki/word", license: "CC BY-SA 4.0" }, "word", "en");
+assert(legacySlot.querySelector(".xp-dict-src a").textContent.includes("Wiktionary"), "missing sourceLabel (old cache shape) falls back to Wiktionary");
 
 section("pbpDictParseCtxAnswer / StripLemmaLine");
 const ans = "LEMMA: run\n\nIn this sentence it means to manage a business.";
