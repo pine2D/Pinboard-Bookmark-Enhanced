@@ -297,6 +297,36 @@ async function pbpVocabSaveWord(owner, w) {
   } catch (_) { return null; }
 }
 
+// ---- Pronunciation (speechSynthesis + click-token guard) ----------------
+const PBP_DICT_SPEAKER_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+
+let _pbpDictSpeakSeq = 0;
+function pbpDictSpeak(text, lang) {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const token = ++_pbpDictSpeakSeq; // a newer click invalidates every pending pick()
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(String(text || "").slice(0, 200));
+    const primary = pbpDictPrimaryLang(lang);
+    if (primary) u.lang = primary;
+    let spoken = false;
+    const pick = () => {
+      if (spoken || token !== _pbpDictSpeakSeq) return;
+      spoken = true;
+      if (primary) {
+        const vs = synth.getVoices();
+        const v = vs.find((x) => x.lang && x.lang.toLowerCase().startsWith(primary));
+        if (v) u.voice = v;
+      }
+      synth.speak(u);
+    };
+    if (synth.getVoices().length) { pick(); return; }
+    synth.addEventListener("voiceschanged", pick, { once: true });
+    setTimeout(pick, 400);
+  } catch (_) {}
+}
+
 // ---- Dictionary slot ----------------------------------------------------
 async function _pbpDictHasPerm() {
   try { return await chrome.permissions.contains({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) { return false; }
