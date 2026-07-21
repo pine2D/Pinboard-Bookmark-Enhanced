@@ -1866,6 +1866,9 @@ function _pbpExplainEnsurePop() {
   openVocab.hidden = true;
   openVocab.textContent = t("dictVocabSection");
   openVocab.addEventListener("click", () => {
+    // pbpOpenOptionsTab retargets an already-open Options tab (and focuses
+    // its window) instead of stacking duplicates; falls back to window.open.
+    if (typeof pbpOpenOptionsTab === "function") { pbpOpenOptionsTab("vocab"); return; }
     try { window.open(chrome.runtime.getURL("options.html#vocab")); } catch (_) {}
   });
   const ask = document.createElement("button");
