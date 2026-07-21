@@ -190,9 +190,14 @@ async function renderVocabPanel() {
     const owner = await pbpVocabCurrentOwner();
     rows = await pbpVocabAll(owner);
   } catch (_) {
-    // Owner read can reject (storage failure); without feedback the tab just
-    // stays on its previous content and the click looks ignored.
-    if (gen === _vocabRenderGen) _pbpVocabFlashStatus(false, t("jinaFailed"));
+    // Fail-closed: a rerender triggered by an account switch that then fails
+    // to read must NOT leave the previous account's rows on screen (isolation
+    // invariant) -- clear the list and say the read failed.
+    if (gen === _vocabRenderGen) {
+      _vocabRows = [];
+      _pbpVocabRenderList([]);
+      _pbpVocabFlashStatus(false, t("jinaFailed"));
+    }
     return;
   }
   if (gen !== _vocabRenderGen) return;

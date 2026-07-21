@@ -236,18 +236,20 @@ async function pbpVocabGet(id) {
   } catch (_) { return null; }
 }
 
+// Unlike the sibling store helpers (which swallow so reader paths degrade),
+// this one PROPAGATES failures: its consumers are the options vocab tab's
+// render/export, which must distinguish "empty" from "read failed" to give
+// fail-closed feedback. Reader-side callers attach their own .catch.
 async function pbpVocabAll(owner) {
-  try {
-    const db = await _pbpVocabOpenDB();
-    const rows = await new Promise((resolve) => {
-      const idx = db.transaction(_PBP_VOCAB_STORE, "readonly").objectStore(_PBP_VOCAB_STORE).index("owner");
-      const req = idx.getAll(owner || "ownerless");
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => resolve([]);
-    });
-    rows.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    return rows;
-  } catch (_) { return []; }
+  const db = await _pbpVocabOpenDB();
+  const rows = await new Promise((resolve, reject) => {
+    const idx = db.transaction(_PBP_VOCAB_STORE, "readonly").objectStore(_PBP_VOCAB_STORE).index("owner");
+    const req = idx.getAll(owner || "ownerless");
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error || new Error("vocab read failed"));
+  });
+  rows.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return rows;
 }
 
 // Transaction-complete semantics (Codex MEDIUM 3): resolve on tx.oncomplete,
