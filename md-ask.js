@@ -2196,7 +2196,11 @@ async function _pbpExplainRun(cap, ctx, pop) {
 function _pbpExplainOpenPop(cap, initialAction) {
   const pop = _pbpExplainEnsurePop();
   pop.querySelector(".xp-term").textContent = cap.text; // ellipsized via CSS
-  pop.querySelector(".xp-model").textContent = _pbpExplainModelLabel(_pbpExplainSettings || {});
+  const modelEl = pop.querySelector(".xp-model");
+  modelEl.textContent = _pbpExplainModelLabel(_pbpExplainSettings || {});
+  // The footer's button row can squeeze the flexed label to nothing; the
+  // native title keeps the full "provider · model" reachable on hover.
+  modelEl.title = modelEl.textContent;
   // Two explicit entry points (bar help-circle -> explain, bar book-open ->
   // dict) plus the card's explicit actions replaced the old term-based smart
   // default: the action is now always caller-declared. Unknown values fall
