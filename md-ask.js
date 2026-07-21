@@ -2171,13 +2171,13 @@ function _pbpExplainOpenPop(cap, initialAction) {
   pop.querySelector(".xp-term").textContent = cap.text; // ellipsized via CSS
   pop.querySelector(".xp-model").textContent = _pbpExplainModelLabel(_pbpExplainSettings || {});
   // Action resets on every open (session-only, not persisted): an explicit
-  // initialAction (Task 3's highlight-card entry point, or dict) always
-  // wins; otherwise a short/term-like selection defaults to "dict" when
+  // initialAction (highlight-card explain, translate, or dict entry points)
+  // always wins; otherwise a short/term-like selection defaults to "dict" when
   // md-dict.js is loaded (self-serve lookup fits a term better than a
   // model call), and so does ANY selection when AI is unavailable (dict is
   // the only action that works without it) -- everything else defaults to
   // "explain".
-  _pbpExplainAction = (initialAction === "translate" || initialAction === "dict")
+  _pbpExplainAction = (initialAction === "explain" || initialAction === "translate" || initialAction === "dict")
     ? initialAction
     : (typeof window.pbpDictRun === "function" && (!_pbpExplainAiOk || pbpExplainIsTerm(cap.text)) ? "dict" : "explain");
   _pbpExplainSyncActButtons(pop);
