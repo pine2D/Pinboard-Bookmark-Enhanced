@@ -439,7 +439,9 @@ function _pbpDictRenderEntry(slot, norm, term, lang) {
   const label = document.createElement("span");
   label.textContent = t("dictSource") + " ";
   const a = document.createElement("a");
-  a.href = norm.sourceUrl || ("https://" + (lang || "en") + ".wiktionary.org/wiki/" + encodeURIComponent(term));
+  // Defense-in-depth: sourceUrl is already sanitized at the normalize/merge
+  // layers, but this is the only point it reaches a live href.
+  a.href = pbpDictSafeUrl(norm.sourceUrl) || ("https://" + (lang || "en") + ".wiktionary.org/wiki/" + encodeURIComponent(term));
   a.target = "_blank";
   a.rel = "noopener noreferrer";
   a.textContent = "Wiktionary · " + (norm.license || "CC BY-SA");
@@ -761,7 +763,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   }
   if (vocabBtn && vocabBtn.dataset.runId === String(runId)) {
     const hit = await pbpVocabGet(pbpDictVocabKey(cur.owner, effectiveLang, cap.text));
-    if (_pbpDictCurrent !== cur || vocabBtn.dataset.runId !== String(runId)) return;
+    if (signal.aborted || _pbpDictCurrent !== cur || vocabBtn.dataset.runId !== String(runId)) return;
     if (hit) { cur.saved = true; vocabBtn.textContent = t("dictSavedVocab"); }
     vocabBtn.disabled = false;
   }

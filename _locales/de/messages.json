@@ -2633,9 +2633,6 @@
   "dictLangAria": {
     "message": "Wörterbuchsprache"
   },
-  "dictDeleted": {
-    "message": "Gelöscht"
-  },
   "dictDeleteWord": {
     "message": "Aus Vokabelliste entfernen"
   },

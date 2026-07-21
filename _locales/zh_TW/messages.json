@@ -2633,9 +2633,6 @@
   "dictLangAria": {
     "message": "詞典語言"
   },
-  "dictDeleted": {
-    "message": "已刪除"
-  },
   "dictDeleteWord": {
     "message": "從生詞庫移除"
   },

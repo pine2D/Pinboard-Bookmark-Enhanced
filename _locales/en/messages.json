@@ -2633,9 +2633,6 @@
   "dictLangAria": {
     "message": "Dictionary language"
   },
-  "dictDeleted": {
-    "message": "Deleted"
-  },
   "dictDeleteWord": {
     "message": "Remove from vocabulary"
   },

@@ -185,8 +185,16 @@ function _pbpVocabRenderList(rows) {
 async function renderVocabPanel() {
   if (!$id("vocab-list")) return;
   const gen = ++_vocabRenderGen;
-  const owner = await pbpVocabCurrentOwner();
-  const rows = await pbpVocabAll(owner);
+  let rows;
+  try {
+    const owner = await pbpVocabCurrentOwner();
+    rows = await pbpVocabAll(owner);
+  } catch (_) {
+    // Owner read can reject (storage failure); without feedback the tab just
+    // stays on its previous content and the click looks ignored.
+    if (gen === _vocabRenderGen) _pbpVocabFlashStatus(false, t("jinaFailed"));
+    return;
+  }
   if (gen !== _vocabRenderGen) return;
   _vocabRows = rows;
   _pbpVocabRenderList(rows);
