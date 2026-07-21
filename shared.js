@@ -369,6 +369,8 @@ const SETTINGS_DEFAULTS = {
   translateGlossary: "",
   dictLangManual: "",       // md-dict: manual dictionary language override ("" = auto-detect)
   dictEchoEnabled: false,   // md-vocab-echo: underline saved vocab words in the reader
+  dictAnkiDeck: "Pinboard Vocab", // anki-connect: target deck for Send to Anki
+  dictAnkiKey: "",              // anki-connect: optional AnkiConnect API key (credential)
   selectionTrigger: "icon"
 };
 
@@ -1467,7 +1469,7 @@ async function persistSettings(data) {
 // settings — reclassifying them would strand every other device of a
 // settings-sync account without a copy once migration scrubbed the cloud
 // value. Only webdavPass is credential-routed.
-const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","webdavPass"];
+const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","webdavPass","dictAnkiKey"];
 
 function pbpExportTargetSecretKeys(targetId) {
   return targetId === "webhook" ? ["token", "url"] : ["token"];

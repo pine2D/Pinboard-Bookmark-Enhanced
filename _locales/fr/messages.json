@@ -2639,6 +2639,44 @@
   "dictEchoHint": {
     "message": "Les mots soulignés en pointillé figurent déjà dans votre vocabulaire. Cliquez dessus pour ouvrir le dictionnaire."
   },
+  "dictAnkiSend": {
+    "message": "Envoyer vers Anki"
+  },
+  "dictAnkiSending": {
+    "message": "Envoi…"
+  },
+  "dictAnkiResult": {
+    "message": "$ADDED$ ajouté(s) · $SKIPPED$ ignoré(s) · $FAILED$ échoué(s)",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "failed": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictAnkiUnreachable": {
+    "message": "Anki est injoignable. Gardez Anki actif avec le module complémentaire AnkiConnect, ou exportez plutôt en TSV."
+  },
+  "dictAnkiModelMismatch": {
+    "message": "Le type de note « Pinboard Vocab » existant a été modifié. L'envoi a été interrompu pour le protéger."
+  },
+  "dictAnkiKeyRequired": {
+    "message": "AnkiConnect nécessite une clé API. Ajoutez-la ci-dessous."
+  },
+  "dictAnkiDeckLabel": {
+    "message": "Paquet Anki"
+  },
+  "dictAnkiKeyLabel": {
+    "message": "Clé API AnkiConnect (facultative)"
+  },
+  "dictAnkiNothing": {
+    "message": "Aucun mot à envoyer pour le moment."
+  },
   "dictDeleteWord": {
     "message": "Retirer du vocabulaire"
   },

@@ -2639,6 +2639,44 @@
   "dictEchoHint": {
     "message": "點狀底線標記生詞庫中已有的詞，按一下即可開啟詞典。"
   },
+  "dictAnkiSend": {
+    "message": "傳送到 Anki"
+  },
+  "dictAnkiSending": {
+    "message": "傳送中…"
+  },
+  "dictAnkiResult": {
+    "message": "新增 $ADDED$ · 跳過 $SKIPPED$ · 失敗 $FAILED$",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "failed": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictAnkiUnreachable": {
+    "message": "無法連接 Anki，請保持 Anki 開啟並安裝 AnkiConnect 外掛，或改用 TSV 匯出。"
+  },
+  "dictAnkiModelMismatch": {
+    "message": "已有的「Pinboard Vocab」筆記類型已被修改，為保護資料已中止傳送。"
+  },
+  "dictAnkiKeyRequired": {
+    "message": "AnkiConnect 需要 API key，請在下方填寫。"
+  },
+  "dictAnkiDeckLabel": {
+    "message": "Anki 牌組"
+  },
+  "dictAnkiKeyLabel": {
+    "message": "AnkiConnect API key（可選）"
+  },
+  "dictAnkiNothing": {
+    "message": "暫時沒有可傳送的生詞。"
+  },
   "dictDeleteWord": {
     "message": "從生詞庫移除"
   },

@@ -2639,6 +2639,44 @@
   "dictEchoHint": {
     "message": "点線の下線は単語帳に登録済みの単語を示します。クリックすると辞書が開きます。"
   },
+  "dictAnkiSend": {
+    "message": "Anki に送信"
+  },
+  "dictAnkiSending": {
+    "message": "送信中…"
+  },
+  "dictAnkiResult": {
+    "message": "$ADDED$ 件追加 · $SKIPPED$ 件スキップ · $FAILED$ 件失敗",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "failed": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictAnkiUnreachable": {
+    "message": "Anki に接続できません。AnkiConnect アドオンを有効にした状態で Anki を起動しておくか、代わりに TSV 書き出しをご利用ください。"
+  },
+  "dictAnkiModelMismatch": {
+    "message": "既存の「Pinboard Vocab」ノートタイプが変更されているため、保護のため送信を中止しました。"
+  },
+  "dictAnkiKeyRequired": {
+    "message": "AnkiConnect には API キーが必要です。下記に入力してください。"
+  },
+  "dictAnkiDeckLabel": {
+    "message": "Anki デッキ"
+  },
+  "dictAnkiKeyLabel": {
+    "message": "AnkiConnect API キー（任意）"
+  },
+  "dictAnkiNothing": {
+    "message": "送信できる単語がまだありません。"
+  },
   "dictDeleteWord": {
     "message": "単語帳から削除"
   },

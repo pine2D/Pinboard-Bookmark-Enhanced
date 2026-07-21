@@ -2639,6 +2639,44 @@
   "dictEchoHint": {
     "message": "Dotted underlines mark words already in your vocabulary. Click one to open the dictionary."
   },
+  "dictAnkiSend": {
+    "message": "Send to Anki"
+  },
+  "dictAnkiSending": {
+    "message": "Sending…"
+  },
+  "dictAnkiResult": {
+    "message": "Added $ADDED$ · skipped $SKIPPED$ · failed $FAILED$",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "failed": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictAnkiUnreachable": {
+    "message": "Anki is not reachable. Keep Anki running with the AnkiConnect add-on, or export TSV instead."
+  },
+  "dictAnkiModelMismatch": {
+    "message": "The existing \"Pinboard Vocab\" note type has been modified — send aborted to protect it."
+  },
+  "dictAnkiKeyRequired": {
+    "message": "AnkiConnect requires an API key. Add it below."
+  },
+  "dictAnkiDeckLabel": {
+    "message": "Anki deck"
+  },
+  "dictAnkiKeyLabel": {
+    "message": "AnkiConnect API key (optional)"
+  },
+  "dictAnkiNothing": {
+    "message": "No words to send yet."
+  },
   "dictDeleteWord": {
     "message": "Remove from vocabulary"
   },

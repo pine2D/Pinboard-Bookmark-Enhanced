@@ -2639,6 +2639,44 @@
   "dictEchoHint": {
     "message": "Gepunktete Unterstreichungen markieren gespeicherte Vokabeln. Klicke darauf, um das Wörterbuch zu öffnen."
   },
+  "dictAnkiSend": {
+    "message": "An Anki senden"
+  },
+  "dictAnkiSending": {
+    "message": "Senden…"
+  },
+  "dictAnkiResult": {
+    "message": "$ADDED$ hinzugefügt · $SKIPPED$ übersprungen · $FAILED$ fehlgeschlagen",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "failed": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictAnkiUnreachable": {
+    "message": "Anki ist nicht erreichbar. Lass Anki mit dem AnkiConnect-Add-on laufen oder exportiere stattdessen als TSV."
+  },
+  "dictAnkiModelMismatch": {
+    "message": "Der vorhandene Notiztyp „Pinboard Vocab“ wurde verändert. Der Versand wurde zum Schutz abgebrochen."
+  },
+  "dictAnkiKeyRequired": {
+    "message": "AnkiConnect benötigt einen API-Schlüssel. Trag ihn unten ein."
+  },
+  "dictAnkiDeckLabel": {
+    "message": "Anki-Stapel"
+  },
+  "dictAnkiKeyLabel": {
+    "message": "AnkiConnect-API-Schlüssel (optional)"
+  },
+  "dictAnkiNothing": {
+    "message": "Noch keine Wörter zum Senden."
+  },
   "dictDeleteWord": {
     "message": "Aus Vokabelliste entfernen"
   },

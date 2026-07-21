@@ -2639,6 +2639,44 @@
   "dictEchoHint": {
     "message": "Пунктирное подчёркивание отмечает слова из вашего словарика — нажмите, чтобы открыть словарь."
   },
+  "dictAnkiSend": {
+    "message": "Отправить в Anki"
+  },
+  "dictAnkiSending": {
+    "message": "Отправка…"
+  },
+  "dictAnkiResult": {
+    "message": "Добавлено: $ADDED$ · пропущено: $SKIPPED$ · ошибок: $FAILED$",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "failed": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictAnkiUnreachable": {
+    "message": "Anki недоступна — держите Anki запущенным вместе с аддоном AnkiConnect или экспортируйте TSV."
+  },
+  "dictAnkiModelMismatch": {
+    "message": "Существующий тип заметки «Pinboard Vocab» был изменён — отправка прервана для его защиты."
+  },
+  "dictAnkiKeyRequired": {
+    "message": "AnkiConnect требует API-ключ — добавьте его ниже."
+  },
+  "dictAnkiDeckLabel": {
+    "message": "Колода Anki"
+  },
+  "dictAnkiKeyLabel": {
+    "message": "API-ключ AnkiConnect (необязательно)"
+  },
+  "dictAnkiNothing": {
+    "message": "Пока нет слов для отправки."
+  },
   "dictDeleteWord": {
     "message": "Убрать из словарика"
   },

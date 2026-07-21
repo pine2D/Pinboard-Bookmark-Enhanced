@@ -670,6 +670,9 @@
       <div class="section-title" data-i18n="dictVocabSection">Vocabulary</div>
       <div class="fg"><label><input type="checkbox" id="dict-echo-enabled" /> <span data-i18n="dictEchoToggle">Underline saved words while reading</span></label>
         <p class="hint" data-i18n="dictEchoHint">Dotted underlines mark words already in your vocabulary. Click one to open the dictionary.</p></div>
+      <div class="fg"><label class="bl" for="dict-anki-deck" data-i18n="dictAnkiDeckLabel">Anki deck</label>
+        <input type="text" id="dict-anki-deck" placeholder="Pinboard Vocab" /></div>
+      <div class="fg"><label class="bl" for="dict-anki-key" data-i18n="dictAnkiKeyLabel">AnkiConnect API key (optional)</label><input type="password" id="dict-anki-key" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-anki-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></div>
       <div class="notes-toolbar">
         <span id="vocab-count" class="notes-count" aria-live="polite"></span>
         <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportTsv">Export TSV</button>

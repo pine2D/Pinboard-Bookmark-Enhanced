@@ -5,7 +5,7 @@ title: Privacy Policy
 
 # Privacy Policy: Pinboard Bookmark Enhanced
 
-**Last updated:** 2026-07-21
+**Last updated:** 2026-07-22
 
 ## Summary
 
@@ -46,7 +46,7 @@ The Chrome Web Store privacy form uses standardized data categories. To keep the
 | Category | Why it applies |
 |----------|----------------|
 | Personally identifiable information | Your Pinboard API token includes your Pinboard username; account-scoped local state and cache keys store that username owner in plaintext locally (without the token), including offline, tag, AI, Batch, tag-cleanup, and preview state; and optional backup/export settings may include usernames you enter, such as a WebDAV username |
-| Authentication information | The extension stores and uses credentials you provide, such as your Pinboard API token, AI/Jina provider keys, Wayback S3 credentials, GitHub token, webhook authorization value or capability URL, and WebDAV password |
+| Authentication information | The extension stores and uses credentials you provide, such as your Pinboard API token, AI/Jina provider keys, Wayback S3 credentials, GitHub token, webhook authorization value or capability URL, WebDAV password, and AnkiConnect API key |
 | Web history | The extension reads page URLs and titles for bookmark status, popup prefill, batch save, Save Tab Set, offline queue, and bookmark/export metadata |
 | Website content | The extension can extract page text, selected text, links, metadata, highlights, and notes for AI tags/summaries, Markdown preview, Translate, Ask-the-page, Explain-selection, Dictionary lookups and the vocabulary book, exports, and optional backups |
 
@@ -84,6 +84,8 @@ The extension uses the required Pinboard hosts for its core bookmark features. C
 
 14. **Free Dictionary API** (`freedictionaryapi.com`, optional): when you use the Dictionary lookup in Markdown preview and grant an exact `https://freedictionaryapi.com` origin, the selected word and its language code are sent to fetch Wiktionary-based definitions. The lookup is never contacted automatically or in the background.
 
+15. **AnkiConnect** (`http://127.0.0.1:8765`, local loopback, optional; inactive until you click Send to Anki): the **Send to Anki** action sends each vocabulary book entry's term, reading, definition, contexts, source, and license text to a locally running Anki instance through the AnkiConnect add-on, authenticated with an API key you provide if AnkiConnect requires one. The request targets a fixed loopback address; it never reaches the public internet or the developer. The action requests only that exact origin and runs only when you click Send to Anki.
+
 For configured AI, Webhook, and WebDAV destinations, HTTPS is required. Plain HTTP is accepted only for the literal loopback hosts `localhost`, `127.0.0.1`, and `[::1]` (with an optional port). Public or LAN HTTP hosts, alternate loopback spellings, wildcard hosts, and URLs containing embedded credentials are blocked before any request. The configuration is retained so you can correct it; permission denial or revocation likewise preserves keys and settings.
 
 Page content, URLs, credentials, and remote-image requests are transmitted only as described above, and never to the developer.
@@ -100,9 +102,9 @@ Page content, URLs, credentials, and remote-image requests are transmitted only 
 | `alarms` | Keep the Service Worker warm, retry the offline save queue, refresh the unread badge, prime storage defaults, optionally prewarm Pinboard tags, and run enabled scheduled WebDAV pushes |
 | `declarativeNetRequestWithHostAccess` | Set the `Referer` header (to the article page's origin) on the extension's **own** image re-fetches during the preview's Fix-images action and the Embed-export retry. Only effective for image origins you granted, only for requests from that preview tab, via a temporary session rule removed after each run; it grants no page access by itself and never touches other tabs' or sites' traffic |
 | `host_permissions` | Required access only to `api.pinboard.in` and `pinboard.in` for core bookmark API and website features |
-| `optional_host_permissions: *://*/*` (declaration ceiling) | Allows Chrome to offer exact runtime grants for arbitrary user-selected origins. The extension requests only the current AI/Jina/Wayback/Gist/Webhook/WebDAV origin, the selected Batch tab origins, the exact origins of the images referenced in a Markdown/HTML/EPUB export when you download it with the Embed (offline) image policy, the exact origins of the failed images when you click **Fix** on the preview's blocked-images notice, or the exact `https://freedictionaryapi.com` origin requested the first time you use the Dictionary lookup in Markdown preview (each a one-time prompt, can be declined; declining only disables the Wiktionary lookup, and the AI explanation (if configured) and pronunciation still work); it never requests this wildcard itself |
+| `optional_host_permissions: *://*/*` (declaration ceiling) | Allows Chrome to offer exact runtime grants for arbitrary user-selected origins. The extension requests only the current AI/Jina/Wayback/Gist/Webhook/WebDAV origin, the selected Batch tab origins, the exact origins of the images referenced in a Markdown/HTML/EPUB export when you download it with the Embed (offline) image policy, the exact origins of the failed images when you click **Fix** on the preview's blocked-images notice, the exact `https://freedictionaryapi.com` origin requested the first time you use the Dictionary lookup in Markdown preview, or the exact `http://127.0.0.1:8765` AnkiConnect origin requested the first time you click **Send to Anki** (each a one-time prompt, can be declined; declining the Dictionary lookup grant only disables the Wiktionary lookup, and the AI explanation (if configured) and pronunciation still work; declining the AnkiConnect grant only disables Send to Anki, and TSV export still works); it never requests this wildcard itself |
 
-Optional grants are requested from a direct user action and remain under Chrome's permission controls. Automatic feature paths that require an optional grant use `permissions.contains` only and never prompt. On upgrade from a legacy version that may have retained an all-sites grant, the extension performs a one-time removal of that wildcard grant. This can also clear matching old exact grants, but configurations are preserved and the next direct use can restore only the exact origin needed.
+Optional grants are requested from a direct user action and remain under Chrome's permission controls. Automatic feature paths that require an optional grant use `permissions.contains` only and never prompt. On upgrade from a legacy version that may have retained an all-sites grant, the extension performs a one-time removal of that wildcard grant. This can also clear matching old exact grants, but configurations are preserved and the next direct use can restore only the exact origin needed. On Chrome 142 and later, granting the AnkiConnect loopback origin can also trigger a separate Local Network Access (LNA) prompt from Chrome itself before the request reaches `127.0.0.1`; declining that prompt leaves Send to Anki unavailable without affecting any other permission.
 
 ## Third-party services
 
@@ -119,6 +121,7 @@ The extension communicates with the following services or destinations for the c
 - **Remote image hosts**: receive direct browser requests for images retained in Markdown preview, with `no-referrer` enforced as described above; if you use the preview's **Fix** action for hotlink-blocked images (or previously granted those origins), they additionally receive one extension re-fetch per image carrying the article page's origin as `Referer`
 - **Embedded export image hosts**: receive a direct extension-page fetch for each image referenced in a Markdown/HTML/EPUB export only when you choose the Embed (offline) image policy and grant the one-time origin permission; images are embedded in the downloaded file (as data URIs, or as bundled files inside the EPUB) with no third-party relay
 - **Free Dictionary API (freedictionaryapi.com)**: receives the word you look up and its language code when you use the Dictionary lookup and grant access; returns Wiktionary-based definitions licensed CC BY-SA 4.0
+- **AnkiConnect** ([project homepage](https://git.sr.ht/~foosoft/anki-connect)): your local Anki installation receives vocabulary book entries only through an explicit Send to Anki action, authenticated with an API key you provide if AnkiConnect requires one; this is local software running on your device, so no data leaves it
 
 Optional-service permission denial or revocation sends nothing to that destination and does not erase its configuration. Selected Batch sites are accessed only to extract the content requested for that batch; they do not receive data from the extension.
 

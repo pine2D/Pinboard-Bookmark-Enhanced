@@ -2639,6 +2639,44 @@
   "dictEchoHint": {
     "message": "Kropkowane podkreślenia oznaczają słówka z Twojego słowniczka — kliknij, aby otworzyć słownik."
   },
+  "dictAnkiSend": {
+    "message": "Wyślij do Anki"
+  },
+  "dictAnkiSending": {
+    "message": "Wysyłanie…"
+  },
+  "dictAnkiResult": {
+    "message": "Dodano: $ADDED$ · pominięto: $SKIPPED$ · nieudane: $FAILED$",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "failed": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictAnkiUnreachable": {
+    "message": "Nie można połączyć się z Anki — uruchom Anki z dodatkiem AnkiConnect lub wyeksportuj TSV."
+  },
+  "dictAnkiModelMismatch": {
+    "message": "Istniejący typ notatki „Pinboard Vocab” został zmieniony — wysyłanie przerwano, aby go chronić."
+  },
+  "dictAnkiKeyRequired": {
+    "message": "AnkiConnect wymaga klucza API — dodaj go poniżej."
+  },
+  "dictAnkiDeckLabel": {
+    "message": "Talia Anki"
+  },
+  "dictAnkiKeyLabel": {
+    "message": "Klucz API AnkiConnect (opcjonalnie)"
+  },
+  "dictAnkiNothing": {
+    "message": "Brak słówek do wysłania."
+  },
   "dictDeleteWord": {
     "message": "Usuń ze słówek"
   },
