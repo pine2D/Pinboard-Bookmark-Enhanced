@@ -1562,7 +1562,7 @@ function _pbpExplainGetSelection() {
 // a silent no-op. Optional initialAction (e.g. "dict") is forwarded so a
 // caller like the highlight bar's dictionary button can jump straight to
 // that tab instead of defaulting to explain.
-function pbpExplainInvoke(initialAction) {
+function pbpExplainInvoke(initialAction = "explain") {
   const cap = _pbpExplainGetSelection();
   if (!cap) return;
   if (cap.range) cap.rect = cap.range.getBoundingClientRect();
@@ -2178,16 +2178,11 @@ function _pbpExplainOpenPop(cap, initialAction) {
   const pop = _pbpExplainEnsurePop();
   pop.querySelector(".xp-term").textContent = cap.text; // ellipsized via CSS
   pop.querySelector(".xp-model").textContent = _pbpExplainModelLabel(_pbpExplainSettings || {});
-  // Action resets on every open (session-only, not persisted): an explicit
-  // initialAction (highlight-card explain, translate, or dict entry points)
-  // always wins; otherwise a short/term-like selection defaults to "dict" when
-  // md-dict.js is loaded (self-serve lookup fits a term better than a
-  // model call), and so does ANY selection when AI is unavailable (dict is
-  // the only action that works without it) -- everything else defaults to
-  // "explain".
-  _pbpExplainAction = (initialAction === "explain" || initialAction === "translate" || initialAction === "dict")
-    ? initialAction
-    : (typeof window.pbpDictRun === "function" && (!_pbpExplainAiOk || pbpExplainIsTerm(cap.text)) ? "dict" : "explain");
+  // Two explicit entry points (bar help-circle -> explain, bar book-open ->
+  // dict) plus the card's explicit actions replaced the old term-based smart
+  // default: the action is now always caller-declared. Unknown values fall
+  // back to explain. Session-only, as before.
+  _pbpExplainAction = (initialAction === "translate" || initialAction === "dict") ? initialAction : "explain";
   _pbpExplainSyncActButtons(pop);
   // Gear radios mirror the live trigger value; menu starts closed.
   const menu = pop.querySelector(".xp-gear-menu");

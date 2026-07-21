@@ -1089,17 +1089,17 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
     max-height: 320px;
     overflow: auto;
   }
-  .exp-img-row option {
+  .exp-img-row option, .xp-dict-lang option {
     padding: 7px 9px;
     border-radius: 6px;
     font-size: 13px;
     cursor: pointer;
   }
-  .exp-img-row option:hover { background: var(--row-hover, rgba(127,127,127,.14)); }
-  .exp-img-row option:focus-visible { background: var(--row-hover, rgba(127,127,127,.14));
+  .exp-img-row option:hover, .xp-dict-lang option:hover { background: var(--row-hover, rgba(127,127,127,.14)); }
+  .exp-img-row option:focus-visible, .xp-dict-lang option:focus-visible { background: var(--row-hover, rgba(127,127,127,.14));
     outline: 2px solid var(--link); outline-offset: -2px; }
-  .exp-img-row option::checkmark { display: none; }
-  .exp-img-row option:checked { background: var(--active-bg); color: var(--active-fg); }
+  .exp-img-row option::checkmark, .xp-dict-lang option::checkmark { display: none; }
+  .exp-img-row option:checked, .xp-dict-lang option:checked { background: var(--active-bg); color: var(--active-fg); }
 }
 /* Format grid: 3 columns (name / primary action / icon-only download).
    .export-fmt keeps its div wrapper for markup readability but hands box
@@ -1532,21 +1532,6 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-ailabel { font-size: 11px; color: var(--fg-muted); margin-top: 4px; }
 .xp-dict-msg { color: var(--fg-muted); padding: 4px 0; }
 
-/* Vocabulary rail section (md-dict.js) */
-.vocab-export { font-size: 12px; }
-.vocab-actions { display: flex; justify-content: flex-end; margin: 2px 0 4px; }
-.vocab-row { border-bottom: 1px solid var(--border); }
-.vocab-row-head { display: flex; gap: 6px; align-items: baseline; width: 100%; text-align: left; background: none; border: 0; padding: 5px 0; cursor: pointer; color: inherit; }
-.vocab-term { font-weight: 600; }
-.vocab-lang { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; }
-.vocab-gloss { font-size: 12px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
-.vocab-detail { padding: 0 0 6px; }
-.vocab-quote { font-size: 12px; font-style: italic; color: var(--fg-muted); }
-.vocab-src { font-size: 12px; color: var(--fg-muted); display: block; margin: 2px 0 4px; }
-.vocab-note { font-size: 12px; color: var(--fg-muted); white-space: pre-wrap; margin: 2px 0; }
-.vocab-del { font-size: 12px; }
-.dict-toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 6px 14px; border-radius: 6px; z-index: 9999; }
-
 .xp-model {
   flex: 1 1 auto;
   min-width: 0;
@@ -1848,14 +1833,15 @@ html.motion-ready #pb-hl-bar:popover-open {
   justify-content: center;
   height: 22px;
   padding: 0 4px 0 8px;
-  margin-left: 2px;
   border: none;
-  border-left: 1px solid var(--border);
   background: transparent;
   color: var(--fg-muted);
   cursor: pointer;
   border-radius: 4px;
 }
+/* Only the first of the pair carries the group divider -- they act as one
+   action group off the color dots/note button. */
+.pb-hl-explain-btn { margin-left: 2px; border-left: 1px solid var(--border); }
 .pb-hl-explain-btn:hover, .pb-hl-explain-btn:focus-visible,
 .pb-hl-dict-btn:hover, .pb-hl-dict-btn:focus-visible { color: var(--fg); background: var(--btn-hover); outline: none; }
 .pb-hl-explain-btn svg, .pb-hl-dict-btn svg { width: 13px; height: 13px; }
