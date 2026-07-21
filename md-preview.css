@@ -85,6 +85,7 @@
      -current is one step deeper/teal so the active match still reads as
      "the same family, emphasized" rather than an unrelated new hue. */
   --hl-search: light-dark(rgba(100, 116, 139, 0.32), #8C8A854D);
+  --vocab-echo: light-dark(rgba(59, 130, 246, 0.55), rgba(96, 165, 250, 0.6));
   --hl-search-current: light-dark(rgba(20, 184, 166, 0.5), #4E9E936B);
   /* Per-script font stacks — DRY building blocks for the :lang() rules below.
      Latin head first (handles en/de/fr/pl/ru + Latin in CJK articles), then the
@@ -1273,6 +1274,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
      dark background-colors (#033a16/#67060c) in the dark vendor sheet,
      which against the forced #1f2328 text would print at ~1.2:1. */
   #rendered-view pre code, #rendered-view pre code span { color: #1f2328 !important; background: transparent !important; }
+  ::highlight(pbp-vocab-echo) { text-decoration-line: none; }
 }
 
 /* Raw view: the TOC navigates the rendered doc, which is hidden in Raw mode. */
@@ -1733,6 +1735,17 @@ html.motion-ready .xp-gear-menu[hidden] {
    (2.4-3.5:1 dark). currentColor = light branch byte-identical. */
 ::highlight(pbp-search) { background-color: var(--hl-search); color: light-dark(currentColor, var(--fg)); }
 ::highlight(pbp-search-current) { background-color: var(--hl-search-current); color: light-dark(currentColor, var(--fg)); }
+
+/* Vocab echo (md-vocab-echo.js): saved vocabulary re-occurrence marker.
+   Decoration LINE only, no background -- highlights are area, vocab is line.
+   Longhands on purpose: ::highlight() supports the text-decoration family;
+   1px shorthand thickness would put cross-platform pixel behavior in the
+   contract for no benefit. priority -1 is set in JS (below user highlights). */
+::highlight(pbp-vocab-echo) {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--vocab-echo);
+}
 
 /* H5 block-level mirror bar (spec 1.5): a 3px left bar echoing the OTHER
    side's highlight color onto the paired block, so a highlight on one side is

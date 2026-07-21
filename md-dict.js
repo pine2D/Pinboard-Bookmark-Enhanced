@@ -799,6 +799,9 @@ async function pbpDictSaveCurrent() {
     // lives in the options tab now (options-vocab.js); it rescans on its own
     // next activation, same as every other options panel.
     if (_pbpDictCurrent === cur) cur.saved = true;
+    try {
+      document.dispatchEvent(new CustomEvent("pbp:vocab-changed", { detail: { owner: cur.owner } }));
+    } catch (_) {}
     return true;
   }
   return false;

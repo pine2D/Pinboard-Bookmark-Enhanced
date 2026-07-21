@@ -2240,13 +2240,17 @@ function _pbpExplainOpenPop(cap, initialAction) {
 // _pbpExplainPackFromBlock(cap.n, cap.text). Setting cap.itemId here is also
 // what makes the popover's "save as note" button target this highlight
 // instead of a live selection.
+// opts.range (optional, vocab-echo click): a live Range for exact context;
+// _pbpExplainPackContext and the save-target wiring already prefer cap.range
+// when present.
 window.pbpExplainOpenForItem = function (opts) {
   if (!opts || typeof _pbpExplainOpenPop !== "function") return;
   const cap = {
     text: String(opts.text == null ? "" : opts.text),
     rect: opts.rect,
     itemId: opts.itemId,
-    n: opts.n
+    n: opts.n,
+    range: (typeof Range !== "undefined" && opts.range instanceof Range) ? opts.range : undefined
   };
   _pbpExplainOpenPop(cap, opts.action);
 };
