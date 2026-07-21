@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>md-dict Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; } .fail { color: #c00; font-weight: bold; }
+h2 { margin-top: 24px; }
+</style></head>
+<body>
+<h1>md-dict.js tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+<script src="../md-dict.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond; ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+function section(name) { const h = document.createElement("h2"); h.textContent = name; root.appendChild(h); }
+function assert(cond, detail) { check(detail || String(cond), cond, detail); }
+function assertEq(a, e, label) {
+  const ok = a === e;
+  check(label || (String(e) + " === " + String(a)), ok, ok ? "" : "expected " + JSON.stringify(e) + " got " + JSON.stringify(a));
+}
+
+section("pbpDictPrimaryLang");
+assertEq(pbpDictPrimaryLang("en-US"), "en", "en-US -> en");
+assertEq(pbpDictPrimaryLang("ZH_cn"), "zh", "ZH_cn -> zh");
+assertEq(pbpDictPrimaryLang("  de "), "de", "trims");
+assertEq(pbpDictPrimaryLang(""), "", "empty -> empty");
+assertEq(pbpDictPrimaryLang(null), "", "null -> empty");
+
+section("pbpDictRouteLang");
+assertEq(pbpDictRouteLang("en", true, "de", "fr"), "fr", "manual wins");
+assertEq(pbpDictRouteLang("en", true, "de", ""), "en", "reliable detection second");
+assertEq(pbpDictRouteLang("en", false, "de", ""), "de", "unreliable falls to article lang");
+assertEq(pbpDictRouteLang("und", true, "de", ""), "de", "und never routes");
+assertEq(pbpDictRouteLang("", false, "", ""), "", "nothing -> auto-unknown");
+
+section("pbpDictVocabKey / pbpDictCacheKeyPublic");
+assertEq(pbpDictVocabKey("acct_u1", "en-US", "  Running  "), "acct_u1|en|running", "owner + primary + normalized");
+assertEq(pbpDictVocabKey("", "en", "x"), "ownerless|en|x", "empty owner -> ownerless");
+assertEq(pbpDictVocabKey("acct_u1", "zh", "书"), "acct_u1|zh|书", "CJK passthrough");
+assertEq(pbpDictCacheKeyPublic("en", "New  York"), pbpDictCacheKeyPublic("en", "New York"), "public key collapses whitespace");
+assertEq(pbpDictCacheKeyPublic("de", "Straße"), "de|straße", "public key has no owner");
+
+section("pbpDictSafeUrl");
+assertEq(pbpDictSafeUrl("https://en.wiktionary.org/wiki/x"), "https://en.wiktionary.org/wiki/x", "https passes");
+assertEq(pbpDictSafeUrl("http://a.example/x"), "http://a.example/x", "http passes");
+assertEq(pbpDictSafeUrl("javascript:alert(1)"), "", "javascript: blocked");
+assertEq(pbpDictSafeUrl("data:text/html,x"), "", "data: blocked");
+assertEq(pbpDictSafeUrl("not a url"), "", "garbage blocked");
+
+section("pbpDictLemmaRetry");
+assert(pbpDictLemmaRetry(404, "run", "running", "en") === true, "404 + different lemma -> retry");
+assert(pbpDictLemmaRetry(404, "Running", "running", "en") === false, "same after normalize -> no retry");
+assert(pbpDictLemmaRetry(404, "-", "running", "en") === false, "'-' sentinel -> no retry");
+assert(pbpDictLemmaRetry(404, "", "running", "en") === false, "empty -> no retry");
+assert(pbpDictLemmaRetry(200, "run", "running", "en") === false, "non-404 -> no retry");
+
+section("pbpDictNormalizeEntry");
+const FDA_SAMPLE = { /* hello 样本，含 source.url 变体 */
+  word: "hello",
+  entries: [{
+    language: { code: "en", name: "English" },
+    partOfSpeech: "interjection",
+    pronunciations: [
+      { type: "ipa", text: "/hɛˈloʊ/", tags: ["General American"] },
+      { type: "ipa", text: "/həˈləʊ/", tags: ["Received Pronunciation"] },
+      { type: "ipa", text: "/x1/", tags: [] }, { type: "ipa", text: "/x2/", tags: [] }
+    ],
+    forms: [{ word: "hellos", tags: ["plural"] }],
+    senses: [
+      { definition: "A greeting.", examples: ["Hello, world!", "Hello there.", "third dropped"] },
+      { definition: "s2", examples: [] }, { definition: "s3", examples: [] },
+      { definition: "s4", examples: [] }, { definition: "s5", examples: [] },
+      { definition: "s6-dropped", examples: [] }
+    ]
+  }],
+  source: { url: "https://en.wiktionary.org/wiki/hello", license: { name: "CC BY-SA 4.0", url: "https://creativecommons.org/licenses/by-sa/4.0/" } }
+};
+const norm = pbpDictNormalizeEntry(FDA_SAMPLE);
+assert(norm !== null, "sample normalizes");
+assertEq(norm.word, "hello", "word");
+assertEq(norm.entries.length, 1, "one entry");
+assertEq(norm.entries[0].pos, "interjection", "pos");
+assertEq(norm.entries[0].ipas.length, 3, "ipa capped at 3");
+assertEq(norm.entries[0].ipas[0].tags[0], "General American", "ipa accent tag");
+assertEq(norm.entries[0].senses.length, 5, "senses capped at 5");
+assertEq(norm.entries[0].senses[0].examples.length, 2, "examples capped at 2");
+assertEq(norm.sourceUrl, "https://en.wiktionary.org/wiki/hello", "source url");
+assertEq(norm.license, "CC BY-SA 4.0", "license name");
+assertEq(pbpDictNormalizeEntry({ ...FDA_SAMPLE, source: { url: "javascript:x", license: {} } }).sourceUrl, "", "unsafe source url stripped");
+assertEq(pbpDictNormalizeEntry({ word: "书", entries: [], source: {} }), null, "empty entries (zh) -> null");
+assertEq(pbpDictNormalizeEntry(null), null, "null json -> null");
+assertEq(pbpDictNormalizeEntry({ entries: [{ partOfSpeech: "noun" }] }), null, "no ipa/sense/form -> null");
+
+section("pbpDictParseCtxAnswer / StripLemmaLine");
+const ans = "LEMMA: run\n\nIn this sentence it means to manage a business.";
+assertEq(pbpDictParseCtxAnswer(ans).lemma, "run", "lemma parsed");
+assert(pbpDictParseCtxAnswer(ans).gloss.indexOf("LEMMA") === -1, "gloss excludes lemma line");
+assertEq(pbpDictParseCtxAnswer("LEMMA: -\n\ngloss").lemma, "", "'-' -> empty lemma");
+assertEq(pbpDictParseCtxAnswer("no marker at all").lemma, "", "missing marker tolerated");
+assertEq(pbpDictParseCtxAnswer("no marker at all").gloss, "no marker at all", "gloss = full text when no marker");
+assertEq(pbpDictStripLemmaLine("L"), "", "partial marker prefix hidden: L");
+assertEq(pbpDictStripLemmaLine("LEMM"), "", "partial marker prefix hidden: LEMM");
+assertEq(pbpDictStripLemmaLine("LEMMA: ru"), "", "partial lemma line hidden");
+assertEq(pbpDictStripLemmaLine("Hello"), "Hello", "ordinary token NOT swallowed");
+assertEq(pbpDictStripLemmaLine("AI"), "AI", "short ordinary token NOT swallowed");
+assertEq(pbpDictStripLemmaLine("Meaning of the word"), "Meaning of the word", "L-adjacent word NOT swallowed");
+assert(pbpDictStripLemmaLine(ans).indexOf("manage") >= 0, "strip keeps gloss");
+
+section("pbpDictCtxHash");
+assertEq(pbpDictCtxHash("abc"), pbpDictCtxHash("abc"), "deterministic");
+assert(pbpDictCtxHash("abc") !== pbpDictCtxHash("abd"), "differs");
+assertEq(pbpDictCtxHash(""), pbpDictCtxHash(null), "null == empty");
+
+section("pbpDictBuildCtxPrompt");
+const cp = pbpDictBuildCtxPrompt({ selection: "bank", sentence: "He sat by the river bank.", title: "T", answerLang: "Simplified Chinese" });
+assert(cp.system.indexOf("LEMMA:") >= 0, "system demands LEMMA first line");
+assert(/do not output ipa/i.test(cp.system), "system forbids IPA");
+assert(cp.system.indexOf("Simplified Chinese") >= 0, "answer lang injected");
+assert(cp.prompt.indexOf("bank") >= 0 && cp.prompt.indexOf("river") >= 0, "prompt carries selection + sentence");
+assert(cp.prompt.indexOf("T") >= 0, "prompt carries title (title is part of cache identity)");
+const longSel = "x".repeat(500);
+assert(pbpDictBuildCtxPrompt({ selection: longSel, sentence: "", title: "", answerLang: "English" }).prompt.indexOf("x".repeat(401)) === -1, "selection capped at 400");
+
+section("pbpDictMergeContext");
+const c1 = { quote: "q1", articleUrl: "u1", articleTitle: "t1", highlightId: null, createdAt: 1 };
+assertEq(pbpDictMergeContext([], c1).length, 1, "append to empty");
+assertEq(pbpDictMergeContext([c1], { ...c1 }).length, 1, "dedup by url+quote");
+assertEq(pbpDictMergeContext([c1], { ...c1, articleUrl: "u2" }).length, 2, "same quote different article kept");
+assertEq(pbpDictMergeContext([c1], null).length, 1, "null ctx no-op");
+assert(Array.isArray(pbpDictMergeContext([c1], c1)), "returns array");
+
+section("pbpDictTsv");
+const tsv = pbpDictTsv([
+  { term: "hello", reading: "/həˈləʊ/", definition: "a greeting", contexts: ["Hello, world"], source: "https://a", license: "CC BY-SA 4.0 https://en.wiktionary.org/wiki/hello" },
+  { term: "tab\there", reading: "", definition: 'say "hi" x', contexts: ["c1", "c2"], source: "", license: "" },
+  { term: "书", reading: "", definition: "book; letter", contexts: ["我在读一本书。"], source: "https://b", license: "" }
+]);
+assert(tsv.startsWith("#separator:Tab\n#html:false\n#columns:Term\tReading\tDefinition\tContext\tSource\tLicense\n"), "anki headers, 6 columns");
+assert(tsv.indexOf("hello\t/həˈləʊ/\ta greeting\tHello, world\thttps://a\tCC BY-SA 4.0 https://en.wiktionary.org/wiki/hello") >= 0, "plain row raw");
+assert(tsv.indexOf('"tab\there"') >= 0, "tab field quoted");
+assert(tsv.indexOf('"c1\nc2"') >= 0, "multiple contexts exported as quoted multiline");
+assert(tsv.indexOf("我在读一本书。") >= 0, "CJK golden row survives");
+assertEq(pbpDictTsv([]), "#separator:Tab\n#html:false\n#columns:Term\tReading\tDefinition\tContext\tSource\tLicense\n", "empty -> header only");
+assert(tsv.indexOf('say "hi" x') === -1 || tsv.indexOf('"say ""hi"" x"') >= 0, "inner quotes doubled when field needs quoting");
+
+document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
+</script>
+</body></html>
