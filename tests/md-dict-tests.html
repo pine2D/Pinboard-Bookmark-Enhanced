@@ -11,6 +11,7 @@ h2 { margin-top: 24px; }
 <div id="summary"></div>
 <div id="results"></div>
 <script src="../md-dict.js"></script>
+<script src="../md-vocab-echo.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -156,6 +157,61 @@ assert(tsv.indexOf('"c1\nc2"') >= 0, "multiple contexts exported as quoted multi
 assert(tsv.indexOf("我在读一本书。") >= 0, "CJK golden row survives");
 assertEq(pbpDictTsv([]), "#separator:Tab\n#html:false\n#columns:Term\tReading\tDefinition\tContext\tSource\tLicense\n", "empty -> header only");
 assert(tsv.indexOf('say "hi" x') === -1 || tsv.indexOf('"say ""hi"" x"') >= 0, "inner quotes doubled when field needs quoting");
+
+section("pbpEchoTermSet");
+const _ets = (rows, cap) => pbpEchoTermSet(rows, cap);
+{
+  const set1 = _ets([{ term: "net" }, { term: "internet" }, { term: "NET" }]);
+  assertEq(set1.length, 2, "dedup by folded key");
+  assertEq(set1[0].key, "internet", "longest-first ordering");
+  const nfc = _ets([{ term: "café" }, { term: "café" }]);
+  assertEq(nfc.length, 1, "NFC merges composed/decomposed");
+  const capd = _ets([{ term: "alpha" }, { term: "beta" }, { term: "gamma" }], 2);
+  assertEq(capd.length, 2, "cap keeps the first (newest) rows only");
+  assertEq(_ets([{ term: "a" }]).length, 0, "single latin letter dropped");
+  assert(_ets([{ term: "书" }]).length === 1 && _ets([{ term: "단" }]).length === 1,
+    "single non-latin chars kept (han substring-matched, hangul boundary-matched)");
+  const lem = _ets([{ term: "running", lemma: "run" }]);
+  assert(lem.length === 1 && lem[0].key === "running", "lemma is NOT echoed (term only)");
+  const turk = _ets([{ term: "İstanbul" }]);
+  assertEq(turk[0].key, "İstanbul", "length-shifting case fold degrades to exact-case key");
+}
+
+section("pbpEchoNeedsBoundary");
+assertEq(pbpEchoNeedsBoundary("word"), true, "latin needs boundary");
+assertEq(pbpEchoNeedsBoundary("слово"), true, "cyrillic needs boundary");
+assertEq(pbpEchoNeedsBoundary("λόγος"), true, "greek needs boundary");
+assertEq(pbpEchoNeedsBoundary("단어"), true, "hangul needs boundary");
+assertEq(pbpEchoNeedsBoundary("书"), false, "han is substring-matched");
+assertEq(pbpEchoNeedsBoundary("ひらがな"), false, "kana is substring-matched");
+
+section("pbpEchoFindInText");
+const _terms = (list) => pbpEchoTermSet(list.map((t) => ({ term: t })));
+{
+  assertEq(pbpEchoFindInText("running fast", _terms(["run"])).length, 0, "latin: no hit inside a longer word");
+  const hit1 = pbpEchoFindInText("a run.", _terms(["run"]));
+  assert(hit1.length === 1 && hit1[0].start === 2 && hit1[0].end === 5, "latin boundary hit with offsets");
+  assertEq(pbpEchoFindInText("словом", _terms(["слово"])).length, 0, "cyrillic: слово does not hit словом");
+  assertEq(pbpEchoFindInText("слово,", _terms(["слово"])).length, 1, "cyrillic exact word hits");
+  assertEq(pbpEchoFindInText("λόγοςα", _terms(["λόγος"])).length, 0, "greek adjacency rejected");
+  assertEq(pbpEchoFindInText("café", _terms(["cafe"])).length, 0, "combining mark after edge rejects (\\p{M})");
+  const cjk = pbpEchoFindInText("读书人", _terms(["书"]));
+  assert(cjk.length === 1 && cjk[0].start === 1, "han substring hit inside run");
+  assertEq(pbpEchoFindInText("かなひらがなだ", _terms(["ひらがな"])).length, 1, "kana substring hit");
+  const ov = pbpEchoFindInText("internet", _terms(["net", "internet"]));
+  assert(ov.length === 1 && ov[0].key === "internet", "overlap: longest term claims first");
+  {
+    const caps = new Map([["读书", 1]]);
+    const r = pbpEchoFindInText("读书读书", _terms(["书", "读书"]), 10, caps);
+    assert(r.length === 2 && r[0].key === "读书" && r[0].start === 0 && r[1].key === "书" && r[1].start === 3,
+      "per-term cap inside the matcher frees the region for the shorter term (no ghost claim)");
+  }
+  const ci = pbpEchoFindInText("HELLO there", _terms(["Hello"]));
+  assert(ci.length === 1 && ci[0].start === 0 && ci[0].end === 5, "case-insensitive with original offsets");
+  assertEq(pbpEchoFindInText("𝐀ab", _terms(["ab"])).length, 0, "astral letter adjacency rejected (code point, not UTF-16 unit)");
+  assertEq(pbpEchoFindInText("😀ab", _terms(["ab"])).length, 1, "emoji adjacency is a boundary (not \\p{L})");
+  assertEq(pbpEchoFindInText("anything", []).length, 0, "empty term set -> no hits");
+}
 
 async function runVocabIdbTests() {
   section("pbp-vocab IDB (runtime)");
