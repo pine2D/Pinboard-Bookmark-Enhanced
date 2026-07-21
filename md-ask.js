@@ -1559,8 +1559,10 @@ function _pbpExplainGetSelection() {
 // and the "e" hotkey. Captures the selection NOW (the popover's light-dismiss
 // may clear it later) and hands off to the popover (Task 17). The typeof
 // guard keeps this commit shippable before the popover lands: invoke is then
-// a silent no-op.
-function pbpExplainInvoke() {
+// a silent no-op. Optional initialAction (e.g. "dict") is forwarded so a
+// caller like the highlight bar's dictionary button can jump straight to
+// that tab instead of defaulting to explain.
+function pbpExplainInvoke(initialAction) {
   const cap = _pbpExplainGetSelection();
   if (!cap) return;
   if (cap.range) cap.rect = cap.range.getBoundingClientRect();
@@ -1570,7 +1572,7 @@ function pbpExplainInvoke() {
   // start/end nodes/offsets but lives on its own, so "Save as note" can still
   // dereference cap.range long after the live selection is gone.
   cap.range = cap.range.cloneRange();
-  if (typeof _pbpExplainOpenPop === "function") _pbpExplainOpenPop(cap);
+  if (typeof _pbpExplainOpenPop === "function") _pbpExplainOpenPop(cap, initialAction);
 }
 
 function pbpExplainInit(detail) {

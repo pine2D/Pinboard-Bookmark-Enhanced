@@ -1047,7 +1047,7 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    page's light-dark() tokens (on Windows it can even follow the browser
    theme against a forced-dark page) and can't be made to match .send-menu
    -- the @supports block below opts it into in-page rendering instead. */
-.exp-img-row select {
+.exp-img-row select, .xp-dict-lang {
   flex: 1;
   appearance: none; -webkit-appearance: none;
   padding: 6px 24px 6px 14px;
@@ -1059,8 +1059,8 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   font-size: 13px; cursor: pointer;
   transition: all 150ms ease;
 }
-.exp-img-row select:hover { background-color: var(--btn-hover); border-color: var(--border); }
-.exp-img-row select:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.exp-img-row select:hover, .xp-dict-lang:hover { background-color: var(--btn-hover); border-color: var(--border); }
+.exp-img-row select:focus-visible, .xp-dict-lang:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 /* Customizable select (Chrome 135+): rail feedback round 2 unified only the
    CLOSED control -- the open list stayed a native UA popup, visually foreign
    next to .send-menu. appearance:base-select on both the control and
@@ -1076,9 +1076,9 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    .exp-tgl[aria-pressed="true"] instead, and is declared after :hover so
    the current choice keeps its inverted look while pointed at. */
 @supports selector(::picker(select)) {
-  .exp-img-row select { appearance: base-select; }
-  .exp-img-row select::picker-icon { display: none; }
-  .exp-img-row select::picker(select) {
+  .exp-img-row select, .xp-dict-lang { appearance: base-select; }
+  .exp-img-row select::picker-icon, .xp-dict-lang::picker-icon { display: none; }
+  .exp-img-row select::picker(select), .xp-dict-lang::picker(select) {
     appearance: base-select;
     margin-top: 4px;
     background: var(--bg, #fff);
@@ -1511,7 +1511,9 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 }
 /* Dictionary view (md-dict.js) */
 .xp-dict-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.xp-dict-lang { font-size: 12px; padding: 2px 4px; }
+/* Joins the .exp-img-row select recipe above (shared border/background/chevron);
+   this override only densifies for the dict view's tighter header row. */
+.xp-dict-lang { flex: 0 1 auto; padding: 3px 22px 3px 8px; font-size: 12px; background-position: right 6px center; }
 .xp-dict-speak { display: inline-flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--border); border-radius: 4px; padding: 3px; cursor: pointer; color: inherit; }
 .xp-dict-speak:hover { background: var(--btn-hover); }
 .xp-dict-speak svg { width: 14px; height: 14px; }
@@ -1838,8 +1840,9 @@ html.motion-ready #pb-hl-bar:popover-open {
 .pb-hl-note-btn svg { width: 13px; height: 13px; }
 /* Explain entry fused into this bar (formerly a standalone floating pill in
    md-ask.js). Same box as .pb-hl-note-btn, plus a divider on the left to set
-   it apart from the color dots/note button. */
-.pb-hl-explain-btn {
+   it apart from the color dots/note button. .pb-hl-dict-btn (real-device
+   feedback: dedicated dictionary entry) joins this same family verbatim. */
+.pb-hl-explain-btn, .pb-hl-dict-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1853,9 +1856,10 @@ html.motion-ready #pb-hl-bar:popover-open {
   cursor: pointer;
   border-radius: 4px;
 }
-.pb-hl-explain-btn:hover, .pb-hl-explain-btn:focus-visible { color: var(--fg); background: var(--btn-hover); outline: none; }
-.pb-hl-explain-btn svg { width: 13px; height: 13px; }
-.pb-hl-explain-btn[hidden] { display: none; }
+.pb-hl-explain-btn:hover, .pb-hl-explain-btn:focus-visible,
+.pb-hl-dict-btn:hover, .pb-hl-dict-btn:focus-visible { color: var(--fg); background: var(--btn-hover); outline: none; }
+.pb-hl-explain-btn svg, .pb-hl-dict-btn svg { width: 13px; height: 13px; }
+.pb-hl-explain-btn[hidden], .pb-hl-dict-btn[hidden] { display: none; }
 
 /* ============================================================
    Full-text translation (md-translate.js)

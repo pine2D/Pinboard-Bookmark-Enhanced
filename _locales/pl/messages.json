@@ -2594,6 +2594,9 @@
   "explainActionDict": {
     "message": "Słownik"
   },
+  "dictLookupSelection": {
+    "message": "Sprawdź w słowniku"
+  },
   "dictConnect": {
     "message": "Połącz ze słownikiem Wiktionary"
   },

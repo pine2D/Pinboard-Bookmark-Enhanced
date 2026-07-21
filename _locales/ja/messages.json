@@ -2594,6 +2594,9 @@
   "explainActionDict": {
     "message": "辞書"
   },
+  "dictLookupSelection": {
+    "message": "辞書で調べる"
+  },
   "dictConnect": {
     "message": "Wiktionary 辞書に接続"
   },

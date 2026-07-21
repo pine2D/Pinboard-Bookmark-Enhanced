@@ -2594,6 +2594,9 @@
   "explainActionDict": {
     "message": "Wörterbuch"
   },
+  "dictLookupSelection": {
+    "message": "Im Wörterbuch nachschlagen"
+  },
   "dictConnect": {
     "message": "Wiktionary-Wörterbuch verbinden"
   },

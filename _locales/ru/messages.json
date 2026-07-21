@@ -2594,6 +2594,9 @@
   "explainActionDict": {
     "message": "Словарь"
   },
+  "dictLookupSelection": {
+    "message": "Найти в словаре"
+  },
   "dictConnect": {
     "message": "Подключить словарь Wiktionary"
   },

@@ -300,6 +300,10 @@ async function pbpVocabSaveWord(owner, w) {
 // ---- Pronunciation (speechSynthesis + click-token guard) ----------------
 const PBP_DICT_SPEAKER_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
 
+// Static inline SVG (Feather book-open). Constant string, never model text.
+// Consumed by the highlight selection bar's dictionary button (md-highlight.js).
+const PBP_DICT_BOOK_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
+
 let _pbpDictSpeakSeq = 0;
 function pbpDictSpeak(text, lang) {
   try {

@@ -2594,6 +2594,9 @@
   "explainActionDict": {
     "message": "詞典"
   },
+  "dictLookupSelection": {
+    "message": "查詞典"
+  },
   "dictConnect": {
     "message": "連接 Wiktionary 詞典"
   },

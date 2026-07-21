@@ -994,15 +994,33 @@ function _pbpHlEnsureBar() {
     if (typeof pbpExplainInvoke === "function") pbpExplainInvoke();
   });
   bar.appendChild(explainBtn);
+  // Dedicated dictionary entry (real-device feedback): same box/behavior as
+  // explainBtn, but jumps the popover straight to the dict tab instead of
+  // defaulting to explain. PBP_DICT_BOOK_SVG is md-dict.js's constant.
+  const dictBtn = document.createElement("button");
+  dictBtn.type = "button";
+  dictBtn.className = "pb-hl-dict-btn";
+  dictBtn.hidden = true;
+  dictBtn.title = t("dictLookupSelection");
+  dictBtn.setAttribute("aria-label", t("dictLookupSelection"));
+  dictBtn.innerHTML = (typeof PBP_DICT_BOOK_SVG === "string" && PBP_DICT_BOOK_SVG) || "";
+  dictBtn.addEventListener("mousedown", (e) => e.preventDefault());
+  dictBtn.addEventListener("click", () => {
+    if (typeof pbpExplainInvoke === "function") pbpExplainInvoke("dict");
+  });
+  bar.appendChild(dictBtn);
   // Visibility gate memoized once at bar creation (same accepted pattern as
   // the hl-card AI row, md-highlight.js:1111 -- see _pbpHlEnsureCard):
-  // dict P1: the button opens the dict-capable popover; AI availability no
+  // dict P1: the buttons open the dict-capable popover; AI availability no
   // longer gates the surface, only the trigger mode does. "hotkey"/"off"
-  // trigger modes still see the bar without this button. A trigger-mode
-  // change mid-session needs a reopen to update this button (same known
-  // corner as the card row).
+  // trigger modes still see the bar without these buttons. A trigger-mode
+  // change mid-session needs a reopen to update them (same known corner as
+  // the card row). dictBtn additionally requires pbpDictRun to exist.
   pbpAiGetSettings().then((s) => {
-    if ((s.selectionTrigger || "icon") === "icon") explainBtn.hidden = false;
+    if ((s.selectionTrigger || "icon") === "icon") {
+      explainBtn.hidden = false;
+      dictBtn.hidden = typeof window.pbpDictRun !== "function";
+    }
   }).catch(() => {});
   bar.addEventListener("toggle", (e) => { if (e.newState === "closed") _pbpHlBarRange = null; });
   document.body.appendChild(bar);
