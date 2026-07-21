@@ -1677,6 +1677,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       resumeOptionsAutoSave();
     }
   }
+  // options-vocab's Send-to-Anki flushes pending edits before reading
+  // deck/key from storage (same contract as setupBackup's beforeExport).
+  window.pbpOptionsFlushAutoSave = flushOptionsAutoSave;
 
   // ---- WebDAV: Test ----
   $id("webdav-test-btn")?.addEventListener("click", async () => {

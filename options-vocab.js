@@ -277,6 +277,14 @@ async function _pbpVocabSendAnki() {
       return;
     }
     const keyRequired = perm.result.requireApiKey === true || perm.result.requireApikey === true;
+    // A just-edited deck/key may still sit in the options page's 500ms
+    // debounced auto-save; flush it so the read below sees what the user
+    // sees, and abort if the save fails (Codex final-review MEDIUM).
+    if (typeof window.pbpOptionsFlushAutoSave === "function") {
+      let flushed = null;
+      try { flushed = await window.pbpOptionsFlushAutoSave(); } catch (_) {}
+      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+    }
     const raw = await pbpReadSettingsWithSecrets({
       dictAnkiDeck: SETTINGS_DEFAULTS.dictAnkiDeck,
       dictAnkiKey: SETTINGS_DEFAULTS.dictAnkiKey
