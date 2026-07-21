@@ -203,6 +203,7 @@ async function renderVocabPanel() {
   if (gen !== _vocabRenderGen) return;
   _vocabRows = rows;
   _pbpVocabRenderList(rows);
+  _pbpPackRefreshStatus();
 }
 
 // Fail-closed on account switch: owner is re-derived AFTER the rows fetch
@@ -337,3 +338,67 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     if (activeBtn && activeBtn.dataset.panel === "vocab") renderVocabPanel();
   });
 }
+
+// ---- Offline dictionary pack (dict-pack.js primitives; CC-CEDICT) -------
+async function _pbpPackRefreshStatus() {
+  const el = $id("dict-pack-status");
+  const del = $id("dict-pack-delete");
+  if (!el) return;
+  const meta = (typeof pbpPackMeta === "function") ? await pbpPackMeta() : null;
+  if (meta && meta.state === "ready") {
+    const d = new Date(meta.importedAt);
+    el.textContent = t("dictPackStatus", String(meta.entries),
+      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
+    if (del) del.hidden = false;
+  } else {
+    el.textContent = t("dictPackEmpty");
+    if (del) del.hidden = true;
+  }
+}
+
+function _pbpPackWire() {
+  const open = $id("dict-pack-open");
+  const imp = $id("dict-pack-import");
+  const file = $id("dict-pack-file");
+  const del = $id("dict-pack-delete");
+  if (!open || !imp || !file) return;
+  open.addEventListener("click", () => {
+    try { chrome.tabs.create({ url: "https://www.mdbg.net/chinese/dictionary?page=cc-cedict" }); } catch (_) {}
+  });
+  imp.addEventListener("click", () => file.click());
+  file.addEventListener("change", async () => {
+    const f = file.files && file.files[0];
+    file.value = "";
+    if (!f || imp.disabled) return;
+    imp.disabled = true;
+    const el = $id("dict-pack-status");
+    let lastShown = 0;
+    try {
+      const res = await pbpPackImportFile(f, (n) => {
+        // TIME-based throttle (~1s): aria-live must not machine-gun the
+        // screen reader on a fast import; final state comes from refresh.
+        const now = performance.now();
+        if (el && now - lastShown >= 1000) { lastShown = now; el.textContent = t("dictPackImporting", String(n)); }
+      });
+      _pbpVocabFlashStatus(true, t("dictPackDone", String(res.entries)));
+    } catch (_) {
+      _pbpVocabFlashStatus(false, t("dictPackFailed"));
+    } finally {
+      imp.disabled = false;
+      _pbpPackRefreshStatus();
+    }
+  });
+  if (del) del.addEventListener("click", () => {
+    showConfirmPopover(del, {
+      msg: t("dictPackDeleteConfirm"),
+      yesText: t("delete"),
+      noText: t("cancel"),
+      onConfirm: async () => {
+        try { await pbpPackDelete(); } catch (_) {}
+        _pbpPackRefreshStatus();
+      }
+    });
+  });
+  _pbpPackRefreshStatus();
+}
+_pbpPackWire();

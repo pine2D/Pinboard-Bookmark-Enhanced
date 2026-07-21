@@ -2674,6 +2674,51 @@
   "dictAnkiKeyLabel": {
     "message": "API-ключ AnkiConnect (необязательно)"
   },
+  "dictPackSection": {
+    "message": "Офлайн-пакет словаря"
+  },
+  "dictPackOpen": {
+    "message": "Открыть страницу загрузки"
+  },
+  "dictPackImport": {
+    "message": "Импортировать файл"
+  },
+  "dictPackImporting": {
+    "message": "Импортировано записей: $N$…",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackDone": {
+    "message": "Импорт завершён: $N$ записей",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackFailed": {
+    "message": "Не удалось импортировать. Убедитесь, что это официальный релиз CC-CEDICT."
+  },
+  "dictPackEmpty": {
+    "message": "Не импортировано. Скачайте CC-CEDICT с MDBG и импортируйте (CC BY-SA 4.0)."
+  },
+  "dictPackStatus": {
+    "message": "Импортировано: $N$ · $DATE$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "dictPackDeleteConfirm": {
+    "message": "Удалить импортированный пакет словаря?"
+  },
   "dictAnkiNothing": {
     "message": "Пока нет слов для отправки."
   },

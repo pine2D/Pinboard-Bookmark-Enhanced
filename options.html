@@ -681,6 +681,15 @@
       </div>
       <div id="vocab-empty" class="notes-empty" data-i18n="dictVocabEmpty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
       <div id="vocab-list"></div>
+
+      <div class="section-title" data-i18n="dictPackSection">Offline dictionary pack</div>
+      <div class="fg">
+        <p class="hint" id="dict-pack-status" role="status" aria-live="polite"></p>
+        <button type="button" class="btn btn-sm" id="dict-pack-open" data-i18n="dictPackOpen">Open download page</button>
+        <button type="button" class="btn btn-sm" id="dict-pack-import" data-i18n="dictPackImport">Import file</button>
+        <button type="button" class="btn btn-sm" id="dict-pack-delete" data-i18n="delete" hidden>Delete</button>
+        <input type="file" id="dict-pack-file" accept=".gz,.txt" hidden />
+      </div>
     </div>
 
     <!-- Tab: Markdown -->
@@ -886,6 +895,7 @@
   <script defer src="options-notes.js"></script>
   <script defer src="md-dict.js"></script>
   <script defer src="anki-connect.js"></script>
+  <script defer src="dict-pack.js"></script>
   <script defer src="options-vocab.js"></script>
 </body>
 </html>

@@ -2674,6 +2674,51 @@
   "dictAnkiKeyLabel": {
     "message": "AnkiConnect-API-Schlüssel (optional)"
   },
+  "dictPackSection": {
+    "message": "Offline-Wörterbuchpaket"
+  },
+  "dictPackOpen": {
+    "message": "Download-Seite öffnen"
+  },
+  "dictPackImport": {
+    "message": "Datei importieren"
+  },
+  "dictPackImporting": {
+    "message": "$N$ Einträge importiert …",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackDone": {
+    "message": "Import abgeschlossen: $N$ Einträge",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackFailed": {
+    "message": "Import fehlgeschlagen. Stelle sicher, dass die Datei ein CC-CEDICT-Release ist."
+  },
+  "dictPackEmpty": {
+    "message": "Nicht importiert. Lade CC-CEDICT von MDBG herunter und importiere es (CC BY-SA 4.0)."
+  },
+  "dictPackStatus": {
+    "message": "$N$ Einträge importiert · $DATE$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "dictPackDeleteConfirm": {
+    "message": "Importiertes Wörterbuchpaket löschen?"
+  },
   "dictAnkiNothing": {
     "message": "Noch keine Wörter zum Senden."
   },

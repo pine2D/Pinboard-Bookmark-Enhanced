@@ -126,3 +126,153 @@ async function* pbpCedictLines(stream, gzip, stats) {
 }
 
 // ---- PURE END ----
+
+// ---- IDB layer (DB pbp-dict-packs) --------------------------------------
+const _PBP_PACK_DB = "pbp-dict-packs";
+const _PBP_PACK_STORE = "cedict";
+const _PBP_PACK_META = "packs";
+let _pbpPackDbPromise = null;
+
+function _pbpPackOpenDB() {
+  if (_pbpPackDbPromise) return _pbpPackDbPromise;
+  _pbpPackDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(_PBP_PACK_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      // Inline autoIncrement id: getAll() only returns VALUES, so the id
+      // must live in the record for merge/dedup/sort to see it.
+      const store = db.createObjectStore(_PBP_PACK_STORE, { keyPath: "id", autoIncrement: true });
+      store.createIndex("simp", "simp", { unique: false });
+      store.createIndex("trad", "trad", { unique: false });
+      db.createObjectStore(_PBP_PACK_META, { keyPath: "id" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => { _pbpPackDbPromise = null; reject(req.error || new Error("pack db open failed")); };
+  });
+  return _pbpPackDbPromise;
+}
+
+function _pbpPackTx(db, mode, fn) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([_PBP_PACK_STORE, _PBP_PACK_META], mode);
+    let out;
+    try { out = fn(tx); } catch (e) { reject(e); return; }
+    tx.oncomplete = () => resolve(out && typeof out.value === "function" ? out.value() : out);
+    tx.onabort = () => reject(tx.error || new Error("pack tx aborted"));
+    tx.onerror = () => reject(tx.error || new Error("pack tx failed"));
+  });
+}
+
+// Import: Web Locks serialize writers; first tx deletes meta AND clears the
+// store in ONE transaction (old meta gone = half-pack invisible); batched
+// puts; meta {state:"ready"} written LAST. A tab closed mid-import leaves
+// no meta -> lookups refuse the data.
+async function pbpPackImport(lineIter, onProgress, stats) {
+  return navigator.locks.request("pbp-cedict-import", async () => {
+    const db = await _pbpPackOpenDB();
+    await _pbpPackTx(db, "readwrite", (tx) => {
+      tx.objectStore(_PBP_PACK_META).delete("cedict");
+      tx.objectStore(_PBP_PACK_STORE).clear();
+    });
+    let batch = [];
+    let entries = 0;
+    let malformed = 0;
+    const flush = () => _pbpPackTx(db, "readwrite", (tx) => {
+      const store = tx.objectStore(_PBP_PACK_STORE);
+      for (const rec of batch) store.put(rec);
+      batch = [];
+    });
+    for await (const line of lineIter) {
+      const rec = pbpCedictParseLine(line);
+      if (!rec) { if (String(line).trim() && !String(line).startsWith("#")) malformed++; continue; }
+      batch.push(rec);
+      entries++;
+      if (entries > 400000) throw new Error("entry count implausible");
+      if (batch.length >= 2000) {
+        await flush();
+        if (onProgress) onProgress(entries);
+        await new Promise((r) => setTimeout(r, 0)); // yield between batches
+      }
+    }
+    if (batch.length) await flush();
+    if (!entries || malformed > entries) throw new Error("import parsed no plausible data");
+    await _pbpPackTx(db, "readwrite", (tx) => {
+      tx.objectStore(_PBP_PACK_META).put({
+        id: "cedict", state: "ready", entries, importedAt: Date.now(),
+        bytes: (stats && stats.bytes) || 0
+      });
+    });
+    return { entries, malformed };
+  });
+}
+
+// Lookup: meta gate and index reads share ONE readonly transaction. For each
+// key BOTH indexes are queried and results merged (a form that is someone's
+// simp and someone else's trad must surface both records).
+async function pbpPackLookup(keys) {
+  const db = await _pbpPackOpenDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction([_PBP_PACK_STORE, _PBP_PACK_META], "readonly");
+    const metaReq = tx.objectStore(_PBP_PACK_META).get("cedict");
+    metaReq.onsuccess = () => {
+      const meta = metaReq.result;
+      if (!meta || meta.state !== "ready") { resolve(null); return; }
+      const store = tx.objectStore(_PBP_PACK_STORE);
+      const tryKey = (i) => {
+        if (i >= keys.length) { resolve(null); return; }
+        const key = keys[i];
+        const bySimp = store.index("simp").getAll(key);
+        bySimp.onsuccess = () => {
+          const byTrad = store.index("trad").getAll(key);
+          byTrad.onsuccess = () => {
+            const seen = new Set();
+            const rows = [];
+            for (const r of [...(bySimp.result || []), ...(byTrad.result || [])]) {
+              if (seen.has(r.id)) continue;
+              seen.add(r.id);
+              rows.push(r);
+            }
+            rows.sort((a, b) => a.id - b.id); // storage order across both indexes
+            if (rows.length) resolve({ matched: key, rows });
+            else tryKey(i + 1);
+          };
+          byTrad.onerror = () => resolve(null);
+        };
+        bySimp.onerror = () => resolve(null);
+      };
+      tryKey(0);
+    };
+    metaReq.onerror = () => resolve(null);
+  });
+}
+
+async function pbpPackMeta() {
+  try {
+    const db = await _pbpPackOpenDB();
+    return await new Promise((resolve) => {
+      const req = db.transaction(_PBP_PACK_META, "readonly").objectStore(_PBP_PACK_META).get("cedict");
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (_) { return null; }
+}
+
+async function pbpPackDelete() {
+  return navigator.locks.request("pbp-cedict-import", async () => {
+    const db = await _pbpPackOpenDB();
+    await _pbpPackTx(db, "readwrite", (tx) => {
+      tx.objectStore(_PBP_PACK_META).delete("cedict");
+      tx.objectStore(_PBP_PACK_STORE).clear();
+    });
+    return true;
+  });
+}
+
+// File import entry (options page): .gz sniffed by magic bytes 1f 8b, not
+// by filename. Any thrown error surfaces to the caller's status line.
+async function pbpPackImportFile(file, onProgress) {
+  const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+  const gzip = head[0] === 0x1f && head[1] === 0x8b;
+  const stats = { bytes: 0 };
+  return pbpPackImport(pbpCedictLines(file.stream(), gzip, stats), onProgress, stats);
+}

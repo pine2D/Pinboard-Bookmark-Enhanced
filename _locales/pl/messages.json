@@ -2674,6 +2674,51 @@
   "dictAnkiKeyLabel": {
     "message": "Klucz API AnkiConnect (opcjonalnie)"
   },
+  "dictPackSection": {
+    "message": "Pakiet słownika offline"
+  },
+  "dictPackOpen": {
+    "message": "Otwórz stronę pobierania"
+  },
+  "dictPackImport": {
+    "message": "Importuj plik"
+  },
+  "dictPackImporting": {
+    "message": "Zaimportowano $N$ wpisów…",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackDone": {
+    "message": "Import zakończony: $N$ wpisów",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackFailed": {
+    "message": "Import nie powiódł się. Upewnij się, że plik to wydanie CC-CEDICT."
+  },
+  "dictPackEmpty": {
+    "message": "Nie zaimportowano. Pobierz CC-CEDICT z MDBG, a potem zaimportuj (CC BY-SA 4.0)."
+  },
+  "dictPackStatus": {
+    "message": "Zaimportowano $N$ wpisów · $DATE$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "dictPackDeleteConfirm": {
+    "message": "Usunąć zaimportowany pakiet słownika?"
+  },
   "dictAnkiNothing": {
     "message": "Brak słówek do wysłania."
   },

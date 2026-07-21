@@ -2674,6 +2674,51 @@
   "dictAnkiKeyLabel": {
     "message": "AnkiConnect API key (optional)"
   },
+  "dictPackSection": {
+    "message": "Offline dictionary pack"
+  },
+  "dictPackOpen": {
+    "message": "Open download page"
+  },
+  "dictPackImport": {
+    "message": "Import file"
+  },
+  "dictPackImporting": {
+    "message": "Imported $N$ entries…",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackDone": {
+    "message": "Import complete: $N$ entries",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackFailed": {
+    "message": "Import failed. Make sure the file is a CC-CEDICT release."
+  },
+  "dictPackEmpty": {
+    "message": "Not imported. Download CC-CEDICT from MDBG, then import it (CC BY-SA 4.0)."
+  },
+  "dictPackStatus": {
+    "message": "$N$ entries imported · $DATE$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "dictPackDeleteConfirm": {
+    "message": "Delete the imported dictionary pack?"
+  },
   "dictAnkiNothing": {
     "message": "No words to send yet."
   },

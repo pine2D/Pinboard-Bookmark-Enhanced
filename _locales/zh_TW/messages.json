@@ -2674,6 +2674,51 @@
   "dictAnkiKeyLabel": {
     "message": "AnkiConnect API key（可選）"
   },
+  "dictPackSection": {
+    "message": "離線詞典包"
+  },
+  "dictPackOpen": {
+    "message": "開啟下載頁面"
+  },
+  "dictPackImport": {
+    "message": "匯入檔案"
+  },
+  "dictPackImporting": {
+    "message": "已匯入 $N$ 筆…",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackDone": {
+    "message": "匯入完成：$N$ 筆",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackFailed": {
+    "message": "匯入失敗，請確認檔案是 CC-CEDICT 發布包"
+  },
+  "dictPackEmpty": {
+    "message": "尚未匯入。請先從 MDBG 下載 CC-CEDICT，再匯入（CC BY-SA 4.0）"
+  },
+  "dictPackStatus": {
+    "message": "已匯入 $N$ 筆 · $DATE$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "dictPackDeleteConfirm": {
+    "message": "刪除已匯入的詞典包？"
+  },
   "dictAnkiNothing": {
     "message": "目前沒有可傳送的生詞。"
   },

@@ -2674,6 +2674,51 @@
   "dictAnkiKeyLabel": {
     "message": "AnkiConnect API キー（任意）"
   },
+  "dictPackSection": {
+    "message": "オフライン辞書パック"
+  },
+  "dictPackOpen": {
+    "message": "ダウンロードページを開く"
+  },
+  "dictPackImport": {
+    "message": "ファイルをインポート"
+  },
+  "dictPackImporting": {
+    "message": "$N$ 件をインポート中…",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackDone": {
+    "message": "インポート完了：$N$ 件",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackFailed": {
+    "message": "インポートに失敗しました。ファイルが CC-CEDICT の配布パックか確認してください。"
+  },
+  "dictPackEmpty": {
+    "message": "未インポートです。MDBG から CC-CEDICT をダウンロードしてインポートしてください（CC BY-SA 4.0）。"
+  },
+  "dictPackStatus": {
+    "message": "$N$ 件をインポート済み · $DATE$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "dictPackDeleteConfirm": {
+    "message": "インポート済みの辞書パックを削除しますか？"
+  },
   "dictAnkiNothing": {
     "message": "送信できる単語がまだありません。"
   },

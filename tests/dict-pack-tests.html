@@ -304,6 +304,122 @@ section("pbpCedictLines");
   }
   check("file >64MB throws", sizeError);
 
+  section("dict-pack IDB layer (pbpPackImport/Lookup/Meta/Delete)");
+  async function* arrLines(arr) { for (const l of arr) yield l; }
+
+  // Clean slate: a prior run (or file:// dev usage) must not leak state
+  // across the pass/fail count this suite pins.
+  await new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase("pbp-dict-packs");
+    req.onsuccess = resolve; req.onerror = resolve; req.onblocked = resolve;
+  });
+  check("clean db before IDB tests: meta is null", (await pbpPackMeta()) === null);
+
+  const L_BEIJING = "北京 北京 [Bei3 jing1] /Beijing/";
+  const L_NIHAO = "你好 你好 [ni3 hao3] /hello/hi/";
+  const L_ZHONGGUO = "中國 中国 [Zhong1 guo2] /China/PRC/";
+  const L_TU = "图 图 [tu2] /picture/map/";
+  const L_CESHI_A = "測試 测试 [ce4 shi4] /testA/"; // trad=測試 simp=测试
+  const L_CESHI_B = "测试 测试异体 [ce4 shi4] /testB/"; // trad=测试 (== L_CESHI_A's simp)
+  const SAMPLE1 = [L_BEIJING, L_NIHAO, L_ZHONGGUO, L_TU, L_CESHI_A, L_CESHI_B, "# comment line", "   "];
+
+  const stats1 = { bytes: 4242 };
+  const res1 = await pbpPackImport(arrLines(SAMPLE1), null, stats1);
+  check("import small sample: entries=6", res1.entries === 6, "got " + JSON.stringify(res1));
+  check("import small sample: malformed=0", res1.malformed === 0, "got " + JSON.stringify(res1));
+
+  const meta1 = await pbpPackMeta();
+  check("meta state ready after import", !!meta1 && meta1.state === "ready");
+  check("meta entries matches import result", !!meta1 && meta1.entries === 6);
+  check("meta bytes field stored from stats", !!meta1 && meta1.bytes === 4242);
+  check("meta importedAt is a fresh timestamp", !!meta1 && typeof meta1.importedAt === "number" && meta1.importedAt > 0);
+
+  const bySimp = await pbpPackLookup(["中国"]);
+  check("lookup by simp: matched key", !!bySimp && bySimp.matched === "中国");
+  check("lookup by simp: returns the trad-differing row", !!bySimp && bySimp.rows.length === 1 && bySimp.rows[0].trad === "中國");
+
+  const byTrad = await pbpPackLookup(["中國"]);
+  check("lookup by trad: matched key", !!byTrad && byTrad.matched === "中國");
+  check("lookup by trad: returns the simp-differing row", !!byTrad && byTrad.rows.length === 1 && byTrad.rows[0].simp === "中国");
+
+  const dedupe = await pbpPackLookup(["你好"]);
+  check("same record hit via both indexes dedupes to one row", !!dedupe && dedupe.rows.length === 1);
+
+  const merged = await pbpPackLookup(["测试"]);
+  check("cross-index merge: matched key", !!merged && merged.matched === "测试");
+  check("cross-index merge: returns both distinct records (id-merge, not just one index)", !!merged && merged.rows.length === 2);
+  check("cross-index merge: rows sorted by id ascending", !!merged && merged.rows[0].id < merged.rows[1].id);
+
+  const fallbackKeys = pbpCedictLookupKeys("图书馆");
+  const fb = await pbpPackLookup(fallbackKeys);
+  check("prefix fallback lands on the shortest available key", !!fb && fb.matched === "图");
+
+  const dbRef = await _pbpPackOpenDB();
+  await new Promise((resolve, reject) => {
+    const tx = dbRef.transaction(_PBP_PACK_META, "readwrite");
+    tx.objectStore(_PBP_PACK_META).delete("cedict");
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  const afterMetaDelete = await pbpPackLookup(["你好"]);
+  check("lookup returns null when meta is missing (not ready)", afterMetaDelete === null);
+
+  async function* throwingLines() {
+    yield L_BEIJING;
+    throw new Error("boom mid-import");
+  }
+  let midThrew = false;
+  try { await pbpPackImport(throwingLines()); } catch (e) { midThrew = /boom/.test(e && e.message); }
+  check("iterator throw after first batch propagates as a rejection", midThrew);
+  const metaAfterThrow = await pbpPackMeta();
+  check("no ready meta survives a mid-import throw", !metaAfterThrow || metaAfterThrow.state !== "ready");
+
+  const res2 = await pbpPackImport(arrLines(SAMPLE1), null, { bytes: 999 });
+  check("re-import: entries count is consistent on overwrite", res2.entries === 6);
+  const meta2 = await pbpPackMeta();
+  check("re-import: meta reflects the latest stats.bytes", !!meta2 && meta2.bytes === 999);
+  const reCheck = await pbpPackLookup(["你好"]);
+  check("re-import: does not duplicate rows (old store was cleared first)", !!reCheck && reCheck.rows.length === 1);
+
+  // Two controlled writers: prove Web Locks serializes pbpPackImport callers
+  // rather than letting a second import race the first's clear+put tx.
+  let writerAStarted = false, writerAFinished = false, writerBStarted = false;
+  let releaseWriterA;
+  const gate = new Promise((r) => { releaseWriterA = r; });
+  async function* writerA() {
+    writerAStarted = true;
+    yield L_BEIJING;
+    await gate;
+    yield L_NIHAO;
+  }
+  async function* writerB() {
+    writerBStarted = true;
+    yield L_CESHI_A;
+  }
+  const p1 = pbpPackImport(writerA()).then((r) => { writerAFinished = true; return r; });
+  await new Promise((r) => setTimeout(r, 30));
+  check("Web Locks: writer A acquired the lock and is running", writerAStarted);
+  const p2 = pbpPackImport(writerB());
+  await new Promise((r) => setTimeout(r, 30));
+  check("Web Locks: writer B is queued behind writer A, not yet started", !writerBStarted);
+  check("Web Locks: writer A has not finished (still holding the lock)", !writerAFinished);
+  releaseWriterA();
+  const [, r2] = await Promise.all([p1, p2]);
+  check("Web Locks: writer A completed", writerAFinished);
+  check("Web Locks: writer B started only after writer A released the lock", writerBStarted);
+  check("Web Locks: writer B's own entries count", r2.entries === 1);
+  const metaFinal = await pbpPackMeta();
+  check("Web Locks: last writer wins (store reflects writer B only)", !!metaFinal && metaFinal.entries === 1);
+  const lookupA = await pbpPackLookup(["北京"]);
+  check("Web Locks: writer A's data was cleared by writer B's overwrite", lookupA === null);
+
+  const delRes = await pbpPackDelete();
+  check("pbpPackDelete resolves true", delRes === true);
+  const metaAfterDelete = await pbpPackMeta();
+  check("meta is null after delete", metaAfterDelete === null);
+  const lookupAfterDelete = await pbpPackLookup(["测试"]);
+  check("lookup is null after delete", lookupAfterDelete === null);
+
   document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
 })();
 </script>

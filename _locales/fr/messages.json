@@ -2674,6 +2674,51 @@
   "dictAnkiKeyLabel": {
     "message": "Clé API AnkiConnect (facultative)"
   },
+  "dictPackSection": {
+    "message": "Pack de dictionnaire hors connexion"
+  },
+  "dictPackOpen": {
+    "message": "Ouvrir la page de téléchargement"
+  },
+  "dictPackImport": {
+    "message": "Importer un fichier"
+  },
+  "dictPackImporting": {
+    "message": "$N$ entrées importées…",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackDone": {
+    "message": "Importation terminée : $N$ entrées",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackFailed": {
+    "message": "Échec de l'importation. Vérifiez que le fichier est bien une publication CC-CEDICT."
+  },
+  "dictPackEmpty": {
+    "message": "Non importé. Téléchargez CC-CEDICT depuis MDBG, puis importez-le (CC BY-SA 4.0)."
+  },
+  "dictPackStatus": {
+    "message": "$N$ entrées importées · $DATE$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "dictPackDeleteConfirm": {
+    "message": "Supprimer le pack de dictionnaire importé ?"
+  },
   "dictAnkiNothing": {
     "message": "Aucun mot à envoyer pour le moment."
   },

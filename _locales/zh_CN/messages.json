@@ -2674,6 +2674,51 @@
   "dictAnkiKeyLabel": {
     "message": "AnkiConnect API key（可选）"
   },
+  "dictPackSection": {
+    "message": "离线词典包"
+  },
+  "dictPackOpen": {
+    "message": "打开下载页"
+  },
+  "dictPackImport": {
+    "message": "导入文件"
+  },
+  "dictPackImporting": {
+    "message": "已导入 $N$ 条…",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackDone": {
+    "message": "导入完成：$N$ 条",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "dictPackFailed": {
+    "message": "导入失败，请确认文件是 CC-CEDICT 发布包"
+  },
+  "dictPackEmpty": {
+    "message": "未导入。从 MDBG 下载 CC-CEDICT 后导入（CC BY-SA 4.0）"
+  },
+  "dictPackStatus": {
+    "message": "已导入 $N$ 条 · $DATE$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "dictPackDeleteConfirm": {
+    "message": "删除已导入的词典包？"
+  },
   "dictAnkiNothing": {
     "message": "暂无可发送的生词。"
   },
