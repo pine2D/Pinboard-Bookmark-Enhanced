@@ -1524,6 +1524,7 @@ function pbpExplainSelectionValid(text) {
 let _pbpExplainPage = { url: "", title: "" };
 let _pbpExplainSettings = null;
 let _pbpExplainTrigger = "icon"; // live value; the in-popover gear updates it
+let _pbpExplainAiOk = false; // live AI-availability snapshot; dict action works without it
 
 // Persist through the shared atomic settings writer. The in-memory trigger has
 // already taken effect, so a storage failure remains non-blocking here.
@@ -1575,8 +1576,11 @@ function pbpExplainInvoke() {
 function pbpExplainInit(detail) {
   _pbpExplainPage = { url: (detail && detail.url) || "", title: (detail && detail.title) || "" };
   pbpAiGetSettings().then((s) => {
-    if (!pbpAiAvailable(s)) return; // gate: master switch + key (spec rule 1/2)
+    // dict P1: the surface exists for everyone; only the trigger ladder gates
+    // it. AI-less runs of explain/translate render their own not-configured
+    // error; dict works fully without AI.
     _pbpExplainSettings = s;
+    _pbpExplainAiOk = pbpAiAvailable(s);
     _pbpExplainTrigger = s.selectionTrigger || "icon";
     if (_pbpExplainTrigger === "off") return; // "off": zero listeners, zero DOM
 
@@ -1779,18 +1783,20 @@ function _pbpExplainEnsurePop() {
   const actGroup = document.createElement("div");
   actGroup.className = "xp-act-group";
   actGroup.setAttribute("role", "group");
-  ["explain", "translate"].forEach((action) => {
+  const PBP_EXPLAIN_ACTION_LABELS = { explain: "explainActionExplain", translate: "explainActionTranslate", dict: "explainActionDict" };
+  ["explain", "translate", "dict"].forEach((action) => {
     const actBtn = document.createElement("button");
     actBtn.type = "button";
     actBtn.className = "xp-act";
     actBtn.dataset.action = action;
-    actBtn.textContent = t(action === "explain" ? "explainActionExplain" : "explainActionTranslate");
+    actBtn.textContent = t(PBP_EXPLAIN_ACTION_LABELS[action]);
     actBtn.setAttribute("aria-pressed", String(action === _pbpExplainAction));
     actBtn.addEventListener("click", () => {
       // Click on the already-active action: no-op (spec 2.1 only defines
       // behavior for clicking the INACTIVE action).
       if (_pbpExplainAction === action) return;
       _pbpExplainAction = action;
+      if (action !== "dict" && typeof window.pbpDictOnActionSwitch === "function") window.pbpDictOnActionSwitch();
       _pbpExplainSyncActButtons(pop);
       // Re-run with the SAME cap/ctx: existing abort-previous-stream in
       // _pbpExplainRun handles the concurrency, no extra dedup needed.
@@ -1833,6 +1839,18 @@ function _pbpExplainEnsurePop() {
     }).catch(() => {
       if (_pbpExplainSaveTarget === myTarget) save.disabled = false;
     });
+  });
+  const vocab = document.createElement("button");
+  vocab.type = "button";
+  vocab.className = "xp-vocab";
+  vocab.hidden = true;
+  vocab.textContent = t("dictSaveVocab");
+  vocab.addEventListener("click", async () => {
+    if (vocab.disabled || typeof window.pbpDictSaveCurrent !== "function") return;
+    vocab.disabled = true;
+    const ok = await window.pbpDictSaveCurrent().catch(() => false);
+    if (ok) vocab.textContent = t("dictSavedVocab");
+    else vocab.disabled = false;
   });
   const ask = document.createElement("button");
   ask.type = "button";
@@ -1892,6 +1910,7 @@ function _pbpExplainEnsurePop() {
   gearWrap.appendChild(menu);
   foot.appendChild(model);
   foot.appendChild(save);
+  foot.appendChild(vocab);
   foot.appendChild(ask);
   foot.appendChild(gearWrap);
   pop.appendChild(head);
@@ -2004,6 +2023,8 @@ async function _pbpExplainRun(cap, ctx, pop) {
   save.hidden = true;
   save.disabled = false;
   save.textContent = t("explainSaveNote");
+  const vocabBtn = pop.querySelector(".xp-vocab");
+  if (vocabBtn) { vocabBtn.hidden = true; vocabBtn.disabled = false; vocabBtn.textContent = t("dictSaveVocab"); }
   _pbpExplainSaveTarget = cap.itemId ? { itemId: cap.itemId } : { range: cap.range };
   // Skeleton: 3 shimmer lines + an SR-only loading announcement.
   if (body.contains(document.activeElement)) {
@@ -2026,6 +2047,31 @@ async function _pbpExplainRun(cap, ctx, pop) {
   if (_pbpExplainAbort) _pbpExplainAbort.abort();
   const ctrl = new AbortController();
   _pbpExplainAbort = ctrl;
+  // dict P1: delegate entirely to md-dict.js, which owns its own body
+  // rendering/streaming/error states. saveTarget shape matches explain's
+  // above so a later highlight cross-reference (spec decision #4) can reuse
+  // it; aria-busy is only cleared here if this run is still the active one
+  // (a newer run may already have taken over the same pop).
+  if (_pbpExplainAction === "dict" && typeof window.pbpDictRun === "function") {
+    if (typeof window.pbpDictSetSaveTarget === "function") {
+      window.pbpDictSetSaveTarget(cap.itemId ? { itemId: cap.itemId } : { range: cap.range });
+    }
+    try {
+      await window.pbpDictRun(cap, ctx, pop, ctrl, s);
+    } catch (_) { /* md-dict degrades internally */ }
+    finally { if (_pbpExplainAbort === ctrl) body.removeAttribute("aria-busy"); }
+    return;
+  }
+  // dict P1: explain/translate need AI; render a not-configured message
+  // instead of attempting a request when the master switch/key gate fails.
+  if (!_pbpExplainAiOk) {
+    const msg = document.createElement("div");
+    msg.className = "xp-dict-msg";
+    msg.textContent = t("dictAiNotConfigured");
+    body.replaceChildren(msg);
+    body.removeAttribute("aria-busy");
+    return;
+  }
   // Action switch (spec 2.1): translate is a lightweight single-shot prompt
   // (no term/passage routing, no neighbor blocks); explain keeps the existing
   // routed prompt. maxTokens 2048 for translate vs 1024 for explain.
@@ -2124,9 +2170,16 @@ function _pbpExplainOpenPop(cap, initialAction) {
   const pop = _pbpExplainEnsurePop();
   pop.querySelector(".xp-term").textContent = cap.text; // ellipsized via CSS
   pop.querySelector(".xp-model").textContent = _pbpExplainModelLabel(_pbpExplainSettings || {});
-  // Action resets to "explain" on every open unless an explicit initial
-  // action is passed (Task 3's highlight-card entry point); session-only.
-  _pbpExplainAction = (initialAction === "translate") ? "translate" : "explain";
+  // Action resets on every open (session-only, not persisted): an explicit
+  // initialAction (Task 3's highlight-card entry point, or dict) always
+  // wins; otherwise a short/term-like selection defaults to "dict" when
+  // md-dict.js is loaded (self-serve lookup fits a term better than a
+  // model call), and so does ANY selection when AI is unavailable (dict is
+  // the only action that works without it) -- everything else defaults to
+  // "explain".
+  _pbpExplainAction = (initialAction === "translate" || initialAction === "dict")
+    ? initialAction
+    : (typeof window.pbpDictRun === "function" && (!_pbpExplainAiOk || pbpExplainIsTerm(cap.text)) ? "dict" : "explain");
   _pbpExplainSyncActButtons(pop);
   // Gear radios mirror the live trigger value; menu starts closed.
   const menu = pop.querySelector(".xp-gear-menu");

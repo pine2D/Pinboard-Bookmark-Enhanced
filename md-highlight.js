@@ -996,11 +996,13 @@ function _pbpHlEnsureBar() {
   bar.appendChild(explainBtn);
   // Visibility gate memoized once at bar creation (same accepted pattern as
   // the hl-card AI row, md-highlight.js:1111 -- see _pbpHlEnsureCard):
-  // AI-less users and "hotkey"/"off" trigger modes see the bar exactly as
-  // before this fusion. A trigger-mode/AI-availability change mid-session
-  // needs a reopen to update this button (same known corner as the card row).
+  // dict P1: the button opens the dict-capable popover; AI availability no
+  // longer gates the surface, only the trigger mode does. "hotkey"/"off"
+  // trigger modes still see the bar without this button. A trigger-mode
+  // change mid-session needs a reopen to update this button (same known
+  // corner as the card row).
   pbpAiGetSettings().then((s) => {
-    if (pbpAiAvailable(s) && (s.selectionTrigger || "icon") === "icon") explainBtn.hidden = false;
+    if ((s.selectionTrigger || "icon") === "icon") explainBtn.hidden = false;
   }).catch(() => {});
   bar.addEventListener("toggle", (e) => { if (e.newState === "closed") _pbpHlBarRange = null; });
   document.body.appendChild(bar);
@@ -1334,6 +1336,27 @@ async function pbpHlAttachNote(target, answerText) {
   });
 }
 window.pbpHlAttachNote = pbpHlAttachNote; // explicit window attach: makes the md-ask.js "Save as note" contract self-documenting.
+
+// Read-only: which stored highlight covers this range's start point?
+// Returns the newest covering item's id, or "". Used by md-dict.js to
+// cross-reference a vocab save with an existing highlight (spec decision #4).
+function pbpHlItemIdAtRange(range) {
+  if (!_pbpHlState || !range) return "";
+  let best = null; // { ts, id }
+  for (const id in _pbpHlState.ranges) {
+    const entry = _pbpHlState.ranges[id];
+    const r = entry && entry.range;
+    if (!r) continue;
+    let hit;
+    try { hit = r.isPointInRange(range.startContainer, range.startOffset); } catch (_) { hit = false; }
+    if (!hit) continue;
+    const it = _pbpHlState.items.find((x) => x.id === id);
+    const ts = it ? Number(it.ts) || 0 : 0;
+    if (!best || ts > best.ts) best = { ts, id };
+  }
+  return best ? best.id : "";
+}
+window.pbpHlItemIdAtRange = pbpHlItemIdAtRange;
 
 // ---- Edit card (spec sec.4). Native popover="auto": Esc + light-dismiss for free,
 // same mechanism as md-ask.js's #explain-pop (md-ask.js:1341-1424). ----
