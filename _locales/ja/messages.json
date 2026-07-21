@@ -2633,6 +2633,9 @@
   "dictDeleted": {
     "message": "削除しました"
   },
+  "dictDeleteWord": {
+    "message": "単語帳から削除"
+  },
   "dictSource": {
     "message": "出典:"
   },

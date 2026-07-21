@@ -2633,6 +2633,9 @@
   "dictDeleted": {
     "message": "Gelöscht"
   },
+  "dictDeleteWord": {
+    "message": "Aus Vokabelliste entfernen"
+  },
   "dictSource": {
     "message": "Quelle:"
   },

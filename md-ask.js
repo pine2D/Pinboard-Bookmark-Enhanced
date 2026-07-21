@@ -1848,7 +1848,9 @@ function _pbpExplainEnsurePop() {
   vocab.addEventListener("click", async () => {
     if (vocab.disabled || typeof window.pbpDictSaveCurrent !== "function") return;
     vocab.disabled = true;
+    const myRunId = vocab.dataset.runId; // the run this click belongs to
     const ok = await window.pbpDictSaveCurrent().catch(() => false);
+    if (vocab.dataset.runId !== myRunId) return; // a newer dict run owns the button now
     if (ok) vocab.textContent = t("dictSavedVocab");
     else vocab.disabled = false;
   });
@@ -2025,6 +2027,10 @@ async function _pbpExplainRun(cap, ctx, pop) {
   save.textContent = t("explainSaveNote");
   const vocabBtn = pop.querySelector(".xp-vocab");
   if (vocabBtn) { vocabBtn.hidden = true; vocabBtn.disabled = false; vocabBtn.textContent = t("dictSaveVocab"); }
+  // No-AI users never initialize the ask panel, so "Ask more" would silently
+  // no-op for them -- hide it whenever AI is unavailable, any action.
+  const askBtn = pop.querySelector(".xp-ask");
+  if (askBtn) askBtn.hidden = !_pbpExplainAiOk;
   _pbpExplainSaveTarget = cap.itemId ? { itemId: cap.itemId } : { range: cap.range };
   // Skeleton: 3 shimmer lines + an SR-only loading announcement.
   if (body.contains(document.activeElement)) {

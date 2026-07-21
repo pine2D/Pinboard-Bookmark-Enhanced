@@ -2633,6 +2633,9 @@
   "dictDeleted": {
     "message": "Usunięto"
   },
+  "dictDeleteWord": {
+    "message": "Usuń ze słówek"
+  },
   "dictSource": {
     "message": "Źródło:"
   },

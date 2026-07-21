@@ -516,6 +516,7 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
 let _pbpDictRunSeq = 0;
 let _pbpDictCurrent = null;      // merged results of the LIVE run only
 let _pbpDictChildCtrl = null;    // the live run's own controller (child of md-ask's)
+let _pbpDictParentCleanup = null; // removes the previous run's parent-abort listener
 let _pbpDictSaveTarget = null;   // {itemId} | {range} | null — explain-shaped
 let _pbpDictOwner = "ownerless"; // set from pbp:rendered detail.account (Task 8 listener)
 
@@ -608,13 +609,19 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
       retry.type = "button";
       retry.className = "xp-retry";
       retry.textContent = t(e && e.code === "host_permission" ? "aiGrantRetry" : "explainErrRetry");
-      retry.addEventListener("click", () => {
+      retry.addEventListener("click", async () => {
         if (retry.disabled) return;
         retry.disabled = true;
-        // Run-level restart: a successful retry must re-merge results and
-        // re-coordinate the lemma wait — never a slot-local recursion
-        // (Codex HIGH 2).
-        if (_pbpDictCurrent && typeof _pbpDictCurrent.rerun === "function") _pbpDictCurrent.rerun();
+        try {
+          // First await in the click chain: pbpAiRetryWithPermission issues the
+          // exact-origin permissions.request for host_permission errors, then
+          // runs the retry callback (a full run-level rerun, never slot recursion
+          // — Codex HIGH 2).
+          const recovered = await pbpAiRetryWithPermission(e, s, async () => {
+            if (_pbpDictCurrent && typeof _pbpDictCurrent.rerun === "function") _pbpDictCurrent.rerun();
+          });
+          if (!recovered) retry.disabled = false;
+        } catch (_) { retry.disabled = false; }
       });
       wrap.appendChild(msg);
       wrap.appendChild(retry);
@@ -632,11 +639,15 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   // Child controller: this run's own signal, chained to md-ask's parent ctrl.
   // A language switch / rerun aborts ONLY the old child (Codex HIGH 1).
   if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort();
+  if (_pbpDictParentCleanup) { _pbpDictParentCleanup(); _pbpDictParentCleanup = null; }
   const child = new AbortController();
   _pbpDictChildCtrl = child;
   const onParentAbort = () => child.abort();
   if (ctrl.signal.aborted) child.abort();
-  else ctrl.signal.addEventListener("abort", onParentAbort, { once: true });
+  else {
+    ctrl.signal.addEventListener("abort", onParentAbort, { once: true });
+    _pbpDictParentCleanup = () => { try { ctrl.signal.removeEventListener("abort", onParentAbort); } catch (_) {} };
+  }
   const signal = child.signal;
 
   const runId = ++_pbpDictRunSeq;
@@ -684,14 +695,13 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   cur.lang = lang;
   const effectiveLang = lang || "und"; // vocab identity: query and save agree (Codex HIGH 6)
   sel.value = PBP_DICT_LANGS.includes(lang) ? lang : "";
-  sel.addEventListener("change", async () => {
+  sel.addEventListener("change", () => {
     const v = sel.value;
     s.dictLangManual = v;
-    try {
-      const r = await persistSettings({ dictLangManual: v }); // async result, not throw (Codex MEDIUM 9)
-      if (!r.ok) throw r.error || new Error("settings write failed");
-    } catch (_) { /* in-memory value already applied */ }
-    cur.rerun();
+    cur.rerun(); // abort old requests NOW; storage latency must not extend their life
+    persistSettings({ dictLangManual: v }).then((r) => {
+      if (!r || !r.ok) { /* in-memory value already applied; same swallow as _pbpExplainPersistTrigger */ }
+    }).catch(() => {});
   });
   speak.addEventListener("click", () => pbpDictSpeak(cap.text, cur.lang));
 
@@ -757,9 +767,12 @@ async function pbpDictSaveCurrent() {
       articleTitle: titleEl ? titleEl.textContent : "", highlightId, createdAt: Date.now()
     }
   });
-  if (entry && _pbpDictCurrent === cur) {
-    cur.saved = true;
+  if (entry) {
+    // The IDB write already happened -- report success unconditionally, even
+    // if a newer dict run has since superseded `cur`. Only mutate the run's
+    // own state when it is still the live one.
     if (typeof _pbpDictPanelRefresh === "function") _pbpDictPanelRefresh();
+    if (_pbpDictCurrent === cur) cur.saved = true;
     return true;
   }
   return false;
@@ -868,7 +881,7 @@ async function _pbpDictPanelRefresh() {
     const del = document.createElement("button");
     del.type = "button";
     del.className = "vocab-del";
-    del.textContent = t("hlDelete"); // reuse, per notebook-delete precedent
+    del.textContent = t("dictDeleteWord");
     detail.appendChild(del);
     del.addEventListener("click", async () => {
       if (del.disabled) return;
@@ -895,7 +908,7 @@ function _pbpDictExportTsv() {
       definition: (w.gloss || "").replace(/\s*\n\s*/g, " "),
       contexts: (Array.isArray(w.contexts) ? w.contexts : []).map((c) => c && c.quote).filter(Boolean),
       source: (w.contexts && w.contexts[0] && w.contexts[0].articleUrl) || "",
-      license: w.sourceUrl ? ((w.license || "CC BY-SA") + " " + w.sourceUrl) : ""
+      license: [w.license, w.sourceUrl].filter(Boolean).join(" ")
     })));
     const blob = new Blob([tsv], { type: "text/tab-separated-values" });
     const a = document.createElement("a");

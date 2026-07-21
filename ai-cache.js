@@ -69,8 +69,11 @@ async function pbpAiCacheGet(key) {
     // ai_cache_ entries (tags/summary, ai.js getAICache) use ts as their
     // GENERATION time for a user-configured fixed TTL - touching them
     // would turn that into a sliding expiry where a frequently-read
-    // summary never expires. Only the LRU-semantic families (ask_/tr_/
-    // trview_/gloss_/skim_) get the read-touch.
+    // summary never expires. The check below is a PREFIX EXCLUSION, not an
+    // allowlist: every key family except ai_cache_ gets the read-touch,
+    // which today includes ask_/tr_/trview_/gloss_/skim_ and (P1) dict_/
+    // dictctx_ -- any new LRU-semantic family benefits automatically
+    // without a code change here.
     if (entry && typeof entry.ts === "number"
       && String(key).indexOf("ai_cache_") !== 0
       && Date.now() - entry.ts > _PBP_AI_TOUCH_MIN_AGE) {

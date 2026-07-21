@@ -2633,6 +2633,9 @@
   "dictDeleted": {
     "message": "已刪除"
   },
+  "dictDeleteWord": {
+    "message": "從生詞庫移除"
+  },
   "dictSource": {
     "message": "來源："
   },
