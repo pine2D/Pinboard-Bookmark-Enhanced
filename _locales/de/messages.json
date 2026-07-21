@@ -2633,6 +2633,12 @@
   "dictLangAria": {
     "message": "Wörterbuchsprache"
   },
+  "dictEchoToggle": {
+    "message": "Gespeicherte Wörter beim Lesen unterstreichen"
+  },
+  "dictEchoHint": {
+    "message": "Gepunktete Unterstreichungen markieren gespeicherte Vokabeln. Klicke darauf, um das Wörterbuch zu öffnen."
+  },
   "dictDeleteWord": {
     "message": "Aus Vokabelliste entfernen"
   },

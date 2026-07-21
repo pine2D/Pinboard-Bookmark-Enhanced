@@ -2633,6 +2633,12 @@
   "dictLangAria": {
     "message": "Langue du dictionnaire"
   },
+  "dictEchoToggle": {
+    "message": "Souligner les mots enregistrés pendant la lecture"
+  },
+  "dictEchoHint": {
+    "message": "Les mots soulignés en pointillé figurent déjà dans votre vocabulaire. Cliquez dessus pour ouvrir le dictionnaire."
+  },
   "dictDeleteWord": {
     "message": "Retirer du vocabulaire"
   },

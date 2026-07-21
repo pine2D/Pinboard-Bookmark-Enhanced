@@ -2633,6 +2633,12 @@
   "dictLangAria": {
     "message": "词典语言"
   },
+  "dictEchoToggle": {
+    "message": "阅读时用下划线标出已保存的生词"
+  },
+  "dictEchoHint": {
+    "message": "点状下划线标记生词库里已有的词，点击即可打开词典。"
+  },
   "dictDeleteWord": {
     "message": "从生词库移除"
   },

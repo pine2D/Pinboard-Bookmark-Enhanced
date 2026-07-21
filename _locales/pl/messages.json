@@ -2633,6 +2633,12 @@
   "dictLangAria": {
     "message": "Język słownika"
   },
+  "dictEchoToggle": {
+    "message": "Podkreślaj zapisane słówka podczas czytania"
+  },
+  "dictEchoHint": {
+    "message": "Kropkowane podkreślenia oznaczają słówka z Twojego słowniczka — kliknij, aby otworzyć słownik."
+  },
   "dictDeleteWord": {
     "message": "Usuń ze słówek"
   },

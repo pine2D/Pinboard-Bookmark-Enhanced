@@ -572,6 +572,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     notes: {
       fields: {},
       skip: []
+    },
+    vocab: {
+      fields: { "dict-echo-enabled": false }
     }
   };
   if (typeof window !== "undefined") window.__PBP_PANEL_DEFAULTS = PANEL_DEFAULTS;
@@ -1119,7 +1122,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-wayback-batch": s.waybackArchiveBatch === true,
     "opt-wayback-skip-private": s.waybackSkipPrivate !== false,
     "opt-preview-ai-enabled": s.previewAiEnabled !== false,
-    "opt-preview-skim": s.previewSkimEnabled === true
+    "opt-preview-skim": s.previewSkimEnabled === true,
+    "dict-echo-enabled": s.dictEchoEnabled === true
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
@@ -1970,6 +1974,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       previewAiModel: $id("opt-preview-ai-model").value.trim(),
       translateTargetLang: resolveTranslateTargetLang(),
       translateGlossary: $id("opt-translate-glossary").value,
+      dictEchoEnabled: $id("dict-echo-enabled").checked,
       selectionTrigger: $id("opt-selection-trigger").value,
       // Appearance
       optLang: $id("opt-lang").value,

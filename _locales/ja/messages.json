@@ -2633,6 +2633,12 @@
   "dictLangAria": {
     "message": "辞書の言語"
   },
+  "dictEchoToggle": {
+    "message": "リーダーで保存済みの単語に下線を表示"
+  },
+  "dictEchoHint": {
+    "message": "点線の下線は単語帳に登録済みの単語を示します。クリックすると辞書が開きます。"
+  },
   "dictDeleteWord": {
     "message": "単語帳から削除"
   },

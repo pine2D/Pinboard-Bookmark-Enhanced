@@ -368,6 +368,7 @@ const SETTINGS_DEFAULTS = {
   translateTargetLang: "auto",
   translateGlossary: "",
   dictLangManual: "",       // md-dict: manual dictionary language override ("" = auto-detect)
+  dictEchoEnabled: false,   // md-vocab-echo: underline saved vocab words in the reader
   selectionTrigger: "icon"
 };
 

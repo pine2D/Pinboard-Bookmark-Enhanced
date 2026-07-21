@@ -2633,6 +2633,12 @@
   "dictLangAria": {
     "message": "Dictionary language"
   },
+  "dictEchoToggle": {
+    "message": "Underline saved words while reading"
+  },
+  "dictEchoHint": {
+    "message": "Dotted underlines mark words already in your vocabulary. Click one to open the dictionary."
+  },
   "dictDeleteWord": {
     "message": "Remove from vocabulary"
   },
