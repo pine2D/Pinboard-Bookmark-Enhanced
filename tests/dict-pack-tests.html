@@ -214,7 +214,7 @@ section("pbpCedictLines");
   for await (const line of pbpCedictLines(stream7, false, stats)) {
     // consume
   }
-  check("stats.bytes populated", stats.bytes > 0);
+  check("stats.bytes exact decompressed byte count", stats.bytes === 6); // "你好" = 2 x 3 UTF-8 bytes
 
   // gzip=false explicit path
   const lines8 = [];
@@ -263,7 +263,28 @@ section("pbpCedictLines");
   } catch (e) {
     longError = e.message.includes("too long");
   }
-  check("line too long throws", longError);
+  check("line too long throws (cross-chunk fallback check)", longError);
+
+  // Overlong line WITH its newline in the SAME chunk: must hit the pre-yield
+  // check -- deleting that guard is exactly the regression this pins.
+  let sameChunkError = false;
+  try {
+    const stream10b = new ReadableStream({
+      start(c) {
+        const buf = new Uint8Array(65538);
+        buf.fill(0x61); // 'a' x 65537
+        buf[65537] = 0x0a; // '\n' in the SAME chunk
+        c.enqueue(buf);
+        c.close();
+      }
+    });
+    for await (const line of pbpCedictLines(stream10b)) {
+      // should not reach
+    }
+  } catch (e) {
+    sameChunkError = e.message.includes("too long");
+  }
+  check("overlong line with newline in the SAME chunk throws (pre-yield guard)", sameChunkError);
 
   // File too large
   let sizeError = false;
