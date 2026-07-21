@@ -296,3 +296,188 @@ async function pbpVocabSaveWord(owner, w) {
     });
   } catch (_) { return null; }
 }
+
+// ---- Dictionary slot ----------------------------------------------------
+async function _pbpDictHasPerm() {
+  try { return await chrome.permissions.contains({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) { return false; }
+}
+
+// Child signal = parent abort OR timeout (no AbortSignal.any: Chrome floor 110).
+function _pbpDictChildSignal(parent, ms) {
+  const c = new AbortController();
+  const onAbort = () => c.abort();
+  if (parent) {
+    if (parent.aborted) c.abort();
+    else parent.addEventListener("abort", onAbort, { once: true });
+  }
+  const timer = setTimeout(() => c.abort(), ms);
+  return {
+    signal: c.signal,
+    done: () => { clearTimeout(timer); if (parent) parent.removeEventListener("abort", onAbort); }
+  };
+}
+
+async function _pbpDictFetch(lang, term, parentSignal) {
+  const child = _pbpDictChildSignal(parentSignal, 8000);
+  try {
+    const res = await fetch(
+      PBP_DICT_ORIGIN + "/api/v1/entries/" + encodeURIComponent(lang) + "/" + encodeURIComponent(term),
+      { signal: child.signal }
+    );
+    if (res.status === 404) return { status: 404, data: null };
+    if (!res.ok) return { status: res.status, data: null };
+    return { status: 200, data: await res.json() };
+  } finally { child.done(); }
+}
+
+// External dictionary data renders through textContent ONLY.
+function _pbpDictRenderEntry(slot, norm, term, lang) {
+  slot.replaceChildren();
+  for (const e of norm.entries) {
+    const ent = document.createElement("div");
+    ent.className = "xp-dict-entry";
+    if (e.ipas.length || e.pos) {
+      const line = document.createElement("div");
+      line.className = "xp-dict-ipa-line";
+      if (e.pos) {
+        const pos = document.createElement("span");
+        pos.className = "xp-dict-pos";
+        pos.textContent = e.pos;
+        line.appendChild(pos);
+      }
+      for (const p of e.ipas) {
+        const ipa = document.createElement("span");
+        ipa.className = "xp-dict-ipa";
+        ipa.textContent = p.text;
+        line.appendChild(ipa);
+        if (p.tags.length) {
+          const tag = document.createElement("span");
+          tag.className = "xp-dict-ipa-tag";
+          tag.textContent = p.tags.join(", ");
+          line.appendChild(tag);
+        }
+      }
+      ent.appendChild(line);
+    }
+    if (e.forms.length) {
+      const forms = document.createElement("div");
+      forms.className = "xp-dict-forms";
+      forms.textContent = e.forms.map((f) => f.word + (f.tags.length ? " (" + f.tags.join(", ") + ")" : "")).join(" · ");
+      ent.appendChild(forms);
+    }
+    if (e.senses.length) {
+      const ol = document.createElement("ol");
+      ol.className = "xp-dict-senses";
+      for (const s of e.senses) {
+        const li = document.createElement("li");
+        li.textContent = s.definition;
+        for (const x of s.examples) {
+          const ex = document.createElement("div");
+          ex.className = "xp-dict-example";
+          ex.textContent = x;
+          li.appendChild(ex);
+        }
+        ol.appendChild(li);
+      }
+      ent.appendChild(ol);
+    }
+    slot.appendChild(ent);
+  }
+  const src = document.createElement("div");
+  src.className = "xp-dict-src";
+  const label = document.createElement("span");
+  label.textContent = t("dictSource") + " ";
+  const a = document.createElement("a");
+  a.href = norm.sourceUrl || ("https://" + (lang || "en") + ".wiktionary.org/wiki/" + encodeURIComponent(term));
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.textContent = "Wiktionary · " + (norm.license || "CC BY-SA");
+  src.appendChild(label);
+  src.appendChild(a);
+  slot.appendChild(src);
+}
+
+function _pbpDictSlotMsg(slot, text) {
+  slot.replaceChildren();
+  const p = document.createElement("div");
+  p.className = "xp-dict-msg";
+  p.textContent = text;
+  slot.appendChild(p);
+}
+
+function _pbpDictSlotSkeleton(slot) {
+  slot.replaceChildren();
+  const sk = document.createElement("div");
+  sk.className = "xp-skel";
+  slot.appendChild(sk);
+}
+
+// perm? -> fetch -> 200 render / 404 wait-lemma -> refetch once / degrade.
+// Returns normalized entry or null; the RUN layer merges into _pbpDictCurrent.
+// onRerun: run-level restart used after a permission grant (never slot-local
+// recursion — Codex HIGH 2).
+async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onRerun) {
+  if (!lang) { _pbpDictSlotMsg(slot, t("dictNoEntry")); return null; }
+  const cacheKey = "dict_" + pbpDictCacheKeyPublic(lang, term);
+  try {
+    const hit = await pbpAiCacheGet(cacheKey);
+    if (hit && hit.result) {
+      _pbpDictRenderEntry(slot, hit.result, term, lang);
+      return hit.result;
+    }
+  } catch (_) {}
+  if (!(await _pbpDictHasPerm())) {
+    slot.replaceChildren();
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "xp-dict-connect";
+    btn.textContent = t("dictConnect");
+    const hint = document.createElement("div");
+    hint.className = "xp-dict-msg";
+    hint.textContent = t("dictConnectHint");
+    btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      let granted = false;
+      // FIRST await in the click chain must be the permission request.
+      try { granted = await chrome.permissions.request({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) {}
+      if (!granted) { btn.disabled = false; return; }
+      if (typeof onRerun === "function") onRerun(); // full-run restart merges results properly
+    });
+    slot.appendChild(btn);
+    slot.appendChild(hint);
+    return null;
+  }
+  _pbpDictSlotSkeleton(slot);
+  let out;
+  try {
+    out = await _pbpDictFetch(lang, term, parentSignal);
+  } catch (e) {
+    if (parentSignal && parentSignal.aborted) return null;
+    _pbpDictSlotMsg(slot, t("dictLoadFailed"));
+    return null;
+  }
+  if (out.status === 404) {
+    const lemma = await lemmaPromise; // resolved on ALL ctx-slot exits
+    if (parentSignal && parentSignal.aborted) return null;
+    if (pbpDictLemmaRetry(404, lemma, term, lang)) {
+      let second;
+      try { second = await _pbpDictFetch(lang, lemma.trim(), parentSignal); } catch (_) { second = { status: 0, data: null }; }
+      if (parentSignal && parentSignal.aborted) return null;
+      const norm2 = second.status === 200 ? pbpDictNormalizeEntry(second.data) : null;
+      if (norm2) {
+        _pbpDictRenderEntry(slot, norm2, lemma, lang);
+        try { await pbpAiCacheSet("dict_" + pbpDictCacheKeyPublic(lang, lemma), norm2, Date.now()); } catch (_) {}
+        return norm2;
+      }
+    }
+    _pbpDictSlotMsg(slot, t("dictNoEntry"));
+    return null;
+  }
+  if (out.status !== 200) { _pbpDictSlotMsg(slot, t("dictLoadFailed")); return null; }
+  const norm = pbpDictNormalizeEntry(out.data);
+  if (!norm) { _pbpDictSlotMsg(slot, t("dictNoEntry")); return null; }
+  _pbpDictRenderEntry(slot, norm, term, lang);
+  try { await pbpAiCacheSet(cacheKey, norm, Date.now()); } catch (_) {}
+  return norm;
+}
