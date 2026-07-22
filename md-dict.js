@@ -152,6 +152,8 @@ function pbpDictBuildCtxPrompt(p) {
   const answerLang = (p && p.answerLang) || "English";
   const system = "You are a precise contextual dictionary embedded in an article reader. " +
     "Explain what the selected term means in this specific sentence, in " + answerLang + ". " +
+    "Write the ENTIRE answer in " + answerLang + " and never switch languages, even when the " +
+    "selected term is a grammar particle or function word (models drift to English there). " +
     "The FIRST line of your answer must be exactly 'LEMMA: <dictionary base form of the selected term>' " +
     "(write 'LEMMA: -' if it is already the base form or has none). " +
     "Then a blank line, then 1-3 short sentences: the part of speech if known, and the sense the term carries in THIS sentence. " +
@@ -160,6 +162,10 @@ function pbpDictBuildCtxPrompt(p) {
   parts.push("Article title: " + title);
   if (sentence) parts.push("Sentence containing the term:\n" + sentence);
   parts.push("Selected term:\n" + selection);
+  // Language directive repeated LAST: recency measurably improves compliance
+  // on small/fast models, which otherwise answer function-word queries in
+  // English regardless of the system instruction (real-device report).
+  parts.push("Answer language: " + answerLang + " only.");
   return { system, prompt: parts.join("\n\n") };
 }
 
@@ -666,7 +672,11 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
     });
     const provider = s.aiProvider || "gemini";
     const model = (typeof pbpAiEffectiveModel === "function" ? pbpAiEffectiveModel(s) : "") || "";
-    const cacheKey = "dictctx_" + _pbpDictOwner + "_" + provider + "_" + model + "_"
+    // dictctx2: prompt-version bump. The v1 prompt let models answer
+    // function-word queries in English regardless of the answer-language
+    // instruction, and those drifted answers were cached under the correct
+    // language key -- a prefix bump orphans them (LRU evicts naturally).
+    const cacheKey = "dictctx2_" + _pbpDictOwner + "_" + provider + "_" + model + "_"
       + pbpDictCacheKeyPublic(lang, cap.text) + "_" + pbpDictCtxHash(ctx.sentence + "␟" + title + "␟" + langName);
     const finish = (full) => {
       const parsed = pbpDictParseCtxAnswer(full);

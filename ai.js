@@ -635,7 +635,11 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     throw e;
   } finally {
     clearTimeout(idleTimer);
-    if (reader) { try { reader.cancel(); } catch (_) {} }
+    // reader.cancel() returns a PROMISE that rejects with AbortError when
+    // the stream is already aborted -- the sync try/catch alone left an
+    // orphaned rejection ("Uncaught (in promise) AbortError:
+    // BodyStreamBuffer was aborted") on every popover close mid-stream.
+    if (reader) { try { reader.cancel().catch(() => {}); } catch (_) {} }
   }
 }
 

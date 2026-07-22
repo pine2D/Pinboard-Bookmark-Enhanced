@@ -149,6 +149,7 @@ assert(cp.prompt.indexOf("bank") >= 0 && cp.prompt.indexOf("river") >= 0, "promp
 assert(cp.prompt.indexOf("T") >= 0, "prompt carries title (title is part of cache identity)");
 const longSel = "x".repeat(500);
 assert(pbpDictBuildCtxPrompt({ selection: longSel, sentence: "", title: "", answerLang: "English" }).prompt.indexOf("x".repeat(401)) === -1, "selection capped at 400");
+assert(cp.prompt.indexOf("Answer language: Simplified Chinese only.") >= 0, "trailing language directive pinned (recency compliance)");
 
 section("pbpDictMergeContext");
 const c1 = { quote: "q1", articleUrl: "u1", articleTitle: "t1", highlightId: null, createdAt: 1 };
