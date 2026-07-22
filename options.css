@@ -293,7 +293,10 @@ html[data-theme] .opt-error { color: var(--opt-danger, #e55); background: var(--
 .btn:focus-visible { outline: 2px solid var(--opt-accent, #4477bb); outline-offset: 2px; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-sm { padding: var(--opt-sp-1) var(--opt-sp-4); font-size: 11px; }
+.btn.danger { color: var(--opt-danger, #c00); border-color: color-mix(in srgb, var(--opt-danger, #c00) 55%, var(--opt-border, #ccc)); }
+.btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--opt-danger, #c00) 8%, var(--opt-btn-bg, #fff)); }
 .save-status { font-size: 12px; color: #080; margin-left: var(--opt-sp-4); }
+.save-status.bad { color: #c00; }
 .field-warn { display:none; font-size: 12px; color: #b85c00; margin-top: var(--opt-sp-2); }
 .field-warn.visible { display: block; }
 .section-title { display: block; font-size: 13px; font-weight: bold; color: #444; margin-bottom: var(--opt-sp-4); margin-top: var(--opt-sp-4); }
@@ -989,6 +992,7 @@ html[data-theme] .et-test-status.err { color: var(--opt-danger, #cf222e); }
 html[data-theme] .et-test-status.warn { color: var(--opt-warn, #9a6700); }
 html[data-theme] .section-title { color: var(--opt-fg-muted); }
 html[data-theme] .save-status { color: var(--opt-save); }
+html[data-theme] .save-status.bad { color: var(--opt-danger); }
 html[data-theme] .auto-save-hint { color: var(--opt-fg-hint); }
 html[data-theme] .auto-save-hint.saved { color: var(--opt-save); }
 html[data-theme] .accordion-header { color: var(--opt-fg-muted); }
@@ -1437,10 +1441,10 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 .notes-toolbar input[type="search"] {
   width: 100%;
   padding: var(--opt-sp-2) var(--opt-sp-4);
-  border: 1px solid var(--opt-input-border);
+  border: 1px solid var(--opt-input-border, #cdd1d6);
   border-radius: var(--opt-radius-sm, 3px);
-  background-color: var(--opt-input-bg);
-  color: var(--opt-fg);
+  background-color: var(--opt-input-bg, #fff);
+  color: var(--opt-fg, #333);
   font-size: 13px;
   box-sizing: border-box;
   -webkit-appearance: none;
@@ -1457,6 +1461,86 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 }
 .notes-toolbar input[type="search"]:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--opt-accent) 18%, transparent);
+}
+.vocab-filter-toolbar {
+  grid-template-columns: minmax(220px, 1fr) minmax(130px, auto) minmax(130px, auto);
+}
+.vocab-filter-toolbar select,
+.vocab-batch-toolbar input[type="text"] {
+  min-width: 0;
+  padding: var(--opt-sp-2) var(--opt-sp-4);
+  border: 1px solid var(--opt-input-border);
+  border-radius: var(--opt-radius-sm, 3px);
+  background-color: var(--opt-input-bg);
+  color: var(--opt-fg);
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.vocab-filter-toolbar select:focus-visible,
+.vocab-batch-toolbar input[type="text"]:focus-visible {
+  outline: 2px solid var(--opt-accent);
+  outline-offset: 1px;
+}
+.vocab-summary-row,
+.vocab-selection-actions,
+.vocab-batch-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--opt-sp-3);
+}
+.vocab-summary-row {
+  justify-content: space-between;
+  margin: 0 0 var(--opt-sp-4);
+}
+#panel-vocab .vocab-summary-row > .notes-count {
+  min-width: 0;
+  white-space: normal;
+}
+.vocab-batch-toolbar {
+  margin: 0 0 var(--opt-sp-4);
+  padding: var(--opt-sp-3) var(--opt-sp-4);
+  border: 1px solid var(--opt-border, #ccc);
+  border-radius: var(--opt-radius-sm, 3px);
+  background: var(--opt-panel, #f8f8f5);
+}
+.vocab-batch-toolbar input[type="text"] { flex: 1 1 170px; }
+.vocab-main-status { display: block; min-height: 18px; margin: 0 0 var(--opt-sp-3); }
+.vocab-load-more { display: block; margin: var(--opt-sp-4) auto var(--opt-sp-5); }
+#panel-vocab .vocab-batch-toolbar[hidden],
+#panel-vocab .vocab-load-more[hidden] { display: none; }
+#panel-vocab,
+#vocab-list,
+.vocab-card,
+.vocab-card .notes-card-top { min-width: 0; }
+.vocab-card .notes-card-top {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--opt-sp-3);
+  padding: var(--opt-sp-2) var(--opt-sp-3);
+}
+.vocab-row-select { width: 16px; height: 16px; margin: 0; }
+.vocab-group-chip {
+  padding: 0 var(--opt-sp-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--opt-accent, #4477bb) 10%, transparent);
+  color: var(--opt-fg, #333);
+}
+.vocab-disclosure {
+  margin-top: var(--opt-sp-4);
+  border-top: 1px solid var(--opt-border-section, var(--opt-border, #ddd));
+}
+.vocab-disclosure > summary {
+  padding: var(--opt-sp-4) 0;
+  color: var(--opt-fg-muted, #555);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.vocab-disclosure > summary:focus-visible { outline: 2px solid var(--opt-accent); outline-offset: 2px; }
+.vocab-details-body { padding: 0 0 var(--opt-sp-3); }
+html[data-theme="flexoki-dark"] #panel-vocab .vocab-details-body > .hint {
+  color: var(--opt-fg-muted);
 }
 /* Vocab toolbar: 5 children (count/export/anki/eudic/status), not the
    3-column grid .notes-toolbar was shaped for (search+count+filter) -- a
@@ -1539,8 +1623,11 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 }
 .notes-card-main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--opt-sp-1);
+  flex: 1 1 0;
   min-width: 0;
+  max-width: 100%;
 }
 .notes-row-title {
   min-width: 0;
@@ -1717,4 +1804,20 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   .notes-row-del {
     justify-self: start;
   }
+  .vocab-card .notes-card-top {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .vocab-card .notes-row-del {
+    grid-column: 2;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .vocab-summary-row { align-items: flex-start; }
+  .vocab-selection-actions { width: 100%; }
+  .vocab-selection-actions .btn { flex: 1 1 130px; }
+  .vocab-batch-toolbar { align-items: stretch; }
+  .vocab-batch-toolbar .notes-count { flex-basis: 100%; }
+  .vocab-batch-toolbar .btn { flex: 1 1 130px; }
 }

@@ -32,6 +32,7 @@ function setupApiTests() {
   async function testAIProvider(provider) {
     const statusEl = $id(`test-${provider}-status`);
     if (!statusEl) return;
+    statusEl.classList.remove("ok", "bad");
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
 
@@ -119,6 +120,7 @@ function setupApiTests() {
       return;
     }
     btn.disabled = true;
+    statusEl.classList.remove("ok", "bad");
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "";
     try {

@@ -98,14 +98,15 @@ async function pbpEudicCall(body, token, timeoutMs) {
   }
 }
 
-// One POST per language, sequential, NO artificial spacing (max 4 requests,
-// far under the 30/min limit). 403 = rate limited -> break the circuit, no
-// retry (the ban windows are 1h/24h). ownerCheck runs before every POST.
+// One POST per language, sequential, NO artificial spacing (max 4 requests).
+// A 403 only proves that Eudic rejected the request; do not guess the cause
+// or a wait window. Break the circuit and let the UI suggest checking the
+// token before a later retry. ownerCheck runs before every POST.
 async function pbpEudicSendRows(rows, opts) {
   const token = (opts && opts.token) || "";
   const ownerCheck = (opts && opts.ownerCheck) || (async () => true);
   const { byLang, unsupported } = pbpEudicPartition(rows);
-  const out = { added: 0, skipped: 0, unsupported, failed: 0, rateLimited: false, generic: false, stage: "done", error: null };
+  const out = { added: 0, skipped: 0, unsupported, failed: 0, forbidden: false, generic: false, stage: "done", error: null };
   const batches = [...byLang];
   for (let i = 0; i < batches.length; i++) {
     const [lang, words] = batches[i];
@@ -118,7 +119,7 @@ async function pbpEudicSendRows(rows, opts) {
     } else if (res.status === 401) {
       out.stage = "auth"; out.error = res.message; return out;
     } else if (res.status === 403) {
-      out.rateLimited = true;
+      out.forbidden = true;
       // Circuit break: the words of THIS batch and every unsent batch all
       // count failed -- nothing silently disappears from the totals.
       for (let j = i; j < batches.length; j++) out.failed += batches[j][1].length;

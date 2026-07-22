@@ -9,8 +9,6 @@
 // the TSV contract; accepted for v1).
 // ============================================================
 
-const PBP_ANKI_ENDPOINT = "http://127.0.0.1:8765";
-
 // Port is user-configurable (AnkiConnect's own config allows changing it);
 // the HOST is never configurable -- loopback-only is a network invariant.
 // Anything that isn't a sane port number falls back to the default 8765.
@@ -151,7 +149,12 @@ async function pbpAnkiSendRows(rows, opts) {
     if (!created.ok) { out.stage = "model"; out.error = created.error; return out; }
   } else {
     const fields = await pbpAnkiCall("modelFieldNames", { modelName: PBP_ANKI_MODEL }, key, 10000, port);
-    if (!fields.ok || !pbpAnkiFieldsMatch(fields.result)) {
+    if (!fields.ok || !Array.isArray(fields.result)) {
+      out.stage = "modelFields";
+      out.error = fields.error || "modelFieldNames failed";
+      return out;
+    }
+    if (!pbpAnkiFieldsMatch(fields.result)) {
       // AnkiConnect silently drops values for unknown field names -- a
       // user-modified model must abort, never silently lose data.
       out.stage = "modelMismatch";

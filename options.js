@@ -2108,13 +2108,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Listen on all form inputs for auto-save
-  document.querySelectorAll('.panel input[type="checkbox"]').forEach(el => {
+  document.querySelectorAll('.panel input[type="checkbox"]:not([data-no-autosave])').forEach(el => {
     el.addEventListener("change", scheduleAutoSave);
   });
-  document.querySelectorAll('.panel input[type="text"], .panel input[type="password"], .panel input[type="number"], .panel textarea').forEach(el => {
+  document.querySelectorAll('.panel input[type="text"]:not([data-no-autosave]), .panel input[type="password"]:not([data-no-autosave]), .panel input[type="number"]:not([data-no-autosave]), .panel textarea:not([data-no-autosave])').forEach(el => {
     el.addEventListener("input", scheduleAutoSave);
   });
-  document.querySelectorAll('.panel select').forEach(el => {
+  document.querySelectorAll('.panel select:not([data-no-autosave])').forEach(el => {
     el.addEventListener("change", scheduleAutoSave);
   });
   document.querySelectorAll('.panel input[type="radio"]').forEach(el => {

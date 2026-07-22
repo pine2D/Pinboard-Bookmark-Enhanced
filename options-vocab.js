@@ -10,7 +10,85 @@
 
 let _vocabRenderGen = 0; // guards stale async renders (account switch mid-fetch)
 let _vocabRows = [];     // last render's rows, kept for export
+let _vocabViewRows = []; // current filtered + sorted view (selection boundary)
+let _vocabSelected = new Set();
+let _vocabLastSelectedId = null;
+let _vocabRenderLimit = 100;
+let _vocabBatchBusy = false;
 let _vocabFlashTimer = 0; // guards two flashes racing to clear each other's text early
+let _vocabOwnerLabel = ""; // decoded non-secret Pinboard username for visible scope copy
+const PBP_VOCAB_RENDER_BATCH = 100;
+const _vocabCollator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+
+function pbpVocabSearchText(value) {
+  return String(value || "")
+    .normalize("NFC")
+    .toLowerCase()
+    .replace(/i\u0307/g, "i")
+    .replace(/ß/g, "ss")
+    .replace(/ς/g, "σ")
+    .trim();
+}
+
+function pbpVocabFilterSort(rows, query, group, sortMode) {
+  const needle = pbpVocabSearchText(query);
+  const groupName = typeof pbpVocabNormalizeGroupName === "function"
+    ? pbpVocabNormalizeGroupName(group) : String(group || "").trim();
+  const filtered = (Array.isArray(rows) ? rows : []).filter((row) => {
+    const groups = typeof pbpVocabGroups === "function" ? pbpVocabGroups(row) : [];
+    if (groupName && !groups.includes(groupName)) return false;
+    if (!needle) return true;
+    const contexts = Array.isArray(row && row.contexts) ? row.contexts : [];
+    const fields = [row && row.term, row && row.lemma, row && row.gloss, row && row.note,
+      ...groups, ...contexts.flatMap((ctx) => [ctx && ctx.quote, ctx && ctx.articleTitle])];
+    return fields.some((value) => pbpVocabSearchText(value).includes(needle));
+  }).map((row, index) => ({ row, index }));
+
+  const mode = ["oldest", "az", "za"].includes(sortMode) ? sortMode : "latest";
+  filtered.sort((a, b) => {
+    let cmp = 0;
+    if (mode === "latest" || mode === "oldest") {
+      cmp = (Number(a.row.updatedAt) || Number(a.row.createdAt) || 0)
+        - (Number(b.row.updatedAt) || Number(b.row.createdAt) || 0);
+      if (mode === "latest") cmp *= -1;
+    } else {
+      cmp = _vocabCollator.compare(String(a.row.term || a.row.lemma || ""), String(b.row.term || b.row.lemma || ""));
+      if (mode === "za") cmp *= -1;
+    }
+    return cmp || a.index - b.index;
+  });
+  return filtered.map((item) => item.row);
+}
+
+function pbpVocabSelectResults(selected, rows, mode) {
+  const next = new Set(selected || []);
+  for (const row of (Array.isArray(rows) ? rows : [])) {
+    if (!row || !row.id) continue;
+    if (mode === "invert") {
+      if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
+    } else {
+      next.add(row.id);
+    }
+  }
+  return next;
+}
+
+function pbpVocabSelectRange(selected, rows, anchorId, targetId, checked) {
+  const next = new Set(selected || []);
+  const ids = (Array.isArray(rows) ? rows : []).map((row) => row && row.id);
+  const start = ids.indexOf(anchorId);
+  const end = ids.indexOf(targetId);
+  if (start < 0 || end < 0) {
+    if (targetId) checked ? next.add(targetId) : next.delete(targetId);
+    return next;
+  }
+  const lo = Math.min(start, end), hi = Math.max(start, end);
+  for (let i = lo; i <= hi; i++) {
+    if (!ids[i]) continue;
+    checked ? next.add(ids[i]) : next.delete(ids[i]);
+  }
+  return next;
+}
 
 // Owner derivation: the ONLY correct path is the same atomic secret-aware
 // read every other account-scoped consumer uses (pbpReadSettingsWithSecrets
@@ -23,12 +101,41 @@ async function pbpVocabCurrentOwner() {
   return pbpDictOwnerScope(pbpPinboardAccountFromToken(s.pinboardToken));
 }
 
+function pbpVocabOwnerLabel(owner) {
+  const scope = String(owner || "");
+  if (!scope.startsWith("acct_")) return t("vocabOwnerNoAccount");
+  const encoded = scope.slice(5);
+  try { return decodeURIComponent(encoded); } catch (_) { return encoded; }
+}
+
 function _pbpVocabBuildRow(w, index) {
   const card = document.createElement("article");
-  card.className = "notes-card";
+  card.className = "notes-card vocab-card";
+  card.setAttribute("role", "listitem");
+  card.dataset.vocabId = w.id;
 
   const top = document.createElement("div");
   top.className = "notes-card-top";
+
+  const select = document.createElement("input");
+  select.type = "checkbox";
+  select.className = "vocab-row-select";
+  select.dataset.vocabId = w.id;
+  select.checked = _vocabSelected.has(w.id);
+  select.setAttribute("aria-label", t("vocabSelectWord", w.term));
+  select.addEventListener("click", (e) => {
+    if (e.shiftKey && _vocabLastSelectedId) {
+      _vocabSelected = pbpVocabSelectRange(_vocabSelected, _vocabViewRows,
+        _vocabLastSelectedId, w.id, select.checked);
+    } else if (select.checked) {
+      _vocabSelected.add(w.id);
+    } else {
+      _vocabSelected.delete(w.id);
+    }
+    _vocabLastSelectedId = w.id;
+    _pbpVocabSyncSelectionUi();
+  });
+  top.appendChild(select);
 
   // Render-index-based id, not w.id -- non-ASCII terms squashed by a regex
   // collide (two CJK words both become "_"), duplicating ids and breaking
@@ -56,14 +163,23 @@ function _pbpVocabBuildRow(w, index) {
 
   const meta = document.createElement("span");
   meta.className = "notes-row-meta";
-  const langChip = document.createElement("span");
-  langChip.className = "notes-meta-chip";
-  langChip.textContent = (w.language || "").toUpperCase();
-  meta.appendChild(langChip);
+  const languageLabel = pbpDictLanguageLabel(w.language, document.documentElement.lang);
+  if (languageLabel) {
+    const langChip = document.createElement("span");
+    langChip.className = "notes-meta-chip";
+    langChip.textContent = languageLabel;
+    meta.appendChild(langChip);
+  }
   const glossChip = document.createElement("span");
   glossChip.className = "notes-meta-chip";
   glossChip.textContent = (w.gloss || "").split("\n")[0];
   meta.appendChild(glossChip);
+  for (const group of pbpVocabGroups(w)) {
+    const groupChip = document.createElement("span");
+    groupChip.className = "notes-meta-chip vocab-group-chip";
+    groupChip.textContent = group;
+    meta.appendChild(groupChip);
+  }
   main.appendChild(meta);
 
   head.appendChild(main);
@@ -133,6 +249,7 @@ function _pbpVocabBuildRow(w, index) {
 function _pbpVocabFlashStatus(ok, text) {
   const el = $id("vocab-status");
   if (!el) return;
+  delete el.dataset.vocabLoading;
   setStatusIcon(el, ok, text);
   // Two flashes in quick succession (e.g. export then Anki) must not race:
   // the earlier call's clear-timer would otherwise wipe the later message.
@@ -140,8 +257,39 @@ function _pbpVocabFlashStatus(ok, text) {
   _vocabFlashTimer = setTimeout(() => { el.textContent = ""; }, 3000);
 }
 
+function _pbpVocabSetLoading(loading) {
+  const list = $id("vocab-list");
+  if (list) list.setAttribute("aria-busy", loading ? "true" : "false");
+  const status = $id("vocab-status");
+  if (!status) return;
+  if (loading) {
+    clearTimeout(_vocabFlashTimer);
+    status.classList.remove("ok", "bad");
+    status.dataset.vocabLoading = "true";
+    status.textContent = t("vocabLoading");
+  } else if (status.dataset.vocabLoading === "true") {
+    delete status.dataset.vocabLoading;
+    status.textContent = "";
+  }
+}
+
+function _pbpVocabFocusStable() {
+  const search = $id("vocab-search");
+  if (!search || search.disabled || search.closest("[hidden], [inert]")) return;
+  try { search.focus({ preventScroll: true }); } catch (_) { search.focus(); }
+}
+
+function pbpVocabSelectionSnapshotValid(ids, selected, rows) {
+  const captured = Array.isArray(ids) ? ids : [];
+  const selectedIds = selected instanceof Set ? selected : new Set(selected || []);
+  const unique = new Set(captured);
+  if (unique.size !== captured.length || unique.size !== selectedIds.size) return false;
+  const visibleIds = new Set((Array.isArray(rows) ? rows : []).map((row) => row && row.id));
+  return captured.every((id) => selectedIds.has(id) && visibleIds.has(id));
+}
+
 // Same anchored confirm popover as every other destructive micro-action
-// (notes, theme delete, tab reset) -- never window.confirm. Owner is
+// (notes, theme delete, tab reset) -- never a blocking browser dialog. Owner is
 // re-derived at action time, not reused from the render pass, so a delete
 // confirmed after an account switch still checks against the CURRENT
 // account (account-isolation invariant).
@@ -151,41 +299,189 @@ function _pbpVocabDeleteRow(w, anchor) {
     yesText: t("delete"),
     noText: t("cancel"),
     onConfirm: async () => {
+      // Share renderVocabPanel's generation: every confirmed mutation gets
+      // a UI-commit ticket immediately, so a later user action supersedes an
+      // older reload even when the older IDB snapshot resolves last.
+      const gen = ++_vocabRenderGen;
+      let owner = null;
       // Whole body in try/catch: showConfirmPopover only console.errors a
       // rejected onConfirm, so a thrown owner read (or anything else here)
       // would otherwise vanish with no user-visible feedback.
       try {
-        const owner = await pbpVocabCurrentOwner();
+        owner = await pbpVocabCurrentOwner();
         const ok = await pbpVocabDelete(w.id, owner);
-        if (ok) {
-          _vocabRows = _vocabRows.filter((r) => r.id !== w.id);
-          _pbpVocabRenderList(_vocabRows);
-        } else {
-          _pbpVocabFlashStatus(false, t("dictDeleteFailed"));
-        }
+        // Re-read on failure too: an earlier overlapping mutation may have
+        // committed already, and this latest action owns the final reconcile.
+        const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
+        if (gen !== _vocabRenderGen) return;
+        if (!ok) _pbpVocabFlashStatus(false, t("dictDeleteFailed"));
+        else if (!refreshed) _pbpVocabFlashStatus(false, t("vocabRefreshFailed"));
       } catch (_) {
-        _pbpVocabFlashStatus(false, t("dictDeleteFailed"));
+        if (owner) await _pbpVocabReloadAfterMutation(owner, gen);
+        else if (gen === _vocabRenderGen) {
+          _pbpVocabClearVisibleState();
+          _pbpVocabSetLoading(false);
+        }
+        if (gen === _vocabRenderGen) _pbpVocabFlashStatus(false, t("dictDeleteFailed"));
       }
     },
   });
 }
 
-function _pbpVocabRenderList(rows) {
-  const list = $id("vocab-list");
-  if (!list) return;
-  const count = $id("vocab-count");
-  if (count) count.textContent = rows.length ? String(rows.length) : "";
-  const empty = $id("vocab-empty");
-  if (empty) empty.hidden = !!rows.length;
-  list.replaceChildren();
-  rows.forEach((w, i) => list.appendChild(_pbpVocabBuildRow(w, i)));
+function _pbpVocabClearSelection() {
+  _vocabSelected.clear();
+  _vocabLastSelectedId = null;
+}
 
+function _pbpVocabSyncSelectionUi() {
+  const validIds = new Set(_vocabViewRows.map((row) => row.id));
+  for (const id of [..._vocabSelected]) if (!validIds.has(id)) _vocabSelected.delete(id);
+  const selectedCount = _vocabSelected.size;
+  const selectedEl = $id("vocab-selected-count");
+  if (selectedEl) selectedEl.textContent = t("vocabSelectedCount", String(selectedCount));
+  const batch = $id("vocab-batch-toolbar");
+  if (batch) batch.hidden = selectedCount === 0;
+  const allBtn = $id("vocab-select-all");
+  const invertBtn = $id("vocab-invert-selection");
+  if (allBtn) allBtn.disabled = _vocabBatchBusy || !_vocabViewRows.length;
+  if (invertBtn) invertBtn.disabled = _vocabBatchBusy || !_vocabViewRows.length;
+  const groupInput = $id("vocab-group-input");
+  const addBtn = $id("vocab-add-group");
+  const deleteBtn = $id("vocab-batch-delete");
+  const group = groupInput && typeof pbpVocabNormalizeGroupName === "function"
+    ? pbpVocabNormalizeGroupName(groupInput.value) : "";
+  if (groupInput) groupInput.disabled = _vocabBatchBusy;
+  if (addBtn) addBtn.disabled = _vocabBatchBusy || !selectedCount || !group;
+  if (deleteBtn) deleteBtn.disabled = _vocabBatchBusy || !selectedCount;
+  document.querySelectorAll("#vocab-list .vocab-row-select").forEach((checkbox) => {
+    checkbox.checked = _vocabSelected.has(checkbox.dataset.vocabId);
+    checkbox.disabled = _vocabBatchBusy;
+  });
+}
+
+function _pbpVocabRefreshGroupOptions(preserveSelection) {
+  const filter = $id("vocab-group-filter");
+  const datalist = $id("vocab-group-list");
+  const groups = [...new Set(_vocabRows.flatMap((row) => pbpVocabGroups(row)))]
+    .sort((a, b) => _vocabCollator.compare(a, b));
+  if (filter) {
+    const previous = preserveSelection ? filter.value : "";
+    filter.replaceChildren();
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = t("vocabAllGroups");
+    filter.appendChild(all);
+    for (const group of groups) {
+      const option = document.createElement("option");
+      option.value = group;
+      option.textContent = group;
+      filter.appendChild(option);
+    }
+    filter.value = groups.includes(previous) ? previous : "";
+  }
+  if (datalist) {
+    datalist.replaceChildren(...groups.map((group) => {
+      const option = document.createElement("option");
+      option.value = group;
+      return option;
+    }));
+  }
+}
+
+function _pbpVocabUpdateExternalActions() {
   const eudicBtn = $id("vocab-eudic-btn");
   if (eudicBtn) {
-    // Hidden when nothing is sendable: don't ask for permissions first and
-    // reveal "no supported words" after.
+    // External sends intentionally stay scoped to ALL current-owner rows,
+    // never the UI selection or the current search result.
     eudicBtn.hidden = typeof pbpEudicPartition !== "function"
-      || pbpEudicPartition(rows).byLang.size === 0;
+      || pbpEudicPartition(_vocabRows).byLang.size === 0;
+  }
+}
+
+function _pbpVocabRenderList(append) {
+  const list = $id("vocab-list");
+  if (!list) return;
+  const rows = _vocabViewRows;
+  const count = $id("vocab-count");
+  if (count) count.textContent = t("vocabResultCount", String(rows.length), String(_vocabRows.length), _vocabOwnerLabel);
+  const empty = $id("vocab-empty");
+  if (empty) {
+    empty.textContent = t("dictVocabEmpty", _vocabOwnerLabel);
+    empty.hidden = _vocabRows.length !== 0;
+  }
+  const noResults = $id("vocab-no-results");
+  if (noResults) noResults.hidden = _vocabRows.length === 0 || rows.length !== 0;
+  const target = Math.min(rows.length, _vocabRenderLimit);
+  const start = append ? Math.min(list.children.length, target) : 0;
+  if (!append) list.replaceChildren();
+  const fragment = document.createDocumentFragment();
+  rows.slice(start, target).forEach((w, i) => fragment.appendChild(_pbpVocabBuildRow(w, start + i)));
+  list.appendChild(fragment);
+  const more = $id("vocab-load-more");
+  if (more) {
+    const remaining = Math.max(0, rows.length - target);
+    more.hidden = remaining === 0;
+    more.textContent = t("vocabLoadMore", String(Math.min(PBP_VOCAB_RENDER_BATCH, remaining)));
+  }
+  _pbpVocabUpdateExternalActions();
+  _pbpVocabSyncSelectionUi();
+}
+
+function _pbpVocabApplyView(resetLimit) {
+  if (resetLimit) _vocabRenderLimit = PBP_VOCAB_RENDER_BATCH;
+  _vocabViewRows = pbpVocabFilterSort(_vocabRows,
+    ($id("vocab-search") || {}).value || "",
+    ($id("vocab-group-filter") || {}).value || "",
+    ($id("vocab-sort") || {}).value || "latest");
+  _pbpVocabRenderList();
+}
+
+function _pbpVocabClearVisibleState() {
+  _vocabRows = [];
+  _vocabViewRows = [];
+  _vocabOwnerLabel = "";
+  _pbpVocabClearSelection();
+  const list = $id("vocab-list");
+  if (list) list.replaceChildren();
+  _pbpVocabSetLoading(true);
+  const count = $id("vocab-count");
+  if (count) count.textContent = "";
+  for (const id of ["vocab-empty", "vocab-no-results", "vocab-load-more", "vocab-batch-toolbar"]) {
+    const el = $id(id); if (el) el.hidden = true;
+  }
+  _pbpVocabRefreshGroupOptions(false);
+  _pbpVocabSyncSelectionUi();
+  _pbpVocabUpdateExternalActions();
+}
+
+async function _pbpVocabReloadAfterMutation(expectedOwner, requestedGen) {
+  const gen = Number.isInteger(requestedGen) ? requestedGen : ++_vocabRenderGen;
+  if (gen !== _vocabRenderGen) return false;
+  _pbpVocabSetLoading(true);
+  try {
+    const rows = await pbpVocabAll(expectedOwner);
+    const ownerNow = await pbpVocabCurrentOwner();
+    // A newer mutation, tab activation or account-change render owns every
+    // visible field now. The old snapshot may still be useful to its caller
+    // as completion, but it must not write rows/loading/selection/status.
+    if (gen !== _vocabRenderGen) return false;
+    if (ownerNow !== expectedOwner) {
+      _pbpVocabClearVisibleState();
+      renderVocabPanel();
+      return false;
+    }
+    _vocabRows = rows;
+    _vocabOwnerLabel = pbpVocabOwnerLabel(expectedOwner);
+    _pbpVocabClearSelection();
+    _pbpVocabRefreshGroupOptions(true);
+    _pbpVocabSetLoading(false);
+    _pbpVocabApplyView(true);
+    return true;
+  } catch (_) {
+    if (gen !== _vocabRenderGen) return false;
+    _pbpVocabClearVisibleState();
+    _pbpVocabSetLoading(false);
+    return false;
   }
 }
 
@@ -197,25 +493,132 @@ function _pbpVocabRenderList(rows) {
 async function renderVocabPanel() {
   if (!$id("vocab-list")) return;
   const gen = ++_vocabRenderGen;
+  // Clear first, before any await: an account-change render must never leave
+  // the previous owner's rows, selection, or derived group names visible.
+  _pbpVocabClearVisibleState();
   let rows;
+  let owner;
   try {
-    const owner = await pbpVocabCurrentOwner();
+    owner = await pbpVocabCurrentOwner();
     rows = await pbpVocabAll(owner);
+    if (await pbpVocabCurrentOwner() !== owner) {
+      if (gen === _vocabRenderGen) renderVocabPanel();
+      return;
+    }
   } catch (_) {
     // Fail-closed: a rerender triggered by an account switch that then fails
     // to read must NOT leave the previous account's rows on screen (isolation
     // invariant) -- clear the list and say the read failed.
     if (gen === _vocabRenderGen) {
-      _vocabRows = [];
-      _pbpVocabRenderList([]);
-      _pbpVocabFlashStatus(false, t("jinaFailed"));
+      _pbpVocabClearVisibleState();
+      _pbpVocabSetLoading(false);
+      _pbpVocabFlashStatus(false, t("vocabLoadFailed"));
     }
     return;
   }
   if (gen !== _vocabRenderGen) return;
   _vocabRows = rows;
-  _pbpVocabRenderList(rows);
+  _vocabOwnerLabel = pbpVocabOwnerLabel(owner);
+  _pbpVocabSetLoading(false);
+  _pbpVocabRefreshGroupOptions(false);
+  _pbpVocabApplyView(true);
   _pbpPackRefreshStatus();
+}
+
+function _pbpVocabSetBatchBusy(busy) {
+  _vocabBatchBusy = !!busy;
+  _pbpVocabSyncSelectionUi();
+}
+
+function _pbpVocabBatchDeleteSelected() {
+  const button = $id("vocab-batch-delete");
+  if (!button || button.disabled || _vocabBatchBusy || !_vocabSelected.size) return;
+  const ids = [..._vocabSelected];
+  showConfirmPopover(button, {
+    msg: t("vocabBatchDeleteConfirm", String(ids.length)),
+    yesText: t("delete"),
+    noText: t("cancel"),
+    onConfirm: async () => {
+      if (_vocabBatchBusy) return;
+      if (!pbpVocabSelectionSnapshotValid(ids, _vocabSelected, _vocabViewRows)) {
+        _pbpVocabFlashStatus(false, t("vocabSelectionChanged"));
+        _pbpVocabFocusStable();
+        return;
+      }
+      _pbpVocabSetBatchBusy(true);
+      const gen = ++_vocabRenderGen;
+      let owner = null;
+      try {
+        owner = await pbpVocabCurrentOwner();
+        const ok = await pbpVocabBatchDelete(ids, owner);
+        const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
+        if (gen !== _vocabRenderGen) return;
+        _pbpVocabFocusStable();
+        if (!ok) {
+          _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
+          return;
+        }
+        if (!refreshed) {
+          _pbpVocabFlashStatus(false, t("vocabRefreshFailed"));
+          return;
+        }
+        _pbpVocabFlashStatus(true, t("vocabBatchDeleted", String(ids.length)));
+      } catch (_) {
+        if (owner) await _pbpVocabReloadAfterMutation(owner, gen);
+        else if (gen === _vocabRenderGen) {
+          _pbpVocabClearVisibleState();
+          _pbpVocabSetLoading(false);
+        }
+        if (gen === _vocabRenderGen) {
+          _pbpVocabFocusStable();
+          _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
+        }
+      } finally {
+        _pbpVocabSetBatchBusy(false);
+      }
+    }
+  });
+}
+
+async function _pbpVocabAddSelectedToGroup() {
+  const input = $id("vocab-group-input");
+  const button = $id("vocab-add-group");
+  if (!input || !button || button.disabled || _vocabBatchBusy || !_vocabSelected.size) return;
+  const group = pbpVocabNormalizeGroupName(input.value);
+  if (!group) { _pbpVocabFlashStatus(false, t("vocabGroupRequired")); return; }
+  const ids = [..._vocabSelected];
+  _pbpVocabSetBatchBusy(true);
+  const gen = ++_vocabRenderGen;
+  let owner = null;
+  try {
+    owner = await pbpVocabCurrentOwner();
+    const ok = await pbpVocabBatchAddGroup(ids, owner, group);
+    const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
+    if (gen !== _vocabRenderGen) return;
+    _pbpVocabFocusStable();
+    if (!ok) {
+      _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
+      return;
+    }
+    if (!refreshed) {
+      _pbpVocabFlashStatus(false, t("vocabRefreshFailed"));
+      return;
+    }
+    input.value = "";
+    _pbpVocabFlashStatus(true, t("vocabBatchGrouped", String(ids.length), group));
+  } catch (_) {
+    if (owner) await _pbpVocabReloadAfterMutation(owner, gen);
+    else if (gen === _vocabRenderGen) {
+      _pbpVocabClearVisibleState();
+      _pbpVocabSetLoading(false);
+    }
+    if (gen === _vocabRenderGen) {
+      _pbpVocabFocusStable();
+      _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
+    }
+  } finally {
+    _pbpVocabSetBatchBusy(false);
+  }
 }
 
 // Fail-closed on account switch: owner is re-derived AFTER the rows fetch
@@ -237,13 +640,13 @@ async function _pbpVocabExport() {
     if (typeof window.pbpOptionsFlushAutoSave === "function") {
       let flushed = null;
       try { flushed = await window.pbpOptionsFlushAutoSave(); } catch (_) {}
-      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("vocabSettingsSaveFailed")); return; }
     }
     const owner = await pbpVocabCurrentOwner();
     const rows = await pbpVocabAll(owner);
     const ownerNow = await pbpVocabCurrentOwner();
     if (ownerNow !== owner) {
-      _pbpVocabFlashStatus(false, t("jinaFailed"));
+      _pbpVocabFlashStatus(false, t("vocabAccountChanged"));
       return;
     }
     const tsv = pbpDictTsv(rows.map(_pbpVocabCanonicalRow));
@@ -258,7 +661,7 @@ async function _pbpVocabExport() {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   } catch (_) {
-    _pbpVocabFlashStatus(false, t("jinaFailed"));
+    _pbpVocabFlashStatus(false, t("vocabExportFailed"));
   } finally {
     btn.disabled = false;
   }
@@ -300,13 +703,15 @@ async function _pbpVocabSendAnki() {
     const pattern = pbpEndpointOriginPattern(pbpAnkiEndpointFor(port));
     let granted = false;
     try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (_) {}
-    if (!granted) { _pbpVocabFlashStatus(false, t("dictAnkiUnreachable")); return; }
+    if (!granted) { _pbpVocabFlashStatus(false, t("dictAnkiHostPermissionDenied")); return; }
     // requestPermission FIRST (spec §3): the long human-approval wait happens
     // BEFORE owner derivation, so the owner snapshot below stays fresh.
     const perm = await pbpAnkiCall("requestPermission", {}, "", 120000, port);
-    if (!perm.ok || !perm.result || perm.result.permission !== "granted"
-        || Number(perm.result.version) < 6) {
-      _pbpVocabFlashStatus(false, t("dictAnkiUnreachable"));
+    if (!perm.ok || !perm.result) { _pbpVocabFlashStatus(false, t("dictAnkiConnectPermissionFailed")); return; }
+    if (perm.result.permission !== "granted") { _pbpVocabFlashStatus(false, t("dictAnkiConnectPermissionDenied")); return; }
+    const apiVersion = Number(perm.result.version);
+    if (!Number.isFinite(apiVersion) || apiVersion < 6) {
+      _pbpVocabFlashStatus(false, t("dictAnkiVersionUnsupported"));
       return;
     }
     const keyRequired = perm.result.requireApiKey === true || perm.result.requireApikey === true;
@@ -316,7 +721,7 @@ async function _pbpVocabSendAnki() {
     if (typeof window.pbpOptionsFlushAutoSave === "function") {
       let flushed = null;
       try { flushed = await window.pbpOptionsFlushAutoSave(); } catch (_) {}
-      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("vocabSettingsSaveFailed")); return; }
     }
     const raw = await pbpReadSettingsWithSecrets({
       dictAnkiDeck: SETTINGS_DEFAULTS.dictAnkiDeck,
@@ -326,7 +731,7 @@ async function _pbpVocabSendAnki() {
     if (keyRequired && !s.dictAnkiKey) { _pbpVocabFlashStatus(false, t("dictAnkiKeyRequired")); return; }
     const owner = await pbpVocabCurrentOwner();
     const rows = await pbpVocabAll(owner);
-    if ((await pbpVocabCurrentOwner()) !== owner) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+    if ((await pbpVocabCurrentOwner()) !== owner) { _pbpVocabFlashStatus(false, t("vocabAccountChanged")); return; }
     if (!rows.length) { _pbpVocabFlashStatus(false, t("dictAnkiNothing")); return; }
     const canonical = rows.map(_pbpVocabCanonicalRow);
     const res = await pbpAnkiSendRows(canonical, {
@@ -339,16 +744,17 @@ async function _pbpVocabSendAnki() {
       _pbpVocabFlashStatus(res.failed === 0, t("dictAnkiResult", String(res.added), String(res.skipped), String(res.failed)));
     } else if (res.stage === "modelMismatch") {
       _pbpVocabFlashStatus(false, t("dictAnkiModelMismatch"));
+    } else if (res.stage === "modelFields") {
+      _pbpVocabFlashStatus(false, t("dictAnkiFieldCheckFailed"));
     } else if (res.stage === "owner") {
-      _pbpVocabFlashStatus(false, t("jinaFailed"));
+      _pbpVocabFlashStatus(false, t("vocabAccountChanged"));
     } else {
       // Pipeline stages (deck/model/precheck/add) carry AnkiConnect's own
-      // error text; "unreachable" is only honest for the connection itself
-      // (mirrors the Eudic 400-message precedent).
-      _pbpVocabFlashStatus(false, res.error || t("dictAnkiUnreachable"));
+      // error text; use the generic send failure only when no detail exists.
+      _pbpVocabFlashStatus(false, res.error || t("dictAnkiFailed"));
     }
   } catch (_) {
-    _pbpVocabFlashStatus(false, t("dictAnkiUnreachable"));
+    _pbpVocabFlashStatus(false, t("dictAnkiFailed"));
   } finally {
     btn.textContent = orig;
     btn.disabled = false;
@@ -365,31 +771,31 @@ async function _pbpVocabSendEudic() {
     const pattern = pbpEndpointOriginPattern(PBP_EUDIC_ENDPOINT);
     let granted = false;
     try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (_) {}
-    if (!granted) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+    if (!granted) { _pbpVocabFlashStatus(false, t("dictEudicHostPermissionDenied")); return; }
     if (typeof window.pbpOptionsFlushAutoSave === "function") {
       let flushed = null;
       try { flushed = await window.pbpOptionsFlushAutoSave(); } catch (_) {}
-      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("vocabSettingsSaveFailed")); return; }
     }
     const raw = await pbpReadSettingsWithSecrets({ dictEudicToken: SETTINGS_DEFAULTS.dictEudicToken });
     const s = deobfuscateSettings(raw);
     if (!s.dictEudicToken) { _pbpVocabFlashStatus(false, t("dictEudicTokenRequired")); return; }
     const owner = await pbpVocabCurrentOwner();
     const rows = await pbpVocabAll(owner);
-    if ((await pbpVocabCurrentOwner()) !== owner) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+    if ((await pbpVocabCurrentOwner()) !== owner) { _pbpVocabFlashStatus(false, t("vocabAccountChanged")); return; }
     const res = await pbpEudicSendRows(rows, {
       token: s.dictEudicToken,
       ownerCheck: async () => (await pbpVocabCurrentOwner()) === owner
     });
     if (res.stage === "owner") {
-      _pbpVocabFlashStatus(false, t("jinaFailed"));
+      _pbpVocabFlashStatus(false, t("vocabAccountChanged"));
     } else if (res.stage === "auth") {
       _pbpVocabFlashStatus(false, t("dictEudicTokenRequired"));
-    } else if (res.rateLimited) {
-      _pbpVocabFlashStatus(false, t("dictEudicRateLimited"));
+    } else if (res.forbidden) {
+      _pbpVocabFlashStatus(false, t("dictEudicRejected"));
     } else if (res.failed) {
       // Parameter errors surface the server's own message (spec §2).
-      _pbpVocabFlashStatus(false, res.error || t("jinaFailed"));
+      _pbpVocabFlashStatus(false, res.error || t("dictEudicFailed"));
     } else if (res.generic) {
       // ANY generic batch poisons the totals -- never show a partial count
       // as if it were the whole story.
@@ -399,7 +805,7 @@ async function _pbpVocabSendEudic() {
         t("dictEudicResult", String(res.added), String(res.skipped), String(res.unsupported)));
     }
   } catch (_) {
-    _pbpVocabFlashStatus(false, t("jinaFailed"));
+    _pbpVocabFlashStatus(false, t("dictEudicFailed"));
   } finally {
     btn.textContent = orig;
     btn.disabled = false;
@@ -415,6 +821,42 @@ if (_vocabEudicBtn) _vocabEudicBtn.addEventListener("click", _pbpVocabSendEudic)
 const _vocabExportBtn = $id("vocab-export-btn");
 if (_vocabExportBtn) _vocabExportBtn.addEventListener("click", _pbpVocabExport);
 
+const _vocabSearch = $id("vocab-search");
+if (_vocabSearch) _vocabSearch.addEventListener("input", () => {
+  _pbpVocabClearSelection();
+  _pbpVocabApplyView(true);
+});
+for (const id of ["vocab-group-filter", "vocab-sort"]) {
+  const control = $id(id);
+  if (control) control.addEventListener("change", () => {
+    _pbpVocabClearSelection();
+    _pbpVocabApplyView(true);
+  });
+}
+const _vocabSelectAll = $id("vocab-select-all");
+if (_vocabSelectAll) _vocabSelectAll.addEventListener("click", () => {
+  _vocabSelected = pbpVocabSelectResults(_vocabSelected, _vocabViewRows, "all");
+  _vocabLastSelectedId = null;
+  _pbpVocabSyncSelectionUi();
+});
+const _vocabInvert = $id("vocab-invert-selection");
+if (_vocabInvert) _vocabInvert.addEventListener("click", () => {
+  _vocabSelected = pbpVocabSelectResults(_vocabSelected, _vocabViewRows, "invert");
+  _vocabLastSelectedId = null;
+  _pbpVocabSyncSelectionUi();
+});
+const _vocabLoadMore = $id("vocab-load-more");
+if (_vocabLoadMore) _vocabLoadMore.addEventListener("click", () => {
+  _vocabRenderLimit = Math.min(_vocabViewRows.length, _vocabRenderLimit + PBP_VOCAB_RENDER_BATCH);
+  _pbpVocabRenderList(true);
+});
+const _vocabGroupInput = $id("vocab-group-input");
+if (_vocabGroupInput) _vocabGroupInput.addEventListener("input", _pbpVocabSyncSelectionUi);
+const _vocabAddGroup = $id("vocab-add-group");
+if (_vocabAddGroup) _vocabAddGroup.addEventListener("click", _pbpVocabAddSelectedToGroup);
+const _vocabBatchDelete = $id("vocab-batch-delete");
+if (_vocabBatchDelete) _vocabBatchDelete.addEventListener("click", _pbpVocabBatchDeleteSelected);
+
 // Account switch (token rotation, or the sync/keys-routing toggles that
 // change which area holds the effective token) invalidates every row
 // currently shown -- re-render only when the vocab tab is the one on
@@ -425,7 +867,10 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     if ((area !== "sync" && area !== "local") ||
         !(changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys)) return;
     const activeBtn = document.querySelector(".tab-btn.active");
-    if (activeBtn && activeBtn.dataset.panel === "vocab") renderVocabPanel();
+    if (activeBtn && activeBtn.dataset.panel === "vocab") {
+      _pbpVocabClearVisibleState();
+      renderVocabPanel();
+    }
   });
 }
 
@@ -434,12 +879,20 @@ async function _pbpPackRefreshStatus() {
   const el = $id("dict-pack-status");
   const del = $id("dict-pack-delete");
   if (!el) return;
-  const meta = (typeof pbpPackMeta === "function") ? await pbpPackMeta() : null;
+  let meta;
+  try {
+    meta = (typeof pbpPackMeta === "function") ? await pbpPackMeta() : { state:"error" };
+  } catch (_) {
+    meta = { state:"error" };
+  }
   if (meta && meta.state === "ready") {
     const d = new Date(meta.importedAt);
     el.textContent = t("dictPackStatus", String(meta.entries),
       d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
     if (del) del.hidden = false;
+  } else if (meta && meta.state === "error") {
+    el.textContent = t("dictPackReadFailed");
+    if (del) del.hidden = true;
   } else {
     el.textContent = t("dictPackEmpty");
     if (del) del.hidden = true;
@@ -484,8 +937,13 @@ function _pbpPackWire() {
       yesText: t("delete"),
       noText: t("cancel"),
       onConfirm: async () => {
-        try { await pbpPackDelete(); } catch (_) {}
-        _pbpPackRefreshStatus();
+        try {
+          await pbpPackDelete();
+          await _pbpPackRefreshStatus();
+        } catch (_) {
+          const status = $id("dict-pack-status");
+          if (status) status.textContent = t("dictPackDeleteFailed");
+        }
       }
     });
   });

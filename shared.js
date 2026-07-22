@@ -41,8 +41,11 @@ const PBP_ICONS = {
 // goes through a text node, so interpolated values (errors, results) can't inject HTML.
 function setStatusIcon(el, ok, text) {
   if (!el) return;
+  const state = ok ? "ok" : "bad";
+  el.classList.toggle("ok", !!ok);
+  el.classList.toggle("bad", !ok);
   const ic = document.createElement("span");
-  ic.className = "status-ic";
+  ic.className = "status-ic " + state;
   ic.innerHTML = ok ? PBP_ICONS.check : PBP_ICONS.cross;
   el.replaceChildren(ic, document.createTextNode(" " + (text != null ? String(text) : "")));
 }
