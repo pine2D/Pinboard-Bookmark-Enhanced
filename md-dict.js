@@ -614,6 +614,11 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
 
 // ---- Contextual-gloss slot + run assembly -------------------------------
 let _pbpDictRunSeq = 0;
+// Manual language override: PER-DOCUMENT memory only (reset on pbp:rendered).
+// It used to persist via settings, which silently forced every later lookup
+// in every article to the stale choice -- a zh page kept "no entry"-ing
+// because "en" was stuck from days earlier (real-device report).
+let _pbpDictManualLang = "";
 let _pbpDictCurrent = null;      // merged results of the LIVE run only
 let _pbpDictChildCtrl = null;    // the live run's own controller (child of md-ask's)
 let _pbpDictParentCleanup = null; // removes the previous run's parent-abort listener
@@ -670,7 +675,10 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
       md.innerHTML = renderMarkdown(parsed.gloss); // single sanitize point
       const tag = document.createElement("div");
       tag.className = "xp-dict-ailabel";
-      tag.textContent = t("dictAiLabel") + " · " + provider;
+      // Label only marks the content as AI-generated; the provider and model
+      // already sit in the footer's .xp-model (real-device report: showing
+      // the provider twice read as clutter).
+      tag.textContent = t("dictAiLabel");
       el.replaceChildren(md, tag);
       return parsed;
     };
@@ -804,19 +812,25 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   wrap.appendChild(ctxEl);
   body.replaceChildren(wrap);
 
-  const manual = typeof s.dictLangManual === "string" ? s.dictLangManual : "";
+  const manual = _pbpDictManualLang;
   const lang = await _pbpDictResolveLang(cap, ctx, manual);
   if (signal.aborted || _pbpDictCurrent !== cur) return;
   cur.lang = lang;
   const effectiveLang = lang || "und"; // vocab identity: query and save agree (Codex HIGH 6)
-  sel.value = PBP_DICT_LANGS.includes(lang) ? lang : "";
+  // Legible override state: auto-detection keeps "Auto" selected and
+  // annotates it with the detected code ("Auto (zh)"); a bare code shows
+  // ONLY when the user picked it this document. The old display put the
+  // detected language in the box as a bare code, indistinguishable from a
+  // stuck manual override.
+  if (manual && PBP_DICT_LANGS.includes(manual)) {
+    sel.value = manual;
+  } else {
+    sel.value = "";
+    sel.options[0].textContent = t("dictLangAuto") + (lang ? " (" + lang + ")" : "");
+  }
   sel.addEventListener("change", () => {
-    const v = sel.value;
-    s.dictLangManual = v;
-    cur.rerun(); // abort old requests NOW; storage latency must not extend their life
-    persistSettings({ dictLangManual: v }).then((r) => {
-      if (!r || !r.ok) { /* in-memory value already applied; same swallow as _pbpExplainPersistTrigger */ }
-    }).catch(() => {});
+    _pbpDictManualLang = sel.value; // per-document only; never persisted
+    cur.rerun(); // abort old requests NOW
   });
   speak.addEventListener("click", () => pbpDictSpeak(cur.term || cap.text, cur.lang));
 
@@ -912,4 +926,5 @@ window.pbpDictOnActionSwitch = () => {
 document.addEventListener("pbp:rendered", (e) => {
   const account = e && e.detail ? e.detail.account : "";
   _pbpDictOwner = pbpDictOwnerScope(account);
+  _pbpDictManualLang = ""; // language override is per-document, never carried over
 });
