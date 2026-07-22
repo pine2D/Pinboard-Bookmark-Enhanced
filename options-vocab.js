@@ -317,7 +317,10 @@ async function _pbpVocabSendAnki() {
     } else if (res.stage === "owner") {
       _pbpVocabFlashStatus(false, t("jinaFailed"));
     } else {
-      _pbpVocabFlashStatus(false, t("dictAnkiUnreachable"));
+      // Pipeline stages (deck/model/precheck/add) carry AnkiConnect's own
+      // error text; "unreachable" is only honest for the connection itself
+      // (mirrors the Eudic 400-message precedent).
+      _pbpVocabFlashStatus(false, res.error || t("dictAnkiUnreachable"));
     }
   } catch (_) {
     _pbpVocabFlashStatus(false, t("dictAnkiUnreachable"));

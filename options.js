@@ -553,9 +553,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     },
     archive: {
+      // Credentials live ONLY in skip: applyPanelReset iterates fields and
+      // never consults skip, so listing them in both cleared the S3 keys
+      // while the confirm dialog promised they were kept.
       fields: {
-        "opt-wayback-enabled": false, "opt-wayback-batch": false,
-        "opt-wayback-s3key": "", "opt-wayback-s3secret": ""
+        "opt-wayback-enabled": false, "opt-wayback-batch": false
       },
       skip: ["opt-wayback-s3key", "opt-wayback-s3secret"]
     },
