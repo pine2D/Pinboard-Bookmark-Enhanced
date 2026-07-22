@@ -2684,7 +2684,7 @@
     "message": "Импортировать файл"
   },
   "dictPackImporting": {
-    "message": "Импортировано записей: $N$…",
+    "message": "Импорт: $N$…",
     "placeholders": {
       "n": {
         "content": "$1"
@@ -2692,7 +2692,7 @@
     }
   },
   "dictPackDone": {
-    "message": "Импорт завершён: $N$ записей",
+    "message": "Импортировано: $N$",
     "placeholders": {
       "n": {
         "content": "$1"

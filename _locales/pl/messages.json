@@ -2684,7 +2684,7 @@
     "message": "Importuj plik"
   },
   "dictPackImporting": {
-    "message": "Zaimportowano $N$ wpisów…",
+    "message": "Importowanie: $N$…",
     "placeholders": {
       "n": {
         "content": "$1"
@@ -2692,7 +2692,7 @@
     }
   },
   "dictPackDone": {
-    "message": "Import zakończony: $N$ wpisów",
+    "message": "Zaimportowano: $N$",
     "placeholders": {
       "n": {
         "content": "$1"
@@ -2706,7 +2706,7 @@
     "message": "Nie zaimportowano. Pobierz CC-CEDICT z MDBG, a potem zaimportuj (CC BY-SA 4.0)."
   },
   "dictPackStatus": {
-    "message": "Zaimportowano $N$ wpisów · $DATE$",
+    "message": "Zaimportowano: $N$ · $DATE$",
     "placeholders": {
       "n": {
         "content": "$1"
