@@ -1,0 +1,668 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>options-vocab Tests</title>
+<link rel="stylesheet" href="../options.css">
+<style>
+body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px solid #ddd}.pass{color:#176}.fail{color:#b00}
+</style></head><body>
+<div id="panel-vocab" style="position:fixed;left:-9999px;top:0;width:800px">
+  <input type="search" id="vocab-search">
+  <select id="vocab-group-filter"><option value="">All</option></select>
+  <select id="vocab-sort"><option value="latest">Latest</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option></select>
+  <span id="vocab-count"></span>
+  <button id="vocab-select-all"></button><button id="vocab-invert-selection"></button>
+  <div id="vocab-batch-toolbar" hidden><span id="vocab-selected-count"></span><input id="vocab-group-input"><button id="vocab-add-group"></button><button id="vocab-batch-delete"></button></div>
+  <datalist id="vocab-group-list"></datalist><span id="vocab-status" class="save-status vocab-main-status" role="status" aria-live="polite"></span>
+  <div id="vocab-empty" hidden></div><div id="vocab-no-results" hidden></div>
+  <div id="vocab-list" aria-busy="false"></div><button class="vocab-load-more" id="vocab-load-more" hidden></button>
+  <input id="dict-anki-deck"><input id="dict-anki-port"><input id="dict-anki-key"><input id="dict-eudic-token">
+  <button id="vocab-export-btn">export</button><button id="vocab-anki-btn">anki</button><button id="vocab-eudic-btn">eudic</button>
+  <p id="dict-pack-status"></p><button id="dict-pack-open"></button><button id="dict-pack-import"></button>
+  <button id="dict-pack-delete" hidden></button><input type="file" id="dict-pack-file">
+</div>
+<div id="results"></div>
+<script>
+function t(key, ...values) { return key + (values.length ? ":" + values.join(",") : ""); }
+</script>
+<script src="../shared.js"></script>
+<script src="../md-dict.js"></script>
+<script src="../anki-connect.js"></script>
+<script src="../eudic-sync.js"></script>
+<script src="../dict-pack.js"></script>
+<script>pbpReadSettingsWithSecrets = async () => ({ pinboardToken: "" });</script>
+<script src="../options-vocab.js"></script>
+<script>
+const results = $id("results");
+let pass = 0, fail = 0;
+function check(name, condition, detail) {
+  const row = document.createElement("div");
+  const ok = !!condition;
+  ok ? pass++ : fail++;
+  row.className = "case " + (ok ? "pass" : "fail");
+  row.textContent = (ok ? "PASS " : "FAIL ") + name + (ok ? "" : "\n  " + (detail || ""));
+  results.appendChild(row);
+}
+function ids(rows) { return rows.map((row) => row.id).join(","); }
+
+const sample = [
+  { id:"a", term:"Défense", lemma:"défendre", gloss:"Protection", note:"Review soon", groups:["French A1"], contexts:[{quote:"La défense gagne.",articleTitle:"Match report"}], updatedAt:30 },
+  { id:"b", term:"word10", lemma:"", gloss:"Tenth item", note:"", groups:["Numbers"], contexts:[], updatedAt:10 },
+  { id:"c", term:"word2", lemma:"", gloss:"Second item", note:"", groups:[], contexts:[], updatedAt:20 }
+];
+
+const hostileOwner = "acct_%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E";
+const hostileOwnerLabel = typeof pbpVocabOwnerLabel === "function" ? pbpVocabOwnerLabel(hostileOwner) : "";
+if (typeof _vocabOwnerLabel !== "undefined") _vocabOwnerLabel = hostileOwnerLabel;
+_vocabRows = [];
+_pbpVocabApplyView(true);
+check("current-account total and empty state render the non-secret owner as text",
+  $id("vocab-count").textContent.includes("<img") && $id("vocab-empty").textContent.includes("<img") &&
+  !$id("vocab-count").querySelector("img") && !$id("vocab-empty").querySelector("img"));
+_pbpVocabClearVisibleState();
+check("account-switch clearing removes the previous owner scope before the next read",
+  !$id("vocab-count").textContent && $id("vocab-empty").hidden &&
+  (typeof _vocabOwnerLabel === "undefined" || !_vocabOwnerLabel));
+
+check("search matches term case-insensitively", ids(pbpVocabFilterSort(sample,"DÉFENSE","","latest")) === "a");
+check("search matches lemma", ids(pbpVocabFilterSort(sample,"défendre","","latest")) === "a");
+check("search matches gloss", ids(pbpVocabFilterSort(sample,"protection","","latest")) === "a");
+check("search matches note", ids(pbpVocabFilterSort(sample,"review soon","","latest")) === "a");
+check("search matches context quote", ids(pbpVocabFilterSort(sample,"gagne","","latest")) === "a");
+check("search matches article title", ids(pbpVocabFilterSort(sample,"match report","","latest")) === "a");
+check("search matches group names", ids(pbpVocabFilterSort(sample,"french a1","","latest")) === "a");
+check("group filter is exact", ids(pbpVocabFilterSort(sample,"","Numbers","latest")) === "b");
+check("search normalizes NFC", ids(pbpVocabFilterSort(sample,"De\u0301fense","","latest")) === "a");
+check("search folds Greek final sigma", pbpVocabSearchText("ΟΣ") === pbpVocabSearchText("οσ"));
+check("search folds German sharp s to ss", pbpVocabSearchText("Straße") === pbpVocabSearchText("STRASSE"));
+check("search folds capital sharp s", pbpVocabSearchText("ẞ") === "ss");
+check("search folds dotted capital I", pbpVocabSearchText("İstanbul") === pbpVocabSearchText("istanbul"));
+check("search preserves German umlaut distinctions", pbpVocabSearchText("schon") !== pbpVocabSearchText("schön"));
+check("search preserves Cyrillic diaeresis distinctions", pbpVocabSearchText("все") !== pbpVocabSearchText("всё"));
+check("search preserves Devanagari vowel marks", pbpVocabSearchText("क") !== pbpVocabSearchText("कि"));
+
+check("latest sort uses updatedAt descending", ids(pbpVocabFilterSort(sample,"","","latest")) === "a,c,b");
+check("oldest sort uses updatedAt ascending", ids(pbpVocabFilterSort(sample,"","","oldest")) === "b,c,a");
+check("A-Z sort uses numeric Intl.Collator order", ids(pbpVocabFilterSort(sample.slice(1),"","","az")) === "c,b");
+check("Z-A sort reverses collator order", ids(pbpVocabFilterSort(sample.slice(1),"","","za")) === "b,c");
+const tied = [{id:"x",term:"same",updatedAt:1},{id:"y",term:"same",updatedAt:1}];
+check("equal sort keys preserve source order", ids(pbpVocabFilterSort(tied,"","","az")) === "x,y");
+
+setStatusIcon($id("vocab-status"), false, "read failed");
+const errorColor = getComputedStyle($id("vocab-status")).color;
+check("shared status renderer marks an error host and icon as bad",
+  $id("vocab-status").classList.contains("bad") && !$id("vocab-status").classList.contains("ok") &&
+  $id("vocab-status").querySelector(".status-ic.bad"));
+setStatusIcon($id("vocab-status"), true, "saved");
+const successColor = getComputedStyle($id("vocab-status")).color;
+check("shared status renderer marks success as ok and keeps success/error colours distinct",
+  $id("vocab-status").classList.contains("ok") && !$id("vocab-status").classList.contains("bad") &&
+  $id("vocab-status").querySelector(".status-ic.ok") && successColor !== errorColor);
+
+_pbpVocabClearVisibleState();
+check("vocabulary loading is visible in the existing polite status region",
+  $id("vocab-status").textContent === "vocabLoading" &&
+  $id("vocab-status").getAttribute("role") === "status" &&
+  $id("vocab-status").getAttribute("aria-live") === "polite" &&
+  getComputedStyle($id("vocab-status")).display !== "none");
+check("vocabulary loading marks the production list busy",
+  $id("vocab-list").getAttribute("aria-busy") === "true");
+check("loading hides batch and load-more controls despite their production display rules",
+  $id("vocab-batch-toolbar").hidden && $id("vocab-load-more").hidden &&
+  getComputedStyle($id("vocab-batch-toolbar")).display === "none" &&
+  getComputedStyle($id("vocab-load-more")).display === "none");
+
+_pbpVocabSetLoading(false);
+_vocabRows = [];
+_pbpVocabApplyView(true);
+check("zero rows shows only the empty state and leaves paging and batching hidden",
+  !$id("vocab-empty").hidden && $id("vocab-no-results").hidden &&
+  $id("vocab-load-more").hidden && $id("vocab-batch-toolbar").hidden &&
+  getComputedStyle($id("vocab-load-more")).display === "none" &&
+  $id("vocab-list").getAttribute("aria-busy") === "false" && !$id("vocab-status").textContent);
+
+_vocabRows = sample.slice(0, 1);
+_pbpVocabApplyView(true);
+check("one row renders one reachable card without empty, no-result, paging or batch UI",
+  $id("vocab-list").querySelectorAll(".vocab-card").length === 1 &&
+  $id("vocab-empty").hidden && $id("vocab-no-results").hidden &&
+  $id("vocab-load-more").hidden && $id("vocab-batch-toolbar").hidden);
+
+_vocabRows = Array.from({length:100}, (_, i) => ({id:"hundred"+i,term:"word"+i,updatedAt:i,groups:[],contexts:[]}));
+_pbpVocabApplyView(true);
+check("exactly 100 rows fills one render batch without exposing Load more",
+  $id("vocab-list").querySelectorAll(".vocab-card").length === 100 &&
+  $id("vocab-load-more").hidden && getComputedStyle($id("vocab-load-more")).display === "none");
+
+_pbpVocabClearVisibleState();
+_pbpVocabSetLoading(false);
+_pbpVocabFlashStatus(false, "read failed");
+check("read-error state clears busy, stays visibly bad and keeps data actions hidden",
+  $id("vocab-list").getAttribute("aria-busy") === "false" &&
+  $id("vocab-status").classList.contains("bad") && $id("vocab-status").textContent.includes("read failed") &&
+  getComputedStyle($id("vocab-batch-toolbar")).display === "none" &&
+  getComputedStyle($id("vocab-load-more")).display === "none");
+
+function channel(value) {
+  const n = value / 255;
+  return n <= 0.04045 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4);
+}
+function luminance(rgb) {
+  const values = (rgb.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+  return 0.2126 * channel(values[0]) + 0.7152 * channel(values[1]) + 0.0722 * channel(values[2]);
+}
+function contrastRatio(a, b) {
+  const la = luminance(a), lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+const contrastFixture = document.createElement("div");
+contrastFixture.className = "panel active";
+contrastFixture.innerHTML = '<div class="vocab-details-body"><p class="hint">CC-CEDICT capability hint</p></div>';
+$id("panel-vocab").appendChild(contrastFixture);
+document.documentElement.dataset.theme = "flexoki-dark";
+const contrastHint = contrastFixture.querySelector(".hint");
+const packHintRatio = contrastRatio(getComputedStyle(contrastHint).color, getComputedStyle(contrastFixture).backgroundColor);
+check("Flexoki dark CC-CEDICT hint reaches WCAG AA contrast",
+  packHintRatio >= 4.5, "contrast=" + packHintRatio.toFixed(3));
+contrastFixture.remove();
+delete document.documentElement.dataset.theme;
+
+let selected = pbpVocabSelectResults(new Set(), sample.slice(0,2), "all");
+check("select-all selects every current result", selected.size === 2 && selected.has("a") && selected.has("b"));
+selected = pbpVocabSelectResults(selected, sample.slice(1), "invert");
+check("invert removes a selected current result", !selected.has("b"));
+check("invert adds an unselected current result", selected.has("c"));
+selected = pbpVocabSelectResults(new Set(["hidden"]), sample.slice(0,1), "invert");
+check("invert does not act on rows outside current results", selected.has("hidden") && selected.has("a"));
+
+selected = pbpVocabSelectRange(new Set(), sample, "a", "c", true);
+check("Shift range selects the forward closed interval", selected.size === 3);
+check("Shift range includes its anchor", selected.has("a"));
+check("Shift range includes its target", selected.has("c"));
+selected = pbpVocabSelectRange(new Set(), sample, "c", "a", true);
+check("Shift range works in reverse order", selected.size === 3 && selected.has("b"));
+selected = pbpVocabSelectRange(selected, sample, "a", "b", false);
+check("Shift uncheck removes the closed interval", !selected.has("a") && !selected.has("b") && selected.has("c"));
+selected = pbpVocabSelectRange(new Set(), sample, "missing", "b", true);
+check("missing Shift anchor falls back to the target", selected.size === 1 && selected.has("b"));
+
+_vocabRows = sample;
+_pbpVocabRefreshGroupOptions(false);
+_pbpVocabApplyView(true);
+_pbpVocabClearSelection();
+const renderedChecks = [...$id("vocab-list").querySelectorAll(".vocab-row-select")];
+check("production row checkbox has an accessible name", renderedChecks.every((checkbox) => checkbox.getAttribute("aria-label")));
+const unknownLanguageRow = _pbpVocabBuildRow({
+  id:"unknown-language", term:"mystery", language:"und", gloss:"", groups:[], contexts:[]
+}, 999);
+check("production vocabulary row hides the unknown language code",
+  !unknownLanguageRow.querySelector(".notes-row-meta").textContent.includes("UND"));
+renderedChecks[0].click();
+check("real row checkbox click establishes the selection anchor", _vocabSelected.size === 1);
+renderedChecks[2].dispatchEvent(new MouseEvent("click", { bubbles:true, cancelable:true, shiftKey:true }));
+check("real Shift-click selects the complete current-view interval", _vocabSelected.size === 3);
+_vocabSelected = new Set(["a"]);
+_pbpVocabSyncSelectionUi();
+check("fixture starts with a selected result", _vocabSelected.size === 1);
+$id("vocab-search").value = "word";
+$id("vocab-search").dispatchEvent(new Event("input", { bubbles:true }));
+check("filter input clears selection", _vocabSelected.size === 0);
+check("filter input rebuilds current result boundary", ids(_vocabViewRows) === "c,b");
+
+_vocabRows = Array.from({length:5000}, (_, i) => ({id:"id"+i,term:"word"+i,updatedAt:5000-i,groups:[],contexts:[]}));
+$id("vocab-search").value = "";
+$id("vocab-group-filter").value = "";
+$id("vocab-sort").value = "latest";
+_pbpVocabClearSelection();
+_pbpVocabApplyView(true);
+check("5000 rows remain in the in-memory result set", _vocabViewRows.length === 5000);
+check("initial large-list DOM is capped at 100 cards", $id("vocab-list").querySelectorAll(".vocab-card").length === 100);
+check("large-list render exposes Load more", !$id("vocab-load-more").hidden);
+check("result count reports all 5000 matches rather than 100 rendered cards", $id("vocab-count").textContent.startsWith("vocabResultCount:5000,5000"));
+const firstLargeCard = $id("vocab-list").firstElementChild;
+firstLargeCard.querySelector(".notes-card-head").click();
+_vocabSelected = pbpVocabSelectResults(new Set(), _vocabViewRows, "all");
+_pbpVocabSyncSelectionUi();
+$id("vocab-load-more").click();
+check("first Load more appends the next 100 cards", $id("vocab-list").children.length === 200);
+check("Load more preserves the identity of earlier DOM nodes", $id("vocab-list").firstElementChild === firstLargeCard);
+check("Load more preserves an earlier card's expanded state", firstLargeCard.querySelector(".notes-card-head").getAttribute("aria-expanded") === "true" && !firstLargeCard.querySelector(".notes-card-body").hidden);
+$id("vocab-load-more").click();
+check("a second Load more appends another chunk", $id("vocab-list").children.length === 300);
+check("selection still covers all filtered results beyond rendered chunks", _vocabSelected.size === 5000);
+
+(async () => {
+  const task = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const realBatchDelete = pbpVocabBatchDelete;
+  const realBatchAddGroup = pbpVocabBatchAddGroup;
+  const realReload = _pbpVocabReloadAfterMutation;
+  async function prepareSelection() {
+    if (document.querySelector(".confirm-popover")) document.querySelector(".confirm-no").click();
+    $id("vocab-status").textContent = "";
+    $id("vocab-search").value = "";
+    $id("vocab-group-filter").value = "";
+    $id("vocab-sort").value = "latest";
+    _vocabRows = sample;
+    _pbpVocabApplyView(true);
+    _vocabSelected = new Set(_vocabViewRows.map((row) => row.id));
+    _pbpVocabSyncSelectionUi();
+    await task();
+  }
+  try {
+    await prepareSelection();
+    let deleteCalls = 0;
+    pbpVocabBatchDelete = async () => { deleteCalls++; return true; };
+    _pbpVocabReloadAfterMutation = async () => true;
+    _pbpVocabBatchDeleteSelected();
+    const staleConfirm = document.querySelector(".confirm-popover");
+    check("batch delete uses the production confirmation popover with captured count", !!staleConfirm && staleConfirm.getAttribute("role") === "dialog" && staleConfirm.textContent.includes("3"));
+    $id("vocab-search").value = "no-match";
+    $id("vocab-search").dispatchEvent(new Event("input", { bubbles:true }));
+    staleConfirm.querySelector(".confirm-yes").click();
+    await task();
+    check("stale confirmation never dispatches the captured mutation", deleteCalls === 0);
+    check("stale confirmation reports the changed selection and focuses visible search", $id("vocab-status").textContent.includes("vocabSelectionChanged") && document.activeElement === $id("vocab-search") && !$id("vocab-search").closest("[hidden]"));
+
+    await prepareSelection();
+    deleteCalls = 0;
+    pbpVocabBatchDelete = async () => { deleteCalls++; return true; };
+    _pbpVocabReloadAfterMutation = async () => false;
+    _pbpVocabBatchDeleteSelected();
+    document.querySelector(".confirm-yes").click();
+    await task(); await task();
+    check("refresh failure does not retry a successful delete mutation", deleteCalls === 1);
+    check("refresh failure reports saved data instead of claiming no changes", $id("vocab-status").textContent.includes("vocabRefreshFailed") && !$id("vocab-status").textContent.includes("vocabBatchFailed"));
+    check("successful mutation with refresh failure moves focus to visible search", document.activeElement === $id("vocab-search") && !$id("vocab-search").closest("[hidden]"));
+
+    await prepareSelection();
+    pbpVocabBatchDelete = async () => true;
+    _pbpVocabReloadAfterMutation = async () => true;
+    _pbpVocabBatchDeleteSelected();
+    document.querySelector(".confirm-yes").click();
+    await task(); await task();
+    check("successful batch delete moves focus to visible search", document.activeElement === $id("vocab-search") && !$id("vocab-search").closest("[hidden]"));
+
+    await prepareSelection();
+    $id("vocab-group-input").value = "Study";
+    _pbpVocabSyncSelectionUi();
+    pbpVocabBatchAddGroup = async () => true;
+    _pbpVocabReloadAfterMutation = async () => true;
+    $id("vocab-add-group").focus();
+    await _pbpVocabAddSelectedToGroup();
+    check("successful batch add-group moves focus to visible search", document.activeElement === $id("vocab-search") && !$id("vocab-search").closest("[hidden]"));
+  } finally {
+    pbpVocabBatchDelete = realBatchDelete;
+    pbpVocabBatchAddGroup = realBatchAddGroup;
+    _pbpVocabReloadAfterMutation = realReload;
+  }
+
+  // Real mutation/reload orchestration: each read snapshots the mock IDB at
+  // call time, matching IndexedDB getAll semantics. Holding the first read
+  // reproduces the audited race where an older snapshot resolves last.
+  const raceRealDelete = pbpVocabDelete;
+  const raceRealBatchDelete = pbpVocabBatchDelete;
+  const raceRealAddGroup = pbpVocabBatchAddGroup;
+  const raceRealOwner = pbpVocabCurrentOwner;
+  const raceRealAll = pbpVocabAll;
+  const raceOwner = "acct_race";
+  const raceSeedRows = () => [
+    { id:"a", owner:raceOwner, term:"alpha", groups:[], contexts:[], updatedAt:30 },
+    { id:"b", owner:raceOwner, term:"beta", groups:[], contexts:[], updatedAt:20 },
+    { id:"c", owner:raceOwner, term:"gamma", groups:[], contexts:[], updatedAt:10 }
+  ];
+  let raceStore = [];
+  let raceRead = null;
+  const cloneRows = (rows) => rows.map((row) => ({ ...row, groups:[...(row.groups || [])], contexts:[...(row.contexts || [])] }));
+  const seedRaceUi = () => {
+    raceStore = raceSeedRows();
+    $id("vocab-search").value = "";
+    $id("vocab-group-filter").value = "";
+    $id("vocab-sort").value = "latest";
+    $id("vocab-group-input").value = "";
+    $id("vocab-status").textContent = "";
+    _vocabRows = cloneRows(raceStore);
+    _pbpVocabClearSelection();
+    _pbpVocabSetLoading(false);
+    _pbpVocabApplyView(true);
+  };
+  const armHeldFirstRead = () => {
+    let release;
+    let markStarted;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const started = new Promise((resolve) => { markStarted = resolve; });
+    let reads = 0;
+    raceRead = async () => {
+      const snapshot = cloneRows(raceStore);
+      reads++;
+      if (reads === 1) {
+        markStarted();
+        await gate;
+      }
+      return snapshot;
+    };
+    return { started, release };
+  };
+  const waitFor = async (predicate, label) => {
+    for (let i = 0; i < 80; i++) {
+      if (predicate()) return;
+      await task();
+    }
+    throw new Error("timed out waiting for " + label);
+  };
+  const confirmSingleDelete = (row) => {
+    const anchor = document.createElement("button");
+    anchor.textContent = "delete " + row.id;
+    document.body.appendChild(anchor);
+    _pbpVocabDeleteRow(row, anchor);
+    const yes = document.querySelector(".confirm-popover .confirm-yes");
+    if (!yes) throw new Error("single delete confirmation missing");
+    yes.click();
+    anchor.remove();
+  };
+  try {
+    pbpVocabCurrentOwner = async () => raceOwner;
+    pbpVocabAll = async () => raceRead();
+    pbpVocabDelete = async (id, owner) => {
+      if (owner !== raceOwner) return false;
+      raceStore = raceStore.filter((row) => row.id !== id);
+      return true;
+    };
+    pbpVocabBatchDelete = async (ids, owner) => {
+      if (owner !== raceOwner) return false;
+      const doomed = new Set(ids);
+      raceStore = raceStore.filter((row) => !doomed.has(row.id));
+      return true;
+    };
+    pbpVocabBatchAddGroup = async (ids, owner, group) => {
+      if (owner !== raceOwner) return false;
+      const selectedIds = new Set(ids);
+      raceStore = raceStore.map((row) => selectedIds.has(row.id)
+        ? { ...row, groups:[...new Set([...(row.groups || []), group])] } : row);
+      return true;
+    };
+
+    seedRaceUi();
+    let held = armHeldFirstRead();
+    confirmSingleDelete(raceStore.find((row) => row.id === "a"));
+    await held.started;
+    confirmSingleDelete(raceStore.find((row) => row.id === "b"));
+    await waitFor(() => ids(_vocabRows) === "c", "newer single-delete reload");
+    held.release();
+    await task(); await task();
+    check("overlapping single deletes leave the mock IDB without B", ids(raceStore) === "c");
+    check("an older delayed delete snapshot cannot restore B to the UI", ids(_vocabRows) === "c");
+
+    seedRaceUi();
+    held = armHeldFirstRead();
+    let deleteAttempt = 0;
+    pbpVocabDelete = async (id, owner) => {
+      if (owner !== raceOwner) return false;
+      deleteAttempt++;
+      if (deleteAttempt === 2) return false;
+      raceStore = raceStore.filter((row) => row.id !== id);
+      return true;
+    };
+    confirmSingleDelete(raceStore.find((row) => row.id === "a"));
+    await held.started;
+    confirmSingleDelete(raceStore.find((row) => row.id === "b"));
+    await waitFor(() => ids(_vocabRows) === "b,c" && $id("vocab-status").textContent.includes("dictDeleteFailed"), "failed newer delete reconcile");
+    held.release();
+    await task(); await task();
+    check("a later failed mutation preserves the true mock IDB state", ids(raceStore) === "b,c");
+    check("a later failed mutation still reconciles the UI from the mock IDB", ids(_vocabRows) === "b,c");
+    check("the latest failed mutation keeps its accurate failure status", $id("vocab-status").textContent.includes("dictDeleteFailed"));
+
+    pbpVocabDelete = async (id, owner) => {
+      if (owner !== raceOwner) return false;
+      raceStore = raceStore.filter((row) => row.id !== id);
+      return true;
+    };
+    seedRaceUi();
+    held = armHeldFirstRead();
+    _vocabSelected = new Set(["a"]);
+    _pbpVocabSyncSelectionUi();
+    _pbpVocabBatchDeleteSelected();
+    document.querySelector(".confirm-popover .confirm-yes").click();
+    await held.started;
+    confirmSingleDelete(raceStore.find((row) => row.id === "b"));
+    await waitFor(() => ids(_vocabRows) === "c", "single delete after batch delete");
+    held.release();
+    await waitFor(() => !_vocabBatchBusy, "older batch cleanup");
+    check("batch-delete and single-delete interleave leaves the mock IDB truthful", ids(raceStore) === "c");
+    check("a delayed batch snapshot cannot overwrite the later single-delete UI", ids(_vocabRows) === "c");
+
+    seedRaceUi();
+    held = armHeldFirstRead();
+    _vocabSelected = new Set(["a"]);
+    $id("vocab-group-input").value = "Study";
+    _pbpVocabSyncSelectionUi();
+    const grouping = _pbpVocabAddSelectedToGroup();
+    await held.started;
+    confirmSingleDelete(raceStore.find((row) => row.id === "b"));
+    await waitFor(() => ids(_vocabRows) === "a,c" && (_vocabRows[0].groups || []).includes("Study"), "single delete after add-group");
+    held.release();
+    await grouping;
+    check("add-group and single-delete interleave preserves both mock IDB mutations",
+      ids(raceStore) === "a,c" && (raceStore[0].groups || []).includes("Study"));
+    check("a delayed add-group snapshot cannot restore the later deleted row",
+      ids(_vocabRows) === "a,c" && (_vocabRows[0].groups || []).includes("Study"));
+  } finally {
+    pbpVocabDelete = raceRealDelete;
+    pbpVocabBatchDelete = raceRealBatchDelete;
+    pbpVocabBatchAddGroup = raceRealAddGroup;
+    pbpVocabCurrentOwner = raceRealOwner;
+    pbpVocabAll = raceRealAll;
+  }
+
+  const realPackMeta = pbpPackMeta;
+  const realPackDelete = pbpPackDelete;
+  try {
+    pbpPackMeta = async () => ({ state:"error" });
+    await _pbpPackRefreshStatus();
+    check("pack metadata read failure is not presented as an empty pack",
+      $id("dict-pack-status").textContent === "dictPackReadFailed" &&
+      $id("dict-pack-status").textContent !== "dictPackEmpty");
+
+    pbpPackDelete = async () => { throw new Error("delete failed"); };
+    $id("dict-pack-delete").hidden = false;
+    $id("dict-pack-delete").click();
+    document.querySelector(".confirm-yes").click();
+    await task(); await task();
+    check("pack delete rejection remains visible instead of being swallowed",
+      $id("dict-pack-status").textContent === "dictPackDeleteFailed");
+  } finally {
+    pbpPackMeta = realPackMeta;
+    pbpPackDelete = realPackDelete;
+  }
+
+  const realOwner = pbpVocabCurrentOwner;
+  const realAll = pbpVocabAll;
+  const realTsv = pbpDictTsv;
+  const realAnkiCall = pbpAnkiCall;
+  const realAnkiSendRows = pbpAnkiSendRows;
+  const realEudicSendRows = pbpEudicSendRows;
+  const realChrome = window.chrome;
+  const realFlush = window.pbpOptionsFlushAutoSave;
+  const realReadSettings = pbpReadSettingsWithSecrets;
+  const realAnchorClick = HTMLAnchorElement.prototype.click;
+  const actionRows = [
+    { id:"all-en", term:"all-en", language:"en", contexts:[] },
+    { id:"all-fr", term:"all-fr", language:"fr", contexts:[] },
+    { id:"all-zh", term:"all-zh", language:"zh", contexts:[] }
+  ];
+  const resetActions = () => {
+    $id("vocab-status").textContent = "";
+    _vocabSelected = new Set(["all-en"]);
+    window.chrome = { permissions: { request: async () => true } };
+    window.pbpOptionsFlushAutoSave = async () => ({ ok:true });
+    pbpReadSettingsWithSecrets = async () => ({
+      pinboardToken:"alice:secret", dictAnkiPort:"8765", dictAnkiDeck:"Deck",
+      dictAnkiKey:"", dictEudicToken:"token"
+    });
+    pbpVocabCurrentOwner = async () => "acct_alice";
+    pbpVocabAll = async () => actionRows;
+    pbpAnkiCall = async () => ({ ok:true, result:{ permission:"granted", version:6 } });
+    pbpAnkiSendRows = async () => ({ stage:"done", added:3, skipped:0, failed:0, error:null });
+    pbpEudicSendRows = async () => ({ stage:"done", added:2, skipped:0, unsupported:1, failed:0, forbidden:false, generic:false, error:null });
+  };
+  try {
+    HTMLAnchorElement.prototype.click = () => {};
+    resetActions();
+    let exportedRows = null;
+    pbpDictTsv = (rows) => { exportedRows = rows; return "tsv"; };
+    await _pbpVocabExport();
+    check("Export all uses every current-owner row rather than the selection", exportedRows?.length === 3);
+
+    resetActions();
+    window.pbpOptionsFlushAutoSave = async () => ({ ok:false });
+    await _pbpVocabExport();
+    check("export reports settings-save failure accurately", $id("vocab-status").textContent.includes("vocabSettingsSaveFailed"));
+
+    resetActions();
+    pbpVocabAll = async () => { throw new Error("read failed"); };
+    await _pbpVocabExport();
+    check("export failure uses its own recovery message", $id("vocab-status").textContent.includes("vocabExportFailed"));
+
+    resetActions();
+    let ownerRead = 0;
+    pbpVocabCurrentOwner = async () => (++ownerRead === 1 ? "acct_alice" : "acct_bob");
+    await _pbpVocabExport();
+    check("export aborts an account switch with an account-specific message", $id("vocab-status").textContent.includes("vocabAccountChanged"));
+
+    resetActions();
+    window.chrome.permissions.request = async () => false;
+    await _pbpVocabSendAnki();
+    check("Anki host-permission denial is distinct from an unreachable add-on", $id("vocab-status").textContent.includes("dictAnkiHostPermissionDenied"));
+
+    resetActions();
+    pbpAnkiCall = async () => ({ ok:false, result:null, error:"unreachable" });
+    await _pbpVocabSendAnki();
+    check("AnkiConnect permission check failure has a dedicated message", $id("vocab-status").textContent.includes("dictAnkiConnectPermissionFailed"));
+
+    resetActions();
+    pbpAnkiCall = async () => ({ ok:true, result:{ permission:"denied", version:6 } });
+    await _pbpVocabSendAnki();
+    check("AnkiConnect permission denial is reported separately", $id("vocab-status").textContent.includes("dictAnkiConnectPermissionDenied"));
+
+    resetActions();
+    pbpAnkiCall = async () => ({ ok:true, result:{ permission:"granted", version:5 } });
+    await _pbpVocabSendAnki();
+    check("unsupported AnkiConnect API version is reported separately", $id("vocab-status").textContent.includes("dictAnkiVersionUnsupported"));
+
+    resetActions();
+    pbpAnkiCall = async () => ({ ok:true, result:{ permission:"granted" } });
+    await _pbpVocabSendAnki();
+    check("missing AnkiConnect API version is treated as unsupported", $id("vocab-status").textContent.includes("dictAnkiVersionUnsupported"));
+
+    resetActions();
+    pbpAnkiSendRows = async () => ({ stage:"modelMismatch", error:"model fields incompatible" });
+    await _pbpVocabSendAnki();
+    check("Anki note-type field mismatch keeps its repair guidance", $id("vocab-status").textContent.includes("dictAnkiModelMismatch"));
+
+    resetActions();
+    pbpAnkiSendRows = async () => ({ stage:"modelFields", error:"field query failed" });
+    await _pbpVocabSendAnki();
+    check("Anki field-query failure is not mislabeled as a field mismatch", $id("vocab-status").textContent.includes("dictAnkiFieldCheckFailed"));
+
+    resetActions();
+    let ankiRows = null;
+    pbpAnkiSendRows = async (rows) => { ankiRows = rows; return { stage:"done", added:3, skipped:0, failed:0 }; };
+    await _pbpVocabSendAnki();
+    check("Send all to Anki passes every current-owner row rather than the selection", ankiRows?.length === 3);
+
+    resetActions();
+    let eudicRows = null;
+    pbpEudicSendRows = async (rows) => { eudicRows = rows; return { stage:"done", added:2, skipped:0, unsupported:1, failed:0, forbidden:false, generic:false }; };
+    await _pbpVocabSendEudic();
+    check("Eudic receives all current-owner rows and applies supported-language filtering downstream", eudicRows?.length === 3);
+
+    resetActions();
+    pbpEudicSendRows = async () => ({ stage:"done", added:0, skipped:0, unsupported:0, failed:3, forbidden:true, generic:false });
+    await _pbpVocabSendEudic();
+    check("Eudic 403 uses the request-rejected recovery message", $id("vocab-status").textContent.includes("dictEudicRejected"));
+
+    resetActions();
+    pbpEudicSendRows = async () => ({ stage:"done", added:0, skipped:0, unsupported:0, failed:3, forbidden:false, generic:false, error:null });
+    await _pbpVocabSendEudic();
+    check("generic Eudic failure no longer reuses a Jina conversion error", $id("vocab-status").textContent.includes("dictEudicFailed"));
+
+    resetActions();
+    pbpVocabCurrentOwner = async () => { throw new Error("owner read failed"); };
+    await renderVocabPanel();
+    check("vocabulary load failure uses its own message", $id("vocab-status").textContent.includes("vocabLoadFailed"));
+  } finally {
+    pbpVocabCurrentOwner = realOwner;
+    pbpVocabAll = realAll;
+    pbpDictTsv = realTsv;
+    pbpAnkiCall = realAnkiCall;
+    pbpAnkiSendRows = realAnkiSendRows;
+    pbpEudicSendRows = realEudicSendRows;
+    if (realChrome === undefined) delete window.chrome; else window.chrome = realChrome;
+    if (realFlush === undefined) delete window.pbpOptionsFlushAutoSave; else window.pbpOptionsFlushAutoSave = realFlush;
+    pbpReadSettingsWithSecrets = realReadSettings;
+    HTMLAnchorElement.prototype.click = realAnchorClick;
+  }
+
+  const locales = ["en","de","fr","pl","ru","zh_HK","zh_CN","zh_TW","ja"];
+  const messages = {};
+  for (const locale of locales) messages[locale] = await (await fetch(`../_locales/${locale}/messages.json`)).json();
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "width:320px;height:800px;border:0";
+  frame.srcdoc = `<!doctype html><html data-options-ready data-theme="github-light"><head><link rel="stylesheet" href="../options.css"></head><body>
+    <main class="container"><section class="panel active" id="panel-vocab">
+      <div class="notes-toolbar vocab-filter-toolbar"><input type="search"><select><option></option></select><select><option></option></select></div>
+      <div class="vocab-summary-row"><span class="notes-count">5000</span><div class="vocab-selection-actions"><button class="btn btn-sm" data-label="all"></button><button class="btn btn-sm" data-label="invert"></button></div></div>
+      <div class="vocab-batch-toolbar"><span class="notes-count">5000</span><input type="text"><button class="btn btn-sm" data-label="add"></button><button class="btn btn-sm danger" data-label="batch-delete"></button></div>
+      <article class="notes-card vocab-card"><div class="notes-card-top"><input class="vocab-row-select" type="checkbox"><button class="notes-card-head"><span class="notes-card-main"><span class="notes-row-title">Wortzusammensetzung mit außergewöhnlich langem ausgewähltem Begriff</span><span class="notes-row-meta"><span class="notes-meta-chip">Außergewöhnlich lange Definition und Gruppe</span></span></span></button><button class="btn btn-sm notes-row-del" data-label="remove"></button></div></article>
+    </section></main></body></html>`;
+  document.body.appendChild(frame);
+  await new Promise((resolve) => frame.addEventListener("load", resolve, { once:true }));
+  const overflows = [], unreachable = [];
+  let germanLongCountFits = false;
+  for (const width of [320, 360, 1280]) {
+    frame.style.width = width + "px";
+    for (const theme of ["github-light", "flexoki-dark"]) {
+      frame.contentDocument.documentElement.dataset.theme = theme;
+      for (const locale of locales) {
+        const doc = frame.contentDocument, m = messages[locale], panel = doc.getElementById("panel-vocab");
+        doc.documentElement.lang = locale;
+        panel.querySelector('[data-label="all"]').textContent = m.vocabSelectAll.message;
+        panel.querySelector('[data-label="invert"]').textContent = m.vocabInvertSelection.message;
+        panel.querySelector('[data-label="add"]').textContent = m.vocabAddToGroup.message;
+        panel.querySelector('[data-label="batch-delete"]').textContent = m.vocabBatchDelete.message;
+        panel.querySelector('[data-label="remove"]').textContent = m.delete.message;
+        panel.querySelector(".vocab-summary-row > .notes-count").textContent = m.vocabResultCount.message
+          .replace("$RESULTS$", "5000").replace("$TOTAL$", "5000");
+        panel.querySelector('input[type="text"]').placeholder = m.vocabGroupNamePlaceholder.message;
+        panel.querySelectorAll("select option")[0].textContent = m.vocabAllGroups.message;
+        panel.querySelectorAll("select option")[1].textContent = m.vocabSortLatest.message;
+        await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
+        if (width === 320 && theme === "github-light" && locale === "de") {
+          const count = panel.querySelector(".vocab-summary-row > .notes-count");
+          const style = frame.contentWindow.getComputedStyle(count);
+          germanLongCountFits = style.whiteSpace === "normal" && style.minWidth === "0px" &&
+            count.scrollWidth <= count.clientWidth + 1;
+        }
+        if (panel.scrollWidth > panel.clientWidth + 1) {
+          const panelRect = panel.getBoundingClientRect();
+          const offenders = [...panel.querySelectorAll("*")].filter((el) => el.getBoundingClientRect().right > panelRect.right + 0.5)
+            .slice(0, 3).map((el) => `${el.className || el.tagName}:${el.getBoundingClientRect().right.toFixed(1)}`);
+          overflows.push(`${width}/${theme}/${locale}:${panel.scrollWidth}>${panel.clientWidth}[${offenders.join(",")}]`);
+        }
+        const panelRect = panel.getBoundingClientRect();
+        for (const el of panel.querySelectorAll("input, select, button")) {
+          const rect = el.getBoundingClientRect();
+          if (rect.left < panelRect.left - 0.5 || rect.right > panelRect.right + 0.5)
+            unreachable.push(`${width}/${theme}/${locale}/${el.dataset.label || el.tagName}:${rect.left.toFixed(1)}-${rect.right.toFixed(1)}`);
+        }
+      }
+    }
+  }
+  check("production CSS keeps 320/360/1280 vocabulary layouts overflow-free across 9 locales and light/dark",
+    overflows.length === 0, overflows.slice(0, 8).join("; "));
+  check("production CSS keeps delete, expand and all other controls reachable across the viewport matrix",
+    unreachable.length === 0, unreachable.slice(0, 8).join("; "));
+  check("production CSS lets the 320px German 5000-row count wrap within its flex component",
+    germanLongCountFits, "vocab count scrollWidth exceeded clientWidth");
+  frame.remove();
+  document.title = fail ? "FAIL options-vocab Tests" : "PASS options-vocab Tests";
+})();
+</script></body></html>

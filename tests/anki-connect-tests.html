@@ -81,6 +81,31 @@ section("pbpAnkiModelDef");
 const md = pbpAnkiModelDef();
 assert(md.modelName === "Pinboard Vocab" && md.inOrderFields.join(",") === "Term,Reading,Definition,Context,Source,License", "model def fields in contract order");
 
-document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
+(async () => {
+  section("pbpAnkiSendRows model-field diagnosis");
+  const realCall = pbpAnkiCall;
+  try {
+    pbpAnkiCall = async (action) => {
+      if (action === "createDeck") return { ok:true, result:null };
+      if (action === "modelNames") return { ok:true, result:["Pinboard Vocab"] };
+      if (action === "modelFieldNames") return { ok:false, result:null, error:"query failed" };
+      throw new Error("unexpected action " + action);
+    };
+    const queryFailure = await pbpAnkiSendRows([{ term:"word" }], { deck:"Deck", ownerCheck:async () => true });
+    assert(queryFailure.stage === "modelFields", "modelFieldNames request failure has a distinct stage");
+
+    pbpAnkiCall = async (action) => {
+      if (action === "createDeck") return { ok:true, result:null };
+      if (action === "modelNames") return { ok:true, result:["Pinboard Vocab"] };
+      if (action === "modelFieldNames") return { ok:true, result:["Term"] };
+      throw new Error("unexpected action " + action);
+    };
+    const mismatch = await pbpAnkiSendRows([{ term:"word" }], { deck:"Deck", ownerCheck:async () => true });
+    assert(mismatch.stage === "modelMismatch", "successful field query with incompatible fields stays modelMismatch");
+  } finally {
+    pbpAnkiCall = realCall;
+  }
+  document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
+})();
 </script>
 </body></html>

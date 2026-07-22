@@ -3971,6 +3971,402 @@ suiteIf("pbpTrIsTypingContext", "pbpTrIsTypingContext", () => {
     assertEq(pbpTrIsTypingContext(null, false), false, "null tag, not editable");
   });
 });
+
+suite("translation view shortcuts and anchors", () => {
+  test("v cycles original -> bilingual -> translated -> original", () => {
+    assertEq(pbpTrNextMode("original"), "bilingual", "original");
+    assertEq(pbpTrNextMode("bilingual"), "translated", "bilingual");
+    assertEq(pbpTrNextMode("translated"), "original", "translated");
+  });
+  test("single-key gate accepts an unmodified key outside editable/raw contexts", () => {
+    assertEq(pbpTrSingleKeyAllowed({}, "DIV", false, false), true, "plain article key");
+  });
+  test("single-key gate rejects Ctrl/Meta/Alt/Shift uniformly", () => {
+    for (const key of ["ctrlKey", "metaKey", "altKey", "shiftKey"]) {
+      assertEq(pbpTrSingleKeyAllowed({ [key]: true }, "DIV", false, false), false, key);
+    }
+  });
+  test("single-key gate rejects typing and raw-view contexts", () => {
+    assertEq(pbpTrSingleKeyAllowed({}, "INPUT", false, false), false, "input");
+    assertEq(pbpTrSingleKeyAllowed({}, "DIV", true, false), false, "contenteditable");
+    assertEq(pbpTrSingleKeyAllowed({}, "DIV", false, true), false, "raw view");
+  });
+  test("t trigger does not restart running or completed translation", () => {
+    const realStart = window._pbpTrStart;
+    let starts = 0, expands = 0;
+    window._pbpTrStart = () => { starts++; return Promise.resolve(); };
+    try {
+      _pbpTrTrigger({ running: true, status: "translating", railHandle: { expand: () => { expands++; } } });
+      assertEq(starts, 0, "running start count");
+      assertEq(expands, 0, "running expand count");
+      _pbpTrTrigger({ running: false, status: "done", railHandle: { expand: () => { expands++; } } });
+      assertEq(starts, 0, "completed start count");
+      assertEq(expands, 1, "completed section expands");
+    } finally {
+      window._pbpTrStart = realStart;
+    }
+  });
+  test("view anchor preserves translated side and fraction inside the block", () => {
+    const anchor = pbpTrViewAnchorPick([
+      { n: 1, side: "orig", top: -300, bottom: -50 },
+      { n: 1, side: "tr", top: -50, bottom: 150 },
+      { n: 2, side: "orig", top: 150, bottom: 350 }
+    ]);
+    assertEq(anchor.n, 1, "block");
+    assertEq(anchor.side, "tr", "side");
+    assertEq(Math.round(anchor.frac * 100), 25, "fraction");
+  });
+  test("view anchor ignores zero-height candidates and falls back to the last past block", () => {
+    const anchor = pbpTrViewAnchorPick([
+      { n: 1, side: "orig", top: 0, bottom: 0 },
+      { n: 2, side: "orig", top: -400, bottom: -200 },
+      { n: 2, side: "tr", top: -200, bottom: -20 }
+    ]);
+    assertEq(anchor.n, 2, "last block");
+    assertEq(anchor.side, "tr", "last visible side");
+    assertEq(anchor.frac, 1, "fully past");
+  });
+  test("view anchor target follows mode and preserves translated side in bilingual mode", () => {
+    const wrap = document.createElement("div");
+    const orig = document.createElement("p");
+    orig.dataset.pb = "7";
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    wrap.append(orig, tr);
+    assertEq(pbpTrViewAnchorTarget(orig, "original", "tr"), orig, "original target");
+    assertEq(pbpTrViewAnchorTarget(orig, "bilingual", "tr"), tr, "bilingual translated target");
+    assertEq(pbpTrViewAnchorTarget(orig, "translated", "orig"), tr, "translated target");
+  });
+  test("view anchor target falls back to original when a translation is missing", () => {
+    const orig = document.createElement("p");
+    orig.dataset.pb = "8";
+    assertEq(pbpTrViewAnchorTarget(orig, "translated", "tr"), orig, "missing translation fallback");
+    assertEq(pbpTrViewAnchorTarget(orig, "bilingual", "tr"), orig, "missing bilingual side fallback");
+  });
+  test("reduced-motion mode switch preserves translated-side anchor, scroll and focus", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    const orig = document.createElement("p");
+    orig.textContent = "Original";
+    orig.dataset.pbTrDone = "1";
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.textContent = "Translation";
+    view.append(orig, tr);
+    const focus = document.createElement("button");
+    focus.textContent = "keep focus";
+    document.body.append(view, focus);
+    pbpAiIndexBlocks(view);
+    orig.getBoundingClientRect = () => ({ top: -200, bottom: -20, height: 180 });
+    tr.getBoundingClientRect = () => ({ top: -20, bottom: 180, height: 200 });
+    let scrolled = null, by = null;
+    tr.scrollIntoView = (opts) => { scrolled = opts; };
+    const realMatch = window.matchMedia;
+    const realScrollBy = window.scrollBy;
+    const scrollDesc = Object.getOwnPropertyDescriptor(window, "scrollY");
+    window.matchMedia = () => ({ matches: true });
+    window.scrollBy = (x, y) => { by = { x, y }; };
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 100 });
+    document.body.classList.add("tr-bilingual");
+    focus.focus();
+    try {
+      const st = { mode: "bilingual", target: { code: "fr" }, trMd: { 1: "Translation" }, url: "test:anchor", account: "" };
+      _pbpTrSetMode(st, "translated", true);
+      assertEq(st.mode, "translated", "state mode");
+      assert(document.body.classList.contains("tr-only"), "translated class set");
+      assert(!document.body.classList.contains("tr-bilingual"), "bilingual class cleared");
+      assertEq(scrolled && scrolled.behavior, "instant", "instant scroll");
+      assertEq(Math.round(by.y), 20, "translated-side fraction restored");
+      assertEq(document.activeElement, focus, "focus retained");
+    } finally {
+      window.matchMedia = realMatch;
+      window.scrollBy = realScrollBy;
+      if (scrollDesc) Object.defineProperty(window, "scrollY", scrollDesc); else delete window.scrollY;
+      document.body.classList.remove("tr-only", "tr-bilingual");
+      view.remove(); focus.remove();
+    }
+  });
+  test("rapid reduced-motion v cycle uses original fallback when translation is missing", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    const orig = document.createElement("p");
+    orig.textContent = "No translation yet";
+    view.appendChild(orig);
+    document.body.appendChild(view);
+    pbpAiIndexBlocks(view);
+    orig.getBoundingClientRect = () => ({ top: -25, bottom: 75, height: 100 });
+    let targets = 0;
+    orig.scrollIntoView = () => { targets++; };
+    const realMatch = window.matchMedia;
+    const realScrollBy = window.scrollBy;
+    const scrollDesc = Object.getOwnPropertyDescriptor(window, "scrollY");
+    window.matchMedia = () => ({ matches: true });
+    window.scrollBy = () => {};
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 100 });
+    try {
+      const st = { mode: "original", target: { code: "fr" }, trMd: {}, url: "test:fallback", account: "" };
+      for (let i = 0; i < 3; i++) _pbpTrSetMode(st, pbpTrNextMode(st.mode), true);
+      assertEq(st.mode, "original", "full cycle");
+      assert(!document.body.classList.contains("tr-only") && !document.body.classList.contains("tr-bilingual"), "returned to original classes");
+      assertEq(targets, 3, "all modes settled on original fallback");
+    } finally {
+      window.matchMedia = realMatch;
+      window.scrollBy = realScrollBy;
+      if (scrollDesc) Object.defineProperty(window, "scrollY", scrollDesc); else delete window.scrollY;
+      document.body.classList.remove("tr-only", "tr-bilingual");
+      view.remove();
+    }
+  });
+  test("progressive heading fill updates TOC immediately in translated mode", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    const heading = document.createElement("h2");
+    heading.id = "live-heading";
+    heading.textContent = "Original heading";
+    view.appendChild(heading);
+    const toc = document.createElement("div");
+    toc.id = "toc-list";
+    const link = document.createElement("a");
+    link.dataset.slug = heading.id;
+    link.textContent = "Original heading";
+    link.title = "Original heading";
+    toc.appendChild(link);
+    document.body.append(view, toc);
+    pbpAiIndexBlocks(view);
+    document.body.classList.add("tr-only");
+    try {
+      const st = { mode: "translated", target: { code: "fr" }, trMd: {} };
+      _pbpTrFill(st, { n: 1, shielded: { slots: [] } }, "Translated heading");
+      assertEq(link.textContent, "Translated heading", "live TOC text");
+      assertEq(link.title, "Translated heading", "live TOC title");
+      assertEq(link.dataset.origText, "Original heading", "original retained");
+    } finally {
+      document.body.classList.remove("tr-only");
+      view.remove(); toc.remove();
+    }
+  });
+  test("live selection-trigger off disables an already-registered e/d handler", () => {
+    const previous = _pbpExplainTrigger;
+    let consumed = false;
+    _pbpExplainTrigger = "off";
+    try {
+      _pbpExplainOnShortcut({ key: "d", preventDefault: () => { consumed = true; } });
+      assertEq(consumed, false, "off handler is inert");
+    } finally {
+      _pbpExplainTrigger = previous;
+    }
+  });
+  test("bilingual -> translated hands focused original control to the same block translation", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    const orig = document.createElement("p");
+    const control = document.createElement("button");
+    control.textContent = "original control";
+    orig.appendChild(control);
+    orig.dataset.pbTrDone = "1";
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.dataset.pbTr = "1";
+    tr.textContent = "Translation";
+    view.append(orig, tr);
+    document.body.appendChild(view);
+    pbpAiIndexBlocks(view);
+    orig.getBoundingClientRect = () => ({ top: -20, bottom: 80, height: 100 });
+    tr.getBoundingClientRect = () => ({ top: 80, bottom: 180, height: 100 });
+    let target = null;
+    tr.scrollIntoView = (opts) => { target = opts; };
+    const realMatch = window.matchMedia;
+    const realScrollBy = window.scrollBy;
+    const scrollDesc = Object.getOwnPropertyDescriptor(window, "scrollY");
+    window.matchMedia = () => ({ matches: true });
+    window.scrollBy = () => {};
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 100 });
+    document.body.classList.add("tr-bilingual");
+    control.focus();
+    try {
+      const st = { mode: "bilingual", target: { code: "fr" }, trMd: { 1: "Translation" }, url: "test:focus-tr", account: "" };
+      _pbpTrSetMode(st, "translated", true);
+      assertEq(document.activeElement, tr, "focus moved to translated side");
+      assertEq(target && target.behavior, "instant", "anchor still restored after focus handoff");
+    } finally {
+      window.matchMedia = realMatch;
+      window.scrollBy = realScrollBy;
+      if (scrollDesc) Object.defineProperty(window, "scrollY", scrollDesc); else delete window.scrollY;
+      document.body.classList.remove("tr-only", "tr-bilingual");
+      view.remove();
+    }
+  });
+  test("translated -> original hands focused translation control to the same original block", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    const orig = document.createElement("p");
+    orig.textContent = "Original";
+    orig.dataset.pbTrDone = "1";
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.dataset.pbTr = "1";
+    const control = document.createElement("button");
+    control.textContent = "translated control";
+    tr.appendChild(control);
+    view.append(orig, tr);
+    document.body.appendChild(view);
+    pbpAiIndexBlocks(view);
+    orig.getBoundingClientRect = () => ({ top: 0, bottom: 0, height: 0 });
+    tr.getBoundingClientRect = () => ({ top: -20, bottom: 80, height: 100 });
+    let target = null;
+    orig.scrollIntoView = (opts) => { target = opts; };
+    const realMatch = window.matchMedia;
+    const realScrollBy = window.scrollBy;
+    const scrollDesc = Object.getOwnPropertyDescriptor(window, "scrollY");
+    window.matchMedia = () => ({ matches: true });
+    window.scrollBy = () => {};
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 100 });
+    document.body.classList.add("tr-only");
+    control.focus();
+    try {
+      const st = { mode: "translated", target: { code: "fr" }, trMd: { 1: "Translation" }, url: "test:focus-orig", account: "" };
+      _pbpTrSetMode(st, "original", true);
+      assertEq(document.activeElement, orig, "focus moved to original side");
+      assertEq(orig.getAttribute("tabindex"), "-1", "plain original made programmatically focusable");
+      assertEq(target && target.behavior, "instant", "anchor still restored after reverse handoff");
+    } finally {
+      window.matchMedia = realMatch;
+      window.scrollBy = realScrollBy;
+      if (scrollDesc) Object.defineProperty(window, "scrollY", scrollDesc); else delete window.scrollY;
+      document.body.classList.remove("tr-only", "tr-bilingual");
+      view.remove();
+    }
+  });
+  test("real translated-only CSS keeps focus available until reverse handoff", () => {
+    const style = document.createElement("style");
+    style.textContent = `
+      #rendered-view .pb-tr { display: none; }
+      body.tr-bilingual #rendered-view .pb-tr,
+      body.tr-only #rendered-view .pb-tr { display: block; }
+      body.tr-only #rendered-view [data-pb-tr-done]:not(.pb-show-orig) { display: none; }
+    `;
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    const orig = document.createElement("p");
+    orig.textContent = "Original";
+    orig.dataset.pbTrDone = "1";
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.dataset.pbTr = "1";
+    tr.setAttribute("role", "button");
+    tr.setAttribute("tabindex", "0");
+    tr.textContent = "Translation";
+    view.append(orig, tr);
+    document.head.appendChild(style);
+    document.body.appendChild(view);
+    pbpAiIndexBlocks(view);
+    const realMatch = window.matchMedia;
+    window.matchMedia = () => ({ matches: true });
+    document.body.classList.add("tr-only");
+    tr.focus();
+    try {
+      assertEq(getComputedStyle(orig).display, "none", "original starts hidden by real view CSS");
+      assertEq(getComputedStyle(tr).display, "block", "translation starts visible by real view CSS");
+      assertEq(document.activeElement, tr, "translated block owns focus before switch");
+      const st = { mode: "translated", target: { code: "fr" }, trMd: { 1: "Translation" }, url: "test:focus-real-css", account: "" };
+      _pbpTrSetMode(st, "original", true);
+      assertEq(document.activeElement, orig, "focus reached original before translated tabindex cleanup");
+      assertEq(getComputedStyle(orig).display, "block", "original is visible after switch");
+      assertEq(getComputedStyle(tr).display, "none", "translation is hidden after switch");
+    } finally {
+      window.matchMedia = realMatch;
+      document.body.classList.remove("tr-only", "tr-bilingual");
+      view.remove();
+      style.remove();
+    }
+  });
+  test("out-of-order View Transition callbacks cannot overwrite or clean up the latest mode", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    view.innerHTML = '<p data-pb-tr-done="1">Original</p><div class="pb-tr" data-pb-tr="1">Translation</div>';
+    document.body.appendChild(view);
+    pbpAiIndexBlocks(view);
+    const realMatch = window.matchMedia;
+    const realStart = document.startViewTransition;
+    const callbacks = [], transitions = [];
+    window.matchMedia = () => ({ matches: false });
+    document.startViewTransition = (callback) => {
+      const finished = {
+        finalizer: null,
+        catch() { return this; },
+        finally(fn) { this.finalizer = fn; return this; },
+        finish() { if (this.finalizer) this.finalizer(); }
+      };
+      const transition = { finished };
+      callbacks.push(callback);
+      transitions.push(transition);
+      return transition;
+    };
+    try {
+      const st = { mode: "original", target: { code: "fr" }, trMd: { 1: "Translation" }, url: "test:vt-race", account: "" };
+      _pbpTrSetMode(st, "bilingual", true);
+      const first = st.viewTransition;
+      _pbpTrSetMode(st, "translated", true);
+      const latest = st.viewTransition;
+      assertEq(st.mode, "translated", "latest state claimed synchronously");
+      callbacks[1]();
+      callbacks[0]();
+      assert(document.body.classList.contains("tr-only") && !document.body.classList.contains("tr-bilingual"), "stale callback did not overwrite latest DOM");
+      first.finished.finish();
+      assertEq(st.viewTransition, latest, "stale transition did not clear latest handle");
+      assert(document.documentElement.classList.contains("pbp-tr-view-transition"), "stale transition did not remove latest class");
+      latest.finished.finish();
+      assertEq(st.viewTransition, null, "latest transition cleaned up its handle");
+      assert(!document.documentElement.classList.contains("pbp-tr-view-transition"), "latest transition cleaned up root class");
+    } finally {
+      window.matchMedia = realMatch;
+      document.startViewTransition = realStart;
+      document.documentElement.classList.remove("pbp-tr-view-transition");
+      document.body.classList.remove("tr-only", "tr-bilingual");
+      view.remove();
+    }
+  });
+  test("nested forum comment uses its immediate translated sibling as the anchor target", () => {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    view.innerHTML = "<blockquote><p>alice</p><blockquote><p>bob</p></blockquote></blockquote>";
+    document.body.appendChild(view);
+    pbpForumMarkComments(view);
+    pbpAiIndexBlocks(view);
+    const blocks = pbpAiBlocks();
+    const bob = blocks[1].el;
+    const tr = document.createElement("div");
+    tr.className = "pb-tr";
+    tr.dataset.pbTr = String(blocks[1].n);
+    tr.textContent = "bob translated";
+    bob.dataset.pbTrDone = "1";
+    bob.insertAdjacentElement("afterend", tr);
+    blocks[0].el.getBoundingClientRect = () => ({ top: -300, bottom: -200, height: 100 });
+    bob.getBoundingClientRect = () => ({ top: -200, bottom: -50, height: 150 });
+    tr.getBoundingClientRect = () => ({ top: -50, bottom: 150, height: 200 });
+    let scrolled = false;
+    tr.scrollIntoView = () => { scrolled = true; };
+    const realMatch = window.matchMedia;
+    const realScrollBy = window.scrollBy;
+    const scrollDesc = Object.getOwnPropertyDescriptor(window, "scrollY");
+    window.matchMedia = () => ({ matches: true });
+    window.scrollBy = () => {};
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 100 });
+    document.body.classList.add("tr-bilingual");
+    try {
+      const st = { mode: "bilingual", target: { code: "fr" }, trMd: { [blocks[1].n]: "bob translated" }, url: "test:forum-anchor", account: "" };
+      _pbpTrSetMode(st, "translated", true);
+      assertEq(bob.nextElementSibling, tr, "translation remains immediate sibling inside nested blockquote");
+      assert(scrolled, "nested translated side received anchor restore");
+    } finally {
+      window.matchMedia = realMatch;
+      window.scrollBy = realScrollBy;
+      if (scrollDesc) Object.defineProperty(window, "scrollY", scrollDesc); else delete window.scrollY;
+      document.body.classList.remove("tr-only", "tr-bilingual");
+      view.remove();
+    }
+  });
+});
 </script>
 <script>
 // ============ Task 1: md-highlight.js anchor/locate (spec 3) ============
@@ -5375,6 +5771,528 @@ suite("skim status line", () => {
     }
   });
 });
+</script>
+<script>
+// ============ C1: explain-pop manual pin / drag lifecycle (async DOM) ============
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "explain-pop pin and drag lifecycle";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  const task = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const pop = _pbpExplainEnsurePop();
+  // Production md-preview.css overrides the UA popover centering. Keep this
+  // DOM-only fixture on the same positioning model so rect-based clamping is
+  // tested against the real fixed/inset-auto geometry.
+  pop.style.position = "fixed";
+  pop.style.inset = "auto";
+  pop.style.margin = "0";
+  await atest("new explain shell names the pin before any interaction", async () => {
+    const pin = pop.querySelector(".xp-pin");
+    const describedBy = pin && pin.getAttribute("aria-describedby");
+    assert(pin && pin.getAttribute("aria-pressed") === "false", "initial pressed state missing");
+    assert(pin.getAttribute("aria-label") && pin.title === pin.getAttribute("aria-label"), "initial accessible name/title missing");
+    assert(describedBy && pop.querySelector("#" + describedBy), "initial movement description missing or dangling");
+  });
+  async function reset() {
+    if (pop.matches(":popover-open")) {
+      pop.hidePopover();
+      await task();
+    }
+    _pbpExplainAbort = null;
+    _pbpExplainSetPinned(pop, false);
+    pop.style.left = "80px";
+    pop.style.top = "80px";
+  }
+  async function show() {
+    if (!pop.matches(":popover-open")) pop.showPopover();
+    await task();
+  }
+
+  function explainFixture() {
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    view.innerHTML = "<p>Stable reading block for explain focus handoff.</p>";
+    document.body.appendChild(view);
+    pbpAiIndexBlocks(view);
+    const cap = (text) => ({ text, n: 1, rect: { left: 40, right: 80, top: 40, bottom: 64 } });
+    return { view, block: view.querySelector("[data-pb]"), cap };
+  }
+
+  await atest("real Chromium Escape restores focus to the first closed-open source", async () => {
+    await reset();
+    const fx = explainFixture();
+    const source = document.createElement("button");
+    source.textContent = "escape source";
+    document.body.appendChild(source);
+    const realRun = _pbpExplainRun;
+    _pbpExplainRun = () => {};
+    try {
+      source.focus();
+      _pbpExplainOpenPop(fx.cap("escape"), "explain");
+      pop.querySelector(".xp-pin").focus();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      await task();
+      assert(!pop.matches(":popover-open"), "Escape left Explain open");
+      assertEq(document.activeElement, source, "Escape did not restore the opening source");
+    } finally {
+      _pbpExplainRun = realRun;
+      source.remove();
+      fx.view.remove();
+    }
+  });
+
+  await atest("real close button restores focus to the opening source", async () => {
+    await reset();
+    const fx = explainFixture();
+    const source = document.createElement("button");
+    source.textContent = "close source";
+    document.body.appendChild(source);
+    const realRun = _pbpExplainRun;
+    _pbpExplainRun = () => {};
+    try {
+      source.focus();
+      _pbpExplainOpenPop(fx.cap("close"), "explain");
+      const close = pop.querySelector(".xp-close");
+      close.focus();
+      close.click();
+      await task();
+      assert(!pop.matches(":popover-open"), "close button left Explain open");
+      assertEq(document.activeElement, source, "close button did not restore the opening source");
+    } finally {
+      _pbpExplainRun = realRun;
+      source.remove();
+      fx.view.remove();
+    }
+  });
+
+  await atest("outside dismissal never steals focus back from its external target", async () => {
+    await reset();
+    const fx = explainFixture();
+    const source = document.createElement("button");
+    const outside = document.createElement("button");
+    source.textContent = "outside source";
+    outside.textContent = "outside target";
+    document.body.append(source, outside);
+    const realRun = _pbpExplainRun;
+    _pbpExplainRun = () => {};
+    try {
+      source.focus();
+      _pbpExplainOpenPop(fx.cap("outside"), "explain");
+      pop.querySelector(".xp-pin").focus();
+      outside.focus();
+      outside.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 41, pointerType: "mouse", isPrimary: true }));
+      await task();
+      assert(!pop.matches(":popover-open"), "outside pointer left loose Explain open");
+      assertEq(document.activeElement, outside, "outside dismissal stole focus from its target");
+    } finally {
+      _pbpExplainRun = realRun;
+      source.remove(); outside.remove();
+      fx.view.remove();
+    }
+  });
+
+  await atest("removed opening source falls back to the reading block and cleans borrowed tabindex", async () => {
+    await reset();
+    const fx = explainFixture();
+    const source = document.createElement("button");
+    const after = document.createElement("button");
+    source.textContent = "removed source";
+    after.textContent = "after fallback";
+    document.body.append(source, after);
+    const realRun = _pbpExplainRun;
+    _pbpExplainRun = () => {};
+    try {
+      source.focus();
+      _pbpExplainOpenPop(fx.cap("fallback"), "explain");
+      source.remove();
+      const close = pop.querySelector(".xp-close");
+      close.focus();
+      close.click();
+      await task();
+      assertEq(document.activeElement, fx.block, "removed source did not hand off to its reading block");
+      assertEq(fx.block.getAttribute("tabindex"), "-1", "fallback did not borrow a focus target");
+      after.focus();
+      assert(!fx.block.hasAttribute("tabindex"), "borrowed tabindex survived fallback blur");
+    } finally {
+      _pbpExplainRun = realRun;
+      source.remove(); after.remove();
+      fx.view.remove();
+    }
+  });
+
+  await atest("pinned re-entry and action switching keep the source while a later reopen replaces it", async () => {
+    await reset();
+    const fx = explainFixture();
+    const first = document.createElement("button");
+    const second = document.createElement("button");
+    first.textContent = "first opener";
+    second.textContent = "second opener";
+    document.body.append(first, second);
+    const realRun = _pbpExplainRun;
+    _pbpExplainRun = () => {};
+    try {
+      first.focus();
+      _pbpExplainOpenPop(fx.cap("first"), "explain");
+      const pin = pop.querySelector(".xp-pin");
+      pin.click();
+      pin.focus();
+      _pbpExplainOpenPop(fx.cap("pinned re-entry"), "dict");
+      const translate = pop.querySelector('.xp-act[data-action="translate"]');
+      translate.focus();
+      translate.click();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      await task();
+      assertEq(document.activeElement, first, "re-entry or action switch replaced the first source");
+
+      second.focus();
+      _pbpExplainOpenPop(fx.cap("reopen"), "explain");
+      const close = pop.querySelector(".xp-close");
+      close.focus();
+      close.click();
+      await task();
+      assertEq(document.activeElement, second, "reopen did not record the newer source");
+    } finally {
+      _pbpExplainRun = realRun;
+      first.remove(); second.remove();
+      fx.view.remove();
+    }
+  });
+
+  await atest("manual shell exposes pin, close and keyboard movement semantics", async () => {
+    await reset();
+    const pin = pop.querySelector(".xp-pin");
+    const close = pop.querySelector(".xp-close");
+    assertEq(pop.getAttribute("popover"), "manual", "popover mode");
+    assert(pin && pin.querySelector("svg") && pin.getAttribute("aria-pressed") === "false", "pin semantics missing");
+    assert(pin.getAttribute("aria-label") && pin.getAttribute("aria-describedby"), "pin accessible text missing");
+    assert(pin.getAttribute("aria-keyshortcuts").includes("Alt+ArrowLeft"), "keyboard movement shortcut missing");
+    assert(close && close.querySelector("svg") && close.getAttribute("aria-label"), "close control missing");
+  });
+
+  await atest("real action controls keep the dialog accessible name in sync", async () => {
+    await reset();
+    _pbpExplainCap = null;
+    _pbpExplainCtx = null;
+    _pbpExplainAction = "explain";
+    _pbpExplainSyncActButtons(pop);
+    assertEq(pop.getAttribute("aria-label"), "explainSelection", "explain dialog name");
+    pop.querySelector('.xp-act[data-action="translate"]').click();
+    assertEq(pop.getAttribute("aria-label"), "explainTranslateSelection", "translate dialog name");
+    pop.querySelector('.xp-act[data-action="dict"]').click();
+    assertEq(pop.getAttribute("aria-label"), "dictLookupSelection", "dictionary dialog name");
+  });
+
+  await atest("real action runs announce action-specific loading states", async () => {
+    await reset();
+    const realSettings = _pbpExplainSettings;
+    const realAiOk = _pbpExplainAiOk;
+    const realStream = window.callAIStream;
+    const realDictRun = window.pbpDictRun;
+    _pbpExplainSettings = { aiProvider: "gemini", geminiApiKey: "test-key" };
+    _pbpExplainAiOk = true;
+    const cap = { text: "term", range: document.createRange() };
+    const ctx = { sentence: "term", blockText: "term in context", prevText: "", nextText: "" };
+    try {
+      for (const [action, expected] of [["explain", "explainLoading"], ["translate", "explainTranslateLoading"]]) {
+        let resolveRun;
+        window.callAIStream = () => new Promise((resolve) => { resolveRun = resolve; });
+        _pbpExplainAction = action;
+        const pending = _pbpExplainRun(cap, ctx, pop);
+        assertEq(pop.querySelector(".xp-body .sr-only").textContent, expected, action + " loading announcement");
+        resolveRun("done");
+        await pending;
+      }
+      let resolveDict;
+      window.pbpDictRun = () => new Promise((resolve) => { resolveDict = resolve; });
+      _pbpExplainAction = "dict";
+      const pendingDict = _pbpExplainRun(cap, ctx, pop);
+      assertEq(pop.querySelector(".xp-body .sr-only").textContent, "dictLoading", "dictionary loading announcement");
+      resolveDict();
+      await pendingDict;
+    } finally {
+      _pbpExplainSettings = realSettings;
+      _pbpExplainAiOk = realAiOk;
+      window.callAIStream = realStream;
+      if (realDictRun === undefined) delete window.pbpDictRun; else window.pbpDictRun = realDictRun;
+    }
+  });
+
+  await atest("no-AI Explain and Translate report their own unavailable actions", async () => {
+    await reset();
+    const realSettings = _pbpExplainSettings;
+    const realAiOk = _pbpExplainAiOk;
+    _pbpExplainSettings = { aiProvider: "gemini" };
+    _pbpExplainAiOk = false;
+    const cap = { text: "term", range: document.createRange() };
+    const ctx = { sentence: "term", blockText: "term", prevText: "", nextText: "" };
+    try {
+      _pbpExplainAction = "explain";
+      await _pbpExplainRun(cap, ctx, pop);
+      assertEq(pop.querySelector(".xp-dict-msg").textContent, "explainAiNotConfigured", "Explain no-AI message");
+      _pbpExplainAction = "translate";
+      await _pbpExplainRun(cap, ctx, pop);
+      assertEq(pop.querySelector(".xp-dict-msg").textContent, "explainTranslateAiNotConfigured", "Translate no-AI message");
+    } finally {
+      _pbpExplainSettings = realSettings;
+      _pbpExplainAiOk = realAiOk;
+    }
+  });
+
+  await atest("updating an existing saved word enters the disabled completion state", async () => {
+    await reset();
+    const realSave = window.pbpDictSaveCurrent;
+    const button = pop.querySelector(".xp-vocab");
+    button.hidden = false;
+    button.disabled = false;
+    button.dataset.runId = "existing-run";
+    button.textContent = "dictUpdateVocab";
+    window.pbpDictSaveCurrent = async () => true;
+    try {
+      button.click();
+      await task();
+      assert(button.disabled && button.textContent === "dictSavedVocab",
+        "successful update did not enter the disabled completed state");
+    } finally {
+      if (realSave === undefined) delete window.pbpDictSaveCurrent; else window.pbpDictSaveCurrent = realSave;
+    }
+  });
+
+  await atest("unpinned outside pointer closes and aborts exactly once", async () => {
+    await reset();
+    await show();
+    let aborts = 0;
+    _pbpExplainAbort = { abort: () => { aborts++; } };
+    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1, pointerType: "mouse" }));
+    await task();
+    assert(!pop.matches(":popover-open"), "outside pointer did not close loose popover");
+    assertEq(aborts, 1, "close abort count");
+  });
+
+  await atest("pinned outside pointer stays open while Escape closes and resets pin", async () => {
+    await reset();
+    await show();
+    pop.querySelector(".xp-pin").click();
+    let aborts = 0;
+    _pbpExplainAbort = { abort: () => { aborts++; } };
+    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 2, pointerType: "mouse" }));
+    await task();
+    assert(pop.matches(":popover-open"), "pinned popover closed on outside pointer");
+    assertEq(aborts, 0, "outside pointer aborted pinned run");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    await task();
+    assert(!pop.matches(":popover-open"), "Escape did not close pinned popover");
+    assertEq(aborts, 1, "Escape abort count");
+    assertEq(pop.querySelector(".xp-pin").getAttribute("aria-pressed"), "false", "close did not reset pin");
+  });
+
+  await atest("pin toggles never abort while explicit close does", async () => {
+    await reset();
+    await show();
+    let aborts = 0;
+    _pbpExplainAbort = { abort: () => { aborts++; } };
+    const pin = pop.querySelector(".xp-pin");
+    pin.click();
+    pin.click();
+    await task();
+    assert(pop.matches(":popover-open") && aborts === 0, "pin toggle closed or aborted the run");
+    pop.querySelector(".xp-close").click();
+    await task();
+    assert(!pop.matches(":popover-open") && aborts === 1, "close button did not perform one real close");
+  });
+
+  await atest("header drag auto-pins, captures the pointer, clamps edges and ignores controls", async () => {
+    await reset();
+    await show();
+    const head = pop.querySelector(".xp-head");
+    const pin = pop.querySelector(".xp-pin");
+    let captured = null, released = null;
+    head.setPointerCapture = (id) => { captured = id; };
+    head.hasPointerCapture = (id) => captured === id;
+    head.releasePointerCapture = (id) => { released = id; captured = null; };
+    Object.defineProperty(pop, "offsetWidth", { configurable: true, value: 220 });
+    Object.defineProperty(pop, "offsetHeight", { configurable: true, value: 180 });
+    pin.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 10, isPrimary: true, clientX: 80, clientY: 80 }));
+    assertEq(captured, null, "pin control started a drag");
+    assertEq(pin.getAttribute("aria-pressed"), "false", "control pointerdown auto-pinned");
+    head.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 12, isPrimary: false, clientX: 80, clientY: 80 }));
+    assertEq(captured, null, "secondary pointer captured the drag handle");
+    assertEq(pin.getAttribute("aria-pressed"), "false", "secondary pointer auto-pinned");
+    head.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 11, isPrimary: true, clientX: 80, clientY: 80 }));
+    assertEq(captured, 11, "header did not capture pointer");
+    assertEq(pin.getAttribute("aria-pressed"), "true", "drag did not auto-pin");
+    head.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 11, clientX: -1000, clientY: -1000 }));
+    assertEq(pop.style.left, "8px", "left safe edge");
+    assertEq(pop.style.top, "8px", "top safe edge");
+    head.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 11, clientX: 5000, clientY: 5000 }));
+    assert(parseFloat(pop.style.left) <= innerWidth - 228, "right edge escaped viewport");
+    assert(parseFloat(pop.style.top) <= innerHeight - 188, "bottom edge escaped viewport");
+    head.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 11 }));
+    assertEq(released, 11, "pointer capture was not released");
+    assert(!pop.classList.contains("xp-dragging"), "drag class remained after pointerup");
+    delete head.setPointerCapture;
+    delete head.hasPointerCapture;
+    delete head.releasePointerCapture;
+    delete pop.offsetWidth;
+    delete pop.offsetHeight;
+  });
+
+  await atest("resize re-clamps and Alt+Arrow moves from the pin button", async () => {
+    await reset();
+    await show();
+    Object.defineProperty(pop, "offsetWidth", { configurable: true, value: 220 });
+    Object.defineProperty(pop, "offsetHeight", { configurable: true, value: 180 });
+    const pin = pop.querySelector(".xp-pin");
+    pin.click();
+    pop.style.left = "9999px";
+    pop.style.top = "9999px";
+    window.dispatchEvent(new Event("resize"));
+    const clampedLeft = parseFloat(pop.style.left);
+    assert(clampedLeft <= innerWidth - 228 && parseFloat(pop.style.top) <= innerHeight - 188, "resize did not clamp");
+    pin.focus();
+    pin.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", altKey: true, bubbles: true, cancelable: true }));
+    assertEq(parseFloat(pop.style.left), clampedLeft - 8, "Alt+ArrowLeft nudge");
+    assertEq(pin.getAttribute("aria-pressed"), "true", "keyboard move lost pin state");
+    delete pop.offsetWidth;
+    delete pop.offsetHeight;
+  });
+
+  await atest("pinned re-invocation updates content without hide, abort or reposition", async () => {
+    await reset();
+    const view = document.createElement("div");
+    view.id = "rendered-view";
+    view.innerHTML = "<p>First paragraph for explain context.</p>";
+    document.body.appendChild(view);
+    pbpAiIndexBlocks(view);
+    const realRun = _pbpExplainRun;
+    let runs = 0, aborts = 0;
+    _pbpExplainRun = () => { runs++; };
+    _pbpExplainAbort = { abort: () => { aborts++; } };
+    try {
+      _pbpExplainOpenPop({ text: "first", n: 1, rect: { left: 32, right: 52, top: 32, bottom: 52 } }, "explain");
+      await task();
+      pop.querySelector(".xp-pin").click();
+      pop.style.left = "96px";
+      pop.style.top = "112px";
+      _pbpExplainOpenPop({ text: "second", n: 1, rect: { left: 500, right: 520, top: 400, bottom: 420 } }, "dict");
+      await task();
+      assert(pop.matches(":popover-open"), "pinned re-invocation closed the popover");
+      assertEq(pop.style.left, "96px", "pinned left changed");
+      assertEq(pop.style.top, "112px", "pinned top changed");
+      assertEq(pop.querySelector(".xp-term").textContent, "second", "content did not update");
+      assertEq(runs, 2, "new action did not take over");
+      assertEq(aborts, 0, "hide/show aborted pinned run");
+    } finally {
+      _pbpExplainRun = realRun;
+      view.remove();
+    }
+  });
+
+  await atest("a superseded AI run cannot clear the active run's busy state", async () => {
+    await reset();
+    await show();
+    const realSettings = _pbpExplainSettings;
+    const realAiOk = _pbpExplainAiOk;
+    const realAction = _pbpExplainAction;
+    const realStream = window.callAIStream;
+    const pending = [];
+    _pbpExplainSettings = { aiProvider: "gemini", geminiApiKey: "test-key" };
+    _pbpExplainAiOk = true;
+    _pbpExplainAction = "explain";
+    window.callAIStream = (settings, prompt, options) => new Promise((resolve, reject) => {
+      options.signal.addEventListener("abort", () => {
+        const error = new Error("aborted");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true });
+      pending.push({ resolve, signal: options.signal });
+    });
+    const cap = { text: "term" };
+    const ctx = { sentence: "term", blockText: "term in context", prevText: "", nextText: "" };
+    try {
+      const first = _pbpExplainRun(cap, ctx, pop);
+      assertEq(pending.length, 1, "first run did not start");
+      const second = _pbpExplainRun(cap, ctx, pop);
+      assertEq(pending.length, 2, "replacement run did not start");
+      await first;
+      assert(pop.querySelector(".xp-body").getAttribute("aria-busy") === "true",
+        "superseded run cleared replacement busy state");
+      pending[1].resolve("replacement answer");
+      await second;
+      assert(!pop.querySelector(".xp-body").hasAttribute("aria-busy"), "active run left busy state behind");
+    } finally {
+      window.callAIStream = realStream;
+      _pbpExplainSettings = realSettings;
+      _pbpExplainAiOk = realAiOk;
+      _pbpExplainAction = realAction;
+    }
+  });
+
+  await atest("reader popover gets the first Escape above pinned explain, while loose explain is dismissed", async () => {
+    await reset();
+    await show();
+    pop.querySelector(".xp-pin").click();
+    let aborts = 0;
+    _pbpExplainAbort = { abort: () => { aborts++; } };
+    _pbpKbdHelpOpen();
+    await task();
+    assert(pop.matches(":popover-open"), "help closed pinned explain");
+    const help = document.getElementById("kbd-help-pop");
+    assert(help.matches(":popover-open"), "help did not open beside pinned explain");
+    const firstEscape = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    document.dispatchEvent(firstEscape);
+    assert(!firstEscape.defaultPrevented, "Explain consumed the temporary popover's Escape");
+    assert(pop.matches(":popover-open") && aborts === 0, "first Escape closed or aborted pinned Explain");
+    help.hidePopover(); // untrusted events have no UA default; model the native first close
+    const secondEscape = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    document.dispatchEvent(secondEscape);
+    assert(secondEscape.defaultPrevented && !pop.matches(":popover-open") && aborts === 1,
+      "second Escape did not close pinned Explain");
+    await show();
+    _pbpExplainAbort = null;
+    _pbpExplainSetPinned(pop, false);
+    _pbpSearchOpen();
+    await task();
+    assert(!pop.matches(":popover-open"), "search kept loose explain open");
+    document.getElementById("search-pop").hidePopover();
+  });
+
+  await atest("content growth re-clamps every popover edge to the 8px viewport margin", async () => {
+    await reset();
+    await show();
+    pop.style.boxSizing = "border-box";
+    pop.style.width = "160px";
+    pop.style.height = "80px";
+    pop.style.left = (innerWidth - 168) + "px";
+    pop.style.top = (innerHeight - 88) + "px";
+    const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    try {
+      await settle();
+      pop.style.width = "360px";
+      pop.style.height = "300px";
+      await settle();
+      const rect = pop.getBoundingClientRect();
+      assert(rect.left >= 8 && rect.top >= 8, "grown panel escaped the leading edges: " + rect.left + "," + rect.top);
+      assert(rect.right <= innerWidth - 8 && rect.bottom <= innerHeight - 8,
+        "grown panel escaped the trailing edges: " + rect.right + "," + rect.bottom);
+    } finally {
+      pop.style.removeProperty("box-sizing");
+      pop.style.removeProperty("width");
+      pop.style.removeProperty("height");
+    }
+  });
+
+  await reset();
+})();
 </script>
 <script>
 // ============ Batch 3: permission recovery gate (async) ============

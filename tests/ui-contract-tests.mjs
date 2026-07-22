@@ -21,6 +21,8 @@ const mdAskJs = read("md-ask.js");
 const mdHighlightJs = read("md-highlight.js");
 const mdSkimJs = read("md-skim.js");
 const mdTranslateJs = read("md-translate.js");
+const mdReaderJsSource = read("md-reader.js");
+const mdCss = read("md-preview.css");
 const popupJs = read("popup.js");
 const popupAiJs = read("popup-ai.js");
 const popupBatchJs = read("popup-batch.js");
@@ -28,9 +30,149 @@ const popupCss = read("popup.css");
 const optionsConnectivityJs = read("options-connectivity.js");
 const optionsCss = read("options.css");
 const optionsJs = read("options.js");
+const optionsVocabJs = read("options-vocab.js");
+const mdDictJs = read("md-dict.js");
 const optionsThemeEarlyJs = read("options-theme-early.js");
 check(optionsJs.includes('webdavLastPush.error === "insecure"') && optionsJs.includes('t("mdTargetWebhookHttpWarn")'), "persisted insecure WebDAV status lacks endpoint guidance");
 const popupTagsJs = read("popup-tags.js");
+
+for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-select-all",
+  "vocab-invert-selection", "vocab-batch-toolbar", "vocab-group-input", "vocab-add-group",
+  "vocab-batch-delete", "vocab-no-results", "vocab-load-more", "vocab-list"]) {
+  check(optionsHtml.includes(`id="${id}"`), `options.html: scalable vocabulary control #${id} is missing`);
+}
+check((optionsHtml.match(/<details class="vocab-disclosure">/g) || []).length === 3 &&
+  optionsHtml.indexOf('id="vocab-search"') < optionsHtml.indexOf('id="dict-anki-deck"'),
+  "options.html: vocabulary management is not first or secondary settings are not collapsed");
+check(["vocab-group-filter", "vocab-sort", "vocab-group-input"].every((id) =>
+  new RegExp(`id="${id}"[^>]*data-no-autosave|data-no-autosave[^>]*id="${id}"`).test(optionsHtml)) &&
+  optionsJs.includes(":not([data-no-autosave])"),
+  "options: vocabulary view controls leak into settings auto-save");
+check(optionsVocabJs.includes("PBP_VOCAB_RENDER_BATCH = 100") &&
+  optionsVocabJs.includes("pbpVocabFilterSort") && optionsVocabJs.includes("pbpVocabSelectRange") &&
+  optionsVocabJs.includes('showConfirmPopover(button') && !optionsVocabJs.includes("window.confirm"),
+  "options-vocab.js: scalable render/selection or safe batch-delete confirmation contract is missing");
+check(optionsVocabJs.includes('.normalize("NFC")') && optionsVocabJs.includes('.toLowerCase()') &&
+  optionsVocabJs.includes('.replace(/i\\u0307/g, "i")') &&
+  optionsVocabJs.includes('.replace(/ß/g, "ss")') && optionsVocabJs.includes('.replace(/ς/g, "σ")') &&
+  !optionsVocabJs.includes("toLocaleLowerCase") && !optionsVocabJs.includes("\\p{M}"),
+  "options-vocab.js: vocabulary search does not use the narrow locale-independent case-fold contract");
+check(optionsVocabJs.includes("pbpVocabSelectionSnapshotValid(ids, _vocabSelected, _vocabViewRows)") &&
+  optionsVocabJs.includes('t("vocabSelectionChanged")') &&
+  optionsVocabJs.includes('search.focus({ preventScroll: true })'),
+  "options-vocab.js: stale destructive confirmations or post-action focus are not guarded");
+check(optionsVocabJs.includes('t("vocabRefreshFailed")') &&
+  optionsVocabJs.includes("const refreshed = await _pbpVocabReloadAfterMutation(owner, gen)") &&
+  optionsVocabJs.includes("if (gen !== _vocabRenderGen) return;") &&
+  optionsVocabJs.includes("_pbpVocabRenderList(true)"),
+  "options-vocab.js: committed mutations, refresh failures, or incremental rendering are conflated");
+check(["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-group-input", "vocab-list"].every((id) =>
+  new RegExp(`id="${id}"[^>]*aria-label=`).test(optionsHtml)) &&
+  /id="vocab-selection-actions"|class="vocab-selection-actions"[^>]*role="group"[^>]*aria-label=/.test(optionsHtml) &&
+  /id="vocab-batch-toolbar"[^>]*role="group"[^>]*aria-label=/.test(optionsHtml) &&
+  /id="vocab-selected-count"[^>]*aria-live="polite"/.test(optionsHtml),
+  "options.html: production vocabulary controls lost accessible names, groups, or live selection status");
+check(optionsVocabJs.includes('select.setAttribute("aria-label", t("vocabSelectWord", w.term))') &&
+  optionsVocabJs.includes('head.setAttribute("aria-expanded", "false")') &&
+  optionsVocabJs.includes('head.setAttribute("aria-expanded", open ? "true" : "false")'),
+  "options-vocab.js: production vocabulary rows lost named selection or expansion state");
+check(mdDictJs.includes("function _pbpVocabBatchMutate") && mdDictJs.includes("tx.abort()") &&
+  mdDictJs.includes("tx.oncomplete") && mdDictJs.includes("pbpVocabBatchAddGroup"),
+  "md-dict.js: vocabulary batch mutations are not one owner-checked atomic transaction");
+check(optionsCss.includes(".vocab-filter-toolbar") && optionsCss.includes(".vocab-batch-toolbar") &&
+  optionsCss.includes(".vocab-card .notes-card-top"),
+  "options.css: scalable vocabulary responsive layout is missing");
+check(/#panel-vocab\s+\.vocab-batch-toolbar\[hidden\][\s\S]{0,120}#panel-vocab\s+\.vocab-load-more\[hidden\][\s\S]{0,80}display:\s*none/.test(optionsCss),
+  "options.css: vocabulary hidden controls can be redisplayed by component display rules");
+check(optionsVocabJs.includes('t("vocabLoading")') &&
+  optionsVocabJs.includes('list.setAttribute("aria-busy", loading ? "true" : "false")'),
+  "options-vocab.js: vocabulary loading is not visible or aria-busy is not closed consistently");
+check(optionsVocabJs.includes("function pbpVocabOwnerLabel") &&
+  optionsVocabJs.includes('t("vocabResultCount", String(rows.length), String(_vocabRows.length), _vocabOwnerLabel)') &&
+  optionsVocabJs.includes('empty.textContent = t("dictVocabEmpty", _vocabOwnerLabel)') &&
+  !optionsVocabJs.includes('t("jinaFailed")'),
+  "options-vocab.js: account scope is absent or action errors still reuse Jina copy");
+check(/data-i18n="dictExportTsv"/.test(optionsHtml) && /data-i18n="dictAnkiSend"/.test(optionsHtml) &&
+  /data-i18n="dictEudicSend"/.test(optionsHtml) && /data-i18n="dictEudicSupportedHint"/.test(optionsHtml) &&
+  /data-i18n="dictPackImportHint"/.test(optionsHtml) &&
+  /id="dict-pack-file"[^>]*accept="[^"]*\.txt[^"]*\.txt\.gz[^"]*\.zip/.test(optionsHtml),
+  "options.html: full-scope actions, Eudic support, or pack import formats are not explicit");
+check(!read("anki-connect.js").includes("PBP_ANKI_ENDPOINT"),
+  "anki-connect.js: unused PBP_ANKI_ENDPOINT remains");
+check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
+  sharedJs.includes('el.classList.toggle("bad", !ok)') && sharedJs.includes('ic.className = "status-ic " + state'),
+  "shared.js: setStatusIcon does not apply matching ok/bad host and icon states");
+{
+  const packSection = optionsHtml.indexOf('data-i18n="dictPackSection"');
+  const packHint = optionsHtml.indexOf('data-i18n="dictPackHint"', packSection);
+  const packStatus = optionsHtml.indexOf('id="dict-pack-status"', packSection);
+  check(packSection >= 0 && packHint > packSection && packStatus > packHint &&
+    optionsHtml.includes("Simplified or Traditional Chinese terms") &&
+    optionsHtml.includes("does not support English word lookup"),
+  "options.html: CC-CEDICT capability hint is missing, misplaced, or describes the wrong lookup direction");
+}
+
+check(!mdTranslateJs.includes("lastViewMode") &&
+  /function pbpTrNextMode\(mode\)/.test(mdTranslateJs) &&
+  /_pbpTrSetMode\(st, pbpTrNextMode\(st\.mode\), true\)/.test(mdTranslateJs),
+  "md-translate.js: v does not implement the strict three-state cycle");
+check(mdTranslateJs.includes("pbpTrSingleKeyAllowed(") && mdAskJs.includes("pbpTrSingleKeyAllowed(") &&
+  mdHighlightJs.includes("pbpTrSingleKeyAllowed("),
+  "md-preview single-key shortcuts do not share the modifier/typing/raw-view gate");
+{
+  const explainShortcut = mdAskJs.slice(mdAskJs.indexOf("function _pbpExplainOnShortcut"),
+    mdAskJs.indexOf("function pbpExplainInit"));
+  const explainInit = mdAskJs.slice(mdAskJs.indexOf("function pbpExplainInit"),
+    mdAskJs.indexOf('document.addEventListener("pbp:rendered"', mdAskJs.indexOf("function pbpExplainInit")));
+  check(mdTranslateJs.includes("_pbpTrTrigger(st)") &&
+    /if \(st\.running\) return;[\s\S]{0,120}if \(st\.status === "done"\) return;/.test(mdTranslateJs) &&
+    explainShortcut.includes('_pbpExplainTrigger === "off"') &&
+    explainShortcut.includes('pbpExplainInvoke(key === "d" ? "dict" : "explain")') &&
+    explainInit.indexOf('if (_pbpExplainTrigger === "off") return') >= 0 &&
+    explainInit.indexOf('if (_pbpExplainTrigger === "off") return') < explainInit.indexOf('document.addEventListener("keydown", _pbpExplainOnShortcut)'),
+    "t/d shortcuts bypass the shared translation/selection action chains");
+}
+check(/\{ chips: \["t"\], key: "kbdHelpTranslate" \}/.test(mdReaderJsSource) &&
+  /\{ chips: \["d"\], key: "kbdHelpDictionary" \}/.test(mdReaderJsSource) &&
+  /\{ chips: \["v"\], key: "kbdHelpToggleView" \}/.test(mdReaderJsSource) &&
+  /\{ chips: \["h", "1-5"\], key: "kbdHelpHighlight" \}/.test(mdReaderJsSource) &&
+  /<kbd>t<\/kbd>[\s\S]*data-i18n="kbdHelpTranslate"/.test(optionsHtml) &&
+  /<kbd>d<\/kbd>[\s\S]*data-i18n="kbdHelpDictionary"/.test(optionsHtml) &&
+  !optionsHtml.includes("<kbd>V</kbd>") && !optionsHtml.includes("<kbd>H</kbd>"),
+  "keyboard help does not expose t/d and lowercase v/h consistently");
+check(/btn\.setAttribute\("aria-keyshortcuts", "t"\)/.test(mdTranslateJs) &&
+  /wrap\.setAttribute\("aria-keyshortcuts", "v"\)/.test(mdTranslateJs) &&
+  /b\.setAttribute\("aria-pressed", "false"\)/.test(mdTranslateJs) &&
+  /b\.setAttribute\("aria-pressed", active \? "true" : "false"\)/.test(mdTranslateJs) &&
+  mdTranslateJs.includes('t(key) + " (v)"'),
+  "translation controls lack lowercase shortcut metadata or production toggle state");
+check(mdTranslateJs.includes('scrollIntoView({ block: "start", behavior: "instant" })') &&
+  mdTranslateJs.includes("document.startViewTransition") &&
+  mdTranslateJs.includes('matchMedia("(prefers-reduced-motion: reduce)")') &&
+  mdCss.includes("view-transition-name: pbp-tr-article") &&
+  /::view-transition-group\(root\),[\s\S]{0,100}::view-transition-group\(pbp-tr-article\) \{ animation: none; \}/.test(mdCss) &&
+  mdCss.includes("animation-name: pbp-tr-fade-out") && mdCss.includes("animation-name: pbp-tr-fade-in") &&
+  mdCss.includes("140ms"),
+  "translation view switching lacks instant anchor restore or reduced-motion-safe article transition");
+{
+  const settle = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrSettleViewAnchor"),
+    mdTranslateJs.indexOf("function _pbpTrApplyMode"));
+  check(settle.includes('behavior: "instant"') && !settle.includes(".focus("),
+    "translation view anchor restore animates scroll or steals keyboard focus");
+}
+{
+  const focus = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrCaptureFocusHandoff"),
+    mdTranslateJs.indexOf("function _pbpTrCaptureViewAnchor"));
+  const applyMode = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrApplyMode"),
+    mdTranslateJs.indexOf("function _pbpTrSetMode"));
+  check(focus.includes('mode !== "original" && mode !== "translated"') &&
+    focus.includes("document.activeElement !== handoff.active") &&
+    focus.includes("target.focus({ preventScroll: true })") &&
+    applyMode.indexOf("_pbpTrApplyFocusHandoff(focusHandoff)") < applyMode.indexOf("_pbpTrSettleViewAnchor(anchor, mode)"),
+  "translation view switching can hide focus or let focus scroll override anchor restoration");
+}
+check(/orig\.dataset\.pbTrDone = "1";[\s\S]{0,380}_pbpTrSyncToc\(st, "translated"\)/.test(mdTranslateJs),
+  "md-translate.js: progressively filled translated headings do not update the live TOC");
 
 const optionsTabs = optionsHtml.slice(optionsHtml.indexOf('<div class="tabs"'), optionsHtml.indexOf('</div>', optionsHtml.indexOf('<div class="tabs"')) + 6);
 check(!optionsTabs.includes('id="reset-panel-btn"') && /id="mobile-tab-select"/.test(optionsHtml),
@@ -486,6 +628,47 @@ check(skimRegenFocus.indexOf("body.focus()") >= 0 && skimRegenFocus.indexOf("bod
 const explainRun = mdAskJs.slice(mdAskJs.indexOf("async function _pbpExplainRun"), mdAskJs.indexOf("// ---- Explain: open", mdAskJs.indexOf("async function _pbpExplainRun")));
 check(explainRun.indexOf("body.focus()") >= 0 && explainRun.indexOf("body.focus()") < explainRun.indexOf("body.replaceChildren()"),
   "md-ask.js: Explain retry removes its focused button before focus handoff");
+const explainShell = mdAskJs.slice(mdAskJs.indexOf("// ---- Explain: popover shell"), mdAskJs.indexOf("// ---- Explain: context pack"));
+check(explainShell.includes('pop.setAttribute("popover", "manual")') &&
+  explainShell.includes("PBP_EXPLAIN_PIN_SVG") && explainShell.includes("PBP_EXPLAIN_CLOSE_SVG") &&
+  explainShell.includes('pin.className = "xp-pin"') && explainShell.includes('close.className = "xp-close"') &&
+  explainShell.includes('pin.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight")') &&
+  explainShell.includes('pin.setAttribute("aria-pressed"') && explainShell.includes('pin.setAttribute("aria-label", label)') &&
+  explainShell.includes('close.setAttribute("aria-label", t("explainClose"))'),
+"md-ask.js: explain-pop is not a manual popover with native pin/close SVG controls");
+check(explainShell.indexOf("_pbpExplainSetPinned(pop, false)") > explainShell.indexOf("pop.appendChild(head)"),
+  "md-ask.js: explain pin is initialized before it becomes a popover descendant");
+check(explainShell.includes("setPointerCapture") && explainShell.includes('addEventListener("pointermove"') &&
+  explainShell.includes('addEventListener("pointercancel"') && explainShell.includes('addEventListener("resize"') &&
+  explainShell.includes("new ResizeObserver") && explainShell.includes('matches(":popover-open")') &&
+  explainShell.includes("e.altKey") && explainShell.includes("pbpExplainClampPosition") &&
+  explainShell.includes('dragZone.className = "xp-drag-zone"') && explainShell.includes("!e.isPrimary"),
+"md-ask.js: explain-pop lacks pointer capture, viewport clamping, resize handling, or Alt+Arrow movement");
+check(explainShell.includes('document.querySelectorAll(":popover-open")') &&
+  explainShell.includes("some((el) => el !== pop)"),
+"md-ask.js: pinned explain-pop consumes Escape before a visually upper transient popover");
+check(explainRun.includes("if (_pbpExplainAbort === ctrl) body.removeAttribute(\"aria-busy\")"),
+"md-ask.js: a superseded Explain run can clear the active run's busy state");
+check(explainShell.includes("explainTranslateSelection") && explainShell.includes("dictLookupSelection") &&
+  explainRun.includes("explainTranslateLoading") && explainRun.includes("dictLoading") &&
+  explainRun.includes("explainAiNotConfigured") && explainRun.includes("explainTranslateAiNotConfigured"),
+"md-ask.js: dialog names, loading states, or no-AI messages are not action-specific");
+const explainOpen = mdAskJs.slice(mdAskJs.indexOf("function _pbpExplainOpenPop"), mdAskJs.indexOf("// ---- Card AI row entry point"));
+check(explainOpen.includes("_pbpExplainPinned") && explainOpen.includes('if (!pop.matches(":popover-open")) pop.showPopover()') &&
+  explainOpen.includes("if (!_pbpExplainPinned)"),
+"md-ask.js: pinned explain re-entry can hide/show or re-anchor the popover");
+check(mdReaderJsSource.includes("_pbpReaderKeepPopover") &&
+  (mdReaderJsSource.match(/_pbpReaderHideOtherPopovers\(/g) || []).length >= 5 &&
+  mdHighlightJs.includes("pbpExplainDismissIfUnpinned"),
+"reader/highlight popover mutual exclusion does not preserve a pinned explain-pop");
+check(mdCss.includes(".xp-window-actions") && mdCss.includes(".xp-pin") && mdCss.includes(".xp-close") &&
+  mdCss.includes(".xp-dragging") && mdCss.includes(".xp-drag-zone") &&
+  mdCss.includes("@media (max-width: 420px)") && !/\.xp-(?:pin|close)[^\n]*[📌📍✕×]/u.test(mdCss),
+"md-preview.css: explain window controls or drag state are missing, or use literal symbol glyphs");
+check(mdDictJs.includes("dictMatchedHeadword") && mdDictJs.includes("dictPermissionDenied") &&
+  mdDictJs.includes("dictConnectRetry") && mdDictJs.includes("dictUpdateVocab") &&
+  mdDictJs.includes("Intl.DisplayNames") && optionsVocabJs.includes("pbpDictLanguageLabel"),
+"dictionary UI does not disclose fallback headwords, permission denial, saved-word updates, or localized language names");
 
 const articleInject = mdPreviewJs.indexOf("renderedView.innerHTML = renderedHtml");
 const firstProgressQueue = mdPreviewJs.indexOf("queueReadingStats();", articleInject);
@@ -534,7 +717,6 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
 // reproduced live -- each check encodes one so it cannot silently return;
 // .qa-scan/typo-export-probe.mjs is the manual behavioral deep-probe, this is
 // the per-verify gate). ----
-const mdCss = read("md-preview.css");
 const mdReaderJs = read("md-reader.js");
 // (1) Load race: the tier maps/apply MUST live in shared.js (loaded before
 // md-preview.js), never in the later md-reader.js defer script; and the

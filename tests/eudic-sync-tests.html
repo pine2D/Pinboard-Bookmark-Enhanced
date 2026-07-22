@@ -132,7 +132,7 @@ const _origCall = pbpEudicCall;
     { term: "fr1", language: "fr" },
     { term: "de1", language: "de" }
   ], { token: "test" });
-  assert(result.rateLimited === true && result.failed === 5, "403: all 5 words counted failed");
+  assert(result.forbidden === true && result.failed === 5, "403: all 5 words counted failed without guessing a rate-limit window");
   assert(callCount === 1, "403: circuit break issues NO further calls");
 
   section("pbpEudicSendRows - mixed results");

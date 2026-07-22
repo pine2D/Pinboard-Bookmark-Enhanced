@@ -1,0 +1,261 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>ai-cache Tests</title>
+<style>body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px solid #ddd}.pass{color:#176}.fail{color:#b00}</style>
+</head><body><div id="results"></div>
+<script src="../ai-cache.js"></script>
+<script>
+let pass = 0, fail = 0;
+const results = document.getElementById("results");
+function assert(condition, message) { if (!condition) throw new Error(message || "assertion failed"); }
+async function test(name, fn) {
+  const row = document.createElement("div");
+  try { await fn(); pass++; row.className = "case pass"; row.textContent = "PASS " + name; }
+  catch (error) { fail++; row.className = "case fail"; row.textContent = "FAIL " + name + "\n  " + error.message; }
+  results.appendChild(row);
+}
+
+async function db() { return _pbpAiOpenDB(); }
+async function clearEntries() {
+  const opened = await db();
+  await new Promise((resolve) => {
+    const tx = opened.transaction(_PBP_AI_STORE, "readwrite");
+    tx.objectStore(_PBP_AI_STORE).clear();
+    tx.oncomplete = resolve; tx.onabort = resolve; tx.onerror = () => {};
+  });
+}
+async function seed(entries) {
+  const opened = await db();
+  await new Promise((resolve) => {
+    const tx = opened.transaction(_PBP_AI_STORE, "readwrite");
+    const store = tx.objectStore(_PBP_AI_STORE);
+    entries.forEach((entry) => store.put(entry));
+    tx.oncomplete = resolve; tx.onabort = resolve; tx.onerror = () => {};
+  });
+}
+async function allEntries() {
+  const opened = await db();
+  return new Promise((resolve) => {
+    const tx = opened.transaction(_PBP_AI_STORE, "readonly");
+    const req = tx.objectStore(_PBP_AI_STORE).getAll();
+    req.onsuccess = () => resolve(req.result || []); req.onerror = () => resolve([]);
+  });
+}
+async function rawEntry(key) {
+  const opened = await db();
+  return new Promise((resolve) => {
+    const tx = opened.transaction(_PBP_AI_STORE, "readonly");
+    const req = tx.objectStore(_PBP_AI_STORE).get(key);
+    req.onsuccess = () => resolve(req.result || null); req.onerror = () => resolve(null);
+  });
+}
+function rows(prefix, count, firstTs) {
+  return Array.from({ length: count }, (_, i) => ({ key: prefix + i, result: i, ts: firstTs + i }));
+}
+function counts(entries) {
+  const dict2 = entries.filter((entry) => _pbpAiIsDict2Key(entry.key)).length;
+  return { dict2, other: entries.length - dict2 };
+}
+
+(async () => {
+  await test("schema remains DB version 1 with the existing entries store", async () => {
+    const opened = await db();
+    assert(opened.version === 1, "version=" + opened.version);
+    assert(opened.objectStoreNames.length === 1 && opened.objectStoreNames.contains("entries"), "store changed");
+  });
+
+  await test("dict2 boundary keeps exactly 500 records", async () => {
+    await clearEntries();
+    await seed(rows("dict2_en|word", 499, 1));
+    await pbpAiCacheSet("dict2_en|word499", "new", 500);
+    const count = counts(await allEntries());
+    assert(count.dict2 === 500 && count.other === 0, JSON.stringify(count));
+  });
+
+  await test("dict2 record 501 evicts the oldest dict2 ts", async () => {
+    await clearEntries();
+    await seed(rows("dict2_fr|word", 500, 1));
+    await pbpAiCacheSet("dict2_fr|newest", "new", 501);
+    const count = counts(await allEntries());
+    assert(count.dict2 === 500, "dict2=" + count.dict2);
+    assert(!await rawEntry("dict2_fr|word0"), "oldest dict2 survived");
+    assert(await rawEntry("dict2_fr|newest"), "newest dict2 was evicted");
+  });
+
+  await test("dict2 write older than every existing ts evicts itself", async () => {
+    await clearEntries();
+    await seed(rows("dict2_it|word", 500, 100));
+    await pbpAiCacheSet("dict2_it|stale-write", "stale", 1);
+    const count = counts(await allEntries());
+    assert(count.dict2 === 500, "dict2=" + count.dict2);
+    assert(!await rawEntry("dict2_it|stale-write"), "oldest new dict2 write survived");
+    assert(await rawEntry("dict2_it|word0"), "existing dict2 LRU head was incorrectly evicted");
+  });
+
+  await test("other-cache boundary is 200 and record 201 evicts its oldest ts", async () => {
+    await clearEntries();
+    await seed(rows("tr_test_", 199, 1));
+    await pbpAiCacheSet("ask_boundary", "two-hundred", 200);
+    let count = counts(await allEntries());
+    assert(count.other === 200, "boundary=" + JSON.stringify(count));
+    await pbpAiCacheSet("skim_overflow", "two-hundred-one", 201);
+    count = counts(await allEntries());
+    assert(count.other === 200 && count.dict2 === 0, "overflow=" + JSON.stringify(count));
+    assert(!await rawEntry("tr_test_0"), "oldest other record survived");
+  });
+
+  await test("other-cache write older than every existing ts evicts itself", async () => {
+    await clearEntries();
+    await seed(rows("ask_existing_", 200, 100));
+    await pbpAiCacheSet("skim_stale_write", "stale", 1);
+    const count = counts(await allEntries());
+    assert(count.other === 200 && count.dict2 === 0, JSON.stringify(count));
+    assert(!await rawEntry("skim_stale_write"), "oldest new other-cache write survived");
+    assert(await rawEntry("ask_existing_0"), "existing other-pool LRU head was incorrectly evicted");
+  });
+
+  await test("mixed dict2 and other quotas never evict each other", async () => {
+    await clearEntries();
+    await seed(rows("dict2_de|word", 500, 1).concat(rows("tr_mixed_", 200, 1001)));
+    await pbpAiCacheSet("dict2_de|newest", "dict", 2001);
+    let count = counts(await allEntries());
+    assert(count.dict2 === 500 && count.other === 200, "dict overflow=" + JSON.stringify(count));
+    assert(await rawEntry("tr_mixed_0"), "dict overflow evicted other cache");
+    await pbpAiCacheSet("ask_mixed_newest", "other", 2002);
+    count = counts(await allEntries());
+    assert(count.dict2 === 500 && count.other === 200, "other overflow=" + JSON.stringify(count));
+    assert(await rawEntry("dict2_de|newest"), "other overflow evicted dict2 cache");
+  });
+
+  await test("dictctx2 belongs to the 200-record other pool and consumes no dict2 slot", async () => {
+    await clearEntries();
+    await seed(rows("dict2_es|word", 500, 100).concat(
+      [{ key: "dictctx2_oldest", result: "context", ts: 1 }], rows("gloss_ctx_", 198, 2)));
+    await pbpAiCacheSet("ask_ctx_boundary", "other-200", 200);
+    let count = counts(await allEntries());
+    assert(count.dict2 === 500 && count.other === 200, "boundary=" + JSON.stringify(count));
+    await pbpAiCacheSet("skim_ctx_overflow", "other-201", 201);
+    count = counts(await allEntries());
+    assert(count.dict2 === 500 && count.other === 200, "overflow=" + JSON.stringify(count));
+    assert(!await rawEntry("dictctx2_oldest"), "dictctx2 was not evicted as other cache");
+  });
+
+  await test("exact-form dict2 aliases each consume one of the 500 slots", async () => {
+    await clearEntries();
+    await seed(rows("dict2_fr|seed", 499, 1));
+    await pbpAiCacheSet("dict2_fr|Défense", { same: true }, 500);
+    await pbpAiCacheSet("dict2_fr|défense", { same: true }, 501);
+    const count = counts(await allEntries());
+    assert(count.dict2 === 500, "dict2=" + count.dict2);
+    assert(await rawEntry("dict2_fr|Défense") && await rawEntry("dict2_fr|défense"), "alias missing");
+    assert(!await rawEntry("dict2_fr|seed0"), "aliases did not consume separate slots");
+  });
+
+  await test("stale dict2 read-touch protects the hot record from ts-LRU eviction", async () => {
+    await clearEntries();
+    const stale = Date.now() - 7200000;
+    await seed([
+      { key: "dict2_en|hot", result: "hot", ts: stale },
+      { key: "dict2_en|cold", result: "cold", ts: stale + 1 }
+    ].concat(rows("dict2_en|fill", 498, stale + 2)));
+    await pbpAiCacheGet("dict2_en|hot");
+    let touched = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      touched = await rawEntry("dict2_en|hot");
+      if (touched && touched.ts > stale) break;
+    }
+    assert(touched && touched.ts > stale, "read-touch did not update ts");
+    await pbpAiCacheSet("dict2_en|newest", "new", Date.now());
+    assert(await rawEntry("dict2_en|hot"), "read-hot dict2 was evicted");
+    assert(!await rawEntry("dict2_en|cold"), "older cold dict2 survived");
+  });
+
+  await test("legacy dict_ keys stay in the 200-record other pool", async () => {
+    await clearEntries();
+    await seed(rows("dict2_ja|word", 500, 1000).concat(
+      [{ key: "dict_legacy", result: "legacy", ts: 1 }], rows("tr_legacy_", 198, 2)));
+    assert(!_pbpAiIsDict2Key("dict_legacy"), "legacy prefix misclassified as dict2");
+    await pbpAiCacheSet("ask_legacy_boundary", "other-200", 200);
+    await pbpAiCacheSet("skim_legacy_overflow", "other-201", 201);
+    const count = counts(await allEntries());
+    assert(count.dict2 === 500 && count.other === 200, JSON.stringify(count));
+    assert(!await rawEntry("dict_legacy"), "legacy dict_ escaped the other-pool cap");
+  });
+
+  await test("full dict2 pool keeps all concurrent 2, 5, and 10 new writes", async () => {
+    for (const concurrency of [2, 5, 10]) {
+      await clearEntries();
+      await seed(rows("dict2_concurrent|old", 500, 1));
+      const keys = Array.from({ length: concurrency }, (_, i) => "dict2_concurrent|new" + i);
+      await Promise.all(keys.map((key, i) => pbpAiCacheSet(key, "new", 10000 + i)));
+      const count = counts(await allEntries());
+      assert(count.dict2 === 500, "concurrency " + concurrency + ": " + JSON.stringify(count));
+      for (const key of keys) assert(await rawEntry(key), "concurrency " + concurrency + " lost " + key);
+    }
+  });
+
+  await test("full other pool keeps all concurrent 2, 5, and 10 new writes", async () => {
+    for (const concurrency of [2, 5, 10]) {
+      await clearEntries();
+      await seed(rows("tr_concurrent_old_", 200, 1));
+      const keys = Array.from({ length: concurrency }, (_, i) => "ask_concurrent_new_" + i);
+      await Promise.all(keys.map((key, i) => pbpAiCacheSet(key, "new", 10000 + i)));
+      const count = counts(await allEntries());
+      assert(count.other === 200, "concurrency " + concurrency + ": " + JSON.stringify(count));
+      for (const key of keys) assert(await rawEntry(key), "concurrency " + concurrency + " lost " + key);
+    }
+  });
+
+  await test("simultaneous writes to full pools never cross-evict", async () => {
+    await clearEntries();
+    await seed(rows("dict2_mixed_concurrent|old", 500, 1).concat(rows("tr_mixed_concurrent_", 200, 1)));
+    const dictKeys = Array.from({ length: 10 }, (_, i) => "dict2_mixed_concurrent|new" + i);
+    const otherKeys = Array.from({ length: 10 }, (_, i) => "ask_mixed_concurrent_" + i);
+    await Promise.all(dictKeys.map((key, i) => pbpAiCacheSet(key, "dict", 10000 + i))
+      .concat(otherKeys.map((key, i) => pbpAiCacheSet(key, "other", 11000 + i))));
+    const count = counts(await allEntries());
+    assert(count.dict2 === 500 && count.other === 200, JSON.stringify(count));
+    for (const key of dictKeys.concat(otherKeys)) assert(await rawEntry(key), "lost new mixed key " + key);
+  });
+
+  await test("empty-pool Promise.all 501 and 201 writes finish at exact caps", async () => {
+    await clearEntries();
+    const dictWrites = Array.from({ length: 501 }, (_, i) =>
+      pbpAiCacheSet("dict2_empty|" + i, i, i + 1));
+    const otherWrites = Array.from({ length: 201 }, (_, i) =>
+      pbpAiCacheSet("tr_empty_" + i, i, i + 1));
+    await Promise.all(dictWrites.concat(otherWrites));
+    const count = counts(await allEntries());
+    assert(count.dict2 === 500 && count.other === 200, JSON.stringify(count));
+    assert(await rawEntry("dict2_empty|500") && await rawEntry("tr_empty_200"), "newest empty-pool writes missing");
+  });
+
+  await test("concurrent same-key append preserves every update while pruning its pool", async () => {
+    await clearEntries();
+    await seed(rows("tr_append_old_", 200, 1));
+    const key = "ask_append_concurrent";
+    await Promise.all(Array.from({ length: 10 }, (_, i) =>
+      pbpAiCacheAppend(key, (previous) => (Array.isArray(previous) ? previous : []).concat([i]), 10000 + i)));
+    const count = counts(await allEntries());
+    const entry = await rawEntry(key);
+    assert(count.other === 200 && count.dict2 === 0, JSON.stringify(count));
+    assert(entry && entry.result.length === 10, "append updates lost: " + JSON.stringify(entry && entry.result));
+    assert(new Set(entry.result).size === 10, "append values duplicated or missing");
+  });
+
+  await test("throwing append transform rolls back without changing the existing record", async () => {
+    await clearEntries();
+    await seed(rows("tr_rollback_old_", 199, 1).concat([
+      { key: "ask_append_rollback", result: ["kept"], ts: 200 }
+    ]));
+    await pbpAiCacheAppend("ask_append_rollback", () => { throw new Error("stop"); }, 10000);
+    const count = counts(await allEntries());
+    const entry = await rawEntry("ask_append_rollback");
+    assert(count.other === 200 && count.dict2 === 0, JSON.stringify(count));
+    assert(entry && entry.ts === 200 && entry.result.join(",") === "kept", "append rollback changed record");
+  });
+
+  await clearEntries();
+  document.title = fail ? "FAIL ai-cache Tests" : "PASS ai-cache Tests";
+})();
+</script></body></html>

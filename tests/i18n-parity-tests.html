@@ -101,7 +101,8 @@ async function loadLocale(loc) {
     "labelNotes","tagCount","tagCountPlural","qlNotes","sepUnderscore",
     "secNotifications","qlNotesTitle","mdOptImages","aiContentSourceLocal",
     "optPopupWidth450","trProgress","labelModel","tagGovKindSeparator",
-    "dictLangAuto" // loanword: "Auto" is the same in all target languages
+    "dictLangAuto", // loanword: "Auto" is the same in all target languages
+    "vocabSortAz","vocabSortZa" // locale-neutral sort notation where the script uses Latin terms
   ]);
   for (const loc of ["de","fr","pl","ru","zh_HK"]) {
     const offenders = Object.keys(msgs.en).filter(k =>
@@ -130,6 +131,134 @@ async function loadLocale(loc) {
     check(`H6 ${loc} has every en key`, missing.length === 0, `missing: ${missing.slice(0,12).join(", ")}`);
     check(`H6 ${loc} has no extra keys`, extra.length === 0, `extra: ${extra.slice(0,12).join(", ")}`);
   }
+  // H7: the two shortcut-help surfaces must describe the same new behavior.
+  check("H7 all locales expose translation/dictionary help and the three-state view",
+    LOCALES.every((loc) => msgs[loc].kbdHelpTranslate?.message &&
+      msgs[loc].kbdHelpDictionary?.message && msgs[loc].kbdHelpToggleView?.message),
+    "one or more shortcut-help messages are missing");
+  check("H7 selection-trigger labels name both e and d",
+    LOCALES.every((loc) => ["selectionTriggerHotkey", "explainTriggerHotkey"].every((key) => {
+      const message = msgs[loc][key]?.message || "";
+      return /e/.test(message) && /d/.test(message);
+    })), "one or more trigger labels still describe only e");
+  check("H8 all locales expose explain pin, unpin, close and move help",
+    LOCALES.every((loc) => ["explainPin", "explainUnpin", "explainClose", "explainMoveHint"]
+      .every((key) => msgs[loc][key]?.message)),
+    "one or more explain window-control messages are missing");
+  const VOCAB_SCALE_KEYS = ["vocabSearchPlaceholder", "vocabGroupFilterAria", "vocabAllGroups",
+    "vocabSortAria", "vocabSortLatest", "vocabSortOldest", "vocabSortAz", "vocabSortZa",
+    "vocabSelectionActions", "vocabSelectAll", "vocabInvertSelection", "vocabBatchActions",
+    "vocabGroupNamePlaceholder", "vocabAddToGroup", "vocabBatchDelete", "vocabNoResults",
+    "vocabListAria", "vocabLoadMore", "vocabReadingSection", "vocabLearningSection",
+    "vocabSelectWord", "vocabResultCount", "vocabSelectedCount", "vocabBatchDeleteConfirm",
+    "vocabBatchFailed", "vocabSelectionChanged", "vocabRefreshFailed", "vocabBatchDeleted",
+    "vocabBatchGrouped", "vocabGroupRequired", "vocabLoading", "dictVocabEmpty", "dictPackHint"];
+  check("H9 all locales expose the scalable vocabulary controls and complete status messages",
+    LOCALES.every((loc) => VOCAB_SCALE_KEYS.every((key) => msgs[loc][key]?.message)),
+    "one or more scalable-vocabulary messages are missing");
+  check("H9 vocabulary placeholders keep the same runtime contract in every locale",
+    LOCALES.every((loc) => ["vocabLoadMore", "vocabSelectWord", "vocabResultCount", "dictVocabEmpty",
+      "vocabSelectedCount", "vocabBatchDeleteConfirm", "vocabBatchDeleted", "vocabBatchGrouped"]
+      .every((key) => JSON.stringify(Object.keys(msgs[loc][key]?.placeholders || {}).sort()) ===
+        JSON.stringify(Object.keys(msgs.en[key]?.placeholders || {}).sort()))),
+    "one or more vocabulary messages changed its placeholder set");
+  const PACK_HINT_MARKERS = {
+    en: ["Simplified", "Traditional", "English", "does not support"],
+    zh_CN: ["简体", "繁体", "英文", "不支持"],
+    zh_TW: ["簡體", "繁體", "英文", "不支援"],
+    zh_HK: ["簡體", "繁體", "英文", "不支援"],
+    ja: ["簡体字", "繁体字", "英語", "対応していません"],
+    de: ["vereinfachten", "traditionellen", "englische", "nicht unterstützt"],
+    fr: ["simplifiés", "traditionnels", "anglais", "pas prise en charge"],
+    pl: ["uproszczonymi", "tradycyjnymi", "angielsku", "Nie obsługuje"],
+    ru: ["упрощённом", "традиционном", "английском", "не поддерживается"]
+  };
+  check("H9 CC-CEDICT hint states both Chinese scripts, English definitions, and no English lookup",
+    LOCALES.every((loc) => PACK_HINT_MARKERS[loc].every((marker) =>
+      msgs[loc].dictPackHint.message.includes(marker))),
+    "one or more dictPackHint messages changed the v2 capability boundary");
+  const DICT_HONESTY_KEYS = ["explainTranslateSelection", "explainTranslateLoading", "dictLoading",
+    "explainAiNotConfigured", "explainTranslateAiNotConfigured", "dictMatchedHeadword",
+    "dictUpdateVocab", "dictTagPinyin", "dictTagSimplified", "dictTagTraditional",
+    "dictConnectRetry", "dictPermissionDenied"];
+  check("H10 all locales expose action-specific and honest dictionary messages",
+    LOCALES.every((loc) => DICT_HONESTY_KEYS.every((key) => msgs[loc][key]?.message)),
+    "one or more action or dictionary honesty messages are missing");
+  check("H10 English permission copy names the intermediary and current-dictionary miss boundary",
+    /freedictionaryapi\.com/i.test(msgs.en.dictConnectHint?.message || "") &&
+      /Wiktionary/i.test(msgs.en.dictConnectHint?.message || "") &&
+      !/connect to Wiktionary/i.test(msgs.en.dictConnect?.message || "") &&
+      /connected dictionary/i.test(msgs.en.dictNoEntry?.message || ""),
+    "English copy blurs freedictionaryapi with Wiktionary or claims a global miss");
+  const DICT_SEMANTIC_BOUNDARIES = {
+    de: {
+      connect: [/Online-Wörterbuch/i, /Zugriff|Berechtigung|erlaub|zulass|freigeb/i],
+      miss: [/Online-Wörterbuch/i, /kein|nicht|nichts|ohne/i, /Eintrag|Treffer|Ergebnis|gefunden/i],
+      connectedCalque: /\bverbunden(?:e|en|er|es|em)?\b/i
+    },
+    fr: {
+      connect: [/dictionnaire en ligne/i, /accès|autorisation|autoris|permettre/i],
+      miss: [/dictionnaire en ligne/i, /aucun|aucune|pas|introuvable|sans résultat|ne .* trouv/i,
+        /entrée|résultat|trouv/i],
+      connectedCalque: /connect(?:é|ée|és|ées)/i
+    },
+    pl: {
+      connect: [/słownik\w* online/i, /dostęp|zezwol|zezwól|pozwol|pozwól|uprawnien/i],
+      miss: [/słownik\w* online/i, /nie|brak|bez|żadn/i, /hasł|wynik|rezultat|znalezion/i],
+      connectedCalque: /\bpodłączon/i
+    },
+    ru: {
+      connect: [/онлайн-словар/i, /доступ|разреш|позвол/i],
+      miss: [/онлайн-словар/i, /не|ничего|нет/i, /найден|результат|стать|совпаден/i],
+      connectedCalque: /подключ[её]нн/i
+    },
+    ja: {
+      connect: [/オンライン辞書/, /アクセス|権限|許可|利用できる/],
+      miss: [/オンライン辞書/, /見つかりません|見つから|該当.*(?:なし|ありません)|結果.*(?:なし|ありません)/],
+      connectedCalque: /接続中/
+    }
+  };
+  const dictBoundaryFailures = [];
+  const dictCalqueFailures = [];
+  for (const [loc, contract] of Object.entries(DICT_SEMANTIC_BOUNDARIES)) {
+    const connect = msgs[loc].dictConnect?.message || "";
+    const miss = msgs[loc].dictNoEntry?.message || "";
+    if (!contract.connect.every((pattern) => pattern.test(connect))) dictBoundaryFailures.push(`${loc}.dictConnect`);
+    if (!contract.miss.every((pattern) => pattern.test(miss))) dictBoundaryFailures.push(`${loc}.dictNoEntry`);
+    if (contract.connectedCalque.test(miss)) dictCalqueFailures.push(`${loc}.dictNoEntry`);
+  }
+  check("H11 reviewed locales preserve online-dictionary permission and miss semantics",
+    dictBoundaryFailures.length === 0, `semantic boundary failed: ${dictBoundaryFailures.join(", ")}`);
+  check("H11 reviewed locales reject the known literal connected-dictionary calques",
+    dictCalqueFailures.length === 0, `connected calque found: ${dictCalqueFailures.join(", ")}`);
+  const OPTIONS_HONESTY_KEYS = ["vocabOwnerNoAccount", "vocabLoadFailed", "vocabExportFailed",
+    "vocabAccountChanged", "vocabSettingsSaveFailed", "dictEudicSupportedHint",
+    "dictAnkiHostPermissionDenied", "dictAnkiConnectPermissionFailed",
+    "dictAnkiConnectPermissionDenied", "dictAnkiVersionUnsupported", "dictAnkiFieldCheckFailed",
+    "dictAnkiFailed", "dictEudicHostPermissionDenied", "dictEudicRejected", "dictEudicFailed",
+    "dictPackImportHint", "dictPackReadFailed", "dictPackDeleteFailed"];
+  check("H12 all locales expose scoped export/integration and storage-stage messages",
+    LOCALES.every((loc) => OPTIONS_HONESTY_KEYS.every((key) => msgs[loc][key]?.message)),
+    "one or more Options scope/error messages are missing");
+  check("H12 English Options copy states account scope, all-row actions, language support, and pack formats",
+    /current Pinboard account/i.test(msgs.en.vocabResultCount?.message || "") &&
+      /\$OWNER\$/.test(msgs.en.vocabResultCount?.message || "") &&
+      /current Pinboard account/i.test(msgs.en.dictVocabEmpty?.message || "") &&
+      /\.tsv/i.test(msgs.en.dictExportTsv?.message || "") &&
+      /^Send all\b/i.test(msgs.en.dictAnkiSend?.message || "") &&
+      /all supported words/i.test(msgs.en.dictEudicSend?.message || "") &&
+      ["en", "fr", "de", "es"].every((code) => (msgs.en.dictEudicSupportedHint?.message || "").includes(code)) &&
+      /Chinese/i.test(msgs.en.dictPackSection?.message || "") && /English/i.test(msgs.en.dictPackSection?.message || "") &&
+      [".txt", ".txt.gz", ".zip"].every((ext) => (msgs.en.dictPackImportHint?.message || "").includes(ext)),
+    "English copy obscures scope, support, direction, or accepted formats");
+  check("H12 English failure copy does not invent a 403 wait window or a single import cause",
+    /token/i.test(msgs.en.dictEudicRejected?.message || "") &&
+      /retry|again|later/i.test(msgs.en.dictEudicRejected?.message || "") &&
+      !/\b(?:1|24)\s*(?:h|hour)/i.test(msgs.en.dictEudicRejected?.message || "") &&
+      /file|format/i.test(msgs.en.dictPackFailed?.message || "") &&
+      /storage/i.test(msgs.en.dictPackFailed?.message || "") &&
+      msgs.en.dictPackReadFailed?.message !== msgs.en.dictPackEmpty?.message,
+    "English failure copy invents a cause/window or collapses read failure into empty state");
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>

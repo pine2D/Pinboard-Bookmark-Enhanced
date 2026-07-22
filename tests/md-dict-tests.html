@@ -35,6 +35,9 @@ assertEq(pbpDictPrimaryLang("ZH_cn"), "zh", "ZH_cn -> zh");
 assertEq(pbpDictPrimaryLang("  de "), "de", "trims");
 assertEq(pbpDictPrimaryLang(""), "", "empty -> empty");
 assertEq(pbpDictPrimaryLang(null), "", "null -> empty");
+assertEq(pbpDictLanguageLabel("und", "en"), "", "unknown language code stays hidden from users");
+assert(pbpDictLanguageLabel("fr", "en") !== "FR" && pbpDictLanguageLabel("fr", "en").length > 2,
+  "supported language code uses the platform's localized language name");
 
 section("pbpDictRouteLang");
 assertEq(pbpDictRouteLang("en", true, "de", "fr"), "fr", "manual wins");
@@ -49,6 +52,15 @@ assertEq(pbpDictVocabKey("", "en", "x"), "ownerless|en|x", "empty owner -> owner
 assertEq(pbpDictVocabKey("acct_u1", "zh", "书"), "acct_u1|zh|书", "CJK passthrough");
 assertEq(pbpDictCacheKeyPublic("en", "New  York"), pbpDictCacheKeyPublic("en", "New York"), "public key collapses whitespace");
 assertEq(pbpDictCacheKeyPublic("de", "Straße"), "de|straße", "public key has no owner");
+assertEq(pbpDictCacheKeyExact("en", "Polish"), "en|Polish", "query key preserves uppercase");
+assertEq(pbpDictCacheKeyExact("en", "polish"), "en|polish", "query key keeps lowercase separate");
+assertEq(pbpDictCacheKeyExact("fr", "  Défense  "), "fr|Défense", "query key trims but preserves case");
+assertEq(pbpDictCacheKeyExact("en", "New  York"), "en|New York", "query key collapses whitespace");
+assertEq(pbpDictCacheKeyExact("fr", "Défense"), "fr|Défense", "query key NFC-normalizes");
+assertEq(pbpDictQueryCacheKey("fr", "Défense"), "dict2_fr|Défense", "online cache uses versioned dict2 prefix");
+assertEq(pbpDictLowerCandidate("Défense", "fr"), "défense", "French uppercase gets a lowercase candidate");
+assertEq(pbpDictLowerCandidate("défense", "fr"), "", "already-lowercase term has no duplicate candidate");
+assertEq(pbpDictLowerCandidate("Word", "xx"), "", "unsupported locale never reaches toLocaleLowerCase");
 
 section("pbpDictOwnerScope");
 assertEq(pbpDictOwnerScope("alice"), "acct_alice", "account -> acct_ prefix");
@@ -61,13 +73,6 @@ assertEq(pbpDictSafeUrl("http://a.example/x"), "http://a.example/x", "http passe
 assertEq(pbpDictSafeUrl("javascript:alert(1)"), "", "javascript: blocked");
 assertEq(pbpDictSafeUrl("data:text/html,x"), "", "data: blocked");
 assertEq(pbpDictSafeUrl("not a url"), "", "garbage blocked");
-
-section("pbpDictLemmaRetry");
-assert(pbpDictLemmaRetry(404, "run", "running", "en") === true, "404 + different lemma -> retry");
-assert(pbpDictLemmaRetry(404, "Running", "running", "en") === false, "same after normalize -> no retry");
-assert(pbpDictLemmaRetry(404, "-", "running", "en") === false, "'-' sentinel -> no retry");
-assert(pbpDictLemmaRetry(404, "", "running", "en") === false, "empty -> no retry");
-assert(pbpDictLemmaRetry(200, "run", "running", "en") === false, "non-404 -> no retry");
 
 section("pbpDictNormalizeEntry");
 const FDA_SAMPLE = { /* hello 样本，含 source.url 变体 */
@@ -107,10 +112,32 @@ assertEq(pbpDictNormalizeEntry({ word: "书", entries: [], source: {} }), null, 
 assertEq(pbpDictNormalizeEntry(null), null, "null json -> null");
 assertEq(pbpDictNormalizeEntry({ entries: [{ partOfSpeech: "noun" }] }), null, "no ipa/sense/form -> null");
 
+section("response classification / Wiktionary fallback / circuit");
+assertEq(pbpDictClassifyResponse({ status: 200, data: FDA_SAMPLE }).kind, "hit", "renderable 200 is a hit");
+assertEq(pbpDictClassifyResponse({ status: 200, data: { entries: [] } }).kind, "miss", "200 + empty entries is a semantic miss");
+assertEq(pbpDictClassifyResponse({ status: 200, data: { entries: [{ partOfSpeech: "noun" }] } }).kind, "miss", "200 + unrenderable entries is a semantic miss");
+assertEq(pbpDictClassifyResponse({ status: 404, data: null }).kind, "miss", "404 is a semantic miss");
+assertEq(pbpDictClassifyResponse({ status: 500, data: null }).kind, "failure", "500 is a failure, never no-entry");
+assertEq(pbpDictClassifyResponse(null).kind, "failure", "missing response is a failure");
+assertEq(pbpDictWiktionaryUrl("Défense"), "https://en.wiktionary.org/wiki/D%C3%A9fense", "fallback URL encodes accents on fixed English Wiktionary");
+assertEq(pbpDictWiktionaryUrl("New York"), "https://en.wiktionary.org/wiki/New%20York", "fallback URL encodes spaces");
+assert(pbpDictWiktionaryUrl("mot").startsWith("https://en.wiktionary.org/"), "fallback never derives a language subdomain");
+let circuit = pbpDictCircuitAfter(null, "failure", 1000);
+assertEq(circuit.failures, 1, "circuit counts first failure");
+circuit = pbpDictCircuitAfter(circuit, "failure", 1001);
+assertEq(circuit.failures, 2, "circuit counts consecutive failure");
+circuit = pbpDictCircuitAfter(circuit, "failure", 1002);
+assertEq(circuit.failures, 3, "third failure opens circuit");
+assertEq(circuit.openUntil, 61002, "circuit cooldown is 60 seconds from threshold failure");
+circuit = pbpDictCircuitAfter(circuit, "abort", 1003);
+assertEq(circuit.openUntil, 61002, "non-failure event leaves circuit unchanged");
+circuit = pbpDictCircuitAfter(circuit, "healthy", 1004);
+assert(circuit.failures === 0 && circuit.openUntil === 0, "healthy response resets circuit");
+
 section("_pbpDictRenderEntry source line");
 // _pbpDictRenderEntry reads t() (i18n.js, not loaded on this pure-layer test
 // page); stub it so the render call below does not throw.
-window.t = window.t || ((k) => k);
+window.t = window.t || ((k, ...args) => k + (args.length ? ":" + args.join(",") : ""));
 const RENDER_ENTRIES = [{ pos: "", ipas: [], forms: [], senses: [{ definition: "d", examples: [] }] }];
 const cedictSlot = document.createElement("div");
 _pbpDictRenderEntry(cedictSlot, { entries: RENDER_ENTRIES, sourceLabel: "CC-CEDICT", sourceUrl: "https://cc-cedict.org/wiki/", license: "CC BY-SA 4.0" }, "词", "zh");
@@ -119,6 +146,18 @@ const legacySlot = document.createElement("div");
 // No sourceLabel field at all -- shape of an entry cached before this field existed.
 _pbpDictRenderEntry(legacySlot, { entries: RENDER_ENTRIES, sourceUrl: "https://en.wiktionary.org/wiki/word", license: "CC BY-SA 4.0" }, "word", "en");
 assert(legacySlot.querySelector(".xp-dict-src a").textContent.includes("Wiktionary"), "missing sourceLabel (old cache shape) falls back to Wiktionary");
+const matchedSlot = document.createElement("div");
+_pbpDictRenderEntry(matchedSlot, { word: "défense", entries: RENDER_ENTRIES, sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/défense", license: "CC BY-SA 4.0" }, "défense", "fr", "Défense");
+assert(matchedSlot.querySelector(".xp-dict-match")?.textContent === "dictMatchedHeadword:défense",
+  "entry renderer discloses a lowercase actual headword without changing the selection title");
+const exactSlot = document.createElement("div");
+_pbpDictRenderEntry(exactSlot, { word: "mot", entries: RENDER_ENTRIES, sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/mot", license: "CC BY-SA 4.0" }, "mot", "fr", "mot");
+assert(!exactSlot.querySelector(".xp-dict-match"), "exact headword match adds no redundant label");
+const tagSlot = document.createElement("div");
+_pbpDictRenderEntry(tagSlot, { word: "漢字", entries: [{ pos: "", ipas: [{ text: "han4 zi4", tags: ["Pinyin"] }], forms: [{ word: "汉字", tags: ["simp"] }, { word: "漢字", tags: ["trad"] }], senses: [] }], sourceLabel: "CC-CEDICT", sourceUrl: "https://cc-cedict.org/wiki/", license: "CC BY-SA 4.0" }, "漢字", "zh", "漢字");
+assert(tagSlot.textContent.includes("dictTagPinyin") && tagSlot.textContent.includes("dictTagSimplified") && tagSlot.textContent.includes("dictTagTraditional"),
+  "CC-CEDICT technical tags render through localized labels");
+assert(!/\b(?:simp|trad|Pinyin)\b/.test(tagSlot.textContent), "raw simp/trad/Pinyin labels are not exposed");
 
 section("pbpDictParseCtxAnswer / StripLemmaLine");
 const ans = "LEMMA: run\n\nIn this sentence it means to manage a business.";
@@ -234,12 +273,302 @@ _pbpDictManualLang = "en";
 document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { account: "" } }));
 assertEq(_pbpDictManualLang, "", "pbp:rendered resets the override (never carried across documents)");
 
+async function runDictNetworkTests() {
+  section("dictionary abort causes / circuit runtime");
+  const parent = new AbortController();
+  const fromParent = _pbpDictChildSignal(parent.signal, 1000);
+  parent.abort();
+  assert(fromParent.signal.aborted, "parent abort reaches child signal");
+  assertEq(fromParent.reason(), "parent", "child records parent as first abort cause");
+  fromParent.done();
+  const fromTimeout = _pbpDictChildSignal(null, 5);
+  await new Promise((r) => setTimeout(r, 15));
+  assert(fromTimeout.signal.aborted, "timeout aborts child signal");
+  assertEq(fromTimeout.reason(), "timeout", "child distinguishes its own timeout");
+  fromTimeout.done();
+
+  const realFetch = window.fetch;
+  try {
+    _pbpDictCircuit = { failures: 0, openUntil: 0 };
+    window.fetch = async () => ({ status: 500, ok: false });
+    await _pbpDictFetch("en", "one", null);
+    assertEq(_pbpDictCircuit.failures, 1, "500 counts as a circuit failure");
+    window.fetch = async () => ({ status: 429, ok: false });
+    await _pbpDictFetch("en", "two", null);
+    assertEq(_pbpDictCircuit.failures, 2, "429 counts as a circuit failure");
+    window.fetch = async () => ({ status: 200, ok: true, json: async () => ({ entries: [] }) });
+    await _pbpDictFetch("en", "healthy-empty", null);
+    assert(_pbpDictCircuit.failures === 0 && _pbpDictCircuit.openUntil === 0, "healthy 200-empty response resets the circuit");
+    _pbpDictCircuit = { failures: 1, openUntil: 0 };
+    window.fetch = async () => ({ status: 404, ok: false });
+    await _pbpDictFetch("en", "healthy-404", null);
+    assert(_pbpDictCircuit.failures === 0 && _pbpDictCircuit.openUntil === 0, "healthy 404 resets the circuit");
+    window.fetch = async () => ({ status: 200, ok: true, json: async () => { throw new SyntaxError("bad json"); } });
+    try { await _pbpDictFetch("en", "bad-json", null); } catch (_) {}
+    assertEq(_pbpDictCircuit.failures, 1, "invalid JSON counts as a circuit failure");
+
+    _pbpDictCircuit = { failures: 0, openUntil: 0 };
+    const bodyCtrl = new AbortController();
+    let bodyStarted;
+    const bodyGate = new Promise((resolve) => { bodyStarted = resolve; });
+    window.fetch = async (_url, opts) => ({
+      status: 200, ok: true,
+      json: () => new Promise((_resolve, reject) => {
+        bodyStarted();
+        opts.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      })
+    });
+    const bodyRead = _pbpDictFetch("en", "slow-body", bodyCtrl.signal).catch((e) => e);
+    await bodyGate;
+    bodyCtrl.abort();
+    const bodyErr = await bodyRead;
+    assert(bodyErr && bodyErr.name === "AbortError", "parent abort during response JSON read stays AbortError");
+    assertEq(_pbpDictCircuit.failures, 0, "in-flight parent abort during JSON read does not increment failures");
+    assert(bodyCtrl.signal.aborted, "deferred JSON regression aborts only after body reading started");
+
+    _pbpDictCircuit = { failures: 0, openUntil: 0 };
+    let fetchCalls = 0;
+    window.fetch = async () => { fetchCalls++; throw new TypeError("offline"); };
+    const stopped = new AbortController();
+    stopped.abort();
+    let parentErr = null;
+    try { await _pbpDictFetch("en", "closed", stopped.signal); } catch (e) { parentErr = e; }
+    assert(parentErr && parentErr.name === "AbortError", "pre-aborted parent exits as AbortError");
+    assertEq(_pbpDictCircuit.failures, 0, "parent abort never increments circuit failures");
+    assertEq(fetchCalls, 0, "pre-aborted parent performs no fetch");
+
+    for (let i = 0; i < 3; i++) {
+      try { await _pbpDictFetch("en", "offline-" + i, null); } catch (_) {}
+    }
+    assertEq(fetchCalls, 3, "three network failures perform exactly three fetches");
+    assertEq(_pbpDictCircuit.failures, 3, "three network failures reach the threshold");
+    assert(_pbpDictCircuit.openUntil > Date.now(), "threshold opens a future cooldown window");
+    let openErr = null;
+    try { await _pbpDictFetch("en", "blocked", null); } catch (e) { openErr = e; }
+    assert(openErr && openErr.code === "dict_circuit_open", "cooldown rejects with the circuit-open reason");
+    assertEq(fetchCalls, 3, "cooldown performs no fourth fetch");
+  } finally {
+    window.fetch = realFetch;
+    _pbpDictCircuit = { failures: 0, openUntil: 0 };
+  }
+}
+
+async function runDictLookupChainTests() {
+  section("dictionary exact / lowercase / lemma chain");
+  const realPerm = _pbpDictHasPerm;
+  const realFetch = _pbpDictFetch;
+  const realCacheGet = window.pbpAiCacheGet;
+  const realCacheSet = window.pbpAiCacheSet;
+  const cache = new Map();
+  let calls = [];
+  window.pbpAiCacheGet = async (key) => cache.has(key) ? { result: cache.get(key) } : null;
+  window.pbpAiCacheSet = async (key, result) => { cache.set(key, result); };
+  _pbpDictHasPerm = async () => true;
+  const dataFor = (word) => ({ ...FDA_SAMPLE, word, source: { ...FDA_SAMPLE.source, url: "https://en.wiktionary.org/wiki/" + encodeURIComponent(word) } });
+  try {
+    _pbpDictFetch = async (_lang, candidate) => {
+      calls.push(candidate);
+      return candidate === "défense" ? { status: 200, data: dataFor(candidate) } : { status: 200, data: { entries: [] } };
+    };
+    let slot = document.createElement("div");
+    let result = await _pbpDictSlotRun(slot, "Défense", "fr", null, Promise.resolve("défendre"), null);
+    assertEq(calls.join(" → "), "Défense → défense", "200-empty exact lookup continues to lowercase in order");
+    assert(result && result.word === "défense", "lowercase candidate returns the dictionary entry");
+    assert(slot.querySelector(".xp-dict-match")?.textContent === "dictMatchedHeadword:défense",
+      "real lowercase lookup renders the actual matched headword");
+    assert(cache.has("dict2_fr|défense"), "lowercase result is cached under its actual query key");
+    assert(cache.has("dict2_fr|Défense"), "lowercase result writes an exact-form alias");
+
+    cache.clear(); calls = [];
+    _pbpDictFetch = async (_lang, candidate) => {
+      calls.push(candidate);
+      return candidate === "run" ? { status: 200, data: dataFor(candidate) } : { status: 200, data: { entries: [] } };
+    };
+    slot = document.createElement("div");
+    result = await _pbpDictSlotRun(slot, "Running", "en", null, Promise.resolve("run"), null);
+    assertEq(calls.join(" → "), "Running → running → run", "semantic misses continue exact to lowercase to lemma");
+    assert(result && result.word === "run", "third distinct lemma can satisfy the lookup");
+    assert(slot.querySelector(".xp-dict-match")?.textContent === "dictMatchedHeadword:run",
+      "real lemma lookup renders the actual matched headword");
+
+    cache.clear(); calls = [];
+    _pbpDictFetch = async (_lang, candidate) => { calls.push(candidate); return { status: 200, data: { entries: [] } }; };
+    slot = document.createElement("div");
+    await _pbpDictSlotRun(slot, "Running", "en", null, Promise.resolve("running"), null);
+    assertEq(calls.join(" → "), "Running → running", "lemma identical to a tried candidate is not requested twice");
+
+    cache.clear(); calls = [];
+    _pbpDictFetch = async (_lang, candidate) => {
+      calls.push(candidate);
+      if (candidate === "run") throw new TypeError("offline");
+      return { status: 200, data: { entries: [] } };
+    };
+    slot = document.createElement("div");
+    await _pbpDictSlotRun(slot, "running", "en", null, Promise.resolve("run"), null);
+    assert(slot.textContent.includes("dictLoadFailed") && slot.querySelector("a").href.startsWith("https://en.wiktionary.org/"),
+      "lemma network failure stays unavailable and exposes Wiktionary");
+
+    cache.clear(); calls = [];
+    _pbpDictFetch = async (_lang, candidate) => { calls.push(candidate); return { status: 404, data: null }; };
+    slot = document.createElement("div");
+    await _pbpDictSlotRun(slot, "ghost word", "en", null, Promise.resolve("-"), null);
+    assert(slot.textContent.includes("dictNoEntry") && slot.querySelector("a").href === "https://en.wiktionary.org/wiki/ghost%20word",
+      "all semantic misses end as no-entry with an encoded fixed-domain fallback");
+  } finally {
+    _pbpDictHasPerm = realPerm;
+    _pbpDictFetch = realFetch;
+    if (realCacheGet === undefined) delete window.pbpAiCacheGet; else window.pbpAiCacheGet = realCacheGet;
+    if (realCacheSet === undefined) delete window.pbpAiCacheSet; else window.pbpAiCacheSet = realCacheSet;
+  }
+}
+
+async function runDictPackRoutingTests() {
+  section("ready CC-CEDICT routing");
+  const realLoad = _pbpDictLoadPack;
+  const realPerm = _pbpDictHasPerm;
+  const realFetch = _pbpDictFetch;
+  const realCacheGet = window.pbpAiCacheGet;
+  const realCacheSet = window.pbpAiCacheSet;
+  const realLookup = window.pbpPackLookup;
+  const realKeys = window.pbpCedictLookupKeys;
+  const realToNorm = window.pbpCedictEntryToNorm;
+  const onlineData = { ...FDA_SAMPLE, word: "在线词" };
+  const packNorm = { ...pbpDictNormalizeEntry(FDA_SAMPLE), word: "词", sourceLabel: "CC-CEDICT", sourceUrl: "https://cc-cedict.org/wiki/" };
+  let permCalls = 0, fetchCalls = [];
+  _pbpDictLoadPack = async () => true;
+  _pbpDictHasPerm = async () => { permCalls++; return true; };
+  _pbpDictFetch = async (_lang, candidate) => { fetchCalls.push(candidate); return { status: 200, data: onlineData }; };
+  window.pbpAiCacheGet = async () => null;
+  window.pbpAiCacheSet = async () => {};
+  window.pbpCedictLookupKeys = (term) => [term];
+  window.pbpCedictEntryToNorm = () => packNorm;
+  try {
+    window.pbpPackLookup = async () => ({ state: "hit", matched: "词", rows: [{}] });
+    let slot = document.createElement("div");
+    let result = await _pbpDictSlotRun(slot, "词", "zh", null, Promise.resolve("-"), null);
+    assert(result && result.word === "词", "ready CC-CEDICT hit renders the local entry");
+    assert(!slot.querySelector(".xp-dict-match"), "exact CC-CEDICT hit adds no redundant matched-headword label");
+    assert(permCalls === 0 && fetchCalls.length === 0, "ready hit needs no permission or network");
+
+    slot = document.createElement("div");
+    result = await _pbpDictSlotRun(slot, "词语", "zh", null, Promise.resolve("-"), null);
+    assert(slot.querySelector(".xp-dict-match")?.textContent === "dictMatchedHeadword:词",
+      "real CC-CEDICT longest-prefix hit discloses the shorter matched headword");
+
+    window.pbpPackLookup = async () => ({ state: "ready-miss" });
+    permCalls = 0; fetchCalls = [];
+    slot = document.createElement("div");
+    result = await _pbpDictSlotRun(slot, "缺词", "zh", null, Promise.resolve("-"), null);
+    assertEq(result, null, "ready CC-CEDICT miss ends locally");
+    assert(slot.textContent.includes("dictNoEntry") && slot.querySelector("a").href === "https://en.wiktionary.org/wiki/%E7%BC%BA%E8%AF%8D",
+      "ready miss uses the unified encoded Wiktionary fallback");
+    assert(permCalls === 0 && fetchCalls.length === 0, "ready miss skips FDA permission/network without a second meta read");
+
+    window.pbpPackLookup = async () => ({ state: "unavailable" });
+    permCalls = 0; fetchCalls = [];
+    slot = document.createElement("div");
+    result = await _pbpDictSlotRun(slot, "在线词", "zh", null, Promise.resolve("-"), null);
+    assert(result && result.word === "在线词", "missing pack may still use the online dictionary path");
+    assert(permCalls === 1 && fetchCalls.join() === "在线词", "missing pack continues through permission and exact FDA request");
+
+    window.pbpPackLookup = async () => ({ state: "error" });
+    permCalls = 0; fetchCalls = [];
+    slot = document.createElement("div");
+    result = await _pbpDictSlotRun(slot, "故障词", "zh", null, Promise.resolve("-"), null);
+    assert(result === null && slot.textContent.includes("dictLoadFailed") && slot.querySelector("a"),
+      "pack lookup error stays a load failure with Wiktionary fallback");
+    assert(permCalls === 0 && fetchCalls.length === 0, "pack lookup error is never disguised by an FDA retry");
+  } finally {
+    _pbpDictLoadPack = realLoad;
+    _pbpDictHasPerm = realPerm;
+    _pbpDictFetch = realFetch;
+    if (realCacheGet === undefined) delete window.pbpAiCacheGet; else window.pbpAiCacheGet = realCacheGet;
+    if (realCacheSet === undefined) delete window.pbpAiCacheSet; else window.pbpAiCacheSet = realCacheSet;
+    if (realLookup === undefined) delete window.pbpPackLookup; else window.pbpPackLookup = realLookup;
+    if (realKeys === undefined) delete window.pbpCedictLookupKeys; else window.pbpCedictLookupKeys = realKeys;
+    if (realToNorm === undefined) delete window.pbpCedictEntryToNorm; else window.pbpCedictEntryToNorm = realToNorm;
+  }
+}
+
+async function runDictPermissionFeedbackTests() {
+  section("online dictionary permission denial feedback");
+  const realPerm = _pbpDictHasPerm;
+  const realCacheGet = window.pbpAiCacheGet;
+  const realChrome = window.chrome;
+  let requests = 0;
+  _pbpDictHasPerm = async () => false;
+  window.pbpAiCacheGet = async () => null;
+  window.chrome = { permissions: { request: async () => { requests++; return false; } } };
+  try {
+    const slot = document.createElement("div");
+    await _pbpDictSlotRun(slot, "word", "en", null, Promise.resolve("-"), () => {});
+    const button = slot.querySelector(".xp-dict-connect");
+    assert(button?.textContent === "dictConnect" && slot.textContent.includes("dictConnectHint"),
+      "production permission gate explains the online dictionary before requesting access");
+    button.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const feedback = slot.querySelector('[role="status"]');
+    assert(feedback && !feedback.hidden && feedback.textContent === "dictPermissionDenied" &&
+      button.textContent === "dictConnectRetry" && !button.disabled,
+      "permission denial is visible, announced, and leaves a retry action enabled");
+    button.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert(requests === 2 && !button.disabled, "denied permission can be retried through the same production action");
+  } finally {
+    _pbpDictHasPerm = realPerm;
+    if (realCacheGet === undefined) delete window.pbpAiCacheGet; else window.pbpAiCacheGet = realCacheGet;
+    if (realChrome === undefined) delete window.chrome; else window.chrome = realChrome;
+  }
+}
+
+async function runDictNoAiAndSavedStateTests() {
+  section("dictionary contextual AI and existing-vocabulary state");
+  const realAvailable = window.pbpAiAvailable;
+  let lemmaResolved = null;
+  window.pbpAiAvailable = () => false;
+  try {
+    const ctxSlot = document.createElement("div");
+    await _pbpDictCtxRun(ctxSlot, { text: "word" }, { sentence: "word" }, {}, new AbortController().signal,
+      (value) => { lemmaResolved = value; }, "en");
+    assert(ctxSlot.textContent === "dictAiNotConfigured", "Dictionary keeps its contextual-AI-specific no-provider message");
+    assertEq(lemmaResolved, "", "Dictionary no-AI context slot still settles the lemma chain");
+  } finally {
+    if (realAvailable === undefined) delete window.pbpAiAvailable; else window.pbpAiAvailable = realAvailable;
+  }
+
+  const realResolveLang = _pbpDictResolveLang;
+  const realSlotRun = _pbpDictSlotRun;
+  const realCtxRun = _pbpDictCtxRun;
+  const realVocabGet = pbpVocabGet;
+  const previousOwner = _pbpDictOwner;
+  _pbpDictResolveLang = async () => "en";
+  _pbpDictSlotRun = async () => pbpDictNormalizeEntry(FDA_SAMPLE);
+  _pbpDictCtxRun = async (_el, _cap, _ctx, _s, _signal, resolveLemmaOnce) => { resolveLemmaOnce(""); return null; };
+  pbpVocabGet = async () => ({ id: "acct_a|en|hello" });
+  _pbpDictOwner = "acct_a";
+  try {
+    const pop = document.createElement("div");
+    pop.innerHTML = '<div class="xp-body"></div><button class="xp-vocab"></button>';
+    await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
+    const button = pop.querySelector(".xp-vocab");
+    assert(button.textContent === "dictUpdateVocab" && !button.disabled,
+      "an existing word offers an enabled update action instead of the completed-state label");
+  } finally {
+    _pbpDictResolveLang = realResolveLang;
+    _pbpDictSlotRun = realSlotRun;
+    _pbpDictCtxRun = realCtxRun;
+    pbpVocabGet = realVocabGet;
+    _pbpDictOwner = previousOwner;
+  }
+}
+
 async function runVocabIdbTests() {
   section("pbp-vocab IDB (runtime)");
   await new Promise((r) => { const del = indexedDB.deleteDatabase("pbp-vocab"); del.onsuccess = del.onerror = del.onblocked = r; });
   const ctx1 = { quote: "q1", articleUrl: "u1", articleTitle: "t1", highlightId: null, createdAt: 1 };
   const e1 = await pbpVocabSaveWord("acct_a", { term: "Running", language: "en-US", gloss: "g1", ipa: "", sourceUrl: "https://en.wiktionary.org/wiki/run", license: "CC BY-SA 4.0", context: ctx1 });
   assert(e1 && e1.id === "acct_a|en|running", "save creates owner-scoped id");
+  assert(Array.isArray(e1.groups) && e1.groups.length === 0, "new vocab records default to an empty groups array");
   assertEq(e1 && e1.sourceUrl, "https://en.wiktionary.org/wiki/run", "attribution saved WITHOUT ipa (independent merge)");
   const e2 = await pbpVocabSaveWord("acct_a", { term: "running", language: "en", gloss: "g2", context: { ...ctx1 } });
   assertEq(e2.contexts.length, 1, "same url+quote deduped");
@@ -278,8 +607,31 @@ async function runVocabIdbTests() {
   assert(okDel === true, "delete resolves true on tx complete");
   assertEq((await pbpVocabAll("acct_a")).length, 0, "deleted row gone");
   assertEq((await pbpVocabAll("acct_b")).length, 1, "other owner untouched");
+
+  await pbpVocabSaveWord("acct_a", { term: "alpha", language: "en", gloss: "ga", context: ctx1 });
+  await pbpVocabSaveWord("acct_a", { term: "beta", language: "en", gloss: "gb", context: ctx1 });
+  const groupIds = (await pbpVocabAll("acct_a")).map((row) => row.id);
+  const otherId = (await pbpVocabAll("acct_b"))[0].id;
+  assertEq(pbpVocabNormalizeGroupName("  Study   List  "), "Study List", "group names NFC-trim and collapse whitespace");
+  assertEq(pbpVocabGroups({ groups: undefined }).length, 0, "legacy record without groups reads as an empty array");
+  assert(await pbpVocabBatchAddGroup(groupIds, "acct_a", " Study   List "), "batch add-group resolves true on transaction completion");
+  assert((await pbpVocabAll("acct_a")).every((row) => row.groups.includes("Study List")), "batch add-group updates every selected owner record");
+  assert(await pbpVocabBatchAddGroup(groupIds, "acct_a", "Study List"), "adding an existing group is idempotent-success");
+  assert((await pbpVocabAll("acct_a")).every((row) => row.groups.filter((g) => g === "Study List").length === 1), "batch add-group never duplicates a group name");
+  assertEq(await pbpVocabBatchAddGroup([groupIds[0], otherId], "acct_a", "Wrong"), false, "cross-owner batch add aborts");
+  assert(!(await pbpVocabAll("acct_a")).some((row) => row.groups.includes("Wrong")), "aborted add-group leaves every owner record unchanged");
+  assertEq(await pbpVocabBatchDelete([groupIds[0], otherId], "acct_a"), false, "cross-owner batch delete aborts");
+  assertEq((await pbpVocabAll("acct_a")).length, 2, "aborted batch delete leaves all selected owner records");
+  assert(await pbpVocabBatchDelete(groupIds, "acct_a"), "same-owner batch delete resolves true on transaction completion");
+  assertEq((await pbpVocabAll("acct_a")).length, 0, "same-owner batch delete removes the complete selection");
+  assertEq((await pbpVocabAll("acct_b")).length, 1, "batch mutations never touch the other owner");
 }
 (async function () {
+  await runDictNetworkTests();
+  await runDictLookupChainTests();
+  await runDictPackRoutingTests();
+  await runDictPermissionFeedbackTests();
+  await runDictNoAiAndSavedStateTests();
   await runVocabIdbTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();

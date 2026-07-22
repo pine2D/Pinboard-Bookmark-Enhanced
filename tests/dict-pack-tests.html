@@ -361,6 +361,7 @@ section("pbpCedictLines");
   check("meta importedAt is a fresh timestamp", !!meta1 && typeof meta1.importedAt === "number" && meta1.importedAt > 0);
 
   const bySimp = await pbpPackLookup(["中国"]);
+  check("lookup hit carries explicit hit state", bySimp && bySimp.state === "hit");
   check("lookup by simp: matched key", !!bySimp && bySimp.matched === "中国");
   check("lookup by simp: returns the trad-differing row", !!bySimp && bySimp.rows.length === 1 && bySimp.rows[0].trad === "中國");
 
@@ -379,6 +380,51 @@ section("pbpCedictLines");
   const fallbackKeys = pbpCedictLookupKeys("图书馆");
   const fb = await pbpPackLookup(fallbackKeys);
   check("prefix fallback lands on the shortest available key", !!fb && fb.matched === "图");
+  const readyMiss = await pbpPackLookup(["不存在的词"]);
+  check("ready pack miss carries explicit ready-miss state", readyMiss && readyMiss.state === "ready-miss");
+
+  const realPackOpen = _pbpPackOpenDB;
+  _pbpPackOpenDB = async () => ({
+    transaction() {
+      const tx = {
+        objectStore(name) {
+          if (name === _PBP_PACK_META) return { get() {
+            const req = {};
+            queueMicrotask(() => { req.result = { state: "ready" }; if (req.onsuccess) req.onsuccess(); });
+            return req;
+          } };
+          return { index() { return { getAll() {
+            const req = {};
+            queueMicrotask(() => { if (req.onerror) req.onerror(); });
+            return req;
+          } }; } };
+        }
+      };
+      return tx;
+    }
+  });
+  const lookupError = await pbpPackLookup(["索引错误"]);
+  _pbpPackOpenDB = realPackOpen;
+  check("index request failure carries explicit error state", lookupError && lookupError.state === "error");
+  const afterLookupError = await pbpPackLookup(["你好"]);
+  check("a lookup error does not poison the next real lookup", afterLookupError && afterLookupError.state === "hit");
+
+  const realMetaOpen = _pbpPackOpenDB;
+  _pbpPackOpenDB = async () => ({
+    transaction() {
+      return { objectStore() { return { get() {
+        const req = {};
+        queueMicrotask(() => { if (req.onerror) req.onerror(); });
+        return req;
+      } }; } };
+    }
+  });
+  const metaRequestError = await pbpPackMeta();
+  check("metadata request failure carries explicit error state", metaRequestError && metaRequestError.state === "error");
+  _pbpPackOpenDB = async () => { throw new Error("open failed"); };
+  const metaOpenError = await pbpPackMeta();
+  check("metadata database-open failure carries explicit error state", metaOpenError && metaOpenError.state === "error");
+  _pbpPackOpenDB = realMetaOpen;
 
   const dbRef = await _pbpPackOpenDB();
   await new Promise((resolve, reject) => {
@@ -388,7 +434,7 @@ section("pbpCedictLines");
     tx.onerror = () => reject(tx.error);
   });
   const afterMetaDelete = await pbpPackLookup(["你好"]);
-  check("lookup returns null when meta is missing (not ready)", afterMetaDelete === null);
+  check("lookup is unavailable when meta is missing (not ready)", afterMetaDelete && afterMetaDelete.state === "unavailable");
 
   async function* throwingLines() {
     yield L_BEIJING;
@@ -406,6 +452,23 @@ section("pbpCedictLines");
   check("re-import: meta reflects the latest stats.bytes", !!meta2 && meta2.bytes === 999);
   const reCheck = await pbpPackLookup(["你好"]);
   check("re-import: does not duplicate rows (old store was cleared first)", !!reCheck && reCheck.rows.length === 1);
+
+  let raceImportWaiting = false, releaseRaceImport;
+  const raceImportGate = new Promise((r) => { releaseRaceImport = r; });
+  async function* raceImportLines() {
+    yield L_BEIJING;
+    raceImportWaiting = true;
+    await raceImportGate;
+  }
+  const raceImport = pbpPackImport(raceImportLines());
+  while (!raceImportWaiting) await new Promise((r) => setTimeout(r, 0));
+  const duringImport = await pbpPackLookup(["北京"]);
+  check("lookup during import is unavailable, never a ready miss from a second meta read",
+    duringImport && duringImport.state === "unavailable");
+  releaseRaceImport();
+  await raceImport;
+  const afterRaceImport = await pbpPackLookup(["北京"]);
+  check("lookup becomes a hit only after import writes ready meta", afterRaceImport && afterRaceImport.state === "hit");
 
   // Two controlled writers: prove Web Locks serializes pbpPackImport callers
   // rather than letting a second import race the first's clear+put tx.
@@ -437,14 +500,14 @@ section("pbpCedictLines");
   const metaFinal = await pbpPackMeta();
   check("Web Locks: last writer wins (store reflects writer B only)", !!metaFinal && metaFinal.entries === 1);
   const lookupA = await pbpPackLookup(["北京"]);
-  check("Web Locks: writer A's data was cleared by writer B's overwrite", lookupA === null);
+  check("Web Locks: writer A's data was cleared by writer B's overwrite", lookupA && lookupA.state === "ready-miss");
 
   const delRes = await pbpPackDelete();
   check("pbpPackDelete resolves true", delRes === true);
   const metaAfterDelete = await pbpPackMeta();
   check("meta is null after delete", metaAfterDelete === null);
   const lookupAfterDelete = await pbpPackLookup(["测试"]);
-  check("lookup is null after delete", lookupAfterDelete === null);
+  check("lookup is unavailable after delete", lookupAfterDelete && lookupAfterDelete.state === "unavailable");
 
   section("pbpPackZipTextStream");
   // Hand-built single-entry zips: local header + data + central dir + EOCD.

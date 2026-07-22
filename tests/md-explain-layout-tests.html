@@ -1,0 +1,83 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Explain Popover Layout Tests</title>
+<style>.case{font-family:monospace;white-space:pre}.pass{color:#176}.fail{color:#b00}</style>
+</head><body><div id="results"></div>
+<script>
+const results = document.getElementById("results");
+function report(name, error) {
+  const row = document.createElement("div");
+  row.className = "case " + (error ? "fail" : "pass");
+  row.textContent = (error ? "FAIL " : "PASS ") + name + (error ? "\n  " + error.message : "");
+  results.appendChild(row);
+}
+async function test(name, fn) { try { await fn(); report(name); } catch (error) { report(name, error); } }
+function assert(condition, message) { if (!condition) throw new Error(message); }
+const LOCALES = ["en", "de", "fr", "pl", "ru", "zh_HK", "zh_CN", "zh_TW", "ja"];
+async function loadMessages() {
+  const out = {};
+  for (const locale of LOCALES) out[locale] = await (await fetch(`../_locales/${locale}/messages.json`)).json();
+  return out;
+}
+async function makeFrame(width) {
+  const frame = document.createElement("iframe");
+  frame.style.cssText = `width:${width}px;height:620px;border:0`;
+  frame.srcdoc = `<!doctype html><html><head><link rel="stylesheet" href="../md-preview.css"></head>
+    <body><div id="explain-pop" popover="manual" style="left:8px;top:8px">
+      <div class="xp-head">
+        <span class="xp-term">A deliberately long selected term for title-space verification</span>
+        <span class="xp-drag-zone" aria-hidden="true"></span>
+        <div class="xp-act-group"><button class="xp-act" data-action="explain"></button><button class="xp-act" data-action="translate"></button><button class="xp-act" data-action="dict"></button></div>
+        <div class="xp-window-actions"><button class="xp-pin"><svg viewBox="0 0 24 24"></svg></button><button class="xp-close"><svg viewBox="0 0 24 24"></svg></button></div>
+      </div><div class="xp-body">Body</div>
+    </div></body></html>`;
+  document.body.appendChild(frame);
+  await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+  const doc = frame.contentDocument;
+  doc.getElementById("explain-pop").showPopover();
+  await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(() => frame.contentWindow.requestAnimationFrame(resolve)));
+  return frame;
+}
+function applyLocale(frame, messages, locale) {
+  const doc = frame.contentDocument;
+  doc.querySelector('[data-action="explain"]').textContent = messages[locale].explainActionExplain.message;
+  doc.querySelector('[data-action="translate"]').textContent = messages[locale].explainActionTranslate.message;
+  doc.querySelector('[data-action="dict"]').textContent = messages[locale].explainActionDict.message;
+}
+function assertLayout(frame, locale) {
+  const doc = frame.contentDocument;
+  const pop = doc.getElementById("explain-pop").getBoundingClientRect();
+  const head = doc.querySelector(".xp-head");
+  const term = doc.querySelector(".xp-term").getBoundingClientRect();
+  const drag = doc.querySelector(".xp-drag-zone").getBoundingClientRect();
+  const pin = doc.querySelector(".xp-pin").getBoundingClientRect();
+  const close = doc.querySelector(".xp-close").getBoundingClientRect();
+  assert(pin.width >= 24 && close.width >= 24, `${locale}: window controls collapsed`);
+  assert(pin.left >= pop.left && close.right <= pop.right + 0.5, `${locale}: window controls overflow ${close.right} > ${pop.right}`);
+  assert(term.width >= 48, `${locale}: title width ${term.width}`);
+  assert(drag.width >= 12, `${locale}: drag blank width ${drag.width}`);
+  assert(head.scrollWidth <= head.clientWidth + 1, `${locale}: header horizontal overflow ${head.scrollWidth} > ${head.clientWidth}`);
+}
+(async () => {
+  const messages = await loadMessages();
+  await test("production CSS keeps all locale header controls and drag space inside 320px", async () => {
+    const frame = await makeFrame(320);
+    try {
+      for (const locale of LOCALES) {
+        applyLocale(frame, messages, locale);
+        await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
+        assertLayout(frame, locale);
+      }
+    } finally { frame.remove(); }
+  });
+  await test("production CSS preserves German and Russian title space at 360px", async () => {
+    const frame = await makeFrame(360);
+    try {
+      for (const locale of ["de", "ru"]) {
+        applyLocale(frame, messages, locale);
+        await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
+        assertLayout(frame, locale);
+      }
+    } finally { frame.remove(); }
+  });
+})();
+</script></body></html>
