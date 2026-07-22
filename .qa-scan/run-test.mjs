@@ -23,8 +23,10 @@ const TEST_TIMEOUT_MS = rel === "tests/md-convert-tests.html" ? 45000 : 30000;
 const CLEANUP_TIMEOUT_MS = 5000;
 
 // Completion is explicit: each suite must emit exactly this many DOM result
-// rows carrying a pass/fail/skip class. Update the count when adding/removing
-// assertions; an unregistered suite is rejected instead of guessed complete.
+// ROWS carrying a pass/fail/skip class. NOTE: the row unit varies per page --
+// md-dict/dict-pack/anki/eudic emit one row per assertion, md-ai emits one
+// row per test() block. Count rows in the page, not assert calls; an
+// unregistered suite is rejected instead of guessed complete.
 const EXPECTED_RESULTS = Object.freeze({
   "tests/a11y-tests.html": 31,
   "tests/ai-tags-tests.html": 70,
