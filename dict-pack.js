@@ -127,6 +127,50 @@ async function* pbpCedictLines(stream, gzip, stats) {
   if (carry) yield carry.endsWith("\r") ? carry.slice(0, -1) : carry;
 }
 
+// ---- Minimal ZIP reader ---------------------------------------------------
+// MDBG also publishes the release as a ZIP with ONE text entry. This parses
+// the End-of-Central-Directory + central entries, picks the first file entry
+// and returns its DECOMPRESSED byte stream (method 8 deflate via
+// DecompressionStream("deflate-raw"), method 0 stored). CRC is not verified
+// (the parser downstream rejects garbage anyway); zip64 and exotic methods
+// are rejected with a clear error. Takes a Blob/File.
+async function pbpPackZipTextStream(file) {
+  const tailSize = Math.min(file.size, 65558); // EOCD = 22 bytes + max comment
+  const tail = new Uint8Array(await file.slice(file.size - tailSize).arrayBuffer());
+  let eocd = -1;
+  for (let i = tail.length - 22; i >= 0; i--) {
+    if (tail[i] === 0x50 && tail[i + 1] === 0x4b && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) { eocd = i; break; }
+  }
+  if (eocd === -1) throw new Error("zip: no end record");
+  const ed = new DataView(tail.buffer, tail.byteOffset + eocd);
+  const count = ed.getUint16(10, true);
+  const cdSize = ed.getUint32(12, true);
+  const cdOfs = ed.getUint32(16, true);
+  if (!count || cdOfs === 0xffffffff) throw new Error("zip: unsupported layout");
+  const cd = new DataView(await file.slice(cdOfs, cdOfs + cdSize).arrayBuffer());
+  let p = 0, chosen = null;
+  for (let n = 0; n < count && p + 46 <= cd.byteLength; n++) {
+    if (cd.getUint32(p, true) !== 0x02014b50) break;
+    const method = cd.getUint16(p + 10, true);
+    const compSize = cd.getUint32(p + 20, true);
+    const nameLen = cd.getUint16(p + 28, true);
+    const extraLen = cd.getUint16(p + 30, true);
+    const commentLen = cd.getUint16(p + 32, true);
+    const localOfs = cd.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(new Uint8Array(cd.buffer, cd.byteOffset + p + 46, nameLen));
+    if (!name.endsWith("/") && !chosen) chosen = { method, compSize, localOfs };
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  if (!chosen) throw new Error("zip: no file entry");
+  if (chosen.compSize === 0xffffffff || chosen.localOfs === 0xffffffff) throw new Error("zip: zip64 unsupported");
+  if (chosen.method !== 8 && chosen.method !== 0) throw new Error("zip: unsupported compression");
+  const lh = new DataView(await file.slice(chosen.localOfs, chosen.localOfs + 30).arrayBuffer());
+  if (lh.getUint32(0, true) !== 0x04034b50) throw new Error("zip: bad local header");
+  const dataOfs = chosen.localOfs + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
+  const raw = file.slice(dataOfs, dataOfs + chosen.compSize).stream();
+  return chosen.method === 8 ? raw.pipeThrough(new DecompressionStream("deflate-raw")) : raw;
+}
+
 // ---- PURE END ----
 
 // ---- IDB layer (DB pbp-dict-packs) --------------------------------------
@@ -280,7 +324,11 @@ async function pbpPackDelete() {
 // by filename. Any thrown error surfaces to the caller's status line.
 async function pbpPackImportFile(file, onProgress) {
   const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
-  const gzip = head[0] === 0x1f && head[1] === 0x8b;
   const stats = { bytes: 0 };
+  if (head[0] === 0x50 && head[1] === 0x4b) { // "PK": the MDBG ZIP release
+    const text = await pbpPackZipTextStream(file);
+    return pbpPackImport(pbpCedictLines(text, false, stats), onProgress, stats);
+  }
+  const gzip = head[0] === 0x1f && head[1] === 0x8b;
   return pbpPackImport(pbpCedictLines(file.stream(), gzip, stats), onProgress, stats);
 }

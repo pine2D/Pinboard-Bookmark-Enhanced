@@ -446,6 +446,68 @@ section("pbpCedictLines");
   const lookupAfterDelete = await pbpPackLookup(["测试"]);
   check("lookup is null after delete", lookupAfterDelete === null);
 
+  section("pbpPackZipTextStream");
+  // Hand-built single-entry zips: local header + data + central dir + EOCD.
+  // CRC fields are zeroed (the reader does not verify CRC by design).
+  function buildZip(name, dataBytes, method) {
+    const enc = new TextEncoder();
+    const nameB = enc.encode(name);
+    const lh = new Uint8Array(30 + nameB.length);
+    const lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(8, method, true);
+    lv.setUint32(18, dataBytes.length, true);
+    lv.setUint32(22, dataBytes.length, true);
+    lv.setUint16(26, nameB.length, true);
+    lh.set(nameB, 30);
+    const localOfs = 0;
+    const cd = new Uint8Array(46 + nameB.length);
+    const cv = new DataView(cd.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(10, method, true);
+    cv.setUint32(20, dataBytes.length, true);
+    cv.setUint32(24, dataBytes.length, true);
+    cv.setUint16(28, nameB.length, true);
+    cv.setUint32(42, localOfs, true);
+    cd.set(nameB, 46);
+    const cdOfs = lh.length + dataBytes.length;
+    const eocd = new Uint8Array(22);
+    const ev = new DataView(eocd.buffer);
+    ev.setUint32(0, 0x06054b50, true);
+    ev.setUint16(8, 1, true);
+    ev.setUint16(10, 1, true);
+    ev.setUint32(12, cd.length, true);
+    ev.setUint32(16, cdOfs, true);
+    return new Blob([lh, dataBytes, cd, eocd]);
+  }
+  async function collectLines(stream) {
+    const out = [];
+    for await (const line of pbpCedictLines(stream, false)) out.push(line);
+    return out;
+  }
+  const zipContent = "中國 中国 [Zhong1 guo2] /China/\n";
+  const storedZip = buildZip("cedict_ts.u8", new TextEncoder().encode(zipContent), 0);
+  const storedLines = await collectLines(await pbpPackZipTextStream(storedZip));
+  assertEq(storedLines.length, 1, "stored zip: one line extracted");
+  check("stored zip: content intact", storedLines[0].indexOf("Zhong1 guo2") >= 0);
+
+  const deflateBlob = new Blob([new TextEncoder().encode(zipContent)]);
+  const deflateBytes = new Uint8Array(await new Response(
+    deflateBlob.stream().pipeThrough(new CompressionStream("deflate-raw"))
+  ).arrayBuffer());
+  const deflateZip = buildZip("cedict_ts.u8", deflateBytes, 8);
+  const deflateLines = await collectLines(await pbpPackZipTextStream(deflateZip));
+  check("deflate zip: decompressed and parsed", deflateLines.length === 1 && deflateLines[0].indexOf("/China/") >= 0);
+
+  let zipErr = false;
+  try { await pbpPackZipTextStream(new Blob([new Uint8Array([1, 2, 3, 4])])); } catch (e) { zipErr = /zip/.test(e.message); }
+  check("non-zip blob throws a zip error", zipErr);
+
+  const zipFile = new File([await storedZip.arrayBuffer()], "cedict.zip");
+  await new Promise((r) => { const del = indexedDB.deleteDatabase("pbp-dict-packs"); del.onsuccess = del.onerror = del.onblocked = r; });
+  const zipRes = await pbpPackImportFile(zipFile, null);
+  check("pbpPackImportFile imports a .zip end to end", zipRes.entries === 1);
+
   document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
 })();
 </script>
