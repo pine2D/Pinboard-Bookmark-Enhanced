@@ -477,7 +477,10 @@ html.motion-ready details.motion-toggle[open]::details-content {
 /* The eye rides INSIDE the field's right edge -- as a plain sibling it fell
    below the 100%-width input and burned a whole row per credential. */
 .key-wrap { position: relative; display: block; }
-.key-wrap input { padding-right: 32px; }
+/* .fg prefix is LOAD-BEARING: the base .fg input[type=password] rule is
+   (0,2,1) and would out-rank a bare .key-wrap input (0,1,1), leaving the
+   eye button sitting on top of the field's trailing text. */
+.fg .key-wrap input { padding-right: 32px; }
 .key-wrap .key-toggle { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); }
 /* Inline status icon (replaces ✓/✗ in test/save/import messages; the glyphs fall back to
    Segoe UI Emoji and stall on first paint at Windows hi-DPI). Inherits the status colour. */

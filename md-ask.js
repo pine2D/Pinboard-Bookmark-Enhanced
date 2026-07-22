@@ -1548,7 +1548,8 @@ async function _pbpExplainPersistTrigger(value) {
 const PBP_EXPLAIN_PILL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
 
 // Current selection if (and only if) it is explainable: non-collapsed, both
-// endpoints inside #rendered-view, >= 2 chars. Returns { range, text } | null.
+// endpoints inside #rendered-view, and pbpExplainSelectionValid (>= 2 chars,
+// or a single Han/Kana character). Returns { range, text } | null.
 function _pbpExplainGetSelection() {
   const view = document.getElementById("rendered-view");
   if (!view) return null;

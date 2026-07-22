@@ -2715,6 +2715,13 @@ suiteIf("pbpExplainSelectionValid", "pbpAskInit", () => {
     assertEq(pbpExplainSelectionValid("ab"), true, "ab");
     assertEq(pbpExplainSelectionValid("  中文  "), true, "CJK trimmed");
   });
+  test("single Han/Kana char is a valid dictionary word", () => {
+    assertEq(pbpExplainSelectionValid("中"), true, "single Han");
+    assertEq(pbpExplainSelectionValid("  书  "), true, "single Han padded");
+    assertEq(pbpExplainSelectionValid("あ"), true, "single Hiragana");
+    assertEq(pbpExplainSelectionValid("ア"), true, "single Katakana");
+    assertEq(pbpExplainSelectionValid("я"), false, "single Cyrillic still rejected");
+  });
   test("short or blank invalid", () => {
     assertEq(pbpExplainSelectionValid("a"), false, "1 char");
     assertEq(pbpExplainSelectionValid("  a  "), false, "1 char padded");
