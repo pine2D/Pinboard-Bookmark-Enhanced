@@ -258,44 +258,61 @@ async function pbpPackImport(lineIter, onProgress, stats) {
   });
 }
 
-// Lookup: meta gate and index reads share ONE readonly transaction. For each
-// key BOTH indexes are queried and results merged (a form that is someone's
-// simp and someone else's trad must surface both records).
+// Lookup status and index reads share ONE readonly transaction, so callers
+// never need a racy second meta read. For each key BOTH indexes are queried
+// and results merged (a form that is someone's simp and someone else's trad
+// must surface both records).
 async function pbpPackLookup(keys) {
-  const db = await _pbpPackOpenDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction([_PBP_PACK_STORE, _PBP_PACK_META], "readonly");
-    const metaReq = tx.objectStore(_PBP_PACK_META).get("cedict");
-    metaReq.onsuccess = () => {
-      const meta = metaReq.result;
-      if (!meta || meta.state !== "ready") { resolve(null); return; }
-      const store = tx.objectStore(_PBP_PACK_STORE);
-      const tryKey = (i) => {
-        if (i >= keys.length) { resolve(null); return; }
-        const key = keys[i];
-        const bySimp = store.index("simp").getAll(key);
-        bySimp.onsuccess = () => {
-          const byTrad = store.index("trad").getAll(key);
-          byTrad.onsuccess = () => {
-            const seen = new Set();
-            const rows = [];
-            for (const r of [...(bySimp.result || []), ...(byTrad.result || [])]) {
-              if (seen.has(r.id)) continue;
-              seen.add(r.id);
-              rows.push(r);
-            }
-            rows.sort((a, b) => a.id - b.id); // storage order across both indexes
-            if (rows.length) resolve({ matched: key, rows });
-            else tryKey(i + 1);
-          };
-          byTrad.onerror = () => resolve(null);
-        };
-        bySimp.onerror = () => resolve(null);
+  try {
+    const db = await _pbpPackOpenDB();
+    return await new Promise((resolve) => {
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
       };
-      tryKey(0);
-    };
-    metaReq.onerror = () => resolve(null);
-  });
+      let tx;
+      try { tx = db.transaction([_PBP_PACK_STORE, _PBP_PACK_META], "readonly"); }
+      catch (_) { finish({ state: "error" }); return; }
+      tx.onabort = tx.onerror = () => finish({ state: "error" });
+      const metaReq = tx.objectStore(_PBP_PACK_META).get("cedict");
+      metaReq.onsuccess = () => {
+        const meta = metaReq.result;
+        if (!meta || meta.state !== "ready") { finish({ state: "unavailable" }); return; }
+        const store = tx.objectStore(_PBP_PACK_STORE);
+        const lookupKeys = Array.isArray(keys) ? keys : [];
+        const tryKey = (i) => {
+          if (i >= lookupKeys.length) { finish({ state: "ready-miss" }); return; }
+          const key = lookupKeys[i];
+          let bySimp;
+          try { bySimp = store.index("simp").getAll(key); }
+          catch (_) { finish({ state: "error" }); return; }
+          bySimp.onsuccess = () => {
+            let byTrad;
+            try { byTrad = store.index("trad").getAll(key); }
+            catch (_) { finish({ state: "error" }); return; }
+            byTrad.onsuccess = () => {
+              const seen = new Set();
+              const rows = [];
+              for (const r of [...(bySimp.result || []), ...(byTrad.result || [])]) {
+                if (seen.has(r.id)) continue;
+                seen.add(r.id);
+                rows.push(r);
+              }
+              rows.sort((a, b) => a.id - b.id); // storage order across both indexes
+              if (rows.length) finish({ state: "hit", matched: key, rows });
+              else tryKey(i + 1);
+            };
+            byTrad.onerror = () => finish({ state: "error" });
+          };
+          bySimp.onerror = () => finish({ state: "error" });
+        };
+        tryKey(0);
+      };
+      metaReq.onerror = () => finish({ state: "error" });
+    });
+  } catch (_) { return { state: "error" }; }
 }
 
 async function pbpPackMeta() {
@@ -304,9 +321,9 @@ async function pbpPackMeta() {
     return await new Promise((resolve) => {
       const req = db.transaction(_PBP_PACK_META, "readonly").objectStore(_PBP_PACK_META).get("cedict");
       req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => resolve(null);
+      req.onerror = () => resolve({ state: "error" });
     });
-  } catch (_) { return null; }
+  } catch (_) { return { state: "error" }; }
 }
 
 async function pbpPackDelete() {

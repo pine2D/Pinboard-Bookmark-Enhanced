@@ -10,6 +10,8 @@ const _PBP_AI_DB_NAME = "pbp-ai-cache";
 const _PBP_AI_DB_VERSION = 1;
 const _PBP_AI_STORE = "entries";
 const _PBP_AI_CACHE_MAX_ENTRIES = 200;
+const _PBP_AI_DICT2_MAX_ENTRIES = 500;
+const _PBP_AI_DICT2_PREFIX = "dict2_";
 let _pbpAiDbPromise = null;
 
 function _pbpAiOpenDB() {
@@ -77,8 +79,8 @@ async function pbpAiCacheGet(key) {
     // would turn that into a sliding expiry where a frequently-read
     // summary never expires. The check below is a PREFIX EXCLUSION, not an
     // allowlist: every key family except ai_cache_ gets the read-touch,
-    // which today includes ask_/tr_/trview_/gloss_/skim_ and (P1) dict_/
-    // dictctx_ -- any new LRU-semantic family benefits automatically
+    // which today includes ask_/tr_/trview_/gloss_/skim_ and dict2_/
+    // dictctx2_ -- any new LRU-semantic family benefits automatically
     // without a code change here.
     if (entry && typeof entry.ts === "number"
       && String(key).indexOf("ai_cache_") !== 0
@@ -91,56 +93,94 @@ async function pbpAiCacheGet(key) {
   }
 }
 
-// LRU enforcement shared by pbpAiCacheSet/pbpAiCacheAppend: count entries;
-// if over cap, delete oldest by ts. Runs in its own transaction(s) AFTER
-// the write transaction resolves - an eviction race here is benign (see
-// D2 checked_clean: worst case an extra recent entry is evicted, which
-// just re-populates on next miss), unlike the get-then-put race
-// pbpAiCacheAppend exists to close.
-async function _pbpAiEvictOverflow(db) {
-  const count = await new Promise((resolve) => {
-    try {
-      const tx = db.transaction(_PBP_AI_STORE, "readonly");
-      const req = tx.objectStore(_PBP_AI_STORE).count();
-      req.onsuccess = () => resolve(req.result || 0);
-      req.onerror = () => resolve(0);
-    } catch (_) { resolve(0); }
-  });
-  if (count > _PBP_AI_CACHE_MAX_ENTRIES) {
-    const overflow = count - _PBP_AI_CACHE_MAX_ENTRIES;
-    await new Promise((resolve) => {
-      try {
-        const tx = db.transaction(_PBP_AI_STORE, "readwrite");
-        const store = tx.objectStore(_PBP_AI_STORE);
-        const cursorReq = store.index("ts").openCursor(); // ASC by ts (oldest first)
-        let deleted = 0;
-        cursorReq.onsuccess = () => {
-          const cursor = cursorReq.result;
-          if (cursor && deleted < overflow) {
-            cursor.delete();
-            deleted++;
-            cursor.continue();
-          } else {
-            resolve();
-          }
-        };
-        cursorReq.onerror = () => resolve();
-      } catch (_) { resolve(); }
-    });
+function _pbpAiIsDict2Key(key) {
+  return typeof key === "string" && key.startsWith(_PBP_AI_DICT2_PREFIX);
+}
+
+function _pbpAiDict2Range() {
+  return IDBKeyRange.bound(_PBP_AI_DICT2_PREFIX, _PBP_AI_DICT2_PREFIX + "\uffff");
+}
+
+function _pbpAiDeleteOldestInPool(store, overflow, dict2Pool) {
+  if (overflow <= 0) return;
+  const cursorReq = store.index("ts").openCursor(); // ASC by ts (oldest first)
+  let deleted = 0;
+  cursorReq.onsuccess = () => {
+    const cursor = cursorReq.result;
+    if (!cursor || deleted >= overflow) return;
+    const entryKey = cursor.value && cursor.value.key;
+    if (_pbpAiIsDict2Key(entryKey) === dict2Pool) {
+      cursor.delete();
+      deleted++;
+    }
+    if (deleted < overflow) cursor.continue();
+  };
+}
+
+function _pbpAiPruneWrittenPool(store, key) {
+  const dict2Pool = _pbpAiIsDict2Key(key);
+  if (dict2Pool) {
+    const countReq = store.count(_pbpAiDict2Range());
+    countReq.onsuccess = () => {
+      _pbpAiDeleteOldestInPool(store,
+        (countReq.result || 0) - _PBP_AI_DICT2_MAX_ENTRIES, true);
+    };
+    return;
   }
+
+  let totalCount = 0;
+  let dict2Count = 0;
+  let pending = 2;
+  const prune = () => {
+    pending--;
+    if (pending !== 0) return;
+    _pbpAiDeleteOldestInPool(store,
+      Math.max(0, totalCount - dict2Count) - _PBP_AI_CACHE_MAX_ENTRIES, false);
+  };
+  const totalReq = store.count();
+  totalReq.onsuccess = () => { totalCount = totalReq.result || 0; prune(); };
+  const dict2Req = store.count(_pbpAiDict2Range());
+  dict2Req.onsuccess = () => { dict2Count = dict2Req.result || 0; prune(); };
+}
+
+// One store-scoped readwrite transaction owns the final write, target-pool
+// count, and ts-LRU pruning. IndexedDB serializes these transactions across
+// connections/tabs, so concurrent writers cannot observe the same overflow
+// and delete it repeatedly. Versioned online dictionary records (exact
+// `dict2_` prefix) have a 500-entry pool; aliases each consume one record.
+// Every other family, including dictctx2_ and legacy dict_, shares 200.
+// `makeResult` is synchronous; append passes the latest value read inside this
+// same transaction, preserving its existing no-lost-update guarantee.
+async function _pbpAiWriteAndPrune(key, makeResult, ts, readExisting) {
+  try {
+    const db = await _pbpAiOpenDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(_PBP_AI_STORE, "readwrite");
+      const store = tx.objectStore(_PBP_AI_STORE);
+      tx.oncomplete = resolve;
+      tx.onabort = () => reject(tx.error || new Error("AI cache transaction aborted"));
+      tx.onerror = () => {};
+
+      const write = (previous) => {
+        let result;
+        try { result = makeResult(previous); }
+        catch (_) { try { tx.abort(); } catch (_) {} return; }
+        const putReq = store.put({ key, result, ts });
+        putReq.onsuccess = () => _pbpAiPruneWrittenPool(store, key);
+      };
+
+      if (!readExisting) {
+        write(undefined);
+        return;
+      }
+      const getReq = store.get(key);
+      getReq.onsuccess = () => write(getReq.result ? getReq.result.result : undefined);
+    });
+  } catch (_) {}
 }
 
 async function pbpAiCacheSet(key, result, ts) {
-  try {
-    const db = await _pbpAiOpenDB();
-    await new Promise((resolve) => {
-      const tx = db.transaction(_PBP_AI_STORE, "readwrite");
-      const req = tx.objectStore(_PBP_AI_STORE).put({ key, result, ts });
-      req.onsuccess = () => resolve();
-      req.onerror = () => resolve();
-    });
-    await _pbpAiEvictOverflow(db);
-  } catch (_) {}
+  await _pbpAiWriteAndPrune(key, () => result, ts, false);
 }
 
 // Atomic get-then-transform-then-put, in ONE readwrite IDB transaction
@@ -154,28 +194,7 @@ async function pbpAiCacheSet(key, result, ts) {
 // pbpAskHistAppend for ask history; degrades to a no-op on any failure
 // (same swallow-all-errors contract as the rest of this file).
 async function pbpAiCacheAppend(key, transform, ts) {
-  try {
-    const db = await _pbpAiOpenDB();
-    await new Promise((resolve) => {
-      const tx = db.transaction(_PBP_AI_STORE, "readwrite");
-      const store = tx.objectStore(_PBP_AI_STORE);
-      const getReq = store.get(key);
-      getReq.onsuccess = () => {
-        let next;
-        try {
-          next = transform(getReq.result ? getReq.result.result : undefined);
-        } catch (_) {
-          resolve();
-          return;
-        }
-        const putReq = store.put({ key, result: next, ts: ts == null ? Date.now() : ts });
-        putReq.onsuccess = () => resolve();
-        putReq.onerror = () => resolve();
-      };
-      getReq.onerror = () => resolve();
-    });
-    await _pbpAiEvictOverflow(db);
-  } catch (_) {}
+  await _pbpAiWriteAndPrune(key, transform, ts == null ? Date.now() : ts, true);
 }
 
 async function pbpAiCacheDelete(key) {

@@ -12,12 +12,27 @@ const PBP_DICT_SENSE_CAP = 5;
 const PBP_DICT_EXAMPLE_CAP = 2;
 const PBP_DICT_FORM_CAP = 6;
 const PBP_DICT_IPA_CAP = 3;
+const PBP_DICT_QUERY_LANGS = Object.freeze(["en", "de", "fr", "es", "it", "pt", "nl", "ru", "pl", "ja", "ko", "zh"]);
+const PBP_DICT_CIRCUIT_THRESHOLD = 3;
+const PBP_DICT_CIRCUIT_COOLDOWN_MS = 60000;
 
 // "en-US" / "ZH_cn" -> "en" / "zh"; falsy -> "".
 function pbpDictPrimaryLang(code) {
   const s = String(code || "").trim().toLowerCase();
   if (!s) return "";
   return s.split(/[-_]/)[0];
+}
+
+// User-facing language names come from the platform's locale data. Unknown
+// or unsupported codes stay hidden instead of leaking technical identifiers.
+function pbpDictLanguageLabel(code, locale) {
+  const primary = pbpDictPrimaryLang(code);
+  if (!primary || primary === "und" || !PBP_DICT_QUERY_LANGS.includes(primary)) return "";
+  try {
+    const names = new Intl.DisplayNames([String(locale || "en").replace("_", "-")], { type: "language" });
+    const label = names.of(primary);
+    return label && label.toLowerCase() !== primary ? label : "";
+  } catch (_) { return ""; }
 }
 
 // Language routing (spec §3): manual override wins; then a reliable
@@ -30,11 +45,32 @@ function pbpDictRouteLang(detected, isReliable, articleLang, manual) {
   return pbpDictPrimaryLang(articleLang);
 }
 
-// Public cache key (dict_ raw dictionary data is public, shared across
-// accounts): "{primary}|{normalized}".
+function pbpDictNormalizeTerm(term) {
+  return String(term || "").normalize("NFC").trim().replace(/\s+/g, " ");
+}
+
+// Folded identity shared by vocab and dictctx2_. Do not use it for online
+// dictionary results: May/may and Polish/polish can be different entries.
 function pbpDictCacheKeyPublic(lang, term) {
-  const t = String(term || "").normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
-  return pbpDictPrimaryLang(lang) + "|" + t;
+  return pbpDictPrimaryLang(lang) + "|" + pbpDictNormalizeTerm(term).toLowerCase();
+}
+
+// Case-sensitive public query cache. The dict2_ prefix orphans old dict_
+// entries whose folded key may already contain the wrong casing's result.
+function pbpDictCacheKeyExact(lang, term) {
+  return pbpDictPrimaryLang(lang) + "|" + pbpDictNormalizeTerm(term);
+}
+
+function pbpDictQueryCacheKey(lang, term) {
+  return "dict2_" + pbpDictCacheKeyExact(lang, term);
+}
+
+function pbpDictLowerCandidate(term, lang) {
+  const primary = pbpDictPrimaryLang(lang);
+  const exact = pbpDictNormalizeTerm(term);
+  if (!exact || !PBP_DICT_QUERY_LANGS.includes(primary)) return "";
+  const lower = exact.toLocaleLowerCase(primary);
+  return lower === exact ? "" : lower;
 }
 
 // Vocab identity (account-isolation invariant): "{owner}|{primary}|{normalized}".
@@ -50,13 +86,6 @@ function pbpDictSafeUrl(url) {
     const u = new URL(String(url || ""));
     return (u.protocol === "https:" || u.protocol === "http:") ? u.href : "";
   } catch (_) { return ""; }
-}
-
-// Lemma retry decision: 404 + a different lemma (after normalization) -> true.
-function pbpDictLemmaRetry(status, lemma, term, lang) {
-  if (status !== 404) return false;
-  if (!lemma || lemma === "-") return false;
-  return pbpDictCacheKeyPublic(lang, lemma) !== pbpDictCacheKeyPublic(lang, term);
 }
 
 // freedictionaryapi.com response -> internal render model. null when nothing
@@ -106,6 +135,30 @@ function pbpDictNormalizeEntry(json) {
     sourceUrl: pbpDictSafeUrl(src.url),
     license: typeof lic.name === "string" ? lic.name : ""
   };
+}
+
+// A healthy 404 and a healthy 200 with no renderable entries are both
+// semantic misses. Transport/server failures must never become "no entry".
+function pbpDictClassifyResponse(out) {
+  const status = out && out.status;
+  const norm = status === 200 ? pbpDictNormalizeEntry(out.data) : null;
+  if (norm) return { kind: "hit", norm };
+  if (status === 404 || status === 200) return { kind: "miss", norm: null };
+  return { kind: "failure", norm: null };
+}
+
+function pbpDictWiktionaryUrl(term) {
+  return "https://en.wiktionary.org/wiki/" + encodeURIComponent(pbpDictNormalizeTerm(term));
+}
+
+function pbpDictCircuitAfter(state, event, now) {
+  const prev = state || { failures: 0, openUntil: 0 };
+  if (event === "healthy") return { failures: 0, openUntil: 0 };
+  if (event !== "failure") return { failures: prev.failures || 0, openUntil: prev.openUntil || 0 };
+  const failures = (prev.failures || 0) + 1;
+  return failures >= PBP_DICT_CIRCUIT_THRESHOLD
+    ? { failures, openUntil: Number(now || 0) + PBP_DICT_CIRCUIT_COOLDOWN_MS }
+    : { failures, openUntil: 0 };
 }
 
 // LEMMA-first-line protocol (spec §3). "LEMMA: -" or missing marker = none.
@@ -251,6 +304,22 @@ async function pbpVocabGet(id) {
   } catch (_) { return null; }
 }
 
+function pbpVocabNormalizeGroupName(value) {
+  return String(value || "").normalize("NFC").trim().replace(/\s+/gu, " ");
+}
+
+function pbpVocabGroups(record) {
+  const seen = new Set();
+  const groups = [];
+  for (const value of (record && Array.isArray(record.groups) ? record.groups : [])) {
+    const name = pbpVocabNormalizeGroupName(value);
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    groups.push(name);
+  }
+  return groups;
+}
+
 // Unlike the sibling store helpers (which swallow so reader paths degrade),
 // this one PROPAGATES failures: its consumers are the options vocab tab's
 // render/export, which must distinguish "empty" from "read failed" to give
@@ -263,6 +332,7 @@ async function pbpVocabAll(owner) {
     req.onsuccess = () => resolve(req.result || []);
     req.onerror = () => reject(req.error || new Error("vocab read failed"));
   });
+  for (const row of rows) row.groups = pbpVocabGroups(row);
   rows.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   return rows;
 }
@@ -293,6 +363,57 @@ async function pbpVocabDelete(id, expectedOwner) {
   } catch (_) { return false; }
 }
 
+// Batch mutations are intentionally store-level primitives: all selected
+// records are re-read and owner-checked inside one readwrite transaction.
+// Any missing/mismatched record aborts the whole transaction, so callers
+// never observe a partly deleted or partly grouped selection.
+async function _pbpVocabBatchMutate(ids, expectedOwner, mutate) {
+  const uniqueIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(Boolean))];
+  if (!uniqueIds.length) return false;
+  try {
+    const db = await _pbpVocabOpenDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(_PBP_VOCAB_STORE, "readwrite");
+      const store = tx.objectStore(_PBP_VOCAB_STORE);
+      let allowed = true;
+      const abort = () => {
+        if (!allowed) return;
+        allowed = false;
+        try { tx.abort(); } catch (_) {}
+      };
+      for (const id of uniqueIds) {
+        const req = store.get(id);
+        req.onsuccess = () => {
+          const record = req.result;
+          if (!record || record.owner !== expectedOwner) { abort(); return; }
+          try { mutate(store, record); } catch (_) { abort(); }
+        };
+        req.onerror = abort;
+      }
+      tx.oncomplete = () => resolve(allowed);
+      tx.onabort = () => resolve(false);
+      tx.onerror = () => resolve(false);
+    });
+  } catch (_) { return false; }
+}
+
+function pbpVocabBatchDelete(ids, expectedOwner) {
+  return _pbpVocabBatchMutate(ids, expectedOwner, (store, record) => store.delete(record.id));
+}
+
+function pbpVocabBatchAddGroup(ids, expectedOwner, rawGroup) {
+  const group = pbpVocabNormalizeGroupName(rawGroup);
+  if (!group) return Promise.resolve(false);
+  const now = Date.now();
+  return _pbpVocabBatchMutate(ids, expectedOwner, (store, record) => {
+    const groups = pbpVocabGroups(record);
+    if (groups.includes(group)) return;
+    record.groups = [...groups, group];
+    record.updatedAt = now;
+    store.put(record);
+  });
+}
+
 async function pbpVocabSaveWord(owner, w) {
   try {
     const db = await _pbpVocabOpenDB();
@@ -310,8 +431,9 @@ async function pbpVocabSaveWord(owner, w) {
           term: String(w.term || "").normalize("NFC").trim(),
           lemma: null, language: pbpDictPrimaryLang(w.language) || "und",
           gloss: "", ipa: null, sourceUrl: null, license: null,
-          contexts: [], note: "", status: "new", createdAt: now, updatedAt: now
+          contexts: [], groups: [], note: "", status: "new", createdAt: now, updatedAt: now
         };
+        cur.groups = pbpVocabGroups(cur);
         if (w.lemma && !cur.lemma) cur.lemma = String(w.lemma);
         if (w.gloss) cur.gloss = String(w.gloss); // latest lookup wins
         if (w.ipa && !cur.ipa) cur.ipa = String(w.ipa);
@@ -388,36 +510,88 @@ async function _pbpDictHasPerm() {
 }
 
 // Child signal = parent abort OR timeout (no AbortSignal.any: Chrome floor 110).
+// Keep the first cause so closing the popover never trips the service circuit.
 function _pbpDictChildSignal(parent, ms) {
   const c = new AbortController();
-  const onAbort = () => c.abort();
+  let reason = "";
+  const abortWith = (next) => {
+    if (c.signal.aborted) return;
+    reason = next;
+    c.abort();
+  };
+  const onAbort = () => abortWith("parent");
   if (parent) {
-    if (parent.aborted) c.abort();
+    if (parent.aborted) abortWith("parent");
     else parent.addEventListener("abort", onAbort, { once: true });
   }
-  const timer = setTimeout(() => c.abort(), ms);
+  const timer = setTimeout(() => abortWith("timeout"), ms);
   return {
     signal: c.signal,
+    reason: () => reason,
     done: () => { clearTimeout(timer); if (parent) parent.removeEventListener("abort", onAbort); }
   };
 }
 
+let _pbpDictCircuit = { failures: 0, openUntil: 0 };
+
 async function _pbpDictFetch(lang, term, parentSignal) {
+  if (parentSignal && parentSignal.aborted) throw new DOMException("Aborted", "AbortError");
+  const now = Date.now();
+  if (_pbpDictCircuit.openUntil && now >= _pbpDictCircuit.openUntil) {
+    _pbpDictCircuit = { failures: 0, openUntil: 0 };
+  }
+  if (_pbpDictCircuit.openUntil > now) {
+    const err = new Error("Dictionary service cooling down");
+    err.code = "dict_circuit_open";
+    throw err;
+  }
   const child = _pbpDictChildSignal(parentSignal, 8000);
+  let failureRecorded = false;
+  const failed = () => {
+    if (failureRecorded) return;
+    failureRecorded = true;
+    _pbpDictCircuit = pbpDictCircuitAfter(_pbpDictCircuit, "failure", Date.now());
+  };
   try {
     const res = await fetch(
       PBP_DICT_ORIGIN + "/api/v1/entries/" + encodeURIComponent(lang) + "/" + encodeURIComponent(term),
       { signal: child.signal }
     );
-    if (res.status === 404) return { status: 404, data: null };
-    if (!res.ok) return { status: res.status, data: null };
-    return { status: 200, data: await res.json() };
+    if (res.status === 429 || res.status >= 500) {
+      failed();
+      return { status: res.status, data: null };
+    }
+    if (res.status === 404 || !res.ok) {
+      _pbpDictCircuit = pbpDictCircuitAfter(_pbpDictCircuit, "healthy", Date.now());
+      return { status: res.status, data: null };
+    }
+    const data = await res.json();
+    _pbpDictCircuit = pbpDictCircuitAfter(_pbpDictCircuit, "healthy", Date.now());
+    return { status: res.status, data };
+  } catch (e) {
+    if (child.reason() !== "parent") failed();
+    throw e;
   } finally { child.done(); }
 }
 
 // External dictionary data renders through textContent ONLY.
-function _pbpDictRenderEntry(slot, norm, term, lang) {
+function _pbpDictTagLabel(tag) {
+  const key = { pinyin: "dictTagPinyin", simp: "dictTagSimplified", trad: "dictTagTraditional" }[
+    String(tag || "").toLowerCase()
+  ];
+  return key ? t(key) : String(tag || "");
+}
+
+function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm) {
   slot.replaceChildren();
+  const actual = pbpDictNormalizeTerm(norm.word || term);
+  const selected = pbpDictNormalizeTerm(selectedTerm);
+  if (selected && actual && actual !== selected) {
+    const matched = document.createElement("div");
+    matched.className = "xp-dict-match";
+    matched.textContent = t("dictMatchedHeadword", actual);
+    slot.appendChild(matched);
+  }
   for (const e of norm.entries) {
     const ent = document.createElement("div");
     ent.className = "xp-dict-entry";
@@ -438,7 +612,7 @@ function _pbpDictRenderEntry(slot, norm, term, lang) {
         if (p.tags.length) {
           const tag = document.createElement("span");
           tag.className = "xp-dict-ipa-tag";
-          tag.textContent = p.tags.join(", ");
+          tag.textContent = p.tags.map(_pbpDictTagLabel).join(", ");
           line.appendChild(tag);
         }
       }
@@ -447,7 +621,7 @@ function _pbpDictRenderEntry(slot, norm, term, lang) {
     if (e.forms.length) {
       const forms = document.createElement("div");
       forms.className = "xp-dict-forms";
-      forms.textContent = e.forms.map((f) => f.word + (f.tags.length ? " (" + f.tags.join(", ") + ")" : "")).join(" · ");
+      forms.textContent = e.forms.map((f) => f.word + (f.tags.length ? " (" + f.tags.map(_pbpDictTagLabel).join(", ") + ")" : "")).join(" · ");
       ent.appendChild(forms);
     }
     if (e.senses.length) {
@@ -475,7 +649,7 @@ function _pbpDictRenderEntry(slot, norm, term, lang) {
   const a = document.createElement("a");
   // Defense-in-depth: sourceUrl is already sanitized at the normalize/merge
   // layers, but this is the only point it reaches a live href.
-  a.href = pbpDictSafeUrl(norm.sourceUrl) || ("https://" + (lang || "en") + ".wiktionary.org/wiki/" + encodeURIComponent(term));
+  a.href = pbpDictSafeUrl(norm.sourceUrl) || pbpDictWiktionaryUrl(term);
   a.target = "_blank";
   a.rel = "noopener noreferrer";
   a.textContent = (norm.sourceLabel || "Wiktionary") + " · " + (norm.license || "CC BY-SA");
@@ -492,11 +666,28 @@ function _pbpDictSlotMsg(slot, text) {
   slot.appendChild(p);
 }
 
+function _pbpDictSlotFallback(slot, text, term) {
+  _pbpDictSlotMsg(slot, text);
+  const src = document.createElement("div");
+  src.className = "xp-dict-src";
+  const a = document.createElement("a");
+  a.href = pbpDictWiktionaryUrl(term);
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.textContent = t("dictViewWiktionary");
+  src.appendChild(a);
+  slot.appendChild(src);
+}
+
 function _pbpDictSlotSkeleton(slot) {
   slot.replaceChildren();
   const sk = document.createElement("div");
   sk.className = "xp-skel";
   slot.appendChild(sk);
+  const sr = document.createElement("span");
+  sr.className = "sr-only";
+  sr.textContent = t("dictLoading");
+  slot.appendChild(sr);
 }
 
 // dict-pack.js is NOT in md-preview.html: most users never import the pack,
@@ -518,38 +709,66 @@ function _pbpDictLoadPack() {
   return _pbpDictPackLoad;
 }
 
-// perm? -> fetch -> 200 render / 404 wait-lemma -> refetch once / degrade.
+async function _pbpDictCacheGet(lang, term) {
+  try {
+    const hit = await pbpAiCacheGet(pbpDictQueryCacheKey(lang, term));
+    return hit && hit.result ? hit.result : null;
+  } catch (_) { return null; }
+}
+
+async function _pbpDictCacheSet(lang, term, norm) {
+  try { await pbpAiCacheSet(pbpDictQueryCacheKey(lang, term), norm, Date.now()); } catch (_) {}
+}
+
+async function _pbpDictLookupCandidate(lang, term, parentSignal, skipCache) {
+  if (!skipCache) {
+    const cached = await _pbpDictCacheGet(lang, term);
+    if (parentSignal && parentSignal.aborted) return { kind: "aborted", norm: null };
+    if (cached) return { kind: "hit", norm: cached };
+  }
+  const classified = pbpDictClassifyResponse(await _pbpDictFetch(lang, term, parentSignal));
+  if (classified.kind === "hit") await _pbpDictCacheSet(lang, term, classified.norm);
+  return classified;
+}
+
+// exact cache -> exact request -> lowercase candidate -> AI lemma -> degrade.
 // Returns normalized entry or null; the RUN layer merges into _pbpDictCurrent.
 // onRerun: run-level restart used after a permission grant (never slot-local
 // recursion — Codex HIGH 2).
 async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onRerun) {
-  if (!lang) { _pbpDictSlotMsg(slot, t("dictNoEntry")); return null; }
+  const exact = pbpDictNormalizeTerm(term);
+  if (!lang || !exact) { _pbpDictSlotFallback(slot, t("dictNoEntry"), term); return null; }
   if (lang === "zh") {
     const loaded = await _pbpDictLoadPack();
     if (parentSignal && parentSignal.aborted) return null;
     if (loaded && typeof pbpPackLookup === "function" && typeof pbpCedictLookupKeys === "function") {
-      let hit = null;
-      try { hit = await pbpPackLookup(pbpCedictLookupKeys(term)); } catch (_) {}
+      let local;
+      try { local = await pbpPackLookup(pbpCedictLookupKeys(term)); }
+      catch (_) { local = { state: "error" }; }
       if (parentSignal && parentSignal.aborted) return null;
-      if (hit) {
-        const norm = pbpCedictEntryToNorm(hit.rows, hit.matched);
-        _pbpDictRenderEntry(slot, norm, hit.matched, lang);
+      if (local && local.state === "hit") {
+        const norm = pbpCedictEntryToNorm(local.rows, local.matched);
+        _pbpDictRenderEntry(slot, norm, local.matched, lang, term);
+        // Prefix hits render norm.word, which may be SHORTER than the raw
+        // selection; the run-level .then() re-syncs cur.term when this settles.
         return norm;
       }
-      // (Prefix hits render norm.word, which may be SHORTER than the raw
-      // selection -- pbpDictRun's dictionary-slot .then() must re-sync
-      // cur.term the moment this slot settles, or save/speak/saved-check
-      // operate on the wrong word.)
+      if (local && local.state === "ready-miss") {
+        _pbpDictSlotFallback(slot, t("dictNoEntry"), term);
+        return null;
+      }
+      if (local && local.state === "error") {
+        _pbpDictSlotFallback(slot, t("dictLoadFailed"), term);
+        return null;
+      }
     }
   }
-  const cacheKey = "dict_" + pbpDictCacheKeyPublic(lang, term);
-  try {
-    const hit = await pbpAiCacheGet(cacheKey);
-    if (hit && hit.result) {
-      _pbpDictRenderEntry(slot, hit.result, term, lang);
-      return hit.result;
-    }
-  } catch (_) {}
+  const exactHit = await _pbpDictCacheGet(lang, exact);
+  if (parentSignal && parentSignal.aborted) return null;
+  if (exactHit) {
+    _pbpDictRenderEntry(slot, exactHit, exact, lang, term);
+    return exactHit;
+  }
   if (!(await _pbpDictHasPerm())) {
     slot.replaceChildren();
     const btn = document.createElement("button");
@@ -559,63 +778,74 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
     const hint = document.createElement("div");
     hint.className = "xp-dict-msg";
     hint.textContent = t("dictConnectHint");
+    const feedback = document.createElement("div");
+    feedback.className = "xp-dict-msg";
+    feedback.setAttribute("role", "status");
+    feedback.setAttribute("aria-live", "polite");
+    feedback.hidden = true;
     btn.addEventListener("click", async () => {
       if (btn.disabled) return;
       btn.disabled = true;
+      feedback.hidden = true;
+      feedback.textContent = "";
       let granted = false;
       // FIRST await in the click chain must be the permission request.
       try { granted = await chrome.permissions.request({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) {}
-      if (!granted) { btn.disabled = false; return; }
+      if (!granted) {
+        btn.textContent = t("dictConnectRetry");
+        feedback.hidden = false;
+        feedback.textContent = t("dictPermissionDenied");
+        btn.disabled = false;
+        return;
+      }
       if (typeof onRerun === "function") onRerun(); // full-run restart merges results properly
     });
     slot.appendChild(btn);
     slot.appendChild(hint);
+    slot.appendChild(feedback);
     return null;
   }
   _pbpDictSlotSkeleton(slot);
-  let out;
+  const tried = new Set();
+  const runCandidate = async (candidate, skipCache) => {
+    const key = pbpDictCacheKeyExact(lang, candidate);
+    if (tried.has(key)) return { kind: "miss", norm: null };
+    tried.add(key);
+    return _pbpDictLookupCandidate(lang, candidate, parentSignal, skipCache);
+  };
+  const finish = async (candidate, result, aliasExact) => {
+    if (result.kind !== "hit") return null;
+    if (aliasExact) await _pbpDictCacheSet(lang, exact, result.norm);
+    if (parentSignal && parentSignal.aborted) return null;
+    _pbpDictRenderEntry(slot, result.norm, candidate, lang, term);
+    return result.norm;
+  };
   try {
-    out = await _pbpDictFetch(lang, term, parentSignal);
+    const first = await runCandidate(exact, true);
+    if (first.kind === "hit") return finish(exact, first, false);
+    if (first.kind === "failure") throw new Error("Dictionary request failed");
+
+    const lower = pbpDictLowerCandidate(exact, lang);
+    if (lower) {
+      const second = await runCandidate(lower, false);
+      if (second.kind === "hit") return finish(lower, second, true);
+      if (second.kind === "failure") throw new Error("Dictionary request failed");
+    }
+
+    const lemma = pbpDictNormalizeTerm(await lemmaPromise); // resolves on ALL ctx-slot exits
+    if (parentSignal && parentSignal.aborted) return null;
+    if (lemma && lemma !== "-" && !tried.has(pbpDictCacheKeyExact(lang, lemma))) {
+      const third = await runCandidate(lemma, false);
+      if (third.kind === "hit") return finish(lemma, third, false);
+      if (third.kind === "failure") throw new Error("Dictionary request failed");
+    }
   } catch (e) {
     if (parentSignal && parentSignal.aborted) return null;
-    _pbpDictSlotMsg(slot, t("dictLoadFailed"));
+    _pbpDictSlotFallback(slot, t("dictLoadFailed"), term);
     return null;
   }
-  if (out.status === 404) {
-    const lemma = await lemmaPromise; // resolved on ALL ctx-slot exits
-    if (parentSignal && parentSignal.aborted) return null;
-    if (pbpDictLemmaRetry(404, lemma, term, lang)) {
-      // Two different selections in the same article can share a lemma
-      // ("running"/"runs" -> "run") -- check the lemma's own cache entry
-      // before spending a second network round-trip on it.
-      try {
-        const lemmaHit = await pbpAiCacheGet("dict_" + pbpDictCacheKeyPublic(lang, lemma.trim()));
-        if (parentSignal && parentSignal.aborted) return null;
-        if (lemmaHit && lemmaHit.result) {
-          _pbpDictRenderEntry(slot, lemmaHit.result, lemma, lang);
-          return lemmaHit.result;
-        }
-      } catch (_) {}
-      if (parentSignal && parentSignal.aborted) return null;
-      let second;
-      try { second = await _pbpDictFetch(lang, lemma.trim(), parentSignal); } catch (_) { second = { status: 0, data: null }; }
-      if (parentSignal && parentSignal.aborted) return null;
-      const norm2 = second.status === 200 ? pbpDictNormalizeEntry(second.data) : null;
-      if (norm2) {
-        _pbpDictRenderEntry(slot, norm2, lemma, lang);
-        try { await pbpAiCacheSet("dict_" + pbpDictCacheKeyPublic(lang, lemma), norm2, Date.now()); } catch (_) {}
-        return norm2;
-      }
-    }
-    _pbpDictSlotMsg(slot, t("dictNoEntry"));
-    return null;
-  }
-  if (out.status !== 200) { _pbpDictSlotMsg(slot, t("dictLoadFailed")); return null; }
-  const norm = pbpDictNormalizeEntry(out.data);
-  if (!norm) { _pbpDictSlotMsg(slot, t("dictNoEntry")); return null; }
-  _pbpDictRenderEntry(slot, norm, term, lang);
-  try { await pbpAiCacheSet(cacheKey, norm, Date.now()); } catch (_) {}
-  return norm;
+  _pbpDictSlotFallback(slot, t("dictNoEntry"), term);
+  return null;
 }
 
 // ---- Contextual-gloss slot + run assembly -------------------------------
@@ -751,7 +981,7 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
   }
 }
 
-const PBP_DICT_LANGS = ["auto", "en", "de", "fr", "es", "it", "pt", "nl", "ru", "pl", "ja", "ko", "zh"];
+const PBP_DICT_LANGS = ["auto", ...PBP_DICT_QUERY_LANGS];
 
 async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   // Child controller: this run's own signal, chained to md-ask's parent ctrl.
@@ -800,10 +1030,11 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   const sel = document.createElement("select");
   sel.className = "xp-dict-lang";
   sel.setAttribute("aria-label", t("dictLangAria"));
+  const languageLocale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang;
   for (const code of PBP_DICT_LANGS) {
     const o = document.createElement("option");
     o.value = code === "auto" ? "" : code;
-    o.textContent = code === "auto" ? t("dictLangAuto") : code;
+    o.textContent = code === "auto" ? t("dictLangAuto") : (pbpDictLanguageLabel(code, languageLocale) || code);
     sel.appendChild(o);
   }
   const speak = document.createElement("button");
@@ -821,6 +1052,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   wrap.appendChild(slot);
   wrap.appendChild(ctxEl);
   body.replaceChildren(wrap);
+  _pbpDictSlotSkeleton(slot);
 
   const manual = _pbpDictManualLang;
   const lang = await _pbpDictResolveLang(cap, ctx, manual);
@@ -836,7 +1068,8 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     sel.value = manual;
   } else {
     sel.value = "";
-    sel.options[0].textContent = t("dictLangAuto") + (lang ? " (" + lang + ")" : "");
+    const detectedLabel = pbpDictLanguageLabel(lang, languageLocale);
+    sel.options[0].textContent = t("dictLangAuto") + (detectedLabel ? " (" + detectedLabel + ")" : "");
   }
   sel.addEventListener("change", () => {
     _pbpDictManualLang = sel.value; // per-document only; never persisted
@@ -883,7 +1116,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   if (vocabBtn && vocabBtn.dataset.runId === String(runId)) {
     const hit = await pbpVocabGet(pbpDictVocabKey(cur.owner, effectiveLang, cur.term));
     if (signal.aborted || _pbpDictCurrent !== cur || vocabBtn.dataset.runId !== String(runId)) return;
-    if (hit) { cur.saved = true; vocabBtn.textContent = t("dictSavedVocab"); }
+    if (hit) { cur.saved = true; vocabBtn.textContent = t("dictUpdateVocab"); }
     vocabBtn.disabled = false;
   }
 }
