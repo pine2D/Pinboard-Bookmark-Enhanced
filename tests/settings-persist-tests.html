@@ -1518,13 +1518,13 @@ async function run() {
     delete syncArea.openaiApiKey;
     delete syncArea.exportTargets;
 
-    await persistSettings({ optTheme: "nord", geminiApiKey: "obf:g1", pinboardToken: "obf:p1", dictAnkiKey: "obf:anki1", exportTargets: { github: { token: "obf:t1", enabled: true } } });
+    await persistSettings({ optTheme: "nord", geminiApiKey: "obf:g1", pinboardToken: "obf:p1", dictAnkiKey: "obf:anki1", dictEudicToken: "obf:eudic1", exportTargets: { github: { token: "obf:t1", enabled: true } } });
     check("E5 default-state: sync area has NO API_KEY_FIELDS after saveAll", API_KEY_FIELDS.every((k) => !(k in syncArea)));
     // Parenthesized member-access-then-fallback BEFORE the `in` check: `in`
     // binds tighter than `||`, so the naive `!("token" in (x||{}).y || {})`
     // form always evaluates false for BOTH leak and no-leak — never fails.
     check("E5 default-state: sync exportTargets has no token", !("token" in ((syncArea.exportTargets || {}).github || {})));
-    check("E5 default-state: local has the real secrets", localArea.geminiApiKey === "obf:g1" && localArea.pinboardToken === "obf:p1" && localArea.dictAnkiKey === "obf:anki1");
+    check("E5 default-state: local has the real secrets", localArea.geminiApiKey === "obf:g1" && localArea.pinboardToken === "obf:p1" && localArea.dictAnkiKey === "obf:anki1" && localArea.dictEudicToken === "obf:eudic1");
 
     // A stale sync copy is source-only: existing local truth wins, then sync is scrubbed.
     syncArea.geminiApiKey = "obf:STALE";
@@ -1707,7 +1707,7 @@ async function run() {
     check("E5 pbpEnableSyncApiKeys: publishes marker and payload in one sync write",
       writeOrder.length === 1 && syncArea.syncApiKeys === true);
     check("E5 pbpEnableSyncApiKeys: flag ends up true", syncArea.syncApiKeys === true);
-    check("E5 pbpEnableSyncApiKeys: current local secrets landed in sync", syncArea.geminiApiKey === "" && syncArea.pinboardToken === "obf:p1" && syncArea.dictAnkiKey === "obf:anki1");
+    check("E5 pbpEnableSyncApiKeys: current local secrets landed in sync", syncArea.geminiApiKey === "" && syncArea.pinboardToken === "obf:p1" && syncArea.dictAnkiKey === "obf:anki1" && syncArea.dictEudicToken === "obf:eudic1");
     globalThis.chrome.storage.sync.set = realSyncSet;
 
     // Storage selection belongs inside the same lock. A queued persist must
@@ -2094,6 +2094,7 @@ async function run() {
       backupIncludeHighlights: true,
       webdavUrl: "obf:" + btoa("https://dav.example.com/secret-path"),
       dictAnkiKey: "obf:anki1",
+      dictEudicToken: "obf:eudic1",
       exportTargets: {
         webhook: { enabled: true, url: "obf:" + btoa("https://hooks.example/secret"), token: "obf:auth" },
         github: { enabled: true, token: "obf:github" },

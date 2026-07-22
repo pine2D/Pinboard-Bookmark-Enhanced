@@ -2719,6 +2719,41 @@
   "dictPackDeleteConfirm": {
     "message": "Удалить импортированный пакет словаря?"
   },
+  "dictEudicSend": {
+    "message": "Отправить в Eudic"
+  },
+  "dictEudicSending": {
+    "message": "Отправка…"
+  },
+  "dictEudicResult": {
+    "message": "Добавлено: $ADDED$ · пропущено: $SKIPPED$ · не поддерживается: $UNSUPPORTED$",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "unsupported": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictEudicGenericOk": {
+    "message": "Отправлено в Eudic — точное количество недоступно."
+  },
+  "dictEudicRateLimited": {
+    "message": "Достигнут лимит запросов Eudic — повторите попытку позже (блокировка длится от 1 до 24 часов)."
+  },
+  "dictEudicTokenRequired": {
+    "message": "Добавьте авторизацию Eudic OpenAPI ниже или проверьте, действительна ли она."
+  },
+  "dictEudicTokenLabel": {
+    "message": "Авторизация Eudic OpenAPI"
+  },
+  "dictEudicTokenHint": {
+    "message": "Скопируйте полное значение авторизации из Eudic"
+  },
   "dictAnkiNothing": {
     "message": "Пока нет слов для отправки."
   },

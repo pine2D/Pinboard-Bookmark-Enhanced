@@ -2719,6 +2719,41 @@
   "dictPackDeleteConfirm": {
     "message": "インポート済みの辞書パックを削除しますか？"
   },
+  "dictEudicSend": {
+    "message": "Eudic に送信"
+  },
+  "dictEudicSending": {
+    "message": "送信中…"
+  },
+  "dictEudicResult": {
+    "message": "$ADDED$ 件追加 · $SKIPPED$ 件スキップ · $UNSUPPORTED$ 件非対応",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "unsupported": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictEudicGenericOk": {
+    "message": "Eudic に送信しました。正確な件数は取得できません。"
+  },
+  "dictEudicRateLimited": {
+    "message": "Eudic のレート制限に達しました。しばらくしてからもう一度お試しください（制限は 1〜24 時間続きます）。"
+  },
+  "dictEudicTokenRequired": {
+    "message": "下記に Eudic OpenAPI の認証情報を入力するか、有効期限が切れていないか確認してください。"
+  },
+  "dictEudicTokenLabel": {
+    "message": "Eudic OpenAPI 認証情報"
+  },
+  "dictEudicTokenHint": {
+    "message": "Eudic の認証情報を全文コピーしてください"
+  },
   "dictAnkiNothing": {
     "message": "送信できる単語がまだありません。"
   },

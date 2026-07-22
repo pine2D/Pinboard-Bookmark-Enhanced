@@ -2719,6 +2719,41 @@
   "dictPackDeleteConfirm": {
     "message": "Importiertes Wörterbuchpaket löschen?"
   },
+  "dictEudicSend": {
+    "message": "An Eudic senden"
+  },
+  "dictEudicSending": {
+    "message": "Senden…"
+  },
+  "dictEudicResult": {
+    "message": "$ADDED$ hinzugefügt · $SKIPPED$ übersprungen · $UNSUPPORTED$ nicht unterstützt",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "unsupported": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictEudicGenericOk": {
+    "message": "An Eudic gesendet. Die genaue Anzahl ist nicht verfügbar."
+  },
+  "dictEudicRateLimited": {
+    "message": "Eudic-Ratenlimit erreicht. Versuch es später erneut (Sperren dauern 1 bis 24 Stunden)."
+  },
+  "dictEudicTokenRequired": {
+    "message": "Trag deine Eudic-OpenAPI-Autorisierung unten ein oder prüfe, ob sie noch gültig ist."
+  },
+  "dictEudicTokenLabel": {
+    "message": "Eudic-OpenAPI-Autorisierung"
+  },
+  "dictEudicTokenHint": {
+    "message": "Kopiere den vollständigen Autorisierungswert von Eudic"
+  },
   "dictAnkiNothing": {
     "message": "Noch keine Wörter zum Senden."
   },

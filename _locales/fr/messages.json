@@ -2719,6 +2719,41 @@
   "dictPackDeleteConfirm": {
     "message": "Supprimer le pack de dictionnaire importé ?"
   },
+  "dictEudicSend": {
+    "message": "Envoyer vers Eudic"
+  },
+  "dictEudicSending": {
+    "message": "Envoi…"
+  },
+  "dictEudicResult": {
+    "message": "$ADDED$ ajouté(s) · $SKIPPED$ ignoré(s) · $UNSUPPORTED$ non pris en charge",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "unsupported": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictEudicGenericOk": {
+    "message": "Envoyé vers Eudic. Le nombre exact n'est pas disponible."
+  },
+  "dictEudicRateLimited": {
+    "message": "Limite de débit Eudic atteinte. Réessayez plus tard (les blocages durent de 1 à 24 heures)."
+  },
+  "dictEudicTokenRequired": {
+    "message": "Ajoutez votre autorisation Eudic OpenAPI ci-dessous, ou vérifiez qu'elle est toujours valide."
+  },
+  "dictEudicTokenLabel": {
+    "message": "Autorisation Eudic OpenAPI"
+  },
+  "dictEudicTokenHint": {
+    "message": "Copiez la valeur d'autorisation complète depuis Eudic"
+  },
   "dictAnkiNothing": {
     "message": "Aucun mot à envoyer pour le moment."
   },

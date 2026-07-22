@@ -673,10 +673,12 @@
       <div class="fg"><label class="bl" for="dict-anki-deck" data-i18n="dictAnkiDeckLabel">Anki deck</label>
         <input type="text" id="dict-anki-deck" placeholder="Pinboard Vocab" /></div>
       <div class="fg"><label class="bl" for="dict-anki-key" data-i18n="dictAnkiKeyLabel">AnkiConnect API key (optional)</label><input type="password" id="dict-anki-key" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-anki-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></div>
+      <div class="fg"><label class="bl" for="dict-eudic-token" data-i18n="dictEudicTokenLabel">Eudic OpenAPI authorization</label><input type="password" id="dict-eudic-token" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-eudic-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://my.eudic.net/OpenAPI/Authorization" target="_blank" rel="noopener noreferrer" data-i18n="dictEudicTokenHint">Copy the full authorization value from Eudic</a></p></div>
       <div class="notes-toolbar">
         <span id="vocab-count" class="notes-count" aria-live="polite"></span>
         <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportTsv">Export TSV</button>
         <button type="button" class="btn btn-sm" id="vocab-anki-btn" data-i18n="dictAnkiSend">Send to Anki</button>
+        <button type="button" class="btn btn-sm" id="vocab-eudic-btn" data-i18n="dictEudicSend" hidden>Send to Eudic</button>
         <span class="save-status" id="vocab-status" role="status" aria-live="polite"></span>
       </div>
       <div id="vocab-empty" class="notes-empty" data-i18n="dictVocabEmpty" hidden>No saved words yet. Save words from the reader's dictionary view.</div>
@@ -896,6 +898,7 @@
   <script defer src="md-dict.js"></script>
   <script defer src="anki-connect.js"></script>
   <script defer src="dict-pack.js"></script>
+  <script defer src="eudic-sync.js"></script>
   <script defer src="options-vocab.js"></script>
 </body>
 </html>

@@ -2719,6 +2719,41 @@
   "dictPackDeleteConfirm": {
     "message": "刪除已匯入的詞典包？"
   },
+  "dictEudicSend": {
+    "message": "傳送到歐路詞典"
+  },
+  "dictEudicSending": {
+    "message": "傳送中…"
+  },
+  "dictEudicResult": {
+    "message": "新增 $ADDED$ · 跳過 $SKIPPED$ · 不支援 $UNSUPPORTED$",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "unsupported": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictEudicGenericOk": {
+    "message": "已傳送到歐路詞典，但無法取得準確數量。"
+  },
+  "dictEudicRateLimited": {
+    "message": "觸發歐路介面限流，請稍後再試（封鎖 1 至 24 小時）。"
+  },
+  "dictEudicTokenRequired": {
+    "message": "請在下方填寫歐路 OpenAPI 授權資訊，或確認其是否仍然有效。"
+  },
+  "dictEudicTokenLabel": {
+    "message": "歐路 OpenAPI 授權資訊"
+  },
+  "dictEudicTokenHint": {
+    "message": "從歐路授權頁面完整複製授權資訊"
+  },
   "dictAnkiNothing": {
     "message": "目前沒有可傳送的生詞。"
   },

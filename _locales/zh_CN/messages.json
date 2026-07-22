@@ -2719,6 +2719,41 @@
   "dictPackDeleteConfirm": {
     "message": "删除已导入的词典包？"
   },
+  "dictEudicSend": {
+    "message": "发送到欧路词典"
+  },
+  "dictEudicSending": {
+    "message": "发送中…"
+  },
+  "dictEudicResult": {
+    "message": "新增 $ADDED$ · 跳过 $SKIPPED$ · 不支持 $UNSUPPORTED$",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "unsupported": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictEudicGenericOk": {
+    "message": "已发送到欧路词典，但无法获取准确数量。"
+  },
+  "dictEudicRateLimited": {
+    "message": "触发欧路接口限流，请稍后再试（封停 1 至 24 小时）。"
+  },
+  "dictEudicTokenRequired": {
+    "message": "请在下方填写欧路 OpenAPI 授权信息，或检查其是否仍有效。"
+  },
+  "dictEudicTokenLabel": {
+    "message": "欧路 OpenAPI 授权信息"
+  },
+  "dictEudicTokenHint": {
+    "message": "从欧路授权页面完整复制授权信息"
+  },
   "dictAnkiNothing": {
     "message": "暂无可发送的生词。"
   },

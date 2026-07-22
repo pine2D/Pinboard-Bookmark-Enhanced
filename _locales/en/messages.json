@@ -2719,6 +2719,41 @@
   "dictPackDeleteConfirm": {
     "message": "Delete the imported dictionary pack?"
   },
+  "dictEudicSend": {
+    "message": "Send to Eudic"
+  },
+  "dictEudicSending": {
+    "message": "Sending…"
+  },
+  "dictEudicResult": {
+    "message": "Added $ADDED$ · skipped $SKIPPED$ · unsupported $UNSUPPORTED$",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "skipped": {
+        "content": "$2"
+      },
+      "unsupported": {
+        "content": "$3"
+      }
+    }
+  },
+  "dictEudicGenericOk": {
+    "message": "Sent to Eudic; exact totals are unavailable."
+  },
+  "dictEudicRateLimited": {
+    "message": "Eudic rate limit hit. Try again later (bans last 1 to 24 hours)."
+  },
+  "dictEudicTokenRequired": {
+    "message": "Add your Eudic OpenAPI authorization below, or check that it is still valid."
+  },
+  "dictEudicTokenLabel": {
+    "message": "Eudic OpenAPI authorization"
+  },
+  "dictEudicTokenHint": {
+    "message": "Copy the full authorization value from Eudic"
+  },
   "dictAnkiNothing": {
     "message": "No words to send yet."
   },

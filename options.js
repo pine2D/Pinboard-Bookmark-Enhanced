@@ -578,7 +578,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "dict-echo-enabled": false,
         "dict-anki-deck": "Pinboard Vocab"
       },
-      skip: ["dict-anki-key"]
+      skip: ["dict-anki-key", "dict-eudic-token"]
     }
   };
   if (typeof window !== "undefined") window.__PBP_PANEL_DEFAULTS = PANEL_DEFAULTS;
@@ -1054,7 +1054,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-webdav-pass": s.webdavPass,
     "opt-webdav-autopush": s.webdavAutoPush || "off",
     "dict-anki-deck": s.dictAnkiDeck || "",
-    "dict-anki-key": s.dictAnkiKey || ""
+    "dict-anki-key": s.dictAnkiKey || "",
+    "dict-eudic-token": s.dictEudicToken || ""
   };
   for (const [id, val] of Object.entries(fieldMap)) {
     const el = $id(id);
@@ -1986,6 +1987,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       dictEchoEnabled: $id("dict-echo-enabled").checked,
       dictAnkiDeck: $id("dict-anki-deck").value.trim(),
       dictAnkiKey: obfuscateKey($id("dict-anki-key").value.trim()),
+      dictEudicToken: obfuscateKey($id("dict-eudic-token").value.trim()),
       selectionTrigger: $id("opt-selection-trigger").value,
       // Appearance
       optLang: $id("opt-lang").value,

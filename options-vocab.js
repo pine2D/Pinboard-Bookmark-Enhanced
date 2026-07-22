@@ -175,6 +175,14 @@ function _pbpVocabRenderList(rows) {
   if (empty) empty.hidden = !!rows.length;
   list.replaceChildren();
   rows.forEach((w, i) => list.appendChild(_pbpVocabBuildRow(w, i)));
+
+  const eudicBtn = $id("vocab-eudic-btn");
+  if (eudicBtn) {
+    // Hidden when nothing is sendable: don't ask for permissions first and
+    // reveal "no supported words" after.
+    eudicBtn.hidden = typeof pbpEudicPartition !== "function"
+      || pbpEudicPartition(rows).byLang.size === 0;
+  }
 }
 
 // Called from options.js's activateTab -- the sole lazy-init line added
@@ -319,8 +327,62 @@ async function _pbpVocabSendAnki() {
   }
 }
 
+async function _pbpVocabSendEudic() {
+  const btn = $id("vocab-eudic-btn");
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  try {
+    btn.textContent = t("dictEudicSending");
+    const pattern = pbpEndpointOriginPattern(PBP_EUDIC_ENDPOINT);
+    let granted = false;
+    try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (_) {}
+    if (!granted) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+    if (typeof window.pbpOptionsFlushAutoSave === "function") {
+      let flushed = null;
+      try { flushed = await window.pbpOptionsFlushAutoSave(); } catch (_) {}
+      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+    }
+    const raw = await pbpReadSettingsWithSecrets({ dictEudicToken: SETTINGS_DEFAULTS.dictEudicToken });
+    const s = deobfuscateSettings(raw);
+    if (!s.dictEudicToken) { _pbpVocabFlashStatus(false, t("dictEudicTokenRequired")); return; }
+    const owner = await pbpVocabCurrentOwner();
+    const rows = await pbpVocabAll(owner);
+    if ((await pbpVocabCurrentOwner()) !== owner) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+    const res = await pbpEudicSendRows(rows, {
+      token: s.dictEudicToken,
+      ownerCheck: async () => (await pbpVocabCurrentOwner()) === owner
+    });
+    if (res.stage === "owner") {
+      _pbpVocabFlashStatus(false, t("jinaFailed"));
+    } else if (res.stage === "auth") {
+      _pbpVocabFlashStatus(false, t("dictEudicTokenRequired"));
+    } else if (res.rateLimited) {
+      _pbpVocabFlashStatus(false, t("dictEudicRateLimited"));
+    } else if (res.failed) {
+      // Parameter errors surface the server's own message (spec §2).
+      _pbpVocabFlashStatus(false, res.error || t("jinaFailed"));
+    } else if (res.generic) {
+      // ANY generic batch poisons the totals -- never show a partial count
+      // as if it were the whole story.
+      _pbpVocabFlashStatus(true, t("dictEudicGenericOk"));
+    } else {
+      _pbpVocabFlashStatus(true,
+        t("dictEudicResult", String(res.added), String(res.skipped), String(res.unsupported)));
+    }
+  } catch (_) {
+    _pbpVocabFlashStatus(false, t("jinaFailed"));
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
+
 const _vocabAnkiBtn = $id("vocab-anki-btn");
 if (_vocabAnkiBtn) _vocabAnkiBtn.addEventListener("click", _pbpVocabSendAnki);
+
+const _vocabEudicBtn = $id("vocab-eudic-btn");
+if (_vocabEudicBtn) _vocabEudicBtn.addEventListener("click", _pbpVocabSendEudic);
 
 const _vocabExportBtn = $id("vocab-export-btn");
 if (_vocabExportBtn) _vocabExportBtn.addEventListener("click", _pbpVocabExport);
