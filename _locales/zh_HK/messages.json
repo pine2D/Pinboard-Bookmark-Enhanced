@@ -2671,6 +2671,9 @@
   "dictAnkiDeckLabel": {
     "message": "Anki 牌組"
   },
+  "dictAnkiPortLabel": {
+    "message": "AnkiConnect 連接埠"
+  },
   "dictAnkiKeyLabel": {
     "message": "AnkiConnect API key（可選）"
   },
@@ -2703,7 +2706,7 @@
     "message": "匯入失敗，請確認檔案是 CC-CEDICT 發布包"
   },
   "dictPackEmpty": {
-    "message": "暫時未匯入。請到 MDBG 下載 CC-CEDICT 後匯入（CC BY-SA 4.0）"
+    "message": "暫時未匯入。請到 MDBG 下載 CC-CEDICT 發佈檔（.txt.gz 或 .zip 均可）後在此匯入（CC BY-SA 4.0）"
   },
   "dictPackStatus": {
     "message": "已匯入 $N$ 筆 · $DATE$",

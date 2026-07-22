@@ -2671,6 +2671,9 @@
   "dictAnkiDeckLabel": {
     "message": "Anki deck"
   },
+  "dictAnkiPortLabel": {
+    "message": "AnkiConnect port"
+  },
   "dictAnkiKeyLabel": {
     "message": "AnkiConnect API key (optional)"
   },
@@ -2703,7 +2706,7 @@
     "message": "Import failed. Make sure the file is a CC-CEDICT release."
   },
   "dictPackEmpty": {
-    "message": "Not imported. Download CC-CEDICT from MDBG, then import it (CC BY-SA 4.0)."
+    "message": "Not imported. Download the CC-CEDICT release from MDBG (.txt.gz or .zip), then import the file here (CC BY-SA 4.0)."
   },
   "dictPackStatus": {
     "message": "$N$ entries imported · $DATE$",

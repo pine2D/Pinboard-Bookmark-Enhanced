@@ -2671,6 +2671,9 @@
   "dictAnkiDeckLabel": {
     "message": "Колода Anki"
   },
+  "dictAnkiPortLabel": {
+    "message": "Порт AnkiConnect"
+  },
   "dictAnkiKeyLabel": {
     "message": "API-ключ AnkiConnect (необязательно)"
   },
@@ -2703,7 +2706,7 @@
     "message": "Не удалось импортировать. Убедитесь, что это официальный релиз CC-CEDICT."
   },
   "dictPackEmpty": {
-    "message": "Не импортировано. Скачайте CC-CEDICT с MDBG и импортируйте (CC BY-SA 4.0)."
+    "message": "Не импортировано. Скачайте выпуск CC-CEDICT с MDBG (.txt.gz или .zip) и импортируйте файл здесь (CC BY-SA 4.0)."
   },
   "dictPackStatus": {
     "message": "Импортировано: $N$ · $DATE$",

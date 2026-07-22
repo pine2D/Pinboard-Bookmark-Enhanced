@@ -2671,6 +2671,9 @@
   "dictAnkiDeckLabel": {
     "message": "Talia Anki"
   },
+  "dictAnkiPortLabel": {
+    "message": "Port AnkiConnect"
+  },
   "dictAnkiKeyLabel": {
     "message": "Klucz API AnkiConnect (opcjonalnie)"
   },
@@ -2703,7 +2706,7 @@
     "message": "Import nie powiódł się. Upewnij się, że plik to wydanie CC-CEDICT."
   },
   "dictPackEmpty": {
-    "message": "Nie zaimportowano. Pobierz CC-CEDICT z MDBG, a potem zaimportuj (CC BY-SA 4.0)."
+    "message": "Nie zaimportowano. Pobierz wydanie CC-CEDICT z MDBG (.txt.gz lub .zip), a potem zaimportuj plik tutaj (CC BY-SA 4.0)."
   },
   "dictPackStatus": {
     "message": "Zaimportowano: $N$ · $DATE$",

@@ -2671,6 +2671,9 @@
   "dictAnkiDeckLabel": {
     "message": "Anki-Stapel"
   },
+  "dictAnkiPortLabel": {
+    "message": "AnkiConnect-Port"
+  },
   "dictAnkiKeyLabel": {
     "message": "AnkiConnect-API-Schlüssel (optional)"
   },
@@ -2703,7 +2706,7 @@
     "message": "Import fehlgeschlagen. Stelle sicher, dass die Datei ein CC-CEDICT-Release ist."
   },
   "dictPackEmpty": {
-    "message": "Nicht importiert. Lade CC-CEDICT von MDBG herunter und importiere es (CC BY-SA 4.0)."
+    "message": "Nicht importiert. Lade die CC-CEDICT-Version von MDBG herunter (.txt.gz oder .zip) und importiere die Datei hier (CC BY-SA 4.0)."
   },
   "dictPackStatus": {
     "message": "$N$ Einträge importiert · $DATE$",

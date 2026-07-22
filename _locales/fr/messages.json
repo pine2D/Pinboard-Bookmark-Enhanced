@@ -2671,6 +2671,9 @@
   "dictAnkiDeckLabel": {
     "message": "Paquet Anki"
   },
+  "dictAnkiPortLabel": {
+    "message": "Port AnkiConnect"
+  },
   "dictAnkiKeyLabel": {
     "message": "Clé API AnkiConnect (facultative)"
   },
@@ -2703,7 +2706,7 @@
     "message": "Échec de l'importation. Vérifiez que le fichier est bien une publication CC-CEDICT."
   },
   "dictPackEmpty": {
-    "message": "Non importé. Téléchargez CC-CEDICT depuis MDBG, puis importez-le (CC BY-SA 4.0)."
+    "message": "Non importé. Téléchargez la version CC-CEDICT depuis MDBG (.txt.gz ou .zip), puis importez le fichier ici (CC BY-SA 4.0)."
   },
   "dictPackStatus": {
     "message": "$N$ entrées importées · $DATE$",

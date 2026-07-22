@@ -2671,6 +2671,9 @@
   "dictAnkiDeckLabel": {
     "message": "Anki デッキ"
   },
+  "dictAnkiPortLabel": {
+    "message": "AnkiConnect ポート"
+  },
   "dictAnkiKeyLabel": {
     "message": "AnkiConnect API キー（任意）"
   },
@@ -2703,7 +2706,7 @@
     "message": "インポートに失敗しました。ファイルが CC-CEDICT の配布パックか確認してください。"
   },
   "dictPackEmpty": {
-    "message": "未インポートです。MDBG から CC-CEDICT をダウンロードしてインポートしてください（CC BY-SA 4.0）。"
+    "message": "未インポートです。MDBG から CC-CEDICT のリリースファイル（.txt.gz または .zip）をダウンロードし、ここでインポートしてください（CC BY-SA 4.0）。"
   },
   "dictPackStatus": {
     "message": "$N$ 件をインポート済み · $DATE$",

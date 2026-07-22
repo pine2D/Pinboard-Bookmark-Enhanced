@@ -578,7 +578,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     vocab: {
       fields: {
         "dict-echo-enabled": false,
-        "dict-anki-deck": "Pinboard Vocab"
+        "dict-anki-deck": "Pinboard Vocab",
+        "dict-anki-port": "8765"
       },
       skip: ["dict-anki-key", "dict-eudic-token"]
     }
@@ -1056,6 +1057,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-webdav-pass": s.webdavPass,
     "opt-webdav-autopush": s.webdavAutoPush || "off",
     "dict-anki-deck": s.dictAnkiDeck || "",
+    "dict-anki-port": s.dictAnkiPort || "8765",
     "dict-anki-key": s.dictAnkiKey || "",
     "dict-eudic-token": s.dictEudicToken || ""
   };
@@ -1988,6 +1990,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       translateGlossary: $id("opt-translate-glossary").value,
       dictEchoEnabled: $id("dict-echo-enabled").checked,
       dictAnkiDeck: $id("dict-anki-deck").value.trim(),
+      dictAnkiPort: $id("dict-anki-port").value.trim(),
       dictAnkiKey: obfuscateKey($id("dict-anki-key").value.trim()),
       dictEudicToken: obfuscateKey($id("dict-eudic-token").value.trim()),
       selectionTrigger: $id("opt-selection-trigger").value,

@@ -474,6 +474,11 @@ html.motion-ready details.motion-toggle[open]::details-content {
 /* ---- API key toggle ---- */
 .key-toggle { background: none; border: none; cursor: pointer; font-size: 13px; padding: var(--opt-sp-1) var(--opt-sp-2); color: #888; vertical-align: middle; }
 .key-toggle svg { display: block; }
+/* The eye rides INSIDE the field's right edge -- as a plain sibling it fell
+   below the 100%-width input and burned a whole row per credential. */
+.key-wrap { position: relative; display: block; }
+.key-wrap input { padding-right: 32px; }
+.key-wrap .key-toggle { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); }
 /* Inline status icon (replaces ✓/✗ in test/save/import messages; the glyphs fall back to
    Segoe UI Emoji and stall on first paint at Windows hi-DPI). Inherits the status colour. */
 .status-ic { display: inline-flex; vertical-align: -2px; margin-right: 1px; }
@@ -1454,6 +1459,9 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
    3-column grid .notes-toolbar was shaped for (search+count+filter) -- a
    flex row lets the buttons wrap together instead of colliding with a grid
    track meant for a single search input. */
+/* Pack status is a standalone line above its button row, not an inline
+   trailing status: drop .save-status's inline indent, add space below. */
+#dict-pack-status { margin: 0 0 var(--opt-sp-2); }
 .vocab-toolbar {
   display: flex;
   gap: 8px;
