@@ -114,12 +114,14 @@ async function* pbpCedictLines(stream, gzip, stats) {
     carry += chunk;
     let end;
     while ((end = carry.indexOf("\n")) !== -1) {
+      // 65536 UTF-16 units (memory bound; NOT a byte-exact limit)
       if (end > 65536) throw new Error("CEDICT line too long");
       let line = carry.slice(0, end);
       carry = carry.slice(end + 1);
       if (line.endsWith("\r")) line = line.slice(0, -1);
       yield line;
     }
+    // 65536 UTF-16 units (memory bound; NOT a byte-exact limit)
     if (carry.length > 65536) throw new Error("CEDICT line too long");
   }
   if (carry) yield carry.endsWith("\r") ? carry.slice(0, -1) : carry;

@@ -77,8 +77,8 @@ assertArrayEq(pbpCedictLookupKeys("字"), ["字"], "single char key");
 assertArrayEq(pbpCedictLookupKeys(""), [], "empty string -> empty keys");
 assertArrayEq(pbpCedictLookupKeys(null), [], "null -> empty keys");
 
-const composed = "é";
-const decomposed = "é";
+const composed = "é"; // U+00E9, single precomposed code point
+const decomposed = "é"; // U+0065 + U+0301 (combining acute accent), the real decomposed form
 const keysC = pbpCedictLookupKeys(composed);
 const keysD = pbpCedictLookupKeys(decomposed);
 assertEq(JSON.stringify(keysC), JSON.stringify(keysD), "NFC normalization applied");
@@ -86,6 +86,13 @@ assertEq(JSON.stringify(keysC), JSON.stringify(keysD), "NFC normalization applie
 const long17 = "一二三四五六七八九十一二三四五六七";
 const keys = pbpCedictLookupKeys(long17);
 check("capped at 16 code points", keys[0].length === 16);
+
+// Astral (surrogate-pair) CJK: the cap must count CODE POINTS, not UTF-16
+// units -- a naive .length cap would slice a surrogate pair in half.
+const astral17 = "\u{20000}".repeat(17);
+const astralKeys = pbpCedictLookupKeys(astral17);
+assertEq(Array.from(astralKeys[0]).length, 16, "astral CJK capped at 16 CODE POINTS (not UTF-16 units)");
+assertEq(astralKeys[0].length, 32, "16 astral code points serialize to 32 UTF-16 units (no split surrogate pair)");
 
 assertArrayEq(pbpCedictLookupKeys("  图书  "), ["图书", "图"], "leading/trailing whitespace trimmed");
 
@@ -285,6 +292,25 @@ section("pbpCedictLines");
     sameChunkError = e.message.includes("too long");
   }
   check("overlong line with newline in the SAME chunk throws (pre-yield guard)", sameChunkError);
+
+  // Same-chunk overlong line, CJK variant: proves the 65536 threshold is
+  // counted in UTF-16 code units AFTER decode, not UTF-8 bytes -- each "字"
+  // is 3 bytes but 1 UTF-16 unit, so this line is ~197KB of UTF-8 yet only
+  // 65537 code units, still tripping the same guard as the ASCII case above.
+  let sameChunkCjkError = false;
+  try {
+    const cjkLine = "字".repeat(65537);
+    const cjkBytes = new TextEncoder().encode(cjkLine + "\n");
+    const stream10c = new ReadableStream({
+      start(c) { c.enqueue(cjkBytes); c.close(); }
+    });
+    for await (const line of pbpCedictLines(stream10c)) {
+      // should not reach
+    }
+  } catch (e) {
+    sameChunkCjkError = e.message.includes("too long");
+  }
+  check("overlong CJK line (65537 units, ~197KB UTF-8, same chunk) throws by UTF-16 unit count", sameChunkCjkError);
 
   // File too large
   let sizeError = false;

@@ -237,6 +237,13 @@ async function runVocabIdbTests() {
   const e2 = await pbpVocabSaveWord("acct_a", { term: "running", language: "en", gloss: "g2", context: { ...ctx1 } });
   assertEq(e2.contexts.length, 1, "same url+quote deduped");
   assertEq(e2.gloss, "g2", "latest gloss wins");
+  // A re-save carrying NEW attribution (e.g. a re-lookup that landed on
+  // CC-CEDICT instead of Wiktionary) must overwrite BOTH sourceUrl and
+  // license as a pair, not just fill them when empty -- otherwise the old
+  // Wiktionary line survives into a CC-CEDICT-attributed export.
+  const e2b = await pbpVocabSaveWord("acct_a", { term: "running", language: "en", gloss: "g2", sourceUrl: "https://cc-cedict.org/wiki/", license: "CC BY-SA 4.0 (CC-CEDICT)", context: { ...ctx1 } });
+  assertEq(e2b.sourceUrl, "https://cc-cedict.org/wiki/", "re-save overwrites sourceUrl with the latest lookup's attribution");
+  assertEq(e2b.license, "CC BY-SA 4.0 (CC-CEDICT)", "re-save overwrites license with the latest lookup's attribution");
   const e3 = await pbpVocabSaveWord("acct_a", { term: "running", language: "en", gloss: "", context: { ...ctx1, articleUrl: "u2" } });
   assertEq(e3.contexts.length, 2, "second article context appended");
   const got = await pbpVocabGet("acct_a|en|running");

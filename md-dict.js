@@ -301,10 +301,13 @@ async function pbpVocabSaveWord(owner, w) {
         if (w.lemma && !cur.lemma) cur.lemma = String(w.lemma);
         if (w.gloss) cur.gloss = String(w.gloss); // latest lookup wins
         if (w.ipa && !cur.ipa) cur.ipa = String(w.ipa);
-        // Attribution merges INDEPENDENTLY of IPA (a senses-only entry still
-        // carries its CC BY-SA obligation — Codex HIGH 7).
-        if (w.sourceUrl && !cur.sourceUrl) cur.sourceUrl = pbpDictSafeUrl(w.sourceUrl) || null;
-        if (w.license && !cur.license) cur.license = String(w.license);
+        // Attribution merges INDEPENDENTLY of IPA, and the LATEST lookup's
+        // attribution wins as a PAIR (matching the latest-gloss-wins rule) --
+        // a re-save from CC-CEDICT must not export a stale Wiktionary line.
+        if (w.sourceUrl || w.license) {
+          if (w.sourceUrl) cur.sourceUrl = pbpDictSafeUrl(w.sourceUrl) || null;
+          if (w.license) cur.license = String(w.license);
+        }
         cur.contexts = pbpDictMergeContext(cur.contexts, w.context);
         cur.updatedAt = now;
         store.put(cur);
@@ -503,8 +506,9 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
         return norm;
       }
       // (Prefix hits render norm.word, which may be SHORTER than the raw
-      // selection -- pbpDictRun's merge step must re-sync cur.term, see
-      // Step 2b below, or save/speak/saved-check operate on the wrong word.)
+      // selection -- pbpDictRun's dictionary-slot .then() must re-sync
+      // cur.term the moment this slot settles, or save/speak/saved-check
+      // operate on the wrong word.)
     }
   }
   const cacheKey = "dict_" + pbpDictCacheKeyPublic(lang, term);
@@ -780,7 +784,12 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   }
 
   const results = await Promise.allSettled([
-    _pbpDictSlotRun(slot, cap.text, lang, signal, lemmaPromise, cur.rerun),
+    _pbpDictSlotRun(slot, cap.text, lang, signal, lemmaPromise, cur.rerun).then((norm) => {
+      // Sync the defined word the moment the dictionary slot settles -- the
+      // speak button is live before the (slower) AI slot finishes.
+      if (norm && norm.sourceLabel === "CC-CEDICT" && norm.word && _pbpDictCurrent === cur) cur.term = norm.word;
+      return norm;
+    }),
     _pbpDictCtxRun(ctxEl, cap, ctx, s, signal, resolveLemmaOnce, lang)
   ]);
   if (signal.aborted || _pbpDictCurrent !== cur) return;
@@ -792,9 +801,6 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     cur.sourceUrl = norm.sourceUrl;
     cur.license = norm.license;
     if (first && first.senses[0]) cur.gloss = first.senses[0].definition;
-    // A CC-CEDICT prefix hit dictionary-defines a SHORTER word than the raw
-    // selection; save/speak/saved-check must follow the defined word.
-    if (norm.sourceLabel === "CC-CEDICT" && norm.word) cur.term = norm.word;
   }
   if (parsed) {
     if (parsed.gloss) cur.gloss = parsed.gloss;
