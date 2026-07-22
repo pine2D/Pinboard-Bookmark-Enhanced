@@ -227,6 +227,12 @@ const _terms = (list) => pbpEchoTermSet(list.map((t) => ({ term: t })));
   assertEq(pbpEchoFindInText("anything", []).length, 0, "empty term set -> no hits");
 }
 
+section("per-document language override");
+assertEq(typeof _pbpDictManualLang, "string", "module override state exists, defaults empty");
+_pbpDictManualLang = "en";
+document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { account: "" } }));
+assertEq(_pbpDictManualLang, "", "pbp:rendered resets the override (never carried across documents)");
+
 async function runVocabIdbTests() {
   section("pbp-vocab IDB (runtime)");
   await new Promise((r) => { const del = indexedDB.deleteDatabase("pbp-vocab"); del.onsuccess = del.onerror = del.onblocked = r; });
