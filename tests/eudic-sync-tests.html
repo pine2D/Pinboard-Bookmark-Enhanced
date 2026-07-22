@@ -133,6 +133,7 @@ const _origCall = pbpEudicCall;
     { term: "de1", language: "de" }
   ], { token: "test" });
   assert(result.rateLimited === true && result.failed === 5, "403: all 5 words counted failed");
+  assert(callCount === 1, "403: circuit break issues NO further calls");
 
   section("pbpEudicSendRows - mixed results");
   callCount = 0;
@@ -163,6 +164,7 @@ const _origCall = pbpEudicCall;
     { term: "de1", language: "de" }
   ], { token: "bad" });
   assert(result3.added === 1 && result3.stage === "auth" && result3.error === "auth failed", "partial: added preserved + auth stage");
+  assert(callCount === 2, "401: return stops the loop, no third call");
 
   section("pbpEudicSendRows - ownerCheck early exit");
   callCount = 0;
