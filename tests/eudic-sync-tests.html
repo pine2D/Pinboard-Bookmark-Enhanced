@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>eudic-sync Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+.case { padding: 6px; border-bottom: 1px solid #eee; white-space: pre-wrap; }
+.pass { color: #0a0; } .fail { color: #c00; font-weight: bold; }
+h2 { margin-top: 24px; }
+</style></head>
+<body>
+<h1>eudic-sync Tests</h1>
+<div id="summary"></div>
+<div id="results"></div>
+<script src="../eudic-sync.js"></script>
+<script>
+const root = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail) {
+  const ok = !!cond; ok ? pass++ : fail++;
+  const div = document.createElement("div");
+  div.className = "case " + (ok ? "pass" : "fail");
+  div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
+  root.appendChild(div);
+}
+function section(name) { const h = document.createElement("h2"); h.textContent = name; root.appendChild(h); }
+function assert(cond, detail) { check(detail || String(cond), cond, detail); }
+function assertEq(a, e, label) {
+  const ok = a === e;
+  check(label || (String(e) + " === " + String(a)), ok, ok ? "" : "expected " + JSON.stringify(e) + " got " + JSON.stringify(a));
+}
+function assertDeepEq(a, e, label) {
+  const ok = JSON.stringify(a) === JSON.stringify(e);
+  check(label || (JSON.stringify(e) + " === " + JSON.stringify(a)), ok, ok ? "" : "expected " + JSON.stringify(e) + " got " + JSON.stringify(a));
+}
+
+section("pbpEudicSupportedLang");
+assertEq(pbpEudicSupportedLang("en-US"), "en", "en-US → en");
+assertEq(pbpEudicSupportedLang("zh"), null, "zh → null");
+assertEq(pbpEudicSupportedLang("FR"), "fr", "FR → fr");
+assertEq(pbpEudicSupportedLang(""), null, "empty → null");
+assertEq(pbpEudicSupportedLang(null), null, "null → null");
+
+section("pbpEudicPartition");
+const p1 = pbpEudicPartition([
+  { term: "hello", language: "en" },
+  { term: "world", language: "fr" },
+  { term: "guten", language: "de" },
+  { term: "hola", language: "es" }
+]);
+assert(p1.byLang.has("en") && p1.byLang.has("fr") && p1.byLang.has("de") && p1.byLang.has("es"), "four languages grouped");
+const p2 = pbpEudicPartition([
+  { term: "test", language: "en" },
+  { term: "test", language: "en" }
+]);
+assertEq(p2.byLang.get("en").length, 1, "same language deduped");
+const p3 = pbpEudicPartition([
+  { term: "hello", language: "en" },
+  { term: "", language: "en" },
+  { term: "   ", language: "en" }
+]);
+assertEq(p3.byLang.get("en").length, 1, "empty and whitespace terms filtered");
+const p4 = pbpEudicPartition([
+  { term: "hello", language: "en" },
+  { term: "你好", language: "zh" }
+]);
+assertEq(p4.unsupported, 1, "unsupported language counted");
+const p5 = pbpEudicPartition([]);
+assertEq(p5.byLang.size, 0, "empty array → empty map");
+const p6 = pbpEudicPartition([{ term: "a", language: "en" }]);
+assert(p6.byLang.has("en") && p6.byLang.get("en").length === 1, "single valid term grouped");
+const p7 = pbpEudicPartition([
+  { term: "test", language: "en" },
+  { term: "test", language: "en" },
+  { term: "word", language: "fr" },
+  { term: "word", language: "fr" }
+]);
+assertEq(p7.byLang.get("en").length + p7.byLang.get("fr").length, 2, "each language independently deduped");
+
+section("pbpEudicAuthHeader");
+assertEq(pbpEudicAuthHeader("mytoken123"), "NIS mytoken123", "bare token prefixed");
+assertEq(pbpEudicAuthHeader("NIS mytoken"), "NIS mytoken", "NIS prefix preserved");
+assertEq(pbpEudicAuthHeader("  nis   mytoken  "), "NIS mytoken", "normalized: lowercase prefix + whitespace");
+assertEq(pbpEudicAuthHeader("  token  "), "NIS token", "surrounding whitespace trimmed");
+assertEq(pbpEudicAuthHeader(""), "", "empty → empty");
+
+section("pbpEudicBuildBody");
+const b1 = pbpEudicBuildBody("en", ["hello", "world"]);
+assertEq(b1.language, "en", "language passed through");
+assertEq(b1.category_id, "0", "category_id literal 0");
+const b2 = pbpEudicBuildBody("fr", "not_array");
+assertEq(b2.words.length, 0, "non-array words → []");
+
+section("pbpEudicParseResult");
+const r1 = pbpEudicParseResult(201, '{"message":"单词导入成功,导入数量 : 2"}');
+assert(r1.ok === true && r1.imported === 2, "201 + count parsed");
+const r2 = pbpEudicParseResult(201, '{"message":"单词导入成功"}');
+assert(r2.ok === true && r2.imported === null, "201 + no count → imported null");
+const r3 = pbpEudicParseResult(200, "anything");
+assertEq(r3.ok, false, "HTTP 200 → ok:false");
+const r4 = pbpEudicParseResult(400, '{"message":"invalid parameter"}');
+assert(r4.ok === false && r4.message === "invalid parameter", "400 + JSON message extracted");
+const r5 = pbpEudicParseResult(400, "plain text error");
+assert(r5.ok === false && r5.message === "plain text error", "non-JSON response passed through");
+const r6 = pbpEudicParseResult(201, '{"message":"单词导入成功,导入数量：5"}');
+assert(r6.ok === true && r6.imported === 5, "full-width colon recognized");
+
+section("pbpEudicCounts");
+const c1 = pbpEudicCounts(10, 8);
+assertEq(c1.added, 8, "normal: added = imported");
+assertEq(c1.skipped, 2, "normal: skipped = unique - imported");
+const c2 = pbpEudicCounts(5, null);
+assertEq(c2, null, "imported null → null");
+const c3 = pbpEudicCounts(5, 20);
+assert(c3.added === 5 && c3.skipped === 0, "imported > unique clamped");
+const c4 = pbpEudicCounts(0, 0);
+assertEq(c4.added, 0, "zero case");
+
+// ---- Client tests (stub pbpEudicCall) ----
+const _origCall = pbpEudicCall;
+
+(async () => {
+  section("pbpEudicSendRows - 403 circuit break");
+  let callCount = 0;
+  pbpEudicCall = async (body, token, ms) => {
+    callCount++;
+    if (callCount === 1) return { ok: false, status: 403, message: "rate limited", imported: null };
+    return { ok: true, status: 201, message: "should not reach", imported: 1 };
+  };
+  const result = await pbpEudicSendRows([
+    { term: "en1", language: "en" },
+    { term: "en2", language: "en" },
+    { term: "en3", language: "en" },
+    { term: "fr1", language: "fr" },
+    { term: "de1", language: "de" }
+  ], { token: "test" });
+  assert(result.rateLimited === true && result.failed === 5, "403: all 5 words counted failed");
+
+  section("pbpEudicSendRows - mixed results");
+  callCount = 0;
+  pbpEudicCall = async (body, token, ms) => {
+    callCount++;
+    if (callCount === 1) return { ok: true, status: 201, message: "导入数量:2", imported: 2 };
+    if (callCount === 2) return { ok: true, status: 201, message: "导入成功", imported: null };
+    return { ok: false, status: 500, message: "server error", imported: null };
+  };
+  const result2 = await pbpEudicSendRows([
+    { term: "en1", language: "en" },
+    { term: "en2", language: "en" },
+    { term: "fr1", language: "fr" }
+  ], { token: "test" });
+  assert(result2.added === 2 && result2.skipped === 0 && result2.generic === true, "mixed: counts + generic flag");
+
+  section("pbpEudicSendRows - partial then 401");
+  callCount = 0;
+  pbpEudicCall = async (body, token, ms) => {
+    callCount++;
+    if (callCount === 1) return { ok: true, status: 201, message: "导入数量:1", imported: 1 };
+    if (callCount === 2) return { ok: false, status: 401, message: "auth failed", imported: null };
+    return { ok: false, status: 500, message: "should not reach", imported: null };
+  };
+  const result3 = await pbpEudicSendRows([
+    { term: "en1", language: "en" },
+    { term: "fr1", language: "fr" },
+    { term: "de1", language: "de" }
+  ], { token: "bad" });
+  assert(result3.added === 1 && result3.stage === "auth" && result3.error === "auth failed", "partial: added preserved + auth stage");
+
+  section("pbpEudicSendRows - ownerCheck early exit");
+  callCount = 0;
+  pbpEudicCall = async (body, token, ms) => {
+    callCount++;
+    return { ok: true, status: 201, message: "导入数量:1", imported: 1 };
+  };
+  const result4 = await pbpEudicSendRows([
+    { term: "en1", language: "en" }
+  ], {
+    token: "test",
+    ownerCheck: async () => false
+  });
+  assert(callCount === 0 && result4.stage === "owner", "ownerCheck fail: no API call + owner stage");
+
+  pbpEudicCall = _origCall;
+  document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
+})();
+</script>
+</body></html>
