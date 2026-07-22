@@ -71,6 +71,12 @@ assertEq(pbpAnkiFieldsMatch(["Term", "Definition", "Reading", "Context", "Source
 assertEq(pbpAnkiFieldsMatch(["Term", "Reading", "Definition", "Context", "Source"]), false, "missing field fails");
 assertEq(pbpAnkiFieldsMatch(null), false, "null fails");
 
+section("pbpAnkiEndpointFor");
+assertEq(pbpAnkiEndpointFor("9999"), "http://127.0.0.1:9999", "custom port used");
+assertEq(pbpAnkiEndpointFor(""), "http://127.0.0.1:8765", "empty falls back to default");
+assertEq(pbpAnkiEndpointFor("abc"), "http://127.0.0.1:8765", "garbage falls back to default");
+assertEq(pbpAnkiEndpointFor("70000"), "http://127.0.0.1:8765", "out-of-range falls back to default");
+
 section("pbpAnkiModelDef");
 const md = pbpAnkiModelDef();
 assert(md.modelName === "Pinboard Vocab" && md.inOrderFields.join(",") === "Term,Reading,Definition,Context,Source,License", "model def fields in contract order");

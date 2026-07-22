@@ -370,6 +370,7 @@ const SETTINGS_DEFAULTS = {
   dictLangManual: "",       // md-dict: manual dictionary language override ("" = auto-detect)
   dictEchoEnabled: false,   // md-vocab-echo: underline saved vocab words in the reader
   dictAnkiDeck: "Pinboard Vocab", // anki-connect: target deck for Send to Anki
+  dictAnkiPort: "8765",         // anki-connect: AnkiConnect port (host stays loopback-only)
   dictAnkiKey: "",              // anki-connect: optional AnkiConnect API key (credential)
   dictEudicToken: "",           // eudic-sync: Eudic OpenAPI authorization (credential)
   selectionTrigger: "icon"

@@ -290,13 +290,20 @@ async function _pbpVocabSendAnki() {
   const orig = btn.textContent;
   try {
     btn.textContent = t("dictAnkiSending");
-    const pattern = pbpEndpointOriginPattern(PBP_ANKI_ENDPOINT);
+    // The permission pattern depends on the configurable port, so one fast
+    // settings read precedes permissions.request. Transient activation is a
+    // TIME window (~5s), not a microtask budget; a single storage read stays
+    // well inside it. A port typed within the 500ms auto-save debounce may
+    // read stale once -- worst case is a connection error and a retry.
+    const preRead = await pbpReadSettingsWithSecrets({ dictAnkiPort: SETTINGS_DEFAULTS.dictAnkiPort });
+    const port = preRead.dictAnkiPort;
+    const pattern = pbpEndpointOriginPattern(pbpAnkiEndpointFor(port));
     let granted = false;
     try { granted = await chrome.permissions.request({ origins: [pattern] }); } catch (_) {}
     if (!granted) { _pbpVocabFlashStatus(false, t("dictAnkiUnreachable")); return; }
     // requestPermission FIRST (spec §3): the long human-approval wait happens
     // BEFORE owner derivation, so the owner snapshot below stays fresh.
-    const perm = await pbpAnkiCall("requestPermission", {}, "", 120000);
+    const perm = await pbpAnkiCall("requestPermission", {}, "", 120000, port);
     if (!perm.ok || !perm.result || perm.result.permission !== "granted"
         || Number(perm.result.version) < 6) {
       _pbpVocabFlashStatus(false, t("dictAnkiUnreachable"));
@@ -325,6 +332,7 @@ async function _pbpVocabSendAnki() {
     const res = await pbpAnkiSendRows(canonical, {
       deck: s.dictAnkiDeck || "Pinboard Vocab",
       key: s.dictAnkiKey || "",
+      port,
       ownerCheck: async () => (await pbpVocabCurrentOwner()) === owner
     });
     if (res.stage === "done") {

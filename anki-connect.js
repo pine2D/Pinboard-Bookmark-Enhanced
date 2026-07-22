@@ -10,6 +10,15 @@
 // ============================================================
 
 const PBP_ANKI_ENDPOINT = "http://127.0.0.1:8765";
+
+// Port is user-configurable (AnkiConnect's own config allows changing it);
+// the HOST is never configurable -- loopback-only is a network invariant.
+// Anything that isn't a sane port number falls back to the default 8765.
+function pbpAnkiEndpointFor(port) {
+  const p = String(port == null ? "" : port).trim();
+  const ok = /^\d{1,5}$/.test(p) && Number(p) >= 1 && Number(p) <= 65535;
+  return "http://127.0.0.1:" + (ok ? p : "8765");
+}
 const PBP_ANKI_MODEL = "Pinboard Vocab";
 const PBP_ANKI_FIELDS = ["Term", "Reading", "Definition", "Context", "Source", "License"];
 
@@ -101,11 +110,11 @@ function pbpAnkiFieldsMatch(names) {
 // trusted, AnkiConnect's preflight answer may carry the DEFAULT
 // Access-Control-Allow-Origin (http://localhost) and the browser would kill
 // a preflighted request before requestPermission ever runs.
-async function pbpAnkiCall(action, params, key, timeoutMs) {
+async function pbpAnkiCall(action, params, key, timeoutMs, port) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs || 10000);
   try {
-    const resp = await fetch(PBP_ANKI_ENDPOINT, {
+    const resp = await fetch(pbpAnkiEndpointFor(port), {
       method: "POST",
       body: JSON.stringify(pbpAnkiBuildRequest(action, params, key)),
       signal: ctrl.signal
@@ -127,20 +136,21 @@ async function pbpAnkiSendRows(rows, opts) {
   const deck = (opts && opts.deck) || PBP_ANKI_MODEL;
   const key = (opts && opts.key) || "";
   const ownerCheck = (opts && opts.ownerCheck) || (async () => true);
+  const port = (opts && opts.port) || "";
   const out = { stage: "", added: 0, skipped: 0, failed: 0, error: null };
 
   // requestPermission/version/keyRequired happen in _pbpVocabSendAnki BEFORE
   // settings/owner (spec §3 ordering) -- this pipeline starts at createDeck.
-  const deckRes = await pbpAnkiCall("createDeck", { deck }, key, 10000); // idempotent
+  const deckRes = await pbpAnkiCall("createDeck", { deck }, key, 10000, port); // idempotent
   if (!deckRes.ok) { out.stage = "deck"; out.error = deckRes.error; return out; }
 
-  const models = await pbpAnkiCall("modelNames", {}, key, 10000);
+  const models = await pbpAnkiCall("modelNames", {}, key, 10000, port);
   if (!models.ok || !Array.isArray(models.result)) { out.stage = "model"; out.error = models.error || "modelNames failed"; return out; }
   if (!models.result.includes(PBP_ANKI_MODEL)) {
-    const created = await pbpAnkiCall("createModel", pbpAnkiModelDef(), key, 10000);
+    const created = await pbpAnkiCall("createModel", pbpAnkiModelDef(), key, 10000, port);
     if (!created.ok) { out.stage = "model"; out.error = created.error; return out; }
   } else {
-    const fields = await pbpAnkiCall("modelFieldNames", { modelName: PBP_ANKI_MODEL }, key, 10000);
+    const fields = await pbpAnkiCall("modelFieldNames", { modelName: PBP_ANKI_MODEL }, key, 10000, port);
     if (!fields.ok || !pbpAnkiFieldsMatch(fields.result)) {
       // AnkiConnect silently drops values for unknown field names -- a
       // user-modified model must abort, never silently lose data.
@@ -152,7 +162,7 @@ async function pbpAnkiSendRows(rows, opts) {
 
   if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
   const notes = rows.map((r) => pbpAnkiNoteFromRow(r, deck));
-  const can = await pbpAnkiCall("canAddNotesWithErrorDetail", { notes }, key, 30000);
+  const can = await pbpAnkiCall("canAddNotesWithErrorDetail", { notes }, key, 30000, port);
   if (!can.ok || !Array.isArray(can.result) || can.result.length !== notes.length) {
     out.stage = "precheck";
     out.error = can.error || "precheck failed";
@@ -168,7 +178,7 @@ async function pbpAnkiSendRows(rows, opts) {
   if (!addable.length) { out.stage = "done"; return out; }
 
   if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
-  const added = await pbpAnkiCall("addNotes", { notes: addable }, key, 60000);
+  const added = await pbpAnkiCall("addNotes", { notes: addable }, key, 60000, port);
   if (!added.ok || !Array.isArray(added.result) || added.result.length !== addable.length) {
     // addNotes is batch-rollback: on ANY error it deletes the notes it had
     // already added and returns a top-level error -- count the whole batch
