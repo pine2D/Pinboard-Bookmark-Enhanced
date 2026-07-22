@@ -1515,9 +1515,15 @@ document.addEventListener("pbp:rendered", (e) => {
 //   "off"            -> nothing registers at all
 // ============================================================
 
-// Minimum meaningful selection: >= 2 chars after trimming (spec 5.3).
+// Minimum meaningful selection: >= 2 chars after trimming (spec 5.3) --
+// EXCEPT a single Han/Kana character, which is a legitimate dictionary
+// word (CC-CEDICT alone has thousands of one-character entries). A single
+// Latin/Cyrillic letter stays rejected as accidental-selection noise.
 function pbpExplainSelectionValid(text) {
-  return typeof text === "string" && text.trim().length >= 2;
+  if (typeof text !== "string") return false;
+  const t = text.trim();
+  if (t.length >= 2) return true;
+  return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(t);
 }
 
 // ---- Explain: module state ----
