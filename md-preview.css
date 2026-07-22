@@ -1554,7 +1554,11 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-msg { color: var(--fg-muted); padding: 4px 0; }
 
 .xp-model {
-  flex: 1 1 auto;
+  /* basis 0, not auto: flex-wrap breaks lines on HYPOTHETICAL sizes before
+     any shrinking, so an auto-basis model forced the whole foot onto two
+     rows instead of ellipsizing. With basis 0 the label never causes a
+     wrap; buttons alone still wrap as the genuine last resort. */
+  flex: 1 1 0;
   min-width: 0;
   font-size: 0.75em;
   color: var(--fg-muted);
