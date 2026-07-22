@@ -148,7 +148,13 @@ function _pbpPackOpenDB() {
       store.createIndex("trad", "trad", { unique: false });
       db.createObjectStore(_PBP_PACK_META, { keyPath: "id" });
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Future schema bump: close on versionchange and drop the cached
+      // promise so a long-lived options tab doesn't block the upgrade.
+      db.onversionchange = () => { try { db.close(); } catch (_) {} _pbpPackDbPromise = null; };
+      resolve(db);
+    };
     req.onerror = () => { _pbpPackDbPromise = null; reject(req.error || new Error("pack db open failed")); };
   });
   return _pbpPackDbPromise;

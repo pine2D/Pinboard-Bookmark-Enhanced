@@ -23,7 +23,13 @@ function _pbpAiOpenDB() {
         store.createIndex("ts", "ts", { unique: false });
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Future schema bump: close on versionchange and drop the cached
+      // promise so a long-lived preview/options page doesn't block it.
+      db.onversionchange = () => { try { db.close(); } catch (_) {} _pbpAiDbPromise = null; };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
   _pbpAiDbPromise.catch(() => { _pbpAiDbPromise = null; }); // allow retry

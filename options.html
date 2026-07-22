@@ -668,13 +668,13 @@
     <!-- Tab: Vocabulary -->
     <div id="panel-vocab" class="panel" role="tabpanel" aria-labelledby="tab-vocab">
       <div class="section-title" data-i18n="dictVocabSection">Vocabulary</div>
-      <div class="fg"><label><input type="checkbox" id="dict-echo-enabled" /> <span data-i18n="dictEchoToggle">Underline saved words while reading</span></label>
-        <p class="hint" data-i18n="dictEchoHint">Dotted underlines mark words already in your vocabulary. Click one to open the dictionary.</p></div>
+      <div class="fg"><label><input type="checkbox" id="dict-echo-enabled" /> <span data-i18n="dictEchoToggle">Underline saved words while reading</span></label></div>
+      <p class="hint" data-i18n="dictEchoHint">Dotted underlines mark words already in your vocabulary. Click one to open the dictionary.</p>
       <div class="fg"><label class="bl" for="dict-anki-deck" data-i18n="dictAnkiDeckLabel">Anki deck</label>
         <input type="text" id="dict-anki-deck" placeholder="Pinboard Vocab" /></div>
       <div class="fg"><label class="bl" for="dict-anki-key" data-i18n="dictAnkiKeyLabel">AnkiConnect API key (optional)</label><input type="password" id="dict-anki-key" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-anki-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></div>
       <div class="fg"><label class="bl" for="dict-eudic-token" data-i18n="dictEudicTokenLabel">Eudic OpenAPI authorization</label><input type="password" id="dict-eudic-token" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-eudic-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button><p class="hint"><a href="https://my.eudic.net/OpenAPI/Authorization" target="_blank" rel="noopener noreferrer" data-i18n="dictEudicTokenHint">Copy the full authorization value from Eudic</a></p></div>
-      <div class="notes-toolbar">
+      <div class="vocab-toolbar">
         <span id="vocab-count" class="notes-count" aria-live="polite"></span>
         <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportTsv">Export TSV</button>
         <button type="button" class="btn btn-sm" id="vocab-anki-btn" data-i18n="dictAnkiSend">Send to Anki</button>
@@ -686,7 +686,7 @@
 
       <div class="section-title" data-i18n="dictPackSection">Offline dictionary pack</div>
       <div class="fg">
-        <p class="hint" id="dict-pack-status" role="status" aria-live="polite"></p>
+        <p class="save-status" id="dict-pack-status" role="status" aria-live="polite"></p>
         <button type="button" class="btn btn-sm" id="dict-pack-open" data-i18n="dictPackOpen">Open download page</button>
         <button type="button" class="btn btn-sm" id="dict-pack-import" data-i18n="dictPackImport">Import file</button>
         <button type="button" class="btn btn-sm" id="dict-pack-delete" data-i18n="delete" hidden>Delete</button>

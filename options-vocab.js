@@ -10,6 +10,7 @@
 
 let _vocabRenderGen = 0; // guards stale async renders (account switch mid-fetch)
 let _vocabRows = [];     // last render's rows, kept for export
+let _vocabFlashTimer = 0; // guards two flashes racing to clear each other's text early
 
 // Owner derivation: the ONLY correct path is the same atomic secret-aware
 // read every other account-scoped consumer uses (pbpReadSettingsWithSecrets
@@ -133,7 +134,10 @@ function _pbpVocabFlashStatus(ok, text) {
   const el = $id("vocab-status");
   if (!el) return;
   setStatusIcon(el, ok, text);
-  setTimeout(() => { el.textContent = ""; }, 3000);
+  // Two flashes in quick succession (e.g. export then Anki) must not race:
+  // the earlier call's clear-timer would otherwise wipe the later message.
+  clearTimeout(_vocabFlashTimer);
+  _vocabFlashTimer = setTimeout(() => { el.textContent = ""; }, 3000);
 }
 
 // Same anchored confirm popover as every other destructive micro-action
@@ -223,7 +227,18 @@ async function renderVocabPanel() {
 // silently (this runs as a click handler; an unhandled rejection there is
 // invisible to the user).
 async function _pbpVocabExport() {
+  const btn = $id("vocab-export-btn");
+  if (!btn || btn.disabled) return; // double-click guard, same as the Anki/Eudic buttons
+  btn.disabled = true;
   try {
+    // A just-edited setting may still sit in the options page's debounced
+    // auto-save; flush it first, same ordering as the Anki/Eudic sends
+    // (Codex final-review MEDIUM precedent), and abort if the flush fails.
+    if (typeof window.pbpOptionsFlushAutoSave === "function") {
+      let flushed = null;
+      try { flushed = await window.pbpOptionsFlushAutoSave(); } catch (_) {}
+      if (!flushed || !flushed.ok) { _pbpVocabFlashStatus(false, t("jinaFailed")); return; }
+    }
     const owner = await pbpVocabCurrentOwner();
     const rows = await pbpVocabAll(owner);
     const ownerNow = await pbpVocabCurrentOwner();
@@ -244,6 +259,8 @@ async function _pbpVocabExport() {
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   } catch (_) {
     _pbpVocabFlashStatus(false, t("jinaFailed"));
+  } finally {
+    btn.disabled = false;
   }
 }
 

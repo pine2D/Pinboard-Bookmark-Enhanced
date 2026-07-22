@@ -169,10 +169,12 @@ async function pbpAnkiSendRows(rows, opts) {
 
   if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
   const added = await pbpAnkiCall("addNotes", { notes: addable }, key, 60000);
-  if (!added.ok || !Array.isArray(added.result)) {
+  if (!added.ok || !Array.isArray(added.result) || added.result.length !== addable.length) {
     // addNotes is batch-rollback: on ANY error it deletes the notes it had
     // already added and returns a top-level error -- count the whole batch
-    // as failed, never claim partial success.
+    // as failed, never claim partial success. A response array shorter than
+    // the request (malformed/truncated) is symmetric with the length check
+    // on canAddNotesWithErrorDetail above and must fail closed the same way.
     out.stage = "add";
     out.failed += addable.length;
     out.error = added.error || "addNotes failed";

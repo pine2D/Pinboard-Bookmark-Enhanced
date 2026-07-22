@@ -85,6 +85,9 @@
      -current is one step deeper/teal so the active match still reads as
      "the same family, emphasized" rather than an unrelated new hue. */
   --hl-search: light-dark(rgba(100, 116, 139, 0.32), #8C8A854D);
+  /* Line color, not an area tint: decoration never sits under text, so the
+     dark value keeps chroma instead of the flattened hex the --hl-* fills
+     need. */
   --vocab-echo: light-dark(rgba(59, 130, 246, 0.55), rgba(96, 165, 250, 0.6));
   --hl-search-current: light-dark(rgba(20, 184, 166, 0.5), #4E9E936B);
   /* Per-script font stacks — DRY building blocks for the :lang() rules below.

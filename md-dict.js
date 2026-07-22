@@ -219,7 +219,15 @@ function _pbpVocabOpenDB() {
         store.createIndex("updatedAt", "updatedAt", { unique: false });
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // A future schema bump fires versionchange on every open connection --
+      // without this, a long-lived preview tab holds the old version open
+      // forever and blocks the upgrade. Close and drop the cached promise so
+      // the next call reopens against the new version.
+      db.onversionchange = () => { try { db.close(); } catch (_) {} _pbpVocabDbPromise = null; };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
   _pbpVocabDbPromise.catch(() => { _pbpVocabDbPromise = null; });
@@ -341,9 +349,20 @@ function pbpDictSpeak(text, lang) {
     const primary = pbpDictPrimaryLang(lang);
     if (primary) u.lang = primary;
     let spoken = false;
+    let timer = 0;
+    // Named handler (not { once: true }) so a stale-token bail-out or the
+    // 400ms timeout firing FIRST still removes it -- otherwise a repeat click
+    // before voiceschanged ever fires leaves the old listener registered
+    // forever, accumulating one per click.
+    const onVoicesChanged = () => pick();
+    const cleanup = () => {
+      clearTimeout(timer);
+      synth.removeEventListener("voiceschanged", onVoicesChanged);
+    };
     const pick = () => {
-      if (spoken || token !== _pbpDictSpeakSeq) return;
+      if (spoken || token !== _pbpDictSpeakSeq) { cleanup(); return; }
       spoken = true;
+      cleanup();
       if (primary) {
         const vs = synth.getVoices();
         const v = vs.find((x) => x.lang && x.lang.toLowerCase().startsWith(primary));
@@ -352,8 +371,8 @@ function pbpDictSpeak(text, lang) {
       synth.speak(u);
     };
     if (synth.getVoices().length) { pick(); return; }
-    synth.addEventListener("voiceschanged", pick, { once: true });
-    setTimeout(pick, 400);
+    synth.addEventListener("voiceschanged", onVoicesChanged);
+    timer = setTimeout(pick, 400);
   } catch (_) {}
 }
 
@@ -484,7 +503,10 @@ function _pbpDictLoadPack() {
     const s = document.createElement("script");
     s.src = "dict-pack.js";
     s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
+    // Drop the cached promise on failure (transient network blip, extension
+    // update mid-flight) so the NEXT zh lookup retries the injection instead
+    // of permanently remembering this one failure.
+    s.onerror = () => { _pbpDictPackLoad = null; resolve(false); };
     document.head.appendChild(s);
   });
   return _pbpDictPackLoad;
@@ -557,6 +579,18 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
     const lemma = await lemmaPromise; // resolved on ALL ctx-slot exits
     if (parentSignal && parentSignal.aborted) return null;
     if (pbpDictLemmaRetry(404, lemma, term, lang)) {
+      // Two different selections in the same article can share a lemma
+      // ("running"/"runs" -> "run") -- check the lemma's own cache entry
+      // before spending a second network round-trip on it.
+      try {
+        const lemmaHit = await pbpAiCacheGet("dict_" + pbpDictCacheKeyPublic(lang, lemma.trim()));
+        if (parentSignal && parentSignal.aborted) return null;
+        if (lemmaHit && lemmaHit.result) {
+          _pbpDictRenderEntry(slot, lemmaHit.result, lemma, lang);
+          return lemmaHit.result;
+        }
+      } catch (_) {}
+      if (parentSignal && parentSignal.aborted) return null;
       let second;
       try { second = await _pbpDictFetch(lang, lemma.trim(), parentSignal); } catch (_) { second = { status: 0, data: null }; }
       if (parentSignal && parentSignal.aborted) return null;
@@ -725,6 +759,21 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   };
   _pbpDictCurrent = cur;
 
+  // Vocab button: disabled until BOTH slots settle so a save is never empty
+  // (Codex HIGH 3). dataset.runId guards stale promise writes. Set the
+  // moment this run becomes current -- BEFORE the first await
+  // (_pbpDictResolveLang) below, not after -- otherwise the OLD run's button
+  // (still showing "saved"/enabled) stays clickable through the async
+  // language-detection gap and can save an und/empty record for a
+  // selection this run has already superseded.
+  const vocabBtn = pop.querySelector(".xp-vocab");
+  if (vocabBtn) {
+    vocabBtn.hidden = false;
+    vocabBtn.disabled = true;
+    vocabBtn.dataset.runId = String(runId);
+    vocabBtn.textContent = t("dictSaveVocab");
+  }
+
   const body = pop.querySelector(".xp-body");
   const wrap = document.createElement("div");
   wrap.className = "xp-dict";
@@ -776,16 +825,6 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   const lemmaPromise = new Promise((r) => { resolveLemmaRaw = r; });
   const resolveLemmaOnce = (v) => { if (!lemmaSettled) { lemmaSettled = true; resolveLemmaRaw(v); } };
 
-  // Vocab button: disabled until BOTH slots settle so a save is never empty
-  // (Codex HIGH 3). dataset.runId guards stale promise writes.
-  const vocabBtn = pop.querySelector(".xp-vocab");
-  if (vocabBtn) {
-    vocabBtn.hidden = false;
-    vocabBtn.disabled = true;
-    vocabBtn.dataset.runId = String(runId);
-    vocabBtn.textContent = t("dictSaveVocab");
-  }
-
   const results = await Promise.allSettled([
     _pbpDictSlotRun(slot, cap.text, lang, signal, lemmaPromise, cur.rerun).then((norm) => {
       // Sync the defined word the moment the dictionary slot settles -- the
@@ -805,7 +844,15 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     cur.license = norm.license;
     if (first && first.senses[0]) cur.gloss = first.senses[0].definition;
   }
-  if (parsed) {
+  // A CC-CEDICT PREFIX hit (norm.word shorter than the raw selection --
+  // e.g. selecting "中国人" resolves the dictionary slot to "中国") means the
+  // AI context slot explained the ORIGINAL long selection, not the prefix
+  // word the dictionary matched. Its gloss/lemma belong to a different piece
+  // of text and must not overwrite what the dictionary slot already wrote
+  // into cur (or, transitively, the saved vocab record) -- the AI slot's own
+  // on-screen rendering is untouched, this only guards persistence.
+  const prefixHit = norm && norm.sourceLabel === "CC-CEDICT" && norm.word && norm.word !== cap.text;
+  if (parsed && !prefixHit) {
     if (parsed.gloss) cur.gloss = parsed.gloss;
     cur.lemma = parsed.lemma;
   }

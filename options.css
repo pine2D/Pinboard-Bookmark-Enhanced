@@ -1450,6 +1450,17 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
 .notes-toolbar input[type="search"]:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--opt-accent) 18%, transparent);
 }
+/* Vocab toolbar: 5 children (count/export/anki/eudic/status), not the
+   3-column grid .notes-toolbar was shaped for (search+count+filter) -- a
+   flex row lets the buttons wrap together instead of colliding with a grid
+   track meant for a single search input. */
+.vocab-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: var(--opt-sp-4) 0 var(--opt-sp-5);
+}
 .notes-count {
   color: var(--opt-fg-muted, #666);
   font-size: 12px;
