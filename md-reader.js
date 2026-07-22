@@ -235,6 +235,22 @@ function _pbpFnFindRef(id) {
 let _pbpFnPop = null;
 let _pbpFnCurrentLi = null;
 
+// Manual explain-pop may coexist with another reader popover only while the
+// user has pinned it. Every loose popover keeps the previous mutual-exclusion
+// behavior and therefore performs a real close (including request abort).
+function _pbpReaderKeepPopover(el) {
+  return !!(el && el.id === "explain-pop" && typeof window.pbpExplainPopoverPinned === "function"
+    && window.pbpExplainPopoverPinned(el));
+}
+
+function _pbpReaderHideOtherPopovers(current) {
+  document.querySelectorAll(":popover-open").forEach((el) => {
+    if (el !== current && !_pbpReaderKeepPopover(el)) {
+      try { el.hidePopover(); } catch (_) {}
+    }
+  });
+}
+
 // Re-applied on every open (cheap; the popover is a page-lifetime
 // singleton) -- same belt-and-suspenders idiom as _pbpHlApplyCardI18n
 // (md-highlight.js).
@@ -246,8 +262,8 @@ function _pbpFnApplyPopI18n(pop) {
 
 // Lazily builds the singleton #fn-pop popover (spec sec.3): a scrollable
 // clone of the resolved definition <li> plus a "jump to footnote"
-// button. Native popover="auto" -- Esc + light-dismiss for free, same as
-// #pb-hl-card/#explain-pop.
+// button. Native popover="auto" supplies Esc + light-dismiss; explain-pop is
+// manual so it can remain alongside this surface while pinned.
 function _pbpFnEnsurePop() {
   if (_pbpFnPop) return _pbpFnPop;
   const pop = document.createElement("div");
@@ -303,9 +319,7 @@ function _pbpFnOpenPop(li, anchorEl) {
   // Mutual exclusion: any other open popover must close first (same
   // explicit-hide convention _pbpHlOpenCard/_pbpExplainOpenPop already
   // use).
-  document.querySelectorAll(":popover-open").forEach((el) => {
-    if (el !== pop) { try { el.hidePopover(); } catch (_) {} }
-  });
+  _pbpReaderHideOtherPopovers(pop);
 
   const rect = anchorEl.getBoundingClientRect();
   if (!pop.matches(":popover-open")) pop.showPopover();
@@ -732,10 +746,7 @@ function _pbpSearchEnsurePop() {
 // happened to mount.
 function _pbpSearchOpen() {
   const pop = _pbpSearchEnsurePop();
-  ["explain-pop", "pb-hl-card", "pb-hl-bar", "fn-pop", "kbd-help-pop"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el && el.matches && el.matches(":popover-open")) { try { el.hidePopover(); } catch (_) {} }
-  });
+  _pbpReaderHideOtherPopovers(pop);
   _pbpSearchTeardown();
   const input = pop.querySelector("#search-input");
   input.value = "";
@@ -746,7 +757,7 @@ function _pbpSearchOpen() {
   _pbpSearchArmObserver();
 }
 
-// Same 4-condition gate as the existing e/V/H/1-5 hotkeys
+// Same typing/modifier gate as the bare-letter shortcuts
 // (pbpTrIsTypingContext, md-translate.js), plus one search-specific 5th
 // gate: raw view is a plain <pre>, not a rendered document -- "/" is a
 // no-op there so native Ctrl+F keeps working on raw text untouched.
@@ -775,9 +786,11 @@ function _pbpSearchInit() {
 // ---- Keyboard-shortcuts help (spec 5): "?" hotkey + rail-bottom link +
 // options static section all point at the same popover. ----
 const PBP_KBD_HELP_ROWS = [
+  { chips: ["t"], key: "kbdHelpTranslate" },
+  { chips: ["v"], key: "kbdHelpToggleView" },
+  { chips: ["d"], key: "kbdHelpDictionary" },
   { chips: ["e"], key: "kbdHelpExplain" },
-  { chips: ["V"], key: "kbdHelpToggleView" },
-  { chips: ["H", "1-5"], key: "kbdHelpHighlight" },
+  { chips: ["h", "1-5"], key: "kbdHelpHighlight" },
   { chips: ["a"], key: "kbdHelpAsk" },
   { chips: ["/"], key: "kbdHelpSearch" },
   { chips: ["z"], key: "kbdHelpZen" },
@@ -790,7 +803,7 @@ function _pbpKbdHelpEnsurePop() {
   if (_pbpKbdHelpPopEl) return _pbpKbdHelpPopEl;
   const pop = document.createElement("div");
   pop.id = "kbd-help-pop";
-  pop.setAttribute("popover", "auto"); // top-layer + Esc + light-dismiss for free, same as #explain-pop/#pb-hl-card
+  pop.setAttribute("popover", "auto"); // top-layer + Esc + light-dismiss for this transient help surface
   const title = document.createElement("div");
   title.className = "kbd-help-title";
   title.textContent = t("kbdHelpTitle");
@@ -827,13 +840,11 @@ function _pbpKbdHelpEnsurePop() {
 // uses before opening #explain-pop.
 function _pbpKbdHelpOpen() {
   const pop = _pbpKbdHelpEnsurePop();
-  document.querySelectorAll(":popover-open").forEach((el) => {
-    if (el !== pop) { try { el.hidePopover(); } catch (_) {} }
-  });
+  _pbpReaderHideOtherPopovers(pop);
   if (!pop.matches(":popover-open")) pop.showPopover();
 }
 
-// "?" hotkey: same 4-condition gate pattern as the existing V/H/a hotkeys,
+// "?" hotkey: same typing/modifier gate pattern as the bare-letter hotkeys,
 // EXCEPT shiftKey is explicitly allowed through (not rejected) -- "?" is
 // typed as Shift+/ on most keyboard layouts, so e.shiftKey is normally true
 // for this key and must not be treated as a modifier that cancels the
@@ -1230,7 +1241,7 @@ function _pbpZenToggle() {
 }
 
 // Same 4-condition gate as this file's own "?" hotkey (_pbpKbdHelpOnKeyDown,
-// above) and md-highlight.js's "H" hotkey (_pbpHlOnKeyDown:921-923) -- z is
+// above) and md-highlight.js's "h" hotkey -- z is
 // a bare letter, so shiftKey is REJECTED like every other bare-letter
 // hotkey in this codebase (unlike "/" and "?", which are already-shifted
 // characters on most keyboard layouts and so are exempted from the shift
@@ -1413,9 +1424,7 @@ function _pbpTypoEnsurePop() {
 function _pbpTypoToggle(anchorEl) {
   const pop = _pbpTypoEnsurePop();
   if (pop.matches(":popover-open")) { try { pop.hidePopover(); } catch (_) {} return; }
-  document.querySelectorAll(":popover-open").forEach((el) => {
-    if (el !== pop) { try { el.hidePopover(); } catch (_) {} }
-  });
+  _pbpReaderHideOtherPopovers(pop);
   _pbpTypoSyncPop();
   const rect = anchorEl.getBoundingClientRect();
   pop.showPopover();

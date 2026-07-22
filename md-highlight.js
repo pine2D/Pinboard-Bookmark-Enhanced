@@ -940,10 +940,10 @@ function _pbpHlNewId() {
   return "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-// ---- Floating creation bar (#pb-hl-bar). Native Popover API (mirrors
-// md-ask.js's #explain-pop, md-ask.js:1338-1427/1557-1582): "top-layer +
-// Esc + light-dismiss for free" -- no hand-rolled outside-click/Escape
-// wiring needed. Positioned above the selection via pbpTrPeekPopPos (spec
+// ---- Floating creation bar (#pb-hl-bar). Native popover="auto" supplies
+// top-layer + Esc + light-dismiss for this transient selection surface.
+// explain-pop is manual so it can remain beside the bar while pinned.
+// Positioned above the selection via pbpTrPeekPopPos (spec
 // 4), horizontally clamped to the viewport the same way #explain-pop is. ----
 let _pbpHlBarEl = null;
 let _pbpHlBarRange = null;
@@ -980,8 +980,8 @@ function _pbpHlEnsureBar() {
   // md-ask.js): one floating control on selection instead of two. Icon is
   // md-ask.js's PBP_EXPLAIN_PILL_SVG constant -- the same help-circle glyph
   // the old pill used. pbpExplainInvoke (md-ask.js) captures the live
-  // selection itself and opening #explain-pop auto-closes this bar, so the
-  // click handler needs nothing else.
+  // selection itself and _pbpExplainOpenPop explicitly closes this bar, so
+  // the click handler needs nothing else.
   const explainBtn = document.createElement("button");
   explainBtn.type = "button";
   explainBtn.className = "pb-hl-explain-btn";
@@ -1031,6 +1031,7 @@ function _pbpHlEnsureBar() {
 function _pbpHlShowBar(range) {
   const bar = _pbpHlEnsureBar();
   _pbpHlBarRange = range;
+  if (typeof window.pbpExplainDismissIfUnpinned === "function") window.pbpExplainDismissIfUnpinned();
   try { bar.hidePopover(); } catch (_) {} // re-invoke while open: reset first (mirrors _pbpExplainOpenPop)
   bar.showPopover();
   const rect = range.getBoundingClientRect();
@@ -1168,18 +1169,15 @@ function _pbpHlOnMouseUp(e) {
   _pbpHlShowBar(range);
 }
 
-// Same 4-condition gate pattern as the existing V/a/e hotkeys (md-ask.js:56-69,
-// md-translate.js keydown): explicit e.shiftKey exclusion (not just case-
+// Same shared modifier/typing/raw-view gate as the t/v/e/d shortcuts:
+// explicit e.shiftKey exclusion (not just case-
 // sensitive e.key checks) so Caps Lock without Shift ("H", shiftKey=false)
 // still fires while Shift+h ("H", shiftKey=true) does not.
 function _pbpHlOnKeyDown(e) {
   if (e.key !== "h" && e.key !== "H" && !/^[1-5]$/.test(e.key)) return;
-  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
   const ae = document.activeElement;
-  const isTyping = (typeof pbpTrIsTypingContext === "function")
-    ? pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))
-    : !!(ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || "")));
-  if (isTyping) return;
+  if (!pbpTrSingleKeyAllowed(e, ae && ae.tagName, !!(ae && ae.isContentEditable),
+    document.body.classList.contains("raw-active"))) return;
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
@@ -1376,8 +1374,8 @@ function pbpHlItemIdAtRange(range) {
 }
 window.pbpHlItemIdAtRange = pbpHlItemIdAtRange;
 
-// ---- Edit card (spec sec.4). Native popover="auto": Esc + light-dismiss for free,
-// same mechanism as md-ask.js's #explain-pop (md-ask.js:1341-1424). ----
+// ---- Edit card (spec sec.4). Native popover="auto": Esc + light-dismiss for
+// this transient editor; a pinned manual explain-pop may remain open. ----
 const PBP_HL_COLOR_KEYS = ["hlColorQuote", "hlColorDefinition", "hlColorExample", "hlColorDoubt", "hlColorTodo"]; // index 0..4 = color 1..5, fixed order (spec sec.5 slugs)
 let _pbpHlCard = null;
 let _pbpHlCardItemId = null;
@@ -1581,6 +1579,7 @@ function _pbpHlOpenCard(id) {
   _pbpHlCardBaseNote = noteEl.value;
   _pbpHlNoteDirty = false;
 
+  if (typeof window.pbpExplainDismissIfUnpinned === "function") window.pbpExplainDismissIfUnpinned();
   if (!card.matches(":popover-open")) card.showPopover();
   // Position AFTER showPopover so offsetHeight is real (measure-then-place
   // two-step, same as the ask subsystem's #explain-pop pattern).

@@ -1510,8 +1510,8 @@ document.addEventListener("pbp:rendered", (e) => {
 // _pbpHlEnsureBar) rather than a standalone pill -- this file used to own
 // #explain-pill; see PBP_EXPLAIN_PILL_SVG below, now consumed cross-file.
 // Trigger ladder lives in settings key selectionTrigger:
-//   "icon" (default) -> explain button in the highlight bar + hotkey "e"
-//   "hotkey"         -> no bar button, hotkey "e" only
+//   "icon" (default) -> explain/dictionary buttons in the highlight bar + e/d
+//   "hotkey"         -> no bar buttons, e/d only
 //   "off"            -> nothing registers at all
 // ============================================================
 
@@ -1562,9 +1562,9 @@ function _pbpExplainGetSelection() {
   return { range, text: text.trim() };
 }
 
-// Entry point for BOTH the highlight bar's explain button (md-highlight.js)
-// and the "e" hotkey. Captures the selection NOW (the popover's light-dismiss
-// may clear it later) and hands off to the popover (Task 17). The typeof
+// Entry point for the highlight bar actions and the e/d hotkeys. Captures the
+// selection NOW (the popover's outside dismissal may clear it later) and
+// hands off to the popover (Task 17). The typeof
 // guard keeps this commit shippable before the popover lands: invoke is then
 // a silent no-op. Optional initialAction (e.g. "dict") is forwarded so a
 // caller like the highlight bar's dictionary button can jump straight to
@@ -1573,13 +1573,27 @@ function pbpExplainInvoke(initialAction = "explain") {
   const cap = _pbpExplainGetSelection();
   if (!cap) return;
   if (cap.range) cap.rect = cap.range.getBoundingClientRect();
-  // H4 2.2: clone the Range into an independent snapshot. The popover's
-  // light-dismiss (or any later DOM interaction) can collapse
+  // H4 2.2: clone the Range into an independent snapshot. Popover dismissal
+  // (or any later DOM interaction) can collapse
   // window.getSelection() -- cloneRange() keeps pointing at the same
   // start/end nodes/offsets but lives on its own, so "Save as note" can still
   // dereference cap.range long after the live selection is gone.
   cap.range = cap.range.cloneRange();
   if (typeof _pbpExplainOpenPop === "function") _pbpExplainOpenPop(cap, initialAction);
+}
+
+function _pbpExplainOnShortcut(e) {
+  const key = String(e.key || "").toLowerCase();
+  if (key !== "e" && key !== "d") return;
+  // The settings gear changes this live after the listener was registered.
+  // Initial off still returns before registration in pbpExplainInit below.
+  if (_pbpExplainTrigger === "off") return;
+  const ae = document.activeElement;
+  if (!pbpTrSingleKeyAllowed(e, ae && ae.tagName, !!(ae && ae.isContentEditable),
+    document.body.classList.contains("raw-active"))) return;
+  if (!_pbpExplainGetSelection()) return;
+  e.preventDefault();
+  pbpExplainInvoke(key === "d" ? "dict" : "explain");
 }
 
 function pbpExplainInit(detail) {
@@ -1607,19 +1621,10 @@ function pbpExplainInit(detail) {
       });
     }
 
-    // Hotkey "e": works in both "icon" and "hotkey" modes (the "icon" mode's
-    // click entry is the highlight bar's explain button, md-highlight.js).
-    // Guarded like the ask panel's "a": no modifiers, not in editable
-    // targets. Coexists with the "a"/Esc keydown handler above -- different
-    // keys entirely.
-    document.addEventListener("keydown", (e) => {
-      if (e.key !== "e" || e.ctrlKey || e.metaKey || e.altKey) return;
-      const el = e.target;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
-      if (!_pbpExplainGetSelection()) return;
-      e.preventDefault();
-      pbpExplainInvoke();
-    });
+    // Hotkeys e/d work in both "icon" and "hotkey" modes. They share the
+    // rendered-reader bare-key gate with t/v/h, then reuse the same captured
+    // selection and popover entry point as the highlight bar buttons.
+    document.addEventListener("keydown", _pbpExplainOnShortcut);
   }).catch(() => {});
 }
 
@@ -1740,9 +1745,111 @@ let _pbpExplainAnswerText = "";
 let _pbpExplainAction = "explain";
 let _pbpExplainCap = null;
 let _pbpExplainCtx = null;
+let _pbpExplainPinned = false;
+let _pbpExplainDrag = null;
+let _pbpExplainResizeObserver = null;
+// Focus handoff is scoped to one real open/close cycle. Pinned re-entry and
+// action switches reuse the already-open shell and must not replace the
+// element that launched it; the next open after a real close records afresh.
+let _pbpExplainFocusSource = null;
+
+const PBP_EXPLAIN_EDGE = 8;
+const PBP_EXPLAIN_NUDGE = 8;
+
+function pbpExplainClampPosition(left, top, width, height, viewportWidth, viewportHeight) {
+  const maxLeft = Math.max(PBP_EXPLAIN_EDGE, Number(viewportWidth) - Number(width) - PBP_EXPLAIN_EDGE);
+  const maxTop = Math.max(PBP_EXPLAIN_EDGE, Number(viewportHeight) - Number(height) - PBP_EXPLAIN_EDGE);
+  return {
+    left: Math.min(Math.max(PBP_EXPLAIN_EDGE, Number(left) || 0), maxLeft),
+    top: Math.min(Math.max(PBP_EXPLAIN_EDGE, Number(top) || 0), maxTop)
+  };
+}
+
+function _pbpExplainPlace(pop, left, top) {
+  const pos = pbpExplainClampPosition(left, top, pop.offsetWidth, pop.offsetHeight,
+    window.innerWidth, window.innerHeight);
+  const nextLeft = pos.left + "px";
+  const nextTop = pos.top + "px";
+  if (pop.style.left !== nextLeft) pop.style.left = nextLeft;
+  if (pop.style.top !== nextTop) pop.style.top = nextTop;
+  return pos;
+}
+
+function _pbpExplainVisibleFocusTarget(el) {
+  if (!el || el === document.body || el === document.documentElement
+    || !el.isConnected || typeof el.focus !== "function") return false;
+  if (typeof el.closest === "function" && el.closest("[hidden], [inert]")) return false;
+  const style = getComputedStyle(el);
+  return style.display !== "none" && style.visibility !== "hidden"
+    && style.visibility !== "collapse" && el.getClientRects().length > 0;
+}
+
+function _pbpExplainFocusPreventScroll(el) {
+  try { el.focus({ preventScroll: true }); } catch (_) {
+    try { el.focus(); } catch (_) {}
+  }
+  return document.activeElement === el;
+}
+
+// Same temporary-tabindex handoff used by view switching: keep the reading
+// target programmatically focusable only while it owns focus, then restore
+// the DOM contract on blur. Prefer the invocation's logical block/side before
+// falling back to the rendered reading surface itself.
+function _pbpExplainFocusReadingFallback() {
+  const view = document.getElementById("rendered-view");
+  if (!view) return false;
+  const n = Number(_pbpExplainCap && _pbpExplainCap.n);
+  const original = n > 0 && typeof pbpAiBlockEl === "function" ? pbpAiBlockEl(n) : null;
+  const translated = n > 0 ? view.querySelector('.pb-tr[data-pb-tr="' + n + '"]') : null;
+  const target = [original, translated, view.querySelector("[data-pb]"), view.querySelector("[data-pb-tr]"), view]
+    .find(_pbpExplainVisibleFocusTarget);
+  if (!target) return false;
+  const borrowed = !target.hasAttribute("tabindex");
+  if (borrowed) target.setAttribute("tabindex", "-1");
+  const focused = _pbpExplainFocusPreventScroll(target);
+  if (borrowed) {
+    if (focused) target.addEventListener("blur", () => target.removeAttribute("tabindex"), { once: true });
+    else target.removeAttribute("tabindex");
+  }
+  return focused;
+}
+
+function _pbpExplainRestoreFocus(pop) {
+  // An outside interaction may already have moved focus to its real target.
+  // In that case the popover must not pull focus back into the reading flow.
+  if (!pop || !pop.contains(document.activeElement)) return false;
+  if (_pbpExplainVisibleFocusTarget(_pbpExplainFocusSource)
+    && _pbpExplainFocusPreventScroll(_pbpExplainFocusSource)) return true;
+  return _pbpExplainFocusReadingFallback();
+}
+
+function _pbpExplainSetPinned(pop, pinned) {
+  _pbpExplainPinned = !!pinned;
+  if (!pop) return;
+  pop.dataset.pinned = String(_pbpExplainPinned);
+  const pin = pop.querySelector(".xp-pin");
+  if (!pin) return;
+  const label = t(_pbpExplainPinned ? "explainUnpin" : "explainPin");
+  pin.setAttribute("aria-pressed", String(_pbpExplainPinned));
+  pin.setAttribute("aria-label", label);
+  pin.title = label;
+}
+
+function _pbpExplainClose(pop, restoreFocus = false) {
+  if (!pop || !pop.matches(":popover-open")) return;
+  if (restoreFocus) _pbpExplainRestoreFocus(pop);
+  try { pop.hidePopover(); } catch (_) {}
+}
+
+window.pbpExplainPopoverPinned = (el) => !!(el && el === _pbpExplainPopEl && _pbpExplainPinned);
+window.pbpExplainDismissIfUnpinned = () => {
+  if (_pbpExplainPopEl && !_pbpExplainPinned) _pbpExplainClose(_pbpExplainPopEl);
+};
 
 // Static inline SVG (Feather settings gear). Constant string, never model text.
 const PBP_EXPLAIN_GEAR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+const PBP_EXPLAIN_PIN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12l-2 6 3 3H5l3-3-2-6z"/><path d="M12 12v9"/></svg>';
+const PBP_EXPLAIN_CLOSE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
 // Footer transparency label: "<provider> · <model>" — override wins, else the
 // provider's configured model key (e.g. s.geminiModel), else provider alone.
@@ -1772,23 +1879,40 @@ function _pbpExplainOpenAsk(selText) {
   }
 }
 
-// Mirrors _pbpExplainAction onto the two .xp-act buttons' aria-pressed state.
+const PBP_EXPLAIN_DIALOG_LABELS = Object.freeze({
+  explain: "explainSelection",
+  translate: "explainTranslateSelection",
+  dict: "dictLookupSelection"
+});
+
+// Mirrors the live action onto both the action controls and dialog name.
 function _pbpExplainSyncActButtons(pop) {
   pop.querySelectorAll(".xp-act").forEach((btn) => {
     btn.setAttribute("aria-pressed", String(btn.dataset.action === _pbpExplainAction));
   });
+  pop.setAttribute("aria-label", t(PBP_EXPLAIN_DIALOG_LABELS[_pbpExplainAction] || "explainSelection"));
 }
 
 function _pbpExplainEnsurePop() {
   if (_pbpExplainPopEl) return _pbpExplainPopEl;
   const pop = document.createElement("div");
   pop.id = "explain-pop";
-  pop.setAttribute("popover", "auto"); // top-layer + Esc + light-dismiss for free
+  pop.setAttribute("popover", "manual");
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-modal", "false");
+  pop.setAttribute("aria-label", t("explainSelection"));
   const head = document.createElement("div");
   head.className = "xp-head";
   const term = document.createElement("span");
   term.className = "xp-term";
   head.appendChild(term);
+  // Keep a real blank drag target between the title and controls. On narrow
+  // screens the action group wraps below, while this zone stays on the first
+  // row so dragging never depends on hitting truncated text.
+  const dragZone = document.createElement("span");
+  dragZone.className = "xp-drag-zone";
+  dragZone.setAttribute("aria-hidden", "true");
+  head.appendChild(dragZone);
   const actGroup = document.createElement("div");
   actGroup.className = "xp-act-group";
   actGroup.setAttribute("role", "group");
@@ -1814,6 +1938,65 @@ function _pbpExplainEnsurePop() {
     actGroup.appendChild(actBtn);
   });
   head.appendChild(actGroup);
+  const windowActions = document.createElement("div");
+  windowActions.className = "xp-window-actions";
+  const moveHint = document.createElement("span");
+  moveHint.id = "xp-move-hint";
+  moveHint.className = "sr-only";
+  moveHint.textContent = t("explainMoveHint");
+  const pin = document.createElement("button");
+  pin.type = "button";
+  pin.className = "xp-pin";
+  pin.setAttribute("aria-describedby", moveHint.id);
+  pin.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight");
+  pin.innerHTML = PBP_EXPLAIN_PIN_SVG;
+  pin.addEventListener("click", () => _pbpExplainSetPinned(pop, !_pbpExplainPinned));
+  pin.addEventListener("keydown", (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+    e.preventDefault();
+    _pbpExplainSetPinned(pop, true);
+    const rect = pop.getBoundingClientRect();
+    const left = parseFloat(pop.style.left) || rect.left;
+    const top = parseFloat(pop.style.top) || rect.top;
+    const dx = e.key === "ArrowLeft" ? -PBP_EXPLAIN_NUDGE : e.key === "ArrowRight" ? PBP_EXPLAIN_NUDGE : 0;
+    const dy = e.key === "ArrowUp" ? -PBP_EXPLAIN_NUDGE : e.key === "ArrowDown" ? PBP_EXPLAIN_NUDGE : 0;
+    _pbpExplainPlace(pop, left + dx, top + dy);
+  });
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "xp-close";
+  close.title = t("explainClose");
+  close.setAttribute("aria-label", t("explainClose"));
+  close.innerHTML = PBP_EXPLAIN_CLOSE_SVG;
+  close.addEventListener("click", () => _pbpExplainClose(pop, true));
+  windowActions.appendChild(moveHint);
+  windowActions.appendChild(pin);
+  windowActions.appendChild(close);
+  head.appendChild(windowActions);
+
+  head.addEventListener("pointerdown", (e) => {
+    if (!e.isPrimary || e.button !== 0 || e.target.closest("button,a,input,select,textarea,label,[contenteditable]")) return;
+    const rect = pop.getBoundingClientRect();
+    _pbpExplainDrag = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, left: rect.left, top: rect.top };
+    _pbpExplainSetPinned(pop, true);
+    pop.classList.add("xp-dragging");
+    try { head.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  head.addEventListener("pointermove", (e) => {
+    const drag = _pbpExplainDrag;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    _pbpExplainPlace(pop, drag.left + e.clientX - drag.x, drag.top + e.clientY - drag.y);
+    e.preventDefault();
+  });
+  const endDrag = (e) => {
+    if (!_pbpExplainDrag || _pbpExplainDrag.pointerId !== e.pointerId) return;
+    _pbpExplainDrag = null;
+    pop.classList.remove("xp-dragging");
+    try { if (head.hasPointerCapture(e.pointerId)) head.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
+  head.addEventListener("pointerup", endDrag);
+  head.addEventListener("pointercancel", endDrag);
   const body = document.createElement("div");
   body.className = "xp-body";
   const foot = document.createElement("div");
@@ -1884,7 +2067,7 @@ function _pbpExplainEnsurePop() {
   ask.textContent = t("explainAskMore");
   ask.addEventListener("click", () => {
     const selText = pop.querySelector(".xp-term").textContent;
-    try { pop.hidePopover(); } catch (_) {}
+    _pbpExplainClose(pop);
     _pbpExplainOpenAsk(selText);
   });
   const gearWrap = document.createElement("span");
@@ -1925,7 +2108,7 @@ function _pbpExplainEnsurePop() {
     gear.setAttribute("aria-expanded", String(!menu.hidden));
   });
   // Click anywhere outside the gear (but still inside the popover) closes the
-  // menu; a click outside the popover light-dismisses the whole popover.
+  // menu. The manual popover's outside-dismiss listener is installed below.
   pop.addEventListener("click", (e) => {
     if (!menu.hidden && !gearWrap.contains(e.target)) {
       menu.hidden = true;
@@ -1943,16 +2126,48 @@ function _pbpExplainEnsurePop() {
   pop.appendChild(head);
   pop.appendChild(body);
   pop.appendChild(foot);
-  // Light dismiss / Esc: abort any in-flight stream when the popover closes,
-  // and reset the gear menu so it reopens closed (the popover element is reused).
-  pop.addEventListener("toggle", (e) => {
+  _pbpExplainSetPinned(pop, false);
+  // Only a real close aborts the active stream and resets session-only state.
+  // Pin toggles and pinned re-entry never hide/show, so they cannot land here.
+  pop.addEventListener("beforetoggle", (e) => {
     if (e.newState === "closed") {
       if (_pbpExplainAbort) _pbpExplainAbort.abort();
+      _pbpExplainSetPinned(pop, false);
+      _pbpExplainDrag = null;
+      pop.classList.remove("xp-dragging");
       menu.hidden = true;
       gear.setAttribute("aria-expanded", "false");
+      _pbpExplainFocusSource = null;
     }
   });
+  document.addEventListener("pointerdown", (e) => {
+    if (!pop.matches(":popover-open") || _pbpExplainPinned || pop.contains(e.target)) return;
+    _pbpExplainClose(pop);
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !pop.matches(":popover-open")) return;
+    // A later auto popover (search/help/highlight) is visually above the
+    // pinned Explain card. Let the browser dismiss that transient layer
+    // first; a following Escape closes Explain once it is topmost again.
+    if ([...document.querySelectorAll(":popover-open")].some((el) => el !== pop)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    _pbpExplainClose(pop, true);
+  }, true);
+  window.addEventListener("resize", () => {
+    if (!pop.matches(":popover-open")) return;
+    const rect = pop.getBoundingClientRect();
+    _pbpExplainPlace(pop, rect.left, rect.top);
+  });
   document.body.appendChild(pop);
+  if (typeof ResizeObserver === "function") {
+    _pbpExplainResizeObserver = new ResizeObserver(() => {
+      if (!pop.matches(":popover-open")) return;
+      const rect = pop.getBoundingClientRect();
+      _pbpExplainPlace(pop, rect.left, rect.top);
+    });
+    _pbpExplainResizeObserver.observe(pop);
+  }
   _pbpExplainPopEl = pop;
   return pop;
 }
@@ -2121,7 +2336,10 @@ async function _pbpExplainRun(cap, ctx, pop) {
   }
   const sr = document.createElement("span");
   sr.className = "sr-only";
-  sr.textContent = t("explainLoading");
+  const loadingKey = _pbpExplainAction === "translate"
+    ? "explainTranslateLoading"
+    : _pbpExplainAction === "dict" ? "dictLoading" : "explainLoading";
+  sr.textContent = t(loadingKey);
   body.appendChild(sr);
   // A new invocation aborts the previous in-flight request — this is also
   // the double-click guard (no inflight dedup needed: the old stream dies).
@@ -2149,7 +2367,9 @@ async function _pbpExplainRun(cap, ctx, pop) {
   if (!_pbpExplainAiOk) {
     const msg = document.createElement("div");
     msg.className = "xp-dict-msg";
-    msg.textContent = t("dictAiNotConfigured");
+    msg.textContent = t(_pbpExplainAction === "translate"
+      ? "explainTranslateAiNotConfigured"
+      : "explainAiNotConfigured");
     body.replaceChildren(msg);
     body.removeAttribute("aria-busy");
     return;
@@ -2238,7 +2458,10 @@ async function _pbpExplainRun(cap, ctx, pop) {
     wrap.appendChild(retry);
     body.replaceChildren(wrap);
   } finally {
-    body.removeAttribute("aria-busy");
+    // A superseded run may settle after its replacement has already marked
+    // the shared body busy. Only the controller that still owns the popover
+    // may clear that state.
+    if (_pbpExplainAbort === ctrl) body.removeAttribute("aria-busy");
   }
 }
 
@@ -2246,10 +2469,11 @@ async function _pbpExplainRun(cap, ctx, pop) {
 // Everything needed is captured at invoke time: cap.rect is a FROZEN DOMRect
 // snapshot taken by pbpExplainInvoke before this runs, so positioning never
 // touches the live range. The block lookup below reads cap.range.startContainer
-// synchronously (before any await) — light dismiss only collapses the range
-// after this turn, so the DOM node is still valid here (spec 5.3).
+// synchronously (before any await), so the DOM node is still valid here.
 function _pbpExplainOpenPop(cap, initialAction) {
   const pop = _pbpExplainEnsurePop();
+  const wasOpen = pop.matches(":popover-open");
+  if (!wasOpen) _pbpExplainFocusSource = document.activeElement;
   pop.querySelector(".xp-term").textContent = cap.text; // ellipsized via CSS
   const modelEl = pop.querySelector(".xp-model");
   modelEl.textContent = _pbpExplainModelLabel(_pbpExplainSettings || {});
@@ -2262,10 +2486,9 @@ function _pbpExplainOpenPop(cap, initialAction) {
   // back to explain. Session-only, as before.
   _pbpExplainAction = (initialAction === "translate" || initialAction === "dict") ? initialAction : "explain";
   _pbpExplainSyncActButtons(pop);
-  // Gear radios mirror the live trigger value; menu starts closed.
+  // Gear radios mirror the live trigger value. Only a real close resets the
+  // menu itself; re-running a pinned popover must not masquerade as dismissal.
   const menu = pop.querySelector(".xp-gear-menu");
-  menu.hidden = true;
-  pop.querySelector(".xp-gear").setAttribute("aria-expanded", "false");
   menu.querySelectorAll('input[type="radio"]').forEach((r) => {
     r.checked = (r.value === _pbpExplainTrigger);
   });
@@ -2274,16 +2497,23 @@ function _pbpExplainOpenPop(cap, initialAction) {
   _pbpExplainCap = cap;
   _pbpExplainCtx = ctx;
   const rect = cap.rect || cap.range.getBoundingClientRect(); // frozen snapshot
-  try { pop.hidePopover(); } catch (_) {} // re-invoke while open: reset first
-  pop.showPopover();
-  // Anchor near the selection: measure after showPopover, clamp to viewport,
-  // flip above when the bottom is too close.
-  const pw = pop.offsetWidth, ph = pop.offsetHeight;
-  const x = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - pw - 8));
-  let y = rect.bottom + 8;
-  if (y + ph > window.innerHeight - 8) y = Math.max(8, rect.top - ph - 8);
-  pop.style.left = x + "px";
-  pop.style.top = y + "px";
+  // A manual popover no longer closes auto popovers implicitly. Preserve the
+  // old mutual exclusion when Explain itself is invoked (not when another
+  // surface opens beside an already pinned Explain panel).
+  document.querySelectorAll(":popover-open").forEach((el) => {
+    if (el !== pop) { try { el.hidePopover(); } catch (_) {} }
+  });
+  if (!pop.matches(":popover-open")) pop.showPopover();
+  if (!_pbpExplainPinned) {
+    // Loose panels follow the newest selection. Pinned panels keep the exact
+    // user-controlled position while _pbpExplainRun takes over their content.
+    const ph = pop.offsetHeight;
+    let y = rect.bottom + PBP_EXPLAIN_EDGE;
+    if (y + ph > window.innerHeight - PBP_EXPLAIN_EDGE) {
+      y = rect.top - ph - PBP_EXPLAIN_EDGE;
+    }
+    _pbpExplainPlace(pop, rect.left, y);
+  }
   _pbpExplainRun(cap, ctx, pop);
 }
 

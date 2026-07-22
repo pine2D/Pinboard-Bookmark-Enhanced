@@ -1457,19 +1457,51 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   padding: 10px 14px 8px;
   border-bottom: 1px solid var(--border-light);
   font-weight: 600;
+  cursor: grab;
+  touch-action: none;
 }
+#explain-pop.xp-dragging { user-select: none; }
+#explain-pop.xp-dragging .xp-head { cursor: grabbing; }
 .xp-term {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 1 auto;
+  min-width: 48px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.xp-drag-zone {
+  flex: 1 1 12px;
+  min-width: 12px;
+  align-self: stretch;
 }
 .xp-act-group {
   display: flex;
   flex: 0 0 auto;
   gap: 4px;
 }
+.xp-window-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+.xp-pin, .xp-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.xp-pin:hover, .xp-close:hover { background: var(--btn-hover); border-color: var(--btn-border); }
+.xp-pin:focus-visible, .xp-close:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.xp-pin[aria-pressed="true"] { background: var(--active-bg); color: var(--active-fg); }
+.xp-pin svg, .xp-close svg { width: 14px; height: 14px; }
 .xp-act {
   padding: 3px 9px;
   border: 1px solid var(--btn-border);
@@ -1487,6 +1519,23 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   color: var(--active-fg);
   border-color: var(--active-bg);
   cursor: default;
+}
+@media (max-width: 420px) {
+  .xp-head { flex-wrap: wrap; }
+  .xp-term { order: 0; flex: 1 1 48px; }
+  .xp-drag-zone { order: 0; }
+  .xp-window-actions { order: 0; }
+  .xp-act-group {
+    order: 1;
+    flex: 1 0 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .xp-act {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 .xp-body {
   padding: 10px 14px;
@@ -1539,6 +1588,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-speak:hover { background: var(--btn-hover); }
 .xp-dict-speak svg { width: 0.8em; height: 0.8em; }
 .xp-dict-slot { min-height: 20px; }
+.xp-dict-match { color: var(--fg-muted); font-size: 0.8em; margin: 0 0 6px; }
 .xp-dict-entry { margin: 0 0 8px; }
 .xp-dict-ipa-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .xp-dict-pos { font-style: italic; color: var(--fg-muted); }
@@ -1794,9 +1844,8 @@ body.tr-only #rendered-view [data-pb-hl-mirror="5"] { box-shadow: inset 3px 0 0 
   color: var(--fg-secondary);
 }
 
-/* Highlight creation bar (md-highlight.js). Native popover -- visibility,
-   top-layer, and [hidden] all managed by the popover attribute itself, no
-   [hidden]-restatement needed (mirrors #explain-pop, md-preview.css:766-783). */
+/* Highlight creation bar (md-highlight.js). Native auto popover -- visibility,
+   top-layer, and [hidden] all managed by the popover attribute itself. */
 #pb-hl-bar {
   position: fixed;
   inset: auto;
@@ -1894,6 +1943,30 @@ html.motion-ready #pb-hl-bar:popover-open {
 /* ============================================================
    Full-text translation (md-translate.js)
    ============================================================ */
+/* User-requested view changes cross-fade only the article snapshot. The root
+   snapshot is held still so the rail and popovers never flash with it. Chrome
+   110 simply ignores this path because JS feature-detects startViewTransition. */
+html.pbp-tr-view-transition #rendered-view { view-transition-name: pbp-tr-article; }
+html.pbp-tr-view-transition::view-transition-old(root),
+html.pbp-tr-view-transition::view-transition-new(root) { animation: none; }
+html.pbp-tr-view-transition::view-transition-group(root),
+html.pbp-tr-view-transition::view-transition-group(pbp-tr-article) { animation: none; }
+html.pbp-tr-view-transition::view-transition-old(pbp-tr-article),
+html.pbp-tr-view-transition::view-transition-new(pbp-tr-article) {
+  mix-blend-mode: normal;
+  animation-duration: 140ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+html.pbp-tr-view-transition::view-transition-old(pbp-tr-article) { animation-name: pbp-tr-fade-out; }
+html.pbp-tr-view-transition::view-transition-new(pbp-tr-article) { animation-name: pbp-tr-fade-in; }
+@keyframes pbp-tr-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes pbp-tr-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  html.pbp-tr-view-transition::view-transition-old(pbp-tr-article),
+  html.pbp-tr-view-transition::view-transition-new(pbp-tr-article) { animation: none; }
+}
+
 /* Translated sibling block: de-emphasized — one text shade down + 0.95em
    (user-picked option A). Hidden in the original view; direct child of
    #rendered-view, so it inherits the content-visibility scroll perf rule. */

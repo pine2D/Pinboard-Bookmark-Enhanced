@@ -594,6 +594,45 @@ function pbpTrIsTypingContext(tagName, isContentEditable) {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
+// Shared gate for bare-letter shortcuts owned by the rendered reader. Caps
+// Lock remains compatible because the generated uppercase key has
+// shiftKey=false; an actual Shift chord is rejected with the other modifiers.
+function pbpTrSingleKeyAllowed(event, tagName, isContentEditable, rawActive) {
+  if (!event || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || rawActive) return false;
+  return !pbpTrIsTypingContext(tagName, isContentEditable);
+}
+
+function pbpTrNextMode(mode) {
+  if (mode === "original") return "bilingual";
+  if (mode === "bilingual") return "translated";
+  return "original";
+}
+
+// Pick the first visible reading unit from an already document-ordered list.
+// Unlike pbpReaderPickScrollAnchor, each entry carries the canonical block id
+// and whether the reader is inside its original or translated side.
+function pbpTrViewAnchorPick(candidates) {
+  if (!Array.isArray(candidates)) return null;
+  const valid = candidates.filter((r) => r && Number.isFinite(r.top) && Number.isFinite(r.bottom) && r.bottom > r.top);
+  if (!valid.length) return null;
+  const r = valid.find((x) => x.bottom > 0) || valid[valid.length - 1];
+  const h = r.bottom - r.top;
+  return {
+    n: Number(r.n),
+    side: r.side === "tr" ? "tr" : "orig",
+    frac: Math.min(Math.max(-r.top / h, 0), 1)
+  };
+}
+
+function pbpTrViewAnchorTarget(orig, mode, side) {
+  if (!orig) return null;
+  const sibling = orig.nextElementSibling;
+  const tr = sibling && sibling.classList && sibling.classList.contains("pb-tr") ? sibling : null;
+  if (mode === "translated") return tr || orig;
+  if (mode === "bilingual" && side === "tr") return tr || orig;
+  return orig;
+}
+
 // ============================================================
 // DOM / UI layer. Lazily mounted: pbpTrInit runs on "pbp:rendered",
 // builds the rail section only when gating passes; everything heavier
@@ -673,10 +712,7 @@ async function pbpTrInit(detail) {
     workReady: null,               // Promise: resolves once the rAF-chunked st.work build finishes
     trMd: Object.create(null),     // n -> RESTORED translated markdown (export + TOC)
     mode: "original",
-    lastViewMode: "bilingual",     // V-key toggle target (spec sec.2); _pbpTrSetMode updates
-                                    // this whenever mode !== "original", including the
-                                    // persisted-mode restore below, so a returning reader's
-                                    // last view (e.g. "translated") is what V returns to.
+    status: "idle",
     running: false,
     ctrl: null,
     glossaryHits: Object.create(null),
@@ -727,15 +763,22 @@ async function pbpTrInit(detail) {
   // Page close terminates every in-flight request (error matrix last row).
   window.addEventListener("pagehide", () => { if (st.ctrl) st.ctrl.abort(); });
 
-  // V key: toggle original <-> last non-original view mode (spec sec.2).
+  // Bare translation shortcuts share one modifier/typing/raw-view gate.
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "v" && e.key !== "V") return;
-    if (e.ctrlKey || e.altKey || e.metaKey) return;      // don't hijack Ctrl+V paste etc.
+    const key = String(e.key || "").toLowerCase();
+    if (key !== "t" && key !== "v") return;
     const ae = document.activeElement;
-    if (pbpTrIsTypingContext(ae && ae.tagName, !!(ae && ae.isContentEditable))) return;
-    if (!document.getElementById("tr-view-toggle")) return;  // nothing to toggle yet
+    if (!pbpTrSingleKeyAllowed(e, ae && ae.tagName, !!(ae && ae.isContentEditable),
+      document.body.classList.contains("raw-active"))) return;
+    if (key === "t") {
+      if (!document.getElementById("tr-section")) return;
+      e.preventDefault();
+      _pbpTrTrigger(st);
+      return;
+    }
+    if (!document.getElementById("tr-view-toggle")) return;
     e.preventDefault();
-    _pbpTrSetMode(st, st.mode === "original" ? st.lastViewMode : "original", true);
+    _pbpTrSetMode(st, pbpTrNextMode(st.mode), true);
   });
 
   // Build st.work OFF the first-paint critical path, then probe the cache. pbpAiMdOf()
@@ -853,6 +896,8 @@ function _pbpTrBuildSection(st) {
   btn.type = "button";
   btn.id = "btn-translate";
   btn.className = "action-btn";
+  btn.setAttribute("aria-keyshortcuts", "t");
+  btn.title = t("trTranslate") + " (t)";
   btn.innerHTML = PBP_TR_BTN_SVG;                  // static inline SVG only
   const bl = document.createElement("span");
   bl.className = "btn-label";
@@ -943,17 +988,23 @@ function _pbpTrBuildSection(st) {
   st.railHandle = pbpRailCollapsible(sec, "tr", { label, defaultCollapsed: true });
 
   anchor.insertAdjacentElement("afterend", sec);
-  btn.addEventListener("click", () => {
-    if (st.railHandle) st.railHandle.expand(true); // Translate/Continue click -> auto-expand (temp)
-    _pbpTrStart(st).catch(() => {
-      // Unexpected rejection (setup error etc.): never leave the UI stuck on
-      // "翻译中". Reset run flag and settle to a terminal status the user can act on.
-      st.running = false;
-      const doneAll = st.work.every((w) => (w.n in st.trMd));
-      _pbpTrSetStatus(st, doneAll ? "done" : "partial");
-    });
-  });
+  btn.addEventListener("click", () => { _pbpTrTrigger(st); });
   stop.addEventListener("click", () => { if (st.ctrl) st.ctrl.abort(); });
+}
+
+// One launch chain for the button and t. Expanding a completed section is
+// useful, but must not re-enter translation or consume more tokens.
+function _pbpTrTrigger(st) {
+  if (st.running) return;
+  if (st.railHandle) st.railHandle.expand(true);
+  if (st.status === "done") return;
+  _pbpTrStart(st).catch(() => {
+    // Unexpected rejection (setup error etc.): never leave the UI stuck on
+    // "翻译中". Reset run flag and settle to a terminal status the user can act on.
+    st.running = false;
+    const doneAll = st.work.every((w) => (w.n in st.trMd));
+    _pbpTrSetStatus(st, doneAll ? "done" : "partial");
+  });
 }
 
 // T4: if the provider didn't emit usage for this call, estimate it (chars/4)
@@ -1340,6 +1391,10 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   div.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
   _pbpTrApplyPeekAttrs(div);
   orig.dataset.pbTrDone = "1";
+  // In translated-only mode headings arrive progressively after the mode/TOC
+  // switch. Refresh now so a newly filled heading never leaves stale original
+  // text in the rail until the reader toggles modes again.
+  if (st.mode === "translated" && /^H[1-6]$/.test(orig.tagName)) _pbpTrSyncToc(st, "translated");
   // KaTeX: only when the article actually rendered math (md-preview gated
   // loading on info.math; a .katex node proves it). ensureKatex is a
   // top-level function in md-preview.js, visible here.
@@ -1580,6 +1635,7 @@ async function _pbpTrRetryAllFailed(st) {
 }
 
 function _pbpTrSetStatus(st, status) {
+  st.status = status;
   const btn = document.getElementById("btn-translate");
   const stop = document.getElementById("btn-tr-stop");
   const prog = document.getElementById("tr-progress");
@@ -1641,7 +1697,7 @@ function _pbpTrShowViewToggle(st) {
     b.className = "toggle-btn";
     b.dataset.trMode = mode;
     b.textContent = t(key);
-    b.title = t(key) + " (V)"; // "V" is the literal key name, deliberately not translated
+    b.title = t(key) + " (v)"; // "v" is the literal key name, deliberately not translated
     b.setAttribute("aria-pressed", "false");
     b.addEventListener("click", () => _pbpTrSetMode(st, mode, true));
     wrap.appendChild(b);
@@ -1658,14 +1714,86 @@ function _pbpTrSyncToggle(mode) {
   });
 }
 
-function _pbpTrSetMode(st, mode, persist) {
-  st.mode = mode;
-  if (mode !== "original") st.lastViewMode = mode;   // V-key toggle target (spec sec.2)
+// Moving between original-only and translated-only can hide the element that
+// currently owns keyboard focus. Capture its same-block counterpart before the
+// class change; the handoff itself runs after the destination side is visible.
+function _pbpTrCaptureFocusHandoff(mode) {
+  if (mode !== "original" && mode !== "translated") return null;
+  const view = document.getElementById("rendered-view");
+  const active = document.activeElement;
+  if (!view || !active || active === document.body || !view.contains(active)) return null;
+
+  if (mode === "translated") {
+    const orig = active.closest("[data-pb]");
+    if (!orig || !view.contains(orig) || !orig.dataset.pbTrDone) return null;
+    const target = pbpTrViewAnchorTarget(orig, "translated", "orig");
+    return target && target !== orig ? { active, target } : null;
+  }
+
+  const tr = active.closest(".pb-tr");
+  if (!tr || !view.contains(tr) || typeof pbpAiBlockEl !== "function") return null;
+  const orig = pbpAiBlockEl(tr.dataset.pbTr);
+  if (!orig || orig.nextElementSibling !== tr) return null;
+  return { active, target: orig };
+}
+
+function _pbpTrApplyFocusHandoff(handoff) {
+  if (!handoff || document.activeElement !== handoff.active) return;
+  const target = handoff.target;
+  if (!handoff.active.isConnected || !target || !target.isConnected) return;
+  let borrowedTabIndex = false;
+  if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) {
+    target.setAttribute("tabindex", "-1");
+    borrowedTabIndex = true;
+  }
+  target.focus({ preventScroll: true });
+  if (borrowedTabIndex && document.activeElement === target) {
+    target.addEventListener("blur", () => {
+      if (target.getAttribute("tabindex") === "-1") target.removeAttribute("tabindex");
+    }, { once: true });
+  }
+}
+
+function _pbpTrCaptureViewAnchor() {
+  if (document.body.classList.contains("raw-active") || window.scrollY === 0 || typeof pbpAiBlocks !== "function") return null;
+  const candidates = [];
+  for (const block of pbpAiBlocks()) {
+    const orig = block.el;
+    if (!orig) continue;
+    const origRect = orig.getBoundingClientRect();
+    candidates.push({ n: block.n, side: "orig", top: origRect.top, bottom: origRect.bottom });
+    const sibling = orig.nextElementSibling;
+    if (sibling && sibling.classList && sibling.classList.contains("pb-tr")) {
+      const trRect = sibling.getBoundingClientRect();
+      candidates.push({ n: block.n, side: "tr", top: trRect.top, bottom: trRect.bottom });
+    }
+  }
+  return pbpTrViewAnchorPick(candidates);
+}
+
+function _pbpTrSettleViewAnchor(anchor, mode) {
+  if (!anchor || typeof pbpAiBlockEl !== "function") return;
+  const orig = pbpAiBlockEl(anchor.n);
+  const target = pbpTrViewAnchorTarget(orig, mode, anchor.side);
+  if (!target) return;
+  target.scrollIntoView({ block: "start", behavior: "instant" });
+  const frac = Math.min(Math.max(Number(anchor.frac) || 0, 0), 1);
+  if (frac > 0) {
+    const h = target.getBoundingClientRect().height;
+    if (h > 0) window.scrollBy(0, frac * h);
+  }
+}
+
+function _pbpTrApplyMode(st, mode, anchor, focusHandoff) {
   document.body.classList.toggle("tr-bilingual", mode === "bilingual");
   document.body.classList.toggle("tr-only", mode === "translated");
   if (mode !== "translated") {
     document.querySelectorAll("#rendered-view .pb-show-orig").forEach((el) => el.classList.remove("pb-show-orig"));
   }
+  // The class switch makes the destination side visible. Move focus before
+  // removing the source .pb-tr's tabindex; Chromium otherwise drops focus to
+  // body and the stale-focus guard correctly refuses the intended handoff.
+  _pbpTrApplyFocusHandoff(focusHandoff);
   // Re-sync every already-filled .pb-tr's peek affordance for the new mode
   // (blocks filled while a DIFFERENT mode was active still need updating).
   document.querySelectorAll("#rendered-view .pb-tr").forEach(_pbpTrApplyPeekAttrs);
@@ -1682,6 +1810,44 @@ function _pbpTrSetMode(st, mode, persist) {
       return { orig, tr: (tr && tr !== orig) ? tr : null };
     }));
   };
+  _pbpTrSettleViewAnchor(anchor, mode);
+}
+
+function _pbpTrSetMode(st, mode, persist) {
+  if (!st || !["original", "bilingual", "translated"].includes(mode) || mode === st.mode) return;
+  const anchor = _pbpTrCaptureViewAnchor();
+  const focusHandoff = _pbpTrCaptureFocusHandoff(mode);
+  // State changes synchronously even when the native transition schedules the
+  // DOM mutation, so repeated v presses always advance from the latest mode.
+  st.mode = mode;
+  const viewSeq = (st.viewSeq || 0) + 1;
+  st.viewSeq = viewSeq;
+  const apply = () => {
+    // startViewTransition may still invoke a skipped transition's update
+    // callback. Only the latest rapid v press may mutate the live document.
+    if (st.viewSeq === viewSeq) _pbpTrApplyMode(st, mode, anchor, focusHandoff);
+  };
+  const reduceMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (persist && !reduceMotion && typeof document.startViewTransition === "function") {
+    const root = document.documentElement;
+    root.classList.add("pbp-tr-view-transition");
+    let transition;
+    try {
+      transition = document.startViewTransition(apply);
+      st.viewTransition = transition;
+      transition.finished.catch(() => {}).finally(() => {
+        if (st.viewTransition === transition) {
+          st.viewTransition = null;
+          root.classList.remove("pbp-tr-view-transition");
+        }
+      });
+    } catch (_) {
+      root.classList.remove("pbp-tr-view-transition");
+      apply();
+    }
+  } else {
+    apply();
+  }
   if (persist) pbpTrViewSet(st.url, { mode, lang: st.target.code }, st.account).catch(() => {});
 }
 
