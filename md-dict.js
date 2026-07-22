@@ -305,8 +305,11 @@ async function pbpVocabSaveWord(owner, w) {
         // attribution wins as a PAIR (matching the latest-gloss-wins rule) --
         // a re-save from CC-CEDICT must not export a stale Wiktionary line.
         if (w.sourceUrl || w.license) {
-          if (w.sourceUrl) cur.sourceUrl = pbpDictSafeUrl(w.sourceUrl) || null;
-          if (w.license) cur.license = String(w.license);
+          // BOTH sides always assigned (missing one -> null): a lookup that
+          // carries only a license must not leave the previous source's URL
+          // behind as mixed attribution.
+          cur.sourceUrl = w.sourceUrl ? (pbpDictSafeUrl(w.sourceUrl) || null) : null;
+          cur.license = w.license ? String(w.license) : null;
         }
         cur.contexts = pbpDictMergeContext(cur.contexts, w.context);
         cur.updatedAt = now;
