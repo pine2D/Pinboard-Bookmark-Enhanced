@@ -2374,7 +2374,7 @@
     "message": "Explain button in the selection toolbar"
   },
   "selectionTriggerHotkey": {
-    "message": "Hotkey E only (no button)"
+    "message": "Hotkeys e and d only (no buttons)"
   },
   "selectionTriggerOff": {
     "message": "Off"
@@ -2564,11 +2564,26 @@
   "explainSelection": {
     "message": "Explain selection"
   },
+  "explainTranslateSelection": {
+    "message": "Translate selection"
+  },
   "explainAskMore": {
     "message": "Ask a follow-up"
   },
   "explainLoading": {
     "message": "Generating explanation…"
+  },
+  "explainTranslateLoading": {
+    "message": "Translating selection…"
+  },
+  "dictLoading": {
+    "message": "Looking up word…"
+  },
+  "explainAiNotConfigured": {
+    "message": "Configure an AI provider in Settings to explain selections."
+  },
+  "explainTranslateAiNotConfigured": {
+    "message": "Configure an AI provider in Settings to translate selections."
   },
   "explainErrRetry": {
     "message": "Retry"
@@ -2576,11 +2591,23 @@
   "explainSettings": {
     "message": "Explain-selection settings"
   },
+  "explainPin": {
+    "message": "Pin"
+  },
+  "explainUnpin": {
+    "message": "Unpin"
+  },
+  "explainClose": {
+    "message": "Close"
+  },
+  "explainMoveHint": {
+    "message": "Use Alt+Arrow keys to move this panel."
+  },
   "explainTriggerIcon": {
     "message": "Button next to selection"
   },
   "explainTriggerHotkey": {
-    "message": "Hotkey E only"
+    "message": "Hotkeys e and d only"
   },
   "explainTriggerOff": {
     "message": "Off"
@@ -2598,16 +2625,33 @@
     "message": "Look up in dictionary"
   },
   "dictConnect": {
-    "message": "Connect Wiktionary dictionary"
+    "message": "Allow online dictionary"
   },
   "dictConnectHint": {
-    "message": "Definitions come from freedictionaryapi.com (Wiktionary data)."
+    "message": "Allow freedictionaryapi.com to provide definitions from Wiktionary data."
+  },
+  "dictConnectRetry": {
+    "message": "Try permission again"
+  },
+  "dictPermissionDenied": {
+    "message": "Permission wasn’t granted. The online dictionary is still unavailable."
   },
   "dictNoEntry": {
-    "message": "No dictionary entry"
+    "message": "The connected dictionary did not find an entry."
+  },
+  "dictMatchedHeadword": {
+    "message": "Matched entry: $TERM$",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
   },
   "dictLoadFailed": {
     "message": "Dictionary unavailable"
+  },
+  "dictViewWiktionary": {
+    "message": "View on Wiktionary"
   },
   "dictSpeak": {
     "message": "Pronounce"
@@ -2618,11 +2662,178 @@
   "dictSavedVocab": {
     "message": "In vocabulary"
   },
+  "dictUpdateVocab": {
+    "message": "Update saved word"
+  },
+  "dictTagPinyin": {
+    "message": "Pinyin"
+  },
+  "dictTagSimplified": {
+    "message": "Simplified"
+  },
+  "dictTagTraditional": {
+    "message": "Traditional"
+  },
   "dictVocabSection": {
     "message": "Vocabulary"
   },
+    "vocabSearchPlaceholder": {
+      "message": "Search words, definitions, context, and groups"
+    },
+    "vocabGroupFilterAria": {
+      "message": "Filter by group"
+    },
+    "vocabAllGroups": {
+      "message": "All groups"
+    },
+    "vocabSortAria": {
+      "message": "Sort vocabulary"
+    },
+    "vocabSortLatest": {
+      "message": "Recently updated"
+    },
+    "vocabSortOldest": {
+      "message": "Least recently updated"
+    },
+    "vocabSortAz": {
+      "message": "A–Z"
+    },
+    "vocabSortZa": {
+      "message": "Z–A"
+    },
+    "vocabSelectionActions": {
+      "message": "Selection actions"
+    },
+    "vocabSelectAll": {
+      "message": "Select all results"
+    },
+    "vocabInvertSelection": {
+      "message": "Invert result selection"
+    },
+    "vocabBatchActions": {
+      "message": "Actions for selected words"
+    },
+    "vocabGroupNamePlaceholder": {
+      "message": "Group name"
+    },
+    "vocabAddToGroup": {
+      "message": "Add to group"
+    },
+    "vocabBatchDelete": {
+      "message": "Delete selected"
+    },
+    "vocabNoResults": {
+      "message": "No words match the current filters."
+    },
+    "vocabListAria": {
+      "message": "Saved vocabulary"
+    },
+    "vocabLoadMore": {
+      "message": "Load the next $COUNT$",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabLoading": {
+      "message": "Loading saved words…"
+    },
+    "vocabReadingSection": {
+      "message": "Reading hints"
+    },
+    "vocabLearningSection": {
+      "message": "Export and integrations"
+    },
+    "vocabOwnerNoAccount": {
+      "message": "No Pinboard account"
+    },
+    "vocabLoadFailed": {
+      "message": "Could not load saved words for the current Pinboard account. Reopen Vocabulary and try again."
+    },
+    "vocabExportFailed": {
+      "message": "Could not export saved words. Check extension storage and try again."
+    },
+    "vocabAccountChanged": {
+      "message": "The Pinboard account changed. Review the current vocabulary list and try again."
+    },
+    "vocabSettingsSaveFailed": {
+      "message": "Could not save the latest integration settings. Review them and try again."
+    },
+    "vocabSelectWord": {
+      "message": "Select $TERM$",
+      "placeholders": {
+        "term": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabResultCount": {
+      "message": "$RESULTS$ found · $TOTAL$ saved for current Pinboard account: $OWNER$",
+      "placeholders": {
+        "results": {
+          "content": "$1"
+        },
+        "total": {
+          "content": "$2"
+        },
+        "owner": {
+          "content": "$3"
+        }
+      }
+    },
+    "vocabSelectedCount": {
+      "message": "Selected: $COUNT$",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchDeleteConfirm": {
+      "message": "Delete the selected words? Count: $COUNT$.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchFailed": {
+      "message": "The bulk action failed. No words were changed."
+    },
+    "vocabSelectionChanged": {
+      "message": "The selection changed. Review the current results and try again."
+    },
+    "vocabRefreshFailed": {
+      "message": "The changes were saved, but the list could not refresh. Reopen Vocabulary."
+    },
+    "vocabBatchDeleted": {
+      "message": "Deleted selected words. Count: $COUNT$.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchGrouped": {
+      "message": "Added selected words to a group. Group: $GROUP$ · Count: $COUNT$.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        },
+        "group": {
+          "content": "$2"
+        }
+      }
+    },
+    "vocabGroupRequired": {
+      "message": "Enter a group name."
+    },
+    "dictPackHint": {
+      "message": "CC-CEDICT looks up Simplified or Traditional Chinese terms and returns English definitions. It does not support English word lookup."
+    },
   "dictExportTsv": {
-    "message": "Export TSV"
+    "message": "Export all (.tsv)"
   },
   "dictAiLabel": {
     "message": "AI generated"
@@ -2640,7 +2851,7 @@
     "message": "Dotted underlines mark words already in your vocabulary. Click one to open the dictionary."
   },
   "dictAnkiSend": {
-    "message": "Send to Anki"
+    "message": "Send all to Anki"
   },
   "dictAnkiSending": {
     "message": "Sending…"
@@ -2659,11 +2870,26 @@
       }
     }
   },
-  "dictAnkiUnreachable": {
-    "message": "Anki is not reachable. Keep Anki running with the AnkiConnect add-on, or export TSV instead."
-  },
   "dictAnkiModelMismatch": {
-    "message": "The existing \"Pinboard Vocab\" note type has been modified. Sending was stopped to protect it."
+    "message": "The existing \"Pinboard Vocab\" note type has different fields. Restore the expected fields and order, then try again."
+  },
+  "dictAnkiHostPermissionDenied": {
+    "message": "Chrome access to the local AnkiConnect address was not granted. Allow access and try again."
+  },
+  "dictAnkiConnectPermissionFailed": {
+    "message": "Could not complete the AnkiConnect permission check. Keep Anki and AnkiConnect running, then try again."
+  },
+  "dictAnkiConnectPermissionDenied": {
+    "message": "AnkiConnect did not grant access. Approve the permission request in Anki and try again."
+  },
+  "dictAnkiVersionUnsupported": {
+    "message": "AnkiConnect API version 6 or later is required. Update AnkiConnect and try again."
+  },
+  "dictAnkiFieldCheckFailed": {
+    "message": "Could not read the \"Pinboard Vocab\" note type fields. Check AnkiConnect and its API key, then try again."
+  },
+  "dictAnkiFailed": {
+    "message": "Could not send words to Anki. Check AnkiConnect and try again, or export all as .tsv."
   },
   "dictAnkiKeyRequired": {
     "message": "AnkiConnect requires an API key. Add it below."
@@ -2678,7 +2904,7 @@
     "message": "AnkiConnect API key (optional)"
   },
   "dictPackSection": {
-    "message": "Offline dictionary pack"
+    "message": "Offline Chinese–English dictionary"
   },
   "dictPackOpen": {
     "message": "Open download page"
@@ -2703,7 +2929,16 @@
     }
   },
   "dictPackFailed": {
-    "message": "Import failed. Make sure the file is a CC-CEDICT release."
+    "message": "Could not import the dictionary. Check the selected file and available extension storage, then try again."
+  },
+  "dictPackImportHint": {
+    "message": "Import a CC-CEDICT .txt, .txt.gz, or .zip file."
+  },
+  "dictPackReadFailed": {
+    "message": "Could not read the offline dictionary status. Reopen Settings and try again."
+  },
+  "dictPackDeleteFailed": {
+    "message": "Could not delete the offline dictionary. Try again."
   },
   "dictPackEmpty": {
     "message": "Not imported. Download the CC-CEDICT release from MDBG (.txt.gz or .zip), then import the file here (CC BY-SA 4.0)."
@@ -2723,7 +2958,10 @@
     "message": "Delete the imported dictionary pack?"
   },
   "dictEudicSend": {
-    "message": "Send to Eudic"
+    "message": "Send all supported words to Eudic"
+  },
+  "dictEudicSupportedHint": {
+    "message": "Eudic supports only English, French, German, and Spanish (en/fr/de/es); other words are skipped."
   },
   "dictEudicSending": {
     "message": "Sending…"
@@ -2745,8 +2983,14 @@
   "dictEudicGenericOk": {
     "message": "Sent to Eudic; exact totals are unavailable."
   },
-  "dictEudicRateLimited": {
-    "message": "Eudic rate limit hit. Try again later (bans last 1 to 24 hours)."
+  "dictEudicRejected": {
+    "message": "Eudic rejected the request. Check your OpenAPI token, then retry later."
+  },
+  "dictEudicHostPermissionDenied": {
+    "message": "Chrome access to the Eudic API was not granted. Allow access and try again."
+  },
+  "dictEudicFailed": {
+    "message": "Could not send words to Eudic. Check the authorization and try again."
   },
   "dictEudicTokenRequired": {
     "message": "Add your Eudic OpenAPI authorization below, or check that it is still valid."
@@ -2770,7 +3014,12 @@
     "message": "Configure an AI provider in Settings to get contextual explanations."
   },
   "dictVocabEmpty": {
-    "message": "No saved words yet. Save words from the reader's dictionary view."
+    "message": "No words saved for current Pinboard account: $OWNER$. Save words from the reader's dictionary view.",
+    "placeholders": {
+      "owner": {
+        "content": "$1"
+      }
+    }
   },
   "dictDeleteConfirm": {
     "message": "Remove \"$TERM$\" from vocabulary?",
@@ -2893,9 +3142,11 @@
   "kbdHelpTitle": { "message": "Keyboard Shortcuts" },
   "kbdHelpIntro": { "message": "These shortcuts work on the Markdown preview page (not here in Settings)." },
   "kbdHelpRailBtn": { "message": "Keyboard shortcuts" },
+  "kbdHelpTranslate": { "message": "Start or continue translating the article" },
+  "kbdHelpDictionary": { "message": "Look up the current selection" },
   "kbdHelpExplain": { "message": "Explain the current selection" },
-  "kbdHelpToggleView": { "message": "Toggle bilingual / original view" },
-  "kbdHelpHighlight": { "message": "Highlight the current selection (H = last color used, 1-5 = pick a color)" },
+  "kbdHelpToggleView": { "message": "Cycle through original, bilingual, and translated views" },
+  "kbdHelpHighlight": { "message": "Highlight the current selection (h = last color used, 1-5 = pick a color)" },
   "kbdHelpAsk": { "message": "Open the Ask-the-page panel" },
   "kbdHelpSearch": { "message": "Search within the article" },
   "kbdHelpShowHelp": { "message": "Show this shortcuts list" },

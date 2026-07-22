@@ -2374,7 +2374,7 @@
     "message": "選択ツールバーの解説ボタン"
   },
   "selectionTriggerHotkey": {
-    "message": "ホットキー E のみ（ボタンなし）"
+    "message": "ショートカット e と d のみ（ボタンなし）"
   },
   "selectionTriggerOff": {
     "message": "オフ"
@@ -2564,11 +2564,26 @@
   "explainSelection": {
     "message": "選択範囲を解説"
   },
+  "explainTranslateSelection": {
+    "message": "選択範囲を翻訳"
+  },
   "explainAskMore": {
     "message": "続けて質問する"
   },
   "explainLoading": {
     "message": "解説を生成中…"
+  },
+  "explainTranslateLoading": {
+    "message": "選択範囲を翻訳中…"
+  },
+  "dictLoading": {
+    "message": "辞書を検索中…"
+  },
+  "explainAiNotConfigured": {
+    "message": "設定で AI プロバイダーを指定すると、選択範囲を解説できます。"
+  },
+  "explainTranslateAiNotConfigured": {
+    "message": "設定で AI プロバイダーを指定すると、選択範囲を翻訳できます。"
   },
   "explainErrRetry": {
     "message": "再試行"
@@ -2576,11 +2591,23 @@
   "explainSettings": {
     "message": "選択解説の設定"
   },
+  "explainPin": {
+    "message": "固定"
+  },
+  "explainUnpin": {
+    "message": "固定を解除"
+  },
+  "explainClose": {
+    "message": "閉じる"
+  },
+  "explainMoveHint": {
+    "message": "Alt+矢印キーでこのパネルを移動できます。"
+  },
   "explainTriggerIcon": {
     "message": "選択テキストの横にボタンを表示"
   },
   "explainTriggerHotkey": {
-    "message": "ショートカット E のみ"
+    "message": "ショートカット e と d のみ"
   },
   "explainTriggerOff": {
     "message": "オフ"
@@ -2598,16 +2625,33 @@
     "message": "辞書で調べる"
   },
   "dictConnect": {
-    "message": "Wiktionary 辞書に接続"
+    "message": "オンライン辞書へのアクセスを許可"
   },
   "dictConnectHint": {
-    "message": "語義は freedictionaryapi.com（Wiktionary データ）から取得します。"
+    "message": "freedictionaryapi.comへのアクセスを許可し、Wiktionaryデータに基づく語義を取得します。"
+  },
+  "dictConnectRetry": {
+    "message": "アクセス権限を再度リクエスト"
+  },
+  "dictPermissionDenied": {
+    "message": "アクセスが許可されませんでした。オンライン辞書は引き続き利用できません。"
   },
   "dictNoEntry": {
-    "message": "辞書に項目がありません"
+    "message": "オンライン辞書では見つかりませんでした。"
+  },
+  "dictMatchedHeadword": {
+    "message": "一致した見出し語：$TERM$",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
   },
   "dictLoadFailed": {
     "message": "辞書を利用できません"
+  },
+  "dictViewWiktionary": {
+    "message": "Wiktionary で見る"
   },
   "dictSpeak": {
     "message": "発音"
@@ -2618,11 +2662,178 @@
   "dictSavedVocab": {
     "message": "単語帳に保存済み"
   },
+  "dictUpdateVocab": {
+    "message": "保存済み単語を更新"
+  },
+  "dictTagPinyin": {
+    "message": "ピンイン"
+  },
+  "dictTagSimplified": {
+    "message": "簡体字"
+  },
+  "dictTagTraditional": {
+    "message": "繁体字"
+  },
   "dictVocabSection": {
     "message": "単語帳"
   },
+    "vocabSearchPlaceholder": {
+      "message": "単語、意味、文脈、グループを検索"
+    },
+    "vocabGroupFilterAria": {
+      "message": "グループで絞り込む"
+    },
+    "vocabAllGroups": {
+      "message": "すべてのグループ"
+    },
+    "vocabSortAria": {
+      "message": "単語帳を並べ替え"
+    },
+    "vocabSortLatest": {
+      "message": "更新が新しい順"
+    },
+    "vocabSortOldest": {
+      "message": "更新が古い順"
+    },
+    "vocabSortAz": {
+      "message": "A–Z"
+    },
+    "vocabSortZa": {
+      "message": "Z–A"
+    },
+    "vocabSelectionActions": {
+      "message": "選択操作"
+    },
+    "vocabSelectAll": {
+      "message": "表示結果をすべて選択"
+    },
+    "vocabInvertSelection": {
+      "message": "表示結果の選択を反転"
+    },
+    "vocabBatchActions": {
+      "message": "選択した単語の操作"
+    },
+    "vocabGroupNamePlaceholder": {
+      "message": "グループ名"
+    },
+    "vocabAddToGroup": {
+      "message": "グループに追加"
+    },
+    "vocabBatchDelete": {
+      "message": "選択項目を削除"
+    },
+    "vocabNoResults": {
+      "message": "現在の条件に一致する単語はありません。"
+    },
+    "vocabListAria": {
+      "message": "保存した単語"
+    },
+    "vocabLoadMore": {
+      "message": "次の $COUNT$ 件を読み込む",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabLoading": {
+      "message": "保存した単語を読み込んでいます…"
+    },
+    "vocabReadingSection": {
+      "message": "読書中のヒント"
+    },
+    "vocabLearningSection": {
+      "message": "エクスポートと連携"
+    },
+    "vocabOwnerNoAccount": {
+      "message": "Pinboard アカウントなし"
+    },
+    "vocabLoadFailed": {
+      "message": "現在の Pinboard アカウントの単語を読み込めませんでした。「単語」を開き直して、もう一度お試しください。"
+    },
+    "vocabExportFailed": {
+      "message": "単語を書き出せませんでした。拡張機能のストレージを確認して、もう一度お試しください。"
+    },
+    "vocabAccountChanged": {
+      "message": "Pinboard アカウントが切り替わりました。現在の単語一覧を確認して、もう一度お試しください。"
+    },
+    "vocabSettingsSaveFailed": {
+      "message": "変更した連携設定を保存できませんでした。設定を確認して、もう一度お試しください。"
+    },
+    "vocabSelectWord": {
+      "message": "「$TERM$」を選択",
+      "placeholders": {
+        "term": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabResultCount": {
+      "message": "現在の Pinboard アカウント（$OWNER$）：$RESULTS$ 件一致・$TOTAL$ 件保存済み",
+      "placeholders": {
+        "results": {
+          "content": "$1"
+        },
+        "total": {
+          "content": "$2"
+        },
+        "owner": {
+          "content": "$3"
+        }
+      }
+    },
+    "vocabSelectedCount": {
+      "message": "選択済み：$COUNT$ 件",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchDeleteConfirm": {
+      "message": "選択した単語を削除しますか？件数：$COUNT$",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchFailed": {
+      "message": "一括操作に失敗しました。単語は変更されていません。"
+    },
+    "vocabSelectionChanged": {
+      "message": "選択内容が変わりました。現在の結果を確認して、もう一度お試しください。"
+    },
+    "vocabRefreshFailed": {
+      "message": "変更は保存されましたが、一覧を更新できませんでした。「単語帳」を開き直してください。"
+    },
+    "vocabBatchDeleted": {
+      "message": "選択した単語を削除しました。件数：$COUNT$",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchGrouped": {
+      "message": "選択した単語をグループに追加しました。グループ：$GROUP$・件数：$COUNT$",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        },
+        "group": {
+          "content": "$2"
+        }
+      }
+    },
+    "vocabGroupRequired": {
+      "message": "グループ名を入力してください。"
+    },
+    "dictPackHint": {
+      "message": "CC-CEDICTは簡体字・繁体字の中国語の語句を検索し、英語の語義を表示します。英単語からの検索には対応していません。"
+    },
   "dictExportTsv": {
-    "message": "TSV を書き出す"
+    "message": "すべて書き出す（.tsv）"
   },
   "dictAiLabel": {
     "message": "AI 生成"
@@ -2640,7 +2851,7 @@
     "message": "点線の下線は単語帳に登録済みの単語を示します。クリックすると辞書が開きます。"
   },
   "dictAnkiSend": {
-    "message": "Anki に送信"
+    "message": "すべて Anki に送信"
   },
   "dictAnkiSending": {
     "message": "送信中…"
@@ -2659,11 +2870,26 @@
       }
     }
   },
-  "dictAnkiUnreachable": {
-    "message": "Anki に接続できません。AnkiConnect アドオンを有効にした状態で Anki を起動しておくか、代わりに TSV 書き出しをご利用ください。"
-  },
   "dictAnkiModelMismatch": {
-    "message": "既存の「Pinboard Vocab」ノートタイプが変更されているため、保護のため送信を中止しました。"
+    "message": "既存の「Pinboard Vocab」ノートタイプのフィールドが一致しません。想定されたフィールドと順序に戻してから、もう一度お試しください。"
+  },
+  "dictAnkiHostPermissionDenied": {
+    "message": "Chrome にローカルの AnkiConnect アドレスへのアクセスが許可されていません。アクセスを許可して、もう一度お試しください。"
+  },
+  "dictAnkiConnectPermissionFailed": {
+    "message": "AnkiConnect の権限を確認できませんでした。Anki と AnkiConnect を起動したまま、もう一度お試しください。"
+  },
+  "dictAnkiConnectPermissionDenied": {
+    "message": "AnkiConnect からアクセスが許可されませんでした。Anki で権限リクエストを承認して、もう一度お試しください。"
+  },
+  "dictAnkiVersionUnsupported": {
+    "message": "AnkiConnect API バージョン 6 以降が必要です。AnkiConnect を更新して、もう一度お試しください。"
+  },
+  "dictAnkiFieldCheckFailed": {
+    "message": "「Pinboard Vocab」ノートタイプのフィールドを読み取れませんでした。AnkiConnect と API キーを確認して、もう一度お試しください。"
+  },
+  "dictAnkiFailed": {
+    "message": "単語を Anki に送信できませんでした。AnkiConnect を確認して再試行するか、すべてを .tsv で書き出してください。"
   },
   "dictAnkiKeyRequired": {
     "message": "AnkiConnect には API キーが必要です。下記に入力してください。"
@@ -2678,7 +2904,7 @@
     "message": "AnkiConnect API キー（任意）"
   },
   "dictPackSection": {
-    "message": "オフライン辞書パック"
+    "message": "オフライン中英辞書"
   },
   "dictPackOpen": {
     "message": "ダウンロードページを開く"
@@ -2703,7 +2929,16 @@
     }
   },
   "dictPackFailed": {
-    "message": "インポートに失敗しました。ファイルが CC-CEDICT の配布パックか確認してください。"
+    "message": "辞書をインポートできませんでした。選択したファイルと拡張機能の空き容量を確認して、もう一度お試しください。"
+  },
+  "dictPackImportHint": {
+    "message": "CC-CEDICT の .txt、.txt.gz、または .zip ファイルをインポートできます。"
+  },
+  "dictPackReadFailed": {
+    "message": "オフライン辞書の状態を読み取れませんでした。設定を開き直して、もう一度お試しください。"
+  },
+  "dictPackDeleteFailed": {
+    "message": "オフライン辞書を削除できませんでした。もう一度お試しください。"
   },
   "dictPackEmpty": {
     "message": "未インポートです。MDBG から CC-CEDICT のリリースファイル（.txt.gz または .zip）をダウンロードし、ここでインポートしてください（CC BY-SA 4.0）。"
@@ -2723,7 +2958,10 @@
     "message": "インポート済みの辞書パックを削除しますか？"
   },
   "dictEudicSend": {
-    "message": "Eudic に送信"
+    "message": "対応するすべての単語を Eudic に送信"
+  },
+  "dictEudicSupportedHint": {
+    "message": "Eudic が対応しているのは英語、フランス語、ドイツ語、スペイン語（en/fr/de/es）のみです。その他の単語は送信されません。"
   },
   "dictEudicSending": {
     "message": "送信中…"
@@ -2745,8 +2983,14 @@
   "dictEudicGenericOk": {
     "message": "Eudic に送信しました。正確な件数は取得できません。"
   },
-  "dictEudicRateLimited": {
-    "message": "Eudic のレート制限に達しました。しばらくしてからもう一度お試しください（制限は 1〜24 時間続きます）。"
+  "dictEudicRejected": {
+    "message": "Eudic がリクエストを拒否しました。OpenAPI トークンを確認し、時間をおいて再試行してください。"
+  },
+  "dictEudicHostPermissionDenied": {
+    "message": "Chrome に Eudic API へのアクセスが許可されていません。アクセスを許可して、もう一度お試しください。"
+  },
+  "dictEudicFailed": {
+    "message": "単語を Eudic に送信できませんでした。認証情報を確認して、もう一度お試しください。"
   },
   "dictEudicTokenRequired": {
     "message": "下記に Eudic OpenAPI の認証情報を入力するか、有効期限が切れていないか確認してください。"
@@ -2770,7 +3014,12 @@
     "message": "設定で AI プロバイダーを設定すると文脈に応じた説明が得られます。"
   },
   "dictVocabEmpty": {
-    "message": "保存された単語はまだありません。リーダーの辞書ビューから保存できます。"
+    "message": "現在の Pinboard アカウント（$OWNER$）には単語が保存されていません。リーダーの辞書ビューから保存できます。",
+    "placeholders": {
+      "owner": {
+        "content": "$1"
+      }
+    }
   },
   "dictDeleteConfirm": {
     "message": "「$TERM$」を単語帳から削除しますか？",
@@ -2899,9 +3148,11 @@
   "kbdHelpTitle": { "message": "キーボードショートカット" },
   "kbdHelpIntro": { "message": "これらのショートカットは Markdown プレビュー画面でのみ有効です(この設定画面では動作しません)。" },
   "kbdHelpRailBtn": { "message": "キーボードショートカット" },
+  "kbdHelpTranslate": { "message": "記事の翻訳を開始または続行する" },
+  "kbdHelpDictionary": { "message": "選択範囲を辞書で調べる" },
   "kbdHelpExplain": { "message": "選択範囲を解説する" },
-  "kbdHelpToggleView": { "message": "バイリンガル/原文表示を切り替える" },
-  "kbdHelpHighlight": { "message": "選択範囲をハイライトする(H = 前回使用した色、1-5 = 色を指定)" },
+  "kbdHelpToggleView": { "message": "原文、対訳、訳文のみの順に表示を切り替える" },
+  "kbdHelpHighlight": { "message": "選択範囲をハイライトする（h = 前回使用した色、1-5 = 色を指定）" },
   "kbdHelpAsk": { "message": "「このページに質問」パネルを開く" },
   "kbdHelpSearch": { "message": "記事内を検索する" },
   "kbdHelpShowHelp": { "message": "このショートカット一覧を表示する" },

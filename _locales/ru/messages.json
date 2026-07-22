@@ -2374,7 +2374,7 @@
     "message": "Кнопка объяснения на панели выделения"
   },
   "selectionTriggerHotkey": {
-    "message": "Только горячая клавиша E (без кнопки)"
+    "message": "Только горячие клавиши e и d (без кнопок)"
   },
   "selectionTriggerOff": {
     "message": "Выключено"
@@ -2564,11 +2564,26 @@
   "explainSelection": {
     "message": "Объяснить выделенное"
   },
+  "explainTranslateSelection": {
+    "message": "Перевести выделенное"
+  },
   "explainAskMore": {
     "message": "Задать уточняющий вопрос"
   },
   "explainLoading": {
     "message": "Создание объяснения…"
+  },
+  "explainTranslateLoading": {
+    "message": "Перевод выделенного…"
+  },
+  "dictLoading": {
+    "message": "Поиск в словаре…"
+  },
+  "explainAiNotConfigured": {
+    "message": "Настройте ИИ-провайдера в настройках, чтобы объяснять выделенное."
+  },
+  "explainTranslateAiNotConfigured": {
+    "message": "Настройте ИИ-провайдера в настройках, чтобы переводить выделенное."
   },
   "explainErrRetry": {
     "message": "Повторить"
@@ -2576,11 +2591,23 @@
   "explainSettings": {
     "message": "Настройки объяснения выделенного"
   },
+  "explainPin": {
+    "message": "Закрепить"
+  },
+  "explainUnpin": {
+    "message": "Открепить"
+  },
+  "explainClose": {
+    "message": "Закрыть"
+  },
+  "explainMoveHint": {
+    "message": "Перемещайте панель с помощью Alt и клавиш со стрелками."
+  },
   "explainTriggerIcon": {
     "message": "Кнопка рядом с выделением"
   },
   "explainTriggerHotkey": {
-    "message": "Только горячая клавиша E"
+    "message": "Только горячие клавиши e и d"
   },
   "explainTriggerOff": {
     "message": "Выключено"
@@ -2598,16 +2625,33 @@
     "message": "Найти в словаре"
   },
   "dictConnect": {
-    "message": "Подключить словарь Wiktionary"
+    "message": "Разрешить доступ к онлайн-словарю"
   },
   "dictConnectHint": {
-    "message": "Определения предоставляет freedictionaryapi.com (данные Wiktionary)."
+    "message": "Разрешите freedictionaryapi.com предоставлять определения на основе данных Wiktionary."
+  },
+  "dictConnectRetry": {
+    "message": "Повторить запрос разрешения"
+  },
+  "dictPermissionDenied": {
+    "message": "Доступ не разрешён. Онлайн-словарь по-прежнему недоступен."
   },
   "dictNoEntry": {
-    "message": "Словарная статья не найдена"
+    "message": "В онлайн-словаре ничего не найдено."
+  },
+  "dictMatchedHeadword": {
+    "message": "Найденная статья: $TERM$",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
   },
   "dictLoadFailed": {
     "message": "Словарь недоступен"
+  },
+  "dictViewWiktionary": {
+    "message": "Посмотреть в Wiktionary"
   },
   "dictSpeak": {
     "message": "Произнести"
@@ -2618,11 +2662,178 @@
   "dictSavedVocab": {
     "message": "Уже в словарике"
   },
+  "dictUpdateVocab": {
+    "message": "Обновить сохранённое слово"
+  },
+  "dictTagPinyin": {
+    "message": "Пиньинь"
+  },
+  "dictTagSimplified": {
+    "message": "Упрощённое"
+  },
+  "dictTagTraditional": {
+    "message": "Традиционное"
+  },
   "dictVocabSection": {
     "message": "Словарик"
   },
+    "vocabSearchPlaceholder": {
+      "message": "Искать по словам, определениям, контексту и группам"
+    },
+    "vocabGroupFilterAria": {
+      "message": "Фильтровать по группе"
+    },
+    "vocabAllGroups": {
+      "message": "Все группы"
+    },
+    "vocabSortAria": {
+      "message": "Сортировать словарик"
+    },
+    "vocabSortLatest": {
+      "message": "Сначала недавно обновлённые"
+    },
+    "vocabSortOldest": {
+      "message": "Сначала давно обновлённые"
+    },
+    "vocabSortAz": {
+      "message": "А–Я"
+    },
+    "vocabSortZa": {
+      "message": "Я–А"
+    },
+    "vocabSelectionActions": {
+      "message": "Действия с выделением"
+    },
+    "vocabSelectAll": {
+      "message": "Выбрать все результаты"
+    },
+    "vocabInvertSelection": {
+      "message": "Инвертировать выбор результатов"
+    },
+    "vocabBatchActions": {
+      "message": "Действия с выбранными словами"
+    },
+    "vocabGroupNamePlaceholder": {
+      "message": "Название группы"
+    },
+    "vocabAddToGroup": {
+      "message": "Добавить в группу"
+    },
+    "vocabBatchDelete": {
+      "message": "Удалить выбранное"
+    },
+    "vocabNoResults": {
+      "message": "Нет слов, соответствующих текущим фильтрам."
+    },
+    "vocabListAria": {
+      "message": "Сохранённые слова"
+    },
+    "vocabLoadMore": {
+      "message": "Загрузить следующие $COUNT$",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabLoading": {
+      "message": "Загрузка сохранённых слов…"
+    },
+    "vocabReadingSection": {
+      "message": "Подсказки при чтении"
+    },
+    "vocabLearningSection": {
+      "message": "Экспорт и интеграции"
+    },
+    "vocabOwnerNoAccount": {
+      "message": "Нет аккаунта Pinboard"
+    },
+    "vocabLoadFailed": {
+      "message": "Не удалось загрузить слова текущего аккаунта Pinboard. Откройте раздел «Слова» заново и повторите попытку."
+    },
+    "vocabExportFailed": {
+      "message": "Не удалось экспортировать слова. Проверьте хранилище расширения и повторите попытку."
+    },
+    "vocabAccountChanged": {
+      "message": "Аккаунт Pinboard изменился. Проверьте текущий список слов и повторите попытку."
+    },
+    "vocabSettingsSaveFailed": {
+      "message": "Не удалось сохранить изменённые настройки интеграции. Проверьте их и повторите попытку."
+    },
+    "vocabSelectWord": {
+      "message": "Выбрать: $TERM$",
+      "placeholders": {
+        "term": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabResultCount": {
+      "message": "Текущий аккаунт Pinboard ($OWNER$): найдено $RESULTS$ · сохранено $TOTAL$",
+      "placeholders": {
+        "results": {
+          "content": "$1"
+        },
+        "total": {
+          "content": "$2"
+        },
+        "owner": {
+          "content": "$3"
+        }
+      }
+    },
+    "vocabSelectedCount": {
+      "message": "Выбрано: $COUNT$",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchDeleteConfirm": {
+      "message": "Удалить выбранные слова? Количество: $COUNT$.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchFailed": {
+      "message": "Групповая операция не выполнена. Слова не изменены."
+    },
+    "vocabSelectionChanged": {
+      "message": "Выбор изменился. Проверьте текущие результаты и повторите попытку."
+    },
+    "vocabRefreshFailed": {
+      "message": "Изменения сохранены, но список не удалось обновить. Откройте раздел «Словарик» ещё раз."
+    },
+    "vocabBatchDeleted": {
+      "message": "Выбранные слова удалены. Количество: $COUNT$.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchGrouped": {
+      "message": "Слова добавлены в группу. Группа: $GROUP$ · Количество: $COUNT$.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        },
+        "group": {
+          "content": "$2"
+        }
+      }
+    },
+    "vocabGroupRequired": {
+      "message": "Введите название группы."
+    },
+    "dictPackHint": {
+      "message": "CC-CEDICT ищет китайские слова в упрощённом или традиционном написании и показывает определения на английском языке. Поиск английских слов не поддерживается."
+    },
   "dictExportTsv": {
-    "message": "Экспорт TSV"
+    "message": "Экспортировать все (.tsv)"
   },
   "dictAiLabel": {
     "message": "Сгенерировано ИИ"
@@ -2640,7 +2851,7 @@
     "message": "Пунктирное подчёркивание отмечает слова из вашего словарика — нажмите, чтобы открыть словарь."
   },
   "dictAnkiSend": {
-    "message": "Отправить в Anki"
+    "message": "Отправить все в Anki"
   },
   "dictAnkiSending": {
     "message": "Отправка…"
@@ -2659,11 +2870,26 @@
       }
     }
   },
-  "dictAnkiUnreachable": {
-    "message": "Anki недоступна — держите Anki запущенным вместе с аддоном AnkiConnect или экспортируйте TSV."
-  },
   "dictAnkiModelMismatch": {
-    "message": "Существующий тип заметки «Pinboard Vocab» был изменён — отправка прервана для его защиты."
+    "message": "Поля существующего типа заметки «Pinboard Vocab» не совпадают — восстановите ожидаемые поля и их порядок, затем повторите попытку."
+  },
+  "dictAnkiHostPermissionDenied": {
+    "message": "Chrome не получил доступ к локальному адресу AnkiConnect — разрешите доступ и повторите попытку."
+  },
+  "dictAnkiConnectPermissionFailed": {
+    "message": "Не удалось проверить разрешение AnkiConnect — оставьте Anki и AnkiConnect запущенными и повторите попытку."
+  },
+  "dictAnkiConnectPermissionDenied": {
+    "message": "AnkiConnect не предоставил доступ — подтвердите запрос в Anki и повторите попытку."
+  },
+  "dictAnkiVersionUnsupported": {
+    "message": "Требуется AnkiConnect API версии 6 или новее — обновите AnkiConnect и повторите попытку."
+  },
+  "dictAnkiFieldCheckFailed": {
+    "message": "Не удалось прочитать поля типа заметки «Pinboard Vocab» — проверьте AnkiConnect и ключ API, затем повторите попытку."
+  },
+  "dictAnkiFailed": {
+    "message": "Не удалось отправить слова в Anki — проверьте AnkiConnect и повторите попытку либо экспортируйте все слова в .tsv."
   },
   "dictAnkiKeyRequired": {
     "message": "AnkiConnect требует API-ключ — добавьте его ниже."
@@ -2678,7 +2904,7 @@
     "message": "API-ключ AnkiConnect (необязательно)"
   },
   "dictPackSection": {
-    "message": "Офлайн-пакет словаря"
+    "message": "Китайско-английский офлайн-словарь"
   },
   "dictPackOpen": {
     "message": "Открыть страницу загрузки"
@@ -2703,7 +2929,16 @@
     }
   },
   "dictPackFailed": {
-    "message": "Не удалось импортировать. Убедитесь, что это официальный релиз CC-CEDICT."
+    "message": "Не удалось импортировать словарь. Проверьте выбранный файл и свободное место в хранилище расширения, затем повторите попытку."
+  },
+  "dictPackImportHint": {
+    "message": "Импортируйте файл CC-CEDICT в формате .txt, .txt.gz или .zip."
+  },
+  "dictPackReadFailed": {
+    "message": "Не удалось прочитать состояние офлайн-словаря. Откройте настройки заново и повторите попытку."
+  },
+  "dictPackDeleteFailed": {
+    "message": "Не удалось удалить офлайн-словарь. Повторите попытку."
   },
   "dictPackEmpty": {
     "message": "Не импортировано. Скачайте выпуск CC-CEDICT с MDBG (.txt.gz или .zip) и импортируйте файл здесь (CC BY-SA 4.0)."
@@ -2723,7 +2958,10 @@
     "message": "Удалить импортированный пакет словаря?"
   },
   "dictEudicSend": {
-    "message": "Отправить в Eudic"
+    "message": "Отправить в Eudic все поддерживаемые слова"
+  },
+  "dictEudicSupportedHint": {
+    "message": "Eudic поддерживает только английский, французский, немецкий и испанский языки (en/fr/de/es) — остальные слова будут пропущены."
   },
   "dictEudicSending": {
     "message": "Отправка…"
@@ -2745,8 +2983,14 @@
   "dictEudicGenericOk": {
     "message": "Отправлено в Eudic — точное количество недоступно."
   },
-  "dictEudicRateLimited": {
-    "message": "Достигнут лимит запросов Eudic — повторите попытку позже (блокировка длится от 1 до 24 часов)."
+  "dictEudicRejected": {
+    "message": "Eudic отклонил запрос — проверьте токен OpenAPI и повторите попытку позже."
+  },
+  "dictEudicHostPermissionDenied": {
+    "message": "Chrome не получил доступ к API Eudic — разрешите доступ и повторите попытку."
+  },
+  "dictEudicFailed": {
+    "message": "Не удалось отправить слова в Eudic — проверьте авторизацию и повторите попытку."
   },
   "dictEudicTokenRequired": {
     "message": "Добавьте авторизацию Eudic OpenAPI ниже или проверьте, действительна ли она."
@@ -2770,7 +3014,12 @@
     "message": "Настройте ИИ-провайдера в настройках, чтобы получать контекстные объяснения."
   },
   "dictVocabEmpty": {
-    "message": "Пока нет сохранённых слов. Сохраняйте слова из словаря в режиме чтения."
+    "message": "В текущем аккаунте Pinboard ($OWNER$) пока нет сохранённых слов. Сохраняйте их из словаря в режиме чтения.",
+    "placeholders": {
+      "owner": {
+        "content": "$1"
+      }
+    }
   },
   "dictDeleteConfirm": {
     "message": "Убрать из словарика: «$TERM$»?",
@@ -2899,9 +3148,11 @@
   "kbdHelpTitle": { "message": "Горячие клавиши" },
   "kbdHelpIntro": { "message": "Эти горячие клавиши работают на странице предпросмотра Markdown (а не здесь, в настройках)." },
   "kbdHelpRailBtn": { "message": "Горячие клавиши" },
+  "kbdHelpTranslate": { "message": "Начать или продолжить перевод статьи" },
+  "kbdHelpDictionary": { "message": "Найти текущее выделение в словаре" },
   "kbdHelpExplain": { "message": "Объяснить текущее выделение" },
-  "kbdHelpToggleView": { "message": "Переключить двуязычный/оригинальный вид" },
-  "kbdHelpHighlight": { "message": "Выделить текущий фрагмент (H = последний использованный цвет, 1-5 = выбрать цвет)" },
+  "kbdHelpToggleView": { "message": "Переключать по кругу оригинал, двуязычный вид и перевод" },
+  "kbdHelpHighlight": { "message": "Выделить текущий фрагмент (h = последний использованный цвет, 1-5 = выбрать цвет)" },
   "kbdHelpAsk": { "message": "Открыть панель вопросов по странице" },
   "kbdHelpSearch": { "message": "Искать в тексте статьи" },
   "kbdHelpShowHelp": { "message": "Показать этот список горячих клавиш" },

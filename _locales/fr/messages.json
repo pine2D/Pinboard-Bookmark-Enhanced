@@ -2374,7 +2374,7 @@
     "message": "Bouton « Expliquer » dans la barre de sélection"
   },
   "selectionTriggerHotkey": {
-    "message": "Raccourci E uniquement (sans bouton)"
+    "message": "Raccourcis e et d uniquement (sans boutons)"
   },
   "selectionTriggerOff": {
     "message": "Désactivé"
@@ -2564,11 +2564,26 @@
   "explainSelection": {
     "message": "Expliquer la sélection"
   },
+  "explainTranslateSelection": {
+    "message": "Traduire la sélection"
+  },
   "explainAskMore": {
     "message": "Poser une question de suivi"
   },
   "explainLoading": {
     "message": "Génération de l'explication…"
+  },
+  "explainTranslateLoading": {
+    "message": "Traduction de la sélection…"
+  },
+  "dictLoading": {
+    "message": "Recherche dans le dictionnaire…"
+  },
+  "explainAiNotConfigured": {
+    "message": "Configurez un fournisseur d'IA dans les réglages pour expliquer les sélections."
+  },
+  "explainTranslateAiNotConfigured": {
+    "message": "Configurez un fournisseur d'IA dans les réglages pour traduire les sélections."
   },
   "explainErrRetry": {
     "message": "Réessayer"
@@ -2576,11 +2591,23 @@
   "explainSettings": {
     "message": "Réglages de l'explication de sélection"
   },
+  "explainPin": {
+    "message": "Épingler"
+  },
+  "explainUnpin": {
+    "message": "Désépingler"
+  },
+  "explainClose": {
+    "message": "Fermer"
+  },
+  "explainMoveHint": {
+    "message": "Déplacez ce panneau avec Alt et les touches fléchées."
+  },
   "explainTriggerIcon": {
     "message": "Bouton à côté de la sélection"
   },
   "explainTriggerHotkey": {
-    "message": "Raccourci E uniquement"
+    "message": "Raccourcis e et d uniquement"
   },
   "explainTriggerOff": {
     "message": "Désactivé"
@@ -2598,16 +2625,33 @@
     "message": "Chercher dans le dictionnaire"
   },
   "dictConnect": {
-    "message": "Connecter le dictionnaire Wiktionary"
+    "message": "Autoriser l’accès au dictionnaire en ligne"
   },
   "dictConnectHint": {
-    "message": "Les définitions proviennent de freedictionaryapi.com (données Wiktionary)."
+    "message": "Autorisez freedictionaryapi.com à fournir des définitions issues des données Wiktionary."
+  },
+  "dictConnectRetry": {
+    "message": "Redemander l'autorisation"
+  },
+  "dictPermissionDenied": {
+    "message": "L'autorisation n'a pas été accordée. Le dictionnaire en ligne reste indisponible."
   },
   "dictNoEntry": {
-    "message": "Aucune entrée de dictionnaire"
+    "message": "Aucune entrée trouvée dans le dictionnaire en ligne."
+  },
+  "dictMatchedHeadword": {
+    "message": "Entrée correspondante : $TERM$",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
   },
   "dictLoadFailed": {
     "message": "Dictionnaire indisponible"
+  },
+  "dictViewWiktionary": {
+    "message": "Voir dans Wiktionary"
   },
   "dictSpeak": {
     "message": "Prononcer"
@@ -2618,11 +2662,178 @@
   "dictSavedVocab": {
     "message": "Dans le vocabulaire"
   },
+  "dictUpdateVocab": {
+    "message": "Mettre à jour le mot enregistré"
+  },
+  "dictTagPinyin": {
+    "message": "Romanisation pinyin"
+  },
+  "dictTagSimplified": {
+    "message": "Simplifié"
+  },
+  "dictTagTraditional": {
+    "message": "Traditionnel"
+  },
   "dictVocabSection": {
     "message": "Vocabulaire"
   },
+    "vocabSearchPlaceholder": {
+      "message": "Rechercher des mots, des définitions, du contexte et des groupes"
+    },
+    "vocabGroupFilterAria": {
+      "message": "Filtrer par groupe"
+    },
+    "vocabAllGroups": {
+      "message": "Tous les groupes"
+    },
+    "vocabSortAria": {
+      "message": "Trier le vocabulaire"
+    },
+    "vocabSortLatest": {
+      "message": "Mise à jour la plus récente"
+    },
+    "vocabSortOldest": {
+      "message": "Mise à jour la plus ancienne"
+    },
+    "vocabSortAz": {
+      "message": "A–Z"
+    },
+    "vocabSortZa": {
+      "message": "Z–A"
+    },
+    "vocabSelectionActions": {
+      "message": "Actions de sélection"
+    },
+    "vocabSelectAll": {
+      "message": "Sélectionner tous les résultats"
+    },
+    "vocabInvertSelection": {
+      "message": "Inverser la sélection des résultats"
+    },
+    "vocabBatchActions": {
+      "message": "Actions sur les mots sélectionnés"
+    },
+    "vocabGroupNamePlaceholder": {
+      "message": "Nom du groupe"
+    },
+    "vocabAddToGroup": {
+      "message": "Ajouter au groupe"
+    },
+    "vocabBatchDelete": {
+      "message": "Supprimer la sélection"
+    },
+    "vocabNoResults": {
+      "message": "Aucun mot ne correspond aux filtres actuels."
+    },
+    "vocabListAria": {
+      "message": "Vocabulaire enregistré"
+    },
+    "vocabLoadMore": {
+      "message": "Charger les $COUNT$ suivants",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabLoading": {
+      "message": "Chargement du vocabulaire enregistré…"
+    },
+    "vocabReadingSection": {
+      "message": "Aides à la lecture"
+    },
+    "vocabLearningSection": {
+      "message": "Exportation et intégrations"
+    },
+    "vocabOwnerNoAccount": {
+      "message": "Aucun compte Pinboard"
+    },
+    "vocabLoadFailed": {
+      "message": "Impossible de charger les mots du compte Pinboard actuel. Rouvrez l'onglet Vocabulaire et réessayez."
+    },
+    "vocabExportFailed": {
+      "message": "Impossible d'exporter les mots. Vérifiez le stockage de l'extension, puis réessayez."
+    },
+    "vocabAccountChanged": {
+      "message": "Le compte Pinboard a changé. Vérifiez la liste de mots actuelle, puis réessayez."
+    },
+    "vocabSettingsSaveFailed": {
+      "message": "Impossible d'enregistrer les paramètres d'intégration modifiés. Vérifiez-les, puis réessayez."
+    },
+    "vocabSelectWord": {
+      "message": "Sélectionner $TERM$",
+      "placeholders": {
+        "term": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabResultCount": {
+      "message": "Compte Pinboard actuel ($OWNER$) : $RESULTS$ résultats · $TOTAL$ mots enregistrés",
+      "placeholders": {
+        "results": {
+          "content": "$1"
+        },
+        "total": {
+          "content": "$2"
+        },
+        "owner": {
+          "content": "$3"
+        }
+      }
+    },
+    "vocabSelectedCount": {
+      "message": "Sélection : $COUNT$",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchDeleteConfirm": {
+      "message": "Supprimer les mots sélectionnés ? Nombre : $COUNT$.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchFailed": {
+      "message": "L’action groupée a échoué. Aucun mot n’a été modifié."
+    },
+    "vocabSelectionChanged": {
+      "message": "La sélection a changé. Vérifiez les résultats actuels, puis réessayez."
+    },
+    "vocabRefreshFailed": {
+      "message": "Les modifications ont été enregistrées, mais la liste n’a pas pu être actualisée. Rouvrez « Vocabulaire »."
+    },
+    "vocabBatchDeleted": {
+      "message": "Mots sélectionnés supprimés. Nombre : $COUNT$.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchGrouped": {
+      "message": "Ajout au groupe terminé. Groupe : $GROUP$ · Nombre : $COUNT$.",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        },
+        "group": {
+          "content": "$2"
+        }
+      }
+    },
+    "vocabGroupRequired": {
+      "message": "Saisissez un nom de groupe."
+    },
+    "dictPackHint": {
+      "message": "CC-CEDICT recherche des termes chinois en caractères simplifiés ou traditionnels et renvoie des définitions en anglais. La recherche de mots anglais n’est pas prise en charge."
+    },
   "dictExportTsv": {
-    "message": "Exporter en TSV"
+    "message": "Tout exporter (.tsv)"
   },
   "dictAiLabel": {
     "message": "Généré par IA"
@@ -2640,7 +2851,7 @@
     "message": "Les mots soulignés en pointillé figurent déjà dans votre vocabulaire. Cliquez dessus pour ouvrir le dictionnaire."
   },
   "dictAnkiSend": {
-    "message": "Envoyer vers Anki"
+    "message": "Tout envoyer vers Anki"
   },
   "dictAnkiSending": {
     "message": "Envoi…"
@@ -2659,11 +2870,26 @@
       }
     }
   },
-  "dictAnkiUnreachable": {
-    "message": "Anki est injoignable. Gardez Anki actif avec le module complémentaire AnkiConnect, ou exportez plutôt en TSV."
-  },
   "dictAnkiModelMismatch": {
-    "message": "Le type de note « Pinboard Vocab » existant a été modifié. L'envoi a été interrompu pour le protéger."
+    "message": "Les champs du type de note « Pinboard Vocab » existant ne correspondent pas. Rétablissez les champs attendus et leur ordre, puis réessayez."
+  },
+  "dictAnkiHostPermissionDenied": {
+    "message": "Chrome n'a pas reçu l'autorisation d'accéder à l'adresse AnkiConnect locale. Autorisez l'accès, puis réessayez."
+  },
+  "dictAnkiConnectPermissionFailed": {
+    "message": "Impossible de vérifier l'autorisation AnkiConnect. Laissez Anki et AnkiConnect actifs, puis réessayez."
+  },
+  "dictAnkiConnectPermissionDenied": {
+    "message": "AnkiConnect n'a pas autorisé l'accès. Acceptez la demande dans Anki, puis réessayez."
+  },
+  "dictAnkiVersionUnsupported": {
+    "message": "La version 6 ou ultérieure de l'API AnkiConnect est requise. Mettez AnkiConnect à jour, puis réessayez."
+  },
+  "dictAnkiFieldCheckFailed": {
+    "message": "Impossible de lire les champs du type de note « Pinboard Vocab ». Vérifiez AnkiConnect et sa clé API, puis réessayez."
+  },
+  "dictAnkiFailed": {
+    "message": "Impossible d'envoyer les mots vers Anki. Vérifiez AnkiConnect et réessayez, ou exportez-les tous au format .tsv."
   },
   "dictAnkiKeyRequired": {
     "message": "AnkiConnect nécessite une clé API. Ajoutez-la ci-dessous."
@@ -2678,7 +2904,7 @@
     "message": "Clé API AnkiConnect (facultative)"
   },
   "dictPackSection": {
-    "message": "Pack de dictionnaire hors connexion"
+    "message": "Dictionnaire chinois–anglais hors connexion"
   },
   "dictPackOpen": {
     "message": "Ouvrir la page de téléchargement"
@@ -2703,7 +2929,16 @@
     }
   },
   "dictPackFailed": {
-    "message": "Échec de l'importation. Vérifiez que le fichier est bien une publication CC-CEDICT."
+    "message": "Impossible d'importer le dictionnaire. Vérifiez le fichier sélectionné et l'espace de stockage disponible pour l'extension, puis réessayez."
+  },
+  "dictPackImportHint": {
+    "message": "Importez un fichier CC-CEDICT au format .txt, .txt.gz ou .zip."
+  },
+  "dictPackReadFailed": {
+    "message": "Impossible de lire l'état du dictionnaire hors connexion. Rouvrez les paramètres, puis réessayez."
+  },
+  "dictPackDeleteFailed": {
+    "message": "Impossible de supprimer le dictionnaire hors connexion. Réessayez."
   },
   "dictPackEmpty": {
     "message": "Non importé. Téléchargez la version CC-CEDICT depuis MDBG (.txt.gz ou .zip), puis importez le fichier ici (CC BY-SA 4.0)."
@@ -2723,7 +2958,10 @@
     "message": "Supprimer le pack de dictionnaire importé ?"
   },
   "dictEudicSend": {
-    "message": "Envoyer vers Eudic"
+    "message": "Envoyer tous les mots compatibles vers Eudic"
+  },
+  "dictEudicSupportedHint": {
+    "message": "Eudic accepte uniquement l'anglais, le français, l'allemand et l'espagnol (en/fr/de/es) ; les autres mots sont ignorés."
   },
   "dictEudicSending": {
     "message": "Envoi…"
@@ -2745,8 +2983,14 @@
   "dictEudicGenericOk": {
     "message": "Envoyé vers Eudic. Le nombre exact n'est pas disponible."
   },
-  "dictEudicRateLimited": {
-    "message": "Limite de débit Eudic atteinte. Réessayez plus tard (les blocages durent de 1 à 24 heures)."
+  "dictEudicRejected": {
+    "message": "Eudic a refusé la requête. Vérifiez le jeton OpenAPI, puis réessayez plus tard."
+  },
+  "dictEudicHostPermissionDenied": {
+    "message": "Chrome n'a pas reçu l'autorisation d'accéder à l'API Eudic. Autorisez l'accès, puis réessayez."
+  },
+  "dictEudicFailed": {
+    "message": "Impossible d'envoyer les mots vers Eudic. Vérifiez l'autorisation, puis réessayez."
   },
   "dictEudicTokenRequired": {
     "message": "Ajoutez votre autorisation Eudic OpenAPI ci-dessous, ou vérifiez qu'elle est toujours valide."
@@ -2770,7 +3014,12 @@
     "message": "Configurez un fournisseur d'IA dans les réglages pour obtenir des explications contextuelles."
   },
   "dictVocabEmpty": {
-    "message": "Aucun mot enregistré. Enregistrez des mots depuis la vue dictionnaire du lecteur."
+    "message": "Aucun mot n'est enregistré pour le compte Pinboard actuel ($OWNER$). Enregistrez-en depuis la vue dictionnaire du lecteur.",
+    "placeholders": {
+      "owner": {
+        "content": "$1"
+      }
+    }
   },
   "dictDeleteConfirm": {
     "message": "Retirer « $TERM$ » du vocabulaire ?",
@@ -2899,9 +3148,11 @@
   "kbdHelpTitle": { "message": "Raccourcis clavier" },
   "kbdHelpIntro": { "message": "Ces raccourcis fonctionnent sur la page d'aperçu Markdown (pas ici dans les réglages)." },
   "kbdHelpRailBtn": { "message": "Raccourcis clavier" },
+  "kbdHelpTranslate": { "message": "Commencer ou continuer la traduction de l’article" },
+  "kbdHelpDictionary": { "message": "Rechercher la sélection actuelle dans le dictionnaire" },
   "kbdHelpExplain": { "message": "Expliquer la sélection actuelle" },
-  "kbdHelpToggleView": { "message": "Basculer entre la vue bilingue et la vue originale" },
-  "kbdHelpHighlight": { "message": "Surligner la sélection actuelle (H = dernière couleur utilisée, 1-5 = choisir une couleur)" },
+  "kbdHelpToggleView": { "message": "Parcourir les vues originale, bilingue et traduite" },
+  "kbdHelpHighlight": { "message": "Surligner la sélection actuelle (h = dernière couleur utilisée, 1-5 = choisir une couleur)" },
   "kbdHelpAsk": { "message": "Ouvrir le panneau « Poser une question sur la page »" },
   "kbdHelpSearch": { "message": "Rechercher dans l'article" },
   "kbdHelpShowHelp": { "message": "Afficher cette liste de raccourcis" },

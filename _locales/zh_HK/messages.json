@@ -2374,7 +2374,7 @@
     "message": "選取工具列中的解釋按鈕"
   },
   "selectionTriggerHotkey": {
-    "message": "僅快捷鍵 E（不顯示按鈕）"
+    "message": "只使用快捷鍵 e 和 d（不顯示按鈕）"
   },
   "selectionTriggerOff": {
     "message": "關閉"
@@ -2564,11 +2564,26 @@
   "explainSelection": {
     "message": "解釋所選內容"
   },
+  "explainTranslateSelection": {
+    "message": "翻譯所選內容"
+  },
   "explainAskMore": {
     "message": "在問答中追問"
   },
   "explainLoading": {
     "message": "正在產生解釋…"
+  },
+  "explainTranslateLoading": {
+    "message": "正在翻譯所選內容…"
+  },
+  "dictLoading": {
+    "message": "正在查詞…"
+  },
+  "explainAiNotConfigured": {
+    "message": "請先在設定中設置 AI 服務，再解釋所選內容。"
+  },
+  "explainTranslateAiNotConfigured": {
+    "message": "請先在設定中設置 AI 服務，再翻譯所選內容。"
   },
   "explainErrRetry": {
     "message": "重試"
@@ -2576,11 +2591,23 @@
   "explainSettings": {
     "message": "劃詞解釋設定"
   },
+  "explainPin": {
+    "message": "固定"
+  },
+  "explainUnpin": {
+    "message": "取消固定"
+  },
+  "explainClose": {
+    "message": "關閉"
+  },
+  "explainMoveHint": {
+    "message": "按 Alt+方向鍵移動此面板。"
+  },
   "explainTriggerIcon": {
     "message": "選取文字旁顯示按鈕"
   },
   "explainTriggerHotkey": {
-    "message": "僅快捷鍵 E"
+    "message": "只使用快捷鍵 e 和 d"
   },
   "explainTriggerOff": {
     "message": "關閉"
@@ -2598,16 +2625,33 @@
     "message": "查詞典"
   },
   "dictConnect": {
-    "message": "連接 Wiktionary 詞典"
+    "message": "允許使用網上詞典"
   },
   "dictConnectHint": {
-    "message": "釋義來自 freedictionaryapi.com（Wiktionary 資料）。"
+    "message": "允許 freedictionaryapi.com 提供基於 Wiktionary 資料的釋義。"
+  },
+  "dictConnectRetry": {
+    "message": "重新要求權限"
+  },
+  "dictPermissionDenied": {
+    "message": "未獲授權，網上詞典仍無法使用。"
   },
   "dictNoEntry": {
-    "message": "沒有找到詞條"
+    "message": "目前連接的詞典找不到詞條。"
+  },
+  "dictMatchedHeadword": {
+    "message": "匹配詞條：$TERM$",
+    "placeholders": {
+      "term": {
+        "content": "$1"
+      }
+    }
   },
   "dictLoadFailed": {
     "message": "詞典暫不可用"
+  },
+  "dictViewWiktionary": {
+    "message": "在 Wiktionary 查看"
   },
   "dictSpeak": {
     "message": "發音"
@@ -2618,11 +2662,178 @@
   "dictSavedVocab": {
     "message": "已在生詞庫"
   },
+  "dictUpdateVocab": {
+    "message": "更新已儲存的生詞"
+  },
+  "dictTagPinyin": {
+    "message": "拼音"
+  },
+  "dictTagSimplified": {
+    "message": "簡體"
+  },
+  "dictTagTraditional": {
+    "message": "繁體"
+  },
   "dictVocabSection": {
     "message": "生詞"
   },
+    "vocabSearchPlaceholder": {
+      "message": "搜尋單字、釋義、文章內容及群組"
+    },
+    "vocabGroupFilterAria": {
+      "message": "按群組篩選"
+    },
+    "vocabAllGroups": {
+      "message": "所有群組"
+    },
+    "vocabSortAria": {
+      "message": "生詞排序"
+    },
+    "vocabSortLatest": {
+      "message": "最近更新"
+    },
+    "vocabSortOldest": {
+      "message": "最早更新"
+    },
+    "vocabSortAz": {
+      "message": "A–Z"
+    },
+    "vocabSortZa": {
+      "message": "Z–A"
+    },
+    "vocabSelectionActions": {
+      "message": "選取操作"
+    },
+    "vocabSelectAll": {
+      "message": "選取目前所有結果"
+    },
+    "vocabInvertSelection": {
+      "message": "反向選取目前結果"
+    },
+    "vocabBatchActions": {
+      "message": "所選生詞的操作"
+    },
+    "vocabGroupNamePlaceholder": {
+      "message": "群組名稱"
+    },
+    "vocabAddToGroup": {
+      "message": "加入群組"
+    },
+    "vocabBatchDelete": {
+      "message": "刪除所選項目"
+    },
+    "vocabNoResults": {
+      "message": "沒有符合目前篩選條件的生詞。"
+    },
+    "vocabListAria": {
+      "message": "已儲存的生詞"
+    },
+    "vocabLoadMore": {
+      "message": "再載入 $COUNT$ 項",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabLoading": {
+      "message": "正在載入生詞……"
+    },
+    "vocabReadingSection": {
+      "message": "閱讀提示"
+    },
+    "vocabLearningSection": {
+      "message": "匯出及整合"
+    },
+    "vocabOwnerNoAccount": {
+      "message": "尚未登入 Pinboard"
+    },
+    "vocabLoadFailed": {
+      "message": "無法載入目前 Pinboard 帳戶的生詞。請重新開啟「生詞」後再試。"
+    },
+    "vocabExportFailed": {
+      "message": "無法匯出生詞。請檢查擴充功能儲存空間後再試。"
+    },
+    "vocabAccountChanged": {
+      "message": "Pinboard 帳戶已切換。請檢查目前的生詞清單後再試。"
+    },
+    "vocabSettingsSaveFailed": {
+      "message": "無法儲存剛才修改的整合設定。請檢查設定後再試。"
+    },
+    "vocabSelectWord": {
+      "message": "選取「$TERM$」",
+      "placeholders": {
+        "term": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabResultCount": {
+      "message": "找到 $RESULTS$ 項；目前 Pinboard 帳戶（$OWNER$）共儲存 $TOTAL$ 項",
+      "placeholders": {
+        "results": {
+          "content": "$1"
+        },
+        "total": {
+          "content": "$2"
+        },
+        "owner": {
+          "content": "$3"
+        }
+      }
+    },
+    "vocabSelectedCount": {
+      "message": "已選取 $COUNT$ 項",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchDeleteConfirm": {
+      "message": "刪除所選生詞？共 $COUNT$ 項。",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchFailed": {
+      "message": "批次操作失敗，未有變更任何生詞。"
+    },
+    "vocabSelectionChanged": {
+      "message": "所選內容已變更，請檢查目前結果後再試。"
+    },
+    "vocabRefreshFailed": {
+      "message": "變更已儲存，但清單未能重新整理。請重新開啟「生詞」。"
+    },
+    "vocabBatchDeleted": {
+      "message": "已刪除 $COUNT$ 項生詞。",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        }
+      }
+    },
+    "vocabBatchGrouped": {
+      "message": "已加入群組「$GROUP$」，共 $COUNT$ 項。",
+      "placeholders": {
+        "count": {
+          "content": "$1"
+        },
+        "group": {
+          "content": "$2"
+        }
+      }
+    },
+    "vocabGroupRequired": {
+      "message": "請輸入群組名稱。"
+    },
+    "dictPackHint": {
+      "message": "CC-CEDICT 可查詢簡體或繁體中文詞語，並顯示英文釋義；不支援查詢英文詞語。"
+    },
   "dictExportTsv": {
-    "message": "匯出 TSV"
+    "message": "全部匯出（.tsv）"
   },
   "dictAiLabel": {
     "message": "AI 生成"
@@ -2640,7 +2851,7 @@
     "message": "點狀底線標記生詞庫中已有的詞，按一下即可開啟詞典。"
   },
   "dictAnkiSend": {
-    "message": "傳送到 Anki"
+    "message": "全部傳送到 Anki"
   },
   "dictAnkiSending": {
     "message": "傳送中…"
@@ -2659,11 +2870,26 @@
       }
     }
   },
-  "dictAnkiUnreachable": {
-    "message": "無法連接 Anki，請保持 Anki 開啟並安裝 AnkiConnect 外掛，或改用 TSV 匯出。"
-  },
   "dictAnkiModelMismatch": {
-    "message": "已有的「Pinboard Vocab」筆記類型已被修改，為保護資料已中止傳送。"
+    "message": "現有「Pinboard Vocab」筆記類型的欄位不相符。請還原預期欄位及次序後再試。"
+  },
+  "dictAnkiHostPermissionDenied": {
+    "message": "尚未授予 Chrome 存取本機 AnkiConnect 位址的權限。請允許存取後再試。"
+  },
+  "dictAnkiConnectPermissionFailed": {
+    "message": "無法完成 AnkiConnect 權限檢查。請讓 Anki 和 AnkiConnect 保持運行後再試。"
+  },
+  "dictAnkiConnectPermissionDenied": {
+    "message": "AnkiConnect 未授予存取權。請在 Anki 中批准權限要求後再試。"
+  },
+  "dictAnkiVersionUnsupported": {
+    "message": "需要 AnkiConnect API 第 6 版或更新版本。請更新 AnkiConnect 後再試。"
+  },
+  "dictAnkiFieldCheckFailed": {
+    "message": "無法讀取「Pinboard Vocab」筆記類型的欄位。請檢查 AnkiConnect 及其 API 金鑰後再試。"
+  },
+  "dictAnkiFailed": {
+    "message": "無法將生詞傳送到 Anki。請檢查 AnkiConnect 後再試，或將所有生詞匯出為 .tsv。"
   },
   "dictAnkiKeyRequired": {
     "message": "AnkiConnect 需要 API key，請在下方填寫。"
@@ -2678,7 +2904,7 @@
     "message": "AnkiConnect API key（可選）"
   },
   "dictPackSection": {
-    "message": "離線詞典包"
+    "message": "離線中英詞典"
   },
   "dictPackOpen": {
     "message": "開啟下載頁面"
@@ -2703,7 +2929,16 @@
     }
   },
   "dictPackFailed": {
-    "message": "匯入失敗，請確認檔案是 CC-CEDICT 發布包"
+    "message": "無法匯入詞典。請檢查所選檔案及擴充功能的可用儲存空間後再試。"
+  },
+  "dictPackImportHint": {
+    "message": "可匯入 CC-CEDICT 的 .txt、.txt.gz 或 .zip 檔案。"
+  },
+  "dictPackReadFailed": {
+    "message": "無法讀取離線詞典狀態。請重新開啟設定後再試。"
+  },
+  "dictPackDeleteFailed": {
+    "message": "無法刪除離線詞典，請再試一次。"
   },
   "dictPackEmpty": {
     "message": "暫時未匯入。請到 MDBG 下載 CC-CEDICT 發佈檔（.txt.gz 或 .zip 均可）後在此匯入（CC BY-SA 4.0）"
@@ -2723,7 +2958,10 @@
     "message": "刪除已匯入的詞典包？"
   },
   "dictEudicSend": {
-    "message": "傳送到歐路詞典"
+    "message": "將所有支援的生詞傳送到歐路詞典"
+  },
+  "dictEudicSupportedHint": {
+    "message": "歐路詞典只支援英文、法文、德文和西班牙文（en/fr/de/es），其他語言的生詞會略過。"
   },
   "dictEudicSending": {
     "message": "傳送中…"
@@ -2745,8 +2983,14 @@
   "dictEudicGenericOk": {
     "message": "已傳送到歐路詞典，但無法取得準確數量。"
   },
-  "dictEudicRateLimited": {
-    "message": "觸發歐路介面限流，請稍後再試（封鎖 1 至 24 小時）。"
+  "dictEudicRejected": {
+    "message": "歐路詞典拒絕了要求。請檢查 OpenAPI 權杖，稍後再試。"
+  },
+  "dictEudicHostPermissionDenied": {
+    "message": "尚未授予 Chrome 存取歐路詞典 API 的權限。請允許存取後再試。"
+  },
+  "dictEudicFailed": {
+    "message": "無法將生詞傳送到歐路詞典。請檢查授權資料後再試。"
   },
   "dictEudicTokenRequired": {
     "message": "請在下方填寫歐路 OpenAPI 授權資訊，或確認其是否仍然有效。"
@@ -2770,7 +3014,12 @@
     "message": "在設定中設置 AI 服務後可獲得語境釋義。"
   },
   "dictVocabEmpty": {
-    "message": "還沒有生詞。在閱讀器的詞典視圖裡儲存單字。"
+    "message": "目前 Pinboard 帳戶（$OWNER$）還沒有生詞。可從閱讀器的詞典檢視儲存單字。",
+    "placeholders": {
+      "owner": {
+        "content": "$1"
+      }
+    }
   },
   "dictDeleteConfirm": {
     "message": "從生詞庫移除「$TERM$」？",
@@ -2899,9 +3148,11 @@
   "kbdHelpTitle": { "message": "鍵盤快捷鍵" },
   "kbdHelpIntro": { "message": "以下快捷鍵僅在 Markdown 預覽頁面生效(此設定頁不適用)。" },
   "kbdHelpRailBtn": { "message": "鍵盤快捷鍵" },
+  "kbdHelpTranslate": { "message": "開始或繼續翻譯全文" },
+  "kbdHelpDictionary": { "message": "查詢目前選取的內容" },
   "kbdHelpExplain": { "message": "解釋目前選取的內容" },
-  "kbdHelpToggleView": { "message": "切換雙語/原文檢視" },
-  "kbdHelpHighlight": { "message": "標記目前選取的內容(H = 沿用上次顏色,1-5 = 指定顏色)" },
+  "kbdHelpToggleView": { "message": "依次切換原文、雙語和只顯示譯文" },
+  "kbdHelpHighlight": { "message": "標記目前選取的內容（h 沿用上次顏色，1-5 指定顏色）" },
   "kbdHelpAsk": { "message": "開啟問答面板" },
   "kbdHelpSearch": { "message": "在正文中搜尋" },
   "kbdHelpShowHelp": { "message": "顯示此快捷鍵說明" },
