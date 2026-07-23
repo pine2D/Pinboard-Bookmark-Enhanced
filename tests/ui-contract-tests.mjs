@@ -41,9 +41,21 @@ for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-sel
   "vocab-batch-delete", "vocab-no-results", "vocab-load-more", "vocab-list"]) {
   check(optionsHtml.includes(`id="${id}"`), `options.html: scalable vocabulary control #${id} is missing`);
 }
-check((optionsHtml.match(/<details class="vocab-disclosure">/g) || []).length === 3 &&
+check((optionsHtml.match(/<details class="vocab-disclosure"/g) || []).length === 3 &&
   optionsHtml.indexOf('id="vocab-search"') < optionsHtml.indexOf('id="dict-anki-deck"'),
   "options.html: vocabulary management is not first or secondary settings are not collapsed");
+const vocabDisclosureKeys = [...optionsHtml.matchAll(
+  /<details class="vocab-disclosure" data-acc-key="([^"]+)"/g
+)].map((match) => match[1]);
+check(vocabDisclosureKeys.join(",") ===
+  "vocab-reading,vocab-learning,vocab-dictionary-pack",
+  "options.html: vocabulary settings disclosures lack stable pp-acc keys");
+check(optionsJs.includes('querySelectorAll("details[data-acc-key]")') &&
+  /addEventListener\("toggle",[\s\S]{0,500}pbpAccSet\(det\.dataset\.accKey, det\.open\)/.test(optionsJs),
+  "options.js: native details state is not restored and persisted through pp-acc");
+check(/vocab:\s*\{[\s\S]{0,260}"dict-echo-enabled": true/.test(optionsJs) &&
+  !/<details class="vocab-card"[^>]*data-acc-key=/.test(optionsHtml),
+  "options: vocab reset is not on or per-word cards were made persistent");
 check(["vocab-group-filter", "vocab-sort", "vocab-group-input"].every((id) =>
   new RegExp(`id="${id}"[^>]*data-no-autosave|data-no-autosave[^>]*id="${id}"`).test(optionsHtml)) &&
   optionsJs.includes(":not([data-no-autosave])"),

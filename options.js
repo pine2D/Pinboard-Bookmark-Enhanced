@@ -577,7 +577,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     vocab: {
       fields: {
-        "dict-echo-enabled": false,
+        "dict-echo-enabled": true,
         "dict-anki-deck": "Pinboard Vocab",
         "dict-anki-port": "8765"
       },
@@ -828,11 +828,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Accordion expand/collapse state, persisted device-locally (localStorage = synchronous
   // read at render = no open->collapse flash; same class as pp-i18n-* / pp-options-fields).
   const PP_ACC_KEY = "pp-acc";
+  let pbpAccRestoring = true;
   function pbpAccState() { try { return JSON.parse(localStorage.getItem(PP_ACC_KEY)) || {}; } catch (_) { return {}; } }
   function pbpAccSet(key, open) { const m = pbpAccState(); m[key] = open; try { localStorage.setItem(PP_ACC_KEY, JSON.stringify(m)); } catch (_) {} }
-  // Apply persisted open/closed to every accordion-section that has a header data-target.
+  // Apply persisted open/closed to custom accordions and keyed native details.
   function pbpAccRestore(root) {
-    (root || document).querySelectorAll(".accordion-section").forEach((sec) => {
+    const scope = root || document;
+    scope.querySelectorAll(".accordion-section").forEach((sec) => {
       const head = sec.querySelector(".accordion-header[data-target]");
       if (!head) return;
       const st = pbpAccState()[head.dataset.target];
@@ -840,6 +842,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       else if (st === false) sec.classList.remove("open");
       head.setAttribute("aria-expanded", String(sec.classList.contains("open")));
       // st === undefined -> leave the HTML default (.open or not)
+    });
+    scope.querySelectorAll("details[data-acc-key]").forEach((det) => {
+      const st = pbpAccState()[det.dataset.accKey];
+      if (typeof st === "boolean") det.open = st;
     });
   }
   // Motion gate: only user-initiated toggles get the height transition.
@@ -871,6 +877,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const summary = e.target.closest("summary");
     const det = summary && summary.closest("details");
     if (det) pbpMotionMark(det);
+  }, true);
+  document.addEventListener("toggle", (e) => {
+    const det = e.target.closest?.("details[data-acc-key]");
+    if (!det || pbpAccRestoring) return;
+    pbpAccSet(det.dataset.accKey, det.open);
   }, true);
 
   setupSecretToggles();
@@ -1093,6 +1104,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   renderExportTargets(_et);
   pbpAccRestore(document); // restore all accordion states (static quick-actions + export targets)
+  setTimeout(() => { pbpAccRestoring = false; }, 0);
 
   // ---- Fill checkbox fields ----
   const checkMap = {

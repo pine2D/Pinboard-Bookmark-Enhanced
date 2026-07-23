@@ -49,6 +49,10 @@ const sample = [
   { id:"c", term:"word2", lemma:"", gloss:"Second item", note:"", groups:[], contexts:[], updatedAt:20 }
 ];
 
+check("vocabulary echo defaults on for new profiles",
+  SETTINGS_DEFAULTS.dictEchoEnabled === true,
+  "SETTINGS_DEFAULTS.dictEchoEnabled must be true");
+
 const hostileOwner = "acct_%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E";
 const hostileOwnerLabel = typeof pbpVocabOwnerLabel === "function" ? pbpVocabOwnerLabel(hostileOwner) : "";
 if (typeof _vocabOwnerLabel !== "undefined") _vocabOwnerLabel = hostileOwnerLabel;

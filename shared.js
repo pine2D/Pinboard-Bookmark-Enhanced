@@ -370,7 +370,7 @@ const SETTINGS_DEFAULTS = {
   previewAiModel: "",
   translateTargetLang: "auto",
   translateGlossary: "",
-  dictEchoEnabled: false,   // md-vocab-echo: underline saved vocab words in the reader
+  dictEchoEnabled: true,    // md-vocab-echo: underline saved vocab words in the reader
   dictAnkiDeck: "Pinboard Vocab", // anki-connect: target deck for Send to Anki
   dictAnkiPort: "8765",         // anki-connect: AnkiConnect port (host stays loopback-only)
   dictAnkiKey: "",              // anki-connect: optional AnkiConnect API key (credential)

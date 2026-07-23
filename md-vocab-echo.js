@@ -4,7 +4,7 @@
 // CSS Custom Highlight API (zero DOM mutation), click opens the dictionary
 // view. Pointer enhancement only -- the keyboard-reachable path stays
 // "select text -> explain popover"; the underline is not presented as a
-// full accessible control. Opt-in via dictEchoEnabled (default off).
+// full accessible control. Controlled by dictEchoEnabled (default on).
 // Pure helpers above PURE END load in tests/md-dict-tests.html via file://.
 // ============================================================
 
