@@ -9,6 +9,13 @@ if (typeof requestAnimationFrame === "function") {
   }));
 }
 
+// This defer script starts async rendering before the later reader scripts have
+// necessarily registered their pbp:rendered listeners. Capture DOMContentLoaded
+// synchronously so the eventual dispatch cannot outrun those defer scripts.
+const pbpDeferredScriptsReady = document.readyState === "complete"
+  ? Promise.resolve()
+  : new Promise((resolve) => document.addEventListener("DOMContentLoaded", resolve, { once: true }));
+
 // Render the styled empty state and hide the rail so the page reads as
 // intentional (not a half-rendered document). textContent only — no innerHTML.
 function renderEmptyState(message) {
@@ -1646,6 +1653,7 @@ function pbpApplyColorScheme(mode) {
   // variant and the comment styling always agree.
   const _isForumPage = (typeof pbpForumShouldMark === "function")
     ? !!pbpForumShouldMark(info, renderedView) : !!info.forum;
+  await pbpDeferredScriptsReady;
   document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, forum: _isForumPage, account: previewAccount } }));
 
   // Raw view populated lazily on first switch

@@ -930,9 +930,7 @@ function _pbpTrBuildSection(st) {
   tgtLink.textContent = t("trChangeLang");
   tgtLink.addEventListener("click", () => {
     try {
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.openOptionsPage) {
-        chrome.runtime.openOptionsPage();
-      }
+      if (typeof pbpOpenOptionsTab === "function") pbpOpenOptionsTab("reader");
     } catch (_) { /* options page unavailable: no-op */ }
   });
   tgt.appendChild(tgtLink);
