@@ -112,6 +112,18 @@ section("WebDAV folder target resolution");
     percentDecision?.kind === "same" &&
     percentDecision.relativePath === percentPath.value);
 
+  const readablePath = pbpWebdavNormalizeRelativePath("Backups/读书/");
+  const readablePathAgain = readablePath.ok
+    ? pbpWebdavNormalizeRelativePath(readablePath.value)
+    : null;
+  check("decoded relative paths cannot bypass separator or absolute policy and valid values remain repeatable",
+    pbpWebdavNormalizeRelativePath("Folder%3FName").error === "separator" &&
+    pbpWebdavNormalizeRelativePath("Folder%23Name").error === "separator" &&
+    pbpWebdavNormalizeRelativePath("https%3ABackups").error === "absolute" &&
+    readablePath.ok &&
+    readablePathAgain?.ok &&
+    readablePathAgain.value === readablePath.value);
+
   check("a full URL is rejected",
     pbpWebdavNormalizeRelativePath("https://other.example/x").error === "absolute");
   check("a leading slash is rejected",
@@ -605,6 +617,31 @@ async function runChromeLayerTests() {
       preserveRequests
         .filter((request) => request.method === "PUT" || request.method === "DELETE")
         .every((request) => request.url.includes(PBP_WEBDAV_WRITE_TEST_PREFIX)));
+
+    const lowercaseRequests = [];
+    globalThis.fetch = async (url, options) => {
+      lowercaseRequests.push({ url, method: options.method });
+      if (options.method === "PROPFIND") return migrationResponse(207);
+      if (options.method === "PUT") return migrationResponse(201);
+      if (options.method === "DELETE") return migrationResponse(204);
+      return migrationResponse(500);
+    };
+    const lowercasePreserved =
+      typeof pbpWebdavInspectLegacyLayout === "function"
+        ? await pbpWebdavInspectLegacyLayout({
+          baseUrl:
+            "https://dav.example.com/root/%e8%af%bb%e4%b9%a6/?access_token=abc%2Fdef",
+          user: "alice",
+          pass: "secret",
+        }) : null;
+    check("lowercase percent escapes preserve the exact legacy CJK target and query",
+      lowercasePreserved?.kind === "preserve" &&
+      lowercasePreserved.candidate.legacyCollectionUrl ===
+        "https://dav.example.com/root/%e8%af%bb%e4%b9%a6/?access_token=abc%2Fdef" &&
+      lowercasePreserved.target.backupCollectionUrl ===
+        "https://dav.example.com/root/%E8%AF%BB%E4%B9%A6/?access_token=abc%2Fdef" &&
+      lowercaseRequests.map((request) => request.method).join(",") ===
+        "PROPFIND,PUT,DELETE");
 
     const fallbackRequests = [];
     globalThis.fetch = async (url, options) => {

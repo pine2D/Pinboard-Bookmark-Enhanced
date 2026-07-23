@@ -76,6 +76,13 @@ function pbpWebdavNormalizeRelativePath(value) {
     let decoded;
     try { decoded = decodeURIComponent(segment); }
     catch (_) { return { ok: false, error: "encoding" }; }
+    if (decoded.includes("?") || decoded.includes("#")) {
+      return { ok: false, error: "separator" };
+    }
+    if (decodedSegments.length === 0 &&
+        /^[a-z][a-z\d+.-]*:/i.test(decoded)) {
+      return { ok: false, error: "absolute" };
+    }
     if (!decoded || decoded === "." || decoded === ".." ||
         decoded.includes("/") || decoded.includes("\\")) {
       return { ok: false, error: "segment" };
@@ -857,6 +864,8 @@ async function pbpWebdavInspectLegacyLayout(cfg) {
     Number.isFinite(result?.status) ? result.status : "",
   ].filter((part) => part !== "").join(":");
   const split = pbpWebdavSplitLegacyCollection(cfg.baseUrl);
+  const encodedUrlKey = (value) => String(value).replace(
+    /%[0-9a-f]{2}/gi, (escape) => escape.toUpperCase());
   let preserveError = split.ok ? "target-mismatch" : split.error;
   if (split.ok) {
     const preserveCfg = Object.assign({}, cfg, {
@@ -865,7 +874,9 @@ async function pbpWebdavInspectLegacyLayout(cfg) {
       relativePath: split.relativePath,
     });
     const target = await pbpWebdavFreezeTarget(preserveCfg);
-    if (target.ok && target.backupCollectionUrl === split.legacyCollectionUrl) {
+    if (target.ok &&
+        encodedUrlKey(target.backupCollectionUrl) ===
+          encodedUrlKey(split.legacyCollectionUrl)) {
       let writable;
       try {
         writable = await pbpWebdavProbeWritable(
