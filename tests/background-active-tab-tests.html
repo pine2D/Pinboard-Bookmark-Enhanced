@@ -106,6 +106,39 @@ function buildLegacyPermissionMigrationHarness(source, chrome) {
     "; return { key: PBP_LEGACY_WILDCARD_CLEANUP_KEY, run: pbpMigrateLegacyWildcardPermission };")(chrome);
 }
 
+function buildWebdavAlarmHarness(source, settingsQueue) {
+  const start = source.indexOf("chrome.alarms.onAlarm.addListener((alarm) => {");
+  const end = source.indexOf("// React to settings change:", start);
+  assert(start >= 0 && end > start, "alarm listener not found");
+  let listener = null;
+  let reads = 0;
+  let pushes = 0;
+  let invalidations = 0;
+  const chrome = { alarms: { onAlarm: { addListener(fn) { listener = fn; } } } };
+  const idle = () => Promise.resolve();
+  new Function(
+    "chrome", "loadSettings", "pbpWebdavAutoPushPeriod", "pbpWebdavPush",
+    "processOfflineQueue", "updateBadge", "ensureKeepAlive", "prewarmTagsNow",
+    "_bgSaveModeMigration", "primeSettings", "pbpMigrateSecretsToLocal",
+    "invalidateSettingsCache",
+    source.slice(start, end)
+  )(
+    chrome,
+    async () => { reads++; return settingsQueue.shift(); },
+    (settings) => settings.webdavLayoutVersion === 2 && settings.webdavAutoPush === "hourly" ? 60 : 0,
+    async () => { pushes++; },
+    idle, idle, () => {}, idle, Promise.resolve(), idle, idle,
+    () => { invalidations++; }
+  );
+  return {
+    async fire() {
+      listener({ name: "webdav-push" });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+    counts: () => ({ reads, pushes, invalidations }),
+  };
+}
+
 function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch = {}, hasKey = true) {
   const start = source.indexOf("async function saveFromBackground");
   const end = source.indexOf("// Helper: resolve prefix-specific settings", start);
@@ -279,6 +312,21 @@ async function run() {
     let threw = false;
     try { await h.run(); } catch (_) { threw = true; }
     assert(threw && marker === null, "failed removal wrote a completion marker");
+  });
+
+  await test("stale WebDAV alarms re-read settings and push only for a valid v2 schedule", async () => {
+    const h = buildWebdavAlarmHarness(source, [
+      { webdavLayoutVersion: 0, webdavAutoPush: "hourly" },
+      { webdavLayoutVersion: 2, webdavAutoPush: "hourly" },
+    ]);
+    await h.fire();
+    const paused = h.counts();
+    await h.fire();
+    const resumed = h.counts();
+    assert(paused.invalidations === 1 && paused.reads === 1 && paused.pushes === 0,
+      "layout v0 stale alarm reached WebDAV push");
+    assert(resumed.invalidations === 2 && resumed.reads === 2 && resumed.pushes === 1,
+      "valid layout v2 alarm did not push exactly once");
   });
 
   await test("background save keeps the extraction fast path when AI is disabled", async () => {

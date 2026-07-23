@@ -1471,10 +1471,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "webdav-push") {
     // pbpWebdavPush() only ever chrome.permissions.contains()-checks --
     // never request() -- so this never surfaces a permission prompt with
-    // no user gesture behind it (spec invariant #3). Any failure (missing
-    // permission, network, non-2xx) is recorded into webdavLastPush and
-    // swallowed here; the next scheduled tick retries naturally.
-    pbpWebdavPush().catch(() => {});
+    // no user gesture behind it (spec invariant #3). Re-check the effective
+    // schedule because a stale alarm may fire while its async clear is pending.
+    invalidateSettingsCache();
+    loadSettings().then((settings) =>
+      pbpWebdavAutoPushPeriod(settings) > 0 ? pbpWebdavPush() : undefined
+    ).catch(() => {});
   }
 });
 

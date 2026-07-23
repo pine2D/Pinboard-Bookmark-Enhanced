@@ -94,6 +94,19 @@ const popupTagsJs = read("popup-tags.js");
     !statusBlock.includes("webdavLastPush"),
     "options.js: page-load WebDAV status still revives persisted operation errors instead of rendering target state");
 }
+{
+  const cfgFromForm = optionsJs.slice(
+    optionsJs.indexOf("function _pbpWebdavCfgFromForm()"),
+    optionsJs.indexOf("// Same-gesture permission request")
+  );
+  check(cfgFromForm.includes("folderMode: s.webdavFolderMode") &&
+    cfgFromForm.includes("relativePath: s.webdavRelativePath") &&
+    cfgFromForm.includes("layoutVersion: s.webdavLayoutVersion") &&
+    !cfgFromForm.includes('folderMode: "managed"') &&
+    !cfgFromForm.includes('relativePath: ""') &&
+    !cfgFromForm.includes("layoutVersion: 0"),
+    "options.js: live WebDAV actions discard the loaded folder target");
+}
 check(!webdavJs.includes("dav.jianguoyun.com") &&
   !webdavJs.includes("pbpWebdavNormalizeEtag") &&
   !webdavJs.includes('headers["If-Match"] = "*"'),

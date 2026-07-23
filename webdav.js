@@ -588,11 +588,13 @@ async function pbpWebdavReadAutoPush(cfg) {
   const target = pbpWebdavFileUrl(cfg && cfg.baseUrl);
   const user = String(cfg && cfg.user || "");
   const targetId = target ? await pbpWebdavTargetId(cfg) : "";
+  const legacyTargetId = target ? await pbpWebdavSha256(target + "\n" + user) : "";
   const state = local[PBP_WEBDAV_SYNC_STATE_KEY];
   const legacyState = local._webdavEtagState;
   const last = local.webdavLastPush;
-  const matchingState = !!(targetId && pbpIsPlainRecord(state) &&
-    state.targetId === targetId && state.settingsHash);
+  const matchingState = !!((targetId || legacyTargetId) &&
+    pbpIsPlainRecord(state) && state.settingsHash &&
+    (state.targetId === targetId || state.targetId === legacyTargetId));
   const matchingLegacyState = !!(target && pbpIsPlainRecord(legacyState) &&
     deobfuscateKey(legacyState.target || "") === target &&
     deobfuscateKey(legacyState.user || "") === user);

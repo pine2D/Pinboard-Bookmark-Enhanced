@@ -1612,9 +1612,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       baseUrl: $id("opt-webdav-url").value.trim(),
       user: $id("opt-webdav-user").value.trim(),
       pass: $id("opt-webdav-pass").value.trim(),
-      folderMode: "managed",
-      relativePath: "",
-      layoutVersion: 0,
+      folderMode: s.webdavFolderMode,
+      relativePath: s.webdavRelativePath,
+      layoutVersion: s.webdavLayoutVersion,
       includeHighlights: $id("opt-backup-include-highlights").checked,
     };
   }

@@ -651,8 +651,15 @@ async function runChromeLayerTests() {
     resetAutoPushStores();
     const unmatched = typeof pbpWebdavReadAutoPush === "function"
       ? await pbpWebdavReadAutoPush(autoCfg) : "missing";
+    resetAutoPushStores();
+    autoLocal[PBP_WEBDAV_SYNC_STATE_KEY] = {
+      targetId: "",
+      settingsHash: "legacy-settings",
+    };
+    const invalidTarget = typeof pbpWebdavReadAutoPush === "function"
+      ? await pbpWebdavReadAutoPush({ baseUrl: "", user: "alice" }) : "missing";
     check("legacy sync schedule defaults off without proof this device used the current target",
-      unmatched === "off" && autoLocal.webdavAutoPush === "off" &&
+      unmatched === "off" && invalidTarget === "off" && autoLocal.webdavAutoPush === "off" &&
       autoLocal._webdavAutoPushLocalV1 === true);
 
     resetAutoPushStores();
@@ -676,6 +683,23 @@ async function runChromeLayerTests() {
       ? await pbpWebdavReadAutoPush(autoCfg) : "missing";
     check("a matching legacy pull baseline safely migrates the device schedule",
       migratedFromPull === "daily" && autoLocal.webdavAutoPush === "daily");
+
+    const legacyTargetId = await pbpWebdavSha256(
+      pbpWebdavFileUrl(autoCfg.baseUrl) + "\n" + autoCfg.user);
+    const migratedSchedules = [];
+    for (const schedule of ["hourly", "daily"]) {
+      resetAutoPushStores();
+      autoSync.webdavAutoPush = schedule;
+      autoLocal[PBP_WEBDAV_SYNC_STATE_KEY] = {
+        targetId: legacyTargetId,
+        settingsHash: "legacy-settings",
+      };
+      migratedSchedules.push(await pbpWebdavReadAutoPush(autoCfg));
+    }
+    check("legacy root-file sync state preserves the old hourly or daily schedule",
+      migratedSchedules.join(",") === "hourly,daily" &&
+      autoLocal.webdavAutoPush === "daily" &&
+      autoLocal._webdavAutoPushLocalV1 === true);
 
     resetAutoPushStores();
     autoLocal.webdavLastPush = {
