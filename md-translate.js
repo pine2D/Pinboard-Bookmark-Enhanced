@@ -955,9 +955,9 @@ function _pbpTrBuildSection(st) {
   skipNote.hidden = true;
   sec.appendChild(skipNote);
 
-  const glossaryHits = document.createElement("div");
+  const glossaryHits = document.createElement("details");
   glossaryHits.id = "tr-glossary-hits";
-  glossaryHits.className = "tr-meta";
+  glossaryHits.className = "tr-meta tr-glossary";
   glossaryHits.hidden = true;
   sec.appendChild(glossaryHits);
 
@@ -1042,16 +1042,30 @@ function _pbpTrRenderGlossaryHits(st) {
   const el = document.getElementById("tr-glossary-hits");
   if (!el) return;
   const hits = st && st.glossaryHits ? st.glossaryHits : Object.create(null);
-  const entries = Object.keys(hits).map((term) => ({ term, translation: hits[term] }));
-  if (!entries.length) {
+  const terms = Object.keys(hits).sort((a, b) => a.localeCompare(b));
+  if (!terms.length) {
     el.hidden = true;
-    el.textContent = "";
+    el.replaceChildren();
     el.removeAttribute("title");
     return;
   }
-  const list = entries.map((x) => x.term + " -> " + (x.translation || x.term)).join(", ");
-  el.textContent = t("translateGlossaryLabel") + ": " + entries.length + " - " + list;
-  el.title = list;
+  const wasOpen = el.open;
+  const summary = document.createElement("summary");
+  summary.textContent = t("translateGlossaryLabel") + " · " + terms.length;
+  const list = document.createElement("dl");
+  list.className = "tr-glossary-list";
+  for (const term of terms) {
+    const row = document.createElement("div");
+    const source = document.createElement("dt");
+    const target = document.createElement("dd");
+    source.textContent = term;
+    target.textContent = hits[term] || term;
+    row.append(source, target);
+    list.appendChild(row);
+  }
+  el.replaceChildren(summary, list);
+  el.open = wasOpen;
+  el.removeAttribute("title");
   el.hidden = false;
 }
 

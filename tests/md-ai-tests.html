@@ -3065,6 +3065,52 @@ suiteIf("pbpTrBuildGlossaryPrompt", "pbpTrBuildGlossaryPrompt", () => {
   });
 });
 
+suiteIf("_pbpTrRenderGlossaryHits", "_pbpTrRenderGlossaryHits", () => {
+  function withGlossaryFixture(run) {
+    const el = document.createElement("details");
+    el.id = "tr-glossary-hits";
+    document.body.appendChild(el);
+    try { run(el); } finally { el.remove(); }
+  }
+
+  test("glossary hits render as a collapsed counted details list", () => {
+    withGlossaryFixture((el) => {
+      const hits = Object.fromEntries(Array.from({ length: 53 }, (_, i) =>
+        [`Term ${String(52 - i).padStart(2, "0")}`, `译文 ${i}`]));
+      _pbpTrRenderGlossaryHits({ glossaryHits: hits });
+      assert(el.tagName === "DETAILS" && !el.open, "native details stays collapsed");
+      assert(el.querySelector("summary").textContent.includes("53"), "count visible");
+      assertEq(el.querySelectorAll(".tr-glossary-list > div").length, 53, "all mappings kept");
+    });
+  });
+
+  test("glossary hits sort terms and render hostile text without HTML", () => {
+    withGlossaryFixture((el) => {
+      const hostile = '<img src=x onerror="window.__pbpGlossaryXss=1">';
+      _pbpTrRenderGlossaryHits({ glossaryHits: { Zulu: "", [hostile]: "<b>bad</b>", Alpha: "首项" } });
+      const terms = Array.from(el.querySelectorAll("dt"), (node) => node.textContent);
+      const expected = [hostile, "Alpha", "Zulu"].sort((a, b) => a.localeCompare(b));
+      assertEq(terms.join("\n"), expected.join("\n"), "locale-sorted terms");
+      assert(!el.querySelector("img, b"), "model data must stay text");
+      const zulu = Array.from(el.querySelectorAll(".tr-glossary-list > div"))
+        .find((row) => row.querySelector("dt").textContent === "Zulu");
+      assertEq(zulu.querySelector("dd").textContent, "Zulu", "empty translation keeps source");
+    });
+  });
+
+  test("glossary rerender preserves open state and empty hits clear the disclosure", () => {
+    withGlossaryFixture((el) => {
+      _pbpTrRenderGlossaryHits({ glossaryHits: { Alpha: "甲" } });
+      el.open = true;
+      _pbpTrRenderGlossaryHits({ glossaryHits: { Beta: "乙" } });
+      assert(el.open, "user-open state preserved");
+      assert(!el.hasAttribute("title"), "long native title removed");
+      _pbpTrRenderGlossaryHits({ glossaryHits: {} });
+      assert(el.hidden && el.childNodes.length === 0, "empty hits hide and clear");
+    });
+  });
+});
+
 // ============ _pbpExplainPackContext forum regression ============
 suiteIf("_pbpExplainPackContext forum", "_pbpExplainPackContext", () => {
   test("explains bob's comment body, not the whole thread", () => {
