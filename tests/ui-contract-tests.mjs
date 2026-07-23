@@ -185,6 +185,12 @@ check(mdTranslateJs.includes('scrollIntoView({ block: "start", behavior: "instan
 }
 check(/orig\.dataset\.pbTrDone = "1";[\s\S]{0,380}_pbpTrSyncToc\(st, "translated"\)/.test(mdTranslateJs),
   "md-translate.js: progressively filled translated headings do not update the live TOC");
+check(mdTranslateJs.includes('const targetCode = plan.targetCode || ""') &&
+  mdTranslateJs.includes("pbpTrLengthRatioOk(seg.text, item.text, targetCode)") &&
+  mdTranslateJs.includes("pbpTrLengthRatioOk(seg.text, text, targetCode)") &&
+  mdTranslateJs.includes("pbpTrLengthRatioOk(split.chunks[i], got, st.target.code)") &&
+  /pbpTrRunQueue\(\{[\s\S]{0,140}targetCode:\s*st\.target\.code/.test(mdTranslateJs),
+  "md-translate.js: target language code does not reach batch, downgrade and manual retry quality gates");
 
 const optionsTabs = optionsHtml.slice(optionsHtml.indexOf('<div class="tabs"'), optionsHtml.indexOf('</div>', optionsHtml.indexOf('<div class="tabs"')) + 6);
 check(!optionsTabs.includes('id="reset-panel-btn"') && /id="mobile-tab-select"/.test(optionsHtml),

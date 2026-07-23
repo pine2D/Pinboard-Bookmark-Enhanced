@@ -1348,6 +1348,15 @@ suiteIf("pbpTrLengthRatioOk", "pbpTrLengthRatioOk", () => {
     assert(pbpTrLengthRatioOk("x".repeat(100), "y".repeat(20)) === true, "0.2 ok");
     assert(pbpTrLengthRatioOk("x".repeat(100), "y".repeat(15)) === false, "0.15 dropped");
   });
+  test("long German sentence accepts a complete Simplified Chinese translation", () => {
+    const source = "Amazons Tipp empfiehlt hoch bewertete Produkte mit einem guten Preis-Leistungs-Verhältnis, die sofort versendet werden können.";
+    assert(pbpTrLengthRatioOk(source, "亚马逊推荐评分高、性价比好且可立即发货的商品。", "zh-CN"),
+      "valid 0.15–0.20 CJK compression must pass");
+    assert(!pbpTrLengthRatioOk(source, "亚马逊推荐", "zh-CN"),
+      "severe truncation must still fail");
+    assert(!pbpTrLengthRatioOk(source, "short non-CJK result", "en"),
+      "non-CJK targets keep the 0.20 floor");
+  });
   test("empty or whitespace translation invalid", () => {
     assert(pbpTrLengthRatioOk("source text", "") === false, "empty");
     assert(pbpTrLengthRatioOk("source text", "   ") === false, "whitespace");
@@ -1641,6 +1650,22 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
     ok(fills.slice().sort((a, b) => a - b).join(",") === "1,2,3,4,5", "all filled");
     ok(progress[progress.length - 1] === "5/5", "final progress");
     ok(state.maxInflight <= 2, "concurrency capped at 2, saw " + state.maxInflight);
+  });
+
+  await atest("CJK target code lets a complete compressed batch result fill directly", async () => {
+    const source = "Amazons Tipp empfiehlt hoch bewertete Produkte mit einem guten Preis-Leistungs-Verhältnis, die sofort versendet werden können.";
+    let singles = 0;
+    const r = await pbpTrRunQueue({
+      targetCode: "zh-CN",
+      batches: [[{ id: 1, text: source }]],
+      requestBatch: async (segments, onItem) => {
+        onItem({ id: segments[0].id, text: "亚马逊推荐评分高、性价比好且可立即发货的商品。" });
+        return { seenIds: new Set([1]) };
+      },
+      requestSingle: async () => { singles++; return null; },
+      onFill: () => {}, onBlockFail: () => { throw new Error("no fail"); }, onProgress: () => {}
+    });
+    ok(r.done === 1 && r.failed.length === 0 && singles === 0, JSON.stringify(r));
   });
 
   await atest("missing id from stream -> single downgrade fills it", async () => {

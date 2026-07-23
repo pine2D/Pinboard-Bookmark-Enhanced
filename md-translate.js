@@ -196,11 +196,10 @@ function pbpTrGlossaryHitEntries(glossary, segments) {
 }
 
 // ---- Hallucination probe (spec 4.3 ladder step 3) ----
-// A translated block whose char-length ratio vs the original falls outside
-// [0.3, 4] (inclusive) is judged invalid and re-queued for single-block
-// retry. Bounds are wide on purpose: CJK<->Latin legitimately shrinks or
-// grows a lot; only runaway repetition / empty answers should trip this.
-function pbpTrLengthRatioOk(orig, translated) {
+// Long translated blocks must retain enough source length to catch dropped
+// content; CJK targets use a lower floor because they compress Latin prose
+// more densely. Every block still rejects empty or runaway-expanded output.
+function pbpTrLengthRatioOk(orig, translated, targetCode) {
   const o = String(orig == null ? "" : orig).trim().length;
   const t = String(translated == null ? "" : translated).trim().length;
   if (o === 0 || t === 0) return false;
@@ -210,9 +209,10 @@ function pbpTrLengthRatioOk(orig, translated) {
   // a dense target language ("The shape of the curriculum" -> "课程的形态", ratio
   // ~0.18), so the 0.3 lower bound is a false positive there. Only enforce a
   // lower bound on longer blocks, where a very low ratio really means dropped
-  // content (and even then 0.2 leaves room for English->CJK compression).
+  // content. CJK targets legitimately compress Latin prose more densely.
   if (o < 80) return true;
-  return t / o >= 0.2;
+  const minRatio = /^(?:zh|ja|ko)(?:-|$)/i.test(String(targetCode || "")) ? 0.15 : 0.20;
+  return t / o >= minRatio;
 }
 
 // Placeholder conservation gate (spec T0-b): a faithful translation keeps every
@@ -321,6 +321,7 @@ const PBP_TR_BACKOFF_MS = [2000, 8000, 32000];
 //                    timeout / AbortError semantics)
 //     requestSingle:async (segment) -> string|null  (downgrade path: one block,
 //                    one attempt; null = model returned nothing usable)
+//     targetCode?:  BCP-47-ish target code used by the length quality gate
 //     onFill(id, text), onBlockFail(id, message), onProgress(done, total)
 //     signal?:      AbortSignal (Stop button / page close)
 //     concurrency?: default 2; backoffMs?: default PBP_TR_BACKOFF_MS (tests
@@ -332,6 +333,7 @@ const PBP_TR_BACKOFF_MS = [2000, 8000, 32000];
 // (pbpTrLengthRatioOk) runs on every fill, batch AND single.
 async function pbpTrRunQueue(plan) {
   const batches = plan.batches || [];
+  const targetCode = plan.targetCode || "";
   const conc = plan.concurrency || 2;
   const backoff = plan.backoffMs || PBP_TR_BACKOFF_MS;
   const sleep = plan.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
@@ -370,7 +372,7 @@ async function pbpTrRunQueue(plan) {
     const onItem = (item) => {
       const seg = byId.get(item.id);
       if (!seg || filled.has(item.id)) return;            // out-of-batch / dup id: skip
-      if (pbpTrPlaceholdersConserved(seg.text, item.text) && pbpTrLengthRatioOk(seg.text, item.text)) fill(item.id, item.text);
+      if (pbpTrPlaceholdersConserved(seg.text, item.text) && pbpTrLengthRatioOk(seg.text, item.text, targetCode)) fill(item.id, item.text);
       // ratio-failed items stay unfilled -> picked up by the missing diff below
     };
     for (let attempt = 0; ; attempt++) {
@@ -417,7 +419,7 @@ async function pbpTrRunQueue(plan) {
     if (!seg || filled.has(seg.id)) continue;
     try {
       const text = await plan.requestSingle(seg);
-      if (typeof text === "string" && pbpTrPlaceholdersConserved(seg.text, text) && pbpTrLengthRatioOk(seg.text, text)) fill(seg.id, text);
+      if (typeof text === "string" && pbpTrPlaceholdersConserved(seg.text, text) && pbpTrLengthRatioOk(seg.text, text, targetCode)) fill(seg.id, text);
       else fail(seg.id, "invalid single-block translation");
     } catch (e) {
       if (aborted()) break;
@@ -1290,6 +1292,7 @@ async function _pbpTrStart(st) {
     }
   }
   const queueResult = await pbpTrRunQueue({
+    targetCode: st.target.code,
     batches: pbpTrPackBatches(segs),
     requestBatch, requestSingle, signal: st.ctrl.signal,
     onFill: (id, text) => {
@@ -1528,7 +1531,7 @@ async function _pbpTrTranslateBlock(st, w, signal) {
       maxTokens: Math.min(8192, Math.max(1024, pbpAiEstimateTokens(split.chunks[i].length) * 3))
     }, (d, acc) => parser.push(acc));
     parser.finish(full);
-    if (typeof got !== "string" || !pbpTrPlaceholdersConserved(split.chunks[i], got) || !pbpTrLengthRatioOk(split.chunks[i], got)) {
+    if (typeof got !== "string" || !pbpTrPlaceholdersConserved(split.chunks[i], got) || !pbpTrLengthRatioOk(split.chunks[i], got, st.target.code)) {
       throw new Error("invalid single-block translation");
     }
     out.push(got);
