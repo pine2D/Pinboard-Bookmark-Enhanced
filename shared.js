@@ -358,7 +358,7 @@ const SETTINGS_DEFAULTS = {
   waybackS3Secret: "",
   // WebDAV settings backup (batch (5)): push is explicit-click or scheduled;
   // pull is always behind a user confirm() -- see webdav.js.
-  webdavUrl: "", webdavUser: "", webdavPass: "", webdavAutoPush: "off", // "off" | "hourly" | "daily"
+  webdavUrl: "", webdavUser: "", webdavPass: "",
   backupIncludeHighlights: true,
   // md-preview in-page AI (explain / ask / translate)
   previewAiEnabled: true,
@@ -1582,6 +1582,42 @@ function pbpStripExportTargetTokens(ets) {
     pbpExportTargetSecretKeys(tid).forEach((key) => { delete cleaned[tid][key]; });
   }
   return cleaned;
+}
+
+// Shared schema-v2 snapshot used by both manual export and WebDAV. Transport
+// credentials and the device-local schedule never enter either file; a
+// WebDAV snapshot also omits its own URL/username so pulling it cannot retarget
+// the active transport.
+function pbpBuildBackupSnapshot(settings, extra, options) {
+  const s = settings || {};
+  const x = extra || {};
+  const opts = options || {};
+  const omitTransport = opts.includeWebdavTransport === false;
+  const payload = {};
+  Object.keys(SETTINGS_DEFAULTS).forEach((key) => {
+    if (API_KEY_FIELDS.includes(key)) return;
+    if (omitTransport && (key === "webdavUrl" || key === "webdavUser")) return;
+    if (Object.prototype.hasOwnProperty.call(s, key)) payload[key] = s[key];
+  });
+  if (!omitTransport) {
+    if ("webdavUrl" in payload) payload.webdavUrl = deobfuscateKey(payload.webdavUrl || "");
+    if ("webdavUser" in payload) payload.webdavUser = deobfuscateKey(payload.webdavUser || "");
+  }
+  if (payload.exportTargets) payload.exportTargets = pbpStripExportTargetTokens(payload.exportTargets);
+  payload.customOverlayCSS = typeof x.overlay === "string" ? x.overlay : "";
+  payload.savedThemes = pbpSanitizeBackupThemes(Array.isArray(x.savedThemes) ? x.savedThemes : []);
+  if (s.backupIncludeHighlights !== false && x.highlights) {
+    payload._highlights = x.highlights;
+    if (x.highlightsOwner) payload._highlightsOwner = x.highlightsOwner;
+  }
+  payload._schemaVersion = 2;
+  if (opts.webdavMeta) {
+    payload._webdav = {
+      pushedAt: opts.webdavMeta.pushedAt,
+      appVersion: opts.webdavMeta.appVersion,
+    };
+  }
+  return payload;
 }
 
 // Migration-scrub variant: removes tokens only, leaving a legacy plaintext

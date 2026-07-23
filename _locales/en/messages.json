@@ -936,10 +936,10 @@
     "message": "Import settings from JSON file"
   },
   "webdavHint": {
-    "message": "Back up your settings to a WebDAV server you control (e.g. Nextcloud). Never includes API keys."
+    "message": "Back up your settings to the WebDAV folder URL you enter. The file is named pinboard-bookmark-enhanced-settings.json. API keys are never included."
   },
   "webdavUrlLabel": {
-    "message": "Server URL"
+    "message": "Backup folder URL"
   },
   "webdavUserLabel": {
     "message": "Username (optional)"
@@ -1004,6 +1004,21 @@
   },
   "webdavConflict": {
     "message": "The remote backup changed. Pull it before pushing again."
+  },
+  "webdavSyncUnpaired": {
+    "message": "A remote backup already exists, but this device has not synced it yet. Pull it or choose Overwrite remote."
+  },
+  "webdavSyncRemoteChanged": {
+    "message": "The remote backup changed after the last successful sync. Pull it or choose Overwrite remote."
+  },
+  "webdavSyncDiverged": {
+    "message": "Settings changed both on this device and in the remote backup. Pull the remote copy or choose Overwrite remote."
+  },
+  "webdavHashMode": {
+    "message": "This server does not provide a reliable version identifier. Changes are verified by content."
+  },
+  "webdavVerifyFailed": {
+    "message": "The uploaded backup could not be verified. Another client may have changed it. Pull before trying again."
   },
   "webdavConflictChoice": {
     "message": "The remote backup has changed. Overwrite it with this device's settings? (Cancel to pull it first instead.)"

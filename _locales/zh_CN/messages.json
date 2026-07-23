@@ -936,10 +936,10 @@
     "message": "从 JSON 文件导入设置"
   },
   "webdavHint": {
-    "message": "将设置备份到你自己的 WebDAV 服务器（如 Nextcloud）。绝不包含 API 密钥。"
+    "message": "将设置备份到所填地址对应的 WebDAV 文件夹。文件名固定为 pinboard-bookmark-enhanced-settings.json。不包含 API 密钥。"
   },
   "webdavUrlLabel": {
-    "message": "服务器地址"
+    "message": "备份文件夹地址"
   },
   "webdavUserLabel": {
     "message": "用户名（可选）"
@@ -1004,6 +1004,21 @@
   },
   "webdavConflict": {
     "message": "远端备份已更改。请先拉取，再重新推送。"
+  },
+  "webdavSyncUnpaired": {
+    "message": "远端已有备份，但本设备尚未与其同步。请先拉取，或选择「覆盖远端」。"
+  },
+  "webdavSyncRemoteChanged": {
+    "message": "远端备份在上次成功同步后发生了变化。请先拉取，或选择「覆盖远端」。"
+  },
+  "webdavSyncDiverged": {
+    "message": "本地设置和远端备份都发生了变化。可拉取远端备份，或选择「覆盖远端」。"
+  },
+  "webdavHashMode": {
+    "message": "服务器未提供可靠的版本标识，扩展将通过内容校验变更。"
+  },
+  "webdavVerifyFailed": {
+    "message": "无法验证刚上传的备份。其他客户端可能同时修改了该文件，请先拉取再重试。"
   },
   "webdavConflictChoice": {
     "message": "远端备份已更改。要用本地设置覆盖远端吗？（也可取消后先拉取）"

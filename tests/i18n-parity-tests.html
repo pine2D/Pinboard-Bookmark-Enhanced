@@ -3,6 +3,7 @@
 <style>.case{font-family:monospace;white-space:pre}.pass{color:#176}.fail{color:#b00}</style>
 </head><body>
 <div id="results"></div>
+<script src="../i18n.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -23,6 +24,19 @@ async function loadLocale(loc) {
   const LOCALES = ["en","de","fr","pl","ru","zh_HK","zh_CN","zh_TW","ja"];
   const msgs = {};
   for (const l of LOCALES) msgs[l] = await loadLocale(l);
+
+  const WEBDAV_STATUS_KEYS = [
+    "webdavSyncUnpaired",
+    "webdavSyncRemoteChanged",
+    "webdavSyncDiverged",
+    "webdavHashMode",
+    "webdavVerifyFailed",
+  ];
+  for (const loc of LOCALES) {
+    check(`WebDAV status messages present in ${loc}`,
+      WEBDAV_STATUS_KEYS.every((key) => !!msgs[loc][key]?.message),
+      `${loc} missing: ${WEBDAV_STATUS_KEYS.filter((key) => !msgs[loc][key]?.message).join(", ")}`);
+  }
 
   // H1: AI/Jina cluster must be present and translated (≠ English) in these
   // locales — EXCEPT values that are legitimately identical to English in that
@@ -317,6 +331,72 @@ async function loadLocale(loc) {
     msgs[loc].aiSummaryMerged?.message !== SUMMARY_MERGED[loc]);
   check("H14 summary ownership loss is specific and actionable in every locale",
     mergedFailures.length === 0, `copy mismatch: ${mergedFailures.join(", ")}`);
+
+  // A slower refresh for the old language must not overwrite the mirror after
+  // a newer refresh has already selected and loaded another locale.
+  const previousChrome = globalThis.chrome;
+  const previousFetch = globalThis.fetch;
+  const previousMessages = _i18nMessages;
+  const previousLang = localStorage.getItem("pp-i18n-lang");
+  const previousMirror = localStorage.getItem("pp-i18n-msgs");
+  const pending = {};
+  const reads = ["de", "fr"];
+  try {
+    globalThis.chrome = {
+      storage: { local: { get: async () => ({ optLang: reads.length ? reads.shift() : "fr" }) } },
+      runtime: { getURL: (path) => path },
+      i18n: { getMessage: () => "", getUILanguage: () => "en" },
+    };
+    globalThis.fetch = (url) => new Promise((resolve) => { pending[url] = resolve; });
+    _i18nMessages = null;
+    localStorage.setItem("pp-i18n-lang", "auto");
+    localStorage.removeItem("pp-i18n-msgs");
+    const oldRefresh = _refreshI18nAsync();
+    await Promise.resolve();
+    const newRefresh = _refreshI18nAsync();
+    await Promise.resolve();
+    pending["_locales/fr/messages.json"]({
+      ok: true,
+      json: async () => ({ marker: { message: "fr" } }),
+    });
+    await newRefresh;
+    pending["_locales/de/messages.json"]({
+      ok: true,
+      json: async () => ({ marker: { message: "de" } }),
+    });
+    await oldRefresh;
+    check("i18n refresh discards a late response for an older language",
+      localStorage.getItem("pp-i18n-lang") === "fr" &&
+      _i18nMessages?.marker?.message === "fr");
+
+    // A storage change can arrive without another refresh call (for example
+    // Chrome Sync updating optLang while this page is fetching messages).
+    // Re-read before commit so that response cannot resurrect the old locale.
+    let currentStoredLang = "de";
+    globalThis.chrome.storage.local.get = async () => ({ optLang: currentStoredLang });
+    globalThis.fetch = (url) => new Promise((resolve) => { pending[url] = resolve; });
+    localStorage.setItem("pp-i18n-lang", "fr");
+    _i18nMessages = { marker: { message: "fr" } };
+    const storageRaceRefresh = _refreshI18nAsync();
+    await Promise.resolve();
+    currentStoredLang = "fr";
+    pending["_locales/de/messages.json"]({
+      ok: true,
+      json: async () => ({ marker: { message: "de" } }),
+    });
+    await storageRaceRefresh;
+    check("i18n refresh rechecks storage before committing fetched messages",
+      localStorage.getItem("pp-i18n-lang") === "fr" &&
+      _i18nMessages?.marker?.message === "fr");
+  } finally {
+    globalThis.chrome = previousChrome;
+    globalThis.fetch = previousFetch;
+    _i18nMessages = previousMessages;
+    if (previousLang === null) localStorage.removeItem("pp-i18n-lang");
+    else localStorage.setItem("pp-i18n-lang", previousLang);
+    if (previousMirror === null) localStorage.removeItem("pp-i18n-msgs");
+    else localStorage.setItem("pp-i18n-msgs", previousMirror);
+  }
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>

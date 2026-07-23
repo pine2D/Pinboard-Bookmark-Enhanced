@@ -936,10 +936,10 @@
     "message": "Importuj ustawienia z pliku JSON"
   },
   "webdavHint": {
-    "message": "Twórz kopię zapasową ustawień na własnym serwerze WebDAV (np. Nextcloud). Nigdy nie zawiera kluczy API."
+    "message": "Utwórz kopię zapasową ustawień we wskazanym folderze WebDAV. Plik ma nazwę pinboard-bookmark-enhanced-settings.json. Klucze API nie są dołączane."
   },
   "webdavUrlLabel": {
-    "message": "Adres URL serwera"
+    "message": "Adres URL folderu kopii zapasowej"
   },
   "webdavUserLabel": {
     "message": "Nazwa użytkownika (opcjonalnie)"
@@ -1005,11 +1005,26 @@
   "webdavConflict": {
     "message": "Kopia zapasowa na serwerze została zmieniona. Pobierz ją przed ponownym wysłaniem."
   },
+  "webdavSyncUnpaired": {
+    "message": "Na serwerze istnieje już kopia zapasowa, ale to urządzenie jeszcze jej nie zsynchronizowało. Pobierz ją albo wybierz „Nadpisz kopię zdalną”."
+  },
+  "webdavSyncRemoteChanged": {
+    "message": "Kopia zapasowa na serwerze zmieniła się od ostatniej udanej synchronizacji. Pobierz ją albo wybierz „Nadpisz kopię zdalną”."
+  },
+  "webdavSyncDiverged": {
+    "message": "Zmieniły się zarówno ustawienia na tym urządzeniu, jak i kopia zapasowa na serwerze. Pobierz zdalną kopię albo wybierz „Nadpisz kopię zdalną”."
+  },
+  "webdavHashMode": {
+    "message": "Ten serwer nie udostępnia wiarygodnego identyfikatora wersji. Zmiany są weryfikowane na podstawie zawartości."
+  },
+  "webdavVerifyFailed": {
+    "message": "Nie udało się zweryfikować wysłanej kopii zapasowej. Inny klient mógł ją zmienić. Pobierz ją przed ponowną próbą."
+  },
   "webdavConflictChoice": {
     "message": "Zdalna kopia zapasowa uległa zmianie. Nadpisać ją ustawieniami tego urządzenia? (Możesz też anulować i najpierw ją pobrać.)"
   },
   "webdavOverwriteRemote": {
-    "message": "Nadpisz zdalną"
+    "message": "Nadpisz kopię zdalną"
   },
   "webdavPermDenied": {
     "message": "Odmowa uprawnień — kliknij „Testuj”, aby je przyznać"

@@ -4,6 +4,7 @@
 
 let _i18nMessages = null;
 let _i18nReady = false;
+let _i18nRefreshGeneration = 0;
 
 /**
  * Synchronously populate _i18nMessages from localStorage mirror (if user
@@ -42,11 +43,13 @@ function initI18n() {
  * translations if anything changed.
  */
 async function _refreshI18nAsync() {
+  const generation = ++_i18nRefreshGeneration;
   try {
     const _storage = typeof getSettingsStorage === "function"
       ? await getSettingsStorage()
       : chrome.storage.local;
     const { optLang = "auto" } = await _storage.get({ optLang: "auto" });
+    if (generation !== _i18nRefreshGeneration) return;
 
     const prevLang = (typeof localStorage !== "undefined" ? localStorage.getItem("pp-i18n-lang") : null) || "auto";
 
@@ -68,6 +71,12 @@ async function _refreshI18nAsync() {
     const resp = await fetch(url);
     if (!resp.ok) return;
     const msgs = await resp.json();
+    if (generation !== _i18nRefreshGeneration) return;
+    const currentStorage = typeof getSettingsStorage === "function"
+      ? await getSettingsStorage()
+      : chrome.storage.local;
+    const { optLang: currentLang = "auto" } = await currentStorage.get({ optLang: "auto" });
+    if (generation !== _i18nRefreshGeneration || currentLang !== optLang) return;
 
     try {
       localStorage.setItem("pp-i18n-lang", optLang);

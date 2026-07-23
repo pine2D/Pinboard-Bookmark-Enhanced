@@ -936,10 +936,10 @@
     "message": "JSONファイルから設定をインポート"
   },
   "webdavHint": {
-    "message": "設定を自分の WebDAV サーバー（Nextcloud など）にバックアップします。API キーは含まれません。"
+    "message": "入力した URL の WebDAV フォルダーに設定をバックアップします。ファイル名は pinboard-bookmark-enhanced-settings.json です。API キーは含まれません。"
   },
   "webdavUrlLabel": {
-    "message": "サーバー URL"
+    "message": "バックアップ先フォルダーの URL"
   },
   "webdavUserLabel": {
     "message": "ユーザー名（任意）"
@@ -1004,6 +1004,21 @@
   },
   "webdavConflict": {
     "message": "リモートのバックアップが変更されています。プルしてから、もう一度プッシュしてください。"
+  },
+  "webdavSyncUnpaired": {
+    "message": "リモートにバックアップがありますが、この端末とはまだ同期されていません。先にプルするか、「リモートを上書き」を選択してください。"
+  },
+  "webdavSyncRemoteChanged": {
+    "message": "リモートのバックアップが前回の同期後に変更されています。先にプルするか、「リモートを上書き」を選択してください。"
+  },
+  "webdavSyncDiverged": {
+    "message": "この端末の設定とリモートのバックアップがどちらも変更されています。先にプルするか、「リモートを上書き」を選択してください。"
+  },
+  "webdavHashMode": {
+    "message": "このサーバーでは信頼できるバージョン識別子を取得できないため、内容を照合して変更を確認します。"
+  },
+  "webdavVerifyFailed": {
+    "message": "アップロードしたバックアップを確認できませんでした。別のクライアントが同時に変更した可能性があります。先にプルしてから、もう一度お試しください。"
   },
   "webdavConflictChoice": {
     "message": "リモートのバックアップが変更されています。この端末の設定で上書きしますか？（キャンセルして先に取得することもできます）"

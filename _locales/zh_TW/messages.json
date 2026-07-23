@@ -936,10 +936,10 @@
     "message": "從 JSON 檔案匯入設定"
   },
   "webdavHint": {
-    "message": "將設定備份到你自己的 WebDAV 伺服器（如 Nextcloud）。絕不包含 API 金鑰。"
+    "message": "將設定備份到所填網址對應的 WebDAV 資料夾。檔名固定為 pinboard-bookmark-enhanced-settings.json。不包含 API 金鑰。"
   },
   "webdavUrlLabel": {
-    "message": "伺服器網址"
+    "message": "備份資料夾網址"
   },
   "webdavUserLabel": {
     "message": "使用者名稱（可選）"
@@ -997,13 +997,28 @@
     }
   },
   "webdavPushNotWritable": {
-    "message": "目錄存在但無法寫入。請選擇堅果雲中已存在且可寫的同步資料夾，不要使用 WebDAV 根目錄。"
+    "message": "目錄存在但無法寫入。請選擇已存在且可寫的同步資料夾，不要使用 WebDAV 根目錄。"
   },
   "webdavTargetUnavailable": {
     "message": "目標目錄不存在或無法建立。請填寫一個可寫的 WebDAV 資料夾地址。"
   },
   "webdavConflict": {
     "message": "遠端備份已變更。請先提取，再重新推送。"
+  },
+  "webdavSyncUnpaired": {
+    "message": "遠端已有備份，但此裝置尚未與其同步。請先提取，或選擇「覆蓋遠端」。"
+  },
+  "webdavSyncRemoteChanged": {
+    "message": "遠端備份在上次成功同步後已有變更。請先提取，或選擇「覆蓋遠端」。"
+  },
+  "webdavSyncDiverged": {
+    "message": "本機設定和遠端備份都有變更。可提取遠端備份，或選擇「覆蓋遠端」。"
+  },
+  "webdavHashMode": {
+    "message": "伺服器未提供可靠的版本識別碼，擴充功能將比對內容來確認變更。"
+  },
+  "webdavVerifyFailed": {
+    "message": "無法驗證剛上傳的備份。其他用戶端可能同時修改了檔案，請先提取再重試。"
   },
   "webdavConflictChoice": {
     "message": "遠端備份已變更。要用本機設定覆蓋遠端嗎？（也可取消後先提取）"

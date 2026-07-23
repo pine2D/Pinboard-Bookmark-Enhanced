@@ -936,10 +936,10 @@
     "message": "Einstellungen aus JSON-Datei importieren"
   },
   "webdavHint": {
-    "message": "Sichert deine Einstellungen auf einem eigenen WebDAV-Server (z. B. Nextcloud). Enthält niemals API-Schlüssel."
+    "message": "Sichere deine Einstellungen im angegebenen WebDAV-Ordner. Die Datei heißt pinboard-bookmark-enhanced-settings.json. API-Schlüssel sind nicht enthalten."
   },
   "webdavUrlLabel": {
-    "message": "Server-URL"
+    "message": "URL des Sicherungsordners"
   },
   "webdavUserLabel": {
     "message": "Benutzername (optional)"
@@ -1004,6 +1004,21 @@
   },
   "webdavConflict": {
     "message": "Die Sicherung auf dem Server wurde geändert. Rufe sie ab, bevor du erneut pushst."
+  },
+  "webdavSyncUnpaired": {
+    "message": "Auf dem Server liegt bereits eine Sicherung, die dieses Gerät noch nicht synchronisiert hat. Rufe sie ab oder wähle „Remote überschreiben“."
+  },
+  "webdavSyncRemoteChanged": {
+    "message": "Die Sicherung auf dem Server wurde seit der letzten erfolgreichen Synchronisierung geändert. Rufe sie ab oder wähle „Remote überschreiben“."
+  },
+  "webdavSyncDiverged": {
+    "message": "Die Einstellungen wurden sowohl auf diesem Gerät als auch in der Sicherung auf dem Server geändert. Rufe die Sicherung ab oder wähle „Remote überschreiben“."
+  },
+  "webdavHashMode": {
+    "message": "Dieser Server stellt keine verlässliche Versionskennung bereit. Änderungen werden anhand des Inhalts geprüft."
+  },
+  "webdavVerifyFailed": {
+    "message": "Die hochgeladene Sicherung konnte nicht überprüft werden. Möglicherweise hat ein anderer Client sie geändert. Rufe sie ab und versuche es erneut."
   },
   "webdavConflictChoice": {
     "message": "Das Remote-Backup wurde geändert. Mit den Einstellungen dieses Geräts überschreiben? (Du kannst auch abbrechen und es zuerst abrufen.)"

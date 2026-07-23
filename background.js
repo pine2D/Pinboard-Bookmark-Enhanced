@@ -212,8 +212,12 @@ async function loadSettings() {
     if (_settingsCache) return _settingsCache;
     const generation = _settingsCacheGeneration;
     if (!_settingsCachePending || _settingsCachePending.generation !== generation) {
-      const promise = pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS).then((settings) => {
+      const promise = pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS).then(async (settings) => {
         deobfuscateSettings(settings);
+        settings.webdavAutoPush = await pbpWebdavReadAutoPush({
+          baseUrl: settings.webdavUrl,
+          user: settings.webdavUser,
+        });
         return settings;
       });
       _settingsCachePending = { generation, promise };
@@ -1474,7 +1478,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // React to settings change: toggle the prewarm alarm on/off (settings live in sync or local based on optSyncEnabled)
 chrome.storage.onChanged.addListener((changes, area) => {
-  if ((area === "sync" || area === "local") && pbpSettingsKeysChanged(changes)) invalidateSettingsCache();
+  if (((area === "sync" || area === "local") && pbpSettingsKeysChanged(changes)) ||
+      (area === "local" && changes.webdavAutoPush)) invalidateSettingsCache();
   if (area === "sync" || area === "local") scheduleEffectiveAuthRefresh(changes, area);
   if (area === "sync" && (changes.syncApiKeys || changes.exportTargets ||
       API_KEY_FIELDS.some((key) => !!changes[key]))) {
@@ -1486,9 +1491,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if ((area === "sync" || area === "local") && (routingChanged || changes.tagSyncMode || changes.pinboardToken)) {
     syncPrewarmTagsAlarm().catch(() => {});
   }
-  if ((area === "sync" || area === "local") &&
-      (routingChanged || changes.webdavAutoPush || changes.webdavUrl ||
-       changes.webdavUser || changes.webdavPass)) {
+  if (((area === "sync" || area === "local") &&
+       (routingChanged || changes.webdavUrl || changes.webdavUser || changes.webdavPass)) ||
+      (area === "local" && changes.webdavAutoPush)) {
     syncWebdavPushAlarm().catch(() => {});
   }
 });

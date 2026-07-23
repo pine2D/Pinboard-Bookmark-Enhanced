@@ -936,10 +936,10 @@
     "message": "Importer les paramètres depuis un fichier JSON"
   },
   "webdavHint": {
-    "message": "Sauvegardez vos paramètres sur un serveur WebDAV que vous contrôlez (ex. Nextcloud). N'inclut jamais les clés API."
+    "message": "Sauvegardez vos paramètres dans le dossier WebDAV indiqué. Le fichier s'appelle pinboard-bookmark-enhanced-settings.json. Les clés API ne sont pas incluses."
   },
   "webdavUrlLabel": {
-    "message": "URL du serveur"
+    "message": "URL du dossier de sauvegarde"
   },
   "webdavUserLabel": {
     "message": "Nom d'utilisateur (facultatif)"
@@ -1005,11 +1005,26 @@
   "webdavConflict": {
     "message": "La sauvegarde distante a été modifiée. Récupérez-la avant un nouvel envoi."
   },
+  "webdavSyncUnpaired": {
+    "message": "Une sauvegarde distante existe déjà, mais cet appareil ne l’a pas encore synchronisée. Récupérez-la ou choisissez « Écraser la sauvegarde distante »."
+  },
+  "webdavSyncRemoteChanged": {
+    "message": "La sauvegarde distante a changé depuis la dernière synchronisation réussie. Récupérez-la ou choisissez « Écraser la sauvegarde distante »."
+  },
+  "webdavSyncDiverged": {
+    "message": "Les paramètres de cet appareil et la sauvegarde distante ont tous deux changé. Récupérez la sauvegarde distante ou choisissez « Écraser la sauvegarde distante »."
+  },
+  "webdavHashMode": {
+    "message": "Ce serveur ne fournit pas d’identifiant de version fiable. Les modifications sont vérifiées à partir du contenu."
+  },
+  "webdavVerifyFailed": {
+    "message": "La sauvegarde envoyée n’a pas pu être vérifiée. Un autre client l’a peut-être modifiée. Récupérez-la avant de réessayer."
+  },
   "webdavConflictChoice": {
     "message": "La sauvegarde distante a changé. L'écraser avec les réglages de cet appareil ? (Vous pouvez aussi annuler et la récupérer d'abord.)"
   },
   "webdavOverwriteRemote": {
-    "message": "Écraser la distante"
+    "message": "Écraser la sauvegarde distante"
   },
   "webdavPermDenied": {
     "message": "Permission refusée. Cliquez sur « Tester » pour l'accorder"

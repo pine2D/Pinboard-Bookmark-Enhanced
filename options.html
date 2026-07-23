@@ -113,8 +113,8 @@
         <input type="file" id="import-settings-file" accept=".json" hidden />
         <span class="save-status" id="import-status" role="status" aria-live="polite"></span>
       </div>
-      <p class="hint" data-i18n="webdavHint">Back up your settings to a WebDAV server you control (e.g. Nextcloud). Never includes API keys.</p>
-      <div class="fg"><label class="bl" for="opt-webdav-url" data-i18n="webdavUrlLabel">Server URL</label><input type="text" id="opt-webdav-url" placeholder="https://dav.example.com/backups/" autocomplete="off" spellcheck="false" /></div>
+      <p class="hint" data-i18n="webdavHint">Back up your settings to the WebDAV folder URL you enter. The file is named pinboard-bookmark-enhanced-settings.json. API keys are never included.</p>
+      <div class="fg"><label class="bl" for="opt-webdav-url" data-i18n="webdavUrlLabel">Backup folder URL</label><input type="text" id="opt-webdav-url" placeholder="https://dav.example.com/backups/" autocomplete="off" spellcheck="false" /></div>
       <p class="hint hint-warn" id="webdav-http-warn" hidden data-i18n="mdTargetWebhookHttpWarn"></p>
       <div class="fg"><label class="bl" for="opt-webdav-user" data-i18n="webdavUserLabel">Username (optional)</label><input type="text" id="opt-webdav-user" autocomplete="off" spellcheck="false" /></div>
       <div class="fg"><label class="bl" for="opt-webdav-pass" data-i18n="webdavPassLabel">Password (optional)</label><span class="key-wrap"><input type="password" id="opt-webdav-pass" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="opt-webdav-pass" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span></div>

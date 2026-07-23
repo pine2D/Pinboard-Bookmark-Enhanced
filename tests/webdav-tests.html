@@ -35,8 +35,8 @@ assertEq(pbpWebdavFileUrl("https://dav.example.com/backups"),
   "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json",
   "no trailing slash -> appends /filename");
 assertEq(pbpWebdavFileUrl("https://dav.jianguoyun.com/dav/"),
-  "https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-settings.json",
-  "provider root URL stores under the extension data collection");
+  "https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced-settings.json",
+  "configured collection is used exactly, without provider-specific rewriting");
 assertEq(pbpWebdavFileUrl("https://dav.example.com/backups/"),
   "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json",
   "trailing slash -> no double slash");
@@ -95,6 +95,10 @@ section("pbpWebdavBuildPayload — zero secrets (spec invariant #1)");
   const fullSettings = Object.assign({}, SETTINGS_DEFAULTS);
   API_KEY_FIELDS.forEach((k, i) => { fullSettings[k] = "obf:v" + i; });
   fullSettings.optTheme = "nord";
+  fullSettings.webdavUrl = "https://dav.example.com/backups/";
+  fullSettings.webdavUser = "alice";
+  fullSettings.webdavPass = "obf:secret";
+  fullSettings.webdavAutoPush = "hourly";
   fullSettings.exportTargets = { github: { enabled: true, token: "ghp_x", repo: "r" } };
   const meta = { pushedAt: "2026-07-08T00:00:00.000Z", appVersion: "2.88" };
   const payload = pbpWebdavBuildPayload(fullSettings, meta);
@@ -104,12 +108,25 @@ section("pbpWebdavBuildPayload — zero secrets (spec invariant #1)");
   assert(!("webdavPass" in payload), "webdavPass absent from payload (not a settings field yet in this batch)");
   assertEq(payload.optTheme, "nord", "a non-secret setting rides the payload");
   assert(!("token" in payload.exportTargets.github), "exportTargets token stripped");
+  assert(!("webdavUrl" in payload) && !("webdavUser" in payload) &&
+    !("webdavPass" in payload) && !("webdavAutoPush" in payload),
+    "WebDAV backup excludes its transport configuration and device schedule");
   assertEq(payload.exportTargets.github.repo, "r", "exportTargets non-secret fields survive");
   assertEq(payload._schemaVersion, 2, "envelope schema version is 2");
   assertEq(payload._webdav.pushedAt, "2026-07-08T00:00:00.000Z", "envelope pushedAt comes from meta, verbatim");
   assertEq(payload._webdav.appVersion, "2.88", "envelope appVersion comes from meta, verbatim");
   assertEq(fullSettings.optTheme, "nord", "input settings object is not mutated");
   assert("token" in fullSettings.exportTargets.github, "input exportTargets still has its token (proves no mutation)");
+
+  const manual = typeof pbpBuildBackupSnapshot === "function"
+    ? pbpBuildBackupSnapshot(fullSettings, {}, { includeWebdavTransport: true })
+    : {};
+  assert(manual.webdavUrl === fullSettings.webdavUrl && manual.webdavUser === fullSettings.webdavUser,
+    "manual backup keeps the portable WebDAV URL and username");
+  assert(!("webdavPass" in manual) && !("webdavAutoPush" in manual),
+    "manual backup excludes the WebDAV password and device schedule");
+  assert(!Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, "webdavAutoPush"),
+    "WebDAV auto-push is device-local, not a normal synced setting");
 }
 section("pbpWebdavBuildPayload — purity (no internal clock)");
 {
@@ -118,6 +135,87 @@ section("pbpWebdavBuildPayload — purity (no internal clock)");
   const p2 = pbpWebdavBuildPayload(s, { pushedAt: "B", appVersion: "1" });
   assert(p1._webdav.pushedAt === "A" && p2._webdav.pushedAt === "B",
     "pushedAt only ever reflects the meta argument -- function never calls Date.now itself");
+}
+
+section("pbpWebdavPreparePullPayload — transport stays local");
+{
+  const remote = {
+    _schemaVersion: 2,
+    optTheme: "dark",
+    webdavUrl: "https://remote.example/dav/",
+    webdavUser: "remote-user",
+    webdavPass: "remote-pass",
+    webdavAutoPush: "daily",
+  };
+  const prepared = typeof pbpWebdavPreparePullPayload === "function"
+    ? pbpWebdavPreparePullPayload(remote) : {};
+  assert(!("webdavUrl" in prepared) && !("webdavUser" in prepared) &&
+    !("webdavPass" in prepared) && !("webdavAutoPush" in prepared),
+    "WebDAV pull drops transport and device schedule fields from legacy remote files");
+  assert(remote.webdavUrl === "https://remote.example/dav/" && remote.webdavAutoPush === "daily",
+    "preparing a WebDAV pull does not mutate the downloaded object");
+}
+
+section("WebDAV content identity — exact bytes vs semantic settings");
+{
+  const a = {
+    z: 1,
+    nested: { b: 2, a: 1 },
+    list: [{ y: 2, x: 1 }, "a"],
+    _schemaVersion: 2,
+    _webdav: { pushedAt: "A", appVersion: "1" },
+  };
+  const b = {
+    _webdav: { appVersion: "2", pushedAt: "B" },
+    _schemaVersion: 2,
+    list: [{ x: 1, y: 2 }, "a"],
+    nested: { a: 1, b: 2 },
+    z: 1,
+  };
+  const stableA = typeof pbpWebdavStableStringify === "function"
+    ? pbpWebdavStableStringify(a) : "";
+  const stableB = typeof pbpWebdavStableStringify === "function"
+    ? pbpWebdavStableStringify(b) : "missing";
+  check("stable stringify ignores object insertion order",
+    stableA !== "" && stableA !== stableB && stableA.indexOf('"nested":{"a":1,"b":2}') >= 0);
+
+  const semanticA = typeof pbpWebdavSemanticValue === "function"
+    ? pbpWebdavSemanticValue(a) : null;
+  const semanticB = typeof pbpWebdavSemanticValue === "function"
+    ? pbpWebdavSemanticValue(b) : null;
+  const semanticTextA = semanticA && typeof pbpWebdavStableStringify === "function"
+    ? pbpWebdavStableStringify(semanticA) : "";
+  const semanticTextB = semanticB && typeof pbpWebdavStableStringify === "function"
+    ? pbpWebdavStableStringify(semanticB) : "missing";
+  check("semantic identity ignores volatile _webdav metadata",
+    semanticTextA !== "" && semanticTextA === semanticTextB);
+  check("semantic identity retains schema and setting content",
+    semanticA && semanticA._schemaVersion === 2 && semanticA.nested.a === 1 && !("_webdav" in semanticA));
+  check("semantic normalization does not mutate the backup payload",
+    semanticA && semanticB && a._webdav.pushedAt === "A" && b._webdav.appVersion === "2");
+  check("stable stringify preserves array order",
+    typeof pbpWebdavStableStringify === "function" &&
+    pbpWebdavStableStringify(["b", "a"]) !== pbpWebdavStableStringify(["a", "b"]));
+}
+
+section("pbpWebdavDecide — three-way semantic comparison");
+{
+  const decide = (input) => typeof pbpWebdavDecide === "function"
+    ? pbpWebdavDecide(input) : "missing";
+  assertEq(decide({ hasBaseline: true, baselineHash: "B", localHash: "L", remoteHash: "L", remoteExists: true }),
+    "same", "local and remote semantic content already converged -> no upload");
+  assertEq(decide({ hasBaseline: true, baselineHash: "B", localHash: "L", remoteHash: "B", remoteExists: true }),
+    "push", "only local content changed -> safe push");
+  assertEq(decide({ hasBaseline: true, baselineHash: "B", localHash: "B", remoteHash: "R", remoteExists: true }),
+    "remote-changed", "only remote content changed -> stop for pull or explicit overwrite");
+  assertEq(decide({ hasBaseline: true, baselineHash: "B", localHash: "L", remoteHash: "R", remoteExists: true }),
+    "diverged", "local and remote both changed differently -> divergence");
+  assertEq(decide({ hasBaseline: false, baselineHash: "", localHash: "L", remoteHash: "R", remoteExists: true }),
+    "unpaired", "existing remote without a local baseline -> no blind takeover");
+  assertEq(decide({ hasBaseline: false, baselineHash: "", localHash: "L", remoteHash: "L", remoteExists: true }),
+    "same", "matching local and remote content can establish a missing baseline without uploading");
+  assertEq(decide({ hasBaseline: false, baselineHash: "", localHash: "L", remoteHash: "", remoteExists: false }),
+    "create", "missing remote without a baseline -> create-only upload");
 }
 
 section("pbpWebdavBuildPayload — optional highlights");
@@ -210,18 +308,9 @@ section("pbpWebdavBuildRequest");
   assertEq(updatePush.headers["If-Match"], '"v1"', "known remote revision is updated with If-Match");
   assert(!("If-None-Match" in updatePush.headers), "known remote revision never sends the create-only precondition");
 
-  const coarseUpdate = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { known: true, etag: "" }));
-  assertEq(coarseUpdate.headers["If-Match"], "*", "known file without a strong ETag stays writable without reverting to create-only mode");
-  assert(!("If-None-Match" in coarseUpdate.headers), "known file without a strong ETag never sends If-None-Match");
   assert(pbpWebdavValidEtag('"strong"') && !pbpWebdavValidEtag('W/"weak"') &&
     !pbpWebdavValidEtag("*") && !pbpWebdavValidEtag("unquoted"),
     "only syntactically valid strong ETags are eligible for exact If-Match CAS");
-
-  assertEq(pbpWebdavNormalizeEtag('"abc-gzip"'), '"abc"',
-    "Apache mod_deflate suffix stripped from GET etags (the pull->push 412 loop)");
-  assertEq(pbpWebdavNormalizeEtag('"abc-br"'), '"abc"', "brotli suffix stripped too");
-  assertEq(pbpWebdavNormalizeEtag('"plain"'), '"plain"', "clean etag passes through unchanged");
-  assertEq(pbpWebdavNormalizeEtag('W/"weak-gzip"'), "", "weak/invalid input normalizes to empty, never a fabricated tag");
 
   const pull = pbpWebdavBuildRequest("pull", cfg);
   assertEq(pull.method, "GET", "pull -> GET");
@@ -258,6 +347,471 @@ section("pbpWebdavBuildRequest");
 }
 
 async function runChromeLayerTests() {
+  section("pbpWebdavSha256 — exact UTF-8 content identity");
+  const abcHash = typeof pbpWebdavSha256 === "function" ? await pbpWebdavSha256("abc") : "";
+  const abdHash = typeof pbpWebdavSha256 === "function" ? await pbpWebdavSha256("abd") : "";
+  assertEq(abcHash, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    "SHA-256 uses the exact UTF-8 bytes");
+  check("different remote bytes produce a different full-content hash",
+    abcHash !== "" && abdHash !== "" && abcHash !== abdHash);
+
+  section("WebDAV sync state — hashed target binding");
+  const stateCfg = { baseUrl: "https://dav.example.com/backups/", user: "alice", pass: "secret" };
+  const targetId = typeof pbpWebdavTargetId === "function" ? await pbpWebdavTargetId(stateCfg) : "";
+  const sameTargetId = typeof pbpWebdavTargetId === "function" ? await pbpWebdavTargetId(Object.assign({}, stateCfg)) : "missing";
+  const otherUserId = typeof pbpWebdavTargetId === "function"
+    ? await pbpWebdavTargetId(Object.assign({}, stateCfg, { user: "bob" })) : "missing";
+  const otherUrlId = typeof pbpWebdavTargetId === "function"
+    ? await pbpWebdavTargetId(Object.assign({}, stateCfg, { baseUrl: "https://dav.example.com/other/" })) : "missing";
+  check("target id is deterministic SHA-256 and stores no plaintext URL",
+    /^[a-f0-9]{64}$/.test(targetId) && targetId === sameTargetId && !targetId.includes("dav.example.com"));
+  check("WebDAV username is part of the remote resource identity",
+    targetId !== "" && otherUserId !== "" && otherUserId !== targetId);
+  check("WebDAV file URL is part of the remote resource identity",
+    targetId !== "" && otherUrlId !== "" && otherUrlId !== targetId);
+
+  const stateStore = {};
+  const realStateChrome = globalThis.chrome;
+  try {
+    globalThis.chrome = {
+      storage: {
+        local: {
+          get: async (key) => key in stateStore ? { [key]: stateStore[key] } : {},
+          set: async (data) => Object.assign(stateStore, data),
+        },
+      },
+    };
+    if (typeof pbpWebdavRememberState === "function") {
+      await pbpWebdavRememberState(stateCfg, {
+        mode: "etag",
+        etag: '"v1"',
+        remoteHash: "wire",
+        settingsHash: "semantic",
+        lastSuccessAt: 1,
+      });
+    }
+    const storedState = typeof PBP_WEBDAV_SYNC_STATE_KEY === "string"
+      ? stateStore[PBP_WEBDAV_SYNC_STATE_KEY] : null;
+    check("persisted sync state stores targetId instead of plaintext target and username",
+      storedState && storedState.targetId === targetId && !("target" in storedState) && !("user" in storedState));
+    const readState = typeof pbpWebdavReadState === "function"
+      ? await pbpWebdavReadState(stateCfg) : null;
+    check("matching target reads the last confirmed semantic and transport baseline",
+      readState && readState.known === true && readState.mode === "etag" &&
+      readState.etag === '"v1"' && readState.remoteHash === "wire" && readState.settingsHash === "semantic");
+    const otherState = typeof pbpWebdavReadState === "function"
+      ? await pbpWebdavReadState(Object.assign({}, stateCfg, { user: "bob" })) : null;
+    check("a different target cannot inherit another target's baseline or capability",
+      otherState && otherState.known === false && otherState.mode === "unknown" &&
+      otherState.etag === "" && otherState.settingsHash === "");
+  } finally {
+    globalThis.chrome = realStateChrome;
+  }
+
+  section("WebDAV auto-push — device-local migration");
+  const realAutoPushChrome = globalThis.chrome;
+  const realAutoPushCache = _settingsStorageCache;
+  const autoLocal = {};
+  const autoSync = {};
+  const getFrom = (store) => async (query) => {
+    if (query === null) return Object.assign({}, store);
+    if (typeof query === "string") return query in store ? { [query]: store[query] } : {};
+    if (Array.isArray(query)) {
+      const out = {};
+      query.forEach((key) => { if (key in store) out[key] = store[key]; });
+      return out;
+    }
+    const out = Object.assign({}, query || {});
+    Object.keys(query || {}).forEach((key) => { if (key in store) out[key] = store[key]; });
+    return out;
+  };
+  const resetAutoPushStores = () => {
+    Object.keys(autoLocal).forEach((key) => delete autoLocal[key]);
+    Object.keys(autoSync).forEach((key) => delete autoSync[key]);
+    autoLocal.optSyncEnabled = true;
+    autoSync.webdavAutoPush = "daily";
+    _settingsStorageCache = null;
+  };
+  try {
+    globalThis.chrome = {
+      storage: {
+        local: {
+          get: getFrom(autoLocal),
+          set: async (data) => Object.assign(autoLocal, data),
+        },
+        sync: {
+          get: getFrom(autoSync),
+          set: async (data) => Object.assign(autoSync, data),
+        },
+      },
+    };
+    const autoCfg = { baseUrl: "https://dav.example.com/backups/", user: "alice" };
+
+    resetAutoPushStores();
+    autoLocal.webdavAutoPush = "hourly";
+    const existingLocal = typeof pbpWebdavReadAutoPush === "function"
+      ? await pbpWebdavReadAutoPush(autoCfg) : "missing";
+    check("an existing device-local schedule wins over the legacy synced value",
+      existingLocal === "hourly" && autoLocal._webdavAutoPushLocalV1 === true);
+
+    resetAutoPushStores();
+    const unmatched = typeof pbpWebdavReadAutoPush === "function"
+      ? await pbpWebdavReadAutoPush(autoCfg) : "missing";
+    check("legacy sync schedule defaults off without proof this device used the current target",
+      unmatched === "off" && autoLocal.webdavAutoPush === "off" &&
+      autoLocal._webdavAutoPushLocalV1 === true);
+
+    resetAutoPushStores();
+    autoLocal.webdavLastPush = {
+      ok: true,
+      target: obfuscateKey(pbpWebdavFileUrl(autoCfg.baseUrl)),
+      user: obfuscateKey(autoCfg.user),
+    };
+    const migrated = typeof pbpWebdavReadAutoPush === "function"
+      ? await pbpWebdavReadAutoPush(autoCfg) : "missing";
+    check("a matching successful local record migrates the legacy synced schedule once",
+      migrated === "daily" && autoLocal.webdavAutoPush === "daily");
+
+    resetAutoPushStores();
+    autoLocal._webdavEtagState = {
+      target: obfuscateKey(pbpWebdavFileUrl(autoCfg.baseUrl)),
+      user: obfuscateKey(autoCfg.user),
+      etag: '"legacy-pull"',
+    };
+    const migratedFromPull = typeof pbpWebdavReadAutoPush === "function"
+      ? await pbpWebdavReadAutoPush(autoCfg) : "missing";
+    check("a matching legacy pull baseline safely migrates the device schedule",
+      migratedFromPull === "daily" && autoLocal.webdavAutoPush === "daily");
+
+    resetAutoPushStores();
+    autoLocal.webdavLastPush = {
+      ok: true,
+      target: obfuscateKey(pbpWebdavFileUrl("https://dav.example.com/other/")),
+      user: obfuscateKey(autoCfg.user),
+    };
+    const switchedTarget = typeof pbpWebdavReadAutoPush === "function"
+      ? await pbpWebdavReadAutoPush(autoCfg) : "missing";
+    check("a successful record for another target cannot enable this device's schedule",
+      switchedTarget === "off" && autoLocal.webdavAutoPush === "off");
+
+    const normalized = typeof pbpWebdavWriteAutoPush === "function"
+      ? await pbpWebdavWriteAutoPush("invalid") : "missing";
+    check("device-local writes normalize invalid schedules to off and retain the migration marker",
+      normalized === "off" && autoLocal.webdavAutoPush === "off" &&
+      autoLocal._webdavAutoPushLocalV1 === true);
+
+    globalThis.chrome.storage.local.get = async () => { throw new Error("storage unavailable"); };
+    const unavailable = typeof pbpWebdavReadAutoPush === "function"
+      ? await pbpWebdavReadAutoPush(autoCfg) : "missing";
+    check("an unavailable local storage area degrades scheduling to off without breaking settings load",
+      unavailable === "off");
+  } finally {
+    globalThis.chrome = realAutoPushChrome;
+    _settingsStorageCache = realAutoPushCache;
+  }
+
+  section("pbpWebdavReadRemote — validated body and dual hashes");
+  const realRemoteFetch = globalThis.fetch;
+  try {
+    const remoteA = JSON.stringify({ _schemaVersion: 2, optTheme: "dark", _webdav: { pushedAt: "A" } });
+    const remoteB = JSON.stringify({ optTheme: "dark", _webdav: { pushedAt: "B" }, _schemaVersion: 2 });
+    let remoteBody = remoteA;
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: (name) => /etag/i.test(name) ? '"remote-v1"' : null },
+      text: async () => remoteBody,
+    });
+    const readA = typeof pbpWebdavReadRemote === "function"
+      ? await pbpWebdavReadRemote(stateCfg) : null;
+    remoteBody = remoteB;
+    const readB = typeof pbpWebdavReadRemote === "function"
+      ? await pbpWebdavReadRemote(stateCfg) : null;
+    check("remote read returns parsed data, strong ETag and both content identities",
+      readA && readA.ok && readA.exists && readA.data.optTheme === "dark" &&
+      readA.etag === '"remote-v1"' && /^[a-f0-9]{64}$/.test(readA.remoteHash) &&
+      /^[a-f0-9]{64}$/.test(readA.settingsHash));
+    check("volatile metadata changes exact bytes but not semantic settings identity",
+      readA && readB && readA.remoteHash !== readB.remoteHash && readA.settingsHash === readB.settingsHash);
+
+    globalThis.fetch = async () => ({ ok: false, status: 404, headers: { get: () => null }, text: async () => "" });
+    const missingRemote = typeof pbpWebdavReadRemote === "function"
+      ? await pbpWebdavReadRemote(stateCfg) : null;
+    check("remote 404 is a valid missing-resource result, not a network failure",
+      missingRemote && missingRemote.ok && missingRemote.exists === false);
+
+    globalThis.fetch = async () => ({ ok: true, status: 200, headers: { get: () => '"bad"' }, text: async () => "<html>" });
+    const invalidRemote = typeof pbpWebdavReadRemote === "function"
+      ? await pbpWebdavReadRemote(stateCfg) : null;
+    check("invalid remote JSON is rejected before it can become a sync baseline",
+      invalidRemote && !invalidRemote.ok && invalidRemote.error === "invalid");
+  } finally {
+    globalThis.fetch = realRemoteFetch;
+  }
+
+  section("pbpWebdavUploadText — ETag CAS with hash-verified fallback");
+  const realUploadChrome = globalThis.chrome;
+  const realUploadFetch = globalThis.fetch;
+  const uploadStore = {};
+  const uploadCfg = { baseUrl: "https://dav.example.com/protocol/", user: "alice", pass: "secret" };
+  const localText = JSON.stringify({ _schemaVersion: 2, optTheme: "dark", _webdav: { pushedAt: "local" } });
+  const baseText = JSON.stringify({ _schemaVersion: 2, optTheme: "light", _webdav: { pushedAt: "base" } });
+  const otherText = JSON.stringify({ _schemaVersion: 2, optTheme: "auto", _webdav: { pushedAt: "remote" } });
+  const response = (status, text = "", etag = "") => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (name) => /etag/i.test(name) ? etag || null : null },
+    text: async () => text,
+  });
+  const resetUploadStore = () => {
+    Object.keys(uploadStore).forEach((key) => delete uploadStore[key]);
+  };
+  const seedUploadState = async (text, etag = '"base"', mode = "etag") => {
+    await pbpWebdavRememberState(uploadCfg, {
+      mode,
+      etag,
+      remoteHash: await pbpWebdavSha256(text),
+      settingsHash: await pbpWebdavSha256(
+        pbpWebdavStableStringify(pbpWebdavSemanticValue(JSON.parse(text)))),
+      lastSuccessAt: 1,
+    });
+  };
+  const upload = async (options) => typeof pbpWebdavUploadText === "function"
+    ? pbpWebdavUploadText(uploadCfg, localText, options) : null;
+  try {
+    globalThis.chrome = {
+      storage: {
+        local: {
+          get: async (key) => key in uploadStore ? { [key]: uploadStore[key] } : {},
+          set: async (data) => Object.assign(uploadStore, data),
+        },
+      },
+    };
+
+    const sameRequests = [];
+    globalThis.fetch = async (_url, opts) => {
+      sameRequests.push(opts.method);
+      return response(200, localText, '"same"');
+    };
+    const same = await upload();
+    check("matching unpaired remote adopts a baseline without another PUT",
+      same && same.ok && same.noop === true && sameRequests.join(",") === "GET");
+    const pairedState = typeof pbpWebdavReadState === "function" ? await pbpWebdavReadState(uploadCfg) : null;
+    check("no-op convergence records the verified remote ETag and semantic baseline",
+      pairedState && pairedState.known && pairedState.etag === '"same"' && pairedState.mode === "etag");
+
+    resetUploadStore();
+    const unpairedRequests = [];
+    globalThis.fetch = async (_url, opts) => {
+      unpairedRequests.push(opts.method);
+      return response(200, otherText, '"other"');
+    };
+    const unpaired = await upload();
+    const unpairedState = typeof pbpWebdavReadState === "function"
+      ? await pbpWebdavReadState(uploadCfg) : null;
+    check("different existing remote without a baseline is not overwritten",
+      unpaired && !unpaired.ok && unpaired.error === "unpaired" &&
+      unpairedRequests.join(",") === "GET" &&
+      unpairedState?.unresolvedConflict?.kind === "unpaired" &&
+      unpairedState.unresolvedConflict.remoteHash === await pbpWebdavSha256(otherText));
+
+    resetUploadStore();
+    await seedUploadState(baseText, '"old"');
+    const refreshRequests = [];
+    let refreshGet = 0;
+    globalThis.fetch = async (_url, opts) => {
+      refreshRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
+      if (opts.method === "GET") {
+        refreshGet++;
+        return refreshGet < 3 ? response(200, baseText, refreshGet === 1 ? '"old"' : '"fresh"')
+          : response(200, localText, '"written"');
+      }
+      if (opts.headers["If-Match"] === '"old"') return response(412);
+      return response(200);
+    };
+    const refreshed = await upload();
+    const refreshPuts = refreshRequests.filter((request) => request.method === "PUT");
+    check("412 re-reads unchanged content and retries once with the fresh strong ETag",
+      refreshed && refreshed.ok && refreshPuts.length === 2 &&
+      refreshPuts[0].headers["If-Match"] === '"old"' &&
+      refreshPuts[1].headers["If-Match"] === '"fresh"');
+    const refreshedState = await pbpWebdavReadState(uploadCfg);
+    check("verified ETag retry commits the post-write revision",
+      refreshedState.mode === "etag" && refreshedState.etag === '"written"' &&
+      refreshedState.settingsHash === refreshed.settingsHash);
+
+    resetUploadStore();
+    await seedUploadState(baseText, '"old"');
+    const vanishedEtagRequests = [];
+    let vanishedEtagGet = 0;
+    globalThis.fetch = async (_url, opts) => {
+      vanishedEtagRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
+      if (opts.method === "GET") {
+        vanishedEtagGet++;
+        if (vanishedEtagGet === 1) return response(200, baseText, '"old"');
+        if (vanishedEtagGet === 2) return response(200, baseText);
+        return response(200, localText);
+      }
+      if (opts.headers["If-Match"]) return response(412);
+      return response(200);
+    };
+    const vanishedEtag = await upload();
+    const vanishedEtagPuts = vanishedEtagRequests.filter((request) => request.method === "PUT");
+    check("a strong ETag that disappears after 412 downgrades to verified hash mode",
+      vanishedEtag?.ok && vanishedEtag.mode === "hash" && vanishedEtagPuts.length === 2 &&
+      vanishedEtagPuts[0].headers["If-Match"] === '"old"' &&
+      !("If-Match" in vanishedEtagPuts[1].headers));
+
+    resetUploadStore();
+    await seedUploadState(baseText, '"old"');
+    const fallbackRequests = [];
+    let fallbackGet = 0;
+    globalThis.fetch = async (_url, opts) => {
+      fallbackRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
+      if (opts.method === "GET") {
+        fallbackGet++;
+        return fallbackGet < 4 ? response(200, baseText, '"fresh"') : response(200, localText);
+      }
+      if (opts.headers["If-Match"]) return response(412);
+      return response(200);
+    };
+    const fallback = await upload();
+    const fallbackPuts = fallbackRequests.filter((request) => request.method === "PUT");
+    check("repeated false 412 falls back to one unconditional PUT only after the remote still matches the baseline",
+      fallback && fallback.ok && fallbackPuts.length === 3 &&
+      fallbackPuts[0].headers["If-Match"] === '"fresh"' &&
+      fallbackPuts[1].headers["If-Match"] === '"fresh"' &&
+      !("If-Match" in fallbackPuts[2].headers) && !("If-None-Match" in fallbackPuts[2].headers));
+    check("a proven incompatible conditional path is remembered as target-bound hash mode",
+      (await pbpWebdavReadState(uploadCfg)).mode === "hash");
+
+    resetUploadStore();
+    await seedUploadState(baseText, "", "hash");
+    const hashRequests = [];
+    let hashGet = 0;
+    globalThis.fetch = async (_url, opts) => {
+      hashRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
+      if (opts.method === "GET") return ++hashGet === 1 ? response(200, baseText) : response(200, localText);
+      return response(200);
+    };
+    const hashMode = await upload();
+    const hashPut = hashRequests.find((request) => request.method === "PUT");
+    check("missing/unreliable ETag uses preflight GET, unconditional PUT and postflight GET",
+      hashMode && hashMode.ok && hashRequests.map((request) => request.method).join(",") === "GET,PUT,GET" &&
+      !("If-Match" in hashPut.headers) && !("If-None-Match" in hashPut.headers));
+    check("successful compatibility upload keeps hash mode",
+      hashMode && hashMode.ok && (await pbpWebdavReadState(uploadCfg)).mode === "hash");
+
+    resetUploadStore();
+    await seedUploadState(baseText, "", "hash");
+    globalThis.fetch = async (_url, opts) =>
+      opts.method === "GET" ? response(200, baseText) : response(200);
+    const notVerified = await upload();
+    check("post-write content mismatch returns verify-failed instead of claiming success",
+      notVerified && !notVerified.ok && notVerified.error === "verify-failed");
+    check("failed post-write verification keeps the last successful baseline",
+      notVerified && !notVerified.ok && (await pbpWebdavReadState(uploadCfg)).settingsHash ===
+      await pbpWebdavSha256(pbpWebdavStableStringify(pbpWebdavSemanticValue(JSON.parse(baseText)))));
+
+    resetUploadStore();
+    const createRequests = [];
+    globalThis.fetch = async (_url, opts) => {
+      createRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
+      if (opts.method === "GET" && createRequests.length === 1) return response(404);
+      if (opts.method === "GET") return response(200, localText, '"created"');
+      return response(201);
+    };
+    const created = await upload();
+    const createPut = createRequests.find((request) => request.method === "PUT");
+    check("missing remote is created with If-None-Match:* and verified by GET",
+      created && created.ok && createPut.headers["If-None-Match"] === "*" &&
+      createRequests.map((request) => request.method).join(",") === "GET,PUT,GET");
+  } finally {
+    globalThis.chrome = realUploadChrome;
+    globalThis.fetch = realUploadFetch;
+  }
+
+  section("pbpWebdavPush — integrates snapshot capture with verified upload");
+  const realIntegratedChrome = globalThis.chrome;
+  const realIntegratedFetch = globalThis.fetch;
+  const realIntegratedCache = _settingsStorageCache;
+  const integratedStore = Object.assign({}, SETTINGS_DEFAULTS, {
+    optSyncEnabled: false,
+    webdavUrl: "https://dav.example.com/integrated/",
+    optTheme: "light",
+  });
+  const integratedGet = async (keys) => {
+    if (keys === null) return Object.assign({}, integratedStore);
+    if (typeof keys === "string") return keys in integratedStore ? { [keys]: integratedStore[keys] } : {};
+    const out = Object.assign({}, Array.isArray(keys) ? {} : keys || {});
+    (Array.isArray(keys) ? keys : Object.keys(keys || {})).forEach((key) => {
+      if (key in integratedStore) out[key] = integratedStore[key];
+    });
+    return out;
+  };
+  let integratedBody = "";
+  let integratedEtag = "";
+  const integratedRequests = [];
+  try {
+    _settingsStorageCache = null;
+    globalThis.chrome = {
+      permissions: { contains: async () => true },
+      runtime: { getManifest: () => ({ version: "test-version" }) },
+      storage: {
+        local: {
+          get: integratedGet,
+          set: async (data) => Object.assign(integratedStore, data),
+          remove: async () => {},
+        },
+        sync: { get: integratedGet, set: async () => {}, remove: async () => {} },
+        onChanged: { addListener() {} },
+      },
+    };
+    globalThis.fetch = async (_url, opts) => {
+      integratedRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
+      if (opts.method === "PROPFIND") return response(207);
+      if (opts.method === "GET") return integratedBody ? response(200, integratedBody, integratedEtag) : response(404);
+      if (opts.method === "PUT") {
+        integratedBody = String(opts.body);
+        integratedEtag = integratedEtag === '"v1"' ? '"v2"' : '"v1"';
+        return response(200);
+      }
+      throw new Error("unexpected integrated method " + opts.method);
+    };
+
+    const integratedCfg = { baseUrl: integratedStore.webdavUrl, user: "", pass: "" };
+    const firstIntegrated = await pbpWebdavPush(integratedCfg);
+    const firstIntegratedPut = integratedRequests.find((request) => request.method === "PUT");
+    check("first push creates only after a 404 preflight and verifies the written body",
+      firstIntegrated.ok && integratedRequests.map((request) => request.method).join(",") === "PROPFIND,GET,PUT,GET" &&
+      firstIntegratedPut.headers["If-None-Match"] === "*");
+    const firstIntegratedState = typeof pbpWebdavReadState === "function"
+      ? await pbpWebdavReadState(integratedCfg) : null;
+    check("integrated push commits both verified hashes and the GET ETag",
+      firstIntegratedState && firstIntegratedState.known && firstIntegratedState.etag === '"v1"' &&
+      /^[a-f0-9]{64}$/.test(firstIntegratedState.remoteHash) &&
+      /^[a-f0-9]{64}$/.test(firstIntegratedState.settingsHash));
+
+    integratedRequests.length = 0;
+    const sameIntegrated = await pbpWebdavPush(integratedCfg);
+    check("same settings with a new pushedAt are a no-op instead of another upload",
+      sameIntegrated.ok && sameIntegrated.noop === true &&
+      integratedRequests.map((request) => request.method).join(",") === "PROPFIND,GET");
+
+    integratedStore.optTheme = "dark";
+    integratedRequests.length = 0;
+    const changedIntegrated = await pbpWebdavPush(integratedCfg);
+    const changedIntegratedPut = integratedRequests.find((request) => request.method === "PUT");
+    check("a local-only change uses the freshly read strong ETag and post-write verification",
+      changedIntegrated.ok && changedIntegratedPut.headers["If-Match"] === '"v1"' &&
+      integratedRequests.map((request) => request.method).join(",") === "PROPFIND,GET,PUT,GET",
+      JSON.stringify({ changedIntegrated, integratedRequests }));
+  } finally {
+    globalThis.chrome = realIntegratedChrome;
+    globalThis.fetch = realIntegratedFetch;
+    _settingsStorageCache = realIntegratedCache;
+  }
+
   section("background routing-change alarm refresh");
   const backgroundSource = await fetch("../background.js").then((response) => response.text());
   const storageListener = backgroundSource.slice(
@@ -267,7 +821,7 @@ async function runChromeLayerTests() {
   check("ordinary/key sync route changes recompute scheduled WebDAV and tag alarms",
     storageListener.includes("changes.optSyncEnabled || changes.syncApiKeys") &&
     storageListener.includes("routingChanged || changes.tagSyncMode") &&
-    storageListener.includes("routingChanged || changes.webdavAutoPush") &&
+    storageListener.includes('area === "local" && changes.webdavAutoPush') &&
     backgroundSource.includes("queuePrewarmAlarmSync = pbpCreateRecoveringTail()") &&
     backgroundSource.includes("queueWebdavAlarmSync = pbpCreateRecoveringTail()"));
 
@@ -331,7 +885,10 @@ async function runChromeLayerTests() {
     check("write probe rejects insecure endpoint", !writable.ok && writable.error === "insecure");
     const pushed = await pbpWebdavPush(cfg);
     check("push rejects insecure endpoint", !pushed.ok && pushed.error === "insecure");
-    check("insecure push persists its failure status", persisted.webdavLastPush?.error === "insecure" && persisted.webdavLastPush.ts === pushed.ts);
+    check("insecure push persists a target-bound failure status",
+      persisted.webdavLastPush?.error === "insecure" &&
+      persisted.webdavLastPush.ts === pushed.ts &&
+      persisted.webdavLastPush.targetId === await pbpWebdavTargetId(cfg));
     check("insecure push preserves WebDAV configuration", persisted.webdavUrl === "https://saved.example/dav/" && persisted.webdavAutoPush === "daily");
     const pulled = await pbpWebdavPull(cfg);
     check("pull rejects insecure endpoint", !pulled.ok && pulled.error === "insecure");
@@ -364,6 +921,8 @@ async function runChromeLayerTests() {
   const puts = [];
   const pushMethods = [];
   const pushRedirects = [], pushCacheModes = [];
+  let liveBody = "";
+  let liveEtag = "";
   function storageGet(keys) {
     if (keys === null) return Promise.resolve(Object.assign({}, localArea));
     if (Array.isArray(keys)) {
@@ -397,15 +956,25 @@ async function runChromeLayerTests() {
       pushMethods.push(opts.method);
       pushRedirects.push(opts.redirect);
       pushCacheModes.push(opts.cache);
-      if (opts.method === "PUT") puts.push(JSON.parse(opts.body));
-      return Promise.resolve({ ok: true, status: opts.method === "PROPFIND" ? 207 : 200 });
+      if (opts.method === "PROPFIND") return Promise.resolve(response(207));
+      if (opts.method === "GET") {
+        return Promise.resolve(liveBody ? response(200, liveBody, liveEtag) : response(404));
+      }
+      if (opts.method === "PUT") {
+        puts.push(JSON.parse(opts.body));
+        liveBody = String(opts.body);
+        liveEtag = liveEtag === '"live-v1"' ? '"live-v2"' : '"live-v1"';
+        return Promise.resolve(response(200));
+      }
+      return Promise.resolve(response(405));
     };
     const res = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: false });
     check("push succeeds under stubbed chrome/fetch", res.ok === true);
-    check("push verifies the collection before PUT", pushMethods[0] === "PROPFIND" && pushMethods[1] === "PUT");
+    check("push verifies the collection and remote body before/after PUT",
+      pushMethods.join(",") === "PROPFIND,GET,PUT,GET");
     check("WebDAV fetches reject redirects and bypass HTTP response caches",
-      pushRedirects.length === 2 && pushRedirects.every((mode) => mode === "error") &&
-      pushCacheModes.length === 2 && pushCacheModes.every((mode) => mode === "no-store"));
+      pushRedirects.length === 4 && pushRedirects.every((mode) => mode === "error") &&
+      pushCacheModes.length === 4 && pushCacheModes.every((mode) => mode === "no-store"));
     check("live includeHighlights=false omits _highlights despite stale stored true",
       puts[0] && !("_highlights" in puts[0]));
     check("live includeHighlights=false is serialized into pushed settings",
@@ -422,62 +991,31 @@ async function runChromeLayerTests() {
       hlPut._highlightsOwner === "alice");
     check("push never leaks the pinboardToken into the payload (SEC-1 belt)",
       !("pinboardToken" in hlPut));
-    // User-confirmed overwrite (conflict-choice UI): even with a stale
-    // CAS baseline stored, force must send a PLAIN unconditional PUT.
-    localArea[PBP_WEBDAV_ETAG_STATE_KEY] = {
-      target: obfuscateKey(pbpWebdavFileUrl("https://dav.example.com/backups/")),
-      user: obfuscateKey(""),
-      etag: '"stale-rev"',
-    };
+    // User-confirmed overwrite: a deliberately different remote is replaced
+    // without an If-Match/If-None-Match precondition, then verified by GET.
+    liveBody = JSON.stringify({ _schemaVersion: 2, optTheme: "remote" });
+    liveEtag = '"remote-rev"';
     const forceHeaderLog = [];
     globalThis.fetch = (_url, opts) => {
-      forceHeaderLog.push(opts.headers || {});
-      return Promise.resolve({ ok: true, status: opts.method === "PROPFIND" ? 207 : 200 });
+      forceHeaderLog.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
+      if (opts.method === "PROPFIND") return Promise.resolve(response(207));
+      if (opts.method === "GET") return Promise.resolve(response(200, liveBody, liveEtag));
+      if (opts.method === "PUT") {
+        liveBody = String(opts.body);
+        liveEtag = '"forced"';
+        return Promise.resolve(response(200));
+      }
+      return Promise.resolve(response(405));
     };
     const forced = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", force: true });
-    const forcePutHeaders = forceHeaderLog[1] || {};
+    const forcePutHeaders = forceHeaderLog.find((entry) => entry.method === "PUT")?.headers || {};
     check("force push succeeds and ignores the stored stale baseline", forced.ok === true);
     check("force push sends NO preconditions (plain overwrite, recreates a deleted file too)",
       !("If-Match" in forcePutHeaders) && !("If-None-Match" in forcePutHeaders));
-    const forcedRev = await pbpWebdavReadRevision({ baseUrl: "https://dav.example.com/backups/", user: "" });
-    check("force success reseeds the baseline (known-exists when the PUT returns no etag)",
-      forcedRev.known === true);
-    delete localArea[PBP_WEBDAV_ETAG_STATE_KEY];
+    const forcedState = await pbpWebdavReadState({ baseUrl: "https://dav.example.com/backups/", user: "" });
+    check("force success reseeds the verified semantic and ETag baseline",
+      forcedState.known === true && forcedState.etag === '"forced"');
 
-    // Alias-safe Apache workaround: a suffixed baseline 412s; a fresh GET
-    // proving the byte-identical suffixed etag authorizes ONE de-suffixed
-    // retry. A different GET etag keeps the genuine conflict.
-    localArea[PBP_WEBDAV_ETAG_STATE_KEY] = {
-      target: obfuscateKey(pbpWebdavFileUrl("https://dav.example.com/backups/")),
-      user: obfuscateKey(""),
-      etag: '"x-gzip"',
-    };
-    const healSeq = [];
-    globalThis.fetch = (_url, opts) => {
-      healSeq.push({ method: opts.method, ifMatch: (opts.headers || {})["If-Match"] || "" });
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
-      if (opts.method === "GET") return Promise.resolve({ ok: true, status: 200, headers: { get: (h) => /etag/i.test(h) ? '"x-gzip"' : null } });
-      if ((opts.headers || {})["If-Match"] === '"x-gzip"') return Promise.resolve({ ok: false, status: 412 });
-      return Promise.resolve({ ok: true, status: 200 });
-    };
-    const healed = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "" });
-    check("suffixed-baseline 412 heals via the proven de-suffixed retry (pull->push loop fix)", healed.ok === true);
-    check("healing sequence = conditional PUT, verifying GET, entity-tag PUT",
-      healSeq.map((s) => s.method).join(",") === "PROPFIND,PUT,GET,PUT" &&
-      healSeq[1].ifMatch === '"x-gzip"' && healSeq[3].ifMatch === '"x"');
-    localArea[PBP_WEBDAV_ETAG_STATE_KEY] = {
-      target: obfuscateKey(pbpWebdavFileUrl("https://dav.example.com/backups/")),
-      user: obfuscateKey(""),
-      etag: '"y-gzip"',
-    };
-    globalThis.fetch = (_url, opts) => {
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
-      if (opts.method === "GET") return Promise.resolve({ ok: true, status: 200, headers: { get: (h) => /etag/i.test(h) ? '"other"' : null } });
-      return Promise.resolve({ ok: false, status: 412 });
-    };
-    const realConflict = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "" });
-    check("a changed remote etag keeps the genuine conflict - no blind retry", realConflict.error === "conflict");
-    delete localArea[PBP_WEBDAV_ETAG_STATE_KEY];
     globalThis.fetch = () => Promise.resolve({ ok: false, status: 404 });
     const missing = await pbpWebdavPush({ baseUrl: "https://dav.example.com/missing/", user: "", pass: "", includeHighlights: false });
     check("push 404 maps to not-found instead of raw http-404", missing.error === "not-found");
@@ -485,43 +1023,60 @@ async function runChromeLayerTests() {
     globalThis.fetch = (_url, opts) => {
       push404Requests.push(opts.method);
       if (push404Requests.length === 1 && opts.method === "PROPFIND") {
-        return Promise.resolve({ ok: true, status: 207 });
+        return Promise.resolve(response(207));
       }
-      if (opts.method === "PUT") return Promise.resolve({ ok: false, status: 404 });
-      return Promise.resolve({ ok: true, status: 207 });
+      if (opts.method === "GET") return Promise.resolve(response(404));
+      if (opts.method === "PUT") return Promise.resolve(response(404));
+      return Promise.resolve(response(207));
     };
-    const notWritable = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: false });
+    const notWritable = await pbpWebdavPush({ baseUrl: "https://dav.example.com/write-fails/", user: "", pass: "", includeHighlights: false });
     check("push 404 + collection PROPFIND ok -> not-writable", notWritable.error === "not-writable");
     check("push preserves failed PUT status", notWritable.status === 404);
-    check("push 404 path probes the collection", push404Requests.join(",") === "PROPFIND,PUT,PROPFIND");
+    check("push 404 path probes the remote file and collection",
+      push404Requests.join(",") === "PROPFIND,GET,PUT,PROPFIND");
 
     const createRequests = [];
+    let createdBody = "";
     globalThis.fetch = (url, opts) => {
       createRequests.push({ url, method: opts.method });
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: false, status: 404 });
-      if (opts.method === "MKCOL") return Promise.resolve({ ok: true, status: 201 });
-      return Promise.resolve({ ok: true, status: 200 });
+      if (opts.method === "PROPFIND") return Promise.resolve(response(404));
+      if (opts.method === "MKCOL") return Promise.resolve(response(201));
+      if (opts.method === "GET") return Promise.resolve(createdBody
+        ? response(200, createdBody, '"created"') : response(404));
+      if (opts.method === "PUT") {
+        createdBody = String(opts.body);
+        return Promise.resolve(response(201));
+      }
+      return Promise.resolve(response(405));
     };
-    const createdPush = await pbpWebdavPush({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "", includeHighlights: false });
-    check("push creates the configured collection before PUT", createdPush.ok && createRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,PUT");
+    const createdPush = await pbpWebdavPush({ baseUrl: "https://dav.example.com/new-backups/", user: "", pass: "", includeHighlights: false });
+    check("push creates the configured collection before verified PUT",
+      createdPush.ok && createRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,GET,PUT,GET");
     check("push probes and creates exactly the configured collection",
-      createRequests[0] && createRequests[0].url === "https://dav.example.com/backups/" &&
-      createRequests[1] && createRequests[1].url === "https://dav.example.com/backups/");
+      createRequests[0] && createRequests[0].url === "https://dav.example.com/new-backups/" &&
+      createRequests[1] && createRequests[1].url === "https://dav.example.com/new-backups/");
     check("push writes under the configured collection",
-      createRequests[2] && createRequests[2].url === "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json");
+      createRequests[3] && createRequests[3].url === "https://dav.example.com/new-backups/pinboard-bookmark-enhanced-settings.json");
 
     const rootRequests = [];
+    let rootBody = "";
     globalThis.fetch = (url, opts) => {
       rootRequests.push({ url, method: opts.method });
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: false, status: 404 });
-      if (opts.method === "MKCOL") return Promise.resolve({ ok: true, status: 201 });
-      return Promise.resolve({ ok: true, status: 200 });
+      if (opts.method === "PROPFIND") return Promise.resolve(response(404));
+      if (opts.method === "MKCOL") return Promise.resolve(response(201));
+      if (opts.method === "GET") return Promise.resolve(rootBody
+        ? response(200, rootBody, '"root"') : response(404));
+      if (opts.method === "PUT") {
+        rootBody = String(opts.body);
+        return Promise.resolve(response(201));
+      }
+      return Promise.resolve(response(405));
     };
     const rootPush = await pbpWebdavPush({ baseUrl: "https://dav.jianguoyun.com/dav/", user: "", pass: "", includeHighlights: false });
-    check("provider root push creates extension data collection before PUT",
-      rootPush.ok && rootRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,PUT");
-    check("provider root push writes under the extension data collection",
-      rootRequests.some((r) => r.method === "PUT" && r.url === "https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-settings.json"));
+    check("provider root push probes the configured collection before verified PUT",
+      rootPush.ok && rootRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,GET,PUT,GET");
+    check("provider root push writes directly under the configured collection",
+      rootRequests.some((r) => r.method === "PUT" && r.url === "https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced-settings.json"));
   } catch (e) {
     check("pbpWebdavPush live includeHighlights override did not throw", false, e.message);
   } finally {
@@ -563,148 +1118,22 @@ async function runChromeLayerTests() {
         onChanged: { addListener() {} },
       },
     };
-    let putNumber = 0;
-    globalThis.fetch = (_url, opts) => {
-      casRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
-      if (opts.method === "PUT") {
-        putNumber++;
-        if (putNumber === 3) return Promise.resolve({ ok: false, status: 412, headers: { get: () => '"remote-v3"' } });
-        const etag = putNumber === 1 ? '"v1"' : '"v2"';
-        return Promise.resolve({ ok: true, status: putNumber === 1 ? 201 : 200, headers: { get: () => etag } });
-      }
-      throw new Error("unexpected method " + opts.method);
-    };
     const casCfg = { baseUrl: "https://dav.example.com/cas/", user: "", pass: "" };
-    const created = await pbpWebdavPush(casCfg);
-    const firstPut = casRequests.find((request) => request.method === "PUT");
-    check("first CAS push is unconditional (upgrade parity: no 412 deadlock against an existing backup)",
-      created.ok && !("If-None-Match" in firstPut.headers) && !("If-Match" in firstPut.headers));
-    check("successful create remembers the server ETag",
-      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v1"');
-    check("ETag state does not persist a plaintext capability URL",
-      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.target.startsWith("obf:") &&
-      deobfuscateKey(casLocal[PBP_WEBDAV_ETAG_STATE_KEY].target) === pbpWebdavFileUrl(casCfg.baseUrl));
-    const otherUserRevision = await pbpWebdavReadRevision(Object.assign({}, casCfg, { user: "other-account" }));
-    check("ETag state is isolated by WebDAV username as well as URL",
-      otherUserRevision.known === false && otherUserRevision.etag === "");
-
-    casRequests.length = 0;
-    const updated = await pbpWebdavPush(casCfg);
-    const secondPut = casRequests.find((request) => request.method === "PUT");
-    check("subsequent CAS push uses the last observed ETag",
-      updated.ok && secondPut.headers["If-Match"] === '"v1"' && !("If-None-Match" in secondPut.headers));
-    check("successful update advances the remembered ETag",
-      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v2"');
-
-    casRequests.length = 0;
-    const conflicted = await pbpWebdavPush(casCfg);
-    const conflictPut = casRequests.find((request) => request.method === "PUT");
-    check("stale ETag returns an explicit conflict without a force overwrite",
-      !conflicted.ok && conflicted.error === "conflict" && conflicted.status === 412 &&
-      conflictPut.headers["If-Match"] === '"v2"');
-    check("conflict keeps the last locally observed ETag",
-      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v2"');
-
-    globalThis.fetch = () => Promise.resolve({
-      ok: true,
-      status: 200,
-      headers: { get: () => '"v3"' },
-      json: async () => ({ _schemaVersion: 2, optTheme: "dark" }),
-    });
+    const pulledText = JSON.stringify({ _schemaVersion: 2, optTheme: "dark", _webdav: { pushedAt: "remote" } });
+    globalThis.fetch = () => Promise.resolve(response(200, pulledText, '"v3"'));
     const pulled = await pbpWebdavPull(casCfg);
-    check("pull returns the observed ETag but does not commit it before settings are applied",
-      pulled.ok && pulled.etag === '"v3"' && casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v2"');
-    await pbpWebdavRememberEtag(casCfg, pulled.etag);
-    check("caller commits the pulled ETag only after a successful apply",
-      casLocal[PBP_WEBDAV_ETAG_STATE_KEY]?.etag === '"v3"');
+    check("pull returns the observed ETag and both hashes without committing a baseline",
+      pulled.ok && pulled.etag === '"v3"' && /^[a-f0-9]{64}$/.test(pulled.remoteHash) &&
+      /^[a-f0-9]{64}$/.test(pulled.settingsHash) &&
+      !(PBP_WEBDAV_SYNC_STATE_KEY in casLocal));
 
-    const noTagCfg = { baseUrl: "https://dav.example.com/no-etag/", user: "", pass: "" };
-    const noTagPutHeaders = [];
-    globalThis.fetch = (_url, opts) => {
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
-      if (opts.method === "PUT") {
-        noTagPutHeaders.push(Object.assign({}, opts.headers));
-        return Promise.resolve({ ok: true, status: 200, headers: { get: () => null } });
-      }
-      throw new Error("unexpected no-ETag request");
-    };
-    const noTagFirst = await pbpWebdavPush(noTagCfg);
-    const noTagSecond = await pbpWebdavPush(noTagCfg);
-    check("a WebDAV server that omits ETag remains writable after the first push",
-      noTagFirst.ok && noTagSecond.ok && noTagPutHeaders.length === 2);
-    check("missing ETag transitions from unconditional first write to known-exists conditional writes",
-      !("If-None-Match" in noTagPutHeaders[0]) && !("If-Match" in noTagPutHeaders[0]) &&
-      noTagPutHeaders[1]["If-Match"] === "*" && !("If-None-Match" in noTagPutHeaders[1]));
-
-    const weakCfg = { baseUrl: "https://dav.example.com/weak-etag/", user: "", pass: "" };
-    await pbpWebdavRememberEtag(weakCfg, 'W/"weak"');
-    const weakRevision = await pbpWebdavReadRevision(weakCfg);
-    const weakReq = pbpWebdavBuildRequest("push", Object.assign({}, weakCfg, weakRevision));
-    check("weak ETag is never echoed into If-Match and degrades to known-exists mode",
-      weakRevision.known && weakRevision.etag === "" && weakReq.headers["If-Match"] === "*");
-
-    // Scheduled pushes (no cfgOverride: storage-sourced cfg) with an unknown
-    // revision are create-only; automation must never blind-overwrite a remote
-    // backup this device has never seen. A 412 seeds known-exists ONCE for an
-    // upgrader that provably pushed before (webdavLastPush.ok), otherwise it
-    // surfaces as a conflict for the user to resolve manually.
-    Object.assign(casLocal, {
-      webdavUrl: "https://dav.example.com/sched/",
-      webdavUser: "",
-      webdavPass: "",
-      optSyncEnabled: false,
-    });
-    delete casLocal[PBP_WEBDAV_ETAG_STATE_KEY];
-    delete casLocal.webdavLastPush;
-    const schedRequests = [];
-    globalThis.fetch = (_url, opts) => {
-      schedRequests.push({ method: opts.method, headers: Object.assign({}, opts.headers) });
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
-      if (opts.method === "PUT") {
-        if (opts.headers["If-None-Match"] === "*") {
-          return Promise.resolve({ ok: false, status: 412, headers: { get: () => null } });
-        }
-        return Promise.resolve({ ok: true, status: 200, headers: { get: () => '"sched-v1"' } });
-      }
-      throw new Error("unexpected scheduled request " + opts.method);
-    };
-    const schedFresh = await pbpWebdavPush();
-    const schedFreshPuts = schedRequests.filter((request) => request.method === "PUT");
-    check("scheduled unknown-revision push is create-only and reports conflict instead of overwriting",
-      !schedFresh.ok && schedFresh.error === "conflict" &&
-      schedFreshPuts.length === 1 && schedFreshPuts[0].headers["If-None-Match"] === "*");
-
-    schedRequests.length = 0;
-    casLocal.webdavLastPush = { ts: 1, ok: true };
-    const schedUpgrade = await pbpWebdavPush();
-    const schedUpgradePuts = schedRequests.filter((request) => request.method === "PUT");
-    check("scheduled 412 with a prior successful push (upgrader) retries once with If-Match:*",
-      schedUpgrade.ok && schedUpgradePuts.length === 2 &&
-      schedUpgradePuts[0].headers["If-None-Match"] === "*" &&
-      schedUpgradePuts[1].headers["If-Match"] === "*" &&
-      !("If-None-Match" in schedUpgradePuts[1].headers));
-    check("upgrader retry remembers the server ETag for future CAS pushes",
-      deobfuscateKey(casLocal[PBP_WEBDAV_ETAG_STATE_KEY].target) === pbpWebdavFileUrl("https://dav.example.com/sched/") &&
-      casLocal[PBP_WEBDAV_ETAG_STATE_KEY].etag === '"sched-v1"');
-
-    // Target switch: the remembered success is now BOUND to its target, so it
-    // must not authorize an If-Match:* takeover at a different server/path.
-    schedRequests.length = 0;
-    casLocal.webdavUrl = "https://dav.example.com/sched-b/";
-    const schedSwitched = await pbpWebdavPush();
-    const schedSwitchedPuts = schedRequests.filter((request) => request.method === "PUT");
-    check("scheduled 412 at a DIFFERENT target than the recorded success stays a conflict (no blind takeover)",
-      !schedSwitched.ok && schedSwitched.error === "conflict" &&
-      schedSwitchedPuts.length === 1 && schedSwitchedPuts[0].headers["If-None-Match"] === "*");
-
-    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, headers: { get: () => '"x"' }, json: async () => ({ _schemaVersion: 3 }) });
+    globalThis.fetch = () => Promise.resolve(response(200, JSON.stringify({ _schemaVersion: 3 }), '"x"'));
     const futureSchema = await pbpWebdavPull(casCfg);
     check("pull rejects an unsupported future schema", !futureSchema.ok && futureSchema.error === "invalid");
-    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, headers: { get: () => '"x"' }, json: async () => [] });
+    globalThis.fetch = () => Promise.resolve(response(200, JSON.stringify([]), '"x"'));
     const arrayRoot = await pbpWebdavPull(casCfg);
     check("pull rejects a non-object backup root", !arrayRoot.ok && arrayRoot.error === "invalid");
-    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, headers: { get: () => '"legacy"' }, json: async () => ({ optTheme: "light" }) });
+    globalThis.fetch = () => Promise.resolve(response(200, JSON.stringify({ optTheme: "light" }), '"legacy"'));
     const legacySchema = await pbpWebdavPull(casCfg);
     check("pull accepts an ownerless schema-v1 backup with no explicit version",
       legacySchema.ok && legacySchema.data.optTheme === "light" && legacySchema.etag === '"legacy"');
@@ -779,9 +1208,9 @@ async function runChromeLayerTests() {
       return Promise.resolve({ ok: true, status: 200 });
     };
     const rootEmpty = await pbpWebdavTest({ baseUrl: "https://dav.jianguoyun.com/dav/", user: "", pass: "" });
-    check("provider root test creates extension data collection and verifies write", rootEmpty.kind === "empty");
-    check("provider root test writes under the extension data collection",
-      rootRequests.some((r) => r.method === "PUT" && r.url.startsWith("https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-write-test-")));
+    check("provider root test verifies the configured collection", rootEmpty.kind === "empty");
+    check("provider root test writes directly under the configured collection",
+      rootRequests.some((r) => r.method === "PUT" && r.url.startsWith("https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced-write-test-")));
   } catch (e) {
     check("pbpWebdavTest missing-folder probe did not throw", false, e.message);
   } finally {

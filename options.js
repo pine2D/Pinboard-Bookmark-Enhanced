@@ -890,6 +890,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   await pbpMigrateSecretsToLocal();
   let s = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
   deobfuscateSettings(s);
+  s.webdavAutoPush = await pbpWebdavReadAutoPush({
+    baseUrl: deobfuscateKey(s.webdavUrl || ""),
+    user: deobfuscateKey(s.webdavUser || ""),
+  });
 
   // ---- Schema v2 migration: split customCSS into themePresetKey + customOverlayCSS ----
   // Runs once per profile (guarded by _migrationV2), then stays dormant. Silently converts
@@ -1635,30 +1639,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
   });
 
-  // ---- WebDAV: render the persisted last-push status on page load ----
-  (async () => {
+  // ---- WebDAV: render only target-bound sync state on page load ----
+  let _webdavStatusGeneration = 0;
+  const _webdavConflictKeys = {
+    unpaired: "webdavSyncUnpaired",
+    "remote-changed": "webdavSyncRemoteChanged",
+    diverged: "webdavSyncDiverged",
+  };
+  async function _pbpRenderWebdavStatus() {
+    const generation = ++_webdavStatusGeneration;
     try {
-      const { webdavLastPush } = await chrome.storage.local.get({ webdavLastPush: null });
+      const cfg = _pbpWebdavCfgFromForm();
+      const state = await pbpWebdavReadState(cfg);
+      if (generation !== _webdavStatusGeneration) return;
       const statusEl = $id("webdav-status");
-      if (!statusEl || !webdavLastPush) return;
-      const when = new Date(webdavLastPush.ts).toLocaleString();
-      if (webdavLastPush.ok) {
-        setStatusIcon(statusEl, true, t("webdavPushOk", when));
-      } else if (webdavLastPush.error === "perm") {
-        setStatusIcon(statusEl, false, t("webdavPermDenied"));
-      } else if (webdavLastPush.error === "insecure") {
-        setStatusIcon(statusEl, false, t("mdTargetWebhookHttpWarn"));
-      } else if (webdavLastPush.error === "not-writable") {
-        setStatusIcon(statusEl, false, webdavLastPush.status ? t("webdavPushFail", "http-" + webdavLastPush.status) : t("webdavPushNotWritable"));
-      } else if (webdavLastPush.error === "not-found") {
-        setStatusIcon(statusEl, false, t("webdavTargetUnavailable"));
-      } else if (webdavLastPush.error === "conflict") {
-        setStatusIcon(statusEl, false, t("webdavConflict"));
-      } else {
-        setStatusIcon(statusEl, false, t("webdavPushFail", webdavLastPush.error || ""));
+      if (!statusEl) return;
+      const conflictKey = _webdavConflictKeys[state.unresolvedConflict?.kind];
+      if (conflictKey) {
+        statusEl.textContent = t(conflictKey);
+        statusEl.style.color = "var(--opt-warn, #b06000)";
+        return;
       }
+      if (state.known && state.mode === "hash") {
+        statusEl.textContent = t("webdavHashMode");
+        statusEl.style.color = "var(--opt-warn, #b06000)";
+        return;
+      }
+      if (state.lastSuccessAt) {
+        setStatusIcon(statusEl, true, t("webdavPushOk", new Date(state.lastSuccessAt).toLocaleString()));
+        statusEl.style.color = "#080";
+        return;
+      }
+      statusEl.textContent = "";
+      statusEl.style.color = "";
     } catch (_) {}
-  })();
+  }
+  void _pbpRenderWebdavStatus();
+  ["opt-webdav-url", "opt-webdav-user"].forEach((id) => {
+    $id(id)?.addEventListener("input", () => { void _pbpRenderWebdavStatus(); });
+  });
 
   const autoSaveState = { suspended: false, chain: Promise.resolve(), waiters: [] };
 
@@ -1764,40 +1783,42 @@ document.addEventListener("DOMContentLoaded", async () => {
       resumeOptionsAutoSave();
     }
     if (res.ok) {
-      setStatusIcon(statusEl, true, t("webdavPushOk", new Date(res.ts).toLocaleString()));
-      statusEl.style.color = "#080";
-    } else if (res.error === "conflict" && !force) {
+      const pushed = t("webdavPushOk", new Date(res.ts).toLocaleString());
+      setStatusIcon(statusEl, true, res.mode === "hash" ? pushed + " " + t("webdavHashMode") : pushed);
+      statusEl.style.color = res.mode === "hash" ? "var(--opt-warn, #b06000)" : "#080";
+    } else if (_webdavConflictKeys[res.error] && !force) {
       // Conflict is a CHOICE, not a wall (user request): the pull button
       // one row up is the take-remote path; this popover offers the
       // explicit overwrite-remote path. Never a native confirm()
       // (ui-contract keeps those pinned to three approved modals).
-      setStatusIcon(statusEl, false, t("webdavConflict"));
-      statusEl.style.color = "#c00";
+      statusEl.textContent = t(_webdavConflictKeys[res.error]);
+      statusEl.style.color = "var(--opt-warn, #b06000)";
       // The overwrite consent binds to the target that CONFLICTED (Codex
       // r3 HIGH): the re-run reads the live form, so if the user edits
       // the URL/username while the popover is open, forcing would blind-
       // overwrite a DIFFERENT target than the one they confirmed. On a
       // changed target fall back to a normal CAS push against it.
-      const conflictedTarget = pbpWebdavFileUrl(cfg.baseUrl) + " " + String(cfg.user || "");
+      const conflictedTarget = JSON.stringify([pbpWebdavFileUrl(cfg.baseUrl), String(cfg.user || "")]);
       showConfirmPopover($id("webdav-push-btn"), {
         msg: t("webdavConflictChoice"),
         yesText: t("webdavOverwriteRemote"),
         noText: t("cancel"),
         onConfirm: () => {
           const cur = _pbpWebdavCfgFromForm();
-          const curTarget = pbpWebdavFileUrl(cur.baseUrl) + " " + String(cur.user || "");
+          const curTarget = JSON.stringify([pbpWebdavFileUrl(cur.baseUrl), String(cur.user || "")]);
           _pbpWebdavRunPush(curTarget === conflictedTarget);
         },
       });
     } else {
-      const msg = res.error === "conflict" ? t("webdavConflict")
+      const msg = _webdavConflictKeys[res.error] ? t(_webdavConflictKeys[res.error])
+        : res.error === "verify-failed" ? t("webdavVerifyFailed")
         : res.error === "not-writable" ? (res.status ? t("webdavPushFail", "http-" + res.status) : t("webdavPushNotWritable"))
         : res.error === "not-found" ? t("webdavTargetUnavailable")
         : t("webdavPushFail", res.error || "");
       setStatusIcon(statusEl, false, msg);
       statusEl.style.color = "#c00";
     }
-    _webdavPushStatusTimer = setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+    _webdavPushStatusTimer = setTimeout(() => { void _pbpRenderWebdavStatus(); }, 5000);
   }
   $id("webdav-push-btn")?.addEventListener("click", () => { _pbpWebdavRunPush(false); });
 
@@ -1827,18 +1848,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       return;
     }
+    const pullData = pbpWebdavPreparePullPayload(res.data);
     try {
       // Reject malformed or future-schema backups before asking the user to
       // confirm a replacement. pbpApplyBackupPayload repeats this check before
       // the first write, so this is an early UX gate rather than the sole guard.
-      pbpPreflightBackupPayload(res.data, EXPORTABLE_KEYS);
+      pbpPreflightBackupPayload(pullData, EXPORTABLE_KEYS);
     } catch (_) {
       setStatusIcon(statusEl, false, t("webdavPullInvalid"));
       statusEl.style.color = "#c00";
       setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
       return;
     }
-    const pushedAt = (res.data._webdav && res.data._webdav.pushedAt) || "";
+    const pushedAt = (pullData._webdav && pullData._webdav.pushedAt) || "";
     const when = pushedAt ? new Date(pushedAt).toLocaleString() : "?";
     // Spec invariant #2: pull only ever applies after this confirm(); Cancel
     // returns here with zero writes made so far (Test/permission-request
@@ -1857,15 +1879,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       await pauseOptionsAutoSave();
       const saved = await saveAll();
       if (!saved.ok) throw saved.error || new Error("settings save failed");
-      applied = await pbpApplyBackupPayload(res.data, {
+      const previousState = await pbpWebdavReadState(cfg);
+      applied = await pbpApplyBackupPayload(pullData, {
         exportableKeys: EXPORTABLE_KEYS,
         saveOverlayWithFallback,
         loadThemes: _loadPinboardThemes,
       });
-      // The settings restore already succeeded. ETag persistence is only the
-      // next-push conflict guard; a local storage hiccup must not misreport the
-      // completed restore as failed (an unknown ETag still fails closed).
-      await pbpWebdavRememberEtag(cfg, res.etag).catch(() => {});
+      // The restore already succeeded. Baseline persistence is the next-push
+      // guard; a local storage hiccup must not misreport the completed restore.
+      await pbpWebdavRememberState(cfg, {
+        mode: previousState.mode === "hash" || !res.etag ? "hash" : "etag",
+        etag: res.etag || "",
+        remoteHash: res.remoteHash,
+        settingsHash: res.settingsHash,
+        lastSuccessAt: Date.now(),
+        unresolvedConflict: null,
+      }).catch(() => {});
+      await chrome.storage.local.remove("webdavLastPush").catch(() => {});
     } catch (err) {
       resumeOptionsAutoSave();
       console.error("[webdav-pull] apply failed", err);
@@ -2041,7 +2071,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       webdavUrl: $id("opt-webdav-url").value.trim(),
       webdavUser: $id("opt-webdav-user").value.trim(),
       webdavPass: obfuscateKey($id("opt-webdav-pass").value.trim()),
-      webdavAutoPush: $id("opt-webdav-autopush").value,
       backupIncludeHighlights: $id("opt-backup-include-highlights").checked,
       themePresetKey: currentPresetKey,
       urlClean: {
@@ -2074,11 +2103,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const savedState = {
     settings: collectSettingsFromForm(),
     overlay: $id("opt-custom-css").value,
+    webdavAutoPush: $id("opt-webdav-autopush").value,
   };
 
   async function saveAll() {
     const data = collectSettingsFromForm();
     const overlayValue = $id("opt-custom-css").value;
+    const webdavAutoPush = $id("opt-webdav-autopush").value;
     try {
       const result = await pbpSaveOptionsSnapshot(savedState, data, overlayValue, {
         persist: persistSettings,
@@ -2090,6 +2121,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
         },
       });
+      if (webdavAutoPush !== savedState.webdavAutoPush) {
+        savedState.webdavAutoPush = await pbpWebdavWriteAutoPush(webdavAutoPush);
+      }
       if (result.fellBackToLocal) {
         flashAutoSave("optSavedLocally", "Saved locally (sync quota full)", 4000);
       } else {

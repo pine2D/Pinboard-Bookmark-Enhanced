@@ -15,6 +15,10 @@ document.addEventListener("DOMContentLoaded", (event) => event.stopImmediateProp
 <script src="../shared.js"></script>
 <script src="../options-backup.js"></script>
 <script src="../export-targets.js"></script>
+<script>
+async function pbpWebdavReadAutoPush() { return "off"; }
+async function pbpWebdavWriteAutoPush(value) { return value; }
+</script>
 <script src="../options.js"></script>
 <script>
 const root = document.getElementById("results");
@@ -2093,6 +2097,9 @@ async function run() {
       optSyncEnabled: false,
       backupIncludeHighlights: true,
       webdavUrl: "obf:" + btoa("https://dav.example.com/secret-path"),
+      webdavUser: "alice",
+      webdavPass: "obf:password",
+      webdavAutoPush: "daily",
       dictAnkiKey: "obf:anki1",
       dictEudicToken: "obf:eudic1",
       exportTargets: {
@@ -2162,6 +2169,11 @@ async function run() {
         exported.exportTargets.webhook.enabled === true &&
         !("url" in exported.exportTargets.webhook) && !("token" in exported.exportTargets.webhook) &&
         !("token" in exported.exportTargets.github));
+      check("E7 manual export: WebDAV URL and username remain portable",
+        exported.webdavUrl === "https://dav.example.com/secret-path" &&
+        exported.webdavUser === "alice");
+      check("E7 manual export: WebDAV password and device schedule stay local",
+        !("webdavPass" in exported) && !("webdavAutoPush" in exported));
     } finally {
       globalThis.chrome = prevChromeE7;
       URL.createObjectURL = prevCreateObjectURL;
@@ -2266,6 +2278,7 @@ async function run() {
         _schemaVersion: 2,
         optTheme: "dark",
         webdavUrl: "https://attacker.example/secret",
+        webdavAutoPush: "daily",
         exportTargets: {
           webhook: { enabled: true, url: "https://attacker.example/hook", token: "attacker" },
           github: { enabled: false, token: "attacker" },
@@ -2282,8 +2295,9 @@ async function run() {
         importedBatch.exportTargets.github.enabled === false &&
         importedBatch.exportTargets.github.token === "obf:live-github" && overlayApplied === "" &&
         // webdavUrl is an ordinary setting again (v2.96 parity): a backup may
-        // restore the server address, while the password stays local-only.
-        importedBatch.webdavUrl === "https://attacker.example/secret");
+        // restore the server address, while password and scheduling stay local.
+        importedBatch.webdavUrl === "https://attacker.example/secret" &&
+        !("webdavAutoPush" in importedBatch));
 
       const writesBeforeInvalid = importedBatch;
       let invalidApplyError = null;

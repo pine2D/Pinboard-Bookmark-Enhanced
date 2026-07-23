@@ -30,11 +30,93 @@ const popupCss = read("popup.css");
 const optionsConnectivityJs = read("options-connectivity.js");
 const optionsCss = read("options.css");
 const optionsJs = read("options.js");
+const webdavJs = read("webdav.js");
 const optionsVocabJs = read("options-vocab.js");
 const mdDictJs = read("md-dict.js");
 const optionsThemeEarlyJs = read("options-theme-early.js");
-check(optionsJs.includes('webdavLastPush.error === "insecure"') && optionsJs.includes('t("mdTargetWebhookHttpWarn")'), "persisted insecure WebDAV status lacks endpoint guidance");
 const popupTagsJs = read("popup-tags.js");
+
+{
+  const collect = optionsJs.slice(
+    optionsJs.indexOf("function collectSettingsFromForm()"),
+    optionsJs.indexOf("const savedState =")
+  );
+  const save = optionsJs.slice(
+    optionsJs.indexOf("async function saveAll()"),
+    optionsJs.indexOf("function reportAutoSaveFailure")
+  );
+  check(!collect.includes("webdavAutoPush:") && save.includes("pbpWebdavWriteAutoPush"),
+    "options.js: WebDAV auto-push still rides the ordinary settings snapshot instead of device-local storage");
+}
+
+{
+  const readyAt = mdPreviewJs.indexOf("const pbpDeferredScriptsReady");
+  const renderedAt = mdPreviewJs.indexOf('document.dispatchEvent(new CustomEvent("pbp:rendered"');
+  const awaitAt = mdPreviewJs.lastIndexOf("await pbpDeferredScriptsReady", renderedAt);
+  const readyGate = mdPreviewJs.slice(readyAt, readyAt + 400);
+  check(readyAt >= 0 && awaitAt > readyAt && renderedAt > awaitAt &&
+    readyGate.includes('document.readyState === "complete"') &&
+    readyGate.includes("DOMContentLoaded"),
+    "md-preview.js: pbp:rendered can fire before later defer scripts register their listeners");
+}
+{
+  const targetLink = mdTranslateJs.slice(
+    mdTranslateJs.indexOf('tgtLink.className = "tr-link"'),
+    mdTranslateJs.indexOf("// Cost transparency")
+  );
+  check(targetLink.includes('pbpOpenOptionsTab("reader")') && !targetLink.includes("openOptionsPage("),
+    "md-translate.js: target-language link does not open the Reader settings tab");
+}
+{
+  const pullHandler = optionsJs.slice(
+    optionsJs.indexOf("// ---- WebDAV: Pull now ----"),
+    optionsJs.indexOf("// ===================== Auto-save")
+  );
+  const prepareAt = pullHandler.indexOf("pbpWebdavPreparePullPayload(res.data)");
+  const applyAt = pullHandler.indexOf("pbpApplyBackupPayload(pullData");
+  const rememberAt = pullHandler.indexOf("pbpWebdavRememberState(cfg");
+  const clearAt = pullHandler.indexOf('chrome.storage.local.remove("webdavLastPush")');
+  const reloadAt = pullHandler.indexOf("location.reload()");
+  check(prepareAt >= 0 && applyAt > prepareAt && rememberAt > applyAt &&
+    clearAt > rememberAt && reloadAt > clearAt &&
+    pullHandler.includes("remoteHash: res.remoteHash") &&
+    pullHandler.includes("settingsHash: res.settingsHash"),
+    "options.js: successful WebDAV pull does not preserve transport fields or commit the verified baseline after apply");
+}
+{
+  const statusBlock = optionsJs.slice(
+    optionsJs.indexOf("// ---- WebDAV: render only target-bound sync state"),
+    optionsJs.indexOf("const autoSaveState")
+  );
+  check(statusBlock.includes("pbpWebdavReadState(cfg)") &&
+    statusBlock.includes("state.lastSuccessAt") &&
+    !statusBlock.includes("webdavLastPush"),
+    "options.js: page-load WebDAV status still revives persisted operation errors instead of rendering target state");
+}
+check(!webdavJs.includes("dav.jianguoyun.com") &&
+  !webdavJs.includes("pbpWebdavNormalizeEtag") &&
+  !webdavJs.includes('headers["If-Match"] = "*"'),
+  "webdav.js: provider/Apache special cases or unsafe If-Match:* compatibility path remain");
+{
+  const expectedLabels = {
+    en: "Backup folder URL",
+    zh_CN: "备份文件夹地址",
+    zh_TW: "備份資料夾網址",
+    zh_HK: "備份資料夾網址",
+    ja: "バックアップ先フォルダーの URL",
+    de: "URL des Sicherungsordners",
+    fr: "URL du dossier de sauvegarde",
+    pl: "Adres URL folderu kopii zapasowej",
+    ru: "URL папки резервных копий",
+  };
+  for (const [locale, label] of Object.entries(expectedLabels)) {
+    const messages = JSON.parse(read(`_locales/${locale}/messages.json`));
+    check(messages.webdavUrlLabel?.message === label &&
+      messages.webdavHint?.message.includes("pinboard-bookmark-enhanced-settings.json") &&
+      !/jianguoyun|坚果|堅果/i.test(JSON.stringify(messages)),
+    `_locales/${locale}: WebDAV folder target or fixed backup path is unclear`);
+  }
+}
 
 for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-select-all",
   "vocab-invert-selection", "vocab-batch-toolbar", "vocab-group-input", "vocab-add-group",
@@ -447,9 +529,10 @@ check((optionsJs.match(/const errorKey = _pbpWebdavPermissionError\(granted\);/g
 // Conflict-choice consent binding (Codex r3 HIGH): the overwrite confirm
 // must compare the LIVE form target against the one that conflicted and
 // downgrade to a normal CAS push when they differ.
-check(/const conflictedTarget = pbpWebdavFileUrl\(cfg\.baseUrl\)[\s\S]{0,600}_pbpWebdavRunPush\(curTarget === conflictedTarget\);/.test(optionsJs),
+check(/const conflictedTarget = JSON\.stringify\(\[pbpWebdavFileUrl\(cfg\.baseUrl\)[\s\S]{0,600}_pbpWebdavRunPush\(curTarget === conflictedTarget\);/.test(optionsJs),
   "options.js: WebDAV overwrite consent is not bound to the conflicted target");
-check(/error === "conflict" && !force/.test(optionsJs) && optionsJs.includes('yesText: t("webdavOverwriteRemote")'),
+check(/_webdavConflictKeys\[res\.error\] && !force/.test(optionsJs) &&
+  optionsJs.includes('yesText: t("webdavOverwriteRemote")'),
   "options.js: WebDAV manual push conflict does not offer the overwrite choice");
 const webdavAutoStart = optionsJs.indexOf('$id("opt-webdav-autopush")?.addEventListener');
 const webdavAutoEnd = optionsJs.indexOf("// ---- WebDAV: render", webdavAutoStart);

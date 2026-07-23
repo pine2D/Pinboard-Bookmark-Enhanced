@@ -24,7 +24,6 @@ const PBP_BACKUP_ENUMS = Object.freeze({
   optTheme: ["auto", "light", "dark"],
   bgSaveMode: ["merge", "skip", "overwrite"],
   tagSyncMode: ["fresh", "cached", "prewarmed"],
-  webdavAutoPush: ["off", "hourly", "daily"],
   aiContentSource: ["local", "jina"],
   mdExportImagePolicy: ["keep", "alt", "strip"],
   selectionTrigger: ["icon", "hotkey", "off"],
@@ -246,29 +245,8 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       // clicking Export immediately after an edit cannot create a stale backup.
       if (beforeExport && (await beforeExport()) === false) return;
       const raw = await pbpReadSettingsWithSecrets(exportableKeys);
-      const exportData = Object.fromEntries(
-        Object.entries(raw).filter(([, v]) => v !== undefined)
-      );
-      exportData._schemaVersion = 2;
       const includeHighlightsEl = $id("opt-backup-include-highlights");
-      if (includeHighlightsEl) exportData.backupIncludeHighlights = !!includeHighlightsEl.checked;
-      // Strip NESTED secrets (e.g. exportTargets.github.token) — the top-level
-      // API_KEY_FIELDS exclusion only covers flat keys, so a nested token would
-      // otherwise ride into this shareable plaintext backup. The shared belt
-      // works even if the registry script failed to load; registry metadata
-      // then removes any additional secret field introduced by a target.
-      if (exportData.exportTargets) {
-        const cleaned = pbpStripExportTargetTokens(exportData.exportTargets);
-        if (typeof PBP_EXPORT_TARGETS !== "undefined") {
-          for (const [tid, cfg] of Object.entries(cleaned)) {
-            const row = PBP_EXPORT_TARGETS[tid];
-            ((row && row.settings) || []).forEach((setting) => {
-              if (setting.type === "secret" || setting.secret === true) delete cfg[setting.key];
-            });
-          }
-        }
-        exportData.exportTargets = cleaned;
-      }
+      if (includeHighlightsEl) raw.backupIncludeHighlights = !!includeHighlightsEl.checked;
       // Read overlay from sync OR local fallback (preserve user data either
       // way — including a legacy oversize overlay, which is why there is no
       // size assert here: a backup that refuses to carry the user's own data
@@ -280,20 +258,34 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       } else {
         overlay = await syncGetLarge("customOverlayCSS", "");
       }
-      exportData.customOverlayCSS = overlay;
       const savedThemesData = await syncGetLarge("savedThemes", []);
-      exportData.savedThemes = pbpSanitizeBackupThemes(savedThemesData);
-      if (exportData.backupIncludeHighlights !== false) {
+      let highlights = null;
+      let highlightsOwner = "";
+      if (raw.backupIncludeHighlights !== false) {
         const allLocal = await chrome.storage.local.get(null);
-        const highlights = pbpBuildHighlightBackup(allLocal);
+        highlights = pbpBuildHighlightBackup(allLocal);
         if (highlights) {
-          exportData._highlights = highlights;
           // Tag with the exporting Pinboard account (non-secret username) so a
           // restore onto a different account can refuse to merge these notes.
           // Read the token directly — exportableKeys excludes secrets.
           const sec = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
-          const owner = pbpPinboardAccountFromToken(sec.pinboardToken);
-          if (owner) exportData._highlightsOwner = owner;
+          highlightsOwner = pbpPinboardAccountFromToken(sec.pinboardToken);
+        }
+      }
+      const exportData = pbpBuildBackupSnapshot(raw, {
+        overlay,
+        savedThemes: savedThemesData,
+        highlights,
+        highlightsOwner,
+      }, { includeWebdavTransport: true });
+      // The shared belt strips known nested credentials. Registry metadata
+      // removes any additional secret field introduced by a future target.
+      if (exportData.exportTargets && typeof PBP_EXPORT_TARGETS !== "undefined") {
+        for (const [tid, cfg] of Object.entries(exportData.exportTargets)) {
+          const row = PBP_EXPORT_TARGETS[tid];
+          ((row && row.settings) || []).forEach((setting) => {
+            if (setting.type === "secret" || setting.secret === true) delete cfg[setting.key];
+          });
         }
       }
       // Generated backups must pass the exact same contract as imports; never
