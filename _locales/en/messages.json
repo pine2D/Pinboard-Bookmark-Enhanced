@@ -989,6 +989,60 @@
   "webdavStageLocatorFailed": {
     "message": "The backup folder works, but its location record could not be updated."
   },
+  "webdavMigrationRequired": {
+    "message": "This WebDAV setup must be checked before automatic backups can resume."
+  },
+  "webdavMigrationSafety": {
+    "message": "The check does not move or delete your existing remote backup."
+  },
+  "webdavMigrationOldLocation": {
+    "message": "Previous location"
+  },
+  "webdavMigrationNewBase": {
+    "message": "New base URL"
+  },
+  "webdavMigrationFolder": {
+    "message": "Backup folder"
+  },
+  "webdavMigrationFinalLocation": {
+    "message": "Final backup location"
+  },
+  "webdavMigrationKeepsTarget": {
+    "message": "This keeps using the same remote backup file."
+  },
+  "webdavLocationConflict": {
+    "message": "This device and the remote location record point to different backup folders. Choose which one to use."
+  },
+  "webdavUseLocalLocation": {
+    "message": "Use this device's folder"
+  },
+  "webdavUseRemoteLocation": {
+    "message": "Use the recorded remote folder"
+  },
+  "webdavMigrationBackupState": {
+    "message": "Backup"
+  },
+  "webdavMigrationPushedAt": {
+    "message": "Last remote push"
+  },
+  "webdavMigrationSemanticHash": {
+    "message": "Semantic hash"
+  },
+  "webdavMigrationContentSame": {
+    "message": "The two backups have the same content."
+  },
+  "webdavMigrationContentDifferent": {
+    "message": "The two backups have different content."
+  },
+  "webdavMigrationConfirm": {
+    "message": "Confirm backup folder"
+  },
+  "webdavClearConfig": {
+    "message": "Stop using WebDAV and clear configuration"
+  },
+  "webdavClearConfigConfirm": {
+    "message": "Clear WebDAV settings and the local sync state? Remote files will not be deleted."
+  },
   "webdavUserLabel": {
     "message": "Username (optional)"
   },

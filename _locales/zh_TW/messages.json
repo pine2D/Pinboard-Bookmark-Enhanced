@@ -989,6 +989,60 @@
   "webdavStageLocatorFailed": {
     "message": "備份資料夾可用，但無法更新其位置記錄。"
   },
+  "webdavMigrationRequired": {
+    "message": "恢復自動備份前，必須先檢查這項 WebDAV 設定。"
+  },
+  "webdavMigrationSafety": {
+    "message": "檢查不會移動或刪除現有的遠端備份。"
+  },
+  "webdavMigrationOldLocation": {
+    "message": "原本的位置"
+  },
+  "webdavMigrationNewBase": {
+    "message": "新的基礎網址"
+  },
+  "webdavMigrationFolder": {
+    "message": "備份資料夾"
+  },
+  "webdavMigrationFinalLocation": {
+    "message": "最終備份位置"
+  },
+  "webdavMigrationKeepsTarget": {
+    "message": "將繼續使用同一個遠端備份檔案。"
+  },
+  "webdavLocationConflict": {
+    "message": "此裝置與遠端位置記錄指向不同的備份資料夾。請選擇要使用的位置。"
+  },
+  "webdavUseLocalLocation": {
+    "message": "使用此裝置的資料夾"
+  },
+  "webdavUseRemoteLocation": {
+    "message": "使用遠端記錄的資料夾"
+  },
+  "webdavMigrationBackupState": {
+    "message": "備份"
+  },
+  "webdavMigrationPushedAt": {
+    "message": "上次遠端推送"
+  },
+  "webdavMigrationSemanticHash": {
+    "message": "語意雜湊"
+  },
+  "webdavMigrationContentSame": {
+    "message": "兩個備份的內容相同。"
+  },
+  "webdavMigrationContentDifferent": {
+    "message": "兩個備份的內容不同。"
+  },
+  "webdavMigrationConfirm": {
+    "message": "確認備份資料夾"
+  },
+  "webdavClearConfig": {
+    "message": "停止使用 WebDAV 並清除設定"
+  },
+  "webdavClearConfigConfirm": {
+    "message": "要清除 WebDAV 設定和本機同步狀態嗎？不會刪除遠端檔案。"
+  },
   "webdavUserLabel": {
     "message": "使用者名稱（可選）"
   },

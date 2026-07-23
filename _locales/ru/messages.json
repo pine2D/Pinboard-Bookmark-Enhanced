@@ -989,6 +989,60 @@
   "webdavStageLocatorFailed": {
     "message": "Папка резервных копий работает, но обновить запись о её расположении не удалось."
   },
+  "webdavMigrationRequired": {
+    "message": "Эту конфигурацию WebDAV нужно проверить до возобновления автоматического резервного копирования."
+  },
+  "webdavMigrationSafety": {
+    "message": "Проверка не перемещает и не удаляет существующую удалённую резервную копию."
+  },
+  "webdavMigrationOldLocation": {
+    "message": "Предыдущее расположение"
+  },
+  "webdavMigrationNewBase": {
+    "message": "Новый базовый URL"
+  },
+  "webdavMigrationFolder": {
+    "message": "Папка резервных копий"
+  },
+  "webdavMigrationFinalLocation": {
+    "message": "Итоговое расположение резервной копии"
+  },
+  "webdavMigrationKeepsTarget": {
+    "message": "Будет по-прежнему использоваться тот же удалённый файл резервной копии."
+  },
+  "webdavLocationConflict": {
+    "message": "На этом устройстве и в удалённой записи указаны разные папки резервных копий. Выберите нужную папку."
+  },
+  "webdavUseLocalLocation": {
+    "message": "Использовать папку этого устройства"
+  },
+  "webdavUseRemoteLocation": {
+    "message": "Использовать записанную удалённую папку"
+  },
+  "webdavMigrationBackupState": {
+    "message": "Резервная копия"
+  },
+  "webdavMigrationPushedAt": {
+    "message": "Последняя удалённая отправка"
+  },
+  "webdavMigrationSemanticHash": {
+    "message": "Семантический хеш"
+  },
+  "webdavMigrationContentSame": {
+    "message": "Содержимое резервных копий совпадает."
+  },
+  "webdavMigrationContentDifferent": {
+    "message": "Содержимое резервных копий различается."
+  },
+  "webdavMigrationConfirm": {
+    "message": "Подтвердить папку резервных копий"
+  },
+  "webdavClearConfig": {
+    "message": "Отключить WebDAV и очистить конфигурацию"
+  },
+  "webdavClearConfigConfirm": {
+    "message": "Очистить настройки WebDAV и локальное состояние синхронизации? Удалённые файлы не будут удалены."
+  },
   "webdavUserLabel": {
     "message": "Имя пользователя (необязательно)"
   },

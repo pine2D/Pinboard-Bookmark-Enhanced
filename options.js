@@ -168,6 +168,115 @@ async function pbpPromoteTestedWebdavLayoutV2(testedBinding, {
   return { ok: true, persisted: true };
 }
 
+function pbpWebdavMigrationRequired(cfg) {
+  return !!String(cfg?.baseUrl ?? cfg?.webdavUrl ?? "").trim() &&
+    Number(cfg?.layoutVersion ?? cfg?.webdavLayoutVersion ?? 0) !==
+      PBP_WEBDAV_LAYOUT_VERSION;
+}
+
+function pbpWebdavShouldInspectLegacy(initial, live) {
+  const initialBase = String(initial?.baseUrl ?? initial?.webdavUrl ?? "").trim();
+  const liveBase = String(live?.baseUrl ?? live?.webdavUrl ?? "").trim();
+  const initialMode = initial?.folderMode === "custom" ? "custom" : "managed";
+  const liveMode = live?.folderMode === "custom" ? "custom" : "managed";
+  return !!initialBase &&
+    Number(initial?.layoutVersion ?? initial?.webdavLayoutVersion ?? 0) !==
+      PBP_WEBDAV_LAYOUT_VERSION &&
+    initialBase === liveBase &&
+    initialMode === liveMode &&
+    String(initial?.relativePath ?? initial?.webdavRelativePath ?? "") ===
+      String(live?.relativePath ?? live?.webdavRelativePath ?? "");
+}
+
+function pbpWebdavHasLocalConfig(cfg) {
+  return !!(
+    String(cfg?.baseUrl ?? cfg?.webdavUrl ?? "").trim() ||
+    String(cfg?.user ?? cfg?.webdavUser ?? "").trim() ||
+    String(cfg?.pass ?? cfg?.webdavPass ?? "").trim() ||
+    (cfg?.folderMode ?? cfg?.webdavFolderMode) === "custom" ||
+    String(cfg?.relativePath ?? cfg?.webdavRelativePath ?? "").trim() ||
+    Number(cfg?.layoutVersion ?? cfg?.webdavLayoutVersion ?? 0) ||
+    String(cfg?.autoPush ?? cfg?.webdavAutoPush ?? "off") !== "off"
+  );
+}
+
+function pbpLockWebdavMigrationControls(card, controls) {
+  const list = Array.from(controls || []);
+  const disabled = list.map((control) => !!control.disabled);
+  card?.setAttribute("aria-busy", "true");
+  list.forEach((control) => { control.disabled = true; });
+  return () => {
+    list.forEach((control, index) => {
+      control.disabled = disabled[index];
+    });
+    card?.removeAttribute("aria-busy");
+  };
+}
+
+async function pbpClearWebdavLocalConfig({
+  persist = persistSettings,
+  writeAutoPush = pbpWebdavWriteAutoPush,
+  removeLocal = (keys) => chrome.storage.local.remove(keys),
+} = {}) {
+  const patch = {
+    webdavUrl: "",
+    webdavUser: "",
+    webdavPass: obfuscateKey(""),
+    webdavFolderMode: "managed",
+    webdavRelativePath: "",
+    webdavLayoutVersion: 0,
+  };
+  let saved;
+  try {
+    saved = await persist(patch);
+  } catch (error) {
+    return {
+      ok: false,
+      settingsCleared: false,
+      autoPushCleared: false,
+      stateCleared: false,
+      errors: [{ stage: "settings", error }],
+    };
+  }
+  if (!saved?.ok) {
+    return Object.assign({}, saved || {}, {
+      ok: false,
+      settingsCleared: false,
+      autoPushCleared: false,
+      stateCleared: false,
+      errors: [{ stage: "settings", error: saved?.error }],
+    });
+  }
+
+  const errors = [];
+  let autoPushCleared = false;
+  let stateCleared = false;
+  try {
+    await writeAutoPush("off");
+    autoPushCleared = true;
+  } catch (error) {
+    errors.push({ stage: "schedule", error });
+  }
+  try {
+    await removeLocal([
+      PBP_WEBDAV_SYNC_STATE_KEY,
+      "_webdavEtagState",
+      "webdavLastPush",
+    ]);
+    stateCleared = true;
+  } catch (error) {
+    errors.push({ stage: "state", error });
+  }
+  return {
+    ok: errors.length === 0,
+    settingsCleared: true,
+    autoPushCleared,
+    stateCleared,
+    errors,
+    patch,
+  };
+}
+
 let _tagGovVisibleAccount = "";
 
 // Enable decorative transitions only after the initial page has painted.
@@ -945,11 +1054,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   let s = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
   deobfuscateSettings(s);
   let _loadedWebdavLayoutVersion = Number(s.webdavLayoutVersion || 0);
-  const loadedWebdavTarget = pbpWebdavResolveTarget({
+  const _initialWebdavMigrationConfig = {
     baseUrl: deobfuscateKey(s.webdavUrl || ""),
+    folderMode: s.webdavFolderMode === "custom" ? "custom" : "managed",
+    relativePath: String(s.webdavRelativePath || ""),
+    layoutVersion: _loadedWebdavLayoutVersion,
+  };
+  const loadedWebdavTarget = pbpWebdavResolveTarget({
+    baseUrl: _initialWebdavMigrationConfig.baseUrl,
     user: deobfuscateKey(s.webdavUser || ""),
-    folderMode: s.webdavFolderMode,
-    relativePath: s.webdavRelativePath,
+    folderMode: _initialWebdavMigrationConfig.folderMode,
+    relativePath: _initialWebdavMigrationConfig.relativePath,
   });
   let _loadedWebdavTargetBinding = loadedWebdavTarget.ok
     ? JSON.stringify([loadedWebdavTarget.backupFileUrl, deobfuscateKey(s.webdavUser || "")])
@@ -1687,6 +1802,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       pass: $id("opt-webdav-pass").value.trim(),
       folderMode: _pbpWebdavFolderModeFromForm(),
       relativePath: $id("opt-webdav-relative-path").value,
+      autoPush: $id("opt-webdav-autopush").value,
       includeHighlights: $id("opt-backup-include-highlights").checked,
     };
     const target = pbpWebdavResolveTarget(cfg);
@@ -1721,8 +1837,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       ? t(_webdavPathErrorKeys[customPath.error] || "webdavRelativePathSegments")
       : "";
     $id("webdav-actual-location").textContent = target.ok ? target.backupFileUrl : "";
+    const migrationRequired = pbpWebdavMigrationRequired(cfg);
+    $id("webdav-migration").hidden = !migrationRequired;
+    $id("webdav-clear-config").hidden = !pbpWebdavHasLocalConfig(cfg);
+    if (migrationRequired) {
+      $id("webdav-migration-old").textContent =
+        pbpWebdavCollectionUrl(cfg.baseUrl);
+    }
     ["webdav-test-btn", "webdav-push-btn", "webdav-pull-btn"].forEach((id) => {
-      $id(id).disabled = !target.ok;
+      const isTest = id === "webdav-test-btn";
+      $id(id).disabled = !target.ok ||
+        (migrationRequired && !isTest);
     });
     return target;
   }
@@ -1747,6 +1872,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $id("opt-webdav-autopush")?.addEventListener("change", async (e) => {
     const cfg = _pbpWebdavCfgFromForm();
+    _pbpRenderWebdavTarget(cfg, false);
     const operation = _webdavUiGuard.begin();
     if (e.target.value === "off") {
       void _pbpRenderWebdavStatus(cfg, operation);
@@ -1817,6 +1943,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function _pbpHandleWebdavTargetChange() {
     const cfg = _pbpWebdavCfgFromForm();
+    _pbpResetWebdavMigration();
     _pbpRenderWebdavTarget(cfg, false);
     void _pbpRenderWebdavStatus(cfg);
   }
@@ -1879,6 +2006,362 @@ document.addEventListener("DOMContentLoaded", async () => {
   // deck/key from storage (same contract as setupBackup's beforeExport).
   window.pbpOptionsFlushAutoSave = flushOptionsAutoSave;
 
+  let _webdavMigrationState = null;
+
+  function _pbpResetWebdavMigration() {
+    _webdavMigrationState = null;
+    [
+      "webdav-migration-old",
+      "webdav-migration-base",
+      "webdav-migration-folder",
+      "webdav-migration-final",
+      "webdav-migration-local-path",
+      "webdav-migration-local-state",
+      "webdav-migration-local-time",
+      "webdav-migration-local-hash",
+      "webdav-migration-remote-path",
+      "webdav-migration-remote-state",
+      "webdav-migration-remote-time",
+      "webdav-migration-remote-hash",
+      "webdav-migration-comparison",
+      "webdav-migration-status",
+    ].forEach((id) => { $id(id).textContent = ""; });
+    $id("webdav-migration-keeps").hidden = true;
+    $id("webdav-migration-conflict").hidden = true;
+    $id("webdav-migration-confirm").hidden = true;
+  }
+
+  function _pbpWebdavMigrationCfg(cfg, baseUrl, relativePath) {
+    const path = pbpWebdavNormalizeRelativePath(relativePath);
+    if (!path.ok) return null;
+    const managed = path.value === PBP_WEBDAV_APP_COLLECTION + "/";
+    return Object.assign({}, cfg, {
+      baseUrl,
+      folderMode: managed ? "managed" : "custom",
+      relativePath: managed ? "" : path.value,
+      layoutVersion: 0,
+    });
+  }
+
+  function _pbpRenderWebdavMigrationCandidate(prefix, candidate) {
+    const remote = candidate.remote;
+    $id(`webdav-migration-${prefix}-path`).textContent =
+      candidate.target.relativePath;
+    $id(`webdav-migration-${prefix}-state`).textContent =
+      remote?.ok
+        ? t(remote.exists ? "webdavTestOkFound" : "webdavTestOkEmpty")
+        : t("webdavTestUnreachable");
+    $id(`webdav-migration-${prefix}-time`).textContent =
+      remote?.data?._webdav?.pushedAt || "";
+    $id(`webdav-migration-${prefix}-hash`).textContent =
+      remote?.settingsHash || "";
+  }
+
+  async function _pbpInspectWebdavMigration(cfg, operation = _webdavUiGuard.begin()) {
+    const statusEl = $id("webdav-migration-status");
+    const origin = pbpWebdavOrigin(cfg.baseUrl);
+    if (!origin) return { ok: false, error: "insecure" };
+    let permitted = false;
+    try {
+      permitted = await chrome.permissions.contains({ origins: [origin] });
+    } catch (_) {}
+    if (!_webdavUiGuard.isCurrent(operation)) return { ok: false, stale: true };
+    if (!permitted) return { ok: false, permissionRequired: true };
+    statusEl.textContent = t("testTesting");
+
+    const inspectLegacy = pbpWebdavShouldInspectLegacy(
+      _initialWebdavMigrationConfig, cfg);
+    let inspected;
+    if (inspectLegacy) {
+      inspected = await pbpWebdavInspectLegacyLayout(cfg);
+    } else {
+      const target = await pbpWebdavFreezeTarget(cfg);
+      inspected = target.ok
+        ? {
+          kind: "base",
+          candidate: { baseUrl: target.baseCollectionUrl },
+          target,
+        }
+        : { kind: "manual" };
+    }
+    if (!_webdavUiGuard.isCurrent(operation)) return { ok: false, stale: true };
+    $id("webdav-migration-old").textContent =
+      pbpWebdavCollectionUrl(cfg.baseUrl);
+    if (inspected.kind === "manual" || inspected.kind === "not-configured") {
+      statusEl.textContent = inspected.kind === "manual"
+        ? t("webdavStageCreateFailed") : "";
+      return { ok: false, error: inspected.kind };
+    }
+
+    const candidateBaseUrl = inspected.candidate.baseUrl;
+    const candidateCfg = Object.assign({}, cfg, {
+      baseUrl: candidateBaseUrl,
+      folderMode: inspected.target.folderMode,
+      relativePath: inspected.target.folderMode === "managed"
+        ? "" : inspected.target.relativePath,
+      layoutVersion: 0,
+    });
+    const locator = await pbpWebdavReadLocator(candidateCfg, inspected.target);
+    if (!_webdavUiGuard.isCurrent(operation)) return { ok: false, stale: true };
+    const confirmedLocalPath =
+      inspected.kind === "preserve" ||
+      (!inspectLegacy && cfg.folderMode === "custom")
+        ? inspected.target.relativePath : "";
+    const decision = pbpWebdavDecideLocation(confirmedLocalPath, locator);
+    if (decision.kind === "invalid-remote") {
+      statusEl.textContent = t("webdavStageLocatorFailed");
+      return { ok: false, error: "invalid-locator" };
+    }
+
+    const makeCandidate = async (relativePath) => {
+      const nextCfg = _pbpWebdavMigrationCfg(
+        cfg, candidateBaseUrl, relativePath);
+      const target = nextCfg && await pbpWebdavFreezeTarget(nextCfg);
+      if (!target?.ok) return null;
+      return {
+        cfg: nextCfg,
+        target,
+        consent: {
+          targetId: target.targetId,
+          backupFileUrl: target.backupFileUrl,
+          user: target.user,
+          generation: operation.generation,
+        },
+      };
+    };
+
+    let localCandidate = null;
+    let remoteCandidate = null;
+    let selectedCandidate = null;
+    if (decision.kind === "choose") {
+      localCandidate = await makeCandidate(decision.localPath);
+      remoteCandidate = await makeCandidate(decision.remotePath);
+    } else {
+      selectedCandidate = await makeCandidate(decision.relativePath);
+    }
+    if (!_webdavUiGuard.isCurrent(operation) ||
+        (!selectedCandidate && (!localCandidate || !remoteCandidate))) {
+      return { ok: false, stale: true };
+    }
+
+    const describe = async (candidate) => {
+      candidate.remote = await pbpWebdavReadRemote(candidate.cfg, candidate.target);
+    };
+    if (decision.kind === "choose") {
+      await Promise.all([describe(localCandidate), describe(remoteCandidate)]);
+    } else {
+      await describe(selectedCandidate);
+    }
+    if (!_webdavUiGuard.isCurrent(operation)) return { ok: false, stale: true };
+
+    const shown = selectedCandidate || localCandidate;
+    $id("webdav-migration-base").textContent = shown.target.baseCollectionUrl;
+    $id("webdav-migration-folder").textContent =
+      `${shown.target.folderMode === "managed"
+        ? t("webdavFolderManaged") : t("webdavFolderCustom")}: ${shown.target.relativePath}`;
+    $id("webdav-migration-final").textContent =
+      selectedCandidate?.target.backupFileUrl || "";
+    $id("webdav-migration-keeps").hidden = !selectedCandidate ||
+      selectedCandidate.target.backupCollectionUrl !==
+        pbpWebdavCollectionUrl(cfg.baseUrl);
+    $id("webdav-migration-confirm").hidden = !selectedCandidate;
+    $id("webdav-migration-conflict").hidden = decision.kind !== "choose";
+    if (decision.kind === "choose") {
+      _pbpRenderWebdavMigrationCandidate("local", localCandidate);
+      _pbpRenderWebdavMigrationCandidate("remote", remoteCandidate);
+      const localHash = localCandidate.remote?.settingsHash || "";
+      const remoteHash = remoteCandidate.remote?.settingsHash || "";
+      $id("webdav-migration-comparison").textContent =
+        localHash && remoteHash
+          ? t(localHash === remoteHash
+            ? "webdavMigrationContentSame"
+            : "webdavMigrationContentDifferent")
+          : "";
+    }
+    statusEl.textContent = inspected.cleanupWarning
+      ? t("webdavStageCleanupWarning") : "";
+    _webdavMigrationState = {
+      operation,
+      locator,
+      selectedCandidate,
+      localCandidate,
+      remoteCandidate,
+    };
+    return { ok: true, decision: decision.kind };
+  }
+
+  async function _pbpMaybeInspectWebdavMigration() {
+    const cfg = _pbpWebdavCfgFromForm();
+    if (!pbpWebdavMigrationRequired(cfg)) return;
+    await _pbpInspectWebdavMigration(cfg, _webdavUiGuard.begin());
+  }
+
+  function _pbpLockWebdavMigrationControls() {
+    const controls = [
+      "opt-webdav-url",
+      "opt-webdav-user",
+      "opt-webdav-pass",
+      "opt-webdav-relative-path",
+      "opt-webdav-autopush",
+      "webdav-test-btn",
+      "webdav-push-btn",
+      "webdav-pull-btn",
+      "webdav-clear-config",
+      "webdav-migration-confirm",
+      "webdav-use-local-location",
+      "webdav-use-remote-location",
+    ].map((id) => $id(id)).filter(Boolean);
+    document.querySelectorAll('input[name="webdav-folder-mode"]').forEach(
+      (control) => controls.push(control));
+    return pbpLockWebdavMigrationControls(
+      $id("webdav-migration"), controls);
+  }
+
+  async function _pbpConfirmWebdavMigration(candidate) {
+    const state = _webdavMigrationState;
+    const consent = candidate?.consent;
+    if (!state || !consent ||
+        consent.generation !== state.operation.generation ||
+        !_webdavUiGuard.isCurrent(state.operation)) return;
+
+    const unlockControls = _pbpLockWebdavMigrationControls();
+    const previous = {
+      baseUrl: $id("opt-webdav-url").value,
+      folderMode: _pbpWebdavFolderModeFromForm(),
+      relativePath: $id("opt-webdav-relative-path").value,
+    };
+    let completed = false;
+    let candidateApplied = false;
+    let paused = false;
+    let operation = null;
+    let failureKey = "webdavStageWriteFailed";
+    try {
+      await pauseOptionsAutoSave();
+      paused = true;
+      if (!_webdavUiGuard.isCurrent(state.operation)) return;
+      const currentCfg = _pbpWebdavCfgFromForm();
+      const liveCfg = Object.assign({}, currentCfg, {
+        baseUrl: candidate.cfg.baseUrl,
+        folderMode: candidate.cfg.folderMode,
+        relativePath: candidate.cfg.folderMode === "custom"
+          ? candidate.cfg.relativePath : "",
+        layoutVersion: 0,
+      });
+      const target = await pbpWebdavFreezeTarget(liveCfg);
+      if (!_webdavUiGuard.isCurrent(state.operation) ||
+          !target.ok ||
+          target.targetId !== consent.targetId ||
+          target.backupFileUrl !== consent.backupFileUrl ||
+          target.user !== consent.user) return;
+
+      const writable = await pbpWebdavProbeWritable(liveCfg, target);
+      if (!_webdavUiGuard.isCurrent(state.operation) || !writable.ok) {
+        if (_webdavUiGuard.isCurrent(state.operation)) {
+          $id("webdav-migration-status").textContent =
+            t("webdavStageWriteFailed");
+        }
+        return;
+      }
+      const expectedRemotePath = state.locator?.ok && state.locator.exists
+        ? state.locator.relativePath : target.relativePath;
+      failureKey = "webdavStageLocatorFailed";
+      const locator = await pbpWebdavWriteLocator(
+        liveCfg, target, target.relativePath, expectedRemotePath);
+      if (!_webdavUiGuard.isCurrent(state.operation) || !locator.ok) {
+        if (_webdavUiGuard.isCurrent(state.operation)) {
+          $id("webdav-migration-status").textContent =
+            t("webdavStageLocatorFailed");
+        }
+        return;
+      }
+
+      failureKey = "optSaveFailed";
+      if (!_webdavUiGuard.isCurrent(state.operation)) return;
+      $id("opt-webdav-url").value = candidate.cfg.baseUrl;
+      document.querySelector(
+        `input[name="webdav-folder-mode"][value="${candidate.cfg.folderMode}"]`
+      ).checked = true;
+      $id("opt-webdav-relative-path").value =
+        candidate.cfg.folderMode === "custom" ? candidate.cfg.relativePath : "";
+      candidateApplied = true;
+      _pbpRenderWebdavTarget(_pbpWebdavCfgFromForm(), false);
+
+      operation = _webdavUiGuard.begin();
+      const appliedCfg = _pbpWebdavCfgFromForm();
+      const appliedTarget = await pbpWebdavFreezeTarget(appliedCfg);
+      if (!_webdavUiGuard.isCurrent(operation) ||
+          !appliedTarget.ok ||
+          appliedTarget.targetId !== consent.targetId ||
+          appliedTarget.backupFileUrl !== consent.backupFileUrl ||
+          appliedTarget.user !== consent.user) return;
+
+      const testedBinding = _pbpWebdavOperationBinding(appliedCfg);
+      const promoted = await pbpPromoteTestedWebdavLayoutV2(testedBinding, {
+        getLiveBinding: () =>
+          _pbpWebdavOperationBinding(_pbpWebdavCfgFromForm()),
+        saveLive: saveAll,
+        persistVersion: () => persistSettings({ webdavLayoutVersion: 2 }),
+        markPersisted: () => {
+          savedState.settings = Object.assign(
+            {}, savedState.settings, { webdavLayoutVersion: 2 });
+        },
+        commitLoaded: () => {
+          const currentCfg = _pbpWebdavCfgFromForm();
+          const currentTarget = pbpWebdavResolveTarget(currentCfg);
+          _loadedWebdavTargetBinding = JSON.stringify([
+            currentTarget.backupFileUrl, currentCfg.user]);
+          _loadedWebdavLayoutVersion = 2;
+          s.webdavLayoutVersion = 2;
+        },
+      });
+      if (!promoted.ok) {
+        if (_webdavUiGuard.isCurrent(operation)) {
+          $id("webdav-migration-status").textContent = t("optSaveFailed");
+        }
+        return;
+      }
+      completed = true;
+      _webdavMigrationState = null;
+      const statusEl = $id("webdav-status");
+      statusEl.textContent = writable.cleanupWarning
+        ? t("webdavStageCleanupWarning")
+        : t(candidate.remote?.exists
+          ? "webdavTestOkFound" : "webdavTestOkEmpty");
+      statusEl.style.color = writable.cleanupWarning
+        ? "var(--opt-warn, #b06000)" : "#080";
+    } catch (error) {
+      const failedOperation = operation || state.operation;
+      if (_webdavUiGuard.isCurrent(failedOperation)) {
+        const statusEl = $id("webdav-migration-status");
+        statusEl.textContent = t(failureKey);
+        statusEl.style.color = "#c00";
+      }
+    } finally {
+      if (!completed && candidateApplied &&
+          _webdavUiGuard.isCurrent(operation)) {
+        $id("opt-webdav-url").value = previous.baseUrl;
+        document.querySelector(
+          `input[name="webdav-folder-mode"][value="${previous.folderMode}"]`
+        ).checked = true;
+        $id("opt-webdav-relative-path").value = previous.relativePath;
+        _pbpRenderWebdavTarget(_pbpWebdavCfgFromForm(), false);
+      }
+      if (paused) resumeOptionsAutoSave();
+      unlockControls();
+      if (completed) _pbpRenderWebdavTarget();
+    }
+  }
+
+  $id("webdav-migration-confirm")?.addEventListener("click", () => {
+    void _pbpConfirmWebdavMigration(_webdavMigrationState?.selectedCandidate);
+  });
+  $id("webdav-use-local-location")?.addEventListener("click", () => {
+    void _pbpConfirmWebdavMigration(_webdavMigrationState?.localCandidate);
+  });
+  $id("webdav-use-remote-location")?.addEventListener("click", () => {
+    void _pbpConfirmWebdavMigration(_webdavMigrationState?.remoteCandidate);
+  });
+
   // ---- WebDAV: Test ----
   $id("webdav-test-btn")?.addEventListener("click", async () => {
     const statusEl = $id("webdav-status");
@@ -1886,11 +2369,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!cfg) return;
     if (!statusEl) return;
     const operation = _webdavUiGuard.begin();
-    const testedBinding = _pbpWebdavOperationBinding(cfg);
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
-    const tested = await pbpWebdavPrepareOperation(cfg);
-    if (!tested.ok || !_webdavUiGuard.isCurrent(operation)) return;
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
     if (!_webdavUiGuard.isCurrent(operation)) return;
     const errorKey = _pbpWebdavPermissionError(granted);
@@ -1900,6 +2380,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       _pbpScheduleWebdavStatus(operation);
       return;
     }
+    if (pbpWebdavMigrationRequired(cfg)) {
+      _pbpResetWebdavMigration();
+      await _pbpInspectWebdavMigration(cfg, operation);
+      if (_webdavUiGuard.isCurrent(operation)) {
+        statusEl.textContent = "";
+        statusEl.style.color = "";
+      }
+      return;
+    }
+    const testedBinding = _pbpWebdavOperationBinding(cfg);
+    const tested = await pbpWebdavPrepareOperation(cfg);
+    if (!tested.ok || !_webdavUiGuard.isCurrent(operation)) return;
     const res = await pbpWebdavTest(cfg);
     if (!_webdavUiGuard.isCurrent(operation)) return;
     if (res.ok) {
@@ -2184,6 +2676,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     setTimeout(() => location.reload(), 180);
   });
 
+  $id("webdav-clear-config")?.addEventListener("click", () => {
+    showConfirmPopover($id("webdav-clear-config"), {
+      msg: t("webdavClearConfigConfirm"),
+      yesText: t("webdavClearConfig"),
+      noText: t("cancel"),
+      onConfirm: async () => {
+        await pauseOptionsAutoSave();
+        try {
+          const cleared = await pbpClearWebdavLocalConfig();
+          if (!cleared.settingsCleared) {
+            setStatusIcon($id("webdav-status"), false, t("optSaveFailed"));
+            return;
+          }
+          Object.assign(s, cleared.patch);
+          savedState.settings = Object.assign({}, savedState.settings, cleared.patch);
+          if (cleared.autoPushCleared) {
+            s.webdavAutoPush = "off";
+            savedState.webdavAutoPush = "off";
+            $id("opt-webdav-autopush").value = "off";
+          }
+          _loadedWebdavTargetBinding = "";
+          _loadedWebdavLayoutVersion = 0;
+          $id("opt-webdav-url").value = "";
+          $id("opt-webdav-user").value = "";
+          $id("opt-webdav-pass").value = "";
+          $id("opt-webdav-relative-path").value = "";
+          document.querySelector(
+            'input[name="webdav-folder-mode"][value="managed"]'
+          ).checked = true;
+          _webdavUiGuard.begin();
+          _pbpResetWebdavMigration();
+          _pbpRenderWebdavTarget();
+          if (!cleared.ok) {
+            $id("webdav-clear-config").hidden = false;
+            setStatusIcon($id("webdav-status"), false, t("optSaveFailed"));
+          } else {
+            void _pbpRenderWebdavStatus();
+          }
+        } finally {
+          resumeOptionsAutoSave();
+        }
+      },
+    });
+  });
+
   // ===================== Auto-save =====================
   // Collect all settings from the form and save to chrome.storage.sync
   function collectSettingsFromForm() {
@@ -2426,6 +2963,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el.addEventListener("change", scheduleAutoSave);
   });
   _pbpRenderWebdavTarget();
+  void _pbpMaybeInspectWebdavMigration();
   function flashAutoSave(key = "optAutoSaved", fallback = "Saved", delay = 1500, ok = true) {
     const el = $id("auto-save-status");
     if (!el) return;

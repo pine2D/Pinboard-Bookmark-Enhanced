@@ -1592,6 +1592,21 @@ html[data-theme="flexoki-dark"] #panel-vocab .vocab-details-body > .hint {
 .webdav-folder-mode .hint { margin: 0 0 var(--opt-sp-2) 22px; }
 .webdav-actual { margin: var(--opt-sp-3) 0 var(--opt-sp-4); overflow-wrap: anywhere; font-size: 12px; }
 .webdav-actual output { display: block; margin-top: var(--opt-sp-1); color: var(--opt-fg-muted, #555); }
+.webdav-migration { margin: 0 0 var(--opt-sp-4); padding: var(--opt-sp-3); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-md); }
+.webdav-migration-title { margin: 0 0 var(--opt-sp-2); font-weight: 600; }
+.webdav-migration-locations,
+.webdav-migration-candidates dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--opt-sp-1) var(--opt-sp-2); margin: var(--opt-sp-3) 0; }
+.webdav-migration-locations dt,
+.webdav-migration-candidates dt { color: var(--opt-fg-muted); }
+.webdav-migration-locations dd,
+.webdav-migration-candidates dd { margin: 0; overflow-wrap: anywhere; }
+.webdav-migration-candidates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--opt-sp-3); }
+.webdav-migration-candidates > div { padding: var(--opt-sp-2); border: 1px solid var(--opt-border); border-radius: var(--opt-radius-md); overflow-wrap: anywhere; }
+.webdav-migration-comparison { display: block; margin-bottom: var(--opt-sp-2); }
+.webdav-clear { margin-top: var(--opt-sp-3); }
+@media (max-width: 600px) {
+  .webdav-migration-candidates { grid-template-columns: 1fr; }
+}
 .field-error { margin: var(--opt-sp-2) 0 0; color: var(--opt-danger, #c00); font-size: 12px; }
 .field-error:empty { display: none; }
 /* Vocab toolbar: 5 children (count/export/anki/eudic/status), not the

@@ -989,6 +989,60 @@
   "webdavStageLocatorFailed": {
     "message": "Folder kopii zapasowej działa, ale nie udało się zaktualizować informacji o jego położeniu."
   },
+  "webdavMigrationRequired": {
+    "message": "Ta konfiguracja WebDAV wymaga sprawdzenia przed wznowieniem automatycznych kopii zapasowych."
+  },
+  "webdavMigrationSafety": {
+    "message": "Sprawdzenie nie przenosi ani nie usuwa istniejącej zdalnej kopii zapasowej."
+  },
+  "webdavMigrationOldLocation": {
+    "message": "Poprzednia lokalizacja"
+  },
+  "webdavMigrationNewBase": {
+    "message": "Nowy podstawowy adres URL"
+  },
+  "webdavMigrationFolder": {
+    "message": "Folder kopii zapasowej"
+  },
+  "webdavMigrationFinalLocation": {
+    "message": "Docelowa lokalizacja kopii zapasowej"
+  },
+  "webdavMigrationKeepsTarget": {
+    "message": "Nadal będzie używany ten sam zdalny plik kopii zapasowej."
+  },
+  "webdavLocationConflict": {
+    "message": "To urządzenie i zdalny rekord lokalizacji wskazują różne foldery kopii zapasowej. Wybierz folder do użycia."
+  },
+  "webdavUseLocalLocation": {
+    "message": "Użyj folderu tego urządzenia"
+  },
+  "webdavUseRemoteLocation": {
+    "message": "Użyj zapisanego folderu zdalnego"
+  },
+  "webdavMigrationBackupState": {
+    "message": "Kopia zapasowa"
+  },
+  "webdavMigrationPushedAt": {
+    "message": "Ostatnie wysłanie zdalne"
+  },
+  "webdavMigrationSemanticHash": {
+    "message": "Skrót semantyczny"
+  },
+  "webdavMigrationContentSame": {
+    "message": "Obie kopie zapasowe mają tę samą zawartość."
+  },
+  "webdavMigrationContentDifferent": {
+    "message": "Kopie zapasowe mają różną zawartość."
+  },
+  "webdavMigrationConfirm": {
+    "message": "Potwierdź folder kopii zapasowej"
+  },
+  "webdavClearConfig": {
+    "message": "Przestań używać WebDAV i wyczyść konfigurację"
+  },
+  "webdavClearConfigConfirm": {
+    "message": "Wyczyścić ustawienia WebDAV i lokalny stan synchronizacji? Pliki zdalne nie zostaną usunięte."
+  },
   "webdavUserLabel": {
     "message": "Nazwa użytkownika (opcjonalnie)"
   },

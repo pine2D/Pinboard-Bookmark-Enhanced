@@ -989,6 +989,60 @@
   "webdavStageLocatorFailed": {
     "message": "Le dossier de sauvegarde fonctionne, mais son enregistrement d’emplacement n’a pas pu être mis à jour."
   },
+  "webdavMigrationRequired": {
+    "message": "Cette configuration WebDAV doit être vérifiée avant la reprise des sauvegardes automatiques."
+  },
+  "webdavMigrationSafety": {
+    "message": "La vérification ne déplace ni ne supprime la sauvegarde distante existante."
+  },
+  "webdavMigrationOldLocation": {
+    "message": "Emplacement précédent"
+  },
+  "webdavMigrationNewBase": {
+    "message": "Nouvelle URL de base"
+  },
+  "webdavMigrationFolder": {
+    "message": "Dossier de sauvegarde"
+  },
+  "webdavMigrationFinalLocation": {
+    "message": "Emplacement final de la sauvegarde"
+  },
+  "webdavMigrationKeepsTarget": {
+    "message": "Le même fichier de sauvegarde distant continuera d’être utilisé."
+  },
+  "webdavLocationConflict": {
+    "message": "Cet appareil et l’enregistrement distant indiquent des dossiers de sauvegarde différents. Choisissez le dossier à utiliser."
+  },
+  "webdavUseLocalLocation": {
+    "message": "Utiliser le dossier de cet appareil"
+  },
+  "webdavUseRemoteLocation": {
+    "message": "Utiliser le dossier distant enregistré"
+  },
+  "webdavMigrationBackupState": {
+    "message": "Sauvegarde"
+  },
+  "webdavMigrationPushedAt": {
+    "message": "Dernier envoi distant"
+  },
+  "webdavMigrationSemanticHash": {
+    "message": "Empreinte sémantique"
+  },
+  "webdavMigrationContentSame": {
+    "message": "Les deux sauvegardes ont le même contenu."
+  },
+  "webdavMigrationContentDifferent": {
+    "message": "Les deux sauvegardes ont un contenu différent."
+  },
+  "webdavMigrationConfirm": {
+    "message": "Confirmer le dossier de sauvegarde"
+  },
+  "webdavClearConfig": {
+    "message": "Ne plus utiliser WebDAV et effacer la configuration"
+  },
+  "webdavClearConfigConfirm": {
+    "message": "Effacer les réglages WebDAV et l’état de synchronisation local ? Les fichiers distants ne seront pas supprimés."
+  },
   "webdavUserLabel": {
     "message": "Nom d'utilisateur (facultatif)"
   },

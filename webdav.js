@@ -86,6 +86,53 @@ function pbpWebdavNormalizeRelativePath(value) {
   };
 }
 
+function pbpWebdavSplitLegacyCollection(value) {
+  const legacyCollectionUrl = pbpWebdavCollectionUrl(value);
+  if (!legacyCollectionUrl || !pbpWebdavOrigin(legacyCollectionUrl)) {
+    return { ok: false, error: "base-url" };
+  }
+  const url = new URL(legacyCollectionUrl);
+  const parts = url.pathname.replace(/\/+$/, "").split("/");
+  const lastEncoded = parts.pop();
+  if (!lastEncoded) return { ok: false, error: "root" };
+  let last;
+  try { last = decodeURIComponent(lastEncoded); }
+  catch (_) { return { ok: false, error: "encoding" }; }
+  const path = pbpWebdavNormalizeRelativePath(last);
+  if (!path.ok) return path;
+  url.pathname = parts.join("/") + "/";
+  const managed = path.value === PBP_WEBDAV_APP_COLLECTION + "/";
+  return {
+    ok: true,
+    baseUrl: url.href,
+    folderMode: managed ? "managed" : "custom",
+    relativePath: managed ? "" : path.value,
+    legacyCollectionUrl,
+  };
+}
+
+function pbpWebdavDecideLocation(localPath, remoteLocator) {
+  const local = localPath ? pbpWebdavNormalizeRelativePath(localPath) : null;
+  if (!remoteLocator || remoteLocator.exists === false) {
+    return {
+      kind: "local",
+      relativePath: local?.ok ? local.value : PBP_WEBDAV_APP_COLLECTION + "/",
+    };
+  }
+  if (!remoteLocator.ok) return { kind: "invalid-remote" };
+  if (!local?.ok) {
+    return { kind: "adopt", relativePath: remoteLocator.relativePath };
+  }
+  if (local.value === remoteLocator.relativePath) {
+    return { kind: "same", relativePath: local.value };
+  }
+  return {
+    kind: "choose",
+    localPath: local.value,
+    remotePath: remoteLocator.relativePath,
+  };
+}
+
 function pbpWebdavEmptyState() {
   return {
     known: false,
@@ -761,14 +808,16 @@ async function pbpWebdavEnsureCollection(cfg) {
   return pbpWebdavEnsureCollectionUrl(cfg, pbpWebdavCollectionUrl(cfg && cfg.baseUrl));
 }
 
-async function pbpWebdavProbeWritable(cfg, target) {
+async function pbpWebdavProbeWritable(cfg, target, options) {
   if (!target || !pbpWebdavOrigin(target.baseCollectionUrl) ||
       !pbpWebdavOrigin(target.backupCollectionUrl)) {
     return { ok: false, error: "insecure" };
   }
-  const ensured = target.relativePath
-    ? await pbpWebdavEnsureCollectionPath(cfg, target, target.relativePath)
-    : await pbpWebdavEnsureCollectionUrl(cfg, target.baseCollectionUrl);
+  const ensured = options?.create === false
+    ? await pbpWebdavProbeCollection(cfg, target.backupCollectionUrl)
+    : target.relativePath
+      ? await pbpWebdavEnsureCollectionPath(cfg, target, target.relativePath)
+      : await pbpWebdavEnsureCollectionUrl(cfg, target.baseCollectionUrl);
   if (!ensured.ok) return ensured;
   const name = PBP_WEBDAV_WRITE_TEST_PREFIX + crypto.randomUUID() + ".txt";
   const url = pbpWebdavCollectionFileUrl(target.backupCollectionUrl, name);
@@ -787,6 +836,93 @@ async function pbpWebdavProbeWritable(cfg, target) {
   } catch (_) {
     return { ok: true, cleanupWarning: true };
   }
+}
+
+async function pbpWebdavInspectLegacyLayout(cfg) {
+  cfg = cfg || {};
+  if (!String(cfg.baseUrl || "").trim()) return { kind: "not-configured" };
+
+  const diagnostic = (result) => [
+    result?.stage || "",
+    result?.error || "unavailable",
+    Number.isFinite(result?.status) ? result.status : "",
+  ].filter((part) => part !== "").join(":");
+  const split = pbpWebdavSplitLegacyCollection(cfg.baseUrl);
+  let preserveError = split.ok ? "target-mismatch" : split.error;
+  if (split.ok) {
+    const preserveCfg = Object.assign({}, cfg, {
+      baseUrl: split.baseUrl,
+      folderMode: split.folderMode,
+      relativePath: split.relativePath,
+    });
+    const target = await pbpWebdavFreezeTarget(preserveCfg);
+    if (target.ok && target.backupCollectionUrl === split.legacyCollectionUrl) {
+      let writable;
+      try {
+        writable = await pbpWebdavProbeWritable(
+          preserveCfg, target, { create: false });
+      } catch (_) {
+        writable = { ok: false, error: "network" };
+      }
+      if (writable.ok) {
+        return {
+          kind: "preserve",
+          candidate: split,
+          target,
+          cleanupWarning: !!writable.cleanupWarning,
+          cleanupStatus: writable.cleanupStatus,
+        };
+      }
+      preserveError = diagnostic(writable);
+    }
+  }
+
+  const managedCfg = Object.assign({}, cfg, {
+    folderMode: "managed",
+    relativePath: "",
+  });
+  const managedTarget = await pbpWebdavFreezeTarget(managedCfg);
+  let writable = { ok: false, error: managedTarget.error || "unavailable" };
+  if (managedTarget.ok) {
+    try {
+      writable = await pbpWebdavProbeWritable(
+        managedCfg, managedTarget, { create: false });
+    } catch (_) {
+      writable = { ok: false, error: "network" };
+    }
+  }
+  if (writable.ok) {
+    return {
+      kind: "managed",
+      candidate: managedCfg,
+      target: managedTarget,
+      cleanupWarning: !!writable.cleanupWarning,
+      cleanupStatus: writable.cleanupStatus,
+    };
+  }
+  if (managedTarget.ok && writable.error === "not-found") {
+    let base;
+    try {
+      base = await pbpWebdavProbeCollection(
+        managedCfg, managedTarget.baseCollectionUrl);
+    } catch (_) {
+      base = { ok: false, error: "network" };
+    }
+    if (base.ok) {
+      return {
+        kind: "managed",
+        candidate: managedCfg,
+        target: managedTarget,
+        needsCreate: true,
+      };
+    }
+    writable = base;
+  }
+  return {
+    kind: "manual",
+    preserveError,
+    managedError: diagnostic(writable),
+  };
 }
 
 // ============================================================

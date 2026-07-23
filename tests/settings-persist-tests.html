@@ -125,6 +125,178 @@ async function run() {
       "webdavFolderMode", "webdavRelativePath", "webdavLayoutVersion"]
       .every((key) => !(key in preparedWebdavPull)));
 
+  const migrationSettings = {
+    baseUrl: "https://dav.example.com/legacy/",
+    layoutVersion: 0,
+    webdavAutoPush: "daily",
+  };
+  const migrationRequired = typeof pbpWebdavMigrationRequired === "function"
+    ? pbpWebdavMigrationRequired(migrationSettings) : false;
+  check("E1 WebDAV migration state requires a non-empty pre-v2 URL and preserves the schedule",
+    migrationRequired &&
+    !pbpWebdavMigrationRequired({ baseUrl: "", layoutVersion: 0 }) &&
+    !pbpWebdavMigrationRequired({
+      baseUrl: "https://dav.example.com/base/", layoutVersion: 2,
+    }) &&
+    migrationSettings.webdavAutoPush === "daily");
+
+  const initialLegacy = {
+    baseUrl: "https://dav.example.com/legacy/",
+    folderMode: "managed",
+    relativePath: "",
+    layoutVersion: 0,
+  };
+  check("E1 only the unchanged non-empty configuration loaded as v0 is inspected as legacy",
+    typeof pbpWebdavShouldInspectLegacy === "function" &&
+    pbpWebdavShouldInspectLegacy(initialLegacy, {
+      ...initialLegacy, user: "new-credential",
+    }) &&
+    !pbpWebdavShouldInspectLegacy(initialLegacy, {
+      ...initialLegacy, folderMode: "custom", relativePath: "Device/Books/",
+    }));
+  check("E1 a new base or a target edited from loaded v2 is never split as legacy",
+    typeof pbpWebdavShouldInspectLegacy === "function" &&
+    !pbpWebdavShouldInspectLegacy({
+      baseUrl: "", folderMode: "managed", relativePath: "", layoutVersion: 0,
+    }, {
+      baseUrl: "https://dav.example.com/base/",
+      folderMode: "managed", relativePath: "", layoutVersion: 0,
+    }) &&
+    !pbpWebdavShouldInspectLegacy({
+      baseUrl: "https://dav.example.com/old/",
+      folderMode: "managed", relativePath: "", layoutVersion: 2,
+    }, {
+      baseUrl: "https://dav.example.com/new/",
+      folderMode: "managed", relativePath: "", layoutVersion: 0,
+    }));
+
+  check("E1 clear remains available for partial WebDAV configuration without a URL",
+    typeof pbpWebdavHasLocalConfig === "function" &&
+    !pbpWebdavHasLocalConfig({
+      baseUrl: "", user: "", pass: "", folderMode: "managed",
+      relativePath: "", layoutVersion: 0, autoPush: "off",
+    }) &&
+    [
+      { user: "alice" },
+      { pass: "secret" },
+      { folderMode: "custom" },
+      { relativePath: "Device/Books/" },
+      { autoPush: "hourly" },
+    ].every((delta) => pbpWebdavHasLocalConfig(Object.assign({
+      baseUrl: "", user: "", pass: "", folderMode: "managed",
+      relativePath: "", layoutVersion: 0, autoPush: "off",
+    }, delta))));
+
+  const busyAttributes = new Map();
+  const busyCard = {
+    setAttribute: (key, value) => busyAttributes.set(key, value),
+    removeAttribute: (key) => busyAttributes.delete(key),
+  };
+  const busyControls = [{ disabled: false }, { disabled: true }];
+  const unlockBusy = typeof pbpLockWebdavMigrationControls === "function"
+    ? pbpLockWebdavMigrationControls(busyCard, busyControls)
+    : null;
+  const lockedBusy = busyAttributes.get("aria-busy") === "true" &&
+    busyControls.every((control) => control.disabled);
+  if (unlockBusy) unlockBusy();
+  check("E1 WebDAV migration busy lock restores each control's previous disabled state",
+    lockedBusy &&
+    !busyAttributes.has("aria-busy") &&
+    busyControls[0].disabled === false &&
+    busyControls[1].disabled === true);
+
+  const clearSettings = {
+    optTheme: "nord",
+    webdavUrl: "https://dav.example.com/base/",
+    webdavUser: "alice",
+    webdavPass: "obf:secret",
+    webdavFolderMode: "custom",
+    webdavRelativePath: "Backups/Books/",
+    webdavLayoutVersion: 2,
+  };
+  let clearSchedule = "daily";
+  let clearFetches = 0;
+  let clearRemoved = [];
+  const realClearFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    clearFetches++;
+    throw new Error("clear must not fetch");
+  };
+  const clearResult = typeof pbpClearWebdavLocalConfig === "function"
+    ? await pbpClearWebdavLocalConfig({
+      persist: async (patch) => {
+        Object.assign(clearSettings, patch);
+        return { ok: true };
+      },
+      writeAutoPush: async (value) => {
+        clearSchedule = value;
+        return value;
+      },
+      removeLocal: async (keys) => { clearRemoved = keys.slice(); },
+    }) : null;
+  globalThis.fetch = realClearFetch;
+  check("E1 WebDAV clear resets only transport, path, layout and the local schedule",
+    clearResult?.ok &&
+    clearSettings.optTheme === "nord" &&
+    clearSettings.webdavUrl === "" &&
+    clearSettings.webdavUser === "" &&
+    clearSettings.webdavPass === "" &&
+    clearSettings.webdavFolderMode === "managed" &&
+    clearSettings.webdavRelativePath === "" &&
+    clearSettings.webdavLayoutVersion === 0 &&
+    clearSchedule === "off");
+  check("E1 WebDAV clear removes only local sync state without any network request",
+    clearFetches === 0 &&
+    JSON.stringify(clearRemoved.sort()) === JSON.stringify(
+      [PBP_WEBDAV_SYNC_STATE_KEY, "_webdavEtagState", "webdavLastPush"].sort()));
+
+  const partialClearCalls = [];
+  let partialClear = null;
+  let partialClearError = null;
+  try {
+    partialClear = await pbpClearWebdavLocalConfig({
+      persist: async () => {
+        partialClearCalls.push("settings");
+        return { ok: true };
+      },
+      writeAutoPush: async () => {
+        partialClearCalls.push("schedule");
+        throw new Error("schedule failed");
+      },
+      removeLocal: async () => {
+        partialClearCalls.push("state");
+        throw new Error("state failed");
+      },
+    });
+  } catch (error) {
+    partialClearError = error;
+  }
+  check("E1 WebDAV clear reports post-persist failures and still attempts schedule and state cleanup",
+    partialClearError === null &&
+    partialClear?.ok === false &&
+    partialClear.settingsCleared === true &&
+    partialClear.autoPushCleared === false &&
+    partialClear.stateCleared === false &&
+    partialClearCalls.join(",") === "settings,schedule,state" &&
+    partialClear.errors?.length === 2);
+
+  let rejectedClear = null;
+  let rejectedClearError = null;
+  try {
+    rejectedClear = await pbpClearWebdavLocalConfig({
+      persist: async () => { throw new Error("settings failed"); },
+      writeAutoPush: async () => { throw new Error("must not run"); },
+      removeLocal: async () => { throw new Error("must not run"); },
+    });
+  } catch (error) {
+    rejectedClearError = error;
+  }
+  check("E1 WebDAV clear converts a settings persistence rejection into a handled result",
+    rejectedClearError === null &&
+    rejectedClear?.ok === false &&
+    rejectedClear.settingsCleared === false &&
+    rejectedClear.errors?.length === 1);
+
   let persistedDelta = null;
   let settingsSavedDelta = null;
   const snapshotState = { settings: { optTheme: "auto", customFont: "" }, overlay: "base-css" };
@@ -266,6 +438,25 @@ async function run() {
     !!webdavUiGuard && webdavTimers.size === 0 && staleWebdavTimerRan === false);
 
   const hasWebdavPromotion = typeof pbpPromoteTestedWebdavLayoutV2 === "function";
+
+  let failedPromotionPersisted = false;
+  let failedPromotionCommitted = false;
+  const failedPromotion = hasWebdavPromotion
+    ? await pbpPromoteTestedWebdavLayoutV2("target-a|pass-a", {
+      getLiveBinding: () => "target-a|pass-a",
+      saveLive: async () => ({ ok: false, error: new Error("save failed") }),
+      persistVersion: async () => {
+        failedPromotionPersisted = true;
+        return { ok: true };
+      },
+      markPersisted: () => {},
+      commitLoaded: () => { failedPromotionCommitted = true; },
+    }) : null;
+  check("E1 failed or cancelled WebDAV migration cannot promote layout v2",
+    hasWebdavPromotion &&
+    failedPromotion?.ok === false &&
+    !failedPromotionPersisted &&
+    !failedPromotionCommitted);
 
   let sameBindingGeneration = 1;
   let sameBindingLoadedVersion = 0;

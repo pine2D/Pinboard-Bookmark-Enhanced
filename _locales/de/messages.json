@@ -989,6 +989,60 @@
   "webdavStageLocatorFailed": {
     "message": "Der Sicherungsordner funktioniert, aber sein Speicherorteintrag konnte nicht aktualisiert werden."
   },
+  "webdavMigrationRequired": {
+    "message": "Diese WebDAV-Konfiguration muss geprüft werden, bevor automatische Sicherungen fortgesetzt werden können."
+  },
+  "webdavMigrationSafety": {
+    "message": "Bei der Prüfung wird die vorhandene Remote-Sicherung weder verschoben noch gelöscht."
+  },
+  "webdavMigrationOldLocation": {
+    "message": "Bisheriger Speicherort"
+  },
+  "webdavMigrationNewBase": {
+    "message": "Neue Basis-URL"
+  },
+  "webdavMigrationFolder": {
+    "message": "Sicherungsordner"
+  },
+  "webdavMigrationFinalLocation": {
+    "message": "Endgültiger Sicherungsort"
+  },
+  "webdavMigrationKeepsTarget": {
+    "message": "Dieselbe Remote-Sicherungsdatei wird weiterverwendet."
+  },
+  "webdavLocationConflict": {
+    "message": "Dieses Gerät und der Speicherorteintrag auf dem Server verweisen auf unterschiedliche Sicherungsordner. Wählen Sie den zu verwendenden Ordner."
+  },
+  "webdavUseLocalLocation": {
+    "message": "Ordner dieses Geräts verwenden"
+  },
+  "webdavUseRemoteLocation": {
+    "message": "Gespeicherten Remote-Ordner verwenden"
+  },
+  "webdavMigrationBackupState": {
+    "message": "Sicherung"
+  },
+  "webdavMigrationPushedAt": {
+    "message": "Letzter Remote-Upload"
+  },
+  "webdavMigrationSemanticHash": {
+    "message": "Semantischer Hash"
+  },
+  "webdavMigrationContentSame": {
+    "message": "Beide Sicherungen enthalten dieselben Daten."
+  },
+  "webdavMigrationContentDifferent": {
+    "message": "Die Sicherungen enthalten unterschiedliche Daten."
+  },
+  "webdavMigrationConfirm": {
+    "message": "Sicherungsordner bestätigen"
+  },
+  "webdavClearConfig": {
+    "message": "WebDAV nicht mehr verwenden und Konfiguration löschen"
+  },
+  "webdavClearConfigConfirm": {
+    "message": "WebDAV-Einstellungen und lokalen Synchronisierungsstatus löschen? Dateien auf dem Server werden nicht gelöscht."
+  },
   "webdavUserLabel": {
     "message": "Benutzername (optional)"
   },

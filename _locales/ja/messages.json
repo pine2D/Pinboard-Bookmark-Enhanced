@@ -989,6 +989,60 @@
   "webdavStageLocatorFailed": {
     "message": "バックアップフォルダーは使用できますが、場所の記録を更新できませんでした。"
   },
+  "webdavMigrationRequired": {
+    "message": "自動バックアップを再開する前に、この WebDAV 設定を確認する必要があります。"
+  },
+  "webdavMigrationSafety": {
+    "message": "確認時に既存のリモートバックアップを移動または削除することはありません。"
+  },
+  "webdavMigrationOldLocation": {
+    "message": "以前の保存先"
+  },
+  "webdavMigrationNewBase": {
+    "message": "新しいベース URL"
+  },
+  "webdavMigrationFolder": {
+    "message": "バックアップフォルダー"
+  },
+  "webdavMigrationFinalLocation": {
+    "message": "最終的なバックアップ先"
+  },
+  "webdavMigrationKeepsTarget": {
+    "message": "同じリモートバックアップファイルを引き続き使用します。"
+  },
+  "webdavLocationConflict": {
+    "message": "このデバイスとリモートの場所記録が、異なるバックアップフォルダーを示しています。使用するフォルダーを選択してください。"
+  },
+  "webdavUseLocalLocation": {
+    "message": "このデバイスのフォルダーを使用"
+  },
+  "webdavUseRemoteLocation": {
+    "message": "記録済みのリモートフォルダーを使用"
+  },
+  "webdavMigrationBackupState": {
+    "message": "バックアップ"
+  },
+  "webdavMigrationPushedAt": {
+    "message": "前回のリモート送信"
+  },
+  "webdavMigrationSemanticHash": {
+    "message": "セマンティックハッシュ"
+  },
+  "webdavMigrationContentSame": {
+    "message": "2 つのバックアップの内容は同じです。"
+  },
+  "webdavMigrationContentDifferent": {
+    "message": "2 つのバックアップの内容は異なります。"
+  },
+  "webdavMigrationConfirm": {
+    "message": "バックアップフォルダーを確定"
+  },
+  "webdavClearConfig": {
+    "message": "WebDAV の使用を停止して設定を消去"
+  },
+  "webdavClearConfigConfirm": {
+    "message": "WebDAV 設定とローカルの同期状態を消去しますか？リモートファイルは削除されません。"
+  },
   "webdavUserLabel": {
     "message": "ユーザー名（任意）"
   },

@@ -101,6 +101,80 @@ section("WebDAV folder target resolution");
     }).folderMode === "managed");
 }
 
+section("WebDAV legacy layout migration decisions");
+{
+  const split = typeof pbpWebdavSplitLegacyCollection === "function"
+    ? pbpWebdavSplitLegacyCollection(
+      "https://dav.example.com/root/Legacy/?access_token=abc%2Fdef")
+    : null;
+  check("legacy collection split preserves the exact target and parent query token",
+    split?.ok &&
+    split.baseUrl === "https://dav.example.com/root/?access_token=abc%2Fdef" &&
+    split.folderMode === "custom" &&
+    split.relativePath === "Legacy/" &&
+    split.legacyCollectionUrl ===
+      "https://dav.example.com/root/Legacy/?access_token=abc%2Fdef");
+
+  const managedSplit = typeof pbpWebdavSplitLegacyCollection === "function"
+    ? pbpWebdavSplitLegacyCollection(
+      "https://dav.example.com/root/pinboard-bookmark-enhanced/")
+    : null;
+  check("legacy managed collection normalizes to managed mode",
+    managedSplit?.ok &&
+    managedSplit.folderMode === "managed" &&
+    managedSplit.relativePath === "");
+
+  const rejectedSplits = typeof pbpWebdavSplitLegacyCollection === "function"
+    ? [
+      pbpWebdavSplitLegacyCollection("not a URL"),
+      pbpWebdavSplitLegacyCollection("https://user:pass@dav.example.com/root/Legacy/"),
+      pbpWebdavSplitLegacyCollection("http://192.168.1.2/root/Legacy/"),
+    ] : [];
+  check("legacy split reuses the endpoint policy for invalid, credential and insecure URLs",
+    rejectedSplits.length === 3 && rejectedSplits.every((result) => !result.ok));
+
+  const noRemote = typeof pbpWebdavDecideLocation === "function"
+    ? pbpWebdavDecideLocation("", { ok: true, exists: false })
+    : null;
+  check("missing locator falls back to the managed path",
+    noRemote?.kind === "local" &&
+    noRemote.relativePath === "pinboard-bookmark-enhanced/");
+
+  const adopted = typeof pbpWebdavDecideLocation === "function"
+    ? pbpWebdavDecideLocation("", {
+      ok: true, exists: true, relativePath: "Remote/Books/",
+    }) : null;
+  const same = typeof pbpWebdavDecideLocation === "function"
+    ? pbpWebdavDecideLocation("Remote/Books/", {
+      ok: true, exists: true, relativePath: "Remote/Books/",
+    }) : null;
+  check("valid locator is adopted only when local path is absent, or continued when equal",
+    adopted?.kind === "adopt" &&
+    adopted.relativePath === "Remote/Books/" &&
+    same?.kind === "same" &&
+    same.relativePath === "Remote/Books/");
+
+  const choose = typeof pbpWebdavDecideLocation === "function"
+    ? pbpWebdavDecideLocation("Device/Books/", {
+      ok: true,
+      exists: true,
+      relativePath: "Remote/Books/",
+      pushedAt: "2099-01-01T00:00:00.000Z",
+      settingsHash: "same-semantic-hash",
+    }) : null;
+  check("different paths always require a choice regardless of time or semantic hash",
+    choose?.kind === "choose" &&
+    choose.localPath === "Device/Books/" &&
+    choose.remotePath === "Remote/Books/");
+
+  const invalidRemote = typeof pbpWebdavDecideLocation === "function"
+    ? pbpWebdavDecideLocation("Device/Books/", {
+      ok: false, exists: true, error: "invalid-locator",
+    }) : null;
+  check("invalid locator is never replaced by a local-path guess",
+    invalidRemote?.kind === "invalid-remote");
+}
+
 section("pbpWebdavAuthHeader");
 assertEq(pbpWebdavAuthHeader("", ""), null, "empty user + empty pass -> null (no header)");
 assertEq(pbpWebdavAuthHeader("bob", "secret"), "Basic " + btoa("bob:secret"), "user+pass -> Basic base64(user:pass)");
@@ -432,6 +506,131 @@ async function runChromeLayerTests() {
     "SHA-256 uses the exact UTF-8 bytes");
   check("different remote bytes produce a different full-content hash",
     abcHash !== "" && abdHash !== "" && abcHash !== abdHash);
+
+  section("WebDAV legacy layout inspection");
+  const migrationResponse = (status, text = "") => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: () => null },
+    text: async () => text || (status === 207 ? COLLECTION_XML : ""),
+  });
+  const realMigrationFetch = globalThis.fetch;
+  try {
+    let emptyFetches = 0;
+    globalThis.fetch = async () => {
+      emptyFetches++;
+      return migrationResponse(500);
+    };
+    const empty = typeof pbpWebdavInspectLegacyLayout === "function"
+      ? await pbpWebdavInspectLegacyLayout({ baseUrl: "   " })
+      : null;
+    check("empty legacy configuration needs no migration and makes zero requests",
+      empty?.kind === "not-configured" && emptyFetches === 0);
+
+    const preserveRequests = [];
+    globalThis.fetch = async (url, options) => {
+      preserveRequests.push({ url, method: options.method });
+      if (options.method === "PROPFIND") return migrationResponse(207);
+      if (options.method === "PUT") return migrationResponse(201);
+      if (options.method === "DELETE") return migrationResponse(204);
+      return migrationResponse(500);
+    };
+    const preserved = typeof pbpWebdavInspectLegacyLayout === "function"
+      ? await pbpWebdavInspectLegacyLayout({
+        baseUrl: "https://dav.example.com/root/Legacy/?access_token=abc%2Fdef",
+        user: "alice",
+        pass: "secret",
+      }) : null;
+    check("writable legacy collection preserves its exact backup target",
+      preserved?.kind === "preserve" &&
+      preserved.candidate.baseUrl ===
+        "https://dav.example.com/root/?access_token=abc%2Fdef" &&
+      preserved.target.backupCollectionUrl ===
+        "https://dav.example.com/root/Legacy/?access_token=abc%2Fdef");
+    check("inspection touches only collection metadata and random temp files",
+      preserveRequests.map((request) => request.method).join(",") ===
+        "PROPFIND,PUT,DELETE" &&
+      !preserveRequests.some((request) =>
+        request.method === "MKCOL" ||
+        request.url.includes(PBP_WEBDAV_FILENAME) ||
+        request.url.includes(PBP_WEBDAV_LOCATOR_FILENAME)) &&
+      preserveRequests
+        .filter((request) => request.method === "PUT" || request.method === "DELETE")
+        .every((request) => request.url.includes(PBP_WEBDAV_WRITE_TEST_PREFIX)));
+
+    const fallbackRequests = [];
+    globalThis.fetch = async (url, options) => {
+      fallbackRequests.push({ url, method: options.method });
+      if (options.method === "PROPFIND") return migrationResponse(207);
+      if (options.method === "PUT" &&
+          url.includes("/dav/pinboard-bookmark-enhanced/")) {
+        return migrationResponse(201);
+      }
+      if (options.method === "DELETE") return migrationResponse(204);
+      return migrationResponse(405);
+    };
+    const fallback = typeof pbpWebdavInspectLegacyLayout === "function"
+      ? await pbpWebdavInspectLegacyLayout({
+        baseUrl: "https://dav.example.com/dav/",
+        user: "",
+        pass: "",
+      }) : null;
+    check("failed final-collection write falls back to the existing managed child",
+      fallback?.kind === "managed" &&
+      fallback.target.backupCollectionUrl ===
+        "https://dav.example.com/dav/pinboard-bookmark-enhanced/" &&
+      !fallbackRequests.some((request) => request.method === "MKCOL"));
+
+    const missingChildRequests = [];
+    globalThis.fetch = async (url, options) => {
+      missingChildRequests.push({ url, method: options.method });
+      if (options.method === "PROPFIND" &&
+          url.includes("/dav/pinboard-bookmark-enhanced/")) {
+        return migrationResponse(404);
+      }
+      if (options.method === "PROPFIND" &&
+          url === "https://dav.example.com/dav/") {
+        return migrationResponse(207);
+      }
+      if (options.method === "PUT") return migrationResponse(405);
+      return migrationResponse(500);
+    };
+    const missingChild = typeof pbpWebdavInspectLegacyLayout === "function"
+      ? await pbpWebdavInspectLegacyLayout({
+        baseUrl: "https://dav.example.com/dav/",
+        user: "",
+        pass: "",
+      }) : null;
+    check("missing managed child remains a confirmable candidate when the base collection exists",
+      missingChild?.kind === "managed" &&
+      missingChild.needsCreate === true &&
+      missingChild.target.backupCollectionUrl ===
+        "https://dav.example.com/dav/pinboard-bookmark-enhanced/" &&
+      !missingChildRequests.some((request) =>
+        request.method === "MKCOL" ||
+        (request.method === "PUT" &&
+          (request.url.includes(PBP_WEBDAV_FILENAME) ||
+            request.url.includes(PBP_WEBDAV_LOCATOR_FILENAME)))));
+
+    const manualRequests = [];
+    globalThis.fetch = async (url, options) => {
+      manualRequests.push({ url, method: options.method });
+      return migrationResponse(404);
+    };
+    const manual = typeof pbpWebdavInspectLegacyLayout === "function"
+      ? await pbpWebdavInspectLegacyLayout({
+        baseUrl: "https://dav.example.com/unavailable/",
+        user: "",
+        pass: "",
+      }) : null;
+    check("two unavailable candidates require manual correction with stable diagnostics",
+      manual?.kind === "manual" &&
+      !!manual.preserveError &&
+      !!manual.managedError &&
+      !manualRequests.some((request) => request.method === "MKCOL"));
+  } finally {
+    globalThis.fetch = realMigrationFetch;
+  }
 
   section("WebDAV locator — schema and conditional writes");
   const locatorCfg = {
