@@ -29,6 +29,14 @@ function assertEq(a, e, label) {
   const ok = a === e;
   check(label || (String(e) + " === " + String(a)), ok, ok ? "" : "expected " + JSON.stringify(e) + " got " + JSON.stringify(a));
 }
+const COLLECTION_XML = `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop>
+<d:resourcetype><d:collection/></d:resourcetype>
+</d:prop></d:propstat></d:response></d:multistatus>`;
+const NON_COLLECTION_XML = `<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop>
+<d:resourcetype/>
+</d:prop></d:propstat></d:response></d:multistatus>`;
 
 section("pbpWebdavFileUrl");
 assertEq(pbpWebdavFileUrl("https://dav.example.com/backups"),
@@ -334,18 +342,20 @@ section("pbpHighlightBackupOwnerAllowed (SEC-1 pure gate)");
 section("pbpWebdavBuildRequest");
 {
   const cfg = { baseUrl: "https://dav.example.com/backups", user: "bob", pass: "secret" };
-  const push = pbpWebdavBuildRequest("push", cfg);
+  const fileUrl = "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json";
+  const collectionUrl = "https://dav.example.com/backups/";
+  const push = pbpWebdavBuildRequest("push", cfg, fileUrl);
   assertEq(push.method, "PUT", "push -> PUT");
   assertEq(push.headers["Content-Type"], "application/json", "push sets JSON content-type");
-  assertEq(push.url, pbpWebdavFileUrl(cfg.baseUrl), "push url built via pbpWebdavFileUrl");
+  assertEq(push.url, fileUrl, "push uses its explicit URL");
   assert(!("If-None-Match" in push.headers),
     "unknown revision pushes unconditionally — create-only If-None-Match would 412 forever against a pre-existing remote backup");
   assert(!("If-Match" in push.headers), "unknown revision push does not send If-Match");
-  const scheduledCreate = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { createOnly: true }));
+  const scheduledCreate = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { createOnly: true }), fileUrl);
   assertEq(scheduledCreate.headers["If-None-Match"], "*",
     "createOnly (scheduled unknown-revision) push sends If-None-Match:* so automation cannot blind-overwrite");
 
-  const updatePush = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { etag: '"v1"' }));
+  const updatePush = pbpWebdavBuildRequest("push", Object.assign({}, cfg, { etag: '"v1"' }), fileUrl);
   assertEq(updatePush.headers["If-Match"], '"v1"', "known remote revision is updated with If-Match");
   assert(!("If-None-Match" in updatePush.headers), "known remote revision never sends the create-only precondition");
 
@@ -353,37 +363,38 @@ section("pbpWebdavBuildRequest");
     !pbpWebdavValidEtag("*") && !pbpWebdavValidEtag("unquoted"),
     "only syntactically valid strong ETags are eligible for exact If-Match CAS");
 
-  const pull = pbpWebdavBuildRequest("pull", cfg);
+  const pull = pbpWebdavBuildRequest("pull", cfg, fileUrl);
   assertEq(pull.method, "GET", "pull -> GET");
   assert(!("Content-Type" in pull.headers), "pull has no content-type header");
 
-  const testReq = pbpWebdavBuildRequest("test", cfg);
+  const testReq = pbpWebdavBuildRequest("test", cfg, fileUrl);
   assertEq(testReq.method, "GET", "test -> GET");
 
-  const probe = pbpWebdavBuildRequest("probe", cfg);
+  const probe = pbpWebdavBuildRequest("probe", cfg, collectionUrl);
   assertEq(probe.method, "PROPFIND", "probe -> PROPFIND");
   assertEq(probe.headers.Depth, "0", "probe checks only the configured collection");
-  assertEq(probe.url, "https://dav.example.com/backups/", "probe url is the collection, not the backup file");
+  assertEq(probe.url, collectionUrl, "probe uses its explicit collection URL");
 
-  const writeProbe = pbpWebdavBuildRequest("write-test", Object.assign({}, cfg, { probeName: "pbp-test.txt" }));
+  const writeProbe = pbpWebdavBuildRequest("write-test", cfg, "https://dav.example.com/backups/pbp-test.txt");
   assertEq(writeProbe.method, "PUT", "write-test -> PUT");
   assertEq(writeProbe.url, "https://dav.example.com/backups/pbp-test.txt", "write-test targets a temp file in the collection");
   assertEq(writeProbe.headers["If-None-Match"], "*", "write-test never overwrites an existing temp file");
 
-  const generatedWriteProbe = pbpWebdavBuildRequest("write-test", Object.assign({}, cfg, { probeName: PBP_WEBDAV_WRITE_TEST_PREFIX + "abc.txt" }));
+  const generatedWriteProbe = pbpWebdavBuildRequest("write-test", cfg,
+    "https://dav.example.com/backups/" + PBP_WEBDAV_WRITE_TEST_PREFIX + "abc.txt");
   assertEq(generatedWriteProbe.url, "https://dav.example.com/backups/pinboard-bookmark-enhanced-write-test-abc.txt",
     "generated write-test filename is a normal visible file, not a dotfile");
 
-  const deleteProbe = pbpWebdavBuildRequest("write-test-delete", Object.assign({}, cfg, { probeName: "pbp-test.txt" }));
+  const deleteProbe = pbpWebdavBuildRequest("write-test-delete", cfg, writeProbe.url);
   assertEq(deleteProbe.method, "DELETE", "write-test-delete -> DELETE");
   assertEq(deleteProbe.url, writeProbe.url, "delete removes the same temp file");
 
-  const mkdir = pbpWebdavBuildRequest("mkdir", cfg);
+  const mkdir = pbpWebdavBuildRequest("mkdir", cfg, collectionUrl);
   assertEq(mkdir.method, "MKCOL", "mkdir -> MKCOL");
   assertEq(mkdir.url, "https://dav.example.com/backups/", "mkdir targets the collection");
 
   assertEq(push.headers.Authorization, "Basic " + btoa("bob:secret"), "Authorization present when user/pass set");
-  const noAuth = pbpWebdavBuildRequest("push", { baseUrl: "https://dav.example.com/backups", user: "", pass: "" });
+  const noAuth = pbpWebdavBuildRequest("push", { baseUrl: "https://dav.example.com/backups", user: "", pass: "" }, fileUrl);
   assert(!("Authorization" in noAuth.headers), "Authorization omitted when user+pass both empty");
 }
 
@@ -602,7 +613,7 @@ async function runChromeLayerTests() {
     ok: status >= 200 && status < 300,
     status,
     headers: { get: (name) => /etag/i.test(name) ? etag || null : null },
-    text: async () => text,
+    text: async () => text || (status === 207 ? COLLECTION_XML : ""),
   });
   const resetUploadStore = () => {
     Object.keys(uploadStore).forEach((key) => delete uploadStore[key]);
@@ -922,7 +933,11 @@ async function runChromeLayerTests() {
     const cfg = { baseUrl: "http://192.168.1.2/dav/", user: "", pass: "" };
     const ensured = await pbpWebdavEnsureCollection(cfg);
     check("collection probe rejects insecure endpoint", !ensured.ok && ensured.error === "insecure");
-    const writable = await pbpWebdavProbeWritable(cfg);
+    const writable = await pbpWebdavProbeWritable(cfg, {
+      baseCollectionUrl: "http://192.168.1.2/dav/",
+      backupCollectionUrl: "http://192.168.1.2/dav/",
+      relativePath: "",
+    });
     check("write probe rejects insecure endpoint", !writable.ok && writable.error === "insecure");
     const pushed = await pbpWebdavPush(cfg);
     check("push rejects insecure endpoint", !pushed.ok && pushed.error === "insecure");
@@ -943,6 +958,113 @@ async function runChromeLayerTests() {
   } finally {
     globalThis.fetch = realFetch0;
     globalThis.chrome = realChrome0;
+  }
+
+  section("WebDAV collection capability checks");
+  const collectionResponse = (status, text = "") => ({
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => text,
+  });
+  const realCollectionFetch = globalThis.fetch;
+  try {
+    const cfg = { baseUrl: "https://changed.example.invalid/dav/", user: "alice", pass: "secret" };
+    const collectionProbeStatuses = [207, 200];
+    globalThis.fetch = async () => collectionResponse(collectionProbeStatuses.shift(), COLLECTION_XML);
+    const collectionProbes = typeof pbpWebdavProbeCollection === "function"
+      ? [
+        await pbpWebdavProbeCollection(cfg, "https://dav.example.com/a/"),
+        await pbpWebdavProbeCollection(cfg, "https://dav.example.com/b/"),
+      ] : [];
+    check("207/200 PROPFIND accepts only DAV collections",
+      collectionProbes.length === 2 && collectionProbes.every((result) => result.ok));
+
+    check("unprefixed collection element is accepted",
+      typeof pbpWebdavResponseIsCollection === "function" &&
+      pbpWebdavResponseIsCollection(COLLECTION_XML.replace(/d:collection/g, "collection")));
+
+    globalThis.fetch = async () => collectionResponse(207, NON_COLLECTION_XML);
+    const nonCollection = typeof pbpWebdavProbeCollection === "function"
+      ? await pbpWebdavProbeCollection(cfg, "https://dav.example.com/not-a-collection/") : null;
+    check("empty resourcetype is rejected as not-collection",
+      nonCollection && !nonCollection.ok && nonCollection.error === "not-collection");
+
+    const managedTarget = typeof pbpWebdavFreezeTarget === "function"
+      ? await pbpWebdavFreezeTarget({ baseUrl: "https://dav.example.com/dav/", folderMode: "managed", user: "alice" }) : null;
+    const managedRequests = [];
+    const managedResponses = [
+      collectionResponse(207, COLLECTION_XML), collectionResponse(404),
+      collectionResponse(201), collectionResponse(207, COLLECTION_XML),
+    ];
+    globalThis.fetch = async (url, opts) => {
+      managedRequests.push({ url, method: opts.method });
+      return managedResponses.shift();
+    };
+    const managed = managedTarget && typeof pbpWebdavEnsureCollectionPath === "function"
+      ? await pbpWebdavEnsureCollectionPath(cfg, managedTarget, managedTarget.relativePath) : null;
+    check("managed target creates only its missing app collection",
+      managed && managed.ok && managedRequests.map((request) => request.method).join(",") === "PROPFIND,PROPFIND,MKCOL,PROPFIND" &&
+      managedRequests.filter((request) => request.method === "MKCOL").map((request) => request.url).join(",") ===
+        "https://dav.example.com/dav/pinboard-bookmark-enhanced/");
+
+    const customTarget = typeof pbpWebdavFreezeTarget === "function"
+      ? await pbpWebdavFreezeTarget({ baseUrl: "https://dav.example.com/dav/", folderMode: "custom", relativePath: "Backups/Read", user: "alice" }) : null;
+    const customRequests = [];
+    const customResponses = [
+      collectionResponse(207, COLLECTION_XML), collectionResponse(404), collectionResponse(201),
+      collectionResponse(207, COLLECTION_XML), collectionResponse(404), collectionResponse(201),
+      collectionResponse(207, COLLECTION_XML),
+    ];
+    globalThis.fetch = async (url, opts) => {
+      customRequests.push({ url, method: opts.method });
+      return customResponses.shift();
+    };
+    const custom = customTarget && typeof pbpWebdavEnsureCollectionPath === "function"
+      ? await pbpWebdavEnsureCollectionPath(cfg, customTarget, customTarget.relativePath) : null;
+    check("custom multi-level path probes and creates each collection in order",
+      custom && custom.ok && customRequests.map((request) => request.method).join(",") ===
+        "PROPFIND,PROPFIND,MKCOL,PROPFIND,PROPFIND,MKCOL,PROPFIND");
+
+    const mkdirResponses = [collectionResponse(207, COLLECTION_XML), collectionResponse(404), collectionResponse(401)];
+    globalThis.fetch = async () => mkdirResponses.shift();
+    const mkdirAuth = managedTarget && typeof pbpWebdavEnsureCollectionPath === "function"
+      ? await pbpWebdavEnsureCollectionPath(cfg, managedTarget, managedTarget.relativePath) : null;
+    check("intermediate MKCOL auth failure is reported at mkdir stage",
+      mkdirAuth && !mkdirAuth.ok && mkdirAuth.error === "auth" && mkdirAuth.stage === "mkdir");
+
+    const writableTarget = {
+      baseCollectionUrl: "https://dav.example.com/dav/",
+      backupCollectionUrl: "https://dav.example.com/dav/",
+      relativePath: "",
+    };
+    const writableResponses = [collectionResponse(207, COLLECTION_XML), collectionResponse(201), collectionResponse(500)];
+    globalThis.fetch = async () => writableResponses.shift();
+    const cleanupWarning = typeof pbpWebdavProbeWritable === "function"
+      ? await pbpWebdavProbeWritable(Object.assign({}, cfg, { baseUrl: writableTarget.baseCollectionUrl }), writableTarget) : null;
+    check("successful temporary PUT preserves DELETE cleanup warning",
+      cleanupWarning && cleanupWarning.ok && cleanupWarning.cleanupWarning === true && cleanupWarning.cleanupStatus === 500);
+
+    const frozenTarget = {
+      baseCollectionUrl: "https://frozen.example.com/base/",
+      backupCollectionUrl: "https://frozen.example.com/base/child/",
+      relativePath: "child/",
+    };
+    const frozenRequests = [];
+    const frozenResponses = [
+      collectionResponse(207, COLLECTION_XML), collectionResponse(404), collectionResponse(201),
+      collectionResponse(207, COLLECTION_XML), collectionResponse(201), collectionResponse(204),
+    ];
+    globalThis.fetch = async (url, opts) => {
+      frozenRequests.push({ url, method: opts.method });
+      return frozenResponses.shift();
+    };
+    const frozen = typeof pbpWebdavProbeWritable === "function"
+      ? await pbpWebdavProbeWritable(cfg, frozenTarget) : null;
+    check("collection requests use the supplied frozen target URLs",
+      frozen && frozen.ok && frozenRequests.length === 6 &&
+      frozenRequests.every((request) => request.url.startsWith("https://frozen.example.com/base/")));
+  } finally {
+    globalThis.fetch = realCollectionFetch;
   }
 
   section("pbpWebdavPush — live includeHighlights override");
@@ -1078,9 +1200,10 @@ async function runChromeLayerTests() {
 
     const createRequests = [];
     let createdBody = "";
+    let createProbes = 0;
     globalThis.fetch = (url, opts) => {
       createRequests.push({ url, method: opts.method });
-      if (opts.method === "PROPFIND") return Promise.resolve(response(404));
+      if (opts.method === "PROPFIND") return Promise.resolve(response(++createProbes === 1 ? 404 : 207));
       if (opts.method === "MKCOL") return Promise.resolve(response(201));
       if (opts.method === "GET") return Promise.resolve(createdBody
         ? response(200, createdBody, '"created"') : response(404));
@@ -1092,18 +1215,19 @@ async function runChromeLayerTests() {
     };
     const createdPush = await pbpWebdavPush({ baseUrl: "https://dav.example.com/new-backups/", user: "", pass: "", includeHighlights: false });
     check("push creates the configured collection before verified PUT",
-      createdPush.ok && createRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,GET,PUT,GET");
+      createdPush.ok && createRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,PROPFIND,GET,PUT,GET");
     check("push probes and creates exactly the configured collection",
       createRequests[0] && createRequests[0].url === "https://dav.example.com/new-backups/" &&
       createRequests[1] && createRequests[1].url === "https://dav.example.com/new-backups/");
     check("push writes under the configured collection",
-      createRequests[3] && createRequests[3].url === "https://dav.example.com/new-backups/pinboard-bookmark-enhanced-settings.json");
+      createRequests[4] && createRequests[4].url === "https://dav.example.com/new-backups/pinboard-bookmark-enhanced-settings.json");
 
     const rootRequests = [];
     let rootBody = "";
+    let rootProbes = 0;
     globalThis.fetch = (url, opts) => {
       rootRequests.push({ url, method: opts.method });
-      if (opts.method === "PROPFIND") return Promise.resolve(response(404));
+      if (opts.method === "PROPFIND") return Promise.resolve(response(++rootProbes === 1 ? 404 : 207));
       if (opts.method === "MKCOL") return Promise.resolve(response(201));
       if (opts.method === "GET") return Promise.resolve(rootBody
         ? response(200, rootBody, '"root"') : response(404));
@@ -1115,7 +1239,7 @@ async function runChromeLayerTests() {
     };
     const rootPush = await pbpWebdavPush({ baseUrl: "https://dav.jianguoyun.com/dav/", user: "", pass: "", includeHighlights: false });
     check("provider root push probes the configured collection before verified PUT",
-      rootPush.ok && rootRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,GET,PUT,GET");
+      rootPush.ok && rootRequests.map((r) => r.method).join(",") === "PROPFIND,MKCOL,PROPFIND,GET,PUT,GET");
     check("provider root push writes directly under the configured collection",
       rootRequests.some((r) => r.method === "PUT" && r.url === "https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced-settings.json"));
   } catch (e) {
@@ -1198,7 +1322,7 @@ async function runChromeLayerTests() {
     globalThis.fetch = (url, opts) => {
       requests.push({ url, method: opts.method });
       if (requests.length === 1) return Promise.resolve({ ok: false, status: 404 });
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
+      if (opts.method === "PROPFIND") return Promise.resolve(response(207));
       return Promise.resolve({ ok: true, status: 200 });
     };
     const empty = await pbpWebdavTest({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "" });
@@ -1214,26 +1338,27 @@ async function runChromeLayerTests() {
     check("file 404 + collection PROPFIND 404 + MKCOL 404 -> missing target collection", missingFolder.kind === "not-found");
 
     const createFolderRequests = [];
+    let createFolderProbes = 0;
     globalThis.fetch = (url, opts) => {
       createFolderRequests.push({ url, method: opts.method });
       if (opts.method === "GET") return Promise.resolve({ ok: false, status: 404 });
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "PROPFIND") return Promise.resolve(response(++createFolderProbes === 1 ? 404 : 207));
       if (opts.method === "MKCOL") return Promise.resolve({ ok: true, status: 201 });
       return Promise.resolve({ ok: true, status: 200 });
     };
     const createdFolder = await pbpWebdavTest({ baseUrl: "https://dav.example.com/backups/", user: "", pass: "" });
     check("test creates the configured collection before write probe", createdFolder.kind === "empty" &&
-      createFolderRequests.map((r) => r.method).join(",") === "GET,PROPFIND,MKCOL,PUT,DELETE");
+      createFolderRequests.map((r) => r.method).join(",") === "GET,PROPFIND,MKCOL,PROPFIND,PUT,DELETE");
     check("test-created collection uses exactly the configured collection",
       createFolderRequests[1] && createFolderRequests[1].url === "https://dav.example.com/backups/" &&
       createFolderRequests[2] && createFolderRequests[2].url === "https://dav.example.com/backups/" &&
-      createFolderRequests[3] && createFolderRequests[3].url.startsWith("https://dav.example.com/backups/pinboard-bookmark-enhanced-write-test-"));
+      createFolderRequests[4] && createFolderRequests[4].url.startsWith("https://dav.example.com/backups/pinboard-bookmark-enhanced-write-test-"));
 
     const readOnlyRequests = [];
     globalThis.fetch = (url, opts) => {
       readOnlyRequests.push({ url, method: opts.method });
       if (opts.method === "GET") return Promise.resolve({ ok: false, status: 404 });
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: true, status: 207 });
+      if (opts.method === "PROPFIND") return Promise.resolve(response(207));
       return Promise.resolve({ ok: false, status: 404 });
     };
     const readOnly = await pbpWebdavTest({ baseUrl: "https://dav.example.com/dav/", user: "", pass: "" });
@@ -1241,10 +1366,11 @@ async function runChromeLayerTests() {
     check("failed temp PUT status is preserved", readOnly.status === 404);
 
     const rootRequests = [];
+    let rootProbes = 0;
     globalThis.fetch = (url, opts) => {
       rootRequests.push({ url, method: opts.method });
       if (opts.method === "GET") return Promise.resolve({ ok: false, status: 404 });
-      if (opts.method === "PROPFIND") return Promise.resolve({ ok: false, status: 404 });
+      if (opts.method === "PROPFIND") return Promise.resolve(response(++rootProbes === 1 ? 404 : 207));
       if (opts.method === "MKCOL") return Promise.resolve({ ok: true, status: 201 });
       return Promise.resolve({ ok: true, status: 200 });
     };

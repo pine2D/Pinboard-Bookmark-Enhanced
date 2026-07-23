@@ -131,7 +131,7 @@ async function pbpWebdavRememberState(cfg, next) {
 
 async function pbpWebdavReadRemote(cfg) {
   try {
-    const resp = await _pbpWebdavFetch("pull", cfg);
+    const resp = await _pbpWebdavFetch("pull", cfg, pbpWebdavFileUrl(cfg && cfg.baseUrl));
     if (resp.status === 401 || resp.status === 403) return { ok: false, error: "auth", status: resp.status };
     if (resp.status === 404) return { ok: true, exists: false, etag: "", remoteHash: "", settingsHash: "" };
     if (!resp.ok) return { ok: false, error: "http-" + resp.status, status: resp.status };
@@ -236,7 +236,7 @@ async function pbpWebdavUploadText(cfg, text, options) {
     mode = "hash";
   }
 
-  let resp = await _pbpWebdavFetch("push", pushCfg, { body: text });
+  let resp = await _pbpWebdavFetch("push", pushCfg, pbpWebdavFileUrl(pushCfg.baseUrl), { body: text });
   if (resp.status === 412) {
     remote = await pbpWebdavReadRemote(cfg);
     if (!remote.ok) return remote;
@@ -254,9 +254,10 @@ async function pbpWebdavUploadText(cfg, text, options) {
 
     if (!remote.etag) {
       mode = "hash";
-      resp = await _pbpWebdavFetch("push", cfg, { body: text });
+      resp = await _pbpWebdavFetch("push", cfg, pbpWebdavFileUrl(cfg.baseUrl), { body: text });
     } else {
-      resp = await _pbpWebdavFetch("push", Object.assign({}, cfg, { etag: remote.etag }), { body: text });
+      const retryCfg = Object.assign({}, cfg, { etag: remote.etag });
+      resp = await _pbpWebdavFetch("push", retryCfg, pbpWebdavFileUrl(retryCfg.baseUrl), { body: text });
       if (resp.status === 412) {
         remote = await pbpWebdavReadRemote(cfg);
         if (!remote.ok) return remote;
@@ -270,7 +271,7 @@ async function pbpWebdavUploadText(cfg, text, options) {
         if (decision === "same") return pbpWebdavAdoptRemote(cfg, remote, state.mode);
         if (decision !== "push") return pbpWebdavDecisionResult(cfg, state, remote, decision);
         mode = "hash";
-        resp = await _pbpWebdavFetch("push", cfg, { body: text });
+        resp = await _pbpWebdavFetch("push", cfg, pbpWebdavFileUrl(cfg.baseUrl), { body: text });
       } else {
         mode = "etag";
       }
@@ -525,27 +526,28 @@ function pbpWebdavPreparePullPayload(data) {
   return payload;
 }
 
+const PBP_WEBDAV_PROPFIND_BODY =
+  '<?xml version="1.0" encoding="utf-8"?>' +
+  '<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>';
+
 // Builds a {url, method, headers} request descriptor for WebDAV actions.
-// push=PUT file, pull/test=GET file, probe=PROPFIND collection.
-function pbpWebdavBuildRequest(kind, cfg) {
+function pbpWebdavBuildRequest(kind, cfg, url) {
   cfg = cfg || {};
-  const url = (kind === "probe" || kind === "mkdir")
-    ? pbpWebdavTargetCollectionUrl(cfg.baseUrl)
-    : (/^write-test/.test(kind) ? pbpWebdavCollectionFileUrl(cfg.baseUrl, cfg.probeName) : pbpWebdavFileUrl(cfg.baseUrl));
   const headers = {};
   const auth = pbpWebdavAuthHeader(cfg.user, cfg.pass);
   if (auth) headers["Authorization"] = auth;
   if (kind === "probe") {
     headers.Depth = "0";
-    return { url, method: "PROPFIND", headers };
+    headers["Content-Type"] = "application/xml; charset=utf-8";
+    return { url, method: "PROPFIND", headers, body: PBP_WEBDAV_PROPFIND_BODY };
   }
+  if (kind === "mkdir") return { url, method: "MKCOL", headers };
   if (kind === "write-test") {
     headers["Content-Type"] = "text/plain";
     headers["If-None-Match"] = "*";
-    return { url, method: "PUT", headers };
+    return { url, method: "PUT", headers, body: "ok" };
   }
   if (kind === "write-test-delete") return { url, method: "DELETE", headers };
-  if (kind === "mkdir") return { url, method: "MKCOL", headers };
   if (kind === "push") {
     headers["Content-Type"] = "application/json";
     if (pbpWebdavValidEtag(cfg.etag)) headers["If-Match"] = cfg.etag.trim();
@@ -555,12 +557,13 @@ function pbpWebdavBuildRequest(kind, cfg) {
   return { url, method: "GET", headers }; // "pull" | "test"
 }
 
-function _pbpWebdavFetch(kind, cfg, extra) {
-  if (!pbpWebdavOrigin(cfg && cfg.baseUrl)) return Promise.reject(new Error("insecure"));
-  const req = pbpWebdavBuildRequest(kind, cfg);
+function _pbpWebdavFetch(kind, cfg, url, extra) {
+  if (!pbpWebdavOrigin(url)) return Promise.reject(new Error("insecure"));
+  const req = pbpWebdavBuildRequest(kind, cfg, url);
   return fetch(req.url, {
     method: req.method,
     headers: req.headers,
+    body: req.body,
     ...(extra || {}),
     cache: "no-store",
     redirect: "error",
@@ -568,29 +571,110 @@ function _pbpWebdavFetch(kind, cfg, extra) {
   });
 }
 
-async function pbpWebdavEnsureCollection(cfg) {
-  if (!pbpWebdavOrigin(cfg && cfg.baseUrl)) return { ok: false, error: "insecure" };
-  const dir = await _pbpWebdavFetch("probe", cfg);
-  if (dir.ok) return { ok: true };
-  if (dir.status === 401 || dir.status === 403) return { ok: false, error: "auth" };
-  if (dir.status !== 404) return { ok: false, error: "unreachable" };
-  const made = await _pbpWebdavFetch("mkdir", cfg);
-  if (made.ok || made.status === 405) return { ok: true };
-  if (made.status === 401 || made.status === 403) return { ok: false, error: "auth" };
-  return { ok: false, error: "not-found" };
+function pbpWebdavResponseIsCollection(xml) {
+  const blocks = String(xml || "").match(
+    /<(?:[A-Za-z_][\w.-]*:)?resourcetype\b[^>]*>[\s\S]*?<\/(?:[A-Za-z_][\w.-]*:)?resourcetype\s*>/gi
+  ) || [];
+  return blocks.some((block) =>
+    /<(?:[A-Za-z_][\w.-]*:)?collection\b[^>]*\/?>/i.test(block)
+  );
 }
 
-async function pbpWebdavProbeWritable(cfg) {
-  if (!pbpWebdavOrigin(cfg && cfg.baseUrl)) return { ok: false, error: "insecure" };
-  const ensured = await pbpWebdavEnsureCollection(cfg);
-  if (!ensured.ok) return ensured;
-  const name = PBP_WEBDAV_WRITE_TEST_PREFIX + Date.now().toString(36) + ".txt";
-  const probeCfg = Object.assign({}, cfg, { probeName: name });
-  const resp = await _pbpWebdavFetch("write-test", probeCfg, { body: "ok" });
-  if (resp.status === 401 || resp.status === 403) return { ok: false, error: "auth", status: resp.status };
-  if (!resp.ok) return { ok: false, error: "not-writable", status: resp.status };
-  try { await _pbpWebdavFetch("write-test-delete", probeCfg); } catch (_) {}
+async function pbpWebdavProbeCollection(cfg, url) {
+  const response = await _pbpWebdavFetch("probe", cfg, url);
+  if (response.status === 401 || response.status === 403) {
+    return { ok: false, error: "auth", status: response.status, stage: "propfind" };
+  }
+  if (response.status === 404) {
+    return { ok: false, error: "not-found", status: 404, stage: "propfind" };
+  }
+  if (!response.ok) {
+    return { ok: false, error: "http", status: response.status, stage: "propfind" };
+  }
+  const xml = await response.text();
+  return pbpWebdavResponseIsCollection(xml)
+    ? { ok: true }
+    : { ok: false, error: "not-collection", status: response.status, stage: "propfind" };
+}
+
+function pbpWebdavCollectionSteps(baseUrl, encodedRelativePath) {
+  const base = pbpWebdavCollectionUrl(baseUrl);
+  if (!base) return [];
+  const parts = String(encodedRelativePath || "").split("/").filter(Boolean);
+  const out = [];
+  const url = new URL(base);
+  for (const part of parts) {
+    url.pathname += part + "/";
+    out.push(url.href);
+  }
+  return out;
+}
+
+async function pbpWebdavEnsureCollectionPath(cfg, target, relativePath) {
+  const base = await pbpWebdavProbeCollection(cfg, target.baseCollectionUrl);
+  if (!base.ok) return Object.assign(base, { stage: "base-propfind" });
+  if (!String(relativePath || "").trim()) return { ok: true };
+  const normalized = pbpWebdavNormalizeRelativePath(relativePath);
+  if (!normalized.ok) return { ok: false, error: "relative-path", stage: "validate" };
+  for (const url of pbpWebdavCollectionSteps(target.baseCollectionUrl, normalized.encoded)) {
+    const probe = await pbpWebdavProbeCollection(cfg, url);
+    if (probe.ok) continue;
+    if (probe.error !== "not-found") return probe;
+    const made = await _pbpWebdavFetch("mkdir", cfg, url);
+    if (!(made.ok || made.status === 405)) {
+      return {
+        ok: false,
+        error: made.status === 401 || made.status === 403 ? "auth" : "mkdir",
+        status: made.status,
+        stage: "mkdir",
+        url,
+      };
+    }
+    const verified = await pbpWebdavProbeCollection(cfg, url);
+    if (!verified.ok) return Object.assign(verified, { stage: "mkdir-verify", url });
+  }
   return { ok: true };
+}
+
+async function pbpWebdavEnsureCollection(cfg) {
+  const baseCollectionUrl = pbpWebdavCollectionUrl(cfg && cfg.baseUrl);
+  if (!pbpWebdavOrigin(baseCollectionUrl)) return { ok: false, error: "insecure" };
+  const dir = await pbpWebdavProbeCollection(cfg, baseCollectionUrl);
+  if (dir.ok) return { ok: true };
+  if (dir.error !== "not-found") return dir;
+  const made = await _pbpWebdavFetch("mkdir", cfg, baseCollectionUrl);
+  if (!(made.ok || made.status === 405)) {
+    return { ok: false, error: made.status === 401 || made.status === 403 ? "auth" : "not-found", status: made.status };
+  }
+  return pbpWebdavProbeCollection(cfg, baseCollectionUrl);
+}
+
+async function pbpWebdavProbeWritable(cfg, target) {
+  if (!target || !pbpWebdavOrigin(target.baseCollectionUrl) ||
+      !pbpWebdavOrigin(target.backupCollectionUrl)) {
+    return { ok: false, error: "insecure" };
+  }
+  const ensured = target.relativePath
+    ? await pbpWebdavEnsureCollectionPath(cfg, target, target.relativePath)
+    : await pbpWebdavEnsureCollection(cfg);
+  if (!ensured.ok) return ensured;
+  const name = PBP_WEBDAV_WRITE_TEST_PREFIX + crypto.randomUUID() + ".txt";
+  const url = pbpWebdavCollectionFileUrl(target.backupCollectionUrl, name);
+  const put = await _pbpWebdavFetch("write-test", cfg, url);
+  if (put.status === 401 || put.status === 403) {
+    return { ok: false, error: "auth", status: put.status, stage: "write-test" };
+  }
+  if (!put.ok) {
+    return { ok: false, error: "not-writable", status: put.status, stage: "write-test" };
+  }
+  try {
+    const removed = await _pbpWebdavFetch("write-test-delete", cfg, url);
+    return removed.ok
+      ? { ok: true }
+      : { ok: true, cleanupWarning: true, cleanupStatus: removed.status };
+  } catch (_) {
+    return { ok: true, cleanupWarning: true };
+  }
 }
 
 // ============================================================
@@ -681,7 +765,7 @@ async function pbpWebdavPush(cfgOverride) {
     if (uploaded.error === "http-404") {
       result.error = "not-found";
       try {
-        const dir = await _pbpWebdavFetch("probe", cfg);
+        const dir = await pbpWebdavProbeCollection(cfg, pbpWebdavCollectionUrl(cfg.baseUrl));
         if (dir.ok) result.error = "not-writable";
       } catch (_) {}
     }
@@ -724,14 +808,16 @@ async function pbpWebdavTest(cfgOverride) {
     if (!has) return { ok: false, kind: "perm" };
   } catch (_) { return { ok: false, kind: "perm" }; }
   try {
-    const resp = await _pbpWebdavFetch("test", cfg);
+    const baseCollectionUrl = pbpWebdavCollectionUrl(cfg.baseUrl);
+    const target = { baseCollectionUrl, backupCollectionUrl: baseCollectionUrl, relativePath: "" };
+    const resp = await _pbpWebdavFetch("test", cfg, pbpWebdavFileUrl(cfg.baseUrl));
     if (resp.status === 401 || resp.status === 403) return { ok: false, kind: "auth" };
     if (resp.status === 404) {
-      const writable = await pbpWebdavProbeWritable(cfg);
+      const writable = await pbpWebdavProbeWritable(cfg, target);
       return writable.ok ? { ok: true, kind: "empty" } : { ok: false, kind: writable.error, status: writable.status };
     }
     if (resp.ok) {
-      const writable = await pbpWebdavProbeWritable(cfg);
+      const writable = await pbpWebdavProbeWritable(cfg, target);
       return writable.ok ? { ok: true, kind: "found" } : { ok: false, kind: writable.error, status: writable.status };
     }
     return { ok: false, kind: "unreachable" };
