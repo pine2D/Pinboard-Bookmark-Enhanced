@@ -573,10 +573,10 @@ function _pbpWebdavFetch(kind, cfg, url, extra) {
 
 function pbpWebdavResponseIsCollection(xml) {
   const blocks = String(xml || "").match(
-    /<(?:[A-Za-z_][\w.-]*:)?resourcetype\b[^>]*>[\s\S]*?<\/(?:[A-Za-z_][\w.-]*:)?resourcetype\s*>/gi
+    /<(?:[A-Za-z_][\w.-]*:)?resourcetype(?=[\s/>])[^>]*>[\s\S]*?<\/(?:[A-Za-z_][\w.-]*:)?resourcetype\s*>/gi
   ) || [];
   return blocks.some((block) =>
-    /<(?:[A-Za-z_][\w.-]*:)?collection\b[^>]*\/?>/i.test(block)
+    /<(?:[A-Za-z_][\w.-]*:)?collection(?=[\s/>])[^>]*\/?>/i.test(block)
   );
 }
 
@@ -636,8 +636,7 @@ async function pbpWebdavEnsureCollectionPath(cfg, target, relativePath) {
   return { ok: true };
 }
 
-async function pbpWebdavEnsureCollection(cfg) {
-  const baseCollectionUrl = pbpWebdavCollectionUrl(cfg && cfg.baseUrl);
+async function pbpWebdavEnsureCollectionUrl(cfg, baseCollectionUrl) {
   if (!pbpWebdavOrigin(baseCollectionUrl)) return { ok: false, error: "insecure" };
   const dir = await pbpWebdavProbeCollection(cfg, baseCollectionUrl);
   if (dir.ok) return { ok: true };
@@ -649,6 +648,10 @@ async function pbpWebdavEnsureCollection(cfg) {
   return pbpWebdavProbeCollection(cfg, baseCollectionUrl);
 }
 
+async function pbpWebdavEnsureCollection(cfg) {
+  return pbpWebdavEnsureCollectionUrl(cfg, pbpWebdavCollectionUrl(cfg && cfg.baseUrl));
+}
+
 async function pbpWebdavProbeWritable(cfg, target) {
   if (!target || !pbpWebdavOrigin(target.baseCollectionUrl) ||
       !pbpWebdavOrigin(target.backupCollectionUrl)) {
@@ -656,7 +659,7 @@ async function pbpWebdavProbeWritable(cfg, target) {
   }
   const ensured = target.relativePath
     ? await pbpWebdavEnsureCollectionPath(cfg, target, target.relativePath)
-    : await pbpWebdavEnsureCollection(cfg);
+    : await pbpWebdavEnsureCollectionUrl(cfg, target.baseCollectionUrl);
   if (!ensured.ok) return ensured;
   const name = PBP_WEBDAV_WRITE_TEST_PREFIX + crypto.randomUUID() + ".txt";
   const url = pbpWebdavCollectionFileUrl(target.backupCollectionUrl, name);

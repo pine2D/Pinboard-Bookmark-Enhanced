@@ -983,6 +983,12 @@ async function runChromeLayerTests() {
       typeof pbpWebdavResponseIsCollection === "function" &&
       pbpWebdavResponseIsCollection(COLLECTION_XML.replace(/d:collection/g, "collection")));
 
+    check("status-suffixed XML names are never treated as collection elements",
+      typeof pbpWebdavResponseIsCollection === "function" &&
+      !pbpWebdavResponseIsCollection(
+        '<d:resourcetype-status><d:collection/></d:resourcetype-status><d:resourcetype></d:resourcetype>') &&
+      !pbpWebdavResponseIsCollection('<d:resourcetype><d:collection-status/></d:resourcetype>'));
+
     globalThis.fetch = async () => collectionResponse(207, NON_COLLECTION_XML);
     const nonCollection = typeof pbpWebdavProbeCollection === "function"
       ? await pbpWebdavProbeCollection(cfg, "https://dav.example.com/not-a-collection/") : null;
@@ -1043,6 +1049,25 @@ async function runChromeLayerTests() {
       ? await pbpWebdavProbeWritable(Object.assign({}, cfg, { baseUrl: writableTarget.baseCollectionUrl }), writableTarget) : null;
     check("successful temporary PUT preserves DELETE cleanup warning",
       cleanupWarning && cleanupWarning.ok && cleanupWarning.cleanupWarning === true && cleanupWarning.cleanupStatus === 500);
+
+    const frozenRootTarget = {
+      baseCollectionUrl: "https://frozen-root.example.com/base/",
+      backupCollectionUrl: "https://frozen-root.example.com/base/",
+      relativePath: "",
+    };
+    const frozenRootRequests = [];
+    const frozenRootResponses = [
+      collectionResponse(207, COLLECTION_XML), collectionResponse(201), collectionResponse(204),
+    ];
+    globalThis.fetch = async (url, opts) => {
+      frozenRootRequests.push({ url, method: opts.method });
+      return frozenRootResponses.shift();
+    };
+    const frozenRoot = typeof pbpWebdavProbeWritable === "function"
+      ? await pbpWebdavProbeWritable(cfg, frozenRootTarget) : null;
+    check("empty relative path keeps every request on the frozen target origin",
+      frozenRoot && frozenRoot.ok && frozenRootRequests.map((request) => request.method).join(",") === "PROPFIND,PUT,DELETE" &&
+      frozenRootRequests.every((request) => request.url.startsWith("https://frozen-root.example.com/base/")));
 
     const frozenTarget = {
       baseCollectionUrl: "https://frozen.example.com/base/",

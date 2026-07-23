@@ -64,7 +64,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/union-tags-tests.html": 12,
   "tests/url-strip-tests.html": 19,
   "tests/wayback-tests.html": 40,
-  "tests/webdav-tests.html": 206,
+  "tests/webdav-tests.html": 208,
 });
 const expected = EXPECTED_RESULTS[rel];
 if (expected === undefined) {
