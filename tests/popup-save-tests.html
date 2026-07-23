@@ -704,6 +704,85 @@ test("posts/add default remains replace=yes for existing callers", () => {
       return { entries, ...api };
     }
 
+    function summaryOwnershipRuntime(description) {
+      const start = popupAiSource.indexOf("function _aiNormalizeUrl");
+      const end = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", start);
+      assert(start >= 0 && end > start, "summary ownership runtime missing");
+      const entries = new Map();
+      const deletes = [];
+      const api = new Function(
+        "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
+        "crypto", "TextEncoder", "_AI_BQ_REGEX_SHARED", "URL",
+        popupAiSource.slice(start, end) +
+        "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
+        "; return { pbpAiSummaryOwnershipKey, pbpAiSummaryOwnershipSnapshot," +
+        " pbpAiSaveSummaryOwnership, pbpAiLoadSummaryOwnership, setSummaryState };"
+      )(
+        (url) => ({ cleaned: String(url) }),
+        async (key) => entries.get(key) || null,
+        async (key, result, ts) => entries.set(key, { key, result, ts }),
+        async (key) => { deletes.push(key); entries.delete(key); },
+        crypto,
+        TextEncoder,
+        /$a/g,
+        window.URL
+      );
+      return { field: { value: description }, entries, deletes, ...api };
+    }
+
+    function summaryRestoreRuntime(description, options = {}) {
+      const start = popupAiSource.indexOf("function _aiNormalizeUrl");
+      const end = popupAiSource.indexOf("// ---- Insert or replace AI summary", start);
+      assert(start >= 0 && end > start, "summary restore runtime missing");
+      const field = { value: description };
+      const urlField = { value: URL };
+      const state = { accountCurrent: true };
+      const actions = [];
+      let loadCalls = 0;
+      let resolveReceipt = null;
+      const loadReceipt = () => {
+        loadCalls++;
+        if (!options.delayed) return Promise.resolve(options.receipt || null);
+        return new Promise((resolve) => { resolveReceipt = () => resolve(options.receipt || null); });
+      };
+      const api = new Function(
+        "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
+        "crypto", "TextEncoder", "_AI_BQ_REGEX_SHARED", "URL", "$id",
+        "pbpPopupAiAccountIsCurrent", "pageInfo", "escapeForExtended",
+        "showSummaryActions", "loadReceipt",
+        popupAiSource.slice(start, end) +
+        "; async function pbpAiLoadSummaryOwnership(account, url, value) {" +
+        " return loadReceipt(account, url, value); }" +
+        "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
+        "; return { _aiRestoreSummaryOwnership, setSummaryState };"
+      )(
+        (url) => ({ cleaned: String(url) }),
+        async () => null,
+        async () => {},
+        async () => {},
+        crypto,
+        TextEncoder,
+        _AI_BQ_REGEX_SHARED,
+        window.URL,
+        (id) => id === "description-input" ? field : urlField,
+        (account) => account === "alice" && state.accountCurrent,
+        { url: URL },
+        (value) => value,
+        (fromCache) => actions.push(fromCache),
+        loadReceipt
+      );
+      return {
+        field,
+        urlField,
+        state,
+        actions,
+        restore: api._aiRestoreSummaryOwnership,
+        setSummaryState: api.setSummaryState,
+        resolveReceipt: () => resolveReceipt?.(),
+        get loadCalls() { return loadCalls; }
+      };
+    }
+
     await testAsync("saved edited summary receipt round-trips without storing notes", async () => {
       const h = summaryReceiptHelpers();
       const account = "alice";
@@ -733,6 +812,82 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "receipt crossed accounts");
       assert(await h.pbpAiLoadSummaryOwnership("alice", url, description + " external") === null,
         "edited notes retained stale ownership");
+    });
+
+    test("summary ownership snapshot requires the live session value and range", () => {
+      const description = "<blockquote>summary</blockquote>";
+      const h = summaryOwnershipRuntime(description);
+      h.setSummaryState(description, { start: 0, end: description.length });
+      const owned = h.pbpAiSummaryOwnershipSnapshot(description);
+      assert(owned && owned.start === 0 && owned.end === description.length,
+        "live summary range was not snapshotted");
+      h.field.value += " external";
+      assert(h.pbpAiSummaryOwnershipSnapshot(h.field.value) === null,
+        "changed description retained ownership");
+      h.setSummaryState(h.field.value, { start: 0, end: 0 });
+      assert(h.pbpAiSummaryOwnershipSnapshot(h.field.value) === null,
+        "invalid range was snapshotted");
+    });
+
+    await testAsync("summary receipt deletion fails closed for invalid and stale receipts", async () => {
+      const description = "note\n\n<blockquote>summary</blockquote>";
+      const h = summaryOwnershipRuntime(description);
+      const key = h.pbpAiSummaryOwnershipKey("alice", URL);
+      await h.pbpAiSaveSummaryOwnership("alice", URL, description, { start: 0, end: 0 });
+      assert(h.deletes.includes(key), "invalid save range did not delete its receipt");
+
+      const start = description.indexOf("<blockquote>");
+      const receipt = {
+        account: "alice", url: URL, notesHash: "wrong", start, end: description.length
+      };
+      h.entries.set(key, { result: receipt });
+      assert(await h.pbpAiLoadSummaryOwnership("alice", URL, description) === null,
+        "hash mismatch did not fail closed");
+      assert(!h.entries.has(key), "hash mismatch receipt was not deleted");
+
+      h.entries.set(key, { result: { ...receipt, start: -1 } });
+      assert(await h.pbpAiLoadSummaryOwnership("alice", URL, description) === null,
+        "illegal receipt range did not fail closed");
+      assert(!h.entries.has(key), "illegal receipt was not deleted");
+    });
+
+    await testAsync("summary restore executes priority and aborts stale ownership", async () => {
+      const session = summaryRestoreRuntime("<blockquote>session</blockquote>");
+      session.setSummaryState(session.field.value, { start: 0, end: session.field.value.length });
+      assert(await session.restore("alice", URL, "session") === "session" && session.loadCalls === 0,
+        "session ownership did not short-circuit receipt lookup");
+      assert(session.actions.join(",") === "false", "session restore used cache UI");
+
+      const receipt = summaryRestoreRuntime("<blockquote>receipt</blockquote>", {
+        receipt: { start: 0, end: "<blockquote>receipt</blockquote>".length }
+      });
+      assert(await receipt.restore("alice", URL, "receipt") === "receipt",
+        "receipt did not outrank legacy/cache fallback");
+      assert(receipt.actions.join(",") === "false", "receipt restore used cache UI");
+
+      const legacy = summaryRestoreRuntime("[AI Summary]\n<blockquote>legacy</blockquote>");
+      assert(await legacy.restore("alice", URL, "legacy") === "legacy",
+        "legacy fallback was not adopted");
+      assert(legacy.actions.join(",") === "false", "legacy restore used cache UI");
+
+      const cache = summaryRestoreRuntime("<blockquote>cache</blockquote>");
+      assert(await cache.restore("alice", URL, "cache") === "cache",
+        "exact cache fallback was not adopted");
+      assert(cache.actions.join(",") === "true", "cache restore did not show the cached UI");
+
+      for (const stale of ["textarea", "account", "url"]) {
+        const h = summaryRestoreRuntime("<blockquote>receipt</blockquote>", {
+          delayed: true,
+          receipt: { start: 0, end: "<blockquote>receipt</blockquote>".length }
+        });
+        const pending = h.restore("alice", URL, "receipt");
+        if (stale === "textarea") h.field.value += " edit";
+        if (stale === "account") h.state.accountCurrent = false;
+        if (stale === "url") h.urlField.value = "https://other.example";
+        h.resolveReceipt();
+        assert(await pending === null && h.actions.length === 0,
+          `${stale} change retained stale ownership`);
+      }
     });
 
     test("editing before a tracked summary shifts both range edges", () => {
