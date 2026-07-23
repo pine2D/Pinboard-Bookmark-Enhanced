@@ -575,8 +575,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const doSummary = popupAiSource.slice(popupAiSource.indexOf("async function doAISummary"), popupAiSource.indexOf("// ---- Show regenerate"));
       assert(doSummary.includes("await _aiAwaitBookmarkLookup();"), "doAISummary must settle the lookup first");
       const setupAi = popupAiSource.slice(popupAiSource.indexOf("function setupAIFeatures()"), popupAiSource.indexOf("function _aiSummaryBlockMatches"));
-      assert(setupAi.includes("await _aiAwaitBookmarkLookup();"), "cached-summary auto-restore must settle the lookup first");
-      assert(setupAi.indexOf("await _aiAwaitBookmarkLookup();") < setupAi.indexOf("pbpShouldRestoreCachedSummary"),
+      assert(setupAi.includes("_aiAwaitBookmarkLookup()"), "cached-summary auto-restore must settle the lookup first");
+      assert(setupAi.indexOf("_aiAwaitBookmarkLookup()") < setupAi.indexOf("pbpShouldRestoreCachedSummary"),
         "restore guard must run AFTER the lookup settles");
     });
 
@@ -657,7 +657,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(helperStart >= 0 && helperEnd > helperStart, "summary ownership helpers missing");
       return new Function("escapeForExtended",
         popupAiSource.slice(helperStart, helperEnd) +
-        "; return { pbpAiWrapSummary, pbpAiTrackSummaryRange, pbpAiRemoveSummaryRange };"
+        "; return { pbpAiWrapSummary, pbpAiTrackSummaryRange, pbpAiRemoveSummaryRange," +
+        " pbpAiFindLastExactSummaryRange };"
       )((value) => "[" + value + "]");
     }
 
@@ -666,6 +667,72 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const wrapped = pbpAiWrapSummary("summary");
       assert(wrapped === "<blockquote>[summary]</blockquote>", "unexpected wrapper: " + wrapped);
       assert(!wrapped.includes("[AI Summary]"), "new wrapper still leaks the legacy marker");
+    });
+
+    test("cached summary exact fallback adopts the last identical block", () => {
+      const { pbpAiFindLastExactSummaryRange } = summaryHelpers();
+      const block = "<blockquote>[same]</blockquote>";
+      const value = block + "\n\nnotes\n\n" + block;
+      const range = pbpAiFindLastExactSummaryRange(value, "same");
+      assert(range.start === value.lastIndexOf(block) && range.end === value.length,
+        "exact fallback did not select the last block");
+      assert(pbpAiFindLastExactSummaryRange(value, "different") === null,
+        "non-matching cache was guessed");
+    });
+
+    function summaryReceiptHelpers() {
+      const start = popupAiSource.indexOf("function _aiNormalizeUrl");
+      const end = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", start);
+      assert(start >= 0 && end > start, "summary receipt helpers missing");
+      const entries = new Map();
+      const api = new Function(
+        "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
+        "crypto", "TextEncoder", "_AI_BQ_REGEX_SHARED", "URL",
+        popupAiSource.slice(start, end) +
+        "; return { pbpAiSummaryOwnershipKey, pbpAiSaveSummaryOwnership," +
+        " pbpAiLoadSummaryOwnership };"
+      )(
+        (url) => ({ cleaned: String(url).replace(/[?&]utm_source=[^&#]*/g, "") }),
+        async (key) => entries.get(key) || null,
+        async (key, result, ts) => entries.set(key, { key, result, ts }),
+        async (key) => entries.delete(key),
+        crypto,
+        TextEncoder,
+        /$a/g,
+        window.URL
+      );
+      return { entries, ...api };
+    }
+
+    await testAsync("saved edited summary receipt round-trips without storing notes", async () => {
+      const h = summaryReceiptHelpers();
+      const account = "alice";
+      const url = "https://example.test/article?utm_source=mail#part";
+      const description = "note\n\n<blockquote>edited summary</blockquote>";
+      const start = description.indexOf("<blockquote>");
+      const range = { start, end: description.length };
+      await h.pbpAiSaveSummaryOwnership(account, url, description, range);
+      const restored = await h.pbpAiLoadSummaryOwnership(
+        account, "https://example.test/article", description);
+      const stored = [...h.entries.values()][0].result;
+      assert(restored.start === range.start && restored.end === range.end,
+        "receipt did not restore edited range");
+      assert(!JSON.stringify(stored).includes(description) &&
+        !("description" in stored) && !("summary" in stored),
+        "receipt leaked notes or summary text");
+    });
+
+    await testAsync("receipt fails closed on external notes edit and account switch", async () => {
+      const h = summaryReceiptHelpers();
+      const url = "https://example.test/article";
+      const description = "note\n\n<blockquote>summary</blockquote>";
+      const start = description.indexOf("<blockquote>");
+      await h.pbpAiSaveSummaryOwnership("alice", url, description,
+        { start, end: description.length });
+      assert(await h.pbpAiLoadSummaryOwnership("bob", url, description) === null,
+        "receipt crossed accounts");
+      assert(await h.pbpAiLoadSummaryOwnership("alice", url, description + " external") === null,
+        "edited notes retained stale ownership");
     });
 
     test("editing before a tracked summary shifts both range edges", () => {
@@ -797,6 +864,24 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "doAITags stale error UI is not liveness-guarded");
       assert(doTags.includes("if (btn && pbpPopupAiAccountIsCurrent(account))"),
         "doAITags stale progress cleanup is not owner-guarded");
+    });
+
+    test("setup restore and cache click share adoption before any append", () => {
+      const setupAi = popupAiSource.slice(
+        popupAiSource.indexOf("function setupAIFeatures()"),
+        popupAiSource.indexOf("// ---- Insert or replace AI summary"));
+      const doSummary = popupAiSource.slice(
+        popupAiSource.indexOf("async function doAISummary"),
+        popupAiSource.indexOf("// ---- Show regenerate"));
+      assert(setupAi.includes("_aiRestoreSummaryOwnership") &&
+        setupAi.includes("existingBookmark"),
+        "existing bookmark initialization does not restore ownership");
+      assert(!setupAi.includes("if (!cached) return"),
+        "receipt restore is still incorrectly gated by AI cache availability");
+      const restoreAt = doSummary.indexOf("_aiRestoreSummaryOwnership");
+      const upsertAt = doSummary.indexOf("upsertSummary(cached)");
+      assert(restoreAt >= 0 && upsertAt > restoreAt,
+        "cache click appends before attempting ownership restore");
     });
 
     test("malformed save responses enter the recoverable error state", () => {

@@ -135,14 +135,23 @@ async function enrichPageTextIfJina(s) {
 // produce a summary of page A cached under A but saved onto bookmark B.
 // Equivalence deliberately ignores fragments and tracking params so the
 // paste-clean flow (strip utm etc.) keeps AI enabled.
+function _aiNormalizeUrl(url) {
+  let normalized = String(url == null ? "" : url).trim();
+  try {
+    const parsed = new URL(normalized);
+    parsed.hash = "";
+    normalized = parsed.href;
+  } catch (_) {}
+  try {
+    if (typeof stripTrackingParams === "function") {
+      normalized = stripTrackingParams(normalized, {}).cleaned || normalized;
+    }
+  } catch (_) {}
+  return normalized;
+}
+
 function _aiUrlEquivalent(a, b) {
-  const norm = (u) => {
-    let x = String(u == null ? "" : u).trim();
-    try { const p = new URL(x); p.hash = ""; x = p.href; } catch (_) {}
-    try { if (typeof stripTrackingParams === "function") x = stripTrackingParams(x).cleaned || x; } catch (_) {}
-    return x;
-  };
-  return norm(a) === norm(b);
+  return _aiNormalizeUrl(a) === _aiNormalizeUrl(b);
 }
 
 // Called from the url-input "input" listener (popup.js): grey the AI
@@ -186,6 +195,12 @@ function _aiOpStillCurrent(account) {
 
 function pbpAiWrapSummary(summary) {
   return `<blockquote>${escapeForExtended(summary)}</blockquote>`;
+}
+
+function pbpAiFindLastExactSummaryRange(value, summary) {
+  const wrapped = pbpAiWrapSummary(summary);
+  const start = String(value).lastIndexOf(wrapped);
+  return start < 0 ? null : { start, end: start + wrapped.length };
 }
 
 function _pbpAiSummaryRangeValid(value, range) {
@@ -255,6 +270,70 @@ const AI_BQ_REGEX = _AI_BQ_REGEX_SHARED;
 // pbpShouldRestoreCachedSummary is defined in shared.js (pure helper, B4).
 let _aiSummaryRange = null;
 let _aiSummaryValue = "";
+
+const AI_SUMMARY_OWNER_PREFIX = "summary_owner_";
+
+function pbpAiSummaryOwnershipKey(account, url) {
+  const normalizedUrl = _aiNormalizeUrl(url);
+  if (!account || !normalizedUrl) return "";
+  return AI_SUMMARY_OWNER_PREFIX + encodeURIComponent(account) + "_" + normalizedUrl;
+}
+
+async function pbpAiSummaryTextHash(value) {
+  const bytes = new TextEncoder().encode(String(value));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function pbpAiSummaryOwnershipSnapshot(description) {
+  if (_aiSummaryValue !== description ||
+      !_pbpAiSummaryRangeValid(description, _aiSummaryRange)) return null;
+  return { start: _aiSummaryRange.start, end: _aiSummaryRange.end };
+}
+
+async function pbpAiSaveSummaryOwnership(account, url, description, range) {
+  const key = pbpAiSummaryOwnershipKey(account, url);
+  if (!key) return;
+  if (!_pbpAiSummaryRangeValid(description, range)) {
+    if (typeof pbpAiCacheDelete === "function") await pbpAiCacheDelete(key);
+    return;
+  }
+  if (typeof pbpAiCacheSet !== "function") return;
+  const savedAt = Date.now();
+  const receipt = {
+    account,
+    url: _aiNormalizeUrl(url),
+    notesHash: await pbpAiSummaryTextHash(description),
+    start: range.start,
+    end: range.end,
+    savedAt
+  };
+  await pbpAiCacheSet(key, receipt, savedAt);
+}
+
+async function pbpAiLoadSummaryOwnership(account, url, description) {
+  const key = pbpAiSummaryOwnershipKey(account, url);
+  if (!key || typeof pbpAiCacheGet !== "function") return null;
+  const entry = await pbpAiCacheGet(key);
+  const receipt = entry && entry.result;
+  const basicValid = receipt &&
+    receipt.account === account &&
+    receipt.url === _aiNormalizeUrl(url) &&
+    _pbpAiSummaryRangeValid(description, receipt);
+  if (!basicValid) {
+    if (entry && typeof pbpAiCacheDelete === "function") await pbpAiCacheDelete(key);
+    return null;
+  }
+  let notesHash;
+  try { notesHash = await pbpAiSummaryTextHash(description); }
+  catch (_) { return null; }
+  if (notesHash !== receipt.notesHash) {
+    if (typeof pbpAiCacheDelete === "function") await pbpAiCacheDelete(key);
+    return null;
+  }
+  return { start: receipt.start, end: receipt.end };
+}
 
 // ---- Setup AI feature listeners ----
 // ---- AI Error Card ----
@@ -436,16 +515,18 @@ function setupAIFeatures() {
   // checkExistingBookmark (popup.js) restores the user's saved `extended` — we
   // must not race it (lost summary) or append on top (duplicate summary).
   const restoreAccount = pbpPopupAiAccount();
-  getAICache(pageInfo.url, "summary", settings.aiCacheDuration, settings.aiContentSource, restoreAccount, settings).then(async cached => {
-    if (!cached) return;
-    // audit A2: the IDB read can win the race against the bookmark lookup
-    // - existingBookmark is still null then, the guard passes, and the
-    // lookup later overwrites the description wholesale (upsertSummary
-    // does not mark the field dirty). Settle the lookup FIRST; the guard
-    // below then sees the real existingBookmark/description state.
-    await _aiAwaitBookmarkLookup();
-    if (_aiOpStillCurrent(restoreAccount)
-        && pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
+  Promise.all([
+    getAICache(pageInfo.url, "summary", settings.aiCacheDuration,
+      settings.aiContentSource, restoreAccount, settings),
+    _aiAwaitBookmarkLookup()
+  ]).then(async ([cached]) => {
+    if (!_aiOpStillCurrent(restoreAccount)) return;
+    if (existingBookmark) {
+      await _aiRestoreSummaryOwnership(restoreAccount, pageInfo.url, cached);
+      return;
+    }
+    if (cached &&
+        pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
       upsertSummary(cached);
       showSummaryActions(true);
     }
@@ -464,6 +545,49 @@ function _aiSummaryBlockMatches(text) {
   return [...String(text || "").matchAll(new RegExp(AI_BQ_REGEX.source, "g"))];
 }
 
+function _aiLastLegacySummaryRange(value) {
+  const matches = _aiSummaryBlockMatches(value);
+  if (!matches.length) return null;
+  const last = matches[matches.length - 1];
+  const lead = last[1] || "";
+  return {
+    start: last.index + lead.length,
+    end: last.index + last[0].length
+  };
+}
+
+function _aiAdoptSummaryRange(value, range, fromCache) {
+  const input = $id("description-input");
+  if (input.value !== value || !_pbpAiSummaryRangeValid(value, range)) return false;
+  _aiSummaryRange = { start: range.start, end: range.end };
+  _aiSummaryValue = value;
+  showSummaryActions(fromCache);
+  return true;
+}
+
+async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
+  const input = $id("description-input");
+  const value = input.value;
+  if (_aiSummaryValue === value &&
+      _pbpAiSummaryRangeValid(value, _aiSummaryRange)) {
+    showSummaryActions(false);
+    return "session";
+  }
+
+  const receiptRange = await pbpAiLoadSummaryOwnership(account, url, value);
+  if (!_aiOpStillCurrent(account) || input.value !== value) return null;
+  if (receiptRange && _aiAdoptSummaryRange(value, receiptRange, false)) return "receipt";
+
+  const legacyRange = _aiLastLegacySummaryRange(value);
+  if (legacyRange && _aiAdoptSummaryRange(value, legacyRange, false)) return "legacy";
+
+  const cachedRange = cachedSummary
+    ? pbpAiFindLastExactSummaryRange(value, cachedSummary)
+    : null;
+  if (cachedRange && _aiAdoptSummaryRange(value, cachedRange, true)) return "cache";
+  return null;
+}
+
 // ---- Insert or replace AI summary in description ----
 // Replace the session-owned range, migrate the last legacy block in place,
 // or append a new block without rewriting surrounding notes.
@@ -478,12 +602,10 @@ function upsertSummary(summary) {
     next = cur.slice(0, start) + wrapped + cur.slice(_aiSummaryRange.end);
   } else {
     _aiSummaryRange = null;
-    const matches = _aiSummaryBlockMatches(cur);
-    if (matches.length) {
-      const last = matches[matches.length - 1];
-      const lead = last[1] || "";
-      start = last.index + lead.length;
-      next = cur.slice(0, last.index) + lead + wrapped + cur.slice(last.index + last[0].length);
+    const legacyRange = _aiLastLegacySummaryRange(cur);
+    if (legacyRange) {
+      start = legacyRange.start;
+      next = cur.slice(0, legacyRange.start) + wrapped + cur.slice(legacyRange.end);
     } else {
       const separator = !cur || cur.endsWith("\n\n") ? "" : (cur.endsWith("\n") ? "\n" : "\n\n");
       start = cur.length + separator.length;
@@ -507,15 +629,8 @@ function removeSummary() {
     removed = pbpAiRemoveSummaryRange(cur, _aiSummaryRange);
   } else {
     _aiSummaryRange = null;
-    const matches = _aiSummaryBlockMatches(cur);
-    if (matches.length) {
-      const last = matches[matches.length - 1];
-      const lead = last[1] || "";
-      removed = pbpAiRemoveSummaryRange(cur, {
-        start: last.index + lead.length,
-        end: last.index + last[0].length
-      });
-    }
+    const legacyRange = _aiLastLegacySummaryRange(cur);
+    if (legacyRange) removed = pbpAiRemoveSummaryRange(cur, legacyRange);
   }
   if (removed.removed) di.value = removed.value;
   _aiSummaryRange = null;
@@ -688,6 +803,9 @@ async function doAISummary(forceRefresh, sOverride) {
   if (!forceRefresh) {
     const cached = await getAICache(pageInfo.url, "summary", s.aiCacheDuration, s.aiContentSource, account, s);
     if (cached && _aiOpStillCurrent(account)) {
+      const adopted = await _aiRestoreSummaryOwnership(account, pageInfo.url, cached);
+      if (!_aiOpStillCurrent(account)) return;
+      if (adopted) return;
       upsertSummary(cached);
       showSummaryActions(true);
       return;
