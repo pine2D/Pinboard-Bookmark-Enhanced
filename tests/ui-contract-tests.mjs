@@ -74,7 +74,7 @@ const popupTagsJs = read("popup-tags.js");
   );
   const prepareAt = pullHandler.indexOf("pbpWebdavPreparePullPayload(res.data)");
   const applyAt = pullHandler.indexOf("pbpApplyBackupPayload(pullData");
-  const rememberAt = pullHandler.indexOf("pbpWebdavRememberState(cfg");
+  const rememberAt = pullHandler.indexOf("pbpWebdavRememberState(res.target");
   const clearAt = pullHandler.indexOf('chrome.storage.local.remove("webdavLastPush")');
   const reloadAt = pullHandler.indexOf("location.reload()");
   check(prepareAt >= 0 && applyAt > prepareAt && rememberAt > applyAt &&
@@ -88,7 +88,8 @@ const popupTagsJs = read("popup-tags.js");
     optionsJs.indexOf("// ---- WebDAV: render only target-bound sync state"),
     optionsJs.indexOf("const autoSaveState")
   );
-  check(statusBlock.includes("pbpWebdavReadState(cfg)") &&
+  check(statusBlock.includes("pbpWebdavPrepareOperation(cfg)") &&
+    statusBlock.includes("pbpWebdavReadState(prepared.target)") &&
     statusBlock.includes("state.lastSuccessAt") &&
     !statusBlock.includes("webdavLastPush"),
     "options.js: page-load WebDAV status still revives persisted operation errors instead of rendering target state");
@@ -97,6 +98,12 @@ check(!webdavJs.includes("dav.jianguoyun.com") &&
   !webdavJs.includes("pbpWebdavNormalizeEtag") &&
   !webdavJs.includes('headers["If-Match"] = "*"'),
   "webdav.js: provider/Apache special cases or unsafe If-Match:* compatibility path remain");
+check(!/jianguoyun|nextcloud/i.test(webdavJs),
+  "webdav.js: provider-specific routing returned");
+check(webdavJs.includes("pbpWebdavPrepareOperation") &&
+  webdavJs.includes("target.backupFileUrl") &&
+  !webdavJs.includes("pbpWebdavFileUrl(cfg.baseUrl)"),
+  "webdav.js: a production operation still bypasses the frozen target");
 {
   const expectedLabels = {
     en: "Backup folder URL",
@@ -529,7 +536,7 @@ check((optionsJs.match(/const errorKey = _pbpWebdavPermissionError\(granted\);/g
 // Conflict-choice consent binding (Codex r3 HIGH): the overwrite confirm
 // must compare the LIVE form target against the one that conflicted and
 // downgrade to a normal CAS push when they differ.
-check(/const conflictedTarget = JSON\.stringify\(\[pbpWebdavFileUrl\(cfg\.baseUrl\)[\s\S]{0,600}_pbpWebdavRunPush\(curTarget === conflictedTarget\);/.test(optionsJs),
+check(/const conflictedTarget = res\.targetBinding[\s\S]{0,800}JSON\.stringify\(\[prepared\.target\.backupFileUrl, prepared\.target\.user\]\)[\s\S]{0,300}_pbpWebdavRunPush\(curTarget === conflictedTarget\);/.test(optionsJs),
   "options.js: WebDAV overwrite consent is not bound to the conflicted target");
 check(/_webdavConflictKeys\[res\.error\] && !force/.test(optionsJs) &&
   optionsJs.includes('yesText: t("webdavOverwriteRemote")'),

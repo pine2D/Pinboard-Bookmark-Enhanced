@@ -217,6 +217,8 @@ async function loadSettings() {
         settings.webdavAutoPush = await pbpWebdavReadAutoPush({
           baseUrl: settings.webdavUrl,
           user: settings.webdavUser,
+          folderMode: settings.webdavFolderMode,
+          relativePath: settings.webdavRelativePath,
         });
         return settings;
       });
@@ -1492,7 +1494,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
     syncPrewarmTagsAlarm().catch(() => {});
   }
   if (((area === "sync" || area === "local") &&
-       (routingChanged || changes.webdavUrl || changes.webdavUser || changes.webdavPass)) ||
+       (routingChanged || changes.webdavUrl || changes.webdavUser || changes.webdavPass ||
+        changes.webdavFolderMode || changes.webdavRelativePath || changes.webdavLayoutVersion)) ||
       (area === "local" && changes.webdavAutoPush)) {
     syncWebdavPushAlarm().catch(() => {});
   }

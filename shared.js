@@ -359,6 +359,7 @@ const SETTINGS_DEFAULTS = {
   // WebDAV settings backup (batch (5)): push is explicit-click or scheduled;
   // pull is always behind a user confirm() -- see webdav.js.
   webdavUrl: "", webdavUser: "", webdavPass: "",
+  webdavFolderMode: "managed", webdavRelativePath: "", webdavLayoutVersion: 0,
   backupIncludeHighlights: true,
   // md-preview in-page AI (explain / ask / translate)
   previewAiEnabled: true,
@@ -1596,7 +1597,10 @@ function pbpBuildBackupSnapshot(settings, extra, options) {
   const payload = {};
   Object.keys(SETTINGS_DEFAULTS).forEach((key) => {
     if (API_KEY_FIELDS.includes(key)) return;
-    if (omitTransport && (key === "webdavUrl" || key === "webdavUser")) return;
+    if (omitTransport && [
+      "webdavUrl", "webdavUser", "webdavFolderMode",
+      "webdavRelativePath", "webdavLayoutVersion",
+    ].includes(key)) return;
     if (Object.prototype.hasOwnProperty.call(s, key)) payload[key] = s[key];
   });
   if (!omitTransport) {

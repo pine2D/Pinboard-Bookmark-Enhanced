@@ -893,6 +893,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   s.webdavAutoPush = await pbpWebdavReadAutoPush({
     baseUrl: deobfuscateKey(s.webdavUrl || ""),
     user: deobfuscateKey(s.webdavUser || ""),
+    folderMode: s.webdavFolderMode,
+    relativePath: s.webdavRelativePath,
   });
 
   // ---- Schema v2 migration: split customCSS into themePresetKey + customOverlayCSS ----
@@ -1610,6 +1612,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       baseUrl: $id("opt-webdav-url").value.trim(),
       user: $id("opt-webdav-user").value.trim(),
       pass: $id("opt-webdav-pass").value.trim(),
+      folderMode: "managed",
+      relativePath: "",
+      layoutVersion: 0,
       includeHighlights: $id("opt-backup-include-highlights").checked,
     };
   }
@@ -1650,7 +1655,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const generation = ++_webdavStatusGeneration;
     try {
       const cfg = _pbpWebdavCfgFromForm();
-      const state = await pbpWebdavReadState(cfg);
+      const prepared = await pbpWebdavPrepareOperation(cfg);
+      const state = prepared.ok
+        ? await pbpWebdavReadState(prepared.target)
+        : pbpWebdavEmptyState();
       if (generation !== _webdavStatusGeneration) return;
       const statusEl = $id("webdav-status");
       if (!statusEl) return;
@@ -1798,14 +1806,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       // the URL/username while the popover is open, forcing would blind-
       // overwrite a DIFFERENT target than the one they confirmed. On a
       // changed target fall back to a normal CAS push against it.
-      const conflictedTarget = JSON.stringify([pbpWebdavFileUrl(cfg.baseUrl), String(cfg.user || "")]);
+      const conflictedTarget = res.targetBinding || "";
       showConfirmPopover($id("webdav-push-btn"), {
         msg: t("webdavConflictChoice"),
         yesText: t("webdavOverwriteRemote"),
         noText: t("cancel"),
-        onConfirm: () => {
+        onConfirm: async () => {
           const cur = _pbpWebdavCfgFromForm();
-          const curTarget = JSON.stringify([pbpWebdavFileUrl(cur.baseUrl), String(cur.user || "")]);
+          const prepared = await pbpWebdavPrepareOperation(cur);
+          const curTarget = prepared.ok
+            ? JSON.stringify([prepared.target.backupFileUrl, prepared.target.user])
+            : "";
           _pbpWebdavRunPush(curTarget === conflictedTarget);
         },
       });
@@ -1879,7 +1890,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       await pauseOptionsAutoSave();
       const saved = await saveAll();
       if (!saved.ok) throw saved.error || new Error("settings save failed");
-      const previousState = await pbpWebdavReadState(cfg);
+      const previousState = await pbpWebdavReadState(res.target);
       applied = await pbpApplyBackupPayload(pullData, {
         exportableKeys: EXPORTABLE_KEYS,
         saveOverlayWithFallback,
@@ -1887,7 +1898,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       // The restore already succeeded. Baseline persistence is the next-push
       // guard; a local storage hiccup must not misreport the completed restore.
-      await pbpWebdavRememberState(cfg, {
+      await pbpWebdavRememberState(res.target, {
         mode: previousState.mode === "hash" || !res.etag ? "hash" : "etag",
         etag: res.etag || "",
         remoteHash: res.remoteHash,

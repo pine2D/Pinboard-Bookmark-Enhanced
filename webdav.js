@@ -54,9 +54,9 @@ async function pbpWebdavSha256(text) {
 }
 
 async function pbpWebdavTargetId(cfg) {
-  const target = pbpWebdavFileUrl(cfg && cfg.baseUrl);
-  if (!target) return "";
-  return pbpWebdavSha256(target + "\n" + String(cfg && cfg.user || ""));
+  if (cfg && cfg.targetId) return String(cfg.targetId);
+  const target = await pbpWebdavFreezeTarget(cfg);
+  return target.ok ? target.targetId : "";
 }
 
 function pbpWebdavNormalizeRelativePath(value) {
@@ -98,8 +98,8 @@ function pbpWebdavEmptyState() {
   };
 }
 
-async function pbpWebdavReadState(cfg) {
-  const targetId = await pbpWebdavTargetId(cfg);
+async function pbpWebdavReadState(target) {
+  const targetId = String(target && target.targetId || "");
   if (!targetId) return pbpWebdavEmptyState();
   try {
     const stored = await chrome.storage.local.get(PBP_WEBDAV_SYNC_STATE_KEY);
@@ -119,8 +119,8 @@ async function pbpWebdavReadState(cfg) {
   }
 }
 
-async function pbpWebdavRememberState(cfg, next) {
-  const targetId = await pbpWebdavTargetId(cfg);
+async function pbpWebdavRememberState(target, next) {
+  const targetId = String(target && target.targetId || "");
   if (!targetId) return false;
   const state = Object.assign(pbpWebdavEmptyState(), next || {});
   delete state.known;
@@ -129,9 +129,9 @@ async function pbpWebdavRememberState(cfg, next) {
   return true;
 }
 
-async function pbpWebdavReadRemote(cfg) {
+async function pbpWebdavReadRemote(cfg, target) {
   try {
-    const resp = await _pbpWebdavFetch("pull", cfg, pbpWebdavFileUrl(cfg && cfg.baseUrl));
+    const resp = await _pbpWebdavFetch("pull", cfg, target.backupFileUrl);
     if (resp.status === 401 || resp.status === 403) return { ok: false, error: "auth", status: resp.status };
     if (resp.status === 404) return { ok: true, exists: false, etag: "", remoteHash: "", settingsHash: "" };
     if (!resp.ok) return { ok: false, error: "http-" + resp.status, status: resp.status };
@@ -157,9 +157,9 @@ async function pbpWebdavReadRemote(cfg) {
   }
 }
 
-async function pbpWebdavDecisionResult(cfg, state, remote, decision) {
+async function pbpWebdavDecisionResult(target, state, remote, decision) {
   if (["remote-changed", "diverged", "unpaired"].includes(decision)) {
-    await pbpWebdavRememberState(cfg, Object.assign({}, state, {
+    await pbpWebdavRememberState(target, Object.assign({}, state, {
       unresolvedConflict: {
         kind: decision,
         remoteHash: remote && remote.remoteHash || "",
@@ -176,9 +176,9 @@ async function pbpWebdavDecisionResult(cfg, state, remote, decision) {
   };
 }
 
-async function pbpWebdavAdoptRemote(cfg, remote, preferredMode) {
+async function pbpWebdavAdoptRemote(target, remote, preferredMode) {
   const mode = preferredMode === "hash" || !remote.etag ? "hash" : "etag";
-  await pbpWebdavRememberState(cfg, {
+  await pbpWebdavRememberState(target, {
     mode,
     etag: remote.etag || "",
     remoteHash: remote.remoteHash,
@@ -197,7 +197,7 @@ async function pbpWebdavAdoptRemote(cfg, remote, preferredMode) {
   };
 }
 
-async function pbpWebdavUploadText(cfg, text, options) {
+async function pbpWebdavUploadText(cfg, target, text, options) {
   options = options || {};
   let payload;
   try {
@@ -209,8 +209,8 @@ async function pbpWebdavUploadText(cfg, text, options) {
   const localHash = await pbpWebdavSha256(
     pbpWebdavStableStringify(pbpWebdavSemanticValue(payload)));
   const uploadedHash = await pbpWebdavSha256(text);
-  const state = await pbpWebdavReadState(cfg);
-  let remote = await pbpWebdavReadRemote(cfg);
+  const state = await pbpWebdavReadState(target);
+  let remote = await pbpWebdavReadRemote(cfg, target);
   if (!remote.ok) return remote;
 
   let decision = pbpWebdavDecide({
@@ -220,9 +220,9 @@ async function pbpWebdavUploadText(cfg, text, options) {
     hasBaseline: state.known,
     remoteExists: remote.exists,
   });
-  if (decision === "same") return pbpWebdavAdoptRemote(cfg, remote, state.mode);
+  if (decision === "same") return pbpWebdavAdoptRemote(target, remote, state.mode);
   if (!options.force && decision !== "push" && decision !== "create") {
-    return pbpWebdavDecisionResult(cfg, state, remote, decision);
+    return pbpWebdavDecisionResult(target, state, remote, decision);
   }
 
   let mode = state.mode === "hash" ? "hash" : "etag";
@@ -236,9 +236,9 @@ async function pbpWebdavUploadText(cfg, text, options) {
     mode = "hash";
   }
 
-  let resp = await _pbpWebdavFetch("push", pushCfg, pbpWebdavFileUrl(pushCfg.baseUrl), { body: text });
+  let resp = await _pbpWebdavFetch("push", pushCfg, target.backupFileUrl, { body: text });
   if (resp.status === 412) {
-    remote = await pbpWebdavReadRemote(cfg);
+    remote = await pbpWebdavReadRemote(cfg, target);
     if (!remote.ok) return remote;
     decision = pbpWebdavDecide({
       baselineHash: state.settingsHash,
@@ -247,19 +247,19 @@ async function pbpWebdavUploadText(cfg, text, options) {
       hasBaseline: state.known,
       remoteExists: remote.exists,
     });
-    if (decision === "same") return pbpWebdavAdoptRemote(cfg, remote, state.mode);
+    if (decision === "same") return pbpWebdavAdoptRemote(target, remote, state.mode);
     if (decision !== "push" || options.force) {
-      return pbpWebdavDecisionResult(cfg, state, remote, decision);
+      return pbpWebdavDecisionResult(target, state, remote, decision);
     }
 
     if (!remote.etag) {
       mode = "hash";
-      resp = await _pbpWebdavFetch("push", cfg, pbpWebdavFileUrl(cfg.baseUrl), { body: text });
+      resp = await _pbpWebdavFetch("push", cfg, target.backupFileUrl, { body: text });
     } else {
       const retryCfg = Object.assign({}, cfg, { etag: remote.etag });
-      resp = await _pbpWebdavFetch("push", retryCfg, pbpWebdavFileUrl(retryCfg.baseUrl), { body: text });
+      resp = await _pbpWebdavFetch("push", retryCfg, target.backupFileUrl, { body: text });
       if (resp.status === 412) {
-        remote = await pbpWebdavReadRemote(cfg);
+        remote = await pbpWebdavReadRemote(cfg, target);
         if (!remote.ok) return remote;
         decision = pbpWebdavDecide({
           baselineHash: state.settingsHash,
@@ -268,10 +268,10 @@ async function pbpWebdavUploadText(cfg, text, options) {
           hasBaseline: state.known,
           remoteExists: remote.exists,
         });
-        if (decision === "same") return pbpWebdavAdoptRemote(cfg, remote, state.mode);
-        if (decision !== "push") return pbpWebdavDecisionResult(cfg, state, remote, decision);
+        if (decision === "same") return pbpWebdavAdoptRemote(target, remote, state.mode);
+        if (decision !== "push") return pbpWebdavDecisionResult(target, state, remote, decision);
         mode = "hash";
-        resp = await _pbpWebdavFetch("push", cfg, pbpWebdavFileUrl(cfg.baseUrl), { body: text });
+        resp = await _pbpWebdavFetch("push", cfg, target.backupFileUrl, { body: text });
       } else {
         mode = "etag";
       }
@@ -285,7 +285,7 @@ async function pbpWebdavUploadText(cfg, text, options) {
     return { ok: false, error: "http-" + resp.status, status: resp.status };
   }
 
-  const verified = await pbpWebdavReadRemote(cfg);
+  const verified = await pbpWebdavReadRemote(cfg, target);
   if (!verified.ok || !verified.exists || verified.remoteHash !== uploadedHash) {
     return {
       ok: false,
@@ -294,7 +294,7 @@ async function pbpWebdavUploadText(cfg, text, options) {
     };
   }
   if (mode !== "hash") mode = verified.etag ? "etag" : "hash";
-  await pbpWebdavRememberState(cfg, {
+  await pbpWebdavRememberState(target, {
     mode,
     etag: verified.etag || "",
     remoteHash: verified.remoteHash,
@@ -397,6 +397,109 @@ async function pbpWebdavFreezeTarget(cfg) {
   });
 }
 
+async function pbpWebdavPrepareOperation(cfg) {
+  const frozenCfg = Object.assign({}, cfg || {});
+  const target = await pbpWebdavFreezeTarget(frozenCfg);
+  return target.ok ? { ok: true, cfg: frozenCfg, target } : target;
+}
+
+function pbpWebdavParseLocator(text) {
+  let value;
+  try { value = JSON.parse(String(text)); }
+  catch (_) { return { ok: false, error: "invalid-locator" }; }
+  if (!pbpIsPlainRecord(value) || value.schemaVersion !== 1) {
+    return { ok: false, error: "invalid-locator" };
+  }
+  const path = pbpWebdavNormalizeRelativePath(value.relativePath);
+  return path.ok
+    ? { ok: true, relativePath: path.value }
+    : { ok: false, error: "invalid-locator" };
+}
+
+function pbpWebdavLocatorText(relativePath) {
+  return JSON.stringify({ schemaVersion: 1, relativePath });
+}
+
+async function pbpWebdavReadLocator(cfg, target) {
+  try {
+    const response = await _pbpWebdavFetch("pull", cfg, target.locatorFileUrl);
+    if (response.status === 404) return { ok: true, exists: false };
+    if (response.status === 401 || response.status === 403) {
+      return { ok: false, error: "auth", status: response.status, stage: "locator-get" };
+    }
+    if (!response.ok) {
+      return { ok: false, error: "http", status: response.status, stage: "locator-get" };
+    }
+    const text = await response.text();
+    const parsed = pbpWebdavParseLocator(text);
+    if (!parsed.ok) return Object.assign(parsed, { stage: "locator-parse" });
+    return Object.assign(parsed, {
+      exists: true,
+      etag: pbpWebdavResponseEtag(response),
+      hash: await pbpWebdavSha256(text),
+    });
+  } catch (_) {
+    return { ok: false, error: "http", stage: "locator-get" };
+  }
+}
+
+async function pbpWebdavWriteLocator(cfg, target, nextRelativePath, expectedRemotePath) {
+  const next = pbpWebdavNormalizeRelativePath(nextRelativePath);
+  const expected = pbpWebdavNormalizeRelativePath(expectedRemotePath);
+  if (!next.ok || !expected.ok) {
+    return { ok: false, error: "invalid-locator", stage: "locator-validate" };
+  }
+  const ensured = await pbpWebdavEnsureCollectionPath(
+    cfg, target, PBP_WEBDAV_APP_COLLECTION + "/");
+  if (!ensured.ok) return ensured;
+
+  const current = await pbpWebdavReadLocator(cfg, target);
+  if (!current.ok) return current;
+  if (current.exists && current.relativePath === next.value) return { ok: true, noop: true };
+  if (current.exists && current.relativePath !== expected.value) {
+    return { ok: false, error: "locator-conflict", stage: "locator-compare" };
+  }
+
+  const text = pbpWebdavLocatorText(next.value);
+  const putCfg = Object.assign({}, cfg);
+  if (current.etag) putCfg.etag = current.etag;
+  else if (!current.exists) putCfg.createOnly = true;
+  let response;
+  try {
+    response = await _pbpWebdavFetch("push", putCfg, target.locatorFileUrl, { body: text });
+  } catch (_) {
+    return { ok: false, error: "http", stage: "locator-put" };
+  }
+  if (response.status === 409 || response.status === 412) {
+    return {
+      ok: false,
+      error: "locator-conflict",
+      status: response.status,
+      stage: "locator-put",
+    };
+  }
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: response.status === 401 || response.status === 403 ? "auth" : "http",
+      status: response.status,
+      stage: "locator-put",
+    };
+  }
+  if (current.etag) return { ok: true };
+
+  const verified = await pbpWebdavReadLocator(cfg, target);
+  const hash = await pbpWebdavSha256(text);
+  return verified.ok && verified.exists && verified.hash === hash
+    ? { ok: true }
+    : {
+      ok: false,
+      error: "locator-verify",
+      stage: "locator-verify",
+      status: verified.status,
+    };
+}
+
 // Basic auth header value, or null when there is nothing to authenticate
 // with (both user and pass empty -- an anonymous WebDAV share). A password-
 // less username (or user-less password) still produces a header: some
@@ -433,6 +536,7 @@ function pbpWebdavResponseEtag(response) {
 
 function pbpWebdavAutoPushPeriod(settings) {
   const s = settings || {};
+  if (Number(s.webdavLayoutVersion || 0) !== PBP_WEBDAV_LAYOUT_VERSION) return 0;
   // deobfuscateKey passes plaintext through and heals values a transitional
   // build stored obf-wrapped. Half-configured Basic auth — either half alone
   // (username without password OR password without username) — never
@@ -520,7 +624,10 @@ function pbpWebdavBuildPayload(settings, meta, extra) {
 
 function pbpWebdavPreparePullPayload(data) {
   const payload = Object.assign({}, data || {});
-  ["webdavUrl", "webdavUser", "webdavPass", "webdavAutoPush"].forEach((key) => {
+  [
+    "webdavUrl", "webdavUser", "webdavPass", "webdavAutoPush",
+    "webdavFolderMode", "webdavRelativePath", "webdavLayoutVersion",
+  ].forEach((key) => {
     delete payload[key];
   });
   return payload;
@@ -693,24 +800,38 @@ async function pbpWebdavProbeWritable(cfg, target) {
 // obfuscated at rest; URL/username are ordinary settings stored in plaintext
 // (deobfuscateKey passes them through, healing transitional obf-wrapped values).
 async function _pbpWebdavCfg() {
-  const s = await pbpReadSettingsWithSecrets({ webdavUrl: "", webdavUser: "", webdavPass: "" });
+  const s = await pbpReadSettingsWithSecrets({
+    webdavUrl: "",
+    webdavUser: "",
+    webdavPass: "",
+    webdavFolderMode: "managed",
+    webdavRelativePath: "",
+    webdavLayoutVersion: 0,
+  });
   return {
     baseUrl: deobfuscateKey(s.webdavUrl || ""),
     user: deobfuscateKey(s.webdavUser || ""),
     pass: deobfuscateKey(s.webdavPass || ""),
+    folderMode: s.webdavFolderMode === "custom" ? "custom" : "managed",
+    relativePath: String(s.webdavRelativePath || ""),
+    layoutVersion: Number(s.webdavLayoutVersion || 0),
   };
 }
 
-async function pbpWebdavPersistPushResult(cfg, result) {
+async function pbpWebdavPersistPushResult(cfg, target, result) {
   const stored = Object.assign({}, result, {
-    targetId: await pbpWebdavTargetId(cfg).catch(() => ""),
+    targetId: String(target && target.targetId || ""),
   });
-  if (stored.ok) {
-    stored.target = obfuscateKey(pbpWebdavFileUrl(cfg.baseUrl));
-    stored.user = obfuscateKey(String(cfg.user || ""));
+  if (target && target.ok) {
+    stored.target = obfuscateKey(target.backupFileUrl);
+    stored.user = obfuscateKey(target.user);
   }
   await chrome.storage.local.set({ webdavLastPush: stored }).catch(() => {});
-  return stored;
+  return target && target.ok
+    ? Object.assign({}, stored, {
+      targetBinding: JSON.stringify([target.backupFileUrl, target.user]),
+    })
+    : stored;
 }
 
 // Test button / Push now / Pull now in options.js pass a cfgOverride built
@@ -719,28 +840,37 @@ async function pbpWebdavPersistPushResult(cfg, result) {
 // .js's testAIProvider, which reads DOM values rather than storage).
 
 async function pbpWebdavPush(cfgOverride) {
-  const cfg = cfgOverride || await _pbpWebdavCfg();
+  let cfg = cfgOverride ? Object.assign({}, cfgOverride) : await _pbpWebdavCfg();
   if (!cfg.baseUrl) return { ok: false, error: "no-url" };
-  const origin = pbpWebdavOrigin(cfg.baseUrl);
-  if (!origin) {
+  const prepared = await pbpWebdavPrepareOperation(cfg);
+  if (!prepared.ok) {
     const result = { ts: Date.now(), ok: false, error: "insecure" };
-    return pbpWebdavPersistPushResult(cfg, result);
+    return pbpWebdavPersistPushResult(cfg, null, result);
   }
+  cfg = prepared.cfg;
+  const target = prepared.target;
+  const origin = pbpWebdavOrigin(target.baseCollectionUrl);
   try {
     const has = await chrome.permissions.contains({ origins: [origin] });
     if (!has) {
       const result = { ts: Date.now(), ok: false, error: "perm" };
-      return pbpWebdavPersistPushResult(cfg, result);
+      return pbpWebdavPersistPushResult(cfg, target, result);
     }
   } catch (_) {
     const result = { ts: Date.now(), ok: false, error: "perm" };
-    return pbpWebdavPersistPushResult(cfg, result);
+    return pbpWebdavPersistPushResult(cfg, target, result);
   }
   try {
-    const ensured = await pbpWebdavEnsureCollection(cfg);
+    const ensured = await pbpWebdavEnsureCollectionPath(cfg, target, target.relativePath);
     if (!ensured.ok) {
-      const result = { ts: Date.now(), ok: false, error: ensured.error };
-      return pbpWebdavPersistPushResult(cfg, result);
+      const result = {
+        ts: Date.now(),
+        ok: false,
+        error: ensured.error,
+        status: ensured.status,
+        stage: ensured.stage,
+      };
+      return pbpWebdavPersistPushResult(cfg, target, result);
     }
     const settings = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
     deobfuscateSettings(settings);
@@ -762,33 +892,45 @@ async function pbpWebdavPush(cfgOverride) {
     }
     const owner = pbpPinboardAccountFromToken(settings.pinboardToken);
     const payload = pbpWebdavBuildPayload(settings, meta, { highlights, highlightsOwner: owner, overlay, savedThemes });
-    const force = cfgOverride && cfgOverride.force === true;
-    const uploaded = await pbpWebdavUploadText(cfg, JSON.stringify(payload), { force });
+    const force = cfg.force === true;
+    const uploaded = await pbpWebdavUploadText(cfg, target, JSON.stringify(payload), { force });
     const result = Object.assign({ ts: Date.now() }, uploaded);
     if (uploaded.error === "http-404") {
       result.error = "not-found";
       try {
-        const dir = await pbpWebdavProbeCollection(cfg, pbpWebdavCollectionUrl(cfg.baseUrl));
+        const dir = await pbpWebdavProbeCollection(cfg, target.backupCollectionUrl);
         if (dir.ok) result.error = "not-writable";
       } catch (_) {}
     }
-    return pbpWebdavPersistPushResult(cfg, result);
+    if (uploaded.ok) {
+      const locator = await pbpWebdavWriteLocator(
+        cfg, target, target.relativePath, target.relativePath);
+      if (!locator.ok) {
+        result.locatorWarning = locator.error;
+        result.locatorStage = locator.stage;
+        result.locatorStatus = locator.status;
+      }
+    }
+    return pbpWebdavPersistPushResult(cfg, target, result);
   } catch (e) {
     const result = { ts: Date.now(), ok: false, error: (e && e.message) || "network" };
-    return pbpWebdavPersistPushResult(cfg, result);
+    return pbpWebdavPersistPushResult(cfg, target, result);
   }
 }
 
 async function pbpWebdavPull(cfgOverride) {
-  const cfg = cfgOverride || await _pbpWebdavCfg();
+  let cfg = cfgOverride ? Object.assign({}, cfgOverride) : await _pbpWebdavCfg();
   if (!cfg.baseUrl) return { ok: false, error: "no-url" };
-  const origin = pbpWebdavOrigin(cfg.baseUrl);
-  if (!origin) return { ok: false, error: "insecure" };
+  const prepared = await pbpWebdavPrepareOperation(cfg);
+  if (!prepared.ok) return { ok: false, error: "insecure" };
+  cfg = prepared.cfg;
+  const target = prepared.target;
+  const origin = pbpWebdavOrigin(target.baseCollectionUrl);
   try {
     const has = await chrome.permissions.contains({ origins: [origin] });
     if (!has) return { ok: false, error: "perm" };
   } catch (_) { return { ok: false, error: "perm" }; }
-  const remote = await pbpWebdavReadRemote(cfg);
+  const remote = await pbpWebdavReadRemote(cfg, target);
   if (!remote.ok) return remote;
   if (!remote.exists) return { ok: false, error: "not-found" };
   return {
@@ -798,32 +940,54 @@ async function pbpWebdavPull(cfgOverride) {
     etag: remote.etag,
     remoteHash: remote.remoteHash,
     settingsHash: remote.settingsHash,
+    target,
   };
 }
 
 async function pbpWebdavTest(cfgOverride) {
-  const cfg = cfgOverride || await _pbpWebdavCfg();
+  let cfg = cfgOverride ? Object.assign({}, cfgOverride) : await _pbpWebdavCfg();
   if (!cfg.baseUrl) return { ok: false, kind: "no-url" };
-  const origin = pbpWebdavOrigin(cfg.baseUrl);
-  if (!origin) return { ok: false, kind: "insecure" };
+  const prepared = await pbpWebdavPrepareOperation(cfg);
+  if (!prepared.ok) return { ok: false, kind: "insecure" };
+  cfg = prepared.cfg;
+  const target = prepared.target;
+  const origin = pbpWebdavOrigin(target.baseCollectionUrl);
   try {
     const has = await chrome.permissions.contains({ origins: [origin] });
     if (!has) return { ok: false, kind: "perm" };
   } catch (_) { return { ok: false, kind: "perm" }; }
   try {
-    const baseCollectionUrl = pbpWebdavCollectionUrl(cfg.baseUrl);
-    const target = { baseCollectionUrl, backupCollectionUrl: baseCollectionUrl, relativePath: "" };
-    const resp = await _pbpWebdavFetch("test", cfg, pbpWebdavFileUrl(cfg.baseUrl));
+    const resp = await _pbpWebdavFetch("test", cfg, target.backupFileUrl);
     if (resp.status === 401 || resp.status === 403) return { ok: false, kind: "auth" };
-    if (resp.status === 404) {
-      const writable = await pbpWebdavProbeWritable(cfg, target);
-      return writable.ok ? { ok: true, kind: "empty" } : { ok: false, kind: writable.error, status: writable.status };
+    if (resp.status !== 404 && !resp.ok) return { ok: false, kind: "unreachable" };
+    const writable = await pbpWebdavProbeWritable(cfg, target);
+    if (!writable.ok) {
+      return {
+        ok: false,
+        kind: writable.error,
+        status: writable.status,
+        stage: writable.stage,
+      };
     }
-    if (resp.ok) {
-      const writable = await pbpWebdavProbeWritable(cfg, target);
-      return writable.ok ? { ok: true, kind: "found" } : { ok: false, kind: writable.error, status: writable.status };
+    const locator = await pbpWebdavWriteLocator(
+      cfg, target, target.relativePath, target.relativePath);
+    if (!locator.ok) {
+      return {
+        ok: false,
+        kind: locator.error,
+        status: locator.status,
+        stage: locator.stage,
+      };
     }
-    return { ok: false, kind: "unreachable" };
+    return Object.assign(
+      { ok: true, kind: resp.status === 404 ? "empty" : "found" },
+      writable.cleanupWarning
+        ? {
+          cleanupWarning: true,
+          cleanupStatus: writable.cleanupStatus,
+        }
+        : {}
+    );
   } catch (_) {
     return { ok: false, kind: "unreachable" };
   }
