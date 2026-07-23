@@ -5,6 +5,7 @@ release/
 !.qa-scan/package.json
 !.qa-scan/package-lock.json
 !.qa-scan/run-test.mjs
+.worktrees/
 
 # Claude Code local state
 .claude/settings.local.json
