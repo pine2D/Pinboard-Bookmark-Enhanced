@@ -53,7 +53,8 @@ function rows(prefix, count, firstTs) {
 }
 function counts(entries) {
   const dict2 = entries.filter((entry) => _pbpAiIsDict2Key(entry.key)).length;
-  return { dict2, other: entries.length - dict2 };
+  const summaryOwner = entries.filter((entry) => _pbpAiIsSummaryOwnerKey(entry.key)).length;
+  return { dict2, summaryOwner, other: entries.length - dict2 - summaryOwner };
 }
 
 (async () => {
@@ -101,6 +102,40 @@ function counts(entries) {
     count = counts(await allEntries());
     assert(count.other === 200 && count.dict2 === 0, "overflow=" + JSON.stringify(count));
     assert(!await rawEntry("tr_test_0"), "oldest other record survived");
+  });
+
+  await test("summary ownership boundary keeps exactly 500 records", async () => {
+    await clearEntries();
+    await seed(rows("summary_owner_alice|url", 499, 1));
+    await pbpAiCacheSet("summary_owner_alice|url499", "new", 500);
+    const count = counts(await allEntries());
+    assert(count.summaryOwner === 500 && count.other === 0 && count.dict2 === 0,
+      JSON.stringify(count));
+  });
+
+  await test("summary ownership record 501 evicts only its oldest receipt", async () => {
+    await clearEntries();
+    await seed(rows("summary_owner_alice|url", 500, 1)
+      .concat(rows("dict2_en|word", 500, 1001), rows("tr_owner_mix_", 200, 2001)));
+    await pbpAiCacheSet("summary_owner_alice|newest", "new", 3001);
+    const count = counts(await allEntries());
+    assert(count.summaryOwner === 500 && count.dict2 === 500 && count.other === 200,
+      JSON.stringify(count));
+    assert(!await rawEntry("summary_owner_alice|url0"), "oldest receipt survived");
+    assert(await rawEntry("dict2_en|word0"), "receipt overflow evicted dict2");
+    assert(await rawEntry("tr_owner_mix_0"), "receipt overflow evicted ordinary cache");
+  });
+
+  await test("other-cache overflow does not evict summary ownership receipts", async () => {
+    await clearEntries();
+    await seed(rows("summary_owner_bob|url", 500, 1)
+      .concat(rows("ask_owner_mix_", 200, 1001)));
+    await pbpAiCacheSet("skim_owner_newest", "new", 2001);
+    const count = counts(await allEntries());
+    assert(count.summaryOwner === 500 && count.other === 200,
+      JSON.stringify(count));
+    assert(await rawEntry("summary_owner_bob|url0"), "ordinary overflow evicted receipt");
+    assert(!await rawEntry("ask_owner_mix_0"), "oldest ordinary cache survived");
   });
 
   await test("other-cache write older than every existing ts evicts itself", async () => {

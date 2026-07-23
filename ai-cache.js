@@ -12,6 +12,8 @@ const _PBP_AI_STORE = "entries";
 const _PBP_AI_CACHE_MAX_ENTRIES = 200;
 const _PBP_AI_DICT2_MAX_ENTRIES = 500;
 const _PBP_AI_DICT2_PREFIX = "dict2_";
+const _PBP_AI_SUMMARY_OWNER_MAX_ENTRIES = 500;
+const _PBP_AI_SUMMARY_OWNER_PREFIX = "summary_owner_";
 let _pbpAiDbPromise = null;
 
 function _pbpAiOpenDB() {
@@ -97,11 +99,29 @@ function _pbpAiIsDict2Key(key) {
   return typeof key === "string" && key.startsWith(_PBP_AI_DICT2_PREFIX);
 }
 
-function _pbpAiDict2Range() {
-  return IDBKeyRange.bound(_PBP_AI_DICT2_PREFIX, _PBP_AI_DICT2_PREFIX + "\uffff");
+function _pbpAiIsSummaryOwnerKey(key) {
+  return typeof key === "string" && key.startsWith(_PBP_AI_SUMMARY_OWNER_PREFIX);
 }
 
-function _pbpAiDeleteOldestInPool(store, overflow, dict2Pool) {
+function _pbpAiPoolForKey(key) {
+  if (_pbpAiIsDict2Key(key)) return "dict2";
+  if (_pbpAiIsSummaryOwnerKey(key)) return "summary-owner";
+  return "other";
+}
+
+function _pbpAiPrefixRange(prefix) {
+  return IDBKeyRange.bound(prefix, prefix + "\uffff");
+}
+
+function _pbpAiDict2Range() {
+  return _pbpAiPrefixRange(_PBP_AI_DICT2_PREFIX);
+}
+
+function _pbpAiSummaryOwnerRange() {
+  return _pbpAiPrefixRange(_PBP_AI_SUMMARY_OWNER_PREFIX);
+}
+
+function _pbpAiDeleteOldestInPool(store, overflow, pool) {
   if (overflow <= 0) return;
   const cursorReq = store.index("ts").openCursor(); // ASC by ts (oldest first)
   let deleted = 0;
@@ -109,7 +129,7 @@ function _pbpAiDeleteOldestInPool(store, overflow, dict2Pool) {
     const cursor = cursorReq.result;
     if (!cursor || deleted >= overflow) return;
     const entryKey = cursor.value && cursor.value.key;
-    if (_pbpAiIsDict2Key(entryKey) === dict2Pool) {
+    if (_pbpAiPoolForKey(entryKey) === pool) {
       cursor.delete();
       deleted++;
     }
@@ -118,29 +138,37 @@ function _pbpAiDeleteOldestInPool(store, overflow, dict2Pool) {
 }
 
 function _pbpAiPruneWrittenPool(store, key) {
-  const dict2Pool = _pbpAiIsDict2Key(key);
-  if (dict2Pool) {
-    const countReq = store.count(_pbpAiDict2Range());
+  const pool = _pbpAiPoolForKey(key);
+  if (pool === "dict2" || pool === "summary-owner") {
+    const range = pool === "dict2" ? _pbpAiDict2Range() : _pbpAiSummaryOwnerRange();
+    const max = pool === "dict2"
+      ? _PBP_AI_DICT2_MAX_ENTRIES
+      : _PBP_AI_SUMMARY_OWNER_MAX_ENTRIES;
+    const countReq = store.count(range);
     countReq.onsuccess = () => {
-      _pbpAiDeleteOldestInPool(store,
-        (countReq.result || 0) - _PBP_AI_DICT2_MAX_ENTRIES, true);
+      _pbpAiDeleteOldestInPool(store, (countReq.result || 0) - max, pool);
     };
     return;
   }
 
   let totalCount = 0;
   let dict2Count = 0;
-  let pending = 2;
+  let summaryOwnerCount = 0;
+  let pending = 3;
   const prune = () => {
     pending--;
     if (pending !== 0) return;
     _pbpAiDeleteOldestInPool(store,
-      Math.max(0, totalCount - dict2Count) - _PBP_AI_CACHE_MAX_ENTRIES, false);
+      Math.max(0, totalCount - dict2Count - summaryOwnerCount)
+        - _PBP_AI_CACHE_MAX_ENTRIES,
+      "other");
   };
   const totalReq = store.count();
   totalReq.onsuccess = () => { totalCount = totalReq.result || 0; prune(); };
   const dict2Req = store.count(_pbpAiDict2Range());
   dict2Req.onsuccess = () => { dict2Count = dict2Req.result || 0; prune(); };
+  const ownerReq = store.count(_pbpAiSummaryOwnerRange());
+  ownerReq.onsuccess = () => { summaryOwnerCount = ownerReq.result || 0; prune(); };
 }
 
 // One store-scoped readwrite transaction owns the final write, target-pool
