@@ -801,6 +801,18 @@ async function pbpWebdavProbeWritable(cfg, target) {
 // doesn't hand in a live-DOM override). The password is credential-routed and
 // obfuscated at rest; URL/username are ordinary settings stored in plaintext
 // (deobfuscateKey passes them through, healing transitional obf-wrapped values).
+function pbpWebdavCfgFromSettings(settings) {
+  const s = settings || {};
+  return {
+    baseUrl: deobfuscateKey(s.webdavUrl || ""),
+    user: deobfuscateKey(s.webdavUser || ""),
+    pass: deobfuscateKey(s.webdavPass || ""),
+    folderMode: s.webdavFolderMode === "custom" ? "custom" : "managed",
+    relativePath: String(s.webdavRelativePath || ""),
+    layoutVersion: Number(s.webdavLayoutVersion || 0),
+  };
+}
+
 async function _pbpWebdavCfg() {
   const s = await pbpReadSettingsWithSecrets({
     webdavUrl: "",
@@ -810,14 +822,7 @@ async function _pbpWebdavCfg() {
     webdavRelativePath: "",
     webdavLayoutVersion: 0,
   });
-  return {
-    baseUrl: deobfuscateKey(s.webdavUrl || ""),
-    user: deobfuscateKey(s.webdavUser || ""),
-    pass: deobfuscateKey(s.webdavPass || ""),
-    folderMode: s.webdavFolderMode === "custom" ? "custom" : "managed",
-    relativePath: String(s.webdavRelativePath || ""),
-    layoutVersion: Number(s.webdavLayoutVersion || 0),
-  };
+  return pbpWebdavCfgFromSettings(s);
 }
 
 async function pbpWebdavPersistPushResult(cfg, target, result) {

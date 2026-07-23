@@ -1475,7 +1475,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     // schedule because a stale alarm may fire while its async clear is pending.
     invalidateSettingsCache();
     loadSettings().then((settings) =>
-      pbpWebdavAutoPushPeriod(settings) > 0 ? pbpWebdavPush() : undefined
+      pbpWebdavAutoPushPeriod(settings) > 0
+        ? pbpWebdavPush(pbpWebdavCfgFromSettings(settings))
+        : undefined
     ).catch(() => {});
   }
 });
