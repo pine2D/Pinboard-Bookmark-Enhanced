@@ -175,8 +175,8 @@ function _pbpAiPruneWrittenPool(store, key) {
 // count, and ts-LRU pruning. IndexedDB serializes these transactions across
 // connections/tabs, so concurrent writers cannot observe the same overflow
 // and delete it repeatedly. Versioned online dictionary records (exact
-// `dict2_` prefix) have a 500-entry pool; aliases each consume one record.
-// Every other family, including dictctx2_ and legacy dict_, shares 200.
+// `dict2_` prefix) and `summary_owner_` receipts each have independent
+// 500-entry pools; every other family shares 200.
 // `makeResult` is synchronous; append passes the latest value read inside this
 // same transaction, preserving its existing no-lost-update guarantee.
 async function _pbpAiWriteAndPrune(key, makeResult, ts, readExisting) {

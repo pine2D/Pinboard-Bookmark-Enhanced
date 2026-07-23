@@ -515,11 +515,9 @@ function setupAIFeatures() {
   // checkExistingBookmark (popup.js) restores the user's saved `extended` — we
   // must not race it (lost summary) or append on top (duplicate summary).
   const restoreAccount = pbpPopupAiAccount();
-  Promise.all([
-    getAICache(pageInfo.url, "summary", settings.aiCacheDuration,
-      settings.aiContentSource, restoreAccount, settings),
-    _aiAwaitBookmarkLookup()
-  ]).then(async ([cached]) => {
+  getAICache(pageInfo.url, "summary", settings.aiCacheDuration,
+    settings.aiContentSource, restoreAccount, settings).then(async (cached) => {
+    await _aiAwaitBookmarkLookup();
     if (!_aiOpStillCurrent(restoreAccount)) return;
     if (existingBookmark) {
       await _aiRestoreSummaryOwnership(restoreAccount, pageInfo.url, cached);
@@ -574,7 +572,9 @@ async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
     return "session";
   }
 
-  const receiptRange = await pbpAiLoadSummaryOwnership(account, url, value);
+  const receiptRange = existingBookmark && value === existingBookmark.extended
+    ? await pbpAiLoadSummaryOwnership(account, url, value)
+    : null;
   if (!_aiOpStillCurrent(account) || input.value !== value) return null;
   if (receiptRange && _aiAdoptSummaryRange(value, receiptRange, false)) return "receipt";
 

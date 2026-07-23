@@ -602,6 +602,52 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "restore guard must run AFTER the lookup settles");
     });
 
+    await testAsync("cached summary initialization waits for a lookup started after setup", async () => {
+      const lookupStart = popupAiSource.indexOf("async function _aiAwaitBookmarkLookup");
+      const lookupEnd = popupAiSource.indexOf("function _aiOpStillCurrent", lookupStart);
+      const blockStart = popupAiSource.indexOf("  const restoreAccount = pbpPopupAiAccount();");
+      const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
+      assert(lookupStart >= 0 && lookupEnd > lookupStart && blockStart >= 0 && blockEnd > blockStart,
+        "cached-summary initialization source not found");
+      const events = [];
+      const start = new Function(
+        "pbpPopupAiAccount", "getAICache", "pageInfo", "settings", "_aiOpStillCurrent",
+        "_aiRestoreSummaryOwnership", "pbpShouldRestoreCachedSummary", "$id",
+        "upsertSummary", "showSummaryActions",
+        "let bookmarkLookup = { promise: null }; let existingBookmark = null;" +
+        popupAiSource.slice(lookupStart, lookupEnd) +
+        "function start() {" + popupAiSource.slice(blockStart, blockEnd) + "}" +
+        "start(); return {" +
+        " installLookup(promise) { bookmarkLookup = { promise }; }," +
+        " setExisting(bookmark) { existingBookmark = bookmark; }" +
+        "};"
+      )(
+        () => "alice",
+        () => Promise.resolve("cached"),
+        { url: URL },
+        { aiCacheDuration: 60, aiContentSource: "local" },
+        () => true,
+        async () => { events.push("restore"); },
+        () => true,
+        () => ({ value: "" }),
+        () => { events.push("upsert"); },
+        () => {}
+      );
+      let resolveLookup;
+      const lookup = new Promise((resolve) => { resolveLookup = resolve; });
+      start.installLookup(lookup);
+      await Promise.resolve();
+      await Promise.resolve();
+      const beforeLookup = events.slice();
+      start.setExisting({ extended: "saved notes" });
+      resolveLookup({ status: "found" });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      assert(beforeLookup.length === 0,
+        "cached summary restore ran before the newly-started lookup: " + beforeLookup.join(","));
+      assert(events.join(",") === "restore",
+        "existing bookmark did not restore ownership after lookup: " + events.join(","));
+    });
+
     test("AI ops run on immutable settings snapshots - no global provider mutation (A4)", () => {
       assert(!popupAiSource.includes("settings.aiProvider = "), "global settings.aiProvider mutation must be gone");
       assert(popupAiSource.includes("const s = { ...(sOverride || settings) }"), "op-level snapshot missing");
@@ -770,7 +816,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const api = new Function(
         "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
         "crypto", "TextEncoder", "_AI_BQ_REGEX_SHARED", "URL", "$id",
-        "pbpPopupAiAccountIsCurrent", "pageInfo", "escapeForExtended",
+        "pbpPopupAiAccountIsCurrent", "pageInfo", "existingBookmark", "escapeForExtended",
         "showSummaryActions", "loadReceipt",
         popupAiSource.slice(start, end) +
         "; async function pbpAiLoadSummaryOwnership(account, url, value) {" +
@@ -789,6 +835,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         (id) => id === "description-input" ? field : urlField,
         (account) => account === "alice" && state.accountCurrent,
         { url: URL },
+        options.existingBookmark || null,
         (value) => value,
         (fromCache) => actions.push(fromCache),
         loadReceipt
@@ -881,6 +928,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(session.actions.join(",") === "false", "session restore used cache UI");
 
       const receipt = summaryRestoreRuntime("<blockquote>receipt</blockquote>", {
+        existingBookmark: { extended: "<blockquote>receipt</blockquote>" },
         receipt: { start: 0, end: "<blockquote>receipt</blockquote>".length }
       });
       assert(await receipt.restore("alice", URL, "receipt") === "receipt",
@@ -900,6 +948,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       for (const stale of ["textarea", "account", "url"]) {
         const h = summaryRestoreRuntime("<blockquote>receipt</blockquote>", {
           delayed: true,
+          existingBookmark: { extended: "<blockquote>receipt</blockquote>" },
           receipt: { start: 0, end: "<blockquote>receipt</blockquote>".length }
         });
         const pending = h.restore("alice", URL, "receipt");
@@ -910,6 +959,36 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(await pending === null && h.actions.length === 0,
           `${stale} change retained stale ownership`);
       }
+    });
+
+    await testAsync("saved bookmark text still restores its ownership receipt", async () => {
+      const description = "<blockquote>saved summary</blockquote>";
+      const h = summaryRestoreRuntime(description, {
+        existingBookmark: { extended: description },
+        receipt: { start: 0, end: description.length }
+      });
+      assert(await h.restore("alice", URL, "saved summary") === "receipt",
+        "matching saved text did not adopt its receipt");
+      assert(h.loadCalls === 1, "matching saved text skipped receipt lookup");
+    });
+
+    await testAsync("local drafts skip receipt lookup and retain legacy/cache fallback", async () => {
+      const existingBookmark = { extended: "remote saved notes" };
+      const legacy = summaryRestoreRuntime("[AI Summary]\n<blockquote>local draft</blockquote>", {
+        existingBookmark,
+        receipt: { start: 0, end: 1 }
+      });
+      assert(await legacy.restore("alice", URL, "different cache") === "legacy",
+        "local draft did not retain legacy fallback");
+      assert(legacy.loadCalls === 0, "local draft reached the receipt loader");
+
+      const cached = summaryRestoreRuntime("<blockquote>cached draft</blockquote>", {
+        existingBookmark,
+        receipt: { start: 0, end: 1 }
+      });
+      assert(await cached.restore("alice", URL, "cached draft") === "cache",
+        "local draft did not retain exact-cache fallback");
+      assert(cached.loadCalls === 0, "exact-cache draft reached the receipt loader");
     });
 
     test("editing before a tracked summary shifts both range edges", () => {
