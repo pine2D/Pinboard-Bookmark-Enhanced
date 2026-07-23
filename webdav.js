@@ -7,6 +7,9 @@
 // ============================================================
 
 const PBP_WEBDAV_FILENAME = "pinboard-bookmark-enhanced-settings.json";
+const PBP_WEBDAV_APP_COLLECTION = "pinboard-bookmark-enhanced";
+const PBP_WEBDAV_LOCATOR_FILENAME = "location.json";
+const PBP_WEBDAV_LAYOUT_VERSION = 2;
 const PBP_WEBDAV_WRITE_TEST_PREFIX = "pinboard-bookmark-enhanced-write-test-";
 const PBP_WEBDAV_SYNC_STATE_KEY = "_webdavSyncState";
 const PBP_WEBDAV_AUTO_PUSH_KEY = "webdavAutoPush";
@@ -54,6 +57,33 @@ async function pbpWebdavTargetId(cfg) {
   const target = pbpWebdavFileUrl(cfg && cfg.baseUrl);
   if (!target) return "";
   return pbpWebdavSha256(target + "\n" + String(cfg && cfg.user || ""));
+}
+
+function pbpWebdavNormalizeRelativePath(value) {
+  const raw = String(value == null ? "" : value).trim().replace(/\/+$/, "");
+  if (!raw) return { ok: false, error: "empty" };
+  if (/^[a-z][a-z\d+.-]*:/i.test(raw) || raw.startsWith("/")) {
+    return { ok: false, error: "absolute" };
+  }
+  if (raw.includes("\\") || raw.includes("?") || raw.includes("#")) {
+    return { ok: false, error: "separator" };
+  }
+  const segments = raw.split("/");
+  if (segments.some((segment) => !segment)) return { ok: false, error: "segment" };
+  for (const segment of segments) {
+    let decoded;
+    try { decoded = decodeURIComponent(segment); }
+    catch (_) { return { ok: false, error: "encoding" }; }
+    if (!decoded || decoded === "." || decoded === ".." ||
+        decoded.includes("/") || decoded.includes("\\")) {
+      return { ok: false, error: "segment" };
+    }
+  }
+  return {
+    ok: true,
+    value: segments.map((segment) => decodeURIComponent(segment)).join("/") + "/",
+    encoded: segments.map((segment) => encodeURIComponent(decodeURIComponent(segment))).join("/") + "/",
+  };
 }
 
 function pbpWebdavEmptyState() {
@@ -314,6 +344,56 @@ function pbpWebdavCollectionFileUrl(baseUrl, name) {
 
 function pbpWebdavTargetCollectionUrl(baseUrl) {
   return pbpWebdavCollectionUrl(baseUrl);
+}
+
+function pbpWebdavAppendRelativeCollection(baseUrl, encodedPath) {
+  const base = pbpWebdavCollectionUrl(baseUrl);
+  if (!base) return "";
+  const url = new URL(base);
+  url.pathname += encodedPath;
+  return url.href;
+}
+
+function pbpWebdavResolveTarget(cfg) {
+  cfg = cfg || {};
+  const baseCollectionUrl = pbpWebdavCollectionUrl(cfg.baseUrl);
+  if (!baseCollectionUrl || !pbpWebdavOrigin(baseCollectionUrl)) {
+    return { ok: false, error: "base-url" };
+  }
+
+  let folderMode = cfg.folderMode === "custom" ? "custom" : "managed";
+  const path = folderMode === "custom"
+    ? pbpWebdavNormalizeRelativePath(cfg.relativePath)
+    : pbpWebdavNormalizeRelativePath(PBP_WEBDAV_APP_COLLECTION);
+  if (!path.ok) return { ok: false, error: "relative-path", pathError: path.error };
+  if (path.value === PBP_WEBDAV_APP_COLLECTION + "/") folderMode = "managed";
+
+  const appPath = PBP_WEBDAV_APP_COLLECTION + "/";
+  const locatorCollectionUrl = pbpWebdavAppendRelativeCollection(baseCollectionUrl, appPath);
+  const backupCollectionUrl = pbpWebdavAppendRelativeCollection(baseCollectionUrl, path.encoded);
+  const backupFileUrl = pbpWebdavCollectionFileUrl(backupCollectionUrl, PBP_WEBDAV_FILENAME);
+  return {
+    ok: true,
+    folderMode,
+    relativePath: path.value,
+    encodedRelativePath: path.encoded,
+    baseCollectionUrl,
+    locatorCollectionUrl,
+    locatorFileUrl: pbpWebdavCollectionFileUrl(locatorCollectionUrl, PBP_WEBDAV_LOCATOR_FILENAME),
+    backupCollectionUrl,
+    backupFileUrl,
+  };
+}
+
+async function pbpWebdavFreezeTarget(cfg) {
+  const target = pbpWebdavResolveTarget(cfg);
+  if (!target.ok) return target;
+  return Object.assign(target, {
+    targetId: await pbpWebdavSha256(
+      target.backupFileUrl + "\n" + String(cfg && cfg.user || "")
+    ),
+    user: String(cfg && cfg.user || ""),
+  });
 }
 
 // Basic auth header value, or null when there is nothing to authenticate

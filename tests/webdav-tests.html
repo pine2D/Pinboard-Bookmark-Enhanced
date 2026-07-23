@@ -52,6 +52,47 @@ assertEq(pbpWebdavFileUrl("https://dav.example.com/dav#fragment"), "",
   "fragment-bearing target is rejected because fragments never reach WebDAV");
 assertEq(pbpWebdavFileUrl(null), "", "null -> empty string, no throw");
 
+section("WebDAV folder target resolution");
+{
+  const managed = pbpWebdavResolveTarget({
+    baseUrl: "https://dav.example.com/dav/?token=x",
+    folderMode: "managed",
+    relativePath: "",
+  });
+  check("managed mode resolves the dedicated app collection",
+    managed.ok &&
+    managed.backupCollectionUrl === "https://dav.example.com/dav/pinboard-bookmark-enhanced/?token=x" &&
+    managed.backupFileUrl === "https://dav.example.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-settings.json?token=x");
+
+  const custom = pbpWebdavResolveTarget({
+    baseUrl: "https://dav.example.com/dav/",
+    folderMode: "custom",
+    relativePath: "Backups/读书/",
+  });
+  check("custom mode encodes each path segment",
+    custom.ok &&
+    custom.relativePath === "Backups/读书/" &&
+    custom.backupCollectionUrl === "https://dav.example.com/dav/Backups/%E8%AF%BB%E4%B9%A6/");
+
+  check("a full URL is rejected",
+    pbpWebdavNormalizeRelativePath("https://other.example/x").error === "absolute");
+  check("a leading slash is rejected",
+    pbpWebdavNormalizeRelativePath("/Backups/Pinboard").error === "absolute");
+  check("raw traversal is rejected",
+    pbpWebdavNormalizeRelativePath("Backups/../Pinboard").error === "segment");
+  check("encoded traversal is rejected",
+    pbpWebdavNormalizeRelativePath("Backups/%2e%2e/Pinboard").error === "segment");
+  check("encoded slash or backslash is rejected",
+    !pbpWebdavNormalizeRelativePath("Backups/a%2fb").ok &&
+    !pbpWebdavNormalizeRelativePath("Backups/a%5cb").ok);
+  check("the default custom path normalizes to managed mode",
+    pbpWebdavResolveTarget({
+      baseUrl: "https://dav.example.com/dav/",
+      folderMode: "custom",
+      relativePath: "pinboard-bookmark-enhanced",
+    }).folderMode === "managed");
+}
+
 section("pbpWebdavAuthHeader");
 assertEq(pbpWebdavAuthHeader("", ""), null, "empty user + empty pass -> null (no header)");
 assertEq(pbpWebdavAuthHeader("bob", "secret"), "Basic " + btoa("bob:secret"), "user+pass -> Basic base64(user:pass)");
