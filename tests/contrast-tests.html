@@ -15,6 +15,10 @@
   <div class="ac-item"><span>tag</span><span class="ac-count" id="acc">12</span></div>
   <div class="ac-hint-footer" id="ach">hint</div>
 </div>
+<div id="hover-surface-probes" style="position:fixed;left:-9999px;top:0">
+  <div class="confirm-popover"><span class="confirm-msg">Delete?</span><button class="confirm-yes">Delete</button><button class="confirm-no">Cancel</button></div>
+  <div class="del-confirm-popover"><span>Delete?</span><button>Cancel</button></div>
+</div>
 <script>
 function pass(name){const d=document.createElement("div");d.className="case pass";d.textContent="OK "+name;document.getElementById("results").appendChild(d);}
 function fail(name,msg){const d=document.createElement("div");d.className="case fail";d.textContent="X "+name+" :: "+msg;document.getElementById("results").appendChild(d);}
@@ -133,5 +137,35 @@ test("F1 dark --pp-fg meets AA on --pp-bg", () => withDark(() => {
   const r = varPairRatio("--pp-fg", "--pp-bg");
   if (r < 4.5) throw new Error("fg on bg " + r.toFixed(2) + ":1 < 4.5:1");
 }));
+test("hover and confirm surfaces stay readable across every shipped UI theme variant", () => {
+  const themes = ["github-light", "nord-night", "terminal", "modern-card", "paper-ink",
+    "dracula", "flexoki-light", "flexoki-dark", "solarized-light", "solarized-dark",
+    "catppuccin-latte", "catppuccin-mocha", "gruvbox-dark", "rose-pine"];
+  const failures = [];
+  try {
+    for (const theme of themes) {
+      document.documentElement.dataset.theme = theme;
+      for (const [fgSel, bgSel] of [
+        [".confirm-msg", ".confirm-popover"],
+        [".confirm-yes", ".confirm-yes"],
+        [".confirm-no", ".confirm-popover"],
+        [".del-confirm-popover", ".del-confirm-popover"],
+        [".del-confirm-popover button", ".del-confirm-popover button"]
+      ]) {
+        const fgEl = document.querySelector("#hover-surface-probes " + fgSel);
+        const bgEl = document.querySelector("#hover-surface-probes " + bgSel);
+        const fg = getComputedStyle(fgEl).color;
+        const bgStyle = getComputedStyle(bgEl);
+        const bg = bgStyle.backgroundColor;
+        const r = /^rgb/.test(bg) && bg !== "rgba(0, 0, 0, 0)" ? ratio(fg, bg) : 0;
+        if (bgStyle.borderTopWidth === "0px" || r < 4.5)
+          failures.push(`${theme}/${fgSel}:${r.toFixed(2)}`);
+      }
+    }
+  } finally {
+    document.documentElement.removeAttribute("data-theme");
+  }
+  if (failures.length) throw new Error(failures.slice(0, 12).join(", "));
+});
 </script>
 </body></html>

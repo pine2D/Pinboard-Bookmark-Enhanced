@@ -1995,8 +1995,9 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
    never becomes a misleading focus target in original/bilingual view. */
 #rendered-view .pb-tr[role="button"]:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
-/* Per-block failure pill: inline SVG + retry label; title carries the error. */
+/* Per-block failure pill: inline SVG + retry label; hover/focus exposes the reason. */
 .pb-tr-err {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2010,6 +2011,38 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
   cursor: pointer;
 }
 .pb-tr-err svg { width: 13px; height: 13px; flex-shrink: 0; }
+.pb-tr-err::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+  font-size: 12px;
+  font-weight: normal;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  opacity: 0;
+  visibility: hidden;
+  translate: 0 2px;
+  pointer-events: none;
+  transition: opacity 140ms var(--motion-ease), translate 140ms var(--motion-ease);
+}
+.pb-tr-err:hover::after,
+.pb-tr-err:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  translate: 0 0;
+}
 /* D8-4: swapping to --btn-hover dropped --danger text under AA (worst case
    3.74:1 dark). Background stays transparent (rest-state contrast already
    clears AA); hover cue is a currentColor ring instead. */

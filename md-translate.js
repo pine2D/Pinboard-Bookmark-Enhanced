@@ -1439,8 +1439,8 @@ function _pbpTrFill(st, w, shieldedTranslation) {
   if (typeof window.pbpHlReanchorTr === "function") { try { window.pbpHlReanchorTr(w.n); } catch (_) {} }
 }
 
-// Per-block failure: inline error pill after the block. Hover (title) shows
-// the error; click retries this single block.
+// Per-block failure: inline error pill after the block. Hover/focus shows the
+// error; click retries this single block.
 function _pbpTrMarkFailed(st, w, message) {
   const orig = pbpAiBlockEl(w.n);
   if (!orig) return;
@@ -1451,10 +1451,8 @@ function _pbpTrMarkFailed(st, w, message) {
   btn.type = "button";
   btn.className = "pb-tr-err";
   btn.dataset.pbTrErr = String(w.n);
-  btn.title = t("trBlockFailed") + " - " + String(message || "");
-  // title only surfaces on hover: keyboard/touch/SR users need the reason in
-  // the accessible name too (audit md-translate.js:911).
-  btn.setAttribute("aria-label", btn.title);
+  btn.dataset.tip = t("trBlockFailed") + " - " + String(message || "");
+  btn.setAttribute("aria-label", btn.dataset.tip);
   btn.innerHTML = PBP_TR_ERR_SVG;                   // static inline SVG only
   const lab = document.createElement("span");
   lab.textContent = t("trRetryBlock");
@@ -1494,8 +1492,8 @@ function _pbpTrMarkPartial(st, w) {
   btn.type = "button";
   btn.className = "pb-tr-err";
   btn.dataset.pbTrErr = String(w.n);
-  btn.title = t("trBlockFailed");
-  btn.setAttribute("aria-label", btn.title);
+  btn.dataset.tip = t("trBlockFailed");
+  btn.setAttribute("aria-label", btn.dataset.tip);
   btn.innerHTML = PBP_TR_ERR_SVG;
   const lab = document.createElement("span");
   lab.textContent = t("trRetryBlock");
@@ -1585,8 +1583,8 @@ async function _pbpTrRetryBlock(st, w, btn) {
     if (e && e.code === "host_permission") st.permissionError = e;
     if (label) label.textContent = t(e && e.code === "host_permission" ? "aiGrantRetry" : "trRetryBlock");
     btn.disabled = false;
-    btn.title = t("trBlockFailed") + " - " + String((e && e.message) || "");
-    btn.setAttribute("aria-label", btn.title);
+    btn.dataset.tip = t("trBlockFailed") + " - " + String((e && e.message) || "");
+    btn.setAttribute("aria-label", btn.dataset.tip);
   } finally {
     window.removeEventListener("pagehide", onHide);
   }

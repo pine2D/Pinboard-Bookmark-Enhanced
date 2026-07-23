@@ -12,6 +12,19 @@ function report(name, error) {
 }
 async function test(name, fn) { try { await fn(); report(name); } catch (error) { report(name, error); } }
 function assert(condition, message) { if (!condition) throw new Error(message); }
+function contrastRatio(fg, bg) {
+  const rgb = (value) => {
+    const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (!match) throw new Error(`unresolved color: ${value}`);
+    return match.slice(1, 4).map(Number);
+  };
+  const luminance = (value) => rgb(value).map((channel) => {
+    channel /= 255;
+    return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+  }).reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  const values = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
 const LOCALES = ["en", "de", "fr", "pl", "ru", "zh_HK", "zh_CN", "zh_TW", "ja"];
 async function loadMessages() {
   const out = {};
@@ -77,6 +90,41 @@ function assertLayout(frame, locale) {
         await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
         assertLayout(frame, locale);
       }
+    } finally { frame.remove(); }
+  });
+  await test("reader hover and popover surfaces stay readable in light and dark mode", async () => {
+    const frame = await makeFrame(420);
+    try {
+      const doc = frame.contentDocument;
+      const probes = document.createElement("div");
+      probes.innerHTML = [
+        '<div id="ask-tip" style="display:block">Citation</div>',
+        '<div id="pb-hl-bar" style="display:flex">Highlight</div>',
+        '<div id="pb-hl-card" style="display:flex">Note</div>',
+        '<div id="fn-pop" style="display:flex">Footnote</div>',
+        '<div id="search-pop" style="display:flex">Search</div>',
+        '<div id="kbd-help-pop" style="display:flex">Shortcuts</div>',
+        '<div id="typo-pop" style="display:flex">Typography</div>',
+        '<button class="pb-tr-err" data-tip="Translation failed">Retry</button>'
+      ].join("");
+      doc.body.appendChild(probes);
+      const failures = [];
+      for (const mode of ["light", "dark"]) {
+        doc.documentElement.style.colorScheme = mode;
+        await new Promise((resolve) => frame.contentWindow.requestAnimationFrame(resolve));
+        for (const selector of ["#ask-tip", "#pb-hl-bar", "#pb-hl-card", "#fn-pop",
+          "#search-pop", "#kbd-help-pop", "#typo-pop"]) {
+          const style = frame.contentWindow.getComputedStyle(doc.querySelector(selector));
+          const ratio = contrastRatio(style.color, style.backgroundColor);
+          if (style.borderTopWidth === "0px" || ratio < 4.5)
+            failures.push(`${mode}/${selector}:${ratio.toFixed(2)}`);
+        }
+        const tip = frame.contentWindow.getComputedStyle(doc.querySelector(".pb-tr-err"), "::after");
+        const tipRatio = contrastRatio(tip.color, tip.backgroundColor);
+        if (tip.content === "none" || tip.borderTopWidth === "0px" || tipRatio < 4.5)
+          failures.push(`${mode}/.pb-tr-err::after:${tipRatio.toFixed(2)}`);
+      }
+      assert(failures.length === 0, failures.join(", "));
     } finally { frame.remove(); }
   });
 })();

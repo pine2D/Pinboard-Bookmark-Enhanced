@@ -1365,7 +1365,7 @@
     "message": "Zapisz jako motyw"
   },
   "saveAsThemeHint": {
-    "message": "Zapisz bieżący CSS jako motyw wielokrotnego użytku."
+    "message": "Najpierw zmodyfikuj niestandardową nakładkę CSS. Potem możesz zapisać ją jako motyw."
   },
   "customCSSPlaceholder": {
     "message": "/* Niestandardowy CSS dla pinboard.in */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
@@ -2009,7 +2009,7 @@
     "message": "Nigdy nie archiwizuj w archive.org zakładek zapisanych jako prywatne"
   },
   "waybackPermDenied": {
-    "message": "Brakuje uprawnienia dla web.archive.org — włącz archiwizację ponownie, aby je przyznać."
+    "message": "U góry tej strony wyłącz, a następnie ponownie włącz opcję „Archiwizuj zapisane strony w Internet Archive”, aby ponownie poprosić o uprawnienie do web.archive.org."
   },
   "archiveThisSave": {
     "message": "archiwizuj"

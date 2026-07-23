@@ -1365,7 +1365,7 @@
     "message": "Save as theme"
   },
   "saveAsThemeHint": {
-    "message": "Save current CSS as a reusable theme."
+    "message": "Modify Custom CSS to enable saving it as a reusable theme."
   },
   "customCSSPlaceholder": {
     "message": "/* Custom CSS for pinboard.in */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
@@ -2009,7 +2009,7 @@
     "message": "Never archive bookmarks you save as private"
   },
   "waybackPermDenied": {
-    "message": "Permission for web.archive.org is missing. Turn archiving on again to grant it."
+    "message": "At the top of this page, turn “Archive saved pages to the Wayback Machine” off and back on to request permission for web.archive.org again."
   },
   "archiveThisSave": {
     "message": "archive"

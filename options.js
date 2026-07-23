@@ -3736,6 +3736,7 @@ async function renderWaybackLog() {
     const outcome = (typeof entry.outcome === "string") ? entry.outcome : "";
     let outcomeText;
     let showRetry = false;
+    let showPermissionHelp = false;
     if (outcome === "requested") {
       outcomeText = t("archiveOutcomeRequested");
     } else if (outcome.startsWith("job:")) {
@@ -3747,7 +3748,7 @@ async function renderWaybackLog() {
       outcomeText = t("archiveOutcomeSkippedPrivate");
     } else if (outcome === "permDenied") {
       outcomeText = t("archiveOutcomePermMissing");
-      outcomeEl.title = t("waybackPermDenied");
+      showPermissionHelp = true;
     } else if (outcome === "rate-limited") {
       outcomeText = t("archiveOutcomeRateLimited");
       outcomeEl.title = t("archiveErrRateLimited");
@@ -3768,10 +3769,33 @@ async function renderWaybackLog() {
       outcomeText = outcome;
     }
     outcomeEl.textContent = outcomeText;
+    const outcomeWrap = document.createElement("span");
+    outcomeWrap.className = "wayback-log-outcome-wrap";
+    outcomeWrap.appendChild(outcomeEl);
 
     row.appendChild(urlEl);
     row.appendChild(timeEl);
-    row.appendChild(outcomeEl);
+    row.appendChild(outcomeWrap);
+
+    if (showPermissionHelp) {
+      const help = document.createElement("button");
+      help.type = "button";
+      help.className = "wayback-perm-help";
+      help.setAttribute("aria-label", t("waybackPermDenied"));
+      help.innerHTML = PBP_ICONS.warning;
+      help.addEventListener("click", () => {
+        const target = $id("opt-wayback-enabled");
+        target?.scrollIntoView({ block: "center", behavior: "smooth" });
+        target?.focus({ preventScroll: true });
+      });
+      outcomeWrap.appendChild(help);
+
+      const tip = document.createElement("span");
+      tip.className = "wayback-perm-tip";
+      tip.setAttribute("role", "note");
+      tip.textContent = t("waybackPermDenied");
+      row.appendChild(tip);
+    }
 
     if (showRetry && entry.url) {
       const btn = document.createElement("button");

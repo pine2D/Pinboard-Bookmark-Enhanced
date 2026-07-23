@@ -191,6 +191,38 @@ check(mdTranslateJs.includes('const targetCode = plan.targetCode || ""') &&
   mdTranslateJs.includes("pbpTrLengthRatioOk(split.chunks[i], got, st.target.code)") &&
   /pbpTrRunQueue\(\{[\s\S]{0,140}targetCode:\s*st\.target\.code/.test(mdTranslateJs),
   "md-translate.js: target language code does not reach batch, downgrade and manual retry quality gates");
+{
+  const waybackLog = optionsJs.slice(optionsJs.indexOf("function renderWaybackLog"),
+    optionsJs.indexOf("function loadWaybackLog"));
+  const permissionBranch = waybackLog.slice(waybackLog.indexOf('outcome === "permDenied"'),
+    waybackLog.indexOf('outcome === "rate-limited"'));
+  check(waybackLog.includes("wayback-perm-help") &&
+    waybackLog.includes("PBP_ICONS.warning") &&
+    waybackLog.includes('scrollIntoView({ block: "center", behavior: "smooth" })') &&
+    waybackLog.includes('focus({ preventScroll: true })') &&
+    !permissionBranch.includes("outcomeEl.title"),
+    "options.js: archive permission recovery remains hover-only or cannot reach the controlling setting");
+}
+check(/\.wayback-log-row:hover\s+\.wayback-perm-tip[\s\S]{0,120}\.wayback-log-row:focus-within\s+\.wayback-perm-tip/.test(optionsCss) &&
+  optionsCss.includes("background: var(--opt-panel)") &&
+  optionsCss.includes("color: var(--opt-fg)"),
+  "options.css: archive permission guidance lacks themed hover/focus disclosure");
+check(popupCss.includes("html[data-theme] .confirm-popover .confirm-yes:hover { background: var(--pp-warn-fg)") &&
+  popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { background: var(--pp-warn-bg)") &&
+  optionsCss.includes("html[data-theme] .confirm-popover .confirm-yes:hover { background: var(--opt-danger)") &&
+  optionsCss.includes("html[data-theme] .theme-name-popover .tnp-save:hover { background: var(--opt-fg)"),
+  "custom themed popovers can fall back to hardcoded hover backgrounds with unreadable foregrounds");
+{
+  const failed = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrMarkFailed"),
+    mdTranslateJs.indexOf("function _pbpTrMarkPartial"));
+  const partial = mdTranslateJs.slice(mdTranslateJs.indexOf("function _pbpTrMarkPartial"),
+    mdTranslateJs.indexOf("function _pbpTrClearPendingFailures"));
+  check(failed.includes("btn.dataset.tip") && partial.includes("btn.dataset.tip") &&
+    failed.includes('btn.setAttribute("aria-label"') && partial.includes('btn.setAttribute("aria-label"') &&
+    !failed.includes("btn.title") && !partial.includes("btn.title") &&
+    mdCss.includes(".pb-tr-err::after") && mdCss.includes("content: attr(data-tip)"),
+    "translation failure reasons still depend on native title tooltips or lack a themed hover/focus surface");
+}
 
 const optionsTabs = optionsHtml.slice(optionsHtml.indexOf('<div class="tabs"'), optionsHtml.indexOf('</div>', optionsHtml.indexOf('<div class="tabs"')) + 6);
 check(!optionsTabs.includes('id="reset-panel-btn"') && /id="mobile-tab-select"/.test(optionsHtml),

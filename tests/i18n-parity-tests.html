@@ -259,6 +259,49 @@ async function loadLocale(loc) {
       /storage/i.test(msgs.en.dictPackFailed?.message || "") &&
       msgs.en.dictPackReadFailed?.message !== msgs.en.dictPackEmpty?.message,
     "English failure copy invents a cause/window or collapses read failure into empty state");
+  const ACTIONABLE_HINTS = {
+    en: [
+      "At the top of this page, turn “Archive saved pages to the Wayback Machine” off and back on to request permission for web.archive.org again.",
+      "Modify Custom CSS to enable saving it as a reusable theme."
+    ],
+    de: [
+      "Deaktiviere oben auf dieser Seite „Gespeicherte Seiten im Wayback Machine archivieren“ und aktiviere die Option erneut, um die Berechtigung für web.archive.org neu anzufordern.",
+      "Bearbeite zuerst die eigene CSS-Überlagerung. Danach kannst du sie als Theme speichern."
+    ],
+    fr: [
+      "En haut de cette page, désactivez puis réactivez « Archiver les pages enregistrées sur Internet Archive » pour redemander l’autorisation d’accéder à web.archive.org.",
+      "Modifiez d’abord la surcouche CSS personnalisée. Vous pourrez ensuite l’enregistrer comme thème réutilisable."
+    ],
+    pl: [
+      "U góry tej strony wyłącz, a następnie ponownie włącz opcję „Archiwizuj zapisane strony w Internet Archive”, aby ponownie poprosić o uprawnienie do web.archive.org.",
+      "Najpierw zmodyfikuj niestandardową nakładkę CSS. Potem możesz zapisać ją jako motyw."
+    ],
+    ru: [
+      "В верхней части этой страницы выключите, а затем снова включите параметр «Архивировать сохранённые страницы в Wayback Machine», чтобы повторно запросить разрешение для web.archive.org.",
+      "Сначала измените пользовательское наложение CSS. После этого его можно сохранить как тему."
+    ],
+    zh_HK: [
+      "請在本頁頂部先關閉再重新開啟「儲存頁面到互聯網檔案館」，以重新申請 web.archive.org 權限。",
+      "修改自訂 CSS 疊加後，便可將它儲存為可重用的主題。"
+    ],
+    zh_CN: [
+      "请在本页顶部关闭后重新开启「保存页面到互联网档案馆」，以重新申请 web.archive.org 权限。",
+      "修改自定义 CSS 覆盖后，即可将其保存为可复用主题。"
+    ],
+    zh_TW: [
+      "請在本頁頂端先關閉再重新開啟「儲存頁面到網際網路檔案館」，以重新申請 web.archive.org 權限。",
+      "修改自訂 CSS 疊加後，即可將其儲存為可重複使用的主題。"
+    ],
+    ja: [
+      "このページ上部で「保存したページを Wayback Machine にアーカイブする」をいったんオフにしてから再度オンにし、web.archive.org の権限を再申請してください。",
+      "カスタム CSS オーバーレイを編集すると、再利用可能なテーマとして保存できます。"
+    ]
+  };
+  const actionableFailures = LOCALES.filter((loc) =>
+    msgs[loc].waybackPermDenied?.message !== ACTIONABLE_HINTS[loc][0] ||
+    msgs[loc].saveAsThemeHint?.message !== ACTIONABLE_HINTS[loc][1]);
+  check("H13 permission and disabled-state hints expose the exact recovery action in every locale",
+    actionableFailures.length === 0, `copy mismatch: ${actionableFailures.join(", ")}`);
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>

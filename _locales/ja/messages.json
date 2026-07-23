@@ -1365,7 +1365,7 @@
     "message": "テーマとして保存"
   },
   "saveAsThemeHint": {
-    "message": "現在の CSS を再利用可能なテーマとして保存します。"
+    "message": "カスタム CSS オーバーレイを編集すると、再利用可能なテーマとして保存できます。"
   },
   "customCSSPlaceholder": {
     "message": "/* pinboard.in 用カスタム CSS */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
@@ -2009,7 +2009,7 @@
     "message": "非公開で保存したブックマークは archive.org に送信しない"
   },
   "waybackPermDenied": {
-    "message": "web.archive.org の権限がありません。アーカイブを再度オンにして許可してください。"
+    "message": "このページ上部で「保存したページを Wayback Machine にアーカイブする」をいったんオフにしてから再度オンにし、web.archive.org の権限を再申請してください。"
   },
   "archiveThisSave": {
     "message": "アーカイブ"

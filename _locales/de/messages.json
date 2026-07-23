@@ -1365,7 +1365,7 @@
     "message": "Als Theme speichern"
   },
   "saveAsThemeHint": {
-    "message": "Aktuelles CSS als wiederverwendbares Theme speichern."
+    "message": "Bearbeite zuerst die eigene CSS-Überlagerung. Danach kannst du sie als Theme speichern."
   },
   "customCSSPlaceholder": {
     "message": "/* Benutzerdefiniertes CSS für pinboard.in */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
@@ -2009,7 +2009,7 @@
     "message": "Als privat gespeicherte Lesezeichen nie bei archive.org archivieren"
   },
   "waybackPermDenied": {
-    "message": "Berechtigung für web.archive.org fehlt. Aktiviere die Archivierung erneut, um sie zu erteilen."
+    "message": "Deaktiviere oben auf dieser Seite „Gespeicherte Seiten im Wayback Machine archivieren“ und aktiviere die Option erneut, um die Berechtigung für web.archive.org neu anzufordern."
   },
   "archiveThisSave": {
     "message": "Archivieren"

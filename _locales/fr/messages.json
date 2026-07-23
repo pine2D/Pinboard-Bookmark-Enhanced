@@ -1365,7 +1365,7 @@
     "message": "Enregistrer comme thème"
   },
   "saveAsThemeHint": {
-    "message": "Enregistrer le CSS actuel comme thème réutilisable."
+    "message": "Modifiez d’abord la surcouche CSS personnalisée. Vous pourrez ensuite l’enregistrer comme thème réutilisable."
   },
   "customCSSPlaceholder": {
     "message": "/* CSS personnalisé pour pinboard.in */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
@@ -2009,7 +2009,7 @@
     "message": "Ne jamais archiver sur archive.org les favoris enregistrés comme privés"
   },
   "waybackPermDenied": {
-    "message": "L'autorisation pour web.archive.org manque. Réactivez l'archivage pour l'accorder."
+    "message": "En haut de cette page, désactivez puis réactivez « Archiver les pages enregistrées sur Internet Archive » pour redemander l’autorisation d’accéder à web.archive.org."
   },
   "archiveThisSave": {
     "message": "archiver"

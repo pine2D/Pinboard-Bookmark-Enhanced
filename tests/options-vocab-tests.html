@@ -666,6 +666,43 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     unreachable.length === 0, unreachable.slice(0, 8).join("; "));
   check("production CSS lets the 320px German 5000-row count wrap within its flex component",
     germanLongCountFits, "vocab count scrollWidth exceeded clientWidth");
+  const hoverHost = frame.contentDocument.createElement("div");
+  hoverHost.style.cssText = "position:fixed;left:-9999px;top:0";
+  hoverHost.innerHTML =
+    '<div class="confirm-popover"><span class="confirm-msg">Delete?</span><button class="confirm-yes">Delete</button><button class="confirm-no">Cancel</button></div>' +
+    '<div class="theme-name-popover"><label>Name</label><input type="text" value="Theme"><p class="tnp-overwrite">Overwrite?</p><button class="tnp-save">Save</button><button class="tnp-cancel">Cancel</button></div>' +
+    '<div class="wayback-perm-tip">Permission guidance</div>';
+  frame.contentDocument.body.appendChild(hoverHost);
+  const themeVariants = ["github-light", "nord-night", "terminal", "modern-card", "paper-ink",
+    "dracula", "flexoki-light", "flexoki-dark", "solarized-light", "solarized-dark",
+    "catppuccin-latte", "catppuccin-mocha", "gruvbox-dark", "rose-pine"];
+  const hoverFailures = [];
+  for (const theme of themeVariants) {
+    frame.contentDocument.documentElement.dataset.theme = theme;
+    for (const [fgSel, bgSel] of [
+      [".confirm-msg", ".confirm-popover"],
+      [".confirm-yes", ".confirm-yes"],
+      [".confirm-no", ".confirm-popover"],
+      [".theme-name-popover label", ".theme-name-popover"],
+      [".theme-name-popover input", ".theme-name-popover input"],
+      [".theme-name-popover .tnp-overwrite", ".theme-name-popover"],
+      [".theme-name-popover .tnp-save", ".theme-name-popover .tnp-save"],
+      [".theme-name-popover .tnp-cancel", ".theme-name-popover"],
+      [".wayback-perm-tip", ".wayback-perm-tip"]
+    ]) {
+      const fgEl = hoverHost.querySelector(fgSel);
+      const bgEl = hoverHost.querySelector(bgSel);
+      const fg = frame.contentWindow.getComputedStyle(fgEl).color;
+      const bgStyle = frame.contentWindow.getComputedStyle(bgEl);
+      const bg = bgStyle.backgroundColor;
+      const ratio = /^rgb/.test(bg) && bg !== "rgba(0, 0, 0, 0)" ? contrastRatio(fg, bg) : 0;
+      if (bgStyle.borderTopWidth === "0px" || ratio < 4.5)
+        hoverFailures.push(`${theme}/${fgSel}:${ratio.toFixed(2)}`);
+    }
+  }
+  check("options hover and popover surfaces stay readable across every shipped UI theme variant",
+    hoverFailures.length === 0, hoverFailures.slice(0, 12).join("; "));
+  hoverHost.remove();
   frame.remove();
   document.title = fail ? "FAIL options-vocab Tests" : "PASS options-vocab Tests";
 })();

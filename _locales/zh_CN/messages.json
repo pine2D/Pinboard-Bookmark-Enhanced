@@ -1365,7 +1365,7 @@
     "message": "保存为主题"
   },
   "saveAsThemeHint": {
-    "message": "将当前 CSS 保存为可复用的主题。"
+    "message": "修改自定义 CSS 覆盖后，即可将其保存为可复用主题。"
   },
   "customCSSPlaceholder": {
     "message": "/* pinboard.in 自定义 CSS */\nbody { line-height: 1.6; }\n.bookmark_title { font-size: 14px; }"
@@ -2009,7 +2009,7 @@
     "message": "保存为私密的书签一律不提交到 archive.org"
   },
   "waybackPermDenied": {
-    "message": "缺少 web.archive.org 权限，重新开启存档即可授权。"
+    "message": "请在本页顶部关闭后重新开启「保存页面到互联网档案馆」，以重新申请 web.archive.org 权限。"
   },
   "archiveThisSave": {
     "message": "存档"
