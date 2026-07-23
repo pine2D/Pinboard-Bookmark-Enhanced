@@ -969,11 +969,19 @@ async function pbpWebdavTest(cfgOverride) {
     if (resp.status !== 404 && !resp.ok) return { ok: false, kind: "unreachable" };
     const writable = await pbpWebdavProbeWritable(cfg, target);
     if (!writable.ok) {
+      const detailStage = writable.stage || "";
+      const uiStage = detailStage === "base-propfind"
+        ? "base-collection"
+        : detailStage === "write-test"
+          ? "write"
+          : "backup-collection";
       return {
         ok: false,
         kind: writable.error,
         status: writable.status,
         stage: writable.stage,
+        detailStage,
+        uiStage,
       };
     }
     const locator = await pbpWebdavWriteLocator(
@@ -984,6 +992,8 @@ async function pbpWebdavTest(cfgOverride) {
         kind: locator.error,
         status: locator.status,
         stage: locator.stage,
+        detailStage: locator.stage || "",
+        uiStage: "locator",
       };
     }
     return Object.assign(
@@ -992,6 +1002,7 @@ async function pbpWebdavTest(cfgOverride) {
         ? {
           cleanupWarning: true,
           cleanupStatus: writable.cleanupStatus,
+          uiStage: "cleanup",
         }
         : {}
     );

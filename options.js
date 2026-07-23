@@ -114,6 +114,39 @@ function pbpQueueOptionsSave(state, save) {
   return run;
 }
 
+function pbpCreateWebdavUiGuard(getBinding, {
+  setTimer = (fn, delay) => setTimeout(fn, delay),
+  clearTimer = (timer) => clearTimeout(timer),
+} = {}) {
+  let generation = 0;
+  let timer = null;
+  const cancelTimer = () => {
+    if (timer !== null) clearTimer(timer);
+    timer = null;
+  };
+  const isCurrent = (operation) =>
+    !!operation &&
+    operation.generation === generation &&
+    operation.binding === String(getBinding() || "");
+  return {
+    begin() {
+      cancelTimer();
+      return {
+        generation: ++generation,
+        binding: String(getBinding() || ""),
+      };
+    },
+    isCurrent,
+    schedule(operation, callback, delay) {
+      cancelTimer();
+      timer = setTimer(() => {
+        timer = null;
+        if (isCurrent(operation)) callback();
+      }, delay);
+    },
+  };
+}
+
 let _tagGovVisibleAccount = "";
 
 // Enable decorative transitions only after the initial page has painted.
@@ -1704,20 +1737,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- WebDAV: render only target-bound sync state on page load ----
-  let _webdavStatusGeneration = 0;
+  function _pbpWebdavOperationBinding(cfg) {
+    const target = pbpWebdavResolveTarget(cfg);
+    return target.ok
+      ? JSON.stringify([target.backupFileUrl, String(cfg.user || ""), String(cfg.pass || "")])
+      : "";
+  }
+
+  const _webdavUiGuard = pbpCreateWebdavUiGuard(
+    () => _pbpWebdavOperationBinding(_pbpWebdavCfgFromForm())
+  );
   const _webdavConflictKeys = {
     unpaired: "webdavSyncUnpaired",
     "remote-changed": "webdavSyncRemoteChanged",
     diverged: "webdavSyncDiverged",
   };
-  async function _pbpRenderWebdavStatus(cfg = _pbpWebdavCfgFromForm()) {
-    const generation = ++_webdavStatusGeneration;
+  async function _pbpRenderWebdavStatus(
+    cfg = _pbpWebdavCfgFromForm(),
+    operation = _webdavUiGuard.begin()
+  ) {
     try {
       const prepared = await pbpWebdavPrepareOperation(cfg);
       const state = prepared.ok
         ? await pbpWebdavReadState(prepared.target)
         : pbpWebdavEmptyState();
-      if (generation !== _webdavStatusGeneration) return;
+      if (!_webdavUiGuard.isCurrent(operation)) return;
       const statusEl = $id("webdav-status");
       if (!statusEl) return;
       const conflictKey = _webdavConflictKeys[state.unresolvedConflict?.kind];
@@ -1748,12 +1792,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     void _pbpRenderWebdavStatus(cfg);
   }
 
-  ["opt-webdav-url", "opt-webdav-relative-path", "opt-webdav-user"].forEach((id) => {
+  ["opt-webdav-url", "opt-webdav-relative-path", "opt-webdav-user", "opt-webdav-pass"].forEach((id) => {
     $id(id)?.addEventListener("input", _pbpHandleWebdavTargetChange);
   });
   document.querySelectorAll('input[name="webdav-folder-mode"]').forEach((radio) => {
     radio.addEventListener("change", _pbpHandleWebdavTargetChange);
   });
+
+  function _pbpScheduleWebdavStatus(operation, restore = false) {
+    _webdavUiGuard.schedule(operation, () => {
+      if (restore) {
+        void _pbpRenderWebdavStatus();
+        return;
+      }
+      const statusEl = $id("webdav-status");
+      if (!statusEl) return;
+      statusEl.textContent = "";
+      statusEl.style.color = "";
+    }, 5000);
+  }
 
   const autoSaveState = { suspended: false, chain: Promise.resolve(), waiters: [] };
 
@@ -1798,53 +1855,66 @@ document.addEventListener("DOMContentLoaded", async () => {
     const statusEl = $id("webdav-status");
     const cfg = _pbpWebdavValidCfgFromForm();
     if (!cfg) return;
-    const tested = await pbpWebdavPrepareOperation(cfg);
-    if (!tested.ok) return;
     if (!statusEl) return;
+    const operation = _webdavUiGuard.begin();
+    const testedBinding = _pbpWebdavOperationBinding(cfg);
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
+    const tested = await pbpWebdavPrepareOperation(cfg);
+    if (!tested.ok || !_webdavUiGuard.isCurrent(operation)) return;
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
+    if (!_webdavUiGuard.isCurrent(operation)) return;
     const errorKey = _pbpWebdavPermissionError(granted);
     if (errorKey) {
       setStatusIcon(statusEl, false, t(errorKey));
       statusEl.style.color = "#c00";
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      _pbpScheduleWebdavStatus(operation);
       return;
     }
     const res = await pbpWebdavTest(cfg);
+    if (!_webdavUiGuard.isCurrent(operation)) return;
     if (res.ok) {
-      const currentCfg = _pbpWebdavValidCfgFromForm();
-      const current = currentCfg ? await pbpWebdavPrepareOperation(currentCfg) : null;
-      if (current?.ok && current.target.targetId === tested.target.targetId) {
-        const confirmed = {
-          webdavUrl: cfg.baseUrl,
-          webdavUser: cfg.user,
-          webdavPass: obfuscateKey(cfg.pass),
-          webdavFolderMode: tested.target.folderMode,
-          webdavRelativePath: tested.target.folderMode === "custom"
-            ? tested.target.relativePath : "",
-          webdavLayoutVersion: 2,
-        };
-        const saved = await persistSettings(confirmed);
+      try {
+        await pauseOptionsAutoSave();
+        const currentCfg = _pbpWebdavValidCfgFromForm();
+        if (!_webdavUiGuard.isCurrent(operation) || !currentCfg ||
+            _pbpWebdavOperationBinding(currentCfg) !== testedBinding) return;
+        const saved = await persistSettings({ webdavLayoutVersion: 2 });
         if (!saved.ok) {
-          setStatusIcon(statusEl, false, t("optSaveFailed"));
-          statusEl.style.color = "#c00";
-          setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+          if (_webdavUiGuard.isCurrent(operation)) {
+            setStatusIcon(statusEl, false, t("optSaveFailed"));
+            statusEl.style.color = "#c00";
+            _pbpScheduleWebdavStatus(operation);
+          }
           return;
         }
+        // persistSettings bypasses saveAll's mutable baseline. Record what is
+        // actually in storage so resume() can roll it back to the live form's
+        // layoutVersion when the target changes during the write.
+        savedState.settings = Object.assign(
+          {}, savedState.settings, { webdavLayoutVersion: 2 });
+        const liveCfg = _pbpWebdavValidCfgFromForm();
+        if (!_webdavUiGuard.isCurrent(operation) || !liveCfg ||
+            _pbpWebdavOperationBinding(liveCfg) !== testedBinding) return;
+        const liveTarget = pbpWebdavResolveTarget(liveCfg);
+        if (!liveTarget.ok) return;
         _loadedWebdavTargetBinding = JSON.stringify([
-          tested.target.backupFileUrl, tested.target.user]);
+          liveTarget.backupFileUrl, liveCfg.user]);
         _loadedWebdavLayoutVersion = 2;
         s.webdavLayoutVersion = 2;
-        savedState.settings = Object.assign({}, savedState.settings, confirmed);
+      } finally {
+        resumeOptionsAutoSave();
       }
     }
-    const stageKey = res.stage === "base-propfind" ? "webdavStageBaseFailed"
-      : res.stage === "mkdir" || res.stage === "mkdir-verify" ? "webdavStageCreateFailed"
-      : res.stage === "write-test" ? "webdavStageWriteFailed"
-      : String(res.stage || "").startsWith("locator-") ? "webdavStageLocatorFailed"
-      : "";
-    if (res.ok && res.cleanupWarning) {
+    if (!_webdavUiGuard.isCurrent(operation)) return;
+    const stageKey = {
+      "base-collection": "webdavStageBaseFailed",
+      "backup-collection": "webdavStageCreateFailed",
+      write: "webdavStageWriteFailed",
+      cleanup: "webdavStageCleanupWarning",
+      locator: "webdavStageLocatorFailed",
+    }[res.uiStage] || "";
+    if (res.ok && res.uiStage === "cleanup") {
       statusEl.textContent = t("webdavStageCleanupWarning");
       statusEl.style.color = "var(--opt-warn, #b06000)";
     } else if (res.kind === "found") {
@@ -1858,31 +1928,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
       setStatusIcon(statusEl, false, t("webdavTestUnreachable")); statusEl.style.color = "#c00";
     }
-    setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+    _pbpScheduleWebdavStatus(operation);
   });
 
   // ---- WebDAV: Push now ----
   // Extracted so the conflict-choice popover can re-run it with force
   // (user-confirmed remote overwrite, campaign 2026-07-20). Each run
   // persists the live form once and holds the debounce queue for its
-  // exact snapshot. One shared clear-timer: a stale 5s timer from the
-  // conflicted first run must not wipe the force run's fresh status
-  // (Codex r3 LOW).
-  let _webdavPushStatusTimer = null;
+  // exact snapshot.
   async function _pbpWebdavRunPush(force) {
     const statusEl = $id("webdav-status");
     const cfg = _pbpWebdavValidCfgFromForm();
     if (!cfg) return;
     if (!statusEl) return;
-    clearTimeout(_webdavPushStatusTimer);
+    const operation = _webdavUiGuard.begin();
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
+    if (!_webdavUiGuard.isCurrent(operation)) return;
     const errorKey = _pbpWebdavPermissionError(granted);
     if (errorKey) {
       setStatusIcon(statusEl, false, t(errorKey));
       statusEl.style.color = "#c00";
-      _webdavPushStatusTimer = setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      _pbpScheduleWebdavStatus(operation);
       return;
     }
     let res;
@@ -1891,17 +1959,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       // current form once, then keep it suspended until that exact snapshot has
       // been sent. Edits made during the request are saved after resume().
       await pauseOptionsAutoSave();
+      if (!_webdavUiGuard.isCurrent(operation)) return;
       const saved = await saveAll();
       if (!saved.ok) {
-        setStatusIcon(statusEl, false, t("optSaveFailed"));
-        statusEl.style.color = "#c00";
-        _webdavPushStatusTimer = setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+        if (_webdavUiGuard.isCurrent(operation)) {
+          setStatusIcon(statusEl, false, t("optSaveFailed"));
+          statusEl.style.color = "#c00";
+          _pbpScheduleWebdavStatus(operation);
+        }
         return;
       }
+      if (!_webdavUiGuard.isCurrent(operation)) return;
       res = await pbpWebdavPush(force ? Object.assign({}, cfg, { force: true }) : cfg);
     } finally {
       resumeOptionsAutoSave();
     }
+    if (!_webdavUiGuard.isCurrent(operation)) return;
     if (res.ok) {
       const pushed = t("webdavPushOk", new Date(res.ts).toLocaleString());
       setStatusIcon(statusEl, true, res.mode === "hash" ? pushed + " " + t("webdavHashMode") : pushed);
@@ -1924,15 +1997,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         yesText: t("webdavOverwriteRemote"),
         noText: t("cancel"),
         onConfirm: async () => {
+          if (!_webdavUiGuard.isCurrent(operation)) return;
           const cur = _pbpWebdavValidCfgFromForm();
           if (!cur) return;
           const prepared = await pbpWebdavPrepareOperation(cur);
+          if (!_webdavUiGuard.isCurrent(operation)) return;
           const curTarget = prepared.ok
             ? JSON.stringify([prepared.target.backupFileUrl, prepared.target.user])
             : "";
           _pbpWebdavRunPush(curTarget === conflictedTarget);
         },
+        onCancel: () => {
+          if (_webdavUiGuard.isCurrent(operation)) {
+            _pbpScheduleWebdavStatus(operation, true);
+          }
+        },
       });
+      return;
     } else {
       const msg = _webdavConflictKeys[res.error] ? t(_webdavConflictKeys[res.error])
         : res.error === "verify-failed" ? t("webdavVerifyFailed")
@@ -1942,7 +2023,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setStatusIcon(statusEl, false, msg);
       statusEl.style.color = "#c00";
     }
-    _webdavPushStatusTimer = setTimeout(() => { void _pbpRenderWebdavStatus(); }, 5000);
+    _pbpScheduleWebdavStatus(operation, true);
   }
   $id("webdav-push-btn")?.addEventListener("click", () => { _pbpWebdavRunPush(false); });
 
@@ -1952,17 +2033,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     const cfg = _pbpWebdavValidCfgFromForm();
     if (!cfg) return;
     if (!statusEl) return;
+    const operation = _webdavUiGuard.begin();
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
+    if (!_webdavUiGuard.isCurrent(operation)) return;
     const errorKey = _pbpWebdavPermissionError(granted);
     if (errorKey) {
       setStatusIcon(statusEl, false, t(errorKey));
       statusEl.style.color = "#c00";
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      _pbpScheduleWebdavStatus(operation);
       return;
     }
     const res = await pbpWebdavPull(cfg);
+    if (!_webdavUiGuard.isCurrent(operation)) return;
     if (!res.ok) {
       const key = res.error === "auth" ? "webdavTestAuthFail"
         : res.error === "not-found" ? "webdavTestOkEmpty"
@@ -1970,7 +2054,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         : "webdavTestUnreachable";
       setStatusIcon(statusEl, false, t(key));
       statusEl.style.color = "#c00";
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      _pbpScheduleWebdavStatus(operation);
       return;
     }
     const pullData = pbpWebdavPreparePullPayload(res.data);
@@ -1982,7 +2066,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (_) {
       setStatusIcon(statusEl, false, t("webdavPullInvalid"));
       statusEl.style.color = "#c00";
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      _pbpScheduleWebdavStatus(operation);
       return;
     }
     const pushedAt = (pullData._webdav && pullData._webdav.pushedAt) || "";
@@ -1990,10 +2074,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Spec invariant #2: pull only ever applies after this confirm(); Cancel
     // returns here with zero writes made so far (Test/permission-request
     // above make no storage changes either).
+    if (!_webdavUiGuard.isCurrent(operation)) return;
     if (!confirm(t("webdavPullConfirm", when))) {
       statusEl.textContent = "";
       return;
     }
+    if (!_webdavUiGuard.isCurrent(operation)) return;
     // A confirmed bulk replacement wins over edits that were still waiting in
     // the debounce queue. Persist the live form once before applying so fields
     // deliberately absent from backups (API keys, WebDAV credentials, target
@@ -2002,9 +2088,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     let applied;
     try {
       await pauseOptionsAutoSave();
+      if (!_webdavUiGuard.isCurrent(operation)) {
+        resumeOptionsAutoSave();
+        return;
+      }
       const saved = await saveAll();
       if (!saved.ok) throw saved.error || new Error("settings save failed");
+      if (!_webdavUiGuard.isCurrent(operation)) {
+        resumeOptionsAutoSave();
+        return;
+      }
       const previousState = await pbpWebdavReadState(res.target);
+      if (!_webdavUiGuard.isCurrent(operation)) {
+        resumeOptionsAutoSave();
+        return;
+      }
       applied = await pbpApplyBackupPayload(pullData, {
         exportableKeys: EXPORTABLE_KEYS,
         saveOverlayWithFallback,
@@ -2024,9 +2122,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
       resumeOptionsAutoSave();
       console.error("[webdav-pull] apply failed", err);
-      setStatusIcon(statusEl, false, t("importApplyFailed"));
-      statusEl.style.color = "#c00";
-      setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+      if (_webdavUiGuard.isCurrent(operation)) {
+        setStatusIcon(statusEl, false, t("importApplyFailed"));
+        statusEl.style.color = "#c00";
+        _pbpScheduleWebdavStatus(operation);
+      }
       return;
     }
     // Same fade+reload precedent as the sync-toggle and language-change
@@ -2039,7 +2139,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "general";
     sessionStorage.setItem("activeTab", activePanel);
     document.body.style.transition = "opacity 0.18s";
-    if (applied && applied.highlightsSkipped) {
+    if (applied && applied.highlightsSkipped && _webdavUiGuard.isCurrent(operation)) {
       // The backup carried highlights this device refused (owner mismatch /
       // logged out). Hold the reload long enough to say so — reporting a
       // clean restore here is how notes get silently lost for good.

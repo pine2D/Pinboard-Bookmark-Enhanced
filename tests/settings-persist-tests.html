@@ -231,6 +231,40 @@ async function run() {
     reportedQueueError?.message === "unexpected save crash" && recoveredQueueCalls === 1 &&
     await recoveringQueueState.chain === undefined);
 
+  const hasWebdavUiGuard = typeof pbpCreateWebdavUiGuard === "function";
+  check("E1 WebDAV UI guard: factory is available to Test, Push and Pull", hasWebdavUiGuard);
+  let webdavBinding = "target-a|user|pass-a";
+  const webdavTimers = new Map();
+  let nextWebdavTimer = 1;
+  const webdavUiGuard = hasWebdavUiGuard ? pbpCreateWebdavUiGuard(
+    () => webdavBinding,
+    {
+      setTimer(fn) {
+        const id = nextWebdavTimer++;
+        webdavTimers.set(id, fn);
+        return id;
+      },
+      clearTimer(id) { webdavTimers.delete(id); },
+    }
+  ) : null;
+  const firstWebdavOperation = webdavUiGuard?.begin();
+  const secondWebdavOperation = webdavUiGuard?.begin();
+  check("E1 WebDAV UI guard: a newer operation invalidates an older operation on the same target",
+    !!webdavUiGuard && !webdavUiGuard.isCurrent(firstWebdavOperation) &&
+    webdavUiGuard.isCurrent(secondWebdavOperation));
+  webdavBinding = "target-a|user|pass-b";
+  check("E1 WebDAV UI guard: a live credential change invalidates the frozen operation",
+    !!webdavUiGuard && !webdavUiGuard.isCurrent(secondWebdavOperation));
+  let staleWebdavTimerRan = false;
+  webdavBinding = "target-b|user|pass-b";
+  const timerOperation = webdavUiGuard?.begin();
+  webdavUiGuard?.schedule(timerOperation, () => { staleWebdavTimerRan = true; }, 5000);
+  webdavBinding = "target-c|user|pass-b";
+  webdavUiGuard?.begin();
+  for (const runTimer of webdavTimers.values()) runTimer();
+  check("E1 WebDAV UI guard: target changes cancel stale status timers",
+    !!webdavUiGuard && webdavTimers.size === 0 && staleWebdavTimerRan === false);
+
   // ---------- E1b: real large-value codec round trips ----------
   await (async () => {
     const previousChrome = globalThis.chrome;

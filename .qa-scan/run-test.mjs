@@ -39,7 +39,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/escape-html-tests.html": 8,
   "tests/eudic-sync-tests.html": 37,
   "tests/export-targets-tests.html": 104,
-  "tests/i18n-parity-tests.html": 208,
+  "tests/i18n-parity-tests.html": 209,
   "tests/icon-state-tests.html": 11,
   "tests/jina-cache-tests.html": 25,
   "tests/md-ai-tests.html": 704,
@@ -57,14 +57,14 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/popup-save-tests.html": 67,
   "tests/save-pipeline-tests.html": 50,
   "tests/settings-cache-invalidate-tests.html": 8,
-  "tests/settings-persist-tests.html": 270,
+  "tests/settings-persist-tests.html": 274,
   "tests/tag-gov-layout-tests.html": 6,
   "tests/tag-gov-reserve-tests.html": 2,
   "tests/tag-gov-tests.html": 63,
   "tests/union-tags-tests.html": 12,
   "tests/url-strip-tests.html": 19,
   "tests/wayback-tests.html": 40,
-  "tests/webdav-tests.html": 215,
+  "tests/webdav-tests.html": 220,
 });
 const expected = EXPECTED_RESULTS[rel];
 if (expected === undefined) {

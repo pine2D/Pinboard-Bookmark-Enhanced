@@ -31,6 +31,7 @@ const optionsConnectivityJs = read("options-connectivity.js");
 const optionsCss = read("options.css");
 const optionsJs = read("options.js");
 const webdavJs = read("webdav.js");
+const webdavTestsHtml = read("tests/webdav-tests.html");
 const optionsVocabJs = read("options-vocab.js");
 const mdDictJs = read("md-dict.js");
 const optionsThemeEarlyJs = read("options-theme-early.js");
@@ -83,18 +84,26 @@ const popupTagsJs = read("popup-tags.js");
     optionsJs.indexOf("// ---- WebDAV: Push now ----"),
     optionsJs.indexOf("// ===================== Auto-save")
   );
+  const pauseAt = testHandler.indexOf("await pauseOptionsAutoSave()");
+  const persistAt = testHandler.indexOf("await persistSettings({ webdavLayoutVersion: 2 })");
+  const resumeAt = testHandler.indexOf("resumeOptionsAutoSave()", persistAt);
   check(testHandler.includes("pbpWebdavPrepareOperation(cfg)") &&
     testHandler.includes("pbpWebdavTest(cfg)") &&
     testHandler.includes("res.ok") &&
-    testHandler.includes("current.target.targetId === tested.target.targetId") &&
-    testHandler.includes("webdavLayoutVersion: 2") &&
+    pauseAt >= 0 && persistAt > pauseAt && resumeAt > persistAt &&
+    (testHandler.match(/_webdavUiGuard\.isCurrent\(operation\)/g) || []).length >= 2 &&
+    testHandler.includes("_pbpWebdavOperationBinding") &&
     testHandler.includes("_loadedWebdavLayoutVersion = 2") &&
+    !/webdav(?:Url|User|Pass|FolderMode|RelativePath)\s*:/.test(
+      testHandler.slice(pauseAt, resumeAt)) &&
     !pushPull.includes("webdavLayoutVersion: 2"),
-    "options.js: only a successful Test for the current frozen target may confirm layout v2");
+    "options.js: Test layout v2 promotion is not mutexed, live-credential guarded and version-only");
   check(["webdavStageBaseFailed", "webdavStageCreateFailed", "webdavStageWriteFailed",
     "webdavStageCleanupWarning", "webdavStageLocatorFailed"]
-    .every((key) => testHandler.includes(key)),
-  "options.js: WebDAV Test feedback does not distinguish each failure stage");
+    .every((key) => testHandler.includes(key)) &&
+    testHandler.includes("[res.uiStage]") &&
+    !testHandler.includes("res.stage"),
+  "options.js: WebDAV Test feedback guesses low-level stages instead of using the stable UI stage");
 }
 {
   const webdavUi = optionsHtml.slice(
@@ -107,8 +116,8 @@ const popupTagsJs = read("popup-tags.js");
       .map(([, value]) => value.message))
     .join("\n");
   check(!/jianguoyun|nextcloud|owncloud|koofr|yandex/i.test(
-    [webdavUi, optionsJs, webdavJs, localeWebdav].join("\n")),
-  "WebDAV UI or runtime contains provider-specific routing or copy");
+    [webdavUi, optionsJs, webdavJs, webdavTestsHtml, localeWebdav].join("\n")),
+  "WebDAV UI, runtime or tests contain provider-specific routing, copy or hostnames");
 }
 
 {
@@ -170,6 +179,26 @@ const popupTagsJs = read("popup-tags.js");
     "options.js: page-load WebDAV status still revives persisted operation errors instead of rendering target state");
 }
 {
+  const webdavOps = optionsJs.slice(
+    optionsJs.indexOf("// ---- WebDAV: Test ----"),
+    optionsJs.indexOf("// ===================== Auto-save")
+  );
+  const testOp = webdavOps.slice(0, webdavOps.indexOf("// ---- WebDAV: Push now ----"));
+  const pushOp = webdavOps.slice(
+    webdavOps.indexOf("async function _pbpWebdavRunPush("),
+    webdavOps.indexOf("// ---- WebDAV: Pull now ----")
+  );
+  const pullOp = webdavOps.slice(webdavOps.indexOf("// ---- WebDAV: Pull now ----"));
+  check([testOp, pushOp, pullOp].every((op) =>
+    op.includes("const operation = _webdavUiGuard.begin()") &&
+    op.includes("_webdavUiGuard.isCurrent(operation)")) &&
+    webdavOps.includes("_pbpScheduleWebdavStatus(operation") &&
+    !webdavOps.includes("_webdavPushStatusTimer") &&
+    !/setTimeout\(\(\) => \{\s*statusEl\.(?:textContent|style\.color)/.test(webdavOps) &&
+    /onConfirm:[\s\S]{0,300}_webdavUiGuard\.isCurrent\(operation\)/.test(pushOp),
+  "options.js: Test/Push/Pull do not share one generation/target guard and guarded status timer");
+}
+{
   const handlerAt = optionsJs.indexOf("function _pbpHandleWebdavTargetChange(");
   const listenersAt = optionsJs.indexOf('["opt-webdav-url"', handlerAt);
   const endAt = optionsJs.indexOf("const autoSaveState", listenersAt);
@@ -181,6 +210,7 @@ const popupTagsJs = read("popup-tags.js");
     handler.includes("_pbpRenderWebdavTarget(cfg, false)") &&
     !handler.includes("scheduleAutoSave") &&
     listeners.includes('"opt-webdav-relative-path"') &&
+    listeners.includes('"opt-webdav-pass"') &&
     listeners.includes('addEventListener("input", _pbpHandleWebdavTargetChange)') &&
     listeners.includes('input[name="webdav-folder-mode"]') &&
     listeners.includes('addEventListener("change", _pbpHandleWebdavTargetChange)'),

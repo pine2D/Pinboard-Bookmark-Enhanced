@@ -63,6 +63,9 @@ async function loadLocale(loc) {
     LOCALES.every((loc) => WEBDAV_FOLDER_KEYS.every((key) =>
       !!msgs[loc][key]?.message &&
       webdavPlaceholderShape(msgs[loc][key]) === webdavPlaceholderShape(msgs.en[key]))));
+  check("Japanese WebDAV path validation names empty segments and consecutive slashes naturally",
+    msgs.ja.webdavRelativePathSegments?.message.includes("空のパス要素（連続するスラッシュ）") &&
+    !msgs.ja.webdavRelativePathSegments?.message.includes("空のパス区切り"));
 
   // H1: AI/Jina cluster must be present and translated (≠ English) in these
   // locales — EXCEPT values that are legitimately identical to English in that

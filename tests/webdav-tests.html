@@ -42,8 +42,8 @@ section("pbpWebdavFileUrl");
 assertEq(pbpWebdavFileUrl("https://dav.example.com/backups"),
   "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json",
   "no trailing slash -> appends /filename");
-assertEq(pbpWebdavFileUrl("https://dav.jianguoyun.com/dav/"),
-  "https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced-settings.json",
+assertEq(pbpWebdavFileUrl("https://dav.example.com/dav/"),
+  "https://dav.example.com/dav/pinboard-bookmark-enhanced-settings.json",
   "configured collection is used exactly, without provider-specific rewriting");
 assertEq(pbpWebdavFileUrl("https://dav.example.com/backups/"),
   "https://dav.example.com/backups/pinboard-bookmark-enhanced-settings.json",
@@ -1512,13 +1512,13 @@ async function runChromeLayerTests() {
       }
       return Promise.resolve(response(405));
     };
-    const rootPush = await pbpWebdavPush({ baseUrl: "https://dav.jianguoyun.com/dav/", user: "", pass: "", includeHighlights: false });
+    const rootPush = await pbpWebdavPush({ baseUrl: "https://dav.example.com/dav/", user: "", pass: "", includeHighlights: false });
     check("provider root push probes the configured collection before verified PUT",
       rootPush.ok && rootRequests.map((r) => r.method).join(",") ===
         "PROPFIND,PROPFIND,MKCOL,PROPFIND,GET,PUT,GET,PROPFIND,PROPFIND,GET,PUT,GET");
     check("provider root push writes under the resolved app collection",
       rootRequests.some((r) => r.method === "PUT" &&
-        r.url === "https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-settings.json"));
+        r.url === "https://dav.example.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-settings.json"));
   } catch (e) {
     check("pbpWebdavPush live includeHighlights override did not throw", false, e.message);
   } finally {
@@ -1621,12 +1621,51 @@ async function runChromeLayerTests() {
         "GET,PROPFIND,PROPFIND,PUT,DELETE,PROPFIND,PROPFIND,GET,PUT,GET");
 
     const missingFolderRequests = [];
+    let missingFolderProbes = 0;
     globalThis.fetch = (url, opts) => {
       missingFolderRequests.push({ url, method: opts.method });
+      if (opts.method === "GET") return Promise.resolve(response(404));
+      if (opts.method === "PROPFIND") {
+        missingFolderProbes++;
+        return Promise.resolve(response(missingFolderProbes === 1 ? 207 : 404));
+      }
       return Promise.resolve({ ok: false, status: 404 });
     };
     const missingFolder = await pbpWebdavTest({ baseUrl: "https://dav.example.com/missing/", user: "", pass: "" });
-    check("file 404 + collection PROPFIND 404 + MKCOL 404 -> missing target collection", missingFolder.kind === "not-found");
+    check("file 404 + collection PROPFIND 404 + MKCOL 404 -> missing target collection",
+      !missingFolder.ok &&
+      missingFolder.uiStage === "backup-collection" && missingFolder.detailStage === "mkdir");
+
+    let baseStageProbes = 0;
+    globalThis.fetch = (url, opts) => {
+      if (opts.method === "GET") return Promise.resolve(response(404));
+      if (opts.method === "PROPFIND") {
+        baseStageProbes++;
+        return Promise.resolve(response(500));
+      }
+      return Promise.resolve(response(500));
+    };
+    const baseStage = await pbpWebdavTest({
+      baseUrl: "https://dav.example.com/base-stage/", user: "", pass: "",
+    });
+    check("test exposes a stable base-collection stage while preserving diagnostics",
+      baseStageProbes === 1 && baseStage.uiStage === "base-collection" &&
+      baseStage.detailStage === "base-propfind");
+
+    let backupStageProbes = 0;
+    globalThis.fetch = (url, opts) => {
+      if (opts.method === "GET") return Promise.resolve(response(404));
+      if (opts.method === "PROPFIND") {
+        backupStageProbes++;
+        return Promise.resolve(response(backupStageProbes === 1 ? 207 : 500));
+      }
+      return Promise.resolve(response(500));
+    };
+    const backupStage = await pbpWebdavTest({
+      baseUrl: "https://dav.example.com/backup-stage/", user: "", pass: "",
+    });
+    check("backup folder PROPFIND maps to the stable create/verify stage",
+      backupStage.uiStage === "backup-collection" && backupStage.detailStage === "propfind");
 
     const createFolderRequests = [];
     let createFolderProbes = 0;
@@ -1671,8 +1710,71 @@ async function runChromeLayerTests() {
       return Promise.resolve({ ok: false, status: 404 });
     };
     const readOnly = await pbpWebdavTest({ baseUrl: "https://dav.example.com/dav/", user: "", pass: "" });
-    check("readable collection + failed temp PUT -> not-writable", readOnly.kind === "not-writable");
-    check("failed temp PUT status is preserved", readOnly.status === 404);
+    check("readable collection + failed temp PUT -> not-writable",
+      readOnly.kind === "not-writable" && readOnly.uiStage === "write");
+    check("failed temp PUT status and diagnostic stage are preserved",
+      readOnly.status === 404 && readOnly.detailStage === "write-test");
+
+    let cleanupLocator = "";
+    globalThis.fetch = (url, opts) => {
+      if (url.includes("/location.json")) {
+        if (opts.method === "GET") {
+          return Promise.resolve(cleanupLocator
+            ? response(200, cleanupLocator, '"locator"')
+            : response(404));
+        }
+        if (opts.method === "PUT") {
+          cleanupLocator = String(opts.body);
+          return Promise.resolve(response(201));
+        }
+      }
+      if (opts.method === "GET") return Promise.resolve(response(404));
+      if (opts.method === "PROPFIND") return Promise.resolve(response(207));
+      if (opts.method === "PUT") return Promise.resolve(response(201));
+      if (opts.method === "DELETE") return Promise.resolve(response(500));
+      return Promise.resolve(response(500));
+    };
+    const cleanupStage = await pbpWebdavTest({
+      baseUrl: "https://dav.example.com/cleanup-stage/", user: "", pass: "",
+    });
+    check("temporary-file cleanup warning exposes the stable cleanup stage",
+      cleanupStage.ok && cleanupStage.cleanupWarning && cleanupStage.uiStage === "cleanup");
+
+    let locatorBaseProbes = 0;
+    globalThis.fetch = (url, opts) => {
+      if (opts.method === "GET") return Promise.resolve(response(404));
+      if (opts.method === "PROPFIND") {
+        locatorBaseProbes++;
+        return Promise.resolve(response(locatorBaseProbes === 3 ? 500 : 207));
+      }
+      if (opts.method === "PUT") return Promise.resolve(response(201));
+      if (opts.method === "DELETE") return Promise.resolve(response(204));
+      return Promise.resolve(response(500));
+    };
+    const locatorBaseStage = await pbpWebdavTest({
+      baseUrl: "https://dav.example.com/locator-base/", user: "", pass: "",
+    });
+    check("locator base probe failure always exposes the stable locator stage",
+      locatorBaseStage.uiStage === "locator" &&
+      locatorBaseStage.detailStage === "base-propfind");
+
+    let locatorMkdirProbes = 0;
+    globalThis.fetch = (url, opts) => {
+      if (opts.method === "GET") return Promise.resolve(response(404));
+      if (opts.method === "PROPFIND") {
+        locatorMkdirProbes++;
+        return Promise.resolve(response(locatorMkdirProbes === 4 ? 404 : 207));
+      }
+      if (opts.method === "MKCOL") return Promise.resolve(response(500));
+      if (opts.method === "PUT") return Promise.resolve(response(201));
+      if (opts.method === "DELETE") return Promise.resolve(response(204));
+      return Promise.resolve(response(500));
+    };
+    const locatorMkdirStage = await pbpWebdavTest({
+      baseUrl: "https://dav.example.com/locator-mkdir/", user: "", pass: "",
+    });
+    check("locator mkdir failure always exposes the stable locator stage",
+      locatorMkdirStage.uiStage === "locator" && locatorMkdirStage.detailStage === "mkdir");
 
     const rootRequests = [];
     let rootProbes = 0;
@@ -1698,11 +1800,11 @@ async function runChromeLayerTests() {
       if (opts.method === "GET") return Promise.resolve({ ok: false, status: 404 });
       return Promise.resolve({ ok: true, status: 200 });
     };
-    const rootEmpty = await pbpWebdavTest({ baseUrl: "https://dav.jianguoyun.com/dav/", user: "", pass: "" });
+    const rootEmpty = await pbpWebdavTest({ baseUrl: "https://dav.example.com/dav/", user: "", pass: "" });
     check("provider root test verifies the configured collection", rootEmpty.kind === "empty");
     check("provider root test writes under the resolved app collection",
       rootRequests.some((r) => r.method === "PUT" &&
-        r.url.startsWith("https://dav.jianguoyun.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-write-test-")));
+        r.url.startsWith("https://dav.example.com/dav/pinboard-bookmark-enhanced/pinboard-bookmark-enhanced-write-test-")));
   } catch (e) {
     check("pbpWebdavTest missing-folder probe did not throw", false, e.message);
   } finally {
