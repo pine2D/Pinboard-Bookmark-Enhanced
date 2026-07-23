@@ -445,6 +445,28 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(intentBlock.includes("archive: _archiveUserTouched ? archiveRequested : undefined"), "automatic archive choice is still sent as an override");
     });
 
+    test("summary ownership persists only after a saved delivery", () => {
+      const summarySnapshotIndex = submit.indexOf("const summaryOwnership =", ownershipIndex);
+      const savedStart = submit.indexOf('if (result.status === "saved")', sendIndex);
+      const savedEnd = submit.indexOf('if (result.status === "failed" && result.reason === "too_long")', savedStart);
+      const saved = submit.slice(savedStart, savedEnd);
+      const persistIndex = saved.indexOf("await pbpAiSaveSummaryOwnership(");
+      const recheckIndex = saved.indexOf("bookmarkLookup.generation !== lookupGenerationAtSave", persistIndex);
+      assert(summarySnapshotIndex > ownershipIndex && summarySnapshotIndex < intentIndex,
+        "summary ownership snapshot is not captured before save_intent");
+      assert(!submit.slice(sendIndex, savedStart).includes("pbpAiSaveSummaryOwnership"),
+        "queued or conflict path persists summary ownership");
+      assert(persistIndex >= 0 && saved.includes("try {") && saved.includes("catch (_) {}"),
+        "saved ownership persistence is not exception-isolated");
+      assert(saved.includes('savePolicy.mode === "create" || savePolicy.mode === "update"')
+        && saved.includes("? summaryOwnership") && saved.includes(": null"),
+        "create/update and merge ownership ranges differ incorrectly");
+      const recheck = saved.slice(recheckIndex - 40, recheckIndex + 250);
+      assert(recheckIndex > persistIndex && recheck.includes("!ownsSubmitUi()")
+        && recheck.includes("$id(\"url-input\").value.trim() !== url"),
+        "ownership persistence does not revalidate the submit UI, URL, and lookup generation");
+    });
+
     test("submit no longer builds or sends posts/add directly", () => {
       assert(!submit.includes("buildPostsAddUri"), "Popup submit still builds a posts/add URI");
       assert(!submit.includes("/posts/add"), "Popup submit still names posts/add");

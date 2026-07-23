@@ -1090,6 +1090,10 @@ function setupSubmit(token) {
         setSubmitState("idle");
         return;
       }
+      const summaryOwnership =
+        typeof pbpAiSummaryOwnershipSnapshot === "function"
+          ? pbpAiSummaryOwnershipSnapshot(extended)
+          : null;
       const intent = {
         mode: savePolicy.mode,
         url: saveUrl,
@@ -1172,6 +1176,19 @@ function setupSubmit(token) {
       }
 
       if (result.status === "saved") {
+        try {
+          if (typeof pbpAiSaveSummaryOwnership === "function") {
+            const exactRange =
+              savePolicy.mode === "create" || savePolicy.mode === "update"
+                ? summaryOwnership
+                : null;
+            await pbpAiSaveSummaryOwnership(
+              submitAccount, saveUrl, extended, exactRange);
+          }
+        } catch (_) {}
+        if (!ownsSubmitUi()
+            || bookmarkLookup.generation !== lookupGenerationAtSave
+            || $id("url-input").value.trim() !== url) return;
         if (typeof saveLastUsedTags === "function") saveLastUsedTags(tags, submitAccount);
         if (savePolicy.mode === "update") {
           existingBookmark = {
