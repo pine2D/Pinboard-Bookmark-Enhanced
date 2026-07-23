@@ -240,6 +240,9 @@
   "aiSummaryRemoved": {
     "message": "Podsumowanie usunięte"
   },
+  "aiSummaryMerged": {
+    "message": "Podsumowanie zostało połączone z notatkami i nie można go już usunąć osobno."
+  },
   "aiTagsRegenerated": {
     "message": "Tagi wygenerowane ponownie"
   },

@@ -240,6 +240,9 @@
   "aiSummaryRemoved": {
     "message": "Summary removed"
   },
+  "aiSummaryMerged": {
+    "message": "This summary has been merged with your notes and can no longer be removed separately."
+  },
   "aiTagsRegenerated": {
     "message": "Tags regenerated"
   },

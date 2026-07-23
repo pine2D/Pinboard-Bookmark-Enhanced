@@ -240,6 +240,9 @@
   "aiSummaryRemoved": {
     "message": "摘要已移除"
   },
+  "aiSummaryMerged": {
+    "message": "摘要已與備註合併，無法再單獨移除。"
+  },
   "aiTagsRegenerated": {
     "message": "標籤已重新產生"
   },

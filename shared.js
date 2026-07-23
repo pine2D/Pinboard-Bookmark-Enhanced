@@ -2352,10 +2352,10 @@ function injectEmptyState(container, svgKey, messageText) {
 // Decide whether to auto-restore a cached AI summary into the description.
 // Skip when (a) the page is already a bookmark — checkExistingBookmark restores
 // the user's saved `extended`, which already owns any summary they kept — or
-// (b) the description already contains an [AI Summary] block.
+// (b) the description already contains a legacy [AI Summary] block.
 // Pure function; extracted here for testability (popup-ai.js uses it at runtime).
-// ONE structurally complete [AI Summary] block, matched ANYWHERE in the
-// description (audit A11). The old end-anchored variant ($) had two
+// Match one structurally complete legacy block anywhere in the description
+// (audit A11). The old end-anchored variant ($) had two
 // failure modes: a user note typed AFTER the block made it invisible
 // (regenerate appended a duplicate, remove found nothing), and with two
 // markers present the lazy [\s\S]*? was forced by the anchor to span

@@ -240,6 +240,9 @@
   "aiSummaryRemoved": {
     "message": "Аннотация удалена"
   },
+  "aiSummaryMerged": {
+    "message": "Сводка объединена с заметками, поэтому удалить её отдельно больше нельзя."
+  },
   "aiTagsRegenerated": {
     "message": "Метки пересозданы"
   },

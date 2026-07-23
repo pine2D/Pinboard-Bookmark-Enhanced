@@ -651,6 +651,111 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!popupAiSource.includes("cur.replace(AI_BQ_REGEX"), "old single-replace upsert path must be gone");
     });
 
+    function summaryHelpers() {
+      const helperStart = popupAiSource.indexOf("function pbpAiWrapSummary");
+      const helperEnd = popupAiSource.indexOf("const AI_BQ_REGEX", helperStart);
+      assert(helperStart >= 0 && helperEnd > helperStart, "summary ownership helpers missing");
+      return new Function("escapeForExtended",
+        popupAiSource.slice(helperStart, helperEnd) +
+        "; return { pbpAiWrapSummary, pbpAiTrackSummaryRange, pbpAiRemoveSummaryRange };"
+      )((value) => "[" + value + "]");
+    }
+
+    test("new AI summaries contain only a marker-free blockquote", () => {
+      const { pbpAiWrapSummary } = summaryHelpers();
+      const wrapped = pbpAiWrapSummary("summary");
+      assert(wrapped === "<blockquote>[summary]</blockquote>", "unexpected wrapper: " + wrapped);
+      assert(!wrapped.includes("[AI Summary]"), "new wrapper still leaks the legacy marker");
+    });
+
+    test("editing before a tracked summary shifts both range edges", () => {
+      const { pbpAiTrackSummaryRange } = summaryHelpers();
+      const oldValue = "note\n\n<blockquote>summary</blockquote>\n\nafter";
+      const start = oldValue.indexOf("<blockquote>");
+      const end = oldValue.indexOf("</blockquote>") + "</blockquote>".length;
+      const tracked = pbpAiTrackSummaryRange({ start, end }, oldValue, "preface " + oldValue);
+      assert(tracked.kind === "owned" && tracked.start === start + 8 && tracked.end === end + 8,
+        "before-edit range did not shift equally");
+    });
+
+    test("editing inside a tracked summary adjusts only its end", () => {
+      const { pbpAiTrackSummaryRange } = summaryHelpers();
+      const oldValue = "note\n\n<blockquote>summary</blockquote>\n\nafter";
+      const start = oldValue.indexOf("<blockquote>");
+      const end = oldValue.indexOf("</blockquote>") + "</blockquote>".length;
+      const at = start + "<blockquote>".length;
+      const tracked = pbpAiTrackSummaryRange({ start, end }, oldValue,
+        oldValue.slice(0, at) + "edited " + oldValue.slice(at));
+      assert(tracked.kind === "owned" && tracked.start === start && tracked.end === end + 7,
+        "inside-edit changed the wrong range edge");
+    });
+
+    test("editing after a tracked summary leaves its range unchanged", () => {
+      const { pbpAiTrackSummaryRange } = summaryHelpers();
+      const oldValue = "note\n\n<blockquote>summary</blockquote>\n\nafter";
+      const start = oldValue.indexOf("<blockquote>");
+      const end = oldValue.indexOf("</blockquote>") + "</blockquote>".length;
+      const tracked = pbpAiTrackSummaryRange({ start, end }, oldValue, oldValue + " tail");
+      assert(tracked.kind === "owned" && tracked.start === start && tracked.end === end,
+        "after-edit moved the summary range");
+    });
+
+    test("deleting the complete tracked summary releases ownership", () => {
+      const { pbpAiTrackSummaryRange } = summaryHelpers();
+      const oldValue = "note\n\n<blockquote>summary</blockquote>\n\nafter";
+      const start = oldValue.indexOf("<blockquote>");
+      const end = oldValue.indexOf("</blockquote>") + "</blockquote>".length;
+      const tracked = pbpAiTrackSummaryRange({ start, end }, oldValue,
+        oldValue.slice(0, start) + oldValue.slice(end));
+      assert(tracked.kind === "deleted" && !("start" in tracked) && !("end" in tracked),
+        "complete deletion kept a removable range");
+    });
+
+    test("an edit crossing the summary boundary fails closed as merged", () => {
+      const { pbpAiTrackSummaryRange } = summaryHelpers();
+      const oldValue = "note\n\n<blockquote>summary</blockquote>\n\nafter";
+      const start = oldValue.indexOf("<blockquote>");
+      const end = oldValue.indexOf("</blockquote>") + "</blockquote>".length;
+      const tracked = pbpAiTrackSummaryRange({ start, end }, oldValue,
+        oldValue.slice(0, start - 2) + "joined" + oldValue.slice(start + 5));
+      assert(tracked.kind === "merged" && !("start" in tracked) && !("end" in tracked),
+        "cross-boundary edit retained a guessed deletion range");
+    });
+
+    test("tracked and legacy removal preserve surrounding notes while regeneration migrates legacy blocks", () => {
+      const { pbpAiRemoveSummaryRange } = summaryHelpers();
+      const value = "before\n\n<blockquote>summary</blockquote>\n\nafter";
+      const start = value.indexOf("<blockquote>");
+      const end = value.indexOf("</blockquote>") + "</blockquote>".length;
+      const removed = pbpAiRemoveSummaryRange(value, { start, end });
+      assert(removed.removed && removed.value === "before\n\nafter", "tracked removal damaged surrounding notes");
+      const invalid = pbpAiRemoveSummaryRange(value, { start: -1, end });
+      assert(!invalid.removed && invalid.value === value, "invalid ownership guessed a deletion");
+
+      const runtimeStart = popupAiSource.indexOf("function pbpAiWrapSummary");
+      const runtimeEnd = popupAiSource.indexOf("// Unified \"no AI key\"", runtimeStart);
+      assert(runtimeStart >= 0 && runtimeEnd > runtimeStart, "summary runtime source missing");
+      const createRuntime = (description) => {
+        const field = { value: description };
+        const api = new Function("_AI_BQ_REGEX_SHARED", "escapeForExtended", "$id",
+          "updateCharCount", "autoResizeTextarea",
+          popupAiSource.slice(runtimeStart, runtimeEnd) +
+          "; return { upsertSummary, removeSummary };"
+        )(_AI_BQ_REGEX_SHARED, (text) => text, () => field, () => {}, () => {});
+        return { field, ...api };
+      };
+      const legacy = "before\n\n[AI Summary]\n<blockquote>old</blockquote>\n\nafter";
+      const migrated = createRuntime(legacy);
+      migrated.upsertSummary("new");
+      assert(migrated.field.value === "before\n\n<blockquote>new</blockquote>\n\nafter",
+        "legacy regeneration did not migrate in place");
+      migrated.removeSummary();
+      assert(migrated.field.value === "before\n\nafter", "tracked migrated block was not removable");
+      const legacyRemoval = createRuntime(legacy);
+      legacyRemoval.removeSummary();
+      assert(legacyRemoval.field.value === "before\n\nafter", "legacy fallback removal damaged notes");
+    });
+
     await testAsync("popup summary cache, render, and inflight work are session-account scoped", async () => {
       const fetchStart = popupAiSource.indexOf("async function fetchAIArtifacts");
       const fetchEnd = popupAiSource.indexOf("// ---- AI Summary core logic", fetchStart);

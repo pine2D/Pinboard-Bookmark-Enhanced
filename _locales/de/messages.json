@@ -240,6 +240,9 @@
   "aiSummaryRemoved": {
     "message": "Zusammenfassung entfernt"
   },
+  "aiSummaryMerged": {
+    "message": "Die Zusammenfassung wurde mit deinen Notizen zusammengeführt und kann nicht mehr separat entfernt werden."
+  },
   "aiTagsRegenerated": {
     "message": "Tags neu generiert"
   },

@@ -184,12 +184,77 @@ function _aiOpStillCurrent(account) {
     && _aiUrlEquivalent($id("url-input").value, pageInfo.url);
 }
 
-const AI_SUMMARY_TAG = "[AI Summary]";
-// Single source of truth: the regex literal lives in shared.js (_AI_BQ_REGEX_SHARED),
-// which popup.html loads before popup-ai.js. Alias it here so the [AI Summary]
-// blockquote pattern can never drift between the two files (F3).
+function pbpAiWrapSummary(summary) {
+  return `<blockquote>${escapeForExtended(summary)}</blockquote>`;
+}
+
+function _pbpAiSummaryRangeValid(value, range) {
+  return !!range &&
+    Number.isInteger(range.start) &&
+    Number.isInteger(range.end) &&
+    range.start >= 0 &&
+    range.end > range.start &&
+    range.end <= value.length;
+}
+
+// Locate one continuous textarea edit through its longest common prefix/suffix.
+// Ownership fails closed when that edit crosses a summary/note boundary.
+function pbpAiTrackSummaryRange(range, oldValue, newValue) {
+  const oldText = String(oldValue || "");
+  const newText = String(newValue || "");
+  if (!_pbpAiSummaryRangeValid(oldText, range)) return { kind: "merged" };
+
+  let oldStart = 0;
+  while (oldStart < oldText.length &&
+         oldStart < newText.length &&
+         oldText[oldStart] === newText[oldStart]) oldStart++;
+
+  let oldEnd = oldText.length;
+  let newEnd = newText.length;
+  while (oldEnd > oldStart &&
+         newEnd > oldStart &&
+         oldText[oldEnd - 1] === newText[newEnd - 1]) {
+    oldEnd--;
+    newEnd--;
+  }
+
+  const delta = newEnd - oldEnd;
+  if (oldEnd <= range.start) {
+    return { kind: "owned", start: range.start + delta, end: range.end + delta };
+  }
+  if (oldStart >= range.end) {
+    return { kind: "owned", start: range.start, end: range.end };
+  }
+  if (oldStart >= range.start && oldEnd <= range.end) {
+    const end = range.end + delta;
+    return end <= range.start
+      ? { kind: "deleted" }
+      : { kind: "owned", start: range.start, end };
+  }
+  return { kind: "merged" };
+}
+
+function pbpAiRemoveSummaryRange(value, range) {
+  const text = String(value || "");
+  if (!_pbpAiSummaryRangeValid(text, range)) return { value: text, removed: false };
+  let before = text.slice(0, range.start);
+  let after = text.slice(range.end);
+  if (before.endsWith("\n\n") && after.startsWith("\n\n")) {
+    after = after.slice(2);
+  } else if (before.endsWith("\n\n")) {
+    before = before.slice(0, -2);
+  } else if (after.startsWith("\n\n")) {
+    after = after.slice(2);
+  }
+  return { value: before + after, removed: true };
+}
+
+// Legacy recognition only: new summaries no longer write [AI Summary].
+// The regex literal lives in shared.js so old-block migration/removal cannot drift.
 const AI_BQ_REGEX = _AI_BQ_REGEX_SHARED;
 // pbpShouldRestoreCachedSummary is defined in shared.js (pure helper, B4).
+let _aiSummaryRange = null;
+let _aiSummaryValue = "";
 
 // ---- Setup AI feature listeners ----
 // ---- AI Error Card ----
@@ -345,6 +410,27 @@ function setupAIFeatures() {
     await doAISummary(false);
   });
 
+  const descriptionInput = $id("description-input");
+  _aiSummaryValue = descriptionInput.value;
+  descriptionInput.addEventListener("input", () => {
+    const nextValue = descriptionInput.value;
+    if (!_aiSummaryRange) {
+      _aiSummaryValue = nextValue;
+      return;
+    }
+    const tracked = pbpAiTrackSummaryRange(_aiSummaryRange, _aiSummaryValue, nextValue);
+    _aiSummaryValue = nextValue;
+    if (tracked.kind === "owned") {
+      _aiSummaryRange = { start: tracked.start, end: tracked.end };
+      return;
+    }
+    _aiSummaryRange = null;
+    _aiResetSummaryActions();
+    if (tracked.kind === "merged") {
+      showStatus("status-msg", t("aiSummaryMerged"), "error");
+    }
+  });
+
   // Auto-restore cached summary only for fresh (non-bookmarked) pages whose
   // description doesn't already contain a summary. For existing bookmarks,
   // checkExistingBookmark (popup.js) restores the user's saved `extended` — we
@@ -379,38 +465,64 @@ function _aiSummaryBlockMatches(text) {
 }
 
 // ---- Insert or replace AI summary in description ----
-// Replaces the LAST existing block IN PLACE (a user note typed after the
-// block stays after it - the old append-at-end variant only recognized
-// end-anchored blocks and duplicated the summary otherwise, audit A11).
+// Replace the session-owned range, migrate the last legacy block in place,
+// or append a new block without rewriting surrounding notes.
 function upsertSummary(summary) {
   const di = $id("description-input");
   const cur = di.value;
-  const wrapped = `${AI_SUMMARY_TAG}\n<blockquote>${escapeForExtended(summary)}</blockquote>`;
-  const matches = _aiSummaryBlockMatches(cur);
-  if (matches.length) {
-    const last = matches[matches.length - 1];
-    const lead = last[1] || ""; // keep the captured \n\n separator if present
-    di.value = (cur.slice(0, last.index) + lead + wrapped + cur.slice(last.index + last[0].length)).trim();
+  const wrapped = pbpAiWrapSummary(summary);
+  let next;
+  let start;
+  if (_aiSummaryValue === cur && _pbpAiSummaryRangeValid(cur, _aiSummaryRange)) {
+    start = _aiSummaryRange.start;
+    next = cur.slice(0, start) + wrapped + cur.slice(_aiSummaryRange.end);
   } else {
-    const base = cur.trim();
-    di.value = base ? base + "\n\n" + wrapped : wrapped;
+    _aiSummaryRange = null;
+    const matches = _aiSummaryBlockMatches(cur);
+    if (matches.length) {
+      const last = matches[matches.length - 1];
+      const lead = last[1] || "";
+      start = last.index + lead.length;
+      next = cur.slice(0, last.index) + lead + wrapped + cur.slice(last.index + last[0].length);
+    } else {
+      const separator = !cur || cur.endsWith("\n\n") ? "" : (cur.endsWith("\n") ? "\n" : "\n\n");
+      start = cur.length + separator.length;
+      next = cur + separator + wrapped;
+    }
   }
+  di.value = next;
+  _aiSummaryRange = { start, end: start + wrapped.length };
+  _aiSummaryValue = next;
   updateCharCount();
   autoResizeTextarea(di);
 }
 
 // ---- Remove AI summary block from description ----
-// Removes only the LAST block; text before and after it is preserved.
+// Remove only the session-owned range, or the last identifiable legacy block.
 function removeSummary() {
   const di = $id("description-input");
   const cur = di.value;
-  const matches = _aiSummaryBlockMatches(cur);
-  if (matches.length) {
-    const last = matches[matches.length - 1];
-    di.value = (cur.slice(0, last.index) + cur.slice(last.index + last[0].length)).trim();
+  let removed = { value: cur, removed: false };
+  if (_aiSummaryValue === cur && _pbpAiSummaryRangeValid(cur, _aiSummaryRange)) {
+    removed = pbpAiRemoveSummaryRange(cur, _aiSummaryRange);
+  } else {
+    _aiSummaryRange = null;
+    const matches = _aiSummaryBlockMatches(cur);
+    if (matches.length) {
+      const last = matches[matches.length - 1];
+      const lead = last[1] || "";
+      removed = pbpAiRemoveSummaryRange(cur, {
+        start: last.index + lead.length,
+        end: last.index + last[0].length
+      });
+    }
   }
+  if (removed.removed) di.value = removed.value;
+  _aiSummaryRange = null;
+  _aiSummaryValue = di.value;
   updateCharCount();
   autoResizeTextarea(di);
+  return removed.removed;
 }
 
 // Unified "no AI key" prompt: one feedback card shared by AI summary and AI tags so
@@ -619,6 +731,18 @@ async function doAISummary(forceRefresh, sOverride) {
   }
 }
 
+function _aiResetSummaryActions() {
+  const btn = $id("ai-summary-btn");
+  btn?.parentElement?.querySelector(".cache-hint-wrap")?.remove();
+  if (btn) {
+    setBtnIcon(btn, "robot", t("aiSummaryBtn"));
+    btn.classList.remove("loading");
+    btn.classList.toggle("hidden", settings.optShowAiSummary === false);
+  }
+  const hint = $id("ai-summary-hint");
+  if (hint && settings.optShowAiSummary !== false) hint.classList.remove("hidden");
+}
+
 // ---- Show regenerate + remove actions after summary is inserted ----
 function showSummaryActions(fromCache) {
   const btn = $id("ai-summary-btn");
@@ -655,13 +779,9 @@ function showSummaryActions(fromCache) {
 
   removeLink.addEventListener("click", (e) => {
     e.preventDefault();
-    removeSummary();
-    wrap.remove();
-    setBtnIcon(btn, "robot", t("aiSummaryBtn"));
-    btn.classList.remove("hidden", "loading");
-    const hint = $id("ai-summary-hint");
-    if (hint && settings.optShowAiSummary !== false) hint.classList.remove("hidden");
-    showStatus("status-msg", t("aiSummaryRemoved"), "success");
+    const removed = removeSummary();
+    _aiResetSummaryActions();
+    showStatus("status-msg", t(removed ? "aiSummaryRemoved" : "aiSummaryMerged"), removed ? "success" : "error");
   });
 
   regenLink.addEventListener("click", async (e) => {

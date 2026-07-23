@@ -223,6 +223,22 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-yes:hover { 
     mdCss.includes(".pb-tr-err::after") && mdCss.includes("content: attr(data-tip)"),
     "translation failure reasons still depend on native title tooltips or lack a themed hover/focus surface");
 }
+{
+  const upsert = popupAiJs.slice(popupAiJs.indexOf("function upsertSummary"),
+    popupAiJs.indexOf("// ---- Remove AI summary"));
+  const setupAi = popupAiJs.slice(popupAiJs.indexOf("function setupAIFeatures"),
+    popupAiJs.indexOf("function _aiSummaryBlockMatches"));
+  check(!popupAiJs.includes('const AI_SUMMARY_TAG = "[AI Summary]"') &&
+    !upsert.includes("AI_SUMMARY_TAG") &&
+    popupAiJs.includes("function pbpAiTrackSummaryRange") &&
+    popupAiJs.includes("function pbpAiRemoveSummaryRange") &&
+    setupAi.includes("pbpAiTrackSummaryRange") &&
+    setupAi.includes("_aiResetSummaryActions()") &&
+    setupAi.includes('t("aiSummaryMerged")') &&
+    sharedJs.includes("const _AI_BQ_REGEX_SHARED") &&
+    sharedJs.includes("legacy"),
+    "popup AI summary ownership still writes a marker, lacks fail-closed range tracking, or dropped legacy recognition");
+}
 
 const optionsTabs = optionsHtml.slice(optionsHtml.indexOf('<div class="tabs"'), optionsHtml.indexOf('</div>', optionsHtml.indexOf('<div class="tabs"')) + 6);
 check(!optionsTabs.includes('id="reset-panel-btn"') && /id="mobile-tab-select"/.test(optionsHtml),
