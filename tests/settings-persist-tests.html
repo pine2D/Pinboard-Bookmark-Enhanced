@@ -170,6 +170,43 @@ async function run() {
       folderMode: "managed", relativePath: "", layoutVersion: 0,
     }));
 
+  const freshPendingCfg = {
+    baseUrl: "https://dav.example.com/base/",
+    folderMode: "managed",
+    relativePath: "",
+  };
+  const freshPendingVersion = typeof pbpWebdavLiveLayoutVersion === "function"
+    ? pbpWebdavLiveLayoutVersion({
+      baseUrl: "", folderMode: "managed", relativePath: "", layoutVersion: 0,
+    }, freshPendingCfg, false, 0)
+    : 0;
+  check("E1 a newly entered base persists v1 provenance and stays non-legacy after reload",
+    freshPendingVersion === 1 &&
+    !pbpWebdavShouldInspectLegacy({
+      ...freshPendingCfg, layoutVersion: freshPendingVersion,
+    }, {
+      ...freshPendingCfg, layoutVersion: freshPendingVersion,
+    }));
+
+  check("E1 v0 survives credential rotation only for a true unchanged legacy target",
+    typeof pbpWebdavLiveLayoutVersion === "function" &&
+    pbpWebdavLiveLayoutVersion(initialLegacy, {
+      ...initialLegacy, user: "rotated-user",
+    }, false, 0) === 0 &&
+    pbpWebdavLiveLayoutVersion({
+      ...initialLegacy, layoutVersion: 1,
+    }, {
+      ...initialLegacy, layoutVersion: 1, user: "rotated-user",
+    }, false, 1) === 1 &&
+    pbpWebdavLiveLayoutVersion(initialLegacy, {
+      ...initialLegacy, user: "rotated-after-promotion",
+    }, false, 2) === 1 &&
+    !pbpWebdavShouldInspectLegacy({
+      ...initialLegacy, layoutVersion: 1,
+    }, {
+      ...initialLegacy, layoutVersion: 1,
+    }));
+
   check("E1 clear remains available for partial WebDAV configuration without a URL",
     typeof pbpWebdavHasLocalConfig === "function" &&
     !pbpWebdavHasLocalConfig({

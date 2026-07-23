@@ -120,15 +120,15 @@ const popupTagsJs = read("popup-tags.js");
   const freezeAt = confirm.indexOf("await pbpWebdavFreezeTarget(");
   const writableAt = confirm.indexOf("await pbpWebdavProbeWritable(");
   const locatorAt = confirm.indexOf("await pbpWebdavWriteLocator(");
-  const promoteAt = confirm.indexOf("await pbpPromoteTestedWebdavLayoutV2(");
+  const persistAt = confirm.indexOf("await persistSettings(targetSettings)");
   check(confirm.includes("consent.targetId") &&
     confirm.includes("consent.backupFileUrl") &&
     confirm.includes("consent.user") &&
     confirm.includes("consent.generation") &&
     confirm.includes("_webdavUiGuard.isCurrent(") &&
     freezeAt >= 0 && writableAt > freezeAt && locatorAt > writableAt &&
-    promoteAt > locatorAt,
-  "options.js: migration confirmation is not generation/target-bound or promotes before test and locator CAS");
+    persistAt > locatorAt,
+  "options.js: migration confirmation is not generation/target-bound or persists before test and locator CAS");
   const lockHelper = optionsJs.slice(
     optionsJs.indexOf("function pbpLockWebdavMigrationControls("),
     optionsJs.indexOf("let _tagGovVisibleAccount")
@@ -140,21 +140,35 @@ const popupTagsJs = read("popup-tags.js");
     lockHelper.includes('setAttribute("aria-busy", "true")') &&
     lockHelper.includes("control.disabled = true") &&
     lockHelper.includes("control.disabled = disabled[index]") &&
-    writableAt > pauseAt && locatorAt > writableAt && applyAt > locatorAt &&
-    confirm.includes("candidateApplied &&") &&
-    confirm.includes("_webdavUiGuard.isCurrent(operation)") &&
+    writableAt > pauseAt && locatorAt > writableAt &&
+    persistAt > locatorAt && applyAt > persistAt &&
+    !confirm.includes("candidateApplied") &&
+    !confirm.includes("saveAll") &&
+    !confirm.includes("pbpPromoteTestedWebdavLayoutV2") &&
     confirm.includes("unlockControls()"),
-  "options.js: migration confirmation can mutate or clobber target fields while asynchronous work is active");
+  "options.js: migration confirmation still depends on a v0 DOM save and debounced rollback");
+  const targetBatch = confirm.slice(
+    confirm.indexOf("const targetSettings = {"),
+    persistAt
+  );
+  check(["webdavUrl", "webdavUser", "webdavPass", "webdavFolderMode",
+    "webdavRelativePath", "webdavLayoutVersion"]
+    .every((key) => targetBatch.includes(key)) &&
+    targetBatch.includes("obfuscateKey(liveCfg.pass)") &&
+    targetBatch.includes("PBP_WEBDAV_LAYOUT_VERSION") &&
+    confirm.indexOf("savedState.settings = Object.assign(", persistAt) > persistAt &&
+    confirm.indexOf("_loadedWebdavLayoutVersion = PBP_WEBDAV_LAYOUT_VERSION", persistAt) > persistAt,
+  "options.js: confirmed WebDAV target and layout v2 are not one routed settings batch");
   const catchAt = confirm.indexOf("} catch (error) {");
   const finallyAt = confirm.indexOf("} finally {", catchAt);
   const catchBlock = confirm.slice(catchAt, finallyAt);
-  check(catchAt > promoteAt && finallyAt > catchAt &&
+  check(catchAt > persistAt && finallyAt > catchAt &&
     confirm.indexOf('failureKey = "webdavStageLocatorFailed"') < locatorAt &&
-    confirm.indexOf('failureKey = "optSaveFailed"') < promoteAt &&
+    confirm.indexOf('failureKey = "optSaveFailed"') < persistAt &&
     catchBlock.includes("operation || state.operation") &&
     catchBlock.includes("_webdavUiGuard.isCurrent(") &&
     catchBlock.includes('t(failureKey)') &&
-    /if \(!promoted\.ok\) \{[\s\S]{0,240}t\("optSaveFailed"\)/.test(confirm) &&
+    /if \(!persisted\.ok\) \{[\s\S]{0,240}t\("optSaveFailed"\)/.test(confirm) &&
     confirm.indexOf("unlockControls()", finallyAt) > finallyAt,
   "options.js: rejected migration probe, locator or persistence work escapes without guarded feedback");
 }
@@ -368,6 +382,7 @@ const popupTagsJs = read("popup-tags.js");
   );
   check(cfgFromForm.includes("folderMode: _pbpWebdavFolderModeFromForm()") &&
     cfgFromForm.includes('relativePath: $id("opt-webdav-relative-path").value') &&
+    cfgFromForm.includes("pbpWebdavLiveLayoutVersion(") &&
     cfgFromForm.includes("_loadedWebdavLayoutVersion") &&
     cfgFromForm.includes("_loadedWebdavTargetBinding") &&
     !cfgFromForm.includes('folderMode: "managed"') &&

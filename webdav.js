@@ -9,6 +9,7 @@
 const PBP_WEBDAV_FILENAME = "pinboard-bookmark-enhanced-settings.json";
 const PBP_WEBDAV_APP_COLLECTION = "pinboard-bookmark-enhanced";
 const PBP_WEBDAV_LOCATOR_FILENAME = "location.json";
+const PBP_WEBDAV_PENDING_LAYOUT_VERSION = 1;
 const PBP_WEBDAV_LAYOUT_VERSION = 2;
 const PBP_WEBDAV_WRITE_TEST_PREFIX = "pinboard-bookmark-enhanced-write-test-";
 const PBP_WEBDAV_SYNC_STATE_KEY = "_webdavSyncState";
@@ -70,6 +71,7 @@ function pbpWebdavNormalizeRelativePath(value) {
   }
   const segments = raw.split("/");
   if (segments.some((segment) => !segment)) return { ok: false, error: "segment" };
+  const decodedSegments = [];
   for (const segment of segments) {
     let decoded;
     try { decoded = decodeURIComponent(segment); }
@@ -78,11 +80,13 @@ function pbpWebdavNormalizeRelativePath(value) {
         decoded.includes("/") || decoded.includes("\\")) {
       return { ok: false, error: "segment" };
     }
+    decodedSegments.push(decoded);
   }
   return {
     ok: true,
-    value: segments.map((segment) => decodeURIComponent(segment)).join("/") + "/",
-    encoded: segments.map((segment) => encodeURIComponent(decodeURIComponent(segment))).join("/") + "/",
+    value: decodedSegments.map(
+      (segment) => segment.replace(/%/g, "%25")).join("/") + "/",
+    encoded: decodedSegments.map((segment) => encodeURIComponent(segment)).join("/") + "/",
   };
 }
 
@@ -95,10 +99,7 @@ function pbpWebdavSplitLegacyCollection(value) {
   const parts = url.pathname.replace(/\/+$/, "").split("/");
   const lastEncoded = parts.pop();
   if (!lastEncoded) return { ok: false, error: "root" };
-  let last;
-  try { last = decodeURIComponent(lastEncoded); }
-  catch (_) { return { ok: false, error: "encoding" }; }
-  const path = pbpWebdavNormalizeRelativePath(last);
+  const path = pbpWebdavNormalizeRelativePath(lastEncoded);
   if (!path.ok) return path;
   url.pathname = parts.join("/") + "/";
   const managed = path.value === PBP_WEBDAV_APP_COLLECTION + "/";
@@ -505,6 +506,14 @@ async function pbpWebdavWriteLocator(cfg, target, nextRelativePath, expectedRemo
   if (current.exists && current.relativePath === next.value) return { ok: true, noop: true };
   if (current.exists && current.relativePath !== expected.value) {
     return { ok: false, error: "locator-conflict", stage: "locator-compare" };
+  }
+  if (current.exists && !current.etag) {
+    return {
+      ok: false,
+      error: "locator-conflict",
+      stage: "locator-compare",
+      reason: "missing-etag",
+    };
   }
 
   const text = pbpWebdavLocatorText(next.value);

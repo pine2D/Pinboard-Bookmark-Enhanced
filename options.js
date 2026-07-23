@@ -180,12 +180,23 @@ function pbpWebdavShouldInspectLegacy(initial, live) {
   const initialMode = initial?.folderMode === "custom" ? "custom" : "managed";
   const liveMode = live?.folderMode === "custom" ? "custom" : "managed";
   return !!initialBase &&
-    Number(initial?.layoutVersion ?? initial?.webdavLayoutVersion ?? 0) !==
-      PBP_WEBDAV_LAYOUT_VERSION &&
+    Number(initial?.layoutVersion ?? initial?.webdavLayoutVersion ?? 0) === 0 &&
     initialBase === liveBase &&
     initialMode === liveMode &&
     String(initial?.relativePath ?? initial?.webdavRelativePath ?? "") ===
       String(live?.relativePath ?? live?.webdavRelativePath ?? "");
+}
+
+function pbpWebdavLiveLayoutVersion(
+  initial, live, sameLoadedTarget, loadedVersion
+) {
+  if (!String(live?.baseUrl ?? live?.webdavUrl ?? "").trim()) return 0;
+  if (sameLoadedTarget) return Number(loadedVersion || 0);
+  if (Number(loadedVersion || 0) !== 0) {
+    return PBP_WEBDAV_PENDING_LAYOUT_VERSION;
+  }
+  return pbpWebdavShouldInspectLegacy(initial, live)
+    ? 0 : PBP_WEBDAV_PENDING_LAYOUT_VERSION;
 }
 
 function pbpWebdavHasLocalConfig(cfg) {
@@ -1807,8 +1818,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
     const target = pbpWebdavResolveTarget(cfg);
     const binding = target.ok ? JSON.stringify([target.backupFileUrl, cfg.user]) : "";
-    cfg.layoutVersion = binding && binding === _loadedWebdavTargetBinding
-      ? _loadedWebdavLayoutVersion : 0;
+    cfg.layoutVersion = pbpWebdavLiveLayoutVersion(
+      _initialWebdavMigrationConfig,
+      cfg,
+      !!binding && binding === _loadedWebdavTargetBinding,
+      _loadedWebdavLayoutVersion
+    );
     return cfg;
   }
 
@@ -2225,13 +2240,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         !_webdavUiGuard.isCurrent(state.operation)) return;
 
     const unlockControls = _pbpLockWebdavMigrationControls();
-    const previous = {
-      baseUrl: $id("opt-webdav-url").value,
-      folderMode: _pbpWebdavFolderModeFromForm(),
-      relativePath: $id("opt-webdav-relative-path").value,
-    };
     let completed = false;
-    let candidateApplied = false;
     let paused = false;
     let operation = null;
     let failureKey = "webdavStageWriteFailed";
@@ -2277,49 +2286,38 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       failureKey = "optSaveFailed";
       if (!_webdavUiGuard.isCurrent(state.operation)) return;
+      const targetSettings = {
+        webdavUrl: liveCfg.baseUrl,
+        webdavUser: liveCfg.user,
+        webdavPass: obfuscateKey(liveCfg.pass),
+        webdavFolderMode: liveCfg.folderMode,
+        webdavRelativePath: liveCfg.folderMode === "custom"
+          ? liveCfg.relativePath : "",
+        webdavLayoutVersion: PBP_WEBDAV_LAYOUT_VERSION,
+      };
+      const persisted = await persistSettings(targetSettings);
+      if (!persisted.ok) {
+        if (_webdavUiGuard.isCurrent(state.operation)) {
+          $id("webdav-migration-status").textContent = t("optSaveFailed");
+        }
+        return;
+      }
+      if (!_webdavUiGuard.isCurrent(state.operation)) return;
+
+      savedState.settings = Object.assign(
+        {}, savedState.settings, targetSettings);
+      Object.assign(s, targetSettings, { webdavPass: liveCfg.pass });
+      _loadedWebdavTargetBinding = JSON.stringify([
+        target.backupFileUrl, liveCfg.user]);
+      _loadedWebdavLayoutVersion = PBP_WEBDAV_LAYOUT_VERSION;
       $id("opt-webdav-url").value = candidate.cfg.baseUrl;
       document.querySelector(
         `input[name="webdav-folder-mode"][value="${candidate.cfg.folderMode}"]`
       ).checked = true;
       $id("opt-webdav-relative-path").value =
         candidate.cfg.folderMode === "custom" ? candidate.cfg.relativePath : "";
-      candidateApplied = true;
-      _pbpRenderWebdavTarget(_pbpWebdavCfgFromForm(), false);
 
       operation = _webdavUiGuard.begin();
-      const appliedCfg = _pbpWebdavCfgFromForm();
-      const appliedTarget = await pbpWebdavFreezeTarget(appliedCfg);
-      if (!_webdavUiGuard.isCurrent(operation) ||
-          !appliedTarget.ok ||
-          appliedTarget.targetId !== consent.targetId ||
-          appliedTarget.backupFileUrl !== consent.backupFileUrl ||
-          appliedTarget.user !== consent.user) return;
-
-      const testedBinding = _pbpWebdavOperationBinding(appliedCfg);
-      const promoted = await pbpPromoteTestedWebdavLayoutV2(testedBinding, {
-        getLiveBinding: () =>
-          _pbpWebdavOperationBinding(_pbpWebdavCfgFromForm()),
-        saveLive: saveAll,
-        persistVersion: () => persistSettings({ webdavLayoutVersion: 2 }),
-        markPersisted: () => {
-          savedState.settings = Object.assign(
-            {}, savedState.settings, { webdavLayoutVersion: 2 });
-        },
-        commitLoaded: () => {
-          const currentCfg = _pbpWebdavCfgFromForm();
-          const currentTarget = pbpWebdavResolveTarget(currentCfg);
-          _loadedWebdavTargetBinding = JSON.stringify([
-            currentTarget.backupFileUrl, currentCfg.user]);
-          _loadedWebdavLayoutVersion = 2;
-          s.webdavLayoutVersion = 2;
-        },
-      });
-      if (!promoted.ok) {
-        if (_webdavUiGuard.isCurrent(operation)) {
-          $id("webdav-migration-status").textContent = t("optSaveFailed");
-        }
-        return;
-      }
       completed = true;
       _webdavMigrationState = null;
       const statusEl = $id("webdav-status");
@@ -2337,15 +2335,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         statusEl.style.color = "#c00";
       }
     } finally {
-      if (!completed && candidateApplied &&
-          _webdavUiGuard.isCurrent(operation)) {
-        $id("opt-webdav-url").value = previous.baseUrl;
-        document.querySelector(
-          `input[name="webdav-folder-mode"][value="${previous.folderMode}"]`
-        ).checked = true;
-        $id("opt-webdav-relative-path").value = previous.relativePath;
-        _pbpRenderWebdavTarget(_pbpWebdavCfgFromForm(), false);
-      }
       if (paused) resumeOptionsAutoSave();
       unlockControls();
       if (completed) _pbpRenderWebdavTarget();

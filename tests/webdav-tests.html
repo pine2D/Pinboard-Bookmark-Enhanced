@@ -82,6 +82,36 @@ section("WebDAV folder target resolution");
     custom.relativePath === "Backups/读书/" &&
     custom.backupCollectionUrl === "https://dav.example.com/dav/Backups/%E8%AF%BB%E4%B9%A6/");
 
+  const percentPath = pbpWebdavNormalizeRelativePath("100%25/读书/");
+  const percentPathAgain = percentPath.ok
+    ? pbpWebdavNormalizeRelativePath(percentPath.value)
+    : null;
+  const percentTarget = percentPath.ok
+    ? pbpWebdavResolveTarget({
+      baseUrl: "https://dav.example.com/dav/",
+      folderMode: "custom",
+      relativePath: percentPath.value,
+    })
+    : null;
+  const percentDecision = percentTarget?.ok
+    ? pbpWebdavDecideLocation(percentTarget.relativePath, {
+      ok: true,
+      exists: true,
+      relativePath: percentPath.value,
+    })
+    : null;
+  check("canonical custom paths preserve literal percent and remain stable across normalize, resolve and decision",
+    percentPath.ok &&
+    percentPath.value === "100%25/读书/" &&
+    percentPathAgain?.ok &&
+    percentPathAgain.value === percentPath.value &&
+    percentTarget?.ok &&
+    percentTarget.relativePath === percentPath.value &&
+    percentTarget.backupCollectionUrl ===
+      "https://dav.example.com/dav/100%25/%E8%AF%BB%E4%B9%A6/" &&
+    percentDecision?.kind === "same" &&
+    percentDecision.relativePath === percentPath.value);
+
   check("a full URL is rejected",
     pbpWebdavNormalizeRelativePath("https://other.example/x").error === "absolute");
   check("a leading slash is rejected",
@@ -114,6 +144,24 @@ section("WebDAV legacy layout migration decisions");
     split.relativePath === "Legacy/" &&
     split.legacyCollectionUrl ===
       "https://dav.example.com/root/Legacy/?access_token=abc%2Fdef");
+
+  const percentSplit = typeof pbpWebdavSplitLegacyCollection === "function"
+    ? pbpWebdavSplitLegacyCollection(
+      "https://dav.example.com/root/100%25/")
+    : null;
+  const percentTarget = percentSplit?.ok
+    ? pbpWebdavResolveTarget({
+      baseUrl: percentSplit.baseUrl,
+      folderMode: percentSplit.folderMode,
+      relativePath: percentSplit.relativePath,
+    })
+    : null;
+  check("legacy split decodes an encoded percent exactly once and preserves the target",
+    percentSplit?.ok &&
+    percentSplit.relativePath === "100%25/" &&
+    percentTarget?.ok &&
+    percentTarget.backupCollectionUrl ===
+      "https://dav.example.com/root/100%25/");
 
   const managedSplit = typeof pbpWebdavSplitLegacyCollection === "function"
     ? pbpWebdavSplitLegacyCollection(
@@ -682,6 +730,63 @@ async function runChromeLayerTests() {
       conflict?.error === "locator-conflict" &&
       conflictRequests.map((request) => request.method).join(",") === "PROPFIND,PROPFIND,GET" &&
       !conflictRequests.some((request) => request.method === "PUT"));
+
+    const noEtagRequests = [];
+    const noEtagResponses = [
+      locatorResponse(207), locatorResponse(207),
+      locatorResponse(200, JSON.stringify({
+        schemaVersion: 1,
+        relativePath: locatorTarget.relativePath,
+      })),
+    ];
+    globalThis.fetch = async (url, opts) => {
+      noEtagRequests.push({
+        url,
+        method: opts.method,
+        headers: Object.assign({}, opts.headers),
+      });
+      return noEtagResponses.shift() || locatorResponse(500);
+    };
+    const noEtag = typeof pbpWebdavWriteLocator === "function"
+      ? await pbpWebdavWriteLocator(
+        locatorCfg, locatorTarget, "Other/Books/", locatorTarget.relativePath)
+      : null;
+    check("an existing locator without a strong ETag cannot be changed by an unconditional PUT",
+      noEtag?.error === "locator-conflict" &&
+      noEtag.stage === "locator-compare" &&
+      noEtag.reason === "missing-etag" &&
+      !noEtagRequests.some((request) => request.method === "PUT"));
+
+    const percentCfg = Object.assign({}, locatorCfg, {
+      relativePath: "100%25/读书/",
+    });
+    const percentTarget = await pbpWebdavFreezeTarget(percentCfg);
+    const percentRequests = [];
+    const percentResponses = [
+      locatorResponse(207), locatorResponse(207),
+      locatorResponse(200, JSON.stringify({
+        schemaVersion: 1,
+        relativePath: "100%25/读书/",
+      }), '"percent-locator"'),
+    ];
+    globalThis.fetch = async (url, opts) => {
+      percentRequests.push({ url, method: opts.method });
+      return percentResponses.shift() || locatorResponse(500);
+    };
+    const percentLocator = percentTarget?.ok &&
+      typeof pbpWebdavWriteLocator === "function"
+      ? await pbpWebdavWriteLocator(
+        percentCfg, percentTarget,
+        percentTarget.relativePath, percentTarget.relativePath)
+      : null;
+    check("canonical percent path can re-enter locator comparison without mutation",
+      percentTarget?.ok &&
+      percentTarget.relativePath === "100%25/读书/" &&
+      percentLocator?.ok &&
+      percentLocator.noop === true &&
+      percentRequests.map((request) => request.method).join(",") ===
+        "PROPFIND,PROPFIND,GET" &&
+      !percentRequests.some((request) => request.method === "PUT"));
   } finally {
     globalThis.fetch = realLocatorFetch;
   }
