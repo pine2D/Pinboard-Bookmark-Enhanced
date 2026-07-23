@@ -824,6 +824,64 @@ async function runChromeLayerTests() {
       percentRequests.map((request) => request.method).join(",") ===
         "PROPFIND,PROPFIND,GET" &&
       !percentRequests.some((request) => request.method === "PUT"));
+
+    const casRequests = [];
+    let casResponses = [
+      locatorResponse(207), locatorResponse(207),
+      locatorResponse(200, JSON.stringify({
+        schemaVersion: 1,
+        relativePath: locatorTarget.relativePath,
+      }), '"cas-v1"'),
+      locatorResponse(204),
+    ];
+    globalThis.fetch = async (url, opts) => {
+      casRequests.push({ method: opts.method, headers: { ...opts.headers } });
+      return casResponses.shift() || locatorResponse(500);
+    };
+    const casUpdated = await pbpWebdavWriteLocator(
+      locatorCfg, locatorTarget, "Other/Books/", locatorTarget.relativePath);
+
+    const createRequests = [];
+    const createText = pbpWebdavLocatorText("Created/Path/");
+    casResponses = [
+      locatorResponse(207), locatorResponse(207), locatorResponse(404),
+      locatorResponse(201), locatorResponse(200, createText, '"created"'),
+    ];
+    globalThis.fetch = async (url, opts) => {
+      createRequests.push({ method: opts.method, headers: { ...opts.headers } });
+      return casResponses.shift() || locatorResponse(500);
+    };
+    const created = await pbpWebdavWriteLocator(
+      locatorCfg, locatorTarget, "Created/Path/", "Created/Path/");
+
+    const conflicts = [];
+    for (const status of [409, 412]) {
+      casResponses = [
+        locatorResponse(207), locatorResponse(207),
+        locatorResponse(200, JSON.stringify({
+          schemaVersion: 1,
+          relativePath: locatorTarget.relativePath,
+        }), '"cas-v1"'),
+        locatorResponse(status),
+      ];
+      globalThis.fetch = async () =>
+        casResponses.shift() || locatorResponse(500);
+      conflicts.push(await pbpWebdavWriteLocator(
+        locatorCfg, locatorTarget, "Other/Books/", locatorTarget.relativePath));
+    }
+    check("locator writes use strong CAS, create-only verification and conflict mapping",
+      casUpdated?.ok &&
+      casRequests.find((request) => request.method === "PUT")
+        ?.headers["If-Match"] === '"cas-v1"' &&
+      created?.ok &&
+      createRequests.find((request) => request.method === "PUT")
+        ?.headers["If-None-Match"] === "*" &&
+      createRequests.map((request) => request.method).join(",") ===
+        "PROPFIND,PROPFIND,GET,PUT,GET" &&
+      conflicts.every((result, index) =>
+        result?.error === "locator-conflict" &&
+        result.stage === "locator-put" &&
+        result.status === [409, 412][index]));
   } finally {
     globalThis.fetch = realLocatorFetch;
   }
@@ -904,6 +962,10 @@ async function runChromeLayerTests() {
     targetId !== "" && otherUserId !== "" && otherUserId !== targetId);
   check("WebDAV file URL is part of the remote resource identity",
     targetId !== "" && otherUrlId !== "" && otherUrlId !== targetId);
+  check("caller-supplied targetId cannot replace the frozen target identity",
+    await pbpWebdavTargetId(Object.assign({}, stateCfg, {
+      targetId: "forged-target-id",
+    })) === targetId);
 
   const stateStore = {};
   const realStateChrome = globalThis.chrome;
@@ -1573,6 +1635,27 @@ async function runChromeLayerTests() {
       ? await pbpWebdavEnsureCollectionPath(cfg, managedTarget, managedTarget.relativePath) : null;
     check("intermediate MKCOL auth failure is reported at mkdir stage",
       mkdirAuth && !mkdirAuth.ok && mkdirAuth.error === "auth" && mkdirAuth.stage === "mkdir");
+
+    const verifyRequests = [];
+    const verifyResponses = [
+      collectionResponse(207, COLLECTION_XML), collectionResponse(404),
+      collectionResponse(405), collectionResponse(500),
+    ];
+    globalThis.fetch = async (url, opts) => {
+      verifyRequests.push({ url, method: opts.method });
+      return verifyResponses.shift();
+    };
+    const mkdirVerify = managedTarget &&
+      typeof pbpWebdavEnsureCollectionPath === "function"
+      ? await pbpWebdavEnsureCollectionPath(
+        cfg, managedTarget, managedTarget.relativePath)
+      : null;
+    check("MKCOL 405 still requires a successful collection verification",
+      mkdirVerify && !mkdirVerify.ok &&
+      mkdirVerify.stage === "mkdir-verify" &&
+      mkdirVerify.status === 500 &&
+      verifyRequests.slice(1).map((request) => request.method).join(",") ===
+        "PROPFIND,MKCOL,PROPFIND");
 
     const writableTarget = {
       baseCollectionUrl: "https://dav.example.com/dav/",

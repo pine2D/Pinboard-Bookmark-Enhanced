@@ -55,7 +55,6 @@ async function pbpWebdavSha256(text) {
 }
 
 async function pbpWebdavTargetId(cfg) {
-  if (cfg && cfg.targetId) return String(cfg.targetId);
   const target = await pbpWebdavFreezeTarget(cfg);
   return target.ok ? target.targetId : "";
 }
