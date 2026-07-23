@@ -113,9 +113,33 @@
         <input type="file" id="import-settings-file" accept=".json" hidden />
         <span class="save-status" id="import-status" role="status" aria-live="polite"></span>
       </div>
-      <p class="hint" data-i18n="webdavHint">Back up your settings to the WebDAV folder URL you enter. The file is named pinboard-bookmark-enhanced-settings.json. API keys are never included.</p>
-      <div class="fg"><label class="bl" for="opt-webdav-url" data-i18n="webdavUrlLabel">Backup folder URL</label><input type="text" id="opt-webdav-url" placeholder="https://dav.example.com/backups/" autocomplete="off" spellcheck="false" /></div>
+      <div class="fg">
+        <label class="bl" for="opt-webdav-url" data-i18n="webdavUrlLabel">WebDAV base URL</label>
+        <input type="text" id="opt-webdav-url" placeholder="https://dav.example.com/dav/" autocomplete="off" spellcheck="false" />
+        <p class="hint" id="webdav-url-hint" data-i18n="webdavHint">Enter the WebDAV address from your provider. The extension creates a dedicated backup folder instead of placing the backup in the service root.</p>
+      </div>
       <p class="hint hint-warn" id="webdav-http-warn" hidden data-i18n="mdTargetWebhookHttpWarn"></p>
+      <details class="webdav-disclosure" data-acc-key="webdav-folder">
+        <summary data-i18n="webdavFolderAdvanced">Backup folder</summary>
+        <div class="webdav-details-body">
+          <fieldset class="webdav-folder-mode">
+            <legend data-i18n="webdavFolderModeLabel">Folder mode</legend>
+            <label><input type="radio" name="webdav-folder-mode" value="managed" checked /> <span data-i18n="webdavFolderManaged">Manage automatically</span></label>
+            <p class="hint" data-i18n="webdavFolderManagedHint">Uses pinboard-bookmark-enhanced/ under the base URL.</p>
+            <label><input type="radio" name="webdav-folder-mode" value="custom" /> <span data-i18n="webdavFolderCustom">Use a custom relative path</span></label>
+          </fieldset>
+          <div class="fg" id="webdav-relative-row" hidden>
+            <label class="bl" for="opt-webdav-relative-path" data-i18n="webdavRelativePathLabel">Relative folder path</label>
+            <input type="text" id="opt-webdav-relative-path" placeholder="Backups/Pinboard/" aria-describedby="webdav-relative-hint webdav-path-error" autocomplete="off" spellcheck="false" />
+            <p class="hint" id="webdav-relative-hint" data-i18n="webdavRelativePathHint">Relative to the base URL. Full URLs and parent paths are not allowed.</p>
+            <p class="field-error" id="webdav-path-error" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </details>
+      <div class="webdav-actual">
+        <span id="webdav-actual-label" data-i18n="webdavActualLocation">Actual backup location</span>
+        <output id="webdav-actual-location" for="opt-webdav-url opt-webdav-relative-path" aria-labelledby="webdav-actual-label"></output>
+      </div>
       <div class="fg"><label class="bl" for="opt-webdav-user" data-i18n="webdavUserLabel">Username (optional)</label><input type="text" id="opt-webdav-user" autocomplete="off" spellcheck="false" /></div>
       <div class="fg"><label class="bl" for="opt-webdav-pass" data-i18n="webdavPassLabel">Password (optional)</label><span class="key-wrap"><input type="password" id="opt-webdav-pass" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="opt-webdav-pass" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span></div>
       <div class="fg">
@@ -127,10 +151,10 @@
         </select>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button class="btn" id="webdav-test-btn" data-i18n="webdavTestBtn">Test</button>
-        <button class="btn" id="webdav-push-btn" data-i18n="webdavPushBtn">Push now</button>
-        <button class="btn" id="webdav-pull-btn" data-i18n="webdavPullBtn">Pull now</button>
-        <span class="save-status" id="webdav-status"></span>
+        <button class="btn" id="webdav-test-btn" data-i18n="webdavTestBtn" disabled>Test</button>
+        <button class="btn" id="webdav-push-btn" data-i18n="webdavPushBtn" disabled>Push now</button>
+        <button class="btn" id="webdav-pull-btn" data-i18n="webdavPullBtn" disabled>Pull now</button>
+        <span class="save-status" id="webdav-status" role="status" aria-live="polite"></span>
       </div>
       <div class="divider"></div>
       <div class="section-title" data-i18n="secNotifications">Notifications</div>

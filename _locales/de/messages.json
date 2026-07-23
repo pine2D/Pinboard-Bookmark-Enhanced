@@ -936,10 +936,58 @@
     "message": "Einstellungen aus JSON-Datei importieren"
   },
   "webdavHint": {
-    "message": "Sichere deine Einstellungen im angegebenen WebDAV-Ordner. Die Datei heißt pinboard-bookmark-enhanced-settings.json. API-Schlüssel sind nicht enthalten."
+    "message": "Gib die WebDAV-Adresse deines Anbieters ein. Die Erweiterung erstellt einen eigenen Sicherungsordner, statt die Sicherung im Stammverzeichnis des Dienstes abzulegen."
   },
   "webdavUrlLabel": {
-    "message": "URL des Sicherungsordners"
+    "message": "WebDAV-Basis-URL"
+  },
+  "webdavFolderAdvanced": {
+    "message": "Sicherungsordner"
+  },
+  "webdavFolderModeLabel": {
+    "message": "Ordnermodus"
+  },
+  "webdavFolderManaged": {
+    "message": "Automatisch verwalten"
+  },
+  "webdavFolderManagedHint": {
+    "message": "Verwendet pinboard-bookmark-enhanced/ unter der Basis-URL."
+  },
+  "webdavFolderCustom": {
+    "message": "Benutzerdefinierten relativen Pfad verwenden"
+  },
+  "webdavRelativePathLabel": {
+    "message": "Relativer Ordnerpfad"
+  },
+  "webdavRelativePathHint": {
+    "message": "Relativ zur Basis-URL. Vollständige URLs und übergeordnete Pfade sind nicht zulässig."
+  },
+  "webdavActualLocation": {
+    "message": "Tatsächlicher Sicherungsort"
+  },
+  "webdavRelativePathAbsolute": {
+    "message": "Gib einen relativen Ordnerpfad ein, keine vollständige URL und keinen absoluten Pfad."
+  },
+  "webdavRelativePathSegments": {
+    "message": "Entferne leere Pfadteile, . und .., Abfrageparameter, Fragmente und umgekehrte Schrägstriche."
+  },
+  "webdavRelativePathEncoding": {
+    "message": "Korrigiere die ungültige Prozentkodierung im Ordnerpfad."
+  },
+  "webdavStageBaseFailed": {
+    "message": "Die Basis-URL konnte nicht als WebDAV-Ordner geöffnet werden."
+  },
+  "webdavStageCreateFailed": {
+    "message": "Der Sicherungsordner konnte nicht erstellt oder bestätigt werden."
+  },
+  "webdavStageWriteFailed": {
+    "message": "Der Sicherungsordner wurde gefunden, aber eine temporäre Datei konnte nicht geschrieben werden."
+  },
+  "webdavStageCleanupWarning": {
+    "message": "Der Schreibtest war erfolgreich, aber die temporäre Datei konnte nicht gelöscht werden."
+  },
+  "webdavStageLocatorFailed": {
+    "message": "Der Sicherungsordner funktioniert, aber sein Speicherorteintrag konnte nicht aktualisiert werden."
   },
   "webdavUserLabel": {
     "message": "Benutzername (optional)"

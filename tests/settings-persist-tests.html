@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", (event) => event.stopImmediateProp
 <script src="../shared.js"></script>
 <script src="../options-backup.js"></script>
 <script src="../export-targets.js"></script>
+<script src="../webdav.js"></script>
 <script>
 async function pbpWebdavReadAutoPush() { return "off"; }
 async function pbpWebdavWriteAutoPush(value) { return value; }
@@ -75,6 +76,54 @@ async function run() {
   check("E1 settings delta: nested settings use value equality",
     Object.keys(pbpSettingsDelta({ ...baselineSettings, urlClean: { ...baselineSettings.urlClean } }, baselineSettings)).length === 0 &&
     pbpSettingsDelta({ ...baselineSettings, urlClean: { ...baselineSettings.urlClean, enabled: false } }, baselineSettings).urlClean.enabled === false);
+  check("E1 WebDAV folder settings default to managed, empty path and unconfirmed layout",
+    SETTINGS_DEFAULTS.webdavFolderMode === "managed" &&
+    SETTINGS_DEFAULTS.webdavRelativePath === "" &&
+    SETTINGS_DEFAULTS.webdavLayoutVersion === 0);
+  const webdavFolderDelta = pbpSettingsDelta({
+    webdavFolderMode: "custom",
+    webdavRelativePath: "Backups/Pinboard/",
+    webdavLayoutVersion: 2,
+  }, {
+    webdavFolderMode: "managed",
+    webdavRelativePath: "",
+    webdavLayoutVersion: 0,
+  });
+  check("E1 settings delta preserves WebDAV folder mode, path and layout version",
+    webdavFolderDelta.webdavFolderMode === "custom" &&
+    webdavFolderDelta.webdavRelativePath === "Backups/Pinboard/" &&
+    webdavFolderDelta.webdavLayoutVersion === 2);
+  const webdavPortableSettings = Object.assign({}, SETTINGS_DEFAULTS, {
+    webdavUrl: "https://dav.example.com/base/",
+    webdavUser: "alice",
+    webdavPass: "obf:secret",
+    webdavFolderMode: "custom",
+    webdavRelativePath: "Backups/Pinboard/",
+    webdavLayoutVersion: 2,
+    webdavAutoPush: "daily",
+  });
+  const manualWebdavSnapshot = pbpBuildBackupSnapshot(
+    webdavPortableSettings, {}, { includeWebdavTransport: true });
+  check("E1 manual backup keeps the portable WebDAV folder target",
+    manualWebdavSnapshot.webdavUrl === "https://dav.example.com/base/" &&
+    manualWebdavSnapshot.webdavUser === "alice" &&
+    manualWebdavSnapshot.webdavFolderMode === "custom" &&
+    manualWebdavSnapshot.webdavRelativePath === "Backups/Pinboard/" &&
+    manualWebdavSnapshot.webdavLayoutVersion === 2);
+  check("E1 manual backup excludes the WebDAV password and device schedule",
+    !("webdavPass" in manualWebdavSnapshot) &&
+    !("webdavAutoPush" in manualWebdavSnapshot));
+  const remoteWebdavSnapshot = pbpBuildBackupSnapshot(
+    webdavPortableSettings, {}, { includeWebdavTransport: false });
+  check("E1 WebDAV snapshot excludes its transport and folder target",
+    ["webdavUrl", "webdavUser", "webdavPass", "webdavAutoPush",
+      "webdavFolderMode", "webdavRelativePath", "webdavLayoutVersion"]
+      .every((key) => !(key in remoteWebdavSnapshot)));
+  const preparedWebdavPull = pbpWebdavPreparePullPayload(webdavPortableSettings);
+  check("E1 WebDAV pull discards legacy transport and folder target fields",
+    ["webdavUrl", "webdavUser", "webdavPass", "webdavAutoPush",
+      "webdavFolderMode", "webdavRelativePath", "webdavLayoutVersion"]
+      .every((key) => !(key in preparedWebdavPull)));
 
   let persistedDelta = null;
   let settingsSavedDelta = null;

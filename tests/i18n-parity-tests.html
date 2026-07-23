@@ -32,11 +32,37 @@ async function loadLocale(loc) {
     "webdavHashMode",
     "webdavVerifyFailed",
   ];
+  const WEBDAV_FOLDER_KEYS = [
+    "webdavUrlLabel",
+    "webdavHint",
+    "webdavFolderAdvanced",
+    "webdavFolderModeLabel",
+    "webdavFolderManaged",
+    "webdavFolderManagedHint",
+    "webdavFolderCustom",
+    "webdavRelativePathLabel",
+    "webdavRelativePathHint",
+    "webdavActualLocation",
+    "webdavRelativePathAbsolute",
+    "webdavRelativePathSegments",
+    "webdavRelativePathEncoding",
+    "webdavStageBaseFailed",
+    "webdavStageCreateFailed",
+    "webdavStageWriteFailed",
+    "webdavStageCleanupWarning",
+    "webdavStageLocatorFailed",
+  ];
   for (const loc of LOCALES) {
     check(`WebDAV status messages present in ${loc}`,
-      WEBDAV_STATUS_KEYS.every((key) => !!msgs[loc][key]?.message),
-      `${loc} missing: ${WEBDAV_STATUS_KEYS.filter((key) => !msgs[loc][key]?.message).join(", ")}`);
+      [...WEBDAV_STATUS_KEYS, ...WEBDAV_FOLDER_KEYS].every((key) => !!msgs[loc][key]?.message),
+      `${loc} missing: ${[...WEBDAV_STATUS_KEYS, ...WEBDAV_FOLDER_KEYS]
+        .filter((key) => !msgs[loc][key]?.message).join(", ")}`);
   }
+  const webdavPlaceholderShape = (message) => JSON.stringify(message?.placeholders || {});
+  check("WebDAV folder message placeholders match English in every locale",
+    LOCALES.every((loc) => WEBDAV_FOLDER_KEYS.every((key) =>
+      !!msgs[loc][key]?.message &&
+      webdavPlaceholderShape(msgs[loc][key]) === webdavPlaceholderShape(msgs.en[key]))));
 
   // H1: AI/Jina cluster must be present and translated (≠ English) in these
   // locales — EXCEPT values that are legitimately identical to English in that

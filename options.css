@@ -1568,22 +1568,32 @@ html[data-theme] .preset-preview-content { background: var(--opt-bg); color: var
   background: color-mix(in srgb, var(--opt-accent, #4477bb) 10%, transparent);
   color: var(--opt-fg, #333);
 }
-.vocab-disclosure {
+.vocab-disclosure,
+.webdav-disclosure {
   margin-top: var(--opt-sp-4);
   border-top: 1px solid var(--opt-border-section, var(--opt-border, #ddd));
 }
-.vocab-disclosure > summary {
+.vocab-disclosure > summary,
+.webdav-disclosure > summary {
   padding: var(--opt-sp-4) 0;
   color: var(--opt-fg-muted, #555);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
-.vocab-disclosure > summary:focus-visible { outline: 2px solid var(--opt-accent); outline-offset: 2px; }
+.vocab-disclosure > summary:focus-visible,
+.webdav-disclosure > summary:focus-visible { outline: 2px solid var(--opt-accent); outline-offset: 2px; }
 .vocab-details-body { padding: 0 0 var(--opt-sp-3); }
 html[data-theme="flexoki-dark"] #panel-vocab .vocab-details-body > .hint {
   color: var(--opt-fg-muted);
 }
+.webdav-details-body { padding-bottom: var(--opt-sp-3); }
+.webdav-folder-mode { display: grid; gap: var(--opt-sp-2); margin: 0; padding: 0; border: 0; }
+.webdav-folder-mode .hint { margin: 0 0 var(--opt-sp-2) 22px; }
+.webdav-actual { margin: var(--opt-sp-3) 0 var(--opt-sp-4); overflow-wrap: anywhere; font-size: 12px; }
+.webdav-actual output { display: block; margin-top: var(--opt-sp-1); color: var(--opt-fg-muted, #555); }
+.field-error { margin: var(--opt-sp-2) 0 0; color: var(--opt-danger, #c00); font-size: 12px; }
+.field-error:empty { display: none; }
 /* Vocab toolbar: 5 children (count/export/anki/eudic/status), not the
    3-column grid .notes-toolbar was shaped for (search+count+filter) -- a
    flex row lets the buttons wrap together instead of colliding with a grid

@@ -936,10 +936,58 @@
     "message": "JSONファイルから設定をインポート"
   },
   "webdavHint": {
-    "message": "入力した URL の WebDAV フォルダーに設定をバックアップします。ファイル名は pinboard-bookmark-enhanced-settings.json です。API キーは含まれません。"
+    "message": "プロバイダーから案内された WebDAV アドレスを入力します。拡張機能はサービスのルート直下ではなく、専用のバックアップフォルダーを作成します。"
   },
   "webdavUrlLabel": {
-    "message": "バックアップ先フォルダーの URL"
+    "message": "WebDAV ベース URL"
+  },
+  "webdavFolderAdvanced": {
+    "message": "バックアップフォルダー"
+  },
+  "webdavFolderModeLabel": {
+    "message": "フォルダーモード"
+  },
+  "webdavFolderManaged": {
+    "message": "自動で管理"
+  },
+  "webdavFolderManagedHint": {
+    "message": "ベース URL の下に pinboard-bookmark-enhanced/ を使用します。"
+  },
+  "webdavFolderCustom": {
+    "message": "カスタム相対パスを使用"
+  },
+  "webdavRelativePathLabel": {
+    "message": "フォルダーの相対パス"
+  },
+  "webdavRelativePathHint": {
+    "message": "ベース URL からの相対パスです。完全な URL と親パスは使用できません。"
+  },
+  "webdavActualLocation": {
+    "message": "実際のバックアップ先"
+  },
+  "webdavRelativePathAbsolute": {
+    "message": "相対フォルダーパスを入力してください。完全な URL や絶対パスは使用できません。"
+  },
+  "webdavRelativePathSegments": {
+    "message": "空のパス区切り、.、..、クエリ、フラグメント、バックスラッシュを削除してください。"
+  },
+  "webdavRelativePathEncoding": {
+    "message": "フォルダーパスの不正なパーセントエンコードを修正してください。"
+  },
+  "webdavStageBaseFailed": {
+    "message": "ベース URL を WebDAV フォルダーとして開けませんでした。"
+  },
+  "webdavStageCreateFailed": {
+    "message": "バックアップフォルダーを作成または確認できませんでした。"
+  },
+  "webdavStageWriteFailed": {
+    "message": "バックアップフォルダーは見つかりましたが、一時ファイルを書き込めませんでした。"
+  },
+  "webdavStageCleanupWarning": {
+    "message": "書き込みテストは成功しましたが、一時ファイルを削除できませんでした。"
+  },
+  "webdavStageLocatorFailed": {
+    "message": "バックアップフォルダーは使用できますが、場所の記録を更新できませんでした。"
   },
   "webdavUserLabel": {
     "message": "ユーザー名（任意）"

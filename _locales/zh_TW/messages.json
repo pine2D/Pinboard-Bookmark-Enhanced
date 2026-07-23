@@ -936,10 +936,58 @@
     "message": "從 JSON 檔案匯入設定"
   },
   "webdavHint": {
-    "message": "將設定備份到所填網址對應的 WebDAV 資料夾。檔名固定為 pinboard-bookmark-enhanced-settings.json。不包含 API 金鑰。"
+    "message": "輸入服務供應商提供的 WebDAV 位址。擴充功能會建立專用的備份資料夾，不會將備份直接放在服務的根目錄。"
   },
   "webdavUrlLabel": {
-    "message": "備份資料夾網址"
+    "message": "WebDAV 基礎網址"
+  },
+  "webdavFolderAdvanced": {
+    "message": "備份資料夾"
+  },
+  "webdavFolderModeLabel": {
+    "message": "資料夾模式"
+  },
+  "webdavFolderManaged": {
+    "message": "自動管理"
+  },
+  "webdavFolderManagedHint": {
+    "message": "在基礎網址下使用 pinboard-bookmark-enhanced/。"
+  },
+  "webdavFolderCustom": {
+    "message": "使用自訂相對路徑"
+  },
+  "webdavRelativePathLabel": {
+    "message": "相對資料夾路徑"
+  },
+  "webdavRelativePathHint": {
+    "message": "相對於基礎網址。不得輸入完整網址或上層路徑。"
+  },
+  "webdavActualLocation": {
+    "message": "實際備份位置"
+  },
+  "webdavRelativePathAbsolute": {
+    "message": "請輸入相對資料夾路徑，不要輸入完整網址或絕對路徑。"
+  },
+  "webdavRelativePathSegments": {
+    "message": "請移除空白路徑區段、.、..、查詢字串、網址片段和反斜線。"
+  },
+  "webdavRelativePathEncoding": {
+    "message": "請修正資料夾路徑中無效的百分比編碼。"
+  },
+  "webdavStageBaseFailed": {
+    "message": "無法將基礎網址當作 WebDAV 資料夾開啟。"
+  },
+  "webdavStageCreateFailed": {
+    "message": "無法建立或驗證備份資料夾。"
+  },
+  "webdavStageWriteFailed": {
+    "message": "已找到備份資料夾，但無法寫入暫存檔。"
+  },
+  "webdavStageCleanupWarning": {
+    "message": "寫入測試已通過，但無法刪除暫存檔。"
+  },
+  "webdavStageLocatorFailed": {
+    "message": "備份資料夾可用，但無法更新其位置記錄。"
   },
   "webdavUserLabel": {
     "message": "使用者名稱（可選）"

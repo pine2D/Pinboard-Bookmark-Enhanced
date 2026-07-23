@@ -936,10 +936,58 @@
     "message": "Импортировать настройки из JSON-файла"
   },
   "webdavHint": {
-    "message": "Сохраняйте резервную копию настроек в указанной папке WebDAV. Имя файла: pinboard-bookmark-enhanced-settings.json. Ключи API не включаются."
+    "message": "Введите адрес WebDAV, предоставленный сервисом. Расширение создаёт отдельную папку резервных копий и не помещает копию в корневой каталог сервиса."
   },
   "webdavUrlLabel": {
-    "message": "URL папки резервных копий"
+    "message": "Базовый URL WebDAV"
+  },
+  "webdavFolderAdvanced": {
+    "message": "Папка резервных копий"
+  },
+  "webdavFolderModeLabel": {
+    "message": "Режим папки"
+  },
+  "webdavFolderManaged": {
+    "message": "Управлять автоматически"
+  },
+  "webdavFolderManagedHint": {
+    "message": "В базовом URL используется папка pinboard-bookmark-enhanced/."
+  },
+  "webdavFolderCustom": {
+    "message": "Указать свой относительный путь"
+  },
+  "webdavRelativePathLabel": {
+    "message": "Относительный путь к папке"
+  },
+  "webdavRelativePathHint": {
+    "message": "Путь задаётся относительно базового URL. Полные URL и переходы в родительские каталоги запрещены."
+  },
+  "webdavActualLocation": {
+    "message": "Фактическое расположение резервной копии"
+  },
+  "webdavRelativePathAbsolute": {
+    "message": "Укажите относительный путь к папке, а не полный URL или абсолютный путь."
+  },
+  "webdavRelativePathSegments": {
+    "message": "Удалите пустые сегменты, . и .., строки запроса, фрагменты и обратные косые черты."
+  },
+  "webdavRelativePathEncoding": {
+    "message": "Исправьте недопустимое процентное кодирование в пути к папке."
+  },
+  "webdavStageBaseFailed": {
+    "message": "Не удалось открыть базовый URL как папку WebDAV."
+  },
+  "webdavStageCreateFailed": {
+    "message": "Не удалось создать или проверить папку резервных копий."
+  },
+  "webdavStageWriteFailed": {
+    "message": "Папка резервных копий найдена, но записать в неё временный файл не удалось."
+  },
+  "webdavStageCleanupWarning": {
+    "message": "Проверка записи прошла успешно, но удалить временный файл не удалось."
+  },
+  "webdavStageLocatorFailed": {
+    "message": "Папка резервных копий работает, но обновить запись о её расположении не удалось."
   },
   "webdavUserLabel": {
     "message": "Имя пользователя (необязательно)"

@@ -936,10 +936,58 @@
     "message": "从 JSON 文件导入设置"
   },
   "webdavHint": {
-    "message": "将设置备份到所填地址对应的 WebDAV 文件夹。文件名固定为 pinboard-bookmark-enhanced-settings.json。不包含 API 密钥。"
+    "message": "填写服务商提供的 WebDAV 地址。扩展会创建专用备份文件夹，不会把备份直接放在服务根目录。"
   },
   "webdavUrlLabel": {
-    "message": "备份文件夹地址"
+    "message": "WebDAV 基础地址"
+  },
+  "webdavFolderAdvanced": {
+    "message": "备份文件夹"
+  },
+  "webdavFolderModeLabel": {
+    "message": "文件夹模式"
+  },
+  "webdavFolderManaged": {
+    "message": "自动管理"
+  },
+  "webdavFolderManagedHint": {
+    "message": "在基础地址下使用 pinboard-bookmark-enhanced/。"
+  },
+  "webdavFolderCustom": {
+    "message": "使用自定义相对路径"
+  },
+  "webdavRelativePathLabel": {
+    "message": "相对文件夹路径"
+  },
+  "webdavRelativePathHint": {
+    "message": "以基础地址为起点。不能填写完整网址，也不能使用上级路径。"
+  },
+  "webdavActualLocation": {
+    "message": "实际备份位置"
+  },
+  "webdavRelativePathAbsolute": {
+    "message": "请填写相对文件夹路径，不要填写完整网址或绝对路径。"
+  },
+  "webdavRelativePathSegments": {
+    "message": "请删除空路径段、.、..、查询参数、片段标识和反斜杠。"
+  },
+  "webdavRelativePathEncoding": {
+    "message": "请修正文件夹路径中无效的百分号编码。"
+  },
+  "webdavStageBaseFailed": {
+    "message": "无法将基础地址作为 WebDAV 文件夹打开。"
+  },
+  "webdavStageCreateFailed": {
+    "message": "无法创建或验证备份文件夹。"
+  },
+  "webdavStageWriteFailed": {
+    "message": "已找到备份文件夹，但无法写入临时文件。"
+  },
+  "webdavStageCleanupWarning": {
+    "message": "写入测试已通过，但无法删除临时文件。"
+  },
+  "webdavStageLocatorFailed": {
+    "message": "备份文件夹可用，但无法更新其位置记录。"
   },
   "webdavUserLabel": {
     "message": "用户名（可选）"

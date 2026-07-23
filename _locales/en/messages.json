@@ -936,10 +936,58 @@
     "message": "Import settings from JSON file"
   },
   "webdavHint": {
-    "message": "Back up your settings to the WebDAV folder URL you enter. The file is named pinboard-bookmark-enhanced-settings.json. API keys are never included."
+    "message": "Enter the WebDAV address from your provider. The extension creates a dedicated backup folder instead of placing the backup in the service root."
   },
   "webdavUrlLabel": {
-    "message": "Backup folder URL"
+    "message": "WebDAV base URL"
+  },
+  "webdavFolderAdvanced": {
+    "message": "Backup folder"
+  },
+  "webdavFolderModeLabel": {
+    "message": "Folder mode"
+  },
+  "webdavFolderManaged": {
+    "message": "Manage automatically"
+  },
+  "webdavFolderManagedHint": {
+    "message": "Uses pinboard-bookmark-enhanced/ under the base URL."
+  },
+  "webdavFolderCustom": {
+    "message": "Use a custom relative path"
+  },
+  "webdavRelativePathLabel": {
+    "message": "Relative folder path"
+  },
+  "webdavRelativePathHint": {
+    "message": "Relative to the base URL. Full URLs and parent paths are not allowed."
+  },
+  "webdavActualLocation": {
+    "message": "Actual backup location"
+  },
+  "webdavRelativePathAbsolute": {
+    "message": "Enter a relative folder path, not a full URL or absolute path."
+  },
+  "webdavRelativePathSegments": {
+    "message": "Remove empty segments, ., .., query strings, fragments, and backslashes."
+  },
+  "webdavRelativePathEncoding": {
+    "message": "Fix the invalid percent encoding in the folder path."
+  },
+  "webdavStageBaseFailed": {
+    "message": "The base URL could not be opened as a WebDAV folder."
+  },
+  "webdavStageCreateFailed": {
+    "message": "The backup folder could not be created or verified."
+  },
+  "webdavStageWriteFailed": {
+    "message": "The backup folder was found, but a temporary file could not be written."
+  },
+  "webdavStageCleanupWarning": {
+    "message": "The write test passed, but its temporary file could not be removed."
+  },
+  "webdavStageLocatorFailed": {
+    "message": "The backup folder works, but its location record could not be updated."
   },
   "webdavUserLabel": {
     "message": "Username (optional)"

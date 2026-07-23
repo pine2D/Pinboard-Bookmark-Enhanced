@@ -890,6 +890,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   await pbpMigrateSecretsToLocal();
   let s = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
   deobfuscateSettings(s);
+  let _loadedWebdavLayoutVersion = Number(s.webdavLayoutVersion || 0);
+  const loadedWebdavTarget = pbpWebdavResolveTarget({
+    baseUrl: deobfuscateKey(s.webdavUrl || ""),
+    user: deobfuscateKey(s.webdavUser || ""),
+    folderMode: s.webdavFolderMode,
+    relativePath: s.webdavRelativePath,
+  });
+  let _loadedWebdavTargetBinding = loadedWebdavTarget.ok
+    ? JSON.stringify([loadedWebdavTarget.backupFileUrl, deobfuscateKey(s.webdavUser || "")])
+    : "";
   s.webdavAutoPush = await pbpWebdavReadAutoPush({
     baseUrl: deobfuscateKey(s.webdavUrl || ""),
     user: deobfuscateKey(s.webdavUser || ""),
@@ -1070,6 +1080,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-translate-glossary": s.translateGlossary,
     "opt-selection-trigger": s.selectionTrigger,
     "opt-webdav-url": deobfuscateKey(s.webdavUrl || ""),
+    "opt-webdav-relative-path": String(s.webdavRelativePath || ""),
     "opt-webdav-user": deobfuscateKey(s.webdavUser || ""),
     "opt-webdav-pass": s.webdavPass,
     "opt-webdav-autopush": s.webdavAutoPush || "off",
@@ -1082,6 +1093,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const el = $id(id);
     if (el) el.value = val;
   }
+  const webdavFolderModeRadio = document.querySelector(
+    `input[name="webdav-folder-mode"][value="${s.webdavFolderMode === "custom" ? "custom" : "managed"}"]`);
+  if (webdavFolderModeRadio) webdavFolderModeRadio.checked = true;
 
   // Show default prompts as placeholder so users see them when field is empty
   $id("opt-custom-tag-prompt").placeholder = DEFAULT_TAG_PROMPT;
@@ -1607,16 +1621,61 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- WebDAV: config straight from the live form (never storage) ----
   // Avoids racing the 500ms debounced auto-save -- a click right after typing
   // a URL must not test/push/pull against a stale stored value.
+  function _pbpWebdavFolderModeFromForm() {
+    return document.querySelector('input[name="webdav-folder-mode"]:checked')?.value === "custom"
+      ? "custom" : "managed";
+  }
+
   function _pbpWebdavCfgFromForm() {
-    return {
+    const cfg = {
       baseUrl: $id("opt-webdav-url").value.trim(),
       user: $id("opt-webdav-user").value.trim(),
       pass: $id("opt-webdav-pass").value.trim(),
-      folderMode: s.webdavFolderMode,
-      relativePath: s.webdavRelativePath,
-      layoutVersion: s.webdavLayoutVersion,
+      folderMode: _pbpWebdavFolderModeFromForm(),
+      relativePath: $id("opt-webdav-relative-path").value,
       includeHighlights: $id("opt-backup-include-highlights").checked,
     };
+    const target = pbpWebdavResolveTarget(cfg);
+    const binding = target.ok ? JSON.stringify([target.backupFileUrl, cfg.user]) : "";
+    cfg.layoutVersion = binding && binding === _loadedWebdavTargetBinding
+      ? _loadedWebdavLayoutVersion : 0;
+    return cfg;
+  }
+
+  const _webdavPathErrorKeys = {
+    absolute: "webdavRelativePathAbsolute",
+    empty: "webdavRelativePathSegments",
+    segment: "webdavRelativePathSegments",
+    separator: "webdavRelativePathSegments",
+    encoding: "webdavRelativePathEncoding",
+  };
+
+  function _pbpRenderWebdavTarget(cfg = _pbpWebdavCfgFromForm(), persistNormalization = true) {
+    const custom = cfg.folderMode === "custom";
+    const customPath = custom ? pbpWebdavNormalizeRelativePath(cfg.relativePath) : null;
+    if (customPath?.ok && customPath.value === PBP_WEBDAV_APP_COLLECTION + "/") {
+      document.querySelector('input[name="webdav-folder-mode"][value="managed"]').checked = true;
+      $id("opt-webdav-relative-path").value = "";
+      cfg.folderMode = "managed";
+      cfg.relativePath = "";
+      if (persistNormalization) scheduleAutoSave();
+    }
+    const target = pbpWebdavResolveTarget(cfg);
+    const showCustom = cfg.folderMode === "custom";
+    $id("webdav-relative-row").hidden = !showCustom;
+    $id("webdav-path-error").textContent = showCustom && customPath && !customPath.ok
+      ? t(_webdavPathErrorKeys[customPath.error] || "webdavRelativePathSegments")
+      : "";
+    $id("webdav-actual-location").textContent = target.ok ? target.backupFileUrl : "";
+    ["webdav-test-btn", "webdav-push-btn", "webdav-pull-btn"].forEach((id) => {
+      $id(id).disabled = !target.ok;
+    });
+    return target;
+  }
+
+  function _pbpWebdavValidCfgFromForm() {
+    const cfg = _pbpWebdavCfgFromForm();
+    return _pbpRenderWebdavTarget(cfg).ok ? cfg : null;
   }
 
   // Same-gesture permission request (options-connectivity.js precedent):
@@ -1651,10 +1710,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     "remote-changed": "webdavSyncRemoteChanged",
     diverged: "webdavSyncDiverged",
   };
-  async function _pbpRenderWebdavStatus() {
+  async function _pbpRenderWebdavStatus(cfg = _pbpWebdavCfgFromForm()) {
     const generation = ++_webdavStatusGeneration;
     try {
-      const cfg = _pbpWebdavCfgFromForm();
       const prepared = await pbpWebdavPrepareOperation(cfg);
       const state = prepared.ok
         ? await pbpWebdavReadState(prepared.target)
@@ -1683,8 +1741,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (_) {}
   }
   void _pbpRenderWebdavStatus();
-  ["opt-webdav-url", "opt-webdav-user"].forEach((id) => {
-    $id(id)?.addEventListener("input", () => { void _pbpRenderWebdavStatus(); });
+
+  function _pbpHandleWebdavTargetChange() {
+    const cfg = _pbpWebdavCfgFromForm();
+    _pbpRenderWebdavTarget(cfg, false);
+    void _pbpRenderWebdavStatus(cfg);
+  }
+
+  ["opt-webdav-url", "opt-webdav-relative-path", "opt-webdav-user"].forEach((id) => {
+    $id(id)?.addEventListener("input", _pbpHandleWebdavTargetChange);
+  });
+  document.querySelectorAll('input[name="webdav-folder-mode"]').forEach((radio) => {
+    radio.addEventListener("change", _pbpHandleWebdavTargetChange);
   });
 
   const autoSaveState = { suspended: false, chain: Promise.resolve(), waiters: [] };
@@ -1728,7 +1796,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- WebDAV: Test ----
   $id("webdav-test-btn")?.addEventListener("click", async () => {
     const statusEl = $id("webdav-status");
-    const cfg = _pbpWebdavCfgFromForm();
+    const cfg = _pbpWebdavValidCfgFromForm();
+    if (!cfg) return;
+    const tested = await pbpWebdavPrepareOperation(cfg);
+    if (!tested.ok) return;
     if (!statusEl) return;
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
@@ -1741,12 +1812,52 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     const res = await pbpWebdavTest(cfg);
-    if (res.kind === "found") { setStatusIcon(statusEl, true, t("webdavTestOkFound")); statusEl.style.color = "#080"; }
-    else if (res.kind === "empty") { setStatusIcon(statusEl, true, t("webdavTestOkEmpty")); statusEl.style.color = "#080"; }
-    else if (res.kind === "auth") { setStatusIcon(statusEl, false, t("webdavTestAuthFail")); statusEl.style.color = "#c00"; }
-    else if (res.kind === "not-writable") { setStatusIcon(statusEl, false, res.status ? t("webdavPushFail", "http-" + res.status) : t("webdavPushNotWritable")); statusEl.style.color = "#c00"; }
-    else if (res.kind === "not-found") { setStatusIcon(statusEl, false, t("webdavTargetUnavailable")); statusEl.style.color = "#c00"; }
-    else { setStatusIcon(statusEl, false, t("webdavTestUnreachable")); statusEl.style.color = "#c00"; }
+    if (res.ok) {
+      const currentCfg = _pbpWebdavValidCfgFromForm();
+      const current = currentCfg ? await pbpWebdavPrepareOperation(currentCfg) : null;
+      if (current?.ok && current.target.targetId === tested.target.targetId) {
+        const confirmed = {
+          webdavUrl: cfg.baseUrl,
+          webdavUser: cfg.user,
+          webdavPass: obfuscateKey(cfg.pass),
+          webdavFolderMode: tested.target.folderMode,
+          webdavRelativePath: tested.target.folderMode === "custom"
+            ? tested.target.relativePath : "",
+          webdavLayoutVersion: 2,
+        };
+        const saved = await persistSettings(confirmed);
+        if (!saved.ok) {
+          setStatusIcon(statusEl, false, t("optSaveFailed"));
+          statusEl.style.color = "#c00";
+          setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
+          return;
+        }
+        _loadedWebdavTargetBinding = JSON.stringify([
+          tested.target.backupFileUrl, tested.target.user]);
+        _loadedWebdavLayoutVersion = 2;
+        s.webdavLayoutVersion = 2;
+        savedState.settings = Object.assign({}, savedState.settings, confirmed);
+      }
+    }
+    const stageKey = res.stage === "base-propfind" ? "webdavStageBaseFailed"
+      : res.stage === "mkdir" || res.stage === "mkdir-verify" ? "webdavStageCreateFailed"
+      : res.stage === "write-test" ? "webdavStageWriteFailed"
+      : String(res.stage || "").startsWith("locator-") ? "webdavStageLocatorFailed"
+      : "";
+    if (res.ok && res.cleanupWarning) {
+      statusEl.textContent = t("webdavStageCleanupWarning");
+      statusEl.style.color = "var(--opt-warn, #b06000)";
+    } else if (res.kind === "found") {
+      setStatusIcon(statusEl, true, t("webdavTestOkFound")); statusEl.style.color = "#080";
+    } else if (res.kind === "empty") {
+      setStatusIcon(statusEl, true, t("webdavTestOkEmpty")); statusEl.style.color = "#080";
+    } else if (stageKey) {
+      setStatusIcon(statusEl, false, t(stageKey)); statusEl.style.color = "#c00";
+    } else if (res.kind === "auth") {
+      setStatusIcon(statusEl, false, t("webdavTestAuthFail")); statusEl.style.color = "#c00";
+    } else {
+      setStatusIcon(statusEl, false, t("webdavTestUnreachable")); statusEl.style.color = "#c00";
+    }
     setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = ""; }, 5000);
   });
 
@@ -1760,7 +1871,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   let _webdavPushStatusTimer = null;
   async function _pbpWebdavRunPush(force) {
     const statusEl = $id("webdav-status");
-    const cfg = _pbpWebdavCfgFromForm();
+    const cfg = _pbpWebdavValidCfgFromForm();
+    if (!cfg) return;
     if (!statusEl) return;
     clearTimeout(_webdavPushStatusTimer);
     statusEl.textContent = t("testTesting");
@@ -1812,7 +1924,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         yesText: t("webdavOverwriteRemote"),
         noText: t("cancel"),
         onConfirm: async () => {
-          const cur = _pbpWebdavCfgFromForm();
+          const cur = _pbpWebdavValidCfgFromForm();
+          if (!cur) return;
           const prepared = await pbpWebdavPrepareOperation(cur);
           const curTarget = prepared.ok
             ? JSON.stringify([prepared.target.backupFileUrl, prepared.target.user])
@@ -1836,7 +1949,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- WebDAV: Pull now ----
   $id("webdav-pull-btn")?.addEventListener("click", async () => {
     const statusEl = $id("webdav-status");
-    const cfg = _pbpWebdavCfgFromForm();
+    const cfg = _pbpWebdavValidCfgFromForm();
+    if (!cfg) return;
     if (!statusEl) return;
     statusEl.textContent = t("testTesting");
     statusEl.style.color = "#888";
@@ -1945,6 +2059,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Collect all settings from the form and save to chrome.storage.sync
   function collectSettingsFromForm() {
     const _ets = collectExportTargets();
+    const _webdav = _pbpWebdavCfgFromForm();
     return {
       // Bookmarks
       pinboardToken: obfuscateKey($id("opt-pinboard-token").value.trim()),
@@ -2079,9 +2194,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       waybackS3Secret: obfuscateKey($id("opt-wayback-s3secret").value.trim()),
       // URL/username are ordinary synced settings (plaintext, like every other
       // endpoint field); only the password below is a credential.
-      webdavUrl: $id("opt-webdav-url").value.trim(),
-      webdavUser: $id("opt-webdav-user").value.trim(),
+      webdavUrl: _webdav.baseUrl,
+      webdavUser: _webdav.user,
       webdavPass: obfuscateKey($id("opt-webdav-pass").value.trim()),
+      webdavFolderMode: _webdav.folderMode,
+      webdavRelativePath: _webdav.folderMode === "custom"
+        ? _webdav.relativePath.trim() : "",
+      webdavLayoutVersion: _webdav.layoutVersion,
       backupIncludeHighlights: $id("opt-backup-include-highlights").checked,
       themePresetKey: currentPresetKey,
       urlClean: {
@@ -2177,6 +2296,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll('.panel input[type="radio"]').forEach(el => {
     el.addEventListener("change", scheduleAutoSave);
   });
+  _pbpRenderWebdavTarget();
   function flashAutoSave(key = "optAutoSaved", fallback = "Saved", delay = 1500, ok = true) {
     const el = $id("auto-save-status");
     if (!el) return;

@@ -936,10 +936,58 @@
     "message": "Importer les paramètres depuis un fichier JSON"
   },
   "webdavHint": {
-    "message": "Sauvegardez vos paramètres dans le dossier WebDAV indiqué. Le fichier s'appelle pinboard-bookmark-enhanced-settings.json. Les clés API ne sont pas incluses."
+    "message": "Indiquez l’adresse WebDAV fournie par votre service. L’extension crée un dossier de sauvegarde dédié au lieu de placer la sauvegarde à la racine du service."
   },
   "webdavUrlLabel": {
-    "message": "URL du dossier de sauvegarde"
+    "message": "URL de base WebDAV"
+  },
+  "webdavFolderAdvanced": {
+    "message": "Dossier de sauvegarde"
+  },
+  "webdavFolderModeLabel": {
+    "message": "Mode du dossier"
+  },
+  "webdavFolderManaged": {
+    "message": "Gérer automatiquement"
+  },
+  "webdavFolderManagedHint": {
+    "message": "Utilise pinboard-bookmark-enhanced/ sous l’URL de base."
+  },
+  "webdavFolderCustom": {
+    "message": "Utiliser un chemin relatif personnalisé"
+  },
+  "webdavRelativePathLabel": {
+    "message": "Chemin relatif du dossier"
+  },
+  "webdavRelativePathHint": {
+    "message": "Relatif à l’URL de base. Les URL complètes et les chemins parents ne sont pas autorisés."
+  },
+  "webdavActualLocation": {
+    "message": "Emplacement réel de la sauvegarde"
+  },
+  "webdavRelativePathAbsolute": {
+    "message": "Indiquez un chemin de dossier relatif, pas une URL complète ni un chemin absolu."
+  },
+  "webdavRelativePathSegments": {
+    "message": "Supprimez les segments vides, . et .., les chaînes de requête, les fragments et les barres obliques inverses."
+  },
+  "webdavRelativePathEncoding": {
+    "message": "Corrigez l’encodage en pourcentage non valide dans le chemin du dossier."
+  },
+  "webdavStageBaseFailed": {
+    "message": "Impossible d’ouvrir l’URL de base comme dossier WebDAV."
+  },
+  "webdavStageCreateFailed": {
+    "message": "Impossible de créer ou de vérifier le dossier de sauvegarde."
+  },
+  "webdavStageWriteFailed": {
+    "message": "Le dossier de sauvegarde a été trouvé, mais aucun fichier temporaire n’a pu y être écrit."
+  },
+  "webdavStageCleanupWarning": {
+    "message": "Le test d’écriture a réussi, mais son fichier temporaire n’a pas pu être supprimé."
+  },
+  "webdavStageLocatorFailed": {
+    "message": "Le dossier de sauvegarde fonctionne, mais son enregistrement d’emplacement n’a pas pu être mis à jour."
   },
   "webdavUserLabel": {
     "message": "Nom d'utilisateur (facultatif)"

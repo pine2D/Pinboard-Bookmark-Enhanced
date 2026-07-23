@@ -37,6 +37,81 @@ const optionsThemeEarlyJs = read("options-theme-early.js");
 const popupTagsJs = read("popup-tags.js");
 
 {
+  check(/<details[^>]+data-acc-key="webdav-folder"/.test(optionsHtml),
+    "options.html: WebDAV folder controls do not use the native persisted details pattern");
+  check(/<label[^>]+for="opt-webdav-relative-path"/.test(optionsHtml) &&
+    /id="opt-webdav-relative-path"[^>]+aria-describedby="webdav-relative-hint webdav-path-error"/.test(optionsHtml) &&
+    /id="webdav-path-error"[^>]+role="status"[^>]+aria-live="polite"/.test(optionsHtml),
+    "options.html: custom WebDAV path is missing its label, description or polite live error");
+  check(/id="webdav-actual-label"[^>]+data-i18n="webdavActualLocation"/.test(optionsHtml) &&
+    /<output[^>]+id="webdav-actual-location"[^>]+aria-labelledby="webdav-actual-label"/.test(optionsHtml),
+    "options.html: resolved WebDAV backup location is not a labelled output element");
+}
+{
+  const targetRenderer = optionsJs.slice(
+    optionsJs.indexOf("function _pbpRenderWebdavTarget("),
+    optionsJs.indexOf("// Same-gesture permission request")
+  );
+  check(targetRenderer.includes("pbpWebdavResolveTarget(cfg)") &&
+    targetRenderer.includes('"webdav-test-btn"') &&
+    targetRenderer.includes('"webdav-push-btn"') &&
+    targetRenderer.includes('"webdav-pull-btn"') &&
+    targetRenderer.includes("disabled = !target.ok") &&
+    !/\bfetch\s*\(|pbpWebdav(Test|Push|Pull)\s*\(/.test(targetRenderer),
+    "options.js: live WebDAV location preview is not a local-only shared validity gate");
+  check(targetRenderer.includes('customPath.value === PBP_WEBDAV_APP_COLLECTION + "/"') &&
+    targetRenderer.includes("[value=\"managed\"]').checked = true") &&
+    targetRenderer.includes('$id("opt-webdav-relative-path").value = ""') &&
+    targetRenderer.includes("scheduleAutoSave()"),
+  "options.js: the managed folder entered as a custom path is not normalized and persisted as managed");
+  for (const [name, start, end] of [
+    ["Test", "// ---- WebDAV: Test ----", "// ---- WebDAV: Push now ----"],
+    ["Push", "async function _pbpWebdavRunPush(", "// ---- WebDAV: Pull now ----"],
+    ["Pull", "// ---- WebDAV: Pull now ----", "// ===================== Auto-save"],
+  ]) {
+    const handler = optionsJs.slice(optionsJs.indexOf(start), optionsJs.indexOf(end));
+    check(handler.includes("_pbpWebdavValidCfgFromForm()"),
+      `options.js: WebDAV ${name} bypasses the shared path-valid gate`);
+  }
+}
+{
+  const testHandler = optionsJs.slice(
+    optionsJs.indexOf("// ---- WebDAV: Test ----"),
+    optionsJs.indexOf("// ---- WebDAV: Push now ----")
+  );
+  const pushPull = optionsJs.slice(
+    optionsJs.indexOf("// ---- WebDAV: Push now ----"),
+    optionsJs.indexOf("// ===================== Auto-save")
+  );
+  check(testHandler.includes("pbpWebdavPrepareOperation(cfg)") &&
+    testHandler.includes("pbpWebdavTest(cfg)") &&
+    testHandler.includes("res.ok") &&
+    testHandler.includes("current.target.targetId === tested.target.targetId") &&
+    testHandler.includes("webdavLayoutVersion: 2") &&
+    testHandler.includes("_loadedWebdavLayoutVersion = 2") &&
+    !pushPull.includes("webdavLayoutVersion: 2"),
+    "options.js: only a successful Test for the current frozen target may confirm layout v2");
+  check(["webdavStageBaseFailed", "webdavStageCreateFailed", "webdavStageWriteFailed",
+    "webdavStageCleanupWarning", "webdavStageLocatorFailed"]
+    .every((key) => testHandler.includes(key)),
+  "options.js: WebDAV Test feedback does not distinguish each failure stage");
+}
+{
+  const webdavUi = optionsHtml.slice(
+    optionsHtml.indexOf('data-i18n="webdavHint"'),
+    optionsHtml.indexOf('data-i18n="secNotifications"')
+  );
+  const localeWebdav = readdirSync(resolve(root, "_locales"))
+    .flatMap((locale) => Object.entries(JSON.parse(read(`_locales/${locale}/messages.json`)))
+      .filter(([key]) => key.startsWith("webdav"))
+      .map(([, value]) => value.message))
+    .join("\n");
+  check(!/jianguoyun|nextcloud|owncloud|koofr|yandex/i.test(
+    [webdavUi, optionsJs, webdavJs, localeWebdav].join("\n")),
+  "WebDAV UI or runtime contains provider-specific routing or copy");
+}
+
+{
   const collect = optionsJs.slice(
     optionsJs.indexOf("function collectSettingsFromForm()"),
     optionsJs.indexOf("const savedState =")
@@ -95,16 +170,34 @@ const popupTagsJs = read("popup-tags.js");
     "options.js: page-load WebDAV status still revives persisted operation errors instead of rendering target state");
 }
 {
+  const handlerAt = optionsJs.indexOf("function _pbpHandleWebdavTargetChange(");
+  const listenersAt = optionsJs.indexOf('["opt-webdav-url"', handlerAt);
+  const endAt = optionsJs.indexOf("const autoSaveState", listenersAt);
+  const handler = optionsJs.slice(handlerAt, listenersAt);
+  const listeners = optionsJs.slice(listenersAt, endAt);
+  check(handlerAt >= 0 && listenersAt > handlerAt && endAt > listenersAt &&
+    (handler.match(/_pbpRenderWebdavTarget\(/g) || []).length === 1 &&
+    (handler.match(/_pbpRenderWebdavStatus\(/g) || []).length === 1 &&
+    handler.includes("_pbpRenderWebdavTarget(cfg, false)") &&
+    !handler.includes("scheduleAutoSave") &&
+    listeners.includes('"opt-webdav-relative-path"') &&
+    listeners.includes('addEventListener("input", _pbpHandleWebdavTargetChange)') &&
+    listeners.includes('input[name="webdav-folder-mode"]') &&
+    listeners.includes('addEventListener("change", _pbpHandleWebdavTargetChange)'),
+  "options.js: WebDAV relative-path and folder-mode changes do not refresh preview and target-bound status exactly once");
+}
+{
   const cfgFromForm = optionsJs.slice(
     optionsJs.indexOf("function _pbpWebdavCfgFromForm()"),
     optionsJs.indexOf("// Same-gesture permission request")
   );
-  check(cfgFromForm.includes("folderMode: s.webdavFolderMode") &&
-    cfgFromForm.includes("relativePath: s.webdavRelativePath") &&
-    cfgFromForm.includes("layoutVersion: s.webdavLayoutVersion") &&
+  check(cfgFromForm.includes("folderMode: _pbpWebdavFolderModeFromForm()") &&
+    cfgFromForm.includes('relativePath: $id("opt-webdav-relative-path").value') &&
+    cfgFromForm.includes("_loadedWebdavLayoutVersion") &&
+    cfgFromForm.includes("_loadedWebdavTargetBinding") &&
     !cfgFromForm.includes('folderMode: "managed"') &&
     !cfgFromForm.includes('relativePath: ""') &&
-    !cfgFromForm.includes("layoutVersion: 0"),
+    cfgFromForm.includes("cfg.layoutVersion ="),
     "options.js: live WebDAV actions discard the loaded folder target");
 }
 check(!webdavJs.includes("dav.jianguoyun.com") &&
@@ -119,22 +212,24 @@ check(webdavJs.includes("pbpWebdavPrepareOperation") &&
   "webdav.js: a production operation still bypasses the frozen target");
 {
   const expectedLabels = {
-    en: "Backup folder URL",
-    zh_CN: "备份文件夹地址",
-    zh_TW: "備份資料夾網址",
-    zh_HK: "備份資料夾網址",
-    ja: "バックアップ先フォルダーの URL",
-    de: "URL des Sicherungsordners",
-    fr: "URL du dossier de sauvegarde",
-    pl: "Adres URL folderu kopii zapasowej",
-    ru: "URL папки резервных копий",
+    en: "WebDAV base URL",
+    zh_CN: "WebDAV 基础地址",
+    zh_TW: "WebDAV 基礎網址",
+    zh_HK: "WebDAV 基礎網址",
+    ja: "WebDAV ベース URL",
+    de: "WebDAV-Basis-URL",
+    fr: "URL de base WebDAV",
+    pl: "Podstawowy adres URL WebDAV",
+    ru: "Базовый URL WebDAV",
   };
   for (const [locale, label] of Object.entries(expectedLabels)) {
     const messages = JSON.parse(read(`_locales/${locale}/messages.json`));
     check(messages.webdavUrlLabel?.message === label &&
-      messages.webdavHint?.message.includes("pinboard-bookmark-enhanced-settings.json") &&
+      messages.webdavFolderManagedHint?.message.includes("pinboard-bookmark-enhanced/") &&
+      !!messages.webdavActualLocation?.message &&
+      !messages.webdavHint?.message.includes("pinboard-bookmark-enhanced-settings.json") &&
       !/jianguoyun|坚果|堅果/i.test(JSON.stringify(messages)),
-    `_locales/${locale}: WebDAV folder target or fixed backup path is unclear`);
+    `_locales/${locale}: WebDAV base URL and actual backup location are unclear`);
   }
 }
 
