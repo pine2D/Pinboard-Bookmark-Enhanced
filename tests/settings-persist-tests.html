@@ -265,6 +265,105 @@ async function run() {
   check("E1 WebDAV UI guard: target changes cancel stale status timers",
     !!webdavUiGuard && webdavTimers.size === 0 && staleWebdavTimerRan === false);
 
+  const hasWebdavPromotion = typeof pbpPromoteTestedWebdavLayoutV2 === "function";
+
+  let sameBindingGeneration = 1;
+  let sameBindingLoadedVersion = 0;
+  let sameBindingBaselineVersion = 0;
+  const sameBindingStorage = { target: "target-a", pass: "pass-a", layoutVersion: 0 };
+  const sameBindingOrder = [];
+  const sameBindingResult = hasWebdavPromotion
+    ? await pbpPromoteTestedWebdavLayoutV2("target-a|pass-a", {
+      getLiveBinding: () => "target-a|pass-a",
+      saveLive: async () => {
+        sameBindingOrder.push("save-live");
+        sameBindingStorage.layoutVersion = sameBindingLoadedVersion;
+        sameBindingBaselineVersion = sameBindingLoadedVersion;
+        return { ok: true };
+      },
+      persistVersion: async () => {
+        sameBindingOrder.push("persist-version");
+        sameBindingStorage.layoutVersion = 2;
+        sameBindingGeneration++;
+        return { ok: true };
+      },
+      markPersisted: () => {
+        sameBindingOrder.push("mark-persisted");
+        sameBindingBaselineVersion = 2;
+      },
+      commitLoaded: () => {
+        sameBindingOrder.push("commit-loaded");
+        sameBindingLoadedVersion = 2;
+      },
+    })
+    : null;
+  if (sameBindingLoadedVersion !== sameBindingBaselineVersion) {
+    sameBindingStorage.layoutVersion = sameBindingLoadedVersion;
+  }
+  check("E1 WebDAV layout promotion: same-binding operation generation cannot roll v2 back",
+    hasWebdavPromotion && sameBindingResult?.ok && sameBindingGeneration === 2 &&
+    sameBindingStorage.layoutVersion === 2 && sameBindingLoadedVersion === 2 &&
+    sameBindingBaselineVersion === 2 &&
+    sameBindingOrder.join(",") === "save-live,persist-version,mark-persisted,commit-loaded");
+
+  const newTargetStorage = { target: "old-target", pass: "old-pass", layoutVersion: 0 };
+  const newTargetLive = { target: "new-target", pass: "new-pass" };
+  const newTargetOrder = [];
+  let targetAtVersionPersist = "";
+  const newTargetResult = hasWebdavPromotion
+    ? await pbpPromoteTestedWebdavLayoutV2("new-target|new-pass", {
+      getLiveBinding: () => `${newTargetLive.target}|${newTargetLive.pass}`,
+      saveLive: async () => {
+        newTargetOrder.push("save-live");
+        Object.assign(newTargetStorage, newTargetLive, { layoutVersion: 0 });
+        return { ok: true };
+      },
+      persistVersion: async () => {
+        newTargetOrder.push("persist-version");
+        targetAtVersionPersist = `${newTargetStorage.target}|${newTargetStorage.pass}`;
+        newTargetStorage.layoutVersion = 2;
+        return { ok: true };
+      },
+      markPersisted: () => { newTargetOrder.push("mark-persisted"); },
+      commitLoaded: () => { newTargetOrder.push("commit-loaded"); },
+    })
+    : null;
+  check("E1 WebDAV layout promotion: unsaved live target commits before its v2 marker",
+    hasWebdavPromotion && newTargetResult?.ok &&
+    targetAtVersionPersist === "new-target|new-pass" &&
+    newTargetStorage.layoutVersion === 2 &&
+    newTargetOrder.join(",") === "save-live,persist-version,mark-persisted,commit-loaded");
+
+  let changedBinding = "target-a|pass-a";
+  let changedLoadedVersion = 0;
+  let changedBaselineVersion = 0;
+  let changedCommitted = false;
+  const changedStorage = { target: "target-a", pass: "pass-a", layoutVersion: 0 };
+  const changedResult = hasWebdavPromotion
+    ? await pbpPromoteTestedWebdavLayoutV2("target-a|pass-a", {
+      getLiveBinding: () => changedBinding,
+      saveLive: async () => ({ ok: true }),
+      persistVersion: async () => {
+        changedStorage.layoutVersion = 2;
+        changedBinding = "target-b|pass-b";
+        return { ok: true };
+      },
+      markPersisted: () => { changedBaselineVersion = 2; },
+      commitLoaded: () => {
+        changedCommitted = true;
+        changedLoadedVersion = 2;
+      },
+    })
+    : null;
+  Object.assign(changedStorage, { target: "target-b", pass: "pass-b" });
+  if (changedLoadedVersion !== changedBaselineVersion) {
+    changedStorage.layoutVersion = changedLoadedVersion;
+  }
+  check("E1 WebDAV layout promotion: changed binding resumes to a consistent v0 target",
+    hasWebdavPromotion && changedResult?.stale === true && changedResult.persisted === true &&
+    !changedCommitted && changedStorage.target === "target-b" &&
+    changedStorage.pass === "pass-b" && changedStorage.layoutVersion === 0);
+
   // ---------- E1b: real large-value codec round trips ----------
   await (async () => {
     const previousChrome = globalThis.chrome;

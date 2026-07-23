@@ -76,6 +76,26 @@ const popupTagsJs = read("popup-tags.js");
   }
 }
 {
+  const helper = optionsJs.slice(
+    optionsJs.indexOf("async function pbpPromoteTestedWebdavLayoutV2("),
+    optionsJs.indexOf("let _tagGovVisibleAccount")
+  );
+  const bindingChecks = [...helper.matchAll(/getLiveBinding\(\)/g)].map((match) => match.index);
+  const saveLiveAt = helper.indexOf("await saveLive()");
+  const persistVersionAt = helper.indexOf("await persistVersion()");
+  const markPersistedAt = helper.indexOf("markPersisted()");
+  const commitLoadedAt = helper.indexOf("commitLoaded()");
+  check(bindingChecks.length >= 3 &&
+    bindingChecks[0] < saveLiveAt &&
+    saveLiveAt < bindingChecks[1] &&
+    bindingChecks[1] < persistVersionAt &&
+    persistVersionAt < markPersistedAt &&
+    markPersistedAt < bindingChecks[2] &&
+    bindingChecks[2] < commitLoadedAt &&
+    !helper.includes("UiGuard"),
+  "options.js: WebDAV layout promotion helper does not commit live settings, v2 and loaded state in binding order");
+}
+{
   const testHandler = optionsJs.slice(
     optionsJs.indexOf("// ---- WebDAV: Test ----"),
     optionsJs.indexOf("// ---- WebDAV: Push now ----")
@@ -85,17 +105,20 @@ const popupTagsJs = read("popup-tags.js");
     optionsJs.indexOf("// ===================== Auto-save")
   );
   const pauseAt = testHandler.indexOf("await pauseOptionsAutoSave()");
-  const persistAt = testHandler.indexOf("await persistSettings({ webdavLayoutVersion: 2 })");
-  const resumeAt = testHandler.indexOf("resumeOptionsAutoSave()", persistAt);
+  const promoteAt = testHandler.indexOf("await pbpPromoteTestedWebdavLayoutV2(");
+  const resumeAt = testHandler.indexOf("resumeOptionsAutoSave()", promoteAt);
   check(testHandler.includes("pbpWebdavPrepareOperation(cfg)") &&
     testHandler.includes("pbpWebdavTest(cfg)") &&
     testHandler.includes("res.ok") &&
-    pauseAt >= 0 && persistAt > pauseAt && resumeAt > persistAt &&
-    (testHandler.match(/_webdavUiGuard\.isCurrent\(operation\)/g) || []).length >= 2 &&
+    pauseAt >= 0 && promoteAt > pauseAt && resumeAt > promoteAt &&
+    testHandler.includes("saveLive: saveAll") &&
+    testHandler.includes("persistVersion: () => persistSettings({ webdavLayoutVersion: 2 })") &&
+    testHandler.includes("markPersisted:") &&
+    testHandler.includes("commitLoaded:") &&
     testHandler.includes("_pbpWebdavOperationBinding") &&
     testHandler.includes("_loadedWebdavLayoutVersion = 2") &&
     !/webdav(?:Url|User|Pass|FolderMode|RelativePath)\s*:/.test(
-      testHandler.slice(pauseAt, resumeAt)) &&
+      testHandler.slice(promoteAt, resumeAt)) &&
     !pushPull.includes("webdavLayoutVersion: 2"),
     "options.js: Test layout v2 promotion is not mutexed, live-credential guarded and version-only");
   check(["webdavStageBaseFailed", "webdavStageCreateFailed", "webdavStageWriteFailed",
@@ -166,6 +189,19 @@ const popupTagsJs = read("popup-tags.js");
     pullHandler.includes("remoteHash: res.remoteHash") &&
     pullHandler.includes("settingsHash: res.settingsHash"),
     "options.js: successful WebDAV pull does not preserve transport fields or commit the verified baseline after apply");
+}
+{
+  const autoPush = optionsJs.slice(
+    optionsJs.indexOf('$id("opt-webdav-autopush")?.addEventListener("change"'),
+    optionsJs.indexOf("// ---- WebDAV: render only target-bound sync state")
+  );
+  const beginAt = autoPush.indexOf("const operation = _webdavUiGuard.begin()");
+  const offAt = autoPush.indexOf('if (e.target.value === "off")');
+  const requestAt = autoPush.indexOf("await _pbpWebdavRequestPermission");
+  const currentAt = autoPush.indexOf("_webdavUiGuard.isCurrent(operation)", requestAt);
+  check(beginAt >= 0 && offAt > beginAt && requestAt > offAt && currentAt > requestAt &&
+    autoPush.includes("_pbpScheduleWebdavStatus(operation"),
+  "options.js: auto-push permission result can outlive an off/target change or bypass the guarded timer");
 }
 {
   const statusBlock = optionsJs.slice(

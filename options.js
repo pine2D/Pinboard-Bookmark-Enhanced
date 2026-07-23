@@ -147,6 +147,27 @@ function pbpCreateWebdavUiGuard(getBinding, {
   };
 }
 
+async function pbpPromoteTestedWebdavLayoutV2(testedBinding, {
+  getLiveBinding,
+  saveLive,
+  persistVersion,
+  markPersisted,
+  commitLoaded,
+}) {
+  if (getLiveBinding() !== testedBinding) return { ok: false, stale: true };
+  const saved = await saveLive();
+  if (!saved?.ok) return saved || { ok: false };
+  if (getLiveBinding() !== testedBinding) return { ok: false, stale: true };
+  const persisted = await persistVersion();
+  if (!persisted?.ok) return persisted || { ok: false };
+  markPersisted();
+  if (getLiveBinding() !== testedBinding) {
+    return { ok: false, stale: true, persisted: true };
+  }
+  commitLoaded();
+  return { ok: true, persisted: true };
+}
+
 let _tagGovVisibleAccount = "";
 
 // Enable decorative transitions only after the initial page has painted.
@@ -1725,15 +1746,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   $id("opt-webdav-autopush")?.addEventListener("change", async (e) => {
-    if (e.target.value === "off") return;
-    const statusEl = $id("webdav-status");
     const cfg = _pbpWebdavCfgFromForm();
+    const operation = _webdavUiGuard.begin();
+    if (e.target.value === "off") {
+      void _pbpRenderWebdavStatus(cfg, operation);
+      return;
+    }
+    const statusEl = $id("webdav-status");
     const granted = await _pbpWebdavRequestPermission(cfg.baseUrl);
+    if (!_webdavUiGuard.isCurrent(operation)) return;
     const errorKey = _pbpWebdavPermissionError(granted);
     if (errorKey && statusEl) {
       setStatusIcon(statusEl, false, t(errorKey));
       statusEl.style.color = "#c00";
-    } else if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
+      _pbpScheduleWebdavStatus(operation, true);
+    } else {
+      void _pbpRenderWebdavStatus(cfg, operation);
+    }
   });
 
   // ---- WebDAV: render only target-bound sync state on page load ----
@@ -1876,11 +1905,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (res.ok) {
       try {
         await pauseOptionsAutoSave();
-        const currentCfg = _pbpWebdavValidCfgFromForm();
-        if (!_webdavUiGuard.isCurrent(operation) || !currentCfg ||
-            _pbpWebdavOperationBinding(currentCfg) !== testedBinding) return;
-        const saved = await persistSettings({ webdavLayoutVersion: 2 });
-        if (!saved.ok) {
+        const promoted = await pbpPromoteTestedWebdavLayoutV2(testedBinding, {
+          getLiveBinding: () =>
+            _pbpWebdavOperationBinding(_pbpWebdavCfgFromForm()),
+          saveLive: saveAll,
+          persistVersion: () => persistSettings({ webdavLayoutVersion: 2 }),
+          markPersisted: () => {
+            savedState.settings = Object.assign(
+              {}, savedState.settings, { webdavLayoutVersion: 2 });
+          },
+          commitLoaded: () => {
+            const liveCfg = _pbpWebdavCfgFromForm();
+            const liveTarget = pbpWebdavResolveTarget(liveCfg);
+            _loadedWebdavTargetBinding = JSON.stringify([
+              liveTarget.backupFileUrl, liveCfg.user]);
+            _loadedWebdavLayoutVersion = 2;
+            s.webdavLayoutVersion = 2;
+          },
+        });
+        if (!promoted.ok && !promoted.stale) {
           if (_webdavUiGuard.isCurrent(operation)) {
             setStatusIcon(statusEl, false, t("optSaveFailed"));
             statusEl.style.color = "#c00";
@@ -1888,20 +1931,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
           return;
         }
-        // persistSettings bypasses saveAll's mutable baseline. Record what is
-        // actually in storage so resume() can roll it back to the live form's
-        // layoutVersion when the target changes during the write.
-        savedState.settings = Object.assign(
-          {}, savedState.settings, { webdavLayoutVersion: 2 });
-        const liveCfg = _pbpWebdavValidCfgFromForm();
-        if (!_webdavUiGuard.isCurrent(operation) || !liveCfg ||
-            _pbpWebdavOperationBinding(liveCfg) !== testedBinding) return;
-        const liveTarget = pbpWebdavResolveTarget(liveCfg);
-        if (!liveTarget.ok) return;
-        _loadedWebdavTargetBinding = JSON.stringify([
-          liveTarget.backupFileUrl, liveCfg.user]);
-        _loadedWebdavLayoutVersion = 2;
-        s.webdavLayoutVersion = 2;
       } finally {
         resumeOptionsAutoSave();
       }
