@@ -8,7 +8,7 @@
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/ui-consumer-lint.mjs\"",
             "timeout": 30,
-            "statusMessage": "UI design-language gates (layout-lint + ui-vocabulary)"
+            "statusMessage": "UI design-language gates (layout-lint + ui-vocabulary; theme-factory generated files: css-region-audit + handedit-audit)"
           }
         ]
       }
