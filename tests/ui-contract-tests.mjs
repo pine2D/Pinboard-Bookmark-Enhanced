@@ -1875,6 +1875,15 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
     "ai.js: OPENAI_COMPAT_PROVIDERS is not a plain literal the K81 parity gate can evaluate");
   const BESPOKE_PROVIDERS = new Set(["gemini", "claude", "ollama"]);
 
+  // ---- reasoned allowlist: providers with no API-key concept at all.
+  // ollama is a self-hosted local server -- confirmed by grep: there is no
+  // `ollamaApiKey` anywhere (not in SETTINGS_DEFAULTS, not in
+  // pbpLiveAiSettingsSnapshot, not in API_KEY_FIELDS), only ollamaBaseUrl /
+  // ollamaModel. custom DOES have a key concept (`customApiKey`, wired
+  // through the same getOptVal("opt-custom-key") shape as every other
+  // provider) and is deliberately NOT in this set.
+  const NO_KEY_PROVIDERS = new Set(["ollama"]);
+
   // ---- options.js PANEL_DEFAULTS.ai.fields (re-parsed independently of the
   // K79 block above, same technique/failure handling, matching this file's
   // own "re-parsed independently" idiom -- see K79's own comment on why).
@@ -1902,6 +1911,7 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
   };
 
   const offenders = [];
+  const keyOffenders = [];
   for (const id of PROVIDERS) {
     const key = `${id}Model`;
     const expected = settingsDefaultsK81[key];
@@ -1941,6 +1951,22 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
       if (snapVal !== expected) offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but pbpLiveAiSettingsSnapshot fallback=${JSON.stringify(snapVal)}`);
     }
 
+    // pbpLiveAiSettingsSnapshot key-field coverage (group 2, fix round 1):
+    // `<id>ApiKey: getOptVal("opt-<id>-key")` -- no fallback argument on any
+    // provider's key line (a stale/blank key has no sane literal default),
+    // so unlike the model check above this is presence-only, not a value
+    // comparison. This is the one failure mode the brief's fact-lens
+    // confirmed has NO other door: a provider whose key line is missing
+    // here means the user can fill in a key that the connectivity test can
+    // never actually read. ollama is excluded via NO_KEY_PROVIDERS (no key
+    // concept at all); every other provider, including custom, must have it.
+    if (!NO_KEY_PROVIDERS.has(id)) {
+      const keyRe = new RegExp(`\\b${id}ApiKey:\\s*getOptVal\\("opt-${id}-key"\\)`);
+      if (!keyRe.test(optionsConnectivityJs)) {
+        keyOffenders.push(`${id}: pbpLiveAiSettingsSnapshot has no ${id}ApiKey: getOptVal("opt-${id}-key") call`);
+      }
+    }
+
     if (!BESPOKE_PROVIDERS.has(id)) {
       const cfg = compatProviders && compatProviders[id];
       if (!cfg) offenders.push(`${id}: OPENAI_COMPAT_PROVIDERS has no entry (and it is not in the bespoke gemini/claude/ollama exclusion set)`);
@@ -1949,6 +1975,8 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
   }
   check(offenders.length === 0,
     "K81: provider default model drifted between SETTINGS_DEFAULTS / ai.js OPENAI_COMPAT_PROVIDERS / options.html / PANEL_DEFAULTS.ai.fields / collectSettingsFromForm / pbpLiveAiSettingsSnapshot -> " + offenders.join("; "));
+  check(keyOffenders.length === 0,
+    "K81: pbpLiveAiSettingsSnapshot is missing a provider's API-key field -> " + keyOffenders.join("; "));
 
   // ---- id-set parity: five more hand-copied provider-id lists, compared as
   // SETS against PROVIDERS -- never by order (AI_PROVIDER_ORDER's order is a
@@ -2021,6 +2049,29 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
   }
   check(idOffenders.length === 0,
     "K81: provider id set drifted (compared as sets, order ignored) -> " + idOffenders.join("; "));
+
+  // ---- API_KEY_FIELDS coverage (group 4, fix round 1): shared.js's
+  // API_KEY_FIELDS drives the sync/local credential-routing split (shared.js
+  // ~2153-2727) -- a provider whose `<id>ApiKey` is missing from it would
+  // have its key silently fall outside that routing. It is a single-line
+  // double-quoted JSON array with no trailing comma (also carries
+  // pinboardToken/jinaApiKey/waybackS3Key/waybackS3Secret/dictAnkiKey/
+  // dictEudicToken -- non-AI-provider secrets that are correctly NOT in
+  // PROVIDERS), so JSON.parse handles it directly. Same NO_KEY_PROVIDERS
+  // allowlist as the snapshot check above (ollama has no key at all).
+  const akfStart = sharedJs.indexOf("const API_KEY_FIELDS = [");
+  const akfEnd = sharedJs.indexOf("];", akfStart) + 1;
+  let apiKeyFields = null;
+  try { apiKeyFields = JSON.parse(sharedJs.slice(akfStart + "const API_KEY_FIELDS = ".length, akfEnd)); } catch (_) {}
+  check(Array.isArray(apiKeyFields), "shared.js: API_KEY_FIELDS is not a plain JSON-shaped array the K81 parity gate can evaluate");
+  const apiKeyFieldSet = new Set(apiKeyFields || []);
+  const akfOffenders = [];
+  for (const id of PROVIDERS) {
+    if (NO_KEY_PROVIDERS.has(id)) continue;
+    if (!apiKeyFieldSet.has(`${id}ApiKey`)) akfOffenders.push(`${id}: API_KEY_FIELDS is missing ${id}ApiKey`);
+  }
+  check(akfOffenders.length === 0,
+    "K81: shared.js API_KEY_FIELDS is missing a provider's API-key field -> " + akfOffenders.join("; "));
 }
 
 // Embedded-frame extraction (2026-08-25/26): the candidate rule lives as a
