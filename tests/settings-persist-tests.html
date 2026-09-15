@@ -623,6 +623,7 @@ async function run() {
     const optionsSource = await fetch("../options.js").then((response) => response.text());
     const persistStart = optionsSource.indexOf("  async function persistSavedThemes(");
     const persistEnd = optionsSource.indexOf("  function renderSavedThemes(", persistStart);
+    check("persistSavedThemes: slice found", persistStart >= 0 && persistEnd > persistStart);
     const persistSource = optionsSource.slice(persistStart, persistEnd);
     const makePersist = (write) => {
       const deps = {
@@ -1601,6 +1602,7 @@ async function run() {
     const backgroundSource = await fetch("../background.js").then((response) => response.text());
     const start = backgroundSource.indexOf("let _settingsCache = null;");
     const end = backgroundSource.indexOf("// F7: Track recent saves", start);
+    check("_settingsCache: slice found", start >= 0 && end > start);
     const cacheSource = backgroundSource.slice(start, end);
     const factory = new Function("SETTINGS_DEFAULTS", "pbpReadSettingsWithSecrets", "deobfuscateSettings",
       `${cacheSource}\nreturn { loadSettings, invalidateSettingsCache, cached: () => _settingsCache };`);
@@ -1717,6 +1719,7 @@ async function run() {
     const mdAiSource = await fetch("../md-ai-core.js").then((response) => response.text());
     const mdMemoStart = mdAiSource.indexOf("let _pbpAiSettingsPromise = null;");
     const mdMemoEnd = mdAiSource.indexOf("// Gate: master switch on AND a usable AI key", mdMemoStart);
+    check("_pbpAiSettingsPromise: slice found", mdMemoStart >= 0 && mdMemoEnd > mdMemoStart);
     const mdMemoSource = mdAiSource.slice(mdMemoStart, mdMemoEnd);
     const mdMemoFactory = new Function("chrome", "SETTINGS_DEFAULTS", "pbpReadSettingsWithSecrets",
       "deobfuscateSettings", "pbpSettingsKeysChanged",
@@ -2083,9 +2086,11 @@ async function run() {
     const optionsSource = await fetch("../options.js").then((response) => response.text());
     const syncHandlerStart = optionsSource.indexOf('syncToggle?.addEventListener("change", async () => {');
     const syncHandlerEnd = optionsSource.indexOf("  // syncApiKeys toggle:", syncHandlerStart);
+    check("syncToggle handler: slice found", syncHandlerStart >= 0 && syncHandlerEnd > syncHandlerStart);
     const syncHandlerSource = optionsSource.slice(syncHandlerStart, syncHandlerEnd);
     const keysHandlerStart = optionsSource.indexOf('syncKeysToggle?.addEventListener("change", async () => {', syncHandlerEnd);
     const keysHandlerEnd = optionsSource.indexOf("  // ---- Apply options page theme", keysHandlerStart);
+    check("syncKeysToggle handler: slice found", keysHandlerStart >= 0 && keysHandlerEnd > keysHandlerStart);
     const keysHandlerSource = optionsSource.slice(keysHandlerStart, keysHandlerEnd);
     check("E5 Options handlers: settings migration is fully locked and disable uses the authoritative transition helper",
       syncHandlerSource.indexOf("await pbpWithSecretStorageLock") < syncHandlerSource.indexOf("oldStorage.get") &&
@@ -3030,10 +3035,10 @@ async function run() {
         settingsWrites === settingsBeforeGenuineFailure + 1);
 
       const optionsSource = await (await fetch("../options.js")).text();
-      const helperSource = optionsSource.slice(
-        optionsSource.indexOf("async function saveOverlayWithFallback"),
-        optionsSource.indexOf('document.addEventListener("DOMContentLoaded"')
-      );
+      const helperStart = optionsSource.indexOf("async function saveOverlayWithFallback");
+      const helperClose = optionsSource.indexOf('document.addEventListener("DOMContentLoaded"');
+      check("saveOverlayWithFallback: slice found", helperStart >= 0 && helperClose > helperStart);
+      const helperSource = optionsSource.slice(helperStart, helperClose);
       check("E9 overlay persistence helper never writes UI status", !helperSource.includes("auto-save-status"));
       // Source contracts for the options-init migration fixes (that code runs
       // only inside the real page bootstrap, so pin its load-bearing lines).
@@ -4103,6 +4108,7 @@ async function run() {
       const optionsSource = await fetch("../options.js").then((response) => response.text());
       const keysStart = optionsSource.indexOf('syncKeysToggle?.addEventListener("change", async () => {');
       const keysEnd = optionsSource.indexOf("  // ---- Apply options page theme", keysStart);
+      check("syncKeysToggle handler: slice found", keysStart >= 0 && keysEnd > keysStart);
       const keysSource = optionsSource.slice(keysStart, keysEnd);
       let keysHandler;
       let confirms = 0;

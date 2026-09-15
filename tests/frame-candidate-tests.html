@@ -24,7 +24,9 @@ function extractDetector(src, label) {
   const start = src.indexOf("function dominantFrameOrigin()");
   if (start < 0) throw new Error(label + ": dominantFrameOrigin not found");
   const catchAt = src.indexOf('} catch (_) { return ""; }', start);
+  if (catchAt < 0) throw new Error(label + ": dominantFrameOrigin catch clause not found");
   const close = src.indexOf("}", catchAt + '} catch (_) { return ""; }'.length);
+  if (close < 0) throw new Error(label + ": dominantFrameOrigin closing brace not found");
   const body = src.slice(start, close + 1);
   return new Function(body + "\nreturn dominantFrameOrigin;")();
 }
@@ -35,6 +37,7 @@ function extractFunction(src, name, label) {
   const start = src.indexOf("function " + name + "(");
   if (start < 0) throw new Error(label + ": " + name + " not found");
   let i = src.indexOf("{", start), depth = 0;
+  if (i < 0) throw new Error(label + ": " + name + " opening brace not found");
   for (; i < src.length; i++) { if (src[i] === "{") depth++; else if (src[i] === "}" && --depth === 0) break; }
   return new Function(src.slice(start, i + 1) + "\nreturn " + name + ";")();
 }

@@ -7,23 +7,38 @@ const root = document.getElementById("results"); let pass = 0, fail = 0;
 function check(name, ok) { ok ? pass++ : fail++; const row = document.createElement("div"); row.className = "case " + (ok ? "pass" : "fail"); row.textContent = `${ok ? "✓" : "✗"} ${name}`; root.appendChild(row); }
 (async () => {
   const source = await fetch("../background.js").then((response) => response.text());
-  const imports = source.slice(source.indexOf("importScripts("), source.indexOf(");", source.indexOf("importScripts(")) + 2);
-  const alarms = source.slice(source.indexOf("chrome.alarms.onAlarm.addListener"), source.indexOf("// React to settings change"));
+  const importsStart = source.indexOf("importScripts(");
+  const importsEnd = source.indexOf(");", importsStart);
+  if (importsStart < 0 || importsEnd < importsStart) throw new Error("anchor not found: importScripts source");
+  const imports = source.slice(importsStart, importsEnd + 2);
+  const alarmsStart = source.indexOf("chrome.alarms.onAlarm.addListener");
+  const alarmsEnd = source.indexOf("// React to settings change");
+  if (alarmsStart < 0 || alarmsEnd <= alarmsStart) throw new Error("anchor not found: alarm listener source");
+  const alarms = source.slice(alarmsStart, alarmsEnd);
   // Roadmap #35 named the router, so the body now STARTS at the function
   // declaration and the addListener line trails it.
-  const messages = source.slice(source.indexOf("function handleRuntimeMessage"));
+  const messagesStart = source.indexOf("function handleRuntimeMessage");
+  if (messagesStart < 0) throw new Error("anchor not found: handleRuntimeMessage source");
+  const messages = source.slice(messagesStart);
   const bootAt = source.indexOf("function pbpBootVocabDriveSync");
-  const boot = source.slice(
-    bootAt, source.indexOf("\nasync function pbpDisconnectVocabDrive", bootAt)
-  );
+  const bootEnd = source.indexOf("\nasync function pbpDisconnectVocabDrive", bootAt);
+  if (bootAt < 0 || bootEnd <= bootAt) throw new Error("anchor not found: pbpBootVocabDriveSync source");
+  const boot = source.slice(bootAt, bootEnd);
   const startupAt = source.indexOf("chrome.runtime.onStartup.addListener");
-  const startup = source.slice(startupAt, source.indexOf("chrome.runtime.onInstalled.addListener", startupAt));
+  const startupEnd = source.indexOf("chrome.runtime.onInstalled.addListener", startupAt);
+  if (startupAt < 0 || startupEnd <= startupAt) throw new Error("anchor not found: onStartup listener source");
+  const startup = source.slice(startupAt, startupEnd);
   const syncNowAt = messages.indexOf('message.type === "vocabDriveSyncNow"');
-  const syncNow = messages.slice(syncNowAt, messages.indexOf('message.type === "vocabDriveDisconnect"', syncNowAt));
+  const syncNowEnd = messages.indexOf('message.type === "vocabDriveDisconnect"', syncNowAt);
+  if (syncNowAt < 0 || syncNowEnd <= syncNowAt) throw new Error("anchor not found: vocabDriveSyncNow handler");
+  const syncNow = messages.slice(syncNowAt, syncNowEnd);
   const connectAt = messages.indexOf('message.type === "vocabDriveConnect"');
-  const connect = messages.slice(connectAt, messages.indexOf('message.type === "vocabDriveStatus"', connectAt));
+  const connectEnd = messages.indexOf('message.type === "vocabDriveStatus"', connectAt);
+  if (connectAt < 0 || connectEnd <= connectAt) throw new Error("anchor not found: vocabDriveConnect handler");
+  const connect = messages.slice(connectAt, connectEnd);
   const responseAt = source.indexOf("async function pbpVocabDriveResponse");
   const responseEnd = source.indexOf("\n\nasync function pbpBootVocabDriveSync", responseAt);
+  if (responseAt < 0 || responseEnd <= responseAt) throw new Error("anchor not found: pbpVocabDriveResponse source");
   let responseFactory = null;
   try {
     responseFactory = new Function("pbpGetVocabDriveStatus",
