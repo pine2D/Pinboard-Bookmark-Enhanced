@@ -1728,7 +1728,7 @@ async function run() {
         "E4 background settings cache: rejected read clears singleflight for retry",
         "E4 background settings cache: late stale value cannot replace a completed fresh generation",
         "E4 background settings cache: late stale rejection joins and cannot clear the fresh pending entry",
-      ]) check(name, false);
+      ]) check(name + " -- " + String(error && error.message), false);
     }
 
     // md-preview's memo is the same singleflight shape as loadSettings above,
@@ -1777,7 +1777,7 @@ async function run() {
       mdRetried.value?.pinboardToken === "alice:md-2" && mdMemoized.value === mdRetried.value &&
       mdAfterChange.value?.pinboardToken === "alice:md-3");
     } catch (error) {
-      check("E4 md AI cache: a rejected read is not pinned and storage changes still invalidate", false);
+      check("E4 md AI cache: a rejected read is not pinned and storage changes still invalidate" + " -- " + String(error && error.message), false);
     }
   })();
 
