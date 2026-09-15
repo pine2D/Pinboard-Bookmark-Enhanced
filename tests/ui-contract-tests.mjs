@@ -3938,6 +3938,108 @@ check(/^\.pop-panel \{[\s\S]*?\}/m.test(mdCss) && !/#pb-hl-card \{[^}]*box-shado
     "md-video.js: prepareVideoSession must build a session from window.pbpVideoFixture before it checks the origin grant, and requestVideoOrigin must honour it -- the render sweep's video leg depends on it");
 }
 
+// ===================== K113: icon-only button accessible name =====================
+// CLAUDE.md's icon contract requires every icon-only button to carry BOTH a
+// title and an aria-label (plus >=24px hit area, which ui-render-audit
+// family 4 already measures via its sweepProbe). Only three ids had a
+// regression pin for the name half (the #vocab-lookup-narrow checks above);
+// a newly added icon-only button was not covered at all. This walks every
+// <button> in the four surface HTML files with a general content-shape
+// classifier -- not a new regex per id -- so a future icon-only button is
+// covered for free, plus the JS-constructed ones this codebase actually has
+// (setBtnIcon call sites are always followed by a .title/.setAttribute
+// aria-label pair already -- library-vocab.js:596-600 is representative --
+// so the one JS-authored family that was NOT self-disciplined, the shared
+// "×" dismiss/cancel/delete buttons built via createElement, is what this
+// re-derives instead of pinning by file:line).
+//
+// "Icon-only" is decided from the three decorative/icon markup shapes this
+// codebase actually renders inline -- <svg>, a `.btn-ic` span (hydrated at
+// load by the repeated `.btn-ic[data-ic]` one-liner in library.js/popup.js/
+// options.js), and any `aria-hidden="true"` element (CSS-drawn shapes like
+// .send-tri) -- stripped away, then:
+//   - if a tag still remains after that, the button is out of scope: a
+//     leftover element is either a real text label (#dict-pack-open) or an
+//     empty placeholder a JS routine fills with real text later
+//     (#offline-queue-toggle's #offline-queue-text span). Neither is
+//     icon-only even once rendered. This is exactly the generalization the
+//     "any button with no text node" version (considered and rejected, see
+//     the K113 brief) gets wrong: it misfires on #tags-last-used /
+//     #ai-error-fallback / #offline-queue-toggle / #vocab-stat-learning /
+//     #vocab-stat-known / #tag-gov-progress-btn -- six buttons that are
+//     genuinely empty until JS fills them from scratch, where none of the
+//     three recognized shapes are present statically to say so.
+//   - otherwise, if what is left (with any literal "×" stripped) is empty,
+//     the button is icon-only and needs a name.
+function iconOnlyButtonInner(inner) {
+  const svgFree = inner.replace(/<svg[\s\S]*?<\/svg>/g, "");
+  const ariaHiddenFree = svgFree.replace(/<([a-zA-Z][\w-]*)\b[^>]*\baria-hidden="true"[^>]*>[\s\S]*?<\/\1>/g, "");
+  const btnIcFree = ariaHiddenFree.replace(/<([a-zA-Z][\w-]*)\b[^>]*\bclass="[^"]*\bbtn-ic\b[^"]*"[^>]*>[\s\S]*?<\/\1>/g, "");
+  const hadIconMarkup = btnIcFree !== inner;
+  if (/<[a-zA-Z]/.test(btnIcFree)) return false; // a non-decorative element remains -- not our concern
+  const text = btnIcFree.replace(/&nbsp;/g, " ").trim();
+  if (!hadIconMarkup && text === "") return false; // nothing renders statically at all -- JS fills it from scratch
+  return text.replace(/×/g, "").trim() === ""; // empty (or only the × glyph) once the icon shapes are gone
+}
+
+// #vocab-remove-group's title legitimately lives at runtime:
+// _pbpVocabSyncSelectionUi (library-vocab.js) swaps it between
+// vocabRemoveFromGroup and vocabRemoveGroupNoMatch by selection state, so a
+// static data-i18n-title would be overwritten by applyI18n on every locale
+// refresh and permanently hide the "selection and group don't overlap"
+// message. The gate still requires its aria-label statically (that half
+// never changes) and cross-checks the JS ownership is really still there --
+// an allowlist entry that stops verifying itself is worse than no entry.
+const ICON_BUTTON_RUNTIME_TITLE_OWNERS = {
+  "vocab-remove-group": () => {
+    const fn = /function _pbpVocabSyncSelectionUi\(\) \{[\s\S]*?\n\}/.exec(libraryVocabJs);
+    return !!fn && /\$id\("vocab-remove-group"\)/.test(fn[0]) && /removeBtn\.title\s*=/.test(fn[0]);
+  },
+};
+
+for (const [file, html] of [["popup.html", popupHtml], ["options.html", optionsHtml], ["library.html", libraryHtml], ["md-preview.html", mdHtml]]) {
+  const re = /<button\b([^>]*)>([\s\S]*?)<\/button>/g;
+  let m;
+  while ((m = re.exec(html))) {
+    const [, attrs, inner] = m;
+    if (!iconOnlyButtonInner(inner)) continue;
+    const id = (/\bid="([^"]*)"/.exec(attrs) || [])[1] || "";
+    const label = id ? `#${id}` : `(${attrs.trim().slice(0, 60)})`;
+    const hasName = /\baria-label="[^"]*"/.test(attrs) || /\bdata-i18n-aria="/.test(attrs) || /\baria-labelledby="/.test(attrs);
+    check(hasName, `${file}: icon-only button ${label} has no aria-label/data-i18n-aria/aria-labelledby -- icon-only buttons must carry an accessible name (CLAUDE.md icon contract)`);
+    const owner = id && ICON_BUTTON_RUNTIME_TITLE_OWNERS[id];
+    if (owner) {
+      check(owner(), `${file}: #${id} is allowlisted as a runtime-owned title, but the JS that is supposed to own it no longer matches that shape -- either restore the ownership or give it a static data-i18n-title and drop the allowlist entry`);
+      continue;
+    }
+    const hasTitle = /\btitle="[^"]*"/.test(attrs) || /\bdata-i18n-title="/.test(attrs);
+    check(hasTitle, `${file}: icon-only button ${label} has no title/data-i18n-title -- icon-only buttons must carry both a title and an aria-label (CLAUDE.md icon contract)`);
+  }
+}
+
+// The lone "×" glyph is CLAUDE.md's one literal-character exception for an
+// icon-only close/cancel/delete button (it inherits a fast-loading fallback
+// font, unlike emoji/dingbats) -- but a bare "×" is still not an accessible
+// name by itself, so every JS-constructed button that sets textContent to
+// "×" must also set both a title and an aria-label near that assignment,
+// same as its documented siblings (popup.html's #ai-error-dismiss is static
+// and already covered by the HTML scan above; this re-derives the JS-built
+// ones from the actual call sites across every root JS file instead of
+// pinning three file:line locations, so a newly added one is covered too).
+for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
+  const src = read(f);
+  const xRe = /(\b[A-Za-z_$][\w$]*)\.textContent\s*=\s*(?:"×"|'×'|"\\u00d7"|'\\u00d7')/g;
+  let xm;
+  while ((xm = xRe.exec(src))) {
+    const v = xm[1];
+    const around = src.slice(Math.max(0, xm.index - 400), xm.index + 400);
+    const titleRe = new RegExp(`\\b${v}\\.title\\s*=`);
+    const ariaRe = new RegExp(`\\b${v}\\.setAttribute\\(\\s*["']aria-label["']|\\b${v}\\.ariaLabel\\s*=`);
+    check(titleRe.test(around), `${f}: a JS-constructed "×" button ("${v}") has no ${v}.title assignment nearby -- a bare × glyph is not an accessible name on its own`);
+    check(ariaRe.test(around), `${f}: a JS-constructed "×" button ("${v}") has no aria-label near its textContent = "×" assignment`);
+  }
+}
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);
