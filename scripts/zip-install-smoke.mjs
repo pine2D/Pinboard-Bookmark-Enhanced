@@ -168,6 +168,7 @@ const REQUIRED_RUNTIME_FILES = [
   'site-rules.js',
   'vocab-store.js',
   'vocab-gdrive.js',
+  'bili-player-bridge.js',
   'vendor/turndown.js',
   'vendor/highlight.min.js',
   'vendor/hljs-github.min.css',
