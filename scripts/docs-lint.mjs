@@ -69,14 +69,21 @@ for (const f of EN_PROSE_DASH_BAN) {
   });
 }
 
-// ---- 4. CLAUDE.md temporary items: no 到期日 may be in the past ----
+// ---- 4. CLAUDE.md temporary items: expiry has a 14-day grace window ----
 // One-time migrations/sweeps are registered under "## 临时事项" with a 到期日.
 // Retired items are rewritten as a parenthetical history line with no 到期日
 // ("（... 已于 2026-08-26 退役 ...）"), which is why the date has to be read
-// off the 到期日 marker and not off any date in the line.
+// off the 到期日 marker and not off any date in the line. Grace window: an
+// item overdue by 1-14 days WARNs by name (with a day count) but does not
+// fail the build; overdue by more than 14 days it FAILs, same as a bullet
+// whose 到期日 date is calendar-invalid, or one that carries no 到期日
+// marker at all and isn't the retired parenthetical history form.
 const TEMP_HEADING = "## 临时事项";
+const TEMP_GRACE_DAYS = 14;
+const HISTORY_FORM = /^-\s*（.*已于\s*\d{4}-\d{2}-\d{2}\s*退役.*）\s*$/;
 const claude = readFileSync("CLAUDE.md", "utf8").split("\n");
 const tempStart = claude.findIndex((l) => l.startsWith(TEMP_HEADING));
+const warnings = [];
 if (tempStart === -1) {
   errors.push(`CLAUDE.md: "${TEMP_HEADING}" section is gone (expiry gate has nothing to check)`);
 } else {
@@ -89,18 +96,45 @@ if (tempStart === -1) {
     String(now.getMonth() + 1).padStart(2, "0"),
     String(now.getDate()).padStart(2, "0"),
   ].join("-");
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   for (const [i, line] of section.entries()) {
-    if (!line.includes("到期日")) continue;
+    if (!/^-\s/.test(line)) continue; // only top-level bullets carry 到期日
     const lineNo = tempStart + 2 + i;
-    const due = /到期日[：:\s]*(\d{4}-\d{2}-\d{2})/.exec(line);
     // Title: the bolded lead of the bullet, e.g. "- **`x` 可退役（到期日 ...）**：..."
     const title = (/^-\s+\*\*(.+?)\*\*/.exec(line) || [])[1] || line.trim().slice(0, 60);
+    if (!line.includes("到期日")) {
+      if (!HISTORY_FORM.test(line.trim())) {
+        errors.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" has no 到期日 marker and is not the retired parenthetical history form (（…已于 YYYY-MM-DD 退役…）)`);
+      }
+      continue;
+    }
+    const due = /到期日[：:\s]*(\d{4}-\d{2}-\d{2})/.exec(line);
     if (!due) {
       errors.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" says 到期日 but carries no YYYY-MM-DD date`);
-    } else if (due[1] < today) {
-      errors.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} 已过期（今天 ${today}），删它或改期`);
+      continue;
+    }
+    const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(due[1]);
+    const y = Number(dm[1]), mo = Number(dm[2]), d = Number(dm[3]);
+    const dueUtc = Date.UTC(y, mo - 1, d);
+    const calendarValid = new Date(dueUtc).getUTCFullYear() === y &&
+      new Date(dueUtc).getUTCMonth() === mo - 1 && new Date(dueUtc).getUTCDate() === d;
+    if (!calendarValid) {
+      errors.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} is not a valid calendar date`);
+      continue;
+    }
+    const overdueDays = Math.round((todayUtc - dueUtc) / 86400000);
+    if (overdueDays <= 0) continue; // not yet due
+    if (overdueDays <= TEMP_GRACE_DAYS) {
+      warnings.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} 已过期（今天 ${today}）：${overdueDays} days overdue; hard failure after ${TEMP_GRACE_DAYS} days`);
+    } else {
+      errors.push(`CLAUDE.md:${lineNo}: 临时事项 "${title}" 到期日 ${due[1]} 已过期（今天 ${today}，超期 ${overdueDays} 天，超过 ${TEMP_GRACE_DAYS} 天宽限期），删它或改期`);
     }
   }
+}
+
+if (warnings.length) {
+  console.warn(`[docs-lint] WARN (${warnings.length}):`);
+  for (const w of warnings) console.warn("  - " + w);
 }
 
 if (errors.length) {

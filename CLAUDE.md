@@ -144,7 +144,7 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
 - **扩展 ID 分层**：源码 manifest 固定开发 ID `feoognahlmfmbllpmgailahcnjppiegb`（开发公钥 + 开发 OAuth client，可与 CWS 版并存）；release.sh 校验源码身份后只在 ZIP 内替换为 CWS 公钥与生产 OAuth client，正式版固定 CWS ID `pnjndmjhljjbdlbejeenkepdalokfooh`。严禁占位 client ID/secret。Drive 两个 OAuth client 对同一 Google 账号 appDataFolder 的互通性 smoke 测不到，发布前需人工实测（细则见 rules/vocab-sync.md）。
 - **ZIP smoke**（release.sh 内置，失败即中止）：Playwright 装解压后的 ZIP，校验 SW 注册、扩展 ID/OAuth client、vocab 模块加载、popup/options 无 pageerror、DNR 防盗链契约。`--skip-smoke` 仅限调试 release 脚本本身；单独跑 `node scripts/zip-install-smoke.mjs`。前置：`.qa-scan/` 已装 playwright + bundled Chromium。
 
-## 临时事项（有到期日，过期即清）
+## 临时事项（有到期日，过期即清；到期日由 verify.sh 强制检查，超期 14 天内 WARN、超过 14 天 FAIL）
 
 - （`bgSaveMode` 迁移已于 2026-09-15 退役——自 v2.79 / 2026-06-10 起运行三个月，远超 10 个版本 / 33 天的先例；`PRIME_EXCLUDED_KEYS` 里的 `bgSaveMode` 保留，理由见 shared.js 该常量注释）
 - （WebDAV 遗留清理迁移已于 2026-08-26 退役——自 v2.98 起随 10 个版本运行 33 天）
