@@ -7,6 +7,10 @@
 //     shipping undisclosed.
 //  2. Every oracle exit host appears in docs/privacy.md.
 //  3. Every manifest static host is a listed exit.
+//  5. Every loopback http:// literal (AnkiConnect, Ollama) is on a hardcoded
+//     origin-granularity allowlist and disclosed in docs/privacy.md (K130).
+//     Deliberately independent of steps 1-3: the https regex and the oracle
+//     schema are untouched — see that step's own comment for why.
 //
 // The release gate only checks "was a monitored doc edited at all"; this is
 // the missing "does the edit actually correspond" half. The oracle is hand-
@@ -26,6 +30,21 @@ const fail = (msg) => { failures++; console.error(`[network-exits] FAIL: ${msg}`
 
 const exits = new Set(Object.keys(oracle.exits));
 const nonExits = new Set(Object.keys(oracle.nonExitHosts));
+
+// Loopback HTTP allowlist for step 5 below (K130). Kept as a hardcoded list
+// here rather than a docs/network-exits.json row on purpose: the oracle
+// classifies by *host*, but a bare host classification would silently allow
+// a brand-new *port* (a new undisclosed local endpoint) to pass — this check
+// needs origin granularity. AnkiConnect's port is user-configurable
+// (anki-connect.js concatenates "http://127.0.0.1:" + port at runtime), so
+// its entry is a host+scheme prefix; Ollama's port is a fixed literal
+// (ai.js), so its entry is an exact origin.
+const LOOPBACK_ALLOWLIST = [
+  { origin: "http://localhost:11434", disclosedAs: "local Ollama" },
+  { origin: "http://127.0.0.1:", disclosedAs: "AnkiConnect" },
+];
+const loopbackAllowed = (origin, entry) =>
+  origin === entry.origin || (entry.origin.endsWith(":") && origin.startsWith(entry.origin));
 
 // 1. Classify every literal https host in runtime scripts.
 const seen = new Set();
@@ -61,6 +80,23 @@ for (const pattern of manifest.host_permissions || []) {
   if (m && !exits.has(m[1])) fail(`${m[1]}: manifest host_permissions entry missing from the oracle's exits`);
 }
 
+// 3b. optional_host_permissions is the declaration ceiling Chrome grants
+// runtime origins from (K130, near-zero-cost addition alongside step 5):
+// every LOOPBACK_ALLOWLIST host must have a matching loopback pattern here,
+// or Chrome could never actually grant that origin. The blanket
+// "https://*/*" ceiling is skipped automatically — it has no "http://" prefix.
+const declaredLoopbackHosts = new Set();
+for (const pattern of manifest.optional_host_permissions || []) {
+  const m = /^http:\/\/([^/]+)\/\*$/.exec(pattern);
+  if (m) declaredLoopbackHosts.add(m[1]);
+}
+for (const entry of LOOPBACK_ALLOWLIST) {
+  const host = /^http:\/\/([^:]+):?/.exec(entry.origin)[1];
+  if (!declaredLoopbackHosts.has(host)) {
+    fail(`${host}: LOOPBACK_ALLOWLIST entry has no matching manifest optional_host_permissions ceiling`);
+  }
+}
+
 // 4. STRUCTURAL layer (Codex final review; CLAUDE.md's grep-is-not-consumption
 // rule): evaluate the provider registry the runtime actually dispatches
 // through and require every base host in it to be a disclosed exit. The text
@@ -88,8 +124,52 @@ try {
   fail(`provider-registry structural check failed to run: ${e.message}`);
 }
 
+// 5. Loopback http:// literals, at origin granularity (K130). Steps 1-3 are
+// https-only by design (see the header comment): widening that regex or the
+// oracle schema to host granularity would (a) let a brand-new port on an
+// already-classified loopback host — e.g. a hypothetical local TTS or vector
+// store on a different port — pass silently, defeating the point, and
+// (b) drag in XML/SVG namespace URIs (www.w3.org, purl.org, www.idpf.org)
+// that share no host with a loopback literal but would still need an
+// oracle row under host-only classification. This check is independent:
+// it does not touch `seen`, `exits`, `nonExits`, or docs/network-exits.json.
+const LOOPBACK_RE = /http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?/g;
+const loopbackOrigins = new Set();
+for (const f of readdirSync(ROOT).filter((n) => n.endsWith(".js"))) {
+  const src = readFileSync(join(ROOT, f), "utf8");
+  for (const m of src.matchAll(LOOPBACK_RE)) {
+    // A loopback mention inside a `//` comment (e.g. anki-connect.js citing
+    // AnkiConnect's own default CORS Access-Control-Allow-Origin value in
+    // prose) is documentation, not a literal the runtime fetches — every
+    // genuine data-exit literal in this codebase is a quoted string, so
+    // require the match to be immediately preceded by a quote character.
+    const before = src[m.index - 1];
+    if (before !== '"' && before !== "'" && before !== "`") continue;
+    let origin = m[0];
+    // A string-concatenated port ("http://127.0.0.1:" + port, anki-connect.js)
+    // leaves a bare colon right after the match with no digits for the regex
+    // to consume; normalize that to a host+colon prefix template, since the
+    // concrete port is runtime data, not a literal.
+    if (!/:\d+$/.test(origin) && src[m.index + origin.length] === ":") origin += ":";
+    loopbackOrigins.add(origin);
+  }
+}
+for (const origin of [...loopbackOrigins].sort()) {
+  if (!LOOPBACK_ALLOWLIST.some((entry) => loopbackAllowed(origin, entry))) {
+    fail(`${origin}: loopback HTTP literal not in network-exits-check.mjs's LOOPBACK_ALLOWLIST — new local endpoints must be disclosed in docs/privacy.md and added to the allowlist`);
+  }
+}
+for (const entry of LOOPBACK_ALLOWLIST) {
+  if (![...loopbackOrigins].some((origin) => loopbackAllowed(origin, entry))) {
+    fail(`${entry.origin}: allowlisted but no runtime script mentions it anymore — stale allowlist entry?`);
+  }
+  if (!privacy.includes(entry.disclosedAs)) {
+    fail(`${entry.disclosedAs}: loopback allowlist entry not mentioned in docs/privacy.md`);
+  }
+}
+
 if (failures) {
   console.error(`[network-exits] ${failures} problem(s)`);
   process.exit(1);
 }
-console.log(`[network-exits] PASS - ${seen.size} script hosts classified, ${exits.size} exits all disclosed, manifest hosts covered`);
+console.log(`[network-exits] PASS - ${seen.size} script hosts classified, ${exits.size} exits all disclosed, manifest hosts covered, ${loopbackOrigins.size} loopback origin(s) allowlisted`);
