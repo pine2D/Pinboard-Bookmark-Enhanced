@@ -4031,39 +4031,107 @@ for (const [file, html] of [["popup.html", popupHtml], ["options.html", optionsH
   }
 }
 
-// Blanks out string/template literals and comments (same length, kept as
-// spaces so indices don't move) so the brace counter below cannot be fooled
-// by a "{"/"}" that only exists inside a string or a comment -- both are
-// routine in this codebase (template literals, JSON-shaped option objects).
+// Regex-literal-vs-division disambiguation for blankNonCode below. Genuinely
+// ambiguous from a single "/" in a text scan; this only resolves the
+// unambiguous cases (an operator, an opening bracket, ";", or the "return"
+// keyword immediately before it, skipping whitespace) and defaults to
+// "division" otherwise -- getting that wrong is safe: a regex misread as
+// division leaves its content unblanked, which can desync enclosingBlock,
+// but the fail-closed check below turns that into a visible gate failure
+// instead of a silent pass, so this heuristic only needs to cover the
+// common cases, not all of them.
+function regexLiteralAllowedBefore(src, i) {
+  let j = i - 1;
+  while (j >= 0 && /\s/.test(src[j])) j--;
+  if (j < 0) return true;
+  const c = src[j];
+  if ("(,=:[!&|?{};".includes(c)) return true;
+  if (/[A-Za-z0-9_$]/.test(c)) {
+    let k = j;
+    while (k >= 0 && /[A-Za-z0-9_$]/.test(src[k])) k--;
+    return src.slice(k + 1, j + 1) === "return";
+  }
+  return false;
+}
+
+// Blanks out string/template literals, regex literals and comments (same
+// length, kept as spaces/newlines so indices don't move) so the brace
+// counter below cannot be fooled by a "{"/"}" that only exists inside one
+// of them -- both are real shapes in this codebase, not hypothetical:
+// md-video.js:467's sentence-end regex has a literal "}" inside its
+// character class (`/[...}"']*$/`), and md-epub.js:80 / popup-batch.js:301
+// both nest a template literal inside another template's `${...}`. A naive
+// quote-to-quote string scanner desyncs on the inner template's backtick;
+// this tracks `${...}` interpolation with a depth-counted stack (one frame
+// per currently-open interpolation) so nesting to any depth resolves, and
+// the interpolation's own "${" / matching "}" delimiters are blanked while
+// any real code braces inside it (an arrow function body, an object
+// literal) pass through untouched for the caller's brace matching.
 function blankNonCode(src) {
-  let out = "", i = 0;
   const n = src.length;
+  const out = new Array(n);
+  const blank = (i) => { out[i] = src[i] === "\n" ? "\n" : " "; };
+  const tpl = []; // depth of unmatched "{" remaining to close each open ${...}
+  let mode = "code"; // code | linecomment | blockcomment | dq | sq | regex | template
+  let regexInClass = false;
+  let i = 0;
   while (i < n) {
     const c = src[i], c2 = src[i + 1];
-    if (c === "/" && c2 === "/") {
-      let j = i;
-      while (j < n && src[j] !== "\n") j++;
-      out += src.slice(i, j).replace(/[^\n]/g, " ");
-      i = j;
-    } else if (c === "/" && c2 === "*") {
-      let j = i + 2;
-      while (j < n && !(src[j] === "*" && src[j + 1] === "/")) j++;
-      j = Math.min(j + 2, n);
-      out += src.slice(i, j).replace(/[^\n]/g, " ");
-      i = j;
-    } else if (c === '"' || c === "'" || c === "`") {
-      const quote = c;
-      let j = i + 1;
-      while (j < n && src[j] !== quote) { if (src[j] === "\\") j++; j++; }
-      j = Math.min(j + 1, n);
-      out += src.slice(i, j).replace(/[^\n]/g, " ");
-      i = j;
-    } else {
-      out += c;
-      i++;
+    if (mode === "code") {
+      if (c === "/" && c2 === "/") { mode = "linecomment"; blank(i); i++; continue; }
+      if (c === "/" && c2 === "*") { mode = "blockcomment"; blank(i); i++; continue; }
+      if (c === "/" && regexLiteralAllowedBefore(src, i)) { mode = "regex"; regexInClass = false; blank(i); i++; continue; }
+      if (c === '"') { mode = "dq"; blank(i); i++; continue; }
+      if (c === "'") { mode = "sq"; blank(i); i++; continue; }
+      if (c === "`") { mode = "template"; blank(i); i++; continue; }
+      if (tpl.length) {
+        if (c === "{") { tpl[tpl.length - 1]++; out[i] = c; i++; continue; }
+        if (c === "}") {
+          tpl[tpl.length - 1]--;
+          if (tpl[tpl.length - 1] === 0) { tpl.pop(); blank(i); mode = "template"; i++; continue; }
+          out[i] = c; i++; continue;
+        }
+      }
+      out[i] = c; i++; continue;
+    }
+    if (mode === "linecomment") {
+      blank(i);
+      if (c === "\n") mode = "code";
+      i++; continue;
+    }
+    if (mode === "blockcomment") {
+      blank(i);
+      if (c === "*" && c2 === "/") { blank(i + 1); i += 2; mode = "code"; continue; }
+      i++; continue;
+    }
+    if (mode === "dq" || mode === "sq") {
+      const q = mode === "dq" ? '"' : "'";
+      if (c === "\\") { blank(i); i++; if (i < n) { blank(i); i++; } continue; }
+      blank(i);
+      if (c === q) mode = "code";
+      i++; continue;
+    }
+    if (mode === "regex") {
+      if (c === "\\") { blank(i); i++; if (i < n) { blank(i); i++; } continue; }
+      if (c === "[") { regexInClass = true; blank(i); i++; continue; }
+      if (c === "]") { regexInClass = false; blank(i); i++; continue; }
+      if (c === "/" && !regexInClass) {
+        blank(i); i++;
+        while (i < n && /[a-z]/i.test(src[i])) { blank(i); i++; }
+        mode = "code";
+        continue;
+      }
+      if (c === "\n") { blank(i); mode = "code"; i++; continue; } // unterminated -- bail defensively
+      blank(i); i++; continue;
+    }
+    if (mode === "template") {
+      if (c === "\\") { blank(i); i++; if (i < n) { blank(i); i++; } continue; }
+      if (c === "`") { blank(i); mode = "code"; i++; continue; }
+      if (c === "$" && c2 === "{") { blank(i); blank(i + 1); i += 2; tpl.push(1); mode = "code"; continue; }
+      blank(i); i++; continue;
     }
   }
-  return out;
+  return out.join("");
 }
 
 // The smallest {...} block that encloses `index` in `code` (a blankNonCode
@@ -4112,6 +4180,15 @@ function enclosingBlock(code, index) {
 // aria-label to a different button that never set its own (reviewer
 // counterexample: two `btn`-named buttons in one function, only the
 // non-× one titled -- proven red/green by hand, see the K113 fix report).
+//
+// blankNonCode's regex/template handling is a heuristic, not a full parser
+// (see regexLiteralAllowedBefore above), so enclosingBlock() can still fail
+// to balance on a shape it doesn't recognize. When that happens this does
+// NOT fall back to searching the whole file -- an unrelated .title on some
+// other same-named variable elsewhere would silently satisfy the check,
+// which is exactly the false pass a reviewer reproduced against the prior
+// +-400-char-window version. Instead it fails the gate directly, naming the
+// file and variable, so a desync is visible instead of silently passing.
 for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   const src = read(f);
   const code = blankNonCode(src);
@@ -4119,11 +4196,16 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   let xm;
   while ((xm = xRe.exec(src))) {
     const v = xm[1];
-    const [blockStart, blockEnd] = enclosingBlock(code, xm.index) || [0, src.length];
+    const block = enclosingBlock(code, xm.index);
+    if (!block) {
+      check(false, `${f}: cannot determine enclosing scope for × button "${v}" -- blankNonCode likely desynced on a regex literal or template nesting it doesn't recognize; fix the scanner or, if this is a false trigger, narrow it instead of widening the scope search`);
+      continue;
+    }
+    const [blockStart, blockEnd] = block;
     const declRe = new RegExp(`(?:\\b(?:const|let|var)\\s+${v}\\b|[^.\\w$]${v}\\s*=(?!=))`, "g");
     let scopeStart = blockStart, scopeEnd = blockEnd, dm;
     declRe.lastIndex = blockStart;
-    while ((dm = declRe.exec(src)) && dm.index < blockEnd) {
+    while ((dm = declRe.exec(code)) && dm.index < blockEnd) {
       if (dm.index < xm.index) { scopeStart = dm.index; continue; }
       scopeEnd = dm.index;
       break;
