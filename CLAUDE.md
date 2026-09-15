@@ -16,7 +16,7 @@ Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支�
 | 平台 | Chrome Extension Manifest V3 |
 | 语言 | Vanilla JavaScript（无框架、无构建步骤、零运行时依赖——保持这一点） |
 | 存储 | Chrome Storage API（sync + local）+ IndexedDB |
-| AI providers | OpenAI / Anthropic / Gemini / DeepSeek / Qwen / MiniMax / OpenRouter / Groq / Mistral / Cohere / SiliconFlow / Zhipu (BigModel) / Moonshot / Ollama (local) |
+| AI providers | OpenAI / Anthropic / Gemini / DeepSeek / Qwen / MiniMax / OpenRouter / Groq / Mistral / Cohere / SiliconFlow / Zhipu (BigModel) / Moonshot (Kimi) / Ollama (local) |
 | 页面正文抽取 | Defuddle（vendor/ 本地化，懒注入）；备用 Jina Reader API |
 | 主题生产 | 自建 theme factory（`docs/theme-surface/`） |
 
@@ -48,7 +48,7 @@ tests/                       # file:// 直开的 HTML 测试页 40+ 套（不入
                              # + render-audit-checklist.mjs（手写渲染 oracle，禁止从配方源生成）
                              # + render-audit-known-failures.json（迁移期基线，当前为空）+ render-audit-spacing-baseline.json（spacingScale 只减不增账本）+ ui-contract-tests.mjs
 scripts/                     # 发布链：bump-version.sh / release.sh / zip-install-smoke.mjs
-                             # 质量门：verify.sh / pre-commit-hook.sh / commit-msg-hook.sh / docs-lint.mjs / ui-render-audit.mjs
+                             # 质量门：verify.sh（门的权威清单以其自身的阶段 echo 为准）/ pre-commit-hook.sh / commit-msg-hook.sh / ui-consumer-lint.mjs（编辑期）
                              # 工具：setup-hooks.sh / update-vendor.sh / sync-runtime.sh / qa-drive.mjs / perf 与截图辅助若干
 docs/                        # GitHub Pages：index.md / privacy.md / _layouts / assets / screenshots / cws-assets
 docs/theme-surface/          # 主题工厂：composers/ pilots/ tools/ qa-harness/ snapshots/ + COMPONENTS.md / NEW_THEME.md / README.md
