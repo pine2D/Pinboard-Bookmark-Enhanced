@@ -108,20 +108,43 @@ function calleeName(callee) {
   return "";
 }
 
+// Two distinct outcomes, never conflated: MODULE_SCOPE means the walk crossed
+// no function at all, ANONYMOUS means it crossed one (or more) whose name
+// cannot be derived. Only the first is a real coordinate; the second must never
+// be registrable, or one entry would cover every unresolvable shape in a file.
+const MODULE_SCOPE = "(top level)";
+const ANONYMOUS_FN = "(anonymous)";
+
+// `class C { m() {} }` / `class C { m = () => {} }` -> "C.m", or "m" when the
+// class itself is anonymous.
+function classMemberName(owner, parents) {
+  const key = owner.key.name;
+  const body = parents.get(owner);
+  const klass = body ? parents.get(body) : null;
+  const cls = klass && klass.id && klass.id.name ? klass.id.name : "";
+  return cls ? `${cls}.${key}` : key;
+}
+
 // Nearest enclosing function that has a name we can derive -- the stable key
 // for the indirect-call registry below (a line number drifts on every edit).
 function enclosingFunctionName(node, parents) {
+  let sawFunction = false;
   for (let cur = parents.get(node); cur; cur = parents.get(cur)) {
     if (!/^(FunctionDeclaration|FunctionExpression|ArrowFunctionExpression)$/.test(cur.type)) continue;
+    sawFunction = true;
     if (cur.id && cur.id.name) return cur.id.name;
     const owner = parents.get(cur);
     if (!owner) continue;
     if (owner.type === "VariableDeclarator" && owner.id.type === "Identifier") return owner.id.name;
     if (owner.type === "Property" && !owner.computed && owner.key.type === "Identifier") return owner.key.name;
+    // Class members: without these the walk would pass straight through a
+    // method and report the call as module scope.
+    if ((owner.type === "MethodDefinition" || owner.type === "PropertyDefinition") &&
+        !owner.computed && owner.key.type === "Identifier") return classMemberName(owner, parents);
     if (owner.type === "AssignmentExpression" && owner.left.type === "MemberExpression" &&
         !owner.left.computed && owner.left.property.type === "Identifier") return owner.left.property.name;
   }
-  return "(top level)";
+  return sawFunction ? ANONYMOUS_FN : MODULE_SCOPE;
 }
 
 // Names bound by a declaration id (handles destructuring).
@@ -161,6 +184,18 @@ const INDIRECT_ALLOWLIST = [
     why: "callback-form forwarder: it hands its caller's own literal options object straight to chrome.scripting, and every one of those call sites is checked here.",
   },
 ];
+
+// A key must name one function, not a shape. ANONYMOUS_FN is what an
+// unresolvable enclosing function reports, so registering it would wave through
+// every such call in that file -- refuse the registry outright rather than run
+// with a hole in it.
+for (const entry of INDIRECT_ALLOWLIST) {
+  if (entry.fn !== ANONYMOUS_FN) continue;
+  console.error(`[script-graph] INDIRECT_ALLOWLIST cannot register "${ANONYMOUS_FN}" (entry for ${entry.file}):`);
+  console.error("[script-graph] it is the marker for a call whose enclosing function has no derivable name, not a coordinate.");
+  console.error("[script-graph] Give that function a name, then register it.");
+  process.exit(2);
+}
 
 function collectBundleSymbols(parsed) {
   const table = new Map(); // name -> Set(file)
