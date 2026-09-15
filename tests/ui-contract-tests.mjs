@@ -170,6 +170,7 @@ const popupAiJs = read("popup-ai.js");
 const popupBatchJs = read("popup-batch.js");
 const popupCss = read("popup.css");
 const optionsConnectivityJs = read("options-connectivity.js");
+const aiJs = read("ai.js");
 const optionsCss = read("options.css");
 const optionsJs = read("options.js");
 const optionsBackupJs = read("options-backup.js");
@@ -1813,6 +1814,213 @@ for (const [id, label, heading] of [["opt-lang", "secLanguage", "sec-language"],
 
   check(eqOffenders.length === 0,
     "default value drifted between SETTINGS_DEFAULTS / options.html / PANEL_DEFAULTS -> " + eqOffenders.join("; "));
+}
+
+// Provider default-model & id-set parity gate (K81, follow-up to the
+// default-value equality gate above -- same "hand-copied, drift silently"
+// failure class, but for the 15 AI providers rather than plain settings).
+// Each provider's default model string is hand-copied SIX times (shared.js
+// SETTINGS_DEFAULTS, ai.js OPENAI_COMPAT_PROVIDERS.defaultModel for the 12
+// callOpenAICompat-dispatched providers, options.html's `value=`, options.js
+// PANEL_DEFAULTS.ai.fields, options.js collectSettingsFromForm's `||
+// "literal"` fallback, and options-connectivity.js pbpLiveAiSettingsSnapshot's
+// getOptVal(...) fallback), and the provider ID list is separately
+// hand-copied across five more spots. 0 drift today (verified by hand,
+// 2026-09) -- this gate is what keeps it that way without merging any of the
+// copies: K81's controller-reviewed direction explicitly rejects folding
+// gemini/claude/ollama into OPENAI_COMPAT_PROVIDERS (that table's contract is
+// "reached via callOpenAICompat", and scripts/network-exits-check.mjs parses
+// it expecting every `base` host to be an allowlisted network exit -- ollama's
+// localhost base would trip that door) and rejects merging the four ID
+// arrays (AI_PROVIDER_ORDER's ordering is a deliberate fallback-provider
+// priority, not an accidental duplicate of PBP_CONNECTION_HEALTH_IDS or the
+// options.js/options-connectivity.js provider-id lists). See task-1-brief.md
+// for the full reasoning trail this gate's shape is drawn from.
+{
+  // ---- ground truth: every SETTINGS_DEFAULTS key of shape "<id>Model",
+  // minus the one documented non-provider exception. previewAiModel is a
+  // COMPUTED per-provider override (_previewModelMap[s.aiProvider] ?? ""),
+  // not a provider's declared default -- K79's own DEFAULT_EQ_ALLOWLIST
+  // documents the exact same exception for opt-preview-ai-model. Deriving
+  // PROVIDERS from the real SETTINGS_DEFAULTS keys (instead of hand-typing a
+  // 15-provider array here, which would just be a seventh hand copy) means a
+  // 16th provider is picked up automatically the moment shared.js adds
+  // `<id>Model:` -- and the gate below will immediately point at every other
+  // copy that still needs it.
+  const NON_PROVIDER_MODEL_KEYS = new Set(["previewAiModel"]);
+
+  const sdStart3 = sharedJs.indexOf("const SETTINGS_DEFAULTS = {");
+  const sdEnd3 = sharedJs.indexOf("\n};", sdStart3);
+  let settingsDefaultsK81 = null;
+  try { settingsDefaultsK81 = runInNewContext("(" + sharedJs.slice(sdStart3 + "const SETTINGS_DEFAULTS = ".length, sdEnd3 + 2) + ")", {}); } catch (_) {}
+  check(settingsDefaultsK81 && typeof settingsDefaultsK81 === "object",
+    "shared.js: SETTINGS_DEFAULTS is not a plain literal the K81 parity gate can evaluate");
+
+  const PROVIDERS = settingsDefaultsK81
+    ? Object.keys(settingsDefaultsK81)
+      .filter((k) => k.endsWith("Model") && !NON_PROVIDER_MODEL_KEYS.has(k))
+      .map((k) => k.slice(0, -"Model".length))
+    : [];
+  check(PROVIDERS.length > 0, "shared.js: found no `<id>Model` keys in SETTINGS_DEFAULTS -- K81 parity gate has nothing to check");
+
+  // ---- ai.js OPENAI_COMPAT_PROVIDERS (bespoke gemini/claude/ollama are
+  // dispatched ahead of this table by design -- ai.js's own header comment
+  // says so -- so they are excluded from this one comparison, not from the
+  // gate overall: every other copy below still covers all 15).
+  const cpStart = aiJs.indexOf("const OPENAI_COMPAT_PROVIDERS = {");
+  const cpEnd = aiJs.indexOf("\n};", cpStart);
+  let compatProviders = null;
+  try { compatProviders = runInNewContext("(" + aiJs.slice(cpStart + "const OPENAI_COMPAT_PROVIDERS = ".length, cpEnd + 2) + ")", {}); } catch (_) {}
+  check(compatProviders && typeof compatProviders === "object",
+    "ai.js: OPENAI_COMPAT_PROVIDERS is not a plain literal the K81 parity gate can evaluate");
+  const BESPOKE_PROVIDERS = new Set(["gemini", "claude", "ollama"]);
+
+  // ---- options.js PANEL_DEFAULTS.ai.fields (re-parsed independently of the
+  // K79 block above, same technique/failure handling, matching this file's
+  // own "re-parsed independently" idiom -- see K79's own comment on why).
+  const pdStart3 = optionsJs.indexOf("const PANEL_DEFAULTS = {");
+  const pdEnd3 = optionsJs.indexOf("\n  };", pdStart3) + 4;
+  let panelDefaultsK81 = null;
+  try { panelDefaultsK81 = runInNewContext("(" + optionsJs.slice(pdStart3 + "const PANEL_DEFAULTS = ".length, pdEnd3) + ")", {}); } catch (_) {}
+  check(panelDefaultsK81 && panelDefaultsK81.ai && panelDefaultsK81.ai.fields && typeof panelDefaultsK81.ai.fields === "object",
+    "options.js: PANEL_DEFAULTS.ai.fields is not a plain literal the K81 parity gate can evaluate");
+  const aiFields = (panelDefaultsK81 && panelDefaultsK81.ai && panelDefaultsK81.ai.fields) || {};
+
+  // options.html: `<input ... id="opt-<id>-model" value="...">`. opt-custom-
+  // model carries no `value=` at all (placeholder="model-name" instead,
+  // options.html ~592) -- a deliberate different pattern for the one provider
+  // whose default really is "no default", mirrored by customModel: "" in
+  // SETTINGS_DEFAULTS. The regex below resolves a missing value= to "" (not
+  // to a sentinel), so custom's absence *agrees* with the empty-string
+  // default -- no allowlist entry is needed to make this pass, but it also
+  // means a provider that legitimately ships no value= must have "" as its
+  // SETTINGS_DEFAULTS default, exactly like custom does.
+  const htmlModelValue = (id) => {
+    const m = optionsHtml.match(new RegExp(`<input[^>]*\\bid="opt-${id}-model"[^>]*>`));
+    if (!m) return undefined;
+    return (m[0].match(/\bvalue="([^"]*)"/) || [])[1] ?? "";
+  };
+
+  const offenders = [];
+  for (const id of PROVIDERS) {
+    const key = `${id}Model`;
+    const expected = settingsDefaultsK81[key];
+
+    const htmlVal = htmlModelValue(id);
+    if (htmlVal === undefined) offenders.push(`${id}: options.html has no id="opt-${id}-model" input`);
+    else if (htmlVal !== expected) offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but options.html value="opt-${id}-model"=${JSON.stringify(htmlVal)}`);
+
+    if (!Object.prototype.hasOwnProperty.call(aiFields, `opt-${id}-model`)) {
+      offenders.push(`${id}: PANEL_DEFAULTS.ai.fields is missing opt-${id}-model`);
+    } else if (aiFields[`opt-${id}-model`] !== expected) {
+      offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but PANEL_DEFAULTS.ai.fields["opt-${id}-model"]=${JSON.stringify(aiFields[`opt-${id}-model`])}`);
+    }
+
+    // collectSettingsFromForm: `<id>Model: $id("opt-<id>-model").value.trim()
+    // [|| "literal"]` -- custom's line has no `|| "..."` tail at all (its
+    // .trim() alone already agrees with customModel: ""), so the fallback
+    // group is optional and a missing match resolves to "".
+    const collectRe = new RegExp(`\\b${key}:\\s*\\$id\\("opt-${id}-model"\\)\\.value\\.trim\\(\\)(?:\\s*\\|\\|\\s*"((?:[^"\\\\]|\\\\.)*)")?`);
+    const collectM = optionsJs.match(collectRe);
+    if (!collectM) {
+      offenders.push(`${id}: collectSettingsFromForm has no "${key}: $id(\\"opt-${id}-model\\").value.trim()" assignment`);
+    } else {
+      const collectVal = collectM[1] !== undefined ? collectM[1] : "";
+      if (collectVal !== expected) offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but collectSettingsFromForm fallback=${JSON.stringify(collectVal)}`);
+    }
+
+    // options-connectivity.js pbpLiveAiSettingsSnapshot:
+    // getOptVal("opt-<id>-model"[, "literal"]) -- same optional-fallback
+    // shape as above, same reason (custom has no second argument).
+    const snapRe = new RegExp(`getOptVal\\("opt-${id}-model"(?:,\\s*"((?:[^"\\\\]|\\\\.)*)")?\\)`);
+    const snapM = optionsConnectivityJs.match(snapRe);
+    if (!snapM) {
+      offenders.push(`${id}: pbpLiveAiSettingsSnapshot has no getOptVal("opt-${id}-model", ...) call`);
+    } else {
+      const snapVal = snapM[1] !== undefined ? snapM[1] : "";
+      if (snapVal !== expected) offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but pbpLiveAiSettingsSnapshot fallback=${JSON.stringify(snapVal)}`);
+    }
+
+    if (!BESPOKE_PROVIDERS.has(id)) {
+      const cfg = compatProviders && compatProviders[id];
+      if (!cfg) offenders.push(`${id}: OPENAI_COMPAT_PROVIDERS has no entry (and it is not in the bespoke gemini/claude/ollama exclusion set)`);
+      else if (cfg.defaultModel !== expected) offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but OPENAI_COMPAT_PROVIDERS.${id}.defaultModel=${JSON.stringify(cfg.defaultModel)}`);
+    }
+  }
+  check(offenders.length === 0,
+    "K81: provider default model drifted between SETTINGS_DEFAULTS / ai.js OPENAI_COMPAT_PROVIDERS / options.html / PANEL_DEFAULTS.ai.fields / collectSettingsFromForm / pbpLiveAiSettingsSnapshot -> " + offenders.join("; "));
+
+  // ---- id-set parity: five more hand-copied provider-id lists, compared as
+  // SETS against PROVIDERS -- never by order (AI_PROVIDER_ORDER's order is a
+  // deliberate fallback-provider priority, e.g. minimax sits near the end on
+  // purpose; PBP_CONNECTION_HEALTH_IDS is an independent validation
+  // allowlist by design). A missing or extra id is a real drift signal
+  // either way; only the ORDER is intentionally allowed to differ.
+  const idOffenders = [];
+
+  // options.js PBP_CONNECTION_HEALTH_IDS: `new Set(["pinboard","anki","eudic",
+  // ...[...].map(p => \`ai:${p}\`)])` -- self-contained (no closure refs), so
+  // the whole expression evaluates under runInNewContext; strip the "ai:"
+  // prefix and drop the three non-AI integration ids it also carries.
+  const chStart = optionsJs.indexOf("const PBP_CONNECTION_HEALTH_IDS = new Set([");
+  const chEnd = optionsJs.indexOf("\n]);", chStart);
+  let healthIds = null;
+  try {
+    const expr = optionsJs.slice(chStart + "const PBP_CONNECTION_HEALTH_IDS = ".length, chEnd + 4).replace(/;\s*$/, "");
+    healthIds = runInNewContext(expr, {});
+  } catch (_) {}
+  // runInNewContext evaluates in a separate realm, so its `Set` is not the
+  // outer realm's `Set` constructor -- `instanceof Set` would false-negative
+  // here even on success; duck-type on the iterator protocol instead (the
+  // spread below already relies on exactly that protocol).
+  const healthIdsOk = healthIds && typeof healthIds[Symbol.iterator] === "function" && typeof healthIds.has === "function";
+  check(healthIdsOk, "options.js: PBP_CONNECTION_HEALTH_IDS is not a plain Set literal the K81 parity gate can evaluate");
+  const healthProviderIds = healthIdsOk ? [...healthIds].filter((v) => v.startsWith("ai:")).map((v) => v.slice(3)) : [];
+
+  // options.js `const providers = [...]` (provider-field toggle) and
+  // options-connectivity.js's `[...].forEach(p => { $id(\`test-${p}\`)... })`
+  // (connectivity test buttons) are both single-line double-quoted JSON
+  // array literals -- JSON.parse handles them directly, no eval needed.
+  const providersArrM = optionsJs.match(/const providers = (\[[^\]]*\]);/);
+  const connectivityArrM = optionsConnectivityJs.match(/(\["gemini"[^\]]*\])\.forEach\(p => \{/);
+  let providersArr = null, connectivityArr = null;
+  try { providersArr = providersArrM ? JSON.parse(providersArrM[1]) : null; } catch (_) {}
+  try { connectivityArr = connectivityArrM ? JSON.parse(connectivityArrM[1]) : null; } catch (_) {}
+  check(Array.isArray(providersArr), "options.js: `const providers = [...]` (provider-field toggle) is not a plain JSON-shaped array the K81 parity gate can evaluate");
+  check(Array.isArray(connectivityArr), "options-connectivity.js: the connectivity-test-button provider array is not a plain JSON-shaped array the K81 parity gate can evaluate");
+
+  // popup-ai.js AI_PROVIDER_ORDER (JSON-shaped array) and AI_PROVIDER_LABEL
+  // (object literal, unquoted keys -- needs runInNewContext like PANEL_
+  // DEFAULTS above, not JSON.parse).
+  const aoStart = popupAiJs.indexOf("const AI_PROVIDER_ORDER = [");
+  const aoEnd = popupAiJs.indexOf("];", aoStart) + 1;
+  let aiProviderOrder = null;
+  try { aiProviderOrder = JSON.parse(popupAiJs.slice(aoStart + "const AI_PROVIDER_ORDER = ".length, aoEnd)); } catch (_) {}
+  check(Array.isArray(aiProviderOrder), "popup-ai.js: AI_PROVIDER_ORDER is not a plain JSON-shaped array the K81 parity gate can evaluate");
+
+  const alStart = popupAiJs.indexOf("const AI_PROVIDER_LABEL = {");
+  const alEnd = popupAiJs.indexOf("\n};", alStart);
+  let aiProviderLabel = null;
+  try { aiProviderLabel = runInNewContext("(" + popupAiJs.slice(alStart + "const AI_PROVIDER_LABEL = ".length, alEnd + 2) + ")", {}); } catch (_) {}
+  check(aiProviderLabel && typeof aiProviderLabel === "object", "popup-ai.js: AI_PROVIDER_LABEL is not a plain literal the K81 parity gate can evaluate");
+
+  const idSources = {
+    "options.js PBP_CONNECTION_HEALTH_IDS (ai: prefix)": healthProviderIds,
+    "options.js `const providers` (provider-field toggle)": providersArr || [],
+    "options-connectivity.js connectivity-test-button array": connectivityArr || [],
+    "popup-ai.js AI_PROVIDER_ORDER": aiProviderOrder || [],
+    "popup-ai.js AI_PROVIDER_LABEL keys": aiProviderLabel ? Object.keys(aiProviderLabel) : [],
+  };
+  const canonical = new Set(PROVIDERS);
+  for (const [name, list] of Object.entries(idSources)) {
+    const set = new Set(list);
+    const missing = PROVIDERS.filter((id) => !set.has(id));
+    const extra = list.filter((id) => !canonical.has(id));
+    if (missing.length) idOffenders.push(`${name} is missing: ${missing.join(", ")}`);
+    if (extra.length) idOffenders.push(`${name} has unexpected extra ids: ${extra.join(", ")}`);
+  }
+  check(idOffenders.length === 0,
+    "K81: provider id set drifted (compared as sets, order ignored) -> " + idOffenders.join("; "));
 }
 
 // Embedded-frame extraction (2026-08-25/26): the candidate rule lives as a
