@@ -23,42 +23,23 @@ const results=document.getElementById("results");
 
 function assert(cond,msg){if(!cond)throw new Error(msg||"assertion failed");}
 
-// G1: build a Recent edit/delete control exactly as popup.js fetchRecentBookmarks ships it.
-// This helper mirrors the shipped code; if popup.js diverges the contract assertions below catch it.
-function buildRecentControl(kind){
-  const el=document.createElement("span");
-  el.className=kind==="edit"?"recent-bm-edit":"recent-bm-del";
-  el.innerHTML=kind==="edit"?PBP_ICONS.pencil:PBP_ICONS.cross;
-  el.title=kind==="edit"?"Edit":"Delete";
-  el.setAttribute("role","button");
-  el.setAttribute("tabindex","0");
-  el.setAttribute("aria-label",kind==="edit"?"Edit":"Delete");
-  let fired=0;
-  const act=()=>{fired++;};
-  el.addEventListener("click",act);
-  el.addEventListener("keydown",(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();act();}});
-  el._firedCount=()=>fired;
-  return el;
-}
-
-["edit","del"].forEach(kind=>{
-  const el=buildRecentControl(kind==="del"?"del":"edit");
-  test(kind+": has role=button",()=>{if(el.getAttribute("role")!=="button")throw new Error("role="+el.getAttribute("role"));});
-  test(kind+": is focusable (tabindex=0)",()=>{if(el.getAttribute("tabindex")!=="0")throw new Error("tabindex="+el.getAttribute("tabindex"));});
-  test(kind+": has aria-label",()=>{if(!el.getAttribute("aria-label"))throw new Error("missing aria-label");});
-  test(kind+": Enter key activates",()=>{
-    document.getElementById("fixture").appendChild(el);
-    el.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}));
-    if(el._firedCount()<1)throw new Error("Enter did not fire handler");
-  });
-  test(kind+": Space key activates",()=>{
-    el.dispatchEvent(new KeyboardEvent("keydown",{key:" ",bubbles:true}));
-    if(el._firedCount()<2)throw new Error("Space did not fire handler");
-  });
-});
+// Division of labor in this file (K114 fixture-honesty fix, 2026-09):
+// G6/G6b/G7/G8 load ../shared.js and ../i18n.js and drive real shipped
+// functions (showConfirmPopover / applyI18n / setupSecretToggles) -- true
+// regression gates. G2/G3/G4 are shape snapshots: popup.js/options.js need
+// chrome.* APIs and their own HTML, so a file:// page can't load them; where
+// a static assertion is feasible their real shipped shape is pinned instead
+// in tests/ui-contract-tests.mjs. A G1 block (a hand-built role=button span
+// mirroring the Recent-row edit/delete controls) was deleted here 2026-09:
+// popup.js ships native <button> elements with no role/tabindex/keydown, so
+// G1 was pinning a shape the shipped code no longer has and stayed green
+// regardless -- see tests/ui-contract-tests.mjs for the replacement.
 
 // G2: ARIA tablist/tab/tabpanel + roving focus for options tabs (vertical sidebar).
-// Fixture mirrors the shipped options.html markup; wiring mirrors options.js activateTab + keydown.
+// Shape snapshot, not a regression gate (see division-of-labor note above).
+// The real shipped shape -- tablist role/aria-orientation, per-tab
+// role/aria-controls, and the roving-tabindex + ArrowUp/ArrowDown handlers --
+// is asserted against source text in tests/ui-contract-tests.mjs (K114).
 // Deviation from brief: ArrowDown/ArrowUp used (not ArrowRight/ArrowLeft) because .tabs is
 // a vertical sidebar (flex-direction:column) and aria-orientation="vertical" requires vertical arrows.
 (function(){
@@ -106,6 +87,8 @@ function buildRecentControl(kind){
 })();
 
 // G4: Offline retry button — aria-label + icon-preserving loading state.
+// Shape snapshot, not a regression gate (see division-of-labor note above) --
+// built fresh here, not loaded from popup.js/options.js.
 (function(){
   const btn=document.createElement("button");
   btn.type="button";
@@ -127,7 +110,8 @@ function buildRecentControl(kind){
 })();
 
 // G3: Ask-the-page panel focus return on close (non-modal, no trap).
-// Mirrors the opener-capture / restore logic shipped in _pbpAskSetOpen.
+// Shape snapshot, not a regression gate (see division-of-labor note above) --
+// not loaded from md-ask.js; pins the opener-capture/restore pattern in isolation.
 (function(){
   // Build the fixture dynamically so it exists before the test functions run.
   const fix=document.createElement("div");

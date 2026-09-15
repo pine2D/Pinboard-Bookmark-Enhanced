@@ -1482,6 +1482,55 @@ check(!optionsTabs.includes('id="reset-panel-btn"') && /id="mobile-tab-select"/.
 check(/mobileTabSelect\.value = btn\.dataset\.panel/.test(optionsJs) &&
   /mobileTabSelect\?\.addEventListener\("change"/.test(optionsJs),
   "options.js: desktop tabs and mobile category select can drift");
+
+// K114 (a11y self-certifying fixture retirement, 2026-09): the options
+// tablist's ARIA shape and roving-tabindex + arrow-key contract, and the
+// popup Recent-row edit/delete controls' accessible-name contract, used to
+// be pinned only by hand-built fixtures in tests/a11y-tests.html that never
+// loaded this source (G1 there had already drifted from shipped popup.js --
+// popup.js ships native <button>s, the fixture built a role=button span --
+// and stayed green regardless). These check the shipped source text
+// directly; tests/a11y-tests.html keeps the behavioural shape snapshots for
+// what can't be checked statically (G2/G3/G4), now honestly labelled as such.
+check(/<div class="tabs" role="tablist" aria-orientation="vertical">/.test(optionsHtml),
+  "options.html: .tabs lost role=tablist or aria-orientation=vertical");
+{
+  const tabBtnTags = [...optionsHtml.matchAll(/<button class="tab-btn[^>]*>/g)].map((m) => m[0]);
+  check(tabBtnTags.length > 0, "options.html: found no .tab-btn buttons");
+  const offenders = tabBtnTags.filter((tag) => {
+    const controls = (tag.match(/aria-controls="([^"]+)"/) || [])[1];
+    return !/role="tab"/.test(tag) || !controls || !optionsHtml.includes(`id="${controls}"`);
+  });
+  check(offenders.length === 0,
+    "options.html: a .tab-btn lost role=tab or points aria-controls at a panel id that doesn't exist -> " + offenders.join(", "));
+}
+check(/btn\.tabIndex = btn\.classList\.contains\("active"\) \? 0 : -1;/.test(optionsJs),
+  "options.js: tab button roving-tabindex init is missing (btn.tabIndex = ...active ? 0 : -1)");
+{
+  const kdStart = optionsJs.indexOf('_tabBtns.forEach((btn, i) => {');
+  const kdEnd = kdStart < 0 ? -1 : optionsJs.indexOf("mobileTabSelect?.addEventListener", kdStart);
+  const kdBody = kdStart < 0 || kdEnd < 0 ? "" : optionsJs.slice(kdStart, kdEnd);
+  check(/e\.key === "ArrowDown"/.test(kdBody) && /e\.key === "ArrowUp"/.test(kdBody) &&
+    /activateTab\(_tabBtns\[n\]\)/.test(kdBody) && /_tabBtns\[n\]\.focus\(\)/.test(kdBody),
+    "options.js: tab keydown handler lost the ArrowDown/ArrowUp roving-focus branches");
+}
+{
+  // Native <button> needs no role/tabindex/keydown of its own -- the
+  // contract that matters post-fix is the accessible name (title +
+  // aria-label pair), not the ARIA-widget shape the retired fixture pinned.
+  const editIdx = popupJs.indexOf('const edit = document.createElement("button");');
+  const delIdx = popupJs.indexOf('const del = document.createElement("button");');
+  check(editIdx >= 0 && delIdx >= 0,
+    "popup.js: recent-row edit/delete controls are no longer built as <button> elements");
+  const editSlice = editIdx >= 0 && delIdx > editIdx ? popupJs.slice(editIdx, delIdx) : "";
+  const delEnd = delIdx >= 0 ? popupJs.indexOf("showConfirmPopover(del,", delIdx) : -1;
+  const delSlice = delIdx >= 0 && delEnd > delIdx ? popupJs.slice(delIdx, delEnd) : "";
+  check(/edit\.title = /.test(editSlice) && /edit\.setAttribute\("aria-label", /.test(editSlice),
+    "popup.js: recent-row edit button lost its title/aria-label pair");
+  check(/del\.title = /.test(delSlice) && /del\.setAttribute\("aria-label", /.test(delSlice),
+    "popup.js: recent-row delete button lost its title/aria-label pair");
+}
+
 check(/result && typeof result\.catch === "function"\) result\.catch\(reportConfirmError\)/.test(sharedJs),
   "shared.js: asynchronous confirm failures can become unhandled rejections");
 // Leading-edge alignment: the popover is routinely far wider than its anchor, so
