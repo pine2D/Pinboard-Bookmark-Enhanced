@@ -1476,9 +1476,30 @@ check(popupCss.includes("html[data-theme] .confirm-popover .confirm-no:hover { b
     "popup AI summary ownership still writes a marker, lacks fail-closed range tracking, or dropped legacy recognition");
 }
 
-const optionsTabs = optionsHtml.slice(optionsHtml.indexOf('<div class="tabs"'), optionsHtml.indexOf('</div>', optionsHtml.indexOf('<div class="tabs"')) + 6);
-check(!optionsTabs.includes('id="reset-panel-btn"') && /id="mobile-tab-select"/.test(optionsHtml),
-  "options.html: reset action remains inside tablist or mobile category select is missing");
+{
+  // optionsTabs used to stop at the FIRST nested </div> -- inside .tabs
+  // that's the close of .tab-group-label (158 chars, 0 .tab-btn), so
+  // !optionsTabs.includes('id="reset-panel-btn"') was vacuously true no
+  // matter what optionsHtml contained. Walk div depth to the real matching
+  // close instead (HTML comments blanked first so a `<!-- <div> -->` aside
+  // can't perturb the count) -- the balanced extent is 2816 chars / 13
+  // .tab-btn today, with reset-panel-btn sitting just outside it.
+  const tabsStart = optionsHtml.indexOf('<div class="tabs"');
+  const commentless = optionsHtml.replace(/<!--[\s\S]*?-->/g, (c) => " ".repeat(c.length));
+  const divRe = /<div\b|<\/div>/g;
+  divRe.lastIndex = tabsStart;
+  let depth = 0, tabsEnd = -1, dm;
+  while ((dm = divRe.exec(commentless))) {
+    depth += dm[0] === "</div>" ? -1 : 1;
+    if (depth === 0) { tabsEnd = dm.index + dm[0].length; break; }
+  }
+  const optionsTabs = tabsEnd === -1 ? "" : optionsHtml.slice(tabsStart, tabsEnd);
+  const tabBtnCount = (optionsTabs.match(/class="tab-btn/g) || []).length;
+  check(tabBtnCount >= 13,
+    `options.html: balanced .tabs extent only has ${tabBtnCount} .tab-btn (expected >= 13) -- the extent may be truncated again`);
+  check(!optionsTabs.includes('id="reset-panel-btn"') && /id="mobile-tab-select"/.test(optionsHtml),
+    "options.html: reset action remains inside tablist or mobile category select is missing");
+}
 check(/mobileTabSelect\.value = btn\.dataset\.panel/.test(optionsJs) &&
   /mobileTabSelect\?\.addEventListener\("change"/.test(optionsJs),
   "options.js: desktop tabs and mobile category select can drift");
