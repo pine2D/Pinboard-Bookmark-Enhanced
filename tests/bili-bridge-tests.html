@@ -72,6 +72,16 @@ function makeBridgeFrame() {
       const loaded = new Promise((resolve) => { ifr.onload = resolve; });
       document.body.appendChild(ifr);
       await loaded;
+      // iframe "load" fires whether the bridge's <script src> actually
+      // executed or merely 404'd -- without this check, "zero postMessage
+      // calls" would be indistinguishable from "the bridge script never ran
+      // at all" (a vacuous pass). __pbpBiliBridge is the marker the
+      // bridge's own IIFE sets unconditionally right after its
+      // window===window.top / re-injection guards (bili-player-bridge.js:27),
+      // before anything else runs -- the cheapest real signal that
+      // execution actually reached it.
+      assert(ifr.contentWindow.__pbpBiliBridge === 1,
+        "bridge script did not execute (missing __pbpBiliBridge marker) -- the zero-calls check below would be vacuous");
       // No hello posted into the frame. A short wait catches anything the
       // bridge might fire off a tick or two after load (e.g. from a stray
       // top-level call or a microtask), not just synchronous leaks.
