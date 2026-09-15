@@ -11,6 +11,23 @@
 #
 # Covers: defuddle, turndown, marked, dompurify (npm) + highlight.js (cdnjs build).
 # NOT covered: katex/ (multi-file dist + woff2 fonts) — refresh per vendor/README.md.
+#
+# Modes:
+#   (no args)      Refresh vendored libraries in place — writes vendor/*, prints new
+#                   sha256 sums to paste into vendor/vendor-lock.json (see below).
+#   --check-only    Read-only upstream-drift sentinel (roadmap K136). Diffs every
+#                   package.json fields.version in vendor/vendor-lock.json against
+#                   registry.npmjs.org's `dist-tags.latest`, PLUS katex and mermaid
+#                   (both npm packages, even though the refresh path above doesn't
+#                   pull them from npm — katex is a multi-file dist, mermaid is
+#                   vendored from the jsDelivr CDN build). Also asserts the OpenRouter
+#                   default model (ai.js OPENAI_COMPAT_PROVIDERS.openrouter.defaultModel)
+#                   is still listed at the free, key-less openrouter.ai/api/v1/models —
+#                   the one provider-catalog check cheap enough to run every time.
+#                   Prints a table, downloads/writes NOTHING, exits non-zero if anything
+#                   is behind or dead. Deliberately NOT wired into verify.sh / pre-commit
+#                   / release.sh (those gates stay offline by design) — it's a command
+#                   you run by hand when you want a signal the world moved.
 set -euo pipefail
 REPO_ROOT=$(git rev-parse --show-toplevel)
 VENDOR_DIR="${REPO_ROOT}/vendor"
@@ -19,6 +36,110 @@ TMP=$(mktemp -d)
 trap 'rm -rf "${TMP}"' EXIT
 
 REG="https://registry.npmjs.org"
+
+# --check-only: see the "Modes" header comment above.
+check_only() {
+  echo "Upstream drift check (--check-only): vendor-lock.json versions vs registry.npmjs.org latest."
+  echo "Read-only — nothing is downloaded into vendor/, vendor-lock.json is not touched."
+  echo ""
+
+  local lock_json="${VENDOR_DIR}/vendor-lock.json"
+  # package name -> vendor-lock.json entry path, hand-written on purpose (NOT parsed
+  # from the lock's free-text "source" field — that field mixes npm:/cdnjs:/jsdelivr:
+  # prefixes and exists for SHA verification, not as a package-name registry; see
+  # CLAUDE.md on reading real data structures instead of scraping text). Rows sharing
+  # one upstream version (the two hljs theme CSS files; the three katex/ dist files)
+  # collapse to a single package row here.
+  local -a PKG_NAMES=(defuddle turndown marked dompurify highlight.js katex mermaid)
+  local -a LOCK_PATHS=(
+    vendor/defuddle.js
+    vendor/turndown.js
+    vendor/marked.min.js
+    vendor/purify.min.js
+    vendor/highlight.min.js
+    vendor/katex/katex.min.js
+    vendor/mermaid.min.js
+  )
+
+  local behind=0
+  printf "  %-12s  %-10s  %-10s  %s\n" "package" "current" "latest" "status"
+  local i pkg lockpath cur latest status
+  for i in "${!PKG_NAMES[@]}"; do
+    pkg="${PKG_NAMES[$i]}"
+    lockpath="${LOCK_PATHS[$i]}"
+    if ! cur=$(node -e '
+        const d = require(process.argv[1]);
+        const e = d.files[process.argv[2]];
+        if (!e) process.exit(3);
+        process.stdout.write(e.version);
+      ' "${lock_json}" "${lockpath}" 2>/dev/null); then
+      printf "  %-12s  %-10s  %-10s  %s\n" "${pkg}" "?" "?" "manual (no lock entry at ${lockpath})"
+      behind=1
+      continue
+    fi
+    if curl -fsS --max-time 15 "${REG}/${pkg}/latest" -o "${TMP}/latest-${i}.json" 2>/dev/null \
+        && latest=$(node -e 'process.stdout.write(require(process.argv[1]).version)' "${TMP}/latest-${i}.json" 2>/dev/null); then
+      if [ "${cur}" = "${latest}" ]; then
+        status="ok"
+      else
+        status="BEHIND"
+        behind=1
+      fi
+    else
+      latest="?"
+      status="fetch-error (network; not counted as drift)"
+    fi
+    printf "  %-12s  %-10s  %-10s  %s\n" "${pkg}" "${cur}" "${latest}" "${status}"
+  done
+
+  echo ""
+  echo "OpenRouter default-model liveness (the only provider-catalog check kept; the"
+  echo "other 12 providers' deprecation pages are deliberately not scraped — a scraper"
+  echo "over 12 self-changing doc pages would itself become another thing to keep fresh):"
+  local or_model or_status
+  if or_model=$(node -e '
+      const fs = require("fs");
+      const src = fs.readFileSync(process.argv[1], "utf8");
+      const m = src.match(/openrouter:\s*\{[^}]*defaultModel:\s*"([^"]+)"/);
+      if (!m) process.exit(5);
+      process.stdout.write(m[1]);
+    ' "${REPO_ROOT}/ai.js" 2>/dev/null); then
+    if curl -fsS --max-time 15 "https://openrouter.ai/api/v1/models" -o "${TMP}/openrouter-models.json" 2>/dev/null; then
+      if node -e '
+          const d = require(process.argv[1]);
+          const ids = new Set((d.data || []).map((x) => x.id));
+          process.exit(ids.has(process.argv[2]) ? 0 : 1);
+        ' "${TMP}/openrouter-models.json" "${or_model}" 2>/dev/null; then
+        or_status="ok (live in OpenRouter catalog)"
+      else
+        or_status="DEAD (not in https://openrouter.ai/api/v1/models data[].id)"
+        behind=1
+      fi
+    else
+      or_status="fetch-error (network; not counted as drift)"
+    fi
+  else
+    or_model="?"
+    or_status="local-parse-error (ai.js openrouter.defaultModel regex miss)"
+  fi
+  printf "  %-12s  %-10s  %s\n" "openrouter" "${or_model}" "${or_status}"
+
+  echo ""
+  if [ "${behind}" -ne 0 ]; then
+    echo "Result: at least one package is behind, or the OpenRouter default model is dead. Exit 1."
+    return 1
+  fi
+  echo "Result: everything matches the latest registry/catalog state. Exit 0."
+  return 0
+}
+
+if [ "${1:-}" = "--check-only" ]; then
+  if check_only; then
+    exit 0
+  else
+    exit 1
+  fi
+fi
 
 # fetch_npm <pkg> <path-in-tarball> <dest-file> <banner-name|""> <banner-url|"">
 # A non-empty banner-name prepends "// <name> v<ver> — <url>" — used for dist
