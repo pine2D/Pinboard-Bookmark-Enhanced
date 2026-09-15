@@ -1124,10 +1124,29 @@ function pbpCanonicalBackupOwner(value) {
 
 function pbpBackupOwnerScope(value) {
   const owner = pbpCanonicalBackupOwner(value);
-  return owner ? pbpDictOwnerScope(owner) : "";
+  // pbpDictOwnerScope lives in vocab-store.js, and popup.html is the one entry
+  // point that loads shared.js without it. An owner that cannot be scoped
+  // therefore degrades to "" -- the value this already returns for
+  // a missing owner, and the one every caller treats as fail-closed: the
+  // vocabulary import rejects a falsy scope outright, and an empty scope makes
+  // pbpScopeHighlightBackupImport claim nothing and admit nothing.
+  if (!owner || typeof pbpDictOwnerScope !== "function") return "";
+  return pbpDictOwnerScope(owner);
 }
 
 function pbpSanitizeBackupVocabulary(value) {
+  // Call-time deps, all from vocab-store.js: _pbpVocabDenseArray,
+  // pbpDictCacheKeyPublic, pbpVocabValidateEvent and (via pbpBackupOwnerScope)
+  // pbpDictOwnerScope. Without the validators there is no way to tell a real
+  // record from a forged one, and a backup file is untrusted input -- a context
+  // that lacks them rejects the section rather than skipping the checks
+  // (rules/backup.md: both ends fail closed). Named error, not a ReferenceError.
+  if (typeof _pbpVocabDenseArray !== "function" ||
+      typeof pbpDictCacheKeyPublic !== "function" ||
+      typeof pbpVocabValidateEvent !== "function" ||
+      typeof pbpDictOwnerScope !== "function") {
+    throw pbpBackupValueError("_vocabulary");
+  }
   const owner = pbpCanonicalBackupOwner(value && value.owner);
   if (!pbpIsPlainRecord(value) ||
       Object.keys(value).some((key) => !["owner", "records"].includes(key)) ||
@@ -1217,7 +1236,11 @@ function pbpBuildBackupPreview(prepared, currentOwner, syncState) {
   const languages = {};
   if (vocabulary) {
     vocabulary.records.forEach((record) => {
-      const language = pbpDictPrimaryLang(record.language) || "und";
+      // pbpDictPrimaryLang: vocab-store.js again. "und" is this line's own
+      // fallback for a language tag it cannot resolve, so an absent helper
+      // lands in the bucket that already exists instead of throwing.
+      const language = (typeof pbpDictPrimaryLang === "function"
+        ? pbpDictPrimaryLang(record.language) : "") || "und";
       languages[language] = (languages[language] || 0) + 1;
     });
   }
@@ -1578,6 +1601,11 @@ function pbpPinboardAccountFromToken(token) {
 // pbpDictOwnerScope (vocab-store.js — loaded by every page that calls this).
 async function pbpVocabCurrentOwner() {
   const s = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
+  // Without vocab-store.js there is no scope to speak of. "" — not the
+  // "ownerless" bucket pbpDictOwnerScope returns for a signed-out account —
+  // is the fail-closed degrade: it matches no stored record at all, and every
+  // consumer already reads a non-"acct_" scope as "no account".
+  if (typeof pbpDictOwnerScope !== "function") return "";
   return pbpDictOwnerScope(pbpPinboardAccountFromToken(s.pinboardToken));
 }
 
