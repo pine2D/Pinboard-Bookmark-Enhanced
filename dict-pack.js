@@ -595,7 +595,7 @@ async function pbpPackMeta() {
     return await new Promise((resolve) => {
       const req = db.transaction(_PBP_PACK_META, "readonly").objectStore(_PBP_PACK_META).get("cedict");
       req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => resolve({ state: "error" });
+      req.onerror = () => { console.warn("[pack] meta failed:", req.error?.name); resolve({ state: "error" }); };
     });
   } catch (error) { console.warn("[pack] meta failed:", error?.name, error?.message); return { state: "error" }; }
 }
