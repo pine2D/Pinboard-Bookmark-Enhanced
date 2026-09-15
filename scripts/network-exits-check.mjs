@@ -7,6 +7,9 @@
 //     shipping undisclosed.
 //  2. Every oracle exit host appears in docs/privacy.md.
 //  3. Every manifest static host is a listed exit.
+//  4. Every host in the AI provider registry (ai.js) is a disclosed exit —
+//     the structural under-inclusion guard for the one place endpoint hosts
+//     actually live, complementing step 1's text-scan over-inclusion guard.
 //  5. Every loopback http:// literal (AnkiConnect, Ollama) is on a hardcoded
 //     origin-granularity allowlist and disclosed in docs/privacy.md (K130).
 //     Deliberately independent of steps 1-3: the https regex and the oracle
@@ -45,6 +48,25 @@ const LOOPBACK_ALLOWLIST = [
 ];
 const loopbackAllowed = (origin, entry) =>
   origin === entry.origin || (entry.origin.endsWith(":") && origin.startsWith(entry.origin));
+
+// Bracket-aware host extraction for an "http://<host>[:<port>]" origin —
+// shared by step 3b below. IPv6 loopback ([::1]) wraps its host in brackets
+// containing colons, so a naive "stop at the first colon" regex misreads
+// "http://[::1]:1234" as host "[" instead of "[::1]". No script literal
+// exercises the [::1] branch today (see step 5's own comment), so a self-
+// check runs immediately below rather than relying on incidental coverage.
+const hostFromOrigin = (origin) => {
+  const m = /^http:\/\/(\[[^\]]+\]|[^:/]+)(?::\d+)?/.exec(origin);
+  return m && m[1];
+};
+for (const [origin, expected] of [
+  ["http://localhost:11434", "localhost"],
+  ["http://127.0.0.1:8765", "127.0.0.1"],
+  ["http://[::1]:1234", "[::1]"],
+]) {
+  const got = hostFromOrigin(origin);
+  if (got !== expected) fail(`internal error: hostFromOrigin(${origin}) = ${got}, expected ${expected} — bracket-aware host extraction regressed`);
+}
 
 // 1. Classify every literal https host in runtime scripts.
 const seen = new Set();
@@ -91,7 +113,7 @@ for (const pattern of manifest.optional_host_permissions || []) {
   if (m) declaredLoopbackHosts.add(m[1]);
 }
 for (const entry of LOOPBACK_ALLOWLIST) {
-  const host = /^http:\/\/([^:]+):?/.exec(entry.origin)[1];
+  const host = hostFromOrigin(entry.origin);
   if (!declaredLoopbackHosts.has(host)) {
     fail(`${host}: LOOPBACK_ALLOWLIST entry has no matching manifest optional_host_permissions ceiling`);
   }
