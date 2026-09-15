@@ -79,7 +79,7 @@ async function pbpSendToTarget(id, ctx) {
       try {
         const has = await chrome.permissions.contains({ origins: [origin] });
         if (!has) return apiFail("api-perm");
-      } catch (_) { return apiFail("api-perm"); }
+      } catch (error) { console.warn("[pbp-send] perm-check failed:", error?.name, error?.message); return apiFail("api-perm"); }
       // Liveness/token precheck.
       if (row.precheckRequest) {
         try {
@@ -87,7 +87,7 @@ async function pbpSendToTarget(id, ctx) {
           const presp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body, redirect: "error", signal: AbortSignal.timeout(20000) });
           if (presp.status === 401) return apiFail("api-token");
           if (!presp.ok) return apiFail("api-down");
-        } catch (_) { return apiFail("api-down"); }
+        } catch (error) { console.warn("[pbp-send] precheck failed:", error?.name, error?.message); return apiFail("api-down"); }
       }
       // Best-effort pre-request (e.g. create the target container/page).
       // Failures are swallowed — the main request below is the source of truth.
@@ -130,7 +130,7 @@ async function pbpSendToTarget(id, ctx) {
           return { ok: true, fellBack: false, error: null, url: (json && (json.html_url || json.url)) || null };
         }
         return apiFail("api-failed");
-      } catch (_) { return apiFail("api-down"); }
+      } catch (error) { console.warn("[pbp-send] request failed:", error?.name, error?.message); return apiFail("api-down"); }
     }
 
     if (row.mechanism === "url-scheme") {

@@ -548,8 +548,8 @@ async function pbpPackLookup(keys) {
       };
       let tx;
       try { tx = db.transaction([_PBP_PACK_STORE, _PBP_PACK_META], "readonly"); }
-      catch (_) { finish({ state: "error" }); return; }
-      tx.onabort = tx.onerror = () => finish({ state: "error" });
+      catch (error) { console.warn("[pack] lookup tx-open failed:", error?.name, error?.message); finish({ state: "error" }); return; }
+      tx.onabort = tx.onerror = () => { console.warn("[pack] lookup tx failed:", tx.error?.name); finish({ state: "error" }); };
       const metaReq = tx.objectStore(_PBP_PACK_META).get("cedict");
       metaReq.onsuccess = () => {
         const meta = metaReq.result;
@@ -561,11 +561,11 @@ async function pbpPackLookup(keys) {
           const key = lookupKeys[i];
           let bySimp;
           try { bySimp = store.index("simp").getAll(key); }
-          catch (_) { finish({ state: "error" }); return; }
+          catch (error) { console.warn("[pack] simp index read failed:", error?.name, error?.message); finish({ state: "error" }); return; }
           bySimp.onsuccess = () => {
             let byTrad;
             try { byTrad = store.index("trad").getAll(key); }
-            catch (_) { finish({ state: "error" }); return; }
+            catch (error) { console.warn("[pack] trad index read failed:", error?.name, error?.message); finish({ state: "error" }); return; }
             byTrad.onsuccess = () => {
               const seen = new Set();
               const rows = [];
@@ -578,15 +578,15 @@ async function pbpPackLookup(keys) {
               if (rows.length) finish({ state: "hit", matched: key, rows });
               else tryKey(i + 1);
             };
-            byTrad.onerror = () => finish({ state: "error" });
+            byTrad.onerror = () => { console.warn("[pack] trad index read failed:", byTrad.error?.name); finish({ state: "error" }); };
           };
-          bySimp.onerror = () => finish({ state: "error" });
+          bySimp.onerror = () => { console.warn("[pack] simp index read failed:", bySimp.error?.name); finish({ state: "error" }); };
         };
         tryKey(0);
       };
-      metaReq.onerror = () => finish({ state: "error" });
+      metaReq.onerror = () => { console.warn("[pack] lookup meta read failed:", metaReq.error?.name); finish({ state: "error" }); };
     });
-  } catch (_) { return { state: "error" }; }
+  } catch (error) { console.warn("[pack] lookup failed:", error?.name, error?.message); return { state: "error" }; }
 }
 
 async function pbpPackMeta() {
@@ -597,7 +597,7 @@ async function pbpPackMeta() {
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve({ state: "error" });
     });
-  } catch (_) { return { state: "error" }; }
+  } catch (error) { console.warn("[pack] meta failed:", error?.name, error?.message); return { state: "error" }; }
 }
 
 async function pbpPackDelete() {
@@ -777,24 +777,24 @@ async function pbpEcdictLookup(term) {
       const finish = (r) => { if (!settled) { settled = true; resolve(r); } };
       let tx;
       try { tx = db.transaction([_PBP_ECDICT_STORE, _PBP_PACK_META], "readonly"); }
-      catch (_) { finish({ state: "error" }); return; }
-      tx.onabort = tx.onerror = () => finish({ state: "error" });
+      catch (error) { console.warn("[pack] ecdict lookup tx-open failed:", error?.name, error?.message); finish({ state: "error" }); return; }
+      tx.onabort = tx.onerror = () => { console.warn("[pack] ecdict lookup tx failed:", tx.error?.name); finish({ state: "error" }); };
       const metaReq = tx.objectStore(_PBP_PACK_META).get(_PBP_ECDICT_META_ID);
       metaReq.onsuccess = () => {
         const meta = metaReq.result;
         if (!meta || meta.state !== "ready") { finish({ state: "unavailable" }); return; }
         let rowsReq;
         try { rowsReq = tx.objectStore(_PBP_ECDICT_STORE).index("key").getAll(key); }
-        catch (_) { finish({ state: "error" }); return; }
+        catch (error) { console.warn("[pack] ecdict index read failed:", error?.name, error?.message); finish({ state: "error" }); return; }
         rowsReq.onsuccess = () => {
           const rows = rowsReq.result || [];
           finish(rows.length ? { state: "hit", matched: key, rows, meta } : { state: "ready-miss" });
         };
-        rowsReq.onerror = () => finish({ state: "error" });
+        rowsReq.onerror = () => { console.warn("[pack] ecdict index read failed:", rowsReq.error?.name); finish({ state: "error" }); };
       };
-      metaReq.onerror = () => finish({ state: "error" });
+      metaReq.onerror = () => { console.warn("[pack] ecdict lookup meta read failed:", metaReq.error?.name); finish({ state: "error" }); };
     });
-  } catch (_) { return { state: "error" }; }
+  } catch (error) { console.warn("[pack] ecdict lookup failed:", error?.name, error?.message); return { state: "error" }; }
 }
 
 // Batched exact lookup for the vocabulary/export paths: ONE readonly
@@ -835,9 +835,9 @@ async function pbpEcdictMeta() {
     return await new Promise((resolve) => {
       const req = db.transaction(_PBP_PACK_META, "readonly").objectStore(_PBP_PACK_META).get(_PBP_ECDICT_META_ID);
       req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => resolve({ state: "error" });
+      req.onerror = () => { console.warn("[pack] ecdict meta failed:", req.error?.name); resolve({ state: "error" }); };
     });
-  } catch (_) { return { state: "error" }; }
+  } catch (error) { console.warn("[pack] ecdict meta failed:", error?.name, error?.message); return { state: "error" }; }
 }
 
 async function pbpEcdictDelete() {
