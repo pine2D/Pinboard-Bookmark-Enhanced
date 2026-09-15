@@ -39,7 +39,11 @@ function collectTopLevelGlobals() {
   return globals;
 }
 
-const browserGlobals = Object.fromEntries([
+// Exported (named, so ESLint still only reads the default export): the names
+// a page already owns before any extension script runs. scripts/script-graph-lint.mjs
+// needs exactly this set to tell a real cross-file export (`window.pbpX = ...`)
+// apart from a monkey-patch of a platform global (`window.fetch = ...`).
+export const PAGE_GLOBALS = [
   "chrome", "window", "document", "navigator", "location", "history",
   "localStorage", "sessionStorage", "indexedDB", "fetch", "Headers",
   "Request", "Response", "AbortController", "AbortSignal", "URL",
@@ -62,7 +66,9 @@ const browserGlobals = Object.fromEntries([
   "isSecureContext", "reportError", "XMLHttpRequest", "IDBKeyRange",
   "TextDecoderStream", "TextEncoderStream", "DOMException", "IDBDatabase",
   "IDBTransaction", "IDBObjectStore", "IDBRequest",
-].map((g) => [g, "readonly"]));
+];
+
+const browserGlobals = Object.fromEntries(PAGE_GLOBALS.map((g) => [g, "readonly"]));
 
 export default [
   {

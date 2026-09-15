@@ -47,6 +47,13 @@ echo "[eslint] correctness lint over runtime scripts (config: eslint.config.mjs)
 # playwright); the flat config self-collects this repo's cross-file globals.
 ESLINT_USE_FLAT_CONFIG=true npx --prefix .qa-scan eslint .
 
+echo "[script-graph] checking executeScript page functions are closure-free"
+# Immediately after eslint, and for the blind spot eslint structurally has:
+# no-undef is fed the UNION of every root script's top-level declarations, so a
+# function serialized into a tab by executeScript({ func }) can reference a
+# bundle symbol that will not exist there and still lint clean.
+node "scripts/script-graph-lint.mjs"
+
 echo "[vendor-lock] verifying vendored artifacts against vendor/vendor-lock.json"
 node "scripts/vendor-lock-check.mjs"
 
