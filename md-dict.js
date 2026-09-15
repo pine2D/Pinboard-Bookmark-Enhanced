@@ -676,7 +676,8 @@ async function _pbpDictHasPerm() {
   try { return await chrome.permissions.contains({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) { return false; }
 }
 
-// Child signal = parent abort OR timeout (no AbortSignal.any: Chrome floor 110).
+// Hand-rolled instead of AbortSignal.any: the circuit breaker needs to know
+// WHICH cause fired -- a parent cancel must not count as a service failure.
 // Keep the first cause so closing the popover never trips the service circuit.
 function _pbpDictChildSignal(parent, ms) {
   const c = new AbortController();

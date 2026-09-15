@@ -179,6 +179,9 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
   // TimeoutError (AbortError remains the caller's own cancel); surfaces that
   // label a timeout classify the two names together, as wayback.js and
   // pbpClassifyPinboardError already do.
+  // md-dict.js hand-rolls the equivalent combiner on purpose (its circuit
+  // breaker needs the abort cause, not just the fact of abort) -- see the
+  // comment there before "fixing" it into this shape again.
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
   const signal = options.signal
     ? AbortSignal.any([options.signal, timeoutSignal])
