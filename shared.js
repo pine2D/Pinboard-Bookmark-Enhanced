@@ -1658,16 +1658,15 @@ async function pbpDrainOfflineQueue(queueIds, { getItem, sendItem, removeItem, o
 //
 // PRIME_EXCLUDED_KEYS: keys that must stay genuinely absent until their own
 // writer sets them, on BOTH storage areas.
-//   bgSaveMode -- background.js's migrateBgSaveMode() detects "not migrated yet"
-//   via `raw.bgSaveMode === undefined`. If a transient storage failure makes the
-//   migration give up, priming a default "merge" would make that probe read
-//   "already migrated" forever, permanently losing a legacy
-//   bgSaveNoClobber=false (overwrite) user's choice. Leaving the key absent lets
-//   the migration retry in the next SW generation. Every consumer already hard-
-//   falls back to "merge" when the key is missing (background.js's tri-state
-//   whitelists, options.js's `|| 'merge'`, and loadSettings()'s object-form get
-//   against SETTINGS_DEFAULTS), so absence costs nothing but the boot-lag
-//   micro-optimization on one key.
+//   bgSaveMode -- the bgSaveNoClobber -> bgSaveMode migration this exclusion
+//   was written for was retired on 2026-09-15, but the exclusion stays: absence
+//   is the only state that still says "nobody has set this yet". Priming a
+//   default "merge" writes that signal away on every install and is
+//   indistinguishable from a deliberate user pick afterwards. Every consumer
+//   already hard-falls back to "merge" when the key is missing (background.js's
+//   tri-state whitelists, options.js's `|| 'merge'`, and loadSettings()'s
+//   object-form get against SETTINGS_DEFAULTS), so absence costs nothing but
+//   the boot-lag micro-optimization on one key.
 const PRIME_EXCLUDED_KEYS = ["bgSaveMode"];
 async function primeSettings() {
   try {

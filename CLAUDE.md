@@ -146,7 +146,7 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
 
 ## 临时事项（有到期日，过期即清）
 
-- **`bgSaveMode` 迁移可退役（到期日 2026-09-30）**：background.js 的 `migrateBgSaveMode()` 自 v2.79 / 2026-06-10 上线，已远超 WebDAV 清理迁移的退役先例（10 个版本 / 33 天）。退役要连同三处 `_bgSaveModeMigration.then(() => primeSettings()).catch(() => {})` 门一并删掉、改回直接 `primeSettings().catch(() => {})`，否则留下悬空引用。
+- （`bgSaveMode` 迁移已于 2026-09-15 退役——自 v2.79 / 2026-06-10 起运行三个月，远超 10 个版本 / 33 天的先例；`PRIME_EXCLUDED_KEYS` 里的 `bgSaveMode` 保留，理由见 shared.js 该常量注释）
 - （WebDAV 遗留清理迁移已于 2026-08-26 退役——自 v2.98 起随 10 个版本运行 33 天）
 - **`pbpClaimLegacyHighlightOwners` 可退役（到期日 2026-12-31）**：background.js 的一次性认领（2026-08-29 上线，flag `_hlOwnerClaimDone`）——把无 owner 的存量高亮 item 认领给当前账号（高亮按账号过滤，用户拍板）。未登录用户的 flag 不落，到期删函数与调用行时若 flag 仍未落，存量保持无主（人人可见）属可接受终态。
 - **`pbpScrubLegacySyncWebhookUrls` 可退役（到期日 2026-12-31）**：background.js 的一次性 scrub（2026-08-29 上线，flag `_webhookSyncScrubDone`）——keys-off 用户遗留在 chrome.storage.sync 的明文 webhook capability URL 先救进 local 再全剥。到期直接删函数与调用行；届时 `pbpStripExportTargetTokensOnly`（shared.js）若 migrate 路径仍在用则保留，其注释同步改。

@@ -1660,28 +1660,6 @@ ensurePeriodicAlarm("storage-warm", 5);
 
 sweepSuggestCache().catch(() => {});
 
-// One-time migration: bgSaveNoClobber (boolean) -> bgSaveMode (tri-state).
-// Raw array-key read (no defaults) so a genuinely-absent bgSaveMode is detectable.
-async function migrateBgSaveMode() {
-  try {
-    const store = await getSettingsStorage();
-    const raw = await store.get(["bgSaveMode", "bgSaveNoClobber"]);
-    if (raw.bgSaveMode !== undefined) return; // already migrated or user-set
-    const mode = (raw.bgSaveNoClobber === false) ? "overwrite" : "merge";
-    await store.set({ bgSaveMode: mode });
-  } catch (e) {
-    // MV3 rule: never swallow a platform API failure silently. No secrets here —
-    // bgSaveMode/bgSaveNoClobber are plain preference keys.
-    console.warn("bgSaveMode migration failed:", e?.name, e?.message);
-  }
-}
-// Keep the migration's promise: primeSettings callers await it first. Both are
-// read-then-write over bgSaveMode, and onInstalled fires primeSettings almost
-// immediately on update — if both reads completed before either write, prime's
-// stale snapshot re-inserted the default "merge", permanently clobbering a legacy
-// bgSaveNoClobber=false user's "overwrite" preference.
-const _bgSaveModeMigration = migrateBgSaveMode();
-
 // One-time cleanup: GitHub Models retired its inference API on 2026-07-30
 // (models.github.ai now answers HTTP 410), so the provider entry is gone from
 // the UI and registry. Reset any user still pointing at it to the default
@@ -2256,7 +2234,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     prewarmTagsNow().catch(() => {});
   }
   if (alarm.name === "storage-warm") {
-    _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
+    primeSettings().catch(() => {});
     pbpMigrateSecretsToLocal().catch(() => {});
   }
 });
@@ -2386,7 +2364,7 @@ pbpSweepPreviewOrphans();
 
 // Startup: process offline queue + update badge + prime settings (cheap no-op when already primed)
 chrome.runtime.onStartup.addListener(() => {
-  _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
+  primeSettings().catch(() => {});
   processOfflineQueue().catch(() => {});
   updateBadge().catch(() => {});
 });
@@ -2395,7 +2373,7 @@ chrome.runtime.onStartup.addListener(() => {
 // storage doesn't have every key yet (storage.get(missing-key) is measurably slower).
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === "install" || reason === "update") {
-    _bgSaveModeMigration.then(() => primeSettings()).catch(() => {});
+    primeSettings().catch(() => {});
     readOfflineQueueWithIds().catch(() => {});
   }
 });
