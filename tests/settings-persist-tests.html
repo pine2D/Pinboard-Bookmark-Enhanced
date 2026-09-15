@@ -2907,6 +2907,23 @@ async function run() {
       });
       check("E7b apply: v1 theme dependency failure occurs before any settings write",
         themeLoadFailure.settings === "failed" && importedBatch === batchBeforeThemeLoadFailure);
+
+      // K80: customName (Custom provider "Display Name") was retired -- an
+      // old backup that still carries the field must import cleanly and the
+      // field must be silently dropped, not written back into storage.
+      const legacyCustomNameApply = await pbpApplyBackupPayload({
+        _schemaVersion: 2,
+        optTheme: "light",
+        aiProvider: "custom",
+        customName: "Legacy Display Name",
+      }, {
+        exportableKeys,
+        saveOverlayWithFallback: async () => {},
+      });
+      check("E7b apply: retired customName field from an old backup imports cleanly without being written",
+        legacyCustomNameApply.settings === "applied" &&
+        importedBatch.optTheme === "light" && importedBatch.aiProvider === "custom" &&
+        !("customName" in importedBatch));
     } finally {
       globalThis.chrome = previousChrome;
       globalThis.__pbpTestStorage = previousStorage;

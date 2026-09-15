@@ -465,7 +465,6 @@ async function seedAll(context, worker, aiPort) {
       optPopupFollowTheme: true,
       popupWidth: 550,
       aiProvider: "custom",
-      customName: "QA Mock",
       customBaseUrl: aiBase,
       customApiKey: obfuscateKey("qa-mock-key"),
       customModel: "qa-mock",

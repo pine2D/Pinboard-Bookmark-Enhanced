@@ -1251,9 +1251,6 @@
   "labelBaseUrl": {
     "message": "URL de base"
   },
-  "labelDisplayName": {
-    "message": "Nom d'affichage"
-  },
   "getKey": {
     "message": "Obtenir une clé"
   },

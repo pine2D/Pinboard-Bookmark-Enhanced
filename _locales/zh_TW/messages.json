@@ -1251,9 +1251,6 @@
   "labelBaseUrl": {
     "message": "端點網址"
   },
-  "labelDisplayName": {
-    "message": "顯示名稱"
-  },
   "getKey": {
     "message": "取得 Key"
   },

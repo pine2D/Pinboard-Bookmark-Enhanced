@@ -1251,9 +1251,6 @@
   "labelBaseUrl": {
     "message": "接口地址"
   },
-  "labelDisplayName": {
-    "message": "显示名称"
-  },
   "getKey": {
     "message": "获取 Key"
   },

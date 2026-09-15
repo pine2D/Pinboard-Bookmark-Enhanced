@@ -1251,9 +1251,6 @@
   "labelBaseUrl": {
     "message": "Base URL"
   },
-  "labelDisplayName": {
-    "message": "Display Name"
-  },
   "getKey": {
     "message": "Get key"
   },

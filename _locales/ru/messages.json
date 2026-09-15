@@ -1251,9 +1251,6 @@
   "labelBaseUrl": {
     "message": "Базовый URL"
   },
-  "labelDisplayName": {
-    "message": "Отображаемое имя"
-  },
   "getKey": {
     "message": "Получить ключ"
   },

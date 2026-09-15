@@ -1248,7 +1248,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-cohere-model": "command-r7b-12-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B",
         "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6",
         "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
-        "opt-custom-name": "Custom", "opt-custom-baseurl": "", "opt-custom-model": ""
+        "opt-custom-baseurl": "", "opt-custom-model": ""
       },
       keepsSecrets: true,
       skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-custom-key","opt-jina-key"]
@@ -1893,7 +1893,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-zhipu-key": s.zhipuApiKey, "opt-zhipu-model": s.zhipuModel,
     "opt-kimi-key": s.kimiApiKey, "opt-kimi-model": s.kimiModel,
     "opt-ollama-baseurl": s.ollamaBaseUrl, "opt-ollama-model": s.ollamaModel,
-    "opt-custom-name": s.customName, "opt-custom-baseurl": s.customBaseUrl,
+    "opt-custom-baseurl": s.customBaseUrl,
     "opt-custom-key": s.customApiKey, "opt-custom-model": s.customModel,
     "opt-ai-tag-lang": s.aiTagLang, "opt-ai-summary-lang": s.aiSummaryLang, "opt-ai-cache-duration": s.aiCacheDuration,
     "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
@@ -2676,7 +2676,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       kimiModel: $id("opt-kimi-model").value.trim() || "kimi-k2.6",
       ollamaBaseUrl: $id("opt-ollama-baseurl").value.trim() || "http://localhost:11434",
       ollamaModel: $id("opt-ollama-model").value.trim() || "llama3.2",
-      customName: $id("opt-custom-name").value.trim() || "Custom",
       customBaseUrl: $id("opt-custom-baseurl").value.trim(),
       customApiKey: obfuscateKey($id("opt-custom-key").value.trim()),
       customModel: $id("opt-custom-model").value.trim(),

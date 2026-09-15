@@ -440,7 +440,7 @@ const SETTINGS_DEFAULTS = {
   zhipuApiKey: "", zhipuModel: "glm-4.7-flash",
   kimiApiKey: "", kimiModel: "kimi-k2.6",
   ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3.2",
-  customApiKey: "", customModel: "", customBaseUrl: "", customName: "Custom",
+  customApiKey: "", customModel: "", customBaseUrl: "",
   aiTagLang: "en", aiSummaryLang: "auto", aiCacheDuration: 60,
   aiContentSource: "local", jinaApiKey: "",
   customTagPrompt: "", customSummaryPrompt: "",
