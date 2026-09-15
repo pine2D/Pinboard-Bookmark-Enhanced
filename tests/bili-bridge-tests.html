@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Bili Player Bridge Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1000px; }
+h2 { margin-top: 24px; font-size: 16px; }
+.suite { margin: 12px 0; padding: 8px; border-left: 3px solid #ccc; }
+.case { padding: 4px 8px; margin: 4px 0; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+</style></head>
+<body>
+<h1>bili-player-bridge.js Protocol Tests</h1>
+<p>bili-player-bridge.js is a dynamic content script (chrome.scripting.registerContentScripts,
+armed by md-video.js) injected into every frame of https://player.bilibili.com/* once the
+reader has granted that origin. Its own header comment says it stays "inert until
+greeted": nothing is read from the page and nothing is posted until a hello arrives from
+window.parent at the extension's own origin. This suite locks the cheapest, most valuable
+slice of that invariant.</p>
+<div id="results"></div>
+<script>
+async function test(name, fn) {
+  try {
+    await fn();
+    const div = document.createElement("div"); div.className = "case pass";
+    div.textContent = "PASS " + name; document.getElementById("results").appendChild(div);
+  } catch (e) {
+    const div = document.createElement("div"); div.className = "case fail";
+    div.textContent = "FAIL " + name + "\n  " + e.message; document.getElementById("results").appendChild(div);
+  }
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+
+// Loads bili-player-bridge.js into a child frame built with srcdoc rather
+// than a sibling fixture file: a srcdoc document's origin is inherited from
+// THIS document, so the frame is same-origin whether this page is opened
+// directly as file:// (the project's normal tests/ convention) or served
+// over http by .qa-scan/run-test.mjs -- a sibling tests/fixtures/*.html
+// would instead get file://'s own unique opaque origin per document and
+// break same-origin DOM access. The stubbed chrome.runtime.id is the
+// bridge's only "chrome" dependency before a hello ever arrives, and no
+// <video> is provided on purpose: the guard clauses at the top of the IIFE
+// (window === window.top, the chrome.runtime.id read) and the message
+// listener registration must not need one to stay idle.
+function makeBridgeFrame() {
+  const ifr = document.createElement("iframe");
+  ifr.style.display = "none";
+  ifr.srcdoc =
+    '<!DOCTYPE html><html><body>' +
+    '<script>window.chrome = { runtime: { id: "test-ext-id" } };<\/script>' +
+    '<script src="../bili-player-bridge.js"><\/script>' +
+    '</body></html>';
+  return ifr;
+}
+
+(async () => {
+  await test("inert until greeted: zero postMessage calls before any hello", async () => {
+    // A real window.addEventListener("message", ...) listener on this page
+    // cannot tell a regression from correct behaviour here: the bridge
+    // always targets a chrome-extension://<id> origin (EXT_ORIGIN), which
+    // this test page never has, so the browser's own targetOrigin delivery
+    // check would silently drop a leaked postMessage before any listener
+    // ever saw it -- the assertion would read "0 received" whether or not
+    // the bridge is actually inert. Spying on window.postMessage itself (an
+    // own-property override on this same-origin parent, which the child's
+    // `window.parent.postMessage(...)` resolves to directly) captures the
+    // call synchronously, independent of the browser's origin-based
+    // delivery filtering.
+    const calls = [];
+    window.postMessage = function (...args) { calls.push(args); };
+    const ifr = makeBridgeFrame();
+    try {
+      const loaded = new Promise((resolve) => { ifr.onload = resolve; });
+      document.body.appendChild(ifr);
+      await loaded;
+      // No hello posted into the frame. A short wait catches anything the
+      // bridge might fire off a tick or two after load (e.g. from a stray
+      // top-level call or a microtask), not just synchronous leaks.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      assert(calls.length === 0,
+        "expected zero postMessage calls before hello, got " + calls.length + ": " + JSON.stringify(calls));
+    } finally {
+      document.body.removeChild(ifr);
+      delete window.postMessage;
+    }
+  });
+})();
+</script>
+</body></html>

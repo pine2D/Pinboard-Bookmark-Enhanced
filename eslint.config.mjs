@@ -95,6 +95,20 @@ export default [
       "no-unsafe-negation": "error",
       "no-async-promise-executor": "error",
       "require-atomic-updates": "off",
+      // postMessage's targetOrigin must never be the literal "*" (K110):
+      // it's the browser's own delivery filter, the only thing that keeps
+      // an embedded third-party frame's playback-position leaks (e.g.
+      // bili-player-bridge.js) from reaching any page that happens to
+      // embed it. No test suite can see a targetOrigin regression from the
+      // outside (a real cross-frame message with a mismatched target is
+      // silently dropped, never observed) — this is the static check for it.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "CallExpression[callee.property.name='postMessage'] > Literal[value='*']",
+          message: 'postMessage targetOrigin must not be the literal "*" — target the exact origin.',
+        },
+      ],
     },
   },
 ];

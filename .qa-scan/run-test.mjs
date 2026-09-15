@@ -45,6 +45,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/background-active-tab-tests.html": 31,
   "tests/background-lifecycle-tests.html": 42,
   "tests/batch-dedup-tests.html": 27,
+  "tests/bili-bridge-tests.html": 1,
   "tests/contrast-tests.html": 6,
   "tests/dict-pack-tests.html": 187,
   "tests/escape-html-tests.html": 8,
