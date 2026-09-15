@@ -333,14 +333,6 @@ function pbpVideoDetect(pageUrl) {
   return null;
 }
 
-function pbpOptionsUrl(panel) {
-  const p = /^[a-z0-9-]+$/.test(String(panel || "")) ? String(panel) : "general";
-  const path = "options.html#" + p;
-  return (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL)
-    ? chrome.runtime.getURL(path)
-    : path;
-}
-
 // Opens one of the extension's own pages, reusing the tab already showing it
 // instead of stacking a duplicate on every click, and only then moving its
 // hash. Generalised from the options-only version below, which every other
@@ -1889,10 +1881,6 @@ async function pbpReadChunkedSyncResult(key, stored, defaultValue) {
     return { ok: false, value: defaultValue };
   }
   return pbpDecodeLargeResult(chunkKeys.map((chunkKey) => values[chunkKey]).join(""), defaultValue);
-}
-
-async function pbpReadChunkedSyncValue(key, stored, defaultValue) {
-  return (await pbpReadChunkedSyncResult(key, stored, defaultValue)).value;
 }
 
 async function pbpResolveChunkedSettings(settings, storage, query) {

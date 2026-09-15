@@ -2929,11 +2929,9 @@ async function run() {
           create: (opts) => { created = opts; return Promise.resolve(); },
         },
       };
-      const hasHelper = typeof pbpOptionsUrl === "function" && typeof pbpOpenOptionsTab === "function";
+      const hasHelper = typeof pbpOpenOptionsTab === "function";
       check("E8 options link helper is exported", hasHelper);
       if (hasHelper) {
-        check("E8 options URL carries the target tab hash",
-          pbpOptionsUrl("markdown") === "chrome-extension://pbp/options.html#markdown");
         await pbpOpenOptionsTab("ai");
         check("E8 existing options tab is reused with new hash",
           updated && updated.id === 7 && updated.opts.url === "chrome-extension://pbp/options.html#ai" && updated.opts.active === true);
