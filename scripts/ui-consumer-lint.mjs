@@ -7,22 +7,28 @@
 // HTML, their JS, shared.js, md-preview.css) it runs the two sub-second static
 // gates -- layout-lint (inline spacing, RULE 5) and ui-vocabulary-lint (new
 // structural class tokens). When the edited file is a theme-factory generated
-// artifact (pinboard-themes.js, or popup.css/options.css/library.css, which
-// each carry two @generated regions alongside hand-written layout/spacing
-// tokens) it instead runs the two existing full-repo audits that already make
-// this judgment for pre-commit/verify.sh -- css-region-audit and
-// handedit-audit -- reused verbatim (no second region parser here). Either
-// way it exits 2 with the findings on stderr so the violation reaches the
-// model in the same turn it was written, not at commit time. Any other file,
-// or no stdin, exits 0 silently. It never edits anything.
+// artifact it instead runs whichever existing full-repo audits actually read
+// that file -- reused verbatim, no second region parser here -- routed by
+// what each script's own source touches:
+//   popup.css / options.css / library.css -> layout-lint (its TARGETS are
+//     exactly these three files) + css-region-audit (its SURFACES are these
+//     three files' cssPath, each with two @generated regions).
+//   pinboard-themes.js -> handedit-audit only (it reads pinboard-themes.js
+//     specifically; css-region-audit's SURFACES never include it, and
+//     layout-lint's TARGETS never include it, so running either there would
+//     be dead weight that can never fail).
+// Either way it exits 2 with the findings on stderr so the violation reaches
+// the model in the same turn it was written, not at commit time. Any other
+// file, or no stdin, exits 0 silently. It never edits anything.
 //
 // Deliberately excludes docs/theme-surface/composers/*.mjs and
 // pilots/*.tokens.json (and does not run diff-all): mid-edit-before-sync-all
 // is a legitimate workflow state (CLAUDE.md's "改 composer/pilot -> sync-all
 // -> commit" order) that would make those whole-repo checks red for the
 // *correct* next step, not a violation -- flagging it here would just be
-// noise. css-region-audit/handedit-audit don't have this problem because
-// they only judge the generated files themselves, not the sources.
+// noise. css-region-audit/handedit-audit/layout-lint don't have this problem
+// because they only judge the generated/hand-written files themselves, not
+// the composer/pilot sources that feed them.
 //
 // Manual use: node scripts/ui-consumer-lint.mjs --file options.html
 
@@ -33,7 +39,8 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const GOVERNED = /^(?:(?:popup|options|library|md-preview)\.html|(?:popup|options|library)(?:-[a-z-]+)?\.js|md-[a-z-]+\.js|shared\.js|md-preview\.css|docs\/theme-surface\/ui-vocabulary\.json|scripts\/ui-vocabulary-baseline\.json)$/;
-const THEME_GOVERNED = /^(?:pinboard-themes\.js|(?:popup|options|library)\.css)$/;
+const THEME_CSS_GOVERNED = /^(?:popup|options|library)\.css$/;
+const THEME_JS_GOVERNED = /^pinboard-themes\.js$/;
 
 function targetFromArgsOrStdin() {
   const i = process.argv.indexOf("--file");
@@ -51,22 +58,27 @@ const target = targetFromArgsOrStdin();
 if (!target) process.exit(0);
 const rel = relative(ROOT, resolve(ROOT, target)).replace(/\\/g, "/");
 const governed = GOVERNED.test(rel);
-const themeGoverned = THEME_GOVERNED.test(rel);
+const themeCssGoverned = THEME_CSS_GOVERNED.test(rel);
+const themeJsGoverned = THEME_JS_GOVERNED.test(rel);
+const themeGoverned = themeCssGoverned || themeJsGoverned;
 if (!governed && !themeGoverned) process.exit(0);
 
-const gates = [];
+// Map, not array: keeps each gate script running at most once even if a
+// future GOVERNED/THEME_* pattern were to overlap on the same file.
+const gateMap = new Map();
+const addGate = (name, script) => { if (!gateMap.has(name)) gateMap.set(name, resolve(ROOT, script)); };
 if (governed) {
-  gates.push(
-    ["layout-lint", resolve(ROOT, "docs/theme-surface/tools/layout-lint.mjs")],
-    ["ui-vocabulary", resolve(ROOT, "scripts/ui-vocabulary-lint.mjs")],
-  );
+  addGate("layout-lint", "docs/theme-surface/tools/layout-lint.mjs");
+  addGate("ui-vocabulary", "scripts/ui-vocabulary-lint.mjs");
 }
-if (themeGoverned) {
-  gates.push(
-    ["css-region-audit", resolve(ROOT, "docs/theme-surface/tools/css-region-audit.mjs")],
-    ["handedit-audit", resolve(ROOT, "docs/theme-surface/tools/handedit-audit.mjs")],
-  );
+if (themeCssGoverned) {
+  addGate("layout-lint", "docs/theme-surface/tools/layout-lint.mjs");
+  addGate("css-region-audit", "docs/theme-surface/tools/css-region-audit.mjs");
 }
+if (themeJsGoverned) {
+  addGate("handedit-audit", "docs/theme-surface/tools/handedit-audit.mjs");
+}
+const gates = [...gateMap.entries()];
 const failures = [];
 for (const [name, script] of gates) {
   const r = spawnSync(process.execPath, [script], { cwd: ROOT, encoding: "utf8" });
