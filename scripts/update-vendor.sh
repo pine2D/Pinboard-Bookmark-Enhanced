@@ -24,10 +24,13 @@
 #                   default model (ai.js OPENAI_COMPAT_PROVIDERS.openrouter.defaultModel)
 #                   is still listed at the free, key-less openrouter.ai/api/v1/models —
 #                   the one provider-catalog check cheap enough to run every time.
-#                   Prints a table, downloads/writes NOTHING, exits non-zero if anything
-#                   is behind or dead. Deliberately NOT wired into verify.sh / pre-commit
-#                   / release.sh (those gates stay offline by design) — it's a command
-#                   you run by hand when you want a signal the world moved.
+#                   Prints a table, downloads/writes NOTHING. Exit codes: 0 = every
+#                   check confirmed current/live; 1 = confirmed drift or a dead model
+#                   id; 2 = one or more checks were UNVERIFIED (network hiccup, or the
+#                   ai.js regex missed its match) — never silently reported as clean.
+#                   Deliberately NOT wired into verify.sh / pre-commit / release.sh
+#                   (those gates stay offline by design) — it's a command you run by
+#                   hand when you want a signal the world moved.
 set -euo pipefail
 REPO_ROOT=$(git rev-parse --show-toplevel)
 VENDOR_DIR="${REPO_ROOT}/vendor"
@@ -62,6 +65,13 @@ check_only() {
   )
 
   local behind=0
+  # unverified counts checks whose result is UNKNOWN (network hiccup, or the ai.js
+  # regex missing its match) as opposed to KNOWN-behind/KNOWN-dead. It must never be
+  # folded into `behind` — a check that failed to run is not evidence of currency,
+  # and reporting "everything matches" on an unreachable registry would be a false
+  # green (2026-09-15 review finding: a stubbed always-failing curl produced exactly
+  # that silent false-positive before this counter existed).
+  local unverified=0
   printf "  %-12s  %-10s  %-10s  %s\n" "package" "current" "latest" "status"
   local i pkg lockpath cur latest status
   for i in "${!PKG_NAMES[@]}"; do
@@ -87,7 +97,8 @@ check_only() {
       fi
     else
       latest="?"
-      status="fetch-error (network; not counted as drift)"
+      status="UNVERIFIED (fetch-error: network; not counted as drift, but NOT confirmed current either)"
+      unverified=$((unverified + 1))
     fi
     printf "  %-12s  %-10s  %-10s  %s\n" "${pkg}" "${cur}" "${latest}" "${status}"
   done
@@ -116,16 +127,26 @@ check_only() {
         behind=1
       fi
     else
-      or_status="fetch-error (network; not counted as drift)"
+      or_status="UNVERIFIED (fetch-error: network; not counted as drift, but NOT confirmed live either)"
+      unverified=$((unverified + 1))
     fi
   else
     or_model="?"
-    or_status="local-parse-error (ai.js openrouter.defaultModel regex miss)"
+    or_status="UNVERIFIED (local-parse-error: ai.js openrouter.defaultModel regex miss)"
+    unverified=$((unverified + 1))
   fi
   printf "  %-12s  %-10s  %s\n" "openrouter" "${or_model}" "${or_status}"
 
   echo ""
-  if [ "${behind}" -ne 0 ]; then
+  if [ "${unverified}" -ne 0 ] && [ "${behind}" -ne 0 ]; then
+    echo "Result: ${unverified} check(s) could not be verified (network/parse error) AND at least one"
+    echo "verified package/model is behind or dead. Rerun when online for a trustworthy reading. Exit 2."
+    return 2
+  elif [ "${unverified}" -ne 0 ]; then
+    echo "Result: ${unverified} check(s) could not be verified (network/parse error) — NOT a clean bill of"
+    echo "health, just an inconclusive one. Rerun when online. Exit 2."
+    return 2
+  elif [ "${behind}" -ne 0 ]; then
     echo "Result: at least one package is behind, or the OpenRouter default model is dead. Exit 1."
     return 1
   fi
@@ -134,11 +155,14 @@ check_only() {
 }
 
 if [ "${1:-}" = "--check-only" ]; then
-  if check_only; then
-    exit 0
-  else
-    exit 1
-  fi
+  # `check_only` uses three distinct exit codes (0 = clean, 1 = confirmed drift/dead
+  # model, 2 = one or more checks were unverifiable) — capture the real code rather
+  # than collapsing every non-zero outcome to 1, so the two failure modes stay
+  # distinguishable to a human or a future caller. `|| ck=$?` (not a bare call) is
+  # required so `set -e` doesn't abort the script before the code is captured.
+  ck=0
+  check_only || ck=$?
+  exit "${ck}"
 fi
 
 # fetch_npm <pkg> <path-in-tarball> <dest-file> <banner-name|""> <banner-url|"">
