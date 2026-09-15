@@ -26,16 +26,19 @@
 //
 // Dev-only (never shipped: scripts/ is outside release.sh's packaging
 // patterns). Parses with espree + eslint-scope from .qa-scan/node_modules --
-// the same parser ESLint itself uses there, so the scope analysis is real,
-// not a regex approximation.
+// the same parser ESLint itself uses there, so the scope analysis is real, not
+// a regex approximation. Both are declared in .qa-scan/package.json so this
+// gate owns them outright instead of borrowing whatever eslint happens to hoist.
 //
 // Scope and its one edge: every `func:` whose options object is written
 // literally at the call site (all of today's, plus the named top-level form
-// `func: extractPageForMarkdown`). An options object handed over as a variable
-// is unreachable -- that is _cbExecuteScript's own forwarding call and nothing
-// else, and the count is printed on every run so a new one cannot slip in
-// unnoticed. `files:` injections are NOT this gate's business: those scripts
-// carry their own top level into the page, closure and all.
+// `func: extractPageForMarkdown`). An options object handed over as a VARIABLE
+// hides its func: from this gate, so those calls are a baseline assertion of
+// their own: INDIRECT_ALLOWLIST registers the one legitimate forwarder by file
+// + enclosing function name, and any other such call -- or a registration that
+// stops matching -- fails the run. `files:` injections are NOT this gate's
+// business: those scripts carry their own top level into the page, closure and
+// all.
 //
 // Usage: node scripts/script-graph-lint.mjs [--verbose]
 // Exit 1 with `symbol  file:line` lines when an unguarded reference exists.
@@ -105,6 +108,22 @@ function calleeName(callee) {
   return "";
 }
 
+// Nearest enclosing function that has a name we can derive -- the stable key
+// for the indirect-call registry below (a line number drifts on every edit).
+function enclosingFunctionName(node, parents) {
+  for (let cur = parents.get(node); cur; cur = parents.get(cur)) {
+    if (!/^(FunctionDeclaration|FunctionExpression|ArrowFunctionExpression)$/.test(cur.type)) continue;
+    if (cur.id && cur.id.name) return cur.id.name;
+    const owner = parents.get(cur);
+    if (!owner) continue;
+    if (owner.type === "VariableDeclarator" && owner.id.type === "Identifier") return owner.id.name;
+    if (owner.type === "Property" && !owner.computed && owner.key.type === "Identifier") return owner.key.name;
+    if (owner.type === "AssignmentExpression" && owner.left.type === "MemberExpression" &&
+        !owner.left.computed && owner.left.property.type === "Identifier") return owner.left.property.name;
+  }
+  return "(top level)";
+}
+
 // Names bound by a declaration id (handles destructuring).
 function patternNames(pattern, out) {
   if (!pattern) return out;
@@ -127,6 +146,21 @@ function patternNames(pattern, out) {
 // one (the regex version of this collector cannot tell them apart).
 const GLOBAL_OBJECTS = new Set(["window", "globalThis", "self", "g"]);
 const PAGE_OWNED = new Set(PAGE_GLOBALS);
+
+// ---------- the indirect-call registry ----------
+// An executeScript call whose options object arrives as a VARIABLE hides its
+// `func` from this gate. Exactly one such call is legitimate, so it is
+// registered here by file + enclosing function (a line number drifts on every
+// edit above it); any other one is a hole in the gate and fails the run. An
+// entry that stops matching also fails -- a registry that silently covers
+// nothing is worse than no registry.
+const INDIRECT_ALLOWLIST = [
+  {
+    file: "ai.js",
+    fn: "_cbExecuteScript",
+    why: "callback-form forwarder: it hands its caller's own literal options object straight to chrome.scripting, and every one of those call sites is checked here.",
+  },
+];
 
 function collectBundleSymbols(parsed) {
   const table = new Map(); // name -> Set(file)
@@ -241,7 +275,7 @@ function isGuarded(idNode, funcNode, parents, name) {
 
 // ---------- page-function sites ----------
 
-function findPageFunctionSites(file, ast, indirect) {
+function findPageFunctionSites(file, ast, parents, indirect) {
   const sites = [];
   walk(ast, (node) => {
     if (node.type !== "CallExpression") return;
@@ -261,9 +295,11 @@ function findPageFunctionSites(file, ast, indirect) {
       }
     }
     // The options object came from a variable, so its `func` (if any) is out of
-    // reach. Today that is only _cbExecuteScript's own forwarding call; the
-    // count is surfaced so a NEW indirect call can never register silently.
-    if (!literalOptions) indirect.push({ file, line: node.loc.start.line });
+    // reach of this gate. Checked against INDIRECT_ALLOWLIST below: registered
+    // forwarder or red, never a number nobody reads.
+    if (!literalOptions) {
+      indirect.push({ file, line: node.loc.start.line, fn: enclosingFunctionName(node, parents) });
+    }
   });
   return sites.sort((a, b) => a.line - b.line);
 }
@@ -312,7 +348,7 @@ let siteCount = 0;
 
 for (const [file, ast] of parsed) {
   const parents = parentMaps.get(file);
-  const sites = findPageFunctionSites(file, ast, indirect);
+  const sites = findPageFunctionSites(file, ast, parents, indirect);
   if (!sites.length) continue;
 
   const scopeManager = eslintScope.analyze(ast, {
@@ -374,7 +410,13 @@ for (const [file, ast] of parsed) {
           let s = ref.resolved.scope, local = false;
           while (s) { if (inner.has(s)) { local = true; break; } s = s.upper; }
           if (local) continue;
-          origin = `${file} top level`;
+          // Captured from an enclosing scope of this file: the file's top level,
+          // or a wrapper function (an IIFE module) around the page function.
+          const def = ref.resolved.defs[0];
+          const enclosing = def ? enclosingFunctionName(def.name, parents) : "(top level)";
+          origin = ref.resolved.scope.type === "global"
+            ? `${file} top level`
+            : `${file}, inside ${enclosing === "(top level)" ? "an unnamed wrapper" : enclosing}`;
         } else {
           // Unresolved: a genuine free identifier. Only the bundle's own
           // symbols are a problem -- everything else is a page/browser global,
@@ -401,13 +443,19 @@ for (const [file, ast] of parsed) {
 const bySite = (a, b) => (a.file === b.file ? a.line - b.line : a.file.localeCompare(b.file));
 unguarded.sort(bySite);
 guarded.sort(bySite);
+indirect.sort(bySite);
+
+// Baseline assertion, not a statistic: every indirect call must be registered,
+// and every registration must still match something.
+const unregistered = indirect.filter((r) => !INDIRECT_ALLOWLIST.some((a) => a.file === r.file && a.fn === r.fn));
+const stale = INDIRECT_ALLOWLIST.filter((a) => !indirect.some((r) => r.file === a.file && r.fn === a.fn));
 
 if (VERBOSE) {
   console.log(`[script-graph] ${registry.length} page function site(s):`);
   for (const r of registry.sort()) console.log(`  ${r}`);
   if (indirect.length) {
     console.log(`[script-graph] ${indirect.length} executeScript call(s) with non-literal options (func: unreachable from here):`);
-    for (const r of indirect.sort()) console.log(`  ${r.file}:${r.line}`);
+    for (const r of indirect) console.log(`  ${r.fn.padEnd(28)} ${r.file}:${r.line}`);
   }
 }
 
@@ -430,8 +478,24 @@ if (unguarded.length) {
   console.error('[script-graph] Fix: inline the value, pass it through `args:`, or declare it optional with `typeof X === "function"`.');
 }
 
-if (unguarded.length || broken.length) process.exit(1);
+if (unregistered.length) {
+  console.error(`[script-graph] FAIL — ${unregistered.length} executeScript call(s) hand over an options object this gate cannot read:`);
+  for (const r of unregistered) console.error(`  ${r.fn.padEnd(28)} ${r.file}:${r.line}  (options arrive as a variable, so any func: in them is unchecked)`);
+  console.error("[script-graph] Fix: write the options object literally at the call site so its func: can be checked,");
+  console.error("[script-graph] or register the forwarder in INDIRECT_ALLOWLIST (scripts/script-graph-lint.mjs) with the reason it is safe.");
+}
+
+if (stale.length) {
+  console.error(`[script-graph] FAIL — ${stale.length} INDIRECT_ALLOWLIST entr(ies) no longer match any call:`);
+  for (const a of stale) console.error(`  ${a.fn.padEnd(28)} ${a.file}  (renamed, moved or removed — drop the entry or fix its key)`);
+}
+
+const indirectNote = `${indirect.length} call(s) with non-literal options, ${INDIRECT_ALLOWLIST.length} registered`;
+
+if (unguarded.length || broken.length || unregistered.length || stale.length) {
+  console.error(`[script-graph] (${siteCount} page function site(s) checked, ${guarded.length} guarded optional dependencies, ${indirectNote}.)`);
+  process.exit(1);
+}
 
 console.log(`[script-graph] OK — ${siteCount} executeScript page function(s) are closure-free ` +
-  `(${guarded.length} guarded optional dependencies, ${indirect.length} call(s) with non-literal options). ` +
-  `--verbose lists them.`);
+  `(${guarded.length} guarded optional dependencies, ${indirectNote}). --verbose lists them.`);
