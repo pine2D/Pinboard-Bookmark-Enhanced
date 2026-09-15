@@ -3971,6 +3971,17 @@ check(/^\.pop-panel \{[\s\S]*?\}/m.test(mdCss) && !/#pb-hl-card \{[^}]*box-shado
 //     three recognized shapes are present statically to say so.
 //   - otherwise, if what is left (with any literal "×" stripped) is empty,
 //     the button is icon-only and needs a name.
+//
+// Known limitation, not exercised by any of the four surfaces today (none
+// of them put an sr-only text span *inside* a button as its accessible
+// name -- every sr-only usage in this codebase is a standalone label/status
+// element): this classifier only reads title/aria-label/aria-labelledby
+// attributes on the <button> itself. A button naming itself via a nested
+// visually-hidden text node would be a real accessible name that this gate
+// cannot see and would misreport as missing -- if that pattern is ever
+// introduced, iconOnlyButtonInner needs a "does a stripped child still
+// carry non-empty text" branch that treats it as already-named rather than
+// out of scope.
 function iconOnlyButtonInner(inner) {
   const svgFree = inner.replace(/<svg[\s\S]*?<\/svg>/g, "");
   const ariaHiddenFree = svgFree.replace(/<([a-zA-Z][\w-]*)\b[^>]*\baria-hidden="true"[^>]*>[\s\S]*?<\/\1>/g, "");
@@ -4012,9 +4023,72 @@ for (const [file, html] of [["popup.html", popupHtml], ["options.html", optionsH
       check(owner(), `${file}: #${id} is allowlisted as a runtime-owned title, but the JS that is supposed to own it no longer matches that shape -- either restore the ownership or give it a static data-i18n-title and drop the allowlist entry`);
       continue;
     }
-    const hasTitle = /\btitle="[^"]*"/.test(attrs) || /\bdata-i18n-title="/.test(attrs);
+    // A literal title="" with no data-i18n-title to hydrate it is not a
+    // title -- it is dead weight from a copy-pasted attribute list.
+    const titleAttr = /\btitle="([^"]*)"/.exec(attrs);
+    const hasTitle = (!!titleAttr && titleAttr[1] !== "") || /\bdata-i18n-title="/.test(attrs);
     check(hasTitle, `${file}: icon-only button ${label} has no title/data-i18n-title -- icon-only buttons must carry both a title and an aria-label (CLAUDE.md icon contract)`);
   }
+}
+
+// Blanks out string/template literals and comments (same length, kept as
+// spaces so indices don't move) so the brace counter below cannot be fooled
+// by a "{"/"}" that only exists inside a string or a comment -- both are
+// routine in this codebase (template literals, JSON-shaped option objects).
+function blankNonCode(src) {
+  let out = "", i = 0;
+  const n = src.length;
+  while (i < n) {
+    const c = src[i], c2 = src[i + 1];
+    if (c === "/" && c2 === "/") {
+      let j = i;
+      while (j < n && src[j] !== "\n") j++;
+      out += src.slice(i, j).replace(/[^\n]/g, " ");
+      i = j;
+    } else if (c === "/" && c2 === "*") {
+      let j = i + 2;
+      while (j < n && !(src[j] === "*" && src[j + 1] === "/")) j++;
+      j = Math.min(j + 2, n);
+      out += src.slice(i, j).replace(/[^\n]/g, " ");
+      i = j;
+    } else if (c === '"' || c === "'" || c === "`") {
+      const quote = c;
+      let j = i + 1;
+      while (j < n && src[j] !== quote) { if (src[j] === "\\") j++; j++; }
+      j = Math.min(j + 1, n);
+      out += src.slice(i, j).replace(/[^\n]/g, " ");
+      i = j;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out;
+}
+
+// The smallest {...} block that encloses `index` in `code` (a blankNonCode
+// output). Walking backward with a depth counter finds the nearest "{" that
+// isn't already closed by a "}" seen between it and index; walking forward
+// from there finds its matching close. Returns [openIndex, closeIndex], or
+// null if index sits outside any block (top-level module code).
+function enclosingBlock(code, index) {
+  let depth = 0;
+  for (let i = index - 1; i >= 0; i--) {
+    const c = code[i];
+    if (c === "}") depth++;
+    else if (c === "{") {
+      if (depth === 0) {
+        let d = 1;
+        for (let j = i + 1; j < code.length; j++) {
+          if (code[j] === "{") d++;
+          else if (code[j] === "}") { d--; if (d === 0) return [i, j]; }
+        }
+        return [i, code.length];
+      }
+      depth--;
+    }
+  }
+  return null;
 }
 
 // The lone "×" glyph is CLAUDE.md's one literal-character exception for an
@@ -4026,17 +4100,39 @@ for (const [file, html] of [["popup.html", popupHtml], ["options.html", optionsH
 // and already covered by the HTML scan above; this re-derives the JS-built
 // ones from the actual call sites across every root JS file instead of
 // pinning three file:line locations, so a newly added one is covered too).
+//
+// Bound to real lexical scope, not a fixed character window: find the
+// smallest enclosing {...} block around the × assignment (brace-balanced,
+// via blankNonCode + enclosingBlock above), then within that block find
+// this variable's most recent declaration/reassignment before the ×
+// assignment and its next declaration/reassignment after it, if any -- the
+// search window sits strictly between those two. A second button that
+// happens to reuse the same local name, whether shadowed in a nested block
+// or reassigned later in the very same block, cannot lend its title/
+// aria-label to a different button that never set its own (reviewer
+// counterexample: two `btn`-named buttons in one function, only the
+// non-× one titled -- proven red/green by hand, see the K113 fix report).
 for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   const src = read(f);
+  const code = blankNonCode(src);
   const xRe = /(\b[A-Za-z_$][\w$]*)\.textContent\s*=\s*(?:"×"|'×'|"\\u00d7"|'\\u00d7')/g;
   let xm;
   while ((xm = xRe.exec(src))) {
     const v = xm[1];
-    const around = src.slice(Math.max(0, xm.index - 400), xm.index + 400);
+    const [blockStart, blockEnd] = enclosingBlock(code, xm.index) || [0, src.length];
+    const declRe = new RegExp(`(?:\\b(?:const|let|var)\\s+${v}\\b|[^.\\w$]${v}\\s*=(?!=))`, "g");
+    let scopeStart = blockStart, scopeEnd = blockEnd, dm;
+    declRe.lastIndex = blockStart;
+    while ((dm = declRe.exec(src)) && dm.index < blockEnd) {
+      if (dm.index < xm.index) { scopeStart = dm.index; continue; }
+      scopeEnd = dm.index;
+      break;
+    }
+    const scope = src.slice(scopeStart, scopeEnd);
     const titleRe = new RegExp(`\\b${v}\\.title\\s*=`);
     const ariaRe = new RegExp(`\\b${v}\\.setAttribute\\(\\s*["']aria-label["']|\\b${v}\\.ariaLabel\\s*=`);
-    check(titleRe.test(around), `${f}: a JS-constructed "×" button ("${v}") has no ${v}.title assignment nearby -- a bare × glyph is not an accessible name on its own`);
-    check(ariaRe.test(around), `${f}: a JS-constructed "×" button ("${v}") has no aria-label near its textContent = "×" assignment`);
+    check(titleRe.test(scope), `${f}: a JS-constructed "×" button ("${v}") has no ${v}.title assignment in its own scope -- a bare × glyph is not an accessible name on its own`);
+    check(ariaRe.test(scope), `${f}: a JS-constructed "×" button ("${v}") has no aria-label in its own scope near its textContent = "×" assignment`);
   }
 }
 
