@@ -4057,12 +4057,25 @@ const ICON_BUTTON_RUNTIME_TITLE_OWNERS = {
   },
 };
 
+// K113: buttons that render statically empty (no <svg>/.btn-ic/aria-hidden
+// shape at all) but are hydrated with an icon by a known JS routine -- not
+// "a JS routine fills it with real text" -- must still be in scope for this
+// gate, not routed to iconOnlyButtonInner's "JS fills with text -> out of
+// scope" branch. Today that's setupSecretToggles() (options.js): the 21
+// `.key-toggle` show/hide buttons across popup.html/options.html ship with
+// no children at all and get an eye/eyeOff SVG injected at runtime by
+// data-target. An entry here forces the button into scope regardless of
+// what iconOnlyButtonInner's static read says.
+const JS_ICON_CLASSES = new Set(["key-toggle"]);
+
 for (const [file, html] of [["popup.html", popupHtml], ["options.html", optionsHtml], ["library.html", libraryHtml], ["md-preview.html", mdHtml]]) {
   const re = /<button\b([^>]*)>([\s\S]*?)<\/button>/g;
   let m;
   while ((m = re.exec(html))) {
     const [, attrs, inner] = m;
-    if (!iconOnlyButtonInner(inner)) continue;
+    const classAttr = (/\bclass="([^"]*)"/.exec(attrs) || [])[1] || "";
+    const jsHydratedIcon = classAttr.split(/\s+/).some((c) => JS_ICON_CLASSES.has(c));
+    if (!jsHydratedIcon && !iconOnlyButtonInner(inner)) continue;
     const id = (/\bid="([^"]*)"/.exec(attrs) || [])[1] || "";
     const label = id ? `#${id}` : `(${attrs.trim().slice(0, 60)})`;
     const hasName = /\baria-label="[^"]*"/.test(attrs) || /\bdata-i18n-aria="/.test(attrs) || /\baria-labelledby="/.test(attrs);
