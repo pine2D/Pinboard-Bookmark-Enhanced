@@ -42,9 +42,9 @@ suite("pbpSettingsKeysChanged", () => {
     assert(pbpSettingsKeysChanged({ _waybackAttempts: {} }) === false, "wayback dedup is transient");
     assert(pbpSettingsKeysChanged({ _waybackLog: {} }) === false, "wayback log is transient");
   });
-  test("cached_user_tags / _aiCacheMigrationBackup do NOT count", () => {
+  test("cached_user_tags / _suggestSweepTs do NOT count", () => {
     assert(pbpSettingsKeysChanged({ cached_user_tags: {} }) === false, "tag cache is transient");
-    assert(pbpSettingsKeysChanged({ _aiCacheMigrationBackup: {} }) === false, "migration backup is transient");
+    assert(pbpSettingsKeysChanged({ _suggestSweepTs: {} }) === false, "sweep throttle stamp is transient");
   });
   test("a real setting (tagSyncMode) DOES count", () => {
     assert(pbpSettingsKeysChanged({ tagSyncMode: { newValue: "fresh" } }) === true, "tagSyncMode is a real setting");

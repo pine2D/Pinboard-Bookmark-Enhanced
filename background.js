@@ -1658,7 +1658,6 @@ _syncBadgeAlarm();
 // uses (Chrome evicts storage backend after inactivity, causing slow first-open).
 ensurePeriodicAlarm("storage-warm", 5);
 
-sweepAICacheMigrationBackup().catch(() => {});
 sweepSuggestCache().catch(() => {});
 
 // One-time migration: bgSaveNoClobber (boolean) -> bgSaveMode (tri-state).
@@ -2287,19 +2286,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 // Initial check
 syncPrewarmTagsAlarm().catch(() => {});
-
-// Sweep expired migration backup (7 days)
-async function sweepAICacheMigrationBackup() {
-  try {
-    const { _aiCacheMigrationBackup } = await chrome.storage.local.get("_aiCacheMigrationBackup");
-    if (!_aiCacheMigrationBackup) return;
-    const ageMs = Date.now() - (_aiCacheMigrationBackup.ts || 0);
-    if (ageMs > 7 * 24 * 60 * 60 * 1000) {
-      await chrome.storage.local.remove("_aiCacheMigrationBackup");
-      console.log("[ai-cache] migration backup swept after 7 days");
-    }
-  } catch (_) {}
-}
 
 
 // Recurring sweep of the per-URL suggest-tag cache (cached_suggest_*). The popup
