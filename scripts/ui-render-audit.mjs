@@ -61,9 +61,10 @@
 
 import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
-import { resolve, dirname, join } from "node:path";
+import { resolve, dirname, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 
 import {
   CHECKS,
@@ -3149,7 +3150,51 @@ function report(results) {
   process.exit(0);
 }
 
+// K107: scripts/ci-fonts.conf exists so a developer can make their machine's
+// font resolution match CI's (CJK on WenQuanYi, no Windows/macOS fonts), but
+// nothing in the codebase ever asserted the file actually loaded -- and the
+// conf's own header names two silent failure modes: a relative
+// FONTCONFIG_FILE is looked up under /etc/fonts, fails, and falls back to the
+// default config; an XML comment containing "--" fails to parse and is
+// dropped just as quietly. Both leave fc-match resolving "Microsoft YaHei" to
+// msyh.ttc instead of DejaVu Sans -- which is exactly the sanity check the
+// conf's comment header prescribes as a manual step. This makes it the
+// script's job, not a human's. Only runs when a developer has opted in by
+// setting FONTCONFIG_FILE; CI never sets it, so this is a no-op there and the
+// gate's rendering path is byte-for-byte unchanged.
+function checkFontconfigParity() {
+  const confPath = process.env.FONTCONFIG_FILE;
+  if (!confPath) return;
+  if (!isAbsolute(confPath)) {
+    console.error(
+      `[render-audit] FONTCONFIG_FILE="${confPath}" is not an absolute path. ` +
+      `fontconfig looks up a relative name under /etc/fonts, fails to find it there, ` +
+      `and silently falls back to the default config (see the header comment in ${confPath}). ` +
+      `Use an absolute path, e.g. FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf".`
+    );
+    process.exit(2);
+  }
+  let resolved;
+  try {
+    resolved = execFileSync("fc-match", ["Microsoft YaHei"], { encoding: "utf8" }).trim();
+  } catch (e) {
+    console.warn(`[render-audit] fc-match unavailable (${e.code || e.message}) -- skipping the FONTCONFIG_FILE=${confPath} parity check (fontconfig is Linux-only).`);
+    return;
+  }
+  if (!resolved.includes("DejaVu")) {
+    console.error(
+      `[render-audit] FONTCONFIG_FILE=${confPath} did not take effect: fc-match "Microsoft YaHei" ` +
+      `resolved to "${resolved}", expected a DejaVu Sans match. This is one of the two silent failure ` +
+      `modes ${confPath} documents (relative path already ruled out above; check the file for an ` +
+      `XML comment containing "--", which fontconfig fails to parse and drops silently). ` +
+      `Reproduce: FONTCONFIG_FILE="${confPath}" fc-match "Microsoft YaHei"`
+    );
+    process.exit(2);
+  }
+}
+
 async function main() {
+  checkFontconfigParity();
   if (SHARD) {
     console.log(`[render-audit] shard ${SHARD.i}/${SHARD.n}: ${SHARD_THEMES.length}/${THEMES.length} theme(s) [${SHARD_THEMES.map((t) => t || "(default)").join(", ")}]${RUNS_SWEEP ? " + the single sweep pass (families 4-11 and the spacingScale ledger)" : ""}`);
   }
