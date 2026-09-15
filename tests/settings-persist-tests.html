@@ -1603,6 +1603,13 @@ async function run() {
     const start = backgroundSource.indexOf("let _settingsCache = null;");
     const end = backgroundSource.indexOf("// F7: Track recent saves", start);
     check("_settingsCache: slice found", start >= 0 && end > start);
+    // A broken anchor above already produced a named FAIL for the guard; the
+    // factory(...) calls below throw immediately (a ReferenceError from the
+    // undefined loadSettings/etc identifiers) when cacheSource is garbage.
+    // Contain that here instead of letting it propagate out of this IIFE and
+    // abort run(), which would drop the (unrelated) mdMemo check right below
+    // and every later E5-E12 block in the file.
+    try {
     const cacheSource = backgroundSource.slice(start, end);
     const factory = new Function("SETTINGS_DEFAULTS", "pbpReadSettingsWithSecrets", "deobfuscateSettings",
       `${cacheSource}\nreturn { loadSettings, invalidateSettingsCache, cached: () => _settingsCache };`);
@@ -1710,6 +1717,19 @@ async function run() {
       !lateRejectResult.error && !unhandledReason && reads === 2 && lateRejectValues.length === 3 &&
       lateRejectValues.every((value) => value === lateRejectValues[0]) &&
       lateRejectValues[0]?.pinboardToken === "alice:fresh-pending" && lateRejectCache.cached() === lateRejectValues[0]);
+    } catch (error) {
+      // Render the same named rows the happy path would have produced, so
+      // this block's row count in the suite is unaffected by which anchor
+      // (if any) broke -- a broken _settingsCache anchor is already named by
+      // the guard above.
+      for (const name of [
+        "E4 background settings cache: concurrent callers share one read",
+        "E4 background settings cache: pending invalidation causes exactly one fresh reread for every caller",
+        "E4 background settings cache: rejected read clears singleflight for retry",
+        "E4 background settings cache: late stale value cannot replace a completed fresh generation",
+        "E4 background settings cache: late stale rejection joins and cannot clear the fresh pending entry",
+      ]) check(name, false);
+    }
 
     // md-preview's memo is the same singleflight shape as loadSettings above,
     // so it gets the same BEHAVIOR probe: source-text greps here would stay
@@ -1720,6 +1740,10 @@ async function run() {
     const mdMemoStart = mdAiSource.indexOf("let _pbpAiSettingsPromise = null;");
     const mdMemoEnd = mdAiSource.indexOf("// Gate: master switch on AND a usable AI key", mdMemoStart);
     check("_pbpAiSettingsPromise: slice found", mdMemoStart >= 0 && mdMemoEnd > mdMemoStart);
+    // Same containment as the _settingsCache block above: mdMemoFactory(...)
+    // throws immediately when mdMemoSource is garbage (an undefined
+    // pbpAiGetSettings identifier in its own return statement).
+    try {
     const mdMemoSource = mdAiSource.slice(mdMemoStart, mdMemoEnd);
     const mdMemoFactory = new Function("chrome", "SETTINGS_DEFAULTS", "pbpReadSettingsWithSecrets",
       "deobfuscateSettings", "pbpSettingsKeysChanged",
@@ -1752,6 +1776,9 @@ async function run() {
       mdRejectedWith === mdFirstError && mdReads === 3 && typeof mdOnChanged === "function" &&
       mdRetried.value?.pinboardToken === "alice:md-2" && mdMemoized.value === mdRetried.value &&
       mdAfterChange.value?.pinboardToken === "alice:md-3");
+    } catch (error) {
+      check("E4 md AI cache: a rejected read is not pinned and storage changes still invalidate", false);
+    }
   })();
 
   // ---------- E5: three-state matrix + migration idempotency ----------
@@ -2108,6 +2135,19 @@ async function run() {
     check("E5 Options auto-save persists only the baseline delta and serializes saves",
       optionsSource.includes("pbpSaveOptionsSnapshot(savedState, data, overlayValue") &&
       optionsSource.includes("pbpQueueOptionsSave(autoSaveState, saveAll)"));
+
+    if (syncHandlerStart < 0 || syncHandlerEnd <= syncHandlerStart || keysHandlerStart < 0 || keysHandlerEnd <= keysHandlerStart) {
+      // Everything below drives REAL execution semantics through
+      // new Function(...) built from syncHandlerSource/keysHandlerSource --
+      // a broken anchor here does not just throw (e.g. calling the resulting
+      // undefined handler function): several paths would hang forever
+      // instead, since a handler that never runs never resolves the promise
+      // a later await is waiting on (see handlerMainStarted below). Bail out
+      // of this behavioral sub-suite instead of letting either failure mode
+      // abort run() or stall the whole page; the two guards above already
+      // named exactly which anchor broke.
+      return;
+    }
 
     const handlerLocal = {
       optSyncEnabled: false,

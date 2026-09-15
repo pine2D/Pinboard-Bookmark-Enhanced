@@ -9,7 +9,7 @@ function check(name, ok) { ok ? pass++ : fail++; const row = document.createElem
   const source = await fetch("../background.js").then((response) => response.text());
   const importsStart = source.indexOf("importScripts(");
   const importsEnd = source.indexOf(");", importsStart);
-  if (importsStart < 0 || importsEnd < importsStart) throw new Error("anchor not found: importScripts source");
+  if (importsStart < 0 || importsEnd <= importsStart) throw new Error("anchor not found: importScripts source");
   const imports = source.slice(importsStart, importsEnd + 2);
   const alarmsStart = source.indexOf("chrome.alarms.onAlarm.addListener");
   const alarmsEnd = source.indexOf("// React to settings change");
