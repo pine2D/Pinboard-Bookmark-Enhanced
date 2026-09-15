@@ -501,7 +501,11 @@ popup 现有的 `--pp-tag-bg` / `--pp-tag-fg` 是同一角色的旧名。Task 5 
 
 ## 6. 表单控件（input / select / textarea / checkbox / radio）
 
-**适用**：options + library 全量；popup 只吃颜色对与 `accent-color`。
+**适用**：`.fg` 字段配方**只发射 options**（composer `formRules(ns)` 的 `ns === "opt"` 守卫）；popup 与
+library 都没有一个 `class="fg"`（`ui-vocabulary.json` 也只在 options 名下登记 `fg`），两者只吃颜色对与
+`accent-color`。library 的字段按工具条逐条手写在 library.css 手写区——那是 §6.4 记录的用户裁决（工具条留
+在 sm 20px 阶），不是欠账；手写规则还带着 forced-colors 焦点兜底与焦点环 z-index 抬升，共享配方表达不了。
+**代价**：`.fg` 是 options 独占词汇，别的表面加 `class="fg"` 会静默失效——要用就先改 composer 守卫。
 
 ### 6.1 结构配方
 
@@ -554,8 +558,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); 
 | `accent-color` | `--{ns}-accent` | 既有 |
 
 **字段与按钮同病**：`options.css:207` 与 `library.css:136` 的字段基类都声明了 `background-color` 却
-**没有 `color`**——options 靠 `html[data-theme] .fg input…`（:1187-1191）补，library 的 `.fg` 是死代码所以
-还没爆。成对消费律（§7）对字段和按钮一视同仁。
+**没有 `color`**——options 靠 `html[data-theme] .fg input…`（:1187-1191）补；library 当时的 `.fg` 是死代码所以
+还没爆，2026-09-15 起 composer 干脆不对 lib 发射这一族（见 §6 适用），library 的字段一律由手写规则自带
+`color`。成对消费律（§7）对字段和按钮一视同仁。
 
 **同一 commit 删除的 `html[data-theme]` 字段覆盖**（同 §1.3 的理由与时机）：
 
@@ -572,7 +577,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--{ns}-accent); 
 | ID | 断言 | 层 |
 |---|---|---|
 | `rowRungEq` | 同一 flex 行内并排的 `.btn` / `.btn-sm` / `input` / `select`，两两计算高度差 ≤1px | `[render]` |
-| `fieldRung` | `.fg` 字段计算高度 = 26±1px；工具条字段 = 20±1px | `[render]` |
+| `controlRung` | 字段与按钮同一把尺：计算高度 ∈ {26±1（md）, 20±1（sm）}，豁免清单见 §10.4 与 `SWEEP_CFG.rung.exempt`。**这里不另立 `fieldRung`**——字段没有自己的一把尺，2026-09-15 前门表列的那一行全仓无实现 | `[render]` family 6 |
 | `fieldPairedFg` | 声明 `background-color` 的字段规则所在组件族必须声明 `color` | `[static]` |
 
 ### 6.4 使用守则

@@ -321,52 +321,78 @@ function chipRules(ns) {
 }
 
 // -----------------------------------------------------------------------
-// §6: form controls. options + library get the full field recipe; popup
-// only gets accent-color (§6: "popup 只吃颜色对与 accent-color") — it has
-// no `.fg` class. `.fg select`'s chevron background-image and `.fg
-// textarea`'s monospace stack are explicitly page-level hand-maintained
-// exceptions (§6.1), never emitted here.
+// §6: form controls. The `.fg` field recipe ships to OPTIONS ONLY. Two of the
+// three surfaces have no `class="fg"` anywhere: popup never had one (§6:
+// "popup 只吃颜色对与 accent-color"), and library turned out not to have one
+// either -- `grep -c 'class="fg' library.html` is 0, no library JS ever adds
+// the token, and ui-vocabulary.json registers `fg` under the options surface
+// alone. Emitting the family for either of them ships CSS that can never
+// match anything (library.css carried five such rules from 2026-08-05 until
+// this guard landed).
+//
+// library's fields are hand-written per toolbar instead, and that is
+// deliberate, not debt: §6.4 records the user decision that the toolbar rows
+// stay on the sm 20px rung, because lifting them to this recipe's md 26px
+// rung grows the sticky batch bar by 7px. Those hand-written rules also carry
+// a forced-colors focus fallback and a focus-ring z-index lift that this
+// recipe has no way to express (library.css, `.notes-toolbar
+// input[type="search"]` and the `.vocab-group-unit` fused shell).
+//
+// COST OF THE ASYMMETRY -- keep this note: `.fg` is now an options-only
+// vocabulary word. If library.html or popup.html ever grows a `class="fg"`
+// wrapper it silently gets nothing. The fix then is to widen this guard (and
+// settle the rung question first), never to hand-copy the recipe into the
+// hand-written region.
+//
+// `.fg select`'s chevron background-image and `.fg textarea`'s monospace
+// stack are explicitly page-level hand-maintained exceptions (§6.1), never
+// emitted here.
 function formRules(ns) {
-  if (ns === "pp") {
-    return [rule('input[type="checkbox"], input[type="radio"]', [["accent-color", `var(--${ns}-accent)`]])];
-  }
   const FIELD_SEL = `.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea`;
-  const out = [
-    rule(FIELD_SEL, [
-      ["width", "100%"],
-      ["padding", `${sp(ns, 4)} ${sp(ns, 8)}`],
-      ["font-size", "13px"],
-      ["line-height", "16px"],
-      ["font-family", "inherit"],
-      ["border", `1px solid ${v(ns, "input-border")}`],
-      ["border-radius", `var(--${ns}-radius-md)`],
-      ["background-color", `var(--${ns}-input-bg)`],
-      ["color", `var(--${ns}-fg)`],
-      ["-webkit-appearance", "none"],
-      ["appearance", "none"],
-      ["box-shadow", "none"],
-      ["transition", `border-color ${motion(ns)} ease, background-color ${motion(ns)} ease, box-shadow ${motion(ns)} ease`],
-    ]),
-    rule(`.fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus)`, [
-      ["border-color", `color-mix(in srgb, ${v(ns, "input-border")} 55%, var(--${ns}-fg))`],
-    ], { pairColorWith: FIELD_SEL }),
-    rule(`.fg input:focus, .fg select:focus, .fg textarea:focus`, [
-      ["outline", "none"], ["border-color", `var(--${ns}-focus-bd)`],
-    ], { pairColorWith: FIELD_SEL }),
-    rule(`.fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible`, [
-      ["box-shadow", `var(--${ns}-focus-ring)`],
-    ]),
-    rule('input[type="checkbox"], input[type="radio"]', [["accent-color", `var(--${ns}-accent)`]]),
+  const out = [];
+  if (ns === "opt") {
+    out.push(
+      rule(FIELD_SEL, [
+        ["width", "100%"],
+        ["padding", `${sp(ns, 4)} ${sp(ns, 8)}`],
+        ["font-size", "13px"],
+        ["line-height", "16px"],
+        ["font-family", "inherit"],
+        ["border", `1px solid ${v(ns, "input-border")}`],
+        ["border-radius", `var(--${ns}-radius-md)`],
+        ["background-color", `var(--${ns}-input-bg)`],
+        ["color", `var(--${ns}-fg)`],
+        ["-webkit-appearance", "none"],
+        ["appearance", "none"],
+        ["box-shadow", "none"],
+        ["transition", `border-color ${motion(ns)} ease, background-color ${motion(ns)} ease, box-shadow ${motion(ns)} ease`],
+      ]),
+      rule(`.fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus)`, [
+        ["border-color", `color-mix(in srgb, ${v(ns, "input-border")} 55%, var(--${ns}-fg))`],
+      ], { pairColorWith: FIELD_SEL }),
+      rule(`.fg input:focus, .fg select:focus, .fg textarea:focus`, [
+        ["outline", "none"], ["border-color", `var(--${ns}-focus-bd)`],
+      ], { pairColorWith: FIELD_SEL }),
+      rule(`.fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible`, [
+        ["box-shadow", `var(--${ns}-focus-ring)`],
+      ]),
+    );
+  }
+  // Unscoped and therefore emitted on ALL THREE surfaces -- it is the whole
+  // of popup's §6 share, and library's checkboxes consume it too. It must
+  // stay outside the `.fg` guard above.
+  out.push(rule('input[type="checkbox"], input[type="radio"]', [["accent-color", `var(--${ns}-accent)`]]));
+  if (ns === "opt") {
     // §7.3 `borderless`: a checkbox paints no frame of its own (the tick is
     // UA-drawn from accent-color), so the 1px accent core carries legibility
     // and the token glow carries the family resemblance. The core is NOT
     // optional -- the glow alone is too faint on light surfaces.
-    rule('.fg input[type="checkbox"]:focus-visible', [
+    out.push(rule('.fg input[type="checkbox"]:focus-visible', [
       ["outline", `1px solid var(--${ns}-accent)`],
       ["outline-offset", "2px"],
       ["box-shadow", `var(--${ns}-focus-ring)`],
-    ]),
-  ];
+    ]));
+  }
   // §6.1 toolbar-scoped field variant (sm rung, matches the row's .btn-sm
   // height). Concrete selector per COMPONENTS.md Appendix C3 — the only named
   // target this campaign (library.css:834, "本战役排期"); options has no

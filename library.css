@@ -281,38 +281,8 @@ a { color: var(--lib-link, #1a66c2); }
   box-shadow: var(--lib-focus-ring);
 }
 
-.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg select, .fg textarea {
-  width: 100%;
-  padding: var(--lib-sp-1) var(--lib-sp-2);
-  font-size: 13px;
-  line-height: 16px;
-  font-family: inherit;
-  border: 1px solid var(--lib-input-border);
-  border-radius: var(--lib-radius-md);
-  background-color: var(--lib-input-bg);
-  color: var(--lib-fg);
-  -webkit-appearance: none;
-  appearance: none;
-  box-shadow: none;
-  transition: border-color var(--motion-state) ease, background-color var(--motion-state) ease, box-shadow var(--motion-state) ease;
-}
-.fg input:hover:not(:focus), .fg select:hover:not(:focus), .fg textarea:hover:not(:focus) {
-  border-color: color-mix(in srgb, var(--lib-input-border) 55%, var(--lib-fg));
-}
-.fg input:focus, .fg select:focus, .fg textarea:focus {
-  outline: none;
-  border-color: var(--lib-focus-bd);
-}
-.fg input:focus-visible, .fg select:focus-visible, .fg textarea:focus-visible {
-  box-shadow: var(--lib-focus-ring);
-}
 input[type="checkbox"], input[type="radio"] {
   accent-color: var(--lib-accent);
-}
-.fg input[type="checkbox"]:focus-visible {
-  outline: 1px solid var(--lib-accent);
-  outline-offset: 2px;
-  box-shadow: var(--lib-focus-ring);
 }
 .vocab-group-unit input[type="text"] {
   padding: var(--lib-sp-0) var(--lib-sp-2);
@@ -321,35 +291,30 @@ input[type="checkbox"], input[type="radio"] {
 }
 /* @generated:ui-components end (library) */
 
-/* Base field recipe (width/padding/border/radius/background-color/font-size/
-   font-family/appearance/box-shadow/transition), hover border-color, focus/
-   focus-visible and the checkbox/radio accent-color now all come from
-   @generated:ui-components above (COMPONENTS.md §6). The <select> chevron
-   below is the one page-level exception §6.1 keeps hand-maintained -- it
-   only makes sense once appearance:none has removed the native arrow.
-   STATUS (vocab-group-inspect-report.md 2026-08-05 Finding 9): `.fg` has
-   ZERO consumers in library.html/library-vocab.js/library-notes.js today
-   (`grep class=\"fg\"` = 0 hits) -- every library.html input instead gets
-   its own hand-written per-toolbar recipe (#vocab-search,
-   .vocab-filter-toolbar, .vocab-batch-bar / .vocab-group-unit, ...). This
-   whole `.fg …` block is dead code on this surface (options.css is the real
-   consumer -- 134 `class="fg"` sites there); it renders here only because
-   the recipe source is shared across all three surfaces. Finding 1 was this
-   gap's cost made visible: the detail pane's group input had no per-toolbar
-   recipe written for it and fell through to bare UA styling with nothing to
-   catch it. Left as-is rather than restructured (wrapping library.html
-   inputs in `.fg` is a real, larger change out of this task's scope) -- see
-   the report for the full "one-off-per-toolbar" tradeoff discussion. */
-/* Custom chevron for <select> — native arrow removed by appearance:none. Use
-   background-image / background-repeat / background-position as LONGHANDS so themed
-   overrides that only set background-color preserve the chevron. */
-.fg select {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  padding-right: 26px;
-  cursor: pointer;
-}
+/* NO `.fg` ON THIS SURFACE -- the gap is closed at the source now. `.fg` has
+   ZERO consumers here: `grep -c 'class="fg' library.html` is 0, no library JS
+   ever adds the token, and docs/theme-surface/ui-vocabulary.json registers
+   `fg` under the options surface alone. From 2026-08-05 (vocab-group-inspect-
+   report.md Finding 9) until this commit the composer nevertheless emitted the
+   five `.fg …` field rules here, plus a `.fg select` chevron sitting in this
+   hand-written region -- ~1.5KB that could never match anything. The composer
+   (composers/ui-components.mjs, formRules) now guards the whole family with
+   `ns === "opt"`, so nothing to delete by hand remains and nothing regrows on
+   the next sync-all.
+   What library uses instead: a per-toolbar field recipe written by hand below
+   (.notes-toolbar / .vocab-lookup-bar input[type="search"], .vocab-filter-
+   toolbar + .vocab-filter-row select, .vocab-group-unit, .vocab-note-input,
+   .xp-dict-lang). That is deliberate, not debt -- COMPONENTS.md §6.4 records
+   the user decision that these toolbar rows stay on the sm 20px rung (the
+   `.fg` recipe is md 26px and would grow the sticky batch bar by 7px), and
+   those rules also carry a forced-colors focus fallback and a focus-ring
+   z-index lift that the shared recipe cannot express.
+   COST: `.fg` is now options-only. A `class="fg"` added to library.html would
+   silently get nothing -- widen the composer guard (after settling the rung
+   question), never hand-copy the recipe back into this region. The chevron
+   longhands §6.1 keeps hand-maintained already live on this surface's two
+   <select> families of their own: `.vocab-filter-toolbar select,
+   .vocab-filter-row select` and `.xp-dict-lang`. */
 
 /* §7.3 `borderless` placement (full-width sidebar tabs, accordion and
    disclosure headers): 1px accent core + the --lib-focus-ring glow. The core
@@ -1589,9 +1554,11 @@ html.motion-ready .vocab-note-save {
 .vocab-group-unit > input[type="text"]:focus-visible {
   outline: none;
 }
-/* A toolbar select is still a select: same closed-control recipe as
-   `.fg select` above, written token-first so it needs no themed twin. Only
-   the chevron, being a data URI, needs the dark variant below.
+/* A toolbar select is still a select: the same closed-control recipe that
+   COMPONENTS.md §6.1 spells `.fg select` on the options surface (this surface
+   has no `.fg` at all -- see the note just below the @generated:ui-components
+   end marker), written token-first so it needs no themed twin. Only the
+   chevron, being a data URI, needs the dark variant below.
    .vocab-filter-row joins the selector list rather than getting a copy: when
    the header rebuild moved the group select out of the toolbar wrapper it
    silently lost this whole recipe -- measured 20.5px tall with a native
