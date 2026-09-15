@@ -755,11 +755,14 @@ function pbpTrBlockIsTargetLang(text, targetCode) {
 //   3. Latin ratio >= PBP_TR_SCRIPT_THRESHOLD over >= PBP_TR_SCRIPT_MIN_LETTERS
 //      letters, on the same placeholder-stripped text as the sibling predicate.
 // Documented residual (pinned by the QVP-0 gate): a French/German quote inside
-// a zh article passes -- which is why WIRING this into _pbpTrApplySkips is
-// gated on the QVP-4 field measurement (tests/tr-skip-survey.html; veto metric
-// first: any non-English Latin hit block kills the proposal) plus a visible,
-// undoable skip note. Until that gate passes, the only consumers are the
-// survey harness and the category-regression tests.
+// a zh article passes. EN-1 was adjudicated 2026-08-20 -- the user declined to
+// run the QVP-4 field measurement, so wiring this into _pbpTrApplySkips will
+// never happen; the predicate and tests/tr-skip-survey.html stay in the repo
+// on purpose. tr-skip-survey.html needs real corpora and manual judgment, so
+// it is deliberately outside the tests/*-tests.html glob (same convention as
+// scripts/*-color-matrix.mjs). Kept only as the mirror reference for
+// pbpTrBlockIsTargetLang and the anchor for the "EN-1, QVP-0" regression
+// suite in tests/md-ai-tests.html -- do not re-propose wiring it.
 const PBP_TR_SOURCE_SCRIPTS = {
   "zh-Hans": ["han"], "zh-Hant": ["han"],
   ja: ["han", "kana"], ko: ["hangul", "han"],
