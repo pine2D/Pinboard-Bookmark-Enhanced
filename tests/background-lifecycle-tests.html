@@ -617,15 +617,21 @@ function buildUndoHarness(source, opts) {
   // the expected internal function is reached and the async channel is held.
   const EXT_ID = "feoognahlmfmbllpmgailahcnjppiegb";
   const EXT_URL = `chrome-extension://${EXT_ID}/popup.html`;
-  function buildRouterHarness() {
+  function buildRouterHarness(opts) {
     const start = source.indexOf("function handleRuntimeMessage");
     const end = source.indexOf("chrome.runtime.onMessage.addListener(handleRuntimeMessage);", start);
     if (start < 0 || end <= start) throw new Error("router source not found");
+    const o = opts || {};
     const calls = [];
     const spy = (name, ret) => (...args) => { calls.push([name, args]); return typeof ret === "function" ? ret(...args) : ret; };
     const deps = {
       chrome: {
-        runtime: { id: EXT_ID, getURL: (p) => `chrome-extension://${EXT_ID}/${p}` },
+        runtime: {
+          id: EXT_ID, getURL: (p) => `chrome-extension://${EXT_ID}/${p}`,
+          // K45: popup-context lookup after a "failed" save_intent result.
+          // Flippable per test via opts.popupContexts (default: no popup open).
+          getContexts: spy("getContexts", () => Promise.resolve(o.popupContexts || [])),
+        },
         storage: {
           local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
           session: { get: async () => ({}), set: async () => {} },
@@ -649,7 +655,13 @@ function buildUndoHarness(source, opts) {
       pbpStatusCacheSet: spy("cacheSet", true),
       pbpSameBookmark: () => false,
       pbpSaveFailure: (code) => ({ status: "failed", code }),
-      submitPopupSaveIntent: spy("saveIntent", Promise.resolve({ status: "saved" })),
+      // K45: overridable per test via opts.saveResult / opts.saveReject so the
+      // save_intent branch's post-sendResponse notify logic can be exercised
+      // for failed/queued/saved outcomes and for the internal-error catch path.
+      submitPopupSaveIntent: spy("saveIntent", () => (
+        o.saveReject ? Promise.reject(new Error("boom")) : Promise.resolve(o.saveResult || { status: "saved" })
+      )),
+      notifySaveFailure: spy("notifyFail"),
       handleBatchSave: spy("batchSave", Promise.resolve()),
       handleSaveTabSet: spy("saveTabSet", Promise.resolve()),
       loadSettings: async () => ({}),
@@ -703,6 +715,49 @@ function buildUndoHarness(source, opts) {
     const r = await h.invoke({ type: "save_intent", intent: { mode: "create" }, account: "alice" });
     check("router: save_intent reaches submitPopupSaveIntent and holds the channel",
       r.held === true && h.calls.some(([n]) => n === "saveIntent"));
+  }
+  // ---- K45: a failed popup-initiated save notifies iff no popup context is
+  // left to show it. notifySaveFailure runs after sendResponse, inside an
+  // await on getContexts — give the microtask queue a tick to drain before
+  // inspecting h.calls (same idiom used above for unhandledrejection).
+  {
+    const h = buildRouterHarness({ saveResult: { status: "failed", reason: "conflict" } });
+    const r = await h.invoke({ type: "save_intent", intent: { mode: "create" }, account: "alice" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const notifyCall = h.calls.find(([n]) => n === "notifyFail");
+    check("router: a failed save_intent with no popup context notifies once via notifySaveFailure",
+      r.responses[0]?.status === "failed" &&
+      h.calls.filter(([n]) => n === "notifyFail").length === 1 &&
+      notifyCall?.[1]?.[0] === "popup-save" && notifyCall?.[1]?.[1]?.status === "failed" && notifyCall?.[1]?.[1]?.reason === "conflict");
+  }
+  {
+    const h = buildRouterHarness({ saveResult: { status: "failed", reason: "conflict" }, popupContexts: [{ contextType: "POPUP" }] });
+    const r = await h.invoke({ type: "save_intent", intent: { mode: "create" }, account: "alice" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    check("router: a failed save_intent does not notify when a popup context still exists",
+      r.responses[0]?.status === "failed" && !h.calls.some(([n]) => n === "notifyFail"));
+  }
+  {
+    const h = buildRouterHarness({ saveResult: { status: "queued" } });
+    const r = await h.invoke({ type: "save_intent", intent: { mode: "create" }, account: "alice" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    check("router: a queued save_intent never notifies (the offline-queue row covers it)",
+      r.responses[0]?.status === "queued" && !h.calls.some(([n]) => n === "notifyFail"));
+  }
+  {
+    const h = buildRouterHarness({ saveResult: { status: "saved" } });
+    const r = await h.invoke({ type: "save_intent", intent: { mode: "create" }, account: "alice" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    check("router: a saved save_intent never notifies",
+      r.responses[0]?.status === "saved" && !h.calls.some(([n]) => n === "notifyFail"));
+  }
+  {
+    const h = buildRouterHarness({ saveReject: true });
+    const r = await h.invoke({ type: "save_intent", intent: { mode: "create" }, account: "alice" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    check("router: submitPopupSaveIntent rejecting responds with the internal failure and does not notify",
+      r.responses[0]?.status === "failed" && r.responses[0]?.code === "internal" &&
+      !h.calls.some(([n]) => n === "notifyFail"));
   }
   {
     const h = buildRouterHarness();

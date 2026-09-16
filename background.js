@@ -2717,8 +2717,24 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   }
 
   if (message.type === "save_intent") {
+    // The popup document that asked for this save is often long gone by the
+    // time submitPopupSaveIntent resolves (posts/get + rate-limit wait +
+    // posts/add routinely runs 3-7s; a click on the page or a tab switch
+    // destroys the popup mid-flight). sendResponse to a closed port is a
+    // silent no-op, so on a "failed" result we additionally check whether
+    // any popup context still exists and, if not, surface the failure the
+    // same way the background quick-save path already does (notifySaveFailure).
+    // "queued"/"skipped"/"saved" never notify here: queued is covered by the
+    // offline-queue row on next popup open, and the other two are not
+    // failures. minimum_chrome_version is 123, so getContexts (Chrome 116+)
+    // needs no feature-detection fallback.
     submitPopupSaveIntent(message.intent, message.account)
-      .then(sendResponse)
+      .then(async (result) => {
+        sendResponse(result);
+        if (result.status !== "failed") return;
+        const ctx = await chrome.runtime.getContexts({ contextTypes: ["POPUP"] }).catch(() => []);
+        if (!ctx.length) notifySaveFailure("popup-save", result);
+      })
       .catch(() => sendResponse(pbpSaveFailure("internal")));
     return true;
   }
