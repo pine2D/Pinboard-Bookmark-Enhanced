@@ -240,6 +240,79 @@ async function run() {
   check("E1 quota reject does NOT throw out of persistSettings", threw === false);
   check("E1 quota reject reported as not-ok", r2 && r2.ok === false && /quota/i.test(r2.error.message));
 
+  // (c) K119: a delta holding ONLY keys that get routed elsewhere must not
+  // still send an empty storage.set({}). Two reachable paths -- a delta of
+  // chunked keys only (editing a prompt / the glossary), and a
+  // credentials-only delta while secret routing is active.
+  {
+    const previousChromeK119 = globalThis.chrome;
+    const previousTestStorageK119 = globalThis.__pbpTestStorage;
+    const previousTestLargeK119 = globalThis.__pbpTestSyncSetLarge;
+    try {
+      let chunkedOnlySets = 0;
+      const chunkedOnlyWrites = [];
+      globalThis.__pbpTestStorage = {
+        set: () => { chunkedOnlySets++; return Promise.resolve(); },
+        get: () => Promise.resolve({}),
+      };
+      globalThis.__pbpTestSyncSetLarge = (k) => { chunkedOnlyWrites.push(k); return Promise.resolve(); };
+      globalThis.chrome = {
+        storage: {
+          local: { get: async (keys) => ({ ...(keys || {}) }), set: async () => {} },
+          onChanged: { addListener() {} },
+        },
+      };
+      const chunkedOnly = await persistSettings({ customTagPrompt: "prompt text" });
+      // Both halves, not just "set was not called": asserting the absence
+      // alone would also pass for an implementation that stopped routing the
+      // key at all, and for one that kept the unconditional set() but fed it a
+      // batch that is never empty.
+      check("E1 K119: a chunked-only delta is routed to the codec and sends no empty batch write",
+        chunkedOnly.ok === true && chunkedOnlySets === 0 &&
+        chunkedOnlyWrites.includes("customTagPrompt"));
+
+      let secretOnlySets = 0;
+      let secretLocalWrites = 0;
+      globalThis.__pbpTestStorage = {
+        set: () => { secretOnlySets++; return Promise.resolve(); },
+        get: () => Promise.resolve({}),
+      };
+      globalThis.chrome = {
+        storage: {
+          local: {
+            get: async (keys) => ({ ...(keys || {}), optSyncEnabled: true, syncApiKeys: false }),
+            set: async () => { secretLocalWrites++; },
+          },
+          onChanged: { addListener() {} },
+        },
+      };
+      const secretOnly = await persistSettings({ pinboardToken: "obf:only-secret" });
+      check("E1 K119: a credentials-only delta under active routing writes local and nothing else",
+        secretOnly.ok === true && secretLocalWrites === 1 && secretOnlySets === 0);
+
+      // The guard must not swallow a real batch: one ordinary key still writes.
+      let mixedSets = 0;
+      globalThis.__pbpTestStorage = {
+        set: (d) => { mixedSets++; batchSet = d; return Promise.resolve(); },
+        get: () => Promise.resolve({}),
+      };
+      globalThis.chrome = {
+        storage: {
+          local: { get: async (keys) => ({ ...(keys || {}) }), set: async () => {} },
+          onChanged: { addListener() {} },
+        },
+      };
+      const mixed = await persistSettings({ optTheme: "dracula", customTagPrompt: "p" });
+      check("E1 K119: a delta that still has an ordinary key writes it exactly once",
+        mixed.ok === true && mixedSets === 1 && batchSet.optTheme === "dracula" &&
+        !("customTagPrompt" in batchSet));
+    } finally {
+      globalThis.chrome = previousChromeK119;
+      globalThis.__pbpTestStorage = previousTestStorageK119;
+      globalThis.__pbpTestSyncSetLarge = previousTestLargeK119;
+    }
+  }
+
   const baselineSettings = {
     optTheme: "auto",
     customTagPrompt: "",

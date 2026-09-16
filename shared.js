@@ -2238,7 +2238,14 @@ async function persistSettings(data) {
           delete batch[k];
         }
       }
-      await storage.set(batch);
+      // K119: the loop above deletes every chunked key it routed, and active
+      // secret routing already split the credentials out to local, so `batch`
+      // can be empty by now. chrome.storage.sync counts write OPERATIONS
+      // (120/min, 1800/hour), not keys, so an empty set({}) is not free: it
+      // burns one, and once the quota is spent it is REJECTED -- turning a
+      // save whose chunked key actually landed into a reported failure with a
+      // standing error banner behind it.
+      if (Object.keys(batch).length) await storage.set(batch);
       // MV3 promise-based storage.set() rejects on failure (handled by catch below);
       // it never sets chrome.runtime.lastError (a callback-API artifact). Mirrors the
       // try/catch-only convention in options.js saveOverlayWithFallback (F4).
