@@ -1161,6 +1161,16 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     showNotification(notifyId + "-skipped", t("bgSkippedTitle"), t("bgSkippedExists"), notifyCategory);
     return result;
   }
+  notifySaveFailure(notifyId, result);
+  return result;
+}
+
+// Failure-reason -> showNotification mapping, shared by the background
+// quick-save path above (saveFromBackground) and the popup save_intent
+// router branch below (submitPopupSaveIntent has no popup document left to
+// hand the result to once it fails). Extracted verbatim from the block that
+// used to live at the end of saveFromBackground — behavior is unchanged.
+function notifySaveFailure(notifyId, result) {
   if (result.reason === "not_logged_in") {
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
   } else if (result.reason === "too_long") {
@@ -1177,7 +1187,6 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   } else {
     showNotification(notifyId + "-error", t("bgSaveFailed"), result.detail || result.reason || "Unknown error", "error");
   }
-  return result;
 }
 
 // Helper: resolve prefix-specific settings to internal keys
