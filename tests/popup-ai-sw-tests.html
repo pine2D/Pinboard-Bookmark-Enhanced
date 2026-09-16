@@ -750,20 +750,24 @@ function buildRouterHarness(source, opts) {
   await testCase("the whitelist covers EVERY non-secret aiCacheFingerprint input (probed, not enumerated)", async () => {
     const h = buildAiHarness(source, { settings: {} });
     const listed = h.PBP_AI_OVERRIDE_FIELDS;
-    const candidates = [
-      "aiProvider", "aiTagLang", "aiTagSeparator", "customTagPrompt",
-      "aiSummaryLang", "customSummaryPrompt", "openaiBaseUrl", "ollamaBaseUrl", "customBaseUrl",
-      "geminiModel", "openaiModel", "claudeModel", "ollamaModel", "customModel", "groqModel",
-    ];
+    // Candidates and providers come from the structures the product actually
+    // consumes, never from arrays typed out here: every shipped setting that is
+    // not a credential, plus every model/endpoint field the provider registry
+    // names, against every provider the dispatcher can reach. A new fingerprint
+    // input, a new provider or a new model field is covered the day it lands,
+    // whether or not anyone remembers this case exists.
+    const registryFields = [];
+    for (const cfg of Object.values(OPENAI_COMPAT_PROVIDERS)) {
+      if (cfg.modelField) registryFields.push(cfg.modelField);
+      if (cfg.baseField) registryFields.push(cfg.baseField);
+    }
+    const candidates = [...new Set(Object.keys(SETTINGS_DEFAULTS).concat(registryFields))]
+      .filter((key) => !API_KEY_FIELDS.includes(key));
+    const providers = ["gemini", "claude", "ollama", ...Object.keys(OPENAI_COMPAT_PROVIDERS)];
+    if (candidates.length < 20 || providers.length < 6) return false;  // never vacuous
     const missing = new Set();
-    for (const provider of ["gemini", "openai", "claude", "ollama", "custom", "groq"]) {
-      const base = {
-        aiProvider: provider, aiTagLang: "en", aiTagSeparator: "-", aiSummaryLang: "auto",
-        customTagPrompt: "A {{content}}", customSummaryPrompt: "A {{content}}",
-        openaiBaseUrl: "https://a.example/v1", ollamaBaseUrl: "http://a.example",
-        customBaseUrl: "https://a.example/v1", geminiModel: "a", openaiModel: "a",
-        claudeModel: "a", ollamaModel: "a", customModel: "a", groqModel: "a",
-      };
+    for (const provider of providers) {
+      const base = { ...SETTINGS_DEFAULTS, aiProvider: provider };
       for (const key of candidates) {
         const moved = ["tags", "summary"].some((type) =>
           aiCacheFingerprint({ ...base, [key]: "zzz-different" }, type) !== aiCacheFingerprint(base, type));
