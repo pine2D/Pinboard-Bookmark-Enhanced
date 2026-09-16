@@ -246,6 +246,9 @@ check(manifest.optional_host_permissions.join(",") ===
   "shared optional-host declaration changed");
 check(extensionIdFromKey(manifest.key || "") === "feoognahlmfmbllpmgailahcnjppiegb",
   "manifest.json: source build no longer has the verified development extension ID");
+check(manifest.content_security_policy?.extension_pages ===
+    "script-src 'self'; object-src 'none'; base-uri 'none'",
+  "manifest.json: extension_pages CSP changed — update this assertion AND run node scripts/zip-install-smoke.mjs");
 check(manifest.optional_permissions?.includes("identity") &&
   manifest.oauth2?.client_id ===
     "1002273768498-c6d7mdsd58dfoth1khb21uocmq8kveg5.apps.googleusercontent.com" &&
