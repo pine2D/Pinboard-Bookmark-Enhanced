@@ -1324,9 +1324,13 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
   transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 .toc-list a:hover { color: var(--fg); background: var(--border-light); }
+/* Deeper levels step DOWN in px. They used to be 0.95em / 0.9em, but an em
+   on the <a> resolves against the <li>'s inherited size (the rail's prose
+   scale, ~16px), not the link's own 13px -- so h3/h4 rows rendered LARGER
+   than the h2 rows above them (user report 2026-09-16). */
 .toc-list a[data-level="2"] { padding-left: var(--sp-2); }
-.toc-list a[data-level="3"] { padding-left: var(--sp-4); font-size: 0.95em; }
-.toc-list a[data-level="4"] { padding-left: var(--sp-5); font-size: 0.9em; }
+.toc-list a[data-level="3"] { padding-left: var(--sp-4); font-size: 12.5px; }
+.toc-list a[data-level="4"] { padding-left: var(--sp-5); font-size: 12px; }
 /* No font-weight bump on .active: 600 was outside the transition list, so
    scroll-driven active handoff made the label (and its ellipsis point) jump. */
 .toc-list a.active { color: var(--link); border-left-color: var(--link); background: var(--border-light); }
