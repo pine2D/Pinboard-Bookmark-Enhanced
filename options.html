@@ -728,7 +728,7 @@
         <label><input type="checkbox" id="opt-preview-ai-enabled" checked /> <span data-i18n="previewAiEnabled">Enable AI features on the preview page</span></label>
       </div>
 
-      <div class="fg">
+      <div class="fg fg-indent">
         <label class="bl" for="opt-preview-ai-model" data-i18n="previewAiModelLabel">Model override (optional)</label>
         <input type="text" id="opt-preview-ai-model" />
         <!-- Filled by syncPreviewModelToProvider (options.js): names the provider
@@ -736,7 +736,7 @@
         <p class="hint" id="preview-ai-model-provider"></p>
       </div>
 
-      <div class="fg">
+      <div class="fg fg-indent">
         <label class="bl" id="translate-target-lang-label" for="translate-target-lang" data-i18n="translateTargetLangLabel">Translation target language</label>
         <select id="translate-target-lang">
           <option value="auto" data-i18n="translateLangAuto">Auto (follow interface language)</option>
@@ -764,13 +764,21 @@
         <input type="text" id="translate-target-lang-custom" class="hidden" aria-labelledby="translate-target-lang-label" placeholder="Any language name, e.g. Latin, Classical Chinese" data-i18n-placeholder="translateLangCustomPlaceholder" autocomplete="off" spellcheck="false" />
       </div>
 
-      <div class="fg context-help-host" data-help-role="field">
+      <div class="fg context-help-host fg-indent" data-help-role="field">
         <label class="bl" for="opt-translate-glossary" data-i18n="translateGlossaryLabel">Translation glossary</label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
           <p class="hint context-help-body" data-i18n="translateGlossaryHint">One rule per line, in the form term=translation. Leave the right side empty to keep the term untranslated. Sent with every translation request.</p>
         </details>
         <textarea id="opt-translate-glossary" rows="5" placeholder="LLM=Large Language Model&#10;Pinboard=" data-i18n-placeholder="translateGlossaryPlaceholder"></textarea>
+      </div>
+
+      <div class="fg context-help-host fg-indent" data-help-role="choice">
+        <label><input type="checkbox" id="opt-preview-skim" /> <span data-i18n="skimEnable">Generate an AI key-points summary on the preview page</span></label>
+        <details class="context-help">
+          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+          <p class="hint context-help-body" data-i18n="skimEnableHint">Shows 3-5 key points at the top of the preview page. Each generation uses AI tokens; results are cached per article.</p>
+        </details>
       </div>
 
       <div class="fg">
@@ -780,14 +788,6 @@
           <option value="hotkey" data-i18n="selectionTriggerHotkey">Hotkeys e and d only</option>
           <option value="off" data-i18n="selectionTriggerOff">Off</option>
         </select>
-      </div>
-
-      <div class="fg context-help-host" data-help-role="choice">
-        <label><input type="checkbox" id="opt-preview-skim" /> <span data-i18n="skimEnable">Generate an AI key-points summary on the preview page</span></label>
-        <details class="context-help">
-          <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="skimEnableHint">Shows 3-5 key points at the top of the preview page. Each generation uses AI tokens; results are cached per article.</p>
-        </details>
       </div>
 
       <div class="divider"></div>
