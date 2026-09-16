@@ -1054,11 +1054,13 @@ async function doAISummary(forceRefresh, sOverride) {
     // worker already declines to file one; caching "" here would re-create
     // exactly the sticky fake success it is avoiding, for the whole TTL.
     // M3: an empty single-summary result is a miss too, not a silent success
-    // — skip the cache write (already implied) but also stop short of
-    // reporting success over nothing.
-    if (!summary) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
-    await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
+    // — skip the cache write and stop short of reporting success over
+    // nothing. The error status is a UI write, so it waits for the same
+    // stillCurrent gate as the form commit: a stale op (URL edited away
+    // mid-flight) must not paint an error onto the page now on screen.
+    if (summary) await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
+    if (!summary) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     upsertSummary(summary);
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");

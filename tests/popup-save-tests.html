@@ -1789,7 +1789,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
         pbpRelevantTagsFirst: () => [],
         pbpPopupAiAccount: () => account,
         pbpPopupAiAccountIsCurrent: (a) => a === account,
-        _aiOpStillCurrent: (a) => a === account,
+        // urlDrifted: the account stays current but the URL field is edited
+        // away while the call is in flight -- once the message has left, the
+        // stronger (account + URL) gate must fail while the account gate holds.
+        _aiOpStillCurrent: (a) => a === account && !(o.urlDrifted && calls.sent.length > 0),
         _aiUrlEquivalent: () => true,
         _aiAwaitBookmarkLookup: async () => {},
         _aiRestoreSummaryOwnership: async () => false,
@@ -1857,6 +1860,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "an empty summary did not surface an error status: " + JSON.stringify(h.calls.status));
       assert(h.calls.status[0][1] === tEn("aiNoContent"),
         "the empty-summary status did not use the localized aiNoContent text");
+    });
+
+    await testAsync("an empty summary from a stale op (URL edited away) paints nothing", async () => {
+      const h = makePopupAi({ respond: async () => ({ ok: true, tags: null, summary: null }), urlDrifted: true });
+      await h.doAISummary(false);
+      assert(h.calls.sent.length === 1, "the call must still have reached the worker");
+      assert(h.calls.cache.length === 0, "an empty summary was written to the cache");
+      assert(h.calls.summary.length === 0, "a stale empty summary was committed via upsertSummary");
+      assert(h.calls.status.length === 0 && h.calls.errors.length === 0,
+        "a stale op painted a status onto the page now on screen: " + JSON.stringify(h.calls.status));
     });
 
     await testAsync("PBP_AI_VIA_SW=false keeps the whole call inside the popup document", async () => {
