@@ -551,11 +551,15 @@ function _pbpHlLockName(url) {
 
 let _pbpHlLockWarned = false;
 
-// library-notes.js holds the SAME name around its own deletes; the two files
-// keep separate copies of this helper on purpose (isolated script contexts,
-// no shared module) -- the contract between them is the lock NAME, so
-// _pbpHlLockName and _pbpNotesRecordLockName must keep producing the same
-// string for the same storage key.
+// library-notes.js and options-backup.js hold the SAME name around their own
+// writes; these files keep separate copies of this helper on purpose
+// (isolated script contexts, no shared module) -- the contract between them
+// is the lock NAME, so _pbpHlLockName, _pbpNotesRecordLockName and
+// pbpBackupHighlightLockName must keep producing the same string for the
+// same storage key. A fourth producer exists too: background.js's
+// pbpClaimLegacyHighlightOwners() one-shot legacy-owner migration writes the
+// same "pbp-hl:" + key inline; it is scheduled to retire by 2026-12-31
+// (CLAUDE.md 临时事项) and must match until then.
 //
 // Degrades to a bare call where Web Locks are missing (direct-open test pages,
 // insecure contexts): this page's own queue still orders its own writes, which

@@ -4328,6 +4328,44 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   }
 }
 
+// K25: the pbp-hl:<key> Web Lock prefix has four writers -- three resident
+// (md-highlight.js's reader commit path, library-notes.js's delete path,
+// options-backup.js's backup restore) plus background.js's retiring
+// pbpClaimLegacyHighlightOwners() one-shot legacy-owner migration -- that
+// coordinate purely by each independently producing the SAME string
+// literal. Nothing but four hand-written comments has ever enforced that
+// the SET of files doing so stays exactly these four; this gate makes that
+// machine-checked. Comments are stripped first (full-line // and block
+// /* */, same heuristic already used by the embedded-frame check above) so
+// an explanatory mention of "pbp-hl:" inside a comment cannot masquerade as
+// a writer, and the scan only counts the literal quoted exactly as
+// "pbp-hl:" or 'pbp-hl:' (covers both the bare assignment and the
+// "pbp-hl:" + key concatenation form) in the remaining, non-comment code.
+//
+// PBP_HL_LOCK_PREFIX_WRITERS below is the line that needs editing when
+// background.js's pbpClaimLegacyHighlightOwners() migration retires
+// (CLAUDE.md 临时事项, due 2026-12-31): deleting its inline "pbp-hl:"
+// literal from background.js is meant to make this gate fail on purpose
+// (background.js drops out of the detected set while still being
+// registered here) until "background.js" is removed from this array too.
+{
+  const PBP_HL_LOCK_PREFIX_WRITERS = ["background.js", "library-notes.js", "md-highlight.js", "options-backup.js"];
+  const stripJsComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const pbpHlLiteralRe = /["']pbp-hl:["']/;
+  const detected = readdirSync(root)
+    .filter((n) => n.endsWith(".js"))
+    .filter((n) => pbpHlLiteralRe.test(stripJsComments(read(n))))
+    .sort();
+  const registered = [...PBP_HL_LOCK_PREFIX_WRITERS].sort();
+  const extra = detected.filter((n) => !registered.includes(n));
+  const missing = registered.filter((n) => !detected.includes(n));
+  check(extra.length === 0 && missing.length === 0,
+    `pbp-hl: record lock writer set drifted (registered=${JSON.stringify(registered)}, detected=${JSON.stringify(detected)})` +
+    (extra.length ? ` -- a fifth writer of the pbp-hl: record lock appeared (${extra.join(", ")})` : "") +
+    (missing.length ? ` -- a registered writer stopped using the prefix (${missing.join(", ")})` : "") +
+    ` -- update the registered set (PBP_HL_LOCK_PREFIX_WRITERS in tests/ui-contract-tests.mjs) and the contract comments in all writers.`);
+}
+
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);

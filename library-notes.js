@@ -1013,16 +1013,21 @@ function _pbpNotesLoadFailedText() {
 }
 
 // This page is not the only writer of a pbp_hl_<page> record: the reader
-// (md-highlight.js) rewrites the same key from its own tab, and chrome.storage
-// has no compare-and-swap -- get and set are two independent trips. Re-reading
-// immediately before the rewrite (below) narrows the lost-update window but
-// cannot close it: both contexts can read the same base and the later set wins.
-// Web Locks are origin-scoped, so library.html, every reader tab and the MV3
-// worker queue on one name. That name is the contract with md-highlight.js's
-// _pbpHlLockName -- "pbp-hl:" + the storage key, per record so one page's
-// delete never blocks another's. The helper is deliberately duplicated rather
-// than hoisted into shared.js: these are isolated script contexts and the
-// shared thing is the string, not the function.
+// (md-highlight.js) rewrites the same key from its own tab, options-backup.js
+// rewrites it on backup restore, and chrome.storage has no compare-and-swap --
+// get and set are two independent trips. Re-reading immediately before the
+// rewrite (below) narrows the lost-update window but cannot close it: both
+// contexts can read the same base and the later set wins. Web Locks are
+// origin-scoped, so library.html, every reader tab and the MV3 worker queue
+// on one name. That name is the contract with md-highlight.js's
+// _pbpHlLockName and options-backup.js's pbpBackupHighlightLockName --
+// "pbp-hl:" + the storage key, per record so one page's delete never blocks
+// another's. A fourth producer exists too: background.js's
+// pbpClaimLegacyHighlightOwners() one-shot legacy-owner migration writes the
+// same "pbp-hl:" + key inline; it is scheduled to retire by 2026-12-31
+// (CLAUDE.md 临时事项) and must match until then. The helper is deliberately
+// duplicated rather than hoisted into shared.js: these are isolated script
+// contexts and the shared thing is the string, not the function.
 const PBP_NOTES_RECORD_LOCK_PREFIX = "pbp-hl:";
 function _pbpNotesRecordLockName(key) { return PBP_NOTES_RECORD_LOCK_PREFIX + key; }
 

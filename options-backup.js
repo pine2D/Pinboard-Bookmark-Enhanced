@@ -213,20 +213,24 @@ function pbpBackupImportResultKey(result) {
     : "backupImportNothing";
 }
 
-// This page is the THIRD writer of a pbp_hl_<page> record: the reader
-// (md-highlight.js) rewrites it from its own tab, library.html deletes from it,
-// and chrome.storage has no compare-and-swap. Restoring a backup is a
-// read-modify-write like the other two -- it re-reads the record to keep the
-// items belonging to OTHER accounts (pbpMergeHighlightBackupRecord) -- and it
-// can also land in the middle of somebody else's: a reader tab reads X, this
-// import writes Y, the reader writes back X+A and Y is gone.
+// This page is the THIRD resident writer of a pbp_hl_<page> record: the
+// reader (md-highlight.js) rewrites it from its own tab, library.html deletes
+// from it, and chrome.storage has no compare-and-swap. Restoring a backup is
+// a read-modify-write like the other two -- it re-reads the record to keep
+// the items belonging to OTHER accounts (pbpMergeHighlightBackupRecord) --
+// and it can also land in the middle of somebody else's: a reader tab reads
+// X, this import writes Y, the reader writes back X+A and Y is gone.
 // Web Locks are origin-scoped, so every extension page and the MV3 worker queue
 // on one name. That name is the contract with md-highlight.js's _pbpHlLockName
 // and library-notes.js's _pbpNotesRecordLockName -- "pbp-hl:" + the storage key
-// -- and all three copies must keep producing the same string or the mutual
-// exclusion silently stops existing. Duplicated rather than hoisted into
-// shared.js for the same reason those two are: isolated script contexts, and
-// the shared thing is the string, not the function.
+// -- and all three resident copies must keep producing the same string or the
+// mutual exclusion silently stops existing. A fourth producer exists too:
+// background.js's pbpClaimLegacyHighlightOwners() one-shot legacy-owner
+// migration writes the same "pbp-hl:" + key inline; it is scheduled to
+// retire by 2026-12-31 (CLAUDE.md 临时事项) and must match until then.
+// Duplicated rather than hoisted into shared.js for the same reason those
+// two are: isolated script contexts, and the shared thing is the string,
+// not the function.
 const PBP_BACKUP_HL_RECORD_LOCK_PREFIX = "pbp-hl:";
 function pbpBackupHighlightLockName(key) { return PBP_BACKUP_HL_RECORD_LOCK_PREFIX + key; }
 
