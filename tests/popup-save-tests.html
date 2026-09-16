@@ -108,12 +108,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
 (async () => {
   try {
-    const [source, backgroundSource, popupAiSource, popupHtml, popupCss] = await Promise.all([
+    const [source, backgroundSource, popupAiSource, popupHtml, popupCss, enMessages] = await Promise.all([
       fetch("../popup.js").then((response) => response.text()),
       fetch("../background.js").then((response) => response.text()),
       fetch("../popup-ai.js").then((response) => response.text()),
       fetch("../popup.html").then((response) => response.text()),
-      fetch("../popup.css").then((response) => response.text())
+      fetch("../popup.css").then((response) => response.text()),
+      // The shipped English catalogue, so "localized" is judged against the real
+      // file rather than a string typed into this suite.
+      fetch("../_locales/en/messages.json").then((response) => response.json())
     ]);
     const start = source.indexOf("function setupSubmit(token)");
     const handlerEnd = source.indexOf('  document.addEventListener("keydown"', start);
@@ -1680,13 +1683,46 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const k44SliceB = popupAiSource.slice(
       popupAiSource.indexOf("async function doAITags"),
       popupAiSource.indexOf("// Tags added via AI chips"));
+    // The error card itself, for the cases that judge RENDERED text rather than
+    // the Error object handed to it.
+    const k44SliceC = popupAiSource.slice(
+      popupAiSource.indexOf("function showAIError(op, err, opSettings)"),
+      popupAiSource.indexOf("let _aiErrorHideTimer = null;"));
+    assert(k44SliceC.includes("ai-error-message"), "showAIError source not found");
+    // The real table, sliced out rather than retyped: a renamed label must not
+    // be able to pass here and fail in the product.
+    const AI_PROVIDER_LABEL = new Function(popupAiSource.slice(
+      popupAiSource.indexOf("const AI_PROVIDER_LABEL = {"),
+      popupAiSource.indexOf("// Find first provider OTHER than")) +
+      "; return AI_PROVIDER_LABEL;")();
+    assert(AI_PROVIDER_LABEL.openai === "OpenAI", "provider label table not found");
+    const tEn = (key, sub) => {
+      const raw = enMessages[key] ? enMessages[key].message : key;
+      return sub === undefined ? raw : raw.replace(/\$[A-Za-z0-9_]+\$|\{0\}|%s/, sub);
+    };
+    function fakeEl() {
+      const el = {
+        textContent: "", dataset: {}, nextSibling: null,
+        classList: {
+          tokens: new Set(),
+          add(c) { this.tokens.add(c); },
+          remove(c) { this.tokens.delete(c); },
+          contains(c) { return this.tokens.has(c); },
+          toggle(c, on) { if (on) this.tokens.add(c); else this.tokens.delete(c); },
+        },
+        querySelector: () => null,
+        querySelectorAll: () => [],
+      };
+      el.parentElement = { querySelector: () => null, insertBefore: () => {} };
+      return el;
+    }
     assert(k44SliceA.includes("async function fetchAIArtifacts") && k44SliceA.includes("async function doAISummary"),
       "popup AI routing slice A not found");
     assert(k44SliceB.includes("async function doAITags"), "popup AI routing slice B not found");
 
     function makePopupAi(opts) {
       const o = opts || {};
-      const calls = { sent: [], callAI: [], cache: [], rendered: [], summary: [], status: [], errors: [], order: [] };
+      const calls = { sent: [], callAI: [], cache: [], rendered: [], summary: [], status: [], errors: [], order: [], progressCleared: [] };
       const inflight = new Map();
       // Fill EVERY whitelisted field, so "the snapshot's overrides travel" is a
       // rule about the shared list (which the worker suite pins to every
@@ -1700,12 +1736,23 @@ test("posts/add default remains replace=yes for existing callers", () => {
         if (!(field in snapshot)) snapshot[field] = "fp-" + field;
       }
       const account = o.account || "alice";
-      const container = { classList: { add() {}, remove() {}, toggle() {} }, querySelectorAll: () => [] };
+      const container = fakeEl();
+      const card = fakeEl();
+      card.classList.add("hidden");
       const fields = {
         "title-input": { value: "Title" },
         "description-input": { value: "Notes" },
         "url-input": { value: URL },
         "ai-suggest-tags": container,
+        "ai-summary-btn": fakeEl(),
+        "ai-tags-btn": fakeEl(),
+        "ai-error-card": card,
+        "ai-error-title": fakeEl(),
+        "ai-error-message": fakeEl(),
+        "ai-error-details": fakeEl(),
+        "ai-error-details-toggle": fakeEl(),
+        "ai-error-fallback": fakeEl(),
+        "ai-error-retry": fakeEl(),
       };
       const respond = o.respond || (async () => ({ ok: true, tags: null, summary: "worker summary" }));
       const deps = {
@@ -1748,13 +1795,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _aiRestoreSummaryOwnership: async () => false,
         _aiRequiredOriginPatterns: () => ["https://api.openai.com/*"],
         hasAIKey: () => true,
-        hideAIError: () => {},
+        hideAIError: () => { card.classList.add("hidden"); },
         showStatus: (...a) => calls.status.push(a),
         showAIError: (kind, e) => calls.errors.push({ kind, e }),
-        t: (key) => key,
+        t: tEn,
+        AI_PROVIDER_LABEL, pbpAiModelNotFoundText: () => ({ msg: "", hint: "" }),
+        pickFallbackProvider: () => null,
+        _aiErrorLastOp: null, _aiErrorLastPermission: null, _aiErrorHideTimer: null,
         pbpAiFastCached: async () => null,
         setAiProgress: () => {},
-        clearAiProgress: () => {},
+        clearAiProgress: (id) => calls.progressCleared.push(id),
         ensurePageText: async () => o.source || "local",
         upsertSummary: (text) => calls.summary.push(text),
         showSummaryActions: () => {},
@@ -1763,11 +1813,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _aiParkTagsBtn: () => {},
         pbpAssignAltNumBadges: () => {},
       };
+      // With the real card appended, its declaration shadows the showAIError
+      // parameter above - the cases that want rendered text opt in, the rest
+      // keep the recording stub.
+      const body = k44SliceA + "\n" + k44SliceB + (o.realErrorCard ? "\n" + k44SliceC : "");
       const api = new Function(...Object.keys(deps),
-        k44SliceA + "\n" + k44SliceB +
-        "\n; return { fetchAIArtifacts, doAISummary, doAITags };"
+        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags };"
       )(...Object.values(deps));
-      return { ...api, calls, snapshot, account };
+      return { ...api, calls, snapshot, account, el: fields };
     }
 
     await testAsync("the popup hands the worker a finished prompt, its cache coordinates and no credential", async () => {
@@ -1955,6 +2008,87 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(h.calls.sent.length === 0, "the rollback switch still sent a message");
       assert(h.calls.callAI.join("|") === "COMBINED-PROMPT", "the in-document combined path did not run");
       assert(out.join(",") === "in-document", "the in-document parse did not run: " + JSON.stringify(out));
+    });
+
+    // The worker's wire vocabulary is not product copy: "AI call failed",
+    // "malformed AI call" and "account changed" are log strings. What the card
+    // renders has to come from the shipped catalogue, and a disowned op must
+    // not render at all. (The `invalid` case below also proves the card in this
+    // harness really does open, so the "stayed hidden" assertions are not
+    // passing on a card that could never have shown.)
+    await testAsync("a bus answer with no envelope renders the localized unknown error", async () => {
+      const h = makePopupAi({ realErrorCard: true, respond: async () => undefined });
+      await h.doAISummary(false);
+      const shown = h.el["ai-error-message"].textContent;
+      assert(!h.el["ai-error-card"].classList.contains("hidden"), "the error card was not shown");
+      assert(shown === `[OpenAI] ${enMessages.aiUnknownError.message}`,
+        "the card did not render the shipped aiUnknownError string, got: " + shown);
+      assert(!/AI call failed/i.test(shown), "an untranslated literal reached the card: " + shown);
+    });
+
+    await testAsync("a worker diagnostic code renders as the generic failure, not its log string", async () => {
+      const h = makePopupAi({
+        realErrorCard: true,
+        respond: async () => ({ ok: false, error: { message: "malformed AI call", code: "invalid" } }),
+      });
+      await h.doAISummary(false);
+      const shown = h.el["ai-error-message"].textContent;
+      assert(!h.el["ai-error-card"].classList.contains("hidden"), "an invalid call must still report");
+      assert(shown === `[OpenAI] ${enMessages.aiUnknownError.message}`,
+        "the worker's log string reached the user, got: " + shown);
+      // A provider-classified failure must keep ITS message: the mapping is for
+      // the worker's own two codes, not a blanket flattening.
+      const real = makePopupAi({
+        realErrorCard: true,
+        respond: async () => ({ ok: false, error: { message: "OpenAI: rate limited", status: 429 } }),
+      });
+      await real.doAISummary(false);
+      assert(real.el["ai-error-message"].textContent === "[OpenAI] OpenAI: rate limited",
+        "a real provider error was flattened: " + real.el["ai-error-message"].textContent);
+    });
+
+    await testAsync("an account change during the call drops the summary op silently", async () => {
+      const h = makePopupAi({
+        realErrorCard: true,
+        respond: async () => ({ ok: false, error: { message: "account changed", code: "account_changed" } }),
+      });
+      await h.doAISummary(false);
+      assert(h.el["ai-error-card"].classList.contains("hidden"), "a disowned op raised the error card");
+      assert(h.calls.cache.length === 0, "a disowned op wrote the cache");
+      assert(h.calls.progressCleared.join(",") === "ai-summary-btn",
+        "the progress label was left spinning: " + h.calls.progressCleared.join(","));
+      assert(!h.el["ai-summary-btn"].classList.contains("loading"), "the button was left loading");
+      assert(h.calls.summary.length === 0, "a disowned op still wrote the notes field");
+    });
+
+    await testAsync("an account change during the call drops the tags op silently", async () => {
+      const h = makePopupAi({
+        realErrorCard: true,
+        respond: async () => ({ ok: false, error: { message: "account changed", code: "account_changed" } }),
+      });
+      await h.doAITags(false);
+      assert(h.el["ai-error-card"].classList.contains("hidden"), "a disowned op raised the error card");
+      assert(h.calls.rendered.length === 0, "a disowned op still re-rendered the chip area");
+      assert(h.calls.cache.length === 0, "a disowned op wrote the cache");
+      assert(h.calls.progressCleared.join(",") === "ai-tags-btn",
+        "the progress label was left spinning: " + h.calls.progressCleared.join(","));
+      assert(!h.el["ai-tags-btn"].classList.contains("loading"), "the button was left loading");
+    });
+
+    await testAsync("an account change on the combined call is not retried as a single", async () => {
+      // The combined catch normally falls through to a dedicated single call.
+      // Being disowned is not a parse failure: re-dispatching would ask the
+      // worker a question it has already refused, on behalf of an account that
+      // is no longer signed in here.
+      const h = makePopupAi({
+        realErrorCard: true, settings: noTemplates,
+        respond: async () => ({ ok: false, error: { message: "account changed", code: "account_changed" } }),
+      });
+      await h.doAITags(false);
+      assert(h.calls.sent.length === 1,
+        "a disowned combined call was retried, messages sent: " + h.calls.sent.length);
+      assert(h.el["ai-error-card"].classList.contains("hidden"), "a disowned op raised the error card");
+      assert(h.calls.cache.length === 0, "a disowned op wrote the cache");
     });
 
     test("setup restore and cache click share adoption before any append", () => {

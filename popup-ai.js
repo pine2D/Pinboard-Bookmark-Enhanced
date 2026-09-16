@@ -792,16 +792,38 @@ function finalizeAITags(rawTags, s) {
   return (s || settings).optRespectTagCase ? rawTags.map(t => resolveTagCase(t, tagCaseMap)) : rawTags;
 }
 
+// The two codes the worker mints itself (everything else comes from
+// handleAIError, whose message is the provider's own words). Their messages are
+// log strings — "malformed AI call", "account changed" — written for a console,
+// untranslated, and naming nothing the user can act on. The code survives for
+// the callers that branch on it; the text the card shows does not.
+const PBP_AI_WORKER_CODES = ["invalid", "account_changed"];
+
 // Rebuild an Error from the worker's wire envelope: structured clone drops the
 // Error prototype and every non-enumerable field, so the failure arrives as a
 // plain object. showAIError() consumes message / code / status / paramHint, and
 // its callers still add permissionStage / permissionOrigins in their catch.
 function pbpAiErrorFromEnvelope(envelope) {
-  const err = new Error((envelope && envelope.message) || "AI call failed");
-  if (envelope && typeof envelope.code === "string" && envelope.code) err.code = envelope.code;
+  const code = (envelope && typeof envelope.code === "string" && envelope.code) ? envelope.code : "";
+  const wireMessage = (envelope && envelope.message) || "";
+  // No envelope at all is the same class of thing: the bus answered nothing
+  // (no receiver), which is not a sentence to put in front of anyone either.
+  const showable = (wireMessage && !PBP_AI_WORKER_CODES.includes(code)) ? wireMessage : t("aiUnknownError");
+  const err = new Error(showable);
+  if (code) err.code = code;
   if (envelope && typeof envelope.status === "number") err.status = envelope.status;
   if (envelope && typeof envelope.paramHint === "string" && envelope.paramHint) err.paramHint = envelope.paramHint;
   return err;
+}
+
+// The worker re-reads the live credentials atomically right before dispatch, so
+// it can know this op has been disowned while THIS document still thinks it is
+// current: popup.js has no storage.onChanged, so a switch made on another
+// surface never reaches _aiOpStillCurrent(). Treat it the way every other stale
+// commit here is treated — drop it. Nothing was cached, nothing is rendered,
+// and the finally blocks still clear the progress label.
+function pbpAiOpDisowned(err) {
+  return err?.code === "account_changed";
 }
 
 // Hand ONE assembled prompt plus this op's cache coordinates to the service
@@ -946,6 +968,10 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
       return pbpAiCallViaSW({ s, mode: "combined", kind, prompt, url, source, account, inflightKey: combinedKey });
     });
   } catch (e) {
+    // Being disowned is not a parse failure: the single fallback would ask the
+    // worker a question it has already refused, for an account no longer signed
+    // in here. Let it reach the op's catch, which drops it silently.
+    if (pbpAiOpDisowned(e)) throw e;
     both = null;
   }
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
@@ -1023,6 +1049,7 @@ async function doAISummary(forceRefresh, sOverride) {
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
   } catch (e) {
     if (!_aiOpStillCurrent(account)) return;
+    if (pbpAiOpDisowned(e)) return;
     if (e?.code === "host_permission" && !e.permissionOrigins) {
       e.permissionStage = "calling";
       e.permissionOrigins = _aiRequiredOriginPatterns(s);
@@ -1173,6 +1200,7 @@ async function doAITags(forceRefresh, sOverride) {
     }
   } catch (e) {
     if (!_aiOpStillCurrent(account)) return;
+    if (pbpAiOpDisowned(e)) return;
     if (e?.code === "host_permission" && !e.permissionOrigins) {
       e.permissionStage = "calling";
       e.permissionOrigins = _aiRequiredOriginPatterns(s);
