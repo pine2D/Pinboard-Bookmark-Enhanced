@@ -39,18 +39,33 @@ function pbpApplyOptionsEarlyTheme(mode, presetKey, follow) {
   _optionsLastTheme.mode = mode || "auto";
   _optionsLastTheme.presetKey = presetKey || "";
   _optionsLastTheme.follow = follow !== false;
-  delete _optionsRoot.dataset.theme;
   const prefersDark = mode === "dark" ||
     (mode === "auto" && typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
 
+  let target = "";
   if (Object.prototype.hasOwnProperty.call(PBP_OPTIONS_ADAPTIVE_MAP, key)) {
     const [light, dark] = PBP_OPTIONS_ADAPTIVE_MAP[key];
-    _optionsRoot.dataset.theme = prefersDark ? dark : light;
+    target = prefersDark ? dark : light;
   } else if (key) {
-    _optionsRoot.dataset.theme = key;
+    target = key;
   } else if (prefersDark) {
-    _optionsRoot.dataset.theme = "flexoki-dark";
+    target = "flexoki-dark";
+  }
+
+  // Compute the target first and write ONLY on a real difference: the old
+  // delete-then-reset invalidated every :root[data-theme=...] rule and
+  // forced a full-document style recalc even when the mirror was already
+  // correct (the common case), right in the cold-first-paint window this
+  // function runs in three times (mirror apply, authoritative re-read,
+  // onChanged). Same fix as popup-theme-early.js:76-103, minus the bare
+  // map lookup -- PBP_OPTIONS_ADAPTIVE_MAP[key] would let "__proto__" /
+  // "constructor" resolve through the prototype chain instead of falling
+  // through to the literal-key branch.
+  if (target) {
+    if (_optionsRoot.dataset.theme !== target) _optionsRoot.dataset.theme = target;
+  } else if ("theme" in _optionsRoot.dataset) {
+    delete _optionsRoot.dataset.theme;
   }
 }
 if (typeof window.matchMedia === "function") {

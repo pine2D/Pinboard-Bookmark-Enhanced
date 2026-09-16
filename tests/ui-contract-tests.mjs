@@ -183,6 +183,7 @@ const mdDictJs = read("md-dict.js");
 const vocabStore = read("vocab-store.js");
 const mdDict = read("md-dict.js");
 const optionsThemeEarlyJs = read("options-theme-early.js");
+const popupThemeEarlyJs = read("popup-theme-early.js");
 const mdPreviewThemeEarlyJs = read("md-preview-theme-early.js");
 const popupTagsJs = read("popup-tags.js");
 
@@ -2622,7 +2623,22 @@ check(/@media[^{]*\(max-height:[^)]*\)\s*\{[\s\S]*?\.options-nav\s*\{[^}]*positi
 }
 
 function runOptionsEarly({ mode = "auto", preset = "", dark = false, chrome } = {}) {
-  const root = { dataset: { theme: "stale" } };
+  // dataset is a Proxy that counts real mutations (K33): the write-only-on-
+  // change guard is the actual product of the options-theme-early.js fix,
+  // so tests need to see how many times dataset.theme was actually touched,
+  // not just its end state (a naive "delete then re-set" and the fixed
+  // "write only on diff" produce the same end state for every input).
+  const datasetStore = { theme: "stale" };
+  let datasetWrites = 0;
+  const dataset = new Proxy(datasetStore, {
+    set(target, prop, value) { datasetWrites++; target[prop] = value; return true; },
+    deleteProperty(target, prop) {
+      if (prop in target) datasetWrites++;
+      delete target[prop];
+      return true;
+    },
+  });
+  const root = { dataset };
   const values = new Map([["pp-theme", mode], ["pp-theme-preset", preset]]);
   const timers = [];
   const context = {
@@ -2636,7 +2652,11 @@ function runOptionsEarly({ mode = "auto", preset = "", dark = false, chrome } = 
   };
   if (chrome) context.chrome = chrome;
   runInNewContext(optionsThemeEarlyJs, context);
-  return { root, values, timers };
+  return {
+    root, values, timers, context,
+    datasetWrites: () => datasetWrites,
+    resetDatasetWrites: () => { datasetWrites = 0; },
+  };
 }
 
 for (const [preset, expected] of [["flexoki", "flexoki-dark"], ["solarized", "solarized-dark"], ["catppuccin", "catppuccin-mocha"]]) {
@@ -2664,6 +2684,85 @@ const corrected = runOptionsEarly({ mode: "dark", preset: "dracula", chrome: { s
 await new Promise(resolve => setImmediate(resolve));
 check(corrected.values.get("pp-theme") === "light" && corrected.values.get("pp-theme-preset") === "" &&
   !("theme" in corrected.root.dataset), "options-theme-early.js: authoritative storage did not correct mirror and theme");
+
+// pbpApplyOptionsEarlyTheme is called up to three times per cold Options/
+// Library boot (mirror apply, authoritative re-read, onChanged) -- the K33
+// fix's whole point is that a repeat call with the SAME resolved target
+// must not touch dataset.theme again (popup-theme-early.js:76-103 shape).
+{
+  // (a) same target as what's already on dataset.theme -> zero writes.
+  const same = runOptionsEarly({ mode: "auto", preset: "flexoki", dark: true });
+  check(same.root.dataset.theme === "flexoki-dark", "options-theme-early.js: precondition for the repeat-call test failed");
+  same.resetDatasetWrites();
+  same.context.pbpApplyOptionsEarlyTheme("auto", "flexoki", true);
+  check(same.datasetWrites() === 0,
+    "options-theme-early.js: re-applying an unchanged theme still wrote to dataset.theme (delete-then-reset regressed)");
+
+  // (b) target stays empty and dataset.theme is already absent -> no delete.
+  const noTheme = runOptionsEarly({ mode: "light", preset: "", dark: false });
+  check(!("theme" in noTheme.root.dataset), "options-theme-early.js: precondition for the no-theme repeat test failed");
+  noTheme.resetDatasetWrites();
+  noTheme.context.pbpApplyOptionsEarlyTheme("light", "", true);
+  check(noTheme.datasetWrites() === 0,
+    "options-theme-early.js: re-applying an unchanged no-theme state deleted a dataset.theme that was not there");
+
+  // (c) a real change still writes -- exactly once, not zero.
+  const changed = runOptionsEarly({ mode: "auto", preset: "flexoki", dark: true });
+  changed.resetDatasetWrites();
+  changed.context.pbpApplyOptionsEarlyTheme("auto", "solarized", true);
+  check(changed.datasetWrites() === 1,
+    "options-theme-early.js: switching preset did not write dataset.theme exactly once");
+}
+
+// K33: three runtime copies of the (mode, presetKey) -> [light, dark] preset
+// map (shared.js's ADAPTIVE_THEME_MAP is authoritative; popup-theme-early.js
+// and options-theme-early.js each hand-copy it). This asserts value-SET
+// equality between the three copies by parsing each file's own source text
+// -- it does NOT import ADAPTIVE_THEME_MAP from shared.js and treat it as
+// the expectation, which would just be diffing two copies against a third
+// copy instead of an independent source of truth. scripts/ui-render-audit.mjs
+// carries a fourth, deliberately hand-copied oracle (its own comment says
+// "not imported") that CLAUDE.md's theme-factory rule says must stay
+// independent of the implementation -- it is intentionally excluded here.
+// pinboard-style.js's PBP_ADAPTIVE_THEME_MAP and md-preview-theme-early.js
+// are excluded too: they resolve a different (adaptive -> CSS variant /
+// colorScheme) shape, not this (mode, presetKey, follow, prefersDark) ->
+// data-theme lookup.
+{
+  function extractAdaptiveMapLiteral(source, varName) {
+    const marker = `const ${varName} = {`;
+    const start = source.indexOf(marker);
+    if (start === -1) return null;
+    const end = source.indexOf("\n};", start);
+    if (end === -1) return null;
+    try {
+      return runInNewContext("(" + source.slice(start + `const ${varName} = `.length, end + 2) + ")", {});
+    } catch (_) {
+      return null;
+    }
+  }
+  const adaptiveMapCopies = {
+    "shared.js": extractAdaptiveMapLiteral(sharedJs, "ADAPTIVE_THEME_MAP"),
+    "popup-theme-early.js": extractAdaptiveMapLiteral(popupThemeEarlyJs, "PBP_POPUP_ADAPTIVE_MAP"),
+    "options-theme-early.js": extractAdaptiveMapLiteral(optionsThemeEarlyJs, "PBP_OPTIONS_ADAPTIVE_MAP"),
+  };
+  const tupleSet = (map) => map && typeof map === "object"
+    ? new Set(Object.keys(map).sort().map((k) => JSON.stringify([k, ...map[k]])))
+    : null;
+  const [refFile, ...otherFiles] = Object.keys(adaptiveMapCopies);
+  const refSet = tupleSet(adaptiveMapCopies[refFile]);
+  check(refSet !== null, `${refFile}: ADAPTIVE_THEME_MAP literal not found/parseable for the K33 value-set comparison`);
+  for (const file of otherFiles) {
+    const set = tupleSet(adaptiveMapCopies[file]);
+    check(set !== null, `${file}: adaptive theme map literal not found/parseable for the K33 value-set comparison`);
+    if (refSet && set) {
+      const missing = [...refSet].filter((t) => !set.has(t));
+      const extra = [...set].filter((t) => !refSet.has(t));
+      check(missing.length === 0 && extra.length === 0,
+        `K33: adaptive theme map value-set mismatch between ${refFile} and ${file} -- missing ${JSON.stringify(missing)}, extra ${JSON.stringify(extra)}`);
+    }
+  }
+}
 
 // ============ md-preview-theme-early.js: runReaderEarly (K27) ============
 // Twin of runOptionsEarly above, over the reader's own anti-FOUC bootstrap.
