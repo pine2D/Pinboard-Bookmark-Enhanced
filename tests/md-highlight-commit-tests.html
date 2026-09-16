@@ -1021,9 +1021,68 @@ function selectionRange(n, start, end) {
     storedIds().filter((id) => !beforeCaps.includes(id)).length === 1 && CARD_OPENS.length === 1,
     storedIds().join(",") + " / " + JSON.stringify(CARD_OPENS));
 
+  // A creation that produced nothing must not reach the card hook. The write
+  // path fails for real reasons (quota, an unreadable record, the account
+  // gate) and answers []; opening a card for created[created.length - 1] of
+  // an empty list would read `undefined.id` and throw inside a detached async
+  // IIFE -- an unhandled rejection nobody sees, with the reader left holding
+  // a card it can never bind. FAIL_READS is how the suite already makes the
+  // commit refuse (see "a failed re-read reports no created items" above).
+  await boot(baseRecord());
+  CARD_OPENS = [];
+  const beforeFailed = storedIds();
+  const REJECTIONS = [];
+  const onRejection = (ev) => { REJECTIONS.push(String(ev.reason)); };
+  window.addEventListener("unhandledrejection", onRejection);
+  selectInFixture(1, 0, 5);
+  FAIL_READS = true;
+  pressKey("n");
+  await settle();
+  FAIL_READS = false;
+  window.removeEventListener("unhandledrejection", onRejection);
+  check("(setup) a refused write really did create nothing",
+    sameSet(storedIds(), beforeFailed), storedIds().join(","));
+  check("n opens no card when the write created nothing",
+    CARD_OPENS.length === 0, JSON.stringify(CARD_OPENS));
+  check("a refused n throws nothing into the void (no unhandled rejection)",
+    REJECTIONS.length === 0, JSON.stringify(REJECTIONS));
+  check("a refused n still drops the selection, like h does",
+    window.getSelection().isCollapsed || window.getSelection().rangeCount === 0);
+
+  // A selection spanning two indexed blocks creates one item per block, and
+  // the card must open on the LAST of them -- the end of the selection, where
+  // the reader stopped dragging -- not the first. created[0] would be the
+  // other end, so the two ids have to be told apart by the block they landed
+  // in rather than by position in a list this suite cannot see.
+  await boot(baseRecord());
+  setQuiet("pbp_hl_last_color", LAST_COLOR);
+  CARD_OPENS = [];
+  const beforeSpan = storedIds();
+  {
+    const spanning = document.createRange();
+    spanning.setStart(pbpAiBlockEl(1).firstChild, 0);
+    spanning.setEnd(pbpAiBlockEl(2).firstChild, 4);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(spanning);
+  }
+  pressKey("n");
+  await settle();
+  const spanIds = storedIds().filter((id) => !beforeSpan.includes(id));
+  const byBlock = {};
+  spanIds.forEach((id) => { byBlock[(storedItem(id) || {}).n] = id; });
+  check("a two-block selection creates one highlight per block",
+    spanIds.length === 2 && !!byBlock[1] && !!byBlock[2] && byBlock[1] !== byBlock[2],
+    JSON.stringify(spanIds) + " -> " + JSON.stringify(byBlock));
+  check("n opens the card for the LAST created highlight, not the first",
+    CARD_OPENS.length === 1 && CARD_OPENS[0] === byBlock[2],
+    "opened " + CARD_OPENS[0] + "; block 1 = " + byBlock[1] + ", block 2 = " + byBlock[2]);
+
   // Category, not one instance: EVERY key that already existed keeps creating
-  // without a card. A future writer who routes them all through one shared
-  // tail has to keep that split, or this fails for the key they forgot.
+  // without a card, in ITS OWN colour -- 1-5 name a colour outright, h/H reuse
+  // the last one. A future writer who routes them all through one shared tail
+  // has to keep both halves of that split, or this fails for the key they
+  // forgot.
   for (const key of ["h", "H", "1", "2", "3", "4", "5"]) {
     await boot(baseRecord());
     setQuiet("pbp_hl_last_color", LAST_COLOR);
@@ -1032,9 +1091,13 @@ function selectionRange(n, start, end) {
     selectInFixture(2, 0, 4);
     pressKey(key);
     await settle();
-    check(key + " still creates a highlight",
-      storedIds().filter((id) => !before.includes(id)).length === 1, storedIds().join(","));
+    const made = storedIds().filter((id) => !before.includes(id));
+    check(key + " still creates a highlight", made.length === 1, storedIds().join(","));
     check(key + " never opens the card", CARD_OPENS.length === 0, JSON.stringify(CARD_OPENS));
+    const wantColor = /^[1-5]$/.test(key) ? Number(key) : LAST_COLOR;
+    check(key + " creates in colour " + wantColor,
+      made.length === 1 && (storedItem(made[0]) || {}).color === wantColor,
+      JSON.stringify(storedItem(made[0])));
   }
 
   // Nothing selected / a caret rather than a selection: n has nothing to
