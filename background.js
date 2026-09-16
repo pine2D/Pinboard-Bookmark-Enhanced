@@ -983,6 +983,13 @@ function submitPopupSaveIntent(intent, expectedAccount) {
 async function saveFromBackground({ url, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
   const startAuth = await getCurrentPinboardAuth();
   if (!startAuth.token) {
+    // This is the earliest possible notification in the SW's lifecycle — it
+    // fires before any network round-trip, so on a cold SW the manual-language
+    // refresh kicked off by initI18n() at module top may not have landed yet.
+    // Every other showNotification()/t() call in this file runs after at
+    // least one await on Pinboard's API, by which point the refresh has long
+    // since finished, so only this branch needs to wait for it.
+    await pbpI18nReady();
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
     return pbpSaveFailure("not_logged_in");
   }

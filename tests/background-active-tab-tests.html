@@ -128,7 +128,7 @@ function buildLegacyPermissionMigrationHarness(source, chrome) {
     "; return { key: PBP_LEGACY_WILDCARD_CLEANUP_KEY, run: pbpMigrateLegacyWildcardPermission };")(chrome);
 }
 
-function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch = {}, hasKey = true) {
+function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch = {}, hasKey = true, overrides = {}) {
   const start = source.indexOf("async function saveFromBackground");
   const end = source.indexOf("// Helper: resolve prefix-specific settings", start);
   assert(start >= 0 && end > start, "background save function not found");
@@ -141,6 +141,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     customTagPrompt: "", customSummaryPrompt: "", ...settingsPatch,
   };
   const extractionCalls = [];
+  const i18nReadyCalls = { count: 0 };
   const dependencies = {
     getCurrentPinboardAuth: async () => ({ token: "alice:token", account: "alice", epoch: 1 }),
     loadSettings: async () => settings,
@@ -164,6 +165,11 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     submitSaveIntent: async (intent) => { intents.push(intent); return { status: "saved", mutation: "updated" }; },
     processOfflineQueue: () => Promise.resolve(),
     t: (key, value) => `${key}:${value || ""}`,
+    // K100: pbpI18nReady must be a dep of every harness that slices
+    // saveFromBackground, or the sliced function throws ReferenceError. Default
+    // is an already-resolved promise so the 57 existing cases below stay unchanged.
+    pbpI18nReady: () => { i18nReadyCalls.count++; return Promise.resolve(); },
+    ...overrides,
   };
   const names = Object.keys(dependencies);
   const make = new Function(...names, source.slice(start, end) + "; return saveFromBackground;");
@@ -172,6 +178,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     notifications,
     intents,
     extractionCalls,
+    i18nReadyCalls,
   };
 }
 
@@ -329,6 +336,43 @@ async function run() {
     });
     assert(h.extractionCalls.length === 1 && h.extractionCalls[0][1]?.expectedUrl === url && !h.extractionCalls[0][1]?.withDefuddle,
       "keyless AI save injected the full extractor");
+  });
+
+  await test("background save awaits pbpI18nReady before the not-logged-in notification", async () => {
+    let resolveReady;
+    const ready = new Promise((resolve) => { resolveReady = resolve; });
+    let readyLanded = false;
+    ready.then(() => { readyLanded = true; });
+    const h = buildBackgroundSaveHarness(source, async () => "unused", {}, {}, true, {
+      getCurrentPinboardAuth: async () => ({ token: "", account: null, epoch: 1 }),
+      pbpI18nReady: () => ready,
+      t: (key) => (readyLanded ? "NEW:" + key : "OLD:" + key),
+    });
+    const pending = h.save({
+      url, title: "Article", tab: { id: 7 }, settingsOverrides: {},
+      toread: false, notifyId: "qs", notifyTitle: "Saved", notifyCategory: "quickSave",
+    });
+    // Flush a microtask turn while pbpI18nReady is still pending: no notification
+    // should have fired yet, proving saveFromBackground is blocked on the await
+    // rather than racing ahead with stale (browser-locale) strings.
+    await Promise.resolve();
+    await Promise.resolve();
+    assert(h.notifications.length === 0, "notification fired before pbpI18nReady resolved");
+    resolveReady();
+    const result = await pending;
+    assert(result.status === "failed" && result.reason === "not_logged_in", "not-logged-in save did not fail as expected");
+    assert(h.notifications.length === 1, "expected exactly one notification");
+    assert(h.notifications[0][1] === "NEW:bgNotLoggedIn" && h.notifications[0][2] === "NEW:bgSetToken",
+      "not-logged-in notification used stale text instead of waiting for pbpI18nReady");
+  });
+
+  await test("background save does not pay for pbpI18nReady on the happy path", async () => {
+    const h = buildBackgroundSaveHarness(source, async () => "unused", {}, { _aiTags: false, _aiSummary: false });
+    await h.save({
+      url, title: "Article", tab: { id: 7 }, settingsOverrides: {},
+      toread: false, notifyId: "qs", notifyTitle: "Saved", notifyCategory: "quickSave",
+    });
+    assert(h.i18nReadyCalls.count === 0, "logged-in save should not await pbpI18nReady");
   });
 
   await test("Quick Save and Read Later AI settings both request Defuddle extraction", async () => {

@@ -10,6 +10,11 @@ let _i18nMessages = null;
 let _i18nMessagesLang = null;
 let _i18nReady = false;
 let _i18nRefreshGeneration = 0;
+// Promise for the most recently kicked-off _refreshI18nAsync() call, exposed
+// via pbpI18nReady() below. Every caller of initI18n() is a bare, unawaited
+// call (see doc comment), so this is the only handle any code has on "has the
+// manual-language refresh landed yet."
+let _i18nReadyPromise = null;
 
 /**
  * Synchronously populate _i18nMessages from localStorage mirror (if user
@@ -18,13 +23,16 @@ let _i18nRefreshGeneration = 0;
  * an async refresh that updates the mirror and re-applies translations if
  * data changed.
  *
- * Signature is callable as both sync (returns undefined) and via `await`
- * (await on non-Promise resolves immediately) — preserves call sites in
- * popup.js / options.js / background.js that do `await initI18n();`.
+ * Always returns undefined — every call site (popup.js, options.js,
+ * library.js, md-preview.js, background.js) calls this bare, with nothing
+ * awaited. The refresh promise it kicks off is still tracked internally
+ * (_i18nReadyPromise) so a caller that genuinely needs to wait for it — the
+ * one example is background.js's saveFromBackground not-logged-in branch —
+ * can do so via pbpI18nReady() without changing this function's signature.
  */
 function initI18n() {
   if (_i18nReady) {
-    _refreshI18nAsync().catch(() => {});
+    _i18nReadyPromise = _refreshI18nAsync().catch(() => {});
     return;
   }
   // Sync mirror apply
@@ -41,8 +49,19 @@ function initI18n() {
     }
   } catch (_) {}
   _i18nReady = true;
-  // Async refresh (fire-and-forget)
-  _refreshI18nAsync().catch(() => {});
+  // Async refresh (fire-and-forget); pbpI18nReady() below exposes this same
+  // promise for the one caller that needs to await ordering.
+  _i18nReadyPromise = _refreshI18nAsync().catch(() => {});
+}
+
+/**
+ * Promise that resolves once the most recent initI18n() refresh has landed
+ * (mirror written, _i18nMessages updated for a manual language). Never
+ * rejects — _refreshI18nAsync() already swallows its own errors. Resolves
+ * immediately if initI18n() was never called (e.g. in a test harness).
+ */
+function pbpI18nReady() {
+  return _i18nReadyPromise || Promise.resolve();
 }
 
 /**

@@ -267,6 +267,7 @@ async function createBackgroundSaveHarness(options) {
   const aiSnapshots = [];
   let loadCount = 0;
   let drainCalls = 0;
+  let i18nReadyCalls = 0;
   const result = opts.result || { status: "queued", queueId: "q1" };
   const deps = {
     loadSettings: opts.loadSettings || (async () => settingsSequence[Math.min(loadCount++, settingsSequence.length - 1)]),
@@ -275,7 +276,7 @@ async function createBackgroundSaveHarness(options) {
     ),
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
     showNotification: (...args) => notifications.push(args),
-    t: (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
+    t: opts.t || ((key, ...args) => args.length ? `${key}:${args.join(":")}` : key),
     getPageInfoFromTab: opts.getPageInfoFromTab || (async () => {
       if (opts.onGetPageInfo) opts.onGetPageInfo(cachedSettings);
       return null;
@@ -300,6 +301,11 @@ async function createBackgroundSaveHarness(options) {
       epoch: 0,
     }),
     POSTS_ADD_URI_BUDGET,
+    // K100: pbpI18nReady is a dep of saveFromBackground now (awaited on the
+    // not-logged-in branch only) — every harness slicing it needs this or the
+    // sliced function throws ReferenceError. Defaults to already-resolved so
+    // the many existing cases in this file are unaffected.
+    pbpI18nReady: opts.pbpI18nReady || (() => { i18nReadyCalls++; return Promise.resolve(); }),
   };
   const source = await getBackgroundSaveSource();
   const factory = new Function(...Object.keys(deps), source + "\nreturn saveFromBackground;");
@@ -310,6 +316,7 @@ async function createBackgroundSaveHarness(options) {
     intents,
     aiSnapshots,
     get drainCalls() { return drainCalls; },
+    get i18nReadyCalls() { return i18nReadyCalls; },
   };
 }
 
@@ -1587,6 +1594,10 @@ await suite("unified save pipeline", async () => {
       equal(h.notifications[0][1], expectedTitle);
       equal(h.notifications[0][2], expectedMessage);
       equal(h.drainCalls, 0);
+      // These all resolve through submitSaveIntent/notifySaveFailure, well after
+      // getCurrentPinboardAuth's storage read — K100's await only sits in
+      // saveFromBackground's early not-logged-in branch, which none of these hit.
+      equal(h.i18nReadyCalls, 0, "post-network failure notification should not await pbpI18nReady");
     }
 
     const noToken = await createBackgroundSaveHarness({ cachedSettings: {
@@ -1597,6 +1608,90 @@ await suite("unified save pipeline", async () => {
     equal(early.reason, "not_logged_in");
     equal(noToken.intents.length, 0, "missing token stops before submit");
     equal(noToken.notifications[0][1], "bgNotLoggedIn");
+    equal(noToken.i18nReadyCalls, 1, "not-logged-in branch should await pbpI18nReady exactly once");
+  });
+
+  await test("K100: not-logged-in notification waits for pbpI18nReady before reading text", async () => {
+    let resolveReady;
+    const ready = new Promise((resolve) => { resolveReady = resolve; });
+    let readyLanded = false;
+    ready.then(() => { readyLanded = true; });
+    const h = await createBackgroundSaveHarness({
+      cachedSettings: {
+        pinboardToken: "", bgSaveMode: "merge", optPrivateDefault: false,
+        optPrivateIncognito: false, _defaultTags: "", _aiTags: false, _aiSummary: false,
+      },
+      pbpI18nReady: () => ready,
+      t: (key) => (readyLanded ? "NEW:" + key : "OLD:" + key),
+    });
+    const pending = runBackgroundSave(h);
+    await Promise.resolve();
+    await Promise.resolve();
+    equal(h.notifications.length, 0, "notification fired before pbpI18nReady resolved");
+    resolveReady();
+    const result = await pending;
+    equal(result.reason, "not_logged_in");
+    equal(h.notifications[0][1], "NEW:bgNotLoggedIn");
+    equal(h.notifications[0][2], "NEW:bgSetToken");
+  });
+
+  await test("K100: initI18n() stays synchronous and pbpI18nReady tracks the latest refresh", async () => {
+    const i18nSource = await (await fetch("../i18n.js")).text();
+    const chromeStub = {
+      runtime: { getManifest: () => ({ version: "9.9.9" }), getURL: (p) => "i18n-fixture://" + p },
+      i18n: { getMessage: (key) => key },
+    };
+    // Two distinct fetch resolvers, released under test control, so the test can
+    // prove the SECOND pbpI18nReady() promise stays pending until the SECOND
+    // fetch resolves rather than resolving early off the first one.
+    const pendingFetches = [];
+    const fetchStub = async () => new Promise((resolve) => {
+      pendingFetches.push(() => resolve({ ok: true, json: async () => ({}) }));
+    });
+    // optLang differs between the two calls (en vs zh_CN) so the version-stamp
+    // short-circuit (i18n.js: _i18nMessagesLang === optLang) never fires and each
+    // initI18n() call is guaranteed to perform its own real fetch.
+    const storageData = { optLang: "en" };
+    const getSettingsStorage = async () => ({
+      get: async (defaults) => ({ ...defaults, ...storageData }),
+    });
+    const localStorageStub = (() => {
+      const store = new Map();
+      return {
+        getItem: (k) => (store.has(k) ? store.get(k) : null),
+        setItem: (k, v) => store.set(k, String(v)),
+        removeItem: (k) => store.delete(k),
+      };
+    })();
+    const factory = new Function(
+      "chrome", "fetch", "localStorage", "getSettingsStorage",
+      i18nSource + "\nreturn { initI18n, pbpI18nReady };"
+    );
+    const { initI18n, pbpI18nReady } = factory(chromeStub, fetchStub, localStorageStub, getSettingsStorage);
+
+    const firstReturn = initI18n();
+    equal(firstReturn, undefined, "initI18n() must keep returning undefined");
+    const firstReady = pbpI18nReady();
+    assert(firstReady instanceof Promise, "pbpI18nReady() must return a promise");
+    await new Promise((resolve) => setTimeout(resolve, 0)); // flush microtasks until the fetch() call itself lands in pendingFetches
+    equal(pendingFetches.length, 1, "first initI18n() should have started exactly one fetch");
+    pendingFetches.shift()();
+    await firstReady;
+
+    storageData.optLang = "zh_CN";
+    const secondReturn = initI18n(); // hits the _i18nReady early-return branch (initI18n called a second time)
+    equal(secondReturn, undefined, "repeat initI18n() call must also return undefined");
+    const secondReady = pbpI18nReady();
+    assert(secondReady !== firstReady, "pbpI18nReady() should track the latest refresh, not the first one");
+
+    let secondReadyResolved = false;
+    secondReady.then(() => { secondReadyResolved = true; });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    equal(pendingFetches.length, 1, "second initI18n() should have started its own fetch");
+    assert(!secondReadyResolved, "pbpI18nReady() resolved before its own fetch landed");
+    pendingFetches.shift()();
+    await secondReady;
+    assert(secondReadyResolved, "pbpI18nReady() did not resolve after its refresh landed");
   });
 
   await test("Batch delegates mixed outcomes to unified intents and aggregates once", async () => {
