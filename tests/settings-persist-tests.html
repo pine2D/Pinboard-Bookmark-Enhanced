@@ -4303,6 +4303,8 @@ async function run() {
       await pbpCloudHintProbe;
       check("E13 a freshly installed sync-off device is told Chrome Sync already holds a profile",
         !host.hidden && host.textContent === "syncCloudSettingsAvailable");
+      check("E13 the cloud hint renders as a plain hint, not the amber local-only warning strip",
+        host.className === "hint");
       const probeKeys = hitCalls.gets[hitCalls.gets.length - 1];
       check("E13 the cloud probe reads a bounded key list that asks Chrome Sync for no credential",
         Array.isArray(probeKeys) && probeKeys.includes("optTheme") &&
@@ -4369,6 +4371,8 @@ async function run() {
       check("E13 settings sync ON still reports local-only fallbacks and runs no cloud probe",
         fields.length === 1 && !host.hidden &&
         host.textContent.includes("labelCustomCSSOverlay") && onCalls.gets.length === 0);
+      check("E13 the local-only fallback message keeps the amber warning strip class",
+        host.className === "sync-local-only");
 
       const themeCalls = { gets: [], sets: [], removes: [] };
       globalThis.chrome = {

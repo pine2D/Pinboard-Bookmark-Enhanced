@@ -793,11 +793,13 @@ async function pbpRefreshSyncLocalFallbackStatus() {
     // purpose, and its rejection resolves to "stay hidden".
     status.hidden = true;
     status.textContent = "";
+    status.className = "sync-local-only";
     pbpCloudHintProbe = pbpMaybeShowCloudSettingsHint(status, run).catch(() => false);
     return [];
   }
   const fields = pbpDetectLargeLocalFallbacks(local);
   status.hidden = fields.length === 0;
+  status.className = "sync-local-only";
   status.textContent = fields.length
     ? t("syncLocalOnlyStatus", fields.map((key) => t(pbpLargeFallbackFieldLabel(key))).join(", "))
     : "";
@@ -828,6 +830,7 @@ async function pbpMaybeShowCloudSettingsHint(status, run) {
   if (run !== pbpCloudHintRun) return false;
   if (available) {
     status.textContent = t("syncCloudSettingsAvailable");
+    status.className = "hint";
     status.hidden = false;
     return true;
   }
