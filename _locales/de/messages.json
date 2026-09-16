@@ -644,7 +644,7 @@
     "message": "Tag-Cache"
   },
   "storageCatMisc": {
-    "message": "Archivprotokoll & KI-Nutzung"
+    "message": "KI-Nutzung & Kompatibilitätshinweise"
   },
   "storageReclaimable": {
     "message": "Freigebbar: $AMOUNT$",

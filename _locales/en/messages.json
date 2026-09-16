@@ -644,7 +644,7 @@
     "message": "Tag cache"
   },
   "storageCatMisc": {
-    "message": "Archive log & AI usage"
+    "message": "AI usage & compatibility memos"
   },
   "storageReclaimable": {
     "message": "Reclaimable: $AMOUNT$",

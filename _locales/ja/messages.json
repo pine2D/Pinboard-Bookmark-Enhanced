@@ -644,7 +644,7 @@
     "message": "タグキャッシュ"
   },
   "storageCatMisc": {
-    "message": "アーカイブログとAI使用量"
+    "message": "AI使用量と互換性メモ"
   },
   "storageReclaimable": {
     "message": "整理可能: $AMOUNT$",

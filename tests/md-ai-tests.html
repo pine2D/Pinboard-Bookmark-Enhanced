@@ -4314,13 +4314,19 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
   ];
   const RECLAIMABLE = [
     "jina_md_https://ex.com/a", "jina_md_https://ex.com/b", "cached_existing_urls",
-    "cached_user_tags", "cached_suggest_https://ex.com/a", "_waybackLog",
-    "_waybackAttempts", "pbp_ai_usage", "pbpThinkReject", "pbpAiParamFix",
+    "cached_user_tags", "cached_suggest_https://ex.com/a",
+    "pbp_ai_usage", "pbpThinkReject", "pbpAiParamFix",
   ];
+  // K169: out of the reclaim allowlist entirely (not in any PBP_RECLAIM_CATEGORIES
+  // row) — owned solely by the archive panel's own owner-scoped Clear button, which
+  // keeps _waybackAttempts alive as a dedup map. Must survive every reclaim call,
+  // same as NEVER, but tracked separately so a regression names the real invariant.
+  const WAYBACK_LEGACY = ["_waybackLog", "_waybackAttempts"];
   function freshStore() {
     const s = {};
     NEVER.forEach((k) => { s[k] = { secret: "DO_NOT_DELETE_" + k, blob: "x".repeat(50) }; });
     RECLAIMABLE.forEach((k) => { s[k] = { cache: "y".repeat(200), timestamp: 1 }; });
+    WAYBACK_LEGACY.forEach((k) => { s[k] = { cache: "y".repeat(200), timestamp: 1 }; });
     return s;
   }
   const realChrome = window.chrome;
@@ -4331,6 +4337,7 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
     const freed = await pbpReclaimLocalStorage(["jina", "urls", "tags", "misc"]);
     NEVER.forEach((k) => assert(k in local._store, "must SURVIVE reclaim: " + k));
     RECLAIMABLE.forEach((k) => assert(!(k in local._store), "must be CLEARED: " + k));
+    WAYBACK_LEGACY.forEach((k) => assert(k in local._store, "must SURVIVE reclaim (out of the misc allowlist, owned by the archive panel's Clear): " + k));
     assert(freed > 0, "freed bytes must be > 0, got " + freed);
   });
 
@@ -4380,7 +4387,7 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
     assertEq(m.jina.keys.length, 2, "two jina keys");
     assertEq(m.urls.keys.length, 1, "one url key");
     assertEq(m.tags.keys.length, 2, "cached_user_tags + one suggest");
-    assertEq(m.misc.keys.length, 5, "wayback log+attempts + ai usage + think reject + param fix");
+    assertEq(m.misc.keys.length, 3, "ai usage + think reject + param fix");
     ["jina", "urls", "tags", "misc"].forEach((c) => assert(m[c].bytes > 0, c + " bytes > 0"));
     // never-clear keys never appear in any category
     const allMeasured = [].concat(m.jina.keys, m.urls.keys, m.tags.keys, m.misc.keys);

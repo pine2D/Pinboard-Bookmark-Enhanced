@@ -644,7 +644,7 @@
     "message": "標籤快取"
   },
   "storageCatMisc": {
-    "message": "封存記錄與 AI 用量"
+    "message": "AI 用量與相容性備忘"
   },
   "storageReclaimable": {
     "message": "可清理：$AMOUNT$",

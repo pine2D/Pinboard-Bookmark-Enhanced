@@ -644,7 +644,7 @@
     "message": "Pamięć podręczna tagów"
   },
   "storageCatMisc": {
-    "message": "Dziennik archiwum i użycie AI"
+    "message": "Użycie AI i notatki o zgodności"
   },
   "storageReclaimable": {
     "message": "Do zwolnienia: $AMOUNT$",

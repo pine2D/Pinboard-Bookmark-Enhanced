@@ -644,7 +644,7 @@
     "message": "Cache des tags"
   },
   "storageCatMisc": {
-    "message": "Journal d'archivage et usage de l'IA"
+    "message": "Usage de l'IA et notes de compatibilité"
   },
   "storageReclaimable": {
     "message": "Récupérable : $AMOUNT$",
