@@ -841,15 +841,26 @@ async function pbpAiCallViaSW({ s, mode, kind, prompt, url, source, account, inf
   // read-only (permissions.contains) and never asks for anything.
   // callAI re-checks inside the worker, which is a harmless second door.
   await _ensureAIHostPermission(s);
-  const res = await chrome.runtime.sendMessage({
-    type: "PBP_AI_CALL",
-    account, mode, kind, prompt, source, url, inflightKey,
-    cacheDuration: s.aiCacheDuration,
-    // Never a credential: the worker reads keys from its own storage. The list
-    // is shared.js's, not a second copy, so every aiCacheFingerprint input this
-    // snapshot froze reaches the worker and both sides compute the same key.
-    aiOverrides: pbpSanitizeAiOverrides(s),
-  });
+  let res;
+  try {
+    res = await chrome.runtime.sendMessage({
+      type: "PBP_AI_CALL",
+      account, mode, kind, prompt, source, url, inflightKey,
+      cacheDuration: s.aiCacheDuration,
+      // Never a credential: the worker reads keys from its own storage. The list
+      // is shared.js's, not a second copy, so every aiCacheFingerprint input this
+      // snapshot froze reaches the worker and both sides compute the same key.
+      aiOverrides: pbpSanitizeAiOverrides(s),
+    });
+  } catch (e) {
+    // The worker can be unreachable (service worker asleep mid-reload/update,
+    // extension update in flight): sendMessage then rejects with a raw Chrome
+    // string ("Could not establish connection...") instead of an AI envelope.
+    // That text is neither localized nor attributable to the provider, so it
+    // must never reach showAIError. Never log the prompt or settings here.
+    console.warn("[pbp] AI bus call failed:", e && e.name, e && e.message);
+    throw pbpAiErrorFromEnvelope(null);
+  }
   if (!res || res.ok !== true) throw pbpAiErrorFromEnvelope(res && res.error);
   // The worker reports an empty half as null (A8: empty = miss). Map it back to
   // this document's own empty vocabulary so every caller keeps its shape.
@@ -1042,7 +1053,11 @@ async function doAISummary(forceRefresh, sOverride) {
     // A8, now enforced on BOTH sides of the bus: an empty half is a miss. The
     // worker already declines to file one; caching "" here would re-create
     // exactly the sticky fake success it is avoiding, for the whole TTL.
-    if (summary) await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
+    // M3: an empty single-summary result is a miss too, not a silent success
+    // — skip the cache write (already implied) but also stop short of
+    // reporting success over nothing.
+    if (!summary) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
+    await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
     upsertSummary(summary);
     showSummaryActions(false);

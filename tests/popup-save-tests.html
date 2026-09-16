@@ -1850,6 +1850,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(h.calls.sent.length === 1, "the call must still have reached the worker");
       assert(h.calls.errors.length === 0, "an empty half must not raise the error card");
       assert(h.calls.cache.length === 0, "an empty summary was written to the cache (A8: empty = miss)");
+      // M3: an empty single-summary result must not be reported as success —
+      // no upsertSummary("") commit, and the status line shows an error.
+      assert(h.calls.summary.length === 0, "an empty summary was still committed via upsertSummary");
+      assert(h.calls.status.length === 1 && h.calls.status[0][2] === "error",
+        "an empty summary did not surface an error status: " + JSON.stringify(h.calls.status));
+      assert(h.calls.status[0][1] === tEn("aiNoContent"),
+        "the empty-summary status did not use the localized aiNoContent text");
     });
 
     await testAsync("PBP_AI_VIA_SW=false keeps the whole call inside the popup document", async () => {
@@ -2024,6 +2031,23 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(shown === `[OpenAI] ${enMessages.aiUnknownError.message}`,
         "the card did not render the shipped aiUnknownError string, got: " + shown);
       assert(!/AI call failed/i.test(shown), "an untranslated literal reached the card: " + shown);
+    });
+
+    // M1: chrome.runtime.sendMessage itself can reject (worker unreachable
+    // after a reload/update) instead of resolving to an envelope — that is a
+    // raw, untranslated Chrome string ("Could not establish connection...")
+    // which must never reach the card attributed to the provider.
+    await testAsync("a rejected sendMessage (dead worker port) renders the localized unknown error, not a raw Chrome string", async () => {
+      const h = makePopupAi({
+        realErrorCard: true,
+        respond: async () => { throw new Error("Could not establish connection. Receiving end does not exist."); },
+      });
+      await h.doAISummary(false);
+      const shown = h.el["ai-error-message"].textContent;
+      assert(!h.el["ai-error-card"].classList.contains("hidden"), "the error card was not shown");
+      assert(shown === `[OpenAI] ${enMessages.aiUnknownError.message}`,
+        "a raw Chrome connection string reached the card, got: " + shown);
+      assert(!/establish connection/i.test(shown), "the raw Chrome bus string reached the card: " + shown);
     });
 
     await testAsync("a worker diagnostic code renders as the generic failure, not its log string", async () => {
