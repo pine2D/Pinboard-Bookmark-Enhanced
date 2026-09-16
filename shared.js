@@ -2142,6 +2142,51 @@ async function persistSettings(data) {
 
 const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","dictAnkiKey","dictEudicToken"];
 
+// ---- PBP_AI_CALL override whitelist (K44) ----------------------------------
+// Non-secret settings a popup PBP_AI_CALL message may override for one call: the
+// immutable per-op snapshot (audit A4) and the "Try with <provider>" fallback,
+// which swaps provider + model. A WHITELIST on purpose — a denylist would hand
+// every future settings key to the message bus by default. No credential
+// appears here, and pbpSanitizeAiOverrides deletes every API_KEY_FIELDS entry on
+// top of that: API keys reach the provider from the worker's own loadSettings(),
+// never over chrome.runtime.
+//
+// It lives here, not in background.js, because BOTH ends run it: popup-ai.js
+// builds the overrides out of its frozen snapshot with this very function, and
+// background.js re-sanitizes whatever arrives. One list, so a fingerprint input
+// added below cannot quietly stop travelling from the side that assembles it.
+//
+// The list must cover EVERY aiCacheFingerprint input (ai.js), because setAICache
+// recomputes the fingerprint from the object built here while the popup computed
+// its cache coordinates from its frozen snapshot. Miss one and the worker files
+// the popup's answer under a key the popup will never read — and if the user
+// edited a prompt template in the options tab mid-op, it files the OLD
+// template's answer under the NEW template's key, which is cache pollution
+// rather than a wasted write. That is why the endpoint fields and both custom
+// prompt templates are here even though the popup, not the worker, assembles
+// the prompt. A probing test walks the fingerprint inputs per provider and
+// fails if any of them is absent from this list.
+const PBP_AI_OVERRIDE_FIELDS = Object.freeze([
+  "aiProvider", "aiTagLang", "aiSummaryLang", "aiTagSeparator", "optRespectTagCase",
+  "geminiModel", "openaiModel", "claudeModel", "deepseekModel", "qwenModel",
+  "minimaxModel", "openrouterModel", "groqModel", "mistralModel", "cohereModel",
+  "siliconflowModel", "zhipuModel", "kimiModel", "ollamaModel", "customModel",
+  "openaiBaseUrl", "ollamaBaseUrl", "customBaseUrl",
+  "customTagPrompt", "customSummaryPrompt",
+]);
+
+function pbpSanitizeAiOverrides(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const key of PBP_AI_OVERRIDE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) out[key] = raw[key];
+  }
+  // Belt and braces over the whitelist above: if a credential field is ever
+  // renamed onto one of those names, it still must not survive the bus.
+  for (const key of API_KEY_FIELDS) delete out[key];
+  return out;
+}
+
 function pbpExportTargetSecretKeys(targetId) {
   return targetId === "webhook" ? ["token", "url"] : ["token"];
 }

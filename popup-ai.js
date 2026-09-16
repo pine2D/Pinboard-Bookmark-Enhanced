@@ -2,6 +2,15 @@
 // Pinboard Bookmark Enhanced - AI Summary & Tags
 // ============================================================
 
+// K44 rollback switch. true = the paid LLM call runs in the service worker, so
+// Chrome destroying this document (a click on the page, a tab switch, Esc) costs
+// the render and not the answer — the worker parses it and files it in the
+// shared IDB cache, and the next open is an instant hit. false = the pre-K44
+// path, where every call ran here and died with the document. One line to flip
+// for a patch build; the worker's PBP_AI_CALL branch is harmless with nobody
+// sending to it.
+const PBP_AI_VIA_SW = true;
+
 // ===================== AI Progress Indicator (B3) =====================
 const AI_STAGE_TIMERS = new Map();
 const AI_STAGE_STARTED = new Map();
@@ -783,6 +792,48 @@ function finalizeAITags(rawTags, s) {
   return (s || settings).optRespectTagCase ? rawTags.map(t => resolveTagCase(t, tagCaseMap)) : rawTags;
 }
 
+// Rebuild an Error from the worker's wire envelope: structured clone drops the
+// Error prototype and every non-enumerable field, so the failure arrives as a
+// plain object. showAIError() consumes message / code / status / paramHint, and
+// its callers still add permissionStage / permissionOrigins in their catch.
+function pbpAiErrorFromEnvelope(envelope) {
+  const err = new Error((envelope && envelope.message) || "AI call failed");
+  if (envelope && typeof envelope.code === "string" && envelope.code) err.code = envelope.code;
+  if (envelope && typeof envelope.status === "number") err.status = envelope.status;
+  if (envelope && typeof envelope.paramHint === "string" && envelope.paramHint) err.paramHint = envelope.paramHint;
+  return err;
+}
+
+// Hand ONE assembled prompt plus this op's cache coordinates to the service
+// worker, which runs the provider call, parses it and writes the cache whether
+// or not this document is still alive to receive the answer (K44).
+//
+// Only the last hop moves. Extraction, prompt assembly, the combined/single
+// decision, the namespace (audit A3) and the inflight key all stay here, where
+// they were proven — the worker treats the key as opaque and never re-derives
+// the source.
+async function pbpAiCallViaSW({ s, mode, kind, prompt, url, source, account, inflightKey }) {
+  // The permission gate stays in the popup: granting an origin needs a document
+  // and a user gesture, so the authorization UX (and the permissionStage /
+  // permissionOrigins the error card shows) is unchanged. This check itself is
+  // read-only (permissions.contains) and never asks for anything.
+  // callAI re-checks inside the worker, which is a harmless second door.
+  await _ensureAIHostPermission(s);
+  const res = await chrome.runtime.sendMessage({
+    type: "PBP_AI_CALL",
+    account, mode, kind, prompt, source, url, inflightKey,
+    cacheDuration: s.aiCacheDuration,
+    // Never a credential: the worker reads keys from its own storage. The list
+    // is shared.js's, not a second copy, so every aiCacheFingerprint input this
+    // snapshot froze reaches the worker and both sides compute the same key.
+    aiOverrides: pbpSanitizeAiOverrides(s),
+  });
+  if (!res || res.ok !== true) throw pbpAiErrorFromEnvelope(res && res.error);
+  // The worker reports an empty half as null (A8: empty = miss). Map it back to
+  // this document's own empty vocabulary so every caller keeps its shape.
+  return { tags: res.tags || [], summary: res.summary || "" };
+}
+
 // Fetch one AI artifact ("summary" | "tags") for the current page (cache-miss path only).
 // If the OTHER artifact is also missing, issue ONE combined call and cache the other
 // half so its later click is an instant, zero-extra-body-token cache hit. forceRefresh
@@ -802,8 +853,13 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
 
   const callSingle = () => {
     if (kind === "summary") {
-      return getOrCreateInflight(`${account}|${aiCacheFingerprint(s, "summary")}|summary|${url}`, () =>
-        callAI(s, buildSummaryPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value)));
+      const summaryKey = `${account}|${aiCacheFingerprint(s, "summary")}|summary|${url}`;
+      return getOrCreateInflight(summaryKey, async () => {
+        const prompt = buildSummaryPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value);
+        if (!PBP_AI_VIA_SW) return callAI(s, prompt);
+        const both = await pbpAiCallViaSW({ s, mode: "single", kind: "summary", prompt, url, source, account, inflightKey: summaryKey });
+        return both.summary;
+      });
     }
     return getOrCreateInflight(`${account}|${aiCacheFingerprint(s, "tags")}|tags|${url}`, async () => {
       const resp = await callAI(s, buildTagPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, pbpRelevantTagsFirst(allUserTags, $id("title-input").value, pageInfo.url)));
@@ -939,7 +995,10 @@ async function doAISummary(forceRefresh, sOverride) {
     // protects the form commit.
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "parsing" });
-    await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
+    // A8, now enforced on BOTH sides of the bus: an empty half is a miss. The
+    // worker already declines to file one; caching "" here would re-create
+    // exactly the sticky fake success it is avoiding, for the whole TTL.
+    if (summary) await setAICache(pageInfo.url, "summary", summary, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
     upsertSummary(summary);
     showSummaryActions(false);

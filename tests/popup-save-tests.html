@@ -1619,9 +1619,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(fetchStart >= 0 && fetchEnd > fetchStart, "fetchAIArtifacts source not found");
       const keys = [];
       let currentAccount = "alice";
+      // Pinned to the pre-K44 branch on purpose: this case is about the inflight
+      // KEY, which is computed before the switch and is the same string either
+      // way. The worker route has its own cases below.
       const make = new Function(
         "pageInfo", "settings", "pbpPopupAiAccountIsCurrent", "getOrCreateInflight",
-        "$id", "callAI", "buildSummaryPrompt", "aiCacheFingerprint",
+        "$id", "callAI", "buildSummaryPrompt", "aiCacheFingerprint", "PBP_AI_VIA_SW",
         popupAiSource.slice(fetchStart, fetchEnd) + "; return fetchAIArtifacts;"
       );
       const fetchArtifact = make(
@@ -1632,7 +1635,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         () => ({ value: "" }),
         async () => "summary",
         () => "prompt",
-        (s, type) => s.aiProvider + "#" + type
+        (s, type) => s.aiProvider + "#" + type,
+        false
       );
       assert(await fetchArtifact("summary", true, "alice") === "summary", "Alice summary missing");
       currentAccount = "bob";
@@ -1659,6 +1663,180 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "doAITags stale error UI is not liveness-guarded");
       assert(doTags.includes("if (btn && pbpPopupAiAccountIsCurrent(account))"),
         "doAITags stale progress cleanup is not owner-guarded");
+    });
+
+    // ---- K44: the paid LLM call now runs in the service worker ------------
+    // Chrome destroys this document the instant the user clicks the page or
+    // presses Esc, and it used to take the in-flight provider request with it -
+    // billed server-side, never cached. The last hop now goes to the worker.
+    // Everything below runs the REAL routing slice of popup-ai.js
+    // (finalizeAITags -> pbpAiErrorFromEnvelope -> pbpAiCallViaSW ->
+    // fetchAIArtifacts -> doAISummary, plus doAITags); every collaborator the
+    // executed paths touch is injected, PBP_AI_VIA_SW included, so both sides
+    // of the rollback switch are reachable from here.
+    const k44SliceA = popupAiSource.slice(
+      popupAiSource.indexOf("function finalizeAITags"),
+      popupAiSource.indexOf("function _aiResetSummaryActions"));
+    const k44SliceB = popupAiSource.slice(
+      popupAiSource.indexOf("async function doAITags"),
+      popupAiSource.indexOf("// Tags added via AI chips"));
+    assert(k44SliceA.includes("async function fetchAIArtifacts") && k44SliceA.includes("async function doAISummary"),
+      "popup AI routing slice A not found");
+    assert(k44SliceB.includes("async function doAITags"), "popup AI routing slice B not found");
+
+    function makePopupAi(opts) {
+      const o = opts || {};
+      const calls = { sent: [], callAI: [], cache: [], rendered: [], summary: [], status: [], errors: [], order: [] };
+      const inflight = new Map();
+      // Fill EVERY whitelisted field, so "the snapshot's overrides travel" is a
+      // rule about the shared list (which the worker suite pins to every
+      // aiCacheFingerprint input) and not about names typed out here.
+      const snapshot = Object.assign({
+        aiProvider: "openai", aiCacheDuration: 60, aiContentSource: "local",
+        aiTagSeparator: "-", optRespectTagCase: !!o.respectCase,
+        openaiApiKey: "sk-live-SECRET", pinboardToken: "alice:SECRET-TOKEN",
+      }, o.settings || {});
+      for (const field of PBP_AI_OVERRIDE_FIELDS) {
+        if (!(field in snapshot)) snapshot[field] = "fp-" + field;
+      }
+      const account = o.account || "alice";
+      const container = { classList: { add() {}, remove() {}, toggle() {} }, querySelectorAll: () => [] };
+      const fields = {
+        "title-input": { value: "Title" },
+        "description-input": { value: "Notes" },
+        "url-input": { value: URL },
+        "ai-suggest-tags": container,
+      };
+      const respond = o.respond || (async () => ({ ok: true, tags: null, summary: "worker summary" }));
+      const deps = {
+        PBP_AI_VIA_SW: o.viaSW !== false,
+        settings: snapshot,
+        pageInfo: { url: URL, pageText: "extracted body" },
+        allUserTags: [],
+        tagCaseMap: o.tagCaseMap || {},
+        _inflightAI: inflight,
+        chrome: { runtime: { sendMessage: async (msg) => { calls.order.push("message"); calls.sent.push(msg); return respond(msg); } } },
+        _ensureAIHostPermission: async () => {
+          calls.order.push("permission");
+          if (o.permissionError) throw o.permissionError();
+        },
+        pbpSanitizeAiOverrides, resolveTagCase, AI_TAG_CAP,
+        $id: (id) => (id in fields ? fields[id] : null),
+        getOrCreateInflight: (key, factory) => {
+          if (inflight.has(key)) return inflight.get(key);
+          let p;
+          p = Promise.resolve().then(factory).finally(() => { if (inflight.get(key) === p) inflight.delete(key); });
+          inflight.set(key, p);
+          return p;
+        },
+        aiCacheFingerprint: (s, type) => s.aiProvider + "#" + type,
+        getAICache: async (_url, kind) => ((o.cached && kind in o.cached) ? o.cached[kind] : null),
+        setAICache: async (...args) => { calls.cache.push(args); },
+        callAI: async (_s, prompt) => { calls.order.push("callAI"); calls.callAI.push(prompt); return o.aiText !== undefined ? o.aiText : "in-document text"; },
+        buildSummaryPrompt: () => "SUMMARY-PROMPT",
+        buildTagPrompt: () => "TAG-PROMPT",
+        buildCombinedPrompt: () => "COMBINED-PROMPT",
+        parseAITags: (resp) => String(resp).split(","),
+        refineTags: (tags) => tags,
+        parseAICombined: () => ({ tags: ["in-document"], summary: "in-document combined" }),
+        pbpRelevantTagsFirst: () => [],
+        pbpPopupAiAccount: () => account,
+        pbpPopupAiAccountIsCurrent: (a) => a === account,
+        _aiOpStillCurrent: (a) => a === account,
+        _aiUrlEquivalent: () => true,
+        _aiAwaitBookmarkLookup: async () => {},
+        _aiRestoreSummaryOwnership: async () => false,
+        _aiRequiredOriginPatterns: () => ["https://api.openai.com/*"],
+        hasAIKey: () => true,
+        hideAIError: () => {},
+        showStatus: (...a) => calls.status.push(a),
+        showAIError: (kind, e) => calls.errors.push({ kind, e }),
+        t: (key) => key,
+        pbpAiFastCached: async () => null,
+        setAiProgress: () => {},
+        clearAiProgress: () => {},
+        ensurePageText: async () => o.source || "local",
+        upsertSummary: (text) => calls.summary.push(text),
+        showSummaryActions: () => {},
+        renderAITags: (tags, cached) => calls.rendered.push({ tags, cached }),
+        _aiClearTagsOutput: () => {},
+        _aiParkTagsBtn: () => {},
+        pbpAssignAltNumBadges: () => {},
+      };
+      const api = new Function(...Object.keys(deps),
+        k44SliceA + "\n" + k44SliceB +
+        "\n; return { fetchAIArtifacts, doAISummary, doAITags };"
+      )(...Object.values(deps));
+      return { ...api, calls, snapshot, account };
+    }
+
+    await testAsync("the popup hands the worker a finished prompt, its cache coordinates and no credential", async () => {
+      const h = makePopupAi({ source: "jina" });
+      const out = await h.fetchAIArtifacts("summary", true, h.account, h.snapshot, "jina");
+      assert(out === "worker summary", "the worker's summary did not reach the caller");
+      assert(h.calls.callAI.length === 0, "the popup document still called the provider itself");
+      assert(h.calls.sent.length === 1, "exactly one message must cross the bus");
+      const msg = h.calls.sent[0];
+      assert(msg.type === "PBP_AI_CALL" && msg.mode === "single" && msg.kind === "summary",
+        "wrong message envelope: " + JSON.stringify({ type: msg.type, mode: msg.mode, kind: msg.kind }));
+      assert(msg.prompt === "SUMMARY-PROMPT" && msg.url === URL && msg.source === "jina" &&
+        msg.account === h.account && msg.cacheDuration === 60, "the message lost a cache coordinate");
+      assert(msg.inflightKey === `${h.account}|openai#summary|summary|${URL}`,
+        "the popup's inflight key must travel verbatim, got " + msg.inflightKey);
+      const missing = PBP_AI_OVERRIDE_FIELDS.filter((f) => msg.aiOverrides[f] !== h.snapshot[f]);
+      assert(missing.length === 0, "the overrides dropped fingerprint inputs: " + missing.join(","));
+      assert(API_KEY_FIELDS.every((f) => !(f in msg.aiOverrides)), "a credential field rode the overrides");
+      const wire = JSON.stringify(msg);
+      assert(!wire.includes("sk-live-SECRET") && !wire.includes("SECRET-TOKEN"),
+        "a secret value reached the message bus");
+    });
+
+    await testAsync("an empty summary half is a miss on the popup side too, never a cached fake success", async () => {
+      const h = makePopupAi({ respond: async () => ({ ok: true, tags: null, summary: null }) });
+      await h.doAISummary(false);
+      assert(h.calls.sent.length === 1, "the call must still have reached the worker");
+      assert(h.calls.errors.length === 0, "an empty half must not raise the error card");
+      assert(h.calls.cache.length === 0, "an empty summary was written to the cache (A8: empty = miss)");
+    });
+
+    await testAsync("PBP_AI_VIA_SW=false keeps the whole call inside the popup document", async () => {
+      const h = makePopupAi({ viaSW: false });
+      const out = await h.fetchAIArtifacts("summary", true, h.account, h.snapshot, "local");
+      assert(h.calls.sent.length === 0, "the rollback switch still sent a message");
+      assert(h.calls.callAI.join("|") === "SUMMARY-PROMPT", "the in-document path did not run");
+      assert(out === "in-document text", "the in-document result was not returned");
+    });
+
+    test("the shipped rollback switch is on", () => {
+      assert(/\bconst PBP_AI_VIA_SW = true;/.test(popupAiSource),
+        "popup-ai.js must ship with PBP_AI_VIA_SW = true (one line to flip for a patch build)");
+    });
+
+    await testAsync("the host-permission gate stays in the popup, ahead of the message", async () => {
+      const denied = () => { const e = new Error("grant the origin"); e.code = "host_permission"; return e; };
+      const blocked = makePopupAi({ permissionError: denied });
+      let caught = null;
+      try { await blocked.fetchAIArtifacts("summary", true, blocked.account, blocked.snapshot, "local"); }
+      catch (e) { caught = e; }
+      assert(caught && caught.code === "host_permission", "the permission error did not surface to the popup");
+      assert(blocked.calls.sent.length === 0, "an unauthorized origin still reached the worker");
+      const granted = makePopupAi({});
+      await granted.fetchAIArtifacts("summary", true, granted.account, granted.snapshot, "local");
+      assert(granted.calls.order[0] === "permission" && granted.calls.order[1] === "message",
+        "the permission check must run in this document, before the message: " + granted.calls.order.join(","));
+    });
+
+    await testAsync("the worker's error envelope becomes the Error the existing card already reads", async () => {
+      const h = makePopupAi({
+        respond: async () => ({ ok: false, error: { message: "OpenAI: no such model", code: "model_not_found", status: 404, paramHint: "max_tokens" } }),
+      });
+      await h.doAISummary(false);
+      assert(h.calls.errors.length === 1, "the error card was not raised");
+      const e = h.calls.errors[0].e;
+      assert(e instanceof Error, "the envelope did not become an Error");
+      assert(e.message === "OpenAI: no such model" && e.code === "model_not_found" &&
+        e.status === 404 && e.paramHint === "max_tokens", "the envelope lost a field the card renders");
+      assert(h.calls.cache.length === 0, "a failed call must not write the cache");
     });
 
     test("setup restore and cache click share adoption before any append", () => {

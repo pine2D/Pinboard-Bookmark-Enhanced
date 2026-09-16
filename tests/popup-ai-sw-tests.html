@@ -97,7 +97,10 @@ async function getSource() {
 }
 
 // ---- Harness: the popup-AI worker block sliced out of background.js ---------
-const AI_BLOCK_START = "const PBP_AI_OVERRIDE_FIELDS";
+// PBP_AI_OVERRIDE_FIELDS / pbpSanitizeAiOverrides moved to shared.js when the
+// popup started building the overrides with the SAME list (K44-b); they are
+// injected below as the real globals this page already loaded.
+const AI_BLOCK_START = "// Structured clone drops the Error prototype";
 const AI_BLOCK_END = "// ---- 监听来自 popup 的消息 ----";
 
 function buildAiHarness(source, opts) {
@@ -128,7 +131,7 @@ function buildAiHarness(source, opts) {
     getOrCreateInflight,
     parseAICombined, parseAITags, refineTags,
     buildTagCaseMap, resolveTagCase,
-    AI_TAG_CAP, API_KEY_FIELDS,
+    AI_TAG_CAP, API_KEY_FIELDS, PBP_AI_OVERRIDE_FIELDS, pbpSanitizeAiOverrides,
     setAICache: async (...args) => { calls.setAICache.push(args); if (o.setAICache) return o.setAICache(...args); },
     console: { warn: (...a) => calls.warn.push(a), log: () => {}, error: (...a) => calls.warn.push(a) },
   };
