@@ -934,8 +934,16 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
   let both = null;
   try {
     both = await getOrCreateInflight(combinedKey, async () => {
-      const resp = await callAI(s, buildCombinedPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, pbpRelevantTagsFirst(allUserTags, $id("title-input").value, pageInfo.url)));
-      return parseAICombined(resp, s.aiTagSeparator);
+      const prompt = buildCombinedPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, pbpRelevantTagsFirst(allUserTags, $id("title-input").value, pageInfo.url));
+      if (!PBP_AI_VIA_SW) {
+        const resp = await callAI(s, prompt);
+        return parseAICombined(resp, s.aiTagSeparator);
+      }
+      // Any `ok:false` throws here and the catch below turns it into the single
+      // fallback, which is what the pre-K44 path did when parsing failed. Note
+      // that a combined PARSE failure carries a message and no code at all, so
+      // the fallback can never be selected by error code.
+      return pbpAiCallViaSW({ s, mode: "combined", kind, prompt, url, source, account, inflightKey: combinedKey });
     });
   } catch (e) {
     both = null;

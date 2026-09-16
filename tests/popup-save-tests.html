@@ -1892,6 +1892,71 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(out.join(",") === "alpha,beta", "the in-document parse did not run: " + JSON.stringify(out));
     });
 
+    // The combined path is the common one (both halves missing): ONE call, two
+    // halves, the other one filed for a later free click. The opportunistic
+    // branch is only reachable with no custom template configured.
+    const noTemplates = { customTagPrompt: "", customSummaryPrompt: "" };
+
+    await testAsync("the opportunistic combined call goes to the worker under the combined key", async () => {
+      const h = makePopupAi({
+        settings: noTemplates,
+        respond: async () => ({ ok: true, tags: ["mv3", "chrome"], summary: "one paragraph" }),
+      });
+      const out = await h.fetchAIArtifacts("tags", false, h.account, h.snapshot, "local");
+      assert(out.join(",") === "mv3,chrome", "the requested half did not come back: " + JSON.stringify(out));
+      assert(h.calls.callAI.length === 0, "the popup document still called the provider itself");
+      assert(h.calls.sent.length === 1, "the combined call must be one message, got " + h.calls.sent.length);
+      const msg = h.calls.sent[0];
+      assert(msg.mode === "combined" && msg.kind === "tags" && msg.prompt === "COMBINED-PROMPT",
+        "wrong combined envelope: " + JSON.stringify({ mode: msg.mode, kind: msg.kind }));
+      assert(msg.inflightKey === `${h.account}|openai#combined|combined|${URL}`,
+        "the combined inflight key must travel verbatim, got " + msg.inflightKey);
+      const other = h.calls.cache.filter((args) => args[1] === "summary");
+      assert(other.length === 1 && other[0][2] === "one paragraph",
+        "the free half was not filed for its later click");
+    });
+
+    await testAsync("a combined failure with no error code still falls back to the single call", async () => {
+      // A combined parse failure is exactly this shape: a message and nothing
+      // else. Routing on `ok` is the contract; routing on a code would strand
+      // the most common failure the fallback exists for.
+      const h = makePopupAi({
+        settings: noTemplates,
+        respond: async (msg) => (msg.mode === "combined"
+          ? { ok: false, error: { message: "AI returned unparseable output" } }
+          : { ok: true, tags: ["fallback"], summary: null }),
+      });
+      const out = await h.fetchAIArtifacts("tags", false, h.account, h.snapshot, "local");
+      assert(h.calls.sent.length === 2, "expected combined then single, got " + h.calls.sent.length + " message(s)");
+      assert(h.calls.sent[0].mode === "combined" && h.calls.sent[1].mode === "single" && h.calls.sent[1].kind === "tags",
+        "the fallback was not a dedicated single call for this half");
+      assert(out.join(",") === "fallback", "the single fallback result did not surface: " + JSON.stringify(out));
+      assert(h.calls.cache.length === 0, "a failed combined call must not file anything");
+    });
+
+    await testAsync("a half-empty combined reply still falls through to the single call for that half", async () => {
+      const h = makePopupAi({
+        settings: noTemplates,
+        respond: async (msg) => (msg.mode === "combined"
+          ? { ok: true, tags: null, summary: "only the summary half" }
+          : { ok: true, tags: ["late"], summary: null }),
+      });
+      const out = await h.fetchAIArtifacts("tags", false, h.account, h.snapshot, "local");
+      assert(out.join(",") === "late", "the empty half was treated as a result: " + JSON.stringify(out));
+      assert(h.calls.sent.length === 2 && h.calls.sent[1].mode === "single",
+        "an empty requested half must fall through to its own call");
+      const filed = h.calls.cache.map((args) => args[1]);
+      assert(filed.join(",") === "summary", "only the half with content may be filed, filed: " + filed.join(","));
+    });
+
+    await testAsync("PBP_AI_VIA_SW=false keeps the combined parse inside the popup document", async () => {
+      const h = makePopupAi({ settings: noTemplates, viaSW: false });
+      const out = await h.fetchAIArtifacts("tags", false, h.account, h.snapshot, "local");
+      assert(h.calls.sent.length === 0, "the rollback switch still sent a message");
+      assert(h.calls.callAI.join("|") === "COMBINED-PROMPT", "the in-document combined path did not run");
+      assert(out.join(",") === "in-document", "the in-document parse did not run: " + JSON.stringify(out));
+    });
+
     test("setup restore and cache click share adoption before any append", () => {
       const setupAi = popupAiSource.slice(
         popupAiSource.indexOf("function setupAIFeatures()"),

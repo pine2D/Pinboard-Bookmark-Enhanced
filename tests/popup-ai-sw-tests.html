@@ -140,6 +140,64 @@ function buildAiHarness(source, opts) {
   return { ...factory(...Object.values(deps)), calls, local, get authReads() { return authReads; } };
 }
 
+
+// ---- Harness: the popup's routing slice, sliced out of popup-ai.js ----------
+// K44-b. The popup half is under test here only where it MEETS the worker; its
+// own behaviour is covered in popup-save-tests.html. _inflightAI is per
+// generation on purpose: in the product each popup document gets a fresh Map,
+// and the dedup that matters across generations is the worker's.
+let popupAiSource = null;
+async function getPopupSource() {
+  if (!popupAiSource) popupAiSource = await (await fetch("../popup-ai.js")).text();
+  return popupAiSource;
+}
+
+function buildPopupHarness(source, opts) {
+  const o = opts || {};
+  const start = source.indexOf("function finalizeAITags");
+  const end = source.indexOf("function _aiResetSummaryActions");
+  if (start < 0 || end <= start) throw new Error("popup AI routing slice not found in popup-ai.js");
+  const sent = [];
+  const inflight = new Map();
+  const snapshot = {
+    aiProvider: "openai", aiCacheDuration: "24h", aiContentSource: "local",
+    aiTagSeparator: "-", optRespectTagCase: false,
+    customTagPrompt: "", customSummaryPrompt: "",
+  };
+  const deps = {
+    PBP_AI_VIA_SW: true,
+    settings: snapshot,
+    pageInfo: { url: "https://example.com/a", pageText: "body" },
+    allUserTags: [],
+    tagCaseMap: {},
+    _inflightAI: inflight,
+    chrome: { runtime: { sendMessage: (msg) => { sent.push(msg); return o.send(msg); } } },
+    _ensureAIHostPermission: async () => {},
+    pbpSanitizeAiOverrides, resolveTagCase, AI_TAG_CAP,
+    $id: () => ({ value: "" }),
+    getOrCreateInflight: (key, factory) => {
+      if (inflight.has(key)) return inflight.get(key);
+      let p;
+      p = Promise.resolve().then(factory).finally(() => { if (inflight.get(key) === p) inflight.delete(key); });
+      inflight.set(key, p);
+      return p;
+    },
+    aiCacheFingerprint: () => o.fingerprint,
+    getAICache: async () => null,
+    setAICache: async () => {},
+    callAI: async () => { throw new Error("the popup document must not call the provider itself"); },
+    buildSummaryPrompt: () => "SUMMARY PROMPT",
+    buildTagPrompt: () => "TAG PROMPT",
+    buildCombinedPrompt: () => "COMBINED PROMPT",
+    parseAITags: () => [], refineTags: (tags) => tags, parseAICombined: () => ({ tags: [], summary: "" }),
+    pbpRelevantTagsFirst: () => [],
+    pbpPopupAiAccountIsCurrent: () => true,
+  };
+  const api = new Function(...Object.keys(deps),
+    source.slice(start, end) + "\n; return { fetchAIArtifacts };")(...Object.values(deps));
+  return { ...api, snapshot, sent };
+}
+
 // Unique per case: _inflightAI is ONE module-level Map for the whole page, so a
 // reused key would leak dedup state between cases.
 let keySeq = 0;
@@ -812,6 +870,44 @@ function buildRouterHarness(source, opts) {
     const rh = buildRouterHarness(source);
     const r = await rh.invoke(baseMessage(), { id: EXT_ID, url: "https://pinboard.in/u:alice" });
     return r.responses[0]?.error === "forbidden" && !rh.calls.some(([n]) => n === "aiCall");
+  });
+
+  // ---- Both halves of the bus, end to end (K44-b) ----------------------------
+  // The real popup slice talking to the real worker slice. This is the case that
+  // states the whole point of the feature: the document that started the call is
+  // gone, a NEW popup asks for the same thing, and nobody pays twice.
+  await testCase("a reopened popup rides the call the dead one started — one provider request", async () => {
+    const source = await getSource();
+    const popupSource = await getPopupSource();
+    let settleCall;
+    const provider = new Promise((resolve) => { settleCall = resolve; });
+    const worker = buildAiHarness(source, {
+      settings: { aiProvider: "openai", aiCacheDuration: "24h", aiTagSeparator: "-" },
+      callAI: () => provider,
+    });
+    // Both generations freeze the same settings, so both compute the same key —
+    // which is the ONLY thing that lets the second one ride the first's call.
+    const fingerprint = `fp-reopen-${++keySeq}`;
+    const send = (msg) => worker.pbpRunPopupAiCall(msg);
+
+    const dying = buildPopupHarness(popupSource, { send, fingerprint });
+    const abandoned = dying.fetchAIArtifacts("summary", true, "alice", dying.snapshot, "local");
+    abandoned.catch(() => {});                 // Chrome destroys the document here
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (worker.calls.callAI.length !== 1) return false;
+
+    const reopened = buildPopupHarness(popupSource, { send, fingerprint });
+    const second = reopened.fetchAIArtifacts("summary", true, "alice", reopened.snapshot, "local");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    settleCall("the answer that was already paid for");
+    const got = await second;
+
+    const key = `alice|${fingerprint}|summary|https://example.com/a`;
+    return worker.calls.callAI.length === 1 &&
+      got === "the answer that was already paid for" &&
+      worker.calls.setAICache.some((args) => args[1] === "summary" && args[2] === got) &&
+      dying.sent.length === 1 && reopened.sent.length === 1 &&
+      dying.sent[0].inflightKey === key && reopened.sent[0].inflightKey === key;
   });
 
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
