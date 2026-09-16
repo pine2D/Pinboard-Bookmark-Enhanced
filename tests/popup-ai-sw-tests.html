@@ -129,7 +129,7 @@ function buildAiHarness(source, opts) {
     parseAICombined, parseAITags, refineTags,
     buildTagCaseMap, resolveTagCase,
     AI_TAG_CAP, API_KEY_FIELDS,
-    setAICache: async (...args) => { calls.setAICache.push(args); },
+    setAICache: async (...args) => { calls.setAICache.push(args); if (o.setAICache) return o.setAICache(...args); },
     console: { warn: (...a) => calls.warn.push(a), log: () => {}, error: (...a) => calls.warn.push(a) },
   };
   const factory = new Function(...Object.keys(deps), `${source.slice(start, end)}
@@ -677,6 +677,83 @@ function buildRouterHarness(source, opts) {
       const body = JSON.parse(requests[0].init.body);
       return requests.length === 1 && requests[0].url.includes("api.openai.com") && body.model === "gpt-override-1";
     } finally { window.fetch = realFetch; }
+  });
+
+  // The popup owns prompt assembly and freezes an immutable settings snapshot
+  // for the op (audit A4); the worker owns setAICache, which recomputes
+  // aiCacheFingerprint from ITS settings object. Every fingerprint input the
+  // popup can have frozen must therefore be overridable, or the worker files
+  // the popup's answer under a key the popup will never read — and, when a
+  // template changed mid-op, files the OLD template's answer under the NEW
+  // template's key. That is cache pollution, not just a wasted write.
+  await testCase("the whitelist covers EVERY non-secret aiCacheFingerprint input (probed, not enumerated)", async () => {
+    const h = buildAiHarness(source, { settings: {} });
+    const listed = h.PBP_AI_OVERRIDE_FIELDS;
+    const candidates = [
+      "aiProvider", "aiTagLang", "aiTagSeparator", "customTagPrompt",
+      "aiSummaryLang", "customSummaryPrompt", "openaiBaseUrl", "ollamaBaseUrl", "customBaseUrl",
+      "geminiModel", "openaiModel", "claudeModel", "ollamaModel", "customModel", "groqModel",
+    ];
+    const missing = new Set();
+    for (const provider of ["gemini", "openai", "claude", "ollama", "custom", "groq"]) {
+      const base = {
+        aiProvider: provider, aiTagLang: "en", aiTagSeparator: "-", aiSummaryLang: "auto",
+        customTagPrompt: "A {{content}}", customSummaryPrompt: "A {{content}}",
+        openaiBaseUrl: "https://a.example/v1", ollamaBaseUrl: "http://a.example",
+        customBaseUrl: "https://a.example/v1", geminiModel: "a", openaiModel: "a",
+        claudeModel: "a", ollamaModel: "a", customModel: "a", groqModel: "a",
+      };
+      for (const key of candidates) {
+        const moved = ["tags", "summary"].some((type) =>
+          aiCacheFingerprint({ ...base, [key]: "zzz-different" }, type) !== aiCacheFingerprint(base, type));
+        if (moved && !listed.includes(key)) missing.add(key);
+      }
+    }
+    return missing.size === 0;
+  });
+
+  await testCase("a custom prompt template override reaches the fingerprint, so the worker writes the POPUP's key", async () => {
+    const popupSnapshot = {
+      aiProvider: "openai", openaiModel: "gpt-5.4-nano", aiTagSeparator: "-",
+      aiTagLang: "en", aiSummaryLang: "auto",
+      customTagPrompt: "OLD tag template {{content}}", customSummaryPrompt: "OLD summary template {{content}}",
+    };
+    // The user edited both templates in the options tab while the popup sat open.
+    const swStorage = { ...popupSnapshot, customTagPrompt: "NEW tag template {{content}}", customSummaryPrompt: "NEW summary template {{content}}" };
+    const h = buildAiHarness(source, { settings: swStorage, reply: '["t"]' });
+    await h.pbpRunPopupAiCall(baseMessage({
+      mode: "single", kind: "tags", inflightKey: freshKey("tags"),
+      aiOverrides: { customTagPrompt: popupSnapshot.customTagPrompt, customSummaryPrompt: popupSnapshot.customSummaryPrompt },
+    }));
+    const used = cacheWrite(h.calls, "tags").settings;
+    return aiCacheFingerprint(used, "tags") === aiCacheFingerprint(popupSnapshot, "tags") &&
+      aiCacheFingerprint(used, "summary") === aiCacheFingerprint(popupSnapshot, "summary") &&
+      // the fixture genuinely distinguishes the two templates
+      aiCacheFingerprint(swStorage, "tags") !== aiCacheFingerprint(popupSnapshot, "tags");
+  });
+
+  await testCase("an endpoint override reaches the fingerprint too (openaiBaseUrl)", async () => {
+    const popupSnapshot = { aiProvider: "openai", openaiModel: "gpt-5.4-nano", aiTagSeparator: "-", openaiBaseUrl: "https://old.proxy.example/v1" };
+    const swStorage = { ...popupSnapshot, openaiBaseUrl: "https://new.proxy.example/v1" };
+    const h = buildAiHarness(source, { settings: swStorage, reply: '["t"]' });
+    await h.pbpRunPopupAiCall(baseMessage({
+      mode: "single", kind: "tags", inflightKey: freshKey("tags"),
+      aiOverrides: { openaiBaseUrl: popupSnapshot.openaiBaseUrl },
+    }));
+    const used = cacheWrite(h.calls, "tags").settings;
+    return aiCacheFingerprint(used, "tags") === aiCacheFingerprint(popupSnapshot, "tags") &&
+      aiCacheFingerprint(swStorage, "tags") !== aiCacheFingerprint(popupSnapshot, "tags");
+  });
+
+  await testCase("a failing cache write answers an envelope: pbpRunPopupAiCall really never rejects", async () => {
+    const h = buildAiHarness(source, {
+      settings: { aiTagSeparator: "-" },
+      reply: '{"summary":"S","tags":["t"]}',
+      setAICache: async () => { throw new DOMException("IDB unavailable", "InvalidStateError"); },
+    });
+    const r = await h.pbpRunPopupAiCall(baseMessage());
+    const logged = h.calls.warn.map((a) => a.join(" ")).join("\n");
+    return r.ok === false && r.error.message === "IDB unavailable" && logged.includes("IDB unavailable");
   });
 
   await testCase("settings are re-read per message, never captured once at worker top level", async () => {
