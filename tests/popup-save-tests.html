@@ -108,7 +108,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
 (async () => {
   try {
-    const [source, backgroundSource, popupAiSource, popupHtml, popupCss, enMessages] = await Promise.all([
+    const [source, backgroundSource, popupAiSource, popupHtml, popupCss, enMessages, popupOfflineSource] = await Promise.all([
       fetch("../popup.js").then((response) => response.text()),
       fetch("../background.js").then((response) => response.text()),
       fetch("../popup-ai.js").then((response) => response.text()),
@@ -116,7 +116,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       fetch("../popup.css").then((response) => response.text()),
       // The shipped English catalogue, so "localized" is judged against the real
       // file rather than a string typed into this suite.
-      fetch("../_locales/en/messages.json").then((response) => response.json())
+      fetch("../_locales/en/messages.json").then((response) => response.json()),
+      fetch("../popup-offline.js").then((response) => response.text())
     ]);
     const start = source.indexOf("function setupSubmit(token)");
     const handlerEnd = source.indexOf('  document.addEventListener("keydown"', start);
@@ -148,6 +149,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
     assert(lookupStart >= 0 && lookupEnd > lookupStart, "checkExistingBookmark source not found");
     const lookupSource = source.slice(lookupStart, lookupEnd);
     const setupSource = source.slice(start, setupEnd);
+    const offlineClearStart = source.indexOf("async function showOfflineQueueStatus() {");
+    const offlineClearEnd = source.indexOf("// ===================== Helpers", offlineClearStart);
+    assert(offlineClearStart >= 0 && offlineClearEnd > offlineClearStart, "showOfflineQueueStatus source not found");
+    const offlineClearSource = source.slice(offlineClearStart, offlineClearEnd);
+    const onRemoveStart = popupOfflineSource.indexOf("async function onRemove(queueId) {");
+    const onRemoveEnd = popupOfflineSource.indexOf("async function toggle(ev) {", onRemoveStart);
+    assert(onRemoveStart >= 0 && onRemoveEnd > onRemoveStart, "onRemove source not found");
+    const onRemoveSource = popupOfflineSource.slice(onRemoveStart, onRemoveEnd);
     const rebasePopupTags = new Function("unionTags", `${tagHelperSource}\nreturn pbpRebasePopupTags;`)(unionTags);
 
     function createElementStub(initial = {}) {
@@ -2236,6 +2245,139 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!resetSource.includes("storage.local") && !logoutSource.includes("storage.local"), "token clear still hand-routes a storage area");
       assert(loginSource.includes("const saved = await persistSettings") && loginSource.indexOf("if (!saved.ok)") < loginSource.indexOf("settings.pinboardToken = token"), "login enters memory before persistence succeeds");
       assert(resetSource.includes('settings.pinboardToken = ""') && resetSource.includes("window.location.reload()"), "session reset does not clear memory and reload");
+    });
+
+    // ---- Offline queue remove / clear: promise-form sendMessage failure paths ----
+    // K54: onRemove (popup-offline.js) and the clear_offline_queue confirm
+    // handler (popup.js) used to be callback-style sends that never read
+    // chrome.runtime.lastError. They were converted to the promise form used
+    // elsewhere in the repo (popup.js:11 pinboard_api_call, popup.js:471,
+    // options-vocab.js:318), wrapped in try/catch so BOTH failure paths are
+    // covered: a rejected/throwing send (transport: extension reload / context
+    // invalidated) and a normally-resolved { ok: false } (handler-internal
+    // failure, since background.js's mutateOfflineQueue().catch(() =>
+    // sendResponse({ ok: false })) always resolves). These run the real
+    // extracted source, not a hand-copied re-implementation.
+    async function runWithRejectionGuard(fn) {
+      let unhandled = 0;
+      const onUnhandled = () => { unhandled++; };
+      window.addEventListener("unhandledrejection", onUnhandled);
+      const result = await fn();
+      // unhandledrejection fires after the current microtask queue drains, so
+      // give it a macrotask tick before deciding none occurred.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      window.removeEventListener("unhandledrejection", onUnhandled);
+      return { result, unhandled };
+    }
+
+    function createOfflineRemoveHarness(sendMessageImpl) {
+      const warns = [];
+      let refreshCount = 0;
+      const dependencies = {
+        chrome: { runtime: { sendMessage: sendMessageImpl } },
+        console: { warn: (...args) => warns.push(args) },
+        refreshBar: async () => { refreshCount++; },
+      };
+      const names = Object.keys(dependencies);
+      const onRemove = new Function(...names, `${onRemoveSource}\nreturn onRemove;`)(...names.map((name) => dependencies[name]));
+      return { onRemove, warns, refreshCount: () => refreshCount };
+    }
+
+    function createOfflineClearHarness(sendMessageImpl) {
+      const warns = [];
+      const sent = [];
+      const refreshCalls = [];
+      let confirmOpts = null;
+      const elements = {
+        "offline-queue-bar": createElementStub(),
+        "offline-queue-clear": createElementStub(),
+      };
+      const windowStub = {
+        PPOffline: {
+          init() {},
+          refresh: async () => { refreshCalls.push(refreshCalls.length); },
+        },
+      };
+      const dependencies = {
+        chrome: { runtime: { sendMessage: (...args) => { sent.push(args[0]); return sendMessageImpl(...args); } } },
+        console: { warn: (...args) => warns.push(args) },
+        $id: (id) => (elements[id] ||= createElementStub()),
+        t: (key) => key,
+        window: windowStub,
+        showConfirmPopover: (anchor, opts) => { confirmOpts = opts; },
+      };
+      const names = Object.keys(dependencies);
+      const showOfflineQueueStatus = new Function(...names, `${offlineClearSource}\nreturn showOfflineQueueStatus;`)(...names.map((name) => dependencies[name]));
+      return {
+        run: async () => {
+          await showOfflineQueueStatus();
+          const clickHandler = elements["offline-queue-clear"]._listeners.click[0];
+          clickHandler({ preventDefault() {}, currentTarget: elements["offline-queue-clear"] });
+          const before = refreshCalls.length;
+          await confirmOpts.onConfirm();
+          return refreshCalls.length - before;
+        },
+        warns,
+        sent,
+      };
+    }
+
+    await testAsync("offline remove: a rejecting send resolves false, warns once (no queue content), and still refreshes with no unhandled rejection", async () => {
+      const harness = createOfflineRemoveHarness(async () => { throw new Error("ctx invalidated"); });
+      const { result, unhandled } = await runWithRejectionGuard(() => harness.onRemove("q1"));
+      assert(result === false, "a rejecting send did not resolve false");
+      assert(unhandled === 0, "onRemove let a rejection escape unhandled");
+      assert(harness.warns.length === 1 && harness.warns[0][0] === "offline remove message failed:" && harness.warns[0][1] === "ctx invalidated", "the transport failure left no (or the wrong) console trace: " + JSON.stringify(harness.warns));
+      assert(!harness.warns.some((args) => args.some((a) => typeof a === "string" && a.includes("q1"))), "the console trace leaked the queue id");
+      assert(harness.refreshCount() === 1, "a rejecting send skipped the list refresh");
+    });
+
+    await testAsync("offline remove: a resolved { ok: false } resolves false, does not warn, and still refreshes", async () => {
+      const harness = createOfflineRemoveHarness(async () => ({ ok: false }));
+      const result = await harness.onRemove("q2");
+      assert(result === false, "a handler-reported failure did not resolve false");
+      assert(harness.warns.length === 0, "a normally-resolved failure was mistaken for a transport error");
+      assert(harness.refreshCount() === 1, "a handler-reported failure skipped the list refresh");
+    });
+
+    await testAsync("offline remove: a resolved { ok: true } resolves true and still refreshes", async () => {
+      const harness = createOfflineRemoveHarness(async () => ({ ok: true }));
+      const result = await harness.onRemove("q3");
+      assert(result === true, "a successful remove did not resolve true");
+      assert(harness.refreshCount() === 1, "a successful remove skipped the list refresh");
+    });
+
+    await testAsync("offline clear: a rejecting send warns once and still refreshes via PPOffline (no unhandled rejection)", async () => {
+      const harness = createOfflineClearHarness(async () => { throw new Error("ctx invalidated"); });
+      const { result: refreshDelta, unhandled } = await runWithRejectionGuard(() => harness.run());
+      assert(unhandled === 0, "the clear confirm handler let a rejection escape unhandled");
+      assert(harness.sent.length === 1 && harness.sent[0].type === "clear_offline_queue", "clear did not send clear_offline_queue");
+      assert(harness.warns.length === 1 && harness.warns[0][0] === "offline clear message failed:" && harness.warns[0][1] === "ctx invalidated", "the transport failure left no (or the wrong) console trace: " + JSON.stringify(harness.warns));
+      assert(refreshDelta === 1, "a rejecting clear skipped the list refresh");
+    });
+
+    await testAsync("offline clear: a resolved { ok: false } does not warn and still refreshes", async () => {
+      const harness = createOfflineClearHarness(async () => ({ ok: false }));
+      const refreshDelta = await harness.run();
+      assert(harness.warns.length === 0, "a normally-resolved failure was mistaken for a transport error");
+      assert(refreshDelta === 1, "a handler-reported failure skipped the list refresh");
+    });
+
+    await testAsync("offline clear: a resolved { ok: true } does not warn and still refreshes", async () => {
+      const harness = createOfflineClearHarness(async () => ({ ok: true }));
+      const refreshDelta = await harness.run();
+      assert(harness.warns.length === 0, "a successful clear logged an unexpected warning");
+      assert(refreshDelta === 1, "a successful clear skipped the list refresh");
+    });
+
+    test("offline clear no longer carries the unreachable ok-gated hidden-bar branch", () => {
+      // popup.html unconditionally loads popup-offline.js (script tag asserted
+      // elsewhere), so window.PPOffline is always truthy by the time this runs
+      // and the old "else if (ok) bar.classList.add('hidden')" branch could
+      // never execute. This is a narrow structural check on the one dead
+      // branch this task removed, not a stand-in for the behavior tests above.
+      assert(popupHtml.includes('src="popup-offline.js"'), "popup.html no longer unconditionally loads popup-offline.js -- the dead-branch premise changed");
+      assert(!offlineClearSource.includes("bar.classList.add(\"hidden\")"), "the unreachable ok-gated hidden-bar branch is still present");
     });
 
     // ---- Bookmark lookup failure copy, over the real proxy ----

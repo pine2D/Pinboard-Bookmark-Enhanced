@@ -192,11 +192,18 @@
   }
 
   async function onRemove(queueId) {
-    const ok = await new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: "remove_offline_item", queueId }, (resp) => {
-        resolve(!!(resp && resp.ok));
-      });
-    });
+    // Promise form (not callback+lastError): sendMessage rejects on transport
+    // failure (extension reload / context invalidated) instead of setting
+    // lastError, so a plain try/catch here covers that path, while resp.ok
+    // being false covers the handler-internal failure (background.js's
+    // mutateOfflineQueue().catch(() => sendResponse({ ok: false }))).
+    let ok = false;
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: "remove_offline_item", queueId });
+      ok = !!(resp && resp.ok);
+    } catch (e) {
+      console.warn("offline remove message failed:", e && e.message);
+    }
     await refreshBar();
     return ok;
   }
