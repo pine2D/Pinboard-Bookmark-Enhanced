@@ -414,6 +414,11 @@ async function pbpApplyBackupPayload(data, {
 
   if (selected.themes && Array.isArray(importedThemes) && importedThemes.length) {
     try {
+      // Raw syncSetLarge, deliberately NOT guarded by
+      // pbpAssertChunkedSyncReadComplete: this list came from the user's file,
+      // not from a read that assertion could distrust, so the import is the
+      // one way out of a chunk manifest this build can never decode (see the
+      // assertion's doc comment in shared.js).
       const setLarge = typeof globalThis.__pbpTestSyncSetLarge === "function"
         ? globalThis.__pbpTestSyncSetLarge
         : syncSetLarge;
@@ -847,13 +852,20 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     } catch (err) {
       console.error("[export] failed", err);
       const status = $id("import-status");
-      // Both throw points that reject a field -- pbpBuildBackupSnapshot above
-      // and the preflight after it -- land here. The generic save failure sends
-      // the user to review settings this path never wrote, so it is kept only
-      // for failures with no field to name: an account that changed mid-export,
-      // a storage read that threw.
+      // Three outcomes, because two of them are not "the save half-happened".
+      // pbpAssertChunkedSyncReadComplete's refusal (code "chunks_propagating")
+      // names no field and wrote nothing anywhere -- neither to storage nor to
+      // disk -- and the remedy is to wait, so it gets copy that says so rather
+      // than the generic one telling the user to go audit settings. Both throw
+      // points that reject a field -- pbpBuildBackupSnapshot above and the
+      // preflight after it -- name that field. The generic save failure is
+      // what is left: an account that changed mid-export, a storage read that
+      // threw.
       const field = pbpBackupErrorField(err);
-      setStatusIcon(status, false, field ? t("backupExportFailed", field) : t("optSaveFailed"));
+      setStatusIcon(status, false,
+        err?.code === "chunks_propagating"
+          ? t("backupExportSyncPending")
+          : field ? t("backupExportFailed", field) : t("optSaveFailed"));
     }
   };
 

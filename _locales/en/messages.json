@@ -1138,6 +1138,9 @@
     "message": "Backup file could not be created: the field $FIELD$ is invalid.",
     "placeholders": { "field": { "content": "$1" } }
   },
+  "backupExportSyncPending": {
+    "message": "Chrome Sync has not finished delivering this data to this device. Nothing was written; try again in a minute."
+  },
   "importSettings": {
     "message": "Import Settings"
   },

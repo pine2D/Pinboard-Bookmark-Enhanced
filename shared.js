@@ -1965,8 +1965,25 @@ async function pbpReadChunkedSyncResult(key, stored, defaultValue) {
 //     Checking the manifest alone is not enough: an intentionally empty array
 //     is stored as one real chunk holding "[]", so a sync user who deleted
 //     their last saved theme would never be able to export again.
-// The condition is self-healing -- the chunk arrives and the next attempt
-// succeeds -- which is why it needs no "retry N times / reset" escape hatch.
+// SELF-HEALING ONLY FOR PROPAGATION. The common case -- a named chunk that
+// has not landed on this device yet -- clears itself: the chunk arrives and
+// the next attempt succeeds, which is why that case needs no "retry N times /
+// reset" affordance. The two other ways in do NOT clear themselves:
+//   - a manifest OBJECT this build cannot decode (the `!meta ||
+//     typeof meta !== "object"` guard below lets undefined and legacy strings
+//     through, so what reaches the throw is a real but unusable record), and
+//   - a chunk key the cloud will never deliver (its writer's device is gone,
+//     or the chunk was evicted), which is propagation-shaped but permanent.
+// In either state this refusal is standing, and everything that re-writes
+// savedThemes / customOverlayCSS from a read stops with it: Export (its own
+// backupExportSyncPending line), adding / deleting / renaming a custom theme
+// (the generic auto-save banner), and turning settings sync OFF (the generic
+// syncMigrationFailed). There is no reset button for any of them, by design --
+// each one would publish over the cloud copy this assertion exists to protect.
+// The one remaining way out is importing a backup, whose theme write goes
+// through a raw syncSetLarge (options-backup.js, commented there as the
+// deliberate escape hatch): it publishes a list the USER supplied rather than
+// one derived from the suspicious read, so it is safe to leave unguarded.
 //
 // FAIL-OPEN on every storage exception, deliberately. A probe that threw
 // whenever it could not reach storage would convert transient platform noise

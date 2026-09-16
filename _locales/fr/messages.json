@@ -1138,6 +1138,9 @@
     "message": "Le fichier de sauvegarde n’a pas pu être créé : le champ $FIELD$ n’est pas valide.",
     "placeholders": { "field": { "content": "$1" } }
   },
+  "backupExportSyncPending": {
+    "message": "Chrome Sync n’a pas fini de transférer ces données sur cet appareil. Aucun fichier n’a été écrit ; réessayez dans une minute."
+  },
   "importSettings": {
     "message": "Importer les paramètres"
   },

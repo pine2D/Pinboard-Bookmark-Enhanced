@@ -786,6 +786,104 @@ async function run() {
     })();
   })();
 
+  // ---------- E2c: the legacy local->sync theme migration respects K117 ----------
+  // loadSavedThemes's one-time migration is armed by an EMPTY sync read --
+  // exactly the read pbpAssertChunkedSyncReadComplete distrusts. Hand-written
+  // server shape: the manifest claims three chunks and one never arrived on
+  // this device, so the reader degrades to []. Publishing the legacy local list
+  // over that orphans the themes still in the cloud AND deletes the local copy,
+  // leaving nothing. Reachable right after a backup import re-runs this load.
+  await (async () => {
+    const loadOptionsSource = await fetch("../options.js").then((response) => response.text());
+    const loadStart = loadOptionsSource.indexOf("  async function loadSavedThemes(");
+    const loadEnd = loadOptionsSource.indexOf("  // Merge, never overwrite:", loadStart);
+    check("E2c loadSavedThemes: slice found", loadStart >= 0 && loadEnd > loadStart);
+    const loadSource = loadOptionsSource.slice(loadStart, loadEnd);
+
+    const runLoad = async (syncBacking) => {
+      const prevChromeE2c = globalThis.chrome;
+      const prevCacheE2c = _settingsStorageCache;
+      const legacyThemes = [{ name: "Legacy", css: "a{}" }];
+      const localBacking = { savedThemes: legacyThemes };
+      const writes = [];
+      const localRemoves = [];
+      try {
+        const syncStub = {
+          get: async (keys) => {
+            const list = Array.isArray(keys) ? keys : [keys];
+            const out = {};
+            list.forEach((key) => { if (key in syncBacking) out[key] = syncBacking[key]; });
+            return out;
+          },
+          set: async (data) => { Object.assign(syncBacking, data); },
+          remove: async (keys) => {
+            (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete syncBacking[key]);
+          },
+        };
+        globalThis.chrome = {
+          storage: {
+            local: {
+              get: async (keys) => {
+                if (typeof keys === "string") {
+                  return keys in localBacking ? { [keys]: localBacking[keys] } : {};
+                }
+                const out = Object.assign({}, keys);
+                Object.keys(keys).forEach((key) => {
+                  if (key in localBacking) out[key] = localBacking[key];
+                });
+                return out;
+              },
+              set: async (data) => { Object.assign(localBacking, data); },
+              remove: async (keys) => {
+                (Array.isArray(keys) ? keys : [keys]).forEach((key) => {
+                  localRemoves.push(key);
+                  delete localBacking[key];
+                });
+              },
+            },
+            sync: syncStub,
+            onChanged: { addListener() {} },
+          },
+        };
+        _settingsStorageCache = syncStub;
+        const deps = {
+          savedThemes: [],
+          // The degraded read the real syncGetLarge performs for both cases;
+          // what separates them is the cloud manifest the REAL assertion reads.
+          syncGetLarge: async () => [],
+          syncSetLarge: async (key, value) => { writes.push({ key, value }); },
+          renderSavedThemes: () => {},
+        };
+        await new Function(...Object.keys(deps), loadSource + "\nreturn loadSavedThemes;")(
+          ...Object.values(deps))();
+      } finally {
+        globalThis.chrome = prevChromeE2c;
+        _settingsStorageCache = prevCacheE2c;
+      }
+      return { writes, localRemoves, localBacking, legacyThemes };
+    };
+
+    const incomplete = await runLoad({
+      savedThemes: { _chunks: 3, _generation: "g1" },
+      savedThemes_g1_0: '[{"name":"Cloud",',
+      savedThemes_g1_1: '"css":"b{}"}',
+      // savedThemes_g1_2 has not arrived on this device yet.
+    });
+    check("E2c a chunk still in flight skips the legacy theme migration entirely",
+      incomplete.writes.length === 0 &&
+      !incomplete.localRemoves.includes("savedThemes") &&
+      Array.isArray(incomplete.localBacking.savedThemes) &&
+      incomplete.localBacking.savedThemes.length === 1);
+
+    // Never written to sync at all is NOT the same condition: undefined
+    // metadata must keep migrating, or the legacy list never reaches the cloud.
+    const clean = await runLoad({});
+    check("E2c an empty cloud with no manifest still migrates the legacy local list",
+      clean.writes.length === 1 && clean.writes[0].key === "savedThemes" &&
+      JSON.stringify(clean.writes[0].value) === JSON.stringify(clean.legacyThemes) &&
+      clean.localRemoves.includes("savedThemes"));
+  })();
+
   // ---------- E3: v1 themePresetKey routes through getSettingsStorage ----------
   // Stub both areas; record which one themePresetKey lands in.
   // (chrome is not defined in headless non-extension Chromium; we install a full stub)
@@ -3252,10 +3350,11 @@ async function run() {
       const status = document.getElementById("import-status");
       const manifestBefore = JSON.stringify(syncBacking.savedThemes);
       status.textContent = "";
-      // The export folds its error into a status line, so the only place the
-      // abort's identity is observable is the console it already logs to.
-      // Matching the CODE, not the message or the generic status text, is what
-      // keeps this test pinned to THIS refusal rather than to any failure.
+      // The export folds its error into a status line, so matching the CODE on
+      // the console it already logs to is what keeps this test pinned to THIS
+      // refusal rather than to any failure. The status line is checked too: an
+      // abort that wrote nothing anywhere must NOT borrow optSaveFailed, whose
+      // copy tells the user to go review settings this path never touched.
       const exportErrors = [];
       const prevErrorE7d = console.error;
       console.error = (...args) => { exportErrors.push(...args); };
@@ -3265,7 +3364,8 @@ async function run() {
       }
       console.error = prevErrorE7d;
       check("E7d a chunk still in flight aborts the export instead of writing a hollow backup",
-        status.textContent.includes("optSaveFailed") && exportedBlob === null &&
+        status.textContent.includes("backupExportSyncPending") &&
+        !status.textContent.includes("optSaveFailed") && exportedBlob === null &&
         exportErrors.some((arg) => arg instanceof Error && arg.code === "chunks_propagating"));
       check("E7d the aborted export leaves the cloud manifest on its own generation",
         JSON.stringify(syncBacking.savedThemes) === manifestBefore &&
@@ -3320,7 +3420,8 @@ async function run() {
         await new Promise((resolve) => requestAnimationFrame(resolve));
       }
       check("E7d an unreadable chunked SETTING aborts the export too, not just the themes",
-        status.textContent.includes("optSaveFailed") && exportedBlob === null);
+        status.textContent.includes("backupExportSyncPending") &&
+        !status.textContent.includes("optSaveFailed") && exportedBlob === null);
       syncBacking.customTagPrompt = SETTINGS_DEFAULTS.customTagPrompt;
       delete syncBacking.customTagPrompt_p1_0;
 

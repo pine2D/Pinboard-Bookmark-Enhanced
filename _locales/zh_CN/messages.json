@@ -1138,6 +1138,9 @@
     "message": "备份文件未能生成，字段 $FIELD$ 的内容无效。",
     "placeholders": { "field": { "content": "$1" } }
   },
+  "backupExportSyncPending": {
+    "message": "Chrome Sync 尚未把这些数据同步到这台设备。没有写出备份文件，过一分钟再试。"
+  },
   "importSettings": {
     "message": "导入设置"
   },

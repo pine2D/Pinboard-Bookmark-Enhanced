@@ -3383,8 +3383,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function loadSavedThemes() {
     savedThemes = await syncGetLarge("savedThemes", []);
     if (!Array.isArray(savedThemes)) savedThemes = [];
-    // One-time migration from local
-    if (!savedThemes.length) {
+    // One-time migration from local. K117: the empty read that arms it is
+    // exactly the read the chunk assertion distrusts -- a cloud list whose
+    // chunks have not landed here reads as [] too, and publishing the legacy
+    // local list over it orphans themes the user still has (and then deletes
+    // the local copy). Reachable right after an import, which re-runs this
+    // load. Skipping the migration for one load costs nothing; it runs on the
+    // next load once the read is trustworthy. Non-throwing on purpose: the
+    // assertion fails open on storage errors, and a load must still render.
+    let syncReadComplete = true;
+    try {
+      await pbpAssertChunkedSyncReadComplete("savedThemes", savedThemes);
+    } catch (_) { syncReadComplete = false; }
+    if (syncReadComplete && !savedThemes.length) {
       const local = await chrome.storage.local.get({ savedThemes: [] });
       if (Array.isArray(local.savedThemes) && local.savedThemes.length) {
         savedThemes = local.savedThemes;

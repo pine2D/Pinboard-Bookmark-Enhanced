@@ -1138,6 +1138,9 @@
     "message": "備份檔案未能產生，欄位 $FIELD$ 的內容無效。",
     "placeholders": { "field": { "content": "$1" } }
   },
+  "backupExportSyncPending": {
+    "message": "Chrome Sync 未將這些資料同步到這部裝置。沒有寫出備份檔案，過一分鐘再試。"
+  },
   "importSettings": {
     "message": "匯入設定"
   },

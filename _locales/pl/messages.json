@@ -1138,6 +1138,9 @@
     "message": "Nie udało się utworzyć pliku kopii zapasowej, ponieważ pole $FIELD$ jest nieprawidłowe.",
     "placeholders": { "field": { "content": "$1" } }
   },
+  "backupExportSyncPending": {
+    "message": "Chrome Sync nie zakończył jeszcze przesyłania tych danych na to urządzenie. Nic nie zostało zapisane — spróbuj ponownie za minutę."
+  },
   "importSettings": {
     "message": "Importuj ustawienia"
   },
