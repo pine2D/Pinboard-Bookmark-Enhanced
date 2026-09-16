@@ -1963,6 +1963,23 @@ async function pbpReadChunkedSyncResult(key, stored, defaultValue) {
 //     their last saved theme would never be able to export again.
 // The condition is self-healing -- the chunk arrives and the next attempt
 // succeeds -- which is why it needs no "retry N times / reset" escape hatch.
+//
+// FAIL-OPEN on every storage exception, deliberately. A probe that threw
+// whenever it could not reach storage would convert transient platform noise
+// into a refusal to export or to change the sync setting, i.e. it would break
+// the working case to protect the broken one. The read whose result is being
+// checked came back, so the caller already has a usable value; this function
+// only ever UPGRADES a suspicious empty read into a refusal, never a healthy
+// one. Note it does NOT take pbpWithLargeStorageLock, so it is safe to call
+// from inside a caller that already holds it.
+//
+// KNOWN RESIDUAL (by design): "the manifest itself has not arrived yet" is
+// undetectable here. A device that holds neither the manifest nor the chunks
+// is indistinguishable from one whose cloud copy is genuinely empty without
+// scanning the whole sync area for orphan `<key>_<generation>_<n>` keys --
+// a full-area get(null) on every export and every theme save, which the write
+// path deliberately avoids too (E12 asserts it never scans). That window
+// stays open.
 async function pbpAssertChunkedSyncReadComplete(key, value) {
   const empty = value == null
     || (typeof value === "string" && value === "")
@@ -1980,15 +1997,42 @@ async function pbpAssertChunkedSyncReadComplete(key, value) {
   let meta;
   try { meta = (await chrome.storage.sync.get(key))[key]; } catch (_) { return; }
   const chunkKeys = pbpChunkStorageKeys(key, meta);
-  if (!chunkKeys.length) return;
+  if (!chunkKeys.length) {
+    // The other ok:false exit. A manifest OBJECT that yields no chunk keys is
+    // a cloud record this build cannot decode (bad _chunks, bad _generation);
+    // the reader degraded it to the default just the same, so rewriting from
+    // that default orphans whatever it points at exactly as a missing chunk
+    // does. `undefined` (never written) and a legacy pre-chunk string (which
+    // decodes fine) are NOT that and must keep passing.
+    if (!meta || typeof meta !== "object") return;
+    throw pbpChunksPropagatingError(key);
+  }
   let chunks;
   try { chunks = await chrome.storage.sync.get(chunkKeys); } catch (_) { return; }
   if (chunkKeys.every((chunkKey) => typeof chunks[chunkKey] === "string")) return;
-  // No new user-facing string: both call sites already have a failure path
-  // (the export's generic message, the sync toggle's syncMigrationFailed).
-  const error = new Error(`chunked sync value "${key}" has not finished propagating`);
-  error.code = "sync_chunks_incomplete";
-  throw error;
+  throw pbpChunksPropagatingError(key);
+}
+
+// No new user-facing string: every call site already has a failure path (the
+// export's generic message, the sync toggle's syncMigrationFailed, the theme
+// popover's reportAutoSaveFailure). The code is what callers and tests match
+// on -- never the message.
+function pbpChunksPropagatingError(key) {
+  const error = new Error(`chunked sync value "${key}" could not be read back`);
+  error.code = "chunks_propagating";
+  return error;
+}
+
+// The same assertion for the four PBP_CHUNKED_SETTING_KEYS, which reach their
+// callers already resolved inside a settings object (pbpResolveChunkedSettings)
+// rather than through an individual syncGetLarge. Keys absent from the object
+// were never requested and are skipped.
+async function pbpAssertChunkedSettingsComplete(settings) {
+  if (!settings || typeof settings !== "object") return;
+  for (const key of PBP_CHUNKED_SETTING_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(settings, key)) continue;
+    await pbpAssertChunkedSyncReadComplete(key, settings[key]);
+  }
 }
 
 async function pbpResolveChunkedSettings(settings, storage, query) {

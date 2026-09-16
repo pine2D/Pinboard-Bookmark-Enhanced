@@ -698,12 +698,12 @@ async function run() {
     const persistEnd = optionsSource.indexOf("  function renderSavedThemes(", persistStart);
     check("persistSavedThemes: slice found", persistStart >= 0 && persistEnd > persistStart);
     const persistSource = optionsSource.slice(persistStart, persistEnd);
-    const makePersist = (write) => {
+    const makePersist = (write, read) => {
       const deps = {
         savedThemes: [{ name: "T1", css: "a{}" }],
         pbpApplySavedThemeOp,
         pbpWithLargeStorageLock: (_key, work) => work(),
-        pbpSyncGetLargeUnlocked: async () => stored.map((theme) => ({ ...theme })),
+        pbpSyncGetLargeUnlocked: read || (async () => stored.map((theme) => ({ ...theme }))),
         pbpSyncSetLargeUnlocked: write,
         pbpRefreshSyncLocalFallbackStatus: async () => {},
       };
@@ -733,6 +733,57 @@ async function run() {
     })({ type: "delete", name: "T2" }));
     check("E2b persistSavedThemes still rejects a genuine storage failure",
       !failed.ok && failed.error && failed.error.message === "storage down");
+
+    // K117: the in-lock re-read IS the merge base. Hand-written server shape --
+    // the manifest claims three chunks and one has not propagated here, so the
+    // reader degrades to []. Merging onto that and writing would publish a new
+    // generation and orphan every theme the user still has. Both call sites
+    // wrap persistSavedThemes in try/catch -> reportAutoSaveFailure, so the
+    // rejection asserted here is what the existing auto-save failure UI shows.
+    await (async () => {
+      const prevChromeE2b = globalThis.chrome;
+      const prevCacheE2b = _settingsStorageCache;
+      const propagatingSync = {
+        savedThemes: { _chunks: 3, _generation: "g1" },
+        savedThemes_g1_0: '[{"name":"T2",',
+        savedThemes_g1_1: '"css":"b{}"}',
+      };
+      const manifestBefore = JSON.stringify(propagatingSync.savedThemes);
+      let propagatingWrites = 0;
+      try {
+        const syncStub = {
+          get: async (keys) => {
+            const list = Array.isArray(keys) ? keys : [keys];
+            const out = {};
+            list.forEach((key) => { if (key in propagatingSync) out[key] = propagatingSync[key]; });
+            return out;
+          },
+          set: async (data) => { Object.assign(propagatingSync, data); },
+          remove: async (keys) => {
+            (Array.isArray(keys) ? keys : [keys]).forEach((key) => delete propagatingSync[key]);
+          },
+        };
+        globalThis.chrome = {
+          storage: {
+            local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
+            sync: syncStub,
+            onChanged: { addListener() {} },
+          },
+        };
+        _settingsStorageCache = syncStub;
+        const propagating = await attempt(() => makePersist(
+          async () => { propagatingWrites++; },
+          async () => [],
+        )({ type: "save", name: "T1", css: "a{}" }));
+        check("E2b persistSavedThemes refuses to merge onto a cloud value it could not read",
+          !propagating.ok && propagating.error?.code === "chunks_propagating" &&
+          propagatingWrites === 0 &&
+          JSON.stringify(propagatingSync.savedThemes) === manifestBefore);
+      } finally {
+        globalThis.chrome = prevChromeE2b;
+        _settingsStorageCache = prevCacheE2b;
+      }
+    })();
   })();
 
   // ---------- E3: v1 themePresetKey routes through getSettingsStorage ----------
@@ -2553,6 +2604,76 @@ async function run() {
       !("savedThemes" in propagatingLocal) &&
       JSON.stringify(propagatingSync.savedThemes) === propagatingManifestBefore);
 
+    // Same degrade, but for one of the four PBP_CHUNKED_SETTING_KEYS: those
+    // reach the migration through pbpResolveChunkedSettings and are re-written
+    // into the destination area verbatim, so an undecodable prompt must abort
+    // BEFORE any large write happens.
+    const promptLocal = { optSyncEnabled: true };
+    const promptSync = {
+      syncApiKeys: false,
+      customTagPrompt: { _chunks: 2, _generation: "p1" },
+      customTagPrompt_p1_0: "first half of the prompt ",
+    };
+    const promptChrome = { storage: { local: area(promptLocal), sync: area(promptSync) } };
+    const promptWrites = [];
+    const promptError = { textContent: "", classList: { add() {}, remove() {} } };
+    let promptHandler;
+    const promptToggle = { checked: false, addEventListener: (_type, fn) => { promptHandler = fn; } };
+    const promptDeps = {
+      ...handlerDeps,
+      syncToggle: promptToggle,
+      chrome: promptChrome,
+      syncSetLarge: async (key, value) => { promptWrites.push({ key, value }); },
+      $id: (id) => (id === "opt-sync-error" ? promptError : null),
+    };
+    const promptCache = _settingsStorageCache;
+    globalThis.chrome = promptChrome;
+    _settingsStorageCache = null;
+    new Function(...Object.keys(promptDeps), syncHandlerSource)(...Object.values(promptDeps));
+    await promptHandler();
+    _settingsStorageCache = promptCache;
+    check("E5 Options handler: an unreadable chunked setting aborts the migration before any large write",
+      promptError.textContent === "syncMigrationFailed" &&
+      promptToggle.checked === true && promptLocal.optSyncEnabled === true &&
+      promptWrites.length === 0 && !("customTagPrompt" in promptLocal));
+
+    // Regression guard for the sync-ROUTE gate: while sync is being turned ON
+    // the large reads still come from LOCAL, so a stray cloud manifest left by
+    // an earlier sync-on session says nothing about them. Without that gate
+    // every enable migration on such a profile would abort. The REAL
+    // syncGetLarge is injected so the gate is exercised end to end.
+    const strayLocal = { optSyncEnabled: false, optTheme: "device-theme" };
+    const straySync = {
+      syncApiKeys: false,
+      savedThemes: { _chunks: 3, _generation: "g1" },
+      savedThemes_g1_0: '[{"name":"Stray",',
+    };
+    const strayChrome = { storage: { local: area(strayLocal), sync: area(straySync) } };
+    const strayWrites = [];
+    const strayError = { textContent: "", classList: { add() {}, remove() {} } };
+    const strayAnswers = [false, true];
+    let strayHandler;
+    const strayToggle = { checked: true, addEventListener: (_type, fn) => { strayHandler = fn; } };
+    const strayDeps = {
+      ...handlerDeps,
+      syncToggle: strayToggle,
+      chrome: strayChrome,
+      syncGetLarge,
+      syncSetLarge: async (key, value) => { strayWrites.push({ key, value }); },
+      confirm: () => strayAnswers.shift(),
+      $id: (id) => (id === "opt-sync-error" ? strayError : null),
+    };
+    const strayCache = _settingsStorageCache;
+    globalThis.chrome = strayChrome;
+    _settingsStorageCache = null;
+    new Function(...Object.keys(strayDeps), syncHandlerSource)(...Object.values(strayDeps));
+    await strayHandler();
+    _settingsStorageCache = strayCache;
+    check("E5 Options handler: a stray cloud manifest never blocks enabling sync, whose reads come from local",
+      strayLocal.optSyncEnabled === true && strayError.textContent === "" &&
+      strayToggle.checked === true && strayAnswers.length === 0 &&
+      strayWrites.some((entry) => entry.key === "savedThemes"));
+
     globalThis.chrome = previousHandlerChrome;
 
     delete globalThis.__pbpTestStorage;
@@ -3131,12 +3252,21 @@ async function run() {
       const status = document.getElementById("import-status");
       const manifestBefore = JSON.stringify(syncBacking.savedThemes);
       status.textContent = "";
+      // The export folds its error into a status line, so the only place the
+      // abort's identity is observable is the console it already logs to.
+      // Matching the CODE, not the message or the generic status text, is what
+      // keeps this test pinned to THIS refusal rather than to any failure.
+      const exportErrors = [];
+      const prevErrorE7d = console.error;
+      console.error = (...args) => { exportErrors.push(...args); };
       document.getElementById("export-settings").click();
       for (let i = 0; i < 30 && !status.textContent; i++) {
         await new Promise((resolve) => requestAnimationFrame(resolve));
       }
+      console.error = prevErrorE7d;
       check("E7d a chunk still in flight aborts the export instead of writing a hollow backup",
-        status.textContent.includes("optSaveFailed") && exportedBlob === null);
+        status.textContent.includes("optSaveFailed") && exportedBlob === null &&
+        exportErrors.some((arg) => arg instanceof Error && arg.code === "chunks_propagating"));
       check("E7d the aborted export leaves the cloud manifest on its own generation",
         JSON.stringify(syncBacking.savedThemes) === manifestBefore &&
         !syncCalls.sets.some((data) => "savedThemes" in data) &&
@@ -3176,6 +3306,43 @@ async function run() {
       check("E7d the export self-heals as soon as the last chunk propagates",
         !!healedExport && Array.isArray(healedExport.savedThemes) &&
         healedExport.savedThemes.length === 1 && healedExport.savedThemes[0].name === "One");
+
+      // The four PBP_CHUNKED_SETTING_KEYS reach the export through
+      // pbpResolveChunkedSettings, which degrades the same way. A backup that
+      // silently drops a long custom prompt is just as hollow as one missing
+      // the themes.
+      syncBacking.customTagPrompt = { _chunks: 2, _generation: "p1" };
+      syncBacking.customTagPrompt_p1_0 = "first half of the prompt ";
+      exportedBlob = null;
+      status.textContent = "";
+      document.getElementById("export-settings").click();
+      for (let i = 0; i < 30 && !status.textContent; i++) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      check("E7d an unreadable chunked SETTING aborts the export too, not just the themes",
+        status.textContent.includes("optSaveFailed") && exportedBlob === null);
+      syncBacking.customTagPrompt = SETTINGS_DEFAULTS.customTagPrompt;
+      delete syncBacking.customTagPrompt_p1_0;
+
+      // Regression guard for the pass-through gate this task added: a local
+      // fallback record is authoritative by design, so a cloud manifest that
+      // cannot be read says nothing about the value the reader returned.
+      // Deleting that gate turns this red (the probe would see the missing
+      // chunk and abort an export that is actually fine).
+      syncBacking.savedThemes = { _chunks: 3, _generation: "g1" };
+      delete syncBacking.savedThemes_g1_2;
+      localBacking.savedThemes_localFallback = pbpLargeFallbackRecord([], "gnew", "g1");
+      exportedBlob = null;
+      status.textContent = "";
+      document.getElementById("export-settings").click();
+      for (let i = 0; i < 30 && !exportedBlob && !status.textContent; i++) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      const fallbackExport = exportedBlob ? JSON.parse(await exportedBlob.text()) : null;
+      check("E7d a device-local fallback record keeps the export working over an unreadable cloud copy",
+        !!fallbackExport && status.textContent === "" &&
+        !(fallbackExport.savedThemes && fallbackExport.savedThemes.length));
+      delete localBacking.savedThemes_localFallback;
     } finally {
       globalThis.chrome = prevChromeE7d;
       URL.createObjectURL = prevCreateObjectURL;
@@ -3229,6 +3396,62 @@ async function run() {
     } finally {
       console.warn = prevWarn;
       globalThis.chrome = prevChromeE7e;
+    }
+  })();
+
+  // ---------- E7f: what the completeness probe does and does NOT refuse (K117) ----------
+  await (async () => {
+    const prevChromeE7f = globalThis.chrome;
+    const prevCacheE7f = _settingsStorageCache;
+    const prevWarnE7f = console.warn;
+    const syncBacking = {};
+    try {
+      const syncStub = {
+        get: async (keys) => {
+          const list = Array.isArray(keys) ? keys : [keys];
+          const out = {};
+          list.forEach((key) => { if (key in syncBacking) out[key] = syncBacking[key]; });
+          return out;
+        },
+      };
+      globalThis.chrome = {
+        storage: {
+          local: { get: async () => ({}) },
+          sync: syncStub,
+          onChanged: { addListener() {} },
+        },
+      };
+      _settingsStorageCache = syncStub;
+      console.warn = () => {};
+      const refused = async (key) => {
+        try { await pbpAssertChunkedSyncReadComplete(key, []); return ""; }
+        catch (error) { return (error && error.code) || "threw-without-code"; }
+      };
+      // A manifest OBJECT that yields no chunk keys is the second ok:false
+      // exit -- a cloud record this build cannot decode. The reader degraded it
+      // to [] just like a missing chunk, so a rewrite from [] is just as
+      // destructive and the probe has to refuse.
+      syncBacking.badCount = { _chunks: 0, _generation: "g1" };
+      syncBacking.badGeneration = { _chunks: 2, _generation: "not a generation!" };
+      syncBacking.notAManifest = [1, 2, 3];
+      // ...while the two shapes that mean "legitimately empty" must pass:
+      // never written at all, and a legacy pre-chunk string (which decodes).
+      syncBacking.legacyString = "legacy pre-chunk value";
+      const [badCount, badGeneration, notAManifest, neverWritten, legacyString] = await Promise.all(
+        ["badCount", "badGeneration", "notAManifest", "neverWritten", "legacyString"].map(refused));
+      let nonEmptyRefusal = "";
+      syncBacking.stillFilled = { _chunks: 3, _generation: "g1" };
+      try { await pbpAssertChunkedSyncReadComplete("stillFilled", [{ name: "One" }]); }
+      catch (error) { nonEmptyRefusal = (error && error.code) || "threw"; }
+      console.warn = prevWarnE7f;
+      check("E7f an undecodable manifest is refused, while never-written and legacy pre-chunk values pass",
+        badCount === "chunks_propagating" && badGeneration === "chunks_propagating" &&
+        notAManifest === "chunks_propagating" &&
+        neverWritten === "" && legacyString === "" && nonEmptyRefusal === "");
+    } finally {
+      console.warn = prevWarnE7f;
+      globalThis.chrome = prevChromeE7f;
+      _settingsStorageCache = prevCacheE7f;
     }
   })();
 
@@ -4761,6 +4984,44 @@ async function run() {
           line.includes("rate")) &&
         rateLocal[`${largeKey}_localFallback`]?.value === "rate limited value" &&
         rateLocal[`${largeKey}_localFallback`]?._base === "ratebase");
+
+      // The OTHER arm of the same catch: a non-quota rejection with a fallback
+      // record already in play restores the previous record rather than
+      // keeping the failed write's. It has to leave a trace too, and the
+      // classifier must not dress it up as a quota problem.
+      const otherLocal = {
+        optSyncEnabled: true,
+        [`${largeKey}_localFallback`]: pbpLargeFallbackRecord("earlier local copy", "oldfb", null),
+      };
+      const otherSync = {
+        [largeKey]: { _chunks: 1, _generation: "otherbase" },
+        [`${largeKey}_otherbase_0`]: "old",
+      };
+      const otherArea = makeArea(otherSync);
+      otherArea.set = async (data) => {
+        if (!data[largeKey]) throw new Error("An unexpected error occurred.");
+        Object.assign(otherSync, data);
+      };
+      globalThis.chrome = {
+        storage: {
+          local: makeArea(otherLocal),
+          sync: otherArea,
+          onChanged: { addListener() {} },
+        },
+      };
+      _settingsStorageCache = otherArea;
+      const otherWarnings = [];
+      console.warn = (...args) => { otherWarnings.push(args.map(String).join(" ")); };
+      let otherRejected = false;
+      try { await pbpSyncSetLargeUnlocked(largeKey, "value that fails"); }
+      catch (_) { otherRejected = true; }
+      console.warn = previousWarn;
+      check("E12 a non-quota rejection is traced as other and restores the previous local record",
+        otherRejected &&
+        otherWarnings.some((line) => line.includes("[sync-large] write rejected:") &&
+          line.includes(largeKey) && line.includes("other")) &&
+        otherWarnings.every((line) => !line.includes("value that fails")) &&
+        otherLocal[`${largeKey}_localFallback`]?.value === "earlier local copy");
 
       // Pure classifier, against the real Chromium message templates rather
       // than against whatever this repo happens to construct: the rate

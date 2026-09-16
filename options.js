@@ -2362,6 +2362,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           const settingKeys = Object.keys(SETTINGS_DEFAULTS);
           let data = await oldStorage.get(settingKeys);
           data = await pbpResolveChunkedSettings(data, oldStorage, settingKeys);
+          // K117: largeValues below is re-written into the destination area
+          // verbatim. A chunked key the source area could not actually decode
+          // must not be migrated as "empty" -- abort into the existing
+          // rollback, same as the theme keys further down.
+          await pbpAssertChunkedSettingsComplete(data);
           const largeValues = {};
           PBP_CHUNKED_SETTING_KEYS.forEach((key) => {
             if (Object.prototype.hasOwnProperty.call(data, key)) {
@@ -3367,7 +3372,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function persistSavedThemes(op) {
     try {
       return await pbpWithLargeStorageLock("savedThemes", async () => {
-        const merged = pbpApplySavedThemeOp(await pbpSyncGetLargeUnlocked("savedThemes", []), op);
+        const current = await pbpSyncGetLargeUnlocked("savedThemes", []);
+        // K117: this re-read is the MERGE BASE. An empty read that the cloud
+        // contradicts is not "no themes" -- merging onto it and writing
+        // publishes a new generation that orphans the ones the user still has.
+        // The assertion takes no lock of its own, so it is safe in here; both
+        // callers wrap this function in try/catch -> reportAutoSaveFailure.
+        await pbpAssertChunkedSyncReadComplete("savedThemes", current);
+        const merged = pbpApplySavedThemeOp(current, op);
         try {
           await pbpSyncSetLargeUnlocked("savedThemes", merged);
         } catch (e) {

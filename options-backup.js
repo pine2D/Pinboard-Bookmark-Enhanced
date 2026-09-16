@@ -701,6 +701,11 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       const includeSecrets = $id("opt-backup-include-secrets")?.checked === true;
       const raw = await pbpReadSettingsWithSecrets(
         includeSecrets ? Object.keys(SETTINGS_DEFAULTS) : exportableKeys);
+      // K117: the four chunked settings (prompts, glossary, tag presets) come
+      // back through the same degrade-to-default reader as the themes below,
+      // and a backup that silently drops a long custom prompt is just as
+      // hollow. Abort the export instead of writing one.
+      await pbpAssertChunkedSettingsComplete(raw);
       const includeHighlightsEl = $id("opt-backup-include-highlights");
       if (includeHighlightsEl) raw.backupIncludeHighlights = !!includeHighlightsEl.checked;
       const includeVocabulary = $id("opt-backup-include-vocabulary")?.checked !== false;
