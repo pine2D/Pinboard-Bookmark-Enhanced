@@ -7,7 +7,8 @@
 // Classify a syncSetLarge("savedThemes") failure during import.
 // Quota errors mean the data WAS preserved to local (syncSetLarge's fallback),
 // so report partial success — not the misleading generic "Invalid file".
-// Returns a t() key, or null to signal "rethrow as a genuine import failure".
+// Returns a t() key, or null when the failure is not a quota fallback (the
+// caller reports that case as "failed"; it never rethrows).
 function importThemesResult(err) {
   if (!err) return "importedReload";
   if (err.pbpFellBackToLocal || /QUOTA|quota/i.test(err.message || "")) return "importPartial";
@@ -368,7 +369,8 @@ async function pbpApplyBackupPayload(data, {
         localOnly = localOnly || !!(overlayRes && overlayRes.fellBackToLocal);
       }
       result.settings = localOnly ? "local-only" : "applied";
-    } catch (_) {
+    } catch (error) {
+      console.warn("[backup] settings import failed:", error && error.name, error && error.message);
       result.settings = "failed";
     }
   }
@@ -392,7 +394,8 @@ async function pbpApplyBackupPayload(data, {
       const secretRes = await persistSettings(batch);
       if (!secretRes.ok) throw secretRes.error || new Error("credential import failed");
       result.secrets = "applied";
-    } catch (_) {
+    } catch (error) {
+      console.warn("[backup] credential import failed:", error && error.name, error && error.message);
       result.secrets = "failed";
     }
   }
@@ -405,6 +408,7 @@ async function pbpApplyBackupPayload(data, {
       await setLarge("savedThemes", importedThemes);
       result.themes = "applied";
     } catch (error) {
+      console.warn("[backup] theme import failed:", error && error.name, error && error.message);
       result.themes = importThemesResult(error) === "importPartial" ? "local-only" : "failed";
     }
   }
@@ -482,7 +486,9 @@ async function pbpApplyBackupPayload(data, {
         result.themes = "local-only";
       }
     }
-  } catch (_) {}
+  } catch (error) {
+    console.warn("[backup] local-fallback recount failed:", error && error.name, error && error.message);
+  }
 
   result.highlightsSkipped = highlightsSkipped;
   result.statusKey = ["failed", "local-only"].includes(result.settings) ||

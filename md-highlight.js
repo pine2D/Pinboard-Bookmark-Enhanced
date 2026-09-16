@@ -909,7 +909,10 @@ async function pbpHlInit(detail) {
     try {
       const scope = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
       _pbpHlOwner = (scope && scope !== "ownerless") ? String(scope) : "";
-    } catch (_) { _pbpHlOwner = ""; }
+    } catch (e) {
+      console.warn("pbp: highlight owner read failed", e && e.name, e && e.message);
+      _pbpHlOwner = "";
+    }
     _pbpHlRawItems = await _pbpHlLoad(url);
     const items = pbpHlVisibleItems(_pbpHlRawItems, _pbpHlOwner);
     _pbpHlState = { url, title, items, ranges: Object.create(null), degraded: Object.create(null), resolvedN: Object.create(null), orphans: Object.create(null) };
@@ -2640,7 +2643,10 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
         try {
           const raw = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : "";
           scope = (raw && raw !== "ownerless") ? String(raw) : "";
-        } catch (_) { scope = ""; }
+        } catch (e) {
+          console.warn("pbp: highlight owner read failed", e && e.name, e && e.message);
+          scope = "";
+        }
         if (scope === _pbpHlOwner || !_pbpHlState) { _pbpHlOwner = scope; return; }
         _pbpHlOwner = scope;
         // Take every account-scoped surface down before the repaint: the card

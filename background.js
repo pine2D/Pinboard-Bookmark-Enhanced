@@ -836,10 +836,16 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "" } =
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
-    catch (_) { return pbpSaveFailure("internal"); }
+    catch (e) {
+      console.warn("save intent failed:", e?.name, e?.message);
+      return pbpSaveFailure("internal");
+    }
     let deliveryAuth;
     try { deliveryAuth = await getCurrentPinboardAuth(); }
-    catch (_) { return pbpSaveFailure("internal"); }
+    catch (e) {
+      console.warn("save intent failed:", e?.name, e?.message);
+      return pbpSaveFailure("internal");
+    }
     const deliveryAccount = pbpPinboardAccountFromToken(settings.pinboardToken);
     if (!deliveryAuth.token) return pbpSaveFailure("not_logged_in");
     if (expectedAccount && deliveryAuth.account !== expectedAccount) {
@@ -852,7 +858,10 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "" } =
 
     let envelope;
     try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth); }
-    catch (_) { return pbpSaveFailure("internal"); }
+    catch (e) {
+      console.warn("save intent failed:", e?.name, e?.message);
+      return pbpSaveFailure("internal");
+    }
 
     if (envelope.result.status === "saved" || envelope.result.status === "skipped") {
       await applySaveResultSideEffects(envelope, deliverySettings, { deferBadge, auth: deliveryAuth });
@@ -875,12 +884,14 @@ function sendOfflineItem(item) {
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
-    catch (_) {
+    catch (e) {
+      console.warn("save intent failed:", e?.name, e?.message);
       return { result: pbpSaveFailure("internal"), persisted: null, retryable: false, settings: {} };
     }
     let deliveryAuth;
     try { deliveryAuth = await getCurrentPinboardAuth(); }
-    catch (_) {
+    catch (e) {
+      console.warn("save intent failed:", e?.name, e?.message);
       return { result: pbpSaveFailure("internal"), persisted: null, retryable: false, settings };
     }
     const token = pbpResolveOfflineQueueToken(deliveryAuth.token, item);
@@ -892,7 +903,10 @@ function sendOfflineItem(item) {
     const intent = normalizeOfflineSaveIntent(item, settings);
     let envelope;
     try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth); }
-    catch (_) { envelope = { result: pbpSaveFailure("internal"), persisted: null, retryable: false }; }
+    catch (e) {
+      console.warn("save intent failed:", e?.name, e?.message);
+      envelope = { result: pbpSaveFailure("internal"), persisted: null, retryable: false };
+    }
     return { ...envelope, settings: deliverySettings, auth: deliveryAuth };
   });
 }
@@ -2737,8 +2751,12 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       })
       // Programming-error path only: submitPopupSaveIntent itself never rejects
       // on a delivery failure (those resolve to a "failed" result and take the
-      // notify branch above), so this arm deliberately stays silent.
-      .catch(() => sendResponse(pbpSaveFailure("internal")));
+      // notify branch above), so this arm is rare in practice but must not be
+      // silent when it does fire.
+      .catch((e) => {
+        console.warn("save intent failed:", e?.name, e?.message);
+        sendResponse(pbpSaveFailure("internal"));
+      });
     return true;
   }
 
@@ -2836,7 +2854,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   if (message.type === "retry_offline_item" && typeof message.queueId === "string") {
     retryOfflineItem(message.queueId)
       .then(({ ok, result }) => sendResponse({ ok, result }))
-      .catch(() => sendResponse({ ok: false, result: pbpSaveFailure("internal") }));
+      .catch((e) => {
+        console.warn("save intent failed:", e?.name, e?.message);
+        sendResponse({ ok: false, result: pbpSaveFailure("internal") });
+      });
     return true;
   }
 
