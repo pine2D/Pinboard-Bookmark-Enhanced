@@ -1138,6 +1138,15 @@ suite("md-ai IDB key conventions", () => {
     const k = _pbpTrCacheKey("https://a.test/x", "zh-CN", "gemini-3.5-flash-lite", "alice");
     assert(k === "tr_acct_alice_zh-CN_gemini-3.5-flash-lite_" + pbpAiHash("https://a.test/x"), "got: " + k);
   });
+  // K27: vocab-store.js's pbpDictOwnerScope has this exact case covered
+  // (tests/md-dict-tests.html:157, "a b" -> "acct_a%20b"); this twin
+  // (md-ai-core.js:631, "must stay format-identical") had every other
+  // branch asserted above and below but never its encodeURIComponent
+  // branch specifically -- a normal account name never exercises it.
+  test("_pbpTrOwnerScope encodes account characters that are not URL-safe", () => {
+    assertEq(_pbpTrOwnerScope("a b/c@d"), "acct_" + encodeURIComponent("a b/c@d"), "got: " + _pbpTrOwnerScope("a b/c@d"));
+    assertEq(_pbpTrOwnerScope("a b/c@d"), "acct_a%20b%2Fc%40d", "literal encoded form");
+  });
   test("the translation families key off the NORMALIZED url, like ask_ and skim_", () => {
     // A #anchor or ?utm= arrival of one article must not buy a second full
     // translation (or a second glossary extraction, or a second view state).

@@ -183,6 +183,7 @@ const mdDictJs = read("md-dict.js");
 const vocabStore = read("vocab-store.js");
 const mdDict = read("md-dict.js");
 const optionsThemeEarlyJs = read("options-theme-early.js");
+const mdPreviewThemeEarlyJs = read("md-preview-theme-early.js");
 const popupTagsJs = read("popup-tags.js");
 
 check(/<form[^>]*id="login-form"[^>]*class="login-body"/.test(popupHtml) &&
@@ -2663,6 +2664,131 @@ const corrected = runOptionsEarly({ mode: "dark", preset: "dracula", chrome: { s
 await new Promise(resolve => setImmediate(resolve));
 check(corrected.values.get("pp-theme") === "light" && corrected.values.get("pp-theme-preset") === "" &&
   !("theme" in corrected.root.dataset), "options-theme-early.js: authoritative storage did not correct mirror and theme");
+
+// ============ md-preview-theme-early.js: runReaderEarly (K27) ============
+// Twin of runOptionsEarly above, over the reader's own anti-FOUC bootstrap.
+// Unlike options-theme-early.js this file had ZERO test/script coverage
+// (rg across tests/ and scripts/ for "md-preview-theme-early" was empty)
+// even though rules/md-preview.md names its resolveReader() a "verbatim
+// twin" of pbpResolveReaderScheme (md-preview.js:705-711) that must be kept
+// in sync by hand. Asserts the OBSERVABLE product of the first-frame branch
+// -- documentElement.style.colorScheme and the two hljs <link> media
+// attributes (md-preview.html:8-9 / md-preview-theme-early.js:15-18) --
+// against expectations hand-written from md-preview.js:705-711 and 680-683's
+// stated rules, not against the twin's own source (a self-referential
+// "diff the two copies" check would pass even if both sides drifted the
+// same way).
+function runReaderEarly({ optTheme = "auto", override = "auto", videoDark = false, search = "", chrome } = {}) {
+  const root = { style: {} };
+  const links = {
+    "hljs-light-link": { media: "(prefers-color-scheme: light)" },
+    "hljs-dark-link": { media: "(prefers-color-scheme: dark)" },
+  };
+  // Seeded directly under SHARED_THEME_KEY / SCHEME_KEY / VIDEO_KEY
+  // (md-preview-theme-early.js:23/26/29) so the MIRROR_KEY fallback branch
+  // never needs exercising here, same choice runOptionsEarly makes for
+  // "pp-theme".
+  const values = new Map([
+    ["pp-theme", optTheme],
+    ["md-preview-scheme", override],
+    ["md-preview-video-dark", videoDark ? "1" : "0"],
+  ]);
+  const context = {
+    // videoMode (line 33) is read from location.search at parse time, not a
+    // constructor argument -- this is the one input runOptionsEarly's
+    // "preset" axis has no analogue for.
+    location: { search },
+    document: {
+      documentElement: root,
+      getElementById: (id) => links[id] || null,
+    },
+    localStorage: {
+      getItem: key => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, String(value)),
+    },
+    // chrome intentionally omitted unless passed: typeof chrome ===
+    // "undefined" is true for an identifier never declared in this vm
+    // context, so the async source-of-truth tail (md-preview-theme-early.js:71)
+    // short-circuits at its own early return and only the synchronous
+    // first-frame branch runs -- same trick runOptionsEarly uses.
+  };
+  if (chrome) context.chrome = chrome;
+  runInNewContext(mdPreviewThemeEarlyJs, context);
+  return { root, links, values };
+}
+
+// The rule restated independently of either implementation (same shape as
+// the pbpResolveReaderScheme "full matrix" test at
+// tests/md-ai-tests.html:5359-5360): an explicit override wins; otherwise a
+// video page with the checkbox on is dark; otherwise the global theme
+// passes through unless it is not one of light/dark, in which case "auto".
+function expectedReaderMode(optTheme, override, videoMode, videoDark) {
+  if (override === "light" || override === "dark") return override;
+  if (videoMode && videoDark) return "dark";
+  return optTheme === "light" || optTheme === "dark" ? optTheme : "auto";
+}
+// md-preview.js:680-683's pbpResolveColorScheme mapping (md-preview-theme-early.js's
+// resolve(), lines 35-39, is a verbatim copy of it).
+function expectedReaderResolve(mode) {
+  if (mode === "dark") return { colorScheme: "dark", lightMedia: "not all", darkMedia: "all" };
+  if (mode === "light") return { colorScheme: "light", lightMedia: "all", darkMedia: "not all" };
+  return { colorScheme: "", lightMedia: "(prefers-color-scheme: light)", darkMedia: "(prefers-color-scheme: dark)" };
+}
+
+// resolveReader() has no map indexed by a settings-derived string key (no
+// ADAPTIVE_THEME_MAP-style lookup the way options-theme-early.js's preset
+// is), so there is no __proto__/constructor analogue to add here -- the
+// only string inputs (optTheme/override) are compared with ===, never used
+// as object keys.
+{
+  let combos = 0;
+  for (const optTheme of ["auto", "light", "dark"]) {
+    for (const override of ["auto", "light", "dark", "bogus"]) {
+      for (const search of ["", "?video=1"]) {
+        for (const videoDark of [false, true]) {
+          combos++;
+          const videoMode = search === "?video=1";
+          const run = runReaderEarly({ optTheme, override, videoDark, search });
+          const mode = expectedReaderMode(optTheme, override, videoMode, videoDark);
+          const expected = expectedReaderResolve(mode);
+          const label = `optTheme=${optTheme} override=${override} search=${JSON.stringify(search)} videoDark=${videoDark} (expected mode ${mode})`;
+          check(run.root.style.colorScheme === expected.colorScheme,
+            `md-preview-theme-early.js: colorScheme mismatch for ${label}`);
+          check(run.links["hljs-light-link"].media === expected.lightMedia,
+            `md-preview-theme-early.js: hljs-light-link media mismatch for ${label}`);
+          check(run.links["hljs-dark-link"].media === expected.darkMedia,
+            `md-preview-theme-early.js: hljs-dark-link media mismatch for ${label}`);
+        }
+      }
+    }
+  }
+  check(combos === 48, "md-preview-theme-early.js: runReaderEarly matrix size (3 optTheme x 4 override x 2 search x 2 videoDark)");
+}
+
+// The async source-of-truth branch (chrome.storage read, lines 71-85) is a
+// second call into the same resolve()/apply() pair fed from chrome.storage
+// instead of localStorage. One case confirms it actually corrects a stale
+// mirror and re-applies -- mirroring runOptionsEarly's `corrected` case
+// above rather than re-running the full matrix through it.
+{
+  const chromeLocal = {
+    get: (defaults) => Promise.resolve("optSyncEnabled" in defaults
+      ? { optSyncEnabled: false, pbp_color_scheme: "dark" }
+      : { optTheme: "light", mdVideoDarkScheme: false }),
+  };
+  const readerCorrected = runReaderEarly({
+    optTheme: "auto", override: "auto", videoDark: false, search: "",
+    chrome: { storage: { local: chromeLocal } },
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  check(readerCorrected.values.get("md-preview-theme") === "light" &&
+    readerCorrected.values.get("md-preview-scheme") === "dark" &&
+    readerCorrected.values.get("md-preview-video-dark") === "0" &&
+    readerCorrected.root.style.colorScheme === "dark" &&
+    readerCorrected.links["hljs-light-link"].media === "not all" &&
+    readerCorrected.links["hljs-dark-link"].media === "all",
+    "md-preview-theme-early.js: chrome.storage correction (override=dark) did not re-seed the mirrors and re-apply the resolved scheme");
+}
 
 const optionsHead = optionsHtml.slice(optionsHtml.indexOf("<head>"), optionsHtml.indexOf("</head>"));
 const optionsEarlyTag = '<script src="options-theme-early.js"></script>';
