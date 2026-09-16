@@ -2024,6 +2024,32 @@ async function pbpResolveChunkedSettings(settings, storage, query) {
   return out;
 }
 
+// K120. DIAGNOSTIC ONLY -- never a control-flow input. chrome.storage.sync
+// rejects two very different things with a message containing "quota", and the
+// fallback branch below cannot tell them apart:
+//   rate  extensions/browser/quota_service.cc
+//         `constexpr char kOverQuotaError[] = "This request exceeds the * quota.";`
+//         where * is the heuristic's name, and
+//         extensions/browser/api/storage/storage_api.cc registers
+//         "MAX_WRITE_OPERATIONS_PER_MINUTE" and "MAX_WRITE_OPERATIONS_PER_HOUR".
+//         Transient: stop typing for a few seconds and it clears.
+//   bytes extensions/browser/api/storage/settings_storage_quota_enforcer.cc
+//         `base::StringPrintf("%s quota exceeded", name)` with name one of
+//         "Resource::kQuotaBytes" / "Resource::kQuotaBytesPerItem" /
+//         "Resource::kMaxItems" (older releases spelled these QUOTA_BYTES,
+//         QUOTA_BYTES_PER_ITEM, MAX_ITEMS). Persistent: the user must delete
+//         data.
+// The classification exists so the console can say which one happened; the
+// WRITE behaviour stays identical for both, because in sync routing the local
+// fallback record is the only copy of what the user just typed, and an
+// unrecognised "quota" must fall back rather than be retried as transient.
+function pbpSyncWriteFailureKind(error) {
+  const message = String((error && error.message) || "");
+  if (/MAX_(SUSTAINED_)?WRITE_OPERATIONS/i.test(message)) return "rate";
+  if (/quota/i.test(message)) return "bytes";
+  return "other";
+}
+
 async function pbpSyncSetLargeUnlocked(key, value) {
   const storage = await getSettingsStorage();
   const str = typeof value === "string" ? value : JSON.stringify(value);
@@ -2070,6 +2096,12 @@ async function pbpSyncSetLargeUnlocked(key, value) {
     });
   } catch (e) {
     await chrome.storage.sync.remove(newChunkKeys).catch(() => {});
+    // CLAUDE.md "吞异常必须留痕": everything below folds the platform's own
+    // reason into a product outcome (a local fallback record, or a restore of
+    // the previous one) and the reason itself is gone. Shape only -- the kind,
+    // the error's name and message; never the value being written.
+    console.warn("[sync-large] write rejected:", key, pbpSyncWriteFailureKind(e),
+      e && e.name, e && e.message);
     if (/QUOTA|quota/i.test(e && e.message || "")) {
       await chrome.storage.local.set({ [fallbackKey]: pbpLargeFallbackRecord(value, generation, baseGeneration) });
       try { e.pbpFellBackToLocal = true; } catch (_) {}

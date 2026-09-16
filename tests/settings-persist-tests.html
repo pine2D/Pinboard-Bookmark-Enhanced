@@ -4712,10 +4712,79 @@ async function run() {
         },
       };
       _settingsStorageCache = quotaArea;
+      const quotaWarnings = [];
+      const previousWarn = console.warn;
+      console.warn = (...args) => { quotaWarnings.push(args.map(String).join(" ")); };
       try { await pbpSyncSetLargeUnlocked(largeKey, "quota value"); } catch (_) {}
+      console.warn = previousWarn;
       check("E12 quota fallback retains the generation used for freshness",
         quotaLocal[`${largeKey}_localFallback`]?._base === "quotabase" &&
         quotaLocal[`${largeKey}_localFallback`]?.value === "quota value");
+      check("E12 a rejected sync write leaves a trace naming the key and the failure kind, not the value",
+        quotaWarnings.some((line) => line.includes("[sync-large] write rejected:") &&
+          line.includes(largeKey) && line.includes("bytes")) &&
+        quotaWarnings.every((line) => !line.includes("quota value")));
+
+      // K120: the same catch has to handle a WRITE-RATE rejection, whose
+      // Chromium message also contains "quota"
+      // (quota_service.cc kOverQuotaError = "This request exceeds the * quota."
+      // with * = "MAX_WRITE_OPERATIONS_PER_MINUTE" from storage_api.cc). The
+      // classification is for the console only: in sync routing the fallback
+      // record is the ONLY copy of what the user just typed, so it must still
+      // be written even though this failure is transient.
+      const rateLocal = { optSyncEnabled: true };
+      const rateSync = {
+        [largeKey]: { _chunks: 1, _generation: "ratebase" },
+        [`${largeKey}_ratebase_0`]: "old",
+      };
+      const rateArea = makeArea(rateSync);
+      rateArea.set = async (data) => {
+        if (!data[largeKey]) {
+          throw new Error("This request exceeds the MAX_WRITE_OPERATIONS_PER_MINUTE quota.");
+        }
+        Object.assign(rateSync, data);
+      };
+      globalThis.chrome = {
+        storage: {
+          local: makeArea(rateLocal),
+          sync: rateArea,
+          onChanged: { addListener() {} },
+        },
+      };
+      _settingsStorageCache = rateArea;
+      const rateWarnings = [];
+      console.warn = (...args) => { rateWarnings.push(args.map(String).join(" ")); };
+      try { await pbpSyncSetLargeUnlocked(largeKey, "rate limited value"); } catch (_) {}
+      console.warn = previousWarn;
+      check("E12 a write-rate rejection is named as such but still keeps the user's only copy",
+        rateWarnings.some((line) => line.includes("[sync-large] write rejected:") &&
+          line.includes("rate")) &&
+        rateLocal[`${largeKey}_localFallback`]?.value === "rate limited value" &&
+        rateLocal[`${largeKey}_localFallback`]?._base === "ratebase");
+
+      // Pure classifier, against the real Chromium message templates rather
+      // than against whatever this repo happens to construct: the rate
+      // heuristics are named in storage_api.cc, the byte/item resources in
+      // settings_storage_quota_enforcer.cc (with the pre-Resource:: spellings
+      // older releases shipped). Anything else that merely says "quota" has to
+      // stay on the conservative BYTES side -- treating a persistent quota as
+      // transient is the expensive mistake.
+      check("E12 the failure classifier separates write-rate limits from byte quotas by category",
+        ["This request exceeds the MAX_WRITE_OPERATIONS_PER_MINUTE quota.",
+         "This request exceeds the MAX_WRITE_OPERATIONS_PER_HOUR quota.",
+         "This request exceeds the MAX_SUSTAINED_WRITE_OPERATIONS_PER_MINUTE quota."]
+          .every((message) => pbpSyncWriteFailureKind(new Error(message)) === "rate") &&
+        ["Resource::kQuotaBytes quota exceeded",
+         "Resource::kQuotaBytesPerItem quota exceeded",
+         "Resource::kMaxItems quota exceeded",
+         "QUOTA_BYTES quota exceeded",
+         "QUOTA_BYTES_PER_ITEM quota exceeded",
+         "MAX_ITEMS quota exceeded",
+         "An unfamiliar future quota message"]
+          .every((message) => pbpSyncWriteFailureKind(new Error(message)) === "bytes") &&
+        pbpSyncWriteFailureKind(new Error("Network error")) === "other" &&
+        pbpSyncWriteFailureKind(undefined) === "other" &&
+        pbpSyncWriteFailureKind({}) === "other");
 
       const task10Ready = typeof pbpDetectLargeLocalFallbacks === "function" &&
         typeof pbpRefreshSyncLocalFallbackStatus === "function";
