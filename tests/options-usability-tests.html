@@ -95,6 +95,9 @@
 <input id="batch-ai-tags" type="checkbox" />
 <input id="batch-ai-summary" type="checkbox" checked />
 <input id="opt-preview-ai-enabled" type="checkbox" checked />
+<!-- The Reader panel's "these settings do nothing yet" warning (options.html),
+     hidden until renderConnectionOverview judges the AI controls dead. -->
+<p class="hint hint-warn" id="preview-ai-unavailable" role="status" aria-live="polite" hidden>Reader AI is not usable yet</p>
 <input id="opt-preview-skim" type="checkbox" />
 <input id="dict-echo-enabled" type="checkbox" checked />
 <input id="opt-wayback-enabled" type="checkbox" />
@@ -501,6 +504,93 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     const drive = [...document.querySelectorAll(".connection-health-row")]
       .find((row) => row.textContent.includes("Google Drive"));
     assert(drive && drive.textContent.includes("connectionPermissionMissing"), "stale Drive marker still reads connected");
+  });
+
+  // ---- Reader panel "AI not usable yet" warning (#preview-ai-unavailable) ----
+  // Two factors, not one: a key alone is not enough (the provider's origin has
+  // to be granted too), and neither matters while the master switch is off.
+  // Each case drives renderConnectionOverview through the same live snapshot +
+  // chrome.permissions.contains pair the real page reads.
+  const aiHintEl = () => document.getElementById("preview-ai-unavailable");
+  const aiMasterEl = () => document.getElementById("opt-preview-ai-enabled");
+  async function withAiState({ key, permission }, body) {
+    const realHasKey = hasAIKey, realContains = chrome.permissions.contains;
+    hasAIKey = () => key;
+    chrome.permissions.contains = async (query) => {
+      if (query.origins?.[0]?.includes("private.example")) {
+        if (permission === "throw") throw new Error("permission query blew up");
+        return permission;
+      }
+      return !!(query.permissions?.includes("identity") || query.origins?.[0]?.includes("127.0.0.1"));
+    };
+    try { await body(); }
+    finally {
+      hasAIKey = realHasKey;
+      chrome.permissions.contains = realContains;
+      aiMasterEl().checked = true;
+      await renderConnectionOverview();
+    }
+  }
+
+  await test("Reader AI warning appears when the selected provider has no key", async () => {
+    await withAiState({ key: false, permission: false }, async () => {
+      aiMasterEl().checked = true;
+      await renderConnectionOverview();
+      assert(aiHintEl().hidden === false, "no key left the Reader AI controls looking usable");
+    });
+  });
+
+  await test("Reader AI warning stays away once the provider has a key and the grant", async () => {
+    await withAiState({ key: true, permission: true }, async () => {
+      aiMasterEl().checked = true;
+      await renderConnectionOverview();
+      assert(aiHintEl().hidden === true, "a fully configured provider still raised the warning");
+    });
+  });
+
+  await test("Reader AI warning appears when the key is there but the origin was never granted", async () => {
+    await withAiState({ key: true, permission: false }, async () => {
+      aiMasterEl().checked = true;
+      await renderConnectionOverview();
+      assert(aiHintEl().hidden === false,
+        "a key without the host grant fails just as silently, and the page said nothing");
+    });
+  });
+
+  await test("Reader AI warning is not raised while the master switch is off", async () => {
+    await withAiState({ key: false, permission: false }, async () => {
+      aiMasterEl().checked = false;
+      await renderConnectionOverview();
+      assert(aiHintEl().hidden === true, "turning the feature off was reported as a fault");
+    });
+  });
+
+  await test("an unanswerable permission query does not raise a Reader AI false alarm", async () => {
+    await withAiState({ key: true, permission: "throw" }, async () => {
+      aiMasterEl().checked = true;
+      await renderConnectionOverview();
+      assert(aiHintEl().hidden === true, "an unknown grant state was reported as missing");
+    });
+  });
+
+  await test("the Reader master switch re-renders the connection overview", async () => {
+    // The wiring lives inside the DOMContentLoaded closure this fixture blocks,
+    // so run that slice of the real file with the two dependencies injected --
+    // the listener registration itself is what is under test, not a grep for it.
+    const source = await fetch("../options.js").then((response) => response.text());
+    const start = source.indexOf('  for (const id of ["opt-pinboard-token", "opt-ai-provider"');
+    const end = source.indexOf("  chrome.storage.onChanged?.addListener(", start);
+    assert(start >= 0 && end > start, "the connection-overview wiring block moved");
+    let scheduled = 0;
+    const deps = {
+      $id: (id) => document.getElementById(id),
+      scheduleConnectionOverview: () => { scheduled++; },
+    };
+    new Function(...Object.keys(deps), source.slice(start, end))(...Object.values(deps));
+    aiMasterEl().dispatchEvent(new Event("change", { bubbles: true }));
+    assert(scheduled === 1, "the Reader master switch scheduled " + scheduled + " re-renders");
+    document.getElementById("opt-openai-key").dispatchEvent(new Event("input", { bubbles: true }));
+    assert(scheduled === 2, "the provider-key leg stopped scheduling re-renders");
   });
 
   await test("default options hint text meets WCAG AA against the page background", async () => {

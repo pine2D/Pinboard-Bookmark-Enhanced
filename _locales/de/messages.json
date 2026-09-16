@@ -2453,6 +2453,9 @@
   "previewAiEnabledHint": {
     "message": "Wenn deaktiviert, werden alle KI-Einstiegspunkte aus der Leseansicht entfernt. Einstiegspunkte werden auch automatisch ausgeblendet, wenn kein API-Schlüssel konfiguriert ist."
   },
+  "previewAiUnavailableHint": {
+    "message": "Die Einstellungen unten haben noch keine Wirkung: Dem ausgewählten Anbieter fehlt der API-Schlüssel oder die Berechtigung dafür. Richte beides im Tab „KI-Anbieter“ ein."
+  },
   "previewAiModelLabel": {
     "message": "Modell-Überschreibung (optional)"
   },

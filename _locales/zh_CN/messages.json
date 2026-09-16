@@ -2453,6 +2453,9 @@
   "previewAiEnabledHint": {
     "message": "关闭后阅读器不再出现任何 AI 入口。未配置 API Key 时入口也会自动隐藏。"
   },
+  "previewAiUnavailableHint": {
+    "message": "下面这些设置暂时不生效：所选服务商还缺 API Key 或访问授权。到「AI 服务商」补齐即可。"
+  },
   "previewAiModelLabel": {
     "message": "模型覆盖（可选）"
   },

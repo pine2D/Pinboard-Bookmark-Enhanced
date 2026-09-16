@@ -206,9 +206,12 @@ async function renderConnectionOverview() {
       return null;
     }
   };
+  let aiConfigured = false;
   let aiPattern = "";
-  try { if (hasAIKey(liveAi)) aiPattern = _aiTargetOriginPattern(liveAi); }
-  catch (e) { console.warn("[connection-health] AI origin check failed:", e?.name, e?.message); }
+  try {
+    aiConfigured = hasAIKey(liveAi);
+    if (aiConfigured) aiPattern = _aiTargetOriginPattern(liveAi);
+  } catch (e) { console.warn("[connection-health] AI origin check failed:", e?.name, e?.message); }
   const ankiPort = $id("dict-anki-port")?.value.trim() || "";
   const [aiPermission, driveIdentity, driveHost, ankiPermission, eudicPermission] = await Promise.all([
     permissionFor(aiPattern ? { origins: [aiPattern] } : null),
@@ -221,11 +224,29 @@ async function renderConnectionOverview() {
   ]);
   const drivePermission = driveIdentity === false || driveHost === false
     ? false : (driveIdentity === true && driveHost === true ? true : null);
+  // The Reader panel's indented AI controls (model override, translation
+  // target, glossary, skim) are inert while pbpAiAvailable() is false
+  // (md-ai-core.js), and the page used to say nothing. Same two factors the AI
+  // row below reports, because a key WITHOUT the origin grant fails just as
+  // silently as no key at all. Three deliberate silences: the master switch
+  // being off is a choice, not a fault; `aiPermission === null` means the
+  // query failed or no origin could be derived, so the answer is unknown and a
+  // warning there would be a false alarm; and #opt-selection-trigger is out of
+  // scope -- it drives the non-AI dictionary too (md-ask.js, md-highlight.js).
+  // This sits after the early return above rather than before it: both factors
+  // are only known past it (liveAi needs pbpLiveAiSettingsSnapshot, the grant
+  // needs the awaits above), and the return only fires on a page that carries
+  // neither #connection-health nor this hint.
+  const previewAiHint = $id("preview-ai-unavailable");
+  if (previewAiHint) {
+    previewAiHint.hidden = !($id("opt-preview-ai-enabled")?.checked !== false
+      && (!aiConfigured || aiPermission === false));
+  }
   const items = [
     { id: "pinboard", name: "Pinboard", panel: "general", target: "test-pinboard-token",
       configured: pbpIsValidTokenFormat($id("opt-pinboard-token")?.value.trim() || "") === true, permission: true },
     { id: `ai:${provider}`, name: $id("opt-ai-provider")?.selectedOptions?.[0]?.textContent?.trim() || provider,
-      panel: "ai", target: `test-${provider}`, configured: hasAIKey(liveAi), permission: aiPermission },
+      panel: "ai", target: `test-${provider}`, configured: aiConfigured, permission: aiPermission },
     { id: "drive", name: "Google Drive", panel: "vocab", target: "vocab-drive-connect",
       connected: stored.vocabDriveConnected === true, permission: drivePermission },
     // The port input ships a default ("8765"), so a non-empty field proves
@@ -3175,6 +3196,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       // back over the freshly imported themes. Last, so a render failure here
       // cannot cost the status line above (the caller swallows afterApply).
       await loadSavedThemes();
+      // An import can land a provider, a key or the Reader master switch, and
+      // nothing else repaints the overview or #preview-ai-unavailable after it
+      // (the form-level listeners only fire on user edits). The gap predates
+      // this hint -- Connection Status already went stale the same way.
+      scheduleConnectionOverview();
     },
     // Every control was filled once at load, so an import that landed
     // settings or themes leaves the form showing pre-import values. Reload
@@ -3207,6 +3233,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const el = $id(id);
     el?.addEventListener(el.tagName === "SELECT" ? "change" : "input", scheduleConnectionOverview);
   }
+  // Not a connection source, but the second factor behind #preview-ai-unavailable
+  // (renderConnectionOverview): flipping the Reader master switch decides whether
+  // that warning is due at all, and it had no listener of its own until now.
+  $id("opt-preview-ai-enabled")?.addEventListener("change", scheduleConnectionOverview);
   chrome.storage.onChanged?.addListener((changes, area) => {
     if (area === "local" && (changes[PBP_CONNECTION_HEALTH_KEY] || changes.vocabDriveConnected)) {
       scheduleConnectionOverview();

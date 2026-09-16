@@ -729,6 +729,13 @@
         <label><input type="checkbox" id="opt-preview-ai-enabled" checked /> <span data-i18n="previewAiEnabled">Enable AI features on the preview page</span></label>
       </div>
 
+      <!-- Unhidden by renderConnectionOverview (options.js) when the indented
+           controls below are dead: the selected provider has no key, or its
+           origin was never granted. Covers the indented block only -- the
+           Explain-selection trigger further down drives the non-AI dictionary
+           too, so it keeps working with neither. -->
+      <p class="hint hint-warn" id="preview-ai-unavailable" data-i18n="previewAiUnavailableHint" role="status" aria-live="polite" hidden>The settings below do nothing yet, because the selected AI provider is missing an API key or access to it. Set them up on the AI Providers tab.</p>
+
       <div class="fg fg-indent">
         <label class="bl" for="opt-preview-ai-model" data-i18n="previewAiModelLabel">Model override (optional)</label>
         <input type="text" id="opt-preview-ai-model" />

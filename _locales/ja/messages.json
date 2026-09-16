@@ -2453,6 +2453,9 @@
   "previewAiEnabledHint": {
     "message": "オフにするとリーダーから AI の入口がすべて消えます。API キーが設定されていない場合も入口は自動的に非表示になります。"
   },
+  "previewAiUnavailableHint": {
+    "message": "以下の設定はまだ機能しません。選択中のプロバイダーに API キーがないか、権限が許可されていません。「AI プロバイダー」タブで設定してください。"
+  },
   "previewAiModelLabel": {
     "message": "モデルの上書き（任意）"
   },

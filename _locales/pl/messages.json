@@ -2453,6 +2453,9 @@
   "previewAiEnabledHint": {
     "message": "Wyłączenie usuwa wszystkie punkty wejścia AI z czytnika. Punkty wejścia są również ukrywane automatycznie, gdy nie skonfigurowano klucza API."
   },
+  "previewAiUnavailableHint": {
+    "message": "Ustawienia poniżej na razie nic nie robią: wybranemu dostawcy brakuje klucza API lub uprawnienia do niego. Skonfiguruj je na karcie „Dostawcy AI”."
+  },
   "previewAiModelLabel": {
     "message": "Zastąpienie modelu (opcjonalne)"
   },

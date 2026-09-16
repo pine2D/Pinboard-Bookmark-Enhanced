@@ -2453,6 +2453,9 @@
   "previewAiEnabledHint": {
     "message": "Désactiver cette option supprime tous les points d'entrée IA de la page Lecture. Les points d'entrée sont également masqués automatiquement si aucune clé API n'est configurée."
   },
+  "previewAiUnavailableHint": {
+    "message": "Les paramètres ci-dessous n'ont encore aucun effet : il manque la clé API ou l'autorisation pour le fournisseur sélectionné. Configurez-les dans l'onglet « Fournisseurs IA »."
+  },
   "previewAiModelLabel": {
     "message": "Remplacement du modèle (optionnel)"
   },
