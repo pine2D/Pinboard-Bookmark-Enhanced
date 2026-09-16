@@ -83,10 +83,14 @@ function pbpVocabSplitDriveEntries(entries, envelope) {
       !_pbpVocabDriveValidProperty("owner", envelope.ownerHash) ||
       !_pbpVocabDriveValidProperty("device", envelope.deviceId) ||
       !Number.isFinite(envelope.createdAt)) {
+    console.warn("[vocab-drive] outbox rejected by local validator: envelope");
     return { ok: false, error: "invalid_envelope" };
   }
   for (const entry of entries) {
-    if (!pbpVocabValidateEvent(entry)) return { ok: false, error: "invalid_entry" };
+    if (!pbpVocabValidateEvent(entry)) {
+      console.warn("[vocab-drive] outbox rejected by local validator: entry");
+      return { ok: false, error: "invalid_entry" };
+    }
   }
 
   const emptyBody = _pbpVocabDriveBody([], envelope);

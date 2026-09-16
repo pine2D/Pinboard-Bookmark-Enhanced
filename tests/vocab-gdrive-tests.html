@@ -143,7 +143,7 @@ function syncHarness(options = {}) {
   let authEpoch = 1;
   const auth = () => ({ account: authAccount, epoch: authEpoch, token: "pin-token" });
   const store = {
-    async getMeta() { return { deviceId: DEVICE_ID, counter: 1 }; },
+    async getMeta() { return options.meta || { deviceId: DEVICE_ID, counter: 1 }; },
     async getPreflightState() {
       calls.push("get-preflight");
       if (options.afterGetPreflight) options.afterGetPreflight({
@@ -440,6 +440,49 @@ function syncHarness(options = {}) {
       ok: false, error: "entry_too_large", recordKey: entry.recordKey, bytes: TEST_MAX_BYTES + 1
     });
   }));
+
+  // Category-level guard (K53): every failure code pbpVocabSplitDriveEntries
+  // can really return -- derived here by actually calling it with malformed
+  // input, not a hand-typed guess -- must be run through the sync runner and
+  // checked against how normalizedFailure (a private closure, only reachable
+  // this way) classifies it today. entry_too_large is explicitly claimed and
+  // comes back as its own code; invalid_envelope and invalid_entry are not
+  // claimed and fall into the generic "remote" bucket -- indistinguishable
+  // from any unrecognised error. That gap is the actual finding: this
+  // assertion locks in today's real, observed classification so a future
+  // code added to the validator (or a future normalizedFailure edit) cannot
+  // silently drift past it without this test needing a conscious update.
+  await asyncCheck(
+    "every pbpVocabSplitDriveEntries failure code is accounted for in normalizedFailure's classification",
+    async () => {
+      const nonNfcDeviceId = "é"; // decomposed "e" + combining acute: truthy, but !== its own NFC form
+      const badEnvelope = pbpVocabSplitDriveEntries([], { ownerHash: OWNER_HASH, deviceId: nonNfcDeviceId, createdAt: 1 });
+      const badEntry = pbpVocabSplitDriveEntries([{ garbage: true }], ENVELOPE);
+      const oversized = sizedEntry(TEST_MAX_BYTES + 1, "TooBig");
+      const tooLarge = pbpVocabSplitDriveEntries([oversized], ENVELOPE);
+      const derived = new Set([badEnvelope.error, badEntry.error, tooLarge.error]);
+      if (badEnvelope.ok || badEntry.ok || tooLarge.ok) return false; // sanity: fixtures must actually fail split
+
+      const envelopeRun = await syncHarness({ meta: { deviceId: nonNfcDeviceId, counter: 1 } }).runner()();
+      const entryRun = await syncHarness({
+        outbox: [{ key: `outbox:${OWNER_SCOPE}:bad`, owner: OWNER_SCOPE, recordKey: "en|bad", event: { garbage: true } }]
+      }).runner()();
+      const tooLargeRun = await syncHarness({
+        outbox: [{
+          key: `outbox:${OWNER_SCOPE}:${oversized.recordKey}`, owner: OWNER_SCOPE,
+          recordKey: oversized.recordKey, event: oversized
+        }]
+      }).runner()();
+
+      return derived.has("invalid_envelope") && derived.has("invalid_entry") && derived.has("entry_too_large") &&
+        !envelopeRun.ok && !entryRun.ok && !tooLargeRun.ok &&
+        // Claimed: entry_too_large keeps its own identity.
+        tooLargeRun.error === "entry_too_large" &&
+        // Not claimed today (the finding): both fall into the same generic
+        // bucket a totally unrecognised error code would also land in.
+        envelopeRun.error === "remote" && entryRun.error === "remote";
+    }
+  );
 
   check("invalid noncanonical recordKey rejects the batch", attempt(() => {
     const entry = live();
