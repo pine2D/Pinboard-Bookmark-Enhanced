@@ -906,7 +906,7 @@ function buildRouterHarness(source, opts) {
     settleCall("the answer that was already paid for");
     const got = await second;
 
-    const key = `alice|${fingerprint}|summary|https://example.com/a`;
+    const key = `alice|${fingerprint}|summary|https://example.com/a|local`;
     return worker.calls.callAI.length === 1 &&
       got === "the answer that was already paid for" &&
       worker.calls.setAICache.some((args) => args[1] === "summary" && args[2] === got) &&

@@ -880,13 +880,18 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
   const otherKind = kind === "summary" ? "tags" : "summary";
   // Inflight identity carries the same generation fingerprint as the
   // cache keys (audit A5): two ops differing in model/lang/template must
-  // not dedupe onto one request.
-  const combinedKey = `${account}|${aiCacheFingerprint(s, "combined")}|combined|${url}`;
+  // not dedupe onto one request. It also carries the extraction source
+  // (v2.111 terminal review M2): without it, a call that fell back to a
+  // different source than an already-running one would ride that other
+  // call's answer but file it under ITS OWN source's cache namespace
+  // (background.js's pbpRunPopupAiCall caches by the riding message's
+  // own source) -- aliasing a jina-derived answer into the local namespace.
+  const combinedKey = `${account}|${aiCacheFingerprint(s, "combined")}|combined|${url}|${source}`;
   if (!pbpPopupAiAccountIsCurrent(account)) return null;
 
   const callSingle = () => {
     if (kind === "summary") {
-      const summaryKey = `${account}|${aiCacheFingerprint(s, "summary")}|summary|${url}`;
+      const summaryKey = `${account}|${aiCacheFingerprint(s, "summary")}|summary|${url}|${source}`;
       return getOrCreateInflight(summaryKey, async () => {
         const prompt = buildSummaryPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value);
         if (!PBP_AI_VIA_SW) return callAI(s, prompt);
@@ -894,7 +899,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
         return both.summary;
       });
     }
-    const tagsKey = `${account}|${aiCacheFingerprint(s, "tags")}|tags|${url}`;
+    const tagsKey = `${account}|${aiCacheFingerprint(s, "tags")}|tags|${url}|${source}`;
     return getOrCreateInflight(tagsKey, async () => {
       const prompt = buildTagPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, pbpRelevantTagsFirst(allUserTags, $id("title-input").value, pageInfo.url));
       if (!PBP_AI_VIA_SW) {

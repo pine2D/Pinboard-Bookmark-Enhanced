@@ -1653,7 +1653,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(await fetchArtifact("summary", true, "alice") === "summary", "Alice summary missing");
       currentAccount = "bob";
       assert(await fetchArtifact("summary", true, "bob") === "summary", "Bob summary missing");
-      assert(keys.join("|") === `alice|openai#summary|summary|${URL}|bob|openai#summary|summary|${URL}`,
+      assert(keys.join("|") === `alice|openai#summary|summary|${URL}|local|bob|openai#summary|summary|${URL}|local`,
         "summary inflight key is not owner+fingerprint-scoped: " + keys.join("|"));
 
       const setupAi = popupAiSource.slice(popupAiSource.indexOf("function setupAIFeatures()"), popupAiSource.indexOf("// ---- Insert or replace AI summary"));
@@ -1846,7 +1846,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "wrong message envelope: " + JSON.stringify({ type: msg.type, mode: msg.mode, kind: msg.kind }));
       assert(msg.prompt === "SUMMARY-PROMPT" && msg.url === URL && msg.source === "jina" &&
         msg.account === h.account && msg.cacheDuration === 60, "the message lost a cache coordinate");
-      assert(msg.inflightKey === `${h.account}|openai#summary|summary|${URL}`,
+      assert(msg.inflightKey === `${h.account}|openai#summary|summary|${URL}|jina`,
         "the popup's inflight key must travel verbatim, got " + msg.inflightKey);
       const missing = PBP_AI_OVERRIDE_FIELDS.filter((f) => msg.aiOverrides[f] !== h.snapshot[f]);
       assert(missing.length === 0, "the overrides dropped fingerprint inputs: " + missing.join(","));
@@ -1930,8 +1930,29 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const msg = h.calls.sent[0];
       assert(msg.mode === "single" && msg.kind === "tags" && msg.prompt === "TAG-PROMPT" && msg.source === "transcript",
         "wrong tags envelope: " + JSON.stringify({ mode: msg.mode, kind: msg.kind, source: msg.source }));
-      assert(msg.inflightKey === `${h.account}|openai#tags|tags|${URL}`,
+      assert(msg.inflightKey === `${h.account}|openai#tags|tags|${URL}|transcript`,
         "the tags inflight key must travel verbatim, got " + msg.inflightKey);
+    });
+
+    // v2.111 terminal review M2: two calls for the SAME url/type/account that
+    // differ ONLY in the extraction source (e.g. a Jina-derived call and a later
+    // local-derived call after Jina failed) must never ride one in-flight
+    // promise — riding one would file the wrong extraction's answer under the
+    // OTHER call's cache namespace (background.js's pbpRunPopupAiCall caches by
+    // its OWN message's source, not the source of whoever produced the answer).
+    // Derived from two real fetchAIArtifacts calls, not typed literal strings.
+    await testAsync("class: two calls identical except extraction source never share an inflightKey", async () => {
+      const jinaCall = makePopupAi({});
+      await jinaCall.fetchAIArtifacts("tags", true, jinaCall.account, jinaCall.snapshot, "jina");
+      const localCall = makePopupAi({});
+      await localCall.fetchAIArtifacts("tags", true, localCall.account, localCall.snapshot, "local");
+      const keyJina = jinaCall.calls.sent[0].inflightKey;
+      const keyLocal = localCall.calls.sent[0].inflightKey;
+      assert(keyJina !== keyLocal,
+        "two calls differing only in extraction source shared one inflightKey: " + keyJina);
+      const stripSource = (k) => k.split("|").slice(0, -1).join("|");
+      assert(stripSource(keyJina) === stripSource(keyLocal),
+        "the keys differ somewhere other than the trailing source component: jina=" + keyJina + " local=" + keyLocal);
     });
 
     await testAsync("an empty tags half renders the existing no-result path instead of throwing", async () => {
@@ -1991,7 +2012,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const msg = h.calls.sent[0];
       assert(msg.mode === "combined" && msg.kind === "tags" && msg.prompt === "COMBINED-PROMPT",
         "wrong combined envelope: " + JSON.stringify({ mode: msg.mode, kind: msg.kind }));
-      assert(msg.inflightKey === `${h.account}|openai#combined|combined|${URL}`,
+      assert(msg.inflightKey === `${h.account}|openai#combined|combined|${URL}|local`,
         "the combined inflight key must travel verbatim, got " + msg.inflightKey);
       const other = h.calls.cache.filter((args) => args[1] === "summary");
       assert(other.length === 1 && other[0][2] === "one paragraph",
