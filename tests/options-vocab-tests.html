@@ -216,10 +216,11 @@ delete document.documentElement.dataset.theme;
     input.files = dt.files;
     input.dispatchEvent(new Event("change"));
   };
+  let lastImported = null;
   const settle = async () => { await task(); await task(); await task(); };
   try {
     let importCalls = 0;
-    pbpPackImportFile = async () => { importCalls++; return { entries:3 }; };
+    pbpPackImportFile = async (f) => { importCalls++; lastImported = f && f.name; return { entries:3 }; };
 
     pbpPackMeta = async () => ({ state:"ready", entries:2, importedAt:1, bytes:7 });
     pickPackFile("cedict.txt");
@@ -241,15 +242,29 @@ delete document.documentElement.dataset.theme;
     await settle();
     check("confirming runs the import it was holding back", importCalls === 1, `calls=${importCalls}`);
 
+    // Picking a second file while the question is still up must re-ask about
+    // THAT file. Without the dismiss, showConfirmPopover keeps the popover it
+    // already has for this anchor and the second pick is silently answered by
+    // a confirm that is still holding the first file.
+    pickPackFile("a.txt");
+    await settle();
+    pickPackFile("b.txt");
+    await settle();
+    document.querySelector(".confirm-yes").click();
+    await settle();
+    check("a second pick replaces the pending question instead of importing the first file",
+      importCalls === 2 && lastImported === "b.txt", `calls=${importCalls} imported=${lastImported}`);
+
     // Nothing installed means nothing to lose, so there is no question to ask.
     pbpPackMeta = async () => null;
     pickPackFile("cedict.txt");
     await settle();
     check("a first import is not gated behind a confirm",
-      importCalls === 2 && !document.querySelector(".confirm-popover"), `calls=${importCalls}`);
+      importCalls === 3 && !document.querySelector(".confirm-popover"), `calls=${importCalls}`);
 
-    // The two failures tell opposite stories about the pack the user had: the
-    // probe gate refuses before the clear, everything else fails after it.
+    // Three outcomes, three messages, and only the error's own code says which
+    // one happened. Guessing would tell a user their dictionary was deleted
+    // when a zip header, a read or the database refused before the clear.
     pbpPackImportFile = async () => { const e = new Error("not a release"); e.code = "implausible_pack"; throw e; };
     pickPackFile("wrong-file.txt");
     await settle();
@@ -257,12 +272,20 @@ delete document.documentElement.dataset.theme;
       $id("dict-pack-action-status").textContent.includes("dictPackImplausible"),
       $id("dict-pack-action-status").textContent);
 
-    pbpPackImportFile = async () => { throw new Error("quota exceeded"); };
+    pbpPackImportFile = async () => { const e = new Error("quota exceeded"); e.code = "pack_cleared"; throw e; };
     pickPackFile("cedict.txt");
     await settle();
-    check("an import that failed past the probe reports the pack as lost",
-      $id("dict-pack-action-status").textContent.includes("dictPackFailed"),
+    check("a failure past the clear reports the pack as lost and needing a re-import",
+      $id("dict-pack-action-status").textContent.includes("dictPackFailedCleared"),
       $id("dict-pack-action-status").textContent);
+
+    pbpPackImportFile = async () => { throw new Error("zip: no end record"); };
+    pickPackFile("broken.zip");
+    await settle();
+    const uncodedStatus = $id("dict-pack-action-status").textContent;
+    check("a failure that never reached the clear claims no removal",
+      uncodedStatus.includes("dictPackFailed") && !uncodedStatus.includes("dictPackFailedCleared"),
+      uncodedStatus);
   } finally {
     pbpPackImportFile = realPackImportFile;
     pbpPackMeta = realPackMetaForImport;

@@ -530,11 +530,12 @@ async function _pbpPackProbeHead(it) {
 // downstream is algebraically the SAME 0.5 ratio test over the whole file, so
 // a file the probe consumed entirely gets the identical verdict here, just
 // before the clear instead of after it. While the stream is still running the
-// window has to be wide enough to be representative -- and a long `#` header
-// is not evidence of anything either way, which is why an all-comment window
-// only condemns a file that ended inside it.
+// window has to be wide enough to be representative: under the floor nothing
+// is judged, not even a head where nothing parsed at all. A long `#` header is
+// not evidence either way, which is why an all-comment window only condemns a
+// file that ended inside it.
 function _pbpPackProbeRejects(probe) {
-  if (probe.parsed === 0 && (probe.candidates > 0 || probe.done)) return true;
+  if (probe.parsed === 0 && (probe.done || probe.candidates >= PBP_PACK_PROBE_MIN_CANDIDATES)) return true;
   if (!probe.done && probe.candidates < PBP_PACK_PROBE_MIN_CANDIDATES) return false;
   return probe.parsed < probe.candidates * PBP_PACK_PROBE_MIN_RATIO;
 }
@@ -567,13 +568,15 @@ async function* _pbpPackReplay(head, it) {
 // public dataset the user re-downloads from MDBG in one click, so a lost pack
 // costs a download, not data -- whereas the ECDICT file is the user's own and
 // may be unrecoverable, which is what buys atomicity its ~15 MB buffer there.
-// Buffering this parse to match would double peak memory on a 24 MB+ release
-// (the ZIP branch already holds the whole decompressed text), and a shadow
-// store would mean an IDB version bump. What IS defended is the failure mode
-// that actually happens -- picking the wrong file -- by parsing the head of
-// the stream and refusing before the store is touched. A truncated stream or
-// an exhausted quota mid-write still loses the installed pack; the failure
-// copy in options-vocab.js says so rather than implying nothing happened.
+// Buffering this parse to match would put every parsed record of a 24 MB+
+// release in memory at once -- today nothing is held but the current batch,
+// and every branch (plain, gzip, zip) reaches the parser as a stream -- and a
+// shadow store would mean an IDB version bump. What IS defended is the failure
+// mode that actually happens -- picking the wrong file -- by parsing the head
+// of the stream and refusing before the store is touched. A truncated stream
+// or an exhausted quota mid-write still loses the installed pack; those
+// rejections carry code "pack_cleared" so options-vocab.js can say so, and
+// only those (see the catch below: nothing before the clear may claim it).
 async function pbpPackImport(lineIter, onProgress, stats) {
   return navigator.locks.request("pbp-cedict-import", async () => {
     const it = (lineIter && typeof lineIter[Symbol.asyncIterator] === "function")
@@ -591,39 +594,63 @@ async function pbpPackImport(lineIter, onProgress, stats) {
       throw err;
     }
     const db = await _pbpPackOpenDB();
+    // Everything above this line can fail with the installed pack still on
+    // disk: a zip whose central directory does not parse, a read that
+    // rejects, invalid UTF-8, an over-long line, a database that will not
+    // open, and the clear transaction itself (which aborts as a unit, per
+    // _pbpPackTx). Only once THIS await has committed is the old pack gone,
+    // so only from here on may an error claim it was removed.
+    // Read the old meta in the SAME transaction that deletes it (requests run
+    // in order, so this sees the pre-delete value): "pack_cleared" has to mean
+    // something the user HAD is now gone, and a first-ever import has nothing
+    // to lose no matter how it fails.
+    let hadPack = false;
     await _pbpPackTx(db, "readwrite", (tx) => {
-      tx.objectStore(_PBP_PACK_META).delete("cedict");
+      const metaStore = tx.objectStore(_PBP_PACK_META);
+      const prior = metaStore.get("cedict");
+      prior.onsuccess = () => { hadPack = !!(prior.result && prior.result.state === "ready"); };
+      metaStore.delete("cedict");
       tx.objectStore(_PBP_PACK_STORE).clear();
     });
-    let batch = [];
-    let entries = 0;
-    let malformed = 0;
-    const flush = () => _pbpPackTx(db, "readwrite", (tx) => {
-      const store = tx.objectStore(_PBP_PACK_STORE);
-      for (const rec of batch) store.put(rec);
-      batch = [];
-    });
-    for await (const line of _pbpPackReplay(probe.head, it)) {
-      const rec = pbpCedictParseLine(line);
-      if (!rec) { if (String(line).trim() && !String(line).startsWith("#")) malformed++; continue; }
-      batch.push(rec);
-      entries++;
-      if (entries > 400000) throw new Error("entry count implausible");
-      if (batch.length >= 2000) {
-        await flush();
-        if (onProgress) onProgress(entries);
-        await new Promise((r) => setTimeout(r, 0)); // yield between batches
-      }
-    }
-    if (batch.length) await flush();
-    if (!entries || malformed > entries) throw new Error("import parsed no plausible data");
-    await _pbpPackTx(db, "readwrite", (tx) => {
-      tx.objectStore(_PBP_PACK_META).put({
-        id: "cedict", state: "ready", entries, importedAt: Date.now(),
-        bytes: (stats && stats.bytes) || 0
+    try {
+      let batch = [];
+      let entries = 0;
+      let malformed = 0;
+      const flush = () => _pbpPackTx(db, "readwrite", (tx) => {
+        const store = tx.objectStore(_PBP_PACK_STORE);
+        for (const rec of batch) store.put(rec);
+        batch = [];
       });
-    });
-    return { entries, malformed };
+      for await (const line of _pbpPackReplay(probe.head, it)) {
+        const rec = pbpCedictParseLine(line);
+        if (!rec) { if (String(line).trim() && !String(line).startsWith("#")) malformed++; continue; }
+        batch.push(rec);
+        entries++;
+        if (entries > 400000) throw new Error("entry count implausible");
+        if (batch.length >= 2000) {
+          await flush();
+          if (onProgress) onProgress(entries);
+          await new Promise((r) => setTimeout(r, 0)); // yield between batches
+        }
+      }
+      if (batch.length) await flush();
+      if (!entries || malformed > entries) throw new Error("import parsed no plausible data");
+      await _pbpPackTx(db, "readwrite", (tx) => {
+        tx.objectStore(_PBP_PACK_META).put({
+          id: "cedict", state: "ready", entries, importedAt: Date.now(),
+          bytes: (stats && stats.bytes) || 0
+        });
+      });
+      return { entries, malformed };
+    } catch (error) {
+      // Reached only once the clear has committed. If a ready pack was there,
+      // it is gone now and has to be imported again; `code` is how the UI
+      // knows it may say so. An error that already named itself keeps its own
+      // code, and a first-ever import leaves the error uncoded so the neutral
+      // copy is used.
+      if (error && !error.code && hadPack) error.code = "pack_cleared";
+      throw error;
+    }
   });
 }
 

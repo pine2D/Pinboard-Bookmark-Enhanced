@@ -3408,13 +3408,16 @@
     }
   },
   "dictPackFailed": {
+    "message": "無法匯入詞典。請檢查所選檔案及擴充功能的可用儲存空間後再試。"
+  },
+  "dictPackFailedCleared": {
     "message": "無法匯入詞典，原有的詞典包已經移除。請檢查所選檔案及擴充功能的可用儲存空間後重新匯入。"
   },
   "dictPackImplausible": {
     "message": "這個檔案不像 CC-CEDICT 發佈檔，已匯入的詞典維持原狀。"
   },
   "dictPackReplaceConfirm": {
-    "message": "匯入會先移除目前已裝的詞典包，再讀取新檔案。"
+    "message": "匯入會先移除目前已匯入的詞典包，再讀取新檔案。"
   },
   "dictPackImportHint": {
     "message": "可匯入 CC-CEDICT 的 .txt、.txt.gz 或 .zip 檔案。"

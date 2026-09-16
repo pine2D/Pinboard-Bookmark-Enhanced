@@ -1005,13 +1005,20 @@ function _pbpPackWire() {
       });
       _pbpVocabFlashLocalStatus("dict-pack-action-status", true, t("dictPackDone", String(res.entries)));
     } catch (error) {
-      // Two different stories, and they must not be swapped: the probe gate
-      // refuses a wrong file BEFORE the store is cleared (installed pack
-      // intact), while every other failure happens after it (pack gone, and
-      // the status line above has already flipped to "not imported").
-      const implausible = error && error.code === "implausible_pack";
+      // Three outcomes, and only dict-pack.js knows which one happened: the
+      // probe gate refused a wrong file before the store was cleared (the
+      // installed pack is intact), the import died after the clear (it is
+      // gone and the status line above has already flipped to "not
+      // imported"), or it failed on the way to the clear -- a zip that will
+      // not parse, a read error, a database that will not open -- where the
+      // installed pack is untouched but nothing specific can be said about
+      // the file. Guessing here would tell a user their dictionary was
+      // deleted when it was not.
+      const code = error && error.code;
       _pbpVocabFlashLocalStatus("dict-pack-action-status", false,
-        t(implausible ? "dictPackImplausible" : "dictPackFailed"));
+        t(code === "implausible_pack" ? "dictPackImplausible"
+          : code === "pack_cleared" ? "dictPackFailedCleared"
+          : "dictPackFailed"));
     } finally {
       imp.disabled = false;
       _pbpPackRefreshStatus();

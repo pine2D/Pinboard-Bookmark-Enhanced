@@ -3408,6 +3408,9 @@
     }
   },
   "dictPackFailed": {
+    "message": "Das Wörterbuch konnte nicht importiert werden. Prüfe die ausgewählte Datei und den verfügbaren Erweiterungsspeicher und versuche es erneut."
+  },
+  "dictPackFailedCleared": {
     "message": "Das Wörterbuch konnte nicht importiert werden, und das bisherige Paket ist bereits entfernt. Prüfe die ausgewählte Datei und den verfügbaren Erweiterungsspeicher und importiere es erneut."
   },
   "dictPackImplausible": {

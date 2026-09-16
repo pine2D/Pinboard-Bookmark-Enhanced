@@ -654,19 +654,97 @@ section("pbpCedictLines");
   const pastWindow = await pbpPackLookup(["第" + (longFile.length - 1) + "词"]);
   check("and so is a line from past the probe window", pastWindow && pastWindow.state === "hit");
 
+  // Rejecting has to close the source too, or a real import leaves the file's
+  // stream reader locked open behind it.
+  let proseIteratorClosed = false;
+  async function* proseWithFinally() {
+    try { for (const line of prose) yield line; } finally { proseIteratorClosed = true; }
+  }
+  let closeErr = null;
+  try { await pbpPackImport(proseWithFinally()); } catch (e) { closeErr = e; }
+  check("a probe rejection closes the source iterator instead of abandoning it",
+    !!closeErr && closeErr.code === "implausible_pack" && proseIteratorClosed,
+    "code=" + (closeErr && closeErr.code) + " closed=" + proseIteratorClosed);
+
+  // --- What the two probe constants actually decide, in the regime they were
+  // written for: a stream still running (`!done`), where the window is a
+  // sample rather than the whole file. The floor decides WHETHER the window
+  // is judged; the ratio decides HOW. Both fixtures are 250 lines, so the
+  // probe stops at 200 with the stream still open.
+  const probeComments = (n) => Array.from({ length: n }, (_, i) => "# comment line " + i);
+  const probeJunk = (n, tag) => Array.from({ length: n }, (_, i) => tag + " " + i + " is not a cedict entry");
+  const probeCedict = (n, from) => Array.from({ length: n },
+    (_, i) => "甲" + (from + i) + " 甲" + (from + i) + " [jia3] /entry " + (from + i) + "/");
+
+  // Floor: 10 candidates of which 3 parse. That ratio alone would condemn the
+  // file; ten lines are not enough to condemn anything, so it imports.
+  const probeBelowFloor = [...probeCedict(3, 0), ...probeJunk(7, "below-floor"),
+    ...probeComments(PBP_PACK_PROBE_LINES - 10), ...probeCedict(50, 100)];
+  let probeBelowFloorRes = null, probeBelowFloorErr = null;
+  try { probeBelowFloorRes = await pbpPackImport(arrLines(probeBelowFloor), null, { bytes: 11 }); }
+  catch (e) { probeBelowFloorErr = e; }
+  check("a window under the candidate floor is not judged, whatever its ratio",
+    !!probeBelowFloorRes && probeBelowFloorRes.entries === 53 && probeBelowFloorRes.malformed === 7,
+    "got " + JSON.stringify(probeBelowFloorRes || (probeBelowFloorErr && probeBelowFloorErr.code)));
+
+  // Ratio: 40 candidates of which 10 parse. Wide enough to judge, and it fails.
+  const probeRatio = [...probeCedict(10, 200), ...probeJunk(30, "over-ratio"),
+    ...probeComments(PBP_PACK_PROBE_LINES - 40), ...probeCedict(50, 300)];
+  let probeRatioErr = null;
+  try { await pbpPackImport(arrLines(probeRatio)); } catch (e) { probeRatioErr = e; }
+  check("a window past the floor with too few lines parsing is refused on the ratio",
+    !!probeRatioErr && probeRatioErr.code === "implausible_pack",
+    "got " + (probeRatioErr && (probeRatioErr.code || probeRatioErr.message)));
+  const metaAfterRatio = await pbpPackMeta();
+  check("that ratio rejection left the pack installed a moment earlier alone",
+    !!metaAfterRatio && metaAfterRatio.state === "ready" && metaAfterRatio.entries === 53,
+    "got " + JSON.stringify(metaAfterRatio));
+
   // The residual risk this gate does NOT cover, pinned so nobody reads the
   // probe as atomicity: a stream that dies after the window still loses the
-  // installed pack. That is what the failure copy has to say out loud.
+  // installed pack. That is what the failure copy has to say out loud -- and
+  // the code is how it knows it may say it.
   async function* throwsPastWindow() {
     for (const line of longFile) yield line;
     throw new Error("boom past the probe window");
   }
-  let lateThrew = false;
-  try { await pbpPackImport(throwsPastWindow()); } catch (e) { lateThrew = /boom past/.test(e && e.message); }
-  check("a throw past the probe window still propagates", lateThrew);
+  let lateErr = null;
+  try { await pbpPackImport(throwsPastWindow()); } catch (e) { lateErr = e; }
+  check("a throw past the probe window still propagates", !!lateErr && /boom past/.test(lateErr.message));
+  check("a failure that ran after the clear reports the installed pack as lost",
+    !!lateErr && lateErr.code === "pack_cleared", "got " + (lateErr && lateErr.code));
   const metaAfterLateThrow = await pbpPackMeta();
   check("no ready meta survives a throw past the probe window (this path is not atomic)",
     !metaAfterLateThrow || metaAfterLateThrow.state !== "ready");
+
+  // Nothing was installed this time, so the identical failure must NOT be
+  // allowed to tell the user a dictionary of theirs was removed.
+  async function* throwsPastWindowAgain() {
+    for (const line of longFile) yield line;
+    throw new Error("boom with an empty store");
+  }
+  let firstEverErr = null;
+  try { await pbpPackImport(throwsPastWindowAgain()); } catch (e) { firstEverErr = e; }
+  check("the same failure with nothing installed claims no removal",
+    !!firstEverErr && !firstEverErr.code, "got " + (firstEverErr && firstEverErr.code));
+
+  // ...and neither may a failure that never reached the clear at all. The
+  // database refusing to open stands in for the whole family: a zip whose
+  // central directory will not parse, a read that rejects, invalid UTF-8, an
+  // over-long line, the clear transaction aborting as a unit.
+  await pbpPackImport(arrLines(SAMPLE1), null, { bytes: 999 });
+  const realOpenBeforeClear = _pbpPackOpenDB;
+  _pbpPackOpenDB = async () => { throw new Error("db open failed"); };
+  let preClearErr = null;
+  try { await pbpPackImport(arrLines(longFile)); } catch (e) { preClearErr = e; }
+  _pbpPackOpenDB = realOpenBeforeClear;
+  check("a failure before the clear stays uncoded, so no copy can claim a removal",
+    !!preClearErr && !preClearErr.code && /db open failed/.test(preClearErr.message),
+    "got " + (preClearErr && (preClearErr.code || preClearErr.message)));
+  const metaAfterPreClear = await pbpPackMeta();
+  check("and the pack it never reached is still installed",
+    !!metaAfterPreClear && metaAfterPreClear.state === "ready" && metaAfterPreClear.entries === 6,
+    "got " + JSON.stringify(metaAfterPreClear));
 
   let raceImportWaiting = false, releaseRaceImport;
   const raceImportGate = new Promise((r) => { releaseRaceImport = r; });

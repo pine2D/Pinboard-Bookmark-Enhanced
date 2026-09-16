@@ -3408,6 +3408,9 @@
     }
   },
   "dictPackFailed": {
+    "message": "Impossible d'importer le dictionnaire. Vérifiez le fichier sélectionné et l'espace de stockage disponible pour l'extension, puis réessayez."
+  },
+  "dictPackFailedCleared": {
     "message": "Impossible d'importer le dictionnaire, et le pack installé a déjà été supprimé. Vérifiez le fichier sélectionné et l'espace de stockage disponible pour l'extension, puis importez-le de nouveau."
   },
   "dictPackImplausible": {
