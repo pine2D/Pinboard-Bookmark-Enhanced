@@ -3466,6 +3466,7 @@ async function run() {
 
     const fixture = document.createElement("div");
     let beforeApplyCalls = 0;
+    const onAppliedCalls = [];
     let writesBeforeApply = 0;
     let previewBeforeWrite = false;
     let cleanPreviewAnnounced = false;
@@ -3543,6 +3544,7 @@ async function run() {
           beforeApplyCalls++;
           if (deferApply) await new Promise((resolve) => { releaseDeferredApply = resolve; });
         },
+        onApplied: (result) => { onAppliedCalls.push(result); },
       });
       const oldText = JSON.stringify({
         _schemaVersion: 3,
@@ -3681,6 +3683,31 @@ async function run() {
       fixture.remove();
     }
     check("E11 file selection renders preview before any write", previewBeforeWrite);
+    // Import lands behind the form's back: the page owner is told what landed
+    // so it can reload itself (options.js) -- the hook fires once per apply,
+    // after the writes, with the same result object the card renders.
+    check("E11 onApplied fires once per apply with the applied result",
+      onAppliedCalls.length === 1 && onAppliedCalls[0]?.settings === "applied" &&
+      onAppliedCalls[0]?.themes === "skipped");
+    check("E11 a reload is owed only when settings or themes landed",
+      pbpImportNeedsPageReload({ settings: "applied" }) &&
+      pbpImportNeedsPageReload({ settings: "skipped", themes: "local-only" }) &&
+      !pbpImportNeedsPageReload({ settings: "skipped", themes: "failed", highlights: "applied", vocabulary: "applied" }) &&
+      !pbpImportNeedsPageReload(null));
+    {
+      const stashed = { settings: "applied", themes: "skipped", highlights: "applied", vocabulary: "skipped", secrets: "skipped", vocabularyApplied: 0 };
+      pbpStashImportResult(stashed);
+      const first = pbpTakeImportResult();
+      const second = pbpTakeImportResult();
+      sessionStorage.setItem("pbpImportResult", JSON.stringify({ ts: Date.now() - 60000, result: stashed }));
+      const expired = pbpTakeImportResult();
+      const expiredCleared = sessionStorage.getItem("pbpImportResult") === null;
+      sessionStorage.setItem("pbpImportResult", "{not json");
+      const garbage = pbpTakeImportResult();
+      check("E11 the import result survives exactly one reload and expires after the TTL",
+        JSON.stringify(first) === JSON.stringify(stashed) && second === null &&
+        expired === null && expiredCleared && garbage === null);
+    }
     check("E11 clean preview announces readiness through the live status", cleanPreviewAnnounced);
     check("E11 preview counts settings fields", preview?.settingsCount === 2);
     check("E11 preview counts custom themes", preview?.themeCount === 2);

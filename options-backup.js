@@ -493,7 +493,45 @@ async function pbpApplyBackupPayload(data, {
   return result;
 }
 
-function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, beforeExport, beforeApply, afterApply }) {
+// A settings/theme import is written behind the form's back: every control on
+// this page was filled once at load, so after "Apply selected" the form kept
+// showing the pre-import values until the user reloaded the extension by hand
+// (user report 2026-09-16). The page owner passes onApplied to reload itself;
+// the result card is stashed here so it survives that reload.
+const PBP_IMPORT_RESULT_STASH = "pbpImportResult";
+const PBP_IMPORT_RESULT_STASH_TTL = 5000;
+
+function pbpStashImportResult(result) {
+  try {
+    sessionStorage.setItem(PBP_IMPORT_RESULT_STASH, JSON.stringify({ ts: Date.now(), result }));
+  } catch (_) {}
+}
+
+// Consumes the stash. A stale entry (a reload that never happened because the
+// beforeunload guard refused it) must not repaint an old result on a later
+// visit, hence the TTL.
+function pbpTakeImportResult() {
+  try {
+    const raw = sessionStorage.getItem(PBP_IMPORT_RESULT_STASH);
+    if (!raw) return null;
+    sessionStorage.removeItem(PBP_IMPORT_RESULT_STASH);
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.ts !== "number") return null;
+    if (Date.now() - parsed.ts > PBP_IMPORT_RESULT_STASH_TTL) return null;
+    return parsed.result && typeof parsed.result === "object" ? parsed.result : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// True when the import changed something the form or the theme controls
+// display: highlights and vocabulary live outside this page's form.
+function pbpImportNeedsPageReload(result) {
+  const landed = (v) => v === "applied" || v === "local-only";
+  return !!result && (landed(result.settings) || landed(result.themes));
+}
+
+function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, beforeExport, beforeApply, afterApply, onApplied }) {
   let selectionToken = 0;
   let selectionText = "";
   let busyToken = null;
@@ -607,6 +645,13 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       String(result.vocabularyApplied || 0)
     ));
   };
+
+  // The previous page instance imported and reloaded: show its result card
+  // again so the reload does not eat the outcome the user was reading.
+  {
+    const restored = pbpTakeImportResult();
+    if (restored) renderResult(restored);
+  }
 
   $id("import-settings").addEventListener("click", () => $id("import-settings-file").click());
 
@@ -825,7 +870,12 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
           ));
         },
       });
-      if (token === selectionToken) renderResult(applied);
+      if (token === selectionToken) {
+        renderResult(applied);
+        if (onApplied) {
+          try { onApplied(applied); } catch (e) { console.warn("[import] onApplied failed:", e?.name, e?.message); }
+        }
+      }
     } catch (err) {
       console.error("[import] failed", err);
       if (token === selectionToken) {

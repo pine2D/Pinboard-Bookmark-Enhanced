@@ -3130,6 +3130,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       // cannot cost the status line above (the caller swallows afterApply).
       await loadSavedThemes();
     },
+    // Every control was filled once at load, so an import that landed
+    // settings or themes leaves the form showing pre-import values. Reload
+    // the page the way the sync toggle and the language switch do (the tab
+    // is restored through the same "activeTab" hand-off); the result card is
+    // stashed by options-backup.js and repainted after the reload. No fade
+    // here: if the tag-governance beforeunload guard refuses the reload, the
+    // page stays usable with the result still on screen.
+    onApplied: (applied) => {
+      if (!pbpImportNeedsPageReload(applied)) return;
+      pbpStashImportResult(applied);
+      const activePanel = document.querySelector(".tab-btn.active")?.dataset.panel || "general";
+      sessionStorage.setItem("activeTab", activePanel);
+      setTimeout(() => location.reload(), 140);
+    },
   });
   setupApiTests();
   let _connectionOverviewTimer = 0;
