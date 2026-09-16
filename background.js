@@ -2378,6 +2378,167 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
   }
 });
 
+// ---- Popup AI calls, run by the worker (K44) -------------------------------
+// Chrome destroys the popup document the instant the user clicks the page,
+// switches tab or presses Esc — and it took every in-flight provider request
+// with it. The tokens were already billed server-side, but the reply never
+// reached setAICache, so the next open paid for the same answer again. Same
+// ruling as the batch loop below ("so it survives popup close"): a call the
+// user has already paid for belongs to the worker, not to a document that can
+// vanish mid-flight.
+//
+// Only the last hop moves. The popup keeps extraction, prompt assembly, the
+// combined/single decision and the cache coordinates (url / kind / source /
+// account / settings fingerprint) — so audits A3/A4/A5 and its account gates
+// stay exactly where they were proven. This function takes a finished prompt
+// plus those coordinates, runs the call, parses it, and files the result. Two
+// invariants had to travel with it and are re-stated at their sites below: the
+// A8 half-empty rule, and tag case resolution.
+//
+// Deliberately NOT an extraction of the quick-save AI path above: that block
+// writes four outer mutable flags (aiHostPermissionMissing / aiTagsResolved /
+// summaryResolved / aiPromises), so "equivalent extraction" there would be a
+// fake mechanical operation. This one is standalone and serves the popup
+// message only; CLAUDE.md explicitly tolerates a little duplication between
+// isolated script contexts, and that duplication is the insurance premium here.
+
+// Non-secret settings a popup message may override for one call: the immutable
+// per-op snapshot (audit A4) and the "Try with <provider>" fallback, which
+// swaps provider + model. A WHITELIST on purpose — a denylist would hand every
+// future settings key to the message bus by default. No credential appears
+// here, and pbpSanitizeAiOverrides deletes every API_KEY_FIELDS entry on top of
+// that: API keys reach the provider from the worker's own loadSettings(), never
+// over chrome.runtime.
+const PBP_AI_OVERRIDE_FIELDS = Object.freeze([
+  "aiProvider", "aiTagLang", "aiSummaryLang", "aiTagSeparator", "optRespectTagCase",
+  "geminiModel", "openaiModel", "claudeModel", "deepseekModel", "qwenModel",
+  "minimaxModel", "openrouterModel", "groqModel", "mistralModel", "cohereModel",
+  "siliconflowModel", "zhipuModel", "kimiModel", "ollamaModel", "customModel",
+  "ollamaBaseUrl", "customBaseUrl",
+]);
+
+function pbpSanitizeAiOverrides(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const key of PBP_AI_OVERRIDE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) out[key] = raw[key];
+  }
+  // Belt and braces over the whitelist above: if a credential field is ever
+  // renamed onto one of those names, it still must not survive the bus.
+  for (const key of API_KEY_FIELDS) delete out[key];
+  return out;
+}
+
+// Structured clone drops the Error prototype and every non-enumerable field, so
+// a failure crosses the bus as a plain object and the popup rebuilds an Error
+// from it. Only the four fields the popup's error card consumes travel — never
+// the stack, the prompt or the settings.
+function pbpAiErrorEnvelope(err) {
+  const envelope = { message: String((err && err.message) || "AI call failed") };
+  if (err && typeof err.code === "string" && err.code) envelope.code = err.code;
+  if (err && typeof err.status === "number") envelope.status = err.status;
+  if (err && typeof err.paramHint === "string" && err.paramHint) envelope.paramHint = err.paramHint;
+  return envelope;
+}
+
+// Case resolution lives popup-side in finalizeAITags(), against a tagCaseMap the
+// worker does not have — the one thing that could silently degrade the moment
+// the call moved here. Rebuild it from the SAME storage entry the quick-save
+// path reads, and only when the entry belongs to THIS account.
+async function pbpAiTagCaseMap(account, s) {
+  if (!s || !s.optRespectTagCase) return null;
+  try {
+    const stored = await chrome.storage.local.get("cached_user_tags");
+    const entry = stored && stored.cached_user_tags;
+    if (!entry || entry.account !== account || !entry.counts) {
+      // MV3 iron rule: leave a trace before degrading. No tag text, no account.
+      console.warn("[pbp-ai] no tag vocabulary cached for this account; skipping tag case resolution");
+      return null;
+    }
+    return buildTagCaseMap(entry.counts);
+  } catch (e) {
+    console.warn("[pbp-ai] tag case map unavailable:", e && e.name, e && e.message);
+    return null;
+  }
+}
+
+// Run one popup-originated AI call to completion inside the worker. Always
+// resolves to the wire envelope (never throws), so the caller always has
+// something to send — and the cache write happens before the send either way,
+// which is the whole point: the popup may already be gone.
+async function pbpRunPopupAiCall(message) {
+  const account = typeof message.account === "string" ? message.account : "";
+  const url = typeof message.url === "string" ? message.url : "";
+  const prompt = typeof message.prompt === "string" ? message.prompt : "";
+  const inflightKey = typeof message.inflightKey === "string" ? message.inflightKey : "";
+  const kind = (message.kind === "tags" || message.kind === "summary") ? message.kind : "";
+  const mode = message.mode === "combined" ? "combined" : "single";
+  // The namespace is the popup's decision (audit A3): ensurePageText knows which
+  // extractor actually produced the body. The worker never re-derives it.
+  const source = (typeof message.source === "string" && message.source) ? message.source : "local";
+  if (!account || !url || !prompt || !inflightKey || !kind) {
+    return { ok: false, error: { message: "malformed AI call", code: "invalid" } };
+  }
+
+  // Account gate 1 (cross-cutting iron rule): re-read the live auth atomically
+  // right before dispatch. A switch between the popup's click and this message
+  // must not spend the new account's budget on the old account's page.
+  const before = await getCurrentPinboardAuth();
+  if (before.account !== account) {
+    return { ok: false, error: { message: "account changed", code: "account_changed" } };
+  }
+
+  // Credentials are read HERE, by the worker, right before dispatch — never
+  // taken from the message. The popup holds deobfuscated keys already, but
+  // putting them on the message bus buys nothing and risks everything.
+  const s = { ...(await loadSettings()), ...pbpSanitizeAiOverrides(message.aiOverrides) };
+  const cacheDuration = message.cacheDuration ?? s.aiCacheDuration;
+
+  let produced;
+  try {
+    // Same dedup shape and the same key string the popup builds, on the
+    // worker's single Map: a second click — or a reopened popup — rides the
+    // call already running instead of paying for it twice. The key is opaque
+    // here by design; it carries the popup's account|fingerprint|type|url and
+    // must not be recomputed from a settings snapshot the worker doesn't own.
+    produced = await getOrCreateInflight(inflightKey, async () => {
+      const resp = await callAI(s, prompt);
+      if (mode === "combined") {
+        const parsed = parseAICombined(resp, s.aiTagSeparator);
+        const caseMap = await pbpAiTagCaseMap(account, s);
+        return { tags: caseMap ? parsed.tags.map((tag) => resolveTagCase(tag, caseMap)) : parsed.tags, summary: parsed.summary };
+      }
+      if (kind === "tags") {
+        const tags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
+        const caseMap = await pbpAiTagCaseMap(account, s);
+        return { tags: caseMap ? tags.map((tag) => resolveTagCase(tag, caseMap)) : tags, summary: "" };
+      }
+      return { tags: [], summary: typeof resp === "string" ? resp : "" };
+    });
+  } catch (e) {
+    // CLAUDE.md: log the raw shape before folding it into a product code. The
+    // classification itself is handleAIError's, inside callAI — not re-done here.
+    console.warn("[pbp-ai] popup AI call failed:", e && e.name, e && e.code, e && e.message);
+    return { ok: false, error: pbpAiErrorEnvelope(e) };
+  }
+
+  // Account gate 2: the result belongs to whoever paid for it. A switch during
+  // the call discards it rather than filing it under the new owner.
+  const after = await getCurrentPinboardAuth();
+  if (after.account !== account) {
+    return { ok: false, error: { message: "account changed", code: "account_changed" } };
+  }
+
+  // A8: cache — and hand back — only the half that has content. A cached empty
+  // half turns a malformed reply into a sticky fake success; a null half is a
+  // miss, which is exactly what the popup's own logic already falls through on.
+  const tags = (produced && produced.tags && produced.tags.length) ? produced.tags : null;
+  const summary = (produced && produced.summary) ? produced.summary : null;
+  if (tags) await setAICache(url, "tags", tags, cacheDuration, source, account, s);
+  if (summary) await setAICache(url, "summary", summary, cacheDuration, source, account, s);
+  return { ok: true, tags, summary };
+}
+
 // ---- 监听来自 popup 的消息 ----
 // Named, not an inline arrow (roadmap #35): the router is the single entry
 // for all four surfaces' messaging, and the project's source-slice test
@@ -2546,6 +2707,24 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     readOfflineQueueWithIds()
       .then((queue) => sendResponse({ ok: true, queue }))
       .catch(() => sendResponse({ ok: false, queue: [] }));
+    return true;
+  }
+
+  // K44: the popup hands the worker a finished prompt plus its cache
+  // coordinates; the worker owns the paid call from here, so closing the popup
+  // costs the render and nothing else. `return true` keeps the channel open and
+  // this listener stays a plain (non-async) function — MV3 allows exactly one
+  // of the two. pbpRunPopupAiCall never rejects; the rejection arm covers a
+  // programming error only, and a sendResponse that throws is the expected
+  // dead-port case this whole feature exists for (the cache write already ran).
+  if (message.type === "PBP_AI_CALL") {
+    pbpRunPopupAiCall(message).then(
+      (envelope) => { try { sendResponse(envelope); } catch (_) { /* popup gone: result is cached, nothing to deliver it to */ } },
+      (e) => {
+        console.warn("[pbp-ai] popup AI call crashed:", e && e.name, e && e.message);
+        try { sendResponse({ ok: false, error: pbpAiErrorEnvelope(e) }); } catch (_) {}
+      }
+    );
     return true;
   }
 

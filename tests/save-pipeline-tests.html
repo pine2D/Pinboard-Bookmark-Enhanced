@@ -842,14 +842,18 @@ await suite("unified save pipeline", async () => {
     assert(!branch.includes("persisted") && !branch.includes("retryable"), "private envelope does not cross the message boundary");
   });
 
-  await test("background Quick, Read Later, and Batch summary caches always carry captured account", async () => {
+  await test("background Quick, Read Later, popup-AI, and Batch summary caches always carry captured account", async () => {
     const source = await getBackgroundSource();
     const summaryCalls = source.match(/(?:get|set)AICache\([^\n]*"summary"[^\n]*\)/g) || [];
-    equal(summaryCalls.length, 8, "unexpected production summary cache call count");
+    // K44 added a ninth site: pbpRunPopupAiCall, which runs the popup's paid
+    // call inside the worker. It sits between the quick-save block and the batch
+    // loop in source order, and like batch it carries the operation's own
+    // validated `account` binding rather than the quick-save startAuth capture.
+    equal(summaryCalls.length, 9, "unexpected production summary cache call count");
     assert(summaryCalls.slice(0, 4).every((call) => call.includes("startAuth.account")),
       "Quick/Read Later summary cache lost captured account");
     assert(summaryCalls.slice(4).every((call) => /, account, s\)$/.test(call)),
-      "Batch summary cache lost batch account");
+      "popup-AI/Batch summary cache lost its captured account");
   });
 
   await test("delivery create emits explicit replace, shared, and read-later values", async () => {
