@@ -705,6 +705,25 @@ async function saveOverlayWithFallback(value) {
 //     separate account-wide syncApiKeys opt-in, and naming it here would read
 //     as "tick the box and your keys travel too".
 
+// Theme content lives outside SETTINGS_DEFAULTS, so it has no default to
+// compare against and is judged by presence on both sides: the cloud probe
+// treats any of the three as proof of a real profile, and locally any of them
+// carrying something is proof this device has been customised.
+const PBP_THEME_CONTENT_KEYS = ["customOverlayCSS", "savedThemes", "customCSS"];
+
+// "Present but empty" is still a factory-fresh device: some write path may
+// have created the key with an empty overlay or an empty saved-theme list.
+function pbpThemeContentPresent(value) {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed !== "" && trimmed !== "[]" && trimmed !== "{}";
+  }
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
+}
+
 // Both key lists are built on first use, never at load: the helper prefix of
 // this file is evaluated standalone by tests/ui-contract-tests.mjs, where the
 // shared.js constants do not exist yet.
@@ -713,7 +732,7 @@ function pbpCloudProbeKeys() {
   if (!_pbpCloudProbeKeys) {
     _pbpCloudProbeKeys = Object.keys(SETTINGS_DEFAULTS)
       .filter((key) => !API_KEY_FIELDS.includes(key))
-      .concat(["customOverlayCSS", "savedThemes", "customCSS"]);
+      .concat(PBP_THEME_CONTENT_KEYS);
   }
   return _pbpCloudProbeKeys;
 }
@@ -789,18 +808,21 @@ async function pbpMaybeShowCloudSettingsHint(status, run) {
   const freshKeys = pbpFreshDeviceKeys();
   let local;
   try {
-    local = await chrome.storage.local.get(freshKeys);
+    local = await chrome.storage.local.get(freshKeys.concat(PBP_THEME_CONTENT_KEYS));
   } catch (_) {
     return false;
   }
   // A device somebody has already made their own is not the first-run case.
   // Telling it "the cloud has settings" would be a permanent nag aimed at
-  // exactly the person who deliberately keeps this device unsynced.
+  // exactly the person who deliberately keeps this device unsynced. Local
+  // theme content counts too, and by the same presence test the cloud probe
+  // uses: an overlay or a saved theme is the strongest evidence either side
+  // can offer that somebody has been here.
   const fresh = freshKeys.every((key) => {
     if (!Object.prototype.hasOwnProperty.call(local, key)) return true;
     try { return JSON.stringify(local[key]) === JSON.stringify(SETTINGS_DEFAULTS[key]); }
     catch (_) { return false; }
-  });
+  }) && !PBP_THEME_CONTENT_KEYS.some((key) => pbpThemeContentPresent(local[key]));
   if (!fresh) return false;
   const available = await pbpCloudSettingsAvailable();
   if (run !== pbpCloudHintRun) return false;
@@ -815,8 +837,11 @@ async function pbpMaybeShowCloudSettingsHint(status, run) {
 
 // Chrome delivers the sync payload to a brand-new profile asynchronously, so
 // the first probe can honestly see an empty area on the very device this hint
-// exists for. Retest exactly once, on the first sync-area change of this
-// page's life, then unhook: no polling, no listener that outlives the answer.
+// exists for. There is exactly one retest, and the FIRST sync-area event of
+// any kind consumes it, hit or miss: the listener unhooks before it re-probes,
+// so an event carrying nothing useful spends the retest just as a real payload
+// would, and no second one is ever armed. No polling, no listener that
+// outlives the answer.
 function pbpArmCloudHintSyncRetest() {
   if (pbpCloudHintRetestArmed) return;
   const onChanged = chrome.storage && chrome.storage.onChanged;
@@ -827,9 +852,15 @@ function pbpArmCloudHintSyncRetest() {
     try { onChanged.removeListener(retest); } catch (_) {}
     // Chain onto the probe that refresh starts, so a holder of
     // pbpCloudHintProbe waits for the retest's verdict rather than for the
-    // storage read that precedes it.
-    pbpCloudHintProbe = pbpRefreshSyncLocalFallbackStatus()
-      .then(() => pbpCloudHintProbe, () => false);
+    // storage read that precedes it. That refresh can also return without
+    // starting a probe (no status element, or settings sync is on by now
+    // because the reload was blocked), leaving pbpCloudHintProbe pointing at
+    // this very chain: resolving a promise with itself throws "Chaining cycle
+    // detected", so check identity first and never leave the chain unguarded.
+    const chain = pbpRefreshSyncLocalFallbackStatus()
+      .then(() => (pbpCloudHintProbe === chain ? false : pbpCloudHintProbe))
+      .catch(() => false);
+    pbpCloudHintProbe = chain;
   };
   onChanged.addListener(retest);
 }
@@ -2253,17 +2284,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Chrome can suspend a tab-modal confirm when the options tab loses
       // focus; holding the lock there would also stall popup and SW reads.
       if (enabling && !beforeTransition.optSyncEnabled) {
-        // Same read-only probe the sync-off hint uses, so "the cloud holds a
-        // profile" has one definition. Bookkeeping residue (optOverlayInLocal,
-        // _migrationV2, a stray themePresetKey) and default-valued keys must
-        // not trigger this dialog: choosing "use cloud" against a hollow
-        // profile silently resets every local setting to defaults after the
-        // reload. Credentials are outside the probe's key list, so a cloud
-        // holding nothing but a synced key now counts as hollow here too —
-        // deliberately, because the "use cloud" branch it used to open would
-        // discard this device's settings in favour of an all-default cloud,
-        // while the credential itself is never written by either branch.
-        if (await pbpCloudSettingsAvailable()) {
+        const cloud = await chrome.storage.sync.get(null);
+        // Bookkeeping residue (optOverlayInLocal, _migrationV2, a stray
+        // themePresetKey) and default-valued keys must not trigger this
+        // dialog: choosing "use cloud" against a hollow profile silently
+        // resets every local setting to defaults after the reload.
+        // Deliberately NOT pbpCloudSettingsAvailable(): that probe drops every
+        // API_KEY_FIELDS entry, and those all live in SETTINGS_DEFAULTS with a
+        // "" default, so a cloud holding nothing but synced credentials would
+        // read as hollow here and silence BOTH confirms — including the
+        // overwrite branch, whose Cancel is the only way out of turning sync
+        // on. The probe serves the sync-off hint only.
+        if (pbpCloudHasMeaningfulSyncSettings(cloud)) {
           if (confirm(t("syncConflictUseCloud"))) {
             useCloud = true;
           } else if (!confirm(t("syncConflictOverwriteCloud"))) {

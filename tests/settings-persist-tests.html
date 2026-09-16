@@ -2355,6 +2355,32 @@ async function run() {
       abortToggle.checked === false && abortLocal.optSyncEnabled === false &&
       abortLocal.optTheme === "device-theme" && abortSync.optTheme === "cloud-theme");
 
+    // A cloud holding nothing but synced credentials is still a real profile.
+    // pbpCloudSettingsAvailable (the sync-off hint's probe) drops every
+    // API_KEY_FIELDS entry, and those all sit in SETTINGS_DEFAULTS with a ""
+    // default, so wiring this handler to that probe would read this cloud as
+    // hollow and silence BOTH confirms -- including the overwrite branch,
+    // whose Cancel is the only way back out of turning sync on.
+    const credsLocal = { optSyncEnabled: false, optTheme: SETTINGS_DEFAULTS.optTheme };
+    const credsSync = { syncApiKeys: true, openaiApiKey: "obf:cloud-key" };
+    const credsChrome = { storage: { local: area(credsLocal), sync: area(credsSync) } };
+    const credsPrompts = [];
+    let credsHandler;
+    const credsToggle = { checked: true, addEventListener: (_type, fn) => { credsHandler = fn; } };
+    const credsDeps = {
+      ...handlerDeps,
+      syncToggle: credsToggle,
+      chrome: credsChrome,
+      confirm: (message) => { credsPrompts.push(message); return false; },
+    };
+    globalThis.chrome = credsChrome;
+    new Function(...Object.keys(credsDeps), syncHandlerSource)(...Object.values(credsDeps));
+    await credsHandler();
+    check("E5 Options handler: a credentials-only cloud profile still offers both conflict choices",
+      credsPrompts.join("|") === "syncConflictUseCloud|syncConflictOverwriteCloud" &&
+      credsToggle.checked === false && credsLocal.optSyncEnabled === false &&
+      !("optTheme" in credsSync));
+
     const fallbackLocal = { optSyncEnabled: false, customTagPrompt: "device prompt" };
     const fallbackSync = { syncApiKeys: false };
     const fallbackChrome = { storage: { local: area(fallbackLocal), sync: area(fallbackSync) } };
@@ -4343,6 +4369,109 @@ async function run() {
       check("E13 settings sync ON still reports local-only fallbacks and runs no cloud probe",
         fields.length === 1 && !host.hidden &&
         host.textContent.includes("labelCustomCSSOverlay") && onCalls.gets.length === 0);
+
+      const themeCalls = { gets: [], sets: [], removes: [] };
+      globalThis.chrome = {
+        storage: {
+          local: makeArea(freshLocal({ customOverlayCSS: "body{}" })),
+          sync: makeArea({ optTheme: "dark" }, themeCalls),
+          onChanged,
+        },
+      };
+      pbpCloudHintRetestArmed = false;
+      host = makeStatusHost();
+      await pbpRefreshSyncLocalFallbackStatus();
+      await pbpCloudHintProbe;
+      check("E13 a device that only customised its theme is not fresh and never reads the cloud",
+        host.hidden && host.textContent === "" && themeCalls.gets.length === 0);
+
+      globalThis.chrome = {
+        storage: {
+          local: makeArea(freshLocal({ customOverlayCSS: "", savedThemes: "[]" })),
+          sync: makeArea({ optTheme: "dark" }),
+          onChanged,
+        },
+      };
+      pbpCloudHintRetestArmed = false;
+      host = makeStatusHost();
+      await pbpRefreshSyncLocalFallbackStatus();
+      await pbpCloudHintProbe;
+      check("E13 an empty overlay and an empty saved-theme list still count as freshly installed",
+        !host.hidden && host.textContent === "syncCloudSettingsAvailable");
+
+      // The module-level armed flag is the only thing between a second render
+      // pass of the same page and a second live listener, so this scenario
+      // deliberately does NOT reset it.
+      const armedBefore = addCalls;
+      const listenersBefore = listeners.length;
+      globalThis.chrome = {
+        storage: { local: makeArea(freshLocal()), sync: makeArea({}), onChanged },
+      };
+      pbpCloudHintRetestArmed = false;
+      host = makeStatusHost();
+      await pbpRefreshSyncLocalFallbackStatus();
+      await pbpCloudHintProbe;
+      await pbpRefreshSyncLocalFallbackStatus();
+      await pbpCloudHintProbe;
+      check("E13 a second refresh on the same page never arms a second retest",
+        addCalls - armedBefore === 1 && listeners.length === listenersBefore + 1);
+
+      // The refresh a retest kicks off can return without starting a probe at
+      // all -- here because settings sync came on in between -- which used to
+      // leave the retest chain resolving to itself.
+      const cycleLocal = freshLocal();
+      globalThis.chrome = {
+        storage: { local: makeArea(cycleLocal), sync: makeArea({}), onChanged },
+      };
+      pbpCloudHintRetestArmed = false;
+      host = makeStatusHost();
+      await pbpRefreshSyncLocalFallbackStatus();
+      await pbpCloudHintProbe;
+      const cycleRetest = listeners[listeners.length - 1];
+      cycleLocal.optSyncEnabled = true;
+      const rejections = [];
+      const onRejection = (event) => { rejections.push(event.reason); event.preventDefault(); };
+      globalThis.addEventListener("unhandledrejection", onRejection);
+      cycleRetest({}, "sync");
+      const cycleChain = pbpCloudHintProbe;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      globalThis.removeEventListener("unhandledrejection", onRejection);
+      let cycleSettled = true;
+      try { await cycleChain; } catch (_) { cycleSettled = false; }
+      check("E13 a retest whose refresh starts no probe settles without an unhandled rejection",
+        cycleSettled && rejections.length === 0);
+
+      // A probe that lands after the user has turned settings sync on must not
+      // overwrite the local-only fallback story with the first-run hint.
+      let releaseSlowProbe = null;
+      const raceLocal = freshLocal();
+      globalThis.chrome = {
+        storage: {
+          local: makeArea(raceLocal),
+          sync: {
+            get: async () => new Promise((resolve) => {
+              releaseSlowProbe = () => resolve({ optTheme: "dark" });
+            }),
+            set: async (data) => { writes.push(data); },
+            remove: async (keys) => { writes.push(keys); },
+          },
+          onChanged,
+        },
+      };
+      pbpCloudHintRetestArmed = false;
+      host = makeStatusHost();
+      await pbpRefreshSyncLocalFallbackStatus();
+      const slowProbe = pbpCloudHintProbe;
+      raceLocal.optSyncEnabled = true;
+      raceLocal.customOverlayCSS_localFallback = "overlay";
+      const raceFields = await pbpRefreshSyncLocalFallbackStatus();
+      while (!releaseSlowProbe) await new Promise((resolve) => setTimeout(resolve, 0));
+      releaseSlowProbe();
+      await slowProbe;
+      check("E13 a probe that lands after settings sync came on never overwrites the fallback status",
+        raceFields.length === 1 && !host.hidden &&
+        host.textContent.includes("labelCustomCSSOverlay"));
 
       check("E13 the whole cloud-hint path writes to no storage area", writes.length === 0);
 
