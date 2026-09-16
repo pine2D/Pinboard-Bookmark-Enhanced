@@ -1028,6 +1028,13 @@
     "message": "Pola: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupPreviewSettingsOverlay": {
+    "message": "Pola: $COUNT$; własny CSS: $BYTES$ bajtów",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "bytes": { "content": "$2" }
+    }
+  },
   "backupPreviewThemes": {
     "message": "Motywy niestandardowe: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
@@ -1071,6 +1078,9 @@
   "backupPreviewLocalWarning": {
     "message": "Te wybrane pola są obecnie przechowywane tylko na tym urządzeniu albo ze względu na rozmiar wymagają takiego zapisu: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
+  },
+  "backupPreviewSemantics": {
+    "message": "Przywracanie zastępuje Twoje motywy niestandardowe, a na stronach zawartych w tym pliku również zaznaczenia i notatki tego konta. Ustawienia i słówka są scalane, a w razie różnic decyduje plik."
   },
   "backupSectionSettings": {
     "message": "Ustawienia"
@@ -1121,6 +1131,10 @@
   "exportSettings": {
     "message": "Eksportuj ustawienia"
   },
+  "backupExportFailed": {
+    "message": "Nie udało się utworzyć pliku kopii zapasowej, ponieważ pole $FIELD$ jest nieprawidłowe.",
+    "placeholders": { "field": { "content": "$1" } }
+  },
   "importSettings": {
     "message": "Importuj ustawienia"
   },
@@ -1129,6 +1143,10 @@
   },
   "importInvalid": {
     "message": "Nieprawidłowy plik"
+  },
+  "importInvalidField": {
+    "message": "Nieprawidłowy plik: nie udało się odczytać pola $FIELD$",
+    "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "Nie udało się ukończyć importu; niektóre ustawienia mogły już zostać zmienione. Sprawdź je i spróbuj ponownie."

@@ -1028,6 +1028,13 @@
     "message": "設定欄位：$COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupPreviewSettingsOverlay": {
+    "message": "設定欄位：$COUNT$；自訂 CSS：$BYTES$ 位元組",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "bytes": { "content": "$2" }
+    }
+  },
   "backupPreviewThemes": {
     "message": "自訂主題：$COUNT$",
     "placeholders": { "count": { "content": "$1" } }
@@ -1071,6 +1078,9 @@
   "backupPreviewLocalWarning": {
     "message": "這些已選欄位目前只儲存在本裝置，或因大小限制只能儲存在本裝置：$FIELDS$。",
     "placeholders": { "fields": { "content": "$1" } }
+  },
+  "backupPreviewSemantics": {
+    "message": "還原會取代你的自訂主題；在這份檔案涉及的頁面上，也會取代目前帳號的標記和筆記。設定和生詞會逐項合併，兩邊不同的地方以檔案為準。"
   },
   "backupSectionSettings": {
     "message": "設定"
@@ -1121,6 +1131,10 @@
   "exportSettings": {
     "message": "匯出設定"
   },
+  "backupExportFailed": {
+    "message": "備份檔案未能產生，欄位 $FIELD$ 的內容無效。",
+    "placeholders": { "field": { "content": "$1" } }
+  },
   "importSettings": {
     "message": "匯入設定"
   },
@@ -1129,6 +1143,10 @@
   },
   "importInvalid": {
     "message": "檔案格式無效"
+  },
+  "importInvalidField": {
+    "message": "檔案格式無效：欄位 $FIELD$ 無法讀取",
+    "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "匯入未能完成；部分設定可能已經變更，請檢查後再試"

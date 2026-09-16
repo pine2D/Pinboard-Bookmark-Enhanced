@@ -23,6 +23,13 @@ const PBP_BACKUP_TARGET_FIELDS = Object.freeze({
   webhook: Object.freeze({ enabled: "boolean" }),
 });
 
+// Obligation: this is an exact-value gate over a whole file. Removing a value
+// here (or from any other exact key/value set the preflight enforces, such as
+// pbpSanitizeBackupVocabulary's record field list) does not merely reject that
+// one field -- the preflight is throw-on-first-error, so every historical
+// backup carrying the retired value becomes wholly unimportable, settings and
+// themes included. Any addition or removal must ship a compatible read path
+// for files written by earlier releases.
 const PBP_BACKUP_ENUMS = Object.freeze({
   optTheme: ["auto", "light", "dark"],
   bgSaveMode: ["merge", "skip", "overwrite"],
@@ -580,7 +587,11 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       metadata.createdAt || t("backupPreviewUnknown"),
       metadata.extensionVersion || t("backupPreviewUnknown")
     ));
-    setPreviewText("backup-preview-settings", t("backupPreviewSettings", String(preview.settingsCount)));
+    // An overlay-only backup has no safeData keys at all, so the plain count
+    // would render "0" over a file that still installs a site-wide stylesheet.
+    setPreviewText("backup-preview-settings", preview.overlayBytes > 0
+      ? t("backupPreviewSettingsOverlay", String(preview.settingsCount), String(preview.overlayBytes))
+      : t("backupPreviewSettings", String(preview.settingsCount)));
     setPreviewText("backup-preview-themes", t("backupPreviewThemes", String(preview.themeCount)));
     setPreviewText("backup-preview-highlights", t(
       "backupPreviewHighlights",
@@ -789,7 +800,13 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     } catch (err) {
       console.error("[export] failed", err);
       const status = $id("import-status");
-      setStatusIcon(status, false, t("optSaveFailed"));
+      // Both throw points that reject a field -- pbpBuildBackupSnapshot above
+      // and the preflight after it -- land here. The generic save failure sends
+      // the user to review settings this path never wrote, so it is kept only
+      // for failures with no field to name: an account that changed mid-export,
+      // a storage read that threw.
+      const field = pbpBackupErrorField(err);
+      setStatusIcon(status, false, field ? t("backupExportFailed", field) : t("optSaveFailed"));
     }
   };
 
@@ -841,7 +858,10 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       console.error("[import] failed", err);
       if (token !== selectionToken) return;
       const status = $id("import-status");
-      setStatusIcon(status, false, t("importInvalid"));
+      // "Invalid file" alone left the reason in the console. A rejected field
+      // names itself here; a file that is not JSON has no field to name.
+      const field = pbpBackupErrorField(err);
+      setStatusIcon(status, false, field ? t("importInvalidField", field) : t("importInvalid"));
     }
     e.target.value = "";
   });

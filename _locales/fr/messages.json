@@ -1028,6 +1028,13 @@
     "message": "Champs de paramètres : $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupPreviewSettingsOverlay": {
+    "message": "Champs de paramètres : $COUNT$ ; CSS personnalisé : $BYTES$ octets",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "bytes": { "content": "$2" }
+    }
+  },
   "backupPreviewThemes": {
     "message": "Thèmes personnalisés : $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
@@ -1071,6 +1078,9 @@
   "backupPreviewLocalWarning": {
     "message": "Ces champs sélectionnés sont actuellement stockés sur cet appareil uniquement ou nécessitent ce stockage en raison de leur taille : $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
+  },
+  "backupPreviewSemantics": {
+    "message": "La restauration remplace vos thèmes personnalisés et, sur les pages présentes dans ce fichier, les surlignages et notes de ce compte. Les paramètres et le vocabulaire sont fusionnés : en cas de différence, le fichier fait foi."
   },
   "backupSectionSettings": {
     "message": "Paramètres"
@@ -1121,6 +1131,10 @@
   "exportSettings": {
     "message": "Exporter les paramètres"
   },
+  "backupExportFailed": {
+    "message": "Le fichier de sauvegarde n’a pas pu être créé : le champ $FIELD$ n’est pas valide.",
+    "placeholders": { "field": { "content": "$1" } }
+  },
   "importSettings": {
     "message": "Importer les paramètres"
   },
@@ -1129,6 +1143,10 @@
   },
   "importInvalid": {
     "message": "Fichier invalide"
+  },
+  "importInvalidField": {
+    "message": "Fichier invalide : le champ $FIELD$ n’a pas pu être lu",
+    "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "L’importation n’a pas pu aboutir ; certains paramètres ont peut-être déjà été modifiés. Vérifiez-les, puis réessayez."

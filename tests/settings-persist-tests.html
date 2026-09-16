@@ -2743,6 +2743,64 @@ async function run() {
         noteBothSections === "backupHighlightsVocabOwnerMissing");
       check("E7 manual export: the vocabulary-only owner warning is unchanged",
         noteVocabOnly === "backupVocabOwnerMissing");
+
+      // The export catch reported optSaveFailed -- "some other settings may
+      // already have been saved" -- for a path that saves nothing at all. A
+      // field the snapshot cannot serialize now names itself; an account that
+      // changed mid-export is not a field failure and keeps the old message.
+      {
+        const failStatus = document.getElementById("import-status");
+        const previousExportFailT = globalThis.t;
+        const previousExportVocabAll = globalThis.pbpVocabAll;
+        globalThis.t = (key, ...args) => [key, ...args].join("|");
+        let fieldFailureText = "";
+        let ownerAbortText = "";
+        let blobAfterFieldFailure = null;
+        try {
+          document.getElementById("opt-backup-include-highlights").checked = false;
+          document.getElementById("opt-backup-include-vocabulary").checked = false;
+          localArea.pinboardToken = obfuscateKey("backup-owner:token");
+          _settingsStorageCache = null;
+          localArea.savedThemes = [{ name: "Broken" }];
+          exportedBlob = null;
+          failStatus.textContent = "";
+          document.getElementById("export-settings").click();
+          for (let i = 0; i < 30 && !failStatus.textContent; i++) {
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+          }
+          fieldFailureText = failStatus.textContent;
+          blobAfterFieldFailure = exportedBlob;
+
+          delete localArea.savedThemes;
+          document.getElementById("opt-backup-include-vocabulary").checked = true;
+          globalThis.pbpVocabAll = async () => {
+            localArea.pinboardToken = obfuscateKey("other-owner:token");
+            _settingsStorageCache = null;
+            return [];
+          };
+          exportedBlob = null;
+          failStatus.textContent = "";
+          document.getElementById("export-settings").click();
+          for (let i = 0; i < 30 && !failStatus.textContent; i++) {
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+          }
+          ownerAbortText = failStatus.textContent;
+        } finally {
+          delete localArea.savedThemes;
+          globalThis.pbpVocabAll = previousExportVocabAll;
+          if (previousExportFailT === undefined) delete globalThis.t;
+          else globalThis.t = previousExportFailT;
+          localArea.pinboardToken = obfuscateKey("backup-owner:token");
+          _settingsStorageCache = null;
+          failStatus.textContent = "";
+        }
+        check("E7 manual export: a field the snapshot rejects names itself instead of claiming settings were saved",
+          fieldFailureText.includes("backupExportFailed|savedThemes[0]") &&
+          !fieldFailureText.includes("optSaveFailed") && !blobAfterFieldFailure);
+        check("E7 manual export: an account change mid-export is not reported as a field failure",
+          ownerAbortText.includes("optSaveFailed") &&
+          !ownerAbortText.includes("backupExportFailed"));
+      }
     } finally {
       globalThis.chrome = prevChromeE7;
       URL.createObjectURL = prevCreateObjectURL;
@@ -3471,6 +3529,9 @@ async function run() {
     let previewBeforeWrite = false;
     let cleanPreviewAnnounced = false;
     let highlightWarningRendered = false;
+    let overlaySettingsRow = "";
+    let badFieldImportText = "";
+    let unreadableImportText = "";
     let exactTextRepreflight = false;
     let selectionRaceSafe = false;
     let selectionRaceEvidence = {};
@@ -3618,6 +3679,51 @@ async function run() {
       highlightWarningRendered = fixture.querySelector("#backup-preview-warning").textContent
         .includes("backupPreviewHighlightOwnerMismatch");
 
+      // customOverlayCSS is not part of safeData, so settingsCount alone
+      // rendered this row as "0" for a file whose only payload is a stylesheet
+      // that pinboard.in loads at document_start.
+      const overlayOnlyText = JSON.stringify({
+        _schemaVersion: 3,
+        _backup: metadata,
+        customOverlayCSS: "a{color:red}",
+      });
+      Object.defineProperty(fileInput, "files", {
+        configurable: true,
+        value: [{ text: async () => overlayOnlyText }],
+      });
+      fileInput.dispatchEvent(new Event("change"));
+      for (let i = 0; i < 20 && fixture.querySelector("#backup-import-preview").hidden; i++) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      overlaySettingsRow = fixture.querySelector("#backup-preview-settings").textContent;
+
+      // A rejected field names itself; a file that is not JSON at all has no
+      // field to name and keeps the plain message.
+      const badFieldText = JSON.stringify({
+        _schemaVersion: 3,
+        _backup: metadata,
+        savedThemes: [{ name: "Broken" }],
+      });
+      const readImportStatus = async () => {
+        const statusEl = fixture.querySelector("#import-status");
+        statusEl.textContent = "";
+        fileInput.dispatchEvent(new Event("change"));
+        for (let i = 0; i < 20 && !statusEl.textContent; i++) {
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+        }
+        return statusEl.textContent;
+      };
+      Object.defineProperty(fileInput, "files", {
+        configurable: true,
+        value: [{ text: async () => badFieldText }],
+      });
+      badFieldImportText = await readImportStatus();
+      Object.defineProperty(fileInput, "files", {
+        configurable: true,
+        value: [{ text: async () => "{not json" }],
+      });
+      unreadableImportText = await readImportStatus();
+
       const raceOldText = JSON.stringify({
         _schemaVersion: 3,
         _backup: metadata,
@@ -3727,6 +3833,26 @@ async function run() {
       preview?.vocabularyCount === 3 && preview?.vocabularyOwner === backupOwner);
     check("E11 preview reports vocabulary language distribution",
       preview?.languages?.en === 2 && preview?.languages?.fr === 1);
+    const overlayOnlyPreview = task9Ready
+      ? pbpBuildBackupPreview(pbpPreflightBackupPayload({
+          _schemaVersion: 3,
+          _backup: metadata,
+          customOverlayCSS: "a{color:red}",
+        }, []), backupOwner, { enabled: false, localFallbackKeys: [] })
+      : null;
+    check("E11 an overlay-only backup reports the CSS bytes its enabled settings section carries",
+      overlayOnlyPreview?.sections?.settings?.enabled === true &&
+      overlayOnlyPreview?.settingsCount === 0 &&
+      overlayOnlyPreview?.overlayBytes === 12 &&
+      preview?.overlayBytes === 0 && unrelatedFallbackPreview?.overlayBytes === 0);
+    check("E11 the settings preview row states the overlay bytes instead of a bare zero",
+      overlaySettingsRow.includes("backupPreviewSettingsOverlay") &&
+      overlaySettingsRow.includes("12") &&
+      !overlaySettingsRow.startsWith("backupPreviewSettings|"));
+    check("E11 a rejected import field names itself while an unreadable file keeps the plain message",
+      badFieldImportText.includes("importInvalidField|savedThemes[0]") &&
+      unreadableImportText.includes("importInvalid") &&
+      !unreadableImportText.includes("importInvalidField"));
 
     const mismatchPreview = task9Ready
       ? pbpBuildBackupPreview(previewPrepared, "different-owner", { enabled: false, localFallbackKeys: [] })

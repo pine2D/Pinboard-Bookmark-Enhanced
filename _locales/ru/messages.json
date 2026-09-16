@@ -1028,6 +1028,13 @@
     "message": "Полей: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupPreviewSettingsOverlay": {
+    "message": "Полей: $COUNT$; пользовательский CSS: $BYTES$ байт",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "bytes": { "content": "$2" }
+    }
+  },
   "backupPreviewThemes": {
     "message": "Пользовательских тем: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
@@ -1071,6 +1078,9 @@
   "backupPreviewLocalWarning": {
     "message": "Эти выбранные поля сейчас хранятся только на этом устройстве либо требуют такого хранения из-за размера: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
+  },
+  "backupPreviewSemantics": {
+    "message": "Восстановление заменяет пользовательские темы, а на страницах из этого файла — выделения и заметки этого аккаунта. Настройки и словарик объединяются; при расхождениях приоритет у файла."
   },
   "backupSectionSettings": {
     "message": "Настройки"
@@ -1121,6 +1131,10 @@
   "exportSettings": {
     "message": "Экспорт настроек"
   },
+  "backupExportFailed": {
+    "message": "Не удалось создать файл резервной копии: поле $FIELD$ недопустимо.",
+    "placeholders": { "field": { "content": "$1" } }
+  },
   "importSettings": {
     "message": "Импорт настроек"
   },
@@ -1129,6 +1143,10 @@
   },
   "importInvalid": {
     "message": "Недопустимый файл"
+  },
+  "importInvalidField": {
+    "message": "Недопустимый файл: не удалось прочитать поле $FIELD$",
+    "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "Не удалось завершить импорт; некоторые настройки, возможно, уже изменены. Проверьте их и повторите попытку."

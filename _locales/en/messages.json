@@ -1028,6 +1028,13 @@
     "message": "Settings fields: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupPreviewSettingsOverlay": {
+    "message": "Settings fields: $COUNT$; custom CSS: $BYTES$ bytes",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "bytes": { "content": "$2" }
+    }
+  },
   "backupPreviewThemes": {
     "message": "Custom themes: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
@@ -1071,6 +1078,9 @@
   "backupPreviewLocalWarning": {
     "message": "These selected fields currently use or are known to require storage on this device only: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
+  },
+  "backupPreviewSemantics": {
+    "message": "Restoring replaces your custom themes and, on the pages in this file, this account's highlights and notes. Settings and vocabulary are merged, with the file winning where they differ."
   },
   "backupSectionSettings": {
     "message": "Settings"
@@ -1121,6 +1131,10 @@
   "exportSettings": {
     "message": "Export Settings"
   },
+  "backupExportFailed": {
+    "message": "The backup file could not be created because one field is not valid: $FIELD$",
+    "placeholders": { "field": { "content": "$1" } }
+  },
   "importSettings": {
     "message": "Import Settings"
   },
@@ -1129,6 +1143,10 @@
   },
   "importInvalid": {
     "message": "Invalid file"
+  },
+  "importInvalidField": {
+    "message": "Invalid file: the field $FIELD$ could not be read",
+    "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "Import could not be completed; some settings may already have changed. Review them and try again."

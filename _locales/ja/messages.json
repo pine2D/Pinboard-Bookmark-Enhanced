@@ -1028,6 +1028,13 @@
     "message": "設定フィールド：$COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupPreviewSettingsOverlay": {
+    "message": "設定フィールド：$COUNT$／カスタム CSS：$BYTES$ バイト",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "bytes": { "content": "$2" }
+    }
+  },
   "backupPreviewThemes": {
     "message": "カスタムテーマ：$COUNT$",
     "placeholders": { "count": { "content": "$1" } }
@@ -1071,6 +1078,9 @@
   "backupPreviewLocalWarning": {
     "message": "次の選択項目は現在このデバイスだけに保存されているか、サイズ上このデバイスだけへの保存が必要です：$FIELDS$。",
     "placeholders": { "fields": { "content": "$1" } }
+  },
+  "backupPreviewSemantics": {
+    "message": "復元するとカスタムテーマは置き換わり、このファイルに含まれるページではこのアカウントのハイライトとメモも置き換わります。設定と単語は項目ごとに統合され、内容が異なる場合はファイル側が優先されます。"
   },
   "backupSectionSettings": {
     "message": "設定"
@@ -1121,6 +1131,10 @@
   "exportSettings": {
     "message": "設定をエクスポート"
   },
+  "backupExportFailed": {
+    "message": "フィールド $FIELD$ の内容が無効なため、バックアップファイルを作成できませんでした。",
+    "placeholders": { "field": { "content": "$1" } }
+  },
   "importSettings": {
     "message": "設定をインポート"
   },
@@ -1129,6 +1143,10 @@
   },
   "importInvalid": {
     "message": "無効なファイル"
+  },
+  "importInvalidField": {
+    "message": "無効なファイル：フィールド $FIELD$ を読み取れません",
+    "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "インポートを完了できませんでした。一部の設定はすでに変更されている可能性があります。内容を確認してから再試行してください。"

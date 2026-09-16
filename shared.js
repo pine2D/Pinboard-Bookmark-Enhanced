@@ -1055,7 +1055,21 @@ function pbpIsPlainRecord(value) {
 }
 
 function pbpBackupValueError(key) {
-  return new TypeError("invalid backup field: " + key);
+  const error = new TypeError("invalid backup field: " + key);
+  // The key rides on the error so the UI can name the offending field without
+  // parsing the message. Only the NAME is ever safe to show: the value that
+  // failed validation may be a credential.
+  error.pbpBackupField = key;
+  return error;
+}
+
+// The field name carried by pbpBackupValueError, or "" for any other failure
+// (a JSON parse error, an aborted account re-read). Callers use it to choose
+// between the field-naming message and the generic one -- a failure with no
+// field must never be reported as if a field were at fault.
+function pbpBackupErrorField(error) {
+  const field = error && error.pbpBackupField;
+  return typeof field === "string" ? field : "";
 }
 
 function pbpSanitizeBackupThemes(value) {
@@ -1260,6 +1274,15 @@ function pbpBuildBackupPreview(prepared, currentOwner, syncState) {
     schemaVersion: prepared.schemaVersion,
     metadata: prepared.metadata || null,
     settingsCount: Object.keys(prepared.safeData || {}).length,
+    // customOverlayCSS is not part of the exportable key set, so it never
+    // reaches safeData and settingsCount cannot see it -- while
+    // sections.settings.enabled above DOES count it. Without this field a
+    // backup whose only payload is a stylesheet renders as "Settings fields: 0"
+    // with the section enabled and ticked, and Apply installs CSS that
+    // pinboard-style.js injects into every pinboard.in page at document_start.
+    overlayBytes: typeof prepared?.customOverlayCSS === "string"
+      ? pbpOverlayByteLength(prepared.customOverlayCSS)
+      : 0,
     themeCount: Array.isArray(prepared.importedThemes) ? prepared.importedThemes.length : 0,
     highlightPages: highlightRows.length,
     highlightEntries: highlightRows.reduce((count, [, value]) => count + value.items.length, 0),

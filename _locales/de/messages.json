@@ -1028,6 +1028,13 @@
     "message": "Einstellungsfelder: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupPreviewSettingsOverlay": {
+    "message": "Einstellungsfelder: $COUNT$; eigenes CSS: $BYTES$ Bytes",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "bytes": { "content": "$2" }
+    }
+  },
   "backupPreviewThemes": {
     "message": "Eigene Themes: $COUNT$",
     "placeholders": { "count": { "content": "$1" } }
@@ -1071,6 +1078,9 @@
   "backupPreviewLocalWarning": {
     "message": "Diese ausgewählten Felder werden derzeit nur auf diesem Gerät gespeichert oder benötigen aufgrund ihrer Größe lokalen Speicher: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
+  },
+  "backupPreviewSemantics": {
+    "message": "Beim Wiederherstellen werden deine eigenen Themes ersetzt, auf den Seiten aus dieser Datei auch die Markierungen und Notizen dieses Kontos. Einstellungen und Vokabeln werden zusammengeführt; bei Abweichungen gilt die Datei."
   },
   "backupSectionSettings": {
     "message": "Einstellungen"
@@ -1121,6 +1131,10 @@
   "exportSettings": {
     "message": "Einstellungen exportieren"
   },
+  "backupExportFailed": {
+    "message": "Die Sicherungsdatei konnte nicht erstellt werden, weil das Feld $FIELD$ ungültig ist.",
+    "placeholders": { "field": { "content": "$1" } }
+  },
   "importSettings": {
     "message": "Einstellungen importieren"
   },
@@ -1129,6 +1143,10 @@
   },
   "importInvalid": {
     "message": "Ungültige Datei"
+  },
+  "importInvalidField": {
+    "message": "Ungültige Datei: Das Feld $FIELD$ konnte nicht gelesen werden",
+    "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "Der Import konnte nicht abgeschlossen werden; einige Einstellungen wurden möglicherweise bereits geändert. Bitte prüfe sie und versuche es erneut."

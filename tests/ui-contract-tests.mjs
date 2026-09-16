@@ -568,6 +568,21 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   ];
   check(requiredDisclosures.every((key) => optionsHtml.includes(`data-i18n="${key}"`)),
     "options.html: settings-density reduction removed a security, privacy, cost, or irreversible-action disclosure");
+  // The import preview counts what the file HOLDS; this line is the only place
+  // that says what restoring DOES to what is already on this device. It is a
+  // plain .hint between the counts and the warning slot -- a fact about the
+  // operation, not an alarm, so it must not borrow hint-warn.
+  {
+    const semantics = optionsHtml.match(
+      /<p class="([^"]*)" id="backup-preview-semantics" data-i18n="backupPreviewSemantics">/);
+    const previewAt = optionsHtml.indexOf('id="backup-import-preview"');
+    const countsEnd = optionsHtml.indexOf("</dl>", previewAt);
+    const semanticsAt = optionsHtml.indexOf('id="backup-preview-semantics"');
+    const warningAt = optionsHtml.indexOf('id="backup-preview-warning"');
+    check(!!semantics && /(^|\s)hint(\s|$)/.test(semantics[1]) && !semantics[1].includes("hint-warn") &&
+      countsEnd > previewAt && semanticsAt > countsEnd && semanticsAt < warningAt,
+      "options.html: the import preview no longer states which sections a restore replaces, as a plain hint between the counts and the warning slot");
+  }
   const readerPanel = optionsHtml.slice(
     optionsHtml.indexOf('id="panel-reader"'), optionsHtml.indexOf('id="panel-vocab"'));
   check(readerPanel.includes('id="open-shortcuts-link-md"') &&

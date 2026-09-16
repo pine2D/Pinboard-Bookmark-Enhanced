@@ -1028,6 +1028,13 @@
     "message": "设置字段：$COUNT$",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "backupPreviewSettingsOverlay": {
+    "message": "设置字段：$COUNT$；自定义 CSS：$BYTES$ 字节",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "bytes": { "content": "$2" }
+    }
+  },
   "backupPreviewThemes": {
     "message": "自定义主题：$COUNT$",
     "placeholders": { "count": { "content": "$1" } }
@@ -1071,6 +1078,9 @@
   "backupPreviewLocalWarning": {
     "message": "这些已选字段目前仅保存在本设备，或因大小限制只能保存在本设备：$FIELDS$。",
     "placeholders": { "fields": { "content": "$1" } }
+  },
+  "backupPreviewSemantics": {
+    "message": "还原会替换你的自定义主题；在这份文件涉及的页面上，也会替换当前账号的高亮和笔记。设置和生词按条合并，两边不同的地方以文件为准。"
   },
   "backupSectionSettings": {
     "message": "设置"
@@ -1121,6 +1131,10 @@
   "exportSettings": {
     "message": "导出设置"
   },
+  "backupExportFailed": {
+    "message": "备份文件未能生成，字段 $FIELD$ 的内容无效。",
+    "placeholders": { "field": { "content": "$1" } }
+  },
   "importSettings": {
     "message": "导入设置"
   },
@@ -1129,6 +1143,10 @@
   },
   "importInvalid": {
     "message": "文件格式无效"
+  },
+  "importInvalidField": {
+    "message": "文件格式无效：字段 $FIELD$ 无法读取",
+    "placeholders": { "field": { "content": "$1" } }
   },
   "importApplyFailed": {
     "message": "导入未能完成；部分设置可能已经更改，请检查后重试"
