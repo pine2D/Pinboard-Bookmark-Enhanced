@@ -2172,14 +2172,35 @@ async function pbpDisconnectVocabDrive() {
     token = typeof result === "string" ? result : result?.token || "";
   } catch (_) {}
   if (token) {
-    try { await chrome.identity.removeCachedAuthToken({ token }); } catch (_) {}
+    try { await chrome.identity.removeCachedAuthToken({ token }); }
+    catch (e) { console.warn("[vocab-drive] disconnect: removeCachedAuthToken failed:", e?.name, e?.message); }
   }
+  let removed = false;
   try {
-    await chrome.permissions.remove({
+    removed = await chrome.permissions.remove({
       permissions: ["identity"],
       origins: [PBP_GOOGLE_API_ORIGIN]
     });
-  } catch (_) {}
+  } catch (e) {
+    console.warn("[vocab-drive] disconnect: permissions.remove failed:", e?.name, e?.message);
+  }
+  // Chrome's origin removal is a pattern-set subtraction, not a URL-space one:
+  // a wider already-granted pattern can make `removed` come back true while
+  // access is still live, so `removed !== true` alone cannot see that case.
+  // Recheck with the same remove->contains pairing already used above for the
+  // legacy wildcard cleanup (pbpMigrateLegacyWildcardPermission).
+  let residual = false;
+  try {
+    residual = await chrome.permissions.contains({
+      permissions: ["identity"],
+      origins: [PBP_GOOGLE_API_ORIGIN]
+    });
+  } catch (e) {
+    console.warn("[vocab-drive] disconnect: permissions.contains recheck failed:", e?.name, e?.message);
+  }
+  if (removed !== true || residual === true) {
+    console.warn("[vocab-drive] disconnect: permission removal incomplete", removed, residual);
+  }
   await chrome.storage.local.set({ [PBP_VOCAB_DRIVE_CONNECTED_KEY]: false });
   await Promise.all([
     chrome.alarms.clear("vocab-sync-dirty"),
