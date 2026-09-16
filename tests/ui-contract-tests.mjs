@@ -3542,75 +3542,84 @@ check(mdCss.includes("animation-timeline: scroll(self inline);"),
 // job -- the four closure-scoped functions are unreachable until a caller
 // exists -- but the shape they depend on can be pinned now.
 //
+// Character scanner, not a line/regex filter. A naive version of this is
+// wrong on JS source in (at least) two specific ways that both showed up on
+// the first run against md-preview.js: `o + "/*"` (the permission-origin
+// suffix, three sites -- background.js:3020's `frameOrigin + "/*"` is
+// another live instance) reads as the start of a block comment and swallows
+// the rest of the file, and `/^https?:\/\//i` (engine/URL guards) contains a
+// literal `//` that reads as a line comment and truncates its line. So
+// quotes, template literals and regex literals are all tracked, and newlines
+// are always emitted so slice anchors that pin indentation still match.
+// Module-scoped (not block-local): every check below that needs a
+// comment-stripped copy of a JS file -- the md-preview.js invariants block
+// right after this, and the K25 pbp-hl: writer-set gate far below -- shares
+// this one scanner instead of each rolling its own weaker stripper (a
+// regex-based `/\*[\s\S]*?\*\//` stripper doesn't track string boundaries at
+// all, so it can't tell `frameOrigin + "/*"` from a real block-comment
+// opener either).
+const REGEX_CAN_FOLLOW = "(,=:[!&|?{};+-*%~^";
+function stripJsComments(input) {
+  let out = "";
+  let i = 0;
+  const prevSignificant = () => {
+    for (let k = out.length - 1; k >= 0; k--) {
+      if (out[k] !== " " && out[k] !== "\t" && out[k] !== "\n") return out[k];
+    }
+    return "";
+  };
+  while (i < input.length) {
+    const c = input[i], d = input[i + 1];
+    if (c === "/" && d === "/") {                       // line comment
+      while (i < input.length && input[i] !== "\n") i++;
+      continue;
+    }
+    if (c === "/" && d === "*") {                       // block comment
+      i += 2;
+      while (i < input.length && !(input[i] === "*" && input[i + 1] === "/")) {
+        if (input[i] === "\n") out += "\n";
+        i++;
+      }
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {           // string / template
+      out += c; i++;
+      while (i < input.length) {
+        if (input[i] === "\\") { out += input.slice(i, i + 2); i += 2; continue; }
+        out += input[i];
+        const done = input[i] === c;
+        i++;
+        if (done) break;
+      }
+      continue;
+    }
+    const prev = prevSignificant();
+    if (c === "/" && (prev === "" || REGEX_CAN_FOLLOW.includes(prev))) { // regex literal
+      out += c; i++;
+      let inClass = false;
+      while (i < input.length) {
+        if (input[i] === "\\") { out += input.slice(i, i + 2); i += 2; continue; }
+        if (input[i] === "[") inClass = true;
+        else if (input[i] === "]") inClass = false;
+        out += input[i];
+        const done = input[i] === "/" && !inClass;
+        i++;
+        if (done) break;
+      }
+      continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
+
 // Everything below runs on a COMMENT-STRIPPED copy of the source. This repo's
 // own rule is that a "has this been handled" judgement must not be satisfiable
 // by prose, and md-preview.js's comments name every symbol these checks look
 // for -- an unstripped scan would go green on a deleted guard sitting next to
 // a comment that still describes it.
 {
-  // Character scanner, not a line/regex filter. A naive version of this is
-  // wrong on md-preview.js in two specific ways that both showed up on the
-  // first run: `o + "/*"` (the permission-origin suffix, three sites) reads as
-  // the start of a block comment and swallows the rest of the file, and
-  // `/^https?:\/\//i` (engine/URL guards) contains a literal `//` that reads as
-  // a line comment and truncates its line. So quotes, template literals and
-  // regex literals are all tracked, and newlines are always emitted so slice
-  // anchors that pin indentation still match.
-  const REGEX_CAN_FOLLOW = "(,=:[!&|?{};+-*%~^";
-  const stripJsComments = (input) => {
-    let out = "";
-    let i = 0;
-    const prevSignificant = () => {
-      for (let k = out.length - 1; k >= 0; k--) {
-        if (out[k] !== " " && out[k] !== "\t" && out[k] !== "\n") return out[k];
-      }
-      return "";
-    };
-    while (i < input.length) {
-      const c = input[i], d = input[i + 1];
-      if (c === "/" && d === "/") {                       // line comment
-        while (i < input.length && input[i] !== "\n") i++;
-        continue;
-      }
-      if (c === "/" && d === "*") {                       // block comment
-        i += 2;
-        while (i < input.length && !(input[i] === "*" && input[i + 1] === "/")) {
-          if (input[i] === "\n") out += "\n";
-          i++;
-        }
-        i += 2;
-        continue;
-      }
-      if (c === '"' || c === "'" || c === "`") {           // string / template
-        out += c; i++;
-        while (i < input.length) {
-          if (input[i] === "\\") { out += input.slice(i, i + 2); i += 2; continue; }
-          out += input[i];
-          const done = input[i] === c;
-          i++;
-          if (done) break;
-        }
-        continue;
-      }
-      const prev = prevSignificant();
-      if (c === "/" && (prev === "" || REGEX_CAN_FOLLOW.includes(prev))) { // regex literal
-        out += c; i++;
-        let inClass = false;
-        while (i < input.length) {
-          if (input[i] === "\\") { out += input.slice(i, i + 2); i += 2; continue; }
-          if (input[i] === "[") inClass = true;
-          else if (input[i] === "]") inClass = false;
-          out += input[i];
-          const done = input[i] === "/" && !inClass;
-          i++;
-          if (done) break;
-        }
-        continue;
-      }
-      out += c; i++;
-    }
-    return out;
-  };
   const src = stripJsComments(mdPreviewJs);
   // Self-test the stripper before trusting it. A stripper that returned its
   // input would make every check below satisfiable by prose again; one that
@@ -4335,12 +4344,21 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
 // coordinate purely by each independently producing the SAME string
 // literal. Nothing but four hand-written comments has ever enforced that
 // the SET of files doing so stays exactly these four; this gate makes that
-// machine-checked. Comments are stripped first (full-line // and block
-// /* */, same heuristic already used by the embedded-frame check above) so
-// an explanatory mention of "pbp-hl:" inside a comment cannot masquerade as
-// a writer, and the scan only counts the literal quoted exactly as
-// "pbp-hl:" or 'pbp-hl:' (covers both the bare assignment and the
-// "pbp-hl:" + key concatenation form) in the remaining, non-comment code.
+// machine-checked. Comments are stripped first, using the module-scope
+// character-scanning stripJsComments defined above (NOT a regex stripper --
+// fix round 1: a first cut here used
+// `s.replace(/\/\*[\s\S]*?\*\//g, "")`, which does not track string
+// boundaries and so reads `x + "/*"` -- background.js:3020's
+// `frameOrigin + "/*"` is a live instance of exactly this idiom -- as an
+// opened block comment; if a REAL comment closes somewhere later in the
+// file, the regex greedily swallows everything in between, including a
+// genuine "pbp-hl:" literal sitting between the two. It happened to pass
+// today only because background.js:3020 sits AFTER its "pbp-hl:" literal at
+// :1820 -- pure line-order luck, not a property the gate can rely on) so an
+// explanatory mention of "pbp-hl:" inside a comment cannot masquerade as a
+// writer, and the scan only counts the literal quoted exactly as "pbp-hl:"
+// or 'pbp-hl:' (covers both the bare assignment and the "pbp-hl:" + key
+// concatenation form) in the remaining, non-comment code.
 //
 // PBP_HL_LOCK_PREFIX_WRITERS below is the line that needs editing when
 // background.js's pbpClaimLegacyHighlightOwners() migration retires
@@ -4349,8 +4367,34 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
 // (background.js drops out of the detected set while still being
 // registered here) until "background.js" is removed from this array too.
 {
+  // Self-test the shared scanner against exactly the string-boundary hazard
+  // this gate depends on it handling, before trusting it (same discipline as
+  // the md-preview.js self-check above stripJsComments's first use). Three
+  // cases: (1) the safe idiom `x + "/*"` followed by a real comment BEFORE
+  // the literal must still leave the literal intact (count 1) -- a stripper
+  // that treats the string's "/*" as an opener and the real comment's "*/"
+  // as its closer would eat the literal too if it came later, so this alone
+  // doesn't fully clear the stripper, hence case 3; (2) the literal sitting
+  // INSIDE a real block comment must be stripped (count 0); (3) the actual
+  // danger case -- `x + "/*"` followed by the "pbp-hl:" literal and THEN an
+  // unrelated real comment -- must still leave the literal intact (count 1).
+  // A regex stripper fails case 3 specifically: it treats the string's "/*"
+  // as opening a comment that only closes at the unrelated comment's "*/",
+  // silently eating the literal sitting between them (reproduces the exact
+  // background.js:3020/:1820 ordering hazard in isolation, so this check
+  // does not depend on that file's current line order to catch a regression).
+  const countPbpHl = (s) => (stripJsComments(s).match(/["']pbp-hl:["']/g) || []).length;
+  const selfCheckSafe = 'const o = x + "/*"; /* real */ const k = "pbp-hl:" + key;';
+  const selfCheckHidden = 'const o = x + "/*"; /* contains "pbp-hl:" in a real comment */ const k = 1;';
+  const selfCheckDanger = 'const o = x + "/*"; const k = "pbp-hl:" + key; /* unrelated */ done();';
+  check(countPbpHl(selfCheckSafe) === 1,
+    'ui-contract: the pbp-hl: writer-set gate\'s comment stripper lost a "pbp-hl:" literal that follows a `x + "/*"` string and a real comment -- this gate is UNVERIFIED until the stripper is fixed');
+  check(countPbpHl(selfCheckHidden) === 0,
+    'ui-contract: the pbp-hl: writer-set gate\'s comment stripper failed to remove a "pbp-hl:" mention sitting inside a REAL block comment -- a stray comment mention would masquerade as a writer');
+  check(countPbpHl(selfCheckDanger) === 1,
+    'ui-contract: the pbp-hl: writer-set gate\'s comment stripper is broken on the `x + "/*"` string-boundary hazard -- it swallowed a real "pbp-hl:" literal that sits between that string and a later unrelated block comment (this is the exact background.js:3020/:1820 shape, reproduced in isolation so it does not depend on that file\'s current line order); a regex-based stripper without string tracking fails this case, which is why this gate must reuse the character-scanning stripJsComments defined above instead of rolling its own');
+
   const PBP_HL_LOCK_PREFIX_WRITERS = ["background.js", "library-notes.js", "md-highlight.js", "options-backup.js"];
-  const stripJsComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   const pbpHlLiteralRe = /["']pbp-hl:["']/;
   const detected = readdirSync(root)
     .filter((n) => n.endsWith(".js"))
