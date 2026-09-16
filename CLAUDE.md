@@ -24,7 +24,7 @@ Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支�
 
 ```
 manifest.json                # MV3 配置（permissions / host_permissions / 入口）
-background.js                # Service Worker：图标状态、书签检测、URL 缓存、storage 预热、DNR 防盗链规则
+background.js                # Service Worker：图标状态、书签检测、URL 缓存、storage 预热、DNR 防盗链规则、popup AI 调用代理（PBP_AI_CALL → pbpRunPopupAiCall，两道 getCurrentPinboardAuth 门，覆盖白名单 PBP_AI_OVERRIDE_FIELDS 在 shared.js）
 popup.{html,css,js}          # 主弹窗 + popup-{ai,batch,offline,tags,theme-early}.js（AI 标签/摘要、批量、离线兜底、标签补全、防 FOUC）
 options.{html,css,js}        # 设置页 + options-{connectivity,backup,vocab,theme-early}.js（联通测试、JSON 备份、生词设置侧）
 library.{html,css,js}        # 笔记与生词本独立页 + library-{vocab,notes}.js（主从双栏，owner 隔离）

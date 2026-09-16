@@ -2735,6 +2735,9 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         const ctx = await chrome.runtime.getContexts({ contextTypes: ["POPUP"] }).catch(() => []);
         if (!ctx.length) notifySaveFailure("popup-save", result);
       })
+      // Programming-error path only: submitPopupSaveIntent itself never rejects
+      // on a delivery failure (those resolve to a "failed" result and take the
+      // notify branch above), so this arm deliberately stays silent.
       .catch(() => sendResponse(pbpSaveFailure("internal")));
     return true;
   }

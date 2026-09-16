@@ -837,18 +837,13 @@ await suite("unified save pipeline", async () => {
     const branch = source.slice(start, end);
     assert(start >= 0 && end > start, "save_intent branch not found");
     assert(branch.includes("submitPopupSaveIntent(message.intent, message.account)"), "message uses the guarded popup boundary");
-    // K45: the branch now does a bit of async work (getContexts) after
-    // resolution, to notify when a failed save has no popup left to show
-    // it — but sendResponse(result) must still be the first thing that runs
-    // on resolution, unconditionally and with the raw result, so a still-open
-    // popup gets its answer without waiting on that extra work.
-    const thenIdx = branch.indexOf(".then(");
-    const sendResponseIdx = branch.indexOf("sendResponse(result)");
-    assert(thenIdx >= 0 && sendResponseIdx > thenIdx, "public result is sent directly");
-    const getContextsIdx = branch.indexOf("getContexts(");
-    assert(sendResponseIdx >= 0 && (getContextsIdx < 0 || sendResponseIdx < getContextsIdx),
-      "sendResponse fires before any additional async work");
     assert(branch.includes("return true;"), "listener keeps the response channel open");
+    // K45's sendResponse-before-getContexts ordering, and the deferred notify
+    // that fires only after the probe resolves, are exercised behaviourally
+    // (a controllable hung getContexts + recorded call order) in
+    // background-lifecycle-tests.html's router harness (I2) rather than as
+    // source-text position comparisons here.
+    assert(branch.includes('pbpSaveFailure("internal")'), "a rejected submitPopupSaveIntent still answers with the private internal-failure envelope");
     assert(!branch.includes("persisted") && !branch.includes("retryable"), "private envelope does not cross the message boundary");
   });
 

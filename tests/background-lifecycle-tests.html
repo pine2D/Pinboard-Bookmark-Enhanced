@@ -629,8 +629,10 @@ function buildUndoHarness(source, opts) {
         runtime: {
           id: EXT_ID, getURL: (p) => `chrome-extension://${EXT_ID}/${p}`,
           // K45: popup-context lookup after a "failed" save_intent result.
-          // Flippable per test via opts.popupContexts (default: no popup open).
-          getContexts: spy("getContexts", () => Promise.resolve(o.popupContexts || [])),
+          // Flippable per test via opts.popupContexts (default: no popup open),
+          // or fully overridable via opts.getContexts for a test that needs to
+          // hold the probe open (M2: proving sendResponse never waits on it).
+          getContexts: spy("getContexts", o.getContexts || (() => Promise.resolve(o.popupContexts || []))),
         },
         storage: {
           local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
@@ -695,7 +697,10 @@ function buildUndoHarness(source, opts) {
     const invoke = (message, sender) => new Promise((resolve) => {
       const out = { responses: [], held: undefined };
       const settle = () => resolve(out);
-      out.held = handler(message, sender || { id: EXT_ID, url: EXT_URL }, (r) => { out.responses.push(r); settle(); });
+      // The sendResponse marker lands in `calls` at the exact moment the
+      // listener calls it, alongside every other spy call, so a test can
+      // read call order off one array instead of comparing timestamps.
+      out.held = handler(message, sender || { id: EXT_ID, url: EXT_URL }, (r) => { calls.push(["sendResponse", [r]]); out.responses.push(r); settle(); });
       if (out.held !== true || out.responses.length) settle();
       setTimeout(settle, 250); // async branch that never responds in stubs
     });
@@ -758,6 +763,34 @@ function buildUndoHarness(source, opts) {
     check("router: submitPopupSaveIntent rejecting responds with the internal failure and does not notify",
       r.responses[0]?.status === "failed" && r.responses[0]?.code === "internal" &&
       !h.calls.some(([n]) => n === "notifyFail"));
+  }
+  // ---- I2: sendResponse(result) must not wait on the post-response
+  // getContexts probe. Hold getContexts open indefinitely and prove, from the
+  // recorded call order, that the caller's answer is already delivered while
+  // the probe is still hanging -- then release it and confirm the deferred
+  // notify still fires exactly once.
+  {
+    let releaseGetContexts = null;
+    const h = buildRouterHarness({
+      saveResult: { status: "failed", reason: "conflict" },
+      getContexts: () => new Promise((resolve) => { releaseGetContexts = () => resolve([]); }),
+    });
+    const pending = h.invoke({ type: "save_intent", intent: { mode: "create" }, account: "alice" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const sent = h.calls.find(([n]) => n === "sendResponse");
+    check("router: the caller's response is delivered while the getContexts probe is still hanging",
+      sent?.[1]?.[0]?.status === "failed" &&
+      h.calls.some(([n]) => n === "getContexts") &&
+      !h.calls.some(([n]) => n === "notifyFail"));
+    const sendIdx = h.calls.findIndex(([n]) => n === "sendResponse");
+    const contextsIdx = h.calls.findIndex(([n]) => n === "getContexts");
+    check("router: sendResponse is recorded strictly before the getContexts probe it does not wait on",
+      sendIdx >= 0 && contextsIdx >= 0 && sendIdx < contextsIdx);
+    releaseGetContexts();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    check("router: releasing the hung getContexts probe then notifies exactly once",
+      h.calls.filter(([n]) => n === "notifyFail").length === 1);
+    await pending;
   }
   {
     const h = buildRouterHarness();
