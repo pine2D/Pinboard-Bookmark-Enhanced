@@ -78,7 +78,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/popup-save-tests.html": 118,
   "tests/save-pipeline-tests.html": 61,
   "tests/settings-cache-invalidate-tests.html": 8,
-  "tests/settings-persist-tests.html": 417,
+  "tests/settings-persist-tests.html": 418,
   "tests/tag-gov-layout-tests.html": 6,
   "tests/tag-gov-reserve-tests.html": 2,
   "tests/tag-gov-tests.html": 67,
@@ -86,7 +86,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/url-strip-tests.html": 19,
   "tests/vocab-background-tests.html": 17,
   "tests/vocab-gdrive-tests.html": 73,
-  "tests/vocab-store-tests.html": 59,
+  "tests/vocab-store-tests.html": 62,
   "tests/wayback-tests.html": 44,
 });
 const expected = EXPECTED_RESULTS[rel];

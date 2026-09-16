@@ -1010,9 +1010,9 @@ async function pbpVocabImportRecords(owner, records, limit = 100) {
   const scope = owner || "ownerless";
   const max = Math.max(0, Math.min(100, Number.isFinite(limit) ? Math.floor(limit) : 100));
   const input = Array.isArray(records) ? records.slice(0, max) : [];
-  if (!input.length) return { ok: true, processed: 0, remaining: 0 };
+  if (!input.length) return { ok: true, processed: 0, written: 0, remaining: 0 };
   const imported = input.map((record) => _pbpVocabImportedWord(scope, record));
-  if (imported.some((record) => !record)) return { ok: false, processed: 0, remaining: records.length };
+  if (imported.some((record) => !record)) return { ok: false, processed: 0, written: 0, remaining: records.length };
   const unique = [...new Map(imported.map((record) => [record.id, record])).values()];
   const result = await _pbpVocabLocalMutation(scope, unique.map((record) => ({ id: record.id, imported: record })),
     (current, item) => {
@@ -1029,12 +1029,33 @@ async function pbpVocabImportRecords(owner, records, limit = 100) {
           ? Math.max(current.updatedAt, incoming.updatedAt)
           : incoming.updatedAt
       } : incoming;
+      // Restoring a backup this device already holds has to be a zero-write.
+      // Every changed row here bumps meta.counter, rewrites record: metadata,
+      // queues an outbox event and wakes the Drive sync, so an unconditional
+      // changed:true turned "import one setting back" into "re-upload the
+      // entire vocabulary". _pbpVocabWordValue is the same normalised field
+      // set the outbox event carries, which is exactly the comparison surface:
+      // anything it folds away cannot reach another device either. This does
+      // not change who wins the merge -- only whether an unchanged result is
+      // written.
+      if (current && pbpVocabEventContentEqual(_pbpVocabWordValue(current), _pbpVocabWordValue(word))) {
+        return { changed: false, deleted: false, recordKey: pbpDictCacheKeyPublic(word.language, word.term), word: current, result: current };
+      }
       return {
         changed: true, deleted: false, recordKey: pbpDictCacheKeyPublic(word.language, word.term),
         word, result: word
       };
     });
-  return { ok: result.ok, processed: result.ok ? result.changed : 0, remaining: Math.max(0, records.length - input.length) };
+  // processed counts the rows examined and written the rows actually committed.
+  // They have to stay separate: the import progress line counts to the file's
+  // record total, so feeding it the write count would leave a restore that
+  // changed nothing stuck at "0 of 1234" forever.
+  return {
+    ok: result.ok,
+    processed: result.ok ? unique.length : 0,
+    written: result.ok ? result.changed : 0,
+    remaining: Math.max(0, records.length - input.length)
+  };
 }
 
 // One sweep for the whole settings panel. The status read used four separate

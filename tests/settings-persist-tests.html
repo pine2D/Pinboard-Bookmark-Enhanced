@@ -3463,7 +3463,7 @@ async function run() {
           saveOverlayWithFallback: async () => ({ fellBackToLocal: false }),
           sections: { settings: false, themes: false, highlights: false, vocabulary: true },
           readCurrentOwner: async () => backupOwner,
-          importVocabulary: async () => { legacyVocabCalls++; return { ok: true, processed: 0 }; },
+          importVocabulary: async () => { legacyVocabCalls++; return { ok: true, processed: 0, written: 0 }; },
         }));
       }
     }
@@ -3487,7 +3487,7 @@ async function run() {
           saveOverlayWithFallback: async () => ({ fellBackToLocal: false }),
           sections: { settings: false, themes: true, highlights: false, vocabulary: false },
           readCurrentOwner: async () => backupOwner,
-          importVocabulary: async () => ({ ok: true, processed: 0 }),
+          importVocabulary: async () => ({ ok: true, processed: 0, written: 0 }),
         });
       } finally {
         globalThis.__pbpTestSyncSetLarge = priorEmptyThemeSetLarge;
@@ -3929,7 +3929,7 @@ async function run() {
       saveOverlayWithFallback: async () => ({ fellBackToLocal: false }),
       sections: { settings: false, themes: false, highlights: false, vocabulary: true },
       readCurrentOwner: async () => "different-owner",
-      importVocabulary: async () => { mismatchImports++; return { ok: true, processed: 1 }; },
+      importVocabulary: async () => { mismatchImports++; return { ok: true, processed: 1, written: 1 }; },
     }) : null;
     check("E11 vocabulary import never rebinds records to another owner",
       mismatchImports === 0 && mismatchResult?.vocabulary === "failed" &&
@@ -3982,7 +3982,7 @@ async function run() {
         readCurrentOwner: async () => backupOwner,
         importVocabulary: async (_, records) => {
           vocabWrites += records.length;
-          return { ok: true, processed: records.length, remaining: 0 };
+          return { ok: true, processed: records.length, written: records.length, remaining: 0 };
         },
       };
       sectionResults.push(await pbpApplyBackupPayload({
@@ -4111,8 +4111,8 @@ async function run() {
       importVocabulary: async (_, records) => {
         partialCalls++;
         return partialCalls === 1
-          ? { ok: true, processed: records.length, remaining: 0 }
-          : { ok: false, processed: 0, remaining: records.length };
+          ? { ok: true, processed: records.length, written: records.length, remaining: 0 }
+          : { ok: false, processed: 0, written: 0, remaining: records.length };
       },
     }) : null;
     let ownerChecks = 0;
@@ -4127,6 +4127,7 @@ async function run() {
       importVocabulary: async (_, records) => ({
         ok: true,
         processed: records.length,
+        written: records.length,
         remaining: 0,
       }),
     }) : null;
@@ -4134,6 +4135,28 @@ async function run() {
       partialResult?.vocabulary === "failed" && partialResult?.vocabularyApplied === 100 &&
       switchedOwnerResult?.vocabulary === "failed" &&
       switchedOwnerResult?.vocabularyApplied === 101);
+    // K161: a restore whose records all match this device writes nothing. The
+    // result count has to say 0 -- it is a write count, not a read count --
+    // while the progress line still has to reach the file's record total, or
+    // "restore the backup you just made" would freeze at "0 of 101".
+    const noopProgress = [];
+    const noopRestore = task9Ready ? await pbpApplyBackupPayload({
+      _schemaVersion: 3,
+      _backup: metadata,
+      _vocabulary: { owner: backupOwner, records: importRows },
+    }, {
+      exportableKeys: [],
+      sections: { settings: false, themes: false, highlights: false, vocabulary: true },
+      readCurrentOwner: async () => backupOwner,
+      importVocabulary: async (_, records) => ({
+        ok: true, processed: records.length, written: 0, remaining: 0,
+      }),
+      onVocabularyProgress: (done, total) => noopProgress.push(done + "/" + total),
+    }) : null;
+    check("E11 a vocabulary restore that writes nothing still applies and still reaches full progress",
+      task9Ready && noopRestore?.vocabulary === "applied" &&
+      noopRestore?.vocabularyApplied === 0 && noopRestore?.vocabularyProcessed === 101 &&
+      noopProgress.join(",") === "100/101,101/101");
     check("E11 every imported vocabulary record enters the outbox",
       [...importedKeys].every((recordKey) => outboxRows.some((row) => row.recordKey === recordKey)));
     check("E11 apply reports a status for every section",

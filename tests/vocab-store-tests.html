@@ -525,6 +525,63 @@ async function runIdbChecks() {
   const revivedMeta = await syncGet("record:acct_import:fr|revive");
   check("imported records use the local mutation and outbox path", task3ApiReady && !rejectedImport.ok && rejectedNoWrite && !blankRejectedImport.ok && blankRejectedNoWrite && imported.processed === 3 && importedAgain.processed === 1 && exactStored.term === " Imported Exact " && exactStored.language === "en-US" && exactStored.createdAt === 0 && existingStored.term === "Case Term" && existingStored.language === "en" && existingStored.id === existingImport.id && revivedStored.gloss === "revived" && revivedMeta.deleted === false && importOutbox.length === 3 && dirtyCalls === 2);
 
+  // K161: restoring a backup this device already holds must be a zero-write.
+  // Every "changed" import row bumps meta.counter, rewrites record: metadata,
+  // drops an outbox event and wakes the Drive sync -- so an unconditional
+  // changed:true turned "import one setting back" into "re-upload the whole
+  // vocabulary", with the file's copy dominating every other device.
+  await deleteVocabDb();
+  const priorNoopChrome = globalThis.chrome;
+  let noopDirty = 0;
+  globalThis.chrome = { runtime: { sendMessage: () => { noopDirty++; return Promise.reject(new Error("worker asleep")); } } };
+  const noopKeys = ["en|alpha", "en|beta", "en|gamma"];
+  const noopRows = [
+    word("acct_noop", "Alpha", { gloss: "a", note: "first", createdAt: 1, updatedAt: 2, groups: ["List"], contexts: [{ articleUrl: "https://noop.test/", quote: "q" }] }),
+    word("acct_noop", "Beta", { gloss: "b", createdAt: 1, updatedAt: 2 }),
+    word("acct_noop", "Gamma", { gloss: "c", createdAt: 1, updatedAt: 2 })
+  ];
+  const noopSnapshot = async () => await Promise.all(noopKeys.map(async (key) => JSON.stringify([
+    await syncGet(`record:acct_noop:${key}`), await syncGet(`outbox:acct_noop:${key}`)
+  ])));
+  const noopFirst = await pbpVocabImportRecords("acct_noop", noopRows.map((row) => ({ ...row })));
+  const beforeRepeat = await noopSnapshot();
+  const counterBeforeRepeat = (await syncGet("meta")).counter;
+  const dirtyBeforeRepeat = noopDirty;
+  const noopSecond = await pbpVocabImportRecords("acct_noop", noopRows.map((row) => ({ ...row })));
+  const afterRepeat = await noopSnapshot();
+  check("re-importing an unchanged backup writes nothing",
+    task3ApiReady && noopFirst.ok && noopFirst.processed === 3 && noopFirst.written === 3 &&
+    noopSecond.ok && noopSecond.processed === 3 && noopSecond.written === 0 &&
+    afterRepeat.join(" ") === beforeRepeat.join(" ") &&
+    (await syncGet("meta")).counter === counterBeforeRepeat && noopDirty === dirtyBeforeRepeat &&
+    (await pbpVocabListOutbox("acct_noop")).length === 3);
+
+  // The assertion that actually pins the empty write: a batch that legitimately
+  // writes one record must leave its untouched siblings byte-identical. Only
+  // checking "the whole second import wrote nothing" would also pass if the
+  // importer had stopped writing altogether.
+  const mixedBefore = await noopSnapshot();
+  const mixedRows = noopRows.map((row, index) => index === 1 ? { ...row, note: "edited" } : { ...row });
+  const noopMixed = await pbpVocabImportRecords("acct_noop", mixedRows);
+  const mixedAfter = await noopSnapshot();
+  const mixedStored = await pbpVocabGet(noopRows[1].id);
+  check("a mixed import batch writes only the record that changed",
+    task3ApiReady && noopMixed.ok && noopMixed.processed === 3 && noopMixed.written === 1 &&
+    mixedAfter[0] === mixedBefore[0] && mixedAfter[2] === mixedBefore[2] &&
+    mixedAfter[1] !== mixedBefore[1] && mixedStored.note === "edited" &&
+    (await pbpVocabListOutbox("acct_noop")).length === 3 &&
+    (await syncGet("meta")).counter === counterBeforeRepeat + 1);
+
+  const freshRow = word("acct_noop", "Delta", { gloss: "d", createdAt: 1, updatedAt: 2 });
+  const noopFresh = await pbpVocabImportRecords("acct_noop", [freshRow]);
+  const freshOutbox = (await pbpVocabListOutbox("acct_noop")).find((row) => row.recordKey === "en|delta");
+  const freshMeta = await syncGet("record:acct_noop:en|delta");
+  globalThis.chrome = priorNoopChrome;
+  check("a record this device has never seen still writes",
+    task3ApiReady && noopFresh.ok && noopFresh.processed === 1 && noopFresh.written === 1 &&
+    !!freshOutbox && freshOutbox.event.deleted === false && freshOutbox.event.value.gloss === "d" &&
+    !!freshMeta && freshMeta.deleted === false);
+
   await deleteVocabDb();
 }
 

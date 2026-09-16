@@ -320,6 +320,7 @@ async function pbpApplyBackupPayload(data, {
     vocabulary: "skipped",
     secrets: "skipped",
     vocabularyApplied: 0,
+    vocabularyProcessed: 0,
   };
   const getOwner = readCurrentOwner || (async () => {
     const secret = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
@@ -460,10 +461,22 @@ async function pbpApplyBackupPayload(data, {
         const batch = prepared.vocabulary.records.slice(offset, offset + 100);
         const imported = await importer(scope, batch, 100);
         if (!imported || !imported.ok) throw new Error("vocabulary import failed");
-        result.vocabularyApplied += imported.processed;
-        if (onVocabularyProgress) onVocabularyProgress(result.vocabularyApplied, prepared.vocabulary.records.length);
+        // Two different numbers, and the UI wants them in two different places.
+        // The importer skips a record whose stored copy already matches the
+        // file's, so a restore can legitimately write nothing. Progress counts
+        // toward the file's record total and therefore uses the examined count
+        // -- otherwise "restore a backup this device already has" would sit at
+        // "0 of 1234" to the end. vocabularyApplied stays literal: the records
+        // this import actually wrote.
+        result.vocabularyProcessed += Number(imported.processed) || 0;
+        result.vocabularyApplied += Number(imported.written) || 0;
+        if (onVocabularyProgress) onVocabularyProgress(result.vocabularyProcessed, prepared.vocabulary.records.length);
         if (pbpBackupOwnerScope(await getOwner()) !== scope) throw new Error("vocabulary owner mismatch");
       }
+      // Writing nothing is still a successful restore: every record in the file
+      // is present on this device with that content. The section reports
+      // "applied" on written === 0, exactly as the highlight sibling above
+      // reports it for an empty set.
       result.vocabulary = "applied";
     } catch (error) {
       // Same reason as the highlight sibling above: an IndexedDB failure and
@@ -472,7 +485,7 @@ async function pbpApplyBackupPayload(data, {
       console.warn("[backup] vocabulary import failed:", error && error.name, error && error.message);
       result.vocabulary = "failed";
     }
-    if (result.vocabularyApplied || result.vocabulary === "applied") {
+    if (result.vocabularyProcessed || result.vocabulary === "applied") {
       try { await pbpVocabAll(scope); } catch (_) {}
     }
   }
@@ -657,6 +670,10 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     if (resultHost) resultHost.hidden = false;
     const status = $id("import-status");
     const resultKey = pbpBackupImportResultKey(result);
+    // $1 is the count of vocabulary records this import WROTE, not the number
+    // it looked at -- an import that found every record already up to date
+    // passes 0. No published locale spends the placeholder today; a copy that
+    // starts to has to read as "applied", never as "restored from the file".
     setStatusIcon(status, resultKey === "backupImportComplete", t(
       resultKey,
       String(result.vocabularyApplied || 0)
