@@ -262,6 +262,26 @@ delete document.documentElement.dataset.theme;
     check("a first import is not gated behind a confirm",
       importCalls === 3 && !document.querySelector(".confirm-popover"), `calls=${importCalls}`);
 
+    // An unreadable store is NOT "nothing installed". The read that threw says
+    // nothing either way, and reading it as "none" skips the confirm and lets
+    // the import clear a pack the user still had -- the exact data loss the
+    // confirm exists to prevent. Fail safe: ask, and leave a trace.
+    pbpPackMeta = async () => { throw new Error("IDB unavailable"); };
+    const packMetaWarnings = [];
+    const prevWarnPackMeta = console.warn;
+    console.warn = (...args) => { packMetaWarnings.push(args.join(" ")); };
+    pickPackFile("cedict.txt");
+    await settle();
+    console.warn = prevWarnPackMeta;
+    const unreadableConfirm = document.querySelector(".confirm-popover");
+    check("an unreadable installed-pack check asks instead of silently replacing",
+      !!unreadableConfirm && unreadableConfirm.textContent.includes("dictPackReplaceConfirm") &&
+      importCalls === 3 && packMetaWarnings.some((line) => line.includes("[dict-pack]")),
+      `popover=${!!unreadableConfirm} calls=${importCalls} warned=${packMetaWarnings.length}`);
+    document.querySelector(".confirm-no").click();
+    await settle();
+    pbpPackMeta = async () => null;
+
     // Three outcomes, three messages, and only the error's own code says which
     // one happened. Guessing would tell a user their dictionary was deleted
     // when a zip header, a read or the database refused before the clear.

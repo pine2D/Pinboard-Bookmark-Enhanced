@@ -1035,9 +1035,21 @@ function _pbpPackWire() {
     // be dismissed by a third party (opening the delete confirm closes this
     // one without running onCancel), which would strand the button. Re-entry
     // is handled by dropping our own pending confirm so the newest pick wins.
+    // Fail SAFE, not silent. A pbpPackMeta() that throws says nothing about
+    // whether a pack is installed; reading it as "none" skips the confirm and
+    // the import then clears the pack the user still had. Treat an unreadable
+    // store as INSTALLED and ask -- the worst case is one redundant confirm.
+    // CLAUDE.md "吞异常必须留痕": name/message only, never pack contents.
     let meta = null;
-    try { meta = await pbpPackMeta(); } catch (_) { meta = null; }
-    if (meta && meta.state === "ready") {
+    let metaUnreadable = false;
+    try {
+      meta = await pbpPackMeta();
+    } catch (error) {
+      metaUnreadable = true;
+      console.warn("[dict-pack] installed-pack check failed:",
+        error && error.name, error && error.message);
+    }
+    if (metaUnreadable || (meta && meta.state === "ready")) {
       pbpDismissActiveConfirm(imp);
       showConfirmPopover(imp, {
         msg: t("dictPackReplaceConfirm"),
