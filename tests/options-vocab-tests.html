@@ -204,6 +204,70 @@ delete document.documentElement.dataset.theme;
     pbpPackDelete = realPackDelete;
   }
 
+  // Importing REPLACES: dict-pack.js clears the store before it writes, so a
+  // pack that is already installed is lost the moment the import starts. The
+  // Delete button has always asked first; replacing loses the same data.
+  const realPackImportFile = pbpPackImportFile;
+  const realPackMetaForImport = pbpPackMeta;
+  const pickPackFile = (name) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(["x"], name, { type:"text/plain" }));
+    const input = $id("dict-pack-file");
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change"));
+  };
+  const settle = async () => { await task(); await task(); await task(); };
+  try {
+    let importCalls = 0;
+    pbpPackImportFile = async () => { importCalls++; return { entries:3 }; };
+
+    pbpPackMeta = async () => ({ state:"ready", entries:2, importedAt:1, bytes:7 });
+    pickPackFile("cedict.txt");
+    await settle();
+    const replaceConfirm = document.querySelector(".confirm-popover");
+    check("replacing an installed pack asks before the import can clear it",
+      !!replaceConfirm && replaceConfirm.textContent.includes("dictPackReplaceConfirm") && importCalls === 0,
+      `popover=${!!replaceConfirm} calls=${importCalls}`);
+
+    document.querySelector(".confirm-no").click();
+    await settle();
+    check("cancelling imports nothing and leaves the import button usable",
+      importCalls === 0 && $id("dict-pack-import").disabled === false && $id("dict-pack-file").value === "",
+      `calls=${importCalls} disabled=${$id("dict-pack-import").disabled}`);
+
+    pickPackFile("cedict.txt");
+    await settle();
+    document.querySelector(".confirm-yes").click();
+    await settle();
+    check("confirming runs the import it was holding back", importCalls === 1, `calls=${importCalls}`);
+
+    // Nothing installed means nothing to lose, so there is no question to ask.
+    pbpPackMeta = async () => null;
+    pickPackFile("cedict.txt");
+    await settle();
+    check("a first import is not gated behind a confirm",
+      importCalls === 2 && !document.querySelector(".confirm-popover"), `calls=${importCalls}`);
+
+    // The two failures tell opposite stories about the pack the user had: the
+    // probe gate refuses before the clear, everything else fails after it.
+    pbpPackImportFile = async () => { const e = new Error("not a release"); e.code = "implausible_pack"; throw e; };
+    pickPackFile("wrong-file.txt");
+    await settle();
+    check("a probe rejection reports that the installed pack was left alone",
+      $id("dict-pack-action-status").textContent.includes("dictPackImplausible"),
+      $id("dict-pack-action-status").textContent);
+
+    pbpPackImportFile = async () => { throw new Error("quota exceeded"); };
+    pickPackFile("cedict.txt");
+    await settle();
+    check("an import that failed past the probe reports the pack as lost",
+      $id("dict-pack-action-status").textContent.includes("dictPackFailed"),
+      $id("dict-pack-action-status").textContent);
+  } finally {
+    pbpPackImportFile = realPackImportFile;
+    pbpPackMeta = realPackMetaForImport;
+  }
+
   const realOwner = pbpVocabCurrentOwner;
   const realAll = pbpVocabAll;
   const realTsv = pbpDictTsv;

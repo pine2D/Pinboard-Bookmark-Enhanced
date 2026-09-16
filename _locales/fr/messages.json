@@ -3408,7 +3408,13 @@
     }
   },
   "dictPackFailed": {
-    "message": "Impossible d'importer le dictionnaire. Vérifiez le fichier sélectionné et l'espace de stockage disponible pour l'extension, puis réessayez."
+    "message": "Impossible d'importer le dictionnaire, et le pack installé a déjà été supprimé. Vérifiez le fichier sélectionné et l'espace de stockage disponible pour l'extension, puis importez-le de nouveau."
+  },
+  "dictPackImplausible": {
+    "message": "Ce fichier ne ressemble pas à une version de CC-CEDICT : le dictionnaire déjà importé reste intact."
+  },
+  "dictPackReplaceConfirm": {
+    "message": "L'import supprime d'abord le pack de dictionnaire actuel, puis lit le nouveau fichier."
   },
   "dictPackImportHint": {
     "message": "Importez un fichier CC-CEDICT au format .txt, .txt.gz ou .zip."

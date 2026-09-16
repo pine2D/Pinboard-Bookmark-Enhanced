@@ -595,10 +595,88 @@ section("pbpCedictLines");
   check("the pack is still queryable after an aborted transaction",
     !!hitAfterSyncThrow && hitAfterSyncThrow.state === "hit");
 
+  // --- Probe gate ---------------------------------------------------------
+  // The import clears the store before it writes, so the file has to be judged
+  // BEFORE that clear. Entering this block the installed pack is SAMPLE1:
+  // 6 entries, bytes 999. Every rejection below must leave it exactly there.
+  const prose = [];
+  for (let i = 0; i < 300; i++) prose.push("The quick brown fox jumps over the lazy dog, line " + i + ".");
+  let proseErr = null;
+  try { await pbpPackImport(arrLines(prose), null, { bytes: 1 }); } catch (e) { proseErr = e; }
+  check("a file that is not a CC-CEDICT release is rejected with its own code",
+    !!proseErr && proseErr.code === "implausible_pack", "got " + (proseErr && (proseErr.code || proseErr.message)));
+  const metaAfterProbe = await pbpPackMeta();
+  check("the probe rejection left the installed pack ready and untouched",
+    !!metaAfterProbe && metaAfterProbe.state === "ready" && metaAfterProbe.entries === 6 && metaAfterProbe.bytes === 999,
+    "got " + JSON.stringify(metaAfterProbe));
+  const hitAfterProbe = await pbpPackLookup(["你好"]);
+  check("an entry of the installed pack is still queryable after a probe rejection",
+    !!hitAfterProbe && hitAfterProbe.state === "hit" && hitAfterProbe.rows.length === 1);
+
+  // Class, not instance: the neighbouring pack's own CSV is the likeliest
+  // wrong pick of all (same panel, overlapping accepted extensions).
+  const csvRows = ["word,phonetic,definition,translation"];
+  for (let i = 0; i < 60; i++) csvRows.push("word" + i + ",wud,a definition," + "释义" + i);
+  let csvErr = null;
+  try { await pbpPackImport(arrLines(csvRows)); } catch (e) { csvErr = e; }
+  check("the sibling pack's CSV is refused by the same gate, not only English prose",
+    !!csvErr && csvErr.code === "implausible_pack", "got " + (csvErr && (csvErr.code || csvErr.message)));
+
+  // A file short enough to fit inside the window is judged on the whole file,
+  // which is the same 0.5 ratio the malformed check applies downstream -- so
+  // it is refused here, before the clear, instead of after it.
+  let shortErr = null;
+  try { await pbpPackImport(arrLines([L_BEIJING, "not a cedict line", "nor is this one"])); }
+  catch (e) { shortErr = e; }
+  check("a short wrong file is refused before the clear, not by the post-clear malformed check",
+    !!shortErr && shortErr.code === "implausible_pack", "got " + (shortErr && (shortErr.code || shortErr.message)));
+  const metaAfterShort = await pbpPackMeta();
+  check("the short wrong file left the installed pack ready as well",
+    !!metaAfterShort && metaAfterShort.state === "ready" && metaAfterShort.entries === 6);
+
+  // ...while a small file that is mostly real still imports: the gate must not
+  // start refusing excerpts and hand-made fixtures (SAMPLE1 itself is six
+  // candidate lines and imported cleanly above).
+  const smallMixed = await pbpPackImport(arrLines([L_BEIJING, L_NIHAO, "not a cedict line"]), null, { bytes: 7 });
+  check("a small file below the window still imports, junk lines and all",
+    smallMixed.entries === 2 && smallMixed.malformed === 1, "got " + JSON.stringify(smallMixed));
+
+  // Replay: the probed lines are buffered and fed back, never consumed. A file
+  // longer than the window must land EVERY line, including line 0.
+  const longFile = [];
+  for (let i = 0; i < PBP_PACK_PROBE_LINES + 50; i++) longFile.push("第" + i + "詞 第" + i + "词 [di4 ci2] /word " + i + "/");
+  const longRes = await pbpPackImport(arrLines(longFile), null, { bytes: 1234 });
+  check("every probed line is replayed into the import rather than dropped",
+    longRes.entries === longFile.length, "got " + JSON.stringify(longRes) + " want " + longFile.length);
+  const firstOfLong = await pbpPackLookup(["第0词"]);
+  check("the first line of the file, read during the probe, is in the store",
+    firstOfLong && firstOfLong.state === "hit");
+  const pastWindow = await pbpPackLookup(["第" + (longFile.length - 1) + "词"]);
+  check("and so is a line from past the probe window", pastWindow && pastWindow.state === "hit");
+
+  // The residual risk this gate does NOT cover, pinned so nobody reads the
+  // probe as atomicity: a stream that dies after the window still loses the
+  // installed pack. That is what the failure copy has to say out loud.
+  async function* throwsPastWindow() {
+    for (const line of longFile) yield line;
+    throw new Error("boom past the probe window");
+  }
+  let lateThrew = false;
+  try { await pbpPackImport(throwsPastWindow()); } catch (e) { lateThrew = /boom past/.test(e && e.message); }
+  check("a throw past the probe window still propagates", lateThrew);
+  const metaAfterLateThrow = await pbpPackMeta();
+  check("no ready meta survives a throw past the probe window (this path is not atomic)",
+    !metaAfterLateThrow || metaAfterLateThrow.state !== "ready");
+
   let raceImportWaiting = false, releaseRaceImport;
   const raceImportGate = new Promise((r) => { releaseRaceImport = r; });
+  // The fixture must clear the probe window before it parks: the probe runs
+  // BEFORE the clear, so a generator that stalls inside the window would still
+  // be showing the caller the previous pack -- correctly, but that is not the
+  // window this case is about. Parking on the pull right after the window puts
+  // the stall exactly where the store is cleared and no meta exists yet.
   async function* raceImportLines() {
-    yield L_BEIJING;
+    for (let i = 0; i < PBP_PACK_PROBE_LINES; i++) yield L_BEIJING;
     raceImportWaiting = true;
     await raceImportGate;
   }

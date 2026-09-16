@@ -3408,7 +3408,13 @@
     }
   },
   "dictPackFailed": {
-    "message": "Das Wörterbuch konnte nicht importiert werden. Prüfe die ausgewählte Datei und den verfügbaren Erweiterungsspeicher und versuche es erneut."
+    "message": "Das Wörterbuch konnte nicht importiert werden, und das bisherige Paket ist bereits entfernt. Prüfe die ausgewählte Datei und den verfügbaren Erweiterungsspeicher und importiere es erneut."
+  },
+  "dictPackImplausible": {
+    "message": "Diese Datei sieht nicht nach einer CC-CEDICT-Version aus. Das bereits importierte Wörterbuch bleibt unverändert."
+  },
+  "dictPackReplaceConfirm": {
+    "message": "Beim Import wird zuerst das vorhandene Wörterbuchpaket entfernt und danach die neue Datei gelesen."
   },
   "dictPackImportHint": {
     "message": "Importiere eine CC-CEDICT-Datei im Format .txt, .txt.gz oder .zip."

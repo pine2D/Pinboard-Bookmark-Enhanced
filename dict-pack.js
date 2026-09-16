@@ -489,12 +489,107 @@ function _pbpPackTx(db, mode, fn, stores) {
   });
 }
 
-// Import: Web Locks serialize writers; first tx deletes meta AND clears the
-// store in ONE transaction (old meta gone = half-pack invisible); batched
-// puts; meta {state:"ready"} written LAST. A tab closed mid-import leaves
-// no meta -> lookups refuse the data.
+// Head of the stream parsed BEFORE anything is written. 200 lines is a few
+// tens of KB held for a moment -- no meaningful memory cost -- and wide enough
+// that a real release (a comment header followed by entries) clears the ratio
+// by a mile.
+const PBP_PACK_PROBE_LINES = 200;
+// Candidate = a line that is neither blank nor a `#` comment, i.e. one this
+// parser is entitled to an opinion about. Under this many the window says
+// nothing about a stream that is still running: a hand-made excerpt or a
+// six-line fixture must still import.
+const PBP_PACK_PROBE_MIN_CANDIDATES = 20;
+// A genuine release parses at ~1.0, so this sits deliberately far below it:
+// the gate exists to catch a file that is not CC-CEDICT at all, and a release
+// carrying a block of lines this parser happens to reject (a future line
+// shape, a locally edited copy) must still import rather than be refused.
+const PBP_PACK_PROBE_MIN_RATIO = 0.5;
+
+// Pulls up to PBP_PACK_PROBE_LINES lines off `it` and parses them. The lines
+// are BUFFERED, never consumed: _pbpPackReplay feeds them back into the
+// import ahead of the rest of the stream.
+async function _pbpPackProbeHead(it) {
+  const head = [];
+  let candidates = 0;
+  let parsed = 0;
+  let done = false;
+  while (head.length < PBP_PACK_PROBE_LINES) {
+    const step = await it.next();
+    if (step.done) { done = true; break; }
+    head.push(step.value);
+    const s = String(step.value == null ? "" : step.value).trim();
+    if (!s || s.startsWith("#")) continue;
+    candidates++;
+    if (pbpCedictParseLine(step.value)) parsed++;
+  }
+  return { head, candidates, parsed, done };
+}
+
+// The verdict, evaluated before the store is touched. `done` (the window ate
+// the whole file) is what makes the small-file case safe: `malformed > entries`
+// downstream is algebraically the SAME 0.5 ratio test over the whole file, so
+// a file the probe consumed entirely gets the identical verdict here, just
+// before the clear instead of after it. While the stream is still running the
+// window has to be wide enough to be representative -- and a long `#` header
+// is not evidence of anything either way, which is why an all-comment window
+// only condemns a file that ended inside it.
+function _pbpPackProbeRejects(probe) {
+  if (probe.parsed === 0 && (probe.candidates > 0 || probe.done)) return true;
+  if (!probe.done && probe.candidates < PBP_PACK_PROBE_MIN_CANDIDATES) return false;
+  return probe.parsed < probe.candidates * PBP_PACK_PROBE_MIN_RATIO;
+}
+
+// Replays the probed head, then keeps pulling the SAME iterator (an async
+// generator hands `this` back from [Symbol.asyncIterator], so it resumes where
+// the probe stopped rather than restarting).
+async function* _pbpPackReplay(head, it) {
+  try {
+    for (const line of head) yield line;
+    for (;;) {
+      const step = await it.next();
+      if (step.done) return;
+      yield step.value;
+    }
+  } finally {
+    // An early exit (the entry-count guard, a failed put) must still cancel the
+    // underlying stream reader. A plain `for await` over the original iterator
+    // used to do this for us; going through a wrapper means doing it here.
+    try { if (typeof it.return === "function") await it.return(); } catch (_) {}
+  }
+}
+
+// Import: Web Locks serialize writers; the probe gate runs BEFORE any write;
+// then the first tx deletes meta AND clears the store in ONE transaction (old
+// meta gone = half-pack invisible); batched puts; meta {state:"ready"} written
+// LAST. A tab closed mid-import leaves no meta -> lookups refuse the data.
+//
+// Why this path stays NON-ATOMIC, unlike the ECDICT one below: CC-CEDICT is a
+// public dataset the user re-downloads from MDBG in one click, so a lost pack
+// costs a download, not data -- whereas the ECDICT file is the user's own and
+// may be unrecoverable, which is what buys atomicity its ~15 MB buffer there.
+// Buffering this parse to match would double peak memory on a 24 MB+ release
+// (the ZIP branch already holds the whole decompressed text), and a shadow
+// store would mean an IDB version bump. What IS defended is the failure mode
+// that actually happens -- picking the wrong file -- by parsing the head of
+// the stream and refusing before the store is touched. A truncated stream or
+// an exhausted quota mid-write still loses the installed pack; the failure
+// copy in options-vocab.js says so rather than implying nothing happened.
 async function pbpPackImport(lineIter, onProgress, stats) {
   return navigator.locks.request("pbp-cedict-import", async () => {
+    const it = (lineIter && typeof lineIter[Symbol.asyncIterator] === "function")
+      ? lineIter[Symbol.asyncIterator]()
+      : (lineIter && typeof lineIter[Symbol.iterator] === "function")
+        ? lineIter[Symbol.iterator]()
+        : lineIter;
+    const probe = await _pbpPackProbeHead(it);
+    if (_pbpPackProbeRejects(probe)) {
+      try { if (typeof it.return === "function") await it.return(); } catch (_) {}
+      // `code` is the contract with the UI: this rejection alone leaves the
+      // installed pack intact, so it gets its own message.
+      const err = new Error("file does not look like a CC-CEDICT release");
+      err.code = "implausible_pack";
+      throw err;
+    }
     const db = await _pbpPackOpenDB();
     await _pbpPackTx(db, "readwrite", (tx) => {
       tx.objectStore(_PBP_PACK_META).delete("cedict");
@@ -508,7 +603,7 @@ async function pbpPackImport(lineIter, onProgress, stats) {
       for (const rec of batch) store.put(rec);
       batch = [];
     });
-    for await (const line of lineIter) {
+    for await (const line of _pbpPackReplay(probe.head, it)) {
       const rec = pbpCedictParseLine(line);
       if (!rec) { if (String(line).trim() && !String(line).startsWith("#")) malformed++; continue; }
       batch.push(rec);
@@ -630,6 +725,10 @@ async function pbpPackImportFile(file, onProgress) {
 // user replacing their pack must not lose the working one to a parse error, a
 // truncated stream, a failed write or an exhausted quota. Buffering costs memory
 // (~15 MB at the top rung) and that is the trade being made on purpose.
+// The asymmetry is deliberate, not an oversight: this file is the user's own
+// and may be unrecoverable, while CC-CEDICT is one click away from MDBG. The
+// comment above pbpPackImport records that trade and the probe gate that
+// covers the wrong-file case there without buffering.
 
 const _PBP_ECDICT_META_ID = "ecdict";
 const _PBP_ECDICT_LOCK = "pbp-ecdict-import";

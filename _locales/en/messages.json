@@ -3408,7 +3408,13 @@
     }
   },
   "dictPackFailed": {
-    "message": "Could not import the dictionary. Check the selected file and available extension storage, then try again."
+    "message": "Could not import the dictionary, and the pack that was installed is already gone; check the selected file and available extension storage, then import it again."
+  },
+  "dictPackImplausible": {
+    "message": "That file does not look like a CC-CEDICT release, so the dictionary you already imported was left untouched."
+  },
+  "dictPackReplaceConfirm": {
+    "message": "Importing removes the dictionary pack you have now before it reads the new file."
   },
   "dictPackImportHint": {
     "message": "Import a CC-CEDICT .txt, .txt.gz, or .zip file."

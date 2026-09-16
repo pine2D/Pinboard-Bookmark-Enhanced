@@ -3408,7 +3408,13 @@
     }
   },
   "dictPackFailed": {
-    "message": "无法导入词典。请检查所选文件和扩展可用存储空间后再试。"
+    "message": "无法导入词典，原有词典包已被移除。请检查所选文件和扩展可用存储空间后重新导入。"
+  },
+  "dictPackImplausible": {
+    "message": "这个文件不像 CC-CEDICT 发布包，已导入的词典原样保留。"
+  },
+  "dictPackReplaceConfirm": {
+    "message": "导入会先移除当前已装的词典包，再读取新文件。"
   },
   "dictPackImportHint": {
     "message": "可导入 CC-CEDICT 的 .txt、.txt.gz 或 .zip 文件。"

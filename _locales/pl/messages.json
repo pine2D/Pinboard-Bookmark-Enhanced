@@ -3408,7 +3408,13 @@
     }
   },
   "dictPackFailed": {
-    "message": "Nie udało się zaimportować słownika. Sprawdź wybrany plik i wolne miejsce w pamięci rozszerzenia, a następnie spróbuj ponownie."
+    "message": "Nie udało się zaimportować słownika, a dotychczasowy pakiet został już usunięty. Sprawdź wybrany plik i wolne miejsce w pamięci rozszerzenia, a następnie zaimportuj go ponownie."
+  },
+  "dictPackImplausible": {
+    "message": "Ten plik nie wygląda na wydanie CC-CEDICT, więc zaimportowany wcześniej słownik pozostał nienaruszony."
+  },
+  "dictPackReplaceConfirm": {
+    "message": "Import najpierw usuwa obecny pakiet słownika, a dopiero potem czyta nowy plik."
   },
   "dictPackImportHint": {
     "message": "Zaimportuj plik CC-CEDICT w formacie .txt, .txt.gz lub .zip."

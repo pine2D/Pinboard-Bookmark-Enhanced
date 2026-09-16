@@ -991,10 +991,8 @@ function _pbpPackWire() {
     try { chrome.tabs.create({ url: "https://www.mdbg.net/chinese/dictionary?page=cc-cedict" }); } catch (_) {}
   });
   imp.addEventListener("click", () => file.click());
-  file.addEventListener("change", async () => {
-    const f = file.files && file.files[0];
-    file.value = "";
-    if (!f || imp.disabled) return;
+  const runPackImport = async (f) => {
+    if (imp.disabled) return;
     imp.disabled = true;
     const el = $id("dict-pack-status");
     let lastShown = 0;
@@ -1006,12 +1004,43 @@ function _pbpPackWire() {
         if (el && now - lastShown >= 1000) { lastShown = now; el.textContent = t("dictPackImporting", String(n)); }
       });
       _pbpVocabFlashLocalStatus("dict-pack-action-status", true, t("dictPackDone", String(res.entries)));
-    } catch (_) {
-      _pbpVocabFlashLocalStatus("dict-pack-action-status", false, t("dictPackFailed"));
+    } catch (error) {
+      // Two different stories, and they must not be swapped: the probe gate
+      // refuses a wrong file BEFORE the store is cleared (installed pack
+      // intact), while every other failure happens after it (pack gone, and
+      // the status line above has already flipped to "not imported").
+      const implausible = error && error.code === "implausible_pack";
+      _pbpVocabFlashLocalStatus("dict-pack-action-status", false,
+        t(implausible ? "dictPackImplausible" : "dictPackFailed"));
     } finally {
       imp.disabled = false;
       _pbpPackRefreshStatus();
     }
+  };
+  file.addEventListener("change", async () => {
+    const f = file.files && file.files[0];
+    file.value = "";
+    if (!f || imp.disabled) return;
+    // Importing REPLACES: the import clears the store before it writes, so a
+    // pack that is already installed is lost the moment this starts. Deleting
+    // one asks first; replacing one loses the same data and must ask too.
+    // Deliberately NOT disabling the button across the confirm: a popover can
+    // be dismissed by a third party (opening the delete confirm closes this
+    // one without running onCancel), which would strand the button. Re-entry
+    // is handled by dropping our own pending confirm so the newest pick wins.
+    let meta = null;
+    try { meta = await pbpPackMeta(); } catch (_) { meta = null; }
+    if (meta && meta.state === "ready") {
+      pbpDismissActiveConfirm(imp);
+      showConfirmPopover(imp, {
+        msg: t("dictPackReplaceConfirm"),
+        yesText: t("dictPackImport"),
+        noText: t("cancel"),
+        onConfirm: () => runPackImport(f)
+      });
+      return;
+    }
+    await runPackImport(f);
   });
   if (del) del.addEventListener("click", () => {
     showConfirmPopover(del, {

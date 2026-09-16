@@ -356,6 +356,22 @@ async function loadLocale(loc) {
       /storage/i.test(msgs.en.dictPackFailed?.message || "") &&
       msgs.en.dictPackReadFailed?.message !== msgs.en.dictPackEmpty?.message,
     "English failure copy invents a cause/window or collapses read failure into empty state");
+  // The CC-CEDICT import clears the store before it writes, so the two
+  // failures tell OPPOSITE stories about the pack the user already had:
+  // dictPackFailed happens after the clear (it is gone), dictPackImplausible
+  // is the probe gate refusing before it (it is intact). A locale that lets
+  // them converge would leave the user guessing which one they are in.
+  const PACK_REPLACE_KEYS = ["dictPackFailed", "dictPackImplausible", "dictPackReplaceConfirm"];
+  check("H12b every locale distinguishes an import that lost the pack from one that never touched it",
+    LOCALES.every((loc) => PACK_REPLACE_KEYS.every((key) => msgs[loc][key]?.message)) &&
+      LOCALES.every((loc) => msgs[loc].dictPackImplausible.message !== msgs[loc].dictPackFailed.message) &&
+      /remove|delete|gone/i.test(msgs.en.dictPackFailed.message) &&
+      /file|format/i.test(msgs.en.dictPackFailed.message) &&
+      /storage/i.test(msgs.en.dictPackFailed.message) &&
+      /untouched|intact|unchanged/i.test(msgs.en.dictPackImplausible.message) &&
+      !/remove[ds]?\b|deleted|gone/i.test(msgs.en.dictPackImplausible.message) &&
+      /remove/i.test(msgs.en.dictPackReplaceConfirm.message),
+    "import failure copy is missing, identical across the two outcomes, or claims the wrong fate for the installed pack");
   const ACTIONABLE_HINTS = {
     en: [
       "At the top of this page, turn “Archive saved pages to the Wayback Machine” off and back on to request permission for web.archive.org again.",
