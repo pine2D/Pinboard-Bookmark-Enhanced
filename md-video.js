@@ -1901,7 +1901,10 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // one thing player.bilibili.com never exposes by itself.
   const BILI_PLAYER_ORIGIN = "https://player.bilibili.com/*";
   const BILI_PLAYER_MSG_ORIGIN = "https://player.bilibili.com";
-  const BILI_BRIDGE_ID = "pbp-bili-player-bridge";
+  // Shared with background.js's unregisterContentScripts call -- single
+  // source of truth in shared.js (PBP_BILI_BRIDGE_ID), aliased locally to
+  // keep this file's diff minimal.
+  const BILI_BRIDGE_ID = PBP_BILI_BRIDGE_ID;
   let _biliPlayerGranted = null;   // null = not checked yet on this page
   let _liveGate = null, _bridgeBtn = null, _biliReloadedForBridge = false;
   // Chrome sends no Referer from chrome-extension:// frames, and YouTube's

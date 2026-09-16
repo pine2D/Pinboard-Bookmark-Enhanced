@@ -1545,12 +1545,12 @@ pbpImgFixSweepRules(); // SW start: drop rules whose tab is gone or no longer a 
 // granted again (user widens site access, a future broader grant), the script
 // would resurrect without fresh consent. Drop the registration the moment its
 // origin grant goes away. Top-level synchronous registration per MV3 rules;
-// the id string mirrors md-video.js's BILI_BRIDGE_ID (isolated script
-// contexts, deliberate duplication).
+// the id is shared.js's PBP_BILI_BRIDGE_ID (md-video.js's BILI_BRIDGE_ID
+// aliases the same constant -- isolated script contexts, one source of truth).
 chrome.permissions.onRemoved.addListener((perms) => {
   const origins = (perms && perms.origins) || [];
   if (origins.some((o) => typeof o === "string" && o.includes("player.bilibili.com"))) {
-    chrome.scripting.unregisterContentScripts({ ids: ["pbp-bili-player-bridge"] }).catch(() => {});
+    chrome.scripting.unregisterContentScripts({ ids: [PBP_BILI_BRIDGE_ID] }).catch(() => {});
   }
 });
 

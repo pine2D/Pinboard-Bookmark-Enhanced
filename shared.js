@@ -19,6 +19,10 @@ const PBP_VOCAB_DRIVE_ORIGIN_PATTERN = "https://www.googleapis.com/*";
 // BILI_ORIGIN): the popup checks these with permissions.contains ONLY.
 const PBP_YT_ORIGIN_PATTERN = "https://www.youtube.com/*";
 const PBP_BILI_ORIGIN_PATTERN = "https://api.bilibili.com/*";
+// Dynamic content-script id for the bilibili player bridge (md-video.js
+// registers it, background.js unregisters it on permission revocation).
+// Single source of truth for the two isolated script contexts.
+const PBP_BILI_BRIDGE_ID = "pbp-bili-player-bridge";
 
 function pbpVocabDriveOAuthActive(manifest) {
   const permissions = Array.isArray(manifest?.optional_permissions)
