@@ -2755,6 +2755,7 @@ async function run() {
         globalThis.t = (key, ...args) => [key, ...args].join("|");
         let fieldFailureText = "";
         let ownerAbortText = "";
+        let lookalikeText = "";
         let blobAfterFieldFailure = null;
         try {
           document.getElementById("opt-backup-include-highlights").checked = false;
@@ -2785,6 +2786,22 @@ async function run() {
             await new Promise((resolve) => requestAnimationFrame(resolve));
           }
           ownerAbortText = failStatus.textContent;
+
+          // "property, not regex": an error whose MESSAGE merely reads like a
+          // field rejection carries no pbpBackupField, so it must not be
+          // dressed up as one.
+          localArea.pinboardToken = obfuscateKey("backup-owner:token");
+          _settingsStorageCache = null;
+          globalThis.pbpVocabAll = async () => {
+            throw new TypeError("invalid backup field: x");
+          };
+          exportedBlob = null;
+          failStatus.textContent = "";
+          document.getElementById("export-settings").click();
+          for (let i = 0; i < 30 && !failStatus.textContent; i++) {
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+          }
+          lookalikeText = failStatus.textContent;
         } finally {
           delete localArea.savedThemes;
           globalThis.pbpVocabAll = previousExportVocabAll;
@@ -2800,6 +2817,9 @@ async function run() {
         check("E7 manual export: an account change mid-export is not reported as a field failure",
           ownerAbortText.includes("optSaveFailed") &&
           !ownerAbortText.includes("backupExportFailed"));
+        check("E7 manual export: an error that only reads like a field rejection keeps the generic message",
+          lookalikeText.includes("optSaveFailed") &&
+          !lookalikeText.includes("backupExportFailed"));
       }
     } finally {
       globalThis.chrome = prevChromeE7;
@@ -3532,6 +3552,7 @@ async function run() {
     let overlaySettingsRow = "";
     let badFieldImportText = "";
     let unreadableImportText = "";
+    let hostileFieldImportText = "";
     let exactTextRepreflight = false;
     let selectionRaceSafe = false;
     let selectionRaceEvidence = {};
@@ -3599,7 +3620,7 @@ async function run() {
       globalThis.__pbpTestSyncSetLarge = async () => {};
       globalThis.t = (key, ...args) => [key, ...args].join("|");
       setupBackup({
-        exportableKeys: ["optTheme", "customFont"],
+        exportableKeys: ["optTheme", "customFont", "previewAiModelByProvider"],
         saveOverlayWithFallback: async () => ({ fellBackToLocal: false }),
         beforeApply: async () => {
           beforeApplyCalls++;
@@ -3685,7 +3706,7 @@ async function run() {
       const overlayOnlyText = JSON.stringify({
         _schemaVersion: 3,
         _backup: metadata,
-        customOverlayCSS: "a{color:red}",
+        customOverlayCSS: "中".repeat(4),
       });
       Object.defineProperty(fileInput, "files", {
         configurable: true,
@@ -3723,6 +3744,20 @@ async function run() {
         value: [{ text: async () => "{not json" }],
       });
       unreadableImportText = await readImportStatus();
+
+      // The name spliced into this throw is the map key that just FAILED its
+      // own character test, i.e. whatever the file says. It must not reach the
+      // aria-live status line unbounded or carrying bidi overrides.
+      const hostileFieldText = JSON.stringify({
+        _schemaVersion: 3,
+        _backup: metadata,
+        previewAiModelByProvider: { ["\u202E" + "x".repeat(5000)]: "m" },
+      });
+      Object.defineProperty(fileInput, "files", {
+        configurable: true,
+        value: [{ text: async () => hostileFieldText }],
+      });
+      hostileFieldImportText = await readImportStatus();
 
       const raceOldText = JSON.stringify({
         _schemaVersion: 3,
@@ -3837,7 +3872,7 @@ async function run() {
       ? pbpBuildBackupPreview(pbpPreflightBackupPayload({
           _schemaVersion: 3,
           _backup: metadata,
-          customOverlayCSS: "a{color:red}",
+          customOverlayCSS: "中".repeat(4),
         }, []), backupOwner, { enabled: false, localFallbackKeys: [] })
       : null;
     check("E11 an overlay-only backup reports the CSS bytes its enabled settings section carries",
@@ -3845,14 +3880,18 @@ async function run() {
       overlayOnlyPreview?.settingsCount === 0 &&
       overlayOnlyPreview?.overlayBytes === 12 &&
       preview?.overlayBytes === 0 && unrelatedFallbackPreview?.overlayBytes === 0);
-    check("E11 the settings preview row states the overlay bytes instead of a bare zero",
-      overlaySettingsRow.includes("backupPreviewSettingsOverlay") &&
-      overlaySettingsRow.includes("12") &&
-      !overlaySettingsRow.startsWith("backupPreviewSettings|"));
+    // Exact text, not a substring: the row must carry the count and the BYTES
+    // in that order, and a UTF-8 byte length -- four CJK characters are 12
+    // bytes, so a css.length that happened to render "4" would read as valid.
+    check("E11 the settings preview row states count then overlay bytes, measured in bytes",
+      overlaySettingsRow === "backupPreviewSettingsOverlay|0|12");
     check("E11 a rejected import field names itself while an unreadable file keeps the plain message",
       badFieldImportText.includes("importInvalidField|savedThemes[0]") &&
       unreadableImportText.includes("importInvalid") &&
       !unreadableImportText.includes("importInvalidField"));
+    check("E11 a hostile field name degrades to its safe parent segment instead of flooding the status line",
+      hostileFieldImportText.trim() === "importInvalidField|previewAiModelByProvider" &&
+      !hostileFieldImportText.includes("\u202E") && hostileFieldImportText.length < 200);
 
     const mismatchPreview = task9Ready
       ? pbpBuildBackupPreview(previewPrepared, "different-owner", { enabled: false, localFallbackKeys: [] })

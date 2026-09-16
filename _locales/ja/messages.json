@@ -1029,7 +1029,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "backupPreviewSettingsOverlay": {
-    "message": "設定フィールド：$COUNT$／カスタム CSS：$BYTES$ バイト",
+    "message": "設定フィールド：$COUNT$、カスタム CSS：$BYTES$ バイト",
     "placeholders": {
       "count": { "content": "$1" },
       "bytes": { "content": "$2" }

@@ -1132,7 +1132,7 @@
     "message": "Export Settings"
   },
   "backupExportFailed": {
-    "message": "The backup file could not be created because one field is not valid: $FIELD$",
+    "message": "Backup file could not be created: the field $FIELD$ is invalid.",
     "placeholders": { "field": { "content": "$1" } }
   },
   "importSettings": {

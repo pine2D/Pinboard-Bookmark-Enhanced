@@ -1063,13 +1063,33 @@ function pbpBackupValueError(key) {
   return error;
 }
 
+// Field names that may be echoed into the UI. Deliberately narrow: two throw
+// sites splice a key taken straight OUT of the backup file into the name --
+// `previewAiModelByProvider.<key>` is thrown exactly when <key> FAILED its own
+// character test, and `exportTargets.<targetId>.<field>` accepts any object key
+// the file carries. A backup file is untrusted input, and this string lands in
+// an aria-live status line, so an unbounded key (or one carrying bidi overrides,
+// emoji, or newlines) must never reach it.
+const PBP_BACKUP_FIELD_SAFE = /^[A-Za-z0-9_.\[\]-]{1,80}$/;
+
 // The field name carried by pbpBackupValueError, or "" for any other failure
 // (a JSON parse error, an aborted account re-read). Callers use it to choose
 // between the field-naming message and the generic one -- a failure with no
 // field must never be reported as if a field were at fault.
+// A name the whitelist rejects degrades to its longest safe parent segment
+// ("previewAiModelByProvider" for a hostile provider key), and to "" when even
+// that fails -- which the callers already render as the generic message.
 function pbpBackupErrorField(error) {
   const field = error && error.pbpBackupField;
-  return typeof field === "string" ? field : "";
+  if (typeof field !== "string") return "";
+  let candidate = field;
+  while (candidate) {
+    if (PBP_BACKUP_FIELD_SAFE.test(candidate)) return candidate;
+    const cut = candidate.lastIndexOf(".");
+    if (cut < 0) return "";
+    candidate = candidate.slice(0, cut);
+  }
+  return "";
 }
 
 function pbpSanitizeBackupThemes(value) {
