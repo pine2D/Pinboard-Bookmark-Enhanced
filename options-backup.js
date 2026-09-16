@@ -746,9 +746,24 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       };
       let highlightsOwnerDropped = false;
       if (raw.backupIncludeHighlights !== false) {
-        const allLocal = await chrome.storage.local.get(null);
-        // get(null) deserializes the ENTIRE local area (jina_md_ page caches
-        // included) -- a real round trip another tab can switch accounts
+        let allLocal;
+        if (typeof chrome.storage.local.getKeys === "function") {
+          // Chrome 130+: list keys without deserializing values, then fetch
+          // only the highlight records, instead of get(null) deserializing
+          // the ENTIRE local area (jina_md_ page caches included). Do NOT
+          // copy background.js's pbpClaimLegacyHighlightOwners filter
+          // (`k !== "pbp_hl_last_color"`) -- that one-shot migration doesn't
+          // care about the color preference, but this backup must keep
+          // pbp_hl_last_color: pbpBuildHighlightBackup writes it into the
+          // export below. pbpIsHighlightBackupKey (shared.js) is prefix-only,
+          // so it keeps it. min_chrome is 123 < 130, so the get(null)
+          // fallback below stays.
+          const keys = (await chrome.storage.local.getKeys()).filter(pbpIsHighlightBackupKey);
+          allLocal = keys.length ? await chrome.storage.local.get(keys) : {};
+        } else {
+          allLocal = await chrome.storage.local.get(null);
+        }
+        // Either path is a real round trip another tab can switch accounts
         // across. The same re-check the vocabulary branch below makes after
         // its own read: `owner` both filters the items and becomes the file's
         // _highlightsOwner label, so a stale one ships the previous account's

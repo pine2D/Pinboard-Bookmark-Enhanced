@@ -2833,6 +2833,120 @@ async function run() {
   check("E7 manual export with vocabulary disabled neither reads nor exports vocabulary",
     e7ExportedWithoutVocab);
 
+  // ---------- E7c: highlight export getKeys() fast path is byte-identical to the get(null) fallback (K165) ----------
+  await (async () => {
+    const prevChromeE7c = globalThis.chrome;
+    const prevCreateObjectURL = URL.createObjectURL;
+    const prevRevokeObjectURL = URL.revokeObjectURL;
+    const prevCache = _settingsStorageCache;
+    const prevVocabAll = globalThis.pbpVocabAll;
+    const wrap = document.createElement("div");
+    try {
+      wrap.innerHTML = '<button id="export-settings" type="button"></button><button id="import-settings" type="button"></button><input id="import-settings-file" type="file"><span id="import-status"></span><input id="opt-backup-include-highlights" type="checkbox" checked><input id="opt-backup-include-vocabulary" type="checkbox"><input id="opt-backup-include-secrets" type="checkbox"><p id="backup-secrets-warning" hidden>Plaintext credentials warning</p><span id="backup-export-note"></span>';
+      document.body.appendChild(wrap);
+
+      // Ownerless items so the export result is independent of account
+      // matching -- this fixture is only about the getKeys()/get(null)
+      // parity, not the owner-scoping already covered by E7. jina_md_x
+      // stands in for the bulk, non-highlight local-area content (Markdown
+      // page caches) that the getKeys() path must never request.
+      const baseFixture = () => Object.assign({}, SETTINGS_DEFAULTS, {
+        optSyncEnabled: false,
+        backupIncludeHighlights: true,
+        pinboardToken: obfuscateKey("fastpath-owner:token"),
+        pbp_hl_good: { v: 1, url: "https://x.test", title: "X", items: [{ id: "a", n: 1, quote: "q", color: 1 }] },
+        pbp_hl_last_color: 3,
+        jina_md_x: "a".repeat(2048),
+      });
+
+      const runExportOnce = async (withGetKeys) => {
+        const localArea = baseFixture();
+        let getCalledWithNull = false;
+        let getKeysRequestedNonHighlightKey = false;
+        let getKeysCalls = 0;
+        const storageGetFastpath = (keys) => {
+          if (keys === null) {
+            getCalledWithNull = true;
+            return Promise.resolve(Object.assign({}, localArea));
+          }
+          if (Array.isArray(keys)) {
+            // exportableKeys (SETTINGS_DEFAULTS) legitimately arrives here as
+            // a non-pbp_hl_ array for the settings section; only flag the
+            // non-highlight stand-in key itself (jina_md_x), which is never a
+            // SETTINGS_DEFAULTS member and must stay unreachable from the
+            // getKeys()-derived highlight fetch.
+            if (keys.includes("jina_md_x")) getKeysRequestedNonHighlightKey = true;
+            const out = {};
+            keys.forEach((k) => { if (k in localArea) out[k] = localArea[k]; });
+            return Promise.resolve(out);
+          }
+          if (keys && typeof keys === "object") {
+            const out = Object.assign({}, keys);
+            Object.keys(keys).forEach((k) => { if (k in localArea) out[k] = localArea[k]; });
+            return Promise.resolve(out);
+          }
+          return Promise.resolve({ [keys]: localArea[keys] });
+        };
+        const local = { get: storageGetFastpath, set: () => Promise.resolve(), remove: () => Promise.resolve() };
+        if (withGetKeys) {
+          local.getKeys = () => { getKeysCalls++; return Promise.resolve(Object.keys(localArea)); };
+        }
+        let exportedBlob = null;
+        _settingsStorageCache = null;
+        globalThis.chrome = {
+          storage: {
+            local,
+            sync: { get: storageGetFastpath, set: () => Promise.resolve(), remove: () => Promise.resolve() },
+            onChanged: { addListener() {} },
+          },
+        };
+        URL.createObjectURL = (blob) => { exportedBlob = blob; return "blob:pbp-test-fastpath"; };
+        URL.revokeObjectURL = () => {};
+        globalThis.pbpVocabAll = async () => [];
+        setupBackup({
+          exportableKeys: Object.keys(SETTINGS_DEFAULTS).filter((k) => !API_KEY_FIELDS.includes(k)),
+          saveOverlayWithFallback: () => Promise.resolve(),
+          beforeExport: async () => true,
+        });
+        document.getElementById("opt-backup-include-highlights").checked = true;
+        document.getElementById("opt-backup-include-vocabulary").checked = false;
+        document.getElementById("export-settings").click();
+        for (let i = 0; i < 20 && !exportedBlob; i++) {
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+        }
+        if (!exportedBlob) throw new Error("E7c fast-path export did not produce a Blob");
+        const exported = JSON.parse(await exportedBlob.text());
+        return {
+          highlights: exported._highlights || null,
+          getCalledWithNull,
+          getKeysRequestedNonHighlightKey,
+          getKeysCalls,
+        };
+      };
+
+      const withGetKeys = await runExportOnce(true);
+      const withoutGetKeys = await runExportOnce(false);
+
+      check("E7c getKeys fast path: highlights section (incl. pbp_hl_last_color) is deep-equal to the get(null) fallback",
+        JSON.stringify(withGetKeys.highlights) === JSON.stringify(withoutGetKeys.highlights) &&
+        !!withGetKeys.highlights && withGetKeys.highlights.pbp_hl_last_color === 3 &&
+        "pbp_hl_good" in withGetKeys.highlights);
+      check("E7c getKeys fast path: chrome.storage.local.get is never called with null when getKeys() is available",
+        withGetKeys.getKeysCalls > 0 && !withGetKeys.getCalledWithNull);
+      check("E7c getKeys fast path: a non-highlight key (jina_md_x) is never requested",
+        !withGetKeys.getKeysRequestedNonHighlightKey);
+      check("E7c get(null) fallback: still used when getKeys() is unavailable (sanity check on the fixture itself)",
+        withoutGetKeys.getCalledWithNull);
+    } finally {
+      globalThis.chrome = prevChromeE7c;
+      URL.createObjectURL = prevCreateObjectURL;
+      URL.revokeObjectURL = prevRevokeObjectURL;
+      globalThis.pbpVocabAll = prevVocabAll;
+      _settingsStorageCache = prevCache;
+      wrap.remove();
+    }
+  })();
+
   // ---------- E7b: backup schema/type/nested-secret preflight ----------
   await (async () => {
     const exportableKeys = Object.keys(SETTINGS_DEFAULTS).filter((key) => !API_KEY_FIELDS.includes(key));
