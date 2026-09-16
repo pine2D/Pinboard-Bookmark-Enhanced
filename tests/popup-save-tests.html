@@ -1839,6 +1839,59 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(h.calls.cache.length === 0, "a failed call must not write the cache");
     });
 
+    await testAsync("the tags half travels as its own single call, parsed and filed by the worker", async () => {
+      const h = makePopupAi({ respond: async () => ({ ok: true, tags: ["mv3", "chrome"], summary: null }) });
+      const out = await h.fetchAIArtifacts("tags", true, h.account, h.snapshot, "transcript");
+      assert(out.join(",") === "mv3,chrome", "the worker's tags did not reach the caller: " + JSON.stringify(out));
+      assert(h.calls.callAI.length === 0, "the popup document still called the provider itself");
+      assert(h.calls.sent.length === 1, "exactly one message must cross the bus");
+      const msg = h.calls.sent[0];
+      assert(msg.mode === "single" && msg.kind === "tags" && msg.prompt === "TAG-PROMPT" && msg.source === "transcript",
+        "wrong tags envelope: " + JSON.stringify({ mode: msg.mode, kind: msg.kind, source: msg.source }));
+      assert(msg.inflightKey === `${h.account}|openai#tags|tags|${URL}`,
+        "the tags inflight key must travel verbatim, got " + msg.inflightKey);
+    });
+
+    await testAsync("an empty tags half renders the existing no-result path instead of throwing", async () => {
+      const h = makePopupAi({ respond: async () => ({ ok: true, tags: null, summary: null }) });
+      await h.doAITags(false);
+      assert(h.calls.errors.length === 0, "a null half must not raise the error card: " +
+        (h.calls.errors[0] && h.calls.errors[0].e && h.calls.errors[0].e.message));
+      assert(h.calls.rendered.length === 1, "the no-result render did not happen");
+      const shown = h.calls.rendered[0].tags;
+      assert(Array.isArray(shown) && shown.length === 0,
+        "a null half must reach the renderer as this document's empty value, got " + JSON.stringify(shown));
+      assert(h.calls.cache.length === 0, "an empty tag list was written to the cache (A8: empty = miss)");
+    });
+
+    await testAsync("case resolution survives the boundary in both directions", async () => {
+      const caseMap = { javascript: "JavaScript", mv3: "MV3" };
+      // The worker resolved them against the same vocabulary: re-applying
+      // resolveTagCase here must be a no-op, not a second mangling.
+      const resolved = makePopupAi({
+        respectCase: true, tagCaseMap: caseMap,
+        respond: async () => ({ ok: true, tags: ["JavaScript", "MV3"], summary: null }),
+      });
+      const kept = await resolved.fetchAIArtifacts("tags", true, resolved.account, resolved.snapshot, "local");
+      assert(kept.join(",") === "JavaScript,MV3", "re-applying the case map changed an already-resolved tag: " + kept.join(","));
+      // And when the worker could NOT read this account's vocabulary it degrades
+      // to unresolved tags — the render side still fixes them up.
+      const degraded = makePopupAi({
+        respectCase: true, tagCaseMap: caseMap,
+        respond: async () => ({ ok: true, tags: ["javascript", "mv3"], summary: null }),
+      });
+      const fixed = await degraded.fetchAIArtifacts("tags", true, degraded.account, degraded.snapshot, "local");
+      assert(fixed.join(",") === "JavaScript,MV3", "the popup did not cover a worker that skipped case resolution: " + fixed.join(","));
+    });
+
+    await testAsync("PBP_AI_VIA_SW=false keeps the tags parse inside the popup document", async () => {
+      const h = makePopupAi({ viaSW: false, aiText: "alpha,beta" });
+      const out = await h.fetchAIArtifacts("tags", true, h.account, h.snapshot, "local");
+      assert(h.calls.sent.length === 0, "the rollback switch still sent a message");
+      assert(h.calls.callAI.join("|") === "TAG-PROMPT", "the in-document path did not run");
+      assert(out.join(",") === "alpha,beta", "the in-document parse did not run: " + JSON.stringify(out));
+    });
+
     test("setup restore and cache click share adoption before any append", () => {
       const setupAi = popupAiSource.slice(
         popupAiSource.indexOf("function setupAIFeatures()"),

@@ -861,9 +861,19 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
         return both.summary;
       });
     }
-    return getOrCreateInflight(`${account}|${aiCacheFingerprint(s, "tags")}|tags|${url}`, async () => {
-      const resp = await callAI(s, buildTagPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, pbpRelevantTagsFirst(allUserTags, $id("title-input").value, pageInfo.url)));
-      return finalizeAITags(refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator }), s);
+    const tagsKey = `${account}|${aiCacheFingerprint(s, "tags")}|tags|${url}`;
+    return getOrCreateInflight(tagsKey, async () => {
+      const prompt = buildTagPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, pbpRelevantTagsFirst(allUserTags, $id("title-input").value, pageInfo.url));
+      if (!PBP_AI_VIA_SW) {
+        const resp = await callAI(s, prompt);
+        return finalizeAITags(refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator }), s);
+      }
+      // The worker already parsed, refined and case-resolved this half against
+      // the SAME vocabulary entry. finalizeAITags runs again anyway because
+      // resolveTagCase is idempotent and this side still has to cover a worker
+      // that could not read the account's tag counts.
+      const both = await pbpAiCallViaSW({ s, mode: "single", kind: "tags", prompt, url, source, account, inflightKey: tagsKey });
+      return finalizeAITags(both.tags, s);
     });
   };
 
