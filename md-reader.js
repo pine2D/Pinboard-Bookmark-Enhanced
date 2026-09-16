@@ -940,9 +940,31 @@ function _pbpKbdHelpEnsurePop() {
 // what the page can actually do right now -- md-video.js publishes the
 // live key set (bilibili has no player protocol, so Space / arrows / r / f
 // are not offered there), and captions may land after the first open.
+// Non-video rows get the same live-anchor treatment for t/v/a (K86): those
+// three chips' listeners are wired up conditionally -- pbpTrInit (t/v) and
+// pbpAskInit (a) both bail out when AI is off, and pbpTrInit also bails
+// when the article is already in the target language -- so the static row
+// list used to keep listing them as dead keys. d/e stay unconditional on
+// purpose: dict (d) works fully without AI and explain (e) renders its own
+// not-configured message rather than doing nothing, and both only go quiet
+// when the user has explicitly turned selectionTrigger off themselves, so
+// there is no "why doesn't this work" surprise to fix. Known trade-off:
+// #tr-section is created lazily and later removed by _pbpTrBuildWork
+// (md-translate.js) once it turns out nothing on the page is translatable,
+// so a help panel opened very early -- before that async pass settles --
+// can briefly list t/v moments before they go dead again.
 function _pbpKbdHelpFillList(list) {
   list.replaceChildren();
   let rows = PBP_KBD_HELP_ROWS;
+  const kbdHelpLiveByChip = {
+    t: () => !!document.getElementById("tr-section"),
+    v: () => !!document.getElementById("tr-section"),
+    a: () => !!document.getElementById("ask-open")
+  };
+  rows = rows.filter((row) => {
+    const isLive = kbdHelpLiveByChip[row.chips[0]];
+    return !isLive || isLive();
+  });
   if (document.body.classList.contains("video-mode")) {
     const live = (typeof window.pbpVideoShortcutKeys === "function") ? window.pbpVideoShortcutKeys() : null;
     rows = rows.concat(PBP_KBD_HELP_VIDEO_ROWS.filter((r) => !live || r.chips.every((c) => live.has(c))));

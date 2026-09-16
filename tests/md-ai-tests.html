@@ -6280,6 +6280,82 @@ suiteIf("_pbpSearchOpen (query memory)", "_pbpSearchOpen", () => {
   });
 });
 
+// ============ K86: "?" help panel filters dead t/v/a rows by live anchors (md-reader.js) ============
+suiteIf("_pbpKbdHelpFillList (live-anchor filtering)", "_pbpKbdHelpFillList", () => {
+  function rowsOf(ul) { return Array.from(ul.querySelectorAll(".kbd-help-row")); }
+  function chipTexts(li) { return Array.from(li.querySelectorAll(".kbd-help-chip")).map((k) => k.textContent); }
+  function allChips(ul) { return rowsOf(ul).flatMap(chipTexts); }
+  // This page runs dozens of suites against a shared document, some of
+  // which transiently mount #tr-section / #ask-open or a body.video-mode
+  // class. Strip and restore around each case so this suite's counts are
+  // never at the mercy of another suite's leftovers or in-flight state.
+  function withClean(fn) {
+    const staleTr = document.getElementById("tr-section");
+    const staleAsk = document.getElementById("ask-open");
+    if (staleTr) staleTr.remove();
+    if (staleAsk) staleAsk.remove();
+    const hadVideoMode = document.body.classList.contains("video-mode");
+    document.body.classList.remove("video-mode");
+    try { fn(); } finally {
+      if (hadVideoMode) document.body.classList.add("video-mode");
+    }
+  }
+
+  test("no #tr-section / #ask-open: t/v/a rows are dropped, the rest survive", () => {
+    withClean(() => {
+      const ul = document.createElement("ul");
+      _pbpKbdHelpFillList(ul);
+      const rows = rowsOf(ul);
+      assertEq(rows.length, PBP_KBD_HELP_ROWS.length - 3, "row count did not drop by exactly 3 (t/v/a)");
+      const chips = allChips(ul);
+      assert(!chips.includes("t") && !chips.includes("v") && !chips.includes("a"),
+        "a dead t/v/a chip survived the filter: " + chips.join(","));
+    });
+  });
+
+  test("#tr-section and #ask-open both present: full row count, t/v/a all shown", () => {
+    withClean(() => {
+      const tr = document.createElement("div");
+      tr.id = "tr-section";
+      const ask = document.createElement("button");
+      ask.id = "ask-open";
+      document.body.appendChild(tr);
+      document.body.appendChild(ask);
+      try {
+        const ul = document.createElement("ul");
+        _pbpKbdHelpFillList(ul);
+        const rows = rowsOf(ul);
+        assertEq(rows.length, PBP_KBD_HELP_ROWS.length, "row count changed with both anchors present");
+        const chips = allChips(ul);
+        assert(chips.includes("t") && chips.includes("v") && chips.includes("a"),
+          "t/v/a chip missing despite both anchors present: " + chips.join(","));
+      } finally {
+        tr.remove();
+        ask.remove();
+      }
+    });
+  });
+
+  test("#tr-section alone: t/v shown, a absent -- the two anchors are independent", () => {
+    withClean(() => {
+      const tr = document.createElement("div");
+      tr.id = "tr-section";
+      document.body.appendChild(tr);
+      try {
+        const ul = document.createElement("ul");
+        _pbpKbdHelpFillList(ul);
+        const rows = rowsOf(ul);
+        assertEq(rows.length, PBP_KBD_HELP_ROWS.length - 1, "row count did not drop by exactly 1 (a only)");
+        const chips = allChips(ul);
+        assert(chips.includes("t") && chips.includes("v"), "t/v filtered out despite #tr-section present");
+        assert(!chips.includes("a"), "a survived despite no #ask-open");
+      } finally {
+        tr.remove();
+      }
+    });
+  });
+});
+
 // ============ Skim layer: pbpSkimBuildPrompt ============
 suiteIf("pbpSkimBuildPrompt", "pbpSkimBuildPrompt", () => {
   test("system requires 3-5 bullet points as a markdown unordered list", () => {
