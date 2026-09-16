@@ -1932,10 +1932,9 @@ async function showOfflineQueueStatus() {
       yesText: t("clear"),
       noText: t("cancel"),
       onConfirm: async () => {
-        // Promise form: sendMessage rejects on transport failure (extension
-        // reload / context invalidated) instead of setting lastError, so a
-        // plain try/catch covers that path. popup.html always loads
-        // popup-offline.js, so window.PPOffline is never falsy here -- the
+        // Promise form rejects on transport failure (context invalidated / no receiver / port closed)
+        // so this try/catch absorbs it; Chrome may still print a console-only unchecked-lastError line.
+        // popup.html always loads popup-offline.js, so window.PPOffline is never falsy here -- the
         // former "else if (ok) bar.classList.add('hidden')" branch was dead.
         try {
           await chrome.runtime.sendMessage({ type: "clear_offline_queue" });

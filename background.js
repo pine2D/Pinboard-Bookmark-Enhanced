@@ -2885,14 +2885,20 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   if (message.type === "remove_offline_item" && typeof message.queueId === "string") {
     mutateOfflineQueue({ kind: "remove", queueId: message.queueId })
       .then(() => sendResponse({ ok: true }))
-      .catch(() => sendResponse({ ok: false }));
+      .catch((e) => {
+        console.warn("offline queue remove failed:", e?.name, e?.message);
+        sendResponse({ ok: false });
+      });
     return true;
   }
 
   if (message.type === "clear_offline_queue") {
     mutateOfflineQueue({ kind: "clear" })
       .then(() => sendResponse({ ok: true }))
-      .catch(() => sendResponse({ ok: false }));
+      .catch((e) => {
+        console.warn("offline queue clear failed:", e?.name, e?.message);
+        sendResponse({ ok: false });
+      });
     return true;
   }
 

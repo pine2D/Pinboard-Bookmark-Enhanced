@@ -2272,15 +2272,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     function createOfflineRemoveHarness(sendMessageImpl) {
       const warns = [];
+      const sent = [];
       let refreshCount = 0;
       const dependencies = {
-        chrome: { runtime: { sendMessage: sendMessageImpl } },
+        chrome: { runtime: { sendMessage: (...args) => { sent.push(args[0]); return sendMessageImpl(...args); } } },
         console: { warn: (...args) => warns.push(args) },
         refreshBar: async () => { refreshCount++; },
       };
       const names = Object.keys(dependencies);
       const onRemove = new Function(...names, `${onRemoveSource}\nreturn onRemove;`)(...names.map((name) => dependencies[name]));
-      return { onRemove, warns, refreshCount: () => refreshCount };
+      return { onRemove, warns, sent, refreshCount: () => refreshCount };
     }
 
     function createOfflineClearHarness(sendMessageImpl) {
@@ -2330,6 +2331,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(harness.warns.length === 1 && harness.warns[0][0] === "offline remove message failed:" && harness.warns[0][1] === "ctx invalidated", "the transport failure left no (or the wrong) console trace: " + JSON.stringify(harness.warns));
       assert(!harness.warns.some((args) => args.some((a) => typeof a === "string" && a.includes("q1"))), "the console trace leaked the queue id");
       assert(harness.refreshCount() === 1, "a rejecting send skipped the list refresh");
+      assert(harness.sent.length === 1 && harness.sent[0].type === "remove_offline_item" && harness.sent[0].queueId === "q1", "the message shape or queueId was dropped: " + JSON.stringify(harness.sent));
     });
 
     await testAsync("offline remove: a resolved { ok: false } resolves false, does not warn, and still refreshes", async () => {
@@ -2338,6 +2340,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(result === false, "a handler-reported failure did not resolve false");
       assert(harness.warns.length === 0, "a normally-resolved failure was mistaken for a transport error");
       assert(harness.refreshCount() === 1, "a handler-reported failure skipped the list refresh");
+      assert(harness.sent.length === 1 && harness.sent[0].type === "remove_offline_item" && harness.sent[0].queueId === "q2", "the message shape or queueId was dropped: " + JSON.stringify(harness.sent));
     });
 
     await testAsync("offline remove: a resolved { ok: true } resolves true and still refreshes", async () => {
@@ -2345,6 +2348,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const result = await harness.onRemove("q3");
       assert(result === true, "a successful remove did not resolve true");
       assert(harness.refreshCount() === 1, "a successful remove skipped the list refresh");
+      assert(harness.sent.length === 1 && harness.sent[0].type === "remove_offline_item" && harness.sent[0].queueId === "q3", "the message shape or queueId was dropped: " + JSON.stringify(harness.sent));
     });
 
     await testAsync("offline clear: a rejecting send warns once and still refreshes via PPOffline (no unhandled rejection)", async () => {

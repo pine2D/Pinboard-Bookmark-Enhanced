@@ -192,10 +192,9 @@
   }
 
   async function onRemove(queueId) {
-    // Promise form (not callback+lastError): sendMessage rejects on transport
-    // failure (extension reload / context invalidated) instead of setting
-    // lastError, so a plain try/catch here covers that path, while resp.ok
-    // being false covers the handler-internal failure (background.js's
+    // Promise form rejects on transport failure (context invalidated / no receiver / port closed)
+    // so this try/catch absorbs it; Chrome may still print a console-only unchecked-lastError line.
+    // resp.ok === false separately covers a handler-internal failure (background.js's
     // mutateOfflineQueue().catch(() => sendResponse({ ok: false }))).
     let ok = false;
     try {
