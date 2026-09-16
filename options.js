@@ -2426,6 +2426,14 @@ document.addEventListener("DOMContentLoaded", async () => {
           // 2. Migrate customOverlayCSS (large value) — read from old, then switch pref, then write to new
           const customOverlayCSS = await syncGetLarge("customOverlayCSS", "");
           const savedThemes = await syncGetLarge("savedThemes", []);
+          // K117: this is a read-modify-write across areas. When sync is being
+          // turned OFF the read came from the cloud, where an empty value can
+          // simply mean a chunk has not propagated yet -- writing that into
+          // local (and publishing it on later re-enable) would delete the
+          // theme the user still has. Abort into the existing rollback rather
+          // than migrating a value we could not actually read.
+          await pbpAssertChunkedSyncReadComplete("customOverlayCSS", customOverlayCSS);
+          await pbpAssertChunkedSyncReadComplete("savedThemes", savedThemes);
           await chrome.storage.local.set({ optSyncEnabled: enabling });
           _settingsStorageCache = newStorage;
           for (const [key, value] of [

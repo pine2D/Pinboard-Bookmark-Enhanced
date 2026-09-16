@@ -2439,6 +2439,47 @@ async function run() {
     await staleSyncChangeHandler();
     check("E5 Options handler: stale duplicate sync-enable is a zero-write no-op",
       staleWrites === 0 && staleSync.optTheme === "fresh-sync");
+
+    // K117: turning sync OFF is a read-modify-write across areas -- it reads
+    // the cloud and writes what it read into local. Hand-written server shape
+    // (chrome.storage.sync propagates per ITEM): the manifest claims three
+    // chunks and only two have landed on this device, so the REAL syncGetLarge
+    // below degrades to []. Migrating that value would drop the user's themes
+    // here and publish the empty list on the next re-enable.
+    const propagatingLocal = { optSyncEnabled: true };
+    const propagatingSync = {
+      syncApiKeys: false,
+      savedThemes: { _chunks: 3, _generation: "g1" },
+      savedThemes_g1_0: '[{"name":"One","css"',
+      savedThemes_g1_1: ':"a{}"}',
+    };
+    const propagatingChrome = { storage: { local: area(propagatingLocal), sync: area(propagatingSync) } };
+    const propagatingManifestBefore = JSON.stringify(propagatingSync.savedThemes);
+    const propagatingWrites = [];
+    const propagatingError = { textContent: "", classList: { add() {}, remove() {} } };
+    let propagatingHandler;
+    const propagatingToggle = { checked: false, addEventListener: (_type, fn) => { propagatingHandler = fn; } };
+    const propagatingDeps = {
+      ...handlerDeps,
+      syncToggle: propagatingToggle,
+      chrome: propagatingChrome,
+      syncGetLarge,
+      syncSetLarge: async (key, value) => { propagatingWrites.push({ key, value }); },
+      $id: (id) => (id === "opt-sync-error" ? propagatingError : null),
+    };
+    const propagatingCache = _settingsStorageCache;
+    globalThis.chrome = propagatingChrome;
+    _settingsStorageCache = null;
+    new Function(...Object.keys(propagatingDeps), syncHandlerSource)(...Object.values(propagatingDeps));
+    await propagatingHandler();
+    _settingsStorageCache = propagatingCache;
+    check("E5 Options handler: a chunk still propagating aborts the migration instead of migrating an empty value",
+      propagatingError.textContent === "syncMigrationFailed" &&
+      propagatingToggle.checked === true && propagatingLocal.optSyncEnabled === true &&
+      !propagatingWrites.some((entry) => entry.key === "savedThemes") &&
+      !("savedThemes" in propagatingLocal) &&
+      JSON.stringify(propagatingSync.savedThemes) === propagatingManifestBefore);
+
     globalThis.chrome = previousHandlerChrome;
 
     delete globalThis.__pbpTestStorage;
@@ -2944,6 +2985,177 @@ async function run() {
       globalThis.pbpVocabAll = prevVocabAll;
       _settingsStorageCache = prevCache;
       wrap.remove();
+    }
+  })();
+
+  // ---------- E7d: an incomplete chunked cloud read aborts the export (K117) ----------
+  // Server shape, written by hand from what chrome.storage.sync actually
+  // hands back, NOT from the chunk writer: sync propagates per ITEM, so a
+  // device can hold savedThemes' manifest while the last chunk is still in
+  // flight. pbpReadChunkedSyncResult reports that as ok:false and syncGetLarge
+  // degrades it to [] -- indistinguishable from "this account has no themes".
+  // The backup file is the user's only recovery copy, so the export must
+  // abort instead of shipping a hollow one, and must not touch the manifest.
+  await (async () => {
+    const prevChromeE7d = globalThis.chrome;
+    const prevCreateObjectURL = URL.createObjectURL;
+    const prevRevokeObjectURL = URL.revokeObjectURL;
+    const prevCache = _settingsStorageCache;
+    const prevT = globalThis.t;
+    const prevVocabAll = globalThis.pbpVocabAll;
+    const wrap = document.createElement("div");
+    let exportedBlob = null;
+    const syncBacking = Object.assign({}, SETTINGS_DEFAULTS, {
+      savedThemes: { _chunks: 3, _generation: "g1" },
+      savedThemes_g1_0: '[{"name":"One","css"',
+      savedThemes_g1_1: ':"a{}"}',
+      // savedThemes_g1_2 has not arrived on this device yet.
+    });
+    const localBacking = {
+      optSyncEnabled: true,
+      pinboardToken: obfuscateKey("backup-owner:token"),
+    };
+    const area = (backing, calls) => ({
+      get: async (keys) => {
+        if (keys == null) return Object.assign({}, backing);
+        if (typeof keys === "string") return keys in backing ? { [keys]: backing[keys] } : {};
+        if (Array.isArray(keys)) {
+          const out = {};
+          keys.forEach((key) => { if (key in backing) out[key] = backing[key]; });
+          return out;
+        }
+        const out = Object.assign({}, keys);
+        Object.keys(keys).forEach((key) => { if (key in backing) out[key] = backing[key]; });
+        return out;
+      },
+      set: async (data) => { calls?.sets.push(data); Object.assign(backing, data); },
+      remove: async (keys) => {
+        const list = Array.isArray(keys) ? keys : [keys];
+        calls?.removes.push(list);
+        list.forEach((key) => delete backing[key]);
+      },
+    });
+    const syncCalls = { sets: [], removes: [] };
+    try {
+      wrap.innerHTML = '<button id="export-settings" type="button"></button><button id="import-settings" type="button"></button><input id="import-settings-file" type="file"><span id="import-status"></span><input id="opt-backup-include-highlights" type="checkbox"><input id="opt-backup-include-vocabulary" type="checkbox"><input id="opt-backup-include-secrets" type="checkbox"><p id="backup-secrets-warning" hidden></p><span id="backup-export-note"></span>';
+      document.body.appendChild(wrap);
+      globalThis.chrome = {
+        storage: {
+          local: area(localBacking),
+          sync: area(syncBacking, syncCalls),
+          onChanged: { addListener() {} },
+        },
+      };
+      _settingsStorageCache = null;
+      globalThis.t = (key, ...args) => [key, ...args].join("|");
+      globalThis.pbpVocabAll = async () => [];
+      URL.createObjectURL = (blob) => { exportedBlob = blob; return "blob:pbp-test-e7d"; };
+      URL.revokeObjectURL = () => {};
+      setupBackup({
+        exportableKeys: Object.keys(SETTINGS_DEFAULTS).filter((k) => !API_KEY_FIELDS.includes(k)),
+        saveOverlayWithFallback: () => Promise.resolve(),
+      });
+      const status = document.getElementById("import-status");
+      const manifestBefore = JSON.stringify(syncBacking.savedThemes);
+      status.textContent = "";
+      document.getElementById("export-settings").click();
+      for (let i = 0; i < 30 && !status.textContent; i++) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      check("E7d a chunk still in flight aborts the export instead of writing a hollow backup",
+        status.textContent.includes("optSaveFailed") && exportedBlob === null);
+      check("E7d the aborted export leaves the cloud manifest on its own generation",
+        JSON.stringify(syncBacking.savedThemes) === manifestBefore &&
+        !syncCalls.sets.some((data) => "savedThemes" in data) &&
+        !syncCalls.removes.flat().some((key) => key.startsWith("savedThemes")));
+
+      // Deliberately empty is NOT incomplete: an empty array is stored as one
+      // real chunk holding "[]". Checking the manifest alone would lock every
+      // sync user who deleted their last theme out of Export for good.
+      syncBacking.savedThemes = { _chunks: 1, _generation: "g2" };
+      delete syncBacking.savedThemes_g1_0;
+      delete syncBacking.savedThemes_g1_1;
+      syncBacking.savedThemes_g2_0 = "[]";
+      exportedBlob = null;
+      status.textContent = "";
+      document.getElementById("export-settings").click();
+      for (let i = 0; i < 30 && !exportedBlob && !status.textContent; i++) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      const emptyThemesExport = exportedBlob ? JSON.parse(await exportedBlob.text()) : null;
+      check("E7d a legitimately empty chunked value still exports",
+        !!emptyThemesExport && status.textContent === "" &&
+        !(emptyThemesExport.savedThemes && emptyThemesExport.savedThemes.length));
+
+      // And once the missing chunk lands, the same export carries the themes.
+      syncBacking.savedThemes = { _chunks: 3, _generation: "g1" };
+      delete syncBacking.savedThemes_g2_0;
+      syncBacking.savedThemes_g1_0 = '[{"name":"One","css"';
+      syncBacking.savedThemes_g1_1 = ':"a{}"}';
+      syncBacking.savedThemes_g1_2 = "]";
+      exportedBlob = null;
+      status.textContent = "";
+      document.getElementById("export-settings").click();
+      for (let i = 0; i < 30 && !exportedBlob && !status.textContent; i++) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      const healedExport = exportedBlob ? JSON.parse(await exportedBlob.text()) : null;
+      check("E7d the export self-heals as soon as the last chunk propagates",
+        !!healedExport && Array.isArray(healedExport.savedThemes) &&
+        healedExport.savedThemes.length === 1 && healedExport.savedThemes[0].name === "One");
+    } finally {
+      globalThis.chrome = prevChromeE7d;
+      URL.createObjectURL = prevCreateObjectURL;
+      URL.revokeObjectURL = prevRevokeObjectURL;
+      _settingsStorageCache = prevCache;
+      globalThis.pbpVocabAll = prevVocabAll;
+      if (prevT === undefined) delete globalThis.t;
+      else globalThis.t = prevT;
+      wrap.remove();
+    }
+  })();
+
+  // ---------- E7e: the two unreadable-chunk exits leave a diagnosable trace (K117) ----------
+  await (async () => {
+    const prevChromeE7e = globalThis.chrome;
+    const prevWarn = console.warn;
+    const warnings = [];
+    try {
+      const syncBacking = {
+        savedThemes: { _chunks: 3, _generation: "g1" },
+        savedThemes_g1_0: "SECRET-CHUNK-TEXT-A",
+        savedThemes_g1_1: "SECRET-CHUNK-TEXT-B",
+      };
+      globalThis.chrome = {
+        storage: {
+          sync: {
+            get: async (keys) => {
+              const list = Array.isArray(keys) ? keys : [keys];
+              const out = {};
+              list.forEach((key) => { if (key in syncBacking) out[key] = syncBacking[key]; });
+              return out;
+            },
+          },
+          onChanged: { addListener() {} },
+        },
+      };
+      console.warn = (...args) => { warnings.push(args.map(String).join(" ")); };
+      const missing = await pbpReadChunkedSyncResult("savedThemes", syncBacking.savedThemes, []);
+      const manifest = await pbpReadChunkedSyncResult("savedThemes", { _chunks: 0 }, []);
+      console.warn = prevWarn;
+      check("E7e a missing chunk is reported as unreadable, not as an empty value",
+        missing.ok === false && Array.isArray(missing.value) && missing.value.length === 0 &&
+        manifest.ok === false);
+      check("E7e both unreadable-chunk exits warn with the key name and the counts",
+        warnings.length === 2 &&
+        warnings.every((line) => line.includes("savedThemes")) &&
+        warnings.some((line) => /_chunks:\s*3/.test(line) && /missing:\s*1/.test(line)) &&
+        warnings.some((line) => /_chunks:\s*0/.test(line)));
+      check("E7e the warning never carries the chunk text",
+        warnings.every((line) => !line.includes("SECRET-CHUNK-TEXT")));
+    } finally {
+      console.warn = prevWarn;
+      globalThis.chrome = prevChromeE7e;
     }
   })();
 

@@ -714,8 +714,14 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
         overlay = localOverlay.customOverlayCSS_localFallback;
       } else {
         overlay = await syncGetLarge("customOverlayCSS", "");
+        // K117: an empty read can mean "a chunk has not propagated to this
+        // device yet". This file is the user's only recovery copy, so a
+        // hollow-but-complete-looking backup is worse than no backup: abort
+        // and let them retry once Chrome Sync has caught up.
+        await pbpAssertChunkedSyncReadComplete("customOverlayCSS", overlay);
       }
       const savedThemesData = await syncGetLarge("savedThemes", []);
+      await pbpAssertChunkedSyncReadComplete("savedThemes", savedThemesData);
       let highlights = null;
       let highlightsOwner = "";
       let vocabulary = null;

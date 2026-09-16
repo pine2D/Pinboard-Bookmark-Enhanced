@@ -1917,12 +1917,78 @@ async function pbpReadChunkedSyncResult(key, stored, defaultValue) {
     return pbpDecodeLargeResult(stored, defaultValue); // missing or pre-chunk migration data
   }
   const chunkKeys = pbpChunkStorageKeys(key, stored);
-  if (!chunkKeys.length) return { ok: false, value: defaultValue };
+  // CLAUDE.md "吞异常必须留痕": both ok:false exits hand back the DEFAULT
+  // value, which every caller then reads as "the user has none of these".
+  // Without a line here that degrade is completely unobservable -- the only
+  // difference between "empty" and "unreadable" lived in a flag most callers
+  // drop. Shape only: key name and counts, never a byte of the stored text.
+  // A cold read of an unset key returns above (stored === undefined), so this
+  // does not fire on every startup.
+  if (!chunkKeys.length) {
+    console.warn("[sync-large] unusable chunk manifest:", key,
+      "_chunks:", stored && stored._chunks, "missing:", "all");
+    return { ok: false, value: defaultValue };
+  }
   const values = await chrome.storage.sync.get(chunkKeys);
-  if (chunkKeys.some((chunkKey) => typeof values[chunkKey] !== "string")) {
+  const missing = chunkKeys.reduce(
+    (count, chunkKey) => count + (typeof values[chunkKey] === "string" ? 0 : 1), 0);
+  if (missing) {
+    console.warn("[sync-large] chunks not readable yet:", key,
+      "_chunks:", chunkKeys.length, "missing:", missing);
     return { ok: false, value: defaultValue };
   }
   return pbpDecodeLargeResult(chunkKeys.map((chunkKey) => values[chunkKey]).join(""), defaultValue);
+}
+
+// K117. The chunked readers deliberately degrade an unreadable value to the
+// default: a cold start must render SOMETHING, and every consumer that only
+// DISPLAYS the value is better off with "" / [] than with an exception.
+// A caller that is about to REWRITE the key from what it just read -- or to
+// ship that read as the user's only recovery copy (the manual backup file) --
+// cannot afford the same ambiguity. chrome.storage.sync propagates per item,
+// so an empty read can simply mean a chunk has not landed on this device yet;
+// rewriting from it publishes a new _generation and orphans the real content,
+// and no tombstone protects savedThemes the way one protects highlights.
+//
+// Throws only when the cloud CONTRADICTS the empty read. Every gate below has
+// to hold, because each one is a way for the key to be legitimately empty:
+//   - settings actually route to sync (during the sync-ENABLE migration the
+//     read came from local, where no chunks exist, and stale cloud metadata
+//     from an earlier sync-on session would otherwise abort every migration);
+//   - no local fallback record is in play (a fresh record is authoritative by
+//     design, so a cloud manifest says nothing about what the reader returned);
+//   - the manifest names chunk keys AND at least one of them is still missing.
+//     Checking the manifest alone is not enough: an intentionally empty array
+//     is stored as one real chunk holding "[]", so a sync user who deleted
+//     their last saved theme would never be able to export again.
+// The condition is self-healing -- the chunk arrives and the next attempt
+// succeeds -- which is why it needs no "retry N times / reset" escape hatch.
+async function pbpAssertChunkedSyncReadComplete(key, value) {
+  const empty = value == null
+    || (typeof value === "string" && value === "")
+    || (Array.isArray(value) && value.length === 0)
+    || (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
+  if (!empty) return;
+  let storage;
+  try { storage = await getSettingsStorage(); } catch (_) { return; }
+  if (storage !== chrome.storage.sync) return;
+  const fallbackKey = pbpLargeFallbackKey(key);
+  try {
+    const fallbacks = await chrome.storage.local.get(fallbackKey);
+    if (Object.prototype.hasOwnProperty.call(fallbacks, fallbackKey)) return;
+  } catch (_) {}
+  let meta;
+  try { meta = (await chrome.storage.sync.get(key))[key]; } catch (_) { return; }
+  const chunkKeys = pbpChunkStorageKeys(key, meta);
+  if (!chunkKeys.length) return;
+  let chunks;
+  try { chunks = await chrome.storage.sync.get(chunkKeys); } catch (_) { return; }
+  if (chunkKeys.every((chunkKey) => typeof chunks[chunkKey] === "string")) return;
+  // No new user-facing string: both call sites already have a failure path
+  // (the export's generic message, the sync toggle's syncMigrationFailed).
+  const error = new Error(`chunked sync value "${key}" has not finished propagating`);
+  error.code = "sync_chunks_incomplete";
+  throw error;
 }
 
 async function pbpResolveChunkedSettings(settings, storage, query) {
