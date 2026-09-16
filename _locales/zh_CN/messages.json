@@ -3630,6 +3630,7 @@
   "kbdHelpExplain": { "message": "解释当前选中内容" },
   "kbdHelpToggleView": { "message": "依次切换原文、双语和仅译文视图" },
   "kbdHelpHighlight": { "message": "高亮当前选中内容（h 使用上次颜色，1-5 指定颜色）" },
+  "kbdHelpHighlightNote": { "message": "高亮当前选中内容并打开笔记卡片" },
   "kbdHelpAsk": { "message": "打开问答面板" },
   "kbdHelpSearch": { "message": "在正文中搜索" },
   "kbdHelpShowHelp": { "message": "显示本快捷键说明" },

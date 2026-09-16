@@ -3630,6 +3630,7 @@
   "kbdHelpExplain": { "message": "Explain the current selection" },
   "kbdHelpToggleView": { "message": "Cycle through original, bilingual, and translated views" },
   "kbdHelpHighlight": { "message": "Highlight the current selection (h = last color used, 1-5 = pick a color)" },
+  "kbdHelpHighlightNote": { "message": "Highlight the current selection and open its note card" },
   "kbdHelpAsk": { "message": "Open the Ask-the-page panel" },
   "kbdHelpSearch": { "message": "Search within the article" },
   "kbdHelpShowHelp": { "message": "Show this shortcuts list" },

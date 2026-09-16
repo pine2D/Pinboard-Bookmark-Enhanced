@@ -6354,6 +6354,26 @@ suiteIf("_pbpKbdHelpFillList (live-anchor filtering)", "_pbpKbdHelpFillList", ()
       }
     });
   });
+
+  // K112: n (highlight + open the note card) is the keyboard's only route into
+  // #pb-hl-card. Nothing conditions it -- the highlight subsystem mounts with
+  // the reader, AI on or off -- so it must survive the same stripped page that
+  // kills t/v/a, and it must sit next to the plain h row it pairs with.
+  test("n (highlight and open its note card) is listed unconditionally", () => {
+    withClean(() => {
+      const ul = document.createElement("ul");
+      _pbpKbdHelpFillList(ul);
+      const rows = rowsOf(ul);
+      // Only t/v/a may ever be filtered: whatever the table grows to, exactly
+      // three rows go missing on a stripped page and n is not one of them.
+      assertEq(rows.length, PBP_KBD_HELP_ROWS.length - 3, "a row other than t/v/a was filtered out");
+      const at = (chips) => rows.findIndex((li) => chipTexts(li).join(",") === chips);
+      assert(at("n") !== -1, "the highlight-with-a-note key is missing: " + allChips(ul).join(","));
+      assertEq(at("n"), at("h,1-5") + 1, "n is not listed directly under the plain highlight key");
+      assertEq(rows[at("n")].querySelector(".kbd-help-desc").textContent, t("kbdHelpHighlightNote"),
+        "the n row is not wired to its own locale key");
+    });
+  });
 });
 
 // ============ Skim layer: pbpSkimBuildPrompt ============

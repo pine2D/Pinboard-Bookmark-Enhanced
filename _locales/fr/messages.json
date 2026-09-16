@@ -3636,6 +3636,7 @@
   "kbdHelpExplain": { "message": "Expliquer la sélection actuelle" },
   "kbdHelpToggleView": { "message": "Parcourir les vues originale, bilingue et traduite" },
   "kbdHelpHighlight": { "message": "Surligner la sélection actuelle (h = dernière couleur utilisée, 1-5 = choisir une couleur)" },
+  "kbdHelpHighlightNote": { "message": "Surligner la sélection actuelle et ouvrir sa fiche de note" },
   "kbdHelpAsk": { "message": "Ouvrir le panneau « Interroger la page »" },
   "kbdHelpSearch": { "message": "Rechercher dans l'article" },
   "kbdHelpShowHelp": { "message": "Afficher cette liste de raccourcis" },

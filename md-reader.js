@@ -894,6 +894,7 @@ const PBP_KBD_HELP_ROWS = [
   { chips: ["d"], key: "kbdHelpDictionary" },
   { chips: ["e"], key: "kbdHelpExplain" },
   { chips: ["h", "1-5"], key: "kbdHelpHighlight" },
+  { chips: ["n"], key: "kbdHelpHighlightNote" },
   { chips: ["a"], key: "kbdHelpAsk" },
   { chips: ["/"], key: "kbdHelpSearch" },
   { chips: ["z"], key: "kbdHelpZen" },

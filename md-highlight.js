@@ -1697,7 +1697,7 @@ async function _pbpHlCreateWithNote(btn) {
   }
 }
 
-// ---- Interaction binder: mouseup (show bar) + keydown (H/1-5 hotkeys) +
+// ---- Interaction binder: mouseup (show bar) + keydown (H/N/1-5 hotkeys) +
 // scroll/selection-collapse hide. Esc + click-elsewhere dismiss are free
 // via the popover's own light-dismiss (no listener needed for those). ----
 function _pbpHlOnMouseUp(e) {
@@ -1726,8 +1726,15 @@ function _pbpHlOnMouseUp(e) {
 // explicit e.shiftKey exclusion (not just case-
 // sensitive e.key checks) so Caps Lock without Shift ("H", shiftKey=false)
 // still fires while Shift+h ("H", shiftKey=true) does not.
+//
+// n is h's partner (K112, a11y): identical creation, but it opens the edit
+// card afterwards. Free-text notes and a later colour change live ONLY in
+// #pb-hl-card, whose two other entries are both pointer-bound (click
+// hit-testing via caretRangeFromPoint, and the floating bar's note button,
+// which only a mouseup can raise) -- so without n a keyboard reader can make
+// highlights but can never write a note of their own on one.
 function _pbpHlOnKeyDown(e) {
-  if (e.key !== "h" && e.key !== "H" && !/^[1-5]$/.test(e.key)) return;
+  if (e.key !== "h" && e.key !== "H" && e.key !== "n" && e.key !== "N" && !/^[1-5]$/.test(e.key)) return;
   const ae = document.activeElement;
   if (!pbpTrSingleKeyAllowed(e, ae && ae.tagName, !!(ae && ae.isContentEditable),
     document.body.classList.contains("raw-active"))) return;
@@ -1739,7 +1746,7 @@ function _pbpHlOnKeyDown(e) {
       ? document.getElementById("rendered-view") : null);
   if (!host) return;
   if (typeof pbpStudyHostIsTimeline === "function" && pbpStudyHostIsTimeline(host)) {
-    // (research T2.3) h / 1-5 on a caption row: say where highlighting
+    // (research T2.3) h / n / 1-5 on a caption row: say where highlighting
     // works instead of doing nothing -- the timeline bar carries the hint.
     e.preventDefault();
     _pbpHlShowBar(range, true);
@@ -1749,11 +1756,23 @@ function _pbpHlOnKeyDown(e) {
   if (!segments.length) return;
   e.preventDefault();
   const color = /^[1-5]$/.test(e.key) ? Number(e.key) : null;
+  // n takes the SAME colour as h (the null branch below -> _pbpHlLastColorGet),
+  // not a colour of its own: the card it opens carries the five swatches, so a
+  // wrong last colour is one keystroke away there, and sharing the colour rule
+  // is what keeps h and n reading as one pair. 1-5 keep their explicit colour.
+  const withCard = e.key === "n" || e.key === "N";
   (async () => {
     const c = color || await _pbpHlLastColorGet();
-    await _pbpHlCreateFromRange(range, c, null);
+    const created = await _pbpHlCreateFromRange(range, c, null);
     sel.removeAllRanges();
     _pbpHlHideBar();
+    // Bar down before the card goes up -- the order _pbpHlCreateWithNote has
+    // run on the mouse path all along. The card steals focus into its
+    // textarea; a bar still open would be a second popover in the top layer
+    // racing its own scroll / selectionchange auto-hide against it.
+    if (withCard && created.length && typeof window._pbpHlOpenCard === "function") {
+      window._pbpHlOpenCard(created[created.length - 1].id);
+    }
   })();
 }
 

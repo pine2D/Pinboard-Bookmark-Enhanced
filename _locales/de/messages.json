@@ -3636,6 +3636,7 @@
   "kbdHelpExplain": { "message": "Die aktuelle Auswahl erklären" },
   "kbdHelpToggleView": { "message": "Nacheinander Original, zweisprachige Ansicht und Übersetzung anzeigen" },
   "kbdHelpHighlight": { "message": "Die aktuelle Auswahl markieren (h = zuletzt verwendete Farbe, 1-5 = Farbe wählen)" },
+  "kbdHelpHighlightNote": { "message": "Die aktuelle Auswahl markieren und die Notizkarte öffnen" },
   "kbdHelpAsk": { "message": "Das Frage-Panel öffnen" },
   "kbdHelpSearch": { "message": "Im Artikel suchen" },
   "kbdHelpShowHelp": { "message": "Diese Tastenkürzel-Liste anzeigen" },

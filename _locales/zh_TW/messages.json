@@ -3636,6 +3636,7 @@
   "kbdHelpExplain": { "message": "解釋目前選取的內容" },
   "kbdHelpToggleView": { "message": "依序切換原文、雙語及僅顯示譯文" },
   "kbdHelpHighlight": { "message": "標記目前選取的內容（h 沿用上次顏色，1-5 指定顏色）" },
+  "kbdHelpHighlightNote": { "message": "標記目前選取的內容並開啟筆記卡片" },
   "kbdHelpAsk": { "message": "開啟問答面板" },
   "kbdHelpSearch": { "message": "在正文中搜尋" },
   "kbdHelpShowHelp": { "message": "顯示此快捷鍵說明" },

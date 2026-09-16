@@ -3636,6 +3636,7 @@
   "kbdHelpExplain": { "message": "Wyjaśnij bieżące zaznaczenie" },
   "kbdHelpToggleView": { "message": "Przełączaj kolejno widok oryginalny, dwujęzyczny i tłumaczenie" },
   "kbdHelpHighlight": { "message": "Zaznacz bieżący fragment (h = ostatnio użyty kolor, 1-5 = wybierz kolor)" },
+  "kbdHelpHighlightNote": { "message": "Zaznacz bieżący fragment i otwórz kartę notatki" },
   "kbdHelpAsk": { "message": "Otwórz panel pytań do strony" },
   "kbdHelpSearch": { "message": "Szukaj w treści artykułu" },
   "kbdHelpShowHelp": { "message": "Pokaż tę listę skrótów" },

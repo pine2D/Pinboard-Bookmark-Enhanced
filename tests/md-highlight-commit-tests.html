@@ -76,6 +76,23 @@ function _pbpAskRangeFromOffsets(el, start, end) {
 // answer is enough to let _pbpHlShowBar run to completion.
 function pbpTrPeekPopPos() { return { top: 0 }; }
 
+// md-translate.js:868/877, the gate every bare-letter reader shortcut shares.
+// Its own truth table is md-translate.js's contract (and tests/md-ai-tests.html
+// owns those cases); what this suite needs is a real answer plus a record of
+// the ARGUMENTS, because the half that lives in md-highlight.js is whether the
+// keydown handler hands the gate the live activeElement facts at all.
+let SINGLE_KEY_CALLS = [];
+function pbpTrIsTypingContext(tagName, isContentEditable) {
+  if (isContentEditable) return true;
+  const tag = String(tagName || "").toUpperCase();
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+function pbpTrSingleKeyAllowed(event, tagName, isContentEditable, rawActive) {
+  SINGLE_KEY_CALLS.push({ key: event && event.key, tagName, isContentEditable, rawActive });
+  if (!event || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || rawActive) return false;
+  return !pbpTrIsTypingContext(tagName, isContentEditable);
+}
+
 // Records the call AND reproduces the label resolution the real
 // flashButtonLabel does (md-preview.js:3152-3153: write .btn-label when there
 // is one, else btn.textContent). Both halves matter here -- the routing
@@ -934,6 +951,148 @@ function selectionRange(n, start, end) {
     !pbpHlItemsSame(
       [{ id: "e1", n: 1, quote: "q", color: 1, note: "" }],
       [{ id: "e1", n: 1, quote: "q", color: 1, note: "", owner: "acct_alice" }]));
+
+  // ================= keyboard creation: h creates, n creates and opens the card =================
+  section("(K112) keyboard creation: n is the only keyboard route into the edit card");
+
+  // A real KeyboardEvent, never an object literal: the handler reads
+  // ctrl/meta/alt/shift through the shared gate and calls preventDefault(),
+  // and only the platform's own event answers all of those the way a browser
+  // will. Returned so a case can assert on defaultPrevented.
+  function pressKey(key, init) {
+    const e = new KeyboardEvent("keydown", Object.assign({ key, cancelable: true, bubbles: true }, init || {}));
+    _pbpHlOnKeyDown(e);
+    return e;
+  }
+  // _pbpHlOnKeyDown is sync and hands the real work to a detached async IIFE,
+  // so a single flush() can reach the write queue before the creation does.
+  // Several rounds of "drain the queue, then let a macrotask through" removes
+  // the guess about how many hops the chain takes.
+  async function settle() { for (let i = 0; i < 6; i++) await flush(); }
+  function selectInFixture(n, start, end) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(selectionRange(n, start, end));
+    return sel;
+  }
+  // The card's DOM belongs to another suite. What this one owns is WHICH id
+  // the keyboard path hands the card hook, and how many times -- a recording
+  // spy, restored at the end of the section.
+  let CARD_OPENS = [];
+  const realOpenCard = window._pbpHlOpenCard;
+  window._pbpHlOpenCard = (id) => { CARD_OPENS.push(id); };
+  // Not a colour any key names, so "n reused h's last colour" cannot be
+  // confused with "n happened to default to 1".
+  const LAST_COLOR = 4;
+
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  await boot(baseRecord());
+  setQuiet("pbp_hl_last_color", LAST_COLOR);
+  CARD_OPENS = [];
+  const beforeN = storedIds();
+  selectInFixture(1, 0, 5);
+  const nEvent = pressKey("n");
+  await settle();
+  const madeByN = storedIds().filter((id) => !beforeN.includes(id));
+  check("n creates exactly one highlight", madeByN.length === 1, storedIds().join(","));
+  check("n consumes the key, so the letter never reaches the page", nEvent.defaultPrevented);
+  check("n opens the edit card exactly once", CARD_OPENS.length === 1, JSON.stringify(CARD_OPENS));
+  // Both halves explicitly: "undefined === undefined" is what a keyboard path
+  // that created nothing and opened nothing would otherwise report as a match.
+  check("n opens the card for the highlight it just created",
+    madeByN.length === 1 && CARD_OPENS.length === 1 && CARD_OPENS[0] === madeByN[0],
+    CARD_OPENS[0] + " vs " + madeByN[0]);
+  check("n reuses h's last colour rather than one of its own",
+    (storedItem(madeByN[0]) || {}).color === LAST_COLOR, JSON.stringify(storedItem(madeByN[0])));
+  check("n drops the selection before handing over to the card",
+    window.getSelection().isCollapsed || window.getSelection().rangeCount === 0);
+
+  // Caps Lock produces "N" with shiftKey=false; the gate lets it through, so
+  // the whitelist has to accept the uppercase spelling too (same reason h/H
+  // are both listed).
+  await boot(baseRecord());
+  setQuiet("pbp_hl_last_color", LAST_COLOR);
+  CARD_OPENS = [];
+  const beforeCaps = storedIds();
+  selectInFixture(1, 0, 5);
+  pressKey("N");
+  await settle();
+  check("Caps Lock N behaves exactly like n",
+    storedIds().filter((id) => !beforeCaps.includes(id)).length === 1 && CARD_OPENS.length === 1,
+    storedIds().join(",") + " / " + JSON.stringify(CARD_OPENS));
+
+  // Category, not one instance: EVERY key that already existed keeps creating
+  // without a card. A future writer who routes them all through one shared
+  // tail has to keep that split, or this fails for the key they forgot.
+  for (const key of ["h", "H", "1", "2", "3", "4", "5"]) {
+    await boot(baseRecord());
+    setQuiet("pbp_hl_last_color", LAST_COLOR);
+    CARD_OPENS = [];
+    const before = storedIds();
+    selectInFixture(2, 0, 4);
+    pressKey(key);
+    await settle();
+    check(key + " still creates a highlight",
+      storedIds().filter((id) => !before.includes(id)).length === 1, storedIds().join(","));
+    check(key + " never opens the card", CARD_OPENS.length === 0, JSON.stringify(CARD_OPENS));
+  }
+
+  // Nothing selected / a caret rather than a selection: n has nothing to
+  // highlight, so it must also not consume the key -- an inert shortcut that
+  // still swallows the keystroke is worse than no shortcut.
+  const NO_SELECTION = [
+    ["no selection at all", () => { window.getSelection().removeAllRanges(); }],
+    ["a collapsed caret", () => { selectInFixture(1, 3, 3); }],
+  ];
+  for (const [label, arrange] of NO_SELECTION) {
+    await boot(baseRecord());
+    CARD_OPENS = [];
+    const before = storedIds();
+    arrange();
+    const ev = pressKey("n");
+    await settle();
+    check("n with " + label + " creates nothing", sameSet(storedIds(), before), storedIds().join(","));
+    check("n with " + label + " opens no card", CARD_OPENS.length === 0, JSON.stringify(CARD_OPENS));
+    check("n with " + label + " leaves the key to the page", !ev.defaultPrevented);
+  }
+
+  // The shared typing/modifier/raw-view gate (md-translate.js:877). Each arm
+  // is a way the same keystroke legitimately means something else: a letter
+  // being typed, a browser chord (Ctrl+N opens a window), the raw-markdown
+  // view. The handler must consult the gate with the LIVE activeElement and
+  // obey a refusal before it touches the selection or storage.
+  const editable = document.createElement("div");
+  editable.contentEditable = "true";
+  editable.textContent = "editable";
+  document.getElementById("fixture").appendChild(editable);
+  const GATE_CASES = [
+    ["focus inside a textarea", () => { cardNote.focus(); }, null, (c) => c.tagName === "TEXTAREA"],
+    ["focus inside a contentEditable", () => { editable.focus(); }, null, (c) => c.isContentEditable === true],
+    ["a Ctrl chord (Ctrl+N is the browser's own)", () => {}, { ctrlKey: true }, (c) => c.key === "n"],
+    ["the raw-markdown view", () => { document.body.classList.add("raw-active"); }, null, (c) => c.rawActive === true],
+  ];
+  for (const [label, arrange, init, sawIt] of GATE_CASES) {
+    await boot(baseRecord());
+    CARD_OPENS = [];
+    SINGLE_KEY_CALLS = [];
+    const before = storedIds();
+    selectInFixture(1, 0, 5);
+    arrange();
+    const ev = pressKey("n", init);
+    await settle();
+    const last = SINGLE_KEY_CALLS[SINGLE_KEY_CALLS.length - 1] || {};
+    check("n under " + label + " reaches the shared gate with the live facts",
+      SINGLE_KEY_CALLS.length === 1 && sawIt(last), JSON.stringify(SINGLE_KEY_CALLS));
+    check("n under " + label + " creates nothing", sameSet(storedIds(), before), storedIds().join(","));
+    check("n under " + label + " opens no card", CARD_OPENS.length === 0, JSON.stringify(CARD_OPENS));
+    check("n under " + label + " leaves the key to whoever owns it", !ev.defaultPrevented);
+    document.body.classList.remove("raw-active");
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+  editable.remove();
+  cardNote.value = "";
+  window.getSelection().removeAllRanges();
+  window._pbpHlOpenCard = realOpenCard;
 
   // ================= scenario 8: the account changed under an open card =================
   section("(8) an account switch takes the card down and locks its edits out");
