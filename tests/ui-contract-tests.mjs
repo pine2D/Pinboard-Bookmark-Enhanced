@@ -191,6 +191,15 @@ check(/<form[^>]*id="login-form"[^>]*class="login-body"/.test(popupHtml) &&
   popupJs.includes('$id("login-form").addEventListener("submit"'),
   "popup login is not a semantic submit form with an announced inline error");
 
+// CSP form-action 'none' relies on both extension-page <form> submit
+// handlers actually calling preventDefault() as their first statement —
+// otherwise a real submit would try to navigate and CSP would silently
+// swallow it instead of the JS handler running as designed.
+check(/\$id\("login-form"\)\.addEventListener\("submit",\s*async\s*\(event\)\s*=>\s*\{\s*event\.preventDefault\(\);/.test(popupJs),
+  "popup.js: #login-form submit handler no longer preventDefaults first — form-action 'none' would break login");
+check(/#ask-form"\)\.addEventListener\("submit",\s*\(e\)\s*=>\s*\{\s*e\.preventDefault\(\);/.test(mdAskJs),
+  "md-ask.js: #ask-form submit handler no longer preventDefaults first — form-action 'none' would break Ask");
+
 check(mdPreviewJs.includes('renderEmptyState(t("mdPreviewEmpty"), "mdPreviewClose")') &&
   /function renderEmptyState\(message, actionKey\)/.test(mdPreviewJs) &&
   mdPreviewJs.includes("window.close()"),
