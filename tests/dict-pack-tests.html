@@ -746,6 +746,45 @@ section("pbpCedictLines");
     !!metaAfterPreClear && metaAfterPreClear.state === "ready" && metaAfterPreClear.entries === 6,
     "got " + JSON.stringify(metaAfterPreClear));
 
+  // The failure this whole code exists for, in the shape the browser actually
+  // throws it: a put rejects mid-batch and _pbpPackTx rejects with tx.error, a
+  // DOMException. Its legacy NUMERIC code (QuotaExceededError = 22) is not one
+  // of this codebase's string codes and must not be read as one -- and its
+  // `code` is a prototype getter, so it cannot simply be assigned over.
+  const realTxForQuota = _pbpPackTx;
+  let quotaTxCalls = 0;
+  _pbpPackTx = (db, mode, fn, stores) => {
+    quotaTxCalls++;
+    // Call 1 is the delete+clear: let it commit, so the failure lands where a
+    // real quota blowout lands -- after the installed pack is already gone.
+    if (quotaTxCalls === 1) return realTxForQuota(db, mode, fn, stores);
+    return Promise.reject(new DOMException("quota exceeded", "QuotaExceededError"));
+  };
+  let quotaErr = null;
+  try { await pbpPackImport(arrLines(longFile)); } catch (e) { quotaErr = e; }
+  _pbpPackTx = realTxForQuota;
+  check("a DOMException raised after the clear is still reported as a lost pack",
+    !!quotaErr && quotaErr.code === "pack_cleared", "got " + (quotaErr && quotaErr.code));
+  check("and the browser's own exception survives the stamping, identity included",
+    !!quotaErr && /quota exceeded/.test(quotaErr.message)
+      && quotaErr.name === "QuotaExceededError" && quotaErr instanceof DOMException,
+    "name=" + (quotaErr && quotaErr.name) + " msg=" + (quotaErr && quotaErr.message));
+  const metaAfterQuota = await pbpPackMeta();
+  check("no ready meta survives that quota failure either",
+    !metaAfterQuota || metaAfterQuota.state !== "ready", "got " + JSON.stringify(metaAfterQuota));
+
+  // The contract is the string code, not the mere presence of one: an error
+  // that already named itself keeps its own name.
+  const preCoded = Object.assign(new Error("already labelled"), { code: "implausible_pack" });
+  check("marking does not overwrite a code this codebase already set",
+    _pbpPackMarkCleared(preCoded) === preCoded && preCoded.code === "implausible_pack");
+  const frozenErr = Object.freeze(new DOMException("frozen put", "InvalidStateError"));
+  const frozenMarked = _pbpPackMarkCleared(frozenErr);
+  check("a frozen error is wrapped rather than left unlabelled, keeping its cause",
+    frozenMarked !== frozenErr && frozenMarked.code === "pack_cleared"
+      && frozenMarked.message === "frozen put" && frozenMarked.cause === frozenErr,
+    "got " + JSON.stringify({ code: frozenMarked.code, message: frozenMarked.message }));
+
   let raceImportWaiting = false, releaseRaceImport;
   const raceImportGate = new Promise((r) => { releaseRaceImport = r; });
   // The fixture must clear the probe window before it parks: the probe runs

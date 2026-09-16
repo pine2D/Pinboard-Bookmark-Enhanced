@@ -559,6 +559,31 @@ async function* _pbpPackReplay(head, it) {
   }
 }
 
+// Stamps "the pack the user had is gone" onto an error escaping past the
+// clear. Two traps, both real:
+//   - THIS CODEBASE'S codes are STRINGS. A native DOMException carries a
+//     legacy NUMERIC `code` (QuotaExceededError 22, NotFoundError 8,
+//     InvalidStateError 11), and _pbpPackTx rejects with tx.error, a
+//     DOMException. Testing `!error.code` therefore skipped exactly the
+//     failure this exists for: a quota blowout mid-batch.
+//   - `code` on DOMException is a getter-only accessor on the prototype, so
+//     plain assignment silently does nothing. defineProperty shadows it with
+//     an own property, which keeps the original object (its name, message and
+//     stack reach the console intact).
+// Only a frozen/sealed error falls through to a wrapper, and that keeps the
+// message and hands the original over as `cause` so nothing is lost.
+function _pbpPackMarkCleared(error) {
+  if (typeof error?.code === "string") return error; // already one of ours
+  try {
+    Object.defineProperty(error, "code",
+      { value: "pack_cleared", writable: true, configurable: true, enumerable: true });
+    if (error.code === "pack_cleared") return error;
+  } catch (_) { /* frozen, sealed, or not an object at all */ }
+  const wrapped = new Error(error?.message || "pack import failed", { cause: error });
+  wrapped.code = "pack_cleared";
+  return wrapped;
+}
+
 // Import: Web Locks serialize writers; the probe gate runs BEFORE any write;
 // then the first tx deletes meta AND clears the store in ONE transaction (old
 // meta gone = half-pack invisible); batched puts; meta {state:"ready"} written
@@ -644,12 +669,10 @@ async function pbpPackImport(lineIter, onProgress, stats) {
       return { entries, malformed };
     } catch (error) {
       // Reached only once the clear has committed. If a ready pack was there,
-      // it is gone now and has to be imported again; `code` is how the UI
-      // knows it may say so. An error that already named itself keeps its own
-      // code, and a first-ever import leaves the error uncoded so the neutral
-      // copy is used.
-      if (error && !error.code && hadPack) error.code = "pack_cleared";
-      throw error;
+      // it is gone now and has to be imported again. A first-ever import had
+      // nothing to lose, so its errors stay as they are and get the neutral
+      // copy.
+      throw hadPack ? _pbpPackMarkCleared(error) : error;
     }
   });
 }
