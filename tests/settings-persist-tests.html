@@ -4211,6 +4211,157 @@ async function run() {
     }
   })();
 
+  // ---------- E13: Chrome Sync cloud-profile hint on a sync-off device ----------
+  await (async () => {
+    const previousChrome = globalThis.chrome;
+    const previousT = globalThis.t;
+    // Every write either area sees during this suite, so the "read-only probe"
+    // claim is checked against behaviour rather than against a code reading.
+    const writes = [];
+    const makeArea = (backing, calls) => ({
+      get: async (keys) => {
+        calls?.gets.push(keys);
+        if (keys === null) return { ...backing };
+        if (typeof keys === "string") return keys in backing ? { [keys]: backing[keys] } : {};
+        const out = Array.isArray(keys) ? {} : { ...(keys || {}) };
+        (Array.isArray(keys) ? keys : Object.keys(keys || {})).forEach((key) => {
+          if (key in backing) out[key] = backing[key];
+        });
+        return out;
+      },
+      set: async (data) => { writes.push(data); Object.assign(backing, data); },
+      remove: async (keys) => { writes.push(keys); },
+    });
+    const listeners = [];
+    let addCalls = 0;
+    const onChanged = {
+      addListener: (fn) => { addCalls += 1; listeners.push(fn); },
+      removeListener: (fn) => {
+        const at = listeners.indexOf(fn);
+        if (at >= 0) listeners.splice(at, 1);
+      },
+    };
+    const makeStatusHost = () => {
+      document.querySelector("#opt-sync-local-only")?.remove();
+      delete _domRefs["opt-sync-local-only"];
+      const host = document.createElement("p");
+      host.id = "opt-sync-local-only";
+      host.hidden = true;
+      document.body.appendChild(host);
+      return host;
+    };
+    // primeSettings has already written every default into the local area on a
+    // real install, so a factory-fresh device is the full key set at default
+    // values. The pasted Pinboard token must not make it look "used": that is
+    // the one thing a second-device user does before wondering where their
+    // settings went.
+    const freshLocal = (extra) => Object.assign({}, SETTINGS_DEFAULTS, {
+      optSyncEnabled: false,
+      pinboardToken: "obf:device-token",
+    }, extra || {});
+
+    try {
+      globalThis.t = (key, value) => key === "syncLocalOnlyStatus" ? `local:${value}` : key;
+
+      const hitCalls = { gets: [], sets: [], removes: [] };
+      globalThis.chrome = {
+        storage: {
+          local: makeArea(freshLocal()),
+          sync: makeArea({ optTheme: "dark" }, hitCalls),
+          onChanged,
+        },
+      };
+      pbpCloudHintRetestArmed = false;
+      let host = makeStatusHost();
+      await pbpRefreshSyncLocalFallbackStatus();
+      await pbpCloudHintProbe;
+      check("E13 a freshly installed sync-off device is told Chrome Sync already holds a profile",
+        !host.hidden && host.textContent === "syncCloudSettingsAvailable");
+      const probeKeys = hitCalls.gets[hitCalls.gets.length - 1];
+      check("E13 the cloud probe reads a bounded key list that asks Chrome Sync for no credential",
+        Array.isArray(probeKeys) && probeKeys.includes("optTheme") &&
+        probeKeys.includes("customOverlayCSS") &&
+        !probeKeys.some((key) => API_KEY_FIELDS.includes(key)));
+      check("E13 a cloud profile found on the first probe arms no retest listener", addCalls === 0);
+
+      const lateSync = {};
+      globalThis.chrome = {
+        storage: {
+          local: makeArea(freshLocal()),
+          sync: makeArea(lateSync),
+          onChanged,
+        },
+      };
+      pbpCloudHintRetestArmed = false;
+      host = makeStatusHost();
+      await pbpRefreshSyncLocalFallbackStatus();
+      await pbpCloudHintProbe;
+      check("E13 an empty Chrome Sync area leaves the status hidden",
+        host.hidden && host.textContent === "");
+      check("E13 an empty Chrome Sync area arms exactly one sync-area retest",
+        addCalls === 1 && listeners.length === 1);
+      const retest = listeners[0];
+      retest({}, "local");
+      await pbpCloudHintProbe;
+      check("E13 a local-area change is not the retest trigger",
+        listeners.length === 1 && host.hidden);
+      lateSync.optTheme = "dark";
+      retest({ optTheme: { newValue: "dark" } }, "sync");
+      await pbpCloudHintProbe;
+      check("E13 the one-shot retest unhides the hint when the cloud payload lands late",
+        !host.hidden && host.textContent === "syncCloudSettingsAvailable");
+      check("E13 the retest removes its own listener and never arms a second one",
+        listeners.length === 0 && addCalls === 1);
+
+      const usedCalls = { gets: [], sets: [], removes: [] };
+      globalThis.chrome = {
+        storage: {
+          local: makeArea(freshLocal({ optTheme: "dark" })),
+          sync: makeArea({ optTheme: "dark" }, usedCalls),
+          onChanged,
+        },
+      };
+      pbpCloudHintRetestArmed = false;
+      host = makeStatusHost();
+      await pbpRefreshSyncLocalFallbackStatus();
+      await pbpCloudHintProbe;
+      check("E13 a device whose own settings are already customised is never told about the cloud",
+        host.hidden && host.textContent === "" &&
+        usedCalls.gets.length === 0 && addCalls === 1);
+
+      const onCalls = { gets: [], sets: [], removes: [] };
+      globalThis.chrome = {
+        storage: {
+          local: makeArea({ optSyncEnabled: true, customOverlayCSS_localFallback: "overlay" }),
+          sync: makeArea({ optTheme: "dark" }, onCalls),
+          onChanged,
+        },
+      };
+      pbpCloudHintRetestArmed = false;
+      host = makeStatusHost();
+      const fields = await pbpRefreshSyncLocalFallbackStatus();
+      check("E13 settings sync ON still reports local-only fallbacks and runs no cloud probe",
+        fields.length === 1 && !host.hidden &&
+        host.textContent.includes("labelCustomCSSOverlay") && onCalls.gets.length === 0);
+
+      check("E13 the whole cloud-hint path writes to no storage area", writes.length === 0);
+
+      const hintMessages = await fetch("../_locales/en/messages.json")
+        .then((response) => response.json());
+      const hintCopy = hintMessages.syncCloudSettingsAvailable?.message || "";
+      check("E13 the cloud-hint copy names Chrome Sync and mentions no credential",
+        /Chrome Sync/.test(hintCopy) &&
+        !/\b(api keys?|credentials?|tokens?|passwords?)\b/i.test(hintCopy));
+    } finally {
+      globalThis.chrome = previousChrome;
+      if (previousT === undefined) delete globalThis.t;
+      else globalThis.t = previousT;
+      pbpCloudHintRetestArmed = false;
+      document.querySelector("#opt-sync-local-only")?.remove();
+      delete _domRefs["opt-sync-local-only"];
+    }
+  })();
+
   const summary = document.createElement("h2");
   summary.id = "summary";
   summary.textContent = `${pass} passed, ${fail} failed`;

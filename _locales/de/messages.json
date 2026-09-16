@@ -1568,6 +1568,9 @@
     "message": "Chrome Sync konnte diese Felder nicht speichern. Sie sind nur auf diesem Gerät verfügbar: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "syncCloudSettingsAvailable": {
+    "message": "In Chrome Sync sind bereits Einstellungen von einem anderen Gerät gespeichert. Aktiviere die Einstellungssynchronisierung, um sie hier zu verwenden."
+  },
   "syncApiKeysDisableConfirm": {
     "message": "Synchronisierung der Zugangsdaten deaktivieren? Dieses Gerät verwendet danach lokale Zugangsdaten und alte Zugangsdaten in Chrome Sync werden gelöscht. Andere Geräte, die noch auf diese Cloud-Zugangsdaten angewiesen sind, funktionieren möglicherweise nicht mehr. Dein Google Drive OAuth-Token bleibt davon unberührt."
   },

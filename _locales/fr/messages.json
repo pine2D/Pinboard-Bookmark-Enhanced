@@ -1568,6 +1568,9 @@
     "message": "Chrome Sync n’a pas pu enregistrer ces champs. Ils sont disponibles uniquement sur cet appareil : $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "syncCloudSettingsAvailable": {
+    "message": "Chrome Sync contient déjà des paramètres provenant d’un autre appareil. Activez la synchronisation des paramètres pour les utiliser ici."
+  },
   "syncApiKeysDisableConfirm": {
     "message": "Désactiver la synchronisation des identifiants ? Cet appareil utilisera alors ses identifiants locaux et les anciens identifiants seront supprimés de Chrome Sync. Les autres appareils qui dépendent encore de ces identifiants dans le cloud risquent de ne plus fonctionner. Le jeton OAuth de Google Drive n’est pas affecté."
   },

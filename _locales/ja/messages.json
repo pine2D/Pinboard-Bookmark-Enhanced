@@ -1568,6 +1568,9 @@
     "message": "次の項目は Chrome Sync に保存できず、このデバイスだけに保存されています：$FIELDS$。",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "syncCloudSettingsAvailable": {
+    "message": "他のデバイスの設定が Chrome Sync に保存されています。このデバイスで使うには、設定の同期をオンにしてください。"
+  },
   "syncApiKeysDisableConfirm": {
     "message": "認証情報の同期を無効にしますか？このデバイスはローカルの認証情報を使用するようになり、Chrome Sync に残っている古い認証情報は削除されます。そのクラウド認証情報を使用している他のデバイスでは、機能しなくなる可能性があります。Google Drive の OAuth トークンには影響しません。"
   },

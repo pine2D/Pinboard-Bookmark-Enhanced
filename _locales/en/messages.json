@@ -1568,6 +1568,9 @@
     "message": "Chrome Sync could not store these fields. They are available only on this device: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "syncCloudSettingsAvailable": {
+    "message": "Chrome Sync already holds settings from another device. Turn on settings sync to use them here."
+  },
   "syncApiKeysDisableConfirm": {
     "message": "Turn off credential sync? This device will use its local credentials, and old credentials in Chrome Sync will be cleared. Other devices that still rely on those cloud credentials may stop working. Your Google Drive OAuth token is not affected."
   },

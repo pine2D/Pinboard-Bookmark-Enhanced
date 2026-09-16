@@ -1568,6 +1568,9 @@
     "message": "Chrome Sync nie mógł zapisać tych pól. Są dostępne tylko na tym urządzeniu: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "syncCloudSettingsAvailable": {
+    "message": "Chrome Sync zawiera już ustawienia z innego urządzenia. Włącz synchronizację ustawień, aby użyć ich na tym urządzeniu."
+  },
   "syncApiKeysDisableConfirm": {
     "message": "Wyłączyć synchronizację danych uwierzytelniających? To urządzenie zacznie używać lokalnych danych uwierzytelniających, a stare dane w Chrome Sync zostaną usunięte. Inne urządzenia, które nadal korzystają z tych danych w chmurze, mogą przestać działać. Nie wpłynie to na token OAuth Dysku Google."
   },
