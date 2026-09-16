@@ -866,6 +866,9 @@
   "resetKeysKept": {
     "message": "（キーは保持）"
   },
+  "resetClearsAuthored": {
+    "message": "このページの手書きの内容（プロンプト、用語集、リスト、カスタム CSS など）も消去されます。"
+  },
   "secPinboardAccount": {
     "message": "Pinboard アカウント"
   },

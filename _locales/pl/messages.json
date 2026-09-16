@@ -866,6 +866,9 @@
   "resetKeysKept": {
     "message": " (klucze zachowane)"
   },
+  "resetClearsAuthored": {
+    "message": " Ręcznie wpisany tekst na tej stronie (prompty, słownik, listy, niestandardowy CSS) również zostanie wyczyszczony."
+  },
   "secPinboardAccount": {
     "message": "Konto Pinboard"
   },

@@ -166,24 +166,80 @@ test("ai def resets opt-ai-tag-lang to en", () => {
   <input type="checkbox" id="opt-tag-sort-by-pop">
 </div>
 <script>
+// opt-tag-sort-by-pop is NOT part of the real appearance def (options.js) --
+// it lives on the tags panel (PANEL_DEFAULTS.tags). This copy used to include
+// it (drift caught by K168's structural check below); TAGS_DEF is the correct
+// home for the reset-to-on assertion.
 const APPEARANCE_DEF = {
   fields: {
     "opt-theme": "auto", "opt-popup-follow-theme": true, "opt-custom-font": "",
-    "opt-custom-css": "", "opt-tag-sort-by-pop": true
+    "opt-custom-css": ""
   }
 };
+const TAGS_DEF = { fields: { "opt-tag-sort-by-pop": true } };
 test("appearance def clears custom-overlay CSS", () => {
   $id("opt-custom-css").value = "body { display:none }";
   applyPanelReset(APPEARANCE_DEF, qsa);
   if ($id("opt-custom-css").value !== "") throw new Error("custom CSS not cleared, got " + JSON.stringify($id("opt-custom-css").value));
 });
-test("appearance def resets tag-sort-by-pop to on", () => {
+test("tags def resets tag-sort-by-pop to on", () => {
   $id("opt-tag-sort-by-pop").checked = false;
-  applyPanelReset(APPEARANCE_DEF, qsa);
+  applyPanelReset(TAGS_DEF, qsa);
   if (!$id("opt-tag-sort-by-pop").checked) throw new Error("tag-sort toggle not reset to on");
 });
 // NOTE: the "shipped PANEL_DEFAULTS coverage" assertion (reading
 // window.__PBP_PANEL_DEFAULTS) belongs to Task C6, which loads the real
 // shipped defaults; it cannot run in this bare page (no options.js context).
+</script>
+
+<!-- ---- K168: reset-authored whitelist must resolve against the real
+     PANEL_DEFAULTS/RESET_AUTHORED_IDS in options.js, not a hand copy (the
+     opt-tag-sort-by-pop drift above is exactly the failure mode this guards
+     against). This page has no options.js execution context (its whole body
+     lives inside a DOMContentLoaded closure that expects the real
+     options.html DOM + chrome APIs), so instead of evaluating the file it
+     fetches the source text and extracts just the two self-contained literal
+     declarations by brace/bracket matching, then evals each literal in
+     isolation. PANEL_DEFAULTS.appearance.after is an uninvoked arrow function
+     referencing applyPreset(), which is fine to eval as long as it is never
+     called. -->
+<script>
+function extractBalanced(source, marker, open, close) {
+  const at = source.indexOf(marker);
+  if (at === -1) throw new Error("could not find `" + marker + "` in options.js");
+  const openIdx = at + marker.length - 1;
+  if (source[openIdx] !== open) throw new Error("`" + marker + "` is not followed by `" + open + "`");
+  let depth = 0;
+  for (let i = openIdx; i < source.length; i++) {
+    if (source[i] === open) depth++;
+    else if (source[i] === close) {
+      depth--;
+      if (depth === 0) return source.slice(openIdx, i + 1);
+    }
+  }
+  throw new Error("unbalanced `" + open + "`/`" + close + "` reading `" + marker + "`");
+}
+
+(async () => {
+  const source = await fetch("../options.js").then((response) => response.text());
+  const panelDefaultsLiteral = extractBalanced(source, "const PANEL_DEFAULTS = {", "{", "}");
+  const authoredIdsLiteral = extractBalanced(source, "const RESET_AUTHORED_IDS = [", "[", "]");
+  test("K168: reset-authored whitelist ids resolve in the real PANEL_DEFAULTS fields/nested", () => {
+    const panelDefaults = new Function("return (" + panelDefaultsLiteral + ")")();
+    const authoredIds = new Function("return (" + authoredIdsLiteral + ")")();
+    if (!Array.isArray(authoredIds) || !authoredIds.length) throw new Error("RESET_AUTHORED_IDS extracted empty");
+    const known = new Set();
+    for (const def of Object.values(panelDefaults)) {
+      Object.keys(def.fields || {}).forEach((id) => known.add(id));
+      Object.values(def.nested || {}).forEach((group) => {
+        Object.keys(group).forEach((id) => known.add(id));
+      });
+    }
+    const missing = authoredIds.filter((id) => !known.has(id));
+    if (missing.length) throw new Error("whitelist id(s) not found in any panel's fields/nested: " + missing.join(", "));
+  });
+})().catch((error) => {
+  fail("K168: reset-authored whitelist ids resolve in the real PANEL_DEFAULTS fields/nested", error && error.message || String(error));
+});
 </script>
 </body></html>

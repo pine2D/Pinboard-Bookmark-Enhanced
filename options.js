@@ -1770,6 +1770,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Test hook (browser test harness; no-op in normal page).
   if (typeof window !== "undefined") window.__PBP_applyPanelReset = applyPanelReset;
 
+  // K168: applyPanelReset walks every id in def.fields/def.nested the same
+  // way, but these seven hold hand-written content with no meaningful
+  // "default" -- prompts, a translation glossary, custom CSS, and the
+  // urlClean/tag-preset lists. Unlike credentials (skip/keepsSecrets above),
+  // these stay in scope: their default really is empty (opt-custom-css reset
+  // is a deliberate fix, 5657506a), and moving them out would fork "reset"
+  // semantics per panel. The confirm dialog just discloses it, the same shape
+  // as keepsSecrets does for credentials.
+  const RESET_AUTHORED_IDS = [
+    "opt-custom-tag-prompt", "opt-custom-summary-prompt",
+    "opt-translate-glossary", "opt-custom-css",
+    "opt-urlclean-custom", "opt-urlclean-exclude",
+    "opt-tag-presets"
+  ];
+  if (typeof window !== "undefined") window.__PBP_RESET_AUTHORED_IDS = RESET_AUTHORED_IDS;
+  // True when `id` is actually reset by this panel's def (fields or a nested
+  // group) -- $id(id) alone isn't enough because every panel's inputs live in
+  // the same DOM, just hidden on inactive tabs.
+  function panelDefHasField(def, id) {
+    if (def.fields && Object.prototype.hasOwnProperty.call(def.fields, id)) return true;
+    if (def.nested) {
+      for (const group of Object.values(def.nested)) {
+        if (Object.prototype.hasOwnProperty.call(group, id)) return true;
+      }
+    }
+    return false;
+  }
+
   $id("reset-panel-btn").addEventListener("click", function () {
     const resetBtn = this;
     const activeBtn = document.querySelector(".tab-btn.active");
@@ -1777,12 +1805,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const panel = activeBtn.dataset.panel;
     const def = PANEL_DEFAULTS[panel];
     if (!def) return;
+    const panelHasAuthoredText = RESET_AUTHORED_IDS.some((id) => {
+      if (!panelDefHasField(def, id)) return false;
+      const el = $id(id);
+      return !!(el && typeof el.value === "string" && el.value.trim() !== "");
+    });
     showConfirmPopover(resetBtn, {
       // Driven by an explicit intent flag, never by whether def.skip exists:
       // that truthiness test lied in both directions -- silent on the one
       // panel that was wiping credentials, and promising "(keys kept)" on a
       // panel that has none.
-      msg: t("resetConfirm", activeBtn.textContent) + (def.keepsSecrets ? t("resetKeysKept") : ""),
+      msg: t("resetConfirm", activeBtn.textContent) + (def.keepsSecrets ? t("resetKeysKept") : "") + (panelHasAuthoredText ? t("resetClearsAuthored") : ""),
       yesText: t("reset"),
       noText: t("cancel"),
       onConfirm: () => {

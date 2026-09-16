@@ -866,6 +866,9 @@
   "resetKeysKept": {
     "message": " (ключи сохранены)"
   },
+  "resetClearsAuthored": {
+    "message": " Написанный вручную текст на этой странице (промпты, глоссарий, списки, пользовательский CSS) тоже будет очищен."
+  },
   "secPinboardAccount": {
     "message": "Аккаунт Pinboard"
   },

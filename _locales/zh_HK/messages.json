@@ -866,6 +866,9 @@
   "resetKeysKept": {
     "message": "（密鑰保留）"
   },
+  "resetClearsAuthored": {
+    "message": "本頁手寫的長文本內容（提示詞、術語表、列表、自訂 CSS 等）也會一併清空。"
+  },
   "secPinboardAccount": {
     "message": "Pinboard 帳戶"
   },

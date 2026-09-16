@@ -866,6 +866,9 @@
   "resetKeysKept": {
     "message": " (Schlüssel beibehalten)"
   },
+  "resetClearsAuthored": {
+    "message": " Handgeschriebene Texte auf dieser Seite (Prompts, Glossar, Listen, eigenes CSS) werden ebenfalls gelöscht."
+  },
   "secPinboardAccount": {
     "message": "Pinboard Konto"
   },

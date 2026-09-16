@@ -866,6 +866,9 @@
   "resetKeysKept": {
     "message": " (keys kept)"
   },
+  "resetClearsAuthored": {
+    "message": " Hand-written text on this page (prompts, glossary, lists, custom CSS) is cleared too."
+  },
   "secPinboardAccount": {
     "message": "Pinboard Account"
   },
