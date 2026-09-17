@@ -1133,15 +1133,6 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
    longer applies to this toggle; full labels ride title/aria. */
 #tr-view-toggle .toggle-btn { display: inline-flex; align-items: center; justify-content: center; }
 #tr-view-toggle .toggle-btn svg { width: 16px; height: 16px; flex: none; }
-/* K156: the rail's lone icon-only settings button, in its own .row right
-   after .view-toggle (not the #rail-bottom-row tray -- see the HTML comment
-   at its call site for why). Base .action-btn's text-button padding
-   (var(--sp-1) var(--sp-3)) is asymmetric for a bare 14px glyph with no
-   label; this borrows the same square geometry .export-fmt .action-btn.icon-
-   only already uses below, scoped to the id instead of that combo class so
-   this one-off standalone button doesn't widen the meaning of "icon-only"
-   for every .action-btn everywhere. */
-#rail-settings-btn { padding: 0 var(--sp-2); height: 26px; justify-content: center; }
 .rail-section { margin-top: var(--sp-1); }
 /* ---- Reader chrome contract (2026-07 Claude Design round 5) ----
    Type scale, 4 tiers shared by rail + ask/skim panels:
@@ -1304,8 +1295,17 @@ body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::befo
 .export-fmt { display: contents; }
 .export-fmt .fmt-name { width: 68px; font-size: 13px; color: var(--fg-secondary); }
 .export-fmt .action-btn { justify-content: center; }
-.export-fmt .action-btn.icon-only { padding: 0 var(--sp-2); height: 26px; justify-content: center; } /* md rung pinned in px */
-.export-fmt .action-btn.icon-only svg { margin: 0; }
+/* .icon-only is the family for any labelless .action-btn, NOT an export-grid
+   local: base .action-btn's text-button padding (var(--sp-1) var(--sp-3)) is
+   asymmetric around a bare 14px glyph. Consumers today are the two download
+   buttons below and the rail's gear (#rail-settings-btn, md-preview.html:50),
+   which is why the selector is unscoped -- the same three declarations were
+   otherwise duplicated verbatim under that id. Dropping `.export-fmt` lowers
+   specificity 0,3,0 -> 0,2,0; the only rule that then ties is
+   `.export-fmt .action-btn { justify-content: center }` directly above --
+   same declaration, declared earlier, so the outcome is unchanged. */
+.action-btn.icon-only { padding: 0 var(--sp-2); height: 26px; justify-content: center; } /* md rung pinned in px */
+.action-btn.icon-only svg { margin: 0; }
 /* Export in flight (md-preview.js's _exporting gate): an embed export spends
    seconds behind a permission prompt and an image-fetch round. Two of the
    three buttons are icon-only and have no label to swap, so the running state
