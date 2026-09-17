@@ -1301,6 +1301,36 @@
       }
     }
   },
+  "testOkWithOverride": {
+    "message": "Connected ($RESULT$) · reader model $MODEL$ answered too",
+    "placeholders": {
+      "result": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "testOverrideFailed": {
+    "message": "Provider OK · reader model $MODEL$ failed: $ERROR$",
+    "placeholders": {
+      "model": {
+        "content": "$1"
+      },
+      "error": {
+        "content": "$2"
+      }
+    }
+  },
+  "connectionOverrideFailed": {
+    "message": "Reader model override failed · $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
   "testTimeout": {
     "message": "Timeout (30s)"
   },

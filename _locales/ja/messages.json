@@ -1301,6 +1301,36 @@
       }
     }
   },
+  "testOkWithOverride": {
+    "message": "接続成功（$RESULT$）· リーダーのモデル $MODEL$ も応答しました",
+    "placeholders": {
+      "result": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "testOverrideFailed": {
+    "message": "プロバイダーは正常 · リーダーのモデル $MODEL$ が失敗しました：$ERROR$",
+    "placeholders": {
+      "model": {
+        "content": "$1"
+      },
+      "error": {
+        "content": "$2"
+      }
+    }
+  },
+  "connectionOverrideFailed": {
+    "message": "リーダーのモデル上書きが失敗 · $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
   "testTimeout": {
     "message": "タイムアウト（30秒）"
   },

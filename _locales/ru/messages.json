@@ -1301,6 +1301,36 @@
       }
     }
   },
+  "testOkWithOverride": {
+    "message": "Подключено ($RESULT$) · модель $MODEL$ для «Чтения» тоже отвечает",
+    "placeholders": {
+      "result": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "testOverrideFailed": {
+    "message": "Провайдер работает · модель $MODEL$ для «Чтения» не ответила: $ERROR$",
+    "placeholders": {
+      "model": {
+        "content": "$1"
+      },
+      "error": {
+        "content": "$2"
+      }
+    }
+  },
+  "connectionOverrideFailed": {
+    "message": "Переопределение модели для «Чтения» не работает · $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
   "testTimeout": {
     "message": "Тайм-аут (30 сек)"
   },

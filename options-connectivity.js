@@ -39,17 +39,33 @@ function setupApiTests() {
   // State lives in classes only. An inline `style.color` outranks every themed
   // rule, so the old hardcoded #888/#080/#c00 stayed put on the dark presets --
   // #c00 measured 1.71:1 on Nord Night. .save-status.pending/.ok/.bad carry the
-  // themed tokens instead; setStatusIcon() owns .ok/.bad, these own .pending.
+  // themed tokens instead; setStatusIcon() owns .ok/.bad, these own .pending
+  // and .warn.
   function setStatusPending(statusEl, text) {
     if (!statusEl) return;
-    statusEl.classList.remove("ok", "bad");
+    statusEl.classList.remove("ok", "bad", "warn");
     statusEl.classList.add("pending");
     statusEl.textContent = text;
   }
   function setStatusResult(statusEl, ok, text) {
     if (!statusEl) return;
-    statusEl.classList.remove("pending");
+    statusEl.classList.remove("pending", "warn");
     setStatusIcon(statusEl, ok, text);
+  }
+  // A third tier beside the two setStatusIcon knows: the target itself answered,
+  // but a setting that depends on it did not (K96 -- the Reader's per-provider
+  // model override). .ok would put a green tick over the word "failed"; .bad
+  // would paint "this API key is broken" over a provider that just replied.
+  // Reuses the --opt-warn role the export targets' .et-test-status.warn already
+  // carries, so no new colour enters the surface.
+  function setStatusWarn(statusEl, text) {
+    if (!statusEl) return;
+    statusEl.classList.remove("pending", "ok", "bad");
+    statusEl.classList.add("warn");
+    const ic = document.createElement("span");
+    ic.className = "status-ic warn";
+    ic.innerHTML = PBP_ICONS.warning;
+    statusEl.replaceChildren(ic, document.createTextNode(" " + (text != null ? String(text) : "")));
   }
 
   // Only a SUCCESSFUL result is wiped by a timer. A failure is the one line the
@@ -70,7 +86,7 @@ function setupApiTests() {
     _testClearTimers.set(key, setTimeout(() => {
       _testClearTimers.delete(key);
       statusEl.textContent = "";
-      statusEl.classList.remove("ok", "bad", "pending");
+      statusEl.classList.remove("ok", "bad", "pending", "warn");
     }, ms));
   }
 
@@ -116,6 +132,46 @@ function setupApiTests() {
 
       try {
         const result = await callAI(cs, "Reply with just the word: OK");
+
+        // Second leg (K96): the Reader's per-provider model override. The call
+        // above used the provider's CONFIGURED model -- the one popup tags and
+        // summaries, background quick-save, Batch and tag governance actually
+        // send -- so it stays the subject of the green light and its request
+        // shape is untouched. The override is an extra request with nothing but
+        // opts.model changed; callAI's four branches all honour opts.model
+        // (md-video.js does the same), so this needs no new machinery.
+        //
+        // Read off the VISIBLE field, not storage: pbpLiveAiSettingsSnapshot
+        // above enumerates 15 providers' key/model/baseUrl and carries no
+        // previewAiModel* key at all, while options.js's updateProviderFields ->
+        // syncPreviewModelToProvider keeps #opt-preview-ai-model holding exactly
+        // the SELECTED provider's entry (and writes that visible value back to
+        // previewAiModelByProvider on submit). Hence the guard: the other
+        // fourteen Test buttons must not borrow a model their provider was
+        // never asked to serve.
+        const ov = $id("opt-ai-provider")?.value === provider
+          ? ($id("opt-preview-ai-model")?.value || "").trim()
+          : "";
+        if (ov) {
+          try {
+            await callAI(cs, "Reply with just the word: OK", { model: ov });
+          } catch (ovErr) {
+            console.warn("[connectivity] reader model override failed:", ovErr?.name, ovErr?.message);
+            const ovTimedOut = ovErr?.name === "AbortError" || ovErr?.name === "TimeoutError";
+            // ok:true on purpose. The provider answered a moment ago, so filing
+            // this as a provider failure would render "this API key is broken"
+            // over a mistyped or retired reader model; the overview reads
+            // override_bad as its own warning row instead.
+            setStatusWarn(statusEl, t("testOverrideFailed", ov,
+              ovTimedOut ? t("testTimeout") : (ovErr?.message || "")));
+            recordHealth(`ai:${provider}`, true, "override_bad");
+            return;
+          }
+          setStatusResult(statusEl, true, t("testOkWithOverride", (result || "OK").substring(0, 20), ov));
+          recordHealth(`ai:${provider}`, true, "connected");
+          scheduleStatusClear(provider, statusEl, 4000);
+          return;
+        }
 
         setStatusResult(statusEl, true, t("testConnected", (result || "OK").substring(0, 20)));
         recordHealth(`ai:${provider}`, true, "connected");

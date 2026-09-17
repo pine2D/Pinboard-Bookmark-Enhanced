@@ -278,8 +278,15 @@ async function renderConnectionOverview() {
       stateKey = "connectionPermissionMissing";
       stateClass = "bad";
     } else if (record) {
-      stateKey = record.ok ? "connectionLastSuccess" : "connectionLastFailure";
-      stateClass = record.ok ? "ok" : "bad";
+      // A provider that answered while its Reader model override did not
+      // (options-connectivity.js records ok:true + "override_bad") is not down:
+      // popup tags and summaries, background quick-save, Batch and tag
+      // governance all still run on its configured model. Its own warning tier
+      // keeps that row from reading "this API key is broken" (K96).
+      const overrideOnly = record.ok && record.code === "override_bad";
+      stateKey = overrideOnly ? "connectionOverrideFailed"
+        : (record.ok ? "connectionLastSuccess" : "connectionLastFailure");
+      stateClass = overrideOnly ? "warn" : (record.ok ? "ok" : "bad");
     }
     const button = document.createElement("button");
     button.type = "button";
@@ -290,7 +297,8 @@ async function renderConnectionOverview() {
     name.textContent = item.name;
     const state = document.createElement("span");
     state.className = `connection-health-state ${stateClass}`;
-    state.textContent = record && (stateKey === "connectionLastSuccess" || stateKey === "connectionLastFailure")
+    state.textContent = record && ["connectionLastSuccess", "connectionLastFailure", "connectionOverrideFailed"]
+      .includes(stateKey)
       ? t(stateKey, _pbpConnectionHealthDate(record.checkedAt)) : t(stateKey);
     button.append(name, state);
     host.appendChild(button);

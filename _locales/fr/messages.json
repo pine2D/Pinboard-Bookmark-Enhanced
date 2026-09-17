@@ -1301,6 +1301,36 @@
       }
     }
   },
+  "testOkWithOverride": {
+    "message": "Connecté ($RESULT$) · le modèle $MODEL$ de la page Lecture répond aussi",
+    "placeholders": {
+      "result": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "testOverrideFailed": {
+    "message": "Le fournisseur fonctionne · échec du modèle $MODEL$ de la page Lecture : $ERROR$",
+    "placeholders": {
+      "model": {
+        "content": "$1"
+      },
+      "error": {
+        "content": "$2"
+      }
+    }
+  },
+  "connectionOverrideFailed": {
+    "message": "Échec du remplacement du modèle de Lecture · $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
   "testTimeout": {
     "message": "Délai dépassé (30 s)"
   },

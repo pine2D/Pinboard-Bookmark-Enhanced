@@ -796,6 +796,10 @@ input[type="checkbox"], input[type="radio"] {
 .save-status.pending { color: var(--opt-fg-hint); }
 .save-status.ok { color: var(--opt-save); }
 .save-status.bad { color: var(--opt-danger); }
+/* Partial success: the target answered, a setting that depends on it did not
+   (options-connectivity.js's setStatusWarn -- the Reader model override). Same
+   --opt-warn role .field-warn and .et-test-status.warn already carry. */
+.save-status.warn { color: var(--opt-warn); }
 .connection-health {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -823,6 +827,7 @@ input[type="checkbox"], input[type="radio"] {
 .connection-health-state { color: var(--opt-fg-hint); font-size: 11px; text-align: right; }
 .connection-health-state.ok { color: var(--opt-save); }
 .connection-health-state.bad { color: var(--opt-danger); }
+.connection-health-state.warn { color: var(--opt-warn); }
 .support-diagnostics > .fg-actions { margin-bottom: 0; }   /* last block of the section; .panel-foot brings its own top margin */
 /* Reserved-for-sync-notices slot: an empty span with no content still opens
    an anonymous block line box in flow, leaving a blank line's worth of gap
@@ -1256,6 +1261,7 @@ html.motion-ready #preset-preview-section > summary::after {
    classes and rendered uncolored without them (the rules lived only in popup.css). */
 .status-ic.ok { color: var(--opt-save); }
 .status-ic.bad { color: var(--opt-danger); }
+.status-ic.warn { color: var(--opt-warn); }
 .key-toggle:hover { color: var(--opt-fg-soft); }
 /* FUSED CONTROL (COMPONENTS.md §8), 19 instances. The field and the reveal
    button are one unit; unlike .vocab-group-unit the shell here is a bare

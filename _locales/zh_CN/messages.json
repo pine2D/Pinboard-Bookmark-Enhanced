@@ -1301,6 +1301,36 @@
       }
     }
   },
+  "testOkWithOverride": {
+    "message": "已连接（$RESULT$）· 阅读器模型 $MODEL$ 也能用",
+    "placeholders": {
+      "result": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "testOverrideFailed": {
+    "message": "服务商正常 · 阅读器模型 $MODEL$ 不可用：$ERROR$",
+    "placeholders": {
+      "model": {
+        "content": "$1"
+      },
+      "error": {
+        "content": "$2"
+      }
+    }
+  },
+  "connectionOverrideFailed": {
+    "message": "阅读器模型覆盖失败 · $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
   "testTimeout": {
     "message": "连接超时（30秒）"
   },

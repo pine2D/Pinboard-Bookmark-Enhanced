@@ -1301,6 +1301,36 @@
       }
     }
   },
+  "testOkWithOverride": {
+    "message": "Verbunden ($RESULT$) · Modell $MODEL$ der Leseansicht antwortet ebenfalls",
+    "placeholders": {
+      "result": {
+        "content": "$1"
+      },
+      "model": {
+        "content": "$2"
+      }
+    }
+  },
+  "testOverrideFailed": {
+    "message": "Anbieter funktioniert · Modell $MODEL$ der Leseansicht fehlgeschlagen: $ERROR$",
+    "placeholders": {
+      "model": {
+        "content": "$1"
+      },
+      "error": {
+        "content": "$2"
+      }
+    }
+  },
+  "connectionOverrideFailed": {
+    "message": "Modell-Überschreibung der Leseansicht fehlgeschlagen · $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
   "testTimeout": {
     "message": "Zeitüberschreitung (30s)"
   },

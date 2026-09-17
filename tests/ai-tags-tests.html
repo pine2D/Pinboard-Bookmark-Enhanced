@@ -1086,6 +1086,96 @@ suite("endpoint origin policy", () => {
       await callAIStream(s, "hi", { model: "gemini-3-pro", maxTokens: 64 }, () => {});
       assertEq("thinkingConfig" in bodies[1].generationConfig, false, "reader path sends no thinking config either way");
     });
+
+    // ---- K96: the provider Test also exercises the Reader's model override ----
+    // The first call keeps sending the provider's CONFIGURED model -- what popup
+    // tags and summaries, background quick-save, Batch and tag governance
+    // actually send -- so it stays the subject of the green light. The Reader's
+    // per-provider override (previewAiModelByProvider) never rode along on any
+    // test, so a mistyped or retired model id there only ever surfaced halfway
+    // through a translation. It is read off the VISIBLE #opt-preview-ai-model
+    // field on purpose: pbpLiveAiSettingsSnapshot carries no previewAiModel* key
+    // at all, and options.js keeps that one field showing exactly the selected
+    // provider's entry.
+    async function runProviderTest({ selected, override, secondFails }) {
+      const fixture = document.createElement("div");
+      fixture.innerHTML = '<button id="test-gemini"></button>' +
+        '<span id="test-gemini-status" class="save-status"></span>' +
+        '<input id="opt-gemini-key" value="live-key" />' +
+        '<select id="opt-ai-provider"><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select>' +
+        '<input id="opt-preview-ai-model" />' +
+        '<input id="opt-pinboard-token" value="user:0123456789abcdef" /><span id="token-format-warn"></span>';
+      document.body.appendChild(fixture);
+      document.getElementById("opt-ai-provider").value = selected;
+      document.getElementById("opt-preview-ai-model").value = override;
+      const calls = [];
+      const health = [];
+      const realCallAI = window.callAI;
+      const realHealth = window.pbpRecordConnectionHealth;
+      window.callAI = async (_settings, prompt, opts) => {
+        calls.push({ prompt, model: opts && opts.model });
+        if (secondFails && calls.length === 2) {
+          throw Object.assign(new Error("no such model: " + (opts && opts.model)), { code: "model_not_found" });
+        }
+        return "OK";
+      };
+      window.pbpRecordConnectionHealth = (id, ok, code) => { health.push({ id, ok, code }); return Promise.resolve(); };
+      window.chrome = {
+        i18n: { getMessage: (key, args) => key + (args ? ":" + [].concat(args).join(":") : "") },
+        permissions: { request: async () => true, contains: async () => true },
+      };
+      try {
+        setupApiTests();
+        document.getElementById("test-gemini").click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const statusEl = document.getElementById("test-gemini-status");
+        return { calls, health, status: statusEl.textContent, tone: statusEl.className };
+      } finally {
+        window.callAI = realCallAI;
+        if (realHealth === undefined) delete window.pbpRecordConnectionHealth;
+        else window.pbpRecordConnectionHealth = realHealth;
+        fixture.remove();
+      }
+    }
+
+    await atest("an empty reader override leaves the provider test at one request", async () => {
+      const run = await runProviderTest({ selected: "gemini", override: "   " });
+      assertEq(run.calls.length, 1, "calls made");
+      assertEq(run.calls[0].model, undefined, "the single call stopped using the provider's configured model");
+      assert(run.status.includes("testConnected"), "status: " + run.status);
+      assertEq(run.health.at(-1).code, "connected", "health code");
+    });
+
+    await atest("a reader override on the selected provider is tested as a second request", async () => {
+      const run = await runProviderTest({ selected: "gemini", override: " reader-only-model " });
+      assertEq(run.calls.length, 2, "calls made");
+      assertEq(run.calls[0].model, undefined, "the first call stopped sending the provider's configured model");
+      assertEq(run.calls[1].model, "reader-only-model", "override model handed to the second call");
+      assertEq(run.calls[1].prompt, run.calls[0].prompt, "the second call changed the request shape, not just the model");
+      assert(run.status.includes("reader-only-model"), "the green light never named the override: " + run.status);
+      assertEq(run.health.at(-1).code, "connected", "health code");
+    });
+
+    await atest("another provider's Test button ignores the visible reader override", async () => {
+      // #opt-preview-ai-model only ever holds the SELECTED provider's entry
+      // (options.js syncPreviewModelToProvider), so testing one of the other
+      // fourteen must not borrow it -- that would report a model this provider
+      // was never asked to serve.
+      const run = await runProviderTest({ selected: "openai", override: "reader-only-model" });
+      assertEq(run.calls.length, 1, "calls made");
+      assert(!run.status.includes("reader-only-model"), "status borrowed another provider's override: " + run.status);
+    });
+
+    await atest("a failing reader override warns without marking the provider down", async () => {
+      const run = await runProviderTest({ selected: "gemini", override: "typo-model", secondFails: true });
+      assertEq(run.calls.length, 2, "calls made");
+      assertEq(run.health.length, 1, "health records written");
+      assertEq(run.health[0].ok, true, "the provider answered, yet the run filed it as down");
+      assertEq(run.health[0].code, "override_bad", "health code");
+      assert(run.status.includes("typo-model"), "status never named the broken override: " + run.status);
+      assert(/(^| )warn( |$)/.test(run.tone) && !/(^| )bad( |$)/.test(run.tone),
+        "the partial failure took the whole-provider error tone: " + run.tone);
+    });
   } finally {
     window.fetch = realFetch;
     window.chrome = realChrome;

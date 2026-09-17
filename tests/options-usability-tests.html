@@ -506,6 +506,35 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(drive && drive.textContent.includes("connectionPermissionMissing"), "stale Drive marker still reads connected");
   });
 
+  // K96: the provider Test now also sends the Reader's model override, and a
+  // failure there records ok:true under its own code. The overview has to read
+  // that as "one setting to fix", not "this API key is broken" -- popup tags,
+  // background quick-save, Batch and tag governance all still work.
+  await test("a reader model override failure is a warning row, not a dead provider", async () => {
+    const realContains = chrome.permissions.contains;
+    const priorHealth = structuredClone(localData._connectionHealthV1);
+    chrome.permissions.contains = async () => true;
+    localData._connectionHealthV1 = Object.assign({}, priorHealth,
+      { "ai:openai": { ok: true, code: "override_bad", checkedAt: 1700000000000 } });
+    try {
+      await renderConnectionOverview();
+      const row = [...document.querySelectorAll(".connection-health-row")]
+        .find((entry) => entry.textContent.includes("OpenAI"));
+      const state = row && row.querySelector(".connection-health-state");
+      assert(state, "the AI row disappeared from the overview");
+      assert(state.classList.contains("warn"),
+        "override_bad did not reach the warning tier: " + state.className);
+      assert(!state.classList.contains("bad") && !state.classList.contains("ok"),
+        "override_bad still reads as a full failure or a clean pass: " + state.className);
+      assert(state.textContent.includes("connectionOverrideFailed"),
+        "the row still claims a plain last-test result: " + state.textContent);
+    } finally {
+      chrome.permissions.contains = realContains;
+      localData._connectionHealthV1 = priorHealth;
+      await renderConnectionOverview();
+    }
+  });
+
   // ---- Reader panel "AI not usable yet" warning (#preview-ai-unavailable) ----
   // Two factors, not one: a key alone is not enough (the provider's origin has
   // to be granted too), and neither matters while the master switch is off.
