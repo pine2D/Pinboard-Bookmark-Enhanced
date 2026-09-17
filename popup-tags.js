@@ -436,6 +436,7 @@ function setupTagsInput() {
     if (from >= 0 && from < currentTags.length - 1) {
       const [moved] = currentTags.splice(from, 1);
       currentTags.push(moved);
+      if (typeof _tagsUserTouched !== "undefined") _tagsUserTouched = true;   // K75: reorder is a user edit too
       renderTags();
     }
   });
@@ -445,6 +446,10 @@ function setupTagsInput() {
   $id("tags-clear-all")?.addEventListener("click", (e) => {
     e.preventDefault();
     currentTags = [];
+    // K75: a one-click destructive edit that bypasses removeTag entirely --
+    // without this, clearing every tag and then clicking a recent bookmark's
+    // pencil discarded the deliberate clear with no confirm.
+    if (typeof _tagsUserTouched !== "undefined") _tagsUserTouched = true;
     renderTags();
   });
   $id("tags-copy-all")?.addEventListener("click", async (e) => {
@@ -613,6 +618,7 @@ function renderTags() {
       if (fromIdx !== null && fromIdx !== toIdx) {
         const [moved] = currentTags.splice(fromIdx, 1);
         currentTags.splice(toIdx, 0, moved);
+        if (typeof _tagsUserTouched !== "undefined") _tagsUserTouched = true;   // K75: reorder is a user edit too
         renderTags();
       }
     });

@@ -2958,6 +2958,67 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(harness.isTouched() === true, "removeTag did not set _tagsUserTouched");
     });
 
+    // The other two user edits of currentTags never reach addTag/removeTag:
+    // "Clear all" assigns [] and the drag-reorder drop handlers splice. Both
+    // live inside DOM handlers rather than standalone functions, so each row
+    // slices the handler's REAL source and runs it against a recording $id /
+    // element stub -- the mutation, the flag and pbpPopupFormIsDirty's verdict
+    // are all genuinely executed, not re-implemented.
+    const CLEAN_FLAGS = Object.freeze(
+      { "title-input": false, "description-input": false, "private-check": false, "readlater-check": false });
+
+    test("K75: Clear all -- a one-click destructive edit -- makes the form dirty", () => {
+      const start = popupTagsSource.indexOf('$id("tags-clear-all")?.addEventListener("click"');
+      const end = popupTagsSource.indexOf('$id("tags-copy-all")', start);
+      assert(start >= 0 && end > start, "tags-clear-all handler source not found");
+      let handler = null;
+      const deps = {
+        $id: (id) => (id === "tags-clear-all"
+          ? { addEventListener: (type, fn) => { if (type === "click") handler = fn; } }
+          : null),
+        renderTags: () => {},
+      };
+      const names = Object.keys(deps);
+      const api = new Function(...names,
+        'let _tagsUserTouched = false;\nlet currentTags = ["alpha", "beta"];\n' +
+        popupTagsSource.slice(start, end) +
+        "\nreturn { isTouched: () => _tagsUserTouched, tags: () => currentTags };"
+      )(...names.map((n) => deps[n]));
+      assert(typeof handler === "function", "setup: the clear-all click handler never registered");
+      assert(api.isTouched() === false, "setup: harness should start untouched");
+      handler({ preventDefault() {} });
+      assert(api.tags().length === 0, "setup: clear-all did not actually clear currentTags");
+      assert(runFormIsDirty({ ...CLEAN_FLAGS }, api.isTouched()) === true,
+        "clearing every tag left the form 'clean', so edit-from-recent discards it with no confirm");
+    });
+
+    test("K75: a drag reorder of the tag chips makes the form dirty", () => {
+      const start = popupTagsSource.indexOf('el.addEventListener("drop", (e) => {');
+      const end = popupTagsSource.indexOf("d.appendChild(el);", start);
+      assert(start >= 0 && end > start, "chip drop handler source not found");
+      let handler = null;
+      const deps = {
+        el: {
+          classList: { add() {}, remove() {} },
+          addEventListener: (type, fn) => { if (type === "drop") handler = fn; },
+        },
+        renderTags: () => {},
+      };
+      const names = Object.keys(deps);
+      const api = new Function(...names,
+        'let _tagsUserTouched = false;\nlet currentTags = ["alpha", "beta", "gamma"];\n' +
+        "let _dragReorderFromIdx = 0;\nconst idx = 2;\n" +
+        popupTagsSource.slice(start, end) +
+        "\nreturn { isTouched: () => _tagsUserTouched, tags: () => currentTags };"
+      )(...names.map((n) => deps[n]));
+      assert(typeof handler === "function", "setup: the chip drop handler never registered");
+      handler({ preventDefault() {} });
+      assert(api.tags().join(",") === "beta,gamma,alpha",
+        "setup: the drop did not actually reorder currentTags, got " + api.tags().join(","));
+      assert(runFormIsDirty({ ...CLEAN_FLAGS }, api.isTouched()) === true,
+        "a deliberate tag reorder was reported clean, so edit-from-recent throws it away silently");
+    });
+
     test("K75: checkExistingBookmark's server-filled tags never touch _tagsUserTouched", () => {
       assert(!lookupSource.includes("_tagsUserTouched"),
         "checkExistingBookmark must not mark tags user-touched -- it fills currentTags from the server, not from a user edit");
