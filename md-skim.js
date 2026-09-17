@@ -436,8 +436,11 @@ async function _pbpSkimRun() {
     if (myGen !== st.gen) return; // superseded by a newer regen mid-stream: drop this result silently
     if (!gotUsage) {
       usage.approx = true;
-      usage.inTok = pbpAiEstimateTokens((built.system + built.prompt).length);
-      usage.outTok = pbpAiEstimateTokens(full.length);
+      // K92: the text entry point, not chars/4 -- this line claims to be the
+      // run's ACTUAL usage and carries no compensating multiplier, so a
+      // Chinese page used to read about 2.5x low. Latin input is unchanged.
+      usage.inTok = pbpAiEstimateTokensText(built.system + built.prompt);
+      usage.outTok = pbpAiEstimateTokensText(full);
     }
     _pbpSkimFinalize(full, usage, ctx.sent);
   } catch (e) {

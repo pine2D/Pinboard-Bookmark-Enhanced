@@ -797,7 +797,10 @@ function _pbpAskUpdateMeta() {
         title: st.title, forum: st.forum
       })
     : { system: "", prompt: "" };
-  const tokens = pbpAiEstimateTokens((_askBuilt.system + _askBuilt.prompt).length);
+  // K92: script-aware, because this line says "will send N tokens" and has no
+  // x3 cushion; a Chinese article used to under-report by about 2.5x. Display
+  // only -- the admission side (sampleFit / PBP_ASK_CTX_BUDGET) is untouched.
+  const tokens = pbpAiEstimateTokensText(_askBuilt.system + _askBuilt.prompt);
   let line = t("askWillSend", String(tokens), _pbpAskProviderLabel(st.s));
   if (st.ctx.sentBlocks < st.ctx.totalBlocks) {
     line += " " + t("askSentPartial", String(st.ctx.sentBlocks), String(st.ctx.totalBlocks));

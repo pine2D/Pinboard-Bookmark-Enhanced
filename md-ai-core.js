@@ -256,6 +256,42 @@ function pbpAiEstimateTokens(chars) {
   return Math.ceil((Number(chars) || 0) / 4);
 }
 
+// ---- Script-aware token estimate (K92) ----
+// pbpAiEstimateTokens above is a Latin calibration: mainstream BPE tokenizers
+// spend roughly one token per 4 Latin chars but only about 1-1.5 chars per
+// token on Han/kana/hangul, so a Chinese page estimated at chars/4 reads about
+// 2.5x low. This entry point takes the TEXT and interpolates linearly between
+// the two ends by the CJK share of the content:
+//   chars/4   at share 0 (pure Latin -- byte-for-byte the old number)
+//   chars/1.5 at share 1 (the conservative end of the measured 1-1.5 band)
+// Same spec as its numeric twin: cost transparency only, never an admission
+// test. The numeric entry point is untouched -- callers that only have a
+// character count (and the four x3-compensated translate quote lines, plus
+// md-video's, whose multiplier already absorbs part of the CJK gap) keep it.
+// Deliberately NOT built on md-translate's pbpTrCjkShare: that one feeds the
+// hallucination conservation gate pbpTrLengthRatioOk, and its documented
+// 3.03-4.49 / 1.72-1.91 / 2.01-2.28 figures are TRANSLATED-LENGTH expansion
+// ratios, not tokens per char -- reusing them here would be a category error.
+function pbpAiEstimateTokensText(text) {
+  const s = String(text == null ? "" : text);
+  // Code points, not UTF-16 units: Han beyond the BMP (ext B at U+20000 and up)
+  // is a surrogate pair, so a .length denominator would halve its measured
+  // share while the u-flagged regex still counts it once.
+  let len = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length) {
+      const d = s.charCodeAt(i + 1);
+      if (d >= 0xdc00 && d <= 0xdfff) i++;
+    }
+    len++;
+  }
+  if (!len) return 0;
+  const m = s.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu);
+  const share = m ? m.length / len : 0;
+  return Math.ceil(len * ((1 - share) / 4 + share / 1.5));
+}
+
 // ---- Markdown placeholder shield (translation format fidelity) ----
 // Replaces untranslatable spans with unique placeholders the prompt orders
 // the model to keep verbatim; pbpAiRestore puts the originals back.

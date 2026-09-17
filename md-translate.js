@@ -1483,15 +1483,21 @@ function _pbpTrRetranslate(st) {
   return _pbpTrStart(st);
 }
 
-// T4: if the provider didn't emit usage for this call, estimate it (chars/4)
-// from the sent shielded text and the received model output, and flag approx.
-// `full` is the raw model output (translate JSON envelope) = the tokens the model
-// actually produced, so full.length/4 is the honest output-token proxy.
-function _pbpTrUsageFallback(st, gotReal, sentChars, full) {
+// T4: if the provider didn't emit usage for this call, estimate it from the
+// sent shielded text and the received model output, and flag approx.
+// `full` is the raw model output (translate JSON envelope) = the tokens the
+// model actually produced, so it is the honest output-token proxy.
+// K92: both sides take the TEXT, not a character count -- this number is shown
+// as "what this run actually cost" with no compensating multiplier (unlike the
+// x3 quote lines), and the plain chars/4 estimate read about 2.5x low on a
+// Chinese source. The output side matters just as much: translating INTO
+// Chinese makes `full` CJK, and pbpAiEstimateTokensText is identical to the old
+// value whenever the text is Latin, so this is a strict generalisation.
+function _pbpTrUsageFallback(st, gotReal, sentText, full) {
   if (!st.usage || gotReal) return;
   st.usage.approx = true;
-  st.usage.inTok += pbpAiEstimateTokens(sentChars);
-  st.usage.outTok += pbpAiEstimateTokens((full || "").length);
+  st.usage.inTok += pbpAiEstimateTokensText(sentText);
+  st.usage.outTok += pbpAiEstimateTokensText(full || "");
 }
 
 // T4: render the run's actual token usage in tr-section (session-only, never
@@ -1886,15 +1892,15 @@ async function _pbpTrStart(st) {
     _pbpTrAddGlossaryHits(st, glossary);
     const { system, prompt } = pbpTrBuildPrompt({ ...baseArgs, glossary, segments });
     const parser = pbpAiMakeStreamJsonParser(onItem);
-    const sentChars = segments.reduce((a, x) => a + x.text.length, 0);
-    const opts = streamOpts(segments.map((x) => x.text).join("\n"));
+    const sentText = segments.map((x) => x.text).join("\n");
+    const opts = streamOpts(sentText);
     opts.system = system;
     const u = { got: false };            // T4: did the provider report real usage for this batch?
     opts.onUsage = (usage) => { u.got = true; st.usage.inTok += usage.inTok; st.usage.outTok += usage.outTok; };
     const key = "tr:" + st.modelKey + ":" + st.target.code + ":" + segments.map((x) => x.id).join(",");
     return getOrCreateInflight(key, () =>
       callAIStream(st.s, prompt, opts, (d, acc) => parser.push(acc))
-    ).then((full) => { _pbpTrUsageFallback(st, u.got, sentChars, full); return parser.finish(full); });
+    ).then((full) => { _pbpTrUsageFallback(st, u.got, sentText, full); return parser.finish(full); });
   };
   const requestSingle = async (seg) => {
     const glossary = pbpTrMatchGlossary(st.glossary, [seg]);
@@ -1907,7 +1913,7 @@ async function _pbpTrStart(st) {
     const u = { got: false };            // T4
     opts.onUsage = (usage) => { u.got = true; st.usage.inTok += usage.inTok; st.usage.outTok += usage.outTok; };
     const full = await callAIStream(st.s, prompt, opts, (d, acc) => parser.push(acc));
-    _pbpTrUsageFallback(st, u.got, seg.text.length, full);
+    _pbpTrUsageFallback(st, u.got, seg.text, full);
     parser.finish(full);
     return got;
   };

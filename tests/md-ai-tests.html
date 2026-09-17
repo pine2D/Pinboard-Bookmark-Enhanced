@@ -527,6 +527,72 @@ suite("pbpAiEstimateTokens", () => {
   });
 });
 
+// ============ K92: pbpAiEstimateTokensText (script-aware estimate) ============
+// Category-level assertions only: the interpolation endpoints (chars/4 Latin,
+// chars/1.5 CJK) are a heuristic, so pinning a concrete ratio would turn any
+// future recalibration into a false failure.
+suite("pbpAiEstimateTokensText", () => {
+  const LATIN60 = "a".repeat(60);
+  const HAN60 = "汉".repeat(60);
+
+  test("same code-point count: CJK estimates strictly more than Latin", () => {
+    assert(pbpAiEstimateTokensText(HAN60) > pbpAiEstimateTokensText(LATIN60),
+      "han " + pbpAiEstimateTokensText(HAN60) + " must exceed latin " + pbpAiEstimateTokensText(LATIN60));
+    assert(pbpAiEstimateTokensText("あ".repeat(60)) > pbpAiEstimateTokensText(LATIN60), "hiragana");
+    assert(pbpAiEstimateTokensText("ア".repeat(60)) > pbpAiEstimateTokensText(LATIN60), "katakana");
+    assert(pbpAiEstimateTokensText("한".repeat(60)) > pbpAiEstimateTokensText(LATIN60), "hangul");
+  });
+
+  test("pure Latin stays identical to the numeric chars/4 entry point", () => {
+    const cases = ["", "a", "abcd", "abcde", LATIN60,
+      "Hello, world! 123 (a test)\n\tsecond line.", "c".repeat(8000)];
+    for (const s of cases) {
+      assertEq(pbpAiEstimateTokensText(s), pbpAiEstimateTokens(s.length), "latin len " + s.length);
+    }
+  });
+
+  test("mixed text sits strictly between the two pure ends", () => {
+    const m = pbpAiEstimateTokensText("a".repeat(30) + "汉".repeat(30));
+    assert(m > pbpAiEstimateTokensText(LATIN60), "mixed " + m + " must exceed pure latin");
+    assert(m < pbpAiEstimateTokensText(HAN60), "mixed " + m + " must stay under pure CJK");
+  });
+
+  test("astral-plane Han counts as one CJK code point, not two units", () => {
+    const astral = String.fromCodePoint(0x20000).repeat(10);   // CJK ext B: surrogate pairs
+    assertEq(astral.length, 20, "fixture really is surrogate pairs");
+    assertEq(pbpAiEstimateTokensText(astral), pbpAiEstimateTokensText("汉".repeat(10)),
+      "astral Han must measure the same as BMP Han of equal code-point count");
+    assert(pbpAiEstimateTokensText(astral) > pbpAiEstimateTokensText("a".repeat(10)),
+      "astral Han must still beat Latin of equal code-point count");
+  });
+
+  // Call-site shape: the three "what this really cost / will really send"
+  // numbers must receive TEXT. Passing a .length would silently fall back to
+  // the Latin calibration with every behavioural assertion above still green.
+  test("translate usage fallback is fed the sent text", () => {
+    const fb = _pbpTrUsageFallback.toString();
+    assert(fb.includes("pbpAiEstimateTokensText("), "fallback must use the text entry point");
+    assert(!fb.includes("pbpAiEstimateTokens("), "fallback must not keep the numeric entry point");
+    const start = _pbpTrStart.toString();
+    assert(start.includes("_pbpTrUsageFallback(st, u.got, sentText, full)"), "batch site must pass text");
+    assert(start.includes("_pbpTrUsageFallback(st, u.got, seg.text, full)"), "single site must pass text");
+  });
+
+  test("skim usage fallback is fed the prompt text", () => {
+    const src = _pbpSkimRun.toString();
+    assert(src.includes("pbpAiEstimateTokensText(built.system + built.prompt)"), "inTok must take text");
+    assert(src.includes("pbpAiEstimateTokensText(full)"), "outTok must take text");
+    assert(!src.includes("pbpAiEstimateTokens("), "no numeric entry point left in the skim fallback");
+  });
+
+  test("ask will-send line is fed the prompt text", () => {
+    const src = _pbpAskUpdateMeta.toString();
+    assert(src.includes("pbpAiEstimateTokensText(_askBuilt.system + _askBuilt.prompt)"),
+      "will-send must take text");
+    assert(!src.includes("pbpAiEstimateTokens("), "no numeric entry point left in the will-send line");
+  });
+});
+
 // ============ Task 3: block indexer + textOf/mdOf ============
 suite("pbpAiIndexBlocks family", () => {
   function makeRoot(html) {
@@ -4419,20 +4485,27 @@ suite("htmlToMarkdown table rule: nested table promotes outer table to HTML pass
 suite("_pbpTrUsageFallback (T4)", () => {
   test("real usage present -> no estimate added, approx stays false", () => {
     const st = { usage: { inTok: 100, outTok: 50, approx: false } };
-    _pbpTrUsageFallback(st, true, 4000, "some output text");
+    _pbpTrUsageFallback(st, true, "x".repeat(4000), "some output text");
     assertEq(st.usage.inTok, 100, "in unchanged");
     assertEq(st.usage.outTok, 50, "out unchanged");
     assertEq(st.usage.approx, false, "not approx");
   });
+  // K92: the third argument is the sent TEXT, not a character count. Latin
+  // input keeps the exact chars/4 numbers this test has always asserted;
+  // a CJK source of the same length must land strictly higher.
   test("no real usage -> chars/4 added for sent + received, approx flagged", () => {
     const st = { usage: { inTok: 0, outTok: 0, approx: false } };
-    _pbpTrUsageFallback(st, false, 4000, "x".repeat(400));
-    assertEq(st.usage.inTok, 1000, "sent 4000 chars -> 1000 est tokens");
-    assertEq(st.usage.outTok, 100, "received 400 chars -> 100 est tokens");
+    _pbpTrUsageFallback(st, false, "x".repeat(4000), "x".repeat(400));
+    assertEq(st.usage.inTok, 1000, "sent 4000 latin chars -> 1000 est tokens");
+    assertEq(st.usage.outTok, 100, "received 400 latin chars -> 100 est tokens");
     assertEq(st.usage.approx, true, "approx flagged");
+    const cjk = { usage: { inTok: 0, outTok: 0, approx: false } };
+    _pbpTrUsageFallback(cjk, false, "\u6c49".repeat(4000), "\u6c49".repeat(400));
+    assert(cjk.usage.inTok > 1000, "same-length CJK source must cost more, got " + cjk.usage.inTok);
+    assert(cjk.usage.outTok > 100, "same-length CJK output must cost more, got " + cjk.usage.outTok);
   });
   test("null st.usage tolerated (no throw)", () => {
-    _pbpTrUsageFallback({ usage: null }, false, 100, "y");
+    _pbpTrUsageFallback({ usage: null }, false, "z".repeat(100), "y");
     assert(true, "no throw");
   });
 });
