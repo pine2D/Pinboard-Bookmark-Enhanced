@@ -493,6 +493,66 @@ function _pbpSearchElFromRangeStart(range) {
   return c.nodeType === Node.TEXT_NODE ? c.parentElement : c;
 }
 
+// K83: the search's candidate grain is `#rendered-view`'s direct children
+// (_pbpSearchVisibleCandidates), so a jump centers the BLOCK, not the hit. A
+// block taller than the viewport -- a 200-line <pre>, a long table, a forum
+// thread md-convert keeps as one nested blockquote -- therefore lands with the
+// actual match still off screen: the counter reads "3 / 12" while nothing
+// highlighted is anywhere on the page. Unlike the Ask / Notebook jumps there is
+// no flash fallback here (the current hit is only the priority-2 CSS Custom
+// Highlight painted above), so the reader is left hunting inside the block.
+// This corrects the block-level landing onto the hit's own rect.
+//
+// Deliberately synchronous, NOT an rAF / scrollend two-phase settle: this path
+// re-runs on every debounced keystroke, and an async settle would re-open the
+// overlapping-scroll regression the `instant` note at the call site records.
+// getBoundingClientRect() forces layout, so the geometry read here is final
+// within the same frame and only one scroll ever happens per jump.
+//
+// Three gates, and every failure is a NO-OP that keeps today's block-level
+// landing rather than guessing an offset:
+//   1. the target must be a direct child of `#rendered-view`, i.e. the window
+//      really is the scroller. The video timeline's candidates (.pbv-text /
+//      .pbv-tr) sit inside `.pbv-list`, which is its own overflow-y scroller
+//      outside video-mode -- window.scrollBy there would move the page instead.
+//   2. only when the block is taller than the viewport. A short block is fully
+//      visible after the block-level scroll already and must stay
+//      pixel-identical to what it did before this existed.
+//   3. a 0x0 rect (no laid-out geometry) or a missing Range (an H6 note hit
+//      whose highlight was never painted) drops the correction.
+// Vertical only: a hit hidden inside `.pb-table-wrap`'s horizontal overflow
+// needs that wrapper's own scroller, which is explicitly out of scope.
+function _pbpSearchCalibrateToHit(el, range) {
+  const view = document.getElementById("rendered-view");
+  if (!el || !range || !view || el.parentElement !== view) return; // gate 1
+  const vh = window.innerHeight;
+  if (!vh) return;
+  // md-preview.css gives every top-level block `content-visibility: auto` with
+  // `contain-intrinsic-size: auto 200px`. While the subtree is skipped the
+  // Range inside it measures 0x0 AND the block itself measures the placeholder
+  // estimate -- both readings would defeat the gates below, and the preceding
+  // scrollIntoView() does not un-skip it synchronously (the relevance flip
+  // rides an intersection update, not the forced layout). So override it
+  // inline for the whole measurement, including the block-height gate, then put
+  // the PREVIOUS inline value back -- restoring to "" would silently drop an
+  // inline override the element already carried.
+  const prevCv = el.style.contentVisibility;
+  el.style.contentVisibility = "visible";
+  try {
+    if (el.getBoundingClientRect().height <= vh) return; // gate 2: short block, nothing to correct
+    const rect = range.getBoundingClientRect();
+    if (!rect.width && !rect.height) return; // gate 3: no geometry -- do not guess an offset
+    const EDGE = 8; // px of breathing room; a hit flush against either edge reads as clipped
+    if (rect.top >= EDGE && rect.bottom <= vh - EDGE) return; // already comfortably in view
+    // Explicit "instant": scrollBy's default `auto` follows CSS scroll-behavior
+    // (deliberately absent today, per md-preview.css), and this correction must
+    // stay welded to the instant contract of the jump it is correcting.
+    window.scrollBy({ top: rect.top - vh / 2 + rect.height / 2, behavior: "instant" });
+  } finally {
+    el.style.contentVisibility = prevCv;
+  }
+}
+
 function _pbpSearchPaintCurrent(jump) {
   const st = _pbpSearchState;
   if (typeof Highlight === "function" && typeof CSS !== "undefined" && "highlights" in CSS) {
@@ -517,6 +577,10 @@ function _pbpSearchPaintCurrent(jump) {
     // overlapping distance-scaled smooth scrolls, leaving the page gliding while
     // the reader is trying to read the hit.
     pbpScrollIntoView(el, { block: "center", behavior: "instant" });
+    // K83: the block is centered; now pull the hit itself into view when the
+    // block is taller than the viewport. A no-op for every short block, and
+    // for every candidate that is not a direct #rendered-view child.
+    _pbpSearchCalibrateToHit(el, st.ranges[st.idx]);
   }
 }
 

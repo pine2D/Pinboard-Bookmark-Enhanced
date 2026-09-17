@@ -6296,6 +6296,178 @@ suiteIf("_pbpSearchOpen (query memory)", "_pbpSearchOpen", () => {
   });
 });
 
+// ============ K83: search jump calibrates onto the hit inside an over-tall block (md-reader.js) ============
+suiteIf("_pbpSearchPaintCurrent (K83 over-tall block calibration)", "_pbpSearchPaintCurrent", () => {
+  const LINE = 40;
+
+  // A real #rendered-view holding real text nodes: the Ranges under test are
+  // the ones _pbpSearchRun itself builds (_pbpAskRangeFromOffsets over the
+  // block's own text), not hand-made stand-ins. Prepended for the same reason
+  // the query-memory suite prepends -- getElementById takes the FIRST match.
+  function mountTall() {
+    const vh = window.innerHeight;
+    const v = document.createElement("div");
+    v.id = "rendered-view";
+    const pre = document.createElement("pre");
+    // A fixed line box times a computed line count makes the block ~3
+    // viewports tall on whatever window size the runner happens to use.
+    pre.style.cssText = "margin:0;padding:0;font-size:20px;line-height:" + LINE + "px;white-space:pre";
+    const rows = Math.ceil((vh * 3) / LINE);
+    const lines = [];
+    for (let i = 0; i < rows; i++) lines.push("filler line " + i);
+    lines[0] = "zetahit head";
+    lines[rows - 1] = "zetahit tail";
+    pre.appendChild(document.createTextNode(lines.join("\n")));
+    // A third hit with no boxes at all, INSIDE the same over-tall block: gate 1
+    // and gate 2 both pass, so only the 0x0-rect gate can stop the correction.
+    // Models an H6 note hit whose highlight was never painted.
+    const ghost = document.createElement("span");
+    ghost.style.display = "none";
+    ghost.textContent = "\nzetahit ghost";
+    pre.appendChild(ghost);
+    const short = document.createElement("p");
+    short.textContent = "zetahit short";
+    v.appendChild(pre);
+    v.appendChild(short);
+    document.body.insertBefore(v, document.body.firstChild);
+    // Scroll room past the fixture so a correction is never clamped by the end
+    // of the document -- otherwise these assertions would depend on how many
+    // result rows the page happens to have rendered by the time this suite runs.
+    const pad = document.createElement("div");
+    pad.style.height = (vh * 4) + "px";
+    document.body.insertBefore(pad, v.nextSibling);
+    return { view: v, pad: pad, pre: pre, short: short };
+  }
+
+  function mountShort() {
+    const v = document.createElement("div");
+    v.id = "rendered-view";
+    v.innerHTML = "<p>zetahit one</p><p>zetahit two</p><p>zetahit three</p>";
+    document.body.insertBefore(v, document.body.firstChild);
+    const pad = document.createElement("div");
+    pad.style.height = (window.innerHeight * 4) + "px";
+    document.body.insertBefore(pad, v.nextSibling);
+    return { view: v, pad: pad };
+  }
+
+  function teardown(f) {
+    try { _pbpSearchTeardown(); } catch (_) {}
+    const pop = document.getElementById("search-pop");
+    if (pop && pop.matches(":popover-open")) pop.hidePopover();
+    if (f) { f.view.remove(); f.pad.remove(); }
+    _pbpSearchLastQuery = "";
+    _pbpSearchLastIdx = 0;
+    window.scrollTo(0, 0);
+  }
+
+  // Runs the real search over the fixture with pbpScrollIntoView replaced by an
+  // exact block:center model (a real scrollIntoView would yank the results page
+  // around) and window.scrollBy both recorded and applied, so the hit's rect can
+  // be re-read afterwards instead of trusting the arithmetic.
+  function drive(f, steps, expectedHits) {
+    const realSiv = window.pbpScrollIntoView;
+    const realBy = window.scrollBy;
+    const bys = [];
+    const lands = [];
+    window.pbpScrollIntoView = function (el) {
+      const r = el.getBoundingClientRect();
+      window.scrollTo({ top: window.scrollY + r.top + r.height / 2 - window.innerHeight / 2, behavior: "instant" });
+      lands.push(window.scrollY);
+    };
+    window.scrollBy = function (o) { bys.push(o); realBy.call(window, o); };
+    try {
+      _pbpSearchLastQuery = "";
+      _pbpSearchLastIdx = 0;
+      _pbpSearchOpen();
+      document.getElementById("search-input").value = "zetahit";
+      _pbpSearchRun("zetahit");
+      assertEq(_pbpSearchState.matches.length, expectedHits, "fixture did not produce the expected hit count");
+      for (let i = 0; i < steps; i++) _pbpSearchStep(1);
+      return { bys: bys, lands: lands };
+    } finally {
+      window.pbpScrollIntoView = realSiv;
+      window.scrollBy = realBy;
+    }
+  }
+
+  function hitRect(idx) {
+    return _pbpSearchState.ranges[idx].getBoundingClientRect();
+  }
+
+  test("a hit at the HEAD of an over-tall block is pulled into the viewport", () => {
+    const f = mountTall();
+    try {
+      assert(f.pre.getBoundingClientRect().height > window.innerHeight, "fixture block is not taller than the viewport");
+      const out = drive(f, 0, 4);
+      assertEq(out.bys.length, 1, "the head hit did not calibrate");
+      assertEq(out.bys[0].behavior, "instant", "the calibration scroll must be explicitly instant");
+      assert(out.bys[0].top < 0, "a head hit sits ABOVE the centred block, so the correction must scroll up (got " + Math.round(out.bys[0].top) + ")");
+      const r = hitRect(0);
+      assert(r.height > 0, "head hit has no geometry to assert on");
+      assert(r.top >= 0 && r.bottom <= window.innerHeight,
+        "head hit still outside the viewport after calibration (top=" + Math.round(r.top) + " bottom=" + Math.round(r.bottom) + " vh=" + window.innerHeight + ")");
+    } finally { teardown(f); }
+  });
+
+  test("a hit at the TAIL of an over-tall block is pulled into the viewport", () => {
+    const f = mountTall();
+    try {
+      const out = drive(f, 1, 4);
+      assertEq(_pbpSearchState.idx, 1, "stepping did not land on the tail hit");
+      assertEq(out.bys.length, 2, "the tail hit did not calibrate");
+      assert(out.bys[1].top > 0, "a tail hit sits BELOW the centred block, so the correction must scroll down (got " + Math.round(out.bys[1].top) + ")");
+      const r = hitRect(1);
+      assert(r.height > 0, "tail hit has no geometry to assert on");
+      assert(r.top >= 0 && r.bottom <= window.innerHeight,
+        "tail hit still outside the viewport after calibration (top=" + Math.round(r.top) + " bottom=" + Math.round(r.bottom) + " vh=" + window.innerHeight + ")");
+    } finally { teardown(f); }
+  });
+
+  test("a hit with a 0x0 rect inside the tall block is a no-op, not a guessed offset", () => {
+    const f = mountTall();
+    try {
+      const out = drive(f, 2, 4);
+      assertEq(_pbpSearchState.idx, 2, "stepping did not land on the box-less hit");
+      const r = hitRect(2);
+      assertEq(r.width, 0, "the ghost hit unexpectedly has a width");
+      assertEq(r.height, 0, "the ghost hit unexpectedly has a height");
+      assertEq(out.bys.length, 2, "a hit with no geometry must not move the viewport");
+    } finally { teardown(f); }
+  });
+
+  test("a hit in a short block never calibrates, even beside an over-tall one", () => {
+    const f = mountTall();
+    try {
+      const out = drive(f, 3, 4);
+      assertEq(_pbpSearchState.matches[3].el, f.short, "stepping did not land on the short block");
+      assert(f.short.getBoundingClientRect().height < window.innerHeight, "the short fixture block is not short");
+      assertEq(out.bys.length, 2, "a short block must keep today's block-level landing");
+    } finally { teardown(f); }
+  });
+
+  test("a page whose blocks are all short lands pixel-identically to the block-level scroll", () => {
+    const f = mountShort();
+    try {
+      const out = drive(f, 2, 3);
+      assertEq(out.bys.length, 0, "the calibration branch fired on a page with no over-tall block");
+      assertEq(window.scrollY, out.lands[out.lands.length - 1], "the final scroll position drifted from the block-level landing");
+    } finally { teardown(f); }
+  });
+
+  test("the block's previous inline content-visibility is restored after the jump", () => {
+    const f = mountTall();
+    try {
+      // The short block carries an inline override of its own: restoring to ""
+      // instead of the previous value would silently strip it.
+      f.short.style.contentVisibility = "auto";
+      const out = drive(f, 3, 4);
+      assertEq(out.bys.length, 2, "the tall-block jumps stopped calibrating");
+      assertEq(f.pre.style.contentVisibility, "", "the forced content-visibility was left on the tall block");
+      assertEq(f.short.style.contentVisibility, "auto", "the short block's own inline content-visibility was clobbered");
+    } finally { teardown(f); }
+  });
+});
+
 // ============ K86: "?" help panel filters dead t/v/a rows by live anchors (md-reader.js) ============
 suiteIf("_pbpKbdHelpFillList (live-anchor filtering)", "_pbpKbdHelpFillList", () => {
   function rowsOf(ul) { return Array.from(ul.querySelectorAll(".kbd-help-row")); }
