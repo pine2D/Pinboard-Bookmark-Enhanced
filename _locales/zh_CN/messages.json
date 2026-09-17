@@ -173,6 +173,9 @@
   "bookmarkSaved": {
     "message": "书签已保存"
   },
+  "tagDraftUnsaved": {
+    "message": "标签框里还有未提交的文字"
+  },
   "savedSuccess": {
     "message": "已保存！"
   },

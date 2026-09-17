@@ -173,6 +173,9 @@
   "bookmarkSaved": {
     "message": "Lesezeichen gespeichert."
   },
+  "tagDraftUnsaved": {
+    "message": "Im Tag-Feld liegt noch ungespeicherter Text."
+  },
   "savedSuccess": {
     "message": "Gespeichert!"
   },

@@ -173,6 +173,9 @@
   "bookmarkSaved": {
     "message": "Signet enregistré."
   },
+  "tagDraftUnsaved": {
+    "message": "Du texte non enregistré reste dans le champ des tags."
+  },
   "savedSuccess": {
     "message": "Enregistré !"
   },

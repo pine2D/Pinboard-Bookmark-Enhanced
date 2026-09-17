@@ -173,6 +173,9 @@
   "bookmarkSaved": {
     "message": "書籤已儲存"
   },
+  "tagDraftUnsaved": {
+    "message": "標籤框裡還有未提交的文字"
+  },
   "savedSuccess": {
     "message": "已儲存！"
   },

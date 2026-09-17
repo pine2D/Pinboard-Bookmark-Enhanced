@@ -173,6 +173,9 @@
   "bookmarkSaved": {
     "message": "Закладка сохранена."
   },
+  "tagDraftUnsaved": {
+    "message": "В поле меток остался несохранённый текст."
+  },
   "savedSuccess": {
     "message": "Сохранено!"
   },

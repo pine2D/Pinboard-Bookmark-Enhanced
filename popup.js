@@ -1374,6 +1374,10 @@ function setupSubmit(token) {
   $id("submit-btn").addEventListener("click", async () => {
     const submitAttempt = ++submitAttemptSeq;
     const ownsSubmitUi = () => submitAttempt === submitAttemptSeq;
+    // Snapshotted here, not re-read in the success branch: save is an await
+    // chain and the user can keep typing in tags-input while it runs. Reading
+    // it late would report a draft that was submitted (or cleared) meanwhile.
+    const tagDraftAtClick = ($id("tags-input")?.value || "").trim();
     const url = $id("url-input").value.trim();
     const reviewedAtClick = bookmarkLookup.status === "found"
       && bookmarkLookup.url === url
@@ -1592,7 +1596,24 @@ function setupSubmit(token) {
             }
           }
         } catch (_) {}
-        if (settings.optAutoCloseAfterSave && formMatchesSubmitted()) {
+        // Tell, don't auto-submit: the draft the user was mid-typing at click
+        // time never made it into currentTags (Enter/Tab/Space/comma are the
+        // only submit gestures). Say so instead of silently dropping it or
+        // guessing whether they meant the literal text or an autocomplete
+        // candidate. Plain text only -- no new class, so this never touches
+        // popup.css or the ui-vocabulary registry.
+        if (tagDraftAtClick) {
+          try {
+            const statusEl = $id("status-msg");
+            if (statusEl) {
+              const tagDraftNote = document.createElement("span");
+              tagDraftNote.textContent = t("tagDraftUnsaved");
+              statusEl.appendChild(document.createTextNode(" · "));
+              statusEl.appendChild(tagDraftNote);
+            }
+          } catch (_) {}
+        }
+        if (settings.optAutoCloseAfterSave && !tagDraftAtClick && formMatchesSubmitted()) {
           const autoCloseGeneration = bookmarkLookup.generation;
           const bar = document.createElement("div");
           bar.className = "auto-close-bar";

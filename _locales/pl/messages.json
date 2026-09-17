@@ -173,6 +173,9 @@
   "bookmarkSaved": {
     "message": "Zakładka zapisana."
   },
+  "tagDraftUnsaved": {
+    "message": "W polu tagów pozostał niezapisany tekst."
+  },
   "savedSuccess": {
     "message": "Zapisano!"
   },

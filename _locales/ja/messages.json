@@ -173,6 +173,9 @@
   "bookmarkSaved": {
     "message": "ブックマークを保存しました。"
   },
+  "tagDraftUnsaved": {
+    "message": "タグ入力欄に未確定のテキストが残っています。"
+  },
   "savedSuccess": {
     "message": "保存しました！"
   },

@@ -173,6 +173,9 @@
   "bookmarkSaved": {
     "message": "Bookmark saved."
   },
+  "tagDraftUnsaved": {
+    "message": "Unsaved tag text left in the box."
+  },
   "savedSuccess": {
     "message": "Saved!"
   },

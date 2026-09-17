@@ -407,6 +407,38 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "a missing host permission still produced an optimistic archive indicator");
     });
 
+    await testAsync("real submit callback tells about a tag draft that was in the box at click", async () => {
+      const harness = createSubmitHarness();
+      harness.elements["tags-input"].value = "Uncommitted";
+      const pending = harness.click();
+      harness.resolveSave({ status: "saved", mutation: "created" });
+      await pending;
+      const noteShown = harness.elements["status-msg"].children.some((child) => child.textContent === "tagDraftUnsaved");
+      assert(noteShown, "a tag draft present at click did not produce the unsaved-draft note");
+      assert(harness.timers.every((timer) => timer.delay !== 1800), "a tag draft at click still scheduled auto-close");
+      assert(harness.closeCalls() === 0, "a tag draft at click closed the Popup");
+    });
+
+    await testAsync("real submit callback stays silent when the tags box was empty at click", async () => {
+      const harness = createSubmitHarness();
+      const pending = harness.click();
+      harness.resolveSave({ status: "saved", mutation: "created" });
+      await pending;
+      const noteShown = harness.elements["status-msg"].children.some((child) => child.textContent === "tagDraftUnsaved");
+      assert(!noteShown, "an empty tags box at click produced the unsaved-draft note");
+      assert(harness.timers.some((timer) => timer.delay === 1800), "an empty tags box at click suppressed the ordinary auto-close");
+    });
+
+    await testAsync("real submit callback ignores tag text typed after the click (draft is snapshotted, not re-read)", async () => {
+      const harness = createSubmitHarness();
+      const pending = harness.click();
+      harness.elements["tags-input"].value = "Uncommitted";
+      harness.resolveSave({ status: "saved", mutation: "created" });
+      await pending;
+      const noteShown = harness.elements["status-msg"].children.some((child) => child.textContent === "tagDraftUnsaved");
+      assert(!noteShown, "tag text typed after the click produced the unsaved-draft note despite the click-time snapshot");
+    });
+
     await testAsync("real submit callback preserves edits made while save is pending", async () => {
       const mutations = [
         ["title", (harness) => { harness.elements["title-input"].value = "Edited title"; }],
