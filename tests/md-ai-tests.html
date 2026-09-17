@@ -10560,6 +10560,33 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
     } finally { f.done(); }
   });
 
+  // The reason _pbpAskCaptureAnchor opens with _pbpAskSettleClear(): a second
+  // toggle inside the 200ms push must REPLACE the armed leg, not stack a
+  // second transitionend listener on the same <main>. Both would then fire on
+  // the one push that actually ends, and the first one's anchor describes a
+  // layout two toggles old. Deleting that call leaves every other row here
+  // green, so this is the one that makes it falsifiable.
+  test("a second toggle before the push ends replaces the armed leg instead of stacking one", () => {
+    const f = setup();
+    try {
+      _pbpAskSetOpen(true);
+      const firstOff = _pbpAskSettleOff;
+      assert(typeof firstOff === "function", "setup: the open armed a transitionend leg");
+      assertEq(f.rec.settles.length, 1, "leg 1 of the open");
+      _pbpAskSetOpen(false);                 // no f.end() in between: the push is still animating
+      assertEq(f.rec.captures, 2, "the close captured its own anchor");
+      assertEq(f.rec.settles.length, 2, "leg 1 of the close");
+      assert(_pbpAskSettleOff !== firstOff && typeof _pbpAskSettleOff === "function",
+        "the close armed a NEW leg (and the open's was torn down, not merely overwritten)");
+      f.end();
+      assertEq(f.rec.settles.length, 3,
+        "exactly ONE leg 2 fires: a stacked listener from the abandoned open would settle a stale anchor too");
+      assertEq(_pbpAskSettleOff, null, "and the surviving leg tore itself down");
+      f.end();
+      assertEq(f.rec.settles.length, 3, "still one-shot after the replacement");
+    } finally { f.done(); }
+  });
+
   test("a transitionend for another property is ignored and does not disarm the leg", () => {
     const f = setup();
     try {
