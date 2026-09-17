@@ -10572,4 +10572,270 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
   });
 });
 </script>
+
+<script>
+// ============ K85: the scroll-spy keeps the active TOC entry inside the rail ============
+// Geometry fixture, not a mock: a real #rail (the id keepTocEntryVisible resolves)
+// with a 100px viewport over 40 x 20px TOC links -- 5 entries visible, 700px of
+// overflow -- parked off-screen so the live pointer can never hover it and the
+// ":hover" guard can never fire by accident. Every case drives the REAL
+// keepTocEntryVisible / setupScrollSpy; what is under test is the "nearest" math
+// and the four guards, so scrollTop is instrumented with a COUNTING accessor:
+// "the rail did not move" is asserted as ZERO WRITES, not as an unchanged value
+// (a `+= 0` or a clamped write would sail straight through the latter).
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "keepTocEntryVisible: the active TOC entry stays inside the rail (K85)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  function ktest(name, fn) { try { fn(); report(name); } catch (e) { report(name, e); } }
+  async function katest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+  const N = 40, ENTRY = 20, RAIL_H = 100;
+  // Kept off the element so the counting accessor below can delegate to the real
+  // implementation instead of shadowing it with a plain data property.
+  const SCROLL_DESC = Object.getOwnPropertyDescriptor(Element.prototype, "scrollTop");
+
+  function setup(opts) {
+    const o = opts || {};
+    // Nothing else on the page may answer to the two ids the function resolves by
+    // id: earlier suites build their own #tr-progress fixtures, and one left behind
+    // would silently switch every case here onto the translation guard's path.
+    const staleRail = document.getElementById("rail");
+    if (staleRail) staleRail.id = "k85-parked-rail";
+    const staleProg = document.getElementById("tr-progress");
+    if (staleProg) staleProg.id = "k85-parked-prog";
+    // Focus is page-global state shared with async cases that are mid-flight on
+    // their own awaits (the Explain focus-restore block asserts activeElement
+    // AFTER a task boundary): this suite borrows it and must hand back exactly
+    // what it took, not merely blur.
+    const prevFocus = document.activeElement;
+
+    const rail = document.createElement("div");
+    rail.id = "rail";
+    rail.style.cssText = "position:fixed; left:-9999px; top:0; width:200px; height:" +
+      RAIL_H + "px; overflow-y:auto; margin:0; padding:0; border:0;";
+    const list = document.createElement("ul");
+    list.style.cssText = "list-style:none; margin:0; padding:0;";
+    const links = [];
+    for (let i = 0; i < N; i++) {
+      const li = document.createElement("li");
+      li.style.cssText = "margin:0; padding:0;";
+      const a = document.createElement("a");
+      a.dataset.slug = "k85-" + i;
+      a.textContent = "heading " + i;
+      a.tabIndex = 0;   // the production links carry href; focusability is what the guard reads
+      a.style.cssText = "display:block; box-sizing:border-box; height:" + ENTRY +
+        "px; line-height:" + ENTRY + "px; margin:0; padding:0; font-size:12px;";
+      li.appendChild(a);
+      list.appendChild(li);
+      links.push(a);
+    }
+    rail.appendChild(list);
+    // Optional filler BELOW the list (so no link's offset moves): production's
+    // rail keeps its other sections when #toc collapses, so the container stays
+    // scrollable. Without it, hiding the list zeroes scrollHeight and the ENGINE
+    // clamps scrollTop to 0 on its own -- which would look exactly like the bug
+    // this suite is guarding against and prove nothing either way.
+    if (o.tail) {
+      const sp = document.createElement("div");
+      sp.style.cssText = "height:900px; margin:0; padding:0;";
+      rail.appendChild(sp);
+    }
+    document.body.appendChild(rail);
+
+    let writes = 0;
+    Object.defineProperty(rail, "scrollTop", {
+      configurable: true,
+      get() { return SCROLL_DESC.get.call(this); },
+      set(v) { writes++; SCROLL_DESC.set.call(this, v); }
+    });
+
+    const undo = [];
+    // Stubbed in EVERY case, not just the narrow one: the runner's window width is
+    // not ours to assume, and a <=1000px window would otherwise park the drawer
+    // guard on and turn the whole suite green for the wrong reason.
+    const savedMM = window.matchMedia;
+    window.matchMedia = function (q) {
+      return {
+        matches: !!o.narrow && /max-width/.test(q), media: q,
+        addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}
+      };
+    };
+    undo.push(() => { window.matchMedia = savedMM; });
+    if (o.zen) {
+      document.body.classList.add("zen");
+      undo.push(() => document.body.classList.remove("zen"));
+    }
+    if (o.progress) {
+      const p = document.createElement("div");
+      p.id = "tr-progress";
+      p.textContent = "translating 12/40";
+      document.body.appendChild(p);
+      undo.push(() => p.remove());
+    }
+    return {
+      rail: rail, list: list, links: links,
+      seed(v) { SCROLL_DESC.set.call(rail, v); },   // bypasses the counter: fixture setup is not a write under test
+      raw() { return SCROLL_DESC.get.call(rail); },
+      writes() { return writes; },
+      activeIndex() { return links.findIndex((a) => a.classList.contains("active")); },
+      done() {
+        while (undo.length) undo.pop()();
+        delete rail.scrollTop;
+        rail.remove();
+        if (staleRail) staleRail.id = "rail";
+        if (staleProg) staleProg.id = "tr-progress";
+        try {
+          if (prevFocus && prevFocus.isConnected && typeof prevFocus.focus === "function") {
+            prevFocus.focus({ preventScroll: true });
+          }
+        } catch (_) {}
+      }
+    };
+  }
+
+  if (typeof window.keepTocEntryVisible !== "function") {
+    report("keepTocEntryVisible is defined in md-preview.js",
+      new Error("md-preview.js exposes no keepTocEntryVisible -- the scroll-spy still only paints .active"));
+  } else {
+    report("keepTocEntryVisible is defined in md-preview.js");
+  }
+
+  ktest("an entry below the rail viewport comes back by EXACTLY its overflow (bottom-aligned, not centred, not topped)", () => {
+    const f = setup();
+    try {
+      f.seed(0);
+      keepTocEntryVisible(f.links[10]);           // content box 200..220, rail viewport 0..100
+      assertEq(f.writes(), 1, "one write");
+      assertEq(f.raw(), 120, "minimal displacement: 220 - 100");
+      const r = f.rail.getBoundingClientRect(), e = f.links[10].getBoundingClientRect();
+      assertEq(Math.round(e.bottom - r.bottom), 0, "the entry's bottom now sits on the rail's bottom edge");
+      assert(e.top >= r.top, "and it did not overshoot past the top");
+    } finally { f.done(); }
+  });
+
+  ktest("an entry above the rail viewport comes back by EXACTLY its overflow (top-aligned)", () => {
+    const f = setup();
+    try {
+      f.seed(400);
+      keepTocEntryVisible(f.links[2]);            // content box 40..60, viewport 400..500
+      assertEq(f.writes(), 1, "one write");
+      assertEq(f.raw(), 40, "minimal displacement: 400 - 360");
+      const r = f.rail.getBoundingClientRect(), e = f.links[2].getBoundingClientRect();
+      assertEq(Math.round(e.top - r.top), 0, "the entry's top now sits on the rail's top edge");
+    } finally { f.done(); }
+  });
+
+  ktest("an entry already inside the rail viewport is left alone (no write at all)", () => {
+    const f = setup();
+    try {
+      f.seed(200);
+      keepTocEntryVisible(f.links[12]);           // content box 240..260, viewport 200..300
+      assertEq(f.writes(), 0, "nothing to correct, so nothing is written");
+      assertEq(f.raw(), 200, "and the reader's own rail position is untouched");
+    } finally { f.done(); }
+  });
+
+  ktest("a collapsed/hidden TOC never yanks the rail to the top (offsetParent guard)", () => {
+    const f = setup({ tail: true });
+    try {
+      f.seed(300);
+      f.list.style.display = "none";              // what .rail-collapsed > *:not(.rail-sec-head) does
+      assertEq(f.links[30].offsetParent, null, "the fixture really is in the collapsed shape");
+      keepTocEntryVisible(f.links[30]);
+      assertEq(f.writes(), 0, "a 0/0/0/0 rect must not be read as 'out of view' and scroll the rail to 0");
+      assertEq(f.raw(), 300, "rail position preserved");
+    } finally { f.done(); }
+  });
+
+  ktest("zen hides the rail with transform + visibility, so nothing is written there", () => {
+    const f = setup({ zen: true });
+    try {
+      f.seed(300);
+      assert(f.links[30].offsetParent !== null, "zen is NOT display:none -- offsetParent alone cannot catch it");
+      keepTocEntryVisible(f.links[30]);
+      assertEq(f.writes(), 0, "an off-canvas rail must not accumulate scroll offsets");
+      assertEq(f.raw(), 300, "rail position preserved");
+    } finally { f.done(); }
+  });
+
+  ktest("the narrow-viewport drawer is off-canvas too, so nothing is written there", () => {
+    const f = setup({ narrow: true });
+    try {
+      f.seed(300);
+      assert(f.links[30].offsetParent !== null, "the drawer is transform + visibility, not display:none");
+      keepTocEntryVisible(f.links[30]);
+      assertEq(f.writes(), 0, "at <=1000px the rail is a drawer: leave its scroll position alone");
+      assertEq(f.raw(), 300, "rail position preserved");
+    } finally { f.done(); }
+  });
+
+  ktest("a running translation parks its progress line in the rail: not one scroll write while it is up", () => {
+    const f = setup({ progress: true });
+    try {
+      f.seed(300);
+      keepTocEntryVisible(f.links[30]);
+      assertEq(f.writes(), 0, "#tr-progress must never be scrolled out from under the reader mid-run");
+      assertEq(f.raw(), 300, "rail position preserved");
+    } finally { f.done(); }
+  });
+
+  ktest("keyboard focus inside the rail hands the scroll position back to the reader", () => {
+    const f = setup();
+    try {
+      f.seed(300);
+      f.links[1].focus({ preventScroll: true });
+      assert(f.rail.contains(document.activeElement), "the fixture really did take focus into the rail");
+      keepTocEntryVisible(f.links[30]);
+      assertEq(f.writes(), 0, "whoever is tabbing through the TOC owns the rail's scroll position");
+      assertEq(f.raw(), 300, "rail position preserved");
+    } finally { f.done(); }
+  });
+
+  await katest("through the real scroll-spy: the first activation moves the rail, a repeat of the SAME slug writes nothing", async () => {
+    const f = setup();
+    const view = document.createElement("div");
+    let dispose = null;
+    try {
+      // top:-300px parks headings 0..32 above runFallback's 28px line (10px each),
+      // so the bottom-up scan lands deterministically on #k85-32 -- entry 32 of 40,
+      // far below a 5-entry rail viewport, i.e. a guaranteed first correction.
+      view.style.cssText = "position:fixed; left:-9999px; top:-300px; width:300px; margin:0; padding:0;";
+      for (let i = 0; i < N; i++) {
+        const hd = document.createElement("h2");
+        hd.id = "k85-" + i;
+        hd.textContent = "heading " + i;
+        hd.style.cssText = "height:10px; line-height:10px; margin:0; padding:0; font-size:8px;";
+        view.appendChild(hd);
+      }
+      document.body.appendChild(view);
+      f.seed(0);
+      dispose = setupScrollSpy(view, f.list);
+      window.dispatchEvent(new Event("scroll"));
+      await nextFrame(); await nextFrame();
+      assertEq(f.activeIndex(), 32, "the scroll fallback activated the entry this fixture is built around");
+      assertEq(f.writes(), 1, "the activation brought the entry back into the rail exactly once");
+      assertEq(f.raw(), 560, "bottom-aligned: 660 - 100");
+      window.dispatchEvent(new Event("scroll"));
+      await nextFrame(); await nextFrame();
+      assertEq(f.writes(), 1, "same slug: setActive early-returns, so no second forced layout and no drift");
+      assertEq(f.raw(), 560, "rail position unchanged on the repeat");
+    } finally {
+      if (dispose) dispose();
+      view.remove();
+      f.done();
+    }
+  });
+})();
+</script>
 </body></html>

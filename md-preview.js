@@ -3759,6 +3759,69 @@ function trOnlyScrollTarget(headEl) {
   return (sib && sib.classList && sib.classList.contains("pb-tr")) ? sib : headEl;
 }
 
+// ---- Keep the active TOC entry inside the rail's viewport ----
+// Deliberately OUTSIDE setupScrollSpy: that function's contract (every top-level
+// exit hands back a callable dispose) is asserted by slice in
+// tests/ui-contract-tests.mjs, and a helper with four early `return;`s does not
+// belong under it.
+//
+// #toc is the rail's LAST section -- ident, badges, the Raw/Rendered switch, the
+// translation section, Ask, export and the Notebook list (whose .hl-list alone
+// may take 40vh) all sit above it -- and .rail is the single scroller for a long
+// TOC by explicit user decision (md-preview.css ~:1312: no inner max-height, two
+// adjacent scrollbars are jarring). So on a 30+ heading article the entry that
+// says "you are here" scrolls out of the rail and the scroll-spy stops paying
+// anything back. This puts it back, by the smallest amount that works.
+//
+// Three shapes this deliberately does NOT have:
+//   - scrollIntoView (even via pbpScrollIntoView): it walks EVERY scrollable
+//     ancestor, so it can take the document -- the reader's place in the article
+//     -- with it. A direct scrollTop write cannot reach past the rail, and being
+//     an instant assignment it is also outside pbpScrollIntoView's
+//     reduced-motion contract entirely.
+//   - offsetTop: the link's offsetParent is .rail today only because no
+//     .rail-section is positioned, and #hl-rail-section (css ~:1401) already
+//     shows that adding `position: relative` to a rail section is routine here.
+//     A rect difference is immune to that; offsetTop would silently re-base.
+//   - a suppression window: a timestamp armed by a rail `scroll` listener would
+//     be armed by THIS function's own scrollTop write (that fires scroll too),
+//     i.e. it self-locks. The pointer/focus test below reads live state at call
+//     time instead and needs no listener, no timer and no teardown.
+function keepTocEntryVisible(a) {
+  const rail = document.getElementById("rail");
+  // Collapsed TOC (`.rail-collapsed > *:not(.rail-sec-head) { display:none }`,
+  // css ~:1442) and a hidden #toc both report a degenerate 0/0/0/0 rect, which
+  // naive math reads as "out of view" -- it would drag the rail back to the top
+  // on every section change while the reader watches. offsetParent is null for
+  // exactly those cases.
+  if (!rail || !a || !a.offsetParent) return;
+  // zen (css ~:413) and the <=1000px drawer (css ~:1474) hide the rail with
+  // transform + visibility, NOT display:none: offsetParent and clientHeight both
+  // survive that, so neither the guard above nor any geometry check catches them.
+  // An off-canvas rail must not accumulate scroll offsets behind the reader's
+  // back, so both states are named explicitly.
+  if (document.body.classList.contains("zen")) return;
+  if (typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 1000px)").matches) return;
+  // A run of the full-text translation parks its progress line in the rail
+  // (md-translate.js builds #tr-progress and unhides it for the run). Scrolling
+  // that out from under the reader mid-run is the single worst regression this
+  // feature can cause, so it simply does not run while the line is up -- the
+  // `hidden` attribute makes offsetParent null, which covers a collapsed or
+  // absent translation section in the same read.
+  const prog = document.getElementById("tr-progress");
+  if (prog && prog.offsetParent) return;
+  // Stateless deference: whoever has the pointer over the rail or the keyboard
+  // focus inside it owns its scroll position until they leave.
+  if (rail.matches(":hover") || rail.contains(document.activeElement)) return;
+  const r = rail.getBoundingClientRect();
+  const e = a.getBoundingClientRect();
+  // block:"nearest" semantics -- the minimum displacement that brings the entry
+  // inside, and nothing at all when it already is.
+  if (e.top < r.top) rail.scrollTop -= (r.top - e.top);
+  else if (e.bottom > r.bottom) rail.scrollTop += (e.bottom - r.bottom);
+}
+
 // ---- Scroll-spy: highlight the TOC entry for the heading nearest the top ----
 // Returns a dispose function that unhooks EVERYTHING this installs (observer,
 // scroll listener, any rAF still in flight). Callers must run it before
@@ -3804,6 +3867,12 @@ function setupScrollSpy(renderedView, tocList) {
       // so nothing else has to clean up.
       a.setAttribute("aria-current", "location");
       activeSlug = slug;
+      // Mark AND keep reachable: the highlight buys nothing once it has scrolled
+      // out of the rail. The `slug === activeSlug` early return at the top of
+      // setActive is what keeps this to one call per section change -- without
+      // it the tr-only scroll fallback (runFallback, once per frame) would force
+      // a rail layout every frame.
+      keepTocEntryVisible(a);
     }
   };
 
