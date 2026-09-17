@@ -2103,18 +2103,34 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   function punctModelOverride(sa) {
     return (typeof pbpAiResolveModelOverride === "function") ? (pbpAiResolveModelOverride(sa) || undefined) : undefined;
   }
+  // Normalise a base URL (trim + strip trailing slashes) before it enters the
+  // cache identity (K37): the same backend reached with/without a trailing
+  // slash or surrounding whitespace was fingerprinting as two different
+  // hosts, so a punctuation pass paid for again on a purely cosmetic base
+  // string. Same normalisation as ai.js's _aiEffectiveEndpointForFp and
+  // md-ai-core.js's pbpAiCacheModelKey.
+  function _pbpVideoNormBase(v) {
+    return String(v || "").trim().replace(/\/+$/, "");
+  }
   function punctModelId(sa) {
     const p = sa.aiProvider || "gemini";
     const override = punctModelOverride(sa);
     if (p === "gemini") return "gemini:" + (override || sa.geminiModel || "default");
     if (p === "claude") return "claude:" + (override || sa.claudeModel || "default");
-    if (p === "ollama") return "ollama:" + (override || sa.ollamaModel || "default") + "@" + (sa.ollamaBaseUrl || "");
+    if (p === "ollama") return "ollama:" + (override || sa.ollamaModel || "default") + "@" + _pbpVideoNormBase(sa.ollamaBaseUrl);
     const cfg = (typeof OPENAI_COMPAT_PROVIDERS === "object" && OPENAI_COMPAT_PROVIDERS[p]) || null;
     const model = override || (cfg && ((cfg.modelField && sa[cfg.modelField]) || cfg.defaultModel)) || "default";
     let base = "";
     try { base = (typeof _openaiCompatBase === "function" && cfg) ? String(_openaiCompatBase(cfg, sa) || "") : ""; } catch (_) {}
-    return p + ":" + model + "@" + base;
+    return p + ":" + model + "@" + _pbpVideoNormBase(base);
   }
+  // Test-only exposure (K37): punctModelId is otherwise closure-scoped inside
+  // this runtime IIFE (only pure top-level functions, e.g. pbpVideoStateBuild,
+  // are reachable from tests/md-video-tests.html) and takes no mutable module
+  // state beyond its `sa` argument, so pinning it directly is safe and avoids
+  // standing up the full pbpVideoInit DOM/tab machinery just to assert a
+  // string-normalisation rule.
+  window.pbpVideoPunctModelId = punctModelId;
   function punctCacheKey(sa) {
     if (!_detectedNow || !sa || typeof pbpAiHash !== "function") return "";
     // _ownerNow is already the non-secret owner scope ("acct_<name>" /

@@ -142,6 +142,22 @@ suite("aiCacheFingerprint (A5)", () => {
     assertEq(aiCacheFingerprint(gem, "tags"), aiCacheFingerprint({ ...gem, openaiBaseUrl: "x" }, "tags"),
       "fixed-endpoint provider ignores foreign base fields");
   });
+  test("endpoint normalisation: equivalent bases collapse to the same fp (K37)", () => {
+    const withSlash = { aiProvider: "openai", openaiModel: "m", openaiBaseUrl: "https://x.test/v1/" };
+    const noSlash = { aiProvider: "openai", openaiModel: "m", openaiBaseUrl: "https://x.test/v1" };
+    assertEq(aiCacheFingerprint(withSlash, "tags"), aiCacheFingerprint(noSlash, "tags"),
+      "trailing slash must not fork the fp - same backend, request path already strips it");
+    const padded = { aiProvider: "openai", openaiModel: "m", openaiBaseUrl: "  https://x.test/v1  " };
+    assertEq(aiCacheFingerprint(padded, "tags"), aiCacheFingerprint(noSlash, "tags"),
+      "surrounding whitespace must not fork the fp either");
+    const v2 = { aiProvider: "openai", openaiModel: "m", openaiBaseUrl: "https://x.test/v2" };
+    assert(aiCacheFingerprint(noSlash, "tags") !== aiCacheFingerprint(v2, "tags"),
+      "guard: a genuinely different base must still fork the fp");
+    const ollWithSlash = { aiProvider: "ollama", ollamaBaseUrl: "http://localhost:11434/" };
+    const ollNoSlash = { aiProvider: "ollama", ollamaBaseUrl: "http://localhost:11434" };
+    assertEq(aiCacheFingerprint(ollWithSlash, "tags"), aiCacheFingerprint(ollNoSlash, "tags"),
+      "ollama base trailing slash must not fork the fp");
+  });
   test("punctuated tech tags match via the shared tokenizer (r2 L8)", () => {
     assertEq(pbpRelevantTagsFirst(["python", "c++"], "The C++ guide", "https://x.test/")[0], "c++", "c++ promoted");
     assertEq(pbpRelevantTagsFirst(["cooking", "node.js"], "Node.js streams", "https://x.test/")[0], "node.js", "node.js promoted");

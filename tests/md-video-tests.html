@@ -12,6 +12,7 @@ h2 { margin-top: 24px; }
 <div id="results"></div>
 
 <script src="../shared.js"></script>
+<script src="../ai.js"></script>
 <script src="../md-video.js"></script>
 <script>
 const root = document.getElementById("results");
@@ -151,6 +152,23 @@ section("punctuation enhancement");
   assertEq(hq[0].content, "他说“好。”", "heuristic: quote-closed sentence gets no second mark");
   const hq2 = pbpVideoHeuristicPunctuate([{ from: 0, to: 2, content: "你说对吗”" }, { from: 2, to: 4, content: "其实很简单" }]);
   assertEq(hq2[0].content, "你说对吗”？", "heuristic: interrogative inside a closing quote still gets its question mark");
+})();
+
+// K37: punctModelId (the vpunct_ cache identity's model+endpoint half) is
+// closure-scoped inside md-video.js's runtime IIFE, so it is exposed test-only
+// as window.pbpVideoPunctModelId right next to its definition (see md-video.js
+// comment there) -- it takes no mutable module state beyond its settings
+// argument, so pinning it directly here is safe.
+section("punctModelId endpoint normalisation (K37)");
+(() => {
+  const compatSlash = { aiProvider: "openai", openaiModel: "m", openaiBaseUrl: "https://x.test/v1/" };
+  const compatNoSlash = { aiProvider: "openai", openaiModel: "m", openaiBaseUrl: "https://x.test/v1" };
+  assertEq(pbpVideoPunctModelId(compatSlash), pbpVideoPunctModelId(compatNoSlash),
+    "compat: trailing slash on the base URL must not fork the vpunct_ cache identity");
+  const ollSlash = { aiProvider: "ollama", ollamaBaseUrl: "http://localhost:11434/" };
+  const ollNoSlash = { aiProvider: "ollama", ollamaBaseUrl: "http://localhost:11434" };
+  assertEq(pbpVideoPunctModelId(ollSlash), pbpVideoPunctModelId(ollNoSlash),
+    "ollama: trailing slash on the base URL must not fork the vpunct_ cache identity");
 })();
 
 section("pbpVideoApplyPunctText");

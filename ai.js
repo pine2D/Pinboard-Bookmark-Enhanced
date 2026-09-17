@@ -1404,11 +1404,28 @@ function _aiEffectiveModelForFp(s) {
 // that ignores it kept serving the old backend's results.
 function _aiEffectiveEndpointForFp(s) {
   const p = s.aiProvider || "gemini";
-  if (p === "ollama") return s.ollamaBaseUrl || "http://localhost:11434";
-  const cfg = OPENAI_COMPAT_PROVIDERS[p];
-  return cfg ? _openaiCompatBase(cfg, s) : "";
+  const raw = (p === "ollama")
+    ? (s.ollamaBaseUrl || "http://localhost:11434")
+    : (OPENAI_COMPAT_PROVIDERS[p] ? _openaiCompatBase(OPENAI_COMPAT_PROVIDERS[p], s) : "");
+  // Normalise (trim + strip trailing slashes) so an equivalent base -
+  // "https://api.openai.com/v1" vs ".../v1/" - fingerprints identically
+  // (K37): the request path already collapses both to the same URL
+  // (see the .replace(/\/+$/, "") calls around L457/478/844), so treating
+  // them as different backends was a pure cache-key artifact, not a real
+  // endpoint change.
+  return String(raw || "").trim().replace(/\/+$/, "");
 }
 
+// This fingerprint hashes the endpoint UNCONDITIONALLY (even when it equals
+// the provider's built-in base), unlike the reader's md-ai-core.js
+// pbpAiCacheModelKey, which only folds the endpoint in when it DEVIATES from
+// the built-in base. That is an intentional key-shape difference (audit
+// #33/K37), not a fork to "fix": the reader's deviation-only form was chosen
+// so default-configuration users don't orphan their stored per-article
+// caches, while the popup's unconditional form is the simpler/safer default
+// here. Both sides now normalise the endpoint string the same way (K37)
+// before it enters the fingerprint - that's the only change worth pulling
+// across; the "when to include it at all" logic stays forked on purpose.
 function aiCacheFingerprint(s, type) {
   if (!s) return "";
   if (type === "combined") {
