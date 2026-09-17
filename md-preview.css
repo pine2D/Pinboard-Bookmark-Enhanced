@@ -2313,32 +2313,36 @@ html.motion-ready .xp-gear-menu[hidden] {
    (the .send-tri idiom at :1643); it does not preserve the author color the
    way it does on a real DOM element -- the background disappears outright
    instead -- so text-decoration is the only lever left (::highlight()
-   supports the family, per ::highlight(pbp-vocab-echo) above). Overlap
-   still resolves winner-take-all, not merged: per the priority comment at
-   :2267 (search=1 / current=2 / flash=3 / user hl=0 / vocab-echo=-1), the
-   CSS Custom Highlight spec paints only the highest-priority highlight's
-   full style for an overlapping run, not a union of every contributing
-   highlight's declarations. Device-emulated (Chromium 147/playwright-core
-   1.59.1, forced-colors CDP emulation, K115 evidence run): a
-   search-current hit with NO overlapping colour highlight painted no
-   decoration at all -- text-decoration-line: overline did not render on
-   ::highlight() in isolation in that build -- while a search-current hit
-   INSIDE a pbp-hl-* highlight painted a plain solid underline (the
-   overlapping run's line union with the highlight's own underline, styled
-   solid rather than the highlight's own double/wavy/dashed). So the
-   current hit is not reliably marked by the overline this rule declares in
-   every browser; it still gets a brighter/more opaque background than a
-   plain hl or plain search match (pbp-search-current's alpha token is the
-   highest of the three), which is the one signal that held up across both
-   cases in this test run. Re-verify on a real Windows High Contrast theme
-   before relying on the overline alone. */
+   supports the family, per ::highlight(pbp-vocab-echo) above).
+
+   Overlap resolves per PROPERTY, not per highlight's full style (device-
+   emulated, Chromium 147/playwright-core 1.59.1, two K115 evidence runs).
+   text-decoration-style and text-decoration-thickness each independently
+   take the highest-priority overlapping highlight's own value (priority:
+   search=1/current=2/flash=3/user hl=0/vocab-echo=-1, :2267) -- so on an
+   overlap the winning THICKNESS can come from a highlight that isn't the
+   one whose style also won. A text-decoration-line keyword declared only
+   by the lower-priority highlight is dropped outright, not painted under
+   the higher one's line. And under forced colors ::highlight() paints
+   `underline` only: `overline`, `line-through` and `text-underline-offset`
+   are all neutralized there (the same properties paint fine on a real DOM
+   element, so this is a ::highlight()-pseudo quirk, not a general forced-
+   colors rule). Any background-brightness difference that still shows
+   between highlights (e.g. pbp-search-current vs a plain pbp-hl-*) is an
+   incidental alpha leftover, not a designed signal. Re-verify on a real
+   Windows High Contrast theme -- everything above is emulated. */
 @media (forced-colors: active) {
-  /* overline is unused anywhere else in this file (grepped) and sits on the
-     opposite edge from every underline below, so the current hit stays
-     visually disjoint from the classification marks it can overlap. */
+  /* Underline is the only line type forced colors lets ::highlight() paint
+     (see above), so search-current can't set itself apart with overline.
+     Style is spoken for too: solid/double/wavy/dashed cover hl-1..4,
+     dotted is vocab-echo's (:2287), and hl-5 below already reuses solid at
+     3px. Thickness is the one free axis left -- 5px, bigger than hl-5's
+     3px, so PER-PROPERTY overlap resolution (see above) makes the thicker
+     value win even inside hl-5, the worst-case overlap. */
   ::highlight(pbp-search-current) {
-    text-decoration-line: overline;
-    text-decoration-thickness: 2px;
+    text-decoration-line: underline;
+    text-decoration-style: solid;
+    text-decoration-thickness: 5px;
   }
   /* Five-way classification via line style; dotted is vocab-echo's (:2287)
      so it is excluded here. Colors 1-4 get distinct styles; 5 reuses solid
@@ -2348,13 +2352,16 @@ html.motion-ready .xp-gear-menu[hidden] {
   ::highlight(pbp-hl-3) { text-decoration-line: underline; text-decoration-style: wavy; }
   ::highlight(pbp-hl-4) { text-decoration-line: underline; text-decoration-style: dashed; }
   ::highlight(pbp-hl-5) { text-decoration-line: underline; text-decoration-style: solid; text-decoration-thickness: 3px; }
-  /* Highlight-card / Notebook-panel color dots (:3070, :3201): real DOM
-     elements, so forced-color-adjust:none behaves as documented (unlike the
-     ::highlight() rules above) and keeps their hue as the only classifier
-     those two lists carry -- card dots are unlabeled swatches and item dots
-     are explicitly aria-hidden (md-highlight.js). Same idiom as .send-tri
-     at :1643. */
+  /* Highlight-card / Notebook-panel-filter / Notebook-panel-list color dots
+     (:3134, :3222, :3265): real DOM elements, so forced-color-adjust:none
+     behaves as documented (unlike the ::highlight() rules above) and keeps
+     their hue as the only classifier those three lists carry -- filter
+     dots are real <button>s with their own title/aria-label
+     (md-highlight.js:2417-2432), card dots are unlabeled swatches, and
+     item dots are explicitly aria-hidden. Same idiom as .send-tri at
+     :1643. */
   .hl-card-dot-1, .hl-card-dot-2, .hl-card-dot-3, .hl-card-dot-4, .hl-card-dot-5,
+  .hl-filter-dot-1, .hl-filter-dot-2, .hl-filter-dot-3, .hl-filter-dot-4, .hl-filter-dot-5,
   .hl-item-dot-1, .hl-item-dot-2, .hl-item-dot-3, .hl-item-dot-4, .hl-item-dot-5 {
     forced-color-adjust: none;
   }
