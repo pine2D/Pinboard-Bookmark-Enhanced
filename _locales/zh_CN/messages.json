@@ -79,6 +79,9 @@
   "kbdAltTagHint": {
     "message": "Alt+1–9 添加"
   },
+  "kbdAltCheckHint": {
+    "message": "Alt+P/R/A 切换"
+  },
   "lastUsedTagsLabel": {
     "message": "上次："
   },

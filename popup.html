@@ -102,9 +102,10 @@
         <button type="button" id="ai-error-dismiss" class="fc-dismiss" title="" data-i18n-title="aiErrorDismiss" data-i18n-aria="aiErrorDismiss">×</button>
       </div>
       <div class="bottom-bar">
-        <label><input type="checkbox" id="private-check" /> <span data-i18n="private">private</span></label>
-        <label><input type="checkbox" id="readlater-check" /> <span data-i18n="readLater">read later</span></label>
-        <label><input type="checkbox" id="archive-check" /> <span data-i18n="archiveThisSave">archive</span></label>
+        <label><input type="checkbox" id="private-check" aria-keyshortcuts="Alt+P" /> <span data-i18n="private">private</span></label>
+        <label><input type="checkbox" id="readlater-check" aria-keyshortcuts="Alt+R" /> <span data-i18n="readLater">read later</span></label>
+        <label><input type="checkbox" id="archive-check" aria-keyshortcuts="Alt+A" /> <span data-i18n="archiveThisSave">archive</span></label>
+        <span id="bottom-kb-hint" class="kb-hint" data-i18n="kbdAltCheckHint"></span>
       </div>
       <div class="submit-bar">
         <button id="submit-btn" class="btn" data-i18n="submit">Save</button>

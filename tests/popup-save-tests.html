@@ -3234,6 +3234,163 @@ test("posts/add default remains replace=yes for existing callers", () => {
         harness.cleanup();
       }
     });
+
+    // ===================== K72: Alt+P/R/A (甲) and the chip toolbars (乙) =====================
+    // Both routes run the SHIPPED source, sliced out of popup.js / popup-tags.js
+    // and executed against real DOM nodes: focus order, focus(), disabled and
+    // the browser's own focusin/keydown dispatch are exactly what the popup
+    // gets, not a re-implementation that can agree with itself while the
+    // shipped file drifts.
+
+    const altHotkeyStart = source.indexOf("const PBP_ALT_CHECKBOX_CODES =");
+    assert(altHotkeyStart >= 0, "popup.js: the Alt hotkey table (PBP_ALT_CHECKBOX_CODES) was not found");
+    const altHotkeySource = source.slice(altHotkeyStart);
+
+    function createAltHotkeyHarness(mainClasses = []) {
+      const host = document.createElement("div");
+      host.id = "main-section";
+      mainClasses.forEach((c) => host.classList.add(c));
+      const boxes = {};
+      ["private-check", "readlater-check", "archive-check"].forEach((id) => {
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.id = id;
+        host.appendChild(cb);
+        boxes[id] = cb;
+      });
+      document.body.appendChild(host);
+      const changes = [];
+      // The real archive handler is an async change listener that flips
+      // _archiveUserTouched on its FIRST line: what matters for this contract
+      // is that a change event reaches it at all, which a `.checked = !checked`
+      // shortcut would never have produced.
+      let archiveUserTouched = false;
+      Object.entries(boxes).forEach(([id, cb]) => {
+        cb.addEventListener("change", () => {
+          changes.push(id);
+          if (id === "archive-check") archiveUserTouched = true;
+        });
+      });
+      const byId = { "main-section": host, ...boxes };
+      let handler = null;
+      const documentStub = {
+        addEventListener: (type, fn) => { if (type === "keydown") handler = fn; },
+        querySelector: (sel) => host.querySelector(sel),
+      };
+      new Function("document", "$id", altHotkeySource)(documentStub, (id) => byId[id] || null);
+      assert(handler, "the sliced Alt hotkey listener never registered a keydown handler");
+      return {
+        boxes, changes, host,
+        isArchiveTouched: () => archiveUserTouched,
+        press(init) {
+          let prevented = false;
+          handler({
+            altKey: true, ctrlKey: false, metaKey: false, shiftKey: false, repeat: false,
+            key: "", code: "", ...init, preventDefault() { prevented = true; },
+          });
+          return prevented;
+        },
+        cleanup: () => host.remove(),
+      };
+    }
+
+    test("K72 甲: Alt+P toggles #private-check through the click path (a change event really fires)", () => {
+      const h = createAltHotkeyHarness();
+      try {
+        assert(h.boxes["private-check"].checked === false, "setup: private-check should start unchecked");
+        const prevented = h.press({ key: "p", code: "KeyP" });
+        assert(h.boxes["private-check"].checked === true, "Alt+P did not check #private-check");
+        assert(h.changes.join(",") === "private-check",
+          "Alt+P did not route through the click path -- no change event reached the checkbox's own listener");
+        assert(prevented === true, "Alt+P did not preventDefault");
+        h.press({ key: "p", code: "KeyP" });
+        assert(h.boxes["private-check"].checked === false, "a second Alt+P did not toggle back off");
+      } finally { h.cleanup(); }
+    });
+
+    test("K72 甲: Alt+R toggles #readlater-check and leaves the other two boxes alone", () => {
+      const h = createAltHotkeyHarness();
+      try {
+        h.press({ key: "r", code: "KeyR" });
+        assert(h.boxes["readlater-check"].checked === true, "Alt+R did not check #readlater-check");
+        assert(h.boxes["private-check"].checked === false && h.boxes["archive-check"].checked === false,
+          "Alt+R moved a checkbox it does not own");
+        assert(h.changes.join(",") === "readlater-check", "Alt+R did not fire exactly one change event");
+      } finally { h.cleanup(); }
+    });
+
+    test("K72 甲: Alt+A toggles #archive-check through the click path, so the _archiveUserTouched listener runs", () => {
+      const h = createAltHotkeyHarness();
+      try {
+        assert(h.isArchiveTouched() === false, "setup: archive should start untouched");
+        h.press({ key: "a", code: "KeyA" });
+        assert(h.boxes["archive-check"].checked === true, "Alt+A did not check #archive-check");
+        assert(h.isArchiveTouched() === true,
+          "Alt+A bypassed the change handler -- _archiveUserTouched would never flip, so the Wayback auto-decision would silently overwrite the user's choice");
+      } finally { h.cleanup(); }
+    });
+
+    test("K72 甲: e.code carries the shortcut when e.key is a composed character (macOS Alt+letter)", () => {
+      const h = createAltHotkeyHarness();
+      try {
+        // Real macOS: Alt+P emits e.key === "π". Keying off e.key alone
+        // would have shipped a shortcut that is dead on every Mac.
+        h.press({ key: "π", code: "KeyP" });
+        assert(h.boxes["private-check"].checked === true, "Alt+P via e.code did not reach #private-check");
+      } finally { h.cleanup(); }
+    });
+
+    test("K72 甲: a hidden or unsupported-URL #main-section swallows the shortcut", () => {
+      for (const cls of ["hidden", "unsupported-url"]) {
+        const h = createAltHotkeyHarness([cls]);
+        try {
+          h.press({ key: "p", code: "KeyP" });
+          assert(h.boxes["private-check"].checked === false,
+            `Alt+P toggled an invisible checkbox with #main-section.${cls} -- a control the user cannot see must not be reachable`);
+        } finally { h.cleanup(); }
+      }
+    });
+
+    test("K72 甲: Alt+Shift+P, Ctrl+Alt+P and an auto-repeat are all ignored", () => {
+      const h = createAltHotkeyHarness();
+      try {
+        h.press({ key: "p", code: "KeyP", shiftKey: true });
+        h.press({ key: "p", code: "KeyP", ctrlKey: true });
+        h.press({ key: "p", code: "KeyP", metaKey: true });
+        h.press({ key: "p", code: "KeyP", repeat: true });
+        assert(h.boxes["private-check"].checked === false,
+          "a modified or auto-repeated Alt+P still toggled the checkbox");
+      } finally { h.cleanup(); }
+    });
+
+    test("K72 甲: Alt+1-9 still routes to the badged chip (the new letters share one listener)", () => {
+      const h = createAltHotkeyHarness();
+      try {
+        const chip = document.createElement("button");
+        chip.className = "stag";
+        chip.dataset.altNum = "3";
+        let clicks = 0;
+        chip.addEventListener("click", () => { clicks++; });
+        h.host.appendChild(chip);
+        h.press({ key: "3", code: "Digit3" });
+        assert(clicks === 1, "Alt+3 no longer clicks the chip wearing badge 3");
+        assert(h.changes.length === 0, "Alt+3 leaked into the checkbox branch");
+      } finally { h.cleanup(); }
+    });
+
+    test("K72 甲: popup.html declares aria-keyshortcuts on all three checkboxes and shows a localized .kb-hint", () => {
+      for (const [id, keys] of [["private-check", "Alt+P"], ["readlater-check", "Alt+R"], ["archive-check", "Alt+A"]]) {
+        const tag = (popupHtml.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`)) || [])[0] || "";
+        assert(tag, `popup.html: #${id} markup not found`);
+        assert(tag.includes(`aria-keyshortcuts="${keys}"`),
+          `popup.html: #${id} does not announce ${keys} via aria-keyshortcuts`);
+      }
+      assert(/class="kb-hint"[^>]*data-i18n="kbdAltCheckHint"|data-i18n="kbdAltCheckHint"[^>]*class="kb-hint"/.test(popupHtml),
+        "popup.html: the Alt+P/R/A hint does not ride the existing .kb-hint family with a data-i18n key");
+      assert(typeof enMessages.kbdAltCheckHint?.message === "string" && enMessages.kbdAltCheckHint.message.includes("Alt+"),
+        "_locales/en: kbdAltCheckHint is missing or does not name the keys");
+    });
+
   } catch (error) {
     test("popup submit source contracts load", () => { throw error; });
   }

@@ -1642,6 +1642,27 @@ check(/btn\.tabIndex = btn\.classList\.contains\("active"\) \? 0 : -1;/.test(opt
     "popup.js: recent-row delete button lost its title/aria-label pair");
 }
 
+// K72 甲 (2026-09, opt-wave C): Alt+P/R/A must reach the checkboxes through
+// .click(), because that is the only path that runs their change listeners
+// (_archiveUserTouched, and the web.archive.org host request that needs this
+// keydown's user activation); a refactor that assigns the .checked property
+// instead would look identical on screen and silently break both.
+for (const [id, keys] of [["private-check", "Alt+P"], ["readlater-check", "Alt+R"], ["archive-check", "Alt+A"]]) {
+  const tag = (popupHtml.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`)) || [])[0] || "";
+  check(tag.includes(`aria-keyshortcuts="${keys}"`),
+    `popup.html: #${id} no longer announces ${keys} via aria-keyshortcuts`);
+}
+check(/const PBP_ALT_CHECKBOX_CODES = \{ KeyP: "private-check", KeyR: "readlater-check", KeyA: "archive-check" \};/.test(popupJs) &&
+  /PBP_ALT_CHECKBOX_LETTERS\[String\(e\.key\)\.toLowerCase\(\)\]/.test(popupJs),
+  "popup.js: the Alt+P/R/A table lost its e.code or its e.key half -- one of macOS (composed Alt+letter) or AZERTY/Dvorak (physical key) loses the shortcut");
+{
+  const altStart = popupJs.indexOf("const PBP_ALT_CHECKBOX_CODES =");
+  const altBody = altStart < 0 ? "" : popupJs.slice(altStart);
+  check(/\bbox\.click\(\);/.test(altBody) && !/\bbox\.checked\s*=/.test(altBody),
+    "popup.js: the Alt+P/R/A handler stopped routing through box.click() -- the checkboxes' own change listeners would no longer run");
+  check(/mainSection\.classList\.contains\("hidden"\)/.test(altBody) && /mainSection\.classList\.contains\("unsupported-url"\)/.test(altBody),
+    "popup.js: the Alt+P/R/A handler lost a visibility gate -- it would toggle checkboxes the user cannot see");
+}
 check(/result && typeof result\.catch === "function"\) result\.catch\(reportConfirmError\)/.test(sharedJs),
   "shared.js: asynchronous confirm failures can become unhandled rejections");
 // Leading-edge alignment: the popover is routinely far wider than its anchor, so

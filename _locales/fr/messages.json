@@ -79,6 +79,9 @@
   "kbdAltTagHint": {
     "message": "Alt+1–9 pour ajouter"
   },
+  "kbdAltCheckHint": {
+    "message": "Alt+P/R/A bascule"
+  },
   "lastUsedTagsLabel": {
     "message": "Derniers :"
   },

@@ -79,6 +79,9 @@
   "kbdAltTagHint": {
     "message": "Alt+1–9 для добавления"
   },
+  "kbdAltCheckHint": {
+    "message": "Alt+P/R/A переключает"
+  },
   "lastUsedTagsLabel": {
     "message": "Недавние:"
   },

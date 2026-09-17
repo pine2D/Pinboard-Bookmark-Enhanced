@@ -2099,16 +2099,50 @@ function enc(s) { return encodeURIComponent(s); }
 // into the same index). Used chips keep their badge but are skipped here;
 // syncSuggestTagStates (via addTag -> renderTags) marks every duplicate of
 // the added tag used, including the one just clicked.
+// K72 甲: the same listener also owns Alt+P / Alt+R / Alt+A -> private /
+// read later / archive. They live here, not in the Ctrl+Enter block above,
+// because that one never inspects e.altKey: an Alt chord reaching it would
+// fall through to its Escape branch. Two lookup tables, not one:
+//   e.code  -- macOS emits a COMPOSED character for Alt+letter (Alt+P is
+//              "π"), so e.key alone would ship a shortcut that is dead on
+//              every Mac;
+//   e.key   -- e.code names a PHYSICAL key, so on AZERTY/Dvorak the letter
+//              the user actually presses is the one that should answer.
+// Matching either keeps the printed hint (Alt+P/R/A) true on both.
+// No collision with the digits above (disjoint keys) and none with Chrome's
+// own Alt chords in a popup: the popup has no menu bar to accelerate into.
+const PBP_ALT_CHECKBOX_CODES = { KeyP: "private-check", KeyR: "readlater-check", KeyA: "archive-check" };
+const PBP_ALT_CHECKBOX_LETTERS = { p: "private-check", r: "readlater-check", a: "archive-check" };
 document.addEventListener("keydown", (e) => {
   if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
-  if (!/^[1-9]$/.test(e.key)) return;
-  const el = document.querySelector(`.stag[data-alt-num="${e.key}"]:not(.used)`);
-  if (el) {
-    e.preventDefault();
-    // Route through the chip's own click handler (Codex r2 M3): a direct
-    // addTag() bypassed the AI chips' provenance recording, so replace-
-    // mode regen could not retract hotkey-added AI tags. The handler also
-    // owns the .used/disabled marking.
-    el.click();
+  if (/^[1-9]$/.test(e.key)) {
+    const el = document.querySelector(`.stag[data-alt-num="${e.key}"]:not(.used)`);
+    if (el) {
+      e.preventDefault();
+      // Route through the chip's own click handler (Codex r2 M3): a direct
+      // addTag() bypassed the AI chips' provenance recording, so replace-
+      // mode regen could not retract hotkey-added AI tags. The handler also
+      // owns the .used/disabled marking.
+      el.click();
+    }
+    return;
   }
+  if (e.shiftKey) return;
+  const boxId = PBP_ALT_CHECKBOX_CODES[e.code] || PBP_ALT_CHECKBOX_LETTERS[String(e.key).toLowerCase()];
+  if (!boxId) return;
+  // A control the user cannot see must not be reachable from the keyboard:
+  // .hidden is the logged-out/batch state, .unsupported-url hides every
+  // .form-body child but the warning card (popup.css:610).
+  const mainSection = $id("main-section");
+  if (!mainSection || mainSection.classList.contains("hidden") || mainSection.classList.contains("unsupported-url")) return;
+  const box = $id(boxId);
+  if (!box || box.disabled) return;
+  e.preventDefault();
+  // .click(), never a direct assignment to the .checked property (which the
+  // ui-contract gate also forbids, comments included): the archive box's change
+  // listener is what sets _archiveUserTouched (and asks for the web.archive.org
+  // host grant, which needs the transient user activation this keydown still
+  // carries), and #private-check's change listener is what re-runs
+  // recomputeArchiveCheck. Assigning .checked fires neither.
+  box.click();
 });

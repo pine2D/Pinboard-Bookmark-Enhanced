@@ -816,6 +816,11 @@ button.offline-clear:focus-visible, button.offline-toggle:focus-visible { outlin
 .submit-hint { color: var(--pp-fg-hint); font-size: 11px; margin-left: auto; align-self: center; }
 .kb-hint { color: var(--pp-fg-hint); font-size: 11px; align-self: center; }
 #ai-summary-hint { margin-left: auto; margin-right: var(--pp-sp-3); }
+/* Same .kb-hint family hook as #ai-summary-hint above: the Alt+P/R/A hint
+   right-aligns in .bottom-bar so it can never push the three checkbox
+   labels, on any of the nine locales. No own spacing -- the row gap is
+   .bottom-bar's. */
+#bottom-kb-hint { margin-left: auto; }
 
 .clear-all-link {
   font-size: 11px; color: var(--pp-fg-hint); cursor: pointer;

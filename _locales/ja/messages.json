@@ -79,6 +79,9 @@
   "kbdAltTagHint": {
     "message": "Alt+1–9 で追加"
   },
+  "kbdAltCheckHint": {
+    "message": "Alt+P/R/A で切り替え"
+  },
   "lastUsedTagsLabel": {
     "message": "前回："
   },
