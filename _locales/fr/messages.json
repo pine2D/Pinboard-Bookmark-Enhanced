@@ -813,6 +813,9 @@
   "notesFilterEmpty": {
     "message": "Aucune note ne correspond à ce filtre."
   },
+  "notesHiddenByOwner": {
+    "message": "Certains surlignages présents sur cet appareil appartiennent à d'autres comptes Pinboard et restent invisibles avec ce compte."
+  },
   "notesUnknownPage": {
     "message": "Page inconnue"
   },

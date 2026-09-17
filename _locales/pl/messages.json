@@ -813,6 +813,9 @@
   "notesFilterEmpty": {
     "message": "Żadne notatki nie pasują do tego filtra."
   },
+  "notesHiddenByOwner": {
+    "message": "Część zaznaczeń zapisanych na tym urządzeniu należy do innych kont Pinboard i nie jest widoczna na obecnym koncie."
+  },
   "notesUnknownPage": {
     "message": "Nieznana strona"
   },

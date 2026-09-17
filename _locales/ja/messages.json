@@ -813,6 +813,9 @@
   "notesFilterEmpty": {
     "message": "この条件に一致するメモはありません。"
   },
+  "notesHiddenByOwner": {
+    "message": "この端末に保存されているハイライトの一部は別の Pinboard アカウントのものです。現在のアカウントでは表示できません。"
+  },
   "notesUnknownPage": {
     "message": "不明なページ"
   },

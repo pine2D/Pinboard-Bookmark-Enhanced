@@ -813,6 +813,9 @@
   "notesFilterEmpty": {
     "message": "Keine Notizen entsprechen diesem Filter."
   },
+  "notesHiddenByOwner": {
+    "message": "Einige Markierungen auf diesem Gerät gehören zu anderen Pinboard-Konten und werden für dieses Konto nicht angezeigt."
+  },
   "notesUnknownPage": {
     "message": "Unbekannte Seite"
   },

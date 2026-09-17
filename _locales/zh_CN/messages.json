@@ -813,6 +813,9 @@
   "notesFilterEmpty": {
     "message": "没有符合筛选条件的笔记。"
   },
+  "notesHiddenByOwner": {
+    "message": "这台设备上保存的部分高亮属于其他 Pinboard 账号，当前账号看不到。"
+  },
   "notesUnknownPage": {
     "message": "未知页面"
   },

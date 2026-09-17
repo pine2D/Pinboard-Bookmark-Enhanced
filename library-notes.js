@@ -113,6 +113,13 @@ function pbpNotesEntryHasColor(rec, colorSet) {
 const PBP_NOTES_COLORS = [1, 2, 3, 4, 5];
 const PBP_NOTES_COLOR_KEYS = ["hlColorQuote", "hlColorDefinition", "hlColorExample", "hlColorDoubt", "hlColorTodo"];
 let _notesAllRows = []; // [{ row, rec }], last full scan, sorted lastTs desc
+// Set by _pbpNotesScan itself (not by its caller) at every successful return,
+// true when that scan's owner filter dropped at least one item from some
+// record -- never a count, never which record, just whether it happened. Kept
+// in step with _notesAllRows: both are the last successful scan's picture,
+// both stay stale (not reset to a wrong "nothing hidden") across a failed
+// rescan, and both are reset together on an account switch below.
+let _notesHiddenByOwner = false;
 let _notesActiveColors = new Set(PBP_NOTES_COLORS);
 // Render cap, the vocabulary list's contract (library-vocab.js's
 // _vocabRenderLimit / PBP_VOCAB_RENDER_BATCH): the two lists on this page grow
@@ -177,6 +184,12 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
         // state over it), so leaving the old rows up until it returns would
         // make "fail-closed" depend on the rescan succeeding.
         _notesAllRows = [];
+        // Same reason: the last scan's "some items were hidden by owner"
+        // verdict belongs to the account that just left. Clearing it here
+        // (rather than leaving it true) is what keeps the synchronous
+        // interim render below from showing the wrong-account explanation
+        // for zero rows -- the rescan below recomputes it for real.
+        _notesHiddenByOwner = false;
         // The rebuild below never touches #notes-detail, so on its own it
         // leaves the previous account's quote, note and delete button on
         // screen -- and that button targets the previous account's record.
@@ -204,7 +217,10 @@ function _pbpNotesItemVisible(it, owner) {
 // renderNotesPanel has to tell that apart from "this account has nothing
 // saved", which is the same picture with the opposite meaning.
 async function _pbpNotesScan() {
-  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return [];
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
+    _notesHiddenByOwner = false;
+    return [];
+  }
   // Display-level only: both deletes operate through _pbpNotesItemVisible on a
   // fresh read, so foreign items are untouchable here by construction.
   const _notesOwner = await _pbpNotesOwner();
@@ -224,16 +240,25 @@ async function _pbpNotesScan() {
       all = await chrome.storage.local.get(null);
     }
   } catch (e) {
-    // Name/message only, never highlight or note content.
+    // Name/message only, never highlight or note content. _notesHiddenByOwner
+    // is deliberately left untouched here, same as _notesAllRows: a failed
+    // read keeps the last successful scan's verdict rather than resetting it
+    // to a guess, and renderNotesPanel never reaches the render path that
+    // would consult it on this branch anyway (it bails out on `null` first).
     console.warn("[notes] scan failed", e && e.name, e && e.message);
     return null;
   }
   const rows = [];
+  // Only WHETHER this scan's owner filter dropped anything, never how much --
+  // a count or a list of which pages would leak how many (or which) highlights
+  // another account has on this shared profile.
+  let hiddenByOwner = false;
   for (const key of Object.keys(all || {})) {
     if (!key.startsWith("pbp_hl_") || key === "pbp_hl_last_color") continue;
     let rec = all[key];
     // Owner filter on a COPY — never mutate the stored record shape.
     if (rec && Array.isArray(rec.items) && rec.items.some((it) => !_itemVisible(it))) {
+      hiddenByOwner = true;
       rec = { ...rec, items: rec.items.filter(_itemVisible) };
       if (!rec.items.length) continue; // page fully foreign: no row at all
     }
@@ -241,6 +266,7 @@ async function _pbpNotesScan() {
     if (row) rows.push({ row, rec });
   }
   rows.sort((a, b) => b.row.lastTs - a.row.lastTs);
+  _notesHiddenByOwner = hiddenByOwner;
   return rows;
 }
 
@@ -904,12 +930,28 @@ function _pbpNotesRenderList(hits, allHits, append) {
   const empty = $id("notes-empty");
   if (empty) {
     empty.hidden = hits.length > 0;
-    if (!hits.length) empty.textContent = total ? t("notesFilterEmpty") : t("notesEmpty");
+    // Three states, not two: a filter narrowed a non-empty list to nothing
+    // (notesFilterEmpty), this account genuinely has never highlighted
+    // anything (notesEmpty), or the last successful scan found highlights
+    // but the owner filter hid every one of them (notesHiddenByOwner) --
+    // that third case is NOT "you have no highlights", and saying so points
+    // the reader at the reader instead of at the account switcher. Hangs off
+    // `total === 0`, same guard as the sentence below, so it can only fire on
+    // a scan that actually completed (a failed read never reaches this
+    // render at all -- renderNotesPanel bails out on `null` first).
+    if (!hits.length) {
+      empty.textContent = total
+        ? t("notesFilterEmpty")
+        : (_notesHiddenByOwner ? t("notesHiddenByOwner") : t("notesEmpty"));
+    }
   }
   // Storage scope, only when there is nothing at all to show: with a filter
   // active the user plainly has highlights, and the sentence would be noise.
+  // Also suppressed when every highlight is merely hidden by the owner
+  // filter -- "export a backup to move them" is exactly the wrong advice
+  // when the data is sitting right there under a different account.
   const scopeNote = $id("notes-scope-note");
-  if (scopeNote) scopeNote.hidden = !!total || hits.length > 0;
+  if (scopeNote) scopeNote.hidden = !!total || hits.length > 0 || _notesHiddenByOwner;
   if (!hits.length) { _pbpNotesSyncLoadMore(0); _pbpNotesSyncSelectionUi(hits); return; }
   const target = Math.min(hits.length, _notesRenderLimit);
   const start = append ? Math.min(list.children.length, target) : 0;

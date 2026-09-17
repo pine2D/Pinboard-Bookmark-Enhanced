@@ -813,6 +813,9 @@
   "notesFilterEmpty": {
     "message": "No notes match this filter."
   },
+  "notesHiddenByOwner": {
+    "message": "Some of the highlights on this device belong to other Pinboard accounts, and this account can't see them."
+  },
   "notesUnknownPage": {
     "message": "Unknown page"
   },
