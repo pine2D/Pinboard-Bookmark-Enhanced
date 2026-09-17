@@ -292,6 +292,23 @@ suite("default tag prompt", () => {
     assert(c.indexOf("{{url}} in title") !== -1, "combined title not re-expanded");
     assert(c.indexOf("https://real.test/ in title") === -1, "combined title must not get the url");
   });
+  // K93 positive counterpart to the negative row above (content keeps a
+  // literal {{description}} placeholder): a TEMPLATE-level {{description}}
+  // is genuinely substituted for custom-template users. Documentation-pinning
+  // rows for already-shipped behaviour - RED-first does not apply, there is
+  // no code change to drive red.
+  test("custom templates DO substitute {{description}} (K93)", () => {
+    const s = buildSummaryPrompt({ customSummaryPrompt: "Notes: {{description}}\nTitle: {{title}}" }, "t", "u", "body", "DESCVALUE");
+    assert(s.indexOf("DESCVALUE") !== -1, "description value substituted into custom summary template");
+    assert(s.indexOf("{{description}}") === -1, "literal placeholder gone after substitution");
+    const p = buildTagPrompt({ customTagPrompt: "Notes: {{description}}\nTitle: {{title}}" }, "t", "u", "body", "DESCVALUE", []);
+    assert(p.indexOf("DESCVALUE") !== -1, "description value substituted into custom tag template");
+    assert(p.indexOf("{{description}}") === -1, "literal placeholder gone after substitution");
+  });
+  test("buildCombinedPrompt (default, non-custom path) never consumes description (K93)", () => {
+    const c = buildCombinedPrompt({}, "t", "u", "body", "DESCVALUE", []);
+    assert(c.indexOf("DESCVALUE") === -1, "description value must not appear in the default combined prompt");
+  });
   test("unknown placeholders in custom templates stay literal", () => {
     const p = buildTagPrompt({ aiTagLang: "en", customTagPrompt: "X {{typo_var}} {{title}}" }, "T", "u", "c", "", []);
     assert(p.indexOf("{{typo_var}}") !== -1, "typo placeholder visible");

@@ -225,6 +225,13 @@ async function pbpAiTranscriptText(s, buttonId) {
 // produce a summary of page A cached under A but saved onto bookmark B.
 // Equivalence deliberately ignores fragments and tracking params so the
 // paste-clean flow (strip utm etc.) keeps AI enabled.
+// THIRD URL-normalization variant in this codebase - unconditionally drops
+// the hash below (no `#/` or `#!` router exception), unlike ai.js
+// `_aiCacheUrlNorm` / md-ai-core.js `pbpAiCacheUrlNorm` (both keep hash
+// ROUTERS as significant). Used only for the URL-edit guard
+// (_aiUrlEquivalent) and the `summary_owner_` ownership keys further below -
+// never for AI response cache keys. Must NOT be repointed at cache keys, and
+// must not be merged with the other two normalizers.
 function _aiNormalizeUrl(url) {
   let normalized = String(url == null ? "" : url).trim();
   try {

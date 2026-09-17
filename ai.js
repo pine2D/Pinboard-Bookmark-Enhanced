@@ -1192,6 +1192,27 @@ function buildSummaryPrompt(s, title, url, content, description) {
   });
 }
 
+// K93: `description` is accepted here for signature parity only -
+// buildTagPrompt / buildSummaryPrompt / buildCombinedPrompt share one
+// positional call shape (s, title, url, content, description[, userTags]),
+// and all nine call sites pass by position (popup-ai.js:896/904/975;
+// background.js:1071/1103/1122 and the batch path 3383/3402/3414, the
+// latter three always passing ""). Do not delete or rename this parameter -
+// that would fork the three signatures apart and make a positional mis-pass
+// MORE likely, not less.
+//
+// This builder is the DEFAULT (non-custom-template) path, reachable only
+// when the user has NOT set a custom tag/summary prompt - see the Global
+// Constraint gates at background.js:1060 (quick-save), background.js:3375
+// (batch), and popup-ai.js:934 (popup): !s.customTagPrompt?.trim() &&
+// !s.customSummaryPrompt?.trim(). The default templates deliberately do not
+// fold `description` into _aiFillTemplate's variable table below: per
+// docs/privacy.md:77, "If you put `{{description}}` in a custom tag or
+// summary prompt, the current bookmark description or notes are included" -
+// i.e. notes only leave the device when the user opts in via a CUSTOM
+// template. buildTagPrompt/buildSummaryPrompt above DO wire description
+// into their variable tables (live for custom-template users); this is the
+// one builder where the parameter is inert by design, not a bug.
 function buildCombinedPrompt(s, title, url, content, description, userTags) {
   const sep = s.aiTagSeparator || "-";
   let prompt = `Analyze the following webpage and return ONLY a JSON object with exactly two keys: "summary" and "tags".
