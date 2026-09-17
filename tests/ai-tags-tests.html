@@ -324,6 +324,21 @@ suite("buildCombinedPrompt", () => {
     assertEq(_aiContentWindow("y".repeat(4000)), "y".repeat(4000), "exactly at budget untouched");
     assertEq(_aiContentWindow(null), "", "null tolerated");
   });
+  test("window is idempotent over its own output (K90)", () => {
+    // getPageInfoFromTab now builds this exact window IN THE PAGE, so on every
+    // local-extraction save this function runs over an already-windowed string.
+    // Any drift in separator or in either length would silently re-cut the tail
+    // a second time; pin the no-op instead of trusting the two sites to agree.
+    const long = "H".repeat(9000) + "T".repeat(900);
+    const once = _aiContentWindow(long);
+    assertEq(_aiContentWindow(once), once, "second pass is byte-identical");
+    assertEq(once.length, AI_CONTENT_HEAD + "\n[...]\n".length + AI_CONTENT_TAIL, "window size");
+    // A string already SHAPED as head+sep+tail (what the page returns) must
+    // survive untouched even though it is longer than head+tail.
+    const preShaped = "a".repeat(AI_CONTENT_HEAD) + "\n[...]\n" + "b".repeat(AI_CONTENT_TAIL);
+    assert(preShaped.length > AI_CONTENT_HEAD + AI_CONTENT_TAIL, "pre-shaped string is past the passthrough branch");
+    assertEq(_aiContentWindow(preShaped), preShaped, "already-shaped window returned unchanged");
+  });
   test("appends existing-tags line only when userTags present", () => {
     assert(buildCombinedPrompt({}, "t", "u", "c", "", ["a"]).includes(AI_TAG_REUSE_LINE), "present");
     assert(!/Existing tags/.test(buildCombinedPrompt({}, "t", "u", "c", "", [])), "absent");
@@ -496,6 +511,116 @@ suite("endpoint origin policy", () => {
       const lateResult = await getPageInfoFromTab(7, { withDefuddle: true, expectedUrl });
       assertEq(lateResult, null, "post-extraction live navigation result");
       assertEq(bodyExtractions, 1, "late body extraction count");
+    });
+
+    // ---- K90: the in-page extractor produces the FINAL head+tail window ----
+    // The page is where the article's real ending still exists; before K90 the
+    // three branches all returned the first 8000 chars, so _aiContentWindow's
+    // "tail" was chars 7200-8000 of a long article, i.e. a mid-page paragraph.
+    // executeScript serialises `func` and drops its closure, so the two lengths
+    // can only reach the page through `args` -- hence the args assertions.
+    const k90RunsInjected = (tabUrl) => ({
+      runtime: { lastError: null },
+      tabs: { get: (_tabId, callback) => callback({ url: tabUrl, title: "K90" }) },
+      scripting: { executeScript: (opts, callback) => {
+        if (opts.files) { callback([{}]); return; }
+        // Run the REAL injected function with the REAL args it was handed.
+        callback([{ result: opts.func(...opts.args) }]);
+      } },
+    });
+
+    await atest("page extraction hands the injected function the prompt window lengths (K90)", async () => {
+      let seenArgs = null, seenFunc = null;
+      window.chrome = {
+        runtime: { lastError: null },
+        tabs: { get: (_tabId, callback) => callback({ url: "https://k90.test/a", title: "A" }) },
+        scripting: { executeScript: (opts, callback) => {
+          if (opts.files) { callback([{}]); return; }
+          seenArgs = opts.args; seenFunc = opts.func;
+          callback([{ result: { url: "https://k90.test/a", pageText: "x" } }]);
+        } },
+      };
+      await getPageInfoFromTab(7, { withDefuddle: true });
+      assert(Array.isArray(seenArgs), "an args array reached executeScript");
+      assertEq(seenArgs.length, 3, "args arity");
+      assertEq(seenArgs[0], true, "withDefuddle stays first");
+      assertEq(seenArgs[1], AI_CONTENT_HEAD, "head length travels through args");
+      assertEq(seenArgs[2], AI_CONTENT_TAIL, "tail length travels through args");
+      // args cross a process boundary: anything that is not a plain JSON value
+      // arrives as null in the page, silently disabling the window.
+      assertEq(JSON.stringify(seenArgs), JSON.stringify([true, AI_CONTENT_HEAD, AI_CONTENT_TAIL]),
+        "args are plain JSON-serialisable values");
+      assertEq(typeof seenFunc, "function", "func still handed over by reference");
+    });
+
+    await atest("injected Defuddle branch emits the window _aiContentWindow would (K90)", async () => {
+      const full = "INTRO_" + "h".repeat(4000) + "_MIDDLE_" + "m".repeat(4000) + "_t".repeat(500) + "_CONCLUSION";
+      assert(full.length > 8000, "fixture is longer than the retired 8000-char cap");
+      const realDefuddle = window.Defuddle, realURL = window.URL, realShim = window.__pp_urlShimInstalled;
+      window.Defuddle = function () { this.parse = () => ({ textContent: full }); };
+      try {
+        window.chrome = k90RunsInjected("https://k90.test/long");
+        const info = await getPageInfoFromTab(7, { withDefuddle: true });
+        assert(info && typeof info.pageText === "string", "extraction returned pageText");
+        assertEq(info.pageText, _aiContentWindow(full), "in-page window is byte-identical to the prompt window");
+        assert(info.pageText.endsWith("_CONCLUSION"), "tail is the article's real ending, not chars 7200-8000");
+        assertEq(info.pageText.indexOf("_MIDDLE_"), -1, "middle dropped");
+        assert(info.pageText.indexOf("\n[...]\n") !== -1, "cut marker present");
+        assert(info.pageText.length < 8000, "payload shrank below the old cap");
+      } finally {
+        window.Defuddle = realDefuddle;
+        window.URL = realURL;
+        window.__pp_urlShimInstalled = realShim;
+      }
+    });
+
+    await atest("injected legacy innerText branch windows head+tail too (K90)", async () => {
+      const realURL = window.URL, realShim = window.__pp_urlShimInstalled;
+      const article = document.createElement("article");
+      article.style.cssText = "position:absolute;left:-99999px;top:-99999px;";
+      article.textContent = "LEAD_" + "h".repeat(4200) + "_MIDDLE_" + "m".repeat(4200) + "_LASTWORD";
+      document.body.appendChild(article);
+      try {
+        // Defuddle is not loaded on this page, so the extractor falls through
+        // to the legacy querySelector("article").innerText branch.
+        assertEq(typeof window.Defuddle, "undefined", "legacy branch precondition");
+        window.chrome = k90RunsInjected("https://k90.test/legacy");
+        const info = await getPageInfoFromTab(7, { withDefuddle: true });
+        const seen = article.innerText;
+        assert(seen.length > 8000, "fixture is longer than the retired cap");
+        assertEq(info.pageText, _aiContentWindow(seen), "legacy branch matches the prompt window");
+        assert(info.pageText.endsWith("_LASTWORD"), "the real ending reached the payload");
+        assertEq(info.pageText.indexOf("_MIDDLE_"), -1, "middle dropped");
+      } finally {
+        article.remove();
+        window.URL = realURL;
+        window.__pp_urlShimInstalled = realShim;
+      }
+    });
+
+    await atest("injected site-rule branch deliberately stays head-only (K90)", async () => {
+      // site-rules.js covers aggregation/forum pages (Zhihu/SO/HN/V2EX): their
+      // "end" is the lowest-voted reply, not a conclusion, so this branch keeps
+      // the plain head truncation. The three branches are no longer the same
+      // shape and this asymmetry must not be "unified" away.
+      const full = "TOPREPLY_" + "s".repeat(9000) + "_LOWESTVOTED";
+      const realApply = window.applySiteRule, realText = window.pbpSiteRuleText;
+      const realURL = window.URL, realShim = window.__pp_urlShimInstalled;
+      window.applySiteRule = () => ({ contentHtml: "<p>x</p>" });
+      window.pbpSiteRuleText = () => full;
+      try {
+        window.chrome = k90RunsInjected("https://k90.test/thread");
+        const info = await getPageInfoFromTab(7, { withDefuddle: true });
+        assertEq(info.pageText.length, 8000, "aggregation pages keep the plain 8000-char head");
+        assertEq(info.pageText, full.substring(0, 8000), "head-only, no tail splice");
+        assertEq(info.pageText.indexOf("\n[...]\n"), -1, "no cut marker: this branch is not windowed");
+        assertEq(info.pageText.endsWith("_LOWESTVOTED"), false, "tail budget is not spent on the lowest-voted reply");
+      } finally {
+        window.applySiteRule = realApply;
+        window.pbpSiteRuleText = realText;
+        window.URL = realURL;
+        window.__pp_urlShimInstalled = realShim;
+      }
     });
 
     await atest("invalid custom endpoint fails before fetch", async () => {

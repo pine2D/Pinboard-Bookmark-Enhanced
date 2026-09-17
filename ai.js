@@ -51,8 +51,12 @@ async function getPageInfoFromTab(tabId, opts = {}) {
 
     const results = await _cbExecuteScript({
       target: { tabId },
-      args: [withDefuddle],
-      func: (useDefuddle) => {
+      // AI_CONTENT_HEAD / AI_CONTENT_TAIL travel through `args` because
+      // chrome.scripting serialises `func` and DROPS its closure: nothing in
+      // the injected body may reference ai.js scope, and every args value has
+      // to be a plain JSON-serialisable value or it arrives as null in the page.
+      args: [withDefuddle, AI_CONTENT_HEAD, AI_CONTENT_TAIL],
+      func: (useDefuddle, headChars, tailChars) => {
         const info = { url: location.href, title: document.title, selectedText: "", metaDescription: "", referrer: document.referrer || "", pageText: "" };
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) { const t = sel.toString().trim(); if (t) info.selectedText = t; }
@@ -62,12 +66,30 @@ async function getPageInfoFromTab(tabId, opts = {}) {
         // Fast path (default): no pageText extraction. Popup form only needs the fields above.
         if (!useDefuddle) return info;
 
+        // The page is the LAST place the article's real ending still exists.
+        // Returning the first 8000 chars made ai.js _aiContentWindow slice its
+        // "tail" out of chars 7200-8000 of a long article - a mid-page
+        // paragraph, never the conclusion the window was built for (K90).
+        // Emit the final window here instead: byte-identical shape to
+        // _aiContentWindow (same separator, same lengths), so its second pass
+        // over this string is a no-op and the payload crossing the process
+        // boundary halves (8000 -> ~4007 chars).
+        const headTail = (value, head, tail) => {
+          const s = String(value || "");
+          if (s.length <= head + tail) return s;
+          return s.slice(0, head) + "\n[...]\n" + s.slice(s.length - tail);
+        };
+
         // Per-site rule first (Zhihu/SO/HN/V2EX/arXiv/X): Defuddle's generic
         // single-body extraction drops the answers/replies on exactly the
         // pages site-rules.js exists to cover, so AI tags/summary and batch
         // save fed the model a fraction of the page. Same contract as the
         // markdown extractors: any failure or thin result falls to Defuddle.
-        // Text stays under the same 8000-char budget as the Defuddle path.
+        // HEAD-ONLY on purpose, unlike the two single-article branches below:
+        // these are aggregation/forum pages, so their "end" is the lowest-voted
+        // reply, not a conclusion - spending the tail budget on it would be a
+        // net loss. The three branches are deliberately no longer the same
+        // shape; keep the plain 8000-char head here.
         if (typeof applySiteRule === "function") {
           try {
             const hit = applySiteRule(document, location.href);
@@ -136,7 +158,7 @@ async function getPageInfoFromTab(tabId, opts = {}) {
             let result;
             try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
             if (result?.textContent && result.textContent.length > 50) {
-              info.pageText = result.textContent.substring(0, 8000);
+              info.pageText = headTail(result.textContent, headChars, tailChars);
               return info;
             }
           } catch (_) { /* fall through to legacy */ }
@@ -144,7 +166,7 @@ async function getPageInfoFromTab(tabId, opts = {}) {
 
         // Fallback: legacy innerText extraction
         const mainEl = document.querySelector("article") || document.querySelector("main") || document.querySelector('[role="main"]') || document.body;
-        info.pageText = (mainEl ? mainEl.innerText : "").substring(0, 8000);
+        info.pageText = headTail(mainEl ? mainEl.innerText : "", headChars, tailChars);
         return info;
       }
     });
@@ -1100,10 +1122,21 @@ function aiSummaryLangInstruction(s) {
 // Content window for the tag/summary/combined prompts (campaign S3).
 // The old cap kept only the FIRST 4000 chars - pure lead bias with the
 // conclusion physically deleted. Same total budget, split head+tail: the
-// head carries the framing/purpose the recall-note style leans on, the
-// tail adds the conclusion Defuddle-extracted articles end with (long
-// posts often state what a thing IS FOR at the end). Experimental:
-// head+tail over head-only at this size is inference, not measurement.
+// head carries the framing/purpose the recall-note style leans on, the tail
+// carries the ending (long posts often state what a thing IS FOR there).
+// Where that tail ACTUALLY comes from, per content source (K90):
+//   - Defuddle / legacy innerText: the article's real end. getPageInfoFromTab
+//     receives these two lengths through executeScript `args` and builds the
+//     same head + "\n[...]\n" + tail in the page, so this function is a
+//     byte-identical no-op second pass instead of re-slicing a pre-truncated
+//     head. Before K90 both branches returned the first 8000 chars and the
+//     "tail" was chars 7200-8000, i.e. a mid-page paragraph.
+//   - Jina markdown and video transcripts: the real end too (never truncated).
+//   - Site-rule branch (aggregation/forum pages): head-only BY DESIGN, so the
+//     last AI_CONTENT_TAIL chars are mid-page text. Deliberate - those pages
+//     end on the lowest-voted reply, not on a conclusion.
+// Still experimental: head+tail beating head-only at this size is inference,
+// not measurement. What K90 fixed is the gap between intent and behaviour.
 const AI_CONTENT_HEAD = 3200;
 const AI_CONTENT_TAIL = 800;
 function _aiContentWindow(content) {
