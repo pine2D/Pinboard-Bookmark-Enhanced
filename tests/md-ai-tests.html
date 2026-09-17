@@ -10852,6 +10852,35 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
     } finally { f.done(); }
   });
 
+  // setup() borrows page-global focus and done() hands it back, because async
+  // cases elsewhere on this page assert activeElement AFTER a task boundary (the
+  // Explain focus-restore block) -- a miss here fails one of those instead, with
+  // nothing pointing back at this suite. The restore was previously made and
+  // never checked; every OTHER case starts from <body>, where removing the rail
+  // already returns focus to <body> on its own, so only a case that borrows from
+  // a REAL element can tell a working handback from no handback at all.
+  ktest("the teardown hands focus back to whoever actually held it, not just to <body>", () => {
+    const sentinel = document.createElement("button");
+    sentinel.type = "button";
+    sentinel.textContent = "k85 focus sentinel";
+    sentinel.style.cssText = "position:fixed; left:-9999px; top:0; width:80px; height:20px;";
+    document.body.appendChild(sentinel);
+    try {
+      sentinel.focus({ preventScroll: true });
+      assert(document.activeElement === sentinel, "setup: the sentinel did not take focus");
+      const f = setup();
+      try {
+        f.seed(300);
+        f.links[1].focus({ preventScroll: true });
+        assert(document.activeElement !== sentinel, "setup: the case really did take focus off the sentinel");
+        keepTocEntryVisible(f.links[30]);
+      } finally { f.done(); }
+      assertEq(document.activeElement, sentinel,
+        "teardown left focus on " +
+        (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
+    } finally { sentinel.remove(); }
+  });
+
   ktest("keyboard focus on a TOC entry hands the scroll position back to the reader", () => {
     const f = setup();
     try {
