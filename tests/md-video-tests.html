@@ -1539,6 +1539,162 @@ await (async () => {
     "edges: no batches and a missing hooks object are both harmless");
 })();
 
+section("pbpVideoRunPunctBatches (K141 phase 2: bounded pool, serial downgrade on rate limits)");
+await (async () => {
+  const mk = (n) => Array.from({ length: n }, (_, i) => "批次" + i + "的文字");
+  // Probe worker: records how many runOne calls were in flight at the moment
+  // each batch STARTED (`liveAt[bi]`), the high-water mark, the claim order
+  // and the settle order. `plan(bi)` supplies the per-batch delay plus an
+  // optional canned answer or throw, so a rate limit / a supersede / a hard
+  // provider failure can be placed at an exact index and an exact moment.
+  function probe(plan) {
+    const st = { live: 0, peak: 0, calls: [], liveAt: [], settled: [] };
+    st.runOne = async (b, bi) => {
+      const p = (plan && plan(bi)) || {};
+      st.live++; st.peak = Math.max(st.peak, st.live);
+      st.calls.push(bi); st.liveAt[bi] = st.live;
+      try {
+        await new Promise((r) => setTimeout(r, p.delay == null ? 3 : p.delay));
+        if (p.thrown) throw p.thrown;
+        return p.res || { ok: true, out: "#" + bi + "|" + b };
+      } finally { st.live--; st.settled.push(bi); }
+    };
+    return st;
+  }
+
+  // Out-of-order settles under a pool of 2: the answers still have to land in
+  // their own slots. With two workers the settle order is genuinely NOT the
+  // claim order any more, which is what phase 1's identical assertion could
+  // only lock as a contract (a serial loop makes push and out[bi] look alike).
+  const a6 = mk(6);
+  const pa = probe((bi) => ({ delay: (6 - bi) * 4 })); // later batches answer faster
+  const ra = await pbpVideoRunPunctBatches(a6, pa.runOne, { concurrency: 2 });
+  assert(pa.settled.join(",") !== pa.calls.join(","),
+    "pool fixture: the batches really do settle out of claim order (otherwise the slot assertion below proves nothing)");
+  assert(JSON.stringify(ra.out) === JSON.stringify(a6.map((b, i) => "#" + i + "|" + b)),
+    "pool: every answer lands in its OWN slot even when two workers settle out of order");
+  assertEq(ra.completed, 6, "pool: completed reaches the total");
+  assert(ra.cancelled === false && ra.superseded === false, "pool: a clean concurrent pass reports neither cancel nor supersede");
+
+  // Bounded: two in flight, never a naked Promise.all over every batch.
+  assertEq(pa.peak, 2, "pool: exactly two batches are ever in flight at once");
+  const pbig = probe(() => ({ delay: 4 }));
+  await pbpVideoRunPunctBatches(mk(9), pbig.runOne, { concurrency: 2 });
+  assertEq(pbig.peak, 2, "pool: nine batches still never put more than two requests in flight");
+
+  // concurrency 1 (and every degenerate value) is the phase-1 serial driver.
+  const pc = probe((bi) => ({ delay: (6 - bi) * 4 }));
+  const rc1 = await pbpVideoRunPunctBatches(a6, pc.runOne, { concurrency: 1 });
+  assertEq(pc.peak, 1, "serial: concurrency 1 keeps exactly one request in flight");
+  assertEq(pc.calls.join(","), "0,1,2,3,4,5", "serial: batches are claimed in ascending order");
+  assertEq(pc.settled.join(","), "0,1,2,3,4,5", "serial: and settle in that same order -- phase 1 behaviour, tick for tick");
+  assert(JSON.stringify(rc1.out) === JSON.stringify(a6.map((b, i) => "#" + i + "|" + b)) && rc1.completed === 6,
+    "serial: assembly and completion count are unchanged by the pool being available");
+  const pd0 = probe(() => ({ delay: 2 }));
+  await pbpVideoRunPunctBatches(mk(5), pd0.runOne, {});
+  assertEq(pd0.peak, 1, "serial: a hooks object with no worker count is the phase-1 serial driver");
+  const pd1 = probe(() => ({ delay: 2 }));
+  await pbpVideoRunPunctBatches(mk(5), pd1.runOne, { concurrency: 0 });
+  assertEq(pd1.peak, 1, "serial: a nonsense worker count floors to one -- it never means 'unbounded'");
+  const pd2 = probe(() => ({ delay: 2 }));
+  await pbpVideoRunPunctBatches(mk(2), pd2.runOne, { concurrency: 5 });
+  assertEq(pd2.peak, 2, "pool: the worker count is clamped to the number of batches");
+
+  // Rate limit / server fault: the pool drains itself to one worker for the
+  // rest of the pass (md-translate.js's `slow`), the failed batch keeps its
+  // input, and nothing is retried.
+  const d8 = mk(8);
+  const pdz = probe((bi) => (bi === 1
+    ? { delay: 1, res: { ok: false, out: d8[1], transient: true } }
+    : { delay: 20 }));
+  const rd = await pbpVideoRunPunctBatches(d8, pdz.runOne, { concurrency: 2 });
+  assertEq(pdz.peak, 2, "downgrade fixture: the pool really did start out with two workers");
+  assert(pdz.liveAt.slice(2).every((v) => v === 1),
+    "downgrade: after one rate-limited batch every later batch is claimed alone -- the pool drained to serial");
+  assertEq(rd.out[1], d8[1], "downgrade: the rate-limited batch keeps its own input (fail-closed, no retry)");
+  assert(rd.out.every((o) => o != null) && rd.completed === 8,
+    "downgrade: the remaining batches still all run -- the pass is assembled in full, one at a time");
+  assert(rd.cancelled === false && rd.superseded === false, "downgrade: a rate limit is neither a cancel nor a supersede");
+  const pctl = probe((bi) => ({ delay: bi === 1 ? 1 : 20 }));
+  await pbpVideoRunPunctBatches(d8, pctl.runOne, { concurrency: 2 });
+  assert(pctl.liveAt.slice(2).some((v) => v === 2),
+    "downgrade control: with the SAME timings but no rate limit the later batches do overlap two at a time (so the assertion above is about `slow`, not about the fixture's delays)");
+
+  // Cancel: checked before a worker claims, never mid round-trip. A request
+  // already in flight finishes and its answer is still assembled -- runOne has
+  // banked it in the batch cache by then, and the cancel line is meant to say
+  // how much of the work is already paid for. The PASS still commits nothing.
+  const e6 = mk(6);
+  const pe = probe(() => ({ delay: 4 }));
+  const re = await pbpVideoRunPunctBatches(e6, pe.runOne, { concurrency: 2, cancelled: () => pe.calls.length >= 3 });
+  const callsAtReturn = pe.calls.length;
+  assert(re.cancelled === true, "cancel: the pool stops at a claim boundary and reports the cancel");
+  assert(re.completed >= 2 && re.completed < e6.length, "cancel: completed is the batches that actually ran, never the total");
+  assertEq(pe.calls.length, re.completed, "cancel: every claimed batch settled and was counted -- an in-flight request finishes, it is not dropped");
+  await new Promise((r) => setTimeout(r, 40));
+  assertEq(pe.calls.length, callsAtReturn, "cancel: no worker claims another batch after the flag flips (checked again after the driver returned)");
+  assert(re.out.slice(re.completed).every((x) => x === undefined),
+    "cancel: the batches that never ran have empty slots -- the array is pre-sized to the TOTAL");
+
+  // Supersede from one worker abandons the pass for all of them, and an answer
+  // that lands afterwards belongs to a transcript that is gone -- it is dropped
+  // rather than assembled (unlike a cancel, where the answer is still valid).
+  const f6 = mk(6);
+  const pf = probe((bi) => (bi === 1 ? { delay: 1, res: { superseded: true } } : { delay: 20 }));
+  const rf2 = await pbpVideoRunPunctBatches(f6, pf.runOne, { concurrency: 2 });
+  assert(rf2.superseded === true && rf2.cancelled === false, "supersede: one worker's flag abandons the whole pass, and it is not a cancel");
+  assertEq(pf.calls.join(","), "0,1", "supersede: no worker claims another batch once the transcript this pass was built from is gone");
+  await new Promise((r) => setTimeout(r, 40));
+  assertEq(pf.calls.join(","), "0,1", "supersede: and none appears after the driver returned either");
+  assert(rf2.out[0] === undefined && rf2.completed === 0,
+    "supersede: an answer arriving after the pass was abandoned is dropped, not assembled");
+
+  // A hard (non-transient) failure ends the pass with its own error, exactly
+  // as the serial driver's bare `await runOne(...)` did -- but the sibling
+  // worker has to be drained first, or its rejection lands with nobody
+  // listening (an unhandled rejection the serial driver could never produce).
+  const pg = probe((bi) => (bi === 1
+    ? { delay: 1, thrown: Object.assign(new Error("Gemini failed (HTTP 401)"), { status: 401 }) }
+    : { delay: 20 }));
+  let gErr = null;
+  try { await pbpVideoRunPunctBatches(mk(6), pg.runOne, { concurrency: 2 }); } catch (e) { gErr = e; }
+  assert(gErr && gErr.status === 401, "hard failure: the driver rejects with the batch's own error");
+  assertEq(pg.calls.join(","), "0,1", "hard failure: the sibling worker is drained and claims nothing more");
+
+  // Which provider failures are worth carrying on past.
+  assert(pbpVideoIsTransientAiError({ status: 429 }) === true && pbpVideoIsTransientAiError({ status: 500 }) === true
+    && pbpVideoIsTransientAiError({ status: 503 }) === true,
+    "transient: a rate limit and a server fault are the class where the next batch is still worth sending");
+  assert(pbpVideoIsTransientAiError({ name: "TimeoutError" }) === true,
+    "transient: the request deadline counts (ai.js rejects with TimeoutError, never AbortError, when it fires)");
+  assert(pbpVideoIsTransientAiError({ name: "AbortError" }) === false
+    && pbpVideoIsTransientAiError({ name: "AbortError", status: 429 }) === false,
+    "transient: the user's own Cancel is never a provider fault, whatever status rode along with it");
+  assert(pbpVideoIsTransientAiError({ status: 401 }) === false && pbpVideoIsTransientAiError({ status: 403 }) === false
+    && pbpVideoIsTransientAiError({ status: 400 }) === false && pbpVideoIsTransientAiError({ code: "host_permission" }) === false,
+    "transient: a bad key, a refused model and a missing host permission are standing conditions -- the next batch would hit them too");
+  assert(pbpVideoIsTransientAiError(new Error("Gemini failed (HTTP 429)")) === true,
+    "transient: a provider that only says it in the message still classifies");
+  assert(pbpVideoIsTransientAiError(null) === false && pbpVideoIsTransientAiError(new Error("boom")) === false,
+    "transient: nothing, and an error nobody classified, are not transient");
+
+  // The caller's gate, evaluated rather than grepped: the literal expression is
+  // sliced out of the shipped source and RUN, so a gate rewritten to read the
+  // total batch count (or to fan out unconditionally) fails here.
+  const src = await fetch("../md-video.js").then((r) => r.text());
+  const gm = src.match(/\bconcurrency:\s*([^,\n]+),/);
+  assert(!!gm, "caller gate: the punctuation driver call passes an explicit worker count");
+  const gateExpr = gm ? gm[1].trim() : "";
+  assert(/\bfreshTotal\b/.test(gateExpr) && !/\bbatches\b/.test(gateExpr),
+    "caller gate: it is keyed on freshTotal -- the batches this pass PAYS for -- not on the total batch count, so a nearly-all-cached pass never fans out");
+  const gate = gm ? new Function("freshTotal", "return (" + gateExpr + ");") : () => null;
+  assertEq(gate(3), 1, "caller gate: three fresh batches stay serial");
+  assertEq(gate(4), 2, "caller gate: four fresh batches open the pool to two");
+  assertEq(gate(0), 1, "caller gate: nothing to pay for stays serial");
+  assertEq(gate(19), 2, "caller gate: a two-hour lecture's 19 fresh batches still cap at two");
+})();
+
+
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

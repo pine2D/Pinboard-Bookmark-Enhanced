@@ -830,18 +830,45 @@ function pbpVideoSplitBatches(paras, cap) {
   return batches;
 }
 
-// Assembly of the AI punctuation pass, BY INDEX (K141 phase 1).
+// Which provider failures are worth sending the NEXT batch past (K141 phase
+// 2). A rate limit or a server-side fault is momentary and the batch after it
+// may well succeed; everything else -- a bad key, a model the account cannot
+// call, a missing host permission, the user's own Cancel -- is a standing
+// condition that the next batch would hit too, so it still ends the pass with
+// its own classified message instead of grinding through the remainder.
+// Shape-only so the test page can drive it without a provider: ai.js copies
+// the HTTP status onto the error (handleAIError) and the 30s request deadline
+// rejects with a DOMException named TimeoutError, while the user's Cancel
+// rejects with AbortError -- which is why the name is checked BEFORE the
+// status (an abort can carry a stale status from a retry dialect attempt).
+function pbpVideoIsTransientAiError(err) {
+  if (!err) return false;
+  if (err.name === "AbortError") return false;
+  if (err.name === "TimeoutError") return true;
+  const status = Number(err.status);
+  if (status === 429 || (status >= 500 && status <= 599)) return true;
+  return /\bHTTP 429\b|rate.?limit|too many requests|resource.*exhausted/i.test(String(err.message || ""));
+}
+
+// Assembly of the AI punctuation pass, BY INDEX (K141 phase 1), through a
+// bounded pool of workers (K141 phase 2).
 // `runOne(b, bi)` owns everything about one batch -- cache lookup, the
 // round-trip, the conservation gate, the cache write -- and returns
-// `{ ok, out }`, or `{ superseded: true }` when the transcript this pass was
-// built from is gone. This driver is the ONLY writer of the output array and
-// it writes at `bi`, never appends: the conservation gate is per batch, so a
-// mis-ordered assembly would splice one batch's marks onto another batch's
+// `{ ok, out }`, `{ ok: false, out, transient: true }` when the provider rate
+// limited or faulted, or `{ superseded: true }` when the transcript this pass
+// was built from is gone. This driver is the ONLY writer of the output array
+// and it writes at `bi`, never appends: the conservation gate is per batch, so
+// a mis-ordered assembly would splice one batch's marks onto another batch's
 // words with every per-batch gate green (the whole-output gate in the tests
 // is the backstop). Order therefore has to be structurally impossible to get
-// wrong rather than checked at runtime.
-// Strictly serial (one `await` per batch, exactly the shipped behaviour);
-// this one loop is the seam a bounded fan-out would replace later.
+// wrong rather than checked at runtime -- which is what lets the batches go
+// out two at a time at all.
+// `hooks.concurrency` defaults to 1, i.e. the phase-1 serial driver tick for
+// tick. Above 1, that many workers pull indices off a shared cursor; the claim
+// is synchronous inside one worker turn, so two workers can never share an
+// index. Bounded on purpose and never a naked Promise.all: a 1600-char CJK
+// batch is a real request each, and the same reasoning is written out at
+// md-translate.js's _pbpTrMapLimit ("24k-char chunks would blow TPM").
 // `completed` is counted explicitly and handed back because the array is
 // PRE-SIZED: `out.length` is the TOTAL from the first tick, so a cancel line
 // built from it would claim "N/N done" over batches that never ran.
@@ -850,18 +877,63 @@ async function pbpVideoRunPunctBatches(batches, runOne, hooks) {
   const h = hooks || {};
   const out = new Array(list.length);
   let completed = 0;
-  for (const [bi, b] of list.entries()) {
-    // Between-batch cancel: finished batches stay in the caller's cache,
-    // nothing commits, and `completed` is what the status line reports.
-    if (typeof h.cancelled === "function" && h.cancelled()) return { out, completed, cancelled: true, superseded: false };
-    const res = await runOne(b, bi);
-    if (res && res.superseded) return { out, completed, cancelled: false, superseded: true };
-    // fail-closed: a batch without a conserved answer keeps its own input.
-    out[bi] = (res && res.ok) ? res.out : b;
-    completed++;
-    if (typeof h.onCompleted === "function") h.onCompleted(completed, bi);
+  let next = 0;                         // shared claim cursor
+  let cancelled = false, superseded = false, failure = null;
+  // md-translate.js's downgrade flag, same semantics: the FIRST rate-limited
+  // or faulted answer drains the pool back to one worker so the batches that
+  // are left go out one at a time. callAI has no backoff of its own, so
+  // without this a pool of 2 could turn "slow" into "the whole pass died on a
+  // 429 that a serial run would never have provoked". No backoff and no retry
+  // here either -- the video path has no partial-commit semantics, so a batch
+  // that failed simply keeps its input and the retry click re-pays only for it.
+  let slow = false;
+  const want = Math.floor(Number(h.concurrency) || 1) || 1;
+  const conc = Math.max(1, Math.min(want, list.length || 1));
+  const stopped = () => cancelled || superseded || failure != null;
+
+  async function worker(index) {
+    while (true) {
+      try {
+        if (stopped()) return;
+        if (slow && index > 0) return;
+        // Cancel is checked before a worker CLAIMS, never mid round-trip: a
+        // request already in flight is allowed to finish and its answer is
+        // still assembled and counted, because runOne has already banked it in
+        // the batch cache by then and the cancel line is meant to say how much
+        // of the work is paid for. The PASS commits nothing either way -- the
+        // caller returns on `cancelled` long before it reaches the committer.
+        if (typeof h.cancelled === "function" && h.cancelled()) { cancelled = true; return; }
+        if (next >= list.length) return;
+        const bi = next++;
+        const b = list[bi];
+        const res = await runOne(b, bi);
+        if (res && res.superseded) { superseded = true; return; }
+        // Another worker abandoned the pass while this request was in flight:
+        // this answer describes a transcript that is gone, so it is dropped
+        // rather than assembled (unlike a cancel, where it is still valid).
+        if (superseded) return;
+        if (res && res.transient) slow = true;
+        // fail-closed: a batch without a conserved answer keeps its own input.
+        out[bi] = (res && res.ok) ? res.out : b;
+        completed++;
+        if (typeof h.onCompleted === "function") h.onCompleted(completed, bi);
+      } catch (e) {
+        // A hard failure ends the pass with its own error, exactly as the
+        // serial driver's bare `await runOne(...)` did -- but the sibling
+        // worker has to be drained before it is rethrown, or its own rejection
+        // lands with nobody listening (an unhandled rejection the serial
+        // driver could not produce).
+        if (failure == null) failure = e || new Error("punctuation batch failed");
+        return;
+      }
+    }
   }
-  return { out, completed, cancelled: false, superseded: false };
+
+  const pool = [];
+  for (let w = 0; w < conc; w++) pool.push(worker(w));
+  await Promise.all(pool);              // workers never reject: the catch above owns it
+  if (failure != null) throw failure;
+  return { out, completed, cancelled, superseded };
 }
 
 // Whitespace-insensitive change test: a model that only rewraps lines
@@ -5787,11 +5859,27 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             if (superseded()) return;
           }
           let rejected = 0;
+          // Bounded tolerance for provider rate limits / 5xx / deadlines
+          // (K141 phase 2). The driver drains the pool to one worker on the
+          // FIRST one, so at most `concurrency` requests can already be in
+          // flight when it trips -- the budget is sized to absorb exactly that
+          // burst, so the pool can never turn a pass that a serial run would
+          // have finished into a dead end. The next one after that is a
+          // provider genuinely refusing, and it ends the pass with its own
+          // classified message rather than spending 30s per remaining batch on
+          // a result that could not commit anyway.
+          const TRANSIENT_BUDGET = 2;
+          let transientSeen = 0;
           // Progress counts the batches THIS pass actually pays for (device
           // round 6: a retry that resumed at "1/7" read as starting over --
           // it was numbering by batch index, not by work remaining).
           const freshTotal = batches.filter((x) => !_aiBatchCache.has(x)).length || batches.length;
-          let freshCur = 0;
+          // freshCur is what the status line names (the batch being worked on);
+          // freshDone is what the ring fills to. They are the same number in a
+          // serial pass and diverge only while two batches are in flight, where
+          // driving the ring off freshCur would show it full with a request
+          // still running.
+          let freshCur = 0, freshDone = 0;
           // One batch, start to finish: cache lookup, the round-trip, the
           // conservation gate and the cache write. It deliberately does NOT
           // assemble -- pbpVideoRunPunctBatches is the only writer of the
@@ -5818,7 +5906,31 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             // primary suspect behind "clicked AI punctuation, nothing changed"
             // (device report 2026-08-24). 2 tokens/char + headroom covers every
             // provider's tokenizer; 4096 is within all providers' caps.
-            const text = await callAI(sa, prompt, { maxTokens: Math.min(4096, b.length * 2 + 256), signal: _aiAbort ? _aiAbort.signal : undefined, model: punctModelOverride(sa) }); // same override the cache key hashes
+            let text;
+            try {
+              text = await callAI(sa, prompt, { maxTokens: Math.min(4096, b.length * 2 + 256), signal: _aiAbort ? _aiAbort.signal : undefined, model: punctModelOverride(sa) }); // same override the cache key hashes
+            } catch (e) {
+              // A track switch beat the answer back: the pass is abandoned on
+              // the flag below, not misreported as a provider failure.
+              if (superseded()) return { superseded: true };
+              // The user's Cancel aborts the in-flight request; that throw
+              // belongs to the catch at the end of the pass, which owns the
+              // cancel line. Anything that is not a momentary provider fault
+              // ends the pass there too, exactly as it did before.
+              if (_aiCancelRequested || !pbpVideoIsTransientAiError(e)
+                  || ++transientSeen > TRANSIENT_BUDGET) throw e;
+              // Rate limit / 5xx / deadline, within budget: this batch keeps
+              // its input like any batch that failed the gate, the pool drops
+              // to one worker, and the rest of the pass still runs. No retry --
+              // the passed batches are cached, so the retry click re-pays only
+              // for the failures.
+              rejected++;
+              console.info("[pbp-video] ai punctuation: batch " + (bi + 1) + "/" + batches.length
+                + " hit a transient provider failure (" + ((e && e.name) || "Error") + " " + ((e && e.status) || "")
+                + ") -- keeping original, remaining batches go one at a time");
+              setAiRing(++freshDone, freshTotal);
+              return { ok: false, out: b, transient: true };
+            }
             // The words this pass was built from are gone. A bare `return`
             // would end only THIS batch now, so it travels back as a flag and
             // the driver hands it up here, where the pass is abandoned.
@@ -5862,14 +5974,21 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
               _aiBatchCache.set(b, out.trim());
               persistPunctBatch(sa, batches, b, out.trim());
             }
-            setAiRing(freshCur, freshTotal);
+            setAiRing(++freshDone, freshTotal);
             return { ok, out: out.trim() }; // `ok` false -> the driver keeps `b`
           }
-          // Strictly serial, exactly as before: one batch in flight at a
-          // time, the cancel checked between batches. Every count below reads
-          // `run.completed`; the array is pre-sized, so its `.length` is the
-          // TOTAL and would turn any cancel line into a false "N/N done".
+          // Bounded fan-out (K141 phase 2): two batches at a time once there
+          // are at least four to PAY for -- a two-hour lecture is 15-19 batches
+          // and halves its wait, while a pass whose batches are nearly all
+          // cache hits keeps the single worker rather than carrying a rate
+          // limit risk for a couple of seconds. Below the gate this is the
+          // phase-1 serial driver tick for tick. The pool drains itself back to
+          // one worker the moment a batch reports a rate limit or a server
+          // fault, because callAI has no backoff of its own. Every count below
+          // reads `run.completed`; the array is pre-sized, so its `.length` is
+          // the TOTAL and would turn any cancel line into a false "N/N done".
           const run = await pbpVideoRunPunctBatches(batches, runOneBatch, {
+            concurrency: freshTotal >= 4 ? 2 : 1,
             cancelled: () => _aiCancelRequested,
             // Keeps the catch-path cancel line (an abort throws out of the
             // round-trip) reporting the batches that actually finished.
