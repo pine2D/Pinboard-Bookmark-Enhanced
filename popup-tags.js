@@ -615,6 +615,20 @@ function renderTags() {
   if (copyBtn) copyBtn.classList.toggle("hidden", currentTags.length < 1);
   renderLastUsedHint();
   syncSuggestTagStates();
+  // K73: presets are a one-way "already inserted" marker (.used), never a
+  // currentTags-derived mirror -- but once the tag list is cleared to zero,
+  // that "inserted" claim is no longer true for any preset, so every one of
+  // them resets. This is the only reset direction (remove/enable, never
+  // add/disable), so it can't strand a preset in a disabled+focused state.
+  // Living here (not in the tags-clear-all click handler) covers all three
+  // ways currentTags reaches zero: Clear all, loadBookmarkForEdit(), and
+  // deleting tags one by one down to none -- they all funnel through renderTags.
+  if (!currentTags.length) {
+    document.querySelectorAll("#tag-presets .preset-btn.used").forEach((b) => {
+      b.classList.remove("used");
+      b.disabled = false;
+    });
+  }
   if (typeof updateCharCount === "function") updateCharCount();
 }
 

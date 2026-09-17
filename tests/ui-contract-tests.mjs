@@ -2269,6 +2269,14 @@ check(/const btn = document\.createElement\("button"\);[\s\S]{0,80}btn\.type = "
   "popup-batch.js: tag presets are not native buttons");
 check(/btn\.disabled = true;\s*\$id\("tags-input"\)\?\.focus\(\)/.test(popupBatchJs),
   "popup-batch.js: used tag preset drops focus on a disabled button");
+// K73: presets must stay a one-way "already inserted" marker (never gain a
+// currentTags-derived disable path -- that would re-break the a11y focus
+// contract just asserted above), but renderTags must reset them once the
+// tag list is cleared to zero, so Clear all/loadBookmarkForEdit/deleting
+// down to none don't leave a preset permanently unusable.
+check(/btn\.disabled = true;\s*\$id\("tags-input"\)\?\.focus\(\)/.test(popupBatchJs) &&
+  /if \(!currentTags\.length\) \{\s*document\.querySelectorAll\("#tag-presets \.preset-btn\.used"\)\.forEach\(\(b\) => \{\s*b\.classList\.remove\("used"\);\s*b\.disabled = false;\s*\}\);\s*\}/.test(popupTagsJs),
+  "popup-tags.js: renderTags does not reset presets once tags are cleared to zero");
 const cleanHint = popupJs.slice(popupJs.indexOf("function _renderCleanHint"), popupJs.indexOf('document.addEventListener("DOMContentLoaded"'));
 check(cleanHint.indexOf('hint.classList.add("hidden")') < cleanHint.indexOf("urlInput.focus()"),
   "popup.js: URL-clean undo hides its focused button without returning focus");
