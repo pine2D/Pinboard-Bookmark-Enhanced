@@ -377,7 +377,11 @@ function _pbpNotesBuildRow(hit) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "notes-hit-btn";
-  btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space");
+  // K89: "/" (jump to the search filter) rides along with the existing
+  // multi-select chords -- it fires from anywhere in the list (see the
+  // #notes-list keydown below), not just this row, but this is the only
+  // per-row control an assistive-tech user reading a row would query.
+  btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /");
   // Roving tabindex (see _pbpNotesSyncRowTabStops): every row builds OUT of
   // the tab order, and exactly one is put back after the render.
   btn.tabIndex = -1;
@@ -1350,6 +1354,21 @@ if (typeof $id === "function") {
   // modified Space chords keep their own handler on the row button.
   const _notesListEl = $id("notes-list");
   if (_notesListEl) _notesListEl.addEventListener("keydown", (e) => {
+    // K89: "/" jumps back to the search filter, the twin of md-reader.js's
+    // "/" search shortcut. Placed BEFORE the modifier gate below and only
+    // excludes ctrl/meta/alt (not shift) -- on German QWERTZ / French
+    // AZERTY "/" needs Shift, and on US layouts Shift+/ yields "?" so
+    // e.key already disambiguates (same reasoning md-reader.js's "/" search
+    // shortcut uses). No typing-context guard is needed: this listener only
+    // ever fires with focus on a row inside #notes-list, and the page's
+    // filter field lives outside that container in the toolbar, so its
+    // keydowns never bubble here.
+    if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      const filter = $id("notes-filter");
+      if (_pbpNotesFocus(filter)) filter.select();
+      return;
+    }
     if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     const row = e.target && typeof e.target.closest === "function" ? e.target.closest(".notes-hit") : null;
     if (!row) return;

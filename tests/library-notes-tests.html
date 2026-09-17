@@ -385,6 +385,26 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("a modified ArrowDown is left to the row rather than navigating",
       press("ArrowDown", { shiftKey: true }) === true && document.activeElement === all[0]);
     check("navigation never opens a row", _pbpNotesSelectedKey === held);
+    // K89: "/" jumps from a focused row back to the search filter, the same
+    // gesture md-reader.js's "/" already offers inside the article.
+    all[0].focus();
+    $id("notes-filter").value = "seed";
+    const slash = press("/");
+    check("\"/\" focuses and selects the search filter from a row",
+      document.activeElement === $id("notes-filter") &&
+      $id("notes-filter").selectionStart === 0 &&
+      $id("notes-filter").selectionEnd === "seed".length &&
+      slash === false);
+    all[1].focus();
+    $id("notes-filter").value = "";
+    const shiftSlash = press("/", { shiftKey: true });
+    check("Shift+\"/\" (German/French layouts) still reaches the search filter",
+      document.activeElement === $id("notes-filter") && shiftSlash === false);
+    all[0].focus();
+    const ctrlSlash = press("/", { ctrlKey: true });
+    check("Ctrl+\"/\" is left alone and does not steal focus off the row",
+      document.activeElement === all[0] && ctrlSlash === true);
+    $id("notes-filter").value = "";
   }
 
   // ---- <mark> offsets stay inside the string they index (#25 twin) ----

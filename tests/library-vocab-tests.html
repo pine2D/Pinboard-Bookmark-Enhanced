@@ -486,7 +486,7 @@ check("every row is a grid row that reports its own selected state",
     card.getAttribute("aria-selected") === "false" &&
     card.querySelector('.notes-card-top[role="gridcell"]')));
 check("the row head advertises its selection keyboard shortcuts",
-  renderedHeads.every((head) => head.getAttribute("aria-keyshortcuts") === "Control+Space Shift+Space"));
+  renderedHeads.every((head) => head.getAttribute("aria-keyshortcuts") === "Control+Space Shift+Space /"));
 check("the per-row checkbox is gone from every rendered row",
   !$id("vocab-list").querySelector('input[type="checkbox"]'));
 const unknownLanguageRow = _pbpVocabBuildRow({
@@ -1401,6 +1401,28 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     press(" ", { ctrlKey: true });
     check("a modified Space still selects the row rather than navigating",
       _vocabSelected.size === 1 && document.activeElement === heads[0]);
+    // K89: "/" jumps from a focused row back to the search box, the same
+    // gesture md-reader.js's "/" already offers inside the article.
+    _pbpVocabClearSelection();
+    _pbpVocabSyncSelectionUi();
+    heads[0].focus();
+    $id("vocab-search").value = "seed";
+    const slash = press("/");
+    check("\"/\" focuses and selects the search box from a row",
+      document.activeElement === $id("vocab-search") &&
+      $id("vocab-search").selectionStart === 0 &&
+      $id("vocab-search").selectionEnd === "seed".length &&
+      slash === false);
+    heads[1].focus();
+    $id("vocab-search").value = "";
+    const shiftSlash = press("/", { shiftKey: true });
+    check("Shift+\"/\" (German/French layouts) still reaches the search box",
+      document.activeElement === $id("vocab-search") && shiftSlash === false);
+    heads[0].focus();
+    const ctrlSlash = press("/", { ctrlKey: true });
+    check("Ctrl+\"/\" is left alone and does not steal focus off the row",
+      document.activeElement === heads[0] && ctrlSlash === true);
+    $id("vocab-search").value = "";
     _pbpVocabClearSelection();
     _pbpVocabSyncSelectionUi();
 

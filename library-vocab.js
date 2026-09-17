@@ -241,7 +241,11 @@ function _pbpVocabBuildRow(w) {
   const head = document.createElement("button");
   head.type = "button";
   head.className = "notes-card-head";
-  head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space");
+  // K89: "/" (jump to the search box) rides along with the existing
+  // multi-select chords -- it fires from anywhere in the list (see the
+  // #vocab-list keydown below), not just this row, but this is the only
+  // per-row control an assistive-tech user reading a row would query.
+  head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /");
   // Roving tabindex (see _pbpVocabSyncRowTabStops): every row builds OUT of
   // the tab order and exactly one is put back in per render.
   head.tabIndex = -1;
@@ -2109,6 +2113,23 @@ if (_vocabLoadMore) _vocabLoadMore.addEventListener("click", () => {
 // Space chords keep their own handler on the row head.
 const _vocabListEl = $id("vocab-list");
 if (_vocabListEl) _vocabListEl.addEventListener("keydown", (e) => {
+  // K89: "/" jumps back to the search box, the twin of md-reader.js's "/"
+  // search shortcut. Placed BEFORE the modifier gate below and only
+  // excludes ctrl/meta/alt (not shift) -- on German QWERTZ / French AZERTY
+  // "/" needs Shift, and on US layouts Shift+/ yields "?" so e.key already
+  // disambiguates (same reasoning md-reader.js's "/" search shortcut uses).
+  // No typing-context guard is needed: this listener only ever fires with
+  // focus on a row inside #vocab-list, and the page's other text inputs
+  // (search, group input, lookup input, the note textarea) all live outside
+  // that container in the toolbar/detail pane, so their keydowns never
+  // bubble here.
+  if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    _pbpVocabFocusStable();
+    const search = $id("vocab-search");
+    if (search) search.select();
+    return;
+  }
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
   const card = e.target && typeof e.target.closest === "function" ? e.target.closest(".vocab-card") : null;
   if (!card) return;

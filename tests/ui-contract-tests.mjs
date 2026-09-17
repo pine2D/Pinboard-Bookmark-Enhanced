@@ -407,8 +407,29 @@ check(libraryVocabJs.includes('card.setAttribute("aria-selected", isSelected ? "
 // multi-row selection at all.
 check(/head\.addEventListener\("keydown"[\s\S]{0,400}e\.preventDefault\(\)[\s\S]{0,120}_pbpVocabRowSelect\(w, true\)/.test(libraryVocabJs) &&
   /_pbpVocabRowSelect\(w, false\)/.test(libraryVocabJs) &&
-  libraryVocabJs.includes('head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space")'),
+  libraryVocabJs.includes('head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /")'),
   "library-vocab.js: the keyboard multi-select path (Ctrl+Space toggle / Shift+Space range, announced via aria-keyshortcuts) is gone");
+// K89: "/" must be tested BEFORE the existing ctrl/meta/alt/shift gate (not
+// gating shiftKey itself) in both list keydown handlers, or German
+// QWERTZ/French AZERTY users -- who need Shift to type "/" -- could never
+// trigger it. A ".test(...)" against a $id-scoped snippet, not a bare
+// substring include, so the ordering (branch first, gate second) is what
+// this actually pins, not just the branch's presence somewhere in the file.
+{
+  const vocabListKeydown = libraryVocabJs.slice(libraryVocabJs.indexOf('$id("vocab-list");\nif (_vocabListEl)'),
+    libraryVocabJs.indexOf("const card = e.target"));
+  check(/if \(e\.key === "\/" && !e\.ctrlKey && !e\.metaKey && !e\.altKey\) \{[\s\S]{0,300}\$id\("vocab-search"\)/.test(vocabListKeydown) &&
+    vocabListKeydown.indexOf('e.key === "/"') < vocabListKeydown.indexOf("e.ctrlKey || e.metaKey || e.altKey || e.shiftKey"),
+    "library-vocab.js: #vocab-list's \"/\" search-focus branch is missing or no longer precedes the ctrl/meta/alt/shift gate (breaks it on Shift-requiring keyboard layouts)");
+  const notesListKeydown = read("library-notes.js");
+  const notesKeydownSlice = notesListKeydown.slice(notesListKeydown.indexOf('$id("notes-list");\n  if (_notesListEl)'),
+    notesListKeydown.indexOf("const row = e.target"));
+  check(/if \(e\.key === "\/" && !e\.ctrlKey && !e\.metaKey && !e\.altKey\) \{[\s\S]{0,300}\$id\("notes-filter"\)/.test(notesKeydownSlice) &&
+    notesKeydownSlice.indexOf('e.key === "/"') < notesKeydownSlice.indexOf("e.ctrlKey || e.metaKey || e.altKey || e.shiftKey"),
+    "library-notes.js: #notes-list's \"/\" search-focus branch is missing or no longer precedes the ctrl/meta/alt/shift gate (breaks it on Shift-requiring keyboard layouts)");
+  check(notesListKeydown.includes('btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /")'),
+    "library-notes.js: the row button lost its \"/\" aria-keyshortcuts announcement");
+}
 check(vocabStore.includes('const _PBP_VOCAB_DB_VERSION = 2'),
   "vocabulary database is upgraded through the dedicated store");
 check(!mdDict.includes('indexedDB.open(_PBP_VOCAB_DB_NAME'),
