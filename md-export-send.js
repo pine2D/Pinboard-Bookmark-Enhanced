@@ -106,6 +106,9 @@ async function pbpSendToTarget(id, ctx) {
         // block indefinitely — _sending's re-entrancy guard then silently ate every
         // click on the split button until the browser's own network-stack timeout
         // (minutes) fired, with no way to cancel (audit #30). 20s -> apiFail("api-down").
+        // K49: the options page's export-target Test button calls this same
+        // row.precheckRequest (see the testBtn click handler in renderExportTargets,
+        // options.js) with its own 20s deadline -- keep both in sync.
         const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body, redirect: "error", signal: AbortSignal.timeout(20000) });
         if (resp.status === 401) return apiFail("api-token");
         // GitHub-only: a fine-grained PAT passes the /user precheck (401 never

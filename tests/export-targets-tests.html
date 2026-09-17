@@ -367,8 +367,41 @@ async function runSendNetworkPolicyTests() {
   }
 }
 
+async function runOptionsTestButtonDeadlineTests() {
+  section("options.js export-target Test button precheck deadline (K49)");
+  // options.js's Test button click handler lives inside the page's single
+  // DOMContentLoaded closure (options.js:1021), nested inside
+  // renderExportTargets's per-row forEach -- there is no exported function to
+  // call and no way to run it here without a full options.html DOM + storage
+  // bootstrap (this page intentionally stays that light, per the other
+  // suites that block the same closure -- tests/options-usability-tests.html,
+  // tests/settings-persist-tests.html). So this pins the fix as a literal
+  // source contract instead, the same technique settings-persist-tests.html
+  // uses for options.js helpers it also cannot execute in isolation.
+  const optionsSource = await (await fetch("../options.js")).text();
+  const withPrecheck = pbpExportTargetIds().filter((id) => typeof PBP_EXPORT_TARGETS[id].precheckRequest === "function");
+  assert(withPrecheck.length >= 2 && withPrecheck.includes("notion") && withPrecheck.includes("github"),
+    "sanity: >=2 registry rows still define precheckRequest, or this pin would be vacuous");
+
+  const handlerStart = optionsSource.indexOf('testBtn.addEventListener("click", async () => {');
+  const handlerEnd = optionsSource.indexOf('testWrap.appendChild(testBtn); testWrap.appendChild(testStatus);', handlerStart);
+  assert(handlerStart >= 0 && handlerEnd > handlerStart,
+    "K49 anchor: the Test button click handler is still found by this literal shape -- every registry row with precheckRequest (notion, github) is rendered through this single shared handler, so pinning it once covers all of them");
+  const handler = optionsSource.slice(handlerStart, handlerEnd);
+
+  assert(handler.includes("const pr = row.precheckRequest({ port }, token);"),
+    "handler still calls row.precheckRequest the same way as the send path (md-export-send.js)");
+  assert(/await fetch\(pr\.url,\s*\{[^}]*signal:\s*AbortSignal\.timeout\(20000\)[^}]*\}\)/.test(handler),
+    "K49: the precheck fetch carries the same 20s deadline as the send path (md-export-send.js:87) -- a hung endpoint must not leave the button stuck for minutes");
+  assert(/\}\s*catch\s*\(_\)\s*\{\s*testStatus\.classList\.add\("err"\);\s*testStatus\.textContent = t\("mdSendTestDown"\);\s*\}/.test(handler),
+    "K49: a TimeoutError thrown by the 20s deadline falls into this existing catch, which already renders mdSendTestDown -- zero new copy keys");
+  assert(/\}\s*finally\s*\{\s*testBtn\.disabled = false;\s*testBtn\.removeAttribute\("aria-busy"\);\s*\}/.test(handler),
+    "K49: the disabled/aria-busy reset stays in the existing finally, so a 20s timeout still re-enables the button instead of leaving it stuck");
+}
+
 (async function () {
   await runSendNetworkPolicyTests();
+  await runOptionsTestButtonDeadlineTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

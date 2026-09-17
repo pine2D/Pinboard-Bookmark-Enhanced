@@ -1690,7 +1690,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             try {
               const pr = row.precheckRequest({ port }, token);
-              const resp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body, redirect: "error" });
+              // Same 20s deadline as the send path's precheck (md-export-send.js:87,
+              // comment at :109) -- a hung endpoint must not leave this button stuck
+              // in disabled/aria-busy for minutes (K49). AbortError/TimeoutError lands
+              // in the catch below, which already renders mdSendTestDown.
+              const resp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body, redirect: "error", signal: AbortSignal.timeout(20000) });
               if (resp.status === 401) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestBadToken"); }
               else if (!resp.ok) { testStatus.classList.add("err"); testStatus.textContent = t("mdSendTestDown"); }
               else { testStatus.classList.add("ok"); testStatus.textContent = t("mdSendTestOk"); }
