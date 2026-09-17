@@ -807,6 +807,55 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    // K70: #suggest-row's classList.remove("hidden") used to live behind the
+    // pageInfo await deep in showMain(), so the suggest skeleton popped in
+    // well after the first frame instead of being on screen from the start.
+    // It now lives in the same synchronous visibility switch as
+    // optShowSearch/optShowAiSummary/optShowAiTags, run against the ACTUAL
+    // sliced source (not a reimplementation) so a future edit that moves it
+    // back behind an await, or drops the fetch call into this synchronous
+    // block, fails loudly here.
+    await testAsync("K70: the showMain visibility switch unhides #suggest-row synchronously when optShowSuggestTags is on", async () => {
+      const switchStart = source.indexOf("if (!settings.optShowSearch) {");
+      const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
+      assert(switchStart >= 0 && switchEnd > switchStart, "showMain's visibility-switch block not found");
+      const switchBlock = source.slice(switchStart, switchEnd);
+      assert(switchBlock.includes('$id("suggest-row").classList.remove("hidden")'),
+        "the #suggest-row unhide moved out of the visibility-switch block -- update this slice's bounds");
+      assert(!switchBlock.includes("fetchPinboardSuggestTags("),
+        "fetchPinboardSuggestTags must stay behind the pageInfo await further down, not move into this synchronous block");
+
+      const suggestRow = createElementStub({ classes: ["hidden", "row"] });
+      const settingsStub = { optShowSearch: true, optShowAiSummary: true, optShowAiTags: true, optShowSuggestTags: true };
+      const run = new Function("$id", "document", "settings", switchBlock + "\nreturn true;");
+      run((id) => (id === "suggest-row" ? suggestRow : createElementStub()), document, settingsStub);
+
+      assert(!suggestRow.classList.contains("hidden"),
+        "optShowSuggestTags === true must unhide #suggest-row synchronously, before any await");
+    });
+
+    await testAsync("K70: with optShowSuggestTags off, the visibility switch leaves #suggest-row hidden", async () => {
+      const switchStart = source.indexOf("if (!settings.optShowSearch) {");
+      const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
+      const switchBlock = source.slice(switchStart, switchEnd);
+
+      const suggestRow = createElementStub({ classes: ["hidden", "row"] });
+      const settingsStub = { optShowSearch: true, optShowAiSummary: true, optShowAiTags: true, optShowSuggestTags: false };
+      const run = new Function("$id", "document", "settings", switchBlock + "\nreturn true;");
+      run((id) => (id === "suggest-row" ? suggestRow : createElementStub()), document, settingsStub);
+
+      assert(suggestRow.classList.contains("hidden"),
+        "optShowSuggestTags === false must leave #suggest-row hidden");
+    });
+
+    // The fetch itself must still be gated the same way it always was, just
+    // no longer paired with the unhide -- a regression here would mean the
+    // request fires even when the user turned the row off entirely.
+    await testAsync("K70: fetchPinboardSuggestTags stays gated behind optShowSuggestTags at its original call site", async () => {
+      const enqueueStart = source.indexOf('if (settings.optShowSuggestTags) fetchPinboardSuggestTags(token, targetUrl);');
+      assert(enqueueStart >= 0, "fetchPinboardSuggestTags's original gated call site is gone -- did it move or lose its guard?");
+    });
+
     test("update forwards only the exact loaded server time", () => {
       const timeStart = submit.indexOf('if (savePolicy.mode === "update")', intentIndex);
       const timeBlock = submit.slice(timeStart, submit.indexOf("let attemptsStored", timeStart));

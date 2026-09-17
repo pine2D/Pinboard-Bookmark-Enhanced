@@ -428,6 +428,12 @@ async function showMain(token) {
     const aiTagsRow = aiTagsBox ? aiTagsBox.closest(".row") : null;
     if (aiTagsRow) aiTagsRow.classList.add("hidden");
   }
+  // K70: unhide here (fetchPinboardSuggestTags itself stays where it was,
+  // gated behind the pageInfo await below) so the suggest skeleton is on
+  // screen from the very first frame instead of popping in once the async
+  // chain settles -- one less layout shift above .submit-bar in the first
+  // second.
+  if (settings.optShowSuggestTags) $id("suggest-row").classList.remove("hidden");
   if (settings.optShowQuickLinks === false) {
     const ql = document.querySelector(".quick-links");
     if (ql) ql.classList.add("hidden");
@@ -1153,11 +1159,10 @@ async function htmlToMarkdownAsync(html, opts) {
   fetchAllUserTags(token).then(() => {
     if (settings.optAiAutoTags && settings.optShowAiTags !== false && hasAIKey(settings)) $id("ai-tags-btn").click();
   });
-  // Suggest tags — enqueue after user tags so tagCaseMap is ready
-  if (settings.optShowSuggestTags) {
-    $id("suggest-row").classList.remove("hidden");
-    fetchPinboardSuggestTags(token, targetUrl);
-  }
+  // Suggest tags — enqueue after user tags so tagCaseMap is ready.
+  // #suggest-row's own unhide already happened up in the showMain visibility
+  // switch (K70) so the skeleton isn't waiting on this await chain to paint.
+  if (settings.optShowSuggestTags) fetchPinboardSuggestTags(token, targetUrl);
   // Bookmark check — non-blocking, updates UI when ready.
   // Pass the prefetched cache promise (started right after popup-form-ready) so the
   // service-worker round-trip overlaps with getPageInfoFromTab instead of running after it.
