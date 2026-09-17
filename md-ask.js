@@ -740,6 +740,17 @@ function pbpAskBuildPrompt(args) {
   }
   const parts = [];
   if (title) parts.push("TITLE: " + title, "");
+  // K97: `system` is a fixed string per (forum) variant and this ARTICLE/
+  // THREAD block -> PREVIOUS Q&A -> QUESTION order is byte-identical across
+  // every follow-up on the same article (st.ctx, built once by
+  // _pbpAskEnsureCtx above, intentionally never refreshes -- see its
+  // comment). That stable prefix is exactly what OpenAI / DeepSeek / Kimi /
+  // Qwen / Zhipu's automatic prompt-prefix caching and Gemini's implicit
+  // caching key on, for free, with no code on our side. Do NOT move history
+  // (or anything else) ahead of the article: that would put the part that
+  // changes every turn in front of the part that doesn't, and silently
+  // kill the cache hit for every provider above (locked by the "prompt
+  // order" test in tests/md-ai-tests.html).
   parts.push(a.forum ? "THREAD:" : "ARTICLE:", context, "");
   if (history.length) {
     parts.push("PREVIOUS Q&A (context for follow-ups only):");

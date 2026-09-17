@@ -2878,6 +2878,35 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
       && run.indexOf("st.rounds.slice(0, -1)") !== -1, "replaceLast history exclusion missing");
     assert(run.indexOf("history: promptHistory") !== -1, "prompt not built from the filtered history");
   });
+  test("K97: prompt order pins the provider prefix-caching prefix (ARTICLE before history before question)", () => {
+    // Second-turn prompt (non-empty history) through the real builder, the
+    // same one _pbpAskEnsureCtx/_pbpAskRun call in production. This locks
+    // the ordering the K97 comment above the parts.push(...) line in
+    // md-ask.js depends on: OpenAI/DeepSeek/Kimi/Qwen/Zhipu automatic
+    // prefix caching and Gemini implicit caching all key on the stable
+    // system+ARTICLE prefix staying ahead of the per-turn history/question.
+    const turn1 = pbpAskBuildPrompt({ context: "[P1] alpha\n[P2] beta", history: [], question: "first?" });
+    const hist = [{ q: "first?", a: "the first answer" }];
+    const turn2 = pbpAskBuildPrompt({ context: "[P1] alpha\n[P2] beta", history: hist, question: "second?" });
+    const articleIx = turn2.prompt.indexOf("ARTICLE:");
+    const histIx = turn2.prompt.indexOf("PREVIOUS Q&A");
+    const questionIx = turn2.prompt.indexOf("QUESTION: second?");
+    assert(articleIx !== -1 && histIx !== -1 && questionIx !== -1, "all three blocks present in the 2nd-turn prompt");
+    assert(articleIx < histIx, "ARTICLE must start before PREVIOUS Q&A");
+    assert(histIx < questionIx, "PREVIOUS Q&A must start before QUESTION");
+    // system does not depend on history -> the cached prefix's other half
+    // (system) must also be byte-identical turn over turn.
+    assertEq(turn2.system, turn1.system, "system string must be identical across turns");
+  });
+  test("K97: forum variant pins THREAD before history before question", () => {
+    const hist = [{ q: "first?", a: "the first answer" }];
+    const r = pbpAskBuildPrompt({ context: "[P1] a", history: hist, question: "second?", forum: true });
+    const threadIx = r.prompt.indexOf("THREAD:");
+    const histIx = r.prompt.indexOf("PREVIOUS Q&A");
+    const questionIx = r.prompt.indexOf("QUESTION: second?");
+    assert(threadIx !== -1 && histIx !== -1 && questionIx !== -1, "all three blocks present");
+    assert(threadIx < histIx && histIx < questionIx, "THREAD before PREVIOUS Q&A before QUESTION");
+  });
 });
 
 // ============ Task 14: ask citation tokenizer ============
