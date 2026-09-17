@@ -598,7 +598,12 @@ html[data-section="login"] .quick-actions { display: none !important; }
    via currentColor needs one rule instead of three per-layer duplicates. */
 .preset-btn.used::before { background: currentColor; opacity: .5; }
 
-.form-body { padding: var(--pp-sp-4) 0 var(--pp-sp-4); }
+.form-body {
+  /* No bottom inset: the submit bar already carries sp-3 below the button and
+     the quick-actions strip adds its own sp-4 top margin, so a third layer
+     here read as dead space above the strip (user report 2026-09-17). */
+  padding: var(--pp-sp-4) 0 0;
+}
 /* Unsupported-URL empty state: hide the dead form, keep only #url-warning
    (quick-actions live outside #main-section and stay functional).
    #status-msg and .feedback-card are carved out because both status outlets
@@ -1043,12 +1048,18 @@ html[data-theme] #submit-btn:disabled { background: var(--pp-btn-bg); border-col
    progressbar element (AT treats progressbar descendants as presentational). */
 .batch-progress-wrap {
   position: relative;
-  /* symmetric 6px top/bottom so the bar isn't flush against the popup's bottom edge
-     (.quick-actions has no bottom padding; this is the last visible element) */
-  margin: var(--pp-sp-3) var(--pp-sp-5);
+  /* Horizontal inset only. The vertical sp-3 lives on the bar itself (below)
+     so it disappears with the bar: the wrap is always display:block and an
+     empty block's margins collapse into a 6px strip of dead space at the
+     popup's bottom edge (user report 2026-09-17). */
+  margin: 0 var(--pp-sp-5);
 }
 .batch-progress {
   position: relative;
+  /* symmetric 6px top/bottom so the bar isn't flush against the popup's bottom
+     edge (.quick-actions has only its 3px clip buffer below this). The margins
+     collapse through the border-less wrap, so the cancel button stays centred. */
+  margin: var(--pp-sp-3) 0;
   height: 14px;
   background: var(--pp-input-bg);
   border: 1px solid var(--pp-input-bg);
