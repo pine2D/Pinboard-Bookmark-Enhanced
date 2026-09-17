@@ -1584,6 +1584,13 @@ async function pbpBiliFetchTranscript(bvid, part, opts) {
     if (!pr.ok) return { error: "player", meta: info };
     player = await pr.json();
   } catch (_) { return { error: "player", meta: info }; }
+  // bilibili's risk-control/permission refusals (-352 risk check, -403 access
+  // denied, and friends) come back as HTTP 200 with a non-zero code and no
+  // data, not as an HTTP error -- without this guard subs stays [] and
+  // pbpBiliLoggedOut honestly reports "not a login issue", so the caller is
+  // told "no subtitles" when the real story is "bilibili refused the
+  // request" (the pbpYtPlayabilityStatus guard above is the YouTube twin).
+  if (player && typeof player.code === "number" && player.code !== 0 && !player.data) return { error: "player", meta: info };
   const subs = (player && player.data && player.data.subtitle && player.data.subtitle.subtitles) || [];
   if (!subs.length) return { error: pbpBiliLoggedOut(player && player.data, navData) ? "login" : "no-tracks", meta: info };
   // Default-track pick only -- see the pbpYtFetchTranscript twin: the removed

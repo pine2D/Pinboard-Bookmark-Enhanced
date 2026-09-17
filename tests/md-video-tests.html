@@ -489,6 +489,7 @@ await (async () => {
   check("segments delivered", res.segments && res.segments.length === 2);
   check("picked human zh track", res.track && res.track.lan === "zh-CN");
   check("tracks + meta delivered", res.tracks.length === 3 && res.meta && res.meta.title === "T");
+  check("K139: the no-code player fixture is unaffected by the risk-control guard", res.error === undefined);
   const loggedOut = await pbpBiliFetchTranscript("BV1x", 1, { fetchFn: async (url) => {
     if (url.includes("/x/web-interface/nav")) return { ok: true, json: async () => nav };
     if (url.includes("/x/web-interface/view")) return { ok: true, json: async () => view };
@@ -512,6 +513,44 @@ await (async () => {
     return { ok: true, json: async () => ({}) };
   } });
   check("player API failure -> error:'player', never 'no subtitles' (Codex retro 2)", apiDown.error === "player");
+  // K139: bilibili's risk-control / permission refusals come back as HTTP 200
+  // with a non-zero business `code` and `data: null` (the documented error
+  // envelope), not as an HTTP failure -- fixtures are the full envelope shape
+  // (code/message/ttl/data), hand-written, not derived from a write-side
+  // constructor.
+  const riskControl = await pbpBiliFetchTranscript("BV1x", 1, { fetchFn: async (url) => {
+    if (url.includes("/x/web-interface/nav")) return { ok: true, json: async () => nav };
+    if (url.includes("/x/web-interface/view")) return { ok: true, json: async () => view };
+    if (url.includes("/x/player/wbi/v2")) return { ok: true, json: async () => ({ code: -352, message: "风控校验失败", ttl: 1, data: null }) };
+    return { ok: true, json: async () => ({}) };
+  } });
+  check("K139: risk-control refusal (code -352, data:null) -> error:'player', not 'no subtitles'", riskControl.error === "player");
+  const permissionDenied = await pbpBiliFetchTranscript("BV1x", 1, { fetchFn: async (url) => {
+    if (url.includes("/x/web-interface/nav")) return { ok: true, json: async () => nav };
+    if (url.includes("/x/web-interface/view")) return { ok: true, json: async () => view };
+    if (url.includes("/x/player/wbi/v2")) return { ok: true, json: async () => ({ code: -403, message: "访问权限不足", ttl: 1, data: null }) };
+    return { ok: true, json: async () => ({}) };
+  } });
+  check("K139: permission-denied refusal (code -403, data:null) -> error:'player', not 'no subtitles'", permissionDenied.error === "player");
+  const trulyNoSubs = await pbpBiliFetchTranscript("BV1x", 1, { fetchFn: async (url) => {
+    if (url.includes("/x/web-interface/nav")) return { ok: true, json: async () => nav };
+    if (url.includes("/x/web-interface/view")) return { ok: true, json: async () => view };
+    // code:0 with data present and subtitles genuinely empty -- a real "no
+    // subtitles" case, must not be caught by the code!==0 guard.
+    if (url.includes("/x/player/wbi/v2")) return { ok: true, json: async () => ({ code: 0, data: { login_mid: 170896, login_mid_hash: "abc", need_login_subtitle: false, subtitle: { allow_submit: true, lan: "", lan_doc: "", subtitles: [] } } }) };
+    return { ok: true, json: async () => ({}) };
+  } });
+  check("K139: code:0 + data present + subtitles empty stays 'no-tracks' (guard does not misfire)", trulyNoSubs.error === "no-tracks");
+  const refusalWithData = await pbpBiliFetchTranscript("BV1x", 1, { fetchFn: async (url) => {
+    if (url.includes("/x/web-interface/nav")) return { ok: true, json: async () => nav };
+    if (url.includes("/x/web-interface/view")) return { ok: true, json: async () => view };
+    // Non-zero code but data IS present (anonymous shape, empty subtitles):
+    // pins the "!player.data" condition -- this must fall through to the
+    // existing login/no-tracks judgement, not be swallowed as "player".
+    if (url.includes("/x/player/wbi/v2")) return { ok: true, json: async () => ({ code: -352, message: "风控校验失败", ttl: 1, data: { login_mid: 0, login_mid_hash: "", need_login_subtitle: true, subtitle: { allow_submit: false, lan: "", lan_doc: "", subtitles: [] } } }) };
+    return { ok: true, json: async () => ({}) };
+  } });
+  check("K139: non-zero code but data present falls through to existing judgement, not 'player'", refusalWithData.error !== "player" && refusalWithData.error === "login");
 })();
 
 section("pbpBiliLoggedOut");
