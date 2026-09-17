@@ -3808,6 +3808,7 @@
   "mdVideoRetry": { "message": "Проверить субтитры ещё раз" },
   "mdVideoPermDeclined": { "message": "Видео загружено; субтитры не включены" },
   "mdVideoAiPunctPartial": { "message": "$FAIL$ из $TOTAL$ частей не прошли проверку; исходный текст сохранён. Нажмите ещё раз, чтобы повторить только их.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
+  "mdVideoAiPunctRateLimited": { "message": "В $FAIL$ из $TOTAL$ частей превышен лимит запросов или время ожидания; для них сохранён исходный текст. Нажмите ещё раз, чтобы повторить только их.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoAiCancelled": { "message": "Отменено на $DONE$ из $TOTAL$ частей. Прогресс сохранён — нажмите, чтобы продолжить.", "placeholders": { "done": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoPunctSource": { "message": "Пунктуация есть" },
   "mdVideoPunctHeuristic": { "message": "Базовая пунктуация" },

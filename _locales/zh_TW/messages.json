@@ -3808,6 +3808,7 @@
   "mdVideoRetry": { "message": "重新偵測字幕" },
   "mdVideoPermDeclined": { "message": "影片已載入，字幕未啟用" },
   "mdVideoAiPunctPartial": { "message": "$FAIL$/$TOTAL$ 批未通過檢查，已保留原文；再點一次可只重試失敗的批次", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
+  "mdVideoAiPunctRateLimited": { "message": "$FAIL$/$TOTAL$ 批遇到流量限制或回應逾時，已保留原文；再點一次可只重試這些批次", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoAiCancelled": { "message": "已取消，完成 $DONE$/$TOTAL$ 批（進度已快取，再點一次可繼續）", "placeholders": { "done": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoPunctSource": { "message": "原字幕已有標點" },
   "mdVideoPunctHeuristic": { "message": "已自動加上基本標點" },

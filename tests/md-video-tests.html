@@ -1685,13 +1685,29 @@ await (async () => {
   const gm = src.match(/\bconcurrency:\s*([^,\n]+),/);
   assert(!!gm, "caller gate: the punctuation driver call passes an explicit worker count");
   const gateExpr = gm ? gm[1].trim() : "";
-  assert(/\bfreshTotal\b/.test(gateExpr) && !/\bbatches\b/.test(gateExpr),
-    "caller gate: it is keyed on freshTotal -- the batches this pass PAYS for -- not on the total batch count, so a nearly-all-cached pass never fans out");
-  const gate = gm ? new Function("freshTotal", "return (" + gateExpr + ");") : () => null;
-  assertEq(gate(3), 1, "caller gate: three fresh batches stay serial");
-  assertEq(gate(4), 2, "caller gate: four fresh batches open the pool to two");
-  assertEq(gate(0), 1, "caller gate: nothing to pay for stays serial");
-  assertEq(gate(19), 2, "caller gate: a two-hour lecture's 19 fresh batches still cap at two");
+  assert(/\bfreshPaid\b/.test(gateExpr) && !/\bfreshTotal\b/.test(gateExpr) && !/\bbatches\b/.test(gateExpr),
+    "caller gate: it is keyed on freshPaid -- the batches this pass actually buys -- not on freshTotal (whose display fallback would open the pool for a pass with nothing to pay for) and not on the total batch count");
+  const gate = gm ? new Function("freshPaid", "return (" + gateExpr + ");") : () => null;
+  assertEq(gate(3), 1, "caller gate: three paid batches stay serial");
+  assertEq(gate(4), 2, "caller gate: four paid batches open the pool to two");
+  assertEq(gate(0), 1, "caller gate: an all-cached pass has nothing to pay for and stays serial");
+  assertEq(gate(19), 2, "caller gate: a two-hour lecture's 19 paid batches still cap at two");
+  // ...and the display count keeps the fallback the gate must not inherit.
+  const fm = src.match(/const freshTotal = ([^;\n]+);/);
+  assert(fm && /\bfreshPaid\b/.test(fm[1]) && /batches\.length/.test(fm[1]),
+    "caller gate: freshTotal is still freshPaid || batches.length, so a fully cached pass counts 1/N rather than 1/0 -- the fallback lives on the display side only");
+
+  // Which status line a partial pass paints. A batch that was rate limited or
+  // timed out never reached the conservation gate, so the "failed the check"
+  // copy would name a cause that never happened; a mixed pass takes the
+  // rate-limit line because that is the half that says what to do about it.
+  const pm = src.match(/const partialMsg = ([\s\S]*?);\n/);
+  assert(!!pm, "partial copy: the partial-pass status line picks its key from an inspectable expression");
+  const pick = pm ? new Function("t", "transientSeen", "rejected", "batches", "return (" + pm[1] + ");") : () => null;
+  const keyOf = (seen) => pick((k) => k, seen, 2, ["a", "b", "c"]);
+  assertEq(keyOf(0), "mdVideoAiPunctPartial", "partial copy: conservation failures only -> the check-failed line");
+  assertEq(keyOf(1), "mdVideoAiPunctRateLimited", "partial copy: a rate-limited or timed-out batch -> the rate-limited line, not 'failed the check'");
+  assertEq(keyOf(2), "mdVideoAiPunctRateLimited", "partial copy: a mixed pass prefers the rate-limited line -- it is the actionable half");
 })();
 
 

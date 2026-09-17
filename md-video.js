@@ -5864,16 +5864,24 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           // FIRST one, so at most `concurrency` requests can already be in
           // flight when it trips -- the budget is sized to absorb exactly that
           // burst, so the pool can never turn a pass that a serial run would
-          // have finished into a dead end. The next one after that is a
-          // provider genuinely refusing, and it ends the pass with its own
-          // classified message rather than spending 30s per remaining batch on
-          // a result that could not commit anyway.
+          // have finished into a dead end. Past that the provider is genuinely
+          // refusing, and the bound is what keeps a deadline storm from
+          // spending 30s per remaining batch on a pass that can never commit:
+          // the throw lands in the catch at the end of this pass, which paints
+          // the generic mdVideoAiPunctFail (only a declined host grant carries
+          // copy of its own) and puts the provider's message in console.warn.
           const TRANSIENT_BUDGET = 2;
           let transientSeen = 0;
           // Progress counts the batches THIS pass actually pays for (device
           // round 6: a retry that resumed at "1/7" read as starting over --
           // it was numbering by batch index, not by work remaining).
-          const freshTotal = batches.filter((x) => !_aiBatchCache.has(x)).length || batches.length;
+          // freshPaid is the honest count of batches this pass has to buy.
+          // freshTotal keeps the `|| batches.length` DISPLAY fallback so a
+          // fully cached pass still counts "1/N" instead of "1/0" -- and that
+          // fallback must never reach the worker-count gate below, where it
+          // would fan a pass out over batches it is not paying for at all.
+          const freshPaid = batches.filter((x) => !_aiBatchCache.has(x)).length;
+          const freshTotal = freshPaid || batches.length;
           // freshCur is what the status line names (the batch being worked on);
           // freshDone is what the ring fills to. They are the same number in a
           // serial pass and diverge only while two batches are in flight, where
@@ -5898,7 +5906,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             // busy-quiet: visual count only -- the SR milestone announcements
             // are the pass start and its terminal line (research T7.4).
             pbvSetStatus(status, t("mdVideoAiPunctProgress", String(freshCur), String(freshTotal)), "busy-quiet");
-            setAiRing(freshCur - 1 || 0.05, freshTotal);
+            setAiRing(freshDone || 0.05, freshTotal);
             const prompt = "为下面的语音转写文本添加或修正标点符号，并按语义用空行分段。严格保持文字本身不变：不得增加、删除或改写任何非标点文字；原文中的错别字、重复和口误也必须原样保留，不要纠正。直接输出处理后的文本，不要任何解释。\n\n" + b;
             // Output ≈ input + marks: the provider DEFAULT of ~1024 output
             // tokens truncates any full-size (~1600+ char) CJK batch, and a
@@ -5988,7 +5996,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           // reads `run.completed`; the array is pre-sized, so its `.length` is
           // the TOTAL and would turn any cancel line into a false "N/N done".
           const run = await pbpVideoRunPunctBatches(batches, runOneBatch, {
-            concurrency: freshTotal >= 4 ? 2 : 1,
+            concurrency: freshPaid >= 4 ? 2 : 1,
             cancelled: () => _aiCancelRequested,
             // Keeps the catch-path cancel line (an abort throws out of the
             // round-trip) reporting the batches that actually finished.
@@ -6009,7 +6017,17 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           // batches that still carry heuristic text. Passed batches are
           // cached above, so the retry click only re-pays for the failures.
           if (rejected > 0) {
-            pbvSetStatus(status, t("mdVideoAiPunctPartial", String(rejected), String(batches.length)), true);
+            // Why a batch was kept matters. One that was rate limited or timed
+            // out never reached the conservation gate at all, so the "failed
+            // the check" copy would name a cause that never happened and send
+            // the user looking at the model instead of waiting a minute. A
+            // MIXED pass takes the rate-limit line: it is the half that says
+            // what to do about it, and "retry only those" covers the rest
+            // either way.
+            const partialMsg = transientSeen > 0
+              ? t("mdVideoAiPunctRateLimited", String(rejected), String(batches.length))
+              : t("mdVideoAiPunctPartial", String(rejected), String(batches.length));
+            pbvSetStatus(status, partialMsg, true);
             return;
           }
           // A pass that changed nothing must not commit: committing the

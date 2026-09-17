@@ -3802,6 +3802,7 @@
   "mdVideoRetry": { "message": "Re-check subtitles" },
   "mdVideoPermDeclined": { "message": "Video loaded; subtitles not enabled" },
   "mdVideoAiPunctPartial": { "message": "$FAIL$ of $TOTAL$ batches failed the check; original text kept. Click again to retry only the failed ones.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
+  "mdVideoAiPunctRateLimited": { "message": "$FAIL$ of $TOTAL$ batches were rate-limited or timed out; original text kept for them. Click again to retry only those.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoAiCancelled": { "message": "Cancelled at $DONE$ of $TOTAL$ batches. Progress is cached; click to continue.", "placeholders": { "done": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoPunctSource": { "message": "Already punctuated" },
   "mdVideoPunctHeuristic": { "message": "Basic auto-punctuation" },

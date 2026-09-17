@@ -3808,6 +3808,7 @@
   "mdVideoRetry": { "message": "Sprawdź napisy ponownie" },
   "mdVideoPermDeclined": { "message": "Wideo wczytane; napisy nieaktywne" },
   "mdVideoAiPunctPartial": { "message": "Weryfikacja nie powiodła się w $FAIL$ z $TOTAL$ partii; zachowano oryginalny tekst. Kliknij ponownie, aby powtórzyć tylko nieudane partie.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
+  "mdVideoAiPunctRateLimited": { "message": "W $FAIL$ z $TOTAL$ partii przekroczono limit żądań lub limit czasu; zachowano dla nich oryginalny tekst. Kliknij ponownie, aby powtórzyć tylko te partie.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoAiCancelled": { "message": "Anulowano po $DONE$ z $TOTAL$ partii. Postęp został zapisany; kliknij, aby kontynuować.", "placeholders": { "done": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoPunctSource": { "message": "Z interpunkcją" },
   "mdVideoPunctHeuristic": { "message": "Interpunkcja podstawowa" },

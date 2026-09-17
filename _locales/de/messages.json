@@ -3808,6 +3808,7 @@
   "mdVideoRetry": { "message": "Untertitel erneut prüfen" },
   "mdVideoPermDeclined": { "message": "Video geladen; Untertitel nicht aktiviert" },
   "mdVideoAiPunctPartial": { "message": "$FAIL$ von $TOTAL$ Abschnitten haben die Prüfung nicht bestanden; Originaltext beibehalten. Erneut klicken, um nur diese zu wiederholen.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
+  "mdVideoAiPunctRateLimited": { "message": "$FAIL$ von $TOTAL$ Abschnitten liefen in ein Ratenlimit oder eine Zeitüberschreitung; Originaltext dafür beibehalten. Erneut klicken, um nur diese zu wiederholen.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoAiCancelled": { "message": "Abgebrochen bei $DONE$ von $TOTAL$ Abschnitten; Fortschritt gespeichert, zum Fortsetzen erneut klicken.", "placeholders": { "done": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoPunctSource": { "message": "Bereits interpunktiert" },
   "mdVideoPunctHeuristic": { "message": "Basis-Interpunktion" },

@@ -3802,6 +3802,7 @@
   "mdVideoRetry": { "message": "重新检测字幕" },
   "mdVideoPermDeclined": { "message": "视频已加载，字幕未启用" },
   "mdVideoAiPunctPartial": { "message": "$FAIL$/$TOTAL$ 批未通过校验，已保留原文；再点一次只重试失败批", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
+  "mdVideoAiPunctRateLimited": { "message": "$FAIL$/$TOTAL$ 批遇到限流或响应超时，已保留原文；再点一次只重试这些批", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoAiCancelled": { "message": "已取消，完成 $DONE$/$TOTAL$ 批；进度已缓存，再点一次可继续", "placeholders": { "done": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoPunctSource": { "message": "原字幕已有标点" },
   "mdVideoPunctHeuristic": { "message": "已自动添加基础标点" },

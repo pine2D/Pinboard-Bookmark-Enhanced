@@ -3808,6 +3808,7 @@
   "mdVideoRetry": { "message": "Revérifier les sous-titres" },
   "mdVideoPermDeclined": { "message": "Vidéo chargée ; sous-titres non activés" },
   "mdVideoAiPunctPartial": { "message": "$FAIL$ lots sur $TOTAL$ ont échoué au contrôle ; texte d'origine conservé. Cliquez à nouveau pour ne relancer que ceux-là.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
+  "mdVideoAiPunctRateLimited": { "message": "$FAIL$ lots sur $TOTAL$ ont atteint la limite de débit ou n'ont pas répondu à temps ; texte d'origine conservé pour ces lots. Cliquez à nouveau pour ne relancer que ceux-là.", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoAiCancelled": { "message": "Annulé après $DONE$ lots sur $TOTAL$. Progression conservée ; cliquez pour continuer.", "placeholders": { "done": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoPunctSource": { "message": "Déjà ponctué" },
   "mdVideoPunctHeuristic": { "message": "Ponctuation de base" },

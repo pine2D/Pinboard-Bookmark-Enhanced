@@ -3808,6 +3808,7 @@
   "mdVideoRetry": { "message": "字幕を再チェック" },
   "mdVideoPermDeclined": { "message": "動画は読み込み済み、字幕は有効になっていません" },
   "mdVideoAiPunctPartial": { "message": "$TOTAL$ 件中 $FAIL$ 件のバッチが検証を通過せず、元のテキストを保持しました。もう一度クリックすると失敗分のみ再試行します。", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
+  "mdVideoAiPunctRateLimited": { "message": "$TOTAL$ 件中 $FAIL$ 件のバッチがレート制限またはタイムアウトになり、元のテキストを保持しました。もう一度クリックすると該当分のみ再試行します。", "placeholders": { "fail": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoAiCancelled": { "message": "$TOTAL$ 件中 $DONE$ 件で中止しました。進捗は保存済みです。クリックすると続きから再開します。", "placeholders": { "done": { "content": "$1" }, "total": { "content": "$2" } } },
   "mdVideoPunctSource": { "message": "句読点あり" },
   "mdVideoPunctHeuristic": { "message": "簡易自動句読点" },
