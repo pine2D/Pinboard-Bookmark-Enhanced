@@ -2858,7 +2858,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
         (key) => key,
         {},
         () => {},
-        () => null, // every $id lookup misses, including "tags-input"
+        // ONLY "tags-input" misses -- that is the state under test. Stubbing
+        // every id to null also hid #add-all-suggest from the source, so the
+        // Add-all branch this row's title promises never ran at all (it merely
+        // asserted the button was unresolvable).
+        (id) => (id === "tags-input" ? null : document.getElementById(id)),
         { check: "<svg></svg>" },
         container,
         ["alpha"],
@@ -2868,7 +2872,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
         const chip = container.querySelector(".stag");
         chip.focus(); chip.click();
         assert(chip.disabled, "chip was not disabled");
-        assert(runtime.addAllSuggest === null, "setup: add-all-suggest should be unresolvable in this harness");
+        const addAll = runtime.addAllSuggest;
+        assert(addAll, "setup: add-all-suggest must resolve here, or the branch under test never runs");
+        addAll.focus();
+        addAll.click();
+        assert(addAll.disabled, "add-all was not disabled -- its handler threw on the missing #tags-input");
       } finally {
         container.remove();
       }
