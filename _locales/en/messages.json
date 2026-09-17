@@ -1376,10 +1376,10 @@
     "message": "Русский"
   },
   "labelAiCache": {
-    "message": "AI Cache Duration (minutes)"
+    "message": "AI Cache Duration for Tags, Summaries & Page Fetches (minutes)"
   },
   "aiCacheHint": {
-    "message": "Cached per URL, up to 200 entries (LRU). Set 0 to disable."
+    "message": "Cached per URL, shares a 200-entry LRU pool. Set 0 to disable."
   },
   "labelTagSeparator": {
     "message": "Multi-word tag separator"

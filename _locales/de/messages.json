@@ -1376,10 +1376,10 @@
     "message": "Русский"
   },
   "labelAiCache": {
-    "message": "KI-Cache-Dauer (Minuten)"
+    "message": "KI-Cache-Dauer für Tags, Zusammenfassungen & Seitenabruf (Minuten)"
   },
   "aiCacheHint": {
-    "message": "Pro URL zwischengespeichert, max. 200 Einträge (LRU). Auf 0 setzen zum Deaktivieren."
+    "message": "Pro URL zwischengespeichert, gemeinsamer 200er-Pool (LRU). Auf 0 setzen zum Deaktivieren."
   },
   "labelTagSeparator": {
     "message": "Trennzeichen für mehrteilige Tags"

@@ -674,10 +674,10 @@
         </select>
       </div>
       <div class="fg context-help-host" data-help-role="field">
-        <label class="bl" for="opt-ai-cache-duration" data-i18n="labelAiCache">AI Cache Duration (minutes)</label>
+        <label class="bl" for="opt-ai-cache-duration" data-i18n="labelAiCache">AI Cache Duration for Tags, Summaries &amp; Page Fetches (minutes)</label>
         <details class="context-help">
           <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-          <p class="hint context-help-body" data-i18n="aiCacheHint">Cached per URL, up to 200 entries (LRU). Set 0 to disable.</p>
+          <p class="hint context-help-body" data-i18n="aiCacheHint">Cached per URL, shares a 200-entry LRU pool. Set 0 to disable.</p>
         </details>
         <input type="number" id="opt-ai-cache-duration" value="60" min="0" max="10080" step="15" />
       </div>

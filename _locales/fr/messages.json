@@ -1376,10 +1376,10 @@
     "message": "Русский"
   },
   "labelAiCache": {
-    "message": "Durée du cache IA (minutes)"
+    "message": "Durée du cache IA pour tags, résumés et récupération de pages (minutes)"
   },
   "aiCacheHint": {
-    "message": "Mis en cache par URL, max. 200 entrées (LRU). Mettre 0 pour désactiver."
+    "message": "Mis en cache par URL, pool de 200 partagé (LRU). Mettre 0 pour désactiver."
   },
   "labelTagSeparator": {
     "message": "Séparateur de tags multi-mots"

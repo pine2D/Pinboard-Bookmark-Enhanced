@@ -1376,10 +1376,10 @@
     "message": "Русский"
   },
   "labelAiCache": {
-    "message": "AI キャッシュ時間（分）"
+    "message": "AI タグ・要約とページ取得のキャッシュ時間（分）"
   },
   "aiCacheHint": {
-    "message": "URL ごとにキャッシュ、最大 200 件（LRU）。0 で無効にします。"
+    "message": "URL ごとにキャッシュ、共有枠 200 件（LRU）。0 で無効にします。"
   },
   "labelTagSeparator": {
     "message": "複数語タグの区切り文字"
