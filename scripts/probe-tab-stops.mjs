@@ -303,7 +303,15 @@ const COUNT_EXPR = `(() => {
   const e = document.getElementById('private-check');
   if (!s || !e) return { error: 'markers-not-found' };
   const all = Array.from(document.querySelectorAll('#main-section :is(button,a[href],input,select,textarea,[tabindex]):not(:disabled)'));
+  // tabindex="-1" is programmatically focusable but is NOT a tab stop, so it
+  // cannot count toward a tab-stop total. This filter was added when K72 乙
+  // landed (opt-wave C task 16) and the chip groups started using it; it is a
+  // no-op on the pre-K72 baseline this probe first recorded, because the only
+  // tabindex="-1" in popup.html is #batch-progress, which sits AFTER
+  // #private-check and so was never inside the measured range. Without it the
+  // probe measures "focusable elements", not the thing it is named for.
   const inRange = all.filter((el) => el.offsetParent !== null
+    && el.getAttribute('tabindex') !== '-1'
     && (s.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
     && (e.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING));
   return {
@@ -385,7 +393,13 @@ async function main() {
     results.push(await measure(session, "4-ai-tags-rendered"));
 
     // ---- Row 5: state 4 + 3 tag presets configured ----
-    await evalInPopup(session, `settings.tagPresets = ${JSON.stringify(PRESETS_RAW)}; setupTagPresets();`);
+    // syncSuggestTagStates() is NOT probe-only bookkeeping: popup.js calls it
+    // on the line immediately after setupTagPresets() during init (K72 乙 --
+    // #tag-presets has no render path of its own, so it joins the roving
+    // maintenance through that single point). This probe injects presets
+    // long after init, so it has to reproduce that pair or it would be
+    // measuring a DOM state the shipped popup never actually reaches.
+    await evalInPopup(session, `settings.tagPresets = ${JSON.stringify(PRESETS_RAW)}; setupTagPresets(); syncSuggestTagStates();`);
     results.push(await measure(session, "5-state4-plus-3-presets"));
   } finally {
     try { if (session) await session.send("Runtime.evaluate", { expression: "window.close()" }); } catch { /* ignore */ }

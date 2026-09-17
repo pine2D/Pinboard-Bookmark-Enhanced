@@ -654,6 +654,114 @@ function syncSuggestTagStates() {
     if (lowerTags.has(tag)) { el.classList.add("used"); el.disabled = true; }
     else { el.classList.remove("used"); el.disabled = false; }
   });
+  pbpSyncRovingToolbars();
+}
+
+// ---- K72 乙: one Tab stop per chip group (container-level roving) ----
+// Between #tags-input and the three save checkboxes the popup used to park
+// 16-27 Tab stops, one per chip. The stop now lives on the CONTAINER and
+// never on a chip: a chip the user adopts goes `disabled` (above), and a
+// disabled button is not focusable -- had the stop been pinned to a chip,
+// adopting that one chip would have dropped the whole group out of the
+// keyboard order (the #88 failure mode, strictly worse than the status quo).
+//
+// role="toolbar", never listbox: #tags-autocomplete already owns listbox and
+// #tags-input is its role="combobox" aria-controls owner; a second listbox
+// here would pollute that relationship. Accessible names are static in
+// popup.html (data-i18n-aria), so they follow the language switch for free.
+//
+// Ring membership = the chips PLUS the group's own "Add all" button. Add all
+// is tabindex="-1" like everything else in the container, so it has to ride
+// the ring or it would be keyboard-dead. #ai-tags-btn (generate) is NOT a
+// member: it spends tokens, it is not a peer option among the chips, and it
+// keeps an ordinary Tab stop of its own -- it is hidden whenever chips are on
+// screen (_aiParkTagsBtn), so the group is still exactly one stop.
+const PBP_ROVING_GROUPS = [
+  { id: "tag-presets", chip: ".preset-btn" },
+  { id: "pinboard-suggest-tags", chip: ".stag" },
+  { id: "ai-suggest-tags", chip: ".stag" },
+];
+function pbpRovingSpec(container) {
+  return PBP_ROVING_GROUPS.find((g) => g.id === container.id) || null;
+}
+// Live queries, every time: which chip is disabled changes on every add and
+// remove, so a cached ring would hand focus to a dead button.
+function pbpRovingChips(container, spec) {
+  return [...container.querySelectorAll(spec.chip)].filter((el) => !el.disabled);
+}
+function pbpRovingItems(container, spec) {
+  return [...container.querySelectorAll(`${spec.chip}, .add-all-link`)]
+    .filter((el) => !el.disabled && !el.classList.contains("hidden"));
+}
+function pbpRovingFocusIn(e) {
+  const c = e.currentTarget;
+  const spec = pbpRovingSpec(c);
+  if (!spec) return;
+  // Focus already landed on a chip (Tab forward through us, or a mouse
+  // click): drop the container out of the tab sequence, or Shift+Tab off the
+  // first chip would hit the container, get forwarded straight back to that
+  // same chip, and trap the user inside the group. focusout restores it.
+  if (e.target !== c) { c.tabIndex = -1; return; }
+  const first = pbpRovingChips(c, spec)[0];
+  if (!first) return; // no live chip: the container itself is a valid, quiet stop
+  c.tabIndex = -1;
+  first.focus({ preventScroll: true });
+}
+function pbpRovingFocusOut(e) {
+  const c = e.currentTarget;
+  if (e.relatedTarget && c.contains(e.relatedTarget)) return;
+  if (c.getAttribute("role") === "toolbar") c.tabIndex = 0;
+}
+function pbpRovingKeydown(e) {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const c = e.currentTarget;
+  const spec = pbpRovingSpec(c);
+  if (!spec) return;
+  const fwd = e.key === "ArrowRight", back = e.key === "ArrowLeft";
+  const home = e.key === "Home", end = e.key === "End";
+  if (!fwd && !back && !home && !end) return;
+  const items = pbpRovingItems(c, spec);
+  if (!items.length) return;
+  const at = items.indexOf(document.activeElement);
+  let next;
+  if (home) next = items[0];
+  else if (end) next = items[items.length - 1];
+  else if (at < 0) next = fwd ? items[0] : items[items.length - 1]; // focus still on the container
+  else next = items[(at + (fwd ? 1 : -1) + items.length) % items.length];
+  e.preventDefault();
+  next.focus({ preventScroll: true });
+}
+// Called from syncSuggestTagStates above -- which is itself the first line of
+// pbpAssignAltNumBadges, i.e. it rides BOTH of the single points that already
+// run on every chip rebuild (buildSuggestGroup's finally, renderAITags, every
+// renderTags). No observer, no third lifecycle hook.
+function pbpSyncRovingToolbars() {
+  PBP_ROVING_GROUPS.forEach((spec) => {
+    const c = $id(spec.id);
+    if (!c) return;
+    if (!c.dataset.pbpRoving) {
+      // Bound on the container, never on document: popup-tags.js already
+      // drives the autocomplete dropdown from ArrowUp/Down on #tags-input,
+      // and a document-level listener would race it.
+      c.addEventListener("focusin", pbpRovingFocusIn);
+      c.addEventListener("focusout", pbpRovingFocusOut);
+      c.addEventListener("keydown", pbpRovingKeydown);
+      c.dataset.pbpRoving = "1";
+    }
+    c.querySelectorAll(`${spec.chip}, .add-all-link`).forEach((el) => { el.tabIndex = -1; });
+    if (!c.querySelector(spec.chip)) {
+      // Skeleton, empty result, AI error, or presets never configured: no
+      // chips at all means no toolbar, so Tab must not stop on nothing.
+      c.removeAttribute("role");
+      c.removeAttribute("tabindex");
+      return;
+    }
+    c.setAttribute("role", "toolbar");
+    // A rebuild can land while focus sits inside the group (chip click ->
+    // renderTags). Handing the container tabIndex 0 mid-visit would re-arm the
+    // Shift+Tab trap pbpRovingFocusIn exists to prevent.
+    c.tabIndex = c.contains(document.activeElement) ? -1 : 0;
+  });
 }
 
 // Alt+1..9 slot assignment across BOTH chip rows (suggest, then AI, document

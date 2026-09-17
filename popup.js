@@ -665,6 +665,13 @@ async function showMain(token) {
   setupAIFeatures();
   setupDescriptionCounter();
   setupTagPresets();
+  // K72 乙: the presets container was just built. Fold it into the roving-
+  // toolbar maintenance through the SAME single point every other chip
+  // rebuild uses (popup-tags.js syncSuggestTagStates) rather than minting a
+  // third lifecycle hook -- #tag-presets has no render path of its own, so
+  // without this its buttons would stay individual Tab stops until the first
+  // tag add.
+  if (typeof syncSuggestTagStates === "function") syncSuggestTagStates();
 
 // ---- Local Markdown extraction via Defuddle ----
 // Uses _cbExecuteScript from ai.js to consume chrome.runtime.lastError via

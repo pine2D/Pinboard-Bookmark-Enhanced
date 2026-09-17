@@ -3391,6 +3391,247 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "_locales/en: kbdAltCheckHint is missing or does not name the keys");
     });
 
+    // ---- 乙: container-level roving toolbars ----
+    const rovingStart = popupTagsSource.indexOf("function syncSuggestTagStates() {");
+    const rovingEnd = popupTagsSource.indexOf("// Alt+1..9 slot assignment", rovingStart);
+    assert(rovingStart >= 0 && rovingEnd > rovingStart,
+      "popup-tags.js: syncSuggestTagStates / roving-toolbar block not found");
+    const rovingSource = popupTagsSource.slice(rovingStart, rovingEnd);
+
+    function createRovingFixture({ chips = [], usedIdx = [], addAll = true, containerId = "pinboard-suggest-tags", chipClass = "stag" } = {}) {
+      const container = document.createElement("div");
+      container.id = containerId;
+      container.className = "suggest-area";
+      document.body.appendChild(container);
+      const currentTags = usedIdx.map((i) => chips[i]);
+      const api = new Function("currentTags", "$id", "document",
+        `${rovingSource}\nreturn { syncSuggestTagStates, pbpSyncRovingToolbars };`
+      )(currentTags, (id) => document.getElementById(id), document);
+      function build() {
+        while (container.firstChild) container.removeChild(container.firstChild);
+        const made = chips.map((tag, i) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = chipClass;
+          b.dataset.tag = tag;
+          b.textContent = tag;
+          // .preset-btn disabling is a one-way "already inserted" marker, not a
+          // currentTags mirror, so syncSuggestTagStates will not set it for us.
+          if (chipClass !== "stag" && usedIdx.includes(i)) b.disabled = true;
+          container.appendChild(b);
+          return b;
+        });
+        let aa = null;
+        if (addAll) {
+          aa = document.createElement("button");
+          aa.type = "button";
+          aa.className = "add-all-link";
+          aa.textContent = "Add all";
+          container.appendChild(aa);
+        }
+        api.syncSuggestTagStates();
+        return { made, aa };
+      }
+      let built = build();
+      return {
+        container, api, currentTags,
+        get chips() { return built.made; },
+        get addAll() { return built.aa; },
+        rebuild() { built = build(); },
+        cleanup() {
+          if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+          container.remove();
+        },
+      };
+    }
+
+    test("K72 乙: after syncSuggestTagStates a suggest group is exactly one tab stop", () => {
+      const fx = createRovingFixture({ chips: ["a", "b", "c", "d"] });
+      try {
+        assert(fx.container.getAttribute("role") === "toolbar",
+          "the chip container did not become role=toolbar (listbox is taken by #tags-autocomplete and must not be reused)");
+        assert(fx.container.getAttribute("tabindex") === "0", "the chip container is not a tab stop");
+        const stops = [...fx.container.querySelectorAll("button")].filter((b) => b.tabIndex !== -1);
+        assert(stops.length === 0,
+          "chips/Add all still sit in the tab sequence -- found " + stops.length + " with tabindex != -1");
+      } finally { fx.cleanup(); }
+    });
+
+    test("K72 乙: focusing the container hands focus to the first enabled chip", () => {
+      const fx = createRovingFixture({ chips: ["a", "b", "c"], usedIdx: [0] });
+      try {
+        fx.container.focus();
+        assert(document.activeElement === fx.chips[1],
+          "container focus did not land on the first :not(:disabled) chip; activeElement is " +
+          (document.activeElement && (document.activeElement.textContent || document.activeElement.tagName)));
+        assert(fx.container.getAttribute("tabindex") === "-1",
+          "the container kept tabindex=0 while focus sat on a chip -- Shift+Tab off the first chip would bounce straight back in");
+      } finally { fx.cleanup(); }
+    });
+
+    test("K72 乙: ArrowRight skips a disabled chip and ArrowLeft wraps; Home/End jump to the ends", () => {
+      const fx = createRovingFixture({ chips: ["a", "b", "c", "d"], usedIdx: [1] });
+      const arrow = (key) => document.activeElement.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+      try {
+        fx.chips[0].focus();
+        arrow("ArrowRight");
+        assert(document.activeElement === fx.chips[2],
+          "ArrowRight from chip 1 did not skip the disabled chip 2 and land on chip 3");
+        arrow("ArrowLeft");
+        assert(document.activeElement === fx.chips[0], "ArrowLeft did not walk back over the disabled chip");
+        arrow("End");
+        assert(document.activeElement === fx.addAll,
+          "End did not reach the last enabled item (Add all rides the ring: it is tabindex=-1, so without the ring it would be keyboard-dead)");
+        arrow("Home");
+        assert(document.activeElement === fx.chips[0], "Home did not return to the first enabled item");
+      } finally { fx.cleanup(); }
+    });
+
+    test("K72 乙: the arrow ring covers chips past the ninth (Alt+N badges stop at 9)", () => {
+      const chips = Array.from({ length: 14 }, (_, i) => "t" + (i + 1));
+      const fx = createRovingFixture({ chips, addAll: false });
+      try {
+        fx.chips[12].focus();
+        fx.chips[12].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+        assert(document.activeElement === fx.chips[13],
+          "the 14th chip is unreachable by arrow key -- the ring must not stop where the Alt+1-9 badges do");
+      } finally { fx.cleanup(); }
+    });
+
+    test("K72 乙: every chip disabled -- focusing the container does not throw and focus stays put", () => {
+      const chips = ["a", "b", "c"];
+      const fx = createRovingFixture({ chips, usedIdx: [0, 1, 2], addAll: false });
+      try {
+        assert(fx.chips.every((c) => c.disabled), "setup: all chips should be disabled");
+        fx.container.focus();
+        assert(document.activeElement === fx.container,
+          "focus left the container even though it holds no focusable chip");
+        fx.container.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+        assert(document.activeElement === fx.container, "an arrow key on an all-disabled group moved focus somewhere");
+      } finally { fx.cleanup(); }
+    });
+
+    test("K72 乙: a rebuild re-applies the roving state (no chip is left holding tabindex 0)", () => {
+      const fx = createRovingFixture({ chips: ["a", "b", "c"] });
+      try {
+        fx.rebuild();
+        const stops = [...fx.container.querySelectorAll("button")].filter((b) => b.tabIndex !== -1);
+        assert(stops.length === 0,
+          "freshly rendered chips kept their default tabindex -- the maintenance must ride the rebuild path, not a one-shot init");
+        assert(fx.container.getAttribute("tabindex") === "0" && fx.container.getAttribute("role") === "toolbar",
+          "the rebuilt group lost its container-level tab stop");
+      } finally { fx.cleanup(); }
+    });
+
+    test("K72 乙: a group with no chips at all leaves no dead tab stop behind", () => {
+      const fx = createRovingFixture({ chips: ["a"], addAll: false });
+      try {
+        fx.chips[0].remove();
+        fx.api.syncSuggestTagStates();
+        assert(fx.container.getAttribute("role") === null && fx.container.getAttribute("tabindex") === null,
+          "an empty chip group still advertises a toolbar tab stop -- Tab would stop on nothing");
+      } finally { fx.cleanup(); }
+    });
+
+    test("K72 乙: #tag-presets gets the same container-level stop (its chips are .preset-btn, not .stag)", () => {
+      const fx = createRovingFixture({ chips: ["Work", "Read", "Ref"], addAll: false, containerId: "tag-presets", chipClass: "preset-btn" });
+      try {
+        assert(fx.container.getAttribute("role") === "toolbar" && fx.container.getAttribute("tabindex") === "0",
+          "#tag-presets did not become a single container-level tab stop");
+        assert([...fx.container.querySelectorAll("button")].every((b) => b.tabIndex === -1),
+          "preset buttons are still individual tab stops");
+        fx.container.focus();
+        assert(document.activeElement === fx.chips[0], "focusing #tag-presets did not reach the first preset");
+        fx.chips[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+        assert(document.activeElement === fx.chips[1], "arrow keys do not roam the presets");
+      } finally { fx.cleanup(); }
+    });
+
+    test("K72 乙: the roving listeners bind on the containers, never on document", () => {
+      assert(!/\bdocument\.addEventListener\(\s*"(?:keydown|focusin|focusout)"/.test(rovingSource),
+        "popup-tags.js: a roving listener was bound on document -- it would race the #tags-input ArrowUp/Down autocomplete handler");
+      assert(/c\.addEventListener\("keydown", pbpRovingKeydown\)/.test(rovingSource),
+        "popup-tags.js: the arrow-key handler is no longer bound on the container");
+      assert(/pbpSyncRovingToolbars\(\);/.test(rovingSource),
+        "popup-tags.js: syncSuggestTagStates no longer drives the roving maintenance");
+      assert(/^\s*syncSuggestTagStates\(\);/m.test(popupTagsSource.slice(popupTagsSource.indexOf("function pbpAssignAltNumBadges()"))),
+        "popup-tags.js: pbpAssignAltNumBadges no longer opens with syncSuggestTagStates() -- the rebuild path would stop re-applying the roving state");
+    });
+
+    await testAsync("K72: the real popup markup, in the 3-5-tags state, is <= 6 tab stops between #tags-input and #private-check", async () => {
+      // chrome-dbg :9222 is not up in this sandbox and scripts/probe-tab-stops.mjs
+      // needs its own headed Chromium, so this is the in-page fallback the task
+      // brief specifies: the REAL #main-section markup out of popup.html, the
+      // REAL popup.css, and the REAL sliced syncSuggestTagStates, counted with
+      // the probe's own selector plus the `tabindex !== "-1"` filter a stop
+      // count has to have once anything in range is programmatically focusable.
+      const style = document.createElement("style");
+      style.textContent = popupCss;
+      document.head.appendChild(style);
+      const hadSection = "section" in document.documentElement.dataset;
+      const previousSection = document.documentElement.dataset.section;
+      document.documentElement.dataset.section = "main";
+      const parsed = new DOMParser().parseFromString(popupHtml, "text/html");
+      const imported = document.importNode(parsed.getElementById("main-section"), true);
+      document.body.appendChild(imported);
+      try {
+        const suggest = imported.querySelector("#pinboard-suggest-tags");
+        assert(suggest, "popup.html: #pinboard-suggest-tags not found in the imported markup");
+        imported.querySelector("#suggest-row").classList.remove("hidden");
+        // 4 tags on the form: the two all-tags links are visible, and the four
+        // matching chips go disabled -- the probe's state 3 exactly.
+        imported.querySelector("#tags-copy-all").classList.remove("hidden");
+        imported.querySelector("#tags-clear-all").classList.remove("hidden");
+        while (suggest.firstChild) suggest.removeChild(suggest.firstChild);
+        const names = Array.from({ length: 16 }, (_, i) => (i < 8 ? "pop-tag-" : "rec-tag-") + ((i % 8) + 1));
+        names.forEach((tag) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "stag";
+          b.dataset.tag = tag;
+          b.textContent = tag;
+          suggest.appendChild(b);
+        });
+        const aa = document.createElement("button");
+        aa.type = "button";
+        aa.className = "add-all-link";
+        aa.textContent = "Add all";
+        suggest.appendChild(aa);
+        const currentTags = names.slice(0, 4);
+        const s = imported.querySelector("#tags-input");
+        const e = imported.querySelector("#private-check");
+        assert(s && e, "the imported markup lost #tags-input or #private-check");
+        const countStops = () => [...imported.querySelectorAll(':is(button,a[href],input,select,textarea,[tabindex]):not(:disabled)')]
+          .filter((el) => el.offsetParent !== null
+            && el.getAttribute("tabindex") !== "-1"
+            && (s.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+            && (e.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING));
+        // Baseline first, in this same fixture: the four adopted chips go
+        // disabled (all the pre-K72 sync ever did) and nothing carries a
+        // tabindex. A fixture that cannot reproduce the crowding has nothing
+        // to prove, so the before-count is asserted too.
+        currentTags.forEach((tag) => { suggest.querySelector(`.stag[data-tag="${tag}"]`).disabled = true; });
+        const before = countStops();
+        assert(before.length >= 12,
+          "the fixture did not reproduce the crowded 3-5-tags state (only " + before.length + " stops before the fix)");
+        const api = new Function("currentTags", "$id", "document",
+          `${rovingSource}\nreturn { syncSuggestTagStates };`
+        )(currentTags, (id) => document.getElementById(id), document);
+        api.syncSuggestTagStates();
+        const stops = countStops();
+        assert(stops.length >= 3,
+          "the after-count collapsed to " + stops.length + " -- the fixture stopped measuring anything (the two all-tags links and the AI generate button must survive)");
+        assert(stops.length <= 6,
+          "the 3-5-tags state still has " + stops.length + " tab stops between #tags-input and #private-check (was " +
+          before.length + "): " + stops.map((el) => el.id || el.className).join(", "));
+      } finally {
+        imported.remove();
+        style.remove();
+        if (hadSection) document.documentElement.dataset.section = previousSection;
+        else delete document.documentElement.dataset.section;
+      }
+    });
   } catch (error) {
     test("popup submit source contracts load", () => { throw error; });
   }

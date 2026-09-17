@@ -1642,11 +1642,14 @@ check(/btn\.tabIndex = btn\.classList\.contains\("active"\) \? 0 : -1;/.test(opt
     "popup.js: recent-row delete button lost its title/aria-label pair");
 }
 
-// K72 甲 (2026-09, opt-wave C): Alt+P/R/A must reach the checkboxes through
-// .click(), because that is the only path that runs their change listeners
-// (_archiveUserTouched, and the web.archive.org host request that needs this
-// keydown's user activation); a refactor that assigns the .checked property
-// instead would look identical on screen and silently break both.
+// K72 (2026-09, opt-wave C): the popup save form's two keyboard affordances.
+// 甲 -- Alt+P/R/A must reach the checkboxes through .click(), because that is
+// the only path that runs their change listeners (_archiveUserTouched, and the
+// web.archive.org host request that needs this keydown's user activation); a
+// `.checked = !checked` refactor would look identical on screen and silently
+// break both. 乙 -- the chip groups are one Tab stop each, held by the
+// CONTAINER: pinning the stop to a chip would drop the whole group out of the
+// keyboard order the moment the user adopts that chip (the #88 root cause).
 for (const [id, keys] of [["private-check", "Alt+P"], ["readlater-check", "Alt+R"], ["archive-check", "Alt+A"]]) {
   const tag = (popupHtml.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`)) || [])[0] || "";
   check(tag.includes(`aria-keyshortcuts="${keys}"`),
@@ -1663,6 +1666,30 @@ check(/const PBP_ALT_CHECKBOX_CODES = \{ KeyP: "private-check", KeyR: "readlater
   check(/mainSection\.classList\.contains\("hidden"\)/.test(altBody) && /mainSection\.classList\.contains\("unsupported-url"\)/.test(altBody),
     "popup.js: the Alt+P/R/A handler lost a visibility gate -- it would toggle checkboxes the user cannot see");
 }
+{
+  const rovStart = popupTagsJs.indexOf("function syncSuggestTagStates() {");
+  const rovEnd = popupTagsJs.indexOf("// Alt+1..9 slot assignment", rovStart);
+  const rov = rovStart >= 0 && rovEnd > rovStart ? popupTagsJs.slice(rovStart, rovEnd) : "";
+  check(rov.includes("pbpSyncRovingToolbars();"),
+    "popup-tags.js: syncSuggestTagStates no longer drives the roving-toolbar maintenance -- a chip rebuild would leave chips in the tab sequence");
+  check(/c\.addEventListener\("(?:focusin|focusout|keydown)"/.test(rov) &&
+    !/document\.addEventListener\(\s*"(?:focusin|focusout|keydown)"/.test(rov),
+    "popup-tags.js: a roving listener moved onto document -- it would race the #tags-input ArrowUp/Down autocomplete handler");
+  check(/c\.setAttribute\("role", "toolbar"\)/.test(rov) && !/"listbox"/.test(rov),
+    "popup-tags.js: the chip groups must be role=toolbar; listbox belongs to #tags-autocomplete (#tags-input aria-controls it)");
+  check(/c\.removeAttribute\("tabindex"\)/.test(rov),
+    "popup-tags.js: a chip group with no chips would keep a dead tab stop");
+  check(/el\.tabIndex = -1;/.test(rov),
+    "popup-tags.js: chips/Add all are no longer pushed out of the tab sequence");
+}
+check(/^\s*syncSuggestTagStates\(\);/m.test(popupTagsJs.slice(popupTagsJs.indexOf("function pbpAssignAltNumBadges()"))),
+  "popup-tags.js: pbpAssignAltNumBadges no longer opens with syncSuggestTagStates() -- the second rebuild single point would stop re-applying the roving state");
+for (const id of ["tag-presets", "ai-suggest-tags", "pinboard-suggest-tags"]) {
+  const tag = (popupHtml.match(new RegExp(`<div id="${id}"[^>]*>`)) || [])[0] || "";
+  check(/data-i18n-aria="/.test(tag),
+    `popup.html: #${id} lost its localized accessible name -- role=toolbar with no name announces as an unlabelled group`);
+}
+
 check(/result && typeof result\.catch === "function"\) result\.catch\(reportConfirmError\)/.test(sharedJs),
   "shared.js: asynchronous confirm failures can become unhandled rejections");
 // Leading-edge alignment: the popover is routinely far wider than its anchor, so
