@@ -2048,6 +2048,47 @@ suiteIf("_pbpTrIs429 / _pbpTrMissingIds", "_pbpTrIs429", () => {
     ok(r.done === 3 && r.failed.length === 0, "downgrade filled: " + JSON.stringify(r));
   });
 
+  await atest("K95: missing id logs one truncation observation, no batch text in payload", async () => {
+    // Deliberately digit-free source words (unlike segs()'s "block " + id) so a
+    // stray numeral in the payload (missing: 1, chars: NN) can't false-positive
+    // the leak check below.
+    const batch = [
+      { id: 1, text: "alpha bravo charlie delta echo foxtrot" },
+      { id: 2, text: "golf hotel india juliet kilo lima" },
+      { id: 3, text: "mike november oscar papa quebec romeo" }
+    ];
+    const warnCalls = [];
+    const realWarn = console.warn;
+    console.warn = (...args) => { warnCalls.push(args); };
+    try {
+      const r = await pbpTrRunQueue({
+        targetCode: "en",
+        batches: [batch],
+        requestBatch: async (segments, onItem) => {
+          for (const s of segments) if (s.id !== 2) onItem({ id: s.id, text: "T:" + s.text });
+          return { seenIds: new Set([1, 3]) };
+        },
+        requestSingle: async (seg) => "single:" + seg.text,
+        onFill: () => {}, onBlockFail: () => { throw new Error("no fail"); }, onProgress: () => {}
+      });
+      ok(r.done === 3 && r.failed.length === 0, "downgrade still fills: " + JSON.stringify(r));
+      ok(warnCalls.length === 1, "exactly one console.warn call for the whole batch, saw " + warnCalls.length);
+      const [prefix, payload] = warnCalls[0];
+      ok(prefix === "[pbp-tr] batch truncated:", "warn prefix: " + prefix);
+      ok(payload && typeof payload === "object", "payload is an object");
+      ok(Object.keys(payload).sort().join(",") === "chars,cjkShare,missing,target", "payload keys: " + Object.keys(payload).join(","));
+      ok(typeof payload.chars === "number" && payload.chars > 0, "chars is a positive number: " + payload.chars);
+      ok(typeof payload.cjkShare === "number", "cjkShare is a number: " + payload.cjkShare);
+      ok(payload.missing === 1, "missing count is 1: " + payload.missing);
+      ok(payload.target === "en", "target language code preserved: " + payload.target);
+      const serialized = JSON.stringify(payload);
+      const sourceWords = batch.map((s) => s.text).join(" ").split(/\s+/).filter(Boolean);
+      for (const word of sourceWords) ok(serialized.indexOf(word) === -1, "payload leaked source word: " + word);
+    } finally {
+      console.warn = realWarn;
+    }
+  });
+
   await atest("ratio-failed item goes to downgrade; failed single -> onBlockFail", async () => {
     const failedIds = [];
     const r = await pbpTrRunQueue({

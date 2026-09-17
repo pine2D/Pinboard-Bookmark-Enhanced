@@ -627,7 +627,19 @@ async function pbpTrRunQueue(plan) {
       }
     }
     // stream OK: ids missing from the answer (or ratio-rejected) -> downgrade
-    for (const id of _pbpTrMissingIds(batch, filled)) downgrade.push(byId.get(id));
+    const missingIds = _pbpTrMissingIds(batch, filled);
+    // K95 observation only: no logic change here. Logs once per batch (not per
+    // missing id) so real-machine testing can tell whether the 8000-char pack
+    // cap vs. the 8192 output cap actually collides in practice before anyone
+    // touches pbpTrPackBatches. No article/source text in the payload.
+    if (missingIds.length) {
+      try {
+        const chars = batch.reduce((n, s) => n + String((s && s.text) || "").length, 0);
+        const cjkShare = Math.round(pbpTrCjkShare(batch.map((s) => (s && s.text) || "").join("")) * 100) / 100;
+        console.warn("[pbp-tr] batch truncated:", { chars, cjkShare, missing: missingIds.length, target: targetCode });
+      } catch (_) {}
+    }
+    for (const id of missingIds) downgrade.push(byId.get(id));
   }
 
   async function worker(index) {
