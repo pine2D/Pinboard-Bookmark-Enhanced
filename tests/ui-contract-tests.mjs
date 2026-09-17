@@ -335,6 +335,24 @@ check(vocabGdriveJs.includes("function pbpCreateVocabDriveSyncRunner("),
     "md-translate.js: target-language link does not open the Reader settings tab");
 }
 
+// K156: the reader's only general settings entry point -- a static
+// icon-only gear button in the rail (rail-ident/view-toggle neighbourhood,
+// deliberately NOT the #rail-bottom-row tray, whose four cells are all
+// in-page reading-experience toggles).
+{
+  const btnStart = mdHtml.indexOf('id="rail-settings-btn"');
+  const tagStart = btnStart >= 0 ? mdHtml.lastIndexOf("<button", btnStart) : -1;
+  const tagEnd = tagStart >= 0 ? mdHtml.indexOf("</button>", tagStart) : -1;
+  const btn = tagStart >= 0 && tagEnd > tagStart ? mdHtml.slice(tagStart, tagEnd) : "";
+  check(!!btn && btn.includes('title="settings"') && btn.includes('data-i18n-title="settings"') &&
+    btn.includes('aria-label="settings"') && btn.includes('data-i18n-aria="settings"') && btn.includes("<svg"),
+    "md-preview.html: #rail-settings-btn is missing title/aria-label/icon (or dropped the shared \"settings\" i18n key)");
+  check(/function pbpRailSettingsBtnInit\(\)[\s\S]{0,300}getElementById\("rail-settings-btn"\)[\s\S]{0,120}addEventListener\("click", \(\) => pbpOpenOptionsTab\("reader"\)\)/.test(mdPreviewJs),
+    "md-preview.js: #rail-settings-btn's click handler does not open the Reader settings tab");
+  check(/let _pbpRailSettingsInited = false;\s*\nfunction pbpRailSettingsBtnInit\(\) \{\s*\n\s*if \(_pbpRailSettingsInited\) return;/.test(mdPreviewJs),
+    "md-preview.js: pbpRailSettingsBtnInit lost its idempotency guard (rail-bottom-row family precedent)");
+}
+
 for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-select-all",
   "vocab-invert-selection", "vocab-batch-toolbar", "vocab-group-input", "vocab-add-group",
   "vocab-batch-delete", "vocab-no-results", "vocab-load-more", "vocab-list",

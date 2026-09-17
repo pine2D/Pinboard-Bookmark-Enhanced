@@ -36,6 +36,21 @@
       <button id="btn-raw" class="toggle-btn" data-i18n="mdViewRaw" aria-pressed="false">Raw</button>
       <button id="btn-rendered" class="toggle-btn active" data-i18n="mdViewRendered" aria-pressed="true">Rendered</button>
     </div>
+    <!-- K156: the reader's only general settings entry point. Lives here, not
+         in #rail-bottom-row's icon tray (md-reader.js _pbpRailBottomRow) --
+         that tray is a documented "four ghost cells" contract of in-page
+         reading-experience TOGGLES (kbd help / zen / width / "Aa"), all of
+         which stay on this page; this button NAVIGATES AWAY to options.html,
+         a different action category, and a fifth cell would also squeeze the
+         tray's four existing icons narrower for no shared benefit. Reuses
+         popup.html's own #options-link idiom (same "settings" i18n key, same
+         Lucide gear, title+aria-label doing the labelling for an icon-only
+         control) rather than the ghost-button tray look. -->
+    <div class="row">
+      <button type="button" id="rail-settings-btn" class="action-btn" title="settings" data-i18n-title="settings" aria-label="settings" data-i18n-aria="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
     <div class="rail-section" id="export-section">
       <div class="rail-label" data-i18n="mdExportSection">Export</div>
       <div class="row" role="group" aria-label="Export" data-i18n-aria="mdExportSection">

@@ -742,9 +742,35 @@ window.pbpReaderSchemeSet = function (mode) {
   pbpReaderSchemeApply();
 };
 
+// K156: the rail's only general settings entry point. A named top-level
+// function (declared outside the async IIFE below, like
+// pbpRailCollapseState/pbpRailCollapsible above it), matching this file's own
+// convention for keeping anything a future test might want to reach outside
+// the IIFE's file://-safe bailout. Idempotency guard matches the
+// rail-bottom-row family's own precedent (_pbpKbdHelpInit/_pbpZenInit/
+// _pbpTypoInit, md-reader.js) -- a second call must not double-bind the
+// click listener; that family has no runtime mount test of its own either
+// (tests/ui-contract-tests.mjs's static source/markup assertions are the
+// established bar for this control family -- see the ones added for this
+// button alongside it).
+let _pbpRailSettingsInited = false;
+function pbpRailSettingsBtnInit() {
+  if (_pbpRailSettingsInited) return;
+  _pbpRailSettingsInited = true;
+  const btn = document.getElementById("rail-settings-btn");
+  if (btn) btn.addEventListener("click", () => pbpOpenOptionsTab("reader"));
+}
+
 (async function () {
   initI18n();
   applyI18n();
+  // Wired here, ahead of the file://-safe bailout right below and every
+  // extraction-outcome branch further down, because unlike setupDrawer()
+  // (called separately on the error-shell path AND the fully-rendered path
+  // below) this control has no per-render dependency at all: the button is
+  // always in the initial HTML, so one call before any render attempt
+  // covers every outcome, including the extraction-failure shell.
+  pbpRailSettingsBtnInit();
   // file://-safe bailout: tests/md-ai-tests.html loads this whole file (deferred
   // scripts, no extension context) to reach pbpRailCollapseState/pbpRailCollapsible
   // below -- neither needs anything past this point. Mirrors the same typeof-chrome
