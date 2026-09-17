@@ -302,6 +302,61 @@ function typeInto(value) {
     assert(suggestBox.getAttribute("aria-busy") === "false", "aria-busy stayed true");
   });
 
+  // K74: Add all must ride the last group that actually renders, so a
+  // popular-only response (recommended empty) still gets a batch entry
+  // point, and a both-groups response keeps it exactly where it was.
+  await testAsync("popular-only suggestions get an Add all inside the popular group", async () => {
+    resetInput();
+    settings.pinboardToken = "alice:token";
+    suggestRow.classList.remove("hidden");
+    suggestBox.innerHTML = SKEL;
+    suggestBox.setAttribute("aria-busy", "true");
+    const url = "https://example.com/popular-only";
+    storagePayload = {
+      ["cached_suggest_" + url]: {
+        account: "alice",
+        timestamp: Date.now(),
+        data: [{ popular: ["one", "two"] }, { recommended: [] }],
+      },
+    };
+    const done = fetchPinboardSuggestTags("alice:token", url);
+    releaseStorage();
+    await done;
+    const groups = suggestBox.querySelectorAll(".suggest-group");
+    assert(groups.length === 1, "expected only the popular group, got " + groups.length);
+    const addAll = suggestBox.querySelector("#add-all-suggest");
+    assert(addAll, "popular-only response has no Add all entry point");
+    assert(groups[0].contains(addAll), "Add all must live inside the popular group when it's the only one");
+    addAll.click();
+    assert(currentTags.slice().sort().join(",") === "one,two",
+      "Add all must add exactly the popular tags, got " + currentTags.join(","));
+  });
+
+  await testAsync("both groups present keeps Add all on the recommended group's tail", async () => {
+    resetInput();
+    settings.pinboardToken = "alice:token";
+    suggestRow.classList.remove("hidden");
+    suggestBox.innerHTML = SKEL;
+    suggestBox.setAttribute("aria-busy", "true");
+    const url = "https://example.com/both-groups";
+    storagePayload = {
+      ["cached_suggest_" + url]: {
+        account: "alice",
+        timestamp: Date.now(),
+        data: [{ popular: ["one"] }, { recommended: ["two"] }],
+      },
+    };
+    const done = fetchPinboardSuggestTags("alice:token", url);
+    releaseStorage();
+    await done;
+    const groups = suggestBox.querySelectorAll(".suggest-group");
+    assert(groups.length === 2, "expected both groups, got " + groups.length);
+    const addAll = suggestBox.querySelector("#add-all-suggest");
+    assert(addAll, "Add all missing when both groups render");
+    assert(groups[1].contains(addAll), "Add all must stay on the recommended group's tail, unchanged from before K74");
+    assert(!groups[0].contains(addAll), "Add all must not move to the popular group when recommended also renders");
+  });
+
   await testAsync("a bail-out for another account takes the skeleton down", async () => {
     resetInput();
     settings.pinboardToken = "bob:token";

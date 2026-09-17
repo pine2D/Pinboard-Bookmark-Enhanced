@@ -152,7 +152,11 @@ async function fetchPinboardSuggestTags(token, url) {
       return g;
     }
 
-    if (popular.length) container.appendChild(buildSuggestGroup(t("suggestPopular"), popular, null));
+    // K74: Add all rides the last group that actually renders. With both
+    // groups present this is byte-for-byte the old behavior (still lands on
+    // recommended's tail); popular-only responses now get a batch entry too
+    // instead of a silent gap, without moving the button out of its group.
+    if (popular.length) container.appendChild(buildSuggestGroup(t("suggestPopular"), popular, recommended.length ? null : "add-all-suggest"));
     if (recommended.length) container.appendChild(buildSuggestGroup(t("suggestRecommended"), recommended, "add-all-suggest"));
 
     const addAllSuggest = $id("add-all-suggest");
