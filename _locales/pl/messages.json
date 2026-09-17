@@ -1376,7 +1376,7 @@
     "message": "Русский"
   },
   "labelAiCache": {
-    "message": "Czas pamięci podręcznej AI dla tagów, opisów i pobierania stron (minuty)"
+    "message": "Czas pamięci podręcznej AI dla tagów, podsumowań i pobierania stron (minuty)"
   },
   "aiCacheHint": {
     "message": "Pamięć podręczna per URL, wspólna pula 200 (LRU). Ustaw 0, aby wyłączyć."
