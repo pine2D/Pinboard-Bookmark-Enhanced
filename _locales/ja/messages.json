@@ -209,6 +209,9 @@
   "editCancelTitle": {
     "message": "編集モードを終了"
   },
+  "editDiscardDraftConfirm": {
+    "message": "編集すると、ここに入力した内容が置き換わります。続けますか？"
+  },
   "savedOnDate": {
     "message": "$DATE$ に保存",
     "placeholders": {

@@ -209,6 +209,9 @@
   "editCancelTitle": {
     "message": "Bearbeitungsmodus beenden"
   },
+  "editDiscardDraftConfirm": {
+    "message": "Bearbeiten ersetzt, was du hier eingegeben hast. Fortfahren?"
+  },
   "savedOnDate": {
     "message": "Gespeichert am $DATE$",
     "placeholders": {

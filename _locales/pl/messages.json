@@ -209,6 +209,9 @@
   "editCancelTitle": {
     "message": "Wyjdź z trybu edycji"
   },
+  "editDiscardDraftConfirm": {
+    "message": "Edycja zastąpi to, co tu wpisano. Kontynuować?"
+  },
   "savedOnDate": {
     "message": "zapisano $DATE$",
     "placeholders": {

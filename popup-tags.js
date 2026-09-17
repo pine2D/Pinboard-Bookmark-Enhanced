@@ -556,11 +556,16 @@ function addTag(tag) {
   }
   if (currentTags.some((t) => t.toLowerCase() === tag.toLowerCase())) return;
   currentTags.push(tag);
+  // K75: this is the only entry point that pushes a tag on the user's
+  // behalf (typed, chip click, AI-chip click, paste, preset) -- see
+  // popup.js's _tagsUserTouched comment for what must never set this.
+  if (typeof _tagsUserTouched !== "undefined") _tagsUserTouched = true;
   renderTags();
 }
 
 function removeTag(tag) {
   currentTags = currentTags.filter((t) => t.toLowerCase() !== tag.toLowerCase());
+  if (typeof _tagsUserTouched !== "undefined") _tagsUserTouched = true;
   // Codex r2 M3: a removed tag loses its AI provenance - if the user
   // re-adds the same name by hand, replace-mode regen must treat it as
   // the user's tag and never retract it.

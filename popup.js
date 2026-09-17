@@ -62,6 +62,23 @@ let bookmarkLookup = { status: "idle", url: "", generation: 0, promise: null, fo
 // lookup never clobbers in-progress input. Resets naturally on each popup open
 // (fresh document). Declared top-level so checkExistingBookmark() can read it.
 const fieldDirtyFlags = { "title-input": false, "description-input": false, "private-check": false, "readlater-check": false };
+// K75: tags live in `currentTags`, a plain array with no per-field change
+// event, so fieldDirtyFlags can't see them. This is the equivalent signal for
+// tags specifically -- set ONLY by the user-facing entry points in
+// popup-tags.js (addTag/removeTag), never by a programmatic fill
+// (checkExistingBookmark, loadBookmarkForEdit, AI tag rendering). Reset
+// wherever fieldDirtyFlags resets.
+let _tagsUserTouched = false;
+
+// K75: has the user changed anything in the form since it was last (re)loaded?
+// Gates the "discard current draft?" confirm before editing a different
+// recent bookmark. Deliberately reads only these signals -- NEVER
+// currentTags.length, which checkExistingBookmark fills from the server on
+// every already-bookmarked page whether or not the user touched anything,
+// and would make the confirm fire on every single edit-from-recent click.
+function pbpPopupFormIsDirty() {
+  return Object.values(fieldDirtyFlags).some(Boolean) || _tagsUserTouched;
+}
 
 function pbpRebasePopupTags(serverTags, submittedTags, liveTags) {
   const baseline = Array.isArray(submittedTags) ? submittedTags : [];
@@ -1490,6 +1507,7 @@ function setupSubmit(token) {
         && currentTags.every((tag, index) => tag === tags[index])
       );
       Object.keys(fieldDirtyFlags).forEach((id) => { fieldDirtyFlags[id] = false; });
+      _tagsUserTouched = false;
 
       // Host permission first: without it the background's archive call returns
       // at wayback.js's own permissions gate, so the indicator would claim an
@@ -1796,6 +1814,7 @@ async function loadBookmarkForEdit(url, token) {
   // Reset current form state
   invalidateBookmarkLookup();
   Object.keys(fieldDirtyFlags).forEach((id) => { fieldDirtyFlags[id] = false; });
+  _tagsUserTouched = false;
   currentTags = [];
   renderTags();
   $id("url-input").value = url;
@@ -1882,6 +1901,19 @@ async function fetchRecentBookmarks(token) {
       edit.setAttribute("aria-label", t("recentEditTitle"));
       const doEdit = async (e) => {
         if (e) e.preventDefault();
+        // K75: loadBookmarkForEdit wipes the current draft with no undo. A
+        // clean form (the common, high-frequency case) skips straight in;
+        // only a form the user actually touched gets an anchored confirm,
+        // matching the other destructive actions — never window.confirm.
+        if (pbpPopupFormIsDirty()) {
+          showConfirmPopover(edit, {
+            msg: t("editDiscardDraftConfirm"),
+            yesText: t("confirm"),
+            noText: t("cancel"),
+            onConfirm: async () => { await loadBookmarkForEdit(p.href, token); },
+          });
+          return;
+        }
         await loadBookmarkForEdit(p.href, token);
       };
       edit.addEventListener("click", doEdit);

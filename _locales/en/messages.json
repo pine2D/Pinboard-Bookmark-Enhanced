@@ -209,6 +209,9 @@
   "editCancelTitle": {
     "message": "Exit edit mode"
   },
+  "editDiscardDraftConfirm": {
+    "message": "Editing this bookmark replaces what you typed here. Continue?"
+  },
   "savedOnDate": {
     "message": "saved $DATE$",
     "placeholders": {

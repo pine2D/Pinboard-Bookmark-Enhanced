@@ -209,6 +209,9 @@
   "editCancelTitle": {
     "message": "退出編輯模式"
   },
+  "editDiscardDraftConfirm": {
+    "message": "編輯會取代你在此填寫的內容，確定繼續？"
+  },
   "savedOnDate": {
     "message": "儲存於 $DATE$",
     "placeholders": {

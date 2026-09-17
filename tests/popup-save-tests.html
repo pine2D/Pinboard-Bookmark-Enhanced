@@ -2873,6 +2873,202 @@ test("posts/add default remains replace=yes for existing callers", () => {
         container.remove();
       }
     });
+
+    // ---- K75: edit-from-recent draft-loss confirm ----
+    // loadBookmarkForEdit wipes the form with no undo. doEdit (the click
+    // handler on the recent-bookmark row's pencil button, inside
+    // fetchRecentBookmarks) now gates that behind a dirty check + the same
+    // showConfirmPopover family the row's own delete button already uses.
+    const formIsDirtyStart = source.indexOf("function pbpPopupFormIsDirty()");
+    const formIsDirtyEnd = source.indexOf("function pbpRebasePopupTags(", formIsDirtyStart);
+    assert(formIsDirtyStart >= 0 && formIsDirtyEnd > formIsDirtyStart, "pbpPopupFormIsDirty source not found");
+    const formIsDirtySource = source.slice(formIsDirtyStart, formIsDirtyEnd);
+
+    const recentBookmarksStart = source.indexOf("// ===================== Recent Bookmarks");
+    const recentBookmarksEnd = source.indexOf("// ===================== Offline Queue Status", recentBookmarksStart);
+    assert(recentBookmarksStart >= 0 && recentBookmarksEnd > recentBookmarksStart, "fetchRecentBookmarks source not found");
+    const recentBookmarksSource = source.slice(recentBookmarksStart, recentBookmarksEnd);
+
+    const editFromRecentStart = source.indexOf("// ===================== Edit From Recent");
+    assert(editFromRecentStart >= 0 && recentBookmarksStart > editFromRecentStart, "Edit From Recent section not found");
+    const editFromRecentSource = source.slice(editFromRecentStart, recentBookmarksStart);
+
+    test("K75: pbpPopupFormIsDirty never reads currentTags -- the length proxy is permanently excluded", () => {
+      // An already-bookmarked page has currentTags filled by checkExistingBookmark
+      // before the user touches anything (popup.js:1212-1214) -- if this predicate
+      // ever reads currentTags.length again, the confirm would fire on every
+      // single edit-from-recent click for any heavy Pinboard user.
+      assert(!formIsDirtySource.includes("currentTags"),
+        "pbpPopupFormIsDirty must never reference currentTags (server-filled tags are not a user edit)");
+    });
+
+    function runFormIsDirty(fieldDirtyFlags, tagsUserTouched) {
+      return new Function("fieldDirtyFlags", "_tagsUserTouched",
+        `${formIsDirtySource}\nreturn pbpPopupFormIsDirty();`)(fieldDirtyFlags, tagsUserTouched);
+    }
+
+    test("K75: a clean form (no dirty field, tags untouched) is not dirty", () => {
+      const flags = { "title-input": false, "description-input": false, "private-check": false, "readlater-check": false };
+      assert(runFormIsDirty(flags, false) === false, "a freshly loaded form was reported dirty");
+    });
+
+    test("K75: any single dirty field flag makes the form dirty", () => {
+      const base = { "title-input": false, "description-input": false, "private-check": false, "readlater-check": false };
+      for (const key of Object.keys(base)) {
+        const flags = { ...base, [key]: true };
+        assert(runFormIsDirty(flags, false) === true, `${key} alone did not register as dirty`);
+      }
+    });
+
+    test("K75: _tagsUserTouched alone makes the form dirty even with all four field flags clean", () => {
+      const flags = { "title-input": false, "description-input": false, "private-check": false, "readlater-check": false };
+      assert(runFormIsDirty(flags, true) === true, "a tags-only edit was not treated as dirty");
+    });
+
+    const addRemoveTagStart = popupTagsSource.indexOf("function addTag(tag) {");
+    const addRemoveTagEnd = popupTagsSource.indexOf("function renderTags() {", addRemoveTagStart);
+    assert(addRemoveTagStart >= 0 && addRemoveTagEnd > addRemoveTagStart, "addTag/removeTag source not found");
+    const addRemoveTagSource = popupTagsSource.slice(addRemoveTagStart, addRemoveTagEnd);
+
+    function createTagTouchHarness() {
+      const currentTags = [];
+      const dependencies = {
+        currentTags,
+        settings: {},
+        tagCaseMap: {},
+        resolveTagCase: (tag) => tag,
+        renderTags: () => {},
+      };
+      const names = Object.keys(dependencies);
+      const body = `let _tagsUserTouched = false;\n${addRemoveTagSource}\nreturn { addTag, removeTag, isTouched: () => _tagsUserTouched };`;
+      const factory = new Function(...names, body);
+      return factory(...names.map((name) => dependencies[name]));
+    }
+
+    test("K75: addTag -- the real user add entry point -- sets _tagsUserTouched", () => {
+      const harness = createTagTouchHarness();
+      assert(harness.isTouched() === false, "setup: harness should start untouched");
+      harness.addTag("alpha");
+      assert(harness.isTouched() === true, "addTag did not set _tagsUserTouched");
+    });
+
+    test("K75: removeTag -- the real user remove entry point -- sets _tagsUserTouched", () => {
+      const harness = createTagTouchHarness();
+      harness.removeTag("whatever-was-clicked");
+      assert(harness.isTouched() === true, "removeTag did not set _tagsUserTouched");
+    });
+
+    test("K75: checkExistingBookmark's server-filled tags never touch _tagsUserTouched", () => {
+      assert(!lookupSource.includes("_tagsUserTouched"),
+        "checkExistingBookmark must not mark tags user-touched -- it fills currentTags from the server, not from a user edit");
+    });
+
+    test("K75: popup-ai.js never sets _tagsUserTouched directly (only via the addTag/removeTag entry points)", () => {
+      assert(!popupAiSource.includes("_tagsUserTouched"),
+        "popup-ai.js references _tagsUserTouched directly -- AI tag rendering must go through addTag (a click), not set the flag itself");
+    });
+
+    test("K75: loadBookmarkForEdit resets _tagsUserTouched alongside fieldDirtyFlags", () => {
+      assert(editFromRecentSource.includes("_tagsUserTouched = false"),
+        "loadBookmarkForEdit resets fieldDirtyFlags but leaves a stale _tagsUserTouched behind");
+    });
+
+    test("K75: a successful save resets _tagsUserTouched alongside fieldDirtyFlags", () => {
+      assert(submit.includes("_tagsUserTouched = false"),
+        "the post-submit reset clears fieldDirtyFlags but leaves a stale _tagsUserTouched behind");
+    });
+
+    test("K75: exitEditMode is untouched -- still the plain reload, no confirm gating added", () => {
+      // Controller scope decision: only doEdit gets a confirm. exitEditMode is
+      // a labeled cancel control with no draft left to protect at that point;
+      // folding it in was explicitly rejected to keep this an S-sized change.
+      const exitStart = source.indexOf("function exitEditMode()");
+      assert(exitStart >= 0 && exitStart < recentBookmarksStart, "exitEditMode source not found");
+      const exitSource = source.slice(exitStart, recentBookmarksStart);
+      assert(exitSource.includes("window.location.reload()"), "exitEditMode no longer reloads");
+      assert(!exitSource.includes("showConfirmPopover") && !exitSource.includes("pbpPopupFormIsDirty"),
+        "exitEditMode gained confirm gating -- out of scope for this task");
+    });
+
+    test("K75: doEdit is wired to the dirty check and the new i18n key", () => {
+      assert(recentBookmarksSource.includes("pbpPopupFormIsDirty()"),
+        "doEdit does not consult pbpPopupFormIsDirty()");
+      assert(recentBookmarksSource.includes('t("editDiscardDraftConfirm")'),
+        "doEdit's confirm does not use the new editDiscardDraftConfirm i18n key");
+    });
+
+    function createRecentBookmarksHarness({ posts, formIsDirty }) {
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const confirmCalls = [];
+      const editCalls = [];
+      const dependencies = {
+        $id: (id) => (id === "recent-bookmarks" ? container : null),
+        t: (key) => key,
+        chrome: { runtime: { sendMessage: () => ({ catch: () => {} }) } },
+        showStatus: () => {},
+        esc: (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])),
+        enc: (s) => encodeURIComponent(s),
+        pinboardFetch: async () => ({ status: 200, ok: true, json: async () => ({ posts }) }),
+        showConfirmPopover: (anchor, opts) => { confirmCalls.push({ anchor, opts }); },
+        loadBookmarkForEdit: async (url, token) => { editCalls.push({ url, token }); },
+        pbpPopupFormIsDirty: () => formIsDirty,
+        PBP_ICONS,
+        pbpPinboardAccountFromToken,
+        injectEmptyState,
+        URL,
+        console,
+      };
+      const names = Object.keys(dependencies);
+      const factory = new Function(...names, `${recentBookmarksSource}\nreturn fetchRecentBookmarks;`);
+      const fetchRecentBookmarks = factory(...names.map((name) => dependencies[name]));
+      return {
+        run: () => fetchRecentBookmarks("alice:token"),
+        container, confirmCalls, editCalls,
+        cleanup: () => container.remove(),
+      };
+    }
+
+    const K75_ONE_POST = [{ href: "https://example.com/a", description: "Example A" }];
+
+    await testAsync("K75: a clean form skips the confirm and loads the recent bookmark immediately", async () => {
+      const harness = createRecentBookmarksHarness({ posts: K75_ONE_POST, formIsDirty: false });
+      try {
+        await harness.run();
+        const editBtn = harness.container.querySelector(".recent-bm-edit");
+        assert(editBtn, "setup: edit button not rendered");
+        editBtn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        await Promise.resolve();
+        assert(harness.confirmCalls.length === 0, "a clean form must not show a confirm popover");
+        assert(harness.editCalls.length === 1 && harness.editCalls[0].url === K75_ONE_POST[0].href,
+          "a clean form did not call loadBookmarkForEdit immediately");
+      } finally {
+        harness.cleanup();
+      }
+    });
+
+    await testAsync("K75: a dirty form shows an anchored confirm and only loads the bookmark after Confirm", async () => {
+      const harness = createRecentBookmarksHarness({ posts: K75_ONE_POST, formIsDirty: true });
+      try {
+        await harness.run();
+        const editBtn = harness.container.querySelector(".recent-bm-edit");
+        assert(editBtn, "setup: edit button not rendered");
+        editBtn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        await Promise.resolve();
+        assert(harness.editCalls.length === 0, "a dirty form must not call loadBookmarkForEdit before the user confirms");
+        assert(harness.confirmCalls.length === 1, "a dirty form did not show a confirm popover");
+        const { anchor, opts } = harness.confirmCalls[0];
+        assert(anchor === editBtn, "the confirm popover was not anchored to the edit button");
+        assert(opts.msg === "editDiscardDraftConfirm", "confirm message did not use the new i18n key");
+        assert(opts.yesText === "confirm" && opts.noText === "cancel",
+          "confirm did not reuse the existing yes/no i18n keys (must not mint new ones)");
+        await opts.onConfirm();
+        assert(harness.editCalls.length === 1 && harness.editCalls[0].url === K75_ONE_POST[0].href,
+          "confirming did not call loadBookmarkForEdit exactly once");
+      } finally {
+        harness.cleanup();
+      }
+    });
   } catch (error) {
     test("popup submit source contracts load", () => { throw error; });
   }

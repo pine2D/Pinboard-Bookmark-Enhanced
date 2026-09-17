@@ -209,6 +209,9 @@
   "editCancelTitle": {
     "message": "Quitter le mode édition"
   },
+  "editDiscardDraftConfirm": {
+    "message": "Modifier ce signet remplace ce que vous avez saisi ici. Continuer ?"
+  },
   "savedOnDate": {
     "message": "enregistré le $DATE$",
     "placeholders": {

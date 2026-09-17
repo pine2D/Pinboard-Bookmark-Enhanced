@@ -209,6 +209,9 @@
   "editCancelTitle": {
     "message": "Выйти из режима редактирования"
   },
+  "editDiscardDraftConfirm": {
+    "message": "Редактирование заменит то, что вы здесь ввели. Продолжить?"
+  },
   "savedOnDate": {
     "message": "сохранено $DATE$",
     "placeholders": {
