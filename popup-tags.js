@@ -124,7 +124,19 @@ async function fetchPinboardSuggestTags(token, url) {
           cs.textContent = ` (${count})`;
           el.appendChild(cs);
         }
-        el.addEventListener("click", () => { addTag(resolved); el.classList.add("used"); el.disabled = true; });
+        el.addEventListener("click", () => {
+          // K71: capture BEFORE addTag() -- syncSuggestTagStates (called inside
+          // addTag -> renderTags) disables any chip whose name now matches
+          // currentTags, so by the time we'd reach an `el.disabled = true` line
+          // here the browser may already have yanked focus to <body>. Only
+          // hand focus back when the click actually came from this chip
+          // (Tab+Enter), never on the Alt+N synthetic .click() path.
+          const hadFocus = document.activeElement === el;
+          addTag(resolved);
+          el.classList.add("used");
+          el.disabled = true;
+          if (hadFocus) $id("tags-input")?.focus({ preventScroll: true });
+        });
         g.appendChild(el);
         g.appendChild(document.createTextNode(" "));
       });
@@ -145,8 +157,12 @@ async function fetchPinboardSuggestTags(token, url) {
 
     const addAllSuggest = $id("add-all-suggest");
     addAllSuggest?.addEventListener("click", () => {
+      // K71: same hadFocus guard as the chip handler above -- capture before
+      // any chip (or this button) gets disabled.
+      const hadFocus = document.activeElement === addAllSuggest;
       container.querySelectorAll(".stag:not(.used)").forEach((el) => { addTag(el.dataset.tag); el.classList.add("used"); });
       if (addAllSuggest) { addAllSuggest.innerHTML = PBP_ICONS.check; addAllSuggest.disabled = true; addAllSuggest.classList.add("tag-copied-flash"); }
+      if (hadFocus) $id("tags-input")?.focus({ preventScroll: true });
     });
   } catch (e) {
     if (!pbpPopupTagAccountIsCurrent(account)) return;

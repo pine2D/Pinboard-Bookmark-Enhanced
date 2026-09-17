@@ -108,10 +108,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
 (async () => {
   try {
-    const [source, backgroundSource, popupAiSource, popupHtml, popupCss, enMessages, popupOfflineSource] = await Promise.all([
+    const [source, backgroundSource, popupAiSource, popupTagsSource, popupHtml, popupCss, enMessages, popupOfflineSource] = await Promise.all([
       fetch("../popup.js").then((response) => response.text()),
       fetch("../background.js").then((response) => response.text()),
       fetch("../popup-ai.js").then((response) => response.text()),
+      fetch("../popup-tags.js").then((response) => response.text()),
       fetch("../popup.html").then((response) => response.text()),
       fetch("../popup.css").then((response) => response.text()),
       // The shipped English catalogue, so "localized" is judged against the real
@@ -2559,6 +2560,269 @@ test("posts/add default remains replace=yes for existing callers", () => {
       await harness.run();
       assert(harness.statuses.length === 0, "401 spoke over the login screen: " + JSON.stringify(harness.statuses));
       assert(harness.resets() === 1, "401 did not reset the session exactly once (" + harness.resets() + ")");
+    });
+
+    // ---- K71: chip / Add-all hand focus back to #tags-input, conditionally ----
+    // Both rows disable the control that was just clicked, and a real browser
+    // yanks focus off a just-disabled element to <body> on its own -- these
+    // tests run the actual click handlers (extracted verbatim from source, not
+    // reimplemented) against a live, attached DOM so that browser behavior is
+    // exercised for real. The Alt+N hotkey (popup.js) reaches the same chips
+    // via a SYNTHETIC el.click() while focus sits in a text field; a synthetic
+    // click() does not itself move focus the way a real mousedown does, so
+    // `document.activeElement === el` inside the handler is a faithful signal
+    // for "did this click genuinely originate on the control" without having
+    // to fake the hotkey path separately.
+
+    // popup-ai.js's renderAITags, run for real (fromCache: false skips the
+    // regen-link branch, so none of its extra dependencies are needed).
+    function aiTagFocusRuntime(tags) {
+      const renderStart = popupAiSource.indexOf("function renderAITags(");
+      const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
+      assert(renderStart >= 0 && renderEnd > renderStart, "renderAITags source not found");
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const tagsInput = document.createElement("input");
+      document.body.appendChild(tagsInput);
+      const focusCalls = [];
+      const realFocus = tagsInput.focus.bind(tagsInput);
+      tagsInput.focus = (opts) => { focusCalls.push(opts); realFocus(opts); };
+      const added = [];
+      const runtime = new Function(
+        "$id", "t", "PBP_ICONS", "allUserTagCounts",
+        "addTag", "_aiSessionAddedTags", "pbpAssignAltNumBadges",
+        "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
+        popupAiSource.slice(renderStart, renderEnd + 2) + "\nreturn { renderAITags };"
+      )(
+        (id) => (id === "ai-suggest-tags" ? container : id === "tags-input" ? tagsInput : null),
+        (key) => key,
+        { check: "<svg></svg>" },
+        {},
+        (tag) => added.push(tag),
+        new Set(),
+        () => {},
+        () => {},
+        () => {},
+        () => {}
+      );
+      runtime.renderAITags(tags, false);
+      return { container, tagsInput, focusCalls, added, cleanup() { container.remove(); tagsInput.remove(); } };
+    }
+
+    await testAsync("K71: an AI chip that held focus hands off to #tags-input once disabled, with preventScroll", async () => {
+      const run = aiTagFocusRuntime(["alpha", "beta"]);
+      try {
+        const chip = run.container.querySelector(".stag.ai");
+        chip.focus();
+        assert(document.activeElement === chip, "setup: chip did not take real focus");
+        chip.click();
+        assert(chip.disabled, "chip was not disabled after being accepted");
+        assert(document.activeElement === run.tagsInput,
+          "focus did not land on #tags-input, got " + (document.activeElement && document.activeElement.tagName));
+        assert(run.focusCalls.length === 1 && run.focusCalls[0] && run.focusCalls[0].preventScroll === true,
+          "tags-input.focus() was not called with preventScroll: true, got " + JSON.stringify(run.focusCalls));
+      } finally {
+        run.cleanup();
+      }
+    });
+
+    await testAsync("K71: a synthetic click on an AI chip (Alt+N) must not steal focus from another field", async () => {
+      const run = aiTagFocusRuntime(["alpha", "beta"]);
+      const descInput = document.createElement("textarea");
+      document.body.appendChild(descInput);
+      try {
+        descInput.focus();
+        assert(document.activeElement === descInput, "setup: description field did not take focus");
+        const chip = run.container.querySelector(".stag.ai");
+        chip.click(); // synthetic: never focuses the chip first, unlike a real mousedown+click
+        assert(chip.disabled, "chip was not disabled after being accepted");
+        assert(document.activeElement === descInput,
+          "an Alt+N chip click stole focus from the field the user was typing in, got " + (document.activeElement && document.activeElement.tagName));
+        assert(run.focusCalls.length === 0, "tags-input.focus() must not fire when the chip never held focus");
+      } finally {
+        run.cleanup();
+        descInput.remove();
+      }
+    });
+
+    await testAsync("K71: AI 'Add all' hands off to #tags-input only when the button held focus", async () => {
+      const run = aiTagFocusRuntime(["alpha", "beta"]);
+      try {
+        const addAll = run.container.querySelector(".add-all-link");
+        addAll.focus();
+        assert(document.activeElement === addAll, "setup: add-all did not take real focus");
+        addAll.click();
+        assert(addAll.disabled, "add-all was not disabled after use");
+        assert(run.added.length === 2, "add-all did not add every un-used chip");
+        assert(document.activeElement === run.tagsInput,
+          "focus did not land on #tags-input after add-all, got " + (document.activeElement && document.activeElement.tagName));
+        assert(run.focusCalls.length === 1 && run.focusCalls[0] && run.focusCalls[0].preventScroll === true,
+          "add-all's focus() was not called with preventScroll: true, got " + JSON.stringify(run.focusCalls));
+      } finally {
+        run.cleanup();
+      }
+    });
+
+    await testAsync("K71: a missing #tags-input (harness/edit states) never throws from an AI chip or Add all", async () => {
+      const renderStart = popupAiSource.indexOf("function renderAITags(");
+      const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const runtime = new Function(
+        "$id", "t", "PBP_ICONS", "allUserTagCounts",
+        "addTag", "_aiSessionAddedTags", "pbpAssignAltNumBadges",
+        "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
+        popupAiSource.slice(renderStart, renderEnd + 2) + "\nreturn { renderAITags };"
+      )(
+        (id) => (id === "ai-suggest-tags" ? container : null), // "tags-input" resolves to null
+        (key) => key,
+        { check: "<svg></svg>" },
+        {},
+        () => {},
+        new Set(),
+        () => {},
+        () => {},
+        () => {},
+        () => {}
+      );
+      try {
+        runtime.renderAITags(["alpha"], false);
+        const chip = run_focusedClick(container.querySelector(".stag.ai"));
+        assert(chip.disabled, "chip was not disabled");
+        const addAll = run_focusedClick(container.querySelector(".add-all-link"));
+        assert(addAll.disabled, "add-all was not disabled");
+      } finally {
+        container.remove();
+      }
+      function run_focusedClick(el) {
+        el.focus();
+        el.click();
+        return el;
+      }
+    });
+
+    // popup-tags.js's buildSuggestGroup + the add-all-suggest wiring, extracted
+    // verbatim (it lives nested inside the network-fetching
+    // fetchPinboardSuggestTags and is not itself a standalone top-level
+    // function -- resolveTag is stubbed to identity here, sidestepping its
+    // settings/tagCaseMap dependency, which this focus contract does not touch).
+    function suggestTagFocusRuntime(popularTags, recommendedTags) {
+      const buildStart = popupTagsSource.indexOf("function buildSuggestGroup(");
+      const buildEnd = popupTagsSource.indexOf("\n  } catch (e) {", buildStart);
+      assert(buildStart >= 0 && buildEnd > buildStart, "buildSuggestGroup source not found");
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const tagsInput = document.createElement("input");
+      document.body.appendChild(tagsInput);
+      const focusCalls = [];
+      const realFocus = tagsInput.focus.bind(tagsInput);
+      tagsInput.focus = (opts) => { focusCalls.push(opts); realFocus(opts); };
+      const added = [];
+      const runtime = new Function(
+        "t", "allUserTagCounts", "addTag", "$id", "PBP_ICONS", "container", "popular", "recommended",
+        "const resolveTag = (x) => x;\n" + popupTagsSource.slice(buildStart, buildEnd) +
+          "\nreturn { buildSuggestGroup, addAllSuggest };"
+      )(
+        (key) => key,
+        {},
+        (tag) => added.push(tag),
+        // "tags-input" resolves to the stub above; everything else (the
+        // add-all button's real id, set inside the extracted source) is a
+        // genuine DOM lookup, since `container` is attached to document.body.
+        (id) => (id === "tags-input" ? tagsInput : document.getElementById(id)),
+        { check: "<svg></svg>" },
+        container,
+        popularTags,
+        recommendedTags
+      );
+      return {
+        container, tagsInput, focusCalls, added, addAllSuggest: runtime.addAllSuggest,
+        cleanup() { container.remove(); tagsInput.remove(); }
+      };
+    }
+
+    await testAsync("K71: a suggest chip that held focus hands off to #tags-input once disabled, with preventScroll", async () => {
+      const run = suggestTagFocusRuntime(["alpha", "beta"], []);
+      try {
+        const chip = run.container.querySelector(".stag");
+        chip.focus();
+        assert(document.activeElement === chip, "setup: chip did not take real focus");
+        chip.click();
+        assert(chip.disabled, "chip was not disabled after being accepted");
+        assert(document.activeElement === run.tagsInput,
+          "focus did not land on #tags-input, got " + (document.activeElement && document.activeElement.tagName));
+        assert(run.focusCalls.length === 1 && run.focusCalls[0] && run.focusCalls[0].preventScroll === true,
+          "tags-input.focus() was not called with preventScroll: true, got " + JSON.stringify(run.focusCalls));
+      } finally {
+        run.cleanup();
+      }
+    });
+
+    await testAsync("K71: a synthetic click on a suggest chip (Alt+N) must not steal focus from another field", async () => {
+      const run = suggestTagFocusRuntime(["alpha", "beta"], []);
+      const descInput = document.createElement("textarea");
+      document.body.appendChild(descInput);
+      try {
+        descInput.focus();
+        assert(document.activeElement === descInput, "setup: description field did not take focus");
+        const chip = run.container.querySelector(".stag");
+        chip.click();
+        assert(chip.disabled, "chip was not disabled after being accepted");
+        assert(document.activeElement === descInput,
+          "an Alt+N chip click stole focus from the field the user was typing in, got " + (document.activeElement && document.activeElement.tagName));
+        assert(run.focusCalls.length === 0, "tags-input.focus() must not fire when the chip never held focus");
+      } finally {
+        run.cleanup();
+        descInput.remove();
+      }
+    });
+
+    await testAsync("K71: suggest row 'Add all' hands off to #tags-input only when the button held focus", async () => {
+      const run = suggestTagFocusRuntime([], ["alpha", "beta"]);
+      try {
+        const addAll = run.addAllSuggest;
+        assert(addAll, "setup: add-all-suggest button was not built");
+        addAll.focus();
+        assert(document.activeElement === addAll, "setup: add-all did not take real focus");
+        addAll.click();
+        assert(addAll.disabled, "add-all was not disabled after use");
+        assert(run.added.length === 2, "add-all did not add every un-used chip");
+        assert(document.activeElement === run.tagsInput,
+          "focus did not land on #tags-input after add-all, got " + (document.activeElement && document.activeElement.tagName));
+        assert(run.focusCalls.length === 1 && run.focusCalls[0] && run.focusCalls[0].preventScroll === true,
+          "add-all's focus() was not called with preventScroll: true, got " + JSON.stringify(run.focusCalls));
+      } finally {
+        run.cleanup();
+      }
+    });
+
+    await testAsync("K71: a missing #tags-input (harness/edit states) never throws from a suggest chip or Add all", async () => {
+      const buildStart = popupTagsSource.indexOf("function buildSuggestGroup(");
+      const buildEnd = popupTagsSource.indexOf("\n  } catch (e) {", buildStart);
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const runtime = new Function(
+        "t", "allUserTagCounts", "addTag", "$id", "PBP_ICONS", "container", "popular", "recommended",
+        "const resolveTag = (x) => x;\n" + popupTagsSource.slice(buildStart, buildEnd) +
+          "\nreturn { buildSuggestGroup, addAllSuggest };"
+      )(
+        (key) => key,
+        {},
+        () => {},
+        () => null, // every $id lookup misses, including "tags-input"
+        { check: "<svg></svg>" },
+        container,
+        ["alpha"],
+        ["beta"]
+      );
+      try {
+        const chip = container.querySelector(".stag");
+        chip.focus(); chip.click();
+        assert(chip.disabled, "chip was not disabled");
+        assert(runtime.addAllSuggest === null, "setup: add-all-suggest should be unresolvable in this harness");
+      } finally {
+        container.remove();
+      }
     });
   } catch (error) {
     test("popup submit source contracts load", () => { throw error; });

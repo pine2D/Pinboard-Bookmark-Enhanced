@@ -1313,10 +1313,18 @@ function renderAITags(tags, fromCache) {
       el.appendChild(cs);
     }
     el.addEventListener("click", () => {
+      // K71: capture BEFORE addTag() -- syncSuggestTagStates (called inside
+      // addTag -> renderTags) disables any chip whose name now matches
+      // currentTags, so an `el.disabled = true` line here would already run
+      // after the browser yanked focus to <body>. Only hand focus back when
+      // the click actually came from this chip (Tab+Enter), never on the
+      // Alt+N synthetic .click() path.
+      const hadFocus = document.activeElement === el;
       addTag(tag);
       _aiSessionAddedTags.add(tag.toLowerCase());
       el.classList.add("used");
       el.disabled = true;
+      if (hadFocus) $id("tags-input")?.focus({ preventScroll: true });
     });
     container.appendChild(el);
   });
@@ -1327,12 +1335,16 @@ function renderAITags(tags, fromCache) {
   aa.textContent = t("addAll");
   aa.setAttribute("aria-label", t("addAll"));
   aa.addEventListener("click", () => {
+    // K71: same hadFocus guard as the chip handler above -- capture before
+    // any chip (or this button) gets disabled.
+    const hadFocus = document.activeElement === aa;
     container.querySelectorAll(".stag:not(.used)").forEach((el) => {
       addTag(el.dataset.tag);
       _aiSessionAddedTags.add(el.dataset.tag.toLowerCase());
       el.classList.add("used");
     });
     aa.innerHTML = PBP_ICONS.check; aa.disabled = true; aa.classList.add("tag-copied-flash");
+    if (hadFocus) $id("tags-input")?.focus({ preventScroll: true });
   });
   container.appendChild(aa);
   pbpAssignAltNumBadges();
