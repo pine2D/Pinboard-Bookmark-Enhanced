@@ -2357,14 +2357,21 @@ html.motion-ready .xp-gear-menu[hidden] {
      behaves as documented (unlike the ::highlight() rules above) and keeps
      their hue as the only classifier those three lists carry -- filter
      dots are real <button>s with their own title/aria-label
-     (md-highlight.js:2417-2432), card dots are unlabeled swatches, and
-     item dots are explicitly aria-hidden. Same idiom as .send-tri at
-     :1643. */
+     (md-highlight.js:2417-2432), card dots are <button>s with NO accessible
+     name at all (md-highlight.js:2004-2009 builds type/class/dataset/click
+     and nothing else; :780 calls them "EMPTY buttons"), and item dots are
+     explicitly aria-hidden. Same idiom as .send-tri at :1643. */
   .hl-card-dot-1, .hl-card-dot-2, .hl-card-dot-3, .hl-card-dot-4, .hl-card-dot-5,
   .hl-filter-dot-1, .hl-filter-dot-2, .hl-filter-dot-3, .hl-filter-dot-4, .hl-filter-dot-5,
   .hl-item-dot-1, .hl-item-dot-2, .hl-item-dot-3, .hl-item-dot-4, .hl-item-dot-5 {
     forced-color-adjust: none;
   }
+  /* NOTE: forced-color-adjust:none opts these dots out for ALL their colors,
+     not just background -- so it also stops their focus/active indicators
+     from mapping onto system colors. Those two are put back beside the rules
+     they override (:3146 and :3235 below), NOT here: @media adds no
+     specificity, so a copy in this block would lose the cascade to the very
+     same selector declared later in the file. */
 }
 
 /* H5 block-level mirror bar (spec 1.5): a 3px left bar echoing the OTHER
@@ -3144,6 +3151,16 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 .hl-card-dot-4 { background: light-dark(#ef4444, #B86F8C); }
 .hl-card-dot-5 { background: light-dark(#a855f7, #8B72AF); }
 .hl-card-dot.active, .hl-card-dot:focus-visible { border-color: var(--fg); }
+/* The card dots are opted out of forced-colors mapping above (K115 block) so
+   their hue survives as the only classifier -- but that opt-out covers every
+   colour on the element, border included, and this border is the ONLY signal
+   of BOTH focus and the selected colour on a button with no accessible name
+   at all (md-highlight.js:2004-2009 sets type/class/dataset/click and nothing
+   else; :780 calls them "EMPTY buttons"). Map it back onto a system colour,
+   the same idiom .msg-bar.error / .pbv-row--current use. */
+@media (forced-colors: active) {
+  .hl-card-dot.active, .hl-card-dot:focus-visible { border-color: Highlight; }
+}
 .hl-card-ai { display: flex; gap: var(--sp-2); }
 .hl-card-ai[hidden] { display: none; }
 .hl-card-ai-explain, .hl-card-ai-translate, .hl-card-ai-ask {
@@ -3233,6 +3250,12 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 .hl-filter-dot-5 { background: light-dark(#c084fc, #8B72AF); }
 .hl-filter-dot.off { opacity: 0.25; }
 .hl-filter-dot:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+/* Same reason as the card dots' border above: the K115 forced-color-adjust
+   opt-out that preserves the swatch hue also freezes this ring at the author
+   link colour. Colour only -- width and offset above still apply. */
+@media (forced-colors: active) {
+  .hl-filter-dot:focus-visible { outline-color: Highlight; }
+}
 .hl-filter-empty { font-size: 13px; color: var(--fg-muted); margin: var(--sp-1) 0 var(--sp-2); }
 /* Anchoring round: count-gated "N couldn't be located" note (hidden at 0)
    + the orphan rows themselves. Orphan != dim: dim is "temporarily hidden
