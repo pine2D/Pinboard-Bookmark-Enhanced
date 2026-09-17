@@ -1209,10 +1209,16 @@ function _pbpVocabSetLoading(loading) {
   }
 }
 
+// Returns whether focus actually LANDED, the twin of library-notes.js's
+// _pbpNotesFocus: focus() on a disabled/hidden/inert field is a silent no-op,
+// and a caller that follows up with select() would then be selecting text in a
+// box the caret never reached. Every other caller here uses it for its side
+// effect only and ignores the value.
 function _pbpVocabFocusStable() {
   const search = $id("vocab-search");
-  if (!search || search.disabled || search.closest("[hidden], [inert]")) return;
+  if (!search || search.disabled || search.closest("[hidden], [inert]")) return false;
   try { search.focus({ preventScroll: true }); } catch (_) { search.focus(); }
+  return document.activeElement === search;
 }
 
 function pbpVocabSelectionSnapshotValid(ids, selected, rows) {
@@ -2125,9 +2131,10 @@ if (_vocabListEl) _vocabListEl.addEventListener("keydown", (e) => {
   // bubble here.
   if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
-    _pbpVocabFocusStable();
     const search = $id("vocab-search");
-    if (search) search.select();
+    // select() only when focus really landed -- library-notes.js's twin branch
+    // reads `if (_pbpNotesFocus(filter)) filter.select()` for the same reason.
+    if (search && _pbpVocabFocusStable()) search.select();
     return;
   }
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;

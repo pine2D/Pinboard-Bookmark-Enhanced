@@ -1422,6 +1422,23 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     const ctrlSlash = press("/", { ctrlKey: true });
     check("Ctrl+\"/\" is left alone and does not steal focus off the row",
       document.activeElement === heads[0] && ctrlSlash === true);
+    // focus() on a hidden/inert/disabled field is a SILENT no-op, so select()
+    // has to be conditional on it landing -- otherwise the box the caret never
+    // reached reports a selection, and the next keystroke goes to the row.
+    // library-notes.js's twin branch already gates on _pbpNotesFocus's return.
+    heads[0].focus();
+    $id("vocab-search").value = "seed";
+    $id("vocab-search").setSelectionRange(0, 0);
+    $id("vocab-search").hidden = true;
+    try {
+      press("/");
+      check("\"/\" with an unfocusable search box neither moves focus nor selects its text",
+        document.activeElement === heads[0] && $id("vocab-search").selectionEnd === 0,
+        (document.activeElement && (document.activeElement.className || document.activeElement.id)) +
+        " sel=" + $id("vocab-search").selectionEnd);
+    } finally {
+      $id("vocab-search").hidden = false;
+    }
     $id("vocab-search").value = "";
     _pbpVocabClearSelection();
     _pbpVocabSyncSelectionUi();
