@@ -450,7 +450,10 @@ async function showMain(token) {
   // screen from the very first frame instead of popping in once the async
   // chain settles -- one less layout shift above .submit-bar in the first
   // second.
-  if (settings.optShowSuggestTags) $id("suggest-row").classList.remove("hidden");
+  if (settings.optShowSuggestTags) {
+    const suggestRow = $id("suggest-row");
+    if (suggestRow) suggestRow.classList.remove("hidden");
+  }
   if (settings.optShowQuickLinks === false) {
     const ql = document.querySelector(".quick-links");
     if (ql) ql.classList.add("hidden");

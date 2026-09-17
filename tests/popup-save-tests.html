@@ -820,7 +820,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
       assert(switchStart >= 0 && switchEnd > switchStart, "showMain's visibility-switch block not found");
       const switchBlock = source.slice(switchStart, switchEnd);
-      assert(switchBlock.includes('$id("suggest-row").classList.remove("hidden")'),
+      // finding 6: the unhide is now null-guarded (matches its neighbours'
+      // shape) -- assert the deref and the guarded call are both still here,
+      // not the old unguarded one-liner literal.
+      assert(switchBlock.includes('$id("suggest-row")') && switchBlock.includes('.classList.remove("hidden")'),
         "the #suggest-row unhide moved out of the visibility-switch block -- update this slice's bounds");
       assert(!switchBlock.includes("fetchPinboardSuggestTags("),
         "fetchPinboardSuggestTags must stay behind the pageInfo await further down, not move into this synchronous block");
@@ -846,6 +849,27 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
       assert(suggestRow.classList.contains("hidden"),
         "optShowSuggestTags === false must leave #suggest-row hidden");
+    });
+
+    // finding 6: #suggest-row's unhide was the only unguarded $id() deref in
+    // this block -- its four neighbours (aiSummaryBtn/aiTagsRow/ql/qr) all
+    // null-check first. Mirrors K71's tags-input stub (this file, ~:2865):
+    // ONLY "suggest-row" misses, so the rest of the block still resolves
+    // real elements and the deref under test genuinely runs.
+    await testAsync("finding 6: the showMain visibility switch does not throw when #suggest-row is missing and optShowSuggestTags is on", async () => {
+      const switchStart = source.indexOf("if (!settings.optShowSearch) {");
+      const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
+      const switchBlock = source.slice(switchStart, switchEnd);
+      const settingsStub = { optShowSearch: true, optShowAiSummary: true, optShowAiTags: true, optShowSuggestTags: true };
+      const run = new Function("$id", "document", "settings", switchBlock + "\nreturn true;");
+      let threw = null;
+      try {
+        run((id) => (id === "suggest-row" ? null : createElementStub()), document, settingsStub);
+      } catch (e) {
+        threw = e;
+      }
+      assert(threw === null,
+        "a missing #suggest-row must not throw when optShowSuggestTags is on, got " + (threw && threw.message));
     });
 
     // The fetch itself must still be gated the same way it always was, just
