@@ -956,11 +956,21 @@ async function _streamGemini(s, prompt, opts, onDelta) {
   return full;
 }
 
+// Anthropic deprecated temperature/top_p/top_k for Claude Opus 4.7 and later
+// models: a non-default value now returns a 400 (recommended replacement is
+// to omit the field and steer behavior via prompting instead). The
+// non-streaming callClaude above never sent temperature, so this body now
+// matches that already-safe shape. opts.temperature is intentionally
+// ignored on this branch — callers that pass it (md-translate.js's 0.1) are
+// still honored on every other provider. No parameter-level self-heal is
+// built for this one, unlike thinkingOff: omitting it has no measurable
+// downside (tags/summary already run on default sampling via callClaude;
+// pbpAiCache keys only on prompt/model, not sampling params), so there is
+// nothing worth memoizing per (provider, model).
 async function _streamClaude(s, prompt, opts, onDelta) {
   const body = {
     model: opts.model || s.claudeModel || "claude-haiku-4-5",
     max_tokens: opts.maxTokens || 1024,
-    temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
     messages: [{ role: "user", content: prompt }],
     stream: true
   };

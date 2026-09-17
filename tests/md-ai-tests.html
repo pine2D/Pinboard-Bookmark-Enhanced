@@ -10537,6 +10537,19 @@ suite("_aiBodyDialect / _aiParamRepair (K133)", () => {
         ok(r.body.max_tokens === 1024, "claude keeps max_tokens: " + JSON.stringify(r.body));
         ok(!("max_completion_tokens" in r.body), "claude must never get the OpenAI spelling: " + JSON.stringify(r.body));
       }
+    }],
+    ["K134: claude streaming request omits temperature entirely (Claude 4.7+ 400s on a non-default value)", async () => {
+      reset({ kind: "stream" });
+      const out = await callAIStream({ aiProvider: "claude", claudeApiKey: "k", claudeModel: "claude-haiku-4-5" }, "hi", {}, () => {});
+      ok(out === "ok", "stream must still succeed: " + JSON.stringify(out));
+      ok(sent.length === 1, "no retry expected, saw " + sent.length);
+      ok(!("temperature" in sent[0].body), "claude stream must never send temperature: " + JSON.stringify(sent[0].body));
+    }],
+    ["K134: an explicit opts.temperature from a caller is still ignored on the claude stream path", async () => {
+      reset({ kind: "stream" });
+      await callAIStream({ aiProvider: "claude", claudeApiKey: "k", claudeModel: "claude-haiku-4-5" }, "hi", { temperature: 0.1 }, () => {});
+      ok(sent.length === 1, "no retry expected, saw " + sent.length);
+      ok(!("temperature" in sent[0].body), "explicit opts.temperature must not leak into the claude stream body: " + JSON.stringify(sent[0].body));
     }]
   ];
 
