@@ -10749,9 +10749,22 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
   ktest("a collapsed/hidden TOC never yanks the rail to the top (offsetParent guard)", () => {
     const f = setup({ tail: true });
     try {
+      // The rail is moved OFF the viewport's top edge for this one case, and that
+      // is the whole point of it. A display:none element's rect is a degenerate
+      // (0,0,0,0); against production's `top: 0` rail (md-preview.css:1052-1053,
+      // `position:fixed; top:0; bottom:0`) that rect satisfies NEITHER branch --
+      // 0 < 0 is false and 0 > bottom is false -- so the case passed with the
+      // guard deleted and tested nothing. With the rail's top at 40 the same
+      // degenerate rect reads as ABOVE the viewport, the `e.top < r.top` branch
+      // arms, and removing `!a.offsetParent` really does write scrollTop to 0.
+      f.rail.style.top = "40px";
       f.seed(300);
       f.list.style.display = "none";              // what .rail-collapsed > *:not(.rail-sec-head) does
       assertEq(f.links[30].offsetParent, null, "the fixture really is in the collapsed shape");
+      const r = f.rail.getBoundingClientRect(), e = f.links[30].getBoundingClientRect();
+      assert(e.top < r.top,
+        "the fixture must put the degenerate rect OUT of view or this case cannot fail: entry top " +
+        e.top + " vs rail top " + r.top);
       keepTocEntryVisible(f.links[30]);
       assertEq(f.writes(), 0, "a 0/0/0/0 rect must not be read as 'out of view' and scroll the rail to 0");
       assertEq(f.raw(), 300, "rail position preserved");

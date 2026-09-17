@@ -3790,10 +3790,12 @@ function trOnlyScrollTarget(headEl) {
 function keepTocEntryVisible(a) {
   const rail = document.getElementById("rail");
   // Collapsed TOC (`.rail-collapsed > *:not(.rail-sec-head) { display:none }`,
-  // css ~:1442) and a hidden #toc both report a degenerate 0/0/0/0 rect, which
-  // naive math reads as "out of view" -- it would drag the rail back to the top
-  // on every section change while the reader watches. offsetParent is null for
-  // exactly those cases.
+  // css ~:1442) and a hidden #toc both report a degenerate 0/0/0/0 rect;
+  // offsetParent is null for exactly those cases. Defense in depth: against the
+  // rail's current `top: 0` geometry (css ~:1052) that rect happens to satisfy
+  // neither branch below and is already a no-op -- but ANY nonzero rail top makes
+  // it read as above-viewport, and the correction would then write scrollTop to 0
+  // on every section change while the reader watches.
   if (!rail || !a || !a.offsetParent) return;
   // zen (css ~:413) and the <=1000px drawer (css ~:1474) hide the rail with
   // transform + visibility, NOT display:none: offsetParent and clientHeight both
