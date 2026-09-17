@@ -1398,7 +1398,17 @@ function renderAITags(tags, fromCache) {
         const wasAddedByThisRound = (t) =>
           cachedTagSet.has(t.toLowerCase()) && _aiSessionAddedTags.has(t.toLowerCase());
         let retracted = [];
+        // Finding 5: snapshot _tagsUserTouched before the removal below so a
+        // refused regen's rollback (finally block) can restore it -- addTag
+        // sets the flag unconditionally on every real push, but a retracted
+        // tag that shares a name with one already on the form with no AI
+        // provenance (audit A10: a dup-named chip click still records
+        // provenance even though addTag no-ops) re-adds as a genuine push on
+        // rollback and would force-dirty a form whose tag list never
+        // actually changed.
+        let tagsUserTouchedBeforeRetract;
         if (mode === "replace") {
+          if (typeof _tagsUserTouched !== "undefined") tagsUserTouchedBeforeRetract = _tagsUserTouched;
           retracted = currentTags.filter(wasAddedByThisRound);
           currentTags = currentTags.filter(t => !wasAddedByThisRound(t));
           renderTags();
@@ -1421,7 +1431,15 @@ function renderAITags(tags, fromCache) {
             // drifted) mid-flight" -- nothing clears this bar on a URL edit, so
             // it stays connected there too. Re-check op liveness or the
             // retraction gets replayed into a DIFFERENT bookmark's tag field.
-            if (_aiOpStillCurrent(opAccount)) retracted.forEach((tag) => addTag(tag));
+            if (_aiOpStillCurrent(opAccount)) {
+              retracted.forEach((tag) => addTag(tag));
+              // addTag above force-sets the flag -- restore the pre-retract
+              // snapshot so a rollback that nets to a byte-identical tag
+              // list does not leave the form spuriously dirty.
+              if (typeof _tagsUserTouched !== "undefined" && tagsUserTouchedBeforeRetract !== undefined) {
+                _tagsUserTouched = tagsUserTouchedBeforeRetract;
+              }
+            }
           }
         }
       });

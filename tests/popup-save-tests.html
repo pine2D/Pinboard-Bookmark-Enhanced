@@ -1178,14 +1178,24 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "stripTrackingParams", "URL", "seedTags", "settings",
         "let currentTags = seedTags.slice();\n" +
         "const _aiSessionAddedTags = new Set();\n" +
+        // Finding 5: mirrors the real addTag's dedup-before-flag-set order
+        // (popup-tags.js) -- a dup add (e.g. clicking an AI chip that names a
+        // tag the server already loaded) must not flip _tagsUserTouched. The
+        // real replace-mode rollback (sliced in verbatim below, via
+        // renderStart..renderEnd) reads/writes this same binding through its
+        // own `typeof _tagsUserTouched !== "undefined"` guard.
+        "let _tagsUserTouched = false;\n" +
         "function addTag(tag) {\n" +
-        "  if (!currentTags.some((x) => x.toLowerCase() === String(tag).toLowerCase())) currentTags.push(tag);\n" +
+        "  if (currentTags.some((x) => x.toLowerCase() === String(tag).toLowerCase())) return;\n" +
+        "  currentTags.push(tag);\n" +
+        "  _tagsUserTouched = true;\n" +
         "}\n" +
         popupAiSource.slice(acctStart, acctEnd) + "\n" +
         popupAiSource.slice(urlStart, urlEnd) + "\n" +
         popupAiSource.slice(liveStart, liveEnd) + "\n" +
         popupAiSource.slice(renderStart, renderEnd + 2) + "\n" +
-        "return { renderAITags, provenance: _aiSessionAddedTags, tags: () => currentTags.slice() };"
+        "return { renderAITags, provenance: _aiSessionAddedTags, tags: () => currentTags.slice()," +
+        " touched: () => _tagsUserTouched };"
       )(
         (id) => (id === "url-input" ? urlInput : id === "ai-suggest-tags" ? container : null),
         (key) => key,
@@ -3032,9 +3042,71 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "checkExistingBookmark must not mark tags user-touched -- it fills currentTags from the server, not from a user edit");
     });
 
-    test("K75: popup-ai.js never sets _tagsUserTouched directly (only via the addTag/removeTag entry points)", () => {
-      assert(!popupAiSource.includes("_tagsUserTouched"),
-        "popup-ai.js references _tagsUserTouched directly -- AI tag rendering must go through addTag (a click), not set the flag itself");
+    test("K75/finding 5: popup-ai.js never force-sets _tagsUserTouched -- AI tag rendering must dirty the form only via addTag/removeTag; the replace-mode rollback may snapshot/restore the flag around its retraction, never force it true", () => {
+      assert(!popupAiSource.includes("_tagsUserTouched = true"),
+        "popup-ai.js force-sets _tagsUserTouched directly -- AI tag rendering must go through addTag (a click), not set the flag itself");
+    });
+
+    // ---- finding 5: a refused replace-mode regen must not spuriously dirty
+    // the form when the net tag list is byte-identical to what was loaded ----
+    // popup-ai.js:1396 retracts session-AI tags via a direct currentTags.filter
+    // (no flag write); its finally-block rollback (:1417) re-adds them through
+    // addTag, which DOES set the flag. If one of the retracted tags happens to
+    // share a name with a tag that was already on the form with no AI
+    // provenance (server-loaded, or typed) -- exactly what clicking a
+    // duplicate-named AI chip produces (audit A10: _aiSessionAddedTags is
+    // recorded on every chip click, even one addTag no-ops as a dup) -- the
+    // round trip removes then re-adds that tag, and re-adding it is a genuine
+    // push (nothing dedups against an empty list), which force-sets the flag
+    // even though the net tag list never actually changed.
+    await testAsync("finding 5: a refused replace-mode regen leaves a dup-named AI chip's flag untouched (byte-identical tags stay clean)", async () => {
+      const run = regenRuntime({
+        formUrl: URL,
+        pageUrl: URL,
+        tags: ["alpha", "beta"],
+        seedTags: ["alpha"], // already on the form, no AI provenance (server-loaded)
+        accept: ["alpha"],   // clicking the dup-named AI chip: addTag no-ops
+        attach: true,
+      });
+      try {
+        assert(run.tags().join("|") === "alpha" && run.touched() === false,
+          "setup: a dup-named chip click must not dirty the form, got tags=" + run.tags().join("|") + " touched=" + run.touched());
+        run.replaceLink.click();
+        await settle();
+        assert(run.calls.doAITags === 1, "the regen must still start the AI call");
+        assert(run.tags().join("|") === "alpha",
+          "a refusal must leave the tag list byte-identical to what was loaded, got " + run.tags().join("|"));
+        assert(run.touched() === false,
+          "a refused regen that nets to a byte-identical tag list left the form spuriously dirty");
+      } finally {
+        run.container.remove();
+      }
+    });
+
+    // Positive twin: when the retracted/rolled-back tags were genuinely new
+    // (not a name already on the form), the round trip must still leave the
+    // form dirty -- the fix must restore the PRE-retraction flag value, not
+    // unconditionally clear it.
+    await testAsync("finding 5: a refused replace-mode regen still reports dirty when the retraction+rollback covered a real edit", async () => {
+      const run = regenRuntime({
+        formUrl: URL,
+        pageUrl: URL,
+        tags: ["alpha", "beta"],
+        seedTags: ["manual"],
+        accept: ["alpha", "beta"], // both genuinely new -- real pushes, real dirtying
+        attach: true,
+      });
+      try {
+        assert(run.touched() === true, "setup: accepting two new AI chips must dirty the form");
+        run.replaceLink.click();
+        await settle();
+        assert(run.tags().join("|") === "manual|alpha|beta",
+          "a refusal dropped this session's AI tags for good, got " + run.tags().join("|"));
+        assert(run.touched() === true,
+          "a regen that genuinely added tags must not be reported clean just because the rollback restored them");
+      } finally {
+        run.container.remove();
+      }
     });
 
     test("K75: loadBookmarkForEdit resets _tagsUserTouched alongside fieldDirtyFlags", () => {
