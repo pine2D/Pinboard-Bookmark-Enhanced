@@ -153,6 +153,66 @@ suite("aiCacheFingerprint (A5)", () => {
   });
 });
 
+// ============ K91: getCacheKey URL normalization ============
+// getCacheKey runs the url through _aiCacheUrlNorm (ai.js's twin of the
+// reader's pbpAiCacheUrlNorm) so ai_cache_ follows the same URL rule as the
+// reader families (tr_/ask_/skim_/gloss_). The
+// hash-ROUTER case is the real regression this suite exists for: dropping it
+// would collapse every SPA route of a site onto one summary.
+suite("getCacheKey URL normalization (K91)", () => {
+  const key = (u) => getCacheKey(u, "summary", "local", "alice", "FP|1");
+
+  test("tracking params are stripped: ?utm_source/?utm_medium key like the clean URL", () => {
+    assertEq(key("https://x.test/post?utm_source=news&utm_medium=email"), key("https://x.test/post"),
+      "utm_* must not fork the cache key");
+    assertEq(key("https://x.test/post?utm_campaign=spring&fbclid=abc"), key("https://x.test/post"),
+      "other tracking params too");
+  });
+
+  test("hash ROUTERS stay distinct: #/docs/a and #/docs/b are separate entries", () => {
+    assert(key("https://x.test/app#/docs/a") !== key("https://x.test/app#/docs/b"),
+      "#/ hash-router routes address different content and must not collapse");
+    assert(key("https://x.test/app#!page=1") !== key("https://x.test/app#!page=2"),
+      "#! hash-router routes must not collapse either");
+    assert(key("https://x.test/app#/docs/a") !== key("https://x.test/app"),
+      "a hash-router route is not the bare page");
+  });
+
+  test("plain #fragment anchors are dropped", () => {
+    assertEq(key("https://x.test/post#section"), key("https://x.test/post"),
+      "#section is an anchor into the same article");
+    assertEq(key("https://x.test/post#comments"), key("https://x.test/post#section"),
+      "two anchors into one article share the entry");
+  });
+
+  test("non-tracking query params are preserved", () => {
+    assert(key("https://x.test/post?id=1") !== key("https://x.test/post?id=2"),
+      "?id is content-bearing, must survive normalization");
+    assert(key("https://x.test/post?id=1") !== key("https://x.test/post"),
+      "?id must not be stripped wholesale");
+    assertEq(key("https://x.test/post?id=1&utm_source=news"), key("https://x.test/post?id=1"),
+      "mixed: only the tracking half goes");
+  });
+
+  test("normalization does not blur the type/source/account/fp segments", () => {
+    const u = "https://x.test/post?utm_source=news";
+    assert(getCacheKey(u, "summary", "local", "alice", "FP|1") !== getCacheKey(u, "tags", "local", "alice", "FP|1"),
+      "type still splits the key");
+    assert(getCacheKey(u, "summary", "local", "alice", "FP|1") !== getCacheKey(u, "summary", "local", "bob", "FP|1"),
+      "account still splits the key");
+    assert(getCacheKey(u, "summary", "local", "alice", "FP|1") !== getCacheKey(u, "summary", "jina", "alice", "FP|1"),
+      "source still splits the key");
+    assert(getCacheKey(u, "summary", "local", "alice", "FP|1") !== getCacheKey(u, "summary", "local", "alice", "FP|2"),
+      "fingerprint still splits the key");
+  });
+
+  test("unparseable input and empty input fall back to the raw value", () => {
+    assert(key("not a url").includes("not%20a%20url") || key("not a url").includes("not a url"),
+      "parse failure keeps the input: " + key("not a url"));
+    assertEq(key(""), key(""), "empty url is stable");
+  });
+});
+
 suite("pbpTagsByCount", () => {
   test("frequency desc, name tiebreak, null tolerated", () => {
     assertEq(pbpTagsByCount({ b: 2, a: 5, c: 2 }).join(","), "a,b,c", "count desc then name");

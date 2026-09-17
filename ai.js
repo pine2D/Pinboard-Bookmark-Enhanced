@@ -1403,13 +1403,42 @@ function aiCacheFingerprint(s, type) {
     "c" + _aiFpHash(s.customSummaryPrompt?.trim() || "")].join("|");
 }
 
+// Twin of md-ai-core.js `pbpAiCacheUrlNorm` — DELIBERATELY duplicated, not
+// moved to shared.js: ai.js is loaded by popup/options/md-preview AND
+// importScripts'd by the service worker, while md-ai-core.js is reader-only
+// (it is not in background.js's importScripts list), so the reader copy cannot
+// serve the SW. The project rule allows small duplication across isolated
+// script contexts rather than growing shared.js for it. KEEP THE TWO IN SYNC.
+// Semantics: drop #fragments except hash ROUTERS (#/docs/x, #!page — those
+// address content), then strip the known tracking-param set with DEFAULT
+// settings (deterministic key, independent of the user's strip config — a
+// param the user kept in urlClean.excludeParams is still dropped at the key
+// layer, the same trade-off the reader families already accept). Any parse
+// failure falls back to the input.
+function _aiCacheUrlNorm(url) {
+  let u = String(url || "");
+  try {
+    const p = new URL(u);
+    if (!/^#[!/]/.test(p.hash)) p.hash = "";
+    u = p.href;
+  } catch (_) {}
+  try {
+    if (typeof stripTrackingParams === "function") u = stripTrackingParams(u).cleaned || u;
+  } catch (_) {}
+  return u;
+}
+
 function getCacheKey(url, type, source, account, fp) {
+  // Normalize INSIDE the key builder so all four call surfaces (popup-ai.js,
+  // background.js quick-save + batch, md-translate.js) follow automatically and
+  // ai_cache_ obeys the same URL rule as tr_/ask_/skim_/gloss_.
+  const u = _aiCacheUrlNorm(url);
   if (type === "tags" || type === "summary") {
     if (!account) return "";
     const fpPart = fp ? encodeURIComponent(fp) + "_" : "";
-    return `ai_cache_${type}_${source || "local"}_${fpPart}${encodeURIComponent(account)}_${url}`;
+    return `ai_cache_${type}_${source || "local"}_${fpPart}${encodeURIComponent(account)}_${u}`;
   }
-  return `ai_cache_${type}_${source || "local"}_${url}`;
+  return `ai_cache_${type}_${source || "local"}_${u}`;
 }
 
 
