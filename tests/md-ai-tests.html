@@ -10607,13 +10607,16 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
 
   function setup(opts) {
     const o = opts || {};
-    // Nothing else on the page may answer to the two ids the function resolves by
-    // id: earlier suites build their own #tr-progress fixtures, and one left behind
-    // would silently switch every case here onto the translation guard's path.
+    // Nothing else on the page may answer to the three ids the function resolves
+    // by id: earlier suites build their own #tr-progress and #ask-open fixtures,
+    // and one left behind would silently switch cases here onto the translation
+    // guard's path or shadow this fixture's own rail button.
     const staleRail = document.getElementById("rail");
     if (staleRail) staleRail.id = "k85-parked-rail";
     const staleProg = document.getElementById("tr-progress");
     if (staleProg) staleProg.id = "k85-parked-prog";
+    const staleAsk = document.getElementById("ask-open");
+    if (staleAsk) staleAsk.id = "k85-parked-ask";
     // Focus is page-global state shared with async cases that are mid-flight on
     // their own awaits (the Explain focus-restore block asserts activeElement
     // AFTER a task boundary): this suite borrows it and must hand back exactly
@@ -10625,6 +10628,11 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
     rail.style.cssText = "position:fixed; left:-9999px; top:0; width:200px; height:" +
       RAIL_H + "px; overflow-y:auto; margin:0; padding:0; border:0;";
     const list = document.createElement("ul");
+    // The focus guard defers only to focus INSIDE #toc, so the fixture's entry
+    // list has to carry that id (production: the #toc <nav> wrapping #toc-list,
+    // md-preview.html:122-124 -- one level of nesting this flat fixture folds
+    // away, since `contains` is what the guard reads either way).
+    list.id = "toc";
     list.style.cssText = "list-style:none; margin:0; padding:0;";
     const links = [];
     for (let i = 0; i < N; i++) {
@@ -10650,6 +10658,19 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
       const sp = document.createElement("div");
       sp.style.cssText = "height:900px; margin:0; padding:0;";
       rail.appendChild(sp);
+    }
+    // Optional rail button OUTSIDE #toc, also appended BELOW the list so no
+    // link's offset moves: production's #ask-open / #rail-settings-btn /
+    // #rail-kbd-help-btn all sit in the rail but outside the TOC, and all three
+    // end up holding focus after their own action finishes.
+    let railBtn = null;
+    if (o.railBtn) {
+      railBtn = document.createElement("button");
+      railBtn.type = "button";
+      railBtn.id = "ask-open";
+      railBtn.textContent = "Ask";
+      railBtn.style.cssText = "display:block; height:20px; margin:0; padding:0;";
+      rail.appendChild(railBtn);
     }
     document.body.appendChild(rail);
 
@@ -10684,7 +10705,7 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
       undo.push(() => p.remove());
     }
     return {
-      rail: rail, list: list, links: links,
+      rail: rail, list: list, links: links, railBtn: railBtn,
       seed(v) { SCROLL_DESC.set.call(rail, v); },   // bypasses the counter: fixture setup is not a write under test
       raw() { return SCROLL_DESC.get.call(rail); },
       writes() { return writes; },
@@ -10695,6 +10716,7 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
         rail.remove();
         if (staleRail) staleRail.id = "rail";
         if (staleProg) staleProg.id = "tr-progress";
+        if (staleAsk) staleAsk.id = "ask-open";
         try {
           if (prevFocus && prevFocus.isConnected && typeof prevFocus.focus === "function") {
             prevFocus.focus({ preventScroll: true });
@@ -10803,15 +10825,36 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
     } finally { f.done(); }
   });
 
-  ktest("keyboard focus inside the rail hands the scroll position back to the reader", () => {
+  ktest("keyboard focus on a TOC entry hands the scroll position back to the reader", () => {
     const f = setup();
     try {
       f.seed(300);
       f.links[1].focus({ preventScroll: true });
-      assert(f.rail.contains(document.activeElement), "the fixture really did take focus into the rail");
+      assert(document.getElementById("toc").contains(document.activeElement),
+        "the fixture really did take focus into the TOC");
       keepTocEntryVisible(f.links[30]);
       assertEq(f.writes(), 0, "whoever is tabbing through the TOC owns the rail's scroll position");
       assertEq(f.raw(), 300, "rail position preserved");
+    } finally { f.done(); }
+  });
+
+  // The other half of that guard: focus PARKED on a rail control after its own
+  // action finished is not TOC ownership. #ask-open takes focus back on every
+  // Ask close, the gear keeps it while options.html opens in another tab -- a
+  // rail-wide `contains` turned scroll-following off for the rest of the
+  // session the first time either happened.
+  ktest("focus parked on a rail button OUTSIDE the TOC does not switch scroll-following off", () => {
+    const f = setup({ railBtn: true });
+    try {
+      f.seed(0);
+      f.railBtn.focus({ preventScroll: true });
+      assert(document.activeElement === f.railBtn, "the fixture really did park focus on the rail button");
+      assert(f.rail.contains(document.activeElement), "and that button really is inside the rail");
+      assert(!document.getElementById("toc").contains(document.activeElement),
+        "but outside the TOC -- which is the whole distinction under test");
+      keepTocEntryVisible(f.links[10]);           // content box 200..220, rail viewport 0..100
+      assertEq(f.writes(), 1, "the active entry is still brought back into view");
+      assertEq(f.raw(), 120, "minimal displacement: 220 - 100");
     } finally { f.done(); }
   });
 

@@ -3839,9 +3839,19 @@ function keepTocEntryVisible(a) {
   // absent translation section in the same read.
   const prog = document.getElementById("tr-progress");
   if (prog && prog.offsetParent) return;
-  // Stateless deference: whoever has the pointer over the rail or the keyboard
-  // focus inside it owns its scroll position until they leave.
-  if (rail.matches(":hover") || rail.contains(document.activeElement)) return;
+  // Stateless deference: whoever has the pointer over the rail, or the keyboard
+  // focus inside the TOC, owns its scroll position until they leave.
+  //
+  // The focus half is scoped to #toc, NOT to the whole rail, because focus
+  // PARKED on a rail button after an action is not ownership and the user
+  // never "leaves" it: _pbpAskSetOpen(false) hands focus back to #ask-open
+  // (md-ask.js, a .rail-section child), the gear (#rail-settings-btn) keeps
+  // focus after pbpOpenOptionsTab opens a DIFFERENT tab, and #rail-kbd-help-btn
+  // / #rail-zen-btn do the same. With `rail.contains` this function became a
+  // permanent no-op from the first Ask close onward. Tabbing through the TOC
+  // entries themselves -- the case this guard exists for -- still defers.
+  const toc = document.getElementById("toc");
+  if (rail.matches(":hover") || (toc && toc.contains(document.activeElement))) return;
   const r = rail.getBoundingClientRect();
   const e = a.getBoundingClientRect();
   // block:"nearest" semantics -- the minimum displacement that brings the entry
