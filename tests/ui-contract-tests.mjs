@@ -1659,8 +1659,14 @@ check(/const PBP_ALT_CHECKBOX_CODES = \{ KeyP: "private-check", KeyR: "readlater
   /PBP_ALT_CHECKBOX_LETTERS\[String\(e\.key\)\.toLowerCase\(\)\]/.test(popupJs),
   "popup.js: the Alt+P/R/A table lost its e.code or its e.key half -- one of macOS (composed Alt+letter) or AZERTY/Dvorak (physical key) loses the shortcut");
 {
+  // Bounded to THIS handler, not sliced to EOF: an unrelated `box.checked =`
+  // added anywhere later in popup.js would otherwise trip a K72-labelled
+  // assertion and send the next reader hunting in the wrong place.
   const altStart = popupJs.indexOf("const PBP_ALT_CHECKBOX_CODES =");
-  const altBody = altStart < 0 ? "" : popupJs.slice(altStart);
+  const altEnd = altStart < 0 ? -1 : popupJs.indexOf("\n});", altStart);
+  check(altStart >= 0 && altEnd > altStart,
+    "popup.js: the Alt hotkey keydown handler no longer ends in a recognizable `});` -- the K72 甲 gates below are slicing nothing");
+  const altBody = altStart >= 0 && altEnd > altStart ? popupJs.slice(altStart, altEnd + 3) : "";
   check(/\bbox\.click\(\);/.test(altBody) && !/\bbox\.checked\s*=/.test(altBody),
     "popup.js: the Alt+P/R/A handler stopped routing through box.click() -- the checkboxes' own change listeners would no longer run");
   check(/mainSection\.classList\.contains\("hidden"\)/.test(altBody) && /mainSection\.classList\.contains\("unsupported-url"\)/.test(altBody),
@@ -1681,6 +1687,20 @@ check(/const PBP_ALT_CHECKBOX_CODES = \{ KeyP: "private-check", KeyR: "readlater
     "popup-tags.js: a chip group with no chips would keep a dead tab stop");
   check(/el\.tabIndex = -1;/.test(rov),
     "popup-tags.js: chips/Add all are no longer pushed out of the tab sequence");
+}
+// K72 fix round 1: the cache-hit AI render appends two .regen-link anchors
+// INSIDE the already-role=toolbar #ai-suggest-tags, after the chips. Two ways
+// that silently re-adds tab stops, so both are pinned: the ring's selector has
+// to name .regen-link, and renderAITags' single pbpAssignAltNumBadges() call
+// has to run AFTER the fromCache branch has appended them.
+check(/const PBP_ROVING_EXTRA_ITEMS = "\.add-all-link, \.regen-link";/.test(popupTagsJs),
+  "popup-tags.js: the roving ring's non-chip members no longer include .regen-link -- the cached-AI state goes back to three tab stops for one group");
+{
+  const renderStart = popupAiJs.indexOf("function renderAITags(tags, fromCache) {");
+  const cacheBranch = renderStart < 0 ? -1 : popupAiJs.indexOf("  if (fromCache) {", renderStart);
+  const lastSlot = renderStart < 0 ? -1 : popupAiJs.lastIndexOf("pbpAssignAltNumBadges();");
+  check(renderStart >= 0 && cacheBranch > renderStart && lastSlot > cacheBranch,
+    "popup-ai.js: renderAITags re-slots Alt+N / the roving toolbar BEFORE its fromCache branch appends the regen links -- they would keep their native tabindex");
 }
 check(/^\s*syncSuggestTagStates\(\);/m.test(popupTagsJs.slice(popupTagsJs.indexOf("function pbpAssignAltNumBadges()"))),
   "popup-tags.js: pbpAssignAltNumBadges no longer opens with syncSuggestTagStates() -- the second rebuild single point would stop re-applying the roving state");

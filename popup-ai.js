@@ -1354,7 +1354,6 @@ function renderAITags(tags, fromCache) {
     if (hadFocus) $id("tags-input")?.focus({ preventScroll: true });
   });
   container.appendChild(aa);
-  pbpAssignAltNumBadges();
 
   if (fromCache) {
     const cachedTagSet = new Set(tags.map(t => t.toLowerCase()));
@@ -1448,4 +1447,14 @@ function renderAITags(tags, fromCache) {
 
     container.appendChild(hintWrap);
   }
+
+  // LAST, not before the fromCache block: this single call is what re-slots
+  // Alt+1-9 AND (through syncSuggestTagStates -> pbpSyncRovingToolbars) what
+  // pushes every focusable in this toolbar out of the tab sequence and into
+  // the arrow ring. Running it while the cached-hit branch had yet to append
+  // its two .regen-link anchors left them at their native tabIndex 0, i.e.
+  // three tab stops for one group in the state a returning user meets most.
+  // Every exit path above still ends in its own pbpAssignAltNumBadges() call,
+  // so the empty-result branch is unaffected.
+  pbpAssignAltNumBadges();
 }

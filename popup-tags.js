@@ -670,12 +670,20 @@ function syncSuggestTagStates() {
 // here would pollute that relationship. Accessible names are static in
 // popup.html (data-i18n-aria), so they follow the language switch for free.
 //
-// Ring membership = the chips PLUS the group's own "Add all" button. Add all
-// is tabindex="-1" like everything else in the container, so it has to ride
-// the ring or it would be keyboard-dead. #ai-tags-btn (generate) is NOT a
-// member: it spends tokens, it is not a peer option among the chips, and it
-// keeps an ordinary Tab stop of its own -- it is hidden whenever chips are on
-// screen (_aiParkTagsBtn), so the group is still exactly one stop.
+// Ring membership = the chips PLUS every other focusable the group renders
+// INSIDE the toolbar: the "Add all" button, and (cache hits only) the two
+// .regen-link anchors renderAITags appends with the "cached" hint. They are
+// all tabindex="-1" like the chips, so each one has to ride the ring or it
+// would be keyboard-dead -- and a focusable left OUT of both lists silently
+// re-adds a tab stop, which is what the cached-AI state did before this list
+// grew .regen-link (three stops for one group). One selector, two consumers:
+// pbpRovingItems (the ring) and pbpSyncRovingToolbars (the tabindex sweep)
+// must never drift apart.
+// #ai-tags-btn (generate) is deliberately NOT a member: it spends tokens, it
+// is not a peer option among the chips, and it keeps an ordinary Tab stop of
+// its own -- it is hidden whenever chips are on screen (_aiParkTagsBtn), so
+// the group is still exactly one stop.
+const PBP_ROVING_EXTRA_ITEMS = ".add-all-link, .regen-link";
 const PBP_ROVING_GROUPS = [
   { id: "tag-presets", chip: ".preset-btn" },
   { id: "pinboard-suggest-tags", chip: ".stag" },
@@ -684,13 +692,16 @@ const PBP_ROVING_GROUPS = [
 function pbpRovingSpec(container) {
   return PBP_ROVING_GROUPS.find((g) => g.id === container.id) || null;
 }
+function pbpRovingItemSel(spec) {
+  return `${spec.chip}, ${PBP_ROVING_EXTRA_ITEMS}`;
+}
 // Live queries, every time: which chip is disabled changes on every add and
 // remove, so a cached ring would hand focus to a dead button.
 function pbpRovingChips(container, spec) {
   return [...container.querySelectorAll(spec.chip)].filter((el) => !el.disabled);
 }
 function pbpRovingItems(container, spec) {
-  return [...container.querySelectorAll(`${spec.chip}, .add-all-link`)]
+  return [...container.querySelectorAll(pbpRovingItemSel(spec))]
     .filter((el) => !el.disabled && !el.classList.contains("hidden"));
 }
 function pbpRovingFocusIn(e) {
@@ -748,7 +759,7 @@ function pbpSyncRovingToolbars() {
       c.addEventListener("keydown", pbpRovingKeydown);
       c.dataset.pbpRoving = "1";
     }
-    c.querySelectorAll(`${spec.chip}, .add-all-link`).forEach((el) => { el.tabIndex = -1; });
+    c.querySelectorAll(pbpRovingItemSel(spec)).forEach((el) => { el.tabIndex = -1; });
     if (!c.querySelector(spec.chip)) {
       // Skeleton, empty result, AI error, or presets never configured: no
       // chips at all means no toolbar, so Tab must not stop on nothing.

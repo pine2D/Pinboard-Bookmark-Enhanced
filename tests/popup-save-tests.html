@@ -3559,6 +3559,89 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "popup-tags.js: pbpAssignAltNumBadges no longer opens with syncSuggestTagStates() -- the rebuild path would stop re-applying the roving state");
     });
 
+    // K72 fix round 1: the cache-hit AI render appends a .cache-hint-wrap with
+    // two .regen-link <a href="#"> AFTER the chips and the Add all button. They
+    // sit INSIDE #ai-suggest-tags, which is role="toolbar" by then, so a native
+    // tabIndex 0 on them turns the "one stop per group" contract into three
+    // stops in exactly the state a returning user sees most (cached tags).
+    // Runs the REAL renderAITags against the REAL pbpAssignAltNumBadges ->
+    // syncSuggestTagStates -> pbpSyncRovingToolbars chain, so it fails if the
+    // maintenance runs at the wrong MOMENT as well as on the wrong SELECTOR.
+    const aiRenderStart = popupAiSource.indexOf("const AI_TAGS_OUTPUT_SEL =");
+    assert(aiRenderStart >= 0, "popup-ai.js: the renderAITags block was not found");
+    const aiRenderSource = popupAiSource.slice(aiRenderStart);
+    const tagsPipelineSource = popupTagsSource.slice(rovingStart);
+    assert(tagsPipelineSource.includes("function pbpAssignAltNumBadges()"),
+      "popup-tags.js: pbpAssignAltNumBadges is no longer the tail of the syncSuggestTagStates block");
+
+    function createCachedAiFixture() {
+      const container = document.createElement("div");
+      container.id = "ai-suggest-tags";
+      container.className = "suggest-area";
+      const genBtn = document.createElement("button");
+      genBtn.type = "button";
+      genBtn.id = "ai-tags-btn";
+      genBtn.className = "action-link";
+      container.appendChild(genBtn);
+      document.body.appendChild(container);
+      const byId = { "ai-suggest-tags": container, "ai-tags-btn": genBtn };
+      const idLookup = (id) => byId[id] || document.getElementById(id) || null;
+      const label = (k) => k;
+      const pipeline = new Function("currentTags", "$id", "document", "t",
+        `${tagsPipelineSource}\nreturn { syncSuggestTagStates, pbpAssignAltNumBadges };`
+      )([], idLookup, document, label);
+      const renderAITags = new Function(
+        "$id", "document", "t", "allUserTagCounts", "pbpAssignAltNumBadges", "injectEmptyState",
+        `${aiRenderSource}\nreturn renderAITags;`
+      )(idLookup, document, label, {}, pipeline.pbpAssignAltNumBadges, () => {});
+      return {
+        container, renderAITags,
+        links: () => [...container.querySelectorAll(".regen-link")],
+        chips: () => [...container.querySelectorAll(".stag")],
+        addAll: () => container.querySelector(".add-all-link"),
+        key: (k) => document.activeElement.dispatchEvent(
+          new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true })),
+        cleanup() {
+          if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+          container.remove();
+        },
+      };
+    }
+
+    test("K72 fix1: the cache-hit AI render still leaves #ai-suggest-tags exactly one tab stop", () => {
+      const fx = createCachedAiFixture();
+      try {
+        fx.renderAITags(["alpha", "beta", "gamma"], true);
+        assert(fx.links().length === 2,
+          "setup: the cached path did not render the two regen links (fixture out of sync with renderAITags)");
+        assert(fx.container.getAttribute("role") === "toolbar" && fx.container.getAttribute("tabindex") === "0",
+          "the cached render left #ai-suggest-tags without its container-level tab stop");
+        const strays = [...fx.container.querySelectorAll("*")]
+          .filter((el) => el.tabIndex === 0 && !el.classList.contains("hidden"));
+        assert(strays.length === 0,
+          "the cached render left " + strays.length + " extra tab stop(s) inside the toolbar: " +
+          strays.map((el) => el.className || el.tagName).join(", "));
+      } finally { fx.cleanup(); }
+    });
+
+    test("K72 fix1: End and ArrowRight reach the cached-path regen links (tabindex -1 must not mean unreachable)", () => {
+      const fx = createCachedAiFixture();
+      try {
+        fx.renderAITags(["alpha", "beta"], true);
+        const links = fx.links();
+        assert(links.length === 2, "setup: the two regen links did not render");
+        fx.container.focus();
+        assert(document.activeElement === fx.chips()[0], "container focus did not reach the first chip");
+        fx.key("End");
+        assert(document.activeElement === links[1],
+          "End did not reach the last regen link -- pushing it out of the tab order without putting it in the ring makes it keyboard-dead");
+        fx.key("ArrowLeft");
+        assert(document.activeElement === links[0], "ArrowLeft did not walk back to the first regen link");
+        fx.key("ArrowLeft");
+        assert(document.activeElement === fx.addAll(), "ArrowLeft did not continue on to Add all");
+      } finally { fx.cleanup(); }
+    });
+
     await testAsync("K72: the real popup markup, in the 3-5-tags state, is <= 6 tab stops between #tags-input and #private-check", async () => {
       // chrome-dbg :9222 is not up in this sandbox and scripts/probe-tab-stops.mjs
       // needs its own headed Chromium, so this is the in-page fallback the task

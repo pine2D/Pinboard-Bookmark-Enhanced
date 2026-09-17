@@ -20,6 +20,9 @@
 //        (syncSuggestTagStates), same as the brief's "3-5 tags added"
 //     4. AI tags rendered on top of state 3 (8 chips)
 //     5. same as state 4, plus 3 tag presets configured (#tag-presets)
+//     6. same as state 5, but the AI chips re-rendered from CACHE
+//        (renderAITags(..., true)), which additionally appends the "cached"
+//        hint's two .regen-link anchors inside #ai-suggest-tags
 //
 // WHY THE REAL TOOLBAR POPUP, NOT qa-drive's page-mode
 //   qa-drive's drivePopupPage() opens popup.html as a plain Playwright page.
@@ -401,6 +404,15 @@ async function main() {
     // measuring a DOM state the shipped popup never actually reaches.
     await evalInPopup(session, `settings.tagPresets = ${JSON.stringify(PRESETS_RAW)}; setupTagPresets(); syncSuggestTagStates();`);
     results.push(await measure(session, "5-state4-plus-3-presets"));
+
+    // ---- State 6: the AI chips re-rendered from CACHE (fromCache=true) ----
+    // The branch a returning user meets most: renderAITags then also appends a
+    // .cache-hint-wrap holding two .regen-link <a href="#"> INSIDE
+    // #ai-suggest-tags, i.e. inside the toolbar. They are focusables the
+    // fromCache=false path never produces, so states 4/5 cannot see them and
+    // this row is what proves they joined the ring instead of re-adding stops.
+    await evalInPopup(session, `renderAITags(${JSON.stringify(AI_TAGS)}, true);`);
+    results.push(await measure(session, "6-ai-tags-from-cache-regen-links"));
   } finally {
     try { if (session) await session.send("Runtime.evaluate", { expression: "window.close()" }); } catch { /* ignore */ }
     if (session) session.close();
