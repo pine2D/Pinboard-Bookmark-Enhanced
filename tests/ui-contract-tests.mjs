@@ -439,13 +439,17 @@ check(/head\.addEventListener\("keydown"[\s\S]{0,400}e\.preventDefault\(\)[\s\S]
   check(/if \(e\.key === "\/" && !e\.ctrlKey && !e\.metaKey && !e\.altKey\) \{[\s\S]{0,300}\$id\("vocab-search"\)/.test(vocabListKeydown) &&
     vocabListKeydown.indexOf('e.key === "/"') < vocabListKeydown.indexOf("e.ctrlKey || e.metaKey || e.altKey || e.shiftKey"),
     "library-vocab.js: #vocab-list's \"/\" search-focus branch is missing or no longer precedes the ctrl/meta/alt/shift gate (breaks it on Shift-requiring keyboard layouts)");
-  const notesListKeydown = read("library-notes.js");
-  const notesKeydownSlice = notesListKeydown.slice(notesListKeydown.indexOf('$id("notes-list");\n  if (_notesListEl)'),
-    notesListKeydown.indexOf("const row = e.target"));
+  // finding 7: this is the whole-file source, not a keydown-only slice --
+  // notesKeydownSlice below is the actual keydown slice, and the
+  // aria-keyshortcuts check further down also reads directly off the
+  // whole-file source.
+  const libraryNotesSrc = read("library-notes.js");
+  const notesKeydownSlice = libraryNotesSrc.slice(libraryNotesSrc.indexOf('$id("notes-list");\n  if (_notesListEl)'),
+    libraryNotesSrc.indexOf("const row = e.target"));
   check(/if \(e\.key === "\/" && !e\.ctrlKey && !e\.metaKey && !e\.altKey\) \{[\s\S]{0,300}\$id\("notes-filter"\)/.test(notesKeydownSlice) &&
     notesKeydownSlice.indexOf('e.key === "/"') < notesKeydownSlice.indexOf("e.ctrlKey || e.metaKey || e.altKey || e.shiftKey"),
     "library-notes.js: #notes-list's \"/\" search-focus branch is missing or no longer precedes the ctrl/meta/alt/shift gate (breaks it on Shift-requiring keyboard layouts)");
-  check(notesListKeydown.includes('btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /")'),
+  check(libraryNotesSrc.includes('btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space /")'),
     "library-notes.js: the row button lost its \"/\" aria-keyshortcuts announcement");
 }
 check(vocabStore.includes('const _PBP_VOCAB_DB_VERSION = 2'),
