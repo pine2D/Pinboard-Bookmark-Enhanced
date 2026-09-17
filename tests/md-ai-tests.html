@@ -10519,7 +10519,7 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
       assert(window.scrollY > 2, "fixture is actually scrollable, got scrollY " + window.scrollY);
       f.end();
       assertEq(f.rec.settles.length, 1,
-        "the reader moved themselves inside the transition window: no yank back (md-reader.js:1507-1512's regression)");
+        "the reader moved themselves inside the transition window: no yank back (md-reader.js:1609-1614's regression)");
       assertEq(_pbpAskSettleOff, null, "the listener is still torn down on the abandoned path");
     } finally { f.done(); }
   });

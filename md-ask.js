@@ -261,7 +261,7 @@ function _pbpAskIsOpen() {
 // ---- K84: keep the reader's place across the panel's own relayout ----
 //
 // `body.ask-open` animates main's margin-right from 0 to `380px + --sp-4`
-// over 200ms (md-preview.css:366 + :2802). A margin change on an ancestor
+// over 200ms (md-preview.css:366 + :2880). A margin change on an ancestor
 // is a CSS scroll-anchoring SUPPRESSION trigger, so the browser does NOT
 // hold the reader's line through it - and Ask was the one reader layout
 // change that did not compensate by hand. Every other one already does:
@@ -278,7 +278,7 @@ function _pbpAskIsOpen() {
 // the two (tests/) from throwing.
 //
 // Deliberately NOT _pbpZenSettleAfterLayout: its 300ms fallback leg is
-// exactly what md-reader.js:1507-1512 records as a real-machine regression
+// exactly what md-reader.js:1609-1614 records as a real-machine regression
 // (it settled the reader back 300ms AFTER the user had already scrolled
 // away, which is why _pbpTypoSet dropped it), and "open Ask, then scroll
 // to find the paragraph I want to ask about" is the common next move here.
@@ -286,7 +286,7 @@ function _pbpAskIsOpen() {
 // signal _pbpTypoSet could not use because a tier change has no transition
 // at all - and abandon the re-settle when scrollY moved meanwhile. Staying
 // local also keeps Ask out of _pbpZenSettleTimer/_pbpZenSettlePending
-// (md-reader.js:1246-1247), the single pending slot zen/width share: a zen
+// (md-reader.js:1253-1254), the single pending slot zen/width share: a zen
 // toggle and an Ask toggle landing within the same 300ms would otherwise
 // cancel each other's second phase.
 const PBP_ASK_SETTLE_SLOP = 2; // px: sub-pixel rounding between the two legs is not "the user scrolled"
@@ -301,13 +301,13 @@ function _pbpAskSettleClear() {
 
 // The same breakpoint md-preview.css uses to turn the panel into a bottom
 // sheet: `@media (max-width: 1000px) { body.ask-open main { margin-right: 0 } }`
-// (md-preview.css:2905-2906). At or below it, opening Ask changes NOTHING
+// (md-preview.css:2983-2984). At or below it, opening Ask changes NOTHING
 // about the article's layout, so capturing an anchor and arming a document
 // listener would buy exactly nothing. Video mode is NOT special-cased in
 // either direction: that rule is a plain `body.ask-open main`, so the sheet
 // form drops the push there too, while above the breakpoint the video
 // workspace is the strongest case for this whole block - its `.doc-body` is
-// `min(2160px, 100%)` (md-preview.css:3892), so the push really re-wraps the
+// `min(2160px, 100%)` (md-preview.css:3990), so the push really re-wraps the
 // text at ANY window width, not just inside article mode's narrow
 // 1000px..(--pbp-width + 724) band.
 function _pbpAskLayoutShifts() {
@@ -321,7 +321,7 @@ function _pbpAskLayoutShifts() {
 
 // Called BEFORE the class toggle, in both directions. Returns null - i.e.
 // "nothing to do" - in raw view and at scrollY === 0, which are
-// _pbpZenCaptureAnchor's own two early returns (md-reader.js:1131): reading
+// _pbpZenCaptureAnchor's own two early returns (md-reader.js:1203-1209): reading
 // the raw source, or pressing `a` on a freshly opened preview before
 // scrolling at all, is unchanged by this whole block.
 function _pbpAskCaptureAnchor() {
