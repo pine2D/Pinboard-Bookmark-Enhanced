@@ -130,6 +130,10 @@ function _pbpAskBuildRailEntry() {
   btn.className = "action-btn ask-open-btn";
   btn.setAttribute("aria-expanded", "false");
   btn.setAttribute("aria-controls", "ask-panel");
+  // K87: click (below) and the "a" hotkey (md-ask.js's own keydown handler)
+  // both call _pbpAskSetOpen(!_pbpAskIsOpen()) -- the same action, so the
+  // shortcut is safe to announce here.
+  btn.setAttribute("aria-keyshortcuts", "a");
   btn.innerHTML = PBP_ASK_BTN_SVG; // static inline SVG constant only
   const bl = document.createElement("span");
   bl.className = "btn-label";

@@ -913,6 +913,24 @@ check(/btn\.setAttribute\("aria-keyshortcuts", "t"\)/.test(mdTranslateJs) &&
   /b\.setAttribute\("aria-pressed", active \? "true" : "false"\)/.test(mdTranslateJs) &&
   mdTranslateJs.includes('t(key) + " (v)"'),
   "translation controls lack lowercase shortcut metadata or production toggle state");
+// K87: three more rail-bottom/Ask buttons declare their bare-letter shortcut
+// the same way t/v do above. "?" is deliberately the literal character, not
+// "Shift+Slash" -- _pbpKbdHelpOnKeyDown judges e.key !== "?", and that key
+// NAME (not a US-layout modifier combo) is what stays accurate on
+// QWERTZ/AZERTY. The zen button is optional per spec; when present it must
+// carry the one-line reachability comment explaining why a non-toggling
+// click handler is still safe to pair with a keyshortcut.
+check(mdAskJs.includes('btn.setAttribute("aria-keyshortcuts", "a")'),
+  "md-ask.js: #ask-open lost its \"a\" aria-keyshortcuts");
+check(mdReaderJsSource.includes('btn.setAttribute("aria-keyshortcuts", "?")'),
+  "md-reader.js: #rail-kbd-help-btn lost its \"?\" aria-keyshortcuts");
+if (mdReaderJsSource.includes('btn.setAttribute("aria-keyshortcuts", "z")')) {
+  check(/reachable while non-zen, where enter and toggle are the same action/.test(mdReaderJsSource),
+    "md-reader.js: #rail-zen-btn declares \"z\" aria-keyshortcuts without the reachability comment explaining why a non-toggling click handler is safe");
+}
+check(mdReaderJsSource.includes('#rail-kbd-help-btn button both open this popover') &&
+  !mdReaderJsSource.includes("options static section all point at the same popover"),
+  "md-reader.js: the keyboard-help comment still claims a non-existent options.html entry point");
 check(mdTranslateJs.includes('scrollIntoView({ block: "start", behavior: "instant" })') &&
   mdTranslateJs.includes("document.startViewTransition") &&
   // The predicate moved into shared.js; what matters is that it still gates the

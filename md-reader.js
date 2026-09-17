@@ -950,8 +950,11 @@ function _pbpSearchInit() {
   document.addEventListener("keydown", _pbpSearchOnKeyDown);
 }
 
-// ---- Keyboard-shortcuts help (spec 5): "?" hotkey + rail-bottom link +
-// options static section all point at the same popover. ----
+// ---- Keyboard-shortcuts help (spec 5): the "?" hotkey and the rail-bottom
+// #rail-kbd-help-btn button both open this popover. options.html's own
+// "Keyboard Shortcuts" section (~line 822) only exposes the
+// chrome://extensions/shortcuts command (markdown_preview) -- it lists no
+// reader-internal shortcut, so it is not a third entry point here. ----
 const PBP_KBD_HELP_ROWS = [
   { chips: ["t"], key: "kbdHelpTranslate" },
   { chips: ["v"], key: "kbdHelpToggleView" },
@@ -1117,6 +1120,11 @@ function _pbpKbdHelpInit() {
     btn.innerHTML = PBP_ICONS.keyboard; // static shared constant; label rides title/aria
     btn.title = t("kbdHelpRailBtn");
     btn.setAttribute("aria-label", t("kbdHelpRailBtn"));
+    // K87: literal "?" (not "Shift+Slash") -- _pbpKbdHelpOnKeyDown below
+    // judges e.key !== "?", and on QWERTZ/AZERTY layouts "?" needs different
+    // modifiers than US, so the key NAME is the only spelling that stays
+    // accurate everywhere (same reasoning as the "/" search shortcut above).
+    btn.setAttribute("aria-keyshortcuts", "?");
     btn.addEventListener("click", () => _pbpKbdHelpOpen());
     row.appendChild(btn);
   }
@@ -1550,6 +1558,11 @@ function _pbpZenInit() {
     btn.innerHTML = PBP_ICONS.zen; // static shared constant; label rides title/aria
     btn.title = t("zenEnterBtn");
     btn.setAttribute("aria-label", t("zenEnterBtn"));
+    // K87: click below calls _pbpZenEnter() (not a toggle), but that is still
+    // an accurate description of "z" -- this button lives inside #rail, which
+    // zen mode hides from the a11y tree entirely, so it is only ever
+    // reachable while non-zen, where enter and toggle are the same action.
+    btn.setAttribute("aria-keyshortcuts", "z");
     btn.addEventListener("click", () => _pbpZenEnter());
     row.appendChild(btn);
     // Unified-width round: with --pbp-width governing normal mode too, the
