@@ -1466,6 +1466,79 @@ section("extracted runtime primitives (audit E1/E4/E5)");
   assert(JSON.stringify(pbpVideoPairByTime(pbRows, [])) === '["","",""]' && JSON.stringify(pbpVideoPairByTime([], pbAux)) === "[]", "pair by time: empty sides yield empty strings / no rows");
 })();
 
+section("pbpVideoRunPunctBatches (K141 phase 1: assembly by index, explicit completion count)");
+await (async () => {
+  const batches = ["一二三四五", "六七八九十", "甲乙丙丁戊", "子丑寅卯辰"];
+  // A worker that answers OUT OF STEP with the array it is handed: the later
+  // batches settle faster than the earlier ones, and every answer is tagged
+  // with the index it was produced for -- the text alone never says which
+  // batch it belongs to. Batch `bi`'s answer has to reach slot `bi` whatever
+  // the completion order is (the per-batch conservation gate is blind to the
+  // slot an answer lands in, so the mapping has to be structural).
+  const settleOrder = [];
+  const tagged = async (b, bi) => {
+    await new Promise((r) => setTimeout(r, (batches.length - bi) * 3)); // the LAST batch is the fastest
+    settleOrder.push(bi);
+    return { ok: true, out: "#" + bi + "|" + b };
+  };
+  const r = await pbpVideoRunPunctBatches(batches, tagged, {});
+  assert(JSON.stringify(r.out) === JSON.stringify(batches.map((b, i) => "#" + i + "|" + b)),
+    "assembly: each batch's answer lands in its OWN slot, keyed by bi");
+  assert(r.out.length === batches.length && r.out.every((x) => x != null),
+    "assembly: a completed pass leaves no undefined slot behind");
+  assertEq(r.completed, batches.length, "assembly: completed counts every settled batch");
+  assert(r.cancelled === false && r.superseded === false, "assembly: a clean pass reports neither cancel nor supersede");
+  assertEq(settleOrder.join(","), "0,1,2,3", "assembly: still strictly serial -- one batch in flight at a time (K141 phase 1 changes no timing)");
+
+  // fail-closed: a batch whose answer never passed the conservation gate
+  // keeps its OWN input, and still counts as settled for the status line.
+  const oneFails = async (b, bi) => (bi === 1 ? { ok: false, out: "模型换掉了别的字" } : { ok: true, out: b + "。" });
+  const rf = await pbpVideoRunPunctBatches(batches, oneFails, {});
+  assertEq(rf.out[1], batches[1], "fail-closed: a rejected batch's slot holds the original text, not the model's");
+  assertEq(rf.out[0], batches[0] + "。", "fail-closed: its neighbours still carry their own answers");
+  assertEq(rf.completed, batches.length, "fail-closed: a rejected batch still counts as settled");
+
+  // The regression the pre-sizing could cause: the cancel line must report
+  // the batches that RAN. The array is pre-sized to the total, so a count
+  // taken from `out.length` would claim "4/4 done" after two batches.
+  let settled = 0;
+  const rc = await pbpVideoRunPunctBatches(batches, async (b) => ({ ok: true, out: b + "。" }),
+    { cancelled: () => settled >= 2, onCompleted: (n) => { settled = n; } });
+  assert(rc.cancelled === true, "cancel: the driver stops at a batch boundary, not mid round-trip");
+  assertEq(rc.completed, 2, "cancel: the count is the batches that actually ran (2 of 4)");
+  assertEq(rc.out.length, batches.length, "cancel: the array is pre-sized to the TOTAL -- out.length is not a done count");
+  assert(rc.out[0] != null && rc.out[1] != null && rc.out[2] === undefined && rc.out[3] === undefined,
+    "cancel: only the batches that ran have their slot filled");
+
+  // A track switch landing mid round-trip: the worker's flag abandons the
+  // whole pass instead of just ending that one batch.
+  const rs = await pbpVideoRunPunctBatches(batches,
+    async (b, bi) => (bi === 1 ? { superseded: true } : { ok: true, out: b + "。" }), {});
+  assert(rs.superseded === true && rs.cancelled === false, "supersede: the flag travels up from the worker, it is not a cancel");
+  assertEq(rs.completed, 1, "supersede: only the batches already assembled are reported");
+
+  // Whole-output conservation. The shipped gate is per batch, so it cannot
+  // see a mis-ordered assembly at all; this is the backstop that can.
+  const paras = ["今天我们来讲一个很长的故事", "故事发生在很久很久以前的一个小村子里", "村子里住着一位老人和他的孙女", "他们每天都要去山上砍柴"];
+  const pb = pbpVideoSplitBatches(paras, 12);
+  assert(pb.length >= 3, "conservation fixture: the paragraphs really do split into several batches");
+  // Hand-written stand-in for the model: inserts marks only, never touches a word.
+  const marker = async (b) => ({ ok: true, out: b.replace(/\n/g, "，") + "。" });
+  const rcv = await pbpVideoRunPunctBatches(pb, marker, {});
+  assert(rcv.out.every((o, i) => pbpVideoPunctConserved(pb[i], o) === true),
+    "conservation: every batch passed its own gate at the moment it was produced");
+  assert(pbpVideoPunctConserved(paras.join(" "), rcv.out.join(" ")) === true,
+    "conservation: the ASSEMBLED pass conserves the whole transcript, not only each batch");
+  const swapped = rcv.out.slice();
+  swapped[0] = rcv.out[1]; swapped[1] = rcv.out[0];
+  assert(pbpVideoPunctConserved(paras.join(" "), swapped.join(" ")) === false,
+    "conservation: a mis-ordered assembly is caught ONLY by the whole-output gate (every per-batch gate above was green)");
+
+  assert((await pbpVideoRunPunctBatches([], async () => ({ ok: true, out: "x" }), {})).completed === 0
+    && (await pbpVideoRunPunctBatches(null, async () => ({ ok: true, out: "x" }))).out.length === 0,
+    "edges: no batches and a missing hooks object are both harmless");
+})();
+
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

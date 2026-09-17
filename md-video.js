@@ -830,6 +830,40 @@ function pbpVideoSplitBatches(paras, cap) {
   return batches;
 }
 
+// Assembly of the AI punctuation pass, BY INDEX (K141 phase 1).
+// `runOne(b, bi)` owns everything about one batch -- cache lookup, the
+// round-trip, the conservation gate, the cache write -- and returns
+// `{ ok, out }`, or `{ superseded: true }` when the transcript this pass was
+// built from is gone. This driver is the ONLY writer of the output array and
+// it writes at `bi`, never appends: the conservation gate is per batch, so a
+// mis-ordered assembly would splice one batch's marks onto another batch's
+// words with every per-batch gate green (the whole-output gate in the tests
+// is the backstop). Order therefore has to be structurally impossible to get
+// wrong rather than checked at runtime.
+// Strictly serial (one `await` per batch, exactly the shipped behaviour);
+// this one loop is the seam a bounded fan-out would replace later.
+// `completed` is counted explicitly and handed back because the array is
+// PRE-SIZED: `out.length` is the TOTAL from the first tick, so a cancel line
+// built from it would claim "N/N done" over batches that never ran.
+async function pbpVideoRunPunctBatches(batches, runOne, hooks) {
+  const list = batches || [];
+  const h = hooks || {};
+  const out = new Array(list.length);
+  let completed = 0;
+  for (const [bi, b] of list.entries()) {
+    // Between-batch cancel: finished batches stay in the caller's cache,
+    // nothing commits, and `completed` is what the status line reports.
+    if (typeof h.cancelled === "function" && h.cancelled()) return { out, completed, cancelled: true, superseded: false };
+    const res = await runOne(b, bi);
+    if (res && res.superseded) return { out, completed, cancelled: false, superseded: true };
+    // fail-closed: a batch without a conserved answer keeps its own input.
+    out[bi] = (res && res.ok) ? res.out : b;
+    completed++;
+    if (typeof h.onCompleted === "function") h.onCompleted(completed, bi);
+  }
+  return { out, completed, cancelled: false, superseded: false };
+}
+
 // Whitespace-insensitive change test: a model that only rewraps lines
 // changed the string but punctuated nothing -- committing that would retire
 // the AI button (aiPunct persists) over words that never gained a mark.
@@ -5752,25 +5786,26 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             await ensureAIHostPermissionWithGesture(sa);
             if (superseded()) return;
           }
-          const outBatches = [];
           let rejected = 0;
           // Progress counts the batches THIS pass actually pays for (device
           // round 6: a retry that resumed at "1/7" read as starting over --
           // it was numbering by batch index, not by work remaining).
           const freshTotal = batches.filter((x) => !_aiBatchCache.has(x)).length || batches.length;
           let freshCur = 0;
-          for (const [bi, b] of batches.entries()) {
+          // One batch, start to finish: cache lookup, the round-trip, the
+          // conservation gate and the cache write. It deliberately does NOT
+          // assemble -- pbpVideoRunPunctBatches is the only writer of the
+          // output array and it writes at `bi` (K141 phase 1), so nothing
+          // here can depend on the order the batches finish in.
+          async function runOneBatch(b, bi) {
             // Retry economics (audit B9): a batch this page already got a
             // conservation-passing answer for answers from the cache -- the
             // retry after a partial failure re-pays only for what failed.
-            if (_aiCancelRequested) {
-              // Between-batch cancel (audit U8): finished batches stay in
-              // the cache, nothing commits, the button survives via finally.
-              pbvSetStatus(status, t("mdVideoAiCancelled", String(outBatches.length), String(batches.length)), false);
-              return;
-            }
+            // Handed back verbatim: this is the exact string the cache was
+            // written/seeded with, and re-trimming it at the assembly site
+            // would quietly change what a cached pass produces.
             const cached = _aiBatchCache.get(b);
-            if (cached != null) { outBatches.push(cached); continue; }
+            if (cached != null) return { ok: true, out: cached, cached: true };
             freshCur++;
             // busy-quiet: visual count only -- the SR milestone announcements
             // are the pass start and its terminal line (research T7.4).
@@ -5784,7 +5819,10 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
             // (device report 2026-08-24). 2 tokens/char + headroom covers every
             // provider's tokenizer; 4096 is within all providers' caps.
             const text = await callAI(sa, prompt, { maxTokens: Math.min(4096, b.length * 2 + 256), signal: _aiAbort ? _aiAbort.signal : undefined, model: punctModelOverride(sa) }); // same override the cache key hashes
-            if (superseded()) return;
+            // The words this pass was built from are gone. A bare `return`
+            // would end only THIS batch now, so it travels back as a flag and
+            // the driver hands it up here, where the pass is abandoned.
+            if (superseded()) return { superseded: true };
             // fail-closed per batch: a batch the model rewrote keeps its input.
             // One resilience step first: strip a markdown code fence the model
             // may have wrapped the (otherwise correct) output in -- the
@@ -5824,14 +5862,27 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
               _aiBatchCache.set(b, out.trim());
               persistPunctBatch(sa, batches, b, out.trim());
             }
-            outBatches.push(ok ? out.trim() : b);
-            doneCount = outBatches.length;
             setAiRing(freshCur, freshTotal);
+            return { ok, out: out.trim() }; // `ok` false -> the driver keeps `b`
           }
-          // A cancel during the LAST batch's round-trip must not commit
-          // either (closing review F8): the loop-top check never runs again.
-          if (_aiCancelRequested) {
-            pbvSetStatus(status, t("mdVideoAiCancelled", String(outBatches.length), String(batches.length)), false);
+          // Strictly serial, exactly as before: one batch in flight at a
+          // time, the cancel checked between batches. Every count below reads
+          // `run.completed`; the array is pre-sized, so its `.length` is the
+          // TOTAL and would turn any cancel line into a false "N/N done".
+          const run = await pbpVideoRunPunctBatches(batches, runOneBatch, {
+            cancelled: () => _aiCancelRequested,
+            // Keeps the catch-path cancel line (an abort throws out of the
+            // round-trip) reporting the batches that actually finished.
+            onCompleted: (n) => { doneCount = n; },
+          });
+          if (run.superseded) return; // the words this pass was built from are gone
+          const outBatches = run.out;
+          // Between-batch cancel (audit U8): finished batches stay in the
+          // cache, nothing commits, the button survives via finally. A cancel
+          // during the LAST batch's round-trip lands here too (closing review
+          // F8): the loop-top check never runs again after it.
+          if (run.cancelled || _aiCancelRequested) {
+            pbvSetStatus(status, t("mdVideoAiCancelled", String(run.completed), String(batches.length)), false);
             return;
           }
           // Partial success must NOT commit (audit B9): committing would
